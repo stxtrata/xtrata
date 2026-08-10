@@ -59,6 +59,23 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 
+/* A hash and an address are single unbreakable words.
+   A grid item's automatic minimum size is its MIN-CONTENT, so a 64 character
+   rules hash and a 41 character principal set the minimum width of the whole
+   column. On a 390px phone that column computed to 488px and the thing pushed
+   off the right of the screen was the board: the h file and the Refresh button
+   were simply not reachable.
+   The value is "anywhere" rather than "break-word" on purpose. Only "anywhere"
+   also shrinks MIN-CONTENT, which is the number that was doing the damage.
+   Set on the body rather than on the panels, because the LAST thing still
+   pushing the page wide was the build stamp in the top bar, which is not inside
+   the layout grid at all. A word is only ever broken when it would otherwise
+   overflow, so this costs nothing anywhere else.
+   NOTE: no backticks in this comment. It sits inside a template literal, and
+   one backtick ends the string - which is what this very comment did. */
+.layout > * { min-width: 0; }
+body { overflow-wrap: anywhere; }
+
 .board {
   /* Eight columns AND eight rows. With rows left implicit they size to their
      content, so a row holding a piece grew taller than an empty one and the
@@ -90,6 +107,11 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .sq--light { background: var(--light); }
 .sq--dark { background: var(--dark); }
 .sq--playable { cursor: pointer; }
+/* Reading a game is several round trips. Without a sign that the click landed,
+   the board sits showing the PREVIOUS game and the natural response is to click
+   again - which starts the whole thing twice. */
+.board--loading { opacity: .45; transition: opacity .12s ease-out; }
+.board--loading .sq { pointer-events: none; }
 .sq--selected { outline: 3px solid var(--gold); outline-offset: -3px; }
 .sq--last { box-shadow: inset 0 0 0 3px rgba(216, 162, 74, 0.45); }
 .sq--target::after {
@@ -434,29 +456,33 @@ export const HTML = `
         <div id="verify" class="small muted">Every position here is derived from the log.</div>
         <div class="row"><button class="action" id="verify-game">Re-derive from chain</button></div>
       </div>
-      <!-- Sound. The rows are generated from the voice table; only the master
-           controls are written out here. -->
+      <!-- Sound.
+           One row by default: the switch and the volume, which is all anybody
+           adjusts. Everything else is behind "More" - fourteen per-voice rows
+           on screen at all times made the panel look like a mixing desk for a
+           setting most people touch once. -->
       <div class="panel">
-        <div class="row">
-          <h2 style="margin:0">Sound</h2>
-          <span class="spacer"></span>
-          <button class="action" id="sound-reset">Reset</button>
-        </div>
         <div class="row">
           <label for="sound-master" style="margin:0">
             <input type="checkbox" id="sound-master"> All sounds
           </label>
-          <span class="spacer"></span>
           <input type="range" id="sound-volume" class="snd-gain" min="0" max="100" step="5"
                  style="max-width:130px" aria-label="Overall volume">
+          <span class="spacer"></span>
+          <button class="action" id="sound-more" aria-expanded="false"
+                  aria-controls="sound-detail">More</button>
         </div>
-        <div class="row">
-          <label for="sound-background" style="margin:0">
-            <input type="checkbox" id="sound-background"> Keep listening while this tab is in the background
-          </label>
+        <div id="sound-detail" class="hide">
+          <div class="row">
+            <label for="sound-background" style="margin:0">
+              <input type="checkbox" id="sound-background"> Keep listening while this tab is in the background
+            </label>
+            <span class="spacer"></span>
+            <button class="action" id="sound-reset">Reset</button>
+          </div>
+          <div id="sound-note" class="small muted"></div>
+          <div id="sound-list"></div>
         </div>
-        <div id="sound-note" class="small muted"></div>
-        <div id="sound-list"></div>
       </div>
     </div>
   </section>

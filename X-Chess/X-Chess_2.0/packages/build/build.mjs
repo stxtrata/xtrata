@@ -44,8 +44,15 @@ const PLACEHOLDER = 'SP000000000000000000002Q6VF78.xchess-core-v1';
  *
  * `--contract` still wins, and `--contract <placeholder>` is still a way to ask
  * for an unbound board on purpose.
+ *
+ * KEPT OUTSIDE dist, and the location is the interesting part. It lived in
+ * dist/, which this build deletes before it writes anything - so a build that
+ * failed after the delete destroyed the memory of what it was building for, and
+ * the next argument-less build fell back to the placeholder. The fix for the
+ * problem reintroduced the problem. Gitignored: it is one machine's last
+ * choice, not a fact about the project.
  */
-const TARGET_PATH = resolve(DIST, 'target.json');
+const TARGET_PATH = resolve(ROOT, '.xchess-build-target.json');
 
 async function rememberedTarget() {
   try {
@@ -76,6 +83,36 @@ const CANARY = process.argv.includes('--canary');
 const CANARY_NAME = arg('canary-name', 'xchess-core-v1-canary');
 
 const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+
+/**
+ * How Xtrata hashes an upload, which is NOT a digest of the file.
+ *
+ * The contract cannot hold a 120 KB file to hash it, so it hashes as the chunks
+ * arrive: start from thirty-two zero bytes, and for each chunk replace the
+ * running value with sha256(running || chunk). What it ends up with depends on
+ * the chunk SIZE as well as the bytes, so it is a different number from
+ * `shasum -a 256` and always will be.
+ *
+ * Recording both is the point. The Inscribe page displays this one, the
+ * manifest used to record only the plain digest, and the two disagreeing at one
+ * in the morning looks exactly like inscribing the wrong file. They are two
+ * hashes of the same bytes.
+ */
+const XTRATA_CHUNK_BYTES = 16384;
+
+function xtrataChainHash(text, chunkBytes = XTRATA_CHUNK_BYTES) {
+  const bytes = Buffer.from(text, 'utf8');
+  let running = Buffer.alloc(32);
+  for (let at = 0; at < bytes.length; at += chunkBytes) {
+    running = createHash('sha256')
+      .update(Buffer.concat([running, bytes.subarray(at, at + chunkBytes)]))
+      .digest();
+  }
+  return running.toString('hex');
+}
+
+const chunkCount = (text, chunkBytes = XTRATA_CHUNK_BYTES) =>
+  Math.ceil(Buffer.byteLength(text, 'utf8') / chunkBytes);
 
 /**
  * Inside a JavaScript string `<\/script` is identical to `</script`, so
@@ -150,10 +187,25 @@ async function buildCanary() {
   ].join('\n');
 
   const html = [
+    // An EXPLICIT head, and it is not decoration.
+    //
+    // The Xtrata runtime injects its base tag and support scripts by looking
+    // for a <head> and inserting after it. With no literal head to match, it
+    // falls back to prepending them - which puts markup BEFORE the doctype and
+    // renders the whole page in QUIRKS MODE. That is a different box model,
+    // permanently, on a board whose grid depends on aspect-ratio.
+    //
+    // Nothing about this is visible in local development: served as a file the
+    // page is standards mode and correct. It only appears under the runtime,
+    // which is the entire reason the rehearsal step exists.
     '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<title>X Chess 2 - gates</title>',
+    '</head>',
+    '<body>',
     '<script>',
     inline,
     '</script>',
@@ -211,10 +263,25 @@ async function main() {
   ].join('\n');
 
   const html = [
+    // An EXPLICIT head, and it is not decoration.
+    //
+    // The Xtrata runtime injects its base tag and support scripts by looking
+    // for a <head> and inserting after it. With no literal head to match, it
+    // falls back to prepending them - which puts markup BEFORE the doctype and
+    // renders the whole page in QUIRKS MODE. That is a different box model,
+    // permanently, on a board whose grid depends on aspect-ratio.
+    //
+    // Nothing about this is visible in local development: served as a file the
+    // page is standards mode and correct. It only appears under the runtime,
+    // which is the entire reason the rehearsal step exists.
     '<!doctype html>',
+    '<html lang="en">',
+    '<head>',
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     '<title>X Chess</title>',
+    '</head>',
+    '<body>',
     '<script>',
     inline,
     '</script>',
@@ -256,6 +323,11 @@ async function main() {
     ratingHash: sha256(eloSource),
     contractHash: sha256(contractSource),
     htmlSha256: sha256(html),
+    // What the Xtrata Inscribe page shows, and what its contract arrives at as
+    // the chunks land. Compare THIS one against the upload, not htmlSha256.
+    xtrataChainHash: xtrataChainHash(html),
+    xtrataChunkBytes: XTRATA_CHUNK_BYTES,
+    xtrataChunks: chunkCount(html),
     bytes: Buffer.byteLength(html, 'utf8')
   };
 
@@ -284,7 +356,8 @@ async function main() {
   }
 
   console.log(`built dist/xchess.html  ${manifest.bytes.toLocaleString()} bytes`);
-  console.log(`  sha256    ${manifest.htmlSha256}`);
+  console.log(`  sha256    ${manifest.htmlSha256}  (shasum -a 256)`);
+  console.log(`  xtrata    ${manifest.xtrataChainHash}  (${manifest.xtrataChunks} chunks, what Inscribe shows)`);
   console.log(`  contract  ${CONTRACT} (${NETWORK})${REMEMBERED ? ' - kept from the last build' : ''}`);
   console.log(`  version   ${VERSION} - ${BUILT} - #${manifest.codeHash}`);
   console.log('');

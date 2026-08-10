@@ -298,3 +298,139 @@ describe('naming the players', () => {
     app.stopPolling();
   });
 });
+
+describe('opening a game by number', () => {
+  // Reading a game is several round trips. Before this, the button went back
+  // to looking untouched, the board still showed the PREVIOUS game, and the
+  // natural response was to click again - which starts the whole thing twice.
+  it('acknowledges the click before anything is awaited', async () => {
+    const { chain } = counted();
+    const app = await watching(chain, ALICE);
+    const doc = dom.window.document;
+
+    // A chain that never answers, so the moment being tested is held open.
+    chain.getGame = (() => new Promise(() => {})) as typeof chain.getGame;
+
+    (doc.getElementById('join-game') as HTMLInputElement).value = '1';
+    (doc.getElementById('load-game') as HTMLButtonElement).click();
+    await tick(20);
+
+    const button = doc.getElementById('load-game') as HTMLButtonElement;
+    expect(button.disabled, 'a second click could start it twice').toBe(true);
+    expect(button.textContent).toContain('Finding');
+    expect(doc.getElementById('chain-notice')!.textContent).toContain('Looking for game 1');
+    expect(doc.getElementById('board')!.classList.contains('board--loading')).toBe(true);
+    app.stopPolling();
+  });
+
+  it('gives the button back when the read finishes', async () => {
+    const { chain } = counted();
+    const app = await watching(chain, ALICE);
+    const doc = dom.window.document;
+
+    (doc.getElementById('join-game') as HTMLInputElement).value = '1';
+    (doc.getElementById('load-game') as HTMLButtonElement).click();
+    await tick(60);
+
+    const button = doc.getElementById('load-game') as HTMLButtonElement;
+    expect(button.disabled).toBe(false);
+    expect(button.textContent).not.toContain('Finding');
+    expect(doc.getElementById('board')!.classList.contains('board--loading')).toBe(false);
+    app.stopPolling();
+  });
+
+  it('gives it back even when the game does not exist', async () => {
+    // The failure path is exactly when somebody is most likely to click again.
+    const { chain } = counted();
+    const app = await watching(chain, ALICE);
+    const doc = dom.window.document;
+
+    (doc.getElementById('join-game') as HTMLInputElement).value = '999';
+    (doc.getElementById('load-game') as HTMLButtonElement).click();
+    await tick(60);
+
+    const button = doc.getElementById('load-game') as HTMLButtonElement;
+    expect(button.disabled, 'a failed read left the button dead').toBe(false);
+    expect(doc.getElementById('chain-notice')!.textContent).toContain('999');
+    app.stopPolling();
+  });
+});
+
+describe('the sound panel', () => {
+  it('shows one row until the detail is asked for', async () => {
+    // Fourteen per-voice switches on screen at all times made a setting most
+    // people touch once look like a mixing desk.
+    const { chain } = counted();
+    const app = await watching(chain, ALICE);
+    const doc = dom.window.document;
+
+    const detail = doc.getElementById('sound-detail')!;
+    const more = doc.getElementById('sound-more') as HTMLButtonElement;
+    expect(detail.classList.contains('hide')).toBe(true);
+    expect(doc.getElementById('sound-master')).toBeTruthy();
+    expect(doc.getElementById('sound-volume')).toBeTruthy();
+
+    more.click();
+    expect(detail.classList.contains('hide')).toBe(false);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    expect(more.textContent).toBe('Less');
+
+    more.click();
+    expect(detail.classList.contains('hide')).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    app.stopPolling();
+  });
+});
+
+describe('a sponsored game with nobody to sponsor', () => {
+  // A sponsorship PUSHES gas to a named wallet in the opening transaction.
+  // There is no anonymous version, and the reason is the reason sponsorship
+  // exists: a wallet holding nothing cannot send a transaction, so it could
+  // never claim a pot later either. Somebody has to say where the gas goes.
+  //
+  // Before this the board took the request all the way to the wallet and failed
+  // with "not a Stacks address" from the codec, several layers down.
+  async function openWith(kind: string, white: string, black: string) {
+    const { chain } = counted();
+    const app = await watching(chain, ALICE);
+    const doc = dom.window.document;
+    (doc.getElementById('game-kind') as HTMLSelectElement).value = kind;
+    (doc.getElementById('rules-white') as HTMLInputElement).value = white;
+    (doc.getElementById('rules-black') as HTMLInputElement).value = black;
+    (doc.getElementById('rules-white') as HTMLInputElement).dispatchEvent(
+      new dom.window.Event('input', { bubbles: true })
+    );
+    await tick(20);
+    const before = await chain.getGameCount();
+    (doc.getElementById('open-game') as HTMLButtonElement).click();
+    await tick(60);
+    return { app, chain, before, notice: doc.getElementById('chain-notice')!.textContent ?? '' };
+  }
+
+  it('is refused before the wallet opens, and says why', async () => {
+    const { app, chain, before, notice } = await openWith('sponsor-both', 'anyone', 'anyone');
+    expect(await chain.getGameCount(), 'nothing should have been opened').toBe(before);
+    expect(notice).toMatch(/not a named wallet/i);
+    expect(notice, 'must explain, not just refuse').toMatch(/could not claim it later/i);
+    app.stopPolling();
+  });
+
+  it('names which side is the problem', async () => {
+    const { app, notice } = await openWith('sponsor-opponent', ALICE, 'anyone');
+    expect(notice).toContain('Black');
+    expect(notice).not.toContain('White and Black');
+    app.stopPolling();
+  });
+
+  it('still opens a sponsored game when both sides are named', async () => {
+    const { app, chain, before } = await openWith('sponsor-both', ALICE, BOB);
+    expect(await chain.getGameCount()).toBe(before + 1);
+    app.stopPolling();
+  });
+
+  it('still opens a STANDARD game for anyone, which needs no address', async () => {
+    const { app, chain, before } = await openWith('standard', 'anyone', 'anyone');
+    expect(await chain.getGameCount()).toBe(before + 1);
+    app.stopPolling();
+  });
+});

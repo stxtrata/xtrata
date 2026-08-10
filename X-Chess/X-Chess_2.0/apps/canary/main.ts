@@ -859,7 +859,8 @@ const handlers: Record<string, StepHandler> = {
   rehearsal: manual(
     'rehearsal-note',
     /boot|once|sign|bridge|read|game/i,
-    'Serve the artefact with `npm run serve:runtime` and open it on :4331. Then say: whether ' +
+    'Run `npm run serve:runtime` and open the address it prints (NOT xchess.html - the ' +
+      'runtime addresses the artefact as an inscription, so a filename there is a 404). Say: whether ' +
       'the version line appears ONCE or twice, whether a wallet could be connected, and which ' +
       'game number you loaded from the chain. If the version line appears twice, STOP - every ' +
       'move from that build would cost two transactions.'
@@ -1066,6 +1067,17 @@ const handlers: Record<string, StepHandler> = {
   },
 
   build: async (ctx) => {
+    // A reloaded page remembers which steps PASSED but not the address that
+    // made them pass - the step statuses are stored and the connection is not.
+    // Without this the comparison is against "null.xchess-core-v1-canary" and
+    // the failure reads as a bad manifest, which is the one thing it is not.
+    if (!deployer) {
+      return no(
+        'this page has been reloaded, so it no longer knows which account it is connected as. ' +
+          'Re-run "Connect, and check the account" above, then run this again. Nothing is lost: ' +
+          'the steps that passed are still passed.'
+      );
+    }
     const raw = ctx.input('manifest');
     let manifest: Record<string, unknown>;
     try {
@@ -1077,8 +1089,21 @@ const handlers: Record<string, StepHandler> = {
     if (manifest.contract !== contractId()) {
       problems.push(`names ${String(manifest.contract)}, not ${contractId()}`);
     }
-    if (manifest.contractHash !== state.contractHash) {
-      problems.push('contractHash does not match the source hashed at preflight');
+    // Hashed here if no earlier step did it.
+    //
+    // The question is whether the manifest describes the contract source THIS
+    // PAGE carries, and the page always carries it - so depending on a preflight
+    // step to have run was incidental, and on the short track, where that step
+    // does not exist, it turned a passing check into a failing one about a hash
+    // that was never computed.
+    const sourceHash = state.contractHash ?? (CONFIG.source ? sha256Hex(CONFIG.source) : null);
+    if (!sourceHash) {
+      problems.push('no contract source is inlined in this page, so the manifest cannot be checked against it');
+    } else if (manifest.contractHash !== sourceHash) {
+      problems.push(
+        `contractHash ${String(manifest.contractHash)} does not match the source this page ` +
+          `carries (${sourceHash})`
+      );
     }
     if (manifest.exact !== true) problems.push('the build is not bound exactly to one contract');
     state.manifest = manifest;

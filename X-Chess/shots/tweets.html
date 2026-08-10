@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X Chess posting board</title>
+<style>
+:root{--bg:#12100e;--panel:#1b1815;--line:#2e2924;--ink:#e8e2d9;--dim:#9a9187;
+--gold:#d8a24a;--warn:#e0733f;--good:#6fae5f;--radius:10px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+a{color:var(--gold)}
+header{position:sticky;top:0;z-index:20;background:rgba(18,16,14,.96);
+backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 20px}
+.bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;max-width:1180px;margin:0 auto}
+h1{font-size:18px;margin:0;letter-spacing:.2px}
+h1 b{color:var(--gold)}
+.grow{flex:1}
+input[type=search]{background:#0e0c0a;border:1px solid var(--line);color:var(--ink);
+border-radius:8px;padding:9px 12px;font:inherit;min-width:200px}
+.chip{background:none;border:1px solid var(--line);color:var(--dim);padding:7px 13px;
+border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+.chip:hover{color:var(--ink)}
+.chip[aria-pressed=true]{color:var(--gold);border-color:var(--gold);background:#241d12}
+.prog{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 90px}
+section{margin:0 0 34px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+h2{font-size:16px;color:var(--gold);margin:0}
+.blurb{color:var(--dim);font-size:13px}
+.group{border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:0 0 14px;
+background:#151311}
+.group.thread{border-left:3px solid var(--gold)}
+.group.pair{border-left:3px solid #4a6fa5}
+.group-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.group-label{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.9px}
+.card{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;
+border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);
+margin:0 0 10px}
+.card:last-child{margin-bottom:0}
+.card.done{opacity:.42}
+.card.done .txt{text-decoration:line-through;text-decoration-color:var(--dim)}
+.txt{white-space:pre-wrap;font-size:15px;margin:0 0 10px;overflow-wrap:anywhere}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.count{font-size:12px;font-variant-numeric:tabular-nums;color:var(--good);
+border:1px solid #2f4a29;border-radius:999px;padding:2px 9px}
+.count.over{color:var(--warn);border-color:#5a2f1c}
+.who{font-size:11px;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;
+border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.who.main{color:var(--gold);border-color:#4a3a1e}
+button.act{background:#221d18;border:1px solid var(--line);color:var(--ink);
+border-radius:7px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+button.act:hover{border-color:var(--gold);color:var(--gold)}
+button.act.ok{border-color:var(--good);color:var(--good)}
+.note{font-size:12px;color:var(--warn);margin:8px 0 0}
+.note.plain{color:var(--dim)}
+.side{width:150px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.side img{width:100%;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;
+display:block;background:#0e0c0a}
+.fname{font:11px/1.3 ui-monospace,Menlo,monospace;color:var(--dim);overflow-wrap:anywhere}
+.tick{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--dim);cursor:pointer;
+user-select:none}
+.tick input{width:17px;height:17px;accent-color:var(--gold);cursor:pointer}
+dialog{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px;
+max-width:94vw;max-height:94vh}
+dialog::backdrop{background:rgba(0,0,0,.82)}
+dialog img{max-width:88vw;max-height:80vh;display:block;border-radius:6px}
+dialog .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 4px 2px}
+.hide{display:none!important}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--gold);
+color:#1b1408;padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;
+opacity:0;pointer-events:none;transition:opacity .18s}
+.toast.show{opacity:1}
+footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;color:var(--dim);font-size:13px}
+code{font-family:ui-monospace,Menlo,monospace;background:#0e0c0a;padding:2px 6px;border-radius:4px}
+@media(max-width:720px){.card{grid-template-columns:1fr}.side{width:auto;flex-direction:row;align-items:center}
+.side img{width:110px}}
+</style></head>
+<body>
+<header><div class="bar">
+<h1><b>X Chess</b> posting board</h1>
+<input type="search" id="q" placeholder="Search the text">
+<button class="chip" data-filter="all" aria-pressed="true">All</button>
+<button class="chip" data-filter="todo" aria-pressed="false">Not posted</button>
+<button class="chip" data-filter="shots" aria-pressed="false">Has image</button>
+<span class="grow"></span>
+<span class="prog" id="prog"></span>
+<button class="act" id="reset" type="button">Reset ticks</button>
+</div></header>
+<main>
+<section id="live"><div class="sec-head"><h2>Live</h2><span class="blurb">The announcement. Post these first.</span></div>
+<div class="group single">
+<div class="card" data-id="live-0-0" data-shot="01-hero-game1.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/01-hero-game1.png"
+ data-text="X Chess is live.
+
+Fully on chain. No server, no account, no referee. Open a board and play.">
+<div><p class="txt">X Chess is live.
+
+Fully on chain. No server, no account, no referee. Open a board and play.</p>
+<div class="meta"><span class="count">91/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">The hero shot. Real game, real .btc names.</p></div>
+<div class="side"><img src="01-hero-game1.png" alt="" loading="lazy" draggable="true"><div class="fname">01-hero-game1.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="live-0-1" data-shot="02-players-panel.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/02-players-panel.png"
+ data-text="Game 1 is open.
+
+White is taken. Black is anyone else.
+
+First person to move is playing me.">
+<div><p class="txt">Game 1 is open.
+
+White is taken. Black is anyone else.
+
+First person to move is playing me.</p>
+<div class="meta"><span class="count">91/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Small and quotable. White xtrata.btc, Black anyone-else.</p></div>
+<div class="side"><img src="02-players-panel.png" alt="" loading="lazy" draggable="true"><div class="fname">02-players-panel.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+</div>
+</section>
+<section id="create"><div class="sec-head"><h2>Create your own game</h2><span class="blurb">Thread. The core how-it-works.</span></div>
+<div class="group thread"><div class="group-head"><span class="group-label">Thread: opening a board</span><button class="act copy-thread" type="button">Copy whole thread</button></div>
+<div class="card" data-id="create-0-0" data-shot=""
+ data-abs=""
+ data-text="You do not join X Chess. You open a board.">
+<div><p class="txt">You do not join X Chess. You open a board.</p>
+<div class="meta"><span class="count">42/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="create-0-1" data-shot="04-open-anyone-else.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/04-open-anyone-else.png"
+ data-text="Name your opponent, or leave the seat empty, and share the link.
+
+A .btc name if you want a specific person.
+anyone if you want a stranger.
+anyone-else if you want a stranger who is not you.">
+<div><p class="txt">Name your opponent, or leave the seat empty, and share the link.
+
+A .btc name if you want a specific person.
+anyone if you want a stranger.
+anyone-else if you want a stranger who is not you.</p>
+<div class="meta"><span class="count">190/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Crop to the summary line if you can.</p></div>
+<div class="side"><img src="04-open-anyone-else.png" alt="" loading="lazy" draggable="true"><div class="fname">04-open-anyone-else.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="create-0-2" data-shot="02-players-panel.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/02-players-panel.png"
+ data-text="anyone-else is my favourite setting.
+
+The board is open to the world and closed to me. I cannot quietly play both colours.">
+<div><p class="txt">anyone-else is my favourite setting.
+
+The board is open to the world and closed to me. I cannot quietly play both colours.</p>
+<div class="meta"><span class="count">122/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="02-players-panel.png" alt="" loading="lazy" draggable="true"><div class="fname">02-players-panel.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="create-0-3" data-shot=""
+ data-abs=""
+ data-text="Every game is public and permanent, so people would reasonably wonder if I played myself.
+
+This makes it impossible rather than unlikely.">
+<div><p class="txt">Every game is public and permanent, so people would reasonably wonder if I played myself.
+
+This makes it impossible rather than unlikely.</p>
+<div class="meta"><span class="count">137/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="create-0-4" data-shot="07-ranked.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/07-ranked.png"
+ data-text="Want it to count? Tick ranked.
+
+The rating is stored nowhere. Anyone can recompute every rating from the chain and get the same number.">
+<div><p class="txt">Want it to count? Tick ranked.
+
+The rating is stored nowhere. Anyone can recompute every rating from the chain and get the same number.</p>
+<div class="meta"><span class="count">135/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="07-ranked.png" alt="" loading="lazy" draggable="true"><div class="fname">07-ranked.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="create-0-5" data-shot=""
+ data-abs=""
+ data-text="Copy link, send it to someone, they move.
+
+That is the whole onboarding flow.">
+<div><p class="txt">Copy link, send it to someone, they move.
+
+That is the whole onboarding flow.</p>
+<div class="meta"><span class="count">77/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+<section id="sponsored"><div class="sec-head"><h2>Sponsored games</h2><span class="blurb">Thread. Your strongest material.</span></div>
+<div class="group thread"><div class="group-head"><span class="group-label">Thread: playing with an empty wallet</span><button class="act copy-thread" type="button">Copy whole thread</button></div>
+<div class="card" data-id="sponsored-0-0" data-shot=""
+ data-abs=""
+ data-text="You can challenge somebody who has never held a satoshi.">
+<div><p class="txt">You can challenge somebody who has never held a satoshi.</p>
+<div class="meta"><span class="count">56/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="sponsored-0-1" data-shot="05-sponsored-challenge.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/05-sponsored-challenge.png"
+ data-text="Tick sponsored. The contract sends them their gas in the same transaction that opens the board.
+
+No airdrop. No faucet. No signup. No support ticket.">
+<div><p class="txt">Tick sponsored. The contract sends them their gas in the same transaction that opens the board.
+
+No airdrop. No faucet. No signup. No support ticket.</p>
+<div class="meta"><span class="count">149/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note">BEST SHOT OF THE SET. The itemised cost line does the whole argument.</p></div>
+<div class="side"><img src="05-sponsored-challenge.png" alt="" loading="lazy" draggable="true"><div class="fname">05-sponsored-challenge.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="sponsored-0-2" data-shot=""
+ data-abs=""
+ data-text="They open the link with an empty wallet and they can move.">
+<div><p class="txt">They open the link with an empty wallet and they can move.</p>
+<div class="meta"><span class="count">58/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="sponsored-0-3" data-shot=""
+ data-abs=""
+ data-text="Every move they make is refunded, up to the allowance you paid for.
+
+When it runs out the game does not stop. They just start paying their own way.">
+<div><p class="txt">Every move they make is refunded, up to the allowance you paid for.
+
+When it runs out the game does not stop. They just start paying their own way.</p>
+<div class="meta"><span class="count">147/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="sponsored-0-4" data-shot="06-sponsor-both.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/06-sponsor-both.png"
+ data-text="Sponsor both sides and you hand a whole game to two people who hold nothing.
+
+One transaction.">
+<div><p class="txt">Sponsor both sides and you hand a whole game to two people who hold nothing.
+
+One transaction.</p>
+<div class="meta"><span class="count">94/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="06-sponsor-both.png" alt="" loading="lazy" draggable="true"><div class="fname">06-sponsor-both.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="sponsored-0-5" data-shot=""
+ data-abs=""
+ data-text="The best onboarding is not a tutorial.
+
+It is a game somebody already opened for you.">
+<div><p class="txt">The best onboarding is not a tutorial.
+
+It is a game somebody already opened for you.</p>
+<div class="meta"><span class="count">85/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+<section id="mobile"><div class="sec-head"><h2>Mobile</h2><span class="blurb">Thread. Check the passkey line against the real flow first.</span></div>
+<div class="group thread"><div class="group-head"><span class="group-label">Thread: on a phone</span><button class="act copy-thread" type="button">Copy whole thread</button></div>
+<div class="card" data-id="mobile-0-0" data-shot="08-mobile-game.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/08-mobile-game.png"
+ data-text="X Chess runs on your phone.
+
+Open it in the Xverse browser and play. Same board, same chain, nothing installed.">
+<div><p class="txt">X Chess runs on your phone.
+
+Open it in the Xverse browser and play. Same board, same chain, nothing installed.</p>
+<div class="meta"><span class="count">111/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="08-mobile-game.png" alt="" loading="lazy" draggable="true"><div class="fname">08-mobile-game.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="mobile-0-1" data-shot="09-mobile-play.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/09-mobile-play.png"
+ data-text="No app store. No download. No update.
+
+The board is inscribed. Your browser is the client.">
+<div><p class="txt">No app store. No download. No update.
+
+The board is inscribed. Your browser is the client.</p>
+<div class="meta"><span class="count">90/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="09-mobile-play.png" alt="" loading="lazy" draggable="true"><div class="fname">09-mobile-play.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="mobile-0-2" data-shot=""
+ data-abs=""
+ data-text="Have a passkey wallet? That works on mobile too.
+
+Face ID, then a move on Bitcoin.">
+<div><p class="txt">Have a passkey wallet? That works on mobile too.
+
+Face ID, then a move on Bitcoin.</p>
+<div class="meta"><span class="count">82/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note">UNVERIFIED. Only true if there is no seed import step in front of it.</p></div>
+</div>
+<div class="card" data-id="mobile-0-3" data-shot=""
+ data-abs=""
+ data-text="Chess on Bitcoin, on a phone, signed with your face.
+
+Ten years ago that sentence would have been four separate lies.">
+<div><p class="txt">Chess on Bitcoin, on a phone, signed with your face.
+
+Ten years ago that sentence would have been four separate lies.</p>
+<div class="meta"><span class="count">117/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note">UNVERIFIED. Same caveat as above.</p></div>
+</div>
+</div>
+</section>
+<section id="standalone"><div class="sec-head"><h2>Standalone posts</h2><span class="blurb">Drop these in between threads.</span></div>
+<div class="group single">
+<div class="card" data-id="standalone-0-0" data-shot=""
+ data-abs=""
+ data-text="No matchmaking. No lobby. No queue.
+
+You open a board and share a link. That is the product.">
+<div><p class="txt">No matchmaking. No lobby. No queue.
+
+You open a board and share a link. That is the product.</p>
+<div class="meta"><span class="count">92/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="standalone-0-1" data-shot="05-sponsored-challenge.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/05-sponsored-challenge.png"
+ data-text="A person with nothing in their wallet can play a full game on Bitcoin and it costs them nothing at all.
+
+That is the bit I am proudest of.">
+<div><p class="txt">A person with nothing in their wallet can play a full game on Bitcoin and it costs them nothing at all.
+
+That is the bit I am proudest of.</p>
+<div class="meta"><span class="count">138/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="05-sponsored-challenge.png" alt="" loading="lazy" draggable="true"><div class="fname">05-sponsored-challenge.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="standalone-0-2" data-shot=""
+ data-abs=""
+ data-text="There is no step 5.
+
+1. Open the board
+2. Connect a wallet
+3. Open a game, or open a link
+4. Move">
+<div><p class="txt">There is no step 5.
+
+1. Open the board
+2. Connect a wallet
+3. Open a game, or open a link
+4. Move</p>
+<div class="meta"><span class="count">97/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Pin this one.</p></div>
+</div>
+<div class="card" data-id="standalone-0-3" data-shot=""
+ data-abs=""
+ data-text="The board is not hosted. It is inscribed.
+
+The artefact is the application.">
+<div><p class="txt">The board is not hosted. It is inscribed.
+
+The artefact is the application.</p>
+<div class="meta"><span class="count">75/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="standalone-0-4" data-shot="03-moves-panel.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/03-moves-panel.png"
+ data-text="It stores no position. No turn. No winner.
+
+Just a list of four character strings and the arithmetic to read it.">
+<div><p class="txt">It stores no position. No turn. No winner.
+
+Just a list of four character strings and the arithmetic to read it.</p>
+<div class="meta"><span class="count">112/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="03-moves-panel.png" alt="" loading="lazy" draggable="true"><div class="fname">03-moves-panel.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+</div>
+</section>
+<section id="replies"><div class="sec-head"><h2>Replies</h2><span class="blurb">Alt account asks, main account answers. Leave a few minutes between.</span></div>
+<div class="group pair"><div class="group-head"><span class="group-label">Under the anyone-else post</span></div>
+<div class="card" data-id="replies-0-0" data-shot=""
+ data-abs=""
+ data-text="what stops you just playing yourself with a second wallet">
+<div><p class="txt">what stops you just playing yourself with a second wallet</p>
+<div class="meta"><span class="who alt">alt account</span><span class="count">57/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="replies-0-1" data-shot=""
+ data-abs=""
+ data-text="nothing stops me. anyone-else stops the board accepting it">
+<div><p class="txt">nothing stops me. anyone-else stops the board accepting it</p>
+<div class="meta"><span class="who main">you</span><span class="count">58/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+<div class="group pair"><div class="group-head"><span class="group-label">Under the sponsored post</span></div>
+<div class="card" data-id="replies-1-0" data-shot=""
+ data-abs=""
+ data-text="so you are paying for their moves?">
+<div><p class="txt">so you are paying for their moves?</p>
+<div class="meta"><span class="who alt">alt account</span><span class="count">34/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="replies-1-1" data-shot=""
+ data-abs=""
+ data-text="the fee for opening a board covers it. players fund the next players">
+<div><p class="txt">the fee for opening a board covers it. players fund the next players</p>
+<div class="meta"><span class="who main">you</span><span class="count">68/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+<div class="group pair"><div class="group-head"><span class="group-label">Under the mobile post</span></div>
+<div class="card" data-id="replies-2-0" data-shot=""
+ data-abs=""
+ data-text="does it need an app">
+<div><p class="txt">does it need an app</p>
+<div class="meta"><span class="who alt">alt account</span><span class="count">19/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="replies-2-1" data-shot=""
+ data-abs=""
+ data-text="no. it is a web page that lives on Bitcoin">
+<div><p class="txt">no. it is a web page that lives on Bitcoin</p>
+<div class="meta"><span class="who main">you</span><span class="count">42/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+<div class="group pair"><div class="group-head"><span class="group-label">Under the live post</span></div>
+<div class="card" data-id="replies-3-0" data-shot=""
+ data-abs=""
+ data-text="how do I get a game">
+<div><p class="txt">how do I get a game</p>
+<div class="meta"><span class="who alt">alt account</span><span class="count">19/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="replies-3-1" data-shot=""
+ data-abs=""
+ data-text="open one. there is no queue">
+<div><p class="txt">open one. there is no queue</p>
+<div class="meta"><span class="who main">you</span><span class="count">27/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+<div class="group pair"><div class="group-head"><span class="group-label">Anywhere</span></div>
+<div class="card" data-id="replies-4-0" data-shot=""
+ data-abs=""
+ data-text="wait, no account at all?">
+<div><p class="txt">wait, no account at all?</p>
+<div class="meta"><span class="who alt">alt account</span><span class="count">24/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="replies-4-1" data-shot=""
+ data-abs=""
+ data-text="your wallet is the account. the transaction is the signup">
+<div><p class="txt">your wallet is the account. the transaction is the signup</p>
+<div class="meta"><span class="who main">you</span><span class="count">57/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+<section id="qt"><div class="sec-head"><h2>Quote tweets</h2><span class="blurb">Add an angle rather than repeating the parent.</span></div>
+<div class="group single">
+<div class="card" data-id="qt-0-0" data-shot=""
+ data-abs=""
+ data-text="The list of things we deleted is longer than the list of things we built.
+
+That is the whole project.">
+<div><p class="txt">The list of things we deleted is longer than the list of things we built.
+
+That is the whole project.</p>
+<div class="meta"><span class="count">101/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="qt-0-1" data-shot=""
+ data-abs=""
+ data-text="The chain does not judge. It records.
+
+Judgement happens in every reader at once, and they agree because the rules were fixed before the first move.">
+<div><p class="txt">The chain does not judge. It records.
+
+Judgement happens in every reader at once, and they agree because the rules were fixed before the first move.</p>
+<div class="meta"><span class="count">148/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="qt-0-2" data-shot="05-sponsored-challenge.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/05-sponsored-challenge.png"
+ data-text="Self sustaining is a strong claim so here is the mechanism.
+
+Opening a game costs a fee. That fee funds a reserve. The reserve pays the gas of players who hold nothing.">
+<div><p class="txt">Self sustaining is a strong claim so here is the mechanism.
+
+Opening a game costs a fee. That fee funds a reserve. The reserve pays the gas of players who hold nothing.</p>
+<div class="meta"><span class="count">168/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="05-sponsored-challenge.png" alt="" loading="lazy" draggable="true"><div class="fname">05-sponsored-challenge.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="qt-0-3" data-shot=""
+ data-abs=""
+ data-text="Four characters.
+
+That is the entire protocol.">
+<div><p class="txt">Four characters.
+
+That is the entire protocol.</p>
+<div class="meta"><span class="count">46/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+<section id="subtraction"><div class="sec-head"><h2>Boiling down chess.com</h2><span class="blurb">Thread. Subtraction is legible: people know what chess.com has.</span></div>
+<div class="group thread"><div class="group-head"><span class="group-label">Thread: delete until only the chess is left</span><button class="act copy-thread" type="button">Copy whole thread</button></div>
+<div class="card" data-id="subtraction-0-0" data-shot=""
+ data-abs=""
+ data-text="Imagine boiling chess.com down until nothing is left but the chess.
+
+Delete the servers. Delete the accounts. Delete the referee. Delete the company.
+
+It still works. That is X Chess.">
+<div><p class="txt">Imagine boiling chess.com down until nothing is left but the chess.
+
+Delete the servers. Delete the accounts. Delete the referee. Delete the company.
+
+It still works. That is X Chess.</p>
+<div class="meta"><span class="count">183/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-1" data-shot=""
+ data-abs=""
+ data-text="No servers.
+
+The board is not hosted. It is inscribed on Bitcoin. The artefact is the application.">
+<div><p class="txt">No servers.
+
+The board is not hosted. It is inscribed on Bitcoin. The artefact is the application.</p>
+<div class="meta"><span class="count">98/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-2" data-shot="03-moves-panel.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/03-moves-panel.png"
+ data-text="No database.
+
+No position is stored. No turn, no winner. Just a list of four character strings and the arithmetic to read it.">
+<div><p class="txt">No database.
+
+No position is stored. No turn, no winner. Just a list of four character strings and the arithmetic to read it.</p>
+<div class="meta"><span class="count">125/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="03-moves-panel.png" alt="" loading="lazy" draggable="true"><div class="fname">03-moves-panel.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="subtraction-0-3" data-shot=""
+ data-abs=""
+ data-text="No account.
+
+Your wallet is the login. There is no signup because the transaction is the signup.">
+<div><p class="txt">No account.
+
+Your wallet is the login. There is no signup because the transaction is the signup.</p>
+<div class="meta"><span class="count">96/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-4" data-shot=""
+ data-abs=""
+ data-text="No referee.
+
+The contract has never seen a chessboard and never will. It checks that your move is four characters long. That is all it does.">
+<div><p class="txt">No referee.
+
+The contract has never seen a chessboard and never will. It checks that your move is four characters long. That is all it does.</p>
+<div class="meta"><span class="count">140/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-5" data-shot=""
+ data-abs=""
+ data-text="No anti-cheat.
+
+You are free to submit an illegal move. It will be stored forever, it will cost you a fee, and it will count for nothing.">
+<div><p class="txt">No anti-cheat.
+
+You are free to submit an illegal move. It will be stored forever, it will cost you a fee, and it will count for nothing.</p>
+<div class="meta"><span class="count">137/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-6" data-shot=""
+ data-abs=""
+ data-text="No leaderboard.
+
+Ratings are not kept anywhere. Anyone can recompute every rating from the log and get the same numbers.">
+<div><p class="txt">No leaderboard.
+
+Ratings are not kept anywhere. Anyone can recompute every rating from the log and get the same numbers.</p>
+<div class="meta"><span class="count">120/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="subtraction-0-7" data-shot="05-sponsored-challenge.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/05-sponsored-challenge.png"
+ data-text="No subscription.
+
+Opening a game pays the gas for somebody who holds nothing. New players start with an empty wallet and the contract funds their first moves.">
+<div><p class="txt">No subscription.
+
+Opening a game pays the gas for somebody who holds nothing. New players start with an empty wallet and the contract funds their first moves.</p>
+<div class="meta"><span class="count">158/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="05-sponsored-challenge.png" alt="" loading="lazy" draggable="true"><div class="fname">05-sponsored-challenge.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="subtraction-0-8" data-shot=""
+ data-abs=""
+ data-text="No company.
+
+If everyone who built this disappeared tomorrow, the games would keep going.">
+<div><p class="txt">No company.
+
+If everyone who built this disappeared tomorrow, the games would keep going.</p>
+<div class="meta"><span class="count">89/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+<section id="mystery"><div class="sec-head"><h2>Mystery (pre-launch)</h2><span class="blurb">Kept for reference, or reuse for the next drop.</span></div>
+<div class="group single">
+<div class="card" data-id="mystery-0-0" data-shot=""
+ data-abs=""
+ data-text="e2e4">
+<div><p class="txt">e2e4</p>
+<div class="meta"><span class="count">4/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-1" data-shot=""
+ data-abs=""
+ data-text="A referee that has never seen the game.">
+<div><p class="txt">A referee that has never seen the game.</p>
+<div class="meta"><span class="count">39/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-2" data-shot=""
+ data-abs=""
+ data-text="64 squares. No server.">
+<div><p class="txt">64 squares. No server.</p>
+<div class="meta"><span class="count">22/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-3" data-shot=""
+ data-abs=""
+ data-text="Nobody is keeping score. Everyone is keeping score.">
+<div><p class="txt">Nobody is keeping score. Everyone is keeping score.</p>
+<div class="meta"><span class="count">51/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-4" data-shot=""
+ data-abs=""
+ data-text="The contract cannot tell a queen from a typo. That is the design, not a gap.">
+<div><p class="txt">The contract cannot tell a queen from a typo. That is the design, not a gap.</p>
+<div class="meta"><span class="count">76/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-5" data-shot=""
+ data-abs=""
+ data-text="Your blunder is permanent. So is mine.">
+<div><p class="txt">Your blunder is permanent. So is mine.</p>
+<div class="meta"><span class="count">38/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+<div class="card" data-id="mystery-0-6" data-shot=""
+ data-abs=""
+ data-text="There is nothing to take down. No API, no database, no login, no us.">
+<div><p class="txt">There is nothing to take down. No API, no database, no login, no us.</p>
+<div class="meta"><span class="count">68/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+</div>
+</div>
+</section>
+</main>
+<footer>
+<p>Ticks are remembered in this browser only. Images live beside this file, so keep them together.
+To attach one, drag the thumbnail straight into the compose box, or hit <b>Copy path</b> and paste it
+into the file picker with <code>Cmd Shift G</code>.</p>
+<p>Counts are plain character counts. A link always counts as 23 whatever its length.</p>
+<p>To add a thread later, edit <code>build-page.py</code> and run <code>python3 build-page.py</code>.</p>
+</footer>
+<dialog id="lb"><div class="row"><span class="lbname fname"></span>
+<button class="act" id="lbclose" type="button">Close</button></div><img alt=""></dialog>
+<div class="toast" id="toast"></div>
+<script>
+const LIMIT = 280;
+const KEY = 'xchess-posted-v1';
+const done = new Set(JSON.parse(localStorage.getItem(KEY) || '[]'));
+const save = () => localStorage.setItem(KEY, JSON.stringify([...done]));
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1300);
+}
+async function copy(text, label){
+  try { await navigator.clipboard.writeText(text); toast(label || 'Copied'); }
+  catch { // file:// without permission, so fall back to a selection
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast(label || 'Copied');
+  }
+}
+function progress(){
+  const all = document.querySelectorAll('.card').length;
+  document.getElementById('prog').textContent = done.size + ' of ' + all + ' posted';
+}
+function applyFilter(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const mode = document.querySelector('.chip[aria-pressed=true]').dataset.filter;
+  for (const card of document.querySelectorAll('.card')){
+    const text = card.dataset.text.toLowerCase();
+    const isDone = card.classList.contains('done');
+    let ok = !q || text.includes(q);
+    if (ok && mode === 'todo') ok = !isDone;
+    if (ok && mode === 'shots') ok = card.dataset.shot !== '';
+    card.classList.toggle('hide', !ok);
+  }
+  for (const g of document.querySelectorAll('.group')){
+    g.classList.toggle('hide', !g.querySelector('.card:not(.hide)'));
+  }
+  for (const s of document.querySelectorAll('section')){
+    s.classList.toggle('hide', !s.querySelector('.group:not(.hide)'));
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  for (const card of document.querySelectorAll('.card')){
+    const id = card.dataset.id;
+    const box = card.querySelector('input[type=checkbox]');
+    if (done.has(id)) { card.classList.add('done'); box.checked = true; }
+    box.addEventListener('change', () => {
+      box.checked ? done.add(id) : done.delete(id);
+      card.classList.toggle('done', box.checked);
+      save(); progress(); applyFilter();
+    });
+    card.querySelector('.copy').addEventListener('click', () => copy(card.dataset.text, 'Tweet copied'));
+    const path = card.querySelector('.copypath');
+    if (path) path.addEventListener('click', () => copy(card.dataset.abs, 'Image path copied'));
+    const img = card.querySelector('img');
+    if (img) img.addEventListener('click', () => {
+      const d = document.getElementById('lb');
+      d.querySelector('img').src = img.src;
+      d.querySelector('.lbname').textContent = card.dataset.shot;
+      d.showModal();
+    });
+  }
+  for (const b of document.querySelectorAll('.copy-thread')){
+    b.addEventListener('click', () => {
+      const cards = [...b.closest('.group').querySelectorAll('.card')];
+      const numbered = cards.map((c, i) => (i + 1) + '/ ' + c.dataset.text).join('\n\n---\n\n');
+      copy(numbered, 'Whole thread copied');
+    });
+  }
+  document.getElementById('q').addEventListener('input', applyFilter);
+  for (const chip of document.querySelectorAll('.chip')){
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+      chip.setAttribute('aria-pressed', 'true');
+      applyFilter();
+    });
+  }
+  document.getElementById('reset').addEventListener('click', () => {
+    if (!confirm('Clear every posted tick?')) return;
+    done.clear(); save();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.remove('done'); c.querySelector('input').checked = false;
+    });
+    progress(); applyFilter();
+  });
+  document.getElementById('lbclose').addEventListener('click', () => document.getElementById('lb').close());
+  progress();
+});
+</script>
+</body></html>

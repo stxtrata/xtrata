@@ -496,8 +496,10 @@ export const INSCRIBE_STEPS: StepDef[] = [
     why:
       'THE step that earns the money. Serve the exact bytes through the runtime emulator and ' +
       'check the three things that are invisible until they are permanent: that it boots ONCE ' +
-      'and not twice, that a wallet bridge is reachable, and that it can read a real game. Run ' +
-      'npm run serve:runtime, open the board there, and report what happened.',
+      'and not twice, that a wallet bridge is reachable, and that it can read a real game. ' +
+      'Run `npm run serve:runtime` and open the address it prints when it starts. The runtime ' +
+      'serves the artefact the way an INSCRIPTION is addressed, not by filename, so asking it for ' +
+      'xchess.html is a 404 - use its root, or /i/9002 for the board on its own.',
     needs: ['build'],
     irreversible: false
   },

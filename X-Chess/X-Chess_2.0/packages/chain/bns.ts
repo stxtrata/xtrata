@@ -130,6 +130,21 @@ export class Names {
    * "not ready" rather than as "anyone": committing a game to the wrong side is
    * not something a typo should be able to do.
    */
+  /**
+   * Did the last lookup fail because nobody answered, rather than because the
+   * name is not registered?
+   *
+   * `owner` returns null for both, which is right for a caller that only wants
+   * an address and wrong for one that wants to explain itself. Without this the
+   * board told people to check the spelling of a name that resolves perfectly
+   * well, because the public endpoint had briefly refused.
+   */
+  private lastFailed = false;
+
+  async reachable(): Promise<boolean> {
+    return !this.lastFailed;
+  }
+
   async owner(name: string): Promise<string | null> {
     const raw = String(name ?? '').trim().toLowerCase().replace(/^@/, '');
     const match = /^([a-z0-9][a-z0-9-]*)\.([a-z0-9][a-z0-9-]*)$/.exec(raw);
@@ -141,11 +156,18 @@ export class Names {
     if (existing) return existing;
 
     const work = this.lookupOwner(match[1], match[2])
-      .catch(() => null)
       .then((principal) => {
+        this.lastFailed = false;
         this.cache.set(key, principal);
         this.inFlight.delete(key);
         return principal;
+      })
+      .catch(() => {
+        // Deliberately NOT cached. A refusal is not an answer, and remembering
+        // one would make a passing rate limit permanent for the session.
+        this.lastFailed = true;
+        this.inFlight.delete(key);
+        return null;
       });
     this.inFlight.set(key, work);
     return work;
@@ -171,7 +193,7 @@ export class Names {
         })
       }
     );
-    if (!response.ok) return null;
+    if (!response.ok) throw new Error(`BNS lookup answered ${response.status}`);
 
     const body = (await response.json()) as { okay?: boolean; result?: string };
     if (!body?.okay || typeof body.result !== 'string') return null;
@@ -197,7 +219,7 @@ export class Names {
         body: JSON.stringify({ sender: principal, arguments: [serializePrincipal(principal)] })
       }
     );
-    if (!response.ok) return null;
+    if (!response.ok) throw new Error(`BNS lookup answered ${response.status}`);
 
     const body = (await response.json()) as { okay?: boolean; result?: string };
     if (!body?.okay || typeof body.result !== 'string') return null;

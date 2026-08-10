@@ -288,3 +288,45 @@ describe('the copy a player reads', () => {
     expect(html).toContain('refereeing nothing');
   });
 });
+
+const BUILT: Record<string, string> = {
+  board: readFileSync('dist/xchess.html', 'utf8'),
+  gates: readFileSync('dist/xchess-gates.html', 'utf8')
+};
+
+describe('the document the runtime will rewrite', () => {
+  // Caught by the pre-inscription rehearsal, and permanent if it had not been.
+  //
+  // The Xtrata runtime injects its base tag and support scripts by finding a
+  // <head> and inserting after it. With no literal head to match it falls back
+  // to PREPENDING them, which puts markup before the doctype and renders the
+  // whole board in Quirks Mode - a different box model, on a grid that depends
+  // on aspect-ratio.
+  //
+  // Invisible locally: served as a file the page is standards mode and fine.
+  it('has a literal <head> for the runtime to inject into', () => {
+    for (const [name, html] of Object.entries(BUILT)) {
+      expect(html, `${name} has no <head> tag`).toMatch(/<head[^>]*>/i);
+    }
+  });
+
+  it('starts with the doctype and nothing before it', () => {
+    for (const [name, html] of Object.entries(BUILT)) {
+      expect(html.trimStart().slice(0, 15).toLowerCase(), `${name}`).toBe('<!doctype html>');
+    }
+  });
+
+  it('survives the runtime injection in standards mode', () => {
+    // The exact substitution harness/runtime/serve.mjs performs.
+    for (const [name, html] of Object.entries(BUILT)) {
+      const support = '<base href="https://x.test/"><script src="/runtime/url-support.js"></script>';
+      const rewritten = /<head[^>]*>/i.test(html)
+        ? html.replace(/<head[^>]*>/i, (m) => `${m}\n${support}`)
+        : `${support}\n${html}`;
+      expect(
+        rewritten.trimStart().slice(0, 15).toLowerCase(),
+        `${name} would render in Quirks Mode under the runtime`
+      ).toBe('<!doctype html>');
+    }
+  });
+});

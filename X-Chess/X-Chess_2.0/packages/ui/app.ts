@@ -18,7 +18,13 @@ import type { SoundPanel } from './sound-panel.js';
 import { replay } from '../replay/replay.js';
 import type { ReplayState } from '../replay/replay.js';
 import { EVENT_STRINGS } from '../replay/events.js';
-import { DEFAULT_RULES, describeRules, normaliseRules, readyToOpen } from '../protocol/rules.js';
+import {
+  DEFAULT_RULES,
+  describeRules,
+  looksLikePrincipal,
+  normaliseRules,
+  readyToOpen
+} from '../protocol/rules.js';
 import type { Rules } from '../protocol/rules.js';
 import { rulesHash } from '../protocol/canonical.js';
 import { recoverRules } from '../protocol/recover.js';
@@ -153,7 +159,7 @@ const IDS = [
   'moves-title', 'toggle-skipped', 'skipped-note',
   'verify', 'verify-game',
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
-  'sound-reset', 'sound-note', 'sound-list',
+  'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail',
   'explore-refresh', 'explore-count', 'explore-rows',
   'leaderboard-note', 'leaderboard-rows',
   'profile-who', 'profile-load', 'profile-body',
@@ -251,6 +257,14 @@ export class ChessApp {
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * Set once stopPolling() has run, and never unset.
+   *
+   * Each tick schedules the next, so without this a board that was stopped
+   * mid-read would carry on scheduling for the life of the page - and there
+   * would be no handle left to cancel it with.
+   */
+  private stopped = false;
 
   private readonly sound: Sound;
   private soundPanel: SoundPanel | null = null;
@@ -367,6 +381,14 @@ export class ChessApp {
     // Reaching for the mute button during a slow submission is precisely when
     // somebody wants it to work.
     this.el.soundToggle.addEventListener('click', () => this.sound.setMaster(!this.sound.enabled));
+    // The panel opens on request and stays open for the session. Somebody who
+    // has gone looking for the per-voice switches is not helped by having them
+    // fold away again on the next redraw.
+    this.el.soundMore.addEventListener('click', () => {
+      const open = this.el.soundDetail.classList.toggle('hide');
+      this.el.soundMore.setAttribute('aria-expanded', String(!open));
+      this.el.soundMore.textContent = open ? 'More' : 'Less';
+    });
     this.el.soundReset.addEventListener('click', () => {
       this.sound.reset();
       this.soundPanel?.refresh();
@@ -434,7 +456,39 @@ export class ChessApp {
 
     this.drawDraft();
     void this.checkContract();
+    this.openFromLink();
     this.startPolling();
+  }
+
+  /**
+   * Open the game the address names, if it names one.
+   *
+   * `copyLink` has always BUILT a link carrying the game and its rules, and
+   * nothing ever read the game back out. So the link worked in the sense that
+   * the rules travelled, and failed in the sense that anybody following one
+   * landed on the create-a-game form and had to be told the number by hand.
+   * That is the entire onboarding path for a new player, and it was the one
+   * thing on the page nobody had followed end to end.
+   *
+   * Parsed by hand rather than with URL, which needs a base and would mean
+   * naming a host in an artefact that must never depend on one. Query first,
+   * then fragment, because the Xtrata runtime serves an inscription from a path
+   * that already carries a query of its own.
+   */
+  private openFromLink(): void {
+    const href = String(this.doc.location?.href ?? '');
+    const query = href.includes('?') ? href.slice(href.indexOf('?') + 1).split('#')[0] : '';
+    const fragment = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
+    const raw = new URLSearchParams(query).get('game') ?? new URLSearchParams(fragment).get('game');
+    if (raw === null) return;
+
+    const game = Number(raw);
+    // A link with a nonsense game number is somebody's typo, not an error to
+    // shout about. The create form is a reasonable place to land.
+    if (!Number.isInteger(game) || game < 1) return;
+
+    this.show('game');
+    void this.load(game);
   }
 
   /**
@@ -517,6 +571,7 @@ export class ChessApp {
   }
 
   private scheduleTick(ms: number): void {
+    if (this.stopped) return;
     if (this.poll) clearTimeout(this.poll);
     this.poll = setTimeout(() => void this.tick(), ms);
   }
@@ -539,6 +594,10 @@ export class ChessApp {
         // A poll that throws must not end the polling. The next one may work.
       }
     }
+    // Checked AGAIN, after the await. stopPolling() may have run while this
+    // tick was reading, and a tick that rescheduled anyway would mean stopping
+    // does not stop - the timer would outlive the board that owns it, forever,
+    // because each one schedules the next.
     this.scheduleTick(this.nextPollMs());
   }
 
@@ -563,6 +622,7 @@ export class ChessApp {
   }
 
   stopPolling(): void {
+    this.stopped = true;
     if (this.poll) clearTimeout(this.poll);
     this.poll = null;
   }
@@ -954,9 +1014,19 @@ export class ChessApp {
     const fields = [this.el.rulesWhite, this.el.rulesBlack] as HTMLInputElement[];
     let changed = false;
 
+    // "Absent" and "could not ask" are different answers and must not be
+    // remembered as the same one. `Names.owner` returns null for both, so a
+    // rate limited lookup was cached as "no such name" and the board then told
+    // somebody to check the spelling of a name that is perfectly real.
+    let unreachable = false;
+
     for (const wanted of [...new Set(names)]) {
       if (this.resolvedNames.has(wanted)) continue;
       const owner = await this.names.owner(wanted);
+      if (owner === null && !(await this.names.reachable())) {
+        unreachable = true;
+        continue; // NOT remembered, so it is asked again
+      }
       this.resolvedNames.set(wanted, owner);
       if (!owner) continue;
       for (const field of fields) {
@@ -980,6 +1050,14 @@ export class ChessApp {
       );
       this.el.rulesProblems.classList.remove('hide');
       this.drawDraft();
+    } else if (unreachable) {
+      this.notice(
+        'rulesProblems',
+        'warn',
+        'The name could not be looked up just now, so the lookup will be tried again. ' +
+          'This is the public endpoint being busy rather than anything wrong with the name.'
+      );
+      this.el.rulesProblems.classList.remove('hide');
     } else if (missing.length) {
       this.notice(
         'rulesProblems',
@@ -1027,6 +1105,39 @@ export class ChessApp {
     const hash = rulesHash(rules);
     const kind = (this.el.gameKind as HTMLSelectElement).value;
 
+    // A sponsorship has to have somebody to pay.
+    //
+    // The contract PUSHES the bootstrap to a named wallet in the opening
+    // transaction. There is no version of this that works anonymously, and the
+    // reason is the same one sponsorship exists for: a wallet holding nothing
+    // cannot send a transaction, so it cannot claim anything later either. The
+    // gas has to arrive before they do anything, which means somebody has to
+    // say where.
+    //
+    // Caught here rather than at the wallet. Without this the failure is
+    // "opening a game failed: not a Stacks address" from the codec, several
+    // layers down, after the wallet has already opened.
+    const needsNamed =
+      kind === 'sponsor-both'
+        ? ([['White', rules.white], ['Black', rules.black]] as const)
+        : kind === 'sponsor-opponent'
+          ? ([['Black', rules.black]] as const)
+          : [];
+    const unnamed = needsNamed.filter(([, who]) => !looksLikePrincipal(who));
+    if (unnamed.length) {
+      this.notice(
+        'chainNotice',
+        'warn',
+        `${unnamed.map(([side]) => side).join(' and ')} ${unnamed.length === 1 ? 'is' : 'are'} ` +
+          'not a named wallet, and a sponsored game has to have one to pay. The contract hands ' +
+          'the gas over in this same transaction, so it needs an address - and a wallet holding ' +
+          'nothing could not claim it later anyway, because claiming would cost gas it does not ' +
+          'have.\n\nEither name the players, or open a standard game where anyone may play and ' +
+          'each side pays for itself.'
+      );
+      return;
+    }
+
     // Remembered BEFORE the transaction, not after.
     //
     // This is the only moment the full rule set is known for certain, and the
@@ -1060,13 +1171,42 @@ export class ChessApp {
   // Loading and replaying a game
   // ------------------------------------------------------------------
 
+  /**
+   * Open a game by number, and SAY SO while it happens.
+   *
+   * Reading a game is several round trips to a public endpoint: the row, then
+   * its log, then the mempool. On a slow network that is seconds during which
+   * the button had gone back to looking untouched and the board still showed
+   * the previous game - so it read as a click that did nothing, and the usual
+   * response to that is to click again, which starts the whole thing twice.
+   */
   private async loadFromInput(): Promise<void> {
-    const value = Number((this.el.joinGame as HTMLInputElement).value);
+    const field = this.el.joinGame as HTMLInputElement;
+    const button = this.el.loadGame as HTMLButtonElement;
+    const value = Number(field.value);
     if (!Number.isFinite(value) || value < 1) {
       this.notice('chainNotice', 'warn', 'That is not a game number.');
+      field.focus();
       return;
     }
-    await this.load(value);
+
+    // Said before anything is awaited, so the acknowledgement is instant even
+    // when the answer is not.
+    button.disabled = true;
+    const wasLabel = button.textContent;
+    button.textContent = 'Finding\u2026';
+    this.notice('chainNotice', 'info', `Looking for game ${value} on ${this.chain.contractId}.`);
+    this.show('game');
+    this.text('gameLabel', `Game ${value}`);
+    this.el.board.classList.add('board--loading');
+
+    try {
+      await this.load(value);
+    } finally {
+      button.disabled = false;
+      button.textContent = wasLabel ?? 'Open that game';
+      this.el.board.classList.remove('board--loading');
+    }
   }
 
   async load(game: number): Promise<void> {
