@@ -163,7 +163,7 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
 
   const ordered = view.flipped ? [...squares].reverse() : squares;
 
-  for (const cell of ordered) {
+  for (const [at, cell] of ordered.entries()) {
     const file = FILES.indexOf(cell.square[0]);
     const rank = Number(cell.square[1]);
     // a1 IS DARK. That is the anchor, and it is the whole rule.
@@ -243,9 +243,45 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
     button.disabled = !playable;
     if (playable) button.classList.add('sq--playable');
 
+    // Coordinates, drawn INSIDE the edge squares rather than in a border of
+    // their own.
+    //
+    // A ring of label cells around the board would mean two more grid tracks
+    // and a taller board, and the landscape phone layout is already the
+    // tightest dimension there is. Inside the squares it costs no space at all.
+    //
+    // It also cannot desynchronise from the flip, which a separate label row
+    // very easily can: the position comes from `at`, the index in the array the
+    // squares are ALREADY drawn from, and the text comes from the square's own
+    // name. Turn the board around and both follow, because there is nothing
+    // else for them to follow.
+    //
+    // aria-hidden because each square's accessible name already begins with its
+    // coordinate (see the label above), and a screen reader should not read the
+    // grid twice.
+    const row = Math.floor(at / 8);
+    const column = at % 8;
+    const tint = dark ? 'co--on-dark' : 'co--on-light';
+    // The left file carries rank digits, the bottom rank carries file letters,
+    // and the corner square carries one of each in opposite corners - which is
+    // why these are two nodes and not one string.
+    if (column === 0) button.appendChild(coordinate(cell.square[1], `co--rank ${tint}`));
+    if (row === 7) button.appendChild(coordinate(cell.square[0], `co--file ${tint}`));
+
     button.addEventListener('click', () => handlers.onSquare(cell.square));
     root.appendChild(button);
   }
+}
+
+/** One coordinate mark, drawn in the corner of an edge square. */
+function coordinate(text: string, className: string): HTMLElement {
+  const mark = document.createElement('span');
+  mark.className = `co ${className}`;
+  mark.textContent = text;
+  // Each square's accessible name already begins with its coordinate, so a
+  // screen reader reading these too would read the grid twice.
+  mark.setAttribute('aria-hidden', 'true');
+  return mark;
 }
 
 /** True when a square name is one of the sixty-four. */

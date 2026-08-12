@@ -104,6 +104,26 @@ body { overflow-wrap: anywhere; }
 }
 /* A square is an eighth of the board, so this is about 56% of one. */
 @supports (font-size: 1cqw) { .sq { font-size: 7cqw; } }
+/* Coordinates, in the corners of the edge squares.
+   Sized in cqw like the pieces, so they scale with the BOARD rather than the
+   viewport - the board is one column of a two-column layout and its width has
+   almost nothing to do with the window's. The max() is a legibility floor: on a
+   narrow phone 2.1cqw is about five pixels, which is a smudge rather than a
+   letter.
+   Tinted with the strongest neutral each square can carry rather than the
+   opposite square colour. Light-on-dark and dark-on-light square shades measure
+   2.82:1, which is too weak to read at this size; --ink on a dark square is
+   5.22:1 and --bg on a light one is 8.2:1, and both are variables that already
+   exist. No opacity, for the same reason - it would give the contrast straight
+   back. */
+.co {
+  position: absolute; font-size: max(8px, 2.1cqw); font-weight: 700;
+  line-height: 1; pointer-events: none; user-select: none;
+}
+.co--rank { top: 5%; left: 6%; }
+.co--file { bottom: 4%; right: 6%; }
+.co--on-dark { color: var(--ink); }
+.co--on-light { color: var(--bg); }
 .sq--light { background: var(--light); }
 .sq--dark { background: var(--dark); }
 .sq--playable { cursor: pointer; }
