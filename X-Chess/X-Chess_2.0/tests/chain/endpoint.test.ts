@@ -196,4 +196,160 @@ describe('degrading', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(endpoint.all).toEqual(['https://node.example']);
   });
+
+  // --------------------------------------------------------------------------
+  // The one-way ratchet, reported by the first testers on 2026-08-12.
+  //
+  // Switching from game 8 to game 1 gave "Could not reach any Stacks endpoint".
+  // The chain was fine and so were two of the three hosts. The loop ran
+  // `attempt = index; attempt < bases.length`, so it only ever walked FORWARD:
+  // a recovered host was never returned to, and a host earlier in the list was
+  // never retried. After two bad moments the board was pinned to the last entry,
+  // and the list of three had become a single point of failure.
+  // --------------------------------------------------------------------------
+
+  it('comes back to the primary once it recovers', async () => {
+    let primaryDown = true;
+    let clock = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith(PUBLIC_API.mainnet[0]) && primaryDown) throw new Error('ECONNRESET');
+      return ok();
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch,
+      now: () => clock
+    });
+
+    await endpoint.request('/one');
+    expect(endpoint.base, 'it should have fallen forward').toBe(PUBLIC_API.mainnet[1]);
+
+    // Within the preference window it stays put, which is the whole point of
+    // remembering the move: one bad response must not cost every later call two
+    // round trips.
+    primaryDown = false;
+    clock = 30_000;
+    await endpoint.request('/two');
+    expect(endpoint.base, 'it gave up on the fallback far too eagerly').toBe(
+      PUBLIC_API.mainnet[1]
+    );
+
+    // Past it, the primary is tried again and answers.
+    clock = 61_000;
+    await endpoint.request('/three');
+    expect(
+      endpoint.base,
+      'the primary recovered and was never tried again, so the fallback is permanent'
+    ).toBe(PUBLIC_API.mainnet[0]);
+  });
+
+  it('does not keep retrying a primary that is still down', async () => {
+    // The decay costs one failed attempt per window while the primary is dead.
+    // It must not cost one per request, or a poll every few seconds would pay a
+    // timeout every few seconds.
+    let clock = 0;
+    let primaryTries = 0;
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.startsWith(PUBLIC_API.mainnet[0])) {
+        primaryTries++;
+        throw new Error('ECONNRESET');
+      }
+      return ok();
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch,
+      now: () => clock
+    });
+
+    await endpoint.request('/one');
+    expect(primaryTries).toBe(1);
+
+    for (const t of [5_000, 10_000, 20_000, 40_000]) {
+      clock = t;
+      await endpoint.request('/poll');
+    }
+    expect(primaryTries, 'the dead primary was retried inside its own window').toBe(1);
+
+    clock = 61_000;
+    await endpoint.request('/later');
+    expect(primaryTries, 'the window expired and the primary was not retried').toBe(2);
+  });
+
+  it('wraps around, so being pinned to the last base is not a dead end', async () => {
+    // Walk it to the end of the list, then let ONLY that last base fail. The
+    // earlier hosts are healthy the whole time.
+    const dead = new Set<string>([PUBLIC_API.mainnet[0], PUBLIC_API.mainnet[1]]);
+    const fetchMock = vi.fn(async (url: string) => {
+      for (const base of dead) if (url.startsWith(base)) throw new Error('ECONNRESET');
+      return ok();
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await endpoint.request('/one');
+    const last = PUBLIC_API.mainnet[PUBLIC_API.mainnet.length - 1];
+    expect(endpoint.base).toBe(last);
+
+    // Everything recovers except the one it is now pinned to.
+    dead.clear();
+    dead.add(last);
+
+    const response = await endpoint.request('/two');
+    expect(
+      response.status,
+      'pinned to the last base, a failure there threw CHAIN_UNAVAILABLE while ' +
+        'two healthy hosts were never asked'
+    ).toBe(200);
+    expect(endpoint.base).not.toBe(last);
+  });
+
+  it('believes a host that says it is rate limiting, even without a 429', async () => {
+    // Some hosts refuse with a 503 and put the truth in a header. Reported as
+    // chain unavailability that sends somebody looking for an outage; reported
+    // as a rate limit it says "wait a minute", which is the useful advice.
+    const limitedBy503 = (): Response =>
+      new Response('slow down', { status: 503, headers: { 'retry-after': '30' } });
+    const fetchMock = vi.fn(async () => limitedBy503());
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await expect(endpoint.request('/one')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+  });
+
+  it('does not mistake a plain 503 for a rate limit', async () => {
+    // The same care in the other direction. A host with a problem is a host with
+    // a problem, and guessing from the status code would be the same error.
+    const fetchMock = vi.fn(async () => serverError());
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await expect(endpoint.request('/one')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+  });
+
+  it('tries every base exactly once per call, and no more', async () => {
+    // The wrap must not turn one dead host into an unbounded retry loop. Every
+    // call costs at most one attempt per base, which is what bounds the time a
+    // caller waits when the network really is gone.
+    const tried: string[] = [];
+    const fetchMock = vi.fn(async (url: string) => {
+      tried.push(url);
+      throw new Error('ECONNRESET');
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await expect(endpoint.request('/one')).rejects.toThrow();
+    expect(tried).toHaveLength(PUBLIC_API.mainnet.length);
+    expect(new Set(tried).size, 'a base was tried twice in one call').toBe(tried.length);
+  });
+
 });

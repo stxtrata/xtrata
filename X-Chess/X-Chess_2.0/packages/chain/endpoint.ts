@@ -88,6 +88,8 @@ export interface EndpointOptions {
   document?: Document;
   fetch?: typeof fetch;
   onFallback?: (from: string, to: string) => void;
+  /** The clock, so the preference decay below can be tested without waiting. */
+  now?: () => number;
 }
 
 const trim = (base: string): string => base.replace(/\/+$/, '');
@@ -141,18 +143,48 @@ export interface Endpoint {
 export const ASSUMED_BUDGET = 50;
 
 /**
- * A fetch that moves to the next base when one stops answering.
+ * The remaining-allowance headers, in the spellings seen in the wild.
+ *
+ * Shared by the two places that read them, because a permanent artefact should
+ * not carry the same array twice.
+ */
+const BUDGET_HEADERS = ['x-ratelimit-remaining-minute', 'ratelimit-remaining'];
+
+/**
+ * A fetch that tries every base, preferring the one that last answered.
  *
  * The choice is remembered, so one bad response does not make every later call
- * pay for two. An inscription cannot be corrected, so degrading is the only
- * acceptable behaviour: a board that broke because one host went away would
- * break permanently.
+ * pay for two - but it EXPIRES, so a host that recovers is returned to. An
+ * inscription cannot be corrected, so degrading is the only acceptable
+ * behaviour: a board that broke because one host went away would break
+ * permanently, and a board that never went back to it would be running on its
+ * last fallback within a day.
  */
 export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
   const doFetch = options.fetch ?? (globalThis.fetch?.bind(globalThis) as typeof fetch);
   const bases = endpointsFor(options);
+  const now = options.now ?? (() => Date.now());
   let index = 0;
   let remaining: number | null = null;
+  /** When the current preference stopped being the first base. */
+  let preferredAt = 0;
+
+  /**
+   * How long a fallback stays preferred before the first base is tried again.
+   *
+   * Wrapping around the list stops a failure being fatal, but on its own it does
+   * not bring the primary back: once the board is pinned to the second host,
+   * that host answers first and the first host is never reached. So the
+   * preference has to expire.
+   *
+   * A minute is chosen against what it costs to be wrong in each direction. Too
+   * short and every recovery attempt spends a timeout on a host that is still
+   * down; too long and the board sits on a fallback for an afternoon. At a
+   * minute, a still-dead primary costs one failed attempt per minute against a
+   * poll that runs every few seconds, and a recovered one is picked up while
+   * somebody is still looking at the board.
+   */
+  const PREFER_MS = 60_000;
 
   /**
    * 429 IS NOT AN ANSWER, and this is the one place that distinction is made.
@@ -174,9 +206,28 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
   const unavailable = (response: Response | null): boolean =>
     !response || response.status >= 500 || response.status === 429;
 
+  /**
+   * A failing response that SAYS it is a rate limit, whatever its status code.
+   *
+   * `Retry-After` on a refusal, or a remaining-allowance header reading zero,
+   * are the host telling us in as many words. Header names vary in the wild, so
+   * the same two spellings `noteBudget` accepts are accepted here.
+   */
+  const rateLimitedByHeader = (response: Response): boolean => {
+    if (response.headers?.get?.('retry-after') != null) return true;
+    for (const header of BUDGET_HEADERS) {
+      // The null check is load-bearing: `Number(null)` is 0, so dropping it
+      // reads every response with no allowance header as an exhausted one, and
+      // reports a plain outage as a rate limit.
+      const raw = response.headers?.get?.(header);
+      if (raw != null && Number(raw) === 0) return true;
+    }
+    return false;
+  };
+
   const noteBudget = (response: Response): void => {
-    // Several spellings in the wild; whichever is present wins.
-    for (const header of ['x-ratelimit-remaining-minute', 'ratelimit-remaining']) {
+    // Whichever spelling is present wins.
+    for (const header of BUDGET_HEADERS) {
       const raw = response.headers?.get?.(header);
       if (raw == null) continue;
       const value = Number(raw);
@@ -211,7 +262,25 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
       let lastError: unknown = null;
       let limited = false;
 
-      for (let attempt = index; attempt < bases.length; attempt++) {
+      // EVERY base gets tried, starting from the remembered one and WRAPPING.
+      //
+      // This used to run `attempt = index; attempt < bases.length`, which made
+      // the fallback a one-way ratchet: bases before the remembered one were
+      // never retried, and `index` only ever moved forward, so a host that came
+      // back was never returned to. After two bad moments the board was pinned
+      // to the last entry, the list was a single point of failure, and one wobble
+      // in that entry reported "no Stacks endpoint answered" with healthy hosts
+      // sitting untried. That is what the first testers hit switching between
+      // games, and it is the exact opposite of what a list of hosts is for.
+      //
+      // `index` is a PREFERENCE now, not a floor.
+      // Let the preference expire, so a recovered primary is actually returned
+      // to rather than being abandoned for the life of the page.
+      if (index !== 0 && now() - preferredAt >= PREFER_MS) index = 0;
+
+      const started = index;
+      for (let n = 0; n < bases.length; n++) {
+        const attempt = (started + n) % bases.length;
         const base = bases[attempt];
         try {
           const response = await doFetch(`${base}${path}`, init);
@@ -219,18 +288,37 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
           // A 4xx is the chain answering. Only 5xx, 429 and transport failures
           // mean this base is not usable.
           if (!unavailable(response)) {
-            if (attempt !== index) {
-              options.onFallback?.(bases[index], base);
+            if (attempt !== started) {
+              options.onFallback?.(bases[started], base);
+              // Whatever answered becomes the preference, including a base
+              // EARLIER in the list than the one we started from.
+              //
+              // `preferredAt` records when the preference MOVED, not when it
+              // last worked. Stamping it on every success would restart the
+              // window on each request and the decay above could never fire.
               index = attempt;
+              preferredAt = now();
             }
             return response;
           }
-          if (response.status === 429) limited = true;
+          // A 429 says it outright. Not every host does: some answer 503 and
+          // put the truth in a header instead, and reporting that as "the chain
+          // is unreachable" sends somebody looking for a problem that is not
+          // there when the advice they need is "wait a minute".
+          //
+          // Only ON EVIDENCE, never by guessing from the status code. A bare 503
+          // is a host with a problem, and saying otherwise would be the same
+          // mistake in the opposite direction.
+          if (response.status === 429 || rateLimitedByHeader(response)) limited = true;
           lastError = new Error(`${base} answered ${response.status}`);
         } catch (error) {
           lastError = error;
         }
       }
+
+      // Nothing answered. Move the preference off the base that led this round,
+      // so the next call does not pay for the same dead host's timeout first.
+      index = (started + 1) % bases.length;
 
       // Being rate limited is not the chain being down, and a board that said
       // so would send somebody looking for a problem that is not there. It is
