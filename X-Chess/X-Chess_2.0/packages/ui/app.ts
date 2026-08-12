@@ -12,7 +12,7 @@ import { parseUci } from '../chess/uci.js';
 import { KING, WHITE } from '../chess/board.js';
 import { SHELL } from './shell.js';
 import { Sound } from './audio.js';
-import { soundFor } from './sounds.js';
+import { actorOf, soundFor } from './sounds.js';
 import { renderSoundPanel, soundNote, soundToggleLabel } from './sound-panel.js';
 import type { SoundPanel } from './sound-panel.js';
 import { replay } from '../replay/replay.js';
@@ -159,7 +159,7 @@ const IDS = [
   'moves-title', 'toggle-skipped', 'skipped-note',
   'verify', 'verify-game',
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
-  'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail',
+  'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows',
   'leaderboard-note', 'leaderboard-rows',
   'profile-who', 'profile-load', 'profile-body',
@@ -398,6 +398,21 @@ export class ChessApp {
     master.addEventListener('change', () => this.sound.setMaster(master.checked));
     const volume = this.el.soundVolume as HTMLInputElement;
     volume.addEventListener('input', () => this.sound.setVolume(Number(volume.value) / 100));
+    const sides = this.el.soundSides as HTMLInputElement;
+    sides.addEventListener('change', () => {
+      this.sound.setSides(sides.checked);
+      // Demonstrated rather than described. The switch says Black is pitched
+      // lower; hearing the pair back to back is the only way to know whether
+      // that is a difference you can actually follow.
+      this.sound.audition(this.sound.voiceFor('move'), 'white');
+      if (sides.checked) {
+        this.doc.defaultView?.setTimeout(
+          () => this.sound.audition(this.sound.voiceFor('move'), 'black'),
+          260
+        );
+      }
+    });
+
     const background = this.el.soundBackground as HTMLInputElement;
     background.addEventListener('change', () => {
       this.sound.setBackground(background.checked);
@@ -417,6 +432,8 @@ export class ChessApp {
     (this.el.soundMaster as HTMLInputElement).checked = on;
     (this.el.soundBackground as HTMLInputElement).checked = this.sound.state.background;
     (this.el.soundBackground as HTMLInputElement).disabled = !on;
+    (this.el.soundSides as HTMLInputElement).checked = this.sound.state.sides;
+    (this.el.soundSides as HTMLInputElement).disabled = !on;
     const volume = this.el.soundVolume as HTMLInputElement;
     volume.disabled = !on;
     // Not written back while it is the element being dragged: replacing the
@@ -1327,7 +1344,9 @@ export class ChessApp {
     if (!after) return;
     const event = soundFor(before, after, this.address);
     if (!event) return;
-    this.sound.play(event);
+    // Who acted, so the sides can be told apart by ear when that is switched
+    // on. Null for anything no colour did, which must not be given one.
+    this.sound.play(event, actorOf(before, after));
     if (event === 'your-turn' || event === 'check') this.flashTitle(true);
   }
 

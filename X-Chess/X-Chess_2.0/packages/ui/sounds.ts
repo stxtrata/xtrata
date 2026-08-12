@@ -37,6 +37,8 @@ export type SoundEvent =
   | 'win'
   | 'lose'
   | 'draw'
+  | 'decided'
+  | 'draw-offered'
   | 'sent'
   | 'skipped'
   | 'select'
@@ -435,6 +437,28 @@ export const EVENTS: Record<SoundEvent, EventSpec> = {
     voice: 'level-pair',
     on: true
   },
+  // What a WATCHER hears when a game ends decisively.
+  //
+  // A spectator has no side, so `win` and `lose` are not theirs to hear -
+  // inventing a stake they do not have would be the board asserting something
+  // untrue. Without this they got nothing at all for a resignation, and the
+  // ordinary check sound for a checkmate: the most important moment in a
+  // watched game rendered as its second least.
+  decided: {
+    label: 'Game decided',
+    say: 'a game you are watching ended with a winner (not your game)',
+    voice: 'bell',
+    on: true
+  },
+  // For everyone, players included. A draw offer is a decision somebody now
+  // has to make, and before this it was the one thing on the board that
+  // appeared nowhere in sound at all.
+  'draw-offered': {
+    label: 'Draw offered',
+    say: 'a draw was offered, and is waiting for an answer',
+    voice: 'ping',
+    on: true
+  },
   sent: {
     label: 'Move sent',
     say: 'your submission was broadcast, and is not in a block yet',
@@ -518,7 +542,13 @@ const ORDER: readonly SoundEvent[] = [
   'win',
   'lose',
   'draw',
+  'decided',
   'skipped',
+  // Above `check`, deliberately. A draw offer is a decision somebody now has to
+  // make and it appears NOWHERE else on the page as anything but a line of
+  // text, whereas a check already lights the king's square red and animates it.
+  // The sound is worth more to the thing that has no other way of being seen.
+  'draw-offered',
   'check',
   'promote',
   'your-turn',
@@ -616,9 +646,12 @@ export function soundFor(
       candidates.add('draw');
     } else if (mine) {
       candidates.add(after.result === (mine === 'white' ? '1-0' : '0-1') ? 'win' : 'lose');
+    } else {
+      // A spectator neither won nor lost, and saying otherwise would invent a
+      // stake they do not have - but a game ending is still the biggest thing
+      // that happens in one, so it gets a sound of its own rather than nothing.
+      candidates.add('decided');
     }
-    // A spectator neither won nor lost, and saying otherwise would be inventing
-    // a stake they do not have. They still hear the move that ended it, below.
   }
 
   // Something of yours was stored, charged for, and refused. Worth its own
@@ -644,6 +677,9 @@ export function soundFor(
     // The batch, not just the last record. Two submissions can land in one
     // poll, and a capture in the first of them still happened.
     for (const record of fresh) {
+      if (record.kind === 'event' && record.event === 'draw-offer') {
+        candidates.add('draw-offered');
+      }
       if (record.kind !== 'move') continue;
       if (record.promotion) candidates.add('promote');
       if (record.captured) candidates.add('capture');
@@ -656,4 +692,21 @@ export function soundFor(
     if (candidates.has(event)) return event;
   }
   return null;
+}
+
+/**
+ * Which side caused the change, if a side did.
+ *
+ * What "tell the sides apart" is keyed off. Read from the last new accepted
+ * record rather than from whose turn it now is, because those are not the same
+ * question: after White moves it is Black to play, and the sound is about the
+ * move that happened, not the one that has not.
+ *
+ * Null for anything with no colour behind it - the first draw of a game, a poll
+ * that changed nothing, and every local sound, none of which any side did.
+ */
+export function actorOf(before: ReplayState | null, after: ReplayState): 'white' | 'black' | null {
+  if (!before) return null;
+  const fresh = after.accepted.slice(before.accepted.length);
+  return fresh.length ? fresh[fresh.length - 1].color : null;
 }

@@ -21,6 +21,7 @@ import {
   SOUND_EVENTS,
   VOICES,
   VOICE_IDS,
+  actorOf,
   involved,
   isCastle,
   isVoiceId,
@@ -282,10 +283,77 @@ describe('choosing a sound', () => {
     expect(soundFor(before, after, BOB)).toBe('win');
   });
 
+  it('tells a watcher a game was decided, without giving them a side', () => {
+    // The gap this closed. A checkmate used to reach a spectator as the same
+    // sound as any ordinary check - the biggest moment in a watched game
+    // rendered as its second least.
+    const { before, after } = step(['f2f3', 'e7e5', 'g2g4', 'd8h4']);
+    expect(soundFor(before, after, CARL)).toBe('decided');
+    // And it is still not a result they own. The players keep theirs.
+    expect(soundFor(before, after, ALICE)).toBe('lose');
+    expect(soundFor(before, after, BOB)).toBe('win');
+  });
+
+  it('tells a watcher about a resignation, which used to be silent', () => {
+    // Worse than the mate, because a resignation is not a move: replay records
+    // it as an event, so the move loop skipped it and the watcher got NOTHING
+    // for the most common way an online game ends.
+    const { before, after } = step(['e2e4', 'e7e5', EVENT_STRINGS.RESIGN], [ALICE, BOB, ALICE]);
+    expect(soundFor(before, after, CARL)).toBe('decided');
+    expect(soundFor(before, after, null)).toBe('decided');
+  });
+
+  it('says nothing more once a decided game is polled again', () => {
+    const over = state(['e2e4', 'e7e5', EVENT_STRINGS.RESIGN], [ALICE, BOB, ALICE]);
+    expect(soundFor(over, over, CARL)).toBeNull();
+  });
+
+  it('keeps a drawn game a draw for a watcher, not a decision', () => {
+    const moves = ['e2e4', 'e7e5', EVENT_STRINGS.DRAW_OFFER, EVENT_STRINGS.DRAW_ACCEPT];
+    const { before, after } = step(moves, [ALICE, BOB, ALICE, BOB]);
+    expect(soundFor(before, after, CARL)).toBe('draw');
+  });
+
+  it('announces a draw offer to everyone, including the watcher', () => {
+    // A draw offer is a decision somebody now has to make, and before this it
+    // was the one thing on the board that made no sound for anybody at all.
+    const { before, after } = step(['e2e4', 'e7e5', EVENT_STRINGS.DRAW_OFFER], [ALICE, BOB, ALICE]);
+    for (const who of [ALICE, BOB, CARL]) {
+      expect(soundFor(before, after, who), `nothing for ${who}`).toBe('draw-offered');
+    }
+  });
+
+  it('puts a draw offer above a check in the same batch', () => {
+    // Deliberate. A check already lights the king's square red and animates it;
+    // an offer appears nowhere but as a line of text, so the sound is worth
+    // more to the thing with no other way of being seen.
+    const before = state(['e2e4', 'd7d5'], [ALICE, BOB]);
+    const after = state(['e2e4', 'd7d5', 'f1b5', EVENT_STRINGS.DRAW_OFFER], [ALICE, BOB, ALICE, ALICE]);
+    expect(after.inCheck).toBe(true);
+    expect(soundFor(before, after, BOB)).toBe('draw-offered');
+  });
+
+  it('knows which side caused a change, and when none did', () => {
+    // What telling the sides apart is keyed off. Read from the record that
+    // arrived, not from whose turn it now is: after White moves it is Black to
+    // play, and the sound is about the move that happened.
+    const first = step(['e2e4']);
+    expect(actorOf(first.before, first.after)).toBe('white');
+    const second = step(['e2e4', 'e7e5']);
+    expect(actorOf(second.before, second.after)).toBe('black');
+    // A resignation is not a move, and still has a colour behind it.
+    const quit = step(['e2e4', 'e7e5', EVENT_STRINGS.RESIGN], [ALICE, BOB, ALICE]);
+    expect(actorOf(quit.before, quit.after)).toBe('white');
+    // Nothing arrived, or nothing to compare against: no colour to invent.
+    const same = state(['e2e4']);
+    expect(actorOf(same, same)).toBeNull();
+    expect(actorOf(null, same)).toBeNull();
+  });
+
   it('gives a spectator the position, not a stake in it', () => {
     // Somebody watching neither won nor lost, and inventing a side for them
     // would be the board asserting something untrue. They hear the mate.
-    const { before, after } = step(['f2f3', 'e7e5', 'g2g4', 'd8h4']);
+    const { before, after } = step(['e2e4', 'd7d5', 'f1b5']);
     expect(soundFor(before, after, CARL)).toBe('check');
   });
 

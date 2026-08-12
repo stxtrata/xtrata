@@ -12,7 +12,7 @@
 
 import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Sound, defaultState } from '../../packages/ui/audio.js';
+import { BLACK_TRANSPOSE, Sound, defaultState } from '../../packages/ui/audio.js';
 import { renderSoundPanel, soundNote, soundToggleLabel } from '../../packages/ui/sound-panel.js';
 import { EVENTS, SOUND_EVENTS, VOICES, VOICE_IDS } from '../../packages/ui/sounds.js';
 import { FakeAudioContext, installFakeAudio } from './fake-audio.js';
@@ -453,6 +453,102 @@ describe('the panel', () => {
       '.snd-pick'
     ) as HTMLSelectElement;
     expect(pick.value).toBe(EVENTS['your-turn'].voice);
+  });
+
+  it('leaves both sides alone until the sides switch is on', () => {
+    const sound = unlocked();
+    const ctx = latest()!;
+
+    ctx.forget();
+    sound.play('move', 'white');
+    const white = ctx.oscillators.map((o) => o.frequency.value);
+    ctx.forget();
+    sound.play('move', 'black');
+    const black = ctx.oscillators.map((o) => o.frequency.value);
+
+    expect(black).toEqual(white);
+  });
+
+  it('pitches Black below White once it is on, and by a musical interval', () => {
+    // The point is following a game by ear. Two sides that differ by an amount
+    // nobody can hear would be a setting that does nothing.
+    const sound = unlocked();
+    const ctx = latest()!;
+    sound.setSides(true);
+
+    ctx.forget();
+    sound.play('move', 'white');
+    const white = ctx.oscillators.map((o) => o.frequency.value);
+    ctx.forget();
+    sound.play('move', 'black');
+    const black = ctx.oscillators.map((o) => o.frequency.value);
+
+    expect(black).toHaveLength(white.length);
+    for (const [i, hz] of black.entries()) {
+      expect(hz).toBeCloseTo(white[i] * BLACK_TRANSPOSE, 4);
+      expect(hz, 'Black must be lower, not merely different').toBeLessThan(white[i]);
+    }
+    // A major third. Far enough to hear at a glance, close enough to stay music.
+    expect(BLACK_TRANSPOSE).toBeCloseTo(2 ** (-4 / 12), 6);
+  });
+
+  it('moves every layer of a voice together, noise included', () => {
+    // One multiplier does the whole job because a voice is described in Hz
+    // throughout. Moving the tones and leaving the noise band behind is what
+    // would turn a transposed knock into a different, broken sound.
+    const sound = unlocked();
+    const ctx = latest()!;
+    sound.setSides(true);
+    sound.setEvent('capture', { voice: 'thump' });
+
+    ctx.forget();
+    sound.play('capture', 'black');
+    // Thump is noise plus two tones; the sources are made for every layer.
+    expect(ctx.voices).toBe(VOICES.thump.layers.length);
+    const tones = ctx.oscillators.map((o) => o.frequency.value).sort((a, b) => a - b);
+    const expected = VOICES.thump.layers
+      .filter((l) => l.wave !== 'noise')
+      .map((l) => l.from * BLACK_TRANSPOSE)
+      .sort((a, b) => a - b);
+    for (const [i, hz] of tones.entries()) expect(hz).toBeCloseTo(expected[i], 4);
+  });
+
+  it('gives no colour to a sound no side caused', () => {
+    // Picking a piece up was nobody's move. Colouring it would be inventing an
+    // actor, and on a local sound there is not one.
+    const sound = unlocked();
+    const ctx = latest()!;
+    sound.setSides(true);
+    sound.setEvent('select', { on: true });
+
+    ctx.forget();
+    sound.play('select', null);
+    const loose = ctx.oscillators.map((o) => o.frequency.value);
+    ctx.forget();
+    sound.play('select', 'white');
+    expect(loose).toEqual(ctx.oscillators.map((o) => o.frequency.value));
+  });
+
+  it('remembers the sides switch, and puts it back on reset', () => {
+    const first = new Sound({ document: dom.window.document });
+    first.setSides(true);
+    expect(new Sound({ document: dom.window.document }).state.sides).toBe(true);
+    first.reset();
+    expect(first.state.sides).toBe(false);
+  });
+
+  it('gives the two new events their own rows and pickers', () => {
+    // They are events like any other: assignable, switchable, adjustable.
+    const sound = new Sound({ document: dom.window.document });
+    renderSoundPanel(list(), sound);
+    for (const name of ['decided', 'draw-offered'] as const) {
+      const row = rows()[SOUND_EVENTS.indexOf(name)];
+      expect(row, `${name} has no row`).toBeTruthy();
+      expect(row.querySelector('.snd-name')?.textContent?.trim()).toBe(EVENTS[name].label);
+      const pick = row.querySelector('.snd-pick') as HTMLSelectElement;
+      expect(pick.value).toBe(EVENTS[name].voice);
+      expect([...pick.querySelectorAll('option')]).toHaveLength(VOICE_IDS.length);
+    }
   });
 
   it('says what background listening will and will not do', () => {

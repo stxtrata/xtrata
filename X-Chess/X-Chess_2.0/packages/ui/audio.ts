@@ -45,8 +45,28 @@ export interface SoundState {
   volume: number;
   /** Keep reading the chain, and keep announcing, while the tab is hidden. */
   background: boolean;
+  /**
+   * Pitch Black's sounds below White's, so a game can be followed by ear.
+   *
+   * For watching rather than playing. A spectator hearing "a move happened"
+   * twelve times learns nothing about the shape of a game; hearing the two
+   * sides answer each other does. Off by default, because a player already
+   * knows whose move it was - they were waiting for it.
+   */
+  sides: boolean;
   events: Record<SoundEvent, EventSetting>;
 }
+
+/**
+ * How far Black is moved down when the sides are being told apart.
+ *
+ * A major third, which is far enough to hear instantly on a chime and still
+ * musical rather than broken. Applied to every layer of whatever voice is
+ * assigned, so it works on a knock and a bell alike, and the two sides stay
+ * recognisably the SAME sound - which is the point. Two different sounds would
+ * be two events, and the panel already offers that to anyone who wants it.
+ */
+export const BLACK_TRANSPOSE = 2 ** (-4 / 12);
 
 /**
  * Sound is ON by default, and the background option is OFF.
@@ -63,7 +83,7 @@ export function defaultState(): SoundState {
     const spec = EVENTS[name];
     events[name] = { on: spec.on, gain: 1, voice: spec.voice };
   }
-  return { master: true, volume: 0.7, background: false, events };
+  return { master: true, volume: 0.7, background: false, sides: false, events };
 }
 
 const clamp = (value: number): number => Math.min(1, Math.max(0, Number(value) || 0));
@@ -156,6 +176,12 @@ export class Sound {
     this.changed();
   }
 
+  setSides(on: boolean): void {
+    this.state.sides = on;
+    this.save();
+    this.changed();
+  }
+
   setEvent(name: SoundEvent, patch: Partial<EventSetting>): void {
     const current = this.state.events[name];
     if (!current) return;
@@ -179,6 +205,7 @@ export class Sound {
     this.state.master = fresh.master;
     this.state.volume = fresh.volume;
     this.state.background = fresh.background;
+    this.state.sides = fresh.sides;
     for (const name of SOUND_EVENTS) this.state.events[name] = fresh.events[name];
     this.save();
     this.changed();
@@ -230,6 +257,7 @@ export class Sound {
       if (typeof saved.master === 'boolean') this.state.master = saved.master;
       if (typeof saved.volume === 'number') this.state.volume = clamp(saved.volume);
       if (typeof saved.background === 'boolean') this.state.background = saved.background;
+      if (typeof saved.sides === 'boolean') this.state.sides = saved.sides;
       for (const name of SOUND_EVENTS) {
         const one = saved.events?.[name];
         if (!one) continue;
@@ -338,14 +366,26 @@ export class Sound {
    * sites, so the board can simply say what happened and this can decide
    * whether it is audible.
    */
-  play(event: SoundEvent): void {
+  /**
+   * Play what an event is set to, optionally coloured by who caused it.
+   *
+   * `side` is the colour that acted, where a colour did. It only matters when
+   * the sides are being told apart, and it is deliberately an argument rather
+   * than something read from the state: a local sound like picking a piece up
+   * was nobody's move, and giving it a colour would be inventing one.
+   */
+  play(event: SoundEvent, side: 'white' | 'black' | null = null): void {
     if (!this.state.master) return;
     const setting = this.state.events[event];
     if (!setting?.on) return;
 
     const voice = VOICES[setting.voice];
     if (!voice) return;
-    this.emit(voice.layers, this.state.volume * setting.gain * voice.gain);
+    this.emit(
+      voice.layers,
+      this.state.volume * setting.gain * voice.gain,
+      this.state.sides && side === 'black' ? BLACK_TRANSPOSE : 1
+    );
   }
 
   /**
@@ -356,20 +396,31 @@ export class Sound {
    * question being asked is "what does this one sound like", and answering it
    * through a muted event would answer with silence.
    */
-  audition(id: VoiceId, level = 1): void {
+  audition(id: VoiceId, side: 'white' | 'black' | null = null): void {
     const voice = VOICES[id];
     if (!voice) return;
     this.unlock();
-    this.emit(voice.layers, Math.max(this.state.volume, 0.25) * clamp(level) * voice.gain);
+    this.emit(
+      voice.layers,
+      Math.max(this.state.volume, 0.25) * voice.gain,
+      this.state.sides && side === 'black' ? BLACK_TRANSPOSE : 1
+    );
   }
 
   /** Preview an event, as its assigned voice, even if the event is muted. */
-  preview(event: SoundEvent): void {
-    this.audition(this.voiceFor(event));
+  preview(event: SoundEvent, side: 'white' | 'black' | null = null): void {
+    this.audition(this.voiceFor(event), side);
   }
 
-  /** Schedule a set of layers at a level, if anything is able to play them. */
-  private emit(layers: readonly Layer[], level: number): void {
+  /**
+   * Schedule a set of layers at a level, if anything is able to play them.
+   *
+   * `shift` multiplies every frequency in the voice. One number does the whole
+   * job because a voice is described in Hz throughout - the glides, the
+   * harmonics and the noise band all move together, which is what keeps a
+   * transposed voice recognisably the same sound rather than a broken one.
+   */
+  private emit(layers: readonly Layer[], level: number, shift = 1): void {
     if (level <= 0) return;
     this.unlock();
     const ctx = this.ctx;
@@ -381,7 +432,11 @@ export class Sound {
       // envelope's first ramp partly in the past, which some browsers render as
       // a click on the front of every sound.
       const t0 = ctx.currentTime + 0.012;
-      for (const layer of layers) this.layer(ctx, out, layer, level, t0);
+      for (const layer of layers) {
+        const moved =
+          shift === 1 ? layer : { ...layer, from: layer.from * shift, to: layer.to * shift };
+        this.layer(ctx, out, moved, level, t0);
+      }
     } catch {
       // A context that was closed under us, or a browser refusing to schedule.
       // Nothing here is worth interrupting a game for.

@@ -490,6 +490,15 @@ export const HTML = `
             <span class="spacer"></span>
             <button class="action" id="sound-reset">Reset</button>
           </div>
+          <!-- For watching rather than playing. A player knows whose move it
+               was because they were waiting for it; somebody following a game
+               they are not in has no such clue, and twelve identical knocks
+               tell them nothing about its shape. -->
+          <div class="row">
+            <label for="sound-sides" style="margin:0">
+              <input type="checkbox" id="sound-sides"> Tell the sides apart, by pitching Black lower
+            </label>
+          </div>
           <div id="sound-note" class="small muted"></div>
           <div id="sound-list"></div>
         </div>
