@@ -367,12 +367,36 @@ one chunk, so the recursive version saves no fees and no transactions. It goes f
 3.33 MB to roughly 1 MB. The reason to do it is that the generator becomes the
 artefact, not that it is cheaper.
 
-**On chain does not mean immutable.** `model-set`, `colour-set` and
-`model-special-set` are public and gated only on `tx-sender` being the artist address
-or the deployer. None of them checks `metadata-frozen` — that flag guards
-`set-base-uri` and nothing else, and as of 2026-08-12 it reads `false` anyway. So the
-artwork the contract renders today can be rewritten by two principals at any time,
-and there is no function in the contract that can stop it.
+**On chain does not mean immutable, and here it cannot be made immutable.** This is
+the load-bearing fact, so it is worth setting out exactly:
+
+- `model-set`, `colour-set` and `model-special-set` rewrite the art tables. Each
+  checks one condition: `tx-sender` is `artist-address` or `DEPLOYER`.
+- There is no freeze for them. The contract's only freeze is `freeze-metadata`, and
+  the only functions that read `metadata-frozen` are `set-base-uri` and
+  `freeze-metadata` itself. The art tables are not covered. The flag reads `false`
+  as of 2026-08-12 in any case.
+- The admin cannot be renounced. `artist-address` is a data var and could be pointed
+  at a burn address, but `DEPLOYER` is `(define-constant DEPLOYER tx-sender)`, fixed
+  at deploy time, and there is no `set-deployer`. The deployer keeps the power to
+  rewrite the art for the life of the contract.
+
+So "just freeze the contract" is not an option that exists. There is no sequence of
+calls, by anyone, that makes the rendered art permanent. That is what an Xtrata
+edition would provide, and it is the only route to it short of redeploying.
+
+**The fork problem, and why escrow answers it.** Sealing an edition alongside a
+still-editable original does risk two versions of the same Invader that no longer
+match. That is a real objection and it should not be waved away.
+
+The Forever Twin escrow model is exactly the mechanism that prevents it. Under the
+helper contract, for any given token the holder has the original *or* the twin, never
+both tradeable at once, and can swap back whenever they like. So the collection does
+not fork into two circulating assets. It gains a switch.
+
+Which means Stacks Invaders may be a Forever Twin after all, sold on a different
+basis. Not "your art will disappear", because it will not. Instead: "hold the live
+editable one, or hold the sealed one, and change your mind whenever you want."
 
 That is not an accusation; it is an ordinary admin capability and the artist
 presumably has no intention of using it. But it is a real and different permanence
