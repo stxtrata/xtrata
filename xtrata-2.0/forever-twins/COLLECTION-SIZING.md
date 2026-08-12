@@ -251,7 +251,7 @@ noted.
 | Mutant Monkeys | 220,928 | 4,639 | *unreachable* | *unknown* | - |
 | LeoCats | 123,185 | 10,000 | 23,740 | 237 MB | 1-10 |
 | The Guests | 99,941 | 500 | 659,855 | 330 MB | 41 (staged) |
-| Stacks Invaders | 32,671 | 3,494 | 28,696 | **100 MB** | 2 |
+| Stacks Invaders | 32,671 | 3,494 | *already on chain* | *not a twin candidate* | - |
 | Crash Punks v1 | 27,264 | 5,720 | *unreachable* | *unknown* | - |
 | Bitcoin Bulls OG | 11,086 | 400 | 1,688 | **0.7 MB** | 1 |
 | Bitcoin Badgers | 10,828 | 1,048 | 1,374,192 | 1.44 GB | 84 (staged) |
@@ -271,23 +271,119 @@ either the name is stale or the restriction lives inside the function body. That
 check matters generally, not just here — the whole escrow model depends on the
 original NFT being transferable into the helper, so confirm it per collection.
 
-### The shortlist
+### The two to build first, and pay for ourselves
 
-**Wasteland Apes** is the standout. Second-highest lifetime volume on Stacks at
-251,253 STX, 10,000 items, and the whole collection is 64.8 MB because the art is
-~6.5 KB per ape. Every item fits one chunk, so 10,000 twins is 110 STX of protocol
-fees. This is the best popularity-per-byte on the list by a wide margin.
+These are the sponsored experiments: build the helper contract, inscribe the entire
+collection at our own cost, and use the finished thing as the reference
+implementation. Both are small enough that "we did the whole collection" is a
+sentence we can actually say.
 
-**Bitcoin Bulls OG** is almost free. 400 items at 1,688 bytes each is 0.7 MB for the
-entire collection — 4.4 STX of protocol fees. Low volume at 11,086 STX, but as a
-sponsored demonstration it costs nothing and finishes in an afternoon.
+**Wasteland Apes** — `SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.wasteland-apes-nft`
 
-**Stacks Invaders** at 3,494 items and 100 MB is the middle option: real volume
-(32,671 STX), two chunks per item, ~38 STX of protocol fees.
+The standout by a wide margin. Second-highest lifetime volume on Stacks at
+251,253 STX and 10,000 items, and the whole collection is only 64.8 MB because the
+art is ~6.5 KB per ape. Every item fits one chunk.
+
+| | |
+|---|---|
+| Xtrata protocol fees, all 10,000 | ~110 STX |
+| Miner fees at the Pepes rate (0.0064 STX) | ~64 STX |
+| Miner fees at wallet-default rate (0.21 STX) | ~2,100 STX |
+| Transactions | 10,000, all single-tx |
+
+The miner fee is the whole budget question, and it is ours to control. Script the
+run at a chosen fee rate rather than letting a wallet estimate each one, and the
+full collection lands for under 200 STX. This is the best popularity-per-byte on
+Stacks and the strongest candidate for a fully-sponsored twin.
+
+Contract checks passed: public `transfer`, so escrow works, and no on-chain art
+rendering, so a twin is genuinely adding permanence rather than duplicating it. Note
+that `set-base-uri` and `set-contract-uri` are still live — `freeze-metadata` exists
+but `metadata-frozen` reads `false` as of 2026-08-12, so the pointer to the art can
+still be changed by the admin. That is a fair and factual part of the pitch.
+
+**Bitcoin Bulls OG** — `SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.byzantion-bitcoin-bulls`
+
+Almost free, and the right one to do *first* because it is a complete end-to-end run
+in an afternoon. 400 items at 1,688 bytes each is 0.7 MB for the entire collection.
+
+| | |
+|---|---|
+| Xtrata protocol fees, all 400 | ~4.4 STX |
+| Miner fees at the Pepes rate | ~2.6 STX |
+| Transactions | 400, all single-tx |
+
+Lifetime volume is lower at 11,086 STX, so it is not the headline. It is the
+rehearsal: same helper contract, same canonical-hash seeding, same swap flow, at a
+cost where a mistake is free. Note the same deployer address as Wasteland Apes —
+one conversation may open both.
+
+Contract checks passed: public `transfer`, no on-chain art rendering, and no
+`set-base-uri` at all, so the token URI is fixed for good. The only exposure is IPFS
+pinning, which is exactly the gap a twin closes.
+
+Suggested order: Bitcoin Bulls OG end-to-end to prove the pipeline, then Wasteland
+Apes as the flagship. Both need the founder conversation first; sponsoring a
+collection without the team is not a thing we should do.
+
+**Stacks Invaders is off this list** — its art is already generated on chain. See
+the next section.
 
 Everything at 500 KB+ per item — Crash Punks, The Guests, SpaghettiPunk, Bitcoin
 Badgers, Smoke Ethereals, The Explorer Guild — is in staged-mint territory and is
 only worth doing as a parts/recursive twin, if it is a generator collection at all.
+
+## Stacks Invaders: already on chain, so not a twin
+
+`SPV8C2N59MA417HYQNG6372GCV0SEQE01EV4Z1RQ.stacks-invaders-v0` renders its own art.
+`get-token-svg(token-id)` returns a complete SVG assembled inside the contract from a
+`base-model` table, a `colour-code` table, and the Bitcoin block height the token was
+minted against. The IPFS token URI is a convenience mirror, not the source of truth.
+
+**The 100 MB figure in the first version of this table was wrong.** It measured the
+IPFS PNG render, which is not the artwork. The real numbers:
+
+| | Value |
+|---|---|
+| On-chain SVG per token | 953 bytes mean (n=8, range 849-1,092) |
+| Whole collection, flat | **3.33 MB** |
+| Chunks per item | 1 |
+| Xtrata protocol fees for all 3,494 | ~38 STX |
+
+There is no permanence gap here, so there is no Forever Twin to build. But there is
+still something worth doing, for two reasons.
+
+**It is already the parts architecture.** Everything the Crash Punks proposal wants
+to build, Stacks Invaders already is: a small model library, a colour table, and a
+per-token recipe that is literally one number. `block-digit-3` is a two-character
+slice, so there are at most 100 models at up to 3 KB each — a parts library under
+300 KB for a 3,494-piece collection. Recreating it on Xtrata as a recursive
+inscription set is the cleanest possible demonstration of `mint-single-tx-recursive`,
+and unlike Crash Punks the layers are not lost, they are readable from the contract
+right now.
+
+Worth being straight about the economics though: at 953 bytes each token already fits
+one chunk, so the recursive version saves no fees and no transactions. It goes from
+3.33 MB to roughly 1 MB. The reason to do it is that the generator becomes the
+artefact, not that it is cheaper.
+
+**On chain does not mean immutable.** `model-set`, `colour-set` and
+`model-special-set` are public and gated only on `tx-sender` being the artist address
+or the deployer. None of them checks `metadata-frozen` — that flag guards
+`set-base-uri` and nothing else, and as of 2026-08-12 it reads `false` anyway. So the
+artwork the contract renders today can be rewritten by two principals at any time,
+and there is no function in the contract that can stop it.
+
+That is not an accusation; it is an ordinary admin capability and the artist
+presumably has no intention of using it. But it is a real and different permanence
+argument from the one Forever Twins usually makes. Not "your art will disappear" but
+"your art can be edited, and nothing in the contract can prevent it". An Xtrata
+inscription is a hash-pinned snapshot of the collection exactly as it renders today,
+which is a thing the source contract structurally cannot offer.
+
+Approach for this one is a port or a mirror, not a twin: no escrow, no swap, because
+the original is not at risk of vanishing. Worth a separate conversation with the
+artist about what they would actually want it to mean.
 
 ### Two collections whose art is already failing
 
@@ -315,6 +411,13 @@ longer works, and that is the Forever Twins pitch without any embellishment.
 
 ## Caveats
 
+- **Measure the artefact, not the mirror.** Stacks Invaders was first sized at 100 MB
+  off its IPFS PNGs; the real art is a ~950-byte SVG the contract renders itself, and
+  the whole collection is 3.33 MB. Before sizing any collection, read the contract's
+  public functions and check for a `get-token-svg`-style renderer. `get-token-uri`
+  pointing at IPFS does not mean IPFS holds the artwork. Wasteland Apes and Bitcoin
+  Bulls OG have both been checked and have no on-chain renderer; the rest of the
+  survey table has not.
 - Per-item means for the survey table are 8-sample estimates and will move a few
   percent. The three live FT collections are measured much more heavily (56, 93 and
   200 samples) and should be treated as firm.

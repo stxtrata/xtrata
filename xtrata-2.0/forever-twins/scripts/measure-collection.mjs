@@ -103,6 +103,25 @@ async function imageBytes(imageUri) {
 const applyTemplate = (uri, id) =>
   uri.replace(/\{id\}/g, id).replace(/\$TOKEN_ID/g, id).replace(/\{tokenId\}/g, id);
 
+// Stacks Invaders got sized at 100 MB off its IPFS PNGs before anyone noticed the
+// contract renders its own ~950-byte SVG. `get-token-uri` pointing at IPFS does not
+// mean IPFS holds the artwork. Check the contract before trusting the fetched bytes.
+async function onChainRenderer(contractId) {
+  const [address, name] = contractId.split('.');
+  try {
+    const res = await fetch(`https://api.mainnet.hiro.so/v2/contracts/interface/${address}/${name}`);
+    if (!res.ok) return { checked: false, reason: `HTTP ${res.status}` };
+    const iface = await res.json();
+    const suspects = (iface.functions || [])
+      .filter((f) => f.access === 'read_only' || f.access === 'public')
+      .map((f) => f.name)
+      .filter((n) => /svg|render|design|generate|token-image|onchain/i.test(n));
+    return { checked: true, suspects };
+  } catch (e) {
+    return { checked: false, reason: String(e.message).slice(0, 80) };
+  }
+}
+
 async function mapLimit(items, limit, fn) {
   const out = new Array(items.length);
   let i = 0;
@@ -122,12 +141,14 @@ async function measure(contractId, samples) {
   const supply = Number(last.value?.value?.value ?? last.value?.value);
   if (!Number.isFinite(supply) || supply < 1) return { contractId, error: 'no usable supply' };
 
+  const renderer = await onChainRenderer(contractId);
+
   const uriRes = await readOnly(contractId, 'get-token-uri', [uintCV(1)]);
   const rawUri = (() => {
     const v = uriRes.ok ? uriRes.value?.value?.value : null;
     return typeof v === 'string' ? v : v?.value ?? null;
   })();
-  if (!rawUri) return { contractId, supply, error: `get-token-uri failed: ${uriRes.error ?? 'empty'}` };
+  if (!rawUri) return { contractId, supply, renderer, error: `get-token-uri failed: ${uriRes.error ?? 'empty'}` };
 
   const hasTemplate = /\{id\}|\$TOKEN_ID|\{tokenId\}/.test(rawUri);
   const ids = [];
@@ -170,7 +191,7 @@ async function measure(contractId, samples) {
 
   const measured = results.filter((r) => r.bytes);
   if (!measured.length) {
-    return { contractId, supply, tokenUri: rawUri, sampled: 0, tried: results.length,
+    return { contractId, supply, tokenUri: rawUri, renderer, sampled: 0, tried: results.length,
              error: 'art unreachable for every sampled token', results };
   }
 
@@ -180,7 +201,7 @@ async function measure(contractId, samples) {
   const singleTxEligible = meanChunks <= SINGLE_TX_CHUNK_LIMIT;
 
   return {
-    contractId, supply, tokenUri: rawUri,
+    contractId, supply, tokenUri: rawUri, renderer,
     sampled: measured.length, tried: results.length,
     meanBytes: mean,
     medianBytes: sizes[Math.floor(sizes.length / 2)],
@@ -211,9 +232,15 @@ for (const contractId of contractIds) {
   const r = await measure(contractId, samples);
   all.push(r);
   if (asJson) continue;
+  const rendererWarning = r.renderer?.suspects?.length
+    ? `  WARNING: contract exposes ${r.renderer.suspects.join(', ')} — the art may be rendered on chain,\n           in which case the bytes below are a mirror and not the artwork.`
+    : r.renderer && !r.renderer.checked
+      ? `  note: could not check for an on-chain renderer (${r.renderer.reason})`
+      : null;
   if (r.error) {
     console.log(`\n${contractId}`);
     console.log(`  supply: ${r.supply ?? 'unknown'}`);
+    if (rendererWarning) console.log(rendererWarning);
     console.log(`  ERROR: ${r.error}`);
     continue;
   }
@@ -221,6 +248,7 @@ for (const contractId of contractIds) {
   const mib = (r.totalBytes / 1024 / 1024).toFixed(1);
   console.log(`\n${contractId}`);
   console.log(`  supply            ${r.supply}`);
+  if (rendererWarning) console.log(rendererWarning);
   console.log(`  sampled           ${r.sampled}/${r.tried}  (${r.contentType ?? 'unknown type'})`);
   console.log(`  bytes per item    mean ${r.meanBytes}  median ${r.medianBytes}  range ${r.minBytes}-${r.maxBytes}`);
   console.log(`  chunks per item   ${r.chunksPerItem}${r.singleTxEligible ? '' : '  (over the 32-chunk single-tx cap, staged mint)'}`);
