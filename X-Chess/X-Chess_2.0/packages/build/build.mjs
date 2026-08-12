@@ -355,18 +355,20 @@ async function main() {
     console.log('');
   }
 
-  // Xtrata charges by the chunk, not by the byte, so the number worth printing
-  // is how close this build is to buying another one. Say it every time: the
-  // last two features spent 1,620 bytes between them and nothing mentioned it.
-  const chunkCeiling = manifest.xtrataChunks * XTRATA_CHUNK_BYTES;
-  const headroom = chunkCeiling - manifest.bytes;
+  // `add-chunk-batch` takes `(list 32 (buff 16384))`, so 32 chunks go up in one
+  // transaction. Print the room left inside that, because it is the figure
+  // anybody deciding whether to add something actually needs, and because the
+  // last two features spent 1,620 bytes between them with nothing mentioning it.
+  const BATCH_CHUNKS = 32;
+  const batchCeiling = BATCH_CHUNKS * XTRATA_CHUNK_BYTES;
+  const headroom = batchCeiling - manifest.bytes;
 
   console.log(`built dist/xchess.html  ${manifest.bytes.toLocaleString()} bytes`);
   console.log(`  sha256    ${manifest.htmlSha256}  (shasum -a 256)`);
   console.log(`  xtrata    ${manifest.xtrataChainHash}  (${manifest.xtrataChunks} chunks, what Inscribe shows)`);
   console.log(
-    `  budget    ${headroom.toLocaleString()} bytes left in ${manifest.xtrataChunks} chunks` +
-      ` (ceiling ${chunkCeiling.toLocaleString()})`
+    `  budget    ${manifest.xtrataChunks}/${BATCH_CHUNKS} chunks in one upload transaction, ` +
+      `${headroom.toLocaleString()} bytes to spare`
   );
   console.log(`  contract  ${CONTRACT} (${NETWORK})${REMEMBERED ? ' - kept from the last build' : ''}`);
   console.log(`  version   ${VERSION} - ${BUILT} - #${manifest.codeHash}`);

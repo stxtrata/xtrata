@@ -936,8 +936,23 @@ the step is about - thirty more moves would put another 210,000 back in.
 ## ADR-0014 — The chunk is the unit of account, not the byte
 
 **Date** 2026-08-12
-**Status** accepted
+**Status** accepted, amended the same day
 **Measured on** commit 79f9502f, `dist/xchess.html` at 130,782 bytes
+
+> **Amendment, 2026-08-12.** As first written this ADR asserted a budget of
+> **eight** chunks. That was not a protocol limit. It was the number of chunks
+> the artefact happened to occupy, mistaken for a ceiling, and it made the
+> headroom look like 290 bytes when it is 393,236.
+>
+> The real figure comes from the live contract: `add-chunk-batch` takes
+> `(list 32 (buff 16384))` (`xtrata-v3.4.0.clar:1008`), so **32 chunks, 524,288
+> bytes, go up in a single transaction**. The gate is now 32, and what it
+> protects against is an upload quietly becoming a two-transaction one.
+>
+> The decision below stands - the chunk is still the right unit, and the
+> machinery is unchanged. What changes is the number and, with it, the urgency
+> of everything that was ordered behind it. Minifying the shell CSS is still
+> worth 9.4 permanent kilobytes; it is **not** a precondition for anything.
 
 ### Context
 
@@ -987,9 +1002,14 @@ budget, but a figure that catches a catastrophe rather than permitting one.
 
 ### Consequences
 
-- Every proposal with a byte cost becomes decidable. "About 0.4 KB" stops being a
-  number without a denominator and becomes "more headroom than exists, so
-  something else comes out or a chunk gets bought deliberately".
+- Every proposal with a byte cost becomes decidable, which was the point and
+  survives the amendment: "about 0.4 KB" stops being a number without a
+  denominator. At 32 chunks the answer is usually "that fits comfortably", and
+  the value of the gate is that it is now an answer rather than a guess.
+- **The per-package rows, not the chunk count, are what will actually fire.**
+  They sum to about 142 KB against a 512 KB gate, so a package that starts
+  growing is caught while it is still surprising. That is the useful behaviour;
+  the chunk count is the hard stop behind it.
 - The budget test must be seen to fail before it is trusted. It was: 1,200 bytes
   of dead CSS took the artefact to 132,572 bytes and nine chunks, and the suite
   reported exactly that, by name and figure.

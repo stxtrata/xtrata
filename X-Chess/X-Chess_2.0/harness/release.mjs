@@ -86,17 +86,18 @@ if (!existsSync(HTML) || !existsSync(MANIFEST)) {
     refuse(`the build version is still a development one (${manifest.build})`);
   }
 
-  // A chunk is what Xtrata charges for, and a chunk more is permanent. Going up
-  // is allowed; going up WITHOUT HAVING DECIDED TO is what this stops. The flag
-  // is the decision, and it should arrive with an ADR beside it.
-  const BUDGETED_CHUNKS = 8;
+  // `add-chunk-batch` takes `(list 32 (buff 16384))`, so 32 chunks - 524,288
+  // bytes - go up in ONE transaction. Past that an upload needs a second one,
+  // which is a real change to how the artefact ships. Going over is allowed;
+  // going over WITHOUT HAVING DECIDED TO is what this stops.
+  const BUDGETED_CHUNKS = 32;
   const chunks = Number(manifest.xtrataChunks);
   if (chunks > BUDGETED_CHUNKS && !process.argv.includes('--allow-chunk')) {
     refuse(
-      `the artefact now takes ${chunks} Xtrata chunks, not ${BUDGETED_CHUNKS} ` +
-        `(${Number(manifest.bytes).toLocaleString()} bytes). That is a permanent chunk more ` +
-        'than budgeted. Take bytes out, or pass --allow-chunk with an ADR recording why ' +
-        'the extra chunk is worth paying for, and raise CHUNKS in tests/artifact/budget.test.ts.'
+      `the artefact takes ${chunks} Xtrata chunks (${Number(manifest.bytes).toLocaleString()} ` +
+        `bytes), more than the ${BUDGETED_CHUNKS} that fit in one add-chunk-batch ` +
+        'transaction. Take bytes out, or pass --allow-chunk with an ADR recording that a ' +
+        'two-transaction upload is acceptable, and raise CHUNKS in tests/artifact/budget.test.ts.'
     );
   }
 }

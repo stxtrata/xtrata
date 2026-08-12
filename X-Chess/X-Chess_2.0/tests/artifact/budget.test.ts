@@ -1,24 +1,33 @@
 // The byte budget, in the unit that actually costs money.
 //
-// Xtrata does not charge by the byte. It charges by the CHUNK, and a chunk is
-// 16,384 bytes. So the number that matters is not "how big is the page", it is
-// "how many chunks does it buy", and the only moment that number matters is the
-// moment it goes up.
+// Xtrata uploads in CHUNKS of 16,384 bytes, and `add-chunk-batch` takes
+// `(list 32 (buff 16384))` - so THIRTY-TWO chunks, 524,288 bytes, go up in a
+// single transaction. That is the real step in the cost: within one transaction
+// the marginal chunk is network fee proportional to its bytes, and the thing
+// that actually changes the shape of an upload is needing a SECOND transaction.
 //
-// This exists because it very nearly went up without anybody noticing. Two
-// features landed and spent 1,620 bytes; nothing in the project said so, and
-// the only size gate in the suite permitted 250,000 bytes - sixteen chunks -
-// which is not a budget, it is the absence of one.
+// So the budget is one transaction's worth, and the gate is at 32.
+//
+// An earlier version of this file asserted 8, which was not a protocol limit at
+// all - it was the number of chunks the artefact happened to occupy on the day
+// it was written, mistaken for a ceiling. That error made a 9.4 KB saving look
+// like a precondition for every other change, which it is not.
+//
+// The file still exists for the reason it was written: two features landed and
+// spent 1,620 bytes, nothing in the project said so, and the only size gate in
+// the suite permitted 250,000 bytes without comment. A budget nobody can see is
+// not a budget.
 //
 // Two assertions, doing different jobs:
 //
-//   * The CHUNK COUNT is the gate. It is a single number with a price attached,
-//     and moving it should require a deliberate decision and an ADR.
-//   * The PER-PACKAGE ROWS are a map. They do not gate anything the chunk count
-//     does not already gate; they exist so that when the chunk assertion goes
-//     red, the next line of output says WHERE the bytes went. Their ceilings sum
-//     to more than eight chunks on purpose - they are for locating a regression,
-//     not for rationing.
+//   * The CHUNK COUNT is the hard stop: past it the artefact no longer uploads
+//     in one transaction. Moving it should take a deliberate decision and an ADR.
+//   * The PER-PACKAGE ROWS are the early warning, and in practice they are what
+//     will actually fire. They sit far below the chunk gate - their ceilings sum
+//     to about 142 KB against 512 KB - so a package that starts growing is caught
+//     while it is still a surprise, rather than after the artefact has quietly
+//     tripled. They also give a regression an ADDRESS, which the chunk count
+//     alone never can.
 //
 // The rows are seeded from a measured run and each carries the figure it was
 // measured at, so "is this ceiling real or aspirational" is answerable by
@@ -41,14 +50,15 @@ const MANIFEST_PATH = resolve(ROOT, 'dist/manifest.json');
 const CHUNK_BYTES = 16_384;
 
 /**
- * The chunk count this artefact is budgeted at.
+ * The chunks that fit in one `add-chunk-batch` transaction.
  *
- * Raising this buys a permanent chunk. It is not a number to adjust because a
- * build went over: it is a number to adjust because somebody decided the extra
- * chunk was worth paying for, wrote down why, and passed `--allow-chunk` to the
- * release.
+ * Taken from the live contract: `xtrata-v3.4.0.clar` declares
+ * `(list 32 (buff 16384))`. Crossing it does not make an upload impossible, it
+ * makes it a two-transaction upload - which is a real change to how the artefact
+ * ships, and the thing worth being told about before it happens rather than
+ * after.
  */
-const CHUNKS = 8;
+const CHUNKS = 32;
 
 /**
  * Per-package ceilings, in minified bundle bytes.
@@ -119,15 +129,16 @@ describe('the permanent byte budget', () => {
 
     expect(
       manifest.xtrataChunks,
-      `the artefact is ${manifest.bytes.toLocaleString()} bytes and now takes ` +
-        `${manifest.xtrataChunks} Xtrata chunks, not ${CHUNKS}. The ${CHUNKS}-chunk ` +
-        `ceiling is ${ceiling.toLocaleString()} bytes, so it is ${(-headroom).toLocaleString()} ` +
-        'bytes over. Either take bytes out, or decide to buy a chunk: raise CHUNKS ' +
-        'here, write the ADR, and pass --allow-chunk to the release.'
-    ).toBe(CHUNKS);
+      `the artefact is ${manifest.bytes.toLocaleString()} bytes and takes ` +
+        `${manifest.xtrataChunks} Xtrata chunks, which is more than the ${CHUNKS} that fit ` +
+        `in one add-chunk-batch transaction (${ceiling.toLocaleString()} bytes). It is ` +
+        `${(-headroom).toLocaleString()} bytes over, so this would now be a ` +
+        'two-transaction upload. Either take bytes out, or decide that is acceptable: ' +
+        'raise CHUNKS here, write the ADR, and pass --allow-chunk to the release.'
+    ).toBeLessThanOrEqual(CHUNKS);
 
-    // Not a failure - a permanent artefact with room left is the good case -
-    // but it is the figure every proposal to add something is priced against.
+    // Not a failure - room left is the good case - but it is the figure every
+    // proposal to add something is priced against.
     expect(headroom, 'the artefact is somehow larger than its own chunk count').toBeGreaterThan(0);
   });
 
