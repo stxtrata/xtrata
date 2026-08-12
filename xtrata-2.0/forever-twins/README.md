@@ -1,8 +1,20 @@
-# Forever Twins Campaign
+# Forever Twins
 
-Live document pack for the Bitcoin Pepes permanence campaign.
+Working pack for the Forever Twins permanence project: campaign documents, contract references, and the DeGrants delivery plan.
 
-Status: post-launch live operations. The Bitcoin Pepes helper contract is live, holders have already started claiming Forever Twins on Fak.fun, and the campaign is now a live Xtrata case study. Exact public numbers, promo terms, helper-contract read-only values, and partner wording still need fresh verification before formal publication.
+Status: **grant awarded, not yet confirmed.** Forever Twins was awarded $5,000 in Stacks Community DeGrants Cohort 4, announced 2026-08-05. As of 2026-08-10 the DeGrants panel still shows stage "Initial Pitch" and $0 received, so the 12 week delivery clock has not started.
+
+Separately, the campaign side is in post-launch live operations. The Bitcoin Pepes helper contract is live, holders have already started claiming Forever Twins on Fak.fun, and the campaign is a live Xtrata case study. Exact public numbers, promo terms, helper-contract read-only values, and partner wording still need fresh verification before formal publication.
+
+## Grant Delivery
+
+- `BLUEPRINT-SUBMISSION.md`: the project blueprint text, ready to paste into the DeGrants form.
+- `BLUEPRINT-DECISIONS.md`: what the blueprint changed from the pitch and why, plus what to raise with the steward.
+- `GRANT-DELIVERY-PLAN.md`: the execution spine. What was promised, what already exists, the 12 week schedule, and the risk register.
+- `GRANT-DECISIONS.md`: the open decisions, in plain language, with recommendations.
+- `FUNDING-RADAR.md`: auto-updated weekly list of grants, hackathons and bounties Xtrata could apply for.
+
+Read `GRANT-DECISIONS.md` first. The blueprint has not been submitted yet, and it is the document that defines what "done" means for the final $4,000.
 
 ## Working Positioning
 
@@ -26,6 +38,7 @@ Your NFT can survive while the art disappears.
 - `copy/`: landing page, social, video, carousel, press, and outreach copy.
 - `scripts/`: verification/count/export script stubs and helper-read tooling.
 - `data/`: starter campaign data files.
+- `contracts-reference/`: source copies of the live fak.fun helper contracts and the Xtrata core they mint through. These are the template the grant generalises.
 
 ## Verify Before Formal Publication
 
