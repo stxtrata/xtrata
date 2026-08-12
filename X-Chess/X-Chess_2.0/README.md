@@ -8,7 +8,8 @@ There is no X Chess server: no API, no database, no signing service, no
 indexer, no leaderboard. If every machine anybody involved has ever operated
 disappeared tomorrow, the application would keep working.
 
-**This is not launch-ready and must not be inscribed.** See
+**Live on mainnet as Xtrata inscription 2988.** Open
+<https://xtrata.xyz/i/2988> and play. See
 [Where this actually stands](#where-this-actually-stands).
 
 ---
@@ -428,26 +429,47 @@ game, position, result and rating without this repository existing.
 
 ## Where this actually stands
 
-**405 tests pass. Nothing is inscribable.**
+**Live on mainnet. Real games, real moves, real money.**
 
-`npm run release` currently refuses, and correctly, on five counts:
+The application is Xtrata inscription **2988**, version 2.0.0, built
+2026-08-09, build hash `c2861564`, 123,062 bytes. It is served at
+<https://xtrata.xyz/i/2988> and reconstructed from the chain on every load.
 
-```
-- the build names a placeholder contract
-- the build version is still a development one
-- 14 wallet matrix row(s) have not been run
-- the wallet matrix is not signed against this build hash
-- 23 item(s) in ops/LAUNCH.md are unchecked
-```
+It talks to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`
+on mainnet.
 
-Done: the engine (perft-verified), the protocols, the contract (solvent under
-property testing), the chain and wallet layers, the application, the build, the
-artefact and runtime suites, the cache, the legacy adapters, and the gates page.
+### Live state, read from the contract on 2026-08-11
 
-Not done: anything that needs a real wallet, a real endpoint for writing, or a
-real chain. Nothing has ever been signed. `ops/LAUNCH.md` tracks all of it.
+| Reading | Value |
+| --- | --- |
+| `get-game-count` | 9 |
+| Moves submitted across all games | 80 |
+| Distinct addresses that have opened a game | 2 |
+| `get-ranked-count` | 5 |
+| `get-open-fee` | 1000000 uSTX (1 STX) |
+| `get-rebate-count` | 2 |
+| `is-solvent` | true |
 
-The risk that matters most is **R1** in `ops/RISKS.md`, described above.
+The longest game so far is game 4 at 33 moves. Game 8 is the longest ranked
+one at 20. Every one of those 80 moves is a signed transaction, so the claim
+that a move is a transaction is no longer a design statement.
+
+**These numbers are a snapshot and go stale.** Re-read them from the contract
+before quoting them anywhere. The commands are in
+`xtrata-2.0/comms/README.md`, and the same rule applies to anything published
+from `xtrata-2.0/comms/`.
+
+### Known open point
+
+The inscribed build hardcodes the contract name `xchess-core-v1-canary`, and
+the inscription is permanent. If a contract named `xchess-core-v1` is ever
+deployed as the "real" one, inscription 2988 will keep talking to the canary
+regardless. Either the canary is the production contract from here on, or a new
+inscription is needed. Decide which before promoting a second contract, because
+2988 cannot be repointed.
+
+`ops/LAUNCH.md` and `ops/RISKS.md` still describe the pre-launch gates. R1
+remains the risk that matters most.
 
 ---
 
