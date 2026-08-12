@@ -26,6 +26,16 @@ Read `GRANT-DECISIONS.md` first. The blueprint has not been submitted yet, and i
 
 Your NFT can survive while the art disappears.
 
+## Sizing and Candidate Collections
+
+- `COLLECTION-SIZING.md`: how much data each collection actually puts on chain,
+  measured 2026-08-12. Covers the three live Forever Twin collections, the cost model,
+  the Crash Punks recursive-parts proposal, and a ranked survey of other Stacks
+  collections by popularity against total data size. Read this before scoping any new
+  collection.
+- `scripts/measure-collection.mjs`: the tool those numbers came from. Point it at any
+  SIP-009 contract id.
+
 ## Folder Map
 
 - `Campaign-Facts-and-Open-Questions.md`: control document for verified facts, live checks, and open questions.
