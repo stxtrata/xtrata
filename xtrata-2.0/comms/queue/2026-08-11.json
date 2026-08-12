@@ -1,0 +1,1204 @@
+{
+  "date": "2026-08-11",
+  "generatedBy": "seed. Hand-written to establish the format and the voice baseline. X Chess block added on launch day, 2026-08-11.",
+  "posts": [
+    {
+      "id": "2026-08-11-xchess-live",
+      "surface": "x-chess",
+      "category": "announce",
+      "angle": "board-is-inscribed",
+      "note": "Post this first. Lifted from the hand-written board, which is proven copy.",
+      "text": "X Chess is live.\n\nFully on chain. No server, no account, no referee. Open a board and play.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/01-hero-game1.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/08-mobile-game.png",
+          "path": "X-Chess/shots/08-mobile-game.png",
+          "kind": "curated",
+          "label": "Curated for board-is-inscribed",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-live",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-live.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-2988",
+      "surface": "x-chess",
+      "category": "standalone",
+      "angle": "board-is-inscribed",
+      "variant": 1,
+      "text": "The application is inscription 2988.\n\nNot a website that loads a chess board. The board itself is the inscription, rebuilt from the chain every time somebody opens it.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/01-hero-game1.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/08-mobile-game.png",
+          "path": "X-Chess/shots/08-mobile-game.png",
+          "kind": "curated",
+          "label": "Curated for board-is-inscribed",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-2988",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-2988.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-games",
+      "surface": "x-chess",
+      "category": "standalone",
+      "angle": "live-games",
+      "variant": 2,
+      "note": "The excitement post. The move count moved from 80 to 87 inside half an hour on launch day, so re-read it with npm run comms:signals immediately before sending, not the night before.",
+      "text": "Nine games opened. Eighty seven signed transactions.\n\nNot one of them is a row in a database. The position is stored nowhere. It gets replayed from the log every time somebody opens the board.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/03-moves-panel.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/03-moves-panel.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-games",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-games.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ],
+      "facts": [
+        {
+          "path": "chain.xchess.value.gameCount",
+          "was": 9,
+          "asWritten": "Nine"
+        },
+        {
+          "path": "chain.xchess.value.movesTotal",
+          "was": 87,
+          "asWritten": "Eighty seven"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-notme",
+      "surface": "x-chess",
+      "category": "standalone",
+      "angle": "anyone-else",
+      "note": "Honest framing of a small number. Two addresses have opened games, so do not imply a crowd.",
+      "text": "Somebody who is not me has opened games on it.\n\nThat matters more than it sounds. anyone-else opens a board to the world and closes it to the opener, so I cannot quietly play both colours.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/04-open-anyone-else.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/04-open-anyone-else.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-notme",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-notme.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ],
+      "facts": [
+        {
+          "path": "chain.xchess.value.distinctOpeners",
+          "was": 2,
+          "asWritten": "Somebody who is not me"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-sponsored",
+      "surface": "x-chess",
+      "category": "standalone",
+      "angle": "sponsored",
+      "note": "Strongest material on the hand-written board. The itemised cost shot does the argument.",
+      "text": "You can challenge somebody who has never held a satoshi.\n\nTick sponsored and the contract sends them their gas in the same transaction that opens the board. They open the link with an empty wallet and they can move.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/05-sponsored-challenge.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/06-sponsor-both.png",
+          "path": "X-Chess/shots/06-sponsor-both.png",
+          "kind": "curated",
+          "label": "Curated for sponsored",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-sponsored",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-sponsored.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-versions",
+      "surface": "x-chess",
+      "category": "standalone",
+      "angle": "board-is-inscribed",
+      "variant": 3,
+      "note": "Covers the more-versions-coming question without promising a date.",
+      "text": "2988 is version 2.0.0, and it is permanent.\n\nLater versions will be their own inscriptions. Nothing about this one can be edited, taken down, or quietly patched underneath the people playing on it.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/01-hero-game1.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/08-mobile-game.png",
+          "path": "X-Chess/shots/08-mobile-game.png",
+          "kind": "curated",
+          "label": "Curated for board-is-inscribed",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-versions",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-versions.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-t1",
+      "surface": "x-chess",
+      "category": "thread",
+      "thread": "xchess-subtraction",
+      "threadTitle": "Thread: delete until only the chess is left",
+      "angle": "subtraction",
+      "text": "Imagine boiling chess.com down until nothing is left but the chess.\n\nDelete the servers. Delete the accounts. Delete the referee. Delete the company.\n\nIt still works, and it is live.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/01-hero-game1.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-t1",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-t1.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-t2",
+      "surface": "x-chess",
+      "category": "thread",
+      "thread": "xchess-subtraction",
+      "angle": "four-characters",
+      "text": "The contract stores no position. No turn. No winner.\n\nJust a list of four character strings and the arithmetic to read them.",
+      "image": "X-Chess/shots/03-moves-panel.png",
+      "verified": "verified",
+      "signals": [],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/03-moves-panel.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-t2",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-t2.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-t3",
+      "surface": "x-chess",
+      "category": "thread",
+      "thread": "xchess-subtraction",
+      "angle": "ranked-recomputable",
+      "text": "Ratings are stored nowhere either. Anyone can recompute every rating from the chain and get the same number.\n\nFive of the nine games so far are ranked.",
+      "image": "X-Chess/shots/07-ranked.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/07-ranked.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-t3",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-t3.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ],
+      "facts": [
+        {
+          "path": "chain.xchess.value.rankedCount",
+          "was": 5,
+          "asWritten": "Five"
+        },
+        {
+          "path": "chain.xchess.value.gameCount",
+          "was": 9,
+          "asWritten": "nine"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xchess-t4",
+      "surface": "x-chess",
+      "category": "thread",
+      "thread": "xchess-subtraction",
+      "angle": "live-games",
+      "note": "Closes the thread on the live number and an invitation. Re-read the move count before sending.",
+      "text": "Eighty seven signed transactions so far. The longest game runs to thirty three moves.\n\nOpen a board and add to it.\n\nhttps://xtrata.xyz/i/2988",
+      "image": "X-Chess/shots/03-moves-panel.png",
+      "verified": "verified",
+      "signals": [
+        "chain.xchess"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "X-Chess/shots/03-moves-panel.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/01-hero-game1.png",
+          "path": "X-Chess/shots/01-hero-game1.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/02-players-panel.png",
+          "path": "X-Chess/shots/02-players-panel.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "curated-X-Chess/shots/05-sponsored-challenge.png",
+          "path": "X-Chess/shots/05-sponsored-challenge.png",
+          "kind": "curated",
+          "label": "Curated for X Chess",
+          "source": "repo"
+        },
+        {
+          "id": "capture-x-chess",
+          "path": "comms/assets/2026-08-11/capture-x-chess.jpg",
+          "kind": "capture",
+          "label": "Game 4 on the live board, captured earlier today",
+          "source": "https://xtrata.xyz/i/2988"
+        },
+        {
+          "id": "stat-x-chess",
+          "path": "comms/assets/2026-08-11/stat-x-chess.png",
+          "kind": "card",
+          "label": "Stat card from today signals",
+          "source": "generated"
+        },
+        {
+          "id": "quote-2026-08-11-xchess-t4",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xchess-t4.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ],
+      "facts": [
+        {
+          "path": "chain.xchess.value.movesTotal",
+          "was": 87,
+          "asWritten": "Eighty seven"
+        },
+        {
+          "path": "chain.xchess.value.longestGame.moves",
+          "was": 33,
+          "asWritten": "thirty three"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-ft-a",
+      "surface": "forever-twins",
+      "category": "standalone",
+      "angle": "art-disappears",
+      "variant": 1,
+      "note": "The core line. Strongest opener in the set.",
+      "text": "Your NFT can survive while the art disappears.\n\nMost tokens are a pointer to a file on a server somebody is still paying for. A Forever Twin puts the work itself on chain, and keeps the collection identity and the holder.\n\nhttps://xtrata.xyz/forever-twins/",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        },
+        {
+          "id": "quote-2026-08-11-ft-a",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-ft-a.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-ft-b",
+      "surface": "forever-twins",
+      "category": "standalone",
+      "angle": "dependency-rescue",
+      "variant": 2,
+      "note": "Same argument as the opener, framed as a question. Pick one, not both.",
+      "text": "Ask where the art lives.\n\nIf the answer is a URL, somebody is paying a bill to keep your collectible looking like itself. When that bill stops, the token stays and the picture goes.\n\nForever Twins fix the pointer by removing it.\n\nhttps://xtrata.xyz/forever-twins/",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        },
+        {
+          "id": "quote-2026-08-11-ft-b",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-ft-b.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-ft-t1",
+      "surface": "forever-twins",
+      "category": "thread",
+      "thread": "ft-quiet-death",
+      "threadTitle": "Thread: how a collection dies quietly",
+      "angle": "dependency-rescue",
+      "note": "Open cold. No product name in the first post.",
+      "text": "A collection can die quietly.\n\nNot with a rug or a hack. The art just stops loading one day, because a bill went unpaid, and nobody notices for a week.\n\nhttps://xtrata.xyz/forever-twins/",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        },
+        {
+          "id": "quote-2026-08-11-ft-t1",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-ft-t1.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-ft-t2",
+      "surface": "forever-twins",
+      "category": "thread",
+      "thread": "ft-quiet-death",
+      "angle": "dependency-rescue",
+      "text": "The token is fine. It is doing exactly what it was built to do.\n\nIt is holding a pointer. The thing being pointed at is what left.",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "verified": "verified",
+      "signals": [],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        },
+        {
+          "id": "quote-2026-08-11-ft-t2",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-ft-t2.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-ft-t3",
+      "surface": "forever-twins",
+      "category": "thread",
+      "thread": "ft-quiet-death",
+      "angle": "art-disappears",
+      "note": "Land on the core line, then the link.",
+      "text": "A Forever Twin makes the collectible self contained. Same collection, same holder, no external dependency left to fail.\n\nYour NFT can survive while the art disappears.\n\nhttps://xtrata.xyz/forever-twins/",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        },
+        {
+          "id": "quote-2026-08-11-ft-t3",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-ft-t3.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-suno-a",
+      "surface": "suno-more",
+      "category": "standalone",
+      "angle": "ai-music-permanence",
+      "variant": 1,
+      "text": "You do not own a Suno track. You own an account that currently shows it to you.\n\nInscribe the master and the recording outlives the platform, the account, and the terms it was made under.\n\nhttps://xtrata.xyz/wizard/suno",
+      "image": "suno-more/assets/suno-more-logo.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "suno-more/assets/suno-more-logo.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-suno-more",
+          "path": "comms/assets/2026-08-11/capture-suno-more.jpg",
+          "kind": "capture",
+          "label": "The Suno wizard, captured earlier today",
+          "source": "https://xtrata.xyz/wizard/suno"
+        },
+        {
+          "id": "quote-2026-08-11-suno-a",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-suno-a.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-suno-b",
+      "surface": "suno-more",
+      "category": "standalone",
+      "angle": "attribution-chain",
+      "variant": 2,
+      "text": "Credit is a database entry until the database changes hands.\n\nSuno More inscribes the master, then lets editions and remixes point at it on chain. Attribution travels with the work instead of living in a rights registry.\n\nhttps://xtrata.xyz/wizard/suno",
+      "image": "suno-more/assets/suno-more-logo.webp",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "suno-more/assets/suno-more-logo.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-suno-more",
+          "path": "comms/assets/2026-08-11/capture-suno-more.jpg",
+          "kind": "capture",
+          "label": "The Suno wizard, captured earlier today",
+          "source": "https://xtrata.xyz/wizard/suno"
+        },
+        {
+          "id": "quote-2026-08-11-suno-b",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-suno-b.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-radio-a",
+      "surface": "xtrata-radio",
+      "category": "standalone",
+      "angle": "library-is-the-chain",
+      "note": "Do not post until the canonical URL is confirmed.",
+      "text": "A radio station with no media server.\n\nEvery track is reconstructed from the chain when you press play. There is no library sitting on a disk somewhere waiting for a renewal notice.\n\nhttps://xtrata.xyz/radio.html",
+      "image": "public/radio-face.jpg",
+      "verified": "unverified",
+      "verifyNote": "public/_redirects has no /radio route, so radio.html may not be the link to publish. Confirm the canonical URL before sending.",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "public/radio-face.jpg",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-xtrata-radio",
+          "path": "comms/assets/2026-08-11/capture-xtrata-radio.jpg",
+          "kind": "capture",
+          "label": "The radio player, captured earlier today",
+          "source": "https://xtrata.xyz/radio.html"
+        },
+        {
+          "id": "quote-2026-08-11-radio-a",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-radio-a.png",
+          "kind": "card",
+          "label": "Generated card of the leading line",
+          "source": "generated"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-xplorer-a",
+      "surface": "xplorer",
+      "category": "standalone",
+      "angle": "open-the-object",
+      "note": "Open the inscription link yourself before posting. A dead proof link is worse than no post.",
+      "text": "Most galleries show you a picture of the thing.\n\nThis one opens the thing. Inscription 394 is a working application, not a screenshot of one.\n\nhttps://xtrata.xyz/i/394",
+      "image": "comms/assets/2026-08-11/quote-2026-08-11-xplorer-a.png",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-xplorer-a.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-xplorer",
+          "path": "comms/assets/2026-08-11/capture-xplorer.jpg",
+          "kind": "capture",
+          "label": "The Xplorer grid, captured earlier today",
+          "source": "https://xtrata.xyz/xplorer"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-drops-a",
+      "surface": "drops",
+      "category": "standalone",
+      "angle": "empty-wallet-onboarding",
+      "text": "Somebody with an empty wallet can collect a piece today.\n\nThe creator prepaid the network fee. No faucet, no airdrop, no signup, no support ticket.\n\nhttps://xtrata.xyz/drops",
+      "image": "comms/assets/2026-08-11/quote-2026-08-11-drops-a.png",
+      "verified": "unverified",
+      "verifyNote": "Confirm at least one drop has live supply. The registry lists configured drops, not funded ones.",
+      "signals": [
+        "drops"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-drops-a.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-drops",
+          "path": "comms/assets/2026-08-11/capture-drops.jpg",
+          "kind": "capture",
+          "label": "Live drops, captured earlier today",
+          "source": "https://xtrata.xyz/drops"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-inscribe-a",
+      "surface": "inscribe",
+      "category": "standalone",
+      "angle": "any-file",
+      "note": "Mechanism post. No numbers, so nothing to go stale.",
+      "text": "The wizard chunks your file, hashes it, and inscribes it.\n\nThe chain verifies the hash chain as it goes, so a corrupted upload cannot quietly succeed. It fails loudly or it is correct.\n\nhttps://xtrata.xyz/inscribe",
+      "image": "comms/assets/2026-08-11/quote-2026-08-11-inscribe-a.png",
+      "verified": "verified",
+      "signals": [
+        "contractState"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-inscribe-a.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-inscribe",
+          "path": "comms/assets/2026-08-11/capture-inscribe.jpg",
+          "kind": "capture",
+          "label": "The inscription wizard, captured earlier today",
+          "source": "https://xtrata.xyz/inscribe"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-sdk-a",
+      "surface": "sdk",
+      "category": "standalone",
+      "angle": "reconstruction",
+      "note": "Pin candidate. This is the claim everything else rests on.",
+      "text": "The test of a permanence claim is whether you still need us.\n\nAnyone can rebuild any Xtrata inscription from the chain alone, with no Xtrata service running anywhere. That property is the whole argument.\n\nhttps://xtrata.xyz/#build",
+      "image": "comms/assets/2026-08-11/quote-2026-08-11-sdk-a.png",
+      "verified": "verified",
+      "signals": [
+        "surfaces"
+      ],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "comms/assets/2026-08-11/quote-2026-08-11-sdk-a.png",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-sdk",
+          "path": "comms/assets/2026-08-11/capture-sdk.jpg",
+          "kind": "capture",
+          "label": "Build with Xtrata, captured earlier today",
+          "source": "https://xtrata.xyz/#build"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-reply-jpeg",
+      "surface": "forever-twins",
+      "category": "reply",
+      "angle": "dependency-rescue",
+      "requiresLink": false,
+      "note": "Use under a post making the 'NFTs are just links to jpegs' argument. Agree first, then answer.",
+      "text": "That is true of most of them, and it is the real problem rather than just a joke. The fix is putting the file on chain instead of a pointer to it. That can be done for an existing collection without breaking the collection.",
+      "image": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+      "target": {
+        "author": null,
+        "url": null,
+        "excerpt": null,
+        "why": "Fill from the day's news sweep. Look for a widely shared post making the pointer argument."
+      },
+      "verified": "unverified",
+      "verifyNote": "Reply target is a placeholder. Select a real parent post and read the full thread before sending.",
+      "signals": [],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "forever-twins/bitcoin-pepes/pepe-forever-twin.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "curated-forever-twins/assets/forever-twins-logo.webp",
+          "path": "forever-twins/assets/forever-twins-logo.webp",
+          "kind": "curated",
+          "label": "Curated for Forever Twins",
+          "source": "repo"
+        },
+        {
+          "id": "capture-forever-twins",
+          "path": "comms/assets/2026-08-11/capture-forever-twins.jpg",
+          "kind": "capture",
+          "label": "Forever Twins page, captured earlier today",
+          "source": "https://xtrata.xyz/forever-twins/"
+        }
+      ]
+    },
+    {
+      "id": "2026-08-11-reply-aimusic",
+      "surface": "suno-more",
+      "category": "reply",
+      "angle": "ai-music-permanence",
+      "requiresLink": false,
+      "note": "Use under a post about losing AI generated work when an account or platform changes.",
+      "text": "The recording can be inscribed so it outlives the account that generated it. Attribution travels with the file rather than living in a platform database that can be rewritten.",
+      "image": "suno-more/assets/suno-more-logo.webp",
+      "target": {
+        "author": null,
+        "url": null,
+        "excerpt": null,
+        "why": "Fill from the day's news sweep. Musician or producer discussing platform lock-in."
+      },
+      "verified": "unverified",
+      "verifyNote": "Reply target is a placeholder. Select a real parent post and read the full thread before sending.",
+      "signals": [],
+      "images": [
+        {
+          "id": "chosen",
+          "path": "suno-more/assets/suno-more-logo.webp",
+          "kind": "curated",
+          "label": "Chosen in the draft",
+          "source": "repo"
+        },
+        {
+          "id": "capture-suno-more",
+          "path": "comms/assets/2026-08-11/capture-suno-more.jpg",
+          "kind": "capture",
+          "label": "The Suno wizard, captured earlier today",
+          "source": "https://xtrata.xyz/wizard/suno"
+        }
+      ]
+    }
+  ]
+}
