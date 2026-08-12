@@ -166,7 +166,18 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
   for (const cell of ordered) {
     const file = FILES.indexOf(cell.square[0]);
     const rank = Number(cell.square[1]);
-    const dark = (file + rank) % 2 === 0;
+    // a1 IS DARK. That is the anchor, and it is the whole rule.
+    //
+    // `file` is 0-indexed and `rank` is the literal digit, so a1 is (0 + 1) and
+    // the parity that makes it dark is ODD. This read `=== 0` until 2026-08-12,
+    // which inverted all sixty-four squares: a1 came out light, h1 came out dark
+    // against "light square on your right", and the queens appeared to be off
+    // their own colour, which is how the first testers found it.
+    //
+    // The pieces were never wrong - perft covers 590 million positions - so
+    // nothing but the paint was affected. Do not "tidy" this to `=== 0`; the
+    // colour of a1 is asserted in tests/ui/board-colour.test.ts.
+    const dark = (file + rank) % 2 === 1;
 
     const button = document.createElement('button');
     button.type = 'button';

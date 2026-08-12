@@ -149,6 +149,25 @@ describe('the bytes', () => {
     }
   });
 
+  it('paints a1 dark in the SHIPPED bundle, not just in the source', () => {
+    // tests/ui/board-colour.test.ts asserts this properly, by rendering. This is
+    // the artefact-level guard underneath it, and it exists because the parity
+    // was inverted in a build that every source-reading test passed.
+    //
+    // Variable names change with every minify, so the match is on the shape:
+    // the parity test, then the class it decides, within a hundred-odd bytes.
+    // The board is the only place in the bundle that pairs those two.
+    expect(
+      html,
+      'the shipped board no longer decides sq--dark from an odd file+rank parity, ' +
+        'so either it was inverted again or the renderer moved. Check ' +
+        'packages/ui/board.ts and tests/ui/board-colour.test.ts.'
+    ).toMatch(/%2===1.{0,120}sq--dark/s);
+    expect(html, 'the shipped board paints a1 light, which is inverted').not.toMatch(
+      /%2===0.{0,120}sq--dark/s
+    );
+  });
+
   it('is small enough to be worth inscribing', () => {
     // The real gate is the CHUNK COUNT, in tests/artifact/budget.test.ts, because
     // a chunk is what Xtrata charges for. This is the backstop underneath it: a
