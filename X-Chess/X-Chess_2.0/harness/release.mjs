@@ -85,6 +85,20 @@ if (!existsSync(HTML) || !existsSync(MANIFEST)) {
   if (String(manifest.build).includes('dev')) {
     refuse(`the build version is still a development one (${manifest.build})`);
   }
+
+  // A chunk is what Xtrata charges for, and a chunk more is permanent. Going up
+  // is allowed; going up WITHOUT HAVING DECIDED TO is what this stops. The flag
+  // is the decision, and it should arrive with an ADR beside it.
+  const BUDGETED_CHUNKS = 8;
+  const chunks = Number(manifest.xtrataChunks);
+  if (chunks > BUDGETED_CHUNKS && !process.argv.includes('--allow-chunk')) {
+    refuse(
+      `the artefact now takes ${chunks} Xtrata chunks, not ${BUDGETED_CHUNKS} ` +
+        `(${Number(manifest.bytes).toLocaleString()} bytes). That is a permanent chunk more ` +
+        'than budgeted. Take bytes out, or pass --allow-chunk with an ADR recording why ' +
+        'the extra chunk is worth paying for, and raise CHUNKS in tests/artifact/budget.test.ts.'
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

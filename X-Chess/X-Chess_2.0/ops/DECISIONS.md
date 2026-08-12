@@ -930,3 +930,73 @@ the step is about - thirty more moves would put another 210,000 back in.
   That is generous rather than wrong - a sponsored player is meant to be able to
   play - but it does mean **exhaustion is a configuration to be arranged, not an
   outcome to be waited for.**
+
+---
+
+## ADR-0014 — The chunk is the unit of account, not the byte
+
+**Date** 2026-08-12
+**Status** accepted
+**Measured on** commit 79f9502f, `dist/xchess.html` at 130,782 bytes
+
+### Context
+
+Xtrata inscribes in 16,384-byte chunks, so what an artefact costs is a step
+function of its size, not a linear one. A byte added to a page sitting at 130,782
+costs nothing. The 291st byte added costs a whole permanent chunk.
+
+Nothing in the project knew this. The only size gate was
+`tests/artifact/artifact.test.ts`, asserting the page was under 250,000 bytes -
+sixteen chunks, which is not a budget but the absence of one. `harness/verify.mjs`
+and `harness/release.mjs` had no byte gate at all, and `build.mjs` printed the
+chunk count and formed no opinion about it.
+
+The consequence was already visible rather than hypothetical. Two features landed
+and spent 1,620 bytes between them, taking the headroom to **290 bytes**, and no
+part of the build, the suite or the manifest said so. The review that found this
+also produced a list of proposals whose byte costs sum to more than 20 KB, and
+those costs could not be weighed against anything, because there was no
+denominator.
+
+There was one precedent to copy: `tests/artifact/sounds.test.ts` budgets a single
+module against an esbuild metafile sum, and it works.
+
+### Decision
+
+**The chunk count is the gate.** `tests/artifact/budget.test.ts` asserts
+`manifest.xtrataChunks` is exactly the budgeted number. It is a single figure with
+a price attached, and it fails with the true bytes, the ceiling and the overage
+in its message.
+
+**Per-package rows are a map, not a ration.** The same file carries a coarse
+ceiling per package, seeded from a measured run and recording the figure each was
+measured at. Their ceilings deliberately sum to more than the chunk ceiling: they
+exist so that when the chunk assertion goes red, the next line says where the
+bytes went. A third assertion fails when a package appears in the bundle with no
+row, so a budget cannot be escaped by adding a module it does not mention.
+
+**Every build prints the headroom.** Not the size - the bytes left before the next
+chunk, which is the number a person deciding whether to add something needs.
+
+**The release refuses a chunk it was not told to buy.** `--allow-chunk` is the
+decision, and it should arrive with an ADR beside it. Going up is allowed; going
+up without having decided to is not.
+
+The backstop in `artifact.test.ts` drops from 250,000 to 150,000 - still not a
+budget, but a figure that catches a catastrophe rather than permitting one.
+
+### Consequences
+
+- Every proposal with a byte cost becomes decidable. "About 0.4 KB" stops being a
+  number without a denominator and becomes "more headroom than exists, so
+  something else comes out or a chunk gets bought deliberately".
+- The budget test must be seen to fail before it is trusted. It was: 1,200 bytes
+  of dead CSS took the artefact to 132,572 bytes and nine chunks, and the suite
+  reported exactly that, by name and figure.
+- `packages/storage` is absent from the table on purpose. It is tree-shaken out
+  entirely, because nothing imports `CachingReader`. If it ever appears, the
+  third assertion fails and somebody has to notice - which is the correct
+  outcome, because it means the cache started shipping.
+- The per-package table will need re-seeding after any change that moves code
+  between packages. That is the cost of having an address for a regression, and
+  it is small because the rows are coarse.

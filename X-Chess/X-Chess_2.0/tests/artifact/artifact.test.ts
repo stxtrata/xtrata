@@ -150,8 +150,13 @@ describe('the bytes', () => {
   });
 
   it('is small enough to be worth inscribing', () => {
-    // Not a hard protocol limit, but every byte is permanent and paid for.
-    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(250_000);
+    // The real gate is the CHUNK COUNT, in tests/artifact/budget.test.ts, because
+    // a chunk is what Xtrata charges for. This is the backstop underneath it: a
+    // figure that catches a catastrophe rather than a regression.
+    //
+    // It used to be 250,000 - sixteen chunks - which let the artefact double
+    // without anybody being told.
+    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(150_000);
   });
 });
 

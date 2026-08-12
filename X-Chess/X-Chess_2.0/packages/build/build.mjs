@@ -355,9 +355,19 @@ async function main() {
     console.log('');
   }
 
+  // Xtrata charges by the chunk, not by the byte, so the number worth printing
+  // is how close this build is to buying another one. Say it every time: the
+  // last two features spent 1,620 bytes between them and nothing mentioned it.
+  const chunkCeiling = manifest.xtrataChunks * XTRATA_CHUNK_BYTES;
+  const headroom = chunkCeiling - manifest.bytes;
+
   console.log(`built dist/xchess.html  ${manifest.bytes.toLocaleString()} bytes`);
   console.log(`  sha256    ${manifest.htmlSha256}  (shasum -a 256)`);
   console.log(`  xtrata    ${manifest.xtrataChainHash}  (${manifest.xtrataChunks} chunks, what Inscribe shows)`);
+  console.log(
+    `  budget    ${headroom.toLocaleString()} bytes left in ${manifest.xtrataChunks} chunks` +
+      ` (ceiling ${chunkCeiling.toLocaleString()})`
+  );
   console.log(`  contract  ${CONTRACT} (${NETWORK})${REMEMBERED ? ' - kept from the last build' : ''}`);
   console.log(`  version   ${VERSION} - ${BUILT} - #${manifest.codeHash}`);
   console.log('');
