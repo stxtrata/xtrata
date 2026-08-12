@@ -19,13 +19,23 @@
 // Everything that touches Web Audio is wrapped. A page that cannot make a sound
 // must still play chess.
 
-import { SOUND_EVENTS, VOICES, voiceLength } from './sounds.js';
-import type { Layer, SoundEvent } from './sounds.js';
+import { EVENTS, SOUND_EVENTS, VOICES, isVoiceId, voiceLength } from './sounds.js';
+import type { Layer, SoundEvent, VoiceId } from './sounds.js';
 
 export interface EventSetting {
   on: boolean;
   /** This event's own volume, 0 to 1, on top of the master. */
   gain: number;
+  /**
+   * Which voice from the library this event plays.
+   *
+   * The join between the two tables, and the whole reason they are separate.
+   * Starts at the event's default and is whatever the player last chose after
+   * that. Validated on the way in from storage, because a name from a build
+   * that had a voice this one does not would otherwise be silence with no
+   * explanation.
+   */
+  voice: VoiceId;
 }
 
 export interface SoundState {
@@ -50,7 +60,8 @@ export interface SoundState {
 export function defaultState(): SoundState {
   const events = {} as Record<SoundEvent, EventSetting>;
   for (const name of SOUND_EVENTS) {
-    events[name] = { on: VOICES[name].on, gain: 1 };
+    const spec = EVENTS[name];
+    events[name] = { on: spec.on, gain: 1, voice: spec.voice };
   }
   return { master: true, volume: 0.7, background: false, events };
 }
@@ -150,8 +161,17 @@ export class Sound {
     if (!current) return;
     if (patch.on !== undefined) current.on = patch.on;
     if (patch.gain !== undefined) current.gain = clamp(patch.gain);
+    // A name that is not in the library is dropped rather than stored. Taking
+    // it would leave an event pointing at nothing, which is silence that no
+    // control on the panel can explain or undo.
+    if (patch.voice !== undefined && isVoiceId(patch.voice)) current.voice = patch.voice;
     this.save();
     this.changed();
+  }
+
+  /** Which voice an event is currently set to play. */
+  voiceFor(name: SoundEvent): VoiceId {
+    return this.state.events[name]?.voice ?? EVENTS[name].voice;
   }
 
   reset(): void {
@@ -215,6 +235,10 @@ export class Sound {
         if (!one) continue;
         if (typeof one.on === 'boolean') this.state.events[name].on = one.on;
         if (typeof one.gain === 'number') this.state.events[name].gain = clamp(one.gain);
+        // Checked against the library rather than trusted. Settings written by
+        // a build with a voice this one does not have would otherwise point an
+        // event at nothing and make it silently stop working.
+        if (isVoiceId(one.voice)) this.state.events[name].voice = one.voice;
       }
     } catch {
       // A corrupt store is not worth failing over. Defaults are a fine board.
@@ -315,14 +339,38 @@ export class Sound {
    * whether it is audible.
    */
   play(event: SoundEvent): void {
-    const voice = VOICES[event];
-    if (!voice || !this.state.master) return;
+    if (!this.state.master) return;
     const setting = this.state.events[event];
     if (!setting?.on) return;
 
-    const level = this.state.volume * setting.gain * voice.gain;
-    if (level <= 0) return;
+    const voice = VOICES[setting.voice];
+    if (!voice) return;
+    this.emit(voice.layers, this.state.volume * setting.gain * voice.gain);
+  }
 
+  /**
+   * Play a voice on its own, at the master volume.
+   *
+   * What the picker uses. Auditioning is about the SOUND rather than about the
+   * event, so it deliberately ignores the event's switch and its slider: the
+   * question being asked is "what does this one sound like", and answering it
+   * through a muted event would answer with silence.
+   */
+  audition(id: VoiceId, level = 1): void {
+    const voice = VOICES[id];
+    if (!voice) return;
+    this.unlock();
+    this.emit(voice.layers, Math.max(this.state.volume, 0.25) * clamp(level) * voice.gain);
+  }
+
+  /** Preview an event, as its assigned voice, even if the event is muted. */
+  preview(event: SoundEvent): void {
+    this.audition(this.voiceFor(event));
+  }
+
+  /** Schedule a set of layers at a level, if anything is able to play them. */
+  private emit(layers: readonly Layer[], level: number): void {
+    if (level <= 0) return;
     this.unlock();
     const ctx = this.ctx;
     const out = this.out;
@@ -333,25 +381,11 @@ export class Sound {
       // envelope's first ramp partly in the past, which some browsers render as
       // a click on the front of every sound.
       const t0 = ctx.currentTime + 0.012;
-      for (const layer of voice.layers) this.layer(ctx, out, layer, level, t0);
+      for (const layer of layers) this.layer(ctx, out, layer, level, t0);
     } catch {
       // A context that was closed under us, or a browser refusing to schedule.
       // Nothing here is worth interrupting a game for.
     }
-  }
-
-  /** Preview, from the panel. Loud enough to judge even with the event muted. */
-  preview(event: SoundEvent): void {
-    const setting = this.state.events[event];
-    const was = setting?.on;
-    if (setting) setting.on = true;
-    const master = this.state.master;
-    this.state.master = true;
-    this.unlock();
-    this.play(event);
-    this.state.master = master;
-    if (setting && was !== undefined) setting.on = was;
-    this.changed();
   }
 
   /** One oscillator or noise burst, with its envelope, wired to the master. */
@@ -404,5 +438,5 @@ export class Sound {
   }
 }
 
-export { SOUND_EVENTS, VOICES, voiceLength };
-export type { SoundEvent };
+export { EVENTS, SOUND_EVENTS, VOICES, voiceLength };
+export type { SoundEvent, VoiceId };

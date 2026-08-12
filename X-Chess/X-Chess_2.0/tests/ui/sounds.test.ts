@@ -16,13 +16,18 @@ import { replay } from '../../packages/replay/replay.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { EVENT_STRINGS } from '../../packages/replay/events.js';
 import {
+  EVENTS,
+  FAMILIES,
   SOUND_EVENTS,
   VOICES,
+  VOICE_IDS,
   involved,
   isCastle,
+  isVoiceId,
   mayMoveNow,
   soundFor,
-  voiceLength
+  voiceLength,
+  voicesByFamily
 } from '../../packages/ui/sounds.js';
 import type { ReplayState } from '../../packages/replay/replay.js';
 
@@ -58,34 +63,54 @@ function step(
 }
 
 describe('the library', () => {
-  it('gives every sound a label, an explanation and at least one layer', () => {
-    // A sound with no explanation is a beep somebody cannot decide about, and
-    // the panel prints this text under every row.
-    for (const name of SOUND_EVENTS) {
-      const voice = VOICES[name];
-      expect(voice.label, `${name} has no label`).toBeTruthy();
-      expect(voice.say, `${name} has no explanation`).toBeTruthy();
-      expect(voice.layers.length, `${name} is silent`).toBeGreaterThan(0);
+  it('holds more sounds than there are events to put them on', () => {
+    // The point of the split. A library with exactly one sound per event is a
+    // library where every choice has already been made for the player.
+    expect(VOICE_IDS.length).toBeGreaterThan(SOUND_EVENTS.length);
+    expect(new Set(VOICE_IDS).size, 'a duplicate id would shadow a voice').toBe(VOICE_IDS.length);
+  });
+
+  it('gives every voice a label, a family and at least one layer', () => {
+    for (const id of VOICE_IDS) {
+      const voice = VOICES[id];
+      expect(voice.label, `${id} has no label`).toBeTruthy();
+      expect(FAMILIES).toContain(voice.family);
+      expect(voice.layers.length, `${id} is silent`).toBeGreaterThan(0);
     }
-    expect(SOUND_EVENTS.length).toBeGreaterThan(8);
+  });
+
+  it('gives every voice a distinct name in the picker', () => {
+    // Two voices called the same thing is a picker where one of them can never
+    // knowingly be chosen.
+    const labels = VOICE_IDS.map((id) => VOICES[id].label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('puts every voice in exactly one family, and every family to work', () => {
+    const grouped = voicesByFamily();
+    const seen = grouped.flatMap((group) => group.voices);
+    expect(seen.sort()).toEqual([...VOICE_IDS].sort());
+    for (const group of grouped) {
+      expect(group.voices.length, `${group.family} is an empty group`).toBeGreaterThan(0);
+    }
   });
 
   it('keeps every sound shorter than a second', () => {
     // A sound is punctuation, not an event. Anything longer overlaps the next
     // one on a board where two submissions can land in the same poll.
-    for (const name of SOUND_EVENTS) {
-      const length = voiceLength(VOICES[name]);
-      expect(length, `${name} lasts ${length}s`).toBeGreaterThan(0);
-      expect(length, `${name} lasts ${length}s`).toBeLessThan(1);
+    for (const id of VOICE_IDS) {
+      const length = voiceLength(VOICES[id]);
+      expect(length, `${id} lasts ${length}s`).toBeGreaterThan(0);
+      expect(length, `${id} lasts ${length}s`).toBeLessThan(1);
     }
   });
 
   it('keeps every layer inside the range Web Audio will accept', () => {
     // Both ramps used to build these are exponential, which rejects zero, and a
     // frequency outside human hearing is a node doing nothing but exist.
-    for (const name of SOUND_EVENTS) {
-      for (const layer of VOICES[name].layers) {
-        expect(layer.from, `${name} has a layer at ${layer.from}Hz`).toBeGreaterThan(20);
+    for (const id of VOICE_IDS) {
+      for (const layer of VOICES[id].layers) {
+        expect(layer.from, `${id} has a layer at ${layer.from}Hz`).toBeGreaterThan(20);
         expect(layer.to).toBeGreaterThan(20);
         expect(layer.from).toBeLessThan(20_000);
         expect(layer.to).toBeLessThan(20_000);
@@ -95,18 +120,53 @@ describe('the library', () => {
         expect(layer.decay).toBeGreaterThan(0);
         expect(layer.delay).toBeGreaterThanOrEqual(0);
       }
-      expect(VOICES[name].gain).toBeGreaterThan(0);
-      expect(VOICES[name].gain).toBeLessThanOrEqual(1);
+      expect(VOICES[id].gain, `${id} has no level`).toBeGreaterThan(0);
+      expect(VOICES[id].gain).toBeLessThanOrEqual(1);
     }
   });
 
-  it('makes the turn sound the loudest and the local ones the quietest', () => {
-    // The one this module was asked for has to carry from another room. The
-    // ones that report a finger rather than a chain must not.
-    expect(VOICES['your-turn'].gain).toBeGreaterThan(VOICES.move.gain);
-    expect(VOICES.select.gain).toBeLessThan(VOICES.move.gain);
-    expect(VOICES.select.on, 'picking a piece up fires constantly').toBe(false);
-    expect(VOICES['your-turn'].on).toBe(true);
+  it('knows a real voice name from anything else', () => {
+    // The guard on everything that comes back out of storage.
+    for (const id of VOICE_IDS) expect(isVoiceId(id)).toBe(true);
+    for (const bad of ['', 'nope', 'your-turn', 42, null, undefined, {}]) {
+      expect(isVoiceId(bad), `${String(bad)} was accepted`).toBe(false);
+    }
+  });
+});
+
+describe('the events', () => {
+  it('gives every event a label, an explanation and a default voice', () => {
+    // An unlabelled beep teaches nobody, and the panel prints this text under
+    // every row precisely so a player can decide what to put on it.
+    for (const name of SOUND_EVENTS) {
+      const spec = EVENTS[name];
+      expect(spec.label, `${name} has no label`).toBeTruthy();
+      expect(spec.say, `${name} has no explanation`).toBeTruthy();
+      expect(typeof spec.on).toBe('boolean');
+    }
+    expect(SOUND_EVENTS.length).toBeGreaterThan(8);
+  });
+
+  it('points every event at a voice that is really in the library', () => {
+    // A default naming a voice that does not exist is an event that is silent
+    // out of the box, with nothing on the panel able to explain why.
+    for (const name of SOUND_EVENTS) {
+      expect(isVoiceId(EVENTS[name].voice), `${name} points at nothing`).toBe(true);
+    }
+  });
+
+  it('names every event in the panel distinctly', () => {
+    const labels = SOUND_EVENTS.map((name) => EVENTS[name].label);
+    expect(new Set(labels).size).toBe(labels.length);
+  });
+
+  it('starts the turn sound loud and the local one quiet and off', () => {
+    // Level belongs to the voice, so this is a fact about what the defaults
+    // point AT. Reassigning is allowed to change it, which is the point.
+    expect(VOICES[EVENTS['your-turn'].voice].gain).toBeGreaterThan(VOICES[EVENTS.move.voice].gain);
+    expect(VOICES[EVENTS.select.voice].gain).toBeLessThan(VOICES[EVENTS.move.voice].gain);
+    expect(EVENTS.select.on, 'picking a piece up fires constantly').toBe(false);
+    expect(EVENTS['your-turn'].on).toBe(true);
   });
 });
 

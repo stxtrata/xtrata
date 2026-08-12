@@ -13,19 +13,20 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
-import { SOUND_EVENTS, VOICES } from '../../packages/ui/sounds.js';
+import { EVENTS, SOUND_EVENTS, VOICES, VOICE_IDS } from '../../packages/ui/sounds.js';
 
 const HTML = readFileSync('dist/xchess.html', 'utf8');
 
 /**
  * What the sound module is allowed to weigh, minified, in the bundle.
  *
- * Thirteen sounds, a synthesiser, thirteen switches with a volume each, storage
- * and a generated panel. Set with headroom for a few more voices and not for a
- * change of approach: a single recorded sample would blow it on its own, which
- * is exactly what it is for.
+ * A library of twenty-three voices, a synthesiser, thirteen events each with a
+ * switch, a volume and a free choice from the library, storage, and a panel
+ * generated from both tables. Set with headroom for more voices and not for a
+ * change of approach: ONE recorded sample would blow it on its own, which is
+ * exactly what it is for.
  */
-const BUDGET = 12_000;
+const BUDGET = 16_000;
 
 describe('the built artefact', () => {
   it('carries no recorded audio of any kind', () => {
@@ -58,10 +59,11 @@ describe('the built artefact', () => {
     // The table is the library. If these did not survive, the module shipped
     // with a synthesiser and nothing to play.
     const distinctive = [
-      VOICES['your-turn'].layers[0].from,
-      VOICES.win.layers[0].from,
-      VOICES.capture.layers[1].from,
-      VOICES.check.layers[0].from
+      VOICES['chime-up'].layers[0].from,
+      VOICES['triad-up'].layers[0].from,
+      VOICES.thump.layers[1].from,
+      VOICES.alarm.layers[0].from,
+      VOICES.bell.layers[2].from
     ];
     for (const hz of distinctive) {
       expect(HTML, `${hz}Hz did not survive the build`).toContain(String(hz));
@@ -74,9 +76,15 @@ describe('the built artefact', () => {
     for (const id of ['sound-toggle', 'sound-master', 'sound-volume', 'sound-background', 'sound-list']) {
       expect(HTML, `#${id} is missing from the artefact`).toContain(id);
     }
-    // And the rows are generated from the table, so every sound gets one.
+    // The rows are generated from the event table, so every event gets one.
     for (const name of SOUND_EVENTS) {
-      expect(HTML, `${name} has no label in the artefact`).toContain(VOICES[name].label);
+      expect(HTML, `${name} has no label in the artefact`).toContain(EVENTS[name].label);
+    }
+    // And the picker is generated from the library, so every voice is reachable
+    // on every one of them. A voice that shipped without a name in the artefact
+    // is a voice nobody can ever choose.
+    for (const id of VOICE_IDS) {
+      expect(HTML, `${id} has no name in the artefact`).toContain(VOICES[id].label);
     }
   });
 

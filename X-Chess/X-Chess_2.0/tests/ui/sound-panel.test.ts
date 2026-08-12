@@ -14,7 +14,7 @@ import { JSDOM } from 'jsdom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Sound, defaultState } from '../../packages/ui/audio.js';
 import { renderSoundPanel, soundNote, soundToggleLabel } from '../../packages/ui/sound-panel.js';
-import { SOUND_EVENTS, VOICES } from '../../packages/ui/sounds.js';
+import { EVENTS, SOUND_EVENTS, VOICES, VOICE_IDS } from '../../packages/ui/sounds.js';
 import { FakeAudioContext, installFakeAudio } from './fake-audio.js';
 
 let dom: JSDOM;
@@ -81,7 +81,8 @@ describe('the settings', () => {
     expect(sound.enabled).toBe(false);
     expect(sound.state.volume).toBeCloseTo(0.3);
     for (const name of SOUND_EVENTS) {
-      expect(sound.state.events[name].on).toBe(VOICES[name].on);
+      expect(sound.state.events[name].on).toBe(EVENTS[name].on);
+      expect(sound.state.events[name].voice).toBe(EVENTS[name].voice);
     }
   });
 
@@ -112,7 +113,7 @@ describe('making a sound', () => {
     ctx.forget();
 
     sound.play('your-turn');
-    expect(ctx.voices).toBe(VOICES['your-turn'].layers.length);
+    expect(ctx.voices).toBe(VOICES[EVENTS['your-turn'].voice].layers.length);
     // Every one is stopped. An oscillator left running is a tone that never
     // ends, and a long game would make thousands of them.
     for (const osc of ctx.oscillators) {
@@ -253,14 +254,14 @@ describe('the panel', () => {
     expect(rows()).toHaveLength(SOUND_EVENTS.length);
 
     const labels = rows().map((row) => row.querySelector('.snd-name')?.textContent?.trim());
-    for (const name of SOUND_EVENTS) expect(labels).toContain(VOICES[name].label);
+    for (const name of SOUND_EVENTS) expect(labels).toContain(EVENTS[name].label);
   });
 
   it('explains what each sound means, under the row', () => {
     const sound = new Sound({ document: dom.window.document });
     renderSoundPanel(list(), sound);
     const said = rows().map((row) => row.querySelector('.snd-say')?.textContent ?? '');
-    for (const name of SOUND_EVENTS) expect(said).toContain(VOICES[name].say);
+    for (const name of SOUND_EVENTS) expect(said).toContain(EVENTS[name].say);
   });
 
   it('turns a sound off from its own switch', () => {
@@ -299,7 +300,7 @@ describe('the panel', () => {
 
     const row = rows()[SOUND_EVENTS.indexOf('check')];
     (row.querySelector('.snd-test') as HTMLButtonElement).click();
-    expect(ctx.voices).toBe(VOICES.check.layers.length);
+    expect(ctx.voices).toBe(VOICES[EVENTS.check.voice].layers.length);
   });
 
   it('dims the rows when the master is off, and keeps them', () => {
@@ -332,6 +333,126 @@ describe('the panel', () => {
     expect(sound.state.volume).toBe(defaultState().volume);
     const row = rows()[SOUND_EVENTS.indexOf('your-turn')];
     expect((row.querySelector('input[type=checkbox]') as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('offers the whole library on every event', () => {
+    // The upgrade, in one assertion. Every row can reach every sound, so there
+    // is no event with a shorter menu than any other.
+    const sound = new Sound({ document: dom.window.document });
+    renderSoundPanel(list(), sound);
+
+    for (const row of rows()) {
+      const pick = row.querySelector('.snd-pick') as HTMLSelectElement;
+      const offered = [...pick.querySelectorAll('option')].map((o) => o.value);
+      expect(offered.sort()).toEqual([...VOICE_IDS].sort());
+    }
+  });
+
+  it('groups the library so the list can be read', () => {
+    const sound = new Sound({ document: dom.window.document });
+    renderSoundPanel(list(), sound);
+    const pick = rows()[0].querySelector('.snd-pick') as HTMLSelectElement;
+    const groups = [...pick.querySelectorAll('optgroup')].map((g) => g.label);
+    expect(groups.length).toBeGreaterThan(1);
+    // Every option lives under a heading rather than loose at the top.
+    expect(pick.querySelectorAll(':scope > option')).toHaveLength(0);
+  });
+
+  it('shows each event set to the sound it will actually play', () => {
+    const sound = new Sound({ document: dom.window.document });
+    renderSoundPanel(list(), sound);
+    for (const [i, name] of SOUND_EVENTS.entries()) {
+      const pick = rows()[i].querySelector('.snd-pick') as HTMLSelectElement;
+      expect(pick.value, `${name} shows the wrong sound`).toBe(sound.voiceFor(name));
+    }
+  });
+
+  it('puts any sound on any event, and plays what was chosen', () => {
+    const sound = unlocked();
+    const ctx = latest()!;
+    renderSoundPanel(list(), sound);
+
+    const row = rows()[SOUND_EVENTS.indexOf('your-turn')];
+    const pick = row.querySelector('.snd-pick') as HTMLSelectElement;
+    pick.value = 'clunk';
+    pick.dispatchEvent(new dom.window.Event('change'));
+
+    expect(sound.voiceFor('your-turn')).toBe('clunk');
+    ctx.forget();
+    sound.play('your-turn');
+    // The layer count is the fingerprint: it is the assigned voice being built,
+    // not the one the table shipped with.
+    expect(ctx.voices).toBe(VOICES.clunk.layers.length);
+    expect(ctx.voices).not.toBe(VOICES[EVENTS['your-turn'].voice].layers.length);
+  });
+
+  it('lets one sound sit on several events at once', () => {
+    // Nothing claims a voice. Somebody who wants one bell for everything is
+    // allowed to have exactly that.
+    const sound = new Sound({ document: dom.window.document });
+    for (const name of SOUND_EVENTS) sound.setEvent(name, { voice: 'bell' });
+    for (const name of SOUND_EVENTS) expect(sound.voiceFor(name)).toBe('bell');
+  });
+
+  it('plays the sound the moment it is picked, without a second click', () => {
+    // Choosing from a list of names and then hunting for a button to hear it is
+    // how somebody ends up assigning by guesswork.
+    const sound = unlocked();
+    const ctx = latest()!;
+    renderSoundPanel(list(), sound);
+    ctx.forget();
+
+    const pick = rows()[0].querySelector('.snd-pick') as HTMLSelectElement;
+    pick.value = 'rasp';
+    pick.dispatchEvent(new dom.window.Event('change'));
+    expect(ctx.voices).toBe(VOICES.rasp.layers.length);
+  });
+
+  it('auditions a sound even when the event it lands on is muted', () => {
+    // The question being asked is what this one sounds like. Answering through
+    // a muted event would answer with silence.
+    const sound = unlocked();
+    const ctx = latest()!;
+    sound.setEvent('capture', { on: false, gain: 0 });
+    ctx.forget();
+
+    sound.audition('bell');
+    expect(ctx.voices).toBe(VOICES.bell.layers.length);
+  });
+
+  it('remembers an assignment across a whole new board', () => {
+    const first = new Sound({ document: dom.window.document });
+    first.setEvent('move', { voice: 'ping' });
+    expect(new Sound({ document: dom.window.document }).voiceFor('move')).toBe('ping');
+  });
+
+  it('refuses a sound name that is not in the library', () => {
+    // From a hand-edited store, or from a build that had a voice this one does
+    // not. Taking it would leave the event pointing at nothing, which is
+    // silence that no control on the panel could explain or undo.
+    const sound = new Sound({ document: dom.window.document });
+    sound.setEvent('move', { voice: 'harpsichord' as never });
+    expect(sound.voiceFor('move')).toBe(EVENTS.move.voice);
+
+    dom.window.localStorage.setItem(
+      'xchess.sound.v1',
+      JSON.stringify({ events: { move: { voice: 'harpsichord' } } })
+    );
+    expect(new Sound({ document: dom.window.document }).voiceFor('move')).toBe(EVENTS.move.voice);
+  });
+
+  it('puts the assignments back with the same reset', () => {
+    const sound = new Sound({ document: dom.window.document });
+    const panel = renderSoundPanel(list(), sound);
+    sound.setEvent('your-turn', { voice: 'thud' });
+    sound.reset();
+    panel.refresh();
+
+    expect(sound.voiceFor('your-turn')).toBe(EVENTS['your-turn'].voice);
+    const pick = rows()[SOUND_EVENTS.indexOf('your-turn')].querySelector(
+      '.snd-pick'
+    ) as HTMLSelectElement;
+    expect(pick.value).toBe(EVENTS['your-turn'].voice);
   });
 
   it('says what background listening will and will not do', () => {

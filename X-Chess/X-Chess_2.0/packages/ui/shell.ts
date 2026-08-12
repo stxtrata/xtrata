@@ -274,18 +274,28 @@ th { color: var(--dim); font-weight: 600; font-size: 12px; }
    controls cannot fall behind the library. Every modifier is prefixed with its
    block - see the rule at the top of this file, which a bare .name or .gain
    here would break for the whole application. */
+/* Three lines per event, not one. The row carries a name, a whole library to
+   choose from, a volume and a preview, and four controls abreast in a 380px
+   column is four controls nobody can hit on a phone. */
 .snd {
-  display: grid; grid-template-columns: minmax(0, 1fr) 90px auto; gap: 8px;
-  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line);
+  display: grid; grid-template-columns: minmax(0, 1fr) 84px auto; gap: 6px 8px;
+  align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line);
 }
 .snd:last-child { border-bottom: 0; }
-.snd-name { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--ink); font-size: 13px; }
-/* Under the row rather than beside it. What a sound MEANS is the thing a person
-   needs when deciding whether to keep it, and a tooltip does not exist on
+.snd-name { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px;
+      margin: 0; color: var(--ink); font-size: 13px; }
+/* Under the row rather than beside it. What an event MEANS is the thing a
+   person needs when deciding what to put on it, and a tooltip does not exist on
    touch, which is where most of these will be heard. */
-.snd-say { grid-column: 1 / -1; margin: -3px 0 0; }
-.snd-gain { width: 100%; accent-color: var(--gold); }
-.snd-test { padding: 4px 12px; min-height: 34px; font-size: 12px; }
+.snd-say { grid-column: 1 / -1; margin: -2px 0 0; }
+.snd-pick {
+  grid-column: 1; width: 100%; min-width: 0; min-height: 34px;
+  background: #14120f; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; font: inherit; font-size: 12px;
+}
+.snd-pick:disabled { opacity: .5; }
+.snd-gain { grid-column: 2; width: 100%; accent-color: var(--gold); }
+.snd-test { grid-column: 3; padding: 4px 12px; min-height: 34px; font-size: 12px; }
 /* Dimmed, never hidden. A panel that empties itself when the master switch is
    off says the feature went away rather than that it is switched off. */
 .snd-list--off { opacity: .45; }

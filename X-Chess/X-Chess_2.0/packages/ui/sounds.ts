@@ -1,20 +1,26 @@
-// The sounds, as numbers, and the rule that decides which one to play.
+// A library of sounds, a list of events, and the wire between them.
 //
 // THERE ARE NO AUDIO FILES HERE, and there cannot be. Every byte of this
 // application is inscribed permanently; one short WAV, base64ed into the page,
 // costs twenty to fifty kilobytes, and the whole board is a hundred. A library
-// of a dozen recorded sounds would be several times the size of the chess
+// of two dozen recorded sounds would be several times the size of the chess
 // engine, the replay, the wallet handling and the entire interface combined.
 //
 // So each sound is a handful of oscillators with an envelope on them, described
-// by the table below and built at play time. That is not a compromise forced by
-// the size: it is what makes the set PROGRAMMABLE. Retuning every sound in the
-// application means editing numbers in one table, and the panel that adjusts
-// them is generated from the same table, so the two cannot drift apart. It is
-// the same decision as SCALE in pieces.ts, for the same reason.
+// by a table of numbers and built at play time. That is not a compromise forced
+// by the size: it is what makes the set PROGRAMMABLE, and it is why the library
+// can be twice the length of the event list at almost no cost.
 //
-// Nothing in this file touches the DOM or an AudioContext. It is a table and a
-// pure function, both of which can be tested without a browser making a noise.
+// THE TWO TABLES ARE SEPARATE ON PURPOSE. VOICES is what a sound IS - pitches,
+// envelopes, timbre - and knows nothing about chess. EVENTS is what can HAPPEN
+// on a board, and each one merely names the voice it starts out using. Nothing
+// in a voice mentions an event and nothing in an event describes a sound, so a
+// player reassigning them is not overriding a design decision, it is using a
+// join that was always meant to be moved. The panel that does it is generated
+// from both tables, so it cannot fall behind either.
+//
+// Nothing in this file touches the DOM or an AudioContext. Two tables and some
+// pure functions, all of which can be tested without a browser making a noise.
 
 import { KING } from '../chess/board.js';
 import { checkSender } from '../protocol/rules.js';
@@ -36,8 +42,43 @@ export type SoundEvent =
   | 'select'
   | 'refused';
 
+export type VoiceId =
+  | 'chime-up'
+  | 'chime-down'
+  | 'bell'
+  | 'triad-up'
+  | 'triad-down'
+  | 'level-pair'
+  | 'arpeggio'
+  | 'knock'
+  | 'double-knock'
+  | 'thump'
+  | 'deep-thump'
+  | 'thud'
+  | 'tick'
+  | 'blip'
+  | 'blip-up'
+  | 'blip-down'
+  | 'ping'
+  | 'alarm'
+  | 'buzz-down'
+  | 'rasp'
+  | 'clunk'
+  | 'swoosh-up'
+  | 'swoosh-down';
+
 /**
- * One voice in a sound.
+ * How the library is grouped in the picker.
+ *
+ * Two dozen names in one flat list is a list nobody reads to the end. Grouped
+ * by what they sound LIKE rather than by what they might be for, because what
+ * they are for is exactly the thing being handed over to the player.
+ */
+export const FAMILIES = ['Chimes', 'Wood', 'Digital', 'Rough', 'Air'] as const;
+export type Family = (typeof FAMILIES)[number];
+
+/**
+ * One layer in a voice.
  *
  * A tone that glides from `from` to `to` over its own lifetime, under an
  * attack-and-decay envelope. `noise` is the same shape with a band-pass filter
@@ -63,23 +104,40 @@ export interface Layer {
   delay: number;
 }
 
+/** One entry in the library: a sound, and nothing about when to play it. */
 export interface Voice {
+  /** What the picker calls it. */
+  label: string;
+  family: Family;
+  /**
+   * Its own loudness against the rest of the library.
+   *
+   * Level belongs to the SOUND rather than to the event, so a voice is as loud
+   * wherever it is assigned. A quiet voice on a loud event is then a real
+   * choice somebody made, and the slider beside it is how they undo it.
+   */
+  gain: number;
+  layers: Layer[];
+}
+
+/** One thing that can happen on a board, and the voice it starts out using. */
+export interface EventSpec {
   /** What the panel calls it. */
   label: string;
-  /** What it means, in the panel, because an unlabelled beep teaches nobody. */
+  /** What it means, because an unlabelled beep teaches nobody. */
   say: string;
-  /** Its own loudness against the others, so the table is balanced here. */
-  gain: number;
+  /** The voice it uses until somebody picks another. Only a default. */
+  voice: VoiceId;
   /** Whether it is on for somebody who has never opened the panel. */
   on: boolean;
-  layers: Layer[];
 }
 
 /**
  * A layer, with the boring parts defaulted.
  *
- * Written out in full, the table below would be four hundred lines of `attack:
- * 0.001` and would hide the four numbers per sound that actually matter.
+ * Written out in full the tables below would be hundreds of lines of `attack:
+ * 0.001`, hiding the four numbers per sound that actually matter. `note` is the
+ * same thing at a fixed pitch, which is most of them.
  */
 const tone = (
   wave: Layer['wave'],
@@ -91,69 +149,112 @@ const tone = (
   attack = 0.004
 ): Layer => ({ wave, from, to, attack, decay, level, delay });
 
+const note = (
+  wave: Layer['wave'],
+  hz: number,
+  decay: number,
+  level = 1,
+  delay = 0,
+  attack = 0.004
+): Layer => tone(wave, hz, hz, decay, level, delay, attack);
+
 /**
  * The library.
  *
- * Ordered as the panel lists them: the one this whole module exists for first,
- * then the run of play, then the endings, then the small local ticks that are
- * off until somebody asks for them.
+ * Deliberately longer than the event list. A set with exactly one sound per
+ * event is a set where every choice has already been made, and the point of
+ * this table is that the choices have not been.
  *
- * The pitches are chosen rather than arbitrary. Everything that reports the
- * chain uses clean intervals and lands on a rising shape; everything that
- * reports a problem falls. A player should be able to tell good news from bad
- * from another room without having learned which sound is which.
+ * The pitches are chosen rather than arbitrary. Anything that climbs reads as
+ * good news and anything that falls reads as bad, which holds across every
+ * family here - so a player reassigning voices can follow the same instinct
+ * without having been told the rule.
  */
-export const VOICES: Record<SoundEvent, Voice> = {
-  // A rising perfect fifth, twice as long as anything else and the only sound
-  // with a tail on it. It has to carry from another tab, through whatever else
-  // is making noise, to somebody who is not looking at the screen.
-  'your-turn': {
-    label: 'Your turn',
-    say: 'the opponent move confirmed on chain, and it is now your move',
+export const VOICES: Record<VoiceId, Voice> = {
+  // ---- Chimes: clean, tuned, and the ones that carry furthest ------------
+  'chime-up': {
+    label: 'Rising chime',
+    family: 'Chimes',
     gain: 0.85,
-    on: true,
     layers: [
-      tone('sine', 587.33, 587.33, 0.22, 0.9, 0, 0.01),
-      tone('sine', 880, 880, 0.5, 1, 0.16, 0.01),
-      tone('triangle', 293.66, 293.66, 0.45, 0.28, 0.16, 0.02)
+      note('sine', 587.33, 0.22, 0.9, 0, 0.01),
+      note('sine', 880, 0.5, 1, 0.16, 0.01),
+      note('triangle', 293.66, 0.45, 0.28, 0.16, 0.02)
+    ]
+  },
+  'chime-down': {
+    label: 'Falling chime',
+    family: 'Chimes',
+    gain: 0.8,
+    layers: [
+      note('sine', 880, 0.2, 0.9, 0, 0.01),
+      note('sine', 587.33, 0.45, 1, 0.15, 0.01),
+      note('triangle', 293.66, 0.4, 0.25, 0.15, 0.02)
+    ]
+  },
+  bell: {
+    label: 'Bell',
+    family: 'Chimes',
+    gain: 0.7,
+    // A bell is its overtones. The inharmonic third partial is what stops this
+    // reading as an organ note.
+    layers: [
+      note('sine', 880, 0.6, 1, 0, 0.006),
+      note('sine', 1320, 0.4, 0.45, 0, 0.006),
+      note('sine', 2640, 0.25, 0.3, 0, 0.006)
+    ]
+  },
+  'triad-up': {
+    label: 'Rising triad',
+    family: 'Chimes',
+    gain: 0.9,
+    layers: [
+      note('sine', 523.25, 0.16, 0.8, 0, 0.006),
+      note('sine', 659.25, 0.16, 0.85, 0.11, 0.006),
+      note('sine', 783.99, 0.7, 1, 0.22, 0.006),
+      note('triangle', 261.63, 0.7, 0.35, 0.22, 0.02)
+    ]
+  },
+  'triad-down': {
+    label: 'Falling triad',
+    family: 'Chimes',
+    gain: 0.75,
+    layers: [
+      note('triangle', 392, 0.18, 0.8, 0, 0.01),
+      note('triangle', 329.63, 0.18, 0.85, 0.13, 0.01),
+      note('triangle', 261.63, 0.6, 1, 0.26, 0.012)
+    ]
+  },
+  'level-pair': {
+    label: 'Level pair',
+    family: 'Chimes',
+    gain: 0.7,
+    // Neither rising nor falling. Two of the same note, one slightly detuned.
+    layers: [note('sine', 440, 0.22, 1, 0, 0.01), note('sine', 442.5, 0.55, 0.7, 0.14, 0.01)]
+  },
+  arpeggio: {
+    label: 'Arpeggio',
+    family: 'Chimes',
+    gain: 0.7,
+    layers: [
+      note('sine', 659.25, 0.12, 0.7, 0, 0.005),
+      note('sine', 987.77, 0.12, 0.8, 0.07, 0.005),
+      note('sine', 1318.51, 0.34, 1, 0.14, 0.005)
     ]
   },
 
-  // A piece set down on a board. Short, dry, low, and quiet enough to hear a
-  // hundred times without noticing it.
-  move: {
-    label: 'Move',
-    say: 'a move was accepted by replay',
+  // ---- Wood: a piece meeting a board ------------------------------------
+  knock: {
+    label: 'Knock',
+    family: 'Wood',
     gain: 0.5,
-    on: true,
-    layers: [
-      tone('noise', 1800, 600, 0.03, 0.5, 0, 0.001),
-      tone('triangle', 190, 120, 0.07, 1, 0, 0.001)
-    ]
+    layers: [tone('noise', 1800, 600, 0.03, 0.5, 0, 0.001), tone('triangle', 190, 120, 0.07, 1, 0, 0.001)]
   },
-
-  // The same gesture with more behind it: lower, longer, and with the noise
-  // transient turned up, which is what a piece knocking another one off a
-  // square actually sounds like.
-  capture: {
-    label: 'Capture',
-    say: 'a move that took a piece',
-    gain: 0.65,
-    on: true,
-    layers: [
-      tone('noise', 2600, 400, 0.07, 0.8, 0, 0.001),
-      tone('triangle', 150, 62, 0.16, 1, 0, 0.001),
-      tone('square', 96, 60, 0.1, 0.3, 0.01, 0.002)
-    ]
-  },
-
-  // Two pieces, so two clicks. The gap is the whole sound; a single click here
-  // would be indistinguishable from a move.
-  castle: {
-    label: 'Castle',
-    say: 'castling, on either side',
+  'double-knock': {
+    label: 'Double knock',
+    family: 'Wood',
     gain: 0.55,
-    on: true,
+    // Two pieces, so two knocks. The gap is the whole sound.
     layers: [
       tone('noise', 1800, 600, 0.03, 0.45, 0, 0.001),
       tone('triangle', 200, 130, 0.06, 1, 0, 0.001),
@@ -161,130 +262,225 @@ export const VOICES: Record<SoundEvent, Voice> = {
       tone('triangle', 240, 150, 0.07, 1, 0.085, 0.001)
     ]
   },
+  thump: {
+    label: 'Thump',
+    family: 'Wood',
+    gain: 0.65,
+    layers: [
+      tone('noise', 2600, 400, 0.07, 0.8, 0, 0.001),
+      tone('triangle', 150, 62, 0.16, 1, 0, 0.001),
+      tone('square', 96, 60, 0.1, 0.3, 0.01, 0.002)
+    ]
+  },
+  'deep-thump': {
+    label: 'Deep thump',
+    family: 'Wood',
+    gain: 0.7,
+    layers: [
+      tone('noise', 1400, 200, 0.09, 0.7, 0, 0.001),
+      tone('triangle', 96, 42, 0.26, 1, 0, 0.002),
+      tone('sine', 62, 34, 0.2, 0.5, 0, 0.002)
+    ]
+  },
+  thud: {
+    label: 'Thud',
+    family: 'Wood',
+    gain: 0.4,
+    layers: [tone('triangle', 118, 92, 0.09, 1, 0, 0.002)]
+  },
+  tick: {
+    label: 'Tick',
+    family: 'Wood',
+    gain: 0.3,
+    layers: [note('sine', 1244.51, 0.035, 1, 0, 0.001)]
+  },
 
-  // A pawn becoming something else, so the sound climbs out of the range every
-  // other move sound sits in.
+  // ---- Digital: unmistakably a machine talking --------------------------
+  blip: {
+    label: 'Blip',
+    family: 'Digital',
+    gain: 0.45,
+    layers: [note('square', 880, 0.05, 1, 0, 0.002)]
+  },
+  'blip-up': {
+    label: 'Rising blip',
+    family: 'Digital',
+    gain: 0.5,
+    layers: [tone('square', 440, 1320, 0.09, 1, 0, 0.003)]
+  },
+  'blip-down': {
+    label: 'Falling blip',
+    family: 'Digital',
+    gain: 0.5,
+    layers: [tone('square', 1320, 440, 0.09, 1, 0, 0.003)]
+  },
+  ping: {
+    label: 'Ping',
+    family: 'Digital',
+    gain: 0.55,
+    layers: [note('sine', 1568, 0.18, 1, 0, 0.003), note('sine', 3136, 0.07, 0.35, 0, 0.003)]
+  },
+  alarm: {
+    label: 'Alarm',
+    family: 'Digital',
+    gain: 0.7,
+    // Two tones a semitone apart, held. They beat against each other, which is
+    // unpleasant on purpose: this is the voice for interrupting somebody.
+    layers: [
+      note('sine', 740, 0.3, 1, 0, 0.008),
+      note('sine', 784, 0.3, 0.75, 0, 0.008),
+      note('triangle', 370, 0.26, 0.3, 0, 0.01)
+    ]
+  },
+
+  // ---- Rough: something did not go well ---------------------------------
+  'buzz-down': {
+    label: 'Falling buzz',
+    family: 'Rough',
+    gain: 0.6,
+    layers: [tone('sawtooth', 240, 104, 0.28, 1, 0, 0.006), tone('sawtooth', 121, 52, 0.28, 0.4, 0.01, 0.006)]
+  },
+  rasp: {
+    label: 'Rasp',
+    family: 'Rough',
+    gain: 0.5,
+    layers: [note('sawtooth', 160, 0.16, 1, 0, 0.006), tone('noise', 900, 300, 0.12, 0.5, 0, 0.004)]
+  },
+  clunk: {
+    label: 'Clunk',
+    family: 'Rough',
+    gain: 0.55,
+    layers: [tone('square', 140, 70, 0.12, 1, 0, 0.003), tone('noise', 700, 180, 0.05, 0.7, 0, 0.001)]
+  },
+
+  // ---- Air: motion rather than an object --------------------------------
+  'swoosh-up': {
+    label: 'Rising swoosh',
+    family: 'Air',
+    gain: 0.4,
+    layers: [tone('noise', 400, 2400, 0.14, 0.6, 0, 0.03), tone('sine', 330, 660, 0.12, 0.5, 0, 0.02)]
+  },
+  'swoosh-down': {
+    label: 'Falling swoosh',
+    family: 'Air',
+    gain: 0.4,
+    layers: [tone('noise', 2400, 400, 0.16, 0.6, 0, 0.03), tone('sine', 660, 300, 0.14, 0.5, 0, 0.02)]
+  }
+};
+
+/**
+ * The events, and where each one points to start with.
+ *
+ * Every `voice` here is a DEFAULT and nothing more. It is the assignment
+ * somebody gets before they have an opinion, chosen so the board makes sense
+ * out of the box, and the picker beside each row is the whole point of the
+ * table being separate from the library.
+ *
+ * Ordered as the panel lists them: the one this module exists for first, then
+ * the run of play, then the endings, then what a submission did, then the local
+ * ones that report a finger rather than a chain.
+ */
+export const EVENTS: Record<SoundEvent, EventSpec> = {
+  'your-turn': {
+    label: 'Your turn',
+    say: 'the opponent move confirmed on chain, and it is now your move',
+    voice: 'chime-up',
+    on: true
+  },
+  move: {
+    label: 'Move',
+    say: 'a move was accepted by replay',
+    voice: 'knock',
+    on: true
+  },
+  capture: {
+    label: 'Capture',
+    say: 'a move that took a piece',
+    voice: 'thump',
+    on: true
+  },
+  castle: {
+    label: 'Castle',
+    say: 'castling, on either side',
+    voice: 'double-knock',
+    on: true
+  },
   promote: {
     label: 'Promotion',
     say: 'a pawn reached the far rank and became a piece',
-    gain: 0.7,
-    on: true,
-    layers: [
-      tone('sine', 659.25, 659.25, 0.12, 0.7, 0, 0.005),
-      tone('sine', 987.77, 987.77, 0.12, 0.8, 0.07, 0.005),
-      tone('sine', 1318.51, 1318.51, 0.34, 1, 0.14, 0.005)
-    ]
+    voice: 'arpeggio',
+    on: true
   },
-
-  // Two tones a semitone apart, held. They beat against each other, which is
-  // unpleasant on purpose: this is the one sound in the set that is meant to
-  // interrupt somebody.
   check: {
     label: 'Check',
     say: 'the king of the side to move is in check',
-    gain: 0.7,
-    on: true,
-    layers: [
-      tone('sine', 740, 740, 0.3, 1, 0, 0.008),
-      tone('sine', 784, 784, 0.3, 0.75, 0, 0.008),
-      tone('triangle', 370, 370, 0.26, 0.3, 0, 0.01)
-    ]
+    voice: 'alarm',
+    on: true
   },
-
-  // A major triad, arriving.
   win: {
     label: 'Win',
     say: 'the game ended in your favour',
-    gain: 0.9,
-    on: true,
-    layers: [
-      tone('sine', 523.25, 523.25, 0.16, 0.8, 0, 0.006),
-      tone('sine', 659.25, 659.25, 0.16, 0.85, 0.11, 0.006),
-      tone('sine', 783.99, 783.99, 0.7, 1, 0.22, 0.006),
-      tone('triangle', 261.63, 261.63, 0.7, 0.35, 0.22, 0.02)
-    ]
+    voice: 'triad-up',
+    on: true
   },
-
-  // The same three notes, descending, on a softer wave. Losing does not need a
-  // fanfare and it does not need a raspberry either.
   lose: {
     label: 'Loss',
     say: 'the game ended against you',
-    gain: 0.75,
-    on: true,
-    layers: [
-      tone('triangle', 392, 392, 0.18, 0.8, 0, 0.01),
-      tone('triangle', 329.63, 329.63, 0.18, 0.85, 0.13, 0.01),
-      tone('triangle', 261.63, 261.63, 0.6, 1, 0.26, 0.012)
-    ]
+    voice: 'triad-down',
+    on: true
   },
-
-  // Level, because a draw is level. Two of the same note, one slightly detuned,
-  // so it neither rises nor falls.
   draw: {
     label: 'Draw',
     say: 'the game ended level',
-    gain: 0.7,
-    on: true,
-    layers: [
-      tone('sine', 440, 440, 0.22, 1, 0, 0.01),
-      tone('sine', 442.5, 442.5, 0.55, 0.7, 0.14, 0.01)
-    ]
+    voice: 'level-pair',
+    on: true
   },
-
-  // Your own submission leaving. Quiet and upward: it says gone, not landed.
   sent: {
     label: 'Move sent',
     say: 'your submission was broadcast, and is not in a block yet',
-    gain: 0.4,
-    on: true,
-    layers: [
-      tone('noise', 400, 2400, 0.14, 0.6, 0, 0.03),
-      tone('sine', 330, 660, 0.12, 0.5, 0, 0.02)
-    ]
+    voice: 'swoosh-up',
+    on: true
   },
-
-  // A submission that is on chain, was charged for, and counts for nothing.
-  // The only buzz in the set, and the only sawtooth.
   skipped: {
     label: 'Submission skipped',
     say: 'something you sent was stored and charged for, but replay refused it',
-    gain: 0.6,
-    on: true,
-    layers: [
-      tone('sawtooth', 240, 104, 0.28, 1, 0, 0.006),
-      tone('sawtooth', 121, 52, 0.28, 0.4, 0.01, 0.006)
-    ]
+    voice: 'buzz-down',
+    on: true
   },
-
-  // The two local ones. Nothing on chain has happened when either of these
-  // plays, and picking a piece up happens far more often than anything else in
-  // the set - so it is off until somebody asks for it.
   select: {
     label: 'Piece picked up',
     say: 'you selected a piece (local, nothing on chain)',
-    gain: 0.3,
-    on: false,
-    layers: [tone('sine', 1244.51, 1244.51, 0.035, 1, 0, 0.001)]
+    voice: 'tick',
+    // Off until asked for: this fires far more often than anything else here.
+    on: false
   },
-
-  // The board declining to open a wallet for something it is sure replay would
-  // skip. A dull thud rather than an alarm: nothing went wrong and nothing was
-  // charged for, which is the entire point of the refusal.
   refused: {
     label: 'Refused',
     say: 'the board would not send something it is certain replay would skip',
-    gain: 0.4,
-    on: true,
-    layers: [tone('triangle', 118, 92, 0.09, 1, 0, 0.002)]
+    voice: 'thud',
+    on: true
   }
 };
 
 /** The panel's order, and the order tests iterate. */
-export const SOUND_EVENTS = Object.keys(VOICES) as SoundEvent[];
+export const SOUND_EVENTS = Object.keys(EVENTS) as SoundEvent[];
+export const VOICE_IDS = Object.keys(VOICES) as VoiceId[];
+
+/** True when a stored or typed name is really in the library. */
+export function isVoiceId(value: unknown): value is VoiceId {
+  return typeof value === 'string' && Object.prototype.hasOwnProperty.call(VOICES, value);
+}
+
+/** The library grouped for the picker, in FAMILIES order. */
+export function voicesByFamily(): { family: Family; voices: VoiceId[] }[] {
+  return FAMILIES.map((family) => ({
+    family,
+    voices: VOICE_IDS.filter((id) => VOICES[id].family === family)
+  }));
+}
 
 /**
- * How long a sound lasts, in seconds.
+ * How long a voice lasts, in seconds.
  *
  * The last layer to finish decides, not the first. Used to stop the oscillators
  * and, in the tests, to hold every sound to something shorter than a move.
@@ -297,11 +493,11 @@ export function voiceLength(voice: Voice): number {
 }
 
 // ---------------------------------------------------------------------------
-// Choosing one
+// Choosing an event
 // ---------------------------------------------------------------------------
 
 /**
- * The order sounds beat each other in.
+ * The order events beat each other in.
  *
  * ONE STATE CHANGE PLAYS AT MOST ONE SOUND. This is the rule the whole
  * classifier exists to enforce, and it is not fussiness. A single poll can
@@ -314,6 +510,9 @@ export function voiceLength(voice: Voice): number {
  * already tells you it is your turn AND tells you the thing you most need to
  * know about the position. Announcing your turn instead would be throwing that
  * away to say something you would have worked out anyway.
+ *
+ * This is about EVENTS, not about voices. Which sound comes out is whatever the
+ * player has assigned, and reassigning cannot change what beats what.
  */
 const ORDER: readonly SoundEvent[] = [
   'win',
@@ -380,7 +579,7 @@ export function mayMoveNow(state: ReplayState, me: string | null): boolean {
 }
 
 /**
- * Which sound a change of state deserves, if any.
+ * Which event a change of state deserves, if any.
  *
  * `before` is the state this board was showing and `after` is the state it has
  * just replayed. Both come from the same deterministic replay, so this compares
@@ -438,11 +637,7 @@ export function soundFor(
     if (after.inCheck) candidates.add('check');
 
     const last = fresh[fresh.length - 1];
-    if (
-      involved(after, me) &&
-      mayMoveNow(after, me) &&
-      !same(last.sender, me)
-    ) {
+    if (involved(after, me) && mayMoveNow(after, me) && !same(last.sender, me)) {
       candidates.add('your-turn');
     }
 
