@@ -18,6 +18,7 @@ import { deserialize, serializeBuffer, serializePrincipal } from './clarity.js';
 import type { ClarityJs } from './clarity.js';
 import type { Endpoint } from './endpoint.js';
 import type { Network } from './endpoint.js';
+import { pool } from './pool.js';
 
 /** The registry, which is the only thing that knows which name is primary. */
 export const BNS_V2: Partial<Record<Network, string>> = {
@@ -96,11 +97,26 @@ export class Names {
     if (existing) return existing;
 
     const work = this.lookup(key)
-      .catch(() => null)
       .then((name) => {
+        // A real answer, including "this address has no name". Worth keeping.
         this.cache.set(key, name);
         this.inFlight.delete(key);
         return name;
+      })
+      .catch((error: unknown) => {
+        // A REFUSAL IS NOT AN ANSWER, and caching one made a passing rate limit
+        // permanent for the session: one busy moment and every name stayed
+        // blank until the page was reloaded, which reads to a player as the
+        // board being broken rather than the host being busy.
+        //
+        // The rule is stated twelve lines below, in resolveName, which has
+        // always got this right. This method did not.
+        const code = (error as { code?: string })?.code;
+        if (code !== 'RATE_LIMITED' && code !== 'CHAIN_UNAVAILABLE') {
+          this.cache.set(key, null);
+        }
+        this.inFlight.delete(key);
+        return null;
       });
 
     this.inFlight.set(key, work);
@@ -112,7 +128,9 @@ export class Names {
     const wanted = [...new Set(principals.map((p) => String(p ?? '').toUpperCase()))]
       .filter((p) => looksLikePrincipal(p) && !this.cache.has(p));
     if (!wanted.length) return false;
-    await Promise.all(wanted.map((p) => this.resolve(p)));
+    // A few at a time. A bare Promise.all here fired one request per distinct
+    // sender at once, from one IP, into an allowance the wallet also spends.
+    await pool(3, wanted.map((p) => () => this.resolve(p)));
     return true;
   }
 

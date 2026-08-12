@@ -353,3 +353,67 @@ describe('degrading', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Not spending the whole minute's allowance on the first paint.
+// ---------------------------------------------------------------------------
+
+describe('being polite with a shared allowance', () => {
+  it('asks a few at a time rather than all at once', async () => {
+    const { BlockTimes } = await import('../../packages/chain/block-time.js');
+    let inFlight = 0;
+    let peak = 0;
+    const fetchMock = vi.fn(async () => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      await new Promise((done) => setTimeout(done, 4));
+      inFlight--;
+      return ok('{"block_time":1760000000}');
+    });
+
+    // Heights rather than addresses: both resolvers share this pool, and a
+    // height needs no checksum, so the test exercises the cap rather than the
+    // address encoding.
+    const times = new BlockTimes(
+      makeEndpoint({ fetch: fetchMock as unknown as typeof fetch, document: plainDocument() })
+    );
+    await times.resolveAll(Array.from({ length: 40 }, (_, i) => 900_000 + i));
+
+    expect(
+      fetchMock.mock.calls.length,
+      'nothing was asked, so the cap was never exercised'
+    ).toBeGreaterThan(10);
+    // A bare Promise.all here fired one request per distinct height at once,
+    // into an allowance the WALLET also spends - so a board that emptied it
+    // stopped its own player from moving.
+    expect(peak, `${peak} requests were in flight at once`).toBeLessThanOrEqual(3);
+  });
+
+  it('does not remember a refusal as though it were an answer', async () => {
+    const { Names } = await import('../../packages/chain/bns.js');
+    let refuse = true;
+    const fetchMock = vi.fn(async () => {
+      if (refuse) return new Response('slow down', { status: 429 });
+      return ok('{"okay":true,"result":"0x09"}');
+    });
+
+    const names = new Names({
+      endpoint: makeEndpoint({ fetch: fetchMock as unknown as typeof fetch, document: plainDocument() })
+    });
+    const who = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+
+    await names.resolve(who);
+    const asked = fetchMock.mock.calls.length;
+    expect(asked, 'the first attempt did not happen').toBeGreaterThan(0);
+
+    // The host stops refusing. A cached refusal would mean this address is
+    // never asked about again for the life of the page, so one busy moment
+    // would leave every name blank until a reload.
+    refuse = false;
+    await names.resolve(who);
+    expect(
+      fetchMock.mock.calls.length,
+      'the refusal was cached, so the name can never be learned this session'
+    ).toBeGreaterThan(asked);
+  });
+});

@@ -14,6 +14,7 @@
 // blocks the board.
 
 import type { Endpoint } from './endpoint.js';
+import { pool } from './pool.js';
 
 /** A gap between two moves: "12s", "4m 30s", "2h 15m", "3d 4h". */
 export function formatDuration(seconds: number): string {
@@ -71,11 +72,21 @@ export class BlockTimes {
     if (existing) return existing;
 
     const work = this.lookup(height)
-      .catch(() => null)
       .then((time) => {
         this.cache.set(height, time);
         this.inFlight.delete(height);
         return time;
+      })
+      .catch((error: unknown) => {
+        // A refusal is not an answer. Caching one made a passing rate limit
+        // permanent for the session, so one busy moment left every clock in the
+        // move list blank until the page was reloaded.
+        const code = (error as { code?: string })?.code;
+        if (code !== 'RATE_LIMITED' && code !== 'CHAIN_UNAVAILABLE') {
+          this.cache.set(height, null);
+        }
+        this.inFlight.delete(height);
+        return null;
       });
 
     this.inFlight.set(height, work);
@@ -91,7 +102,9 @@ export class BlockTimes {
       (h) => Number.isFinite(h) && h > 0 && !this.cache.has(h)
     );
     if (!wanted.length) return false;
-    await Promise.all(wanted.map((h) => this.resolve(h)));
+    // Newest first: the end of the move list is the part somebody is looking at.
+    const order = [...wanted].sort((a, b) => b - a);
+    await pool(3, order.map((h) => () => this.resolve(h)));
     return true;
   }
 

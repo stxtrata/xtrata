@@ -187,6 +187,8 @@ export class ChessApp {
   private state: ReplayState | null = null;
   private selected: string | null = null;
   private pendingPromotion: { from: string; to: string } | null = null;
+  /** The game count the explorer was last built for, or null if never. */
+  private exploreLoadedAt: number | null = null;
   private flipped = false;
   private busy = false;
   private pending: PendingRow[] = [];
@@ -743,7 +745,12 @@ export class ChessApp {
     try {
       const version = await this.chain.getFormatVersion();
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId} (format ${version}).`);
-      void this.loadExplore();
+      // NOT the game list. loadExplore reads and replays every listed game -
+      // its own comment says that spend is why it never runs on a poll - and
+      // running it at boot meant following a shared link paid for a list nobody
+      // had asked for, alongside the board's own read. That is the whole
+      // onboarding path, and it cost about eighteen requests where three would
+      // do. It loads when the tab is opened instead; see show().
     } catch (error) {
       this.reportFailure('reading the contract', error);
     }
@@ -869,6 +876,9 @@ export class ChessApp {
       this.el[camel(`tab-${name}`)].setAttribute('aria-selected', String(name === tab));
     }
     if (tab === 'leaderboard') void this.loadLeaderboard();
+    // Memoised on the game count, so re-opening the tab is free while nothing
+    // has been opened since.
+    if (tab === 'explore' && this.exploreLoadedAt === null) void this.loadExplore();
   }
 
   get currentTab(): Tab {
@@ -2397,6 +2407,7 @@ export class ChessApp {
   private async loadExplore(): Promise<void> {
     await this.guard('reading the game list', async () => {
       const count = await this.chain.getGameCount();
+      this.exploreLoadedAt = count;
       this.text('exploreCount', `${count} game${count === 1 ? '' : 's'} on this contract`);
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 

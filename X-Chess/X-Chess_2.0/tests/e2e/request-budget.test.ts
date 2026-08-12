@@ -434,3 +434,41 @@ describe('a sponsored game with nobody to sponsor', () => {
     app.stopPolling();
   });
 });
+
+// ---------------------------------------------------------------------------
+// The first paint, which is what a shared link pays for.
+// ---------------------------------------------------------------------------
+
+describe('opening a link to one game', () => {
+  it('does not also read the whole game list', async () => {
+    // checkContract used to fire loadExplore unconditionally at boot, so
+    // following a shared link - the entire onboarding path - paid for a list
+    // nobody had asked for, alongside the board's own read. loadExplore reads
+    // AND replays every listed game; its own comment says that spend is why it
+    // never runs on a poll.
+    const { chain, reads } = counted();
+    chain.as(ALICE);
+    for (let n = 0; n < 6; n++) await chain.openGame(rulesHash(RULES), false);
+    await chain.submit(1, 'e2e4');
+
+    reads.length = 0;
+    // Booted at a link to ONE game, which is what a spectator follows.
+    const linked = new JSDOM('<!doctype html><html><head></head><body></body></html>', {
+      url: 'https://example.test/xchess.html?game=1'
+    });
+    (globalThis as unknown as Record<string, unknown>).document = linked.window.document;
+    mountShell(linked.window.document);
+    new ChessApp({
+      chain,
+      document: linked.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await tick(80);
+
+    const listReads = reads.filter((r) => r === 'getGame').length;
+    expect(
+      listReads,
+      `opening one game read ${listReads} games: ${reads.join(', ')}`
+    ).toBeLessThanOrEqual(2);
+  });
+});
