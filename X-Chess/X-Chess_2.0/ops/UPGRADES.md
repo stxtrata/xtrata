@@ -110,9 +110,10 @@ the commit, what was actually built, and what was learned doing it.
 | **1** | Price the artefact in Xtrata chunks | ✅ **Done** | `d420f699`, `749cc433` |
 | **24** | Every square is the wrong colour | ✅ **Done** | `a893ea24` |
 | **25** | The endpoint failover never comes back | ✅ **Done** | `fb7d2ced` |
+| **26** | Coordinates around the board | ✅ **Done** | `cbeae473` |
 | **27** | Deep links (the link half only) | ✅ **Already built**, pinned by tests | `bf8e8b01`, tests below |
 
-**Three of thirty-three.** Both defects the testers found are fixed in the tree.
+**Four of thirty-three built, plus one found already built.** Both defects the testers found are fixed in the tree.
 Neither reaches a player until the next inscription, which is deliberate: they
 are small, and pushing a new inscription per fix is how a project ends up with a
 split user base.
@@ -203,7 +204,7 @@ disagreement is permanent.
 |---|---|:---:|:---:|---|---|
 | **24** | ✅ [Every square is the wrong colour](#24-every-square-on-the-board-is-the-wrong-colour) **defect** | 5 | 4 | — | inscription |
 | **25** | ✅ [The endpoint failover never comes back](#25-the-endpoint-failover-never-comes-back) **defect** | 4 | 4 | ~0.2 KB | inscription |
-| **26** | [Coordinates around the board](#26-coordinates-around-the-board) | 5 | 4 | ~0.4 KB | inscription |
+| **26** | ✅ [Coordinates around the board](#26-coordinates-around-the-board) | 5 | 4 | ~0.4 KB | inscription |
 | **27** | [Deep links, and getting back to a game](#27-deep-links-to-a-game-and-getting-back-to-one) | 4 | 4 | ~0.8 KB | inscription |
 | **28** | [Explore: search, filter, spectator facts](#28-explore-search-filter-and-the-facts-a-spectator-needs) | 3 | 4 | ~1.5 KB | inscription |
 | **29** | [Which game am I in, is it my move elsewhere](#29-which-game-am-i-watching-and-is-it-my-move-somewhere-else) | 3 | 4 | ~1.2 KB | inscription |
@@ -2615,6 +2616,23 @@ That is the tester's bug, and it is the test to write first.
 ## 26. Coordinates around the board
 
 **Simplicity 5 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `cbeae473`
+>
+> Drawn in the corners of the edge squares rather than in a ring, so it costs no
+> vertical space and cannot fight master proposal 10's landscape work. The
+> position comes from the index in the array the squares are already drawn from
+> and the text from the square's own name, so a flip carries both — asserted:
+> flipped, the bottom-left square is h8 and carries an `8` and an `h`.
+>
+> **Contrast was measured, and the obvious choice was wrong.** Tinting with the
+> opposite square colour reads 2.82:1, a smudge at this size. `--ink` on a dark
+> square is 5.22:1 and `--bg` on a light one 8.2:1, both already-existing
+> variables, so the better answer also cost nothing. `max(8px, 2.1cqw)` floors
+> the size, since 2.1cqw on a narrow phone is about five pixels.
+>
+> Checked visually at 320px and 150px, both orientations, through the real
+> renderer and stylesheet — jsdom has no layout and this is permanent.
 
 ### In plain terms
 
