@@ -286,7 +286,7 @@ assertion go red naming true figures. Remove, confirm green.
 
 ### In plain terms
 
-Your stylesheet and page skeleton are being written onto Bitcoin with every space,
+Your stylesheet and page skeleton are being inscribed on Xtrata with every space,
 indent and explanatory comment still in them. The build does have a minifier, but it
 only compacts code, and these are stored as text, so it walks straight past them.
 
@@ -311,7 +311,7 @@ esbuild minifies JavaScript, not the strings inside it.
 
 The raw bytes ship. `dist/xchess.html` contains `  --bg: #12100e;` with its
 two-space indent verbatim, and every explanatory prose comment in that CSS is
-inscribed on Bitcoin.
+inscribed on Xtrata.
 
 Measured against the resolved esbuild 0.25.12:
 
@@ -389,8 +389,8 @@ the current build.
 Three related problems with how releases are made.
 
 First, the build stamps the current clock time into the page, so building the same code
-twice produces two different files. That means you can never prove that what is on
-Bitcoin was built from what is in the repository. Your own checklist asks for exactly
+twice produces two different files. That means you can never prove that what is
+inscribed was built from what is in the repository. Your own checklist asks for exactly
 that proof and cannot ever tick it.
 
 Second, the safety check that is supposed to refuse a bad release can never pass. It
@@ -455,7 +455,7 @@ The one gate standing between this project and a wrong permanent artefact
 becomes capable of returning success, and tamper-evident: today a MATRIX row
 saying `pending`, or an indented LAUNCH bullet, silently disarms two bare regexes
 (`release.mjs:100`, `:114`). And the next inscription becomes reproducible from a
-commit, which is the only real answer to "is the thing on Bitcoin the thing in
+commit, which is the only real answer to "is the thing on Xtrata the thing in
 this repo".
 
 ### Steps
@@ -507,8 +507,8 @@ identical sha256.
 ### In plain terms
 
 Your two most authoritative documents currently tell a new reader that the
-application does not exist and **must not be inscribed** — while it is live on Bitcoin
-with 80 real moves played on it.
+application does not exist and **must not be inscribed** — while it is live on
+mainnet with 80 real moves played on it.
 
 They also contradict themselves internally. One file says a risk is closed and, forty
 lines later, says the same thing never happened. The file sizes quoted are half what they

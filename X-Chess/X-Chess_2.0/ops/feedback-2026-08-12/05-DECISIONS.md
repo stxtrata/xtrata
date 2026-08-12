@@ -66,7 +66,7 @@ The board shows which is which.
 
 **A, scoped small.** A messages contract keyed by game id, with a short maximum
 length and a fee that makes spam pointless. It is the only option that does not
-weaken the one claim this project is built on, and "your trash talk is on Bitcoin
+weaken the one claim this project is built on, and "your trash talk is on Stacks
 forever" is a better feature than a chat box.
 
 If that feels too heavy for banter, **D for now** is more honest than B. Once
@@ -129,7 +129,7 @@ heartbeat on top?
 
 ### Recommendation
 
-**Derived last-seen, and no green dot.** In a game where a move is a Bitcoin
+**Derived last-seen, and no green dot.** In a game where a move is a Stacks
 transaction and a reply can take a day, "usually replies within a day" is the
 useful fact. A green dot would be a live claim this system cannot make truthfully,
 and a status that is sometimes wrong is worse than one that is always modest.
