@@ -1019,7 +1019,7 @@ export class ChessApp {
     // permanent artefact is a dependency it can never shed, which is what the
     // serverlessness audit exists to refuse - and it caught this line.
     const href = String(this.doc.location?.href ?? '');
-    const absolute = linkForGame(href.split(/[?#]/)[0] || href, this.gameId, this.rules);
+    const absolute = linkForGame(href, this.gameId, this.rules);
 
     try {
       await (this.doc.defaultView?.navigator?.clipboard?.writeText?.(absolute) ??

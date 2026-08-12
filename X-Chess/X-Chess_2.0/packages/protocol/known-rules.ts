@@ -117,11 +117,43 @@ export function rulesFromLink(url: string, committed: string | null): Rules | nu
   }
 }
 
-/** The link to hand an opponent: the game, and the rules it agreed to. */
-export function linkForGame(base: string, game: number, rules: Rules): string {
-  const query = `game=${game}&rules=${encode(JSON.stringify(rules))}`;
-  const clean = String(base ?? '').split(/[?#]/)[0];
-  return clean ? `${clean}?${query}` : `?${query}`;
+/**
+ * The link to hand an opponent: the game, and the rules it agreed to.
+ *
+ * TAKES THE PAGE'S WHOLE ADDRESS, and keeps every parameter it does not own.
+ *
+ * It used to take a bare path and throw the query away, which is harmless at
+ * /i/2988 and fatal at the only address a player who can actually MOVE is ever
+ * on. Signing needs the host bridge, and the bridge needs the parameters the
+ * Xtrata runtime was opened with - contractId, tokenId, network. Strip those and
+ * the recipient lands on "Missing runtime parameters": a dark box, from the one
+ * link that constitutes this application's entire onboarding path.
+ *
+ * Three parameters are deliberately dropped. `game` and `rules` because they are
+ * being replaced, and `walletBridgeToken` because it is a per-session secret
+ * that must never be pasted into a public post.
+ *
+ * A DENY LIST rather than an allow list, which is the less obvious choice and
+ * the right one here: this artefact is permanent and cannot learn the name of a
+ * parameter Xtrata adds next year, so anything unrecognised has to travel.
+ */
+export function linkForGame(href: string, game: number, rules: Rules): string {
+  const text = String(href ?? '');
+  const path = text.split(/[?#]/)[0];
+  const query = text.includes('?') ? text.slice(text.indexOf('?') + 1).split('#')[0] : '';
+
+  // Parsed by hand rather than with URL, which needs a base and would mean
+  // naming a host in an artefact that must never depend on one.
+  const kept: string[] = [];
+  for (const pair of query.split('&')) {
+    if (!pair) continue;
+    const name = pair.split('=')[0];
+    if (name === 'game' || name === 'rules' || name === 'walletBridgeToken') continue;
+    kept.push(pair);
+  }
+  kept.push(`game=${game}`, `rules=${encode(JSON.stringify(rules))}`);
+
+  return path ? `${path}?${kept.join('&')}` : `?${kept.join('&')}`;
 }
 
 function verify(candidate: Partial<Rules>, committed: string): Rules | null {
