@@ -336,7 +336,7 @@
         "Whether a game has finished, before describing a result",
         "The difference between a submission and a move. get-game next-seq counts SUBMISSIONS, and the app reports that some did not count as moves while still being stored on chain and still costing a fee. Say signed transactions or submissions, never moves, when quoting the total"
       ],
-      "notes": "Went live 2026-08-11. Inscription 2988 is permanent and hardcodes the xchess-core-v1-canary contract, so it cannot be repointed at a differently named contract later. A large hand-written posting board of proven copy is at X-Chess/shots/tweets.html, with screenshots in X-Chess/shots/. Use it rather than inventing new lines. Note that two posts in it are marked UNVERIFIED and still are.",
+      "notes": "Went live 2026-08-11. Inscription 2988 is permanent and hardcodes the xchess-core-v1-canary contract, so it cannot be repointed at a differently named contract later. A large hand-written posting board of proven copy is at X-Chess/shots/tweets.html, with screenshots in X-Chess/shots/. Use it rather than inventing new lines, with two caveats: two of its posts are marked UNVERIFIED and still are, and five of them say a thing is 'on Bitcoin'. X Chess runs on Stacks, which is anchored to Bitcoin and mined by it through Proof of Transfer. Take the structure from those posts and fix the chain word. The linter rejects 'on Bitcoin'.",
       "assets": "X-Chess/shots/ has nine screenshots: hero game, players panel, moves panel, anyone-else, sponsored challenge, sponsor both, ranked, and two mobile shots.",
       "capture": {
         "url": "https://xtrata.xyz/i/2988",

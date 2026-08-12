@@ -6,6 +6,51 @@ that exists. When in doubt, go and read it.
 
 ---
 
+## Terminology: which chain, and how to say it
+
+This is the one category of mistake that costs credibility with the people
+whose opinion matters most, because they will spot it instantly.
+
+**Stacks is its own chain.** It is anchored to Bitcoin and inherits Bitcoin's
+security. It is mined by Bitcoin through Proof of Transfer, which is unique to
+Stacks. Xtrata inscribes to Stacks. Bitcoin is the settlement layer underneath,
+not the place the bytes live.
+
+The repo already states this correctly, in `scripts/gen-announcement.mjs`,
+which draws the stack as three layers:
+
+> XTRATA, the data layer, **writes into**
+> STACKS, the execution layer, which **settles to / is anchored by**
+> BITCOIN, the settlement layer
+
+Say:
+
+- **on Stacks**
+- **on chain** (always safe, and usually the best choice)
+- anchored to Bitcoin
+- settles to Bitcoin
+- secured by Bitcoin
+- mined by Bitcoin through Proof of Transfer
+- inherits Bitcoin's security
+
+Never say:
+
+- ~~on Bitcoin~~
+- ~~inscribed on Bitcoin~~
+- ~~lives on Bitcoin~~
+- ~~a move on Bitcoin~~
+
+`on Bitcoin` is rejected by the linter. If a post is genuinely about Bitcoin L1
+itself, set `"allowOnBitcoin": true` on it and say why in the note.
+
+**The X Chess corpus gets this wrong in five places** and it is otherwise the
+best writing we have, so it is worth naming them rather than trusting the file
+wholesale: "a move on Bitcoin", "Chess on Bitcoin, on a phone", "a full game on
+Bitcoin", "a web page that lives on Bitcoin", and "inscribed on Bitcoin". Use
+those posts for their structure and rhythm, and fix the chain word.
+
+---
+
 ## Hard rules, enforced by `lint-post.mjs`
 
 1. **No em dashes.** Use a full stop. Two short sentences beat one long one.

@@ -23,6 +23,30 @@ export const MAX_CHARS = 280;
 const T_CO_LENGTH = 23;
 const URL_PATTERN = /https?:\/\/\S+/g;
 
+// Stacks is its own chain. It is anchored to Bitcoin, inherits Bitcoin's
+// security, and is mined by Bitcoin through Proof of Transfer. Xtrata inscribes
+// to Stacks. Saying a thing is "on Bitcoin" is wrong, and it is wrong in the
+// way that the audience most worth impressing spots instantly.
+//
+// This is a linter rule rather than a note in the voice guide because the
+// mistake is already in the hand-written X Chess corpus in five places, which
+// is the file everything else is told to imitate. A note would lose that
+// argument every time.
+const CHAIN_MISTAKES = [
+  {
+    pattern: /\bon Bitcoin\b/i,
+    say: 'Say "on Stacks" or "on chain". Stacks is anchored to Bitcoin, the bytes do not live on Bitcoin.'
+  },
+  {
+    pattern: /\bon the Bitcoin (chain|blockchain|network)\b/i,
+    say: 'Say "on Stacks" or "on chain". Xtrata inscribes to Stacks, which settles to Bitcoin.'
+  },
+  {
+    pattern: /\bBitcoin (stores|holds|hosts) \b/i,
+    say: 'Bitcoin settles and anchors. Stacks stores the data.'
+  }
+];
+
 const HYPE = [
   'revolutionary', 'revolutionise', 'revolutionize', 'game-changing',
   'game changing', 'unlock', 'empower', 'seamless', 'seamlessly',
@@ -30,6 +54,19 @@ const HYPE = [
   'unleash', 'supercharge', 'next-generation', 'next generation',
   'paradigm', 'best-in-class', 'world-class', 'blazing fast'
 ];
+
+/**
+ * Chain-language check for any copy, not just posts.
+ *
+ * Exported because generated images carry text too, and a card saying the
+ * wrong thing is worse than a post saying it: it gets screenshotted, reposted,
+ * and outlives the thread it was attached to.
+ */
+export const checkChainLanguage = (text) =>
+  CHAIN_MISTAKES.filter((rule) => rule.pattern.test(String(text ?? ''))).map((rule) => {
+    const hit = String(text).match(rule.pattern);
+    return `"${hit[0]}". ${rule.say}`;
+  });
 
 export const countChars = (text) => {
   const withoutUrls = text.replace(URL_PATTERN, '');
@@ -84,6 +121,15 @@ export const lintPost = (post, context = {}) => {
   for (const word of HYPE) {
     if (lower.includes(word)) {
       errors.push(`Hype vocabulary: "${word}". Say the mechanism instead.`);
+    }
+  }
+
+  // A post genuinely about Bitcoin L1, ordinals for instance, can opt out. It
+  // has to be deliberate, and the note should say why.
+  if (!post.allowOnBitcoin) {
+    for (const rule of CHAIN_MISTAKES) {
+      const hit = text.match(rule.pattern);
+      if (hit) errors.push(`Wrong chain: "${hit[0]}". ${rule.say}`);
     }
   }
 

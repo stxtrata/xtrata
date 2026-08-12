@@ -49,6 +49,19 @@ app itself reports that some did not count while still being stored on chain
 and still costing a fee. Say "signed transactions". This was caught by looking
 at a screenshot, not by reading the contract.
 
+**Stacks is its own chain, and "on Bitcoin" is a lint error.** Stacks is
+anchored to Bitcoin, inherits its security, and is mined by it through Proof of
+Transfer. Xtrata inscribes to Stacks. The generated stat card originally said
+"X Chess, live on Bitcoin", which is wrong in the way the audience worth
+impressing spots instantly.
+
+The root cause is worth naming: the hand-written X Chess corpus says "on
+Bitcoin" in five places, and that corpus is what everything else is told to
+imitate. A note in the voice guide would have lost that argument every time, so
+it is a linter rule instead, and `checkChainLanguage` is exported and applied
+to generated card copy as well as to posts. A card is more dangerous than a
+post here, because it gets screenshotted and outlives the thread.
+
 **Captures use `domcontentloaded` plus a timer.** The site is a SPA that polls
 and never goes network-idle, so `networkidle` timed out on 7 of 8 pages.
 

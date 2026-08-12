@@ -25,6 +25,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { fileURLToPath } from 'node:url';
 import { captureHtml, captureUrl, closeBrowser, TWEET_HEIGHT, TWEET_WIDTH } from './lib/render.mjs';
 import { quoteCard, statCard } from './lib/cards.mjs';
+import { checkChainLanguage } from './lint-post.mjs';
 
 const root = new URL('../../', import.meta.url);
 const rel = (p) => fileURLToPath(new URL(p, root));
@@ -171,16 +172,32 @@ const buildStatCard = async (surfaceId) => {
     };
   }
 
-  const result = await captureHtml(
-    statCard({
-      title: 'X Chess, live on Bitcoin',
-      stats,
-      url: 'xtrata.xyz/i/2988',
-      footnote: `read from the contract on ${DATE}`
-    }),
-    rel(outRel),
-    { width: TWEET_WIDTH, height: TWEET_HEIGHT, scale: 2 }
-  );
+  // "on Stacks", not "on Bitcoin". Stacks is its own chain, anchored to Bitcoin
+  // and mined by it through Proof of Transfer. The first version of this card
+  // said "live on Bitcoin", which is the kind of error the audience worth
+  // impressing spots immediately. See comms/registry/voice.md.
+  const card = {
+    title: 'X Chess, live on Stacks',
+    stats,
+    url: 'xtrata.xyz/i/2988',
+    footnote: `anchored to Bitcoin, read from the contract on ${DATE}`
+  };
+
+  const wrong = [
+    ...checkChainLanguage(card.title),
+    ...checkChainLanguage(card.footnote),
+    ...stats.flatMap((s) => checkChainLanguage(s.label))
+  ];
+  if (wrong.length) {
+    note(`  stat card BLOCKED, wrong chain language: ${wrong.join(' ')}`);
+    return null;
+  }
+
+  const result = await captureHtml(statCard(card), rel(outRel), {
+    width: TWEET_WIDTH,
+    height: TWEET_HEIGHT,
+    scale: 2
+  });
 
   if (!result.ok) {
     note(`  stat card FAILED x-chess: ${result.error}`);
