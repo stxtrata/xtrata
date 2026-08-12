@@ -256,6 +256,7 @@ noted.
 | Bitcoin Bulls OG | 11,086 | 400 | 1,688 | **0.7 MB** | 1 |
 | Bitcoin Badgers | 10,828 | 1,048 | 1,374,192 | 1.44 GB | 84 (staged) |
 | Miami Degens | 9,995 | 420 | 133,941 | 56.3 MB | 8 |
+| NarcotiX | 8,576 | 2,407 of 3,333 | 46,479 | **112 MB** | 3 |
 | Bitcoin Pepes | 8,384 | 2,089 | 5,538 | 11.6 MB | 1 |
 | SpaghettiPunk Club | 3,026 | 1,274 | 954,982 | 1.22 GB | 59 (staged) |
 | Cool Ape | 1,083 | 300 | 117,582 | 35.3 MB | 8 |
@@ -327,7 +328,80 @@ Apes as the flagship. Both need the founder conversation first; sponsoring a
 collection without the team is not a thing we should do.
 
 **Stacks Invaders is off this list** — its art is already generated on chain. See
-the next section.
+the section after next.
+
+## NarcotiX
+
+`SP8HMQP4Q63V3E6SXXPXZ4WJXA263HBD95QY2AM3.narcotix`
+
+A clean, straightforward candidate. It sits comfortably in single-transaction
+territory and the art is unusually consistent in size.
+
+| | Value |
+|---|---|
+| Minted so far (`get-last-token-id`) | 2,407 |
+| Mint limit | 3,333 |
+| Lifetime volume | 8,576 STX over 946 sales |
+| Bytes per item | 46,479 mean, 49,628 median, range 36,987-51,585 (n=10) |
+| Chunks per item | 3 |
+| **Total at today's supply** | **111.9 MB** |
+| Total if it mints out to 3,333 | ~155 MB |
+| Xtrata protocol fees, 2,407 items | **31.3 STX** |
+| Xtrata protocol fees at 3,333 | ~43.3 STX |
+
+Contract checks: public `transfer`, so escrow works. No on-chain renderer, so the
+IPFS PNGs really are the artwork. `set-base-uri` and `set-license-uri` are live and
+`metadata-frozen` reads `false`, so the art pointer is still admin-changeable — the
+same honest point as Wasteland Apes, and unlike Stacks Invaders this contract does
+have a working `freeze-metadata` that would close it.
+
+The tight size range (37-52 KB across the whole id space) means the estimate is
+solid and every item is a 3-chunk single-transaction mint. No staged path, no
+surprises.
+
+### The one thing that changes the plan
+
+**Minting is still open.** `get-paused` returns `false`, the price is 33 STX, and
+926 of the 3,333 remain. That matters because the helper contract's canonical-hash
+mechanism assumes a known set: `seed-canonical` writes token-id to content-hash in
+batches of 200, and `finalize-canonical` locks it permanently.
+
+So the sequencing has to be deliberate:
+
+- Seed canonical hashes for the 2,407 that exist, and **do not call
+  `finalize-canonical`** while minting continues.
+- Re-seed as new tokens mint, then finalise once the mint closes or the artist
+  confirms it is done.
+- Or simply wait for the mint to close before starting.
+
+Getting this wrong is not recoverable: finalising early permanently locks out every
+token minted afterwards from ever getting a twin. Worth agreeing the sequence with
+the artist in writing before any contract is deployed.
+
+### The companion collection is a different story
+
+`SP39DY4WHCZ9TF8ZY9QY2KHFQ31BKJMDR7KY34SKD.the-narcotix-parrot-gallery-exhibition`
+is 85 animated GIFs, and it does not fit.
+
+| | Value |
+|---|---|
+| Supply | 85 |
+| Bytes per item | 17.7 MB mean, 4.08 MB median, up to 61.6 MB (n=8) |
+| Chunks per item | ~1,080 at the mean |
+| Total | ~1.5 GB |
+| Marketplace volume | none recorded |
+
+**Some of these exceed Xtrata's hard cap and cannot be inscribed at all.**
+`MAX-TOTAL-CHUNKS` is 2,048 and `MAX-TOTAL-SIZE` is 2,048 x 16,384 = exactly 32 MiB.
+A separate id-by-id pass found #1 at 22.7 MiB, which fits but needs ~1,453 chunks,
+and #7 at **105.5 MiB**, which is over three times the cap and cannot be inscribed
+by any route. Even the ones that do fit need the staged path at hundreds of
+transactions each.
+
+Anything here would need a conversation about re-encoding, which changes the bytes
+and therefore breaks the "byte for byte" promise that makes a twin a twin. Treat the
+Parrot Gallery as out of scope unless the artist actively wants a re-encoded edition
+and understands it is a different claim.
 
 Everything at 500 KB+ per item — Crash Punks, The Guests, SpaghettiPunk, Bitcoin
 Badgers, Smoke Ethereals, The Explorer Guild — is in staged-mint territory and is
