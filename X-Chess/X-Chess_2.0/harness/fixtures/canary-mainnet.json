@@ -1,0 +1,802 @@
+{
+  "note": "Read from Stacks mainnet. These are real games played by real people.",
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "count": 9,
+  "ranked": [
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "games": [
+    {
+      "game": {
+        "id": 1,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8720994,
+        "nextSeq": 21,
+        "rulesHash": "77508a24db21e486fe8c0b37d0ab7289ea48b9578d26537c2b4e7850c6d4c55d",
+        "ranked": false
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e2e4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8727658
+        },
+        {
+          "seq": 1,
+          "value": "f7f5",
+          "sender": "SP3KF338F5A6KNCVBFANM08AKNVNV4ZZKT12HEBXH",
+          "height": 8727805
+        },
+        {
+          "seq": 2,
+          "value": "e4f5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8727812
+        },
+        {
+          "seq": 3,
+          "value": "d7d5",
+          "sender": "SP3KF338F5A6KNCVBFANM08AKNVNV4ZZKT12HEBXH",
+          "height": 8727837
+        },
+        {
+          "seq": 4,
+          "value": "d1f3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8727841
+        },
+        {
+          "seq": 5,
+          "value": "b7b6",
+          "sender": "SP3KF338F5A6KNCVBFANM08AKNVNV4ZZKT12HEBXH",
+          "height": 8727841
+        },
+        {
+          "seq": 6,
+          "value": "b1c3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8727844
+        },
+        {
+          "seq": 7,
+          "value": "c8b7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743811
+        },
+        {
+          "seq": 8,
+          "value": "f1c4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8743837
+        },
+        {
+          "seq": 9,
+          "value": "c7c6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743965
+        },
+        {
+          "seq": 10,
+          "value": "f3h5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8743981
+        },
+        {
+          "seq": 11,
+          "value": "e8d7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743991
+        },
+        {
+          "seq": 12,
+          "value": "e8d7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743993
+        },
+        {
+          "seq": 13,
+          "value": "c3d5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8744127
+        },
+        {
+          "seq": 14,
+          "value": "c6d5",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744412
+        },
+        {
+          "seq": 15,
+          "value": "c4b5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8744435
+        },
+        {
+          "seq": 16,
+          "value": "b7c6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744460
+        },
+        {
+          "seq": 17,
+          "value": "h5e2",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8744505
+        },
+        {
+          "seq": 18,
+          "value": "g8h6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744630
+        },
+        {
+          "seq": 19,
+          "value": "e2e6",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8744643
+        },
+        {
+          "seq": 20,
+          "value": "d7c7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744847
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 2,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8720999,
+        "nextSeq": 1,
+        "rulesHash": "77508a24db21e486fe8c0b37d0ab7289ea48b9578d26537c2b4e7850c6d4c55d",
+        "ranked": false
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e2e4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721002
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 3,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8721221,
+        "nextSeq": 1,
+        "rulesHash": "d558625c1b368525c65f9d1c7c0d0cb1eb4e59789b07eb57c38cac0dcbd21e36",
+        "ranked": false
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e2e4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721262
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 4,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8721282,
+        "nextSeq": 33,
+        "rulesHash": "d5296cbd9bec58243a98be7e5050cd13cf731771635fe71126c5fc0cf458c600",
+        "ranked": false
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e7e5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721290
+        },
+        {
+          "seq": 1,
+          "value": "e2e4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721358
+        },
+        {
+          "seq": 2,
+          "value": "e7e5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721363
+        },
+        {
+          "seq": 3,
+          "value": "d1g4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721399
+        },
+        {
+          "seq": 4,
+          "value": "f8c5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721419
+        },
+        {
+          "seq": 5,
+          "value": "f1b5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721424
+        },
+        {
+          "seq": 6,
+          "value": "c7c6",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721434
+        },
+        {
+          "seq": 7,
+          "value": "b5c4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721476
+        },
+        {
+          "seq": 8,
+          "value": "d8f6",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721494
+        },
+        {
+          "seq": 9,
+          "value": "f2f3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721499
+        },
+        {
+          "seq": 10,
+          "value": "g8e7",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721511
+        },
+        {
+          "seq": 11,
+          "value": "d2d3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721516
+        },
+        {
+          "seq": 12,
+          "value": "e8g8",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721522
+        },
+        {
+          "seq": 13,
+          "value": "c1e3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721527
+        },
+        {
+          "seq": 14,
+          "value": "f6h4",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8721536
+        },
+        {
+          "seq": 15,
+          "value": "g2g3",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721547
+        },
+        {
+          "seq": 16,
+          "value": "h4f6",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8721567
+        },
+        {
+          "seq": 17,
+          "value": "h4f6",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722197
+        },
+        {
+          "seq": 18,
+          "value": "b1d2",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722204
+        },
+        {
+          "seq": 19,
+          "value": "b7b5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722210
+        },
+        {
+          "seq": 20,
+          "value": "e1c1",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722215
+        },
+        {
+          "seq": 21,
+          "value": "c5e3",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722225
+        },
+        {
+          "seq": 22,
+          "value": "g1e2",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722233
+        },
+        {
+          "seq": 23,
+          "value": "d7d5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722245
+        },
+        {
+          "seq": 24,
+          "value": "h1e1",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722249
+        },
+        {
+          "seq": 25,
+          "value": "c8g4",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722253
+        },
+        {
+          "seq": 26,
+          "value": "f3g4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722257
+        },
+        {
+          "seq": 27,
+          "value": "d5c4",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722262
+        },
+        {
+          "seq": 28,
+          "value": "d3c4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722266
+        },
+        {
+          "seq": 29,
+          "value": "b5c4",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722273
+        },
+        {
+          "seq": 30,
+          "value": "e1f1",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722276
+        },
+        {
+          "seq": 31,
+          "value": "e7e5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722487
+        },
+        {
+          "seq": 32,
+          "value": "e7e5",
+          "sender": "SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W",
+          "height": 8722796
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 5,
+        "openedBy": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+        "openedAt": 8722868,
+        "nextSeq": 10,
+        "rulesHash": "4d219e40264097ab1250f40b3af300bf4a59aa1324ce582d1ae94018444f7474",
+        "ranked": true
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e2e4",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8722915
+        },
+        {
+          "seq": 1,
+          "value": "e7e5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8722917
+        },
+        {
+          "seq": 2,
+          "value": "d1g4",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8724049
+        },
+        {
+          "seq": 3,
+          "value": "d7d6",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8724681
+        },
+        {
+          "seq": 4,
+          "value": "g4g3",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8724688
+        },
+        {
+          "seq": 5,
+          "value": "b8c6",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8724694
+        },
+        {
+          "seq": 6,
+          "value": "g3e5",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8724696
+        },
+        {
+          "seq": 7,
+          "value": "d6e5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8724698
+        },
+        {
+          "seq": 8,
+          "value": "g1f3",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8727467
+        },
+        {
+          "seq": 9,
+          "value": "g8f6",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8727542
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 6,
+        "openedBy": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+        "openedAt": 8722962,
+        "nextSeq": 7,
+        "rulesHash": "3800c4f6f847a951126d45c4d13f5375bd15290c432a0adba923dca865a7a59d",
+        "ranked": true
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "e2e4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8723315
+        },
+        {
+          "seq": 1,
+          "value": "e7e5",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8723523
+        },
+        {
+          "seq": 2,
+          "value": "d1h5",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8723798
+        },
+        {
+          "seq": 3,
+          "value": "d7d6",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8723802
+        },
+        {
+          "seq": 4,
+          "value": "f1c4",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8723806
+        },
+        {
+          "seq": 5,
+          "value": "c8g4",
+          "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+          "height": 8723819
+        },
+        {
+          "seq": 6,
+          "value": "h5f7",
+          "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+          "height": 8723824
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 7,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8733129,
+        "nextSeq": 1,
+        "rulesHash": "da06f9e162d272a46874a0891130469adebfa2e4756343e747f7f60f82215da1",
+        "ranked": true
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "d2d4",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8733732
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 8,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8734002,
+        "nextSeq": 38,
+        "rulesHash": "22257faca8ec3a15c1fca14a4b5d22ebbc5a3a02b4a97fab44b26e41f89fd8cf",
+        "ranked": true
+      },
+      "entries": [
+        {
+          "seq": 0,
+          "value": "d2d4",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734054
+        },
+        {
+          "seq": 1,
+          "value": "d7d5",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734083
+        },
+        {
+          "seq": 2,
+          "value": "e2e4",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734086
+        },
+        {
+          "seq": 3,
+          "value": "d7d6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734102
+        },
+        {
+          "seq": 4,
+          "value": "d1f3",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734106
+        },
+        {
+          "seq": 5,
+          "value": "g8f6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734131
+        },
+        {
+          "seq": 6,
+          "value": "f1c4",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734176
+        },
+        {
+          "seq": 7,
+          "value": "c8g4",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734185
+        },
+        {
+          "seq": 8,
+          "value": "f3b3",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734256
+        },
+        {
+          "seq": 9,
+          "value": "e7e6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734271
+        },
+        {
+          "seq": 10,
+          "value": "b3b7",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734275
+        },
+        {
+          "seq": 11,
+          "value": "b8d7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734278
+        },
+        {
+          "seq": 12,
+          "value": "g1e2",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734282
+        },
+        {
+          "seq": 13,
+          "value": "d7c5",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734287
+        },
+        {
+          "seq": 14,
+          "value": "c4b5",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734373
+        },
+        {
+          "seq": 15,
+          "value": "f6d7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734477
+        },
+        {
+          "seq": 16,
+          "value": "b7c6",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734506
+        },
+        {
+          "seq": 17,
+          "value": "f8e7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8734716
+        },
+        {
+          "seq": 18,
+          "value": "e1g1",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8734847
+        },
+        {
+          "seq": 19,
+          "value": "e8g8",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8738336
+        },
+        {
+          "seq": 20,
+          "value": "d2d4",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8738869
+        },
+        {
+          "seq": 21,
+          "value": "g4e2",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8738879
+        },
+        {
+          "seq": 22,
+          "value": "b5e2",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8738886
+        },
+        {
+          "seq": 23,
+          "value": "c5e4",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8738890
+        },
+        {
+          "seq": 24,
+          "value": "c6e4",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8738902
+        },
+        {
+          "seq": 25,
+          "value": "d6d5",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8738986
+        },
+        {
+          "seq": 26,
+          "value": "e4g4",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8739007
+        },
+        {
+          "seq": 27,
+          "value": "c7c5",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743440
+        },
+        {
+          "seq": 28,
+          "value": "c1h6",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8743805
+        },
+        {
+          "seq": 29,
+          "value": "e7f6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743992
+        },
+        {
+          "seq": 30,
+          "value": "e7f6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8743994
+        },
+        {
+          "seq": 31,
+          "value": "d4c5",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8744080
+        },
+        {
+          "seq": 32,
+          "value": "d7e5",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744401
+        },
+        {
+          "seq": 33,
+          "value": "g4g3",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8744512
+        },
+        {
+          "seq": 34,
+          "value": "d8e7",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8744646
+        },
+        {
+          "seq": 35,
+          "value": "c5c6",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8744898
+        },
+        {
+          "seq": 36,
+          "value": "e5c6",
+          "sender": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+          "height": 8745990
+        },
+        {
+          "seq": 37,
+          "value": "e2d3",
+          "sender": "SPF0285448AVAQ2ASM78FWW89YF1VHPQ70MV4N4K",
+          "height": 8746493
+        }
+      ],
+      "hint": null
+    },
+    {
+      "game": {
+        "id": 9,
+        "openedBy": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+        "openedAt": 8734018,
+        "nextSeq": 0,
+        "rulesHash": "22257faca8ec3a15c1fca14a4b5d22ebbc5a3a02b4a97fab44b26e41f89fd8cf",
+        "ranked": true
+      },
+      "entries": [],
+      "hint": null
+    }
+  ]
+}

@@ -20,6 +20,7 @@
     "serve:runtime:framed": "node harness/runtime/serve.mjs --framed",
     "test:artifact": "vitest run tests/artifact tests/runtime",
     "test:live": "LIVE=1 vitest run tests/legacy/fetch-live.test.ts",
+    "test:live:canary": "LIVE=1 vitest run tests/legacy/fetch-canary.test.ts",
     "serve": "node harness/serve.mjs"
   },
   "devDependencies": {
