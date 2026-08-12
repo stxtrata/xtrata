@@ -1,7 +1,13 @@
 # Upgrades, enhancements and extensions
 
-A review of X Chess 2.0 as it stands on 2026-08-12, with twenty-three proposals
+A review of X Chess 2.0 as it stands on 2026-08-12, with thirty-three proposals
 ordered by what they are worth against what they cost.
+
+**Proposals 1 to 23** come from a review of the code. **Proposals 24 to 33** come
+from the first testers, peacelovemusic.btc and 3hunnatheartist.btc, playing game 8
+on mainnet — including two confirmed defects that the code review did not find.
+Their full working record is in
+[`ops/feedback-2026-08-12/`](feedback-2026-08-12/README.md).
 
 Every claim here carries a `file:line`. Check them rather than believing them:
 several proposals below exist because a comment in this repository states a rule
@@ -20,6 +26,7 @@ and the function underneath it breaks the rule.
 - [Tier 2 — high value, more work](#tier-2--high-value-more-work)
 - [Tier 3 — strategic, needs a decision](#tier-3--strategic-needs-a-decision)
 - [Tier 4 — worth knowing about](#tier-4--worth-knowing-about)
+- [Part two — from the first testers](#part-two--from-the-first-testers)
 - [Suggested order of work](#suggested-order-of-work)
 
 ---
@@ -139,7 +146,7 @@ disagreement is permanent.
 | **7** | [Stop the cold load spending the whole allowance](#7-stop-the-cold-load-spending-the-whole-minutes-allowance) | 4 | 4 | ~0.4 KB | inscription |
 | **8** | [Make Copy link survive the page it was copied from](#8-make-copy-link-survive-the-page-it-was-copied-from) | 4 | 4 | ~0.4 KB | inscription |
 | **9** | [Make the promotion picker dismissable](#9-make-the-promotion-picker-dismissable-and-never-let-it-fire-a-stale-move) | 5 | 4 | ~0.3 KB | inscription |
-| **10** | [Fix the shell CSS: motion, contrast, landscape, targets](#10-fix-the-shell-css-a-dead-reduced-motion-selector-a-1006-1-selection-ring-and-a-board-taller-than-a-landscape-phone) | 4 | 4 | ~0.4 KB | inscription |
+| **10** | [Fix the shell CSS: motion, contrast, landscape, targets](#10-fix-the-shell-css-a-dead-reduced-motion-selector-a-10061-selection-ring-and-a-board-taller-than-a-landscape-phone) | 4 | 4 | ~0.4 KB | inscription |
 | **11** | [Never write a post condition from a guess](#11-never-write-a-post-condition-from-a-guess) | 4 | 4 | ~net 0 | inscription |
 | **12** | [Watch the transaction to its end](#12-watch-the-transaction-to-its-end-so-a-burned-fee-is-never-silent) | 4 | 5 | ~1.0 KB | inscription |
 | **13** | [Bound the rules-recovery search](#13-bound-the-rules-recovery-search-which-a-hostile-log-can-turn-into-a-permanent-freeze) | 4 | 3 | ~0.3 KB | inscription |
@@ -154,10 +161,29 @@ disagreement is permanent.
 | **22** | [`time!` — end abandoned games](#22-time--end-abandoned-games-with-a-block-height-deadline) | 2 | 4 | ~2 KB | inscription |
 | **23** | [Post-launch runbook and errata](#23-write-the-post-launch-runbook-and-a-permanent-errata-list) | 4 | 5 | — | neither |
 
-**Eight of the twenty-three need no new inscription and no new contract** — 1, 3,
+**From the first testers** — see [`ops/feedback-2026-08-12/`](feedback-2026-08-12/README.md).
+
+| # | Proposal | Simp | Safe | Bytes | Needs |
+|---|---|:---:|:---:|---|---|
+| **24** | [Every square is the wrong colour](#24-every-square-on-the-board-is-the-wrong-colour) **defect** | 5 | 4 | — | inscription |
+| **25** | [The endpoint failover never comes back](#25-the-endpoint-failover-never-comes-back) **defect** | 4 | 4 | ~0.2 KB | inscription |
+| **26** | [Coordinates around the board](#26-coordinates-around-the-board) | 5 | 4 | ~0.4 KB | inscription |
+| **27** | [Deep links, and getting back to a game](#27-deep-links-to-a-game-and-getting-back-to-one) | 4 | 4 | ~0.8 KB | inscription |
+| **28** | [Explore: search, filter, spectator facts](#28-explore-search-filter-and-the-facts-a-spectator-needs) | 3 | 4 | ~1.5 KB | inscription |
+| **29** | [Which game am I in, is it my move elsewhere](#29-which-game-am-i-watching-and-is-it-my-move-somewhere-else) | 3 | 4 | ~1.2 KB | inscription |
+| **30** | [Chat, comments and presence](#30-chat-comments-and-presence) | 2 | 2 | tbd | **decision** + contract |
+| **31** | [Wagers, winner takes the pot](#31-wagers-winner-takes-the-pot) | 1 | 1 | tbd | **decision** + contract |
+| **32** | [Tournaments](#32-tournaments) | 2 | 3 | tbd | pot needs **decision** |
+| **33** | [A faster game mode](#33-a-faster-game-mode-inscribed-at-the-end) | 1 | 2 | tbd | **decision** + contract |
+
+**Eight of the thirty-three need no new inscription and no new contract** — 1, 3,
 4, 5, 6, 17, 18 and 23. They are the cheapest and safest work in this document,
 they include the only proposal scoring 5/5 on both axes, and none of them can
 break anything that is live.
+
+**Two are confirmed defects in the live inscription** — 24 and 25, both found by
+testers in a single session of ordinary play, and neither visible to 662 tests, a
+590-million-node perft run, or eight reviewers reading the source.
 
 ---
 
@@ -2329,9 +2355,517 @@ be added without the runbook failing a test.
 
 ---
 
+---
+
+# Part two — from the first testers
+
+Ten further proposals, from feedback by **peacelovemusic.btc** and
+**3hunnatheartist.btc** during game 8 on mainnet, 2026-08-12.
+
+The full working record — what was said, what each item turned out to be,
+reproductions for the two defects, the sequencing, the test plan and the five
+decisions that block four of these — is in
+[`ops/feedback-2026-08-12/`](feedback-2026-08-12/README.md).
+
+**Two of these are confirmed defects that nobody had found**, in the live
+inscription now, neither visible to 662 tests, a 590-million-node perft run, or
+eight reviewers reading the source. That is the argument for doing this again
+with more players.
+
+---
+
+## 24. Every square on the board is the wrong colour
+
+**Simplicity 5 · Safety 4 · Bytes none · Needs a new inscription**
+
+### In plain terms
+
+The testers reported that the queens start on the wrong squares. They were right
+that something is wrong and reasonable about the cause, but the cause is
+bigger and simpler: **the whole board is drawn in inverted colours.**
+
+a1 comes out light when it must be dark. h1 comes out dark, when "light square on
+your right" is the first thing every player learns. The white queen belongs on
+d1, a light square, and this board draws d1 dark — so she looks like she is on
+the wrong colour, which is exactly how a chess player would describe it.
+
+**The pieces are fine.** The engine is verified against 590 million positions and
+no game's result is affected. This is purely how it is painted. But it is painted
+that way on the first screen, for everybody, permanently.
+
+**Why it survived:** nothing anywhere asserts what colour a square should be. The
+expression looks perfectly reasonable, which is why a test that restates the
+arithmetic would be useless — the test has to assert chess.
+
+### The problem
+
+`packages/ui/board.ts:169` is `const dark = (file + rank) % 2 === 0`. `FILES` is
+`'abcdefgh'` (`board.ts:90`), so `file` is 0-indexed while `rank` is the literal
+digit 1–8. For a1 that is `(0 + 1) % 2 === 0` → false → light. All sixty-four
+squares are inverted. Truth table and a runnable check in
+[`ops/feedback-2026-08-12/02-FINDINGS.md`](feedback-2026-08-12/02-FINDINGS.md).
+
+### The proposal
+
+`const dark = (file + rank) % 2 === 1;`, with a comment naming a1 as the anchor
+so the next reader cannot "tidy" it back.
+
+### Steps
+
+1. Change the expression at `packages/ui/board.ts:169` and comment the anchor.
+2. Add `tests/ui/board-colour.test.ts` asserting a1/h1/a8/h8 dark-light-light-dark
+   plus d1 light and d8 dark — the two queens' home squares, which is the check a
+   player actually performs.
+3. Add a flip-invariance case: rendered flipped, a1 is still dark.
+4. Assert in `tests/artifact/` that the built bundle contains no
+   `(file + rank) % 2 === 0`.
+
+**Files** `packages/ui/board.ts` · `tests/ui/board-colour.test.ts` ·
+`tests/artifact/artifact.test.ts`
+
+### Risks
+
+It changes the appearance of every board every player has ever seen, permanently.
+That is the correct change, but it means the screenshots in `shots/` are all of
+an inverted board and should be retaken. Check it through
+`npm run serve:runtime -- --framed` before inscribing, because jsdom has no
+colours.
+
+### How to prove it
+
+The six assertions must **fail before the fix**. If they pass, they are asserting
+the code's arithmetic rather than chess, and they are worthless.
+
+---
+
+## 25. The endpoint failover never comes back
+
+**Simplicity 4 · Safety 4 · Bytes ~0.2 KB · Needs a new inscription**
+
+### In plain terms
+
+A tester tried to switch from game 8 to game 1 and got *"Could not reach any
+Stacks endpoint… The chain is fine; this page cannot see it."* The chain was
+indeed fine. So were two of the three servers the board keeps.
+
+The board holds three interchangeable chain hosts so that no single company can
+take it down. But the failover only ever moves **forwards**. Once it drops from
+the first host to the second it never returns, even when the first recovers, and
+it never tries a host earlier in the list again. After a couple of bad moments it
+is pinned to the last host — at which point the redundancy is gone and any wobble
+in that one host looks like the whole chain being unreachable.
+
+**Why it showed up when switching games:** nothing about switching is special.
+What is special is time. The board polls every few seconds, so a long session
+gives the ratchet plenty of chances to advance. By the time they clicked Open,
+there was one host left to try.
+
+Reproduction you can run in
+[`ops/feedback-2026-08-12/02-FINDINGS.md`](feedback-2026-08-12/02-FINDINGS.md).
+
+### The problem
+
+`packages/chain/endpoint.ts:214` is
+`for (let attempt = index; attempt < bases.length; attempt++)`. It starts at the
+remembered base, so earlier bases are never retried, and `index` is only ever
+assigned forward on a successful fallback, so a recovered host is never returned
+to. The file's own comment (`endpoint.ts:28`) says the list exists so that no host
+becomes "a permanent dependency of a permanent artefact" — which is precisely
+what the last entry becomes.
+
+### The proposal
+
+Try every base per call, starting from the remembered one and wrapping:
+`const attempt = (index + n) % bases.length`. Then let the preference decay —
+reset `index` to 0 on the first failure of the pinned base — so a recovered
+primary is actually returned to.
+
+Separately, `limited` is only set on a literal 429 (`endpoint.ts:228`), so a host
+that rate-limits by answering 503 is reported as chain unavailability. Those need
+different advice: one says wait a minute, the other says something is wrong.
+
+### Steps
+
+1. Rewrite the loop at `packages/chain/endpoint.ts:214` to wrap.
+2. Reset `index` when the pinned base fails, so the preference decays.
+3. Widen the rate-limit signal beyond a literal 429 where the evidence allows.
+4. Add three cases to `tests/chain/endpoint.test.ts`: falls forward, comes back,
+   and — the one that fails today — pinned to the last base with earlier bases
+   healthy, the request succeeds.
+5. Re-run `npm run test:artifact`, because master proposal 16 touches this same
+   list.
+
+**Files** `packages/chain/endpoint.ts` · `tests/chain/endpoint.test.ts`
+
+### Risks
+
+This is the read path for everything. A wrapping loop can turn one dead host into
+N attempts per call, so the per-call attempt count must stay bounded at
+`bases.length` and be asserted. Read alongside master proposal 7, which is about
+not spending the request budget.
+
+### How to prove it
+
+Assertion 3 above throws `CHAIN_UNAVAILABLE` today after trying exactly one host.
+That is the tester's bug, and it is the test to write first.
+
+---
+
+## 26. Coordinates around the board
+
+**Simplicity 5 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
+
+### In plain terms
+
+> "Please can we add grid markings A-G, 1-8 around the edges of the board?"
+
+Files are a–h, so eight of them. There are none at present.
+
+The part not to get wrong: the board flips, so the labels have to flip with it. A
+static label row on a flipped board is worse than no labels, because it is
+confidently wrong.
+
+### The proposal
+
+Render a file row and a rank column derived from the same ordered array the
+squares come from (`board.ts:164`), so flipping cannot desynchronise them. Mark
+them `aria-hidden` — each square's accessible name already carries its coordinate
+(`board.ts:187`), and a screen reader should not read the grid twice.
+
+### Steps
+
+1. Build the labels in `renderBoard` from the same `ordered` array.
+2. Add grid rules to the shell CSS beside the existing board block.
+3. Add a flip case to the board tests.
+4. Check the landscape fit through the browser gate.
+
+**Files** `packages/ui/board.ts` · `packages/ui/shell.ts` · `tests/ui/`
+
+### Risks
+
+It costs vertical space, and master proposal 10 has already found the landscape
+phone layout to be the tightest dimension in the application. **Land these two
+together** — separately means measuring the same layout twice and possibly
+shipping a board that no longer fits.
+
+---
+
+## 27. Deep links to a game, and getting back to one
+
+**Simplicity 4 · Safety 4 · Bytes ~0.8 KB · Needs a new inscription**
+
+### In plain terms
+
+> "The biggest quirk is finding the game once you've left the screen."
+
+There is no history and no list of your own games. Once you leave a board, the
+only way back is retyping its number.
+
+**Check the free half first.** The Xtrata site already forwards the whole query
+string to the board (`xtrata-2.0/functions/inscription/handler.ts:60`), and the
+board already reads `?game=` (`packages/ui/app.ts:495`). So
+`https://xtrata.xyz/i/2988?game=8` ought to open game 8 **today**. Five minutes
+in a browser tells you whether any of this needs building.
+
+What is missing regardless: somewhere the board remembers the games you have
+opened, and a link the board itself produces correctly — which is master
+proposal 8, currently broken for exactly the people who can move.
+
+### The proposal
+
+A short recent-games list, kept locally, shown on Play and in Explore, surviving
+a reload and capped. Plus, if the tidy `2988-8` form is wanted, about five lines
+in `normalizeTokenId` (`handler.ts:41`) to split on `-` and set `game` in the
+forwarded query — **in `xtrata-2.0`, a different project with its own review**.
+
+### Steps
+
+1. Open `https://xtrata.xyz/i/2988?game=8` and record the result in the feedback
+   folder. Everything else depends on the answer.
+2. Add recent games to the disposable local store, capped, newest first.
+3. Render them on Play and Explore, with the game number and state.
+4. Extend `tests/e2e/shared-link.test.ts` with a fixture at the **real runtime URL
+   shape** — every fixture there today uses a plain address, which is why master
+   proposal 8's defect survived.
+5. Only if wanted: the `2988-8` path form, in `xtrata-2.0`.
+
+**Files** `packages/ui/app.ts` · `packages/storage/verified-cache.ts` ·
+`tests/e2e/shared-link.test.ts` · (separately) `xtrata-2.0/functions/inscription/handler.ts`
+
+### Risks
+
+Recent games are a convenience and must never become authoritative — the list is
+a set of game numbers, never a cached position. A list that empties itself when
+the chain has a bad moment loses your games at the worst possible time, so it must
+survive a game being briefly unreachable.
+
+---
+
+## 28. Explore: search, filter, and the facts a spectator needs
+
+**Simplicity 3 · Safety 4 · Bytes ~1.5 KB · Needs a new inscription**
+
+### In plain terms
+
+> "a searchable, filterable explore section that is also very useful for finding
+> your own games as well as searching for other games you might like to watch"
+
+> "which address or BNS created each game? Sponsorship details including who and
+> how much and what remains"
+
+Explore lists the newest 25 games with no search, no filter, and no idea which
+are yours.
+
+Almost everything needed is **already fetched**. Master proposal 14 already
+computes whether you can play in each game and whose turn it is, then discards
+it. The creator is already in the row. The sponsorship's remaining rebates and
+its **expiry** are already decoded (`packages/chain/client.ts:58`) — and no
+interface file reads that expiry at all.
+
+That last one is not cosmetic. A sponsorship expires about fifteen hours after
+funding, and once expired **anyone at all** can end it permanently. Showing
+"expires in about four hours" is the difference between a sponsored game a player
+can protect and one that quietly dies.
+
+**Build this as one piece of work with master proposal 14** — this is largely the
+presentation of what that proposal computes, and splitting them means touching
+`loadExplore` twice.
+
+### The proposal
+
+Filters for mine / open / live / finished / ranked, computed from `checkSender`
+so there is one rule and not a second copy. Search by game number or player,
+which must reach **past** the newest-25 bound at `app.ts:2334` and say how it
+found something outside the window. Creator shown by BNS name where one resolves.
+Sponsorship shown as who, how much is left, and how long it has.
+
+### Steps
+
+1. Do master proposal 14 first, or at the same time.
+2. Add the filter set, driven by `checkSender`.
+3. Add search that falls back to a direct `getGame` for a number outside the
+   window, and says so on screen.
+4. Render creator and sponsorship, with expiry as a duration and never a block
+   height.
+5. Assert in `tests/e2e/request-budget.test.ts` that filtering and searching add
+   **zero** reads over the existing burst.
+
+**Files** `packages/ui/app.ts` · `packages/ui/shell.ts` · `tests/e2e/explore.test.ts` ·
+`tests/e2e/request-budget.test.ts`
+
+### Risks
+
+Search is the one part that can spend chain reads without limit. Bound it: one
+direct lookup for an out-of-window game number, never a walk. If the zero-extra-reads
+assertion is hard to write, the feature has been built wrong.
+
+---
+
+## 29. Which game am I watching, and is it my move somewhere else
+
+**Simplicity 3 · Safety 4 · Bytes ~1.2 KB · Needs a new inscription**
+
+### In plain terms
+
+Two asks that share machinery.
+
+> "clear markings / visual feedback showing which game is currently being
+> viewed/heard"
+
+The testers run several tabs at once and every tab looks identical. The document
+title never changes, so the browser tab strip — the one place a person actually
+tells tabs apart — says nothing.
+
+> "is there also a way that we could add something to update a player in one game
+> that it is their move in another game?"
+
+Yes, with one honest limit stated up front: **no server means no push
+notifications.** A tab has to be open. What is achievable is "this open tab also
+watches your other games and tells you", not "your phone buzzes". The board
+already polls while hidden when a live game is loaded and sound is on
+(`app.ts:98`), and the sound system already exists — what is missing is that it
+only ever watches the game in front of you.
+
+### The proposal
+
+Put the game number and whose turn it is in `document.title`. Then, for a
+connected address, poll a short list of that player's other live games at the
+background rate, and say so when one of them turns — in the Explore badge from
+proposal 14, in the title, and through the existing sound system.
+
+### Steps
+
+1. Set `document.title` from the loaded game and turn; restore it on leaving.
+2. Derive the watch list from the games the connected address can play in.
+3. Watch at the background rate only, never the foreground rate.
+4. Announce a turn once, and never again for the same state.
+5. Assert per-tick read count against a fixed ceiling with four games loaded.
+
+**Files** `packages/ui/app.ts` · `packages/ui/sounds.ts` · `tests/e2e/`
+
+### Risks
+
+**This is the one item in the feedback that wants to spend more of the request
+budget**, while master proposals 7 and 19 are both about spending less. The watch
+must be cheap per game and must stop entirely when no wallet is connected.
+
+The other risk is nagging: a watcher that re-announces the same unchanged state
+every twenty seconds is worse than none. The silent-when-nothing-changed
+assertion is the load-bearing test, and it is the same property master proposal 21
+needs for its screen-reader announcer — build it once.
+
+---
+
+## 30. Chat, comments and presence
+
+**Simplicity 2 · Safety 2 · Bytes unknown until decided · Needs a decision, and probably a new contract**
+
+### In plain terms
+
+> "Players have requested a chat panel (some said for 'trash talking')"
+
+Wanted, and it hits the two hardest constraints in the project at once.
+
+**On chain, through the current contract, is not awkward — it is impossible.**
+`submit` takes `(string-ascii 5)` (`contracts/xchess-core-v1.clar:535`). Five
+characters. A message cannot be represented at all, so this needs a new contract
+whatever else is decided.
+
+**Off chain means a server**, which the serverlessness audit mechanically refuses
+in shipped code, and which breaks the one claim the whole project rests on.
+
+On presence, the honest answer is a qualified no: a live green dot needs a
+heartbeat, and there is nowhere to put one. What *is* free and truthful is
+**derived** — "last moved about four hours ago, usually replies within a day",
+computed from block heights already fetched. In correspondence chess that is
+probably the more useful fact anyway.
+
+**This cannot start until decisions D1, D2 and D3 are settled.** They are written
+up with options, costs and a recommendation in
+[`ops/feedback-2026-08-12/05-DECISIONS.md`](feedback-2026-08-12/05-DECISIONS.md).
+
+### The one property to fix now, whatever is decided
+
+**The board must work with the message layer entirely absent.** Point it at
+nothing, or at a host that refuses everything, and every existing test still
+passes. Write that assertion before anything else; it is what stops a chat
+feature quietly making a server load-bearing.
+
+---
+
+## 31. Wagers, winner takes the pot
+
+**Simplicity 1 · Safety 1 · Needs a decision and a new contract**
+
+### In plain terms
+
+> "Can we add ability for users to add a wager to their games? Both parties lock
+> some stacks into the contract and the winner takes all?"
+
+Locking the stake is easy — the contract already holds STX and proves solvency
+after every operation. **Paying it out is the hard part, and it is hard in a way
+that can lose somebody real money.**
+
+The contract cannot know who won, and must never learn: "the contract may filter,
+never adjudicate" is the invariant everything rests on.
+
+There is a function called `claim-result` that looks like the answer. It is not,
+and its own comment says so — it is an unvalidated hint, and "a dishonest hint
+costs its sender a network fee and convinces nobody". True for a hint. Attach
+money and it becomes **whoever claims first takes the pot**, because the first
+claim wins the slot and cannot be overwritten (`clar:621`). A losing player who
+claims quickly wins the money.
+
+So this needs a real adjudication design. The shape most likely to survive is
+both players signing the outcome, with a fair timeout for the one who walks away —
+and that timeout is the same hole master proposal 22 (`time!`) was designed to
+fill, so **build the clock first and this gets much simpler**.
+
+**Blocked on decision D4**, which lays out four options and what each costs.
+
+**Do this last.** Everything else in this list makes the application better. This
+is the one that can make it harmful.
+
+---
+
+## 32. Tournaments
+
+**Simplicity 2 · Safety 3 · The standings are nearly free; the prize pool is blocked**
+
+### In plain terms
+
+> "Check we can set up a tournament … that can be its own referee and compute the
+> results at the end … then we can have a tournament with a prize pool/bounty"
+
+This splits cleanly, and the good half is available now.
+
+**Nearly free:** a tournament is a set of games. Standings are already derivable
+from the chain — `ranked-v1` decides which games count and `elo-v1` computes the
+ratings, both purely by replay. "Its own referee" is a fair description of what
+replay already is. A named group of games plus a derived standings table needs
+**no contract change at all**.
+
+**Blocked:** the prize pool, which is decision D4 again. Paying somebody means
+knowing who won.
+
+### The proposal
+
+Build the derived half: a tournament as a named set of game ids, with standings
+computed by the existing rating code and a shareable link. Test it offline against
+the frozen real games from master proposal 6 — a fixed set of games must produce a
+hand-checked table.
+
+Leave the pot until D4 is settled.
+
+---
+
+## 33. A faster game mode, inscribed at the end
+
+**Simplicity 1 · Safety 2 · Needs a decision and a new contract**
+
+### In plain terms
+
+> "a faster game mode where the results are inscribed only at the end … using
+> stacked hashing throughout the game to ensure the start and end hash match …
+> rather than inscribing every move the whole match json is inscribed at the end"
+
+**A good instinct, correctly reasoned.** What is being described is a state
+channel, and the stacked hash is exactly the right primitive — the project already
+has one, since the Xtrata chunk chain is `sha256(running || chunk)`
+(`packages/protocol/sha256.ts`).
+
+Two things it has to answer:
+
+**Abandonment.** With no moves on chain during play, a losing player just stops
+signing and the game has no ending. Same hole as the wager, same answer: it needs
+a clock first.
+
+**The reconstruction promise.** The architecture guarantees that the chain plus
+the published documents are enough to rebuild every game. A final hash alone
+breaks that — unless the full signed move list goes on chain at the end, which is
+what the tester actually proposed. That works, and it is a different storage shape
+from the five-character entries, so it means a new contract or an inscription per
+game.
+
+**It composes well with master proposal 20's sealed game**, which is already "one
+finished game as a self-contained object". Building that first makes this much
+smaller later.
+
+**Blocked on decision D5**, whose recommendation is *not yet* — and to find out
+first whether pace is really what stops people playing. The testers said finding
+games was the problem, not slowness.
+
+
 # Suggested order of work
 
 The dependencies are real, and two of them are load-bearing.
+
+### First — five minutes, and it may save building anything
+
+Open **`https://xtrata.xyz/i/2988?game=8`** in a browser. The Xtrata site already
+forwards the whole query string to the board and the board already reads `?game=`,
+so the spectator deep link the testers asked for may work today. The answer
+changes the shape of proposal 27, and it costs nothing to find out.
 
 ### Now — free of permanence, no inscription, no contract
 
@@ -2352,28 +2886,65 @@ configuration.
 
 **23** carries a second free owner transaction: `set-expiry-blocks`.
 
+Fix **24** and **25** in the tree at the same time. Both are defects in the live
+inscription and both are small, but neither reaches a player without a new
+inscription — so they wait for the batch rather than being pushed out alone.
+
 ### Next — batch into one new inscription
 
 Never ship these one at a time. Each inscription costs money and splits the user
 base, so the whole batch goes together:
 
-**2** first (it is what buys the bytes), then **13** and **16** (the two
-correctness fixes that are actively wrong in 2988 today), then **7**, **8**, **9**,
-**10**, **11**, **12**, **14**, **15**.
+**2** first (it is what buys the bytes), then the four things that are actively
+wrong in 2988 today — **24** (board colours), **25** (endpoint ratchet), **13**
+(recovery cap) and **16** (the eaten fallback) — then **7**, **8**, **9**, **10**,
+**11**, **12**, **14**, **15**.
 
-Rough budget: proposal 2 frees ~9.4 KB; proposals 7-16 spend ~4.4 KB. That fits
-inside eight chunks with room, which is the whole point of doing 1 and 2 first.
+Then the navigation batch, which is the whole of the testers' central complaint:
+**26**, **27**, **28**, **29**. Two pairings matter here. **26 goes with 10**,
+because both change the board's landscape sizing and doing them apart means
+measuring the same layout twice. **28 goes with 14**, because 28 is largely the
+presentation of what 14 already computes and discards.
+
+Rough budget:
+
+```
+freed by proposal 2                        -9,418 bytes
+proposals 24, 25                              ~200
+proposals 7-16                              ~4,400
+proposals 26-29                             ~3,900
+                                          ---------
+net                                          -918, and still eight chunks
+```
+
+It fits. It does not fit with much to spare, which is the whole point of doing 1
+and 2 first.
 
 ### Then — decide, then build
 
 **19**, **20**, **21** each need a decision before they start. **21** alone is ~4 KB
-and will not fit alongside the Tier 2 batch.
+and will not fit alongside the batch above.
 
 ### Later — a protocol version
 
 **22** is `events-v2`, and must ship **after 13**. It needs three new frozen
 protocol documents and a golden vector set, and it changes what a game means
 forever.
+
+### Blocked — five questions, then four proposals
+
+**30** (chat and presence), **31** (wagers), **32**'s prize pool and **33** (fast
+mode) cannot start until decisions **D1 to D5** are settled. Each is written up
+with real options, what each costs, and a recommendation, in
+[`ops/feedback-2026-08-12/05-DECISIONS.md`](feedback-2026-08-12/05-DECISIONS.md).
+
+Take **D1** first — it decides where words live, and it is the one that can
+quietly cost the project its serverless claim. Take **D4** last: the contract
+cannot know who won a game, so a wager built before that is settled is the one
+change here that could lose somebody real money.
+
+**32's derived half needs no decision.** Tournament standings already fall out of
+`ranked-v1` and `elo-v1` with no contract change at all. Only the pot is blocked.
 
 ---
 
