@@ -12,3 +12,8 @@
 # Verified before untracking: delete the file entirely and the contract suite
 # still passes 48/48, regenerating it from scratch.
 deployments/default.simnet-plan.yaml
+
+# ops/upgrades.html is the browsable build of ops/UPGRADES.md, generated and
+# published as an artefact. The markdown is the source; a committed copy of the
+# rendered page would only go stale beside it.
+ops/upgrades.html
