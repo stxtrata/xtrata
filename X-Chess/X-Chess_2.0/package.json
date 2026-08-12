@@ -3,7 +3,7 @@
   "version": "2.0.0-dev",
   "private": true,
   "type": "module",
-  "description": "X Chess 2 — a permanent, serverless, on-chain chess application",
+  "description": "X Chess 2 \u2014 a permanent, serverless, on-chain chess application",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "check:contract": "clarinet check",
@@ -17,6 +17,7 @@
     "release": "node harness/release.mjs",
     "build": "node packages/build/build.mjs",
     "serve:runtime": "node harness/runtime/serve.mjs",
+    "serve:runtime:framed": "node harness/runtime/serve.mjs --framed",
     "test:artifact": "vitest run tests/artifact tests/runtime",
     "test:live": "LIVE=1 vitest run tests/legacy/fetch-live.test.ts",
     "serve": "node harness/serve.mjs"

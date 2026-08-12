@@ -497,14 +497,17 @@ export const INSCRIBE_STEPS: StepDef[] = [
       'THE step that earns the money. Serve the exact bytes through the runtime emulator and ' +
       'check the three things that are invisible until they are permanent: that it boots ONCE ' +
       'and not twice, that a wallet bridge is reachable, and that it can read a real game. ' +
-      'Run `npm run serve:runtime` and open the address it prints when it starts. The runtime ' +
-      'serves the artefact the way an INSCRIPTION is addressed, not by filename, so asking it for ' +
-      'xchess.html is a 404 - use its root, or /i/9002 for the board on its own.',
+      'Run `npm run serve:runtime:framed` and open the address it prints. FRAMED IS NOT AN ' +
+      'EXTRA: an inscription can only sign when a host frames it and holds a bridge token, which ' +
+      'is how the Xtrata site opens one. Unframed the board reads perfectly and cannot sign at ' +
+      'all, so the plain `serve:runtime` rehearses everything except the half this step is for. ' +
+      'The runtime addresses the artefact as an INSCRIPTION rather than by filename, so asking ' +
+      'it for xchess.html is a 404 - use its root, or /i/9002 for the board alone.',
     needs: ['build'],
     irreversible: false
   },
   {
-    id: 'inscribe-canary',
+    id: 'inscribe-board',
     phase: 'inscribe',
     title: 'Inscribe the board',
     why:
@@ -515,24 +518,24 @@ export const INSCRIBE_STEPS: StepDef[] = [
     irreversible: true
   },
   {
-    id: 'canary-live',
+    id: 'inscription-live',
     phase: 'after',
     title: 'Open the inscription and check it is the build you inscribed',
     why:
       'Not the local build. It must boot once, self-report the version and hash from the ' +
       'manifest above, and load a game from the chain. A board that reads is most of a board.',
-    needs: ['inscribe-canary'],
+    needs: ['inscribe-board'],
     irreversible: false
   },
   {
-    id: 'launch-verified',
+    id: 'first-move',
     phase: 'after',
     title: 'Play one real move FROM the inscription',
     why:
       'The acceptance test, and the only one that cannot be rehearsed. Sign a submission from ' +
       'the inscribed page itself and watch it land in the log. Reading proves the bytes; this ' +
       'proves the bridge.',
-    needs: ['canary-live'],
+    needs: ['inscription-live'],
     irreversible: true
   }
 ];

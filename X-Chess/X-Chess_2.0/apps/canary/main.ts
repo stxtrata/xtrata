@@ -1124,6 +1124,31 @@ const handlers: Record<string, StepHandler> = {
     'Inscribe dist/xchess.html through Xtrata and paste the inscription id.'
   ),
 
+  // The short track's own three. Separate from the launch sequence's versions
+  // because the WORDING is the whole value: reusing those ids meant a page
+  // asking for a "canary inscription id" when it wanted the board's, and
+  // quoting section numbers from a brief this track is not running.
+  'inscribe-board': manual(
+    'board-inscription',
+    /^\d+$|^[0-9a-f]{64}i\d+$/i,
+    'Inscribe dist/xchess.html with your own Xtrata tooling, then paste the inscription id it ' +
+      'gives back. This page does not inscribe anything.'
+  ),
+
+  'inscription-live': manual(
+    'inscription-note',
+    /.{30,}/,
+    'Open the INSCRIPTION, not the local build. Say which version and build hash it reports, ' +
+      'and which game you loaded from the chain.'
+  ),
+
+  'first-move': manual(
+    'first-move-note',
+    /.{30,}/,
+    'Sign a submission from the inscribed page itself and say what happened: the game, the move, ' +
+      'and whether it landed in the log. Reading proves the bytes; this proves the bridge.'
+  ),
+
   'canary-live': manual(
     'canary-live-note',
     /.{40,}/,
@@ -1178,6 +1203,9 @@ const inputs = {
   rehearsal: [{ name: 'rehearsal-note', label: 'What the runtime harness did' }],
   matrix: [{ name: 'matrix-sign', label: 'The build hash written into MATRIX.md' }],
   'inscribe-canary': [{ name: 'canary-inscription', label: 'Canary inscription id' }],
+  'inscribe-board': [{ name: 'board-inscription', label: 'Inscription id for dist/xchess.html' }],
+  'inscription-live': [{ name: 'inscription-note', label: 'What the inscription reported' }],
+  'first-move': [{ name: 'first-move-note', label: 'The move you played from the inscription' }],
   'canary-live': [{ name: 'canary-live-note', label: 'What the inscription did' }],
   'prod-contract': [{ name: 'prod-name', label: 'Production contract name', placeholder: 'xchess-core-v1' }],
   'prod-verified': [{ name: 'prod-note', label: 'Recorded in RELEASES.md' }],

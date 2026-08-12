@@ -22,8 +22,18 @@ describe('the short track', () => {
     // Reading proves the bytes survived. Only signing proves the bridge, and
     // the bridge is the thing that cannot be rehearsed anywhere else.
     const ids = INSCRIBE_STEPS.map((s) => s.id);
-    expect(ids).toContain('inscribe-canary');
-    expect(ids[ids.length - 1]).toBe('launch-verified');
+    expect(ids).toContain('inscribe-board');
+    expect(ids[ids.length - 1]).toBe('first-move');
+  });
+
+  it('does not call the board a canary', () => {
+    // It borrowed the launch track's ids so the handlers would work without
+    // duplication, and the labels came with them - so the page asked for a
+    // "canary inscription id" when it wanted the board's, at the exact moment
+    // somebody was about to spend money on it.
+    for (const step of INSCRIBE_STEPS) {
+      expect(step.id, `${step.id} still says canary`).not.toMatch(/canary/i);
+    }
   });
 
   it('rehearses under the runtime BEFORE anything is spent', () => {
@@ -31,12 +41,12 @@ describe('the short track', () => {
     // unreachable API are all invisible until they are permanent.
     const ids = INSCRIBE_STEPS.map((s) => s.id);
     expect(ids).toContain('rehearsal');
-    expect(ids.indexOf('rehearsal')).toBeLessThan(ids.indexOf('inscribe-canary'));
+    expect(ids.indexOf('rehearsal')).toBeLessThan(ids.indexOf('inscribe-board'));
   });
 
   it('marks exactly the steps that spend or cannot be undone', () => {
     const irreversible = INSCRIBE_STEPS.filter((s) => s.irreversible).map((s) => s.id);
-    expect(irreversible).toEqual(['inscribe-canary', 'launch-verified']);
+    expect(irreversible).toEqual(['inscribe-board', 'first-move']);
   });
 
   it('runs in order, with nothing depending on a step that is not there', () => {
@@ -49,12 +59,24 @@ describe('the short track', () => {
     }
   });
 
-  it('reuses handlers the full track already has, apart from the rehearsal', () => {
+  it('reuses the full track\u2019s handlers wherever the question is the same', () => {
     // A second implementation of "connect a wallet" is a second thing to get
-    // wrong. Only the rehearsal is new.
+    // wrong, so the reading steps are shared. The four that are not shared each
+    // exist because the WORDING had to differ, not the behaviour.
     const full = new Set(STEPS.map((s) => s.id));
     const novel = INSCRIBE_STEPS.map((s) => s.id).filter((id) => !full.has(id));
-    expect(novel).toEqual(['rehearsal']);
+    expect(novel.sort()).toEqual(
+      ['first-move', 'inscribe-board', 'inscription-live', 'rehearsal'].sort()
+    );
+  });
+
+  it('sends the rehearsal to the FRAMED runtime', () => {
+    // The plain harness is unframed, and an unframed inscription cannot sign at
+    // all - so it rehearses everything except the half this step exists for.
+    // Connect simply does nothing, which reads as a broken board.
+    const rehearsal = INSCRIBE_STEPS.find((s) => s.id === 'rehearsal');
+    expect(rehearsal?.why).toContain('serve:runtime:framed');
+    expect(rehearsal?.why, 'must say why framed is not optional').toMatch(/cannot sign/i);
   });
 
   it('names its own phases rather than borrowing ones it is not running', () => {
