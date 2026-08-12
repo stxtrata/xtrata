@@ -523,6 +523,19 @@ export class ChessApp {
    */
   private startPolling(): void {
     this.scheduleTick(this.nextPollMs());
+    // Escape closes the promotion picker, because a panel that has taken the
+    // board over should give it back the way every other panel does.
+    //
+    // Registered ONCE and guarded on state, rather than added when the picker
+    // opens. A listener added per-open would have to be removed on every one of
+    // the five ways the picker closes, and `{ once: true }` is not the shortcut
+    // it looks like: it fires on the first KEY, not the first Escape, so one
+    // stray keystroke would quietly disarm it.
+    this.doc.addEventListener('keydown', (event) => {
+      if ((event as KeyboardEvent).key !== 'Escape' || !this.pendingPromotion) return;
+      this.hidePromotion();
+      this.drawGame();
+    });
     this.doc.addEventListener('visibilitychange', () => {
       if (this.doc.visibilityState !== 'visible') return;
       // Coming back IS seeing it, so the title stops shouting.
@@ -1227,6 +1240,9 @@ export class ChessApp {
   }
 
   async load(game: number): Promise<void> {
+    // Switching games must not carry a half-finished promotion across. The
+    // picker holds squares, and squares mean nothing on a different board.
+    this.hidePromotion();
     const loaded = await this.guard(`loading game ${game}`, async () => {
       const row = await this.chain.getGame(game);
       if (!row) {
@@ -1326,7 +1342,10 @@ export class ChessApp {
       { rules: this.rules }
     );
     this.selected = null;
-    this.pendingPromotion = null;
+    // A move landed while the picker was open, so the move it was about is no
+    // longer the move on offer. Hiding it is the point: nulling alone left a
+    // panel on screen whose buttons all returned early.
+    this.hidePromotion();
     this.announce(before);
     this.drawGame();
   }
@@ -2012,6 +2031,15 @@ export class ChessApp {
     const state = this.state;
     if (!state) return;
 
+    // Any click on the board ends whatever promotion was being asked about.
+    //
+    // The ordering is clear / handle / re-open: this runs on entry, and the
+    // branch below that opens a fresh picker runs at the end of the same call.
+    // Without it, a player who changed their mind and picked up another piece
+    // left the picker on screen still holding the ABANDONED move, and choosing
+    // Queen submitted it and paid for it.
+    this.hidePromotion();
+
     if (this.selected === null) {
       this.selected = square;
       this.sound.play('select');
@@ -2039,7 +2067,13 @@ export class ChessApp {
       // A promotion must name its piece, so the board has to ask. Submitting
       // `e7e8` would be a submission replay skips.
       this.pendingPromotion = { from: this.selected, to: square };
+      // Drop the selection while the picker is up. Leaving the pawn selected
+      // left the board live underneath an open panel, so the obvious way to
+      // change your mind - click something else - re-selected while the picker
+      // still held the old move.
+      this.selected = null;
       this.askPromotion(promotions);
+      this.drawGame();
       return;
     }
 
@@ -2064,12 +2098,34 @@ export class ChessApp {
     this.drawGame();
   }
 
+  /**
+   * Put the promotion picker away.
+   *
+   * There was no such method, and that was the whole defect. The panel was
+   * shown in one place and hidden in exactly one other - inside the per-piece
+   * click handler - so every other way out of a promotion left it on screen
+   * holding a move.
+   *
+   * Two things followed. A player who changed their mind and picked up a
+   * different piece left the picker open still holding the OLD from/to, and
+   * choosing Queen then submitted and PAID FOR a move they had abandoned. And a
+   * poll landing the opponent's move cleared `pendingPromotion` without hiding
+   * anything, leaving a panel whose every button silently did nothing.
+   */
+  private hidePromotion(): void {
+    this.pendingPromotion = null;
+    this.el.promotion.classList.add('hide');
+  }
+
   private askPromotion(choices: string[]): void {
     const node = this.el.promotion;
+    const pending = this.pendingPromotion;
     node.classList.remove('hide');
     node.replaceChildren();
     const label = this.doc.createElement('span');
-    label.textContent = 'Promote to: ';
+    // Name the pawn. A panel that says which move it is about is a panel you can
+    // tell is stale, and this one could previously outlive its own move.
+    label.textContent = pending ? `Promote the ${pending.from} pawn on ${pending.to}: ` : 'Promote to: ';
     node.appendChild(label);
     for (const piece of choices) {
       const button = this.doc.createElement('button');
@@ -2077,13 +2133,28 @@ export class ChessApp {
       button.className = 'action';
       button.textContent = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' }[piece] ?? piece;
       button.addEventListener('click', () => {
-        const pending = this.pendingPromotion;
-        if (!pending) return;
-        node.classList.add('hide');
-        void this.submit(`${pending.from}${pending.to}${piece}`);
+        const move = this.pendingPromotion;
+        if (!move) return;
+        this.hidePromotion();
+        void this.submit(`${move.from}${move.to}${piece}`);
       });
       node.appendChild(button);
     }
+
+    // Every chess interface a player has ever used lets them back out of a
+    // promotion. Here, backing out previously meant either clicking a piece you
+    // did not want or clicking a button that did nothing, with no way to tell
+    // which you were getting.
+    const cancel = this.doc.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'action';
+    cancel.textContent = 'Cancel';
+    const back = (): void => {
+      this.hidePromotion();
+      this.drawGame();
+    };
+    cancel.addEventListener('click', back);
+    node.appendChild(cancel);
   }
 
   /**
@@ -2185,7 +2256,7 @@ export class ChessApp {
         .submit(game, value, rebate);
 
       this.selected = null;
-      this.pendingPromotion = null;
+      this.hidePromotion();
       // A submission is the only thing that consumes a rebate, so this is the
       // only moment the cached sponsorship can have gone stale.
       this.forgetSponsorship();

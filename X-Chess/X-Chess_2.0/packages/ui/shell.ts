@@ -416,7 +416,7 @@ export const HTML = `
         </div>
         <div id="status" class="notice notice--info"></div>
         <div id="move-hint" class="small muted"></div>
-        <div id="promotion" class="notice notice--loud hide"></div>
+        <div id="promotion" class="notice notice--loud hide" role="group" aria-label="choose a promotion piece"></div>
         <!-- A submission the board thinks is doomed, and the way past it.
              The override is not a courtesy: the board cannot know which account
              the wallet will sign with, and it cannot always confirm a game's
