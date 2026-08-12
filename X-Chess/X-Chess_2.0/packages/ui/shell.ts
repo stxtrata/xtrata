@@ -56,6 +56,9 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 
 .layout { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(260px, 380px); gap: 12px; }
 @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } }
+/* A phone held sideways is short, not narrow, so the width query above never
+   fires for it. */
+@media (max-height: 560px) { .layout { grid-template-columns: 1fr; } }
 
 .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
 
@@ -76,6 +79,14 @@ code, .mono { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .layout > * { min-width: 0; }
 body { overflow-wrap: anywhere; }
 
+/* Capped against the VIEWPORT HEIGHT as well as the column width.
+   width:100% with aspect-ratio:1 says nothing about height, and the only media
+   query in this file keys on width - so at 844x390 the two-column layout held,
+   the board came out about 428px tall in a 390px viewport, and the line saying
+   whose turn it is went below the fold. The cap goes on .board-wrap too, or the
+   arrow overlay - inset:0, preserveAspectRatio:none over an 8x8 viewBox -
+   stretches every pending arrow off its squares. */
+.board, .board-wrap { max-width: min(100%, 78svh); margin-inline: auto; }
 .board {
   /* Eight columns AND eight rows. With rows left implicit they size to their
      content, so a row holding a piece grew taller than an empty one and the
@@ -132,8 +143,17 @@ body { overflow-wrap: anywhere; }
    again - which starts the whole thing twice. */
 .board--loading { opacity: .45; transition: opacity .12s ease-out; }
 .board--loading .sq { pointer-events: none; }
-.sq--selected { outline: 3px solid var(--gold); outline-offset: -3px; }
-.sq--last { box-shadow: inset 0 0 0 3px rgba(216, 162, 74, 0.45); }
+/* TWO-TONE, and that is the whole point. --gold #d8a24a against the light square
+   #b9a98f measures 1.006:1 - identical luminance, so the ring separating the
+   piece you picked up from the rest of the board was distinguishable by hue
+   alone, and invisible to anyone who cannot make that separation. The dark inset
+   sits inside the gold so one edge always resolves, on either square colour and
+   in greyscale. */
+.sq--selected {
+  outline: 3px solid var(--gold); outline-offset: -3px;
+  box-shadow: inset 0 0 0 5px rgba(0, 0, 0, .55);
+}
+.sq--last { box-shadow: inset 0 0 0 3px rgba(216, 162, 74, 0.45), inset 0 0 0 5px rgba(0, 0, 0, .38); }
 .sq--target::after {
   content: ''; position: absolute; width: 26%; height: 26%; border-radius: 50%;
   background: rgba(0, 0, 0, 0.35);
@@ -227,7 +247,14 @@ ${SCALE_CSS}
 .arrows circle { opacity: .85; }
 
 @media (prefers-reduced-motion: reduce) {
-  .pc--ghost path, .sq--check { animation: none; }
+  /* This block used to aim at a path element inside a ghost piece. There is no
+     such element - pieceNode builds a span holding a text glyph - so the whole
+     block was inert, and the trace kept pulsing for somebody who had asked
+     their device for stillness, for as long as a move sat in the mempool. The
+     ghost stays identifiable without the pulse: the stroke colour already
+     separates signing from sent. */
+  .pc--ghost, .sq--check, .live { animation: none; }
+  .board--loading { transition: none; }
 }
 
 /* The submissions list. */
@@ -250,8 +277,6 @@ ${SCALE_CSS}
 .mv-who { color: var(--gold); font-size: 12px; text-align: right; white-space: nowrap; }
 .mv-rejected .mv-san { color: var(--dim); text-decoration: line-through; }
 .mv-reason { color: var(--warn); font-size: 11px; margin-left: 6px; }
-.live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-            background: var(--good); margin-right: 6px; animation: breathe 2.4s ease-in-out infinite; }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .row + .row { margin-top: 8px; }
@@ -425,14 +450,14 @@ export const HTML = `
         <div id="override" class="notice notice--warn hide">
           <div id="override-why"></div>
           <div class="row">
-            <button id="override-yes" type="button">Let me try anyway</button>
+            <button id="override-yes" type="button" class="action action--primary">Let me try anyway</button>
           </div>
         </div>
         <div id="send-anyway" class="notice notice--warn hide">
           <div id="send-anyway-why"></div>
           <div class="row">
-            <button id="send-anyway-yes" type="button">Send anyway</button>
-            <button id="send-anyway-no" type="button">Cancel</button>
+            <button id="send-anyway-yes" type="button" class="action">Send anyway</button>
+            <button id="send-anyway-no" type="button" class="action">Cancel</button>
           </div>
         </div>
       </div>
