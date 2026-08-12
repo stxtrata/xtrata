@@ -72,13 +72,18 @@ games in Explore) and **29** (knowing which one you are in). **→ Proposals 27,
 > could be done with a link like https://xtrata.xyz/inscription/2988-8 or
 > something like that for easy linking to games especially for spectators"
 
-**Half of this may already work, and should be tested before anything is built.**
+**Half of this already works in the tree, and cannot work in the inscription
+that is live.** Tested 2026-08-12: the link lands on Play and the Game tab says
+"no game loaded".
 
 `xtrata-2.0/functions/inscription/handler.ts:60` is
-`runtimeUrl.search = sourceUrl.search`, which forwards the entire query string to
-the runtime page. The board already reads `?game=` in `openFromLink`
-(`packages/ui/app.ts:495`). So **`https://xtrata.xyz/i/2988?game=8` should open
-game 8 today.** Five minutes to confirm.
+`runtimeUrl.search = sourceUrl.search`, so the query does reach the board, and
+`openFromLink` (`packages/ui/app.ts:495`) does read `?game=`. But that function
+landed on 2026-08-10 in `bf8e8b01` and **2988 was built on 2026-08-09**. The live
+board has never had it.
+
+Nothing to build. It ships with the next inscription, and is now covered by tests
+at the real URL shapes.
 
 What does not exist:
 

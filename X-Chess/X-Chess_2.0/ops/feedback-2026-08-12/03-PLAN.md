@@ -28,21 +28,22 @@ afternoon and it cannot break anything.
 
 ---
 
-## Step 0 — five minutes, before anybody builds anything
+## Step 0 — done, 2026-08-12
 
-Open **`https://xtrata.xyz/i/2988?game=8`** in a browser.
+`https://xtrata.xyz/i/2988?game=8` was opened in a browser. **It lands on Play,
+and the Game tab says "no game loaded".**
 
-The Xtrata handler forwards the whole query string to the runtime
-(`xtrata-2.0/functions/inscription/handler.ts:60`) and the board already reads
-`?game=` (`packages/ui/app.ts:495`), so this ought to open game 8 directly.
+The cause is not a defect. `openFromLink` reads `?game=` and the Xtrata handler
+forwards the whole query string — but the function arrived on 2026-08-10 in
+`bf8e8b01`, and **inscription 2988 was built on 2026-08-09**. The live board
+predates the feature.
 
-- **If it works**, the spectator deep-link ask (F4) is already half solved.
-  Document it, tell the testers, and item 27 shrinks to the tidy `2988-8` path
-  form plus the "getting back to a game" work.
-- **If it does not**, find out why before designing anything, because the answer
-  changes item 27's shape.
+So item 27's deep-link half needs **no code**, only the next inscription. It is
+now pinned by tests at both real URL shapes — `/i/<id>?game=<n>` and the runtime
+address it is rewritten to — neither of which anything covered before.
 
-Either way this is the cheapest information available and it costs nothing.
+What is left of item 27 is the part that was always the point: **getting back to
+a game you have left**, which no link solves.
 
 ---
 

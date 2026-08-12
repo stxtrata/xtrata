@@ -43,6 +43,41 @@ async function boardAt(url: string): Promise<{ dom: JSDOM; app: ChessApp }> {
   return { dom, app };
 }
 
+// The URL a spectator is actually given.
+//
+// Tested on 2026-08-12 against the live board and it did NOT work: the page
+// landed on Play and the Game tab said "no game loaded". The cause was not a
+// defect in this code. Inscription 2988 was built on 2026-08-09 from a tree that
+// had no `openFromLink` at all - the function arrived the next day in bf8e8b01 -
+// so the live board has never been able to read `?game=`.
+//
+// Which makes this the one shape nothing covered: every other fixture in this
+// file is a plain `https://example.test/xchess.html`, and the address a real
+// visitor is on is `xtrata.xyz/i/<id>?game=<n>`. The Xtrata handler forwards the
+// whole query string (`functions/inscription/handler.ts:60`), so the board does
+// see it - and nothing asserted that it acts on it.
+describe('the address a spectator is actually given', () => {
+  it('opens the game from an /i/<id>?game=<n> link', async () => {
+    const { dom } = await boardAt('https://xtrata.xyz/i/2988?game=2');
+    expect(dom.window.document.getElementById('game-label')!.textContent).toContain('Game 2');
+  });
+
+  it('opens it from the runtime address the query is rewritten to', async () => {
+    // What the board is really loaded at once the runtime has it, carrying the
+    // parameters the site needs alongside the one we added.
+    const { dom } = await boardAt(
+      'https://xtrata.xyz/runtime/?contractId=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary' +
+        '&tokenId=2988&network=mainnet&game=2'
+    );
+    expect(dom.window.document.getElementById('game-label')!.textContent).toContain('Game 2');
+  });
+
+  it('ignores a game number that is not one, rather than showing an error', async () => {
+    const { dom } = await boardAt('https://xtrata.xyz/i/2988?game=not-a-number');
+    expect(dom.window.document.getElementById('game-label')!.textContent).not.toContain('Game');
+  });
+});
+
 describe('following a shared link', () => {
   it('opens the game rather than the create form', async () => {
     const { dom, app } = await boardAt('https://example.test/xchess.html?game=2');

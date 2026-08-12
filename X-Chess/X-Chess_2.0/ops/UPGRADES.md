@@ -110,16 +110,19 @@ the commit, what was actually built, and what was learned doing it.
 | **1** | Price the artefact in Xtrata chunks | ✅ **Done** | `d420f699`, `749cc433` |
 | **24** | Every square is the wrong colour | ✅ **Done** | `a893ea24` |
 | **25** | The endpoint failover never comes back | ✅ **Done** | `fb7d2ced` |
+| **27** | Deep links (the link half only) | ✅ **Already built**, pinned by tests | `bf8e8b01`, tests below |
 
 **Three of thirty-three.** Both defects the testers found are fixed in the tree.
 Neither reaches a player until the next inscription, which is deliberate: they
 are small, and pushing a new inscription per fix is how a project ends up with a
 split user base.
 
-One item is still outstanding and costs nothing: **open
-`https://xtrata.xyz/i/2988?game=8` in a browser.** It may already answer half of
-proposal 27. It could not be checked from here — the host is blocked by browsing
-policy — so it needs a person.
+**The free check is done.** `https://xtrata.xyz/i/2988?game=8` was opened in a
+browser on 2026-08-12 and does **not** work — but only because inscription 2988
+was built on 2026-08-09, the day before `openFromLink` was written. The code has
+been right since; it has never been inscribed. Half of proposal 27 therefore
+needs no work at all, and is now covered by regression tests at the real URL
+shapes rather than the `example.test` fixtures that let it go unnoticed.
 
 ---
 
@@ -2659,11 +2662,12 @@ shipping a board that no longer fits.
 There is no history and no list of your own games. Once you leave a board, the
 only way back is retyping its number.
 
-**Check the free half first.** The Xtrata site already forwards the whole query
-string to the board (`xtrata-2.0/functions/inscription/handler.ts:60`), and the
-board already reads `?game=` (`packages/ui/app.ts:495`). So
-`https://xtrata.xyz/i/2988?game=8` ought to open game 8 **today**. Five minutes
-in a browser tells you whether any of this needs building.
+**The deep-link half is already built, and cannot work until the next
+inscription.** Tested 2026-08-12: `https://xtrata.xyz/i/2988?game=8` lands on
+Play with "no game loaded". Not a defect — `openFromLink` reads `?game=` and the
+Xtrata site forwards the query, but that function landed on 2026-08-10 and
+**2988 was built on 2026-08-09**. The live board never had it. It now has
+regression tests at the real URL shapes, which nothing covered before.
 
 What is missing regardless: somewhere the board remembers the games you have
 opened, and a link the board itself produces correctly — which is master
@@ -2678,8 +2682,10 @@ forwarded query — **in `xtrata-2.0`, a different project with its own review**
 
 ### Steps
 
-1. Open `https://xtrata.xyz/i/2988?game=8` and record the result in the feedback
-   folder. Everything else depends on the answer.
+1. ~~Open `https://xtrata.xyz/i/2988?game=8` and record the result.~~ **Done
+   2026-08-12** — it does not work live, because 2988 predates `openFromLink`.
+   No code needed; it ships with the next inscription. Covered by tests in
+   `tests/e2e/shared-link.test.ts`.
 2. Add recent games to the disposable local store, capped, newest first.
 3. Render them on Play and Explore, with the game number and state.
 4. Extend `tests/e2e/shared-link.test.ts` with a fixture at the **real runtime URL
@@ -2958,12 +2964,15 @@ games was the problem, not slowness.
 
 The dependencies are real, and two of them are load-bearing.
 
-### First — five minutes, and it may save building anything
+### First — done
 
-Open **`https://xtrata.xyz/i/2988?game=8`** in a browser. The Xtrata site already
-forwards the whole query string to the board and the board already reads `?game=`,
-so the spectator deep link the testers asked for may work today. The answer
-changes the shape of proposal 27, and it costs nothing to find out.
+**`https://xtrata.xyz/i/2988?game=8` was tested on 2026-08-12. It does not work
+live**, and the reason is that inscription 2988 was built the day before
+`openFromLink` was written. The code is correct and is now pinned by tests at the
+real URL shapes; the fix is the next inscription, not an edit.
+
+What remains of proposal 27 is the half a link never solved: **getting back to a
+game you have left.**
 
 ### Now — free of permanence, no inscription, no contract
 

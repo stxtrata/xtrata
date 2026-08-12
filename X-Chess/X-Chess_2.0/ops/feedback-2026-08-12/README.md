@@ -46,11 +46,20 @@ moments it is pinned to the last host, and any wobble in *that* one reports
 is precisely the message the tester saw. Reproduction in
 [`02-FINDINGS.md`](02-FINDINGS.md).
 
-**One ask needs no work at all and should be checked first.** The deep link to a
-specific game may already exist: the Xtrata site forwards the whole query string
-to the board (`xtrata-2.0/functions/inscription/handler.ts:60`), and the board
-already reads `?game=`. So `https://xtrata.xyz/i/2988?game=8` ought to open game
-8 today. Worth five minutes before anybody builds anything.
+**The deep link already works — but not in the inscription that is live.**
+Tested on 2026-08-12: `https://xtrata.xyz/i/2988?game=8` lands on Play, and the
+Game tab says "no game loaded".
+
+That is not a defect in the code. The board reads `?game=` in `openFromLink`, and
+the Xtrata site forwards the whole query string
+(`xtrata-2.0/functions/inscription/handler.ts:60`) — but **`openFromLink` was
+added on 2026-08-10 in `bf8e8b01`, and inscription 2988 was built on 2026-08-09.**
+The live board has never had the feature.
+
+So the spectator deep link needs no code. It needs the next inscription. It is
+now covered by regression tests at the real URL shapes, which nothing tested
+before: every fixture used a plain `example.test` address rather than the one a
+visitor is actually on.
 
 ---
 
