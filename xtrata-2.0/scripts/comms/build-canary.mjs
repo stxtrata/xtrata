@@ -161,18 +161,25 @@ const renderImage = (candidate, postId = null) => {
   if (!entry.ok) {
     return `<div class="shot-missing">Image not found: <code>${esc(path)}</code>. Fix the path in the queue, or the post will go out without it.</div>`;
   }
+  // Every tile is the same size and the button row sits immediately under a
+  // fixed-height frame, so the buttons land in the same place on every card
+  // regardless of whether the image is a tall phone screenshot or a wide
+  // desktop one. Letting the image dictate the layout meant hunting for the
+  // controls on each one.
   return `
     <figure class="shot" data-kind="${esc(candidate.kind ?? 'curated')}">
-      <img data-img="${esc(path)}" alt="${esc(candidate.label ?? path)}">
-      <figcaption>
-        <span class="kind kind-${esc(candidate.kind ?? 'curated')}">${esc(KIND_LABEL[candidate.kind] ?? 'image')}</span>
-        <button class="ghost" data-copy-image="${esc(path)}">Copy image</button>
-        <a class="ghost" data-download="${esc(path)}" download="${esc(path.split('/').pop())}">Download</a>
+      <div class="frame"><img data-img="${esc(path)}" alt="${esc(candidate.label ?? path)}"></div>
+      <div class="shot-actions">
+        <button class="ghost" data-copy-image="${esc(path)}">Copy</button>
         ${
           postId
             ? `<button class="ghost used-toggle" data-used-toggle="${esc(path)}" data-post="${esc(postId)}">not used</button>`
             : ''
         }
+        <a class="ghost" data-download="${esc(path)}" download="${esc(path.split('/').pop())}">Save</a>
+      </div>
+      <figcaption>
+        <span class="kind kind-${esc(candidate.kind ?? 'curated')}">${esc(KIND_LABEL[candidate.kind] ?? 'image')}</span>
         <span class="dim">${kb(entry.bytes)}</span>
         <span class="shot-label">${esc(candidate.label ?? '')}</span>
       </figcaption>
@@ -222,7 +229,6 @@ const renderPost = (post) => {
       ${post.note ? `<div class="note">${esc(post.note)}</div>` : ''}
       ${target}
       <pre class="text">${esc(post.text)}</pre>
-      ${renderImages(post)}
       <div class="meta">
         <span class="count ${result.chars > MAX_CHARS ? 'over' : ''}">${result.chars}/${MAX_CHARS}</span>
         ${post.angle ? `<span class="tag">${esc(post.angle)}</span>` : ''}
@@ -234,9 +240,10 @@ const renderPost = (post) => {
       ${post.verifyNote ? `<div class="verify">Check first: ${esc(post.verifyNote)}</div>` : ''}
       ${problems ? `<ul class="problems">${problems}</ul>` : ''}
       <div class="actions">
-        <button class="copy" data-copy-text>Copy</button>
+        <button class="copy" data-copy-text>Copy text</button>
         <label class="tick"><input type="checkbox" data-tick> posted</label>
       </div>
+      ${renderImages(post)}
     </article>`;
 };
 
@@ -417,10 +424,9 @@ const html = `<!doctype html>
   .post.is-done { opacity: .45; }
   .note { font-size: 12px; color: var(--dim); font-style: italic; margin-bottom: 8px; }
   .text { font: inherit; white-space: pre-wrap; margin: 0 0 10px; }
-  .shots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px; margin-bottom: 10px; }
-  .shots[data-count="1"] { grid-template-columns: 1fr; }
-  @media (max-width: 560px) { .shots { grid-template-columns: 1fr; } }
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 10px; margin: 12px 0 0; }
+  @media (max-width: 520px) { .shots { grid-template-columns: 1fr; } }
   .kind { border-radius: 4px; padding: 1px 6px; font-size: 11px; text-transform: uppercase;
     letter-spacing: .04em; border: 1px solid var(--line); }
   .kind-curated { color: var(--good); }
@@ -439,16 +445,25 @@ const html = `<!doctype html>
   .archived a { color: var(--accent); font-size: 12px; }
   .archive-day { font-size: 13px; margin: 22px 0 4px; text-transform: uppercase;
     letter-spacing: .05em; color: var(--dim); }
-  .shot { margin: 0 0 10px; }
-  .shot img { display: block; width: 100%; height: auto; border-radius: 6px;
-    border: 1px solid var(--line); background: var(--bg); cursor: zoom-in; }
+  .shot { margin: 0; display: flex; flex-direction: column;
+    border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  /* Fixed frame. The image is contained inside it rather than setting the
+     height, which is what keeps every button row on the same line. */
+  .shot .frame { height: 124px; display: flex; align-items: center;
+    justify-content: center; background: #05060a; padding: 4px; }
+  .shot img { display: block; max-width: 100%; max-height: 100%;
+    width: auto; height: auto; object-fit: contain; cursor: zoom-in; }
   .shot img.zoomed { cursor: zoom-out; position: fixed; inset: 12px; z-index: 20;
-    width: auto; height: auto; max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
+    max-width: calc(100vw - 24px); max-height: calc(100vh - 24px);
     margin: auto; box-shadow: 0 8px 40px rgba(0,0,0,.6); }
-  .shot figcaption { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-    margin-top: 6px; font-size: 12px; color: var(--dim); }
-  .shot figcaption code { font-size: 11px; }
-  .shot figcaption .dim { color: var(--dim); }
+  .shot-actions { display: flex; gap: 4px; padding: 7px 7px 0;
+    border-top: 1px solid var(--line); }
+  /* nowrap so a narrow tile never turns "Copy image" into two lines and
+     pushes the row out of alignment with its neighbours. */
+  .shot-actions > * { flex: 1 1 0; min-width: 0; text-align: center;
+    font-size: 11px; padding: 4px 2px; white-space: nowrap; }
+  .shot figcaption { display: flex; flex-wrap: wrap; gap: 5px; align-items: center;
+    padding: 7px; font-size: 11px; color: var(--dim); }
   a.ghost { text-decoration: none; display: inline-block; }
   .shot-missing { font-size: 12px; color: var(--err); border: 1px solid var(--err);
     border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; }
@@ -461,9 +476,15 @@ const html = `<!doctype html>
   .verify { margin-top: 8px; font-size: 12px; color: var(--warn); }
   .problems { margin: 10px 0 0; padding-left: 18px; font-size: 12px; }
   .problems .err { color: var(--err); } .problems .warn { color: var(--warn); }
-  .actions { margin-top: 12px; display: flex; gap: 10px; align-items: center; }
-  button.copy, button.ghost { font: inherit; font-size: 13px; padding: 4px 12px; cursor: pointer;
-    border: 1px solid var(--line); background: transparent; color: var(--fg); border-radius: 6px; }
+  /* The post's own controls sit directly under its text and above the image
+     options, so they are always in the same place. When they lived below the
+     images their position moved with whatever the tallest screenshot happened
+     to be. */
+  .actions { margin-top: 12px; display: flex; gap: 10px; align-items: center;
+    padding-bottom: 2px; }
+  button.copy, button.ghost, a.ghost { font: inherit; font-size: 13px; padding: 4px 12px;
+    cursor: pointer; border: 1px solid var(--line); background: transparent;
+    color: var(--fg); border-radius: 6px; }
   button.copy { background: var(--accent); color: #fff; border-color: var(--accent); }
   .tick { font-size: 13px; color: var(--dim); display: flex; gap: 5px; align-items: center; cursor: pointer; }
   .target { border: 1px dashed var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; font-size: 13px; }
@@ -557,7 +578,10 @@ const html = `<!doctype html>
   function copyImage(key, button) {
     var old = button.textContent;
     var post = button.closest('.post');
-    button.textContent = 'Copying';
+    // Labels stay short. The buttons are nowrap inside a narrow tile, and a
+    // long status string pushes the row out of line with the tiles beside it,
+    // which is the whole thing this layout exists to prevent.
+    button.textContent = 'copying';
     fetch(IMAGES[key])
       .then(function (r) { return r.blob(); })
       .then(function (blob) { return blob.type === 'image/png' ? blob : toPng(blob); })
@@ -565,10 +589,10 @@ const html = `<!doctype html>
         return navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
       })
       .then(function () {
-        button.textContent = 'Copied, marked used';
+        button.textContent = 'copied';
         if (post) markUsed(post.dataset.id, key, true);
       })
-      .catch(function () { button.textContent = 'Blocked, use Download'; })
+      .catch(function () { button.textContent = 'use Save'; })
       .then(function () {
         setTimeout(function () { button.textContent = old; }, 1600);
       });

@@ -82,11 +82,23 @@ changes because Jim said so in writing, and this paragraph gets rewritten.
    `X-Chess/shots/05-sponsored-challenge.png` works even though X-Chess sits
    beside `xtrata-2.0` rather than inside it. Every picture is **embedded in
    the page as a data URI**, not linked, so the board is one self-contained
-   file: click to zoom, **Copy image** to put the actual PNG on the clipboard
-   ready to paste into the composer, or **Download** to save it. Each distinct
-   image is embedded once and referenced by key, so a screenshot shared by four
-   posts is not carried four times. A referenced image that cannot be found
-   renders a red warning rather than silently disappearing.
+   file. Each distinct image is embedded once and referenced by key, so a
+   screenshot shared by four posts is not carried four times. A referenced
+   image that cannot be found renders a red warning rather than silently
+   disappearing.
+
+   **The controls are always in the same place**, which is the point of the
+   layout rather than a detail of it. Assembling a post means one click on
+   `Copy text` and one on `Copy` under the image you want, so those two must
+   not move. `Copy text` sits directly under the post, above the images, so
+   image height cannot shift it. Every image tile is a fixed 124px frame with
+   the picture contained inside, so a tall phone screenshot and a wide desktop
+   one produce identical tiles and their button rows line up exactly. Letting
+   the image set the tile height meant hunting for the controls on every card.
+
+   Per tile: **Copy** puts the real PNG on the clipboard and marks the image
+   used, **used** toggles that by hand, **Save** downloads it, and clicking the
+   picture zooms it full screen.
 8. **Journal.** Write `journal/YYYY-MM-DD.md` covering what was seen, what was
    drafted, what was rejected, and why. **The rejections are the valuable part.**
    A future assistant needs to know which angles were already tried and dropped.
