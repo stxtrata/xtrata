@@ -74,9 +74,10 @@ anything live, 1 touches money, permanence or consensus.
 
 **Items 26 to 29 are the ones to build.** They are the whole of the navigation
 and discovery complaint, they are all inscription-side, and together they cost
-about 3.9 KB — which does not fit in the 290 bytes of headroom the artefact has,
-and does fit comfortably once proposal 2 frees its 9.4 KB. That dependency is the
-main thing the plan turns on.
+about 3.9 KB, which the artefact has room for many times over: it uses 8 of the
+32 chunks that fit in one upload transaction. An earlier draft of this folder said
+these were gated on proposal 2 freeing 9.4 KB. That was wrong, and nothing here
+waits on it.
 
 **Items 30 to 33 are the interesting ones and none of them can start yet.** Each
 runs into the same wall from a different direction: the contract may filter, but

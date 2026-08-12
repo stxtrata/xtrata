@@ -10,19 +10,21 @@ proposals themselves are items 24 to 33 in [`../UPGRADES.md`](../UPGRADES.md).
 
 ## The constraint that shapes all of it
 
-`dist/xchess.html` is 130,782 bytes. Xtrata charges by the 16,384-byte chunk, and
-eight chunks is 131,072. **There are 290 bytes of headroom.**
+`dist/xchess.html` is 131,052 bytes. Xtrata uploads in 16,384-byte chunks and
+`add-chunk-batch` takes 32 of them, so one transaction carries 524,288 bytes.
+The artefact uses **8 of 32, with 393,236 bytes to spare.**
 
 Items 24 to 29 are all inscription-side and together cost roughly **3.9 KB**.
-They do not fit. Master proposal 2 (minifying the shell CSS and HTML) frees a
-measured 9.4 KB and changes nothing on screen, so it is not an optimisation to
-get to later — **it is the thing that makes this feedback buildable at all.**
+They fit easily.
 
-Master proposal 1 (the chunk budget test) comes before that, because it is what
-tells you whether you have succeeded.
+> **This section previously said the opposite.** It reported 290 bytes of
+> headroom and made master proposal 2 a precondition for the whole batch. Eight
+> chunks was never a limit — it is just what the artefact occupies. Nothing in
+> this folder is gated on freeing bytes.
 
-So the first two things to do about this feedback are two items that are not in
-this feedback.
+Master proposal 1 (the byte budget test) is still worth doing first, because it
+is what makes any of these costs checkable rather than guessed. It is an
+afternoon and it cannot break anything.
 
 ---
 
@@ -67,14 +69,16 @@ test is the kind that should have existed from the start.
 
 ---
 
-## Step 2 — buy the bytes
+## Step 2 — make the bytes countable
 
-**Master proposals 1 then 2.** Chunk budget, then minify.
+**Master proposal 1.** The byte budget test.
 
-Nothing from this feedback beyond items 24 and 25 can land until this is done. If
-proposal 2 is rejected for any reason, then items 26 to 29 need a different ~4 KB
-found somewhere else, or a ninth chunk bought deliberately, and that becomes a
-decision in its own right.
+Nothing here waits on it, but it is an afternoon and it is what makes every byte
+figure in this folder checkable rather than asserted. Do it before the batch, and
+the estimates below become a command instead of an argument.
+
+**Master proposal 2** (minify the shell CSS, −9.4 KB) can land whenever. It is
+worth doing on its own terms and is not a dependency of anything.
 
 ---
 
@@ -106,15 +110,15 @@ next:
 master-list items are ready. Rough budget:
 
 ```
-freed by proposal 2                        -9,418 bytes
+today                                    131,052 bytes    8 of 32 chunks
 items 24, 25                                 ~200
 items 26, 27, 28, 29                       ~3,900
 master proposals 7-16 (from the review)    ~4,400
                                           --------
-net                                        -919 bytes, and still eight chunks
+                                         ~139,500 bytes    9 of 32 chunks
 ```
 
-That fits. It does not fit with much to spare, which is exactly why item 1 exists.
+Comfortably one upload transaction, with or without proposal 2's 9.4 KB.
 
 ---
 
@@ -157,10 +161,11 @@ probably more useful in correspondence chess anyway.
 real, and the urge to push a quick fix is exactly how a project ends up with two
 inscriptions a fortnight and a split user base.
 
-**Do not let items 26 to 29 grow.** Each one has an obvious richer version — a
-full notification centre, a game history sidebar, saved searches. The 3.9 KB
-estimate assumes the plain version of each. Anything more needs the budget
-checked again, which after item 1 is a command rather than an argument.
+**Do not let items 26 to 29 grow just because there is room.** Each has an obvious
+richer version — a full notification centre, a game history sidebar, saved
+searches. The 3.9 KB estimate assumes the plain version of each. The constraint is
+no longer the byte budget, it is that every byte is permanent and each of these is
+meant to solve one stated complaint.
 
 ---
 
@@ -170,9 +175,9 @@ checked again, which after item 1 is a command rather than an argument.
 |---|---|---|---|
 | 0 | Test `?game=8` in a browser | no | no |
 | 1 | Items 24, 25 — the two defects | no | yes, batched |
-| 2 | Master proposals 1, 2 — the byte budget | no | 2 does |
+| 2 | Master proposal 1 — make the bytes countable | no | no |
 | 3 | Items 26, 27, 28, 29 — navigation | no | yes, same batch |
 | 4 | Items 30–33 — social, wagers, tournaments, modes | **yes, D1–D5** | yes, and 31/33 need a new contract |
 
-Steps 0 to 3 are ordinary work with no open questions in them. That is most of
-what the testers asked for.
+Steps 0 to 3 are ordinary work with no open questions in them, and none of it is
+blocked by anything. That is most of what the testers asked for.

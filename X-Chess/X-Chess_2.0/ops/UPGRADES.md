@@ -74,19 +74,52 @@ nothing below is "you forgot to build X". Most of it is either a rule this
 codebase states and then breaks in one place, or a cost that is invisible today
 and permanent tomorrow.
 
-**The single most urgent finding is arithmetic.** Xtrata inscribes in 16,384-byte
-chunks. Eight chunks is 131,072 bytes. `dist/xchess.html` is 130,782.
+**Every byte here is permanent, and until now nothing counted them.** Xtrata
+uploads in 16,384-byte chunks, and `add-chunk-batch` takes
+`(list 32 (buff 16384))` — so 32 chunks, 524,288 bytes, go up in a single
+transaction. `dist/xchess.html` is 131,052 bytes.
 
 ```
-headroom to the eight-chunk boundary:  290 bytes
+8 of the 32 chunks in one upload transaction, 393,236 bytes to spare
 ```
 
-Nothing in the repository knows this. The only size gate is
-`tests/artifact/artifact.test.ts:154`, which permits 250,000 bytes — sixteen
-chunks. The last two features spent 1,620 bytes and the manifest reported it to
-nobody. Summing the byte costs of everything below exceeds 20 KB. So the byte
-budget is not a footnote to this document, it is the currency it is priced in,
-which is why proposals 1 and 2 come first.
+**There is plenty of room. What there was not, was a way to know it.** The only
+size gate permitted 250,000 bytes without comment, `verify` and `release` had no
+byte gate at all, and the build printed the chunk count and formed no opinion.
+Two features landed spending 1,620 bytes and nothing said so. That is why
+proposal 1 comes first — not because the artefact is nearly full, but because
+"about 0.4 KB" is meaningless until something has a denominator.
+
+> **A correction worth reading, because it changed this document's ordering.**
+> The first draft treated eight chunks as a ceiling and reported 290 bytes of
+> headroom. That was wrong: eight is simply what the artefact occupies, and it
+> was mistaken for a limit. The consequence was priority rather than code — it
+> made proposal 2 look like a precondition for everything else, and made the
+> navigation work in proposals 26 to 29 look blocked. Neither was true. The
+> figure comes from the contract now, not from the current build.
+
+---
+
+## Progress
+
+Updated 2026-08-12. Implemented proposals carry a **✅ Implemented** block naming
+the commit, what was actually built, and what was learned doing it.
+
+| # | Proposal | State | Commit |
+|---|---|---|---|
+| **1** | Price the artefact in Xtrata chunks | ✅ **Done** | `d420f699`, `749cc433` |
+| **24** | Every square is the wrong colour | ✅ **Done** | `a893ea24` |
+| **25** | The endpoint failover never comes back | ✅ **Done** | `fb7d2ced` |
+
+**Three of thirty-three.** Both defects the testers found are fixed in the tree.
+Neither reaches a player until the next inscription, which is deliberate: they
+are small, and pushing a new inscription per fix is how a project ends up with a
+split user base.
+
+One item is still outstanding and costs nothing: **open
+`https://xtrata.xyz/i/2988?game=8` in a browser.** It may already answer half of
+proposal 27. It could not be checked from here — the host is blocked by browsing
+policy — so it needs a person.
 
 ---
 
@@ -137,7 +170,7 @@ disagreement is permanent.
 
 | # | Proposal | Simp | Safe | Bytes | Needs |
 |---|---|:---:|:---:|---|---|
-| **1** | [Price the artefact in Xtrata chunks](#1-price-the-artefact-in-xtrata-chunks-and-gate-on-the-boundary) | 5 | 5 | — | neither |
+| **1** | ✅ [Price the artefact in Xtrata chunks](#1-price-the-artefact-in-xtrata-chunks-and-gate-on-the-boundary) | 5 | 5 | — | neither |
 | **2** | [Minify the shell CSS and HTML](#2-minify-the-shell-css-and-strip-its-html-comments-at-build-time) | 3 | 3 | **−9.2 KB** | inscription |
 | **3** | [Deterministic build, unstuck release gate, inscription ledger](#3-make-the-build-deterministic-unstick-the-release-gate-and-give-inscriptions-a-ledger) | 3 | 4 | — | neither |
 | **4** | [Reconcile `ops/` with the chain](#4-reconcile-ops-with-what-is-actually-on-chain) | 4 | 5 | — | neither |
@@ -165,8 +198,8 @@ disagreement is permanent.
 
 | # | Proposal | Simp | Safe | Bytes | Needs |
 |---|---|:---:|:---:|---|---|
-| **24** | [Every square is the wrong colour](#24-every-square-on-the-board-is-the-wrong-colour) **defect** | 5 | 4 | — | inscription |
-| **25** | [The endpoint failover never comes back](#25-the-endpoint-failover-never-comes-back) **defect** | 4 | 4 | ~0.2 KB | inscription |
+| **24** | ✅ [Every square is the wrong colour](#24-every-square-on-the-board-is-the-wrong-colour) **defect** | 5 | 4 | — | inscription |
+| **25** | ✅ [The endpoint failover never comes back](#25-the-endpoint-failover-never-comes-back) **defect** | 4 | 4 | ~0.2 KB | inscription |
 | **26** | [Coordinates around the board](#26-coordinates-around-the-board) | 5 | 4 | ~0.4 KB | inscription |
 | **27** | [Deep links, and getting back to a game](#27-deep-links-to-a-game-and-getting-back-to-one) | 4 | 4 | ~0.8 KB | inscription |
 | **28** | [Explore: search, filter, spectator facts](#28-explore-search-filter-and-the-facts-a-spectator-needs) | 3 | 4 | ~1.5 KB | inscription |
@@ -198,25 +231,48 @@ that makes the permanence constraint affordable.
 
 **Simplicity 5 · Safety 5 · Bytes none · Needs neither**
 
+> ### ✅ Implemented — commit `d420f699`, amended by `749cc433`
+>
+> `tests/artifact/budget.test.ts` carries three assertions: the artefact fits in
+> one upload transaction, a coarse per-package table gives a regression an
+> address, and no package may reach the bundle without a budget row. The build
+> prints `8/32 chunks in one upload transaction, 393,236 bytes to spare`, and
+> `npm run release` refuses an extra chunk without `--allow-chunk`. ADR-0014.
+>
+> **Proven to fail first:** 1,200 bytes of dead CSS took the artefact to 132,572
+> bytes and the suite named exactly that.
+>
+> **What it caught immediately:** proposal 25, the very next change, tipped the
+> artefact over the budget as it then stood. That is what led to discovering the
+> eight-chunk figure was wrong — so the gate found a real defect in its own
+> premise within a day.
+
 ### In plain terms
 
-Xtrata does not charge by the byte. It charges by the 16-kilobyte block, and your
-page currently sits **290 bytes** under the eighth block. The next small feature you add
-buys a ninth block, permanently, and nothing in the project would tell you that had
-happened until you were paying for it.
+Xtrata uploads in 16-kilobyte chunks, and thirty-two of them go up in one transaction.
+Your page uses **8 of those 32**, so there is a great deal of room — but nothing in the
+project could tell you that, or tell you when it changed.
 
-This adds a test that fails the moment you cross the line, and prints how much room is
-left on every build. It changes nothing a player sees.
+The only size check permitted 250,000 bytes without comment, and neither the verify nor
+the release gate looked at size at all. Two features landed spending 1,620 bytes between
+them and nothing mentioned it.
 
-**Why it is first:** every other idea in this document has a byte cost, and right now
-those costs are meaningless because there is no budget to weigh them against. This is
-what turns "about 0.4 KB" into "that is more headroom than we have, so something has to
-give". An afternoon's work, and it cannot break anything.
+This adds a test that fails if the artefact ever outgrows a single upload transaction, a
+per-package table that says *where* bytes went when something grows, and a line on every
+build showing what is left. It changes nothing a player sees.
+
+**Why it is first:** every other idea in this document has a byte cost, and those costs
+are meaningless without a denominator. This is what turns "about 0.4 KB" into an answer.
+In practice the per-package rows are what will fire — they sit far below the transaction
+limit, so a package that starts growing is caught while it is still surprising.
+
+An afternoon's work, and it cannot break anything.
 
 ### The problem
 
-`dist/xchess.html` is 130,782 bytes and the eight-chunk ceiling is 131,072. That
-is 290 bytes of headroom, and nothing asserts it:
+`dist/xchess.html` is 131,052 bytes — 8 of the 32 chunks that fit in one
+`add-chunk-batch` transaction, with 393,236 bytes to spare. There is room. What
+there was no way to do is *notice*, because nothing measured or asserted it:
 
 - `tests/artifact/artifact.test.ts:154` is `toBeLessThan(250_000)`, which permits sixteen chunks
 - `harness/verify.mjs:25-77` has no byte gate
@@ -241,11 +297,13 @@ release whose chunk count rose, unless `--allow-chunk` and an ADR.
 ### Why it is worth doing
 
 Every inscription-side proposal in this document becomes decidable. Today
-"~0.4 KB" has no denominator. Afterwards it is "138% of remaining headroom, so
-something else comes out or we buy a chunk."
+"~0.4 KB" has no denominator; afterwards it is an answer, and usually the answer
+is "that fits comfortably".
 
 It also catches what just happened: two features landed, 1,620 bytes went, and
-nothing said so.
+nothing said so. And it caught the very next change made after it landed —
+proposal 25 tipped the artefact over the budget as it then stood, by name and
+figure, which is exactly the job.
 
 ### Steps
 
@@ -284,6 +342,12 @@ assertion go red naming true figures. Remove, confirm green.
 
 **Simplicity 3 · Safety 3 · Bytes −9,418 measured · Needs a new inscription**
 
+> **Not blocking.** An earlier draft of this document treated this proposal as a
+> precondition for everything else, on the mistaken belief that the artefact had
+> 290 bytes of headroom. It has 393,236. This is worth doing because 9.4 KB of
+> permanent weight is worth removing on its own terms, not because anything is
+> waiting on it.
+
 ### In plain terms
 
 Your stylesheet and page skeleton are being inscribed on Xtrata with every space,
@@ -293,10 +357,10 @@ only compacts code, and these are stored as text, so it walks straight past them
 Squeezing them out saves **9.4 KB forever** and changes nothing on screen. That is more
 than the entire sound system weighs.
 
-**Why it matters beyond the saving:** you have 290 bytes of room. Almost every
-improvement below needs some. This is the one change that creates room rather than
-spending it, so in practice it is the thing that decides whether the rest of the list is
-affordable at all.
+**Why it matters beyond the saving:** it is the only change here that makes the artefact
+*smaller*, and every permanent byte removed is removed forever. It is not urgent — there
+is room for everything in this document several times over — but 9.4 KB of indentation
+and prose comments inscribed for eternity is a poor use of the space.
 
 **The catch:** the stylesheet has a piece of generated code spliced into the middle of
 it. Split the file in the wrong place and every chess piece silently renders at the wrong
@@ -340,9 +404,8 @@ comments stay in source where a developer reads them and stop being inscribed.
 
 ### Why it is worth doing
 
-9,418 fewer permanent bytes — larger than the entire sound subsystem, and the
-only thing that makes room for anything else in this document given 290 bytes of
-headroom. `dist/xchess-gates.html` shrinks too, since `packages/ui/canary.ts:25`
+9,418 fewer permanent bytes — larger than the entire sound subsystem, for no
+change on screen at all. `dist/xchess-gates.html` shrinks too, since `packages/ui/canary.ts:25`
 imports `CSS` as `APP_CSS` and `:89` rebuilds `CANARY_CSS` from it.
 
 ### Steps
@@ -1604,8 +1667,8 @@ invested in a feature that can stop working with no indication, and the panel is
 where they would look.
 
 **Budget note** — the sound group is ~13,596 of its 16,000-byte budget and the
-artefact has 290 bytes of headroom, so this lands alongside proposal 2 or not at
-all.
+artefact has room for it many times over. Worth watching the sound group's own
+budget row rather than the transaction limit, since that is what will fire first.
 
 **Prove it** — `tests/ui/sounds.test.ts` already injects a fake context factory: a
 context reporting `'interrupted'` makes `waitingForATap` true and `unlock()` call
@@ -2378,6 +2441,22 @@ with more players.
 
 **Simplicity 5 · Safety 4 · Bytes none · Needs a new inscription**
 
+> ### ✅ Implemented — commit `a893ea24`
+>
+> `packages/ui/board.ts` now reads `(file + rank) % 2 === 1`, anchored on a1 with
+> a comment naming the test so it cannot be "tidied" back.
+> `tests/ui/board-colour.test.ts` asserts chess rather than arithmetic: both
+> queens on their own colour, all four corners, and colours surviving a flip.
+> `tests/artifact` guards the shipped bundle by matching the parity test against
+> the class it decides, which survives minification.
+>
+> **Proven to fail first:** six of the seven cases go red against the old
+> expression. The seventh — thirty-two squares of each colour — passes either
+> way, and is kept precisely because it shows counting would never have caught
+> this.
+>
+> **Reaches players at the next inscription, not before.**
+
 ### In plain terms
 
 The testers reported that the queens start on the wrong squares. They were right
@@ -2441,6 +2520,25 @@ the code's arithmetic rather than chess, and they are worthless.
 ## 25. The endpoint failover never comes back
 
 **Simplicity 4 · Safety 4 · Bytes ~0.2 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `fb7d2ced`
+>
+> The request loop wraps instead of walking one way, and the preference now
+> **expires after a minute** — wrapping alone never brings the primary back,
+> because once pinned to the second host that host answers first. `preferredAt`
+> records when the preference moved, not when it last worked, or every successful
+> request would restart the window. A rate limit is also believed on evidence now
+> (a `Retry-After`, or an allowance header reading zero) rather than only on a
+> literal 429.
+>
+> **Proven to fail first:** three of four new cases go red against the old loop.
+> The fourth — every base tried at most once per call — passes both ways and is
+> kept because the wrap is exactly the change that could cause a retry loop.
+>
+> **Worth knowing:** a byte-saving edit made during this work introduced a real
+> bug. `Number(null)` is `0`, so dropping a null guard read every header-less
+> response as an exhausted allowance. The new test and an existing one both caught
+> it. Trading correctness for bytes under pressure is how that happens.
 
 ### In plain terms
 
@@ -2873,8 +2971,7 @@ Eight proposals — 1, 3, 4, 5, 6, 17, 18, 23 — none of which can break anythi
 live.
 
 **Start with 1** (the chunk budget). It is the only 5/5 in the document, it takes
-an afternoon, and it is what prices every inscription-side proposal that follows,
-including 2.
+an afternoon, and it is what gives every other byte cost a denominator.
 
 Then in any order: **4** (reconcile ops/), **6** (freeze the live games), **3**
 (deterministic build and the ledger), **18** (browser gate), **17** (matrix runner),
@@ -2895,10 +2992,9 @@ inscription — so they wait for the batch rather than being pushed out alone.
 Never ship these one at a time. Each inscription costs money and splits the user
 base, so the whole batch goes together:
 
-**2** first (it is what buys the bytes), then the four things that are actively
-wrong in 2988 today — **24** (board colours), **25** (endpoint ratchet), **13**
-(recovery cap) and **16** (the eaten fallback) — then **7**, **8**, **9**, **10**,
-**11**, **12**, **14**, **15**.
+Start with the four things that are actively wrong in 2988 today — **24** (board
+colours), **25** (endpoint ratchet), **13** (recovery cap) and **16** (the eaten
+fallback) — then **7**, **8**, **9**, **10**, **11**, **12**, **14**, **15**.
 
 Then the navigation batch, which is the whole of the testers' central complaint:
 **26**, **27**, **28**, **29**. Two pairings matter here. **26 goes with 10**,
@@ -2906,24 +3002,28 @@ because both change the board's landscape sizing and doing them apart means
 measuring the same layout twice. **28 goes with 14**, because 28 is largely the
 presentation of what 14 already computes and discards.
 
+**2** can land anywhere in this batch. It is worth 9.4 KB of permanent weight on
+its own terms, and nothing waits on it.
+
 Rough budget:
 
 ```
-freed by proposal 2                        -9,418 bytes
-proposals 24, 25                              ~200
+today                                     131,052 bytes   8 of 32 chunks
 proposals 7-16                              ~4,400
 proposals 26-29                             ~3,900
+proposal 2                                  -9,418
                                           ---------
-net                                          -918, and still eight chunks
+                                          ~129,900 bytes   still 8 of 32 chunks
 ```
 
-It fits. It does not fit with much to spare, which is the whole point of doing 1
-and 2 first.
+Even without proposal 2 the whole batch is about 139 KB — nine chunks, and still
+comfortably one upload transaction. The budget is not what constrains this work.
 
 ### Then — decide, then build
 
-**19**, **20**, **21** each need a decision before they start. **21** alone is ~4 KB
-and will not fit alongside the batch above.
+**19**, **20**, **21** each need a decision before they start. **21** is ~4 KB, the
+largest single item here — which is a reason to decide on it deliberately, not a
+reason it cannot fit.
 
 ### Later — a protocol version
 

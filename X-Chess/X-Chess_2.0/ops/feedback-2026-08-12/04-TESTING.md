@@ -213,5 +213,5 @@ work — a look through the runtime harness, because jsdom has no layout:
 npm run serve:runtime -- --framed
 ```
 
-And the chunk check from master proposal 1, which after that item exists is the
-thing that tells you whether the batch still fits in eight chunks.
+And the byte budget from master proposal 1, which after that item exists reports
+where the bytes went and whether the artefact still uploads in one transaction.
