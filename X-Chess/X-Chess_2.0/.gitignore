@@ -1,0 +1,14 @@
+# Clarinet regenerates this on every contract test run, with FRESH RANDOM
+# wallet addresses each time - settings/Devnet.toml carries no mnemonic, so
+# there is nothing for the derivation to be stable against.
+#
+# Committing it meant `git status` was dirty after every `npm run test:clarity`
+# or `npm run verify`, and every commit of it was a diff of eight addresses
+# that mean nothing. The tests look wallets up by NAME (accounts.get('wallet_5')
+# and never by literal address, and the part that carries meaning - wallet_5
+# holding 5,000 uSTX and wallet_6 holding exactly nothing - lives in
+# settings/Devnet.toml, which IS committed.
+#
+# Verified before untracking: delete the file entirely and the contract suite
+# still passes 48/48, regenerating it from scratch.
+deployments/default.simnet-plan.yaml
