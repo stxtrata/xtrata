@@ -23,6 +23,9 @@ import {
 } from './gates.js';
 import type { Phase, StepDef, StepStates } from './gates.js';
 import { CSS as APP_CSS } from './shell.js';
+import { makeEndpoint } from '../chain/endpoint.js';
+import { watchTx } from '../chain/tx-status.js';
+import type { TxOutcome } from '../chain/tx-status.js';
 
 export interface StepResult {
   ok: boolean;
@@ -56,15 +59,7 @@ export interface CanaryContext {
   confirm: (txid: string, what?: string) => Promise<TxOutcome>;
 }
 
-export interface TxOutcome {
-  /** True only for `success`. An abort is settled, and is not a success. */
-  ok: boolean;
-  /** The chain's own word: success, abort_by_post_condition, and so on. */
-  status: string;
-  txid: string;
-  /** Set when the wait gave up rather than the chain answering. */
-  timedOut?: boolean;
-}
+export type { TxOutcome } from '../chain/tx-status.js';
 
 export interface CanaryOptions {
   handlers: Record<string, StepHandler>;
@@ -179,43 +174,47 @@ export class Canary {
    * mined by then has usually been dropped for too low a fee, and telling
    * somebody that is more use than spinning forever.
    */
+  /**
+   * Wait for a transaction, and say what became of it.
+   *
+   * The polling itself lives in packages/chain/tx-status.ts now, because the
+   * BOARD needs it too - it used to say "Sent" and never look again. Moving it
+   * also gave it the endpoint list: this read a single hardcoded host with a
+   * bare fetch, so one host having a bad moment looked like a transaction that
+   * never resolved.
+   */
   private async confirm(txid: string, what = 'the transaction'): Promise<TxOutcome> {
     const id = txid.startsWith('0x') ? txid : `0x${txid}`;
-    const base = String(this.options.build?.api ?? 'https://api.mainnet.hiro.so');
-    const deadline = Date.now() + 20 * 60_000;
     let announced = false;
 
-    for (;;) {
-      try {
-        const response = await fetch(`${base}/extended/v1/tx/${id}`);
-        if (response.ok) {
-          const body = (await response.json()) as { tx_status?: string };
-          const status = String(body.tx_status ?? '');
-          if (status && status !== 'pending') {
-            const ok = status === 'success';
-            this.log(
-              ok ? 'ok' : 'error',
-              `${what} ${ok ? 'confirmed' : `ended as ${status}`}`,
-              id
-            );
-            return { ok, status, txid: id };
-          }
-        }
-      } catch {
-        // A read that failed is not an answer about the transaction. Keep
-        // waiting: the endpoint being briefly unreachable says nothing.
-      }
+    // The endpoint list rather than one host. This used to be a bare fetch
+    // against build.api, so a single host having a bad moment looked like a
+    // transaction that never resolved.
+    const endpoint = makeEndpoint({
+      override: (this.options.build?.api as string | undefined) ?? null,
+      document: this.doc
+    });
 
-      if (!announced) {
-        this.log('info', `waiting for ${what} to confirm; nothing else to do`, id);
-        announced = true;
+    const outcome = await watchTx(endpoint, id, {
+      shouldAsk: () => {
+        if (!announced) {
+          this.log('info', `waiting for ${what} to confirm; nothing else to do`, id);
+          announced = true;
+        }
+        return true;
       }
-      if (Date.now() > deadline) {
-        this.log('warn', `gave up waiting for ${what} after twenty minutes`, id);
-        return { ok: false, status: 'timeout', txid: id, timedOut: true };
-      }
-      await new Promise((done) => setTimeout(done, 10_000));
+    });
+
+    if (outcome.timedOut) {
+      this.log('warn', `gave up waiting for ${what} after twenty minutes`, id);
+    } else {
+      this.log(
+        outcome.ok ? 'ok' : 'error',
+        `${what} ${outcome.ok ? 'confirmed' : `ended as ${outcome.status}`}`,
+        id
+      );
     }
+    return outcome;
   }
 
   private mount(): void {

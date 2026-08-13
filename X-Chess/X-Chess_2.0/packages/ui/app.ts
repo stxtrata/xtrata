@@ -35,6 +35,8 @@ import type { Ctx, Verdict } from './eligibility.js';
 import { computeRatings, leaderboard } from '../ratings/elo-v1.js';
 import type { RatedGame } from '../ratings/elo-v1.js';
 import { describeContractError } from '../chain/client.js';
+import { describeOutcome, realTxid, watchTx } from '../chain/tx-status.js';
+import type { Endpoint } from '../chain/endpoint.js';
 import type {
   Chain,
   ChainReader,
@@ -189,6 +191,8 @@ export class ChessApp {
   private pendingPromotion: { from: string; to: string } | null = null;
   /** The game count the explorer was last built for, or null if never. */
   private exploreLoadedAt: number | null = null;
+  /** True while a broadcast move is being followed to its conclusion. */
+  private watching = false;
   private flipped = false;
   private busy = false;
   private pending: PendingRow[] = [];
@@ -2253,7 +2257,16 @@ export class ChessApp {
       // owed - and could not have known anyway, since the wallet chooses the
       // signer. The sponsorship read that used to be here is kept for the
       // on-screen panel and nothing else.
-      await this.chain.submit!(game, value);
+      const sent = await this.chain.submit!(game, value);
+
+      // Follow it. The board used to say "Sent" and never look again, so a
+      // transaction that failed made the move VANISH off the board a poll or
+      // two later with no explanation and no mention of the fee - because
+      // settleIntent clears the ghost as soon as the value appears in the log
+      // OR the mempool, and an aborted transaction reaches the mempool first.
+      //
+      // Not awaited: nothing downstream waits on a block.
+      void this.watchSubmission(sent);
 
       this.selected = null;
       this.hidePromotion();
@@ -2297,6 +2310,44 @@ export class ChessApp {
   // ------------------------------------------------------------------
   // Wallet
   // ------------------------------------------------------------------
+
+  /**
+   * Report what became of a broadcast move, and only when something went wrong.
+   *
+   * Success says nothing: a board that congratulated somebody on every move
+   * would be noise, and the reason this exists is the moment a fee is spent for
+   * a move that did not count.
+   */
+  private async watchSubmission(sent: unknown): Promise<void> {
+    const txid = (sent as { txid?: string | null } | null)?.txid;
+    // A null or all-zero id is not a transaction to ask about. WriteResult.txid
+    // is nullable by design, and the runtime emulator answers with zeroes.
+    if (!realTxid(txid)) return;
+
+    const endpoint = (this.chain as { reader?: Endpoint }).reader;
+    if (!endpoint) return;
+
+    // One at a time, so a fast player cannot start a queue of pollers against
+    // an allowance the wallet also spends.
+    if (this.watching) return;
+    this.watching = true;
+    const game = this.gameId;
+    try {
+      const outcome = await watchTx(endpoint, String(txid), {
+        // ADR-0011 decision 4: nothing polls while a wallet dialog is open.
+        shouldAsk: () => this.intent?.state !== 'signing'
+      });
+      // Do not report on a game the player has since left.
+      if (this.gameId !== game) return;
+      const say = describeOutcome(outcome);
+      if (say) {
+        this.notice('chainNotice', 'warn', say);
+        this.sound.play('refused');
+      }
+    } finally {
+      this.watching = false;
+    }
+  }
 
   private async connect(): Promise<void> {
     if (!this.options.connect) return;
