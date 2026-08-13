@@ -109,6 +109,24 @@ Nobody has done this. It costs a few thousand five-character submissions.
 
 *Fixed in the tree* by ADR-0015. **2988 keeps it.**
 
+### The runtime's rewrite eats the primary chain host
+
+The board keeps three interchangeable hosts so that no single company can take it
+down. The Xtrata runtime rewrites `https://api.mainnet.hiro.so` to its own proxy
+in any text/html it serves — a blind find-and-replace, which also rewrites the
+FALLBACK TABLE.
+
+So under the runtime the served bytes do not contain the primary public host at
+all, and because the board puts the proxy on top when it detects the runtime,
+entries 0 and 1 both point at the proxy and fail together. A list of three is
+really a list of two, one a duplicate.
+
+The existing test could not catch it: it asserted the rewrite HAPPENED, so the
+very thing that proves the fallback was lost read as a pass.
+
+*Fixed in the tree* by `PUBLIC_API` spelling the host in two pieces, plus a test
+over the built file. **2988 keeps it.**
+
 ### `?game=` deep links do nothing
 
 `openFromLink` was written on 2026-08-10, the day after this inscription was

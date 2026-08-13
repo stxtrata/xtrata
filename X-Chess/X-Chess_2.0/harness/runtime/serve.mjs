@@ -73,14 +73,25 @@ const ARTIFACT = (() => {
 // passes through here.
 // ---------------------------------------------------------------------------
 
+const PROXY_ORIGIN = 'https://xtrata.xyz';
+
+// Copied from xtrata-2.0/functions/runtime/html-hiro-rewrite.ts. All FOUR rules,
+// and an ABSOLUTE origin - the worker rewrites to `${origin}/hiro/<network>`
+// because rewritten HTML can end up inside a blob: document, where a relative
+// path cannot resolve. An emulator that dropped two rules and the origin is an
+// emulator that cannot show you what the real one does, and this one did: the
+// rewrite silently eating the board's primary fallback went unnoticed for that
+// reason.
 const HIRO_REWRITES = [
   [/https:\/\/api\.mainnet\.hiro\.so/g, '/hiro/mainnet'],
-  [/https:\/\/api\.testnet\.hiro\.so/g, '/hiro/testnet']
+  [/https:\/\/api\.testnet\.hiro\.so/g, '/hiro/testnet'],
+  [/https:\/\/stacks-node-api\.mainnet\.stacks\.co/g, '/hiro/mainnet'],
+  [/https:\/\/stacks-node-api\.testnet\.stacks\.co/g, '/hiro/testnet']
 ];
 
 function rewriteHiroBases(html) {
   let out = html;
-  for (const [pattern, replacement] of HIRO_REWRITES) out = out.replace(pattern, replacement);
+  for (const [pattern, path] of HIRO_REWRITES) out = out.replace(pattern, `${PROXY_ORIGIN}${path}`);
   return out;
 }
 

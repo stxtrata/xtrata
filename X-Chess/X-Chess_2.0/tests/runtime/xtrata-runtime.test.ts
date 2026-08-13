@@ -33,11 +33,22 @@ beforeAll(() => {
   artifact = readFileSync(HTML_PATH, 'utf8');
 });
 
-/** The serve-time rewrite, copied from the worker. text/html only. */
+/**
+ * The serve-time rewrite, copied from the worker. text/html only.
+ *
+ * All FOUR rules and an ABSOLUTE origin, matching
+ * xtrata-2.0/functions/runtime/html-hiro-rewrite.ts. This used to carry two
+ * rules and a relative path, and that infidelity is why nobody noticed the
+ * rewrite eating the board's primary fallback: an emulator that does less than
+ * the real thing cannot show you what the real thing does.
+ */
+const PROXY_ORIGIN = 'https://xtrata.xyz';
 function rewriteHiroBases(html: string): string {
   return html
-    .replace(/https:\/\/api\.mainnet\.hiro\.so/g, '/hiro/mainnet')
-    .replace(/https:\/\/api\.testnet\.hiro\.so/g, '/hiro/testnet');
+    .replace(/https:\/\/api\.mainnet\.hiro\.so/g, `${PROXY_ORIGIN}/hiro/mainnet`)
+    .replace(/https:\/\/api\.testnet\.hiro\.so/g, `${PROXY_ORIGIN}/hiro/testnet`)
+    .replace(/https:\/\/stacks-node-api\.mainnet\.stacks\.co/g, `${PROXY_ORIGIN}/hiro/mainnet`)
+    .replace(/https:\/\/stacks-node-api\.testnet\.stacks\.co/g, `${PROXY_ORIGIN}/hiro/testnet`);
 }
 
 /**
@@ -262,5 +273,49 @@ describe('document.open wiping the page', () => {
       dom.window.document
     );
     dom.window.close();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The fallback list has to survive being served.
+// ---------------------------------------------------------------------------
+
+describe('what the rewrite leaves the board with', () => {
+  it('still carries a real public host after the runtime has served it', () => {
+    // The rewrite is a blind find-and-replace over text/html, so it did not
+    // only rewrite URLs the page fetches - it rewrote the FALLBACK TABLE, whose
+    // entire purpose is to survive one host going away. Under the runtime the
+    // served bytes stopped containing the primary public host at all, and since
+    // endpointsFor puts the proxy on top, entries 0 and 1 both pointed at the
+    // proxy and failed together.
+    //
+    // This asserts against the BUILT artefact, because the defence is a
+    // spelling that the minifier must not fold back into a matchable literal.
+    const served = rewriteHiroBases(artifact);
+
+    expect(
+      served,
+      'the served page no longer contains a real public Stacks host, so the ' +
+        'fallback list is shorter than it looks'
+    ).toMatch(/api\.hiro\.so|stacks-node-api/);
+
+    // And the primary is still reachable in some spelling: the value has to
+    // survive even though the literal must not.
+    expect(
+      served,
+      'the primary host was eaten by the rewrite. Check that PUBLIC_API still ' +
+        'splits it, and that esbuild has not folded the join back into a literal.'
+    ).toContain('mainnet.hiro.so');
+  });
+
+  it('leaves the proxy exactly once, not twice', () => {
+    // The duplicate is the symptom: two entries pointing at the same place look
+    // like redundancy and are not.
+    const served = rewriteHiroBases(artifact);
+    const proxied = served.match(/https:\/\/xtrata\.xyz\/hiro\/mainnet/g) ?? [];
+    expect(
+      proxied.length,
+      'the rewrite hit the fallback table, so the board has two entries for one host'
+    ).toBe(0);
   });
 });

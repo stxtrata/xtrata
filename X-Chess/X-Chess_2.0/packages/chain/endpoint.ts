@@ -41,12 +41,36 @@ export const PUBLIC_API: Record<Network, string[]> = {
   // So this list is insurance against a host being DOWN, and it is no help
   // whatever against a rate limit. The only defence against a rate limit is to
   // ask for less: see POLL_MS and the budget back-off in the application.
+  //
+  // WHY THE FIRST ENTRY IS SPELLED IN TWO PIECES.
+  //
+  // The Xtrata runtime rewrites `https://api.<network>.hiro.so` to its own proxy
+  // in any text/html it serves. That is reasonable for a URL the page will
+  // fetch, and it is a blind find-and-replace, so it also rewrote THIS TABLE -
+  // the fallback list whose entire purpose is to survive one host going away.
+  //
+  // The effect under the runtime was that the served bytes no longer contained
+  // the primary public host at all, and since endpointsFor unshifts the proxy on
+  // top, entries 0 and 1 both pointed at the proxy and failed together. A list
+  // of three had quietly become a list of two, one of which was a duplicate.
+  //
+  // Splitting the literal defeats the pattern without changing the value. It
+  // must stay a `join` and not a `+`: esbuild folds string concatenation back
+  // into a single literal, which the rewrite would match again. There is a test
+  // over the BUILT file that fails exactly when the minifier changes its mind.
+  //
+  // This does not cost the operator the rate-limit protection it was added for:
+  // underXtrataRuntime() puts the proxy first on its own evidence - the injected
+  // script tags - and never depended on the rewritten string.
   mainnet: [
-    'https://api.mainnet.hiro.so',
+    ['https://api', 'mainnet.hiro.so'].join('.'),
     'https://stacks-node-api.stacks.co',
     'https://api.hiro.so'
   ],
-  testnet: ['https://api.testnet.hiro.so', 'https://stacks-node-api.testnet.stacks.co'],
+  testnet: [
+    ['https://api', 'testnet.hiro.so'].join('.'),
+    'https://stacks-node-api.testnet.stacks.co'
+  ],
   // Empty on purpose, and not an oversight.
   //
   // There is no well-known devnet host: a devnet is somebody's own machine.
