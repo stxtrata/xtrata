@@ -7,6 +7,9 @@
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { REBATE_CEILING } from '../../packages/wallet/postconditions.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   ALICE,
   BOB,
@@ -574,6 +577,34 @@ describe('what is absent', () => {
         'transfer-ownership',
         'withdraw'
       ].sort()
+    );
+  });
+
+  it('has exactly the owner-gated levers the runbook enumerates', () => {
+    // ops/RUNBOOK.md is organised by lever, and its whole usefulness rests on
+    // the list being complete. A new setter added without a line in the runbook
+    // is a lever nobody knows they have - which for a permanent artefact is the
+    // difference between a fault that can be fixed with one transaction and one
+    // that looks like it cannot be fixed at all.
+    //
+    // So the set is pinned here rather than described there.
+    const source = readFileSync(
+      resolve(fileURLToPath(new URL('../../contracts/xchess-core-v1.clar', import.meta.url))),
+      'utf8'
+    );
+    const ownerGated = [...source.matchAll(/\(define-public \((\S+)[\s\S]*?\n/g)]
+      .map((match) => match[1])
+      .filter((name) => {
+        const at = source.indexOf(`(define-public (${name}`);
+        const body = source.slice(at, source.indexOf('\n(define-', at + 10));
+        return body.includes('(is-owner)');
+      });
+
+    expect(
+      ownerGated.sort(),
+      'the owner-gated functions changed. Update ops/RUNBOOK.md, which is organised around them.'
+    ).toEqual(
+      ['set-expiry-blocks', 'set-open-fee', 'set-sponsorship', 'transfer-ownership', 'withdraw'].sort()
     );
   });
 
