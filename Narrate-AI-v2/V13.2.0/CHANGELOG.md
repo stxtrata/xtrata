@@ -3,12 +3,17 @@
 Newest first. The version shown in the app header comes from `APP_VERSION` in
 [`src/frontend/js/core.js`](src/frontend/js/core.js) — bump it there, add an entry here, and commit.
 
-Patch = a fix. Minor = new or changed behaviour. No build step, so a hard refresh
-(Cmd+Shift+R) is all that is needed to see a new version.
+**Major and minor track the folder name.** This is `V13.2.0`, so every version here is
+`13.2.x` and only the patch number moves, however big the change. A new lineage means a new
+folder: clone to `V13.3.0` and its first version is `13.3.0`. That way the badge always tells
+you which folder you are running out of, and a version number can never name a folder that
+holds something else.
+
+No build step, so a hard refresh (Cmd+Shift+R) is all that is needed to see a new version.
 
 ---
 
-## 13.3.0 — 2026-08-13
+## 13.2.4 — 2026-08-13
 
 **Changed**
 
@@ -21,6 +26,11 @@ Same `createProjectFromSettings()` behind it, confirmation dialog included, so a
 click still cannot wipe unsaved text. No JavaScript change was needed: the function ends
 with `closeProjectModal()`, which only removes a CSS class and is a no-op when no modal
 is open.
+
+**Versioning correction.** This entry was briefly numbered 13.3.0, which collided with the
+folder-naming scheme: a future `V13.3.0` folder would have been a different thing from a
+`13.3.0` running inside `V13.2.0`. Major and minor now follow the folder and only the patch
+number moves. Renumbered before this reached anything outside the working tree.
 
 ---
 
