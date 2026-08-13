@@ -13,6 +13,27 @@ No build step, so a hard refresh (Cmd+Shift+R) is all that is needed to see a ne
 
 ---
 
+## 13.2.5 — 2026-08-13
+
+**Fixed**
+
+- `core.js` held two raw control characters — a literal NUL and a literal `0x1F` — inside the
+  control-character regex in `toReadableFilename`, where the escapes `\x00` and `\x1f` were
+  meant. The code worked, since JavaScript accepts literal control characters in a regex
+  character class, but the raw NUL made every tool treat the file as **binary**: `git diff`
+  reported `Bin 8445 bytes` with no lines, and `grep` silently matched nothing in it.
+- That mattered more than it looks. `core.js` is where `APP_VERSION` lives, so every future
+  version bump would have been an unreviewable binary blob in the history.
+
+Both bytes are now written as escapes. Same characters, same range, no behaviour change:
+verified that `toReadableFilename` still strips NUL, `0x1F` and `0x07` from a filename. This
+predates the session, and `core.js` was the only one of the 23 tracked files affected.
+
+This commit still shows as binary because the version in HEAD is the binary side. Diffs from
+here on are readable.
+
+---
+
 ## 13.2.4 — 2026-08-13
 
 **Changed**
