@@ -21,6 +21,7 @@ import { EVENT_STRINGS } from '../replay/events.js';
 import {
   DEFAULT_RULES,
   describeRules,
+  checkSender,
   looksLikePrincipal,
   normaliseRules,
   readyToOpen
@@ -50,6 +51,14 @@ export type Tab = 'play' | 'game' | 'explore' | 'leaderboard' | 'profile';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+/**
+ * A principal that is nobody, for asking "would this game admit a stranger?".
+ *
+ * Never displayed and never signed with. The burn address is used precisely
+ * because no player can hold it.
+ */
+const STRANGER = 'SP000000000000000000002Q6VF78';
+
 /** A row of the game list, after it has been read and replayed. */
 interface ExploreRow {
   id: number;
@@ -59,6 +68,18 @@ interface ExploreRow {
   black: string | null;
   confirmed: boolean;
   state: string;
+  /**
+   * Whether the connected player can act here, and whether it is their turn.
+   *
+   * Computed from `checkSender` - the same pure function that decides who may
+   * move - so there is one rule and not a second copy of it. Null when nobody
+   * is connected, or when the rules could not be confirmed: a board that said
+   * "your move" under rules nobody agreed to would be asserting a turn it has
+   * no standing to assert.
+   */
+  mine: 'your-move' | 'waiting' | null;
+  /** An unclaimed seat a stranger could walk into. */
+  seat: 'open' | null;
 }
 
 /**
@@ -2358,6 +2379,9 @@ export class ChessApp {
       this.el.connect.classList.add('hide');
       this.el.disconnect.classList.remove('hide');
       this.notice('chainNotice', 'good', `Connected as ${session.address}`);
+      // Every "your move" answer depends on who is asking, so a list built
+      // before connecting was built for nobody.
+      this.exploreLoadedAt = null;
       (this.el.profileWho as HTMLInputElement).value = session.address;
       this.drawGame();
       return true;
@@ -2449,7 +2473,14 @@ export class ChessApp {
     await this.guard('reading the game list', async () => {
       const count = await this.chain.getGameCount();
       this.exploreLoadedAt = count;
-      this.text('exploreCount', `${count} game${count === 1 ? '' : 's'} on this contract`);
+      // Both facts matter: the window is real, so a player's game can fall off
+      // it, and the order depends on who is looking.
+      this.text(
+        'exploreCount',
+        `${count} game${count === 1 ? '' : 's'} on this contract` +
+          (count > 25 ? ', newest 25 shown' : '') +
+          (this.address ? ', yours first' : '')
+      );
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 
       // Newest first, and bounded: an unbounded walk on a busy contract would
@@ -2468,40 +2499,84 @@ export class ChessApp {
           white: null,
           black: null,
           confirmed: false,
-          state: game.nextSeq === 0 ? 'not started' : 'live'
+          state: game.nextSeq === 0 ? 'not started' : 'live',
+          mine: null,
+          seat: null
         };
 
-        if (game.nextSeq > 0) {
-          try {
-            const entries = await this.chain.getAllEntries(id);
-            const rules = recoverRules({
-              rulesHash: game.rulesHash,
-              openedBy: game.openedBy,
-              ranked: game.ranked,
-              senders: entries.map((e) => e.sender),
-              viewer: this.address,
-              candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
-            });
-            const state = replay(
-              entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
-              { rules: rules.rules }
-            );
-            row.white = rules.rules.white;
-            row.black = rules.rules.black;
-            row.confirmed = rules.confirmed;
-            row.state =
-              state.status === 'over'
-                ? `${state.result} ${state.termination}`
+        try {
+          // Recovery runs for an EMPTY game too. A game with no submissions is
+          // exactly the kind a stranger can walk up to - the only kind - and it
+          // was the one kind the list refused to describe, because both this
+          // and the remembered-rules lookup sat inside a "has entries" guard.
+          // It costs no extra read: the entries are already fetched below.
+          const entries = game.nextSeq > 0 ? await this.chain.getAllEntries(id) : [];
+          const rules = recoverRules({
+            rulesHash: game.rulesHash,
+            openedBy: game.openedBy,
+            ranked: game.ranked,
+            senders: entries.map((e) => e.sender),
+            viewer: this.address,
+            candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
+          });
+          const state = replay(
+            entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
+            { rules: rules.rules }
+          );
+          row.white = rules.rules.white;
+          row.black = rules.rules.black;
+          row.confirmed = rules.confirmed;
+          row.state =
+            state.status === 'over'
+              ? `${state.result} ${state.termination}`
+              : game.nextSeq === 0
+                ? 'not started'
                 : `${state.turn} to move`;
-          } catch {
-            // A row that will not replay is still a row. Saying less about it
-            // beats dropping the game out of the list.
+
+          // Only for a game whose rules this board can actually confirm, and
+          // only while it is still live. replay reports a turn for a FINISHED
+          // game too, so without the status check every game somebody happened
+          // to hold the side-to-move in would claim to be waiting for them.
+          if (rules.confirmed && state.status !== 'over') {
+            if (this.address) {
+              const yours = checkSender(rules.rules, {
+                sender: this.address,
+                turn: state.turn,
+                history: state.accepted
+              }) === null;
+              const theirs = checkSender(rules.rules, {
+                sender: this.address,
+                turn: state.turn === 'white' ? 'black' : 'white',
+                history: state.accepted
+              }) === null;
+              row.mine = yours ? 'your-move' : theirs ? 'waiting' : null;
+            }
+            // A seat nobody has claimed: the side to move admits anyone.
+            const anyone = checkSender(rules.rules, {
+              // Somebody with no history here at all. If the side to move
+              // admits them, the seat is genuinely unclaimed.
+              sender: STRANGER,
+              turn: state.turn,
+              history: state.accepted
+            }) === null;
+            if (anyone && row.mine === null) row.seat = 'open';
           }
+        } catch {
+          // A row that will not replay is still a row. Saying less about it
+          // beats dropping the game out of the list.
         }
         found.push(row);
       }
 
-      this.exploreRows = found;
+      // Sorted for whoever is looking: games waiting on them, then seats they
+      // could take, then the rest in the order the chain gave them. Stable, so
+      // two games in the same class keep their newest-first order.
+      const rank = (row: ExploreRow): number =>
+        row.mine === 'your-move' ? 0 : row.seat === 'open' ? 1 : 2;
+      this.exploreRows = found
+        .map((row, at) => ({ row, at }))
+        .sort((a, b) => rank(a.row) - rank(b.row) || a.at - b.at)
+        .map((entry) => entry.row);
       this.drawExplore();
 
       // Names for everyone on the list, in one go, then draw again if it
@@ -2554,7 +2629,20 @@ export class ChessApp {
       cell(rules);
 
       cell(text(String(row.entries)));
-      cell(text(row.state));
+
+      // The answer the list already computed and used to throw away: whether
+      // this game is waiting for YOU. A correspondence player with four games
+      // had to open all four to find out where they owed a move.
+      const state = this.doc.createElement('span');
+      if (row.mine === 'your-move') {
+        state.appendChild(text('Your move', 'badge badge--turn'));
+        state.appendChild(text(' ', ''));
+      } else if (row.seat === 'open') {
+        state.appendChild(text('Open seat', 'badge'));
+        state.appendChild(text(' ', ''));
+      }
+      state.appendChild(text(row.state));
+      cell(state);
 
       const open = this.doc.createElement('button');
       open.className = 'action';

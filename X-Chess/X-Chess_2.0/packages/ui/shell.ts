@@ -346,6 +346,10 @@ th { color: var(--dim); font-weight: 600; font-size: 12px; }
 .snd-list--off { opacity: .45; }
 
 .muted { color: var(--dim); }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
+         text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
+         border: 1px solid var(--line-2); color: var(--dim); }
+.badge--turn { color: var(--bg); background: var(--gold); border-color: var(--gold); }
 .small { font-size: 12px; }
 .addr { font-family: ui-monospace, monospace; font-size: 12px; color: var(--dim); }
 /* Abbreviated, so a row is one line. The full value is on the element, so a

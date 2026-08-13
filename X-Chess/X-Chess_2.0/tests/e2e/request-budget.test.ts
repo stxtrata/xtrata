@@ -464,3 +464,37 @@ describe('opening a link to one game', () => {
     ).toBeLessThanOrEqual(2);
   });
 });
+
+describe('the badges the game list shows', () => {
+  it('cost no chain reads at all', async () => {
+    // Every answer - who can play, whose turn it is, whether a seat is free -
+    // was already being computed and thrown away. If this assertion is hard to
+    // make, the feature has been built wrong.
+    const { chain, reads } = counted();
+    chain.as(ALICE);
+    for (let n = 0; n < 4; n++) await chain.openGame(rulesHash(RULES), false);
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId },
+      connect: async () => ({ address: ALICE })
+    });
+    await tick(40);
+    (dom.window.document.getElementById('connect') as HTMLButtonElement).click();
+    await tick(40);
+
+    reads.length = 0;
+    (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+    await tick(120);
+
+    // One getGame plus one getAllEntries per listed game, and nothing more.
+    const perGame = reads.filter((r) => r === 'getGame' || r === 'getAllEntries').length;
+    expect(
+      reads.length,
+      `the badges added reads beyond the list itself: ${reads.join(', ')}`
+    ).toBe(perGame);
+    app.stopPolling();
+  });
+});
