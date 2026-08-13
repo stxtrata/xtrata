@@ -111,9 +111,17 @@ whenReady(document, () => {
       // Method-first, provider-second: a wallet that cannot do one method may
       // still answer another, and a provider that refuses everything must not
       // stop us reaching the one beside it that works.
+      // SIX SECONDS, not the signing timeout.
+      //
+      // This is a probe, not a signature. A signature legitimately takes as long
+      // as a person takes to read it; asking a wallet whether it can answer at
+      // all should not. Four methods at fifteen seconds is a minute of a board
+      // that looks like it did not hear the click - which is exactly how this
+      // presented, because Xverse's BitcoinProvider never settles on
+      // `wallet_connect` and ranks first.
       for (const method of ['wallet_connect', 'stx_requestAccounts', 'stx_getAddresses', 'getAddresses']) {
         try {
-          const { result } = await walletCall(method, {}, { timeoutMs: 15_000 });
+          const { result } = await walletCall(method, {}, { timeoutMs: 6_000 });
           const address = extractAddress(result);
           if (address) {
             connected = address;

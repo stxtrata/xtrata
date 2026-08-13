@@ -28,6 +28,7 @@ import {
   needsWalletBridge,
   networkFromAddress,
   providerCannot,
+  providerDidNotAnswer,
   userCancelled,
   walletCall,
   walletRequest
@@ -489,5 +490,66 @@ describe('reading an address back', () => {
     expect(networkFromAddress('ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM')).toBe('testnet');
     expect(networkFromAddress('nonsense')).toBeNull();
     expect(networkFromAddress(null)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A provider that never answers at all.
+//
+// Found on a real staging board, 2026-08-13, with Xverse installed. Clicking
+// Connect appeared to do nothing whatever. The cause:
+//
+//   XverseProviders.BitcoinProvider  wallet_connect  ->  never settles
+//
+// No result, no rejection - the promise simply stays pending. BitcoinProvider
+// ranks FIRST because it is usually Xverse's working surface, so the board
+// waited on it, timed out, and treated the timeout as fatal to the whole method
+// - never reaching the shim-patched StacksProvider sitting right behind it,
+// which connects fine.
+//
+// Four methods at fifteen seconds each is a minute of silence, which is why it
+// read as a dead button rather than a slow one.
+// ---------------------------------------------------------------------------
+
+describe('a wallet that says nothing at all', () => {
+  it('moves to the next provider instead of giving up on the method', async () => {
+    const hangs = { request: () => new Promise(() => {}) };
+    const answers = {
+      request: async (method: string) => {
+        if (method !== 'stx_getAddresses') throw Object.assign(new Error('not implemented'), { code: -32601 });
+        return { addresses: [{ address: ADDRESS }] };
+      }
+    };
+
+    const g = globalThis as unknown as Record<string, unknown>;
+    g.XverseProviders = { BitcoinProvider: hangs, StacksProvider: answers };
+
+    // The hanging provider ranks first, exactly as it does in a real page.
+    const order = collectProviders().map((entry) => entry.label);
+    expect(order[0], 'the hanging provider should still rank first').toContain('BitcoinProvider');
+
+    const { result, entry } = await walletCall('stx_getAddresses', {}, { timeoutMs: 60 });
+    expect(extractAddress(result), 'the working provider was never reached').toBe(ADDRESS);
+    expect(entry.label, 'it connected through the wrong provider').toContain('StacksProvider');
+  });
+
+  it('reports a hang as not-answered rather than as a capability', async () => {
+    // The two are different claims and want different handling: one is a wallet
+    // saying it cannot, the other is a wallet saying nothing.
+    const timeout = Object.assign(new Error('wallet did not answer x within 6s'), {
+      code: 'TIMEOUT'
+    });
+    expect(providerDidNotAnswer(timeout)).toBe(true);
+    expect(providerCannot(timeout), 'a hang is not a statement about capability').toBe(false);
+  });
+
+  it('gives up in seconds, not in a minute', async () => {
+    const hangs = { request: () => new Promise(() => {}) };
+    const g = globalThis as unknown as Record<string, unknown>;
+    g.XverseProviders = { BitcoinProvider: hangs };
+
+    const started = Date.now();
+    await expect(walletCall('wallet_connect', {}, { timeoutMs: 50 })).rejects.toThrow();
+    expect(Date.now() - started, 'it waited far past its own timeout').toBeLessThan(500);
   });
 });

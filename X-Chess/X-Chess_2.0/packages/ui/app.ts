@@ -2484,6 +2484,10 @@ export class ChessApp {
 
   private async connect(): Promise<void> {
     if (!this.options.connect) return;
+    // Said BEFORE anything is awaited. Connecting means asking each provider in
+    // turn, and a wallet that never answers is a real case - so without this the
+    // board looks like it did not hear the click for as long as the probes take.
+    this.notice('chainNotice', 'info', 'Asking your wallet. Approve it if a window opens.');
     await this.guard('connecting', async () => {
       const session = await this.options.connect!();
       if (!session) return false;

@@ -47,6 +47,24 @@ export function needsWalletBridge(error: unknown): boolean {
     .includes('host wallet bridge');
 }
 
+/**
+ * This provider never answered.
+ *
+ * A provider that hangs has, in every way that matters, declined - and the next
+ * provider is the whole reason the list exists. Kept separate from
+ * `providerCannot` because the two are different claims: one is a wallet saying
+ * it cannot, the other is a wallet saying nothing at all.
+ *
+ * Xverse is why this exists. It injects a BitcoinProvider that ranks first
+ * because it is usually the working surface, and that provider NEVER SETTLES on
+ * `wallet_connect` - no result, no rejection. Treating that as fatal meant the
+ * shim-patched StacksProvider sitting right behind it, which connects fine, was
+ * never reached.
+ */
+export function providerDidNotAnswer(error: unknown): boolean {
+  return (error as WalletError)?.code === 'TIMEOUT';
+}
+
 /** This provider cannot do this method. Move on to the next one. */
 export function providerCannot(error: unknown): boolean {
   const err = error as WalletError;
@@ -167,8 +185,13 @@ export async function walletCall(
       return { result, entry };
     } catch (error) {
       lastError = error;
-      if (providerCannot(error) && !needsWalletBridge(error)) {
-        log('info', `${entry.label} cannot do ${method}, trying the next provider`);
+      if ((providerCannot(error) || providerDidNotAnswer(error)) && !needsWalletBridge(error)) {
+        log(
+          'info',
+          providerDidNotAnswer(error)
+            ? `${entry.label} did not answer ${method}, trying the next provider`
+            : `${entry.label} cannot do ${method}, trying the next provider`
+        );
         continue;
       }
       throw error;
