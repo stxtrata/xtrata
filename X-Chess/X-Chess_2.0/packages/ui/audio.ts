@@ -112,6 +112,15 @@ export class Sound {
   private noiseBuffer: AudioBuffer | null = null;
   private listeners: (() => void)[] = [];
   private wake: (() => void) | null = null;
+  /**
+   * Has the browser taken the audio away while nobody was looking?
+   *
+   * Recorded from OBSERVATION - a statechange while the tab was hidden - never
+   * from a user-agent sniff. A sniff in a permanent artefact ages badly, and
+   * this is the one branch of the panel's explanation that would otherwise have
+   * to guess.
+   */
+  private stoppedWhileHidden = false;
 
   constructor(options: SoundOptions = {}) {
     this.doc = options.document ?? document;
@@ -150,9 +159,19 @@ export class Sound {
    * here: it reads as a broken feature rather than as a browser waiting for a
    * tap it never asked for out loud.
    */
+  /** True when the OS silenced this board while the tab was in the background. */
+  get interruptedInBackground(): boolean {
+    return this.stoppedWhileHidden && this.waitingForATap;
+  }
+
   get waitingForATap(): boolean {
     if (!this.state.master) return false;
-    return this.ctx === null || this.ctx.state === 'suspended';
+    // Not-running, rather than specifically 'suspended'. A context that is not
+    // running will not make a noise, which is the only question this asks - and
+    // iOS's 'interrupted' state made it answer FALSE while nothing played, so
+    // the panel told the player sound was working when it was not. Silence with
+    // no explanation is the worst outcome here, and this was that.
+    return this.ctx === null || this.ctx.state !== 'running';
   }
 
   setMaster(on: boolean): void {
@@ -287,10 +306,17 @@ export class Sound {
    */
   listen(): void {
     if (this.wake) return;
-    const wake = (): void => {
-      this.unlock();
-      if (this.ctx && this.ctx.state === 'running') this.stopListening();
-    };
+    // NOT removed once it works. The listeners stay for the life of the page,
+    // because the page outlives the first success: a correspondence board is
+    // open for hours, and iOS takes the audio away again after a phone call, an
+    // alarm or a spell in the background. Disarming on the first success meant
+    // there was nothing left to re-arm it, so the sound simply stopped and
+    // never came back.
+    //
+    // They cost nothing to keep: capture and passive, so they cannot interfere
+    // with a square click, and unlock() is a state check and an occasional
+    // resume.
+    const wake = (): void => this.unlock();
     this.wake = wake;
     for (const name of ['pointerdown', 'keydown', 'touchend']) {
       this.doc.addEventListener(name, wake, { capture: true, passive: true });
@@ -321,9 +347,23 @@ export class Sound {
           this.out = this.ctx.createGain();
           this.out.gain.value = 1;
           this.out.connect(this.ctx.destination);
+          // So the panel re-renders the moment the browser takes the sound
+          // away. Without this, a context suspended by the OS changed nothing
+          // on screen and the only symptom was silence.
+          this.ctx.addEventListener?.('statechange', () => {
+            if (this.ctx && this.ctx.state !== 'running' && this.doc.visibilityState === 'hidden') {
+              this.stoppedWhileHidden = true;
+            }
+            this.changed();
+          });
         }
       }
-      if (this.ctx && this.ctx.state === 'suspended') void this.ctx.resume();
+      // Anything that is not running needs resuming, not just 'suspended'.
+      // iOS Safari uses the WebKit-only 'interrupted' state after a phone call
+      // or a spell in the background: neither suspended nor running, so a check
+      // for 'suspended' did nothing at all, emit() scheduled into a context
+      // that would never play, and waitingForATap said everything was fine.
+      if (this.ctx && this.ctx.state !== 'running') void this.ctx.resume();
     } catch {
       // No Web Audio here. Nothing else in the application depends on it.
     }

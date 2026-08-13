@@ -12,6 +12,8 @@
 // Everything here is pure. No browser, no audio, nothing that makes a sound.
 
 import { describe, expect, it } from 'vitest';
+import { JSDOM } from 'jsdom';
+import { Sound } from '../../packages/ui/audio.js';
 import { replay } from '../../packages/replay/replay.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { EVENT_STRINGS } from '../../packages/replay/events.js';
@@ -418,5 +420,147 @@ describe('choosing a sound', () => {
       expect(soundFor(before, after, ALICE), `${name}, for White`).toBe(white);
       expect(soundFor(before, after, BOB), `${name}, for Black`).toBe(black);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Surviving a phone.
+//
+// The point of this module is a sound arriving on its own, from the chain,
+// hours later, while the player is doing something else. Three faults broke
+// exactly that case, and broke it into silence with a panel saying everything
+// was fine - which audio.ts names as the worst possible outcome.
+// ---------------------------------------------------------------------------
+
+describe('sound on a device that takes it away again', () => {
+  /** A context whose state the test drives, as a browser would. */
+  function fakeContext(state = 'suspended') {
+    const listeners: (() => void)[] = [];
+    return {
+      resumed: 0,
+      listeners,
+      ctx: {
+        get state() {
+          return state;
+        },
+        set state(next: string) {
+          state = next;
+          for (const fire of listeners) fire();
+        },
+        resume() {
+          (this as unknown as { _r?: number })._r = 0;
+          state = 'running';
+          for (const fire of listeners) fire();
+          return Promise.resolve();
+        },
+        addEventListener(_name: string, fire: () => void) {
+          listeners.push(fire);
+        },
+        createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+        destination: {},
+        close: () => Promise.resolve(),
+        currentTime: 0
+      }
+    };
+  }
+
+  it('keeps listening for a gesture after the first one worked', () => {
+    // It used to disarm itself the moment the context reached running, and
+    // nothing ever re-armed it. A correspondence board is open for hours.
+    const dom = new JSDOM('<!doctype html><html><body></body></html>');
+    let resumes = 0;
+    // Reaches 'running' on the first resume, which is what the old code keyed
+    // on to disarm itself. Without that this test passes either way.
+    const patched = {
+      state: 'suspended',
+      resume() {
+        resumes++;
+        this.state = 'running';
+        return Promise.resolve();
+      },
+      addEventListener() {},
+      createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+      destination: {},
+      close: () => Promise.resolve(),
+      currentTime: 0
+    };
+    const sound = new Sound({
+      document: dom.window.document as unknown as Document,
+      context: () => patched as unknown as AudioContext
+    });
+    sound.setMaster(true);
+    sound.listen();
+
+    // First gesture: it starts working.
+    dom.window.document.dispatchEvent(new dom.window.Event('pointerdown'));
+    expect(resumes, 'the first gesture did not start the sound').toBe(1);
+
+    // Then the device takes it away, which is what a phone call or a spell in
+    // the background does.
+    patched.state = 'suspended';
+
+    // The next tap must bring it back. The old code had removed its listeners
+    // the moment the context first reached running, and nothing ever re-added
+    // them - so from here the board was silent for the rest of its life.
+    dom.window.document.dispatchEvent(new dom.window.Event('pointerdown'));
+    expect(
+      resumes,
+      'the page stopped listening once sound worked, so it can never come back'
+    ).toBe(2);
+  });
+
+  it("treats iOS's interrupted state as asleep, because it is", () => {
+    // Neither suspended nor running. A check for 'suspended' did nothing, so
+    // the context was never resumed and the panel said sound was working.
+    const dom = new JSDOM('<!doctype html><html><body></body></html>');
+    // Stuck: resume() is attempted and the state does not move, which is what
+    // an interruption the browser has not released yet looks like.
+    let resumes = 0;
+    const stuck = {
+      state: 'interrupted',
+      resume() {
+        resumes++;
+        return Promise.resolve();
+      },
+      addEventListener() {},
+      createGain: () => ({ gain: { value: 1 }, connect() {}, disconnect() {} }),
+      destination: {},
+      close: () => Promise.resolve(),
+      currentTime: 0
+    };
+    const sound = new Sound({
+      document: dom.window.document as unknown as Document,
+      context: () => stuck as unknown as AudioContext
+    });
+    sound.setMaster(true);
+    sound.unlock();
+
+    // A check for 'suspended' would not have called resume at all.
+    expect(resumes, 'an interrupted context was never resumed').toBeGreaterThan(0);
+    expect(sound.waitingForATap, 'the panel would claim sound is working').toBe(true);
+  });
+
+  it('tells the panel when the browser takes the sound away', () => {
+    const dom = new JSDOM('<!doctype html><html><body></body></html>');
+    const fake = fakeContext('running');
+    const sound = new Sound({
+      document: dom.window.document as unknown as Document,
+      context: () => fake.ctx as unknown as AudioContext
+    });
+    let changes = 0;
+    sound.onChange(() => changes++);
+    sound.setMaster(true);
+    sound.unlock();
+    const before = changes;
+
+    // The OS silences it while the tab is in the background.
+    Object.defineProperty(dom.window.document, 'visibilityState', {
+      value: 'hidden',
+      configurable: true
+    });
+    (fake.ctx as unknown as { state: string }).state = 'interrupted';
+
+    expect(changes, 'nothing on screen changed when the sound stopped').toBeGreaterThan(before);
+    expect(sound.interruptedInBackground).toBe(true);
   });
 });

@@ -156,6 +156,17 @@ export function soundToggleLabel(sound: Sound): string {
  */
 export function soundNote(sound: Sound): string {
   if (!sound.enabled) return 'Sound is off. Nothing on this board will make a noise.';
+  // Said BEFORE the generic waiting-for-a-tap line, because it is the same
+  // symptom with a different cause and different advice. The player did touch
+  // the page - the browser took the sound away afterwards, which on iOS happens
+  // after a phone call, an alarm, or a spell in the background.
+  //
+  // Only ever from observation: a statechange seen while the tab was hidden.
+  if (sound.interruptedInBackground) {
+    return 'Your device stopped this page playing sound while you were away, which phones do ' +
+      'after a call or a while in the background. Touch the page and it will start working ' +
+      'again.';
+  }
   if (sound.waitingForATap) {
     return 'Your browser will not play a sound until you have touched the page. ' +
       'Press Play on any row below, or make a move, and it will start working.';
