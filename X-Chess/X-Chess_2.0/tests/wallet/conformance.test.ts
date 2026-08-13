@@ -553,3 +553,48 @@ describe('a wallet that says nothing at all', () => {
     expect(Date.now() - started, 'it waited far past its own timeout').toBeLessThan(500);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The shim's rank, and why a bridge is the condition for it.
+//
+// Found 2026-08-13 by clicking Connect on the staging board and reading the
+// console:
+//
+//   TypeError: Cannot read properties of undefined (reading '$instanceValues$')
+//     at connect-ui@6.6.0/es2022/dist/esm/loader.mjs
+//
+// That is @stacks/connect's own modal failing to render. The runtime assembles
+// the document with document.write, and connect-ui's Stencil loader cannot
+// survive it - so the shim's last-resort connect opens nothing, calls no
+// callback, and pends until its own 90-second timeout.
+//
+// The shim outranked every real provider on the page, so the board spent its
+// patience waiting for a dialog that could never appear, with a working Xverse
+// surface sitting untried behind it. The shim earns that rank from a HOST
+// BRIDGE, not from being installed.
+// ---------------------------------------------------------------------------
+
+describe('what the shim is worth without a bridge', () => {
+  it('puts a real provider first when the shim has no host to forward to', () => {
+    installXverse();
+    installShim({ bridged: false });
+
+    const order = collectProviders().map((entry) => entry.label);
+    expect(order[0], 'the shim outranked a real wallet it cannot beat').not.toBe(
+      'window.StacksProvider'
+    );
+    expect(order[0]).toContain('BitcoinProvider');
+  });
+
+  it('still puts the shim first when it does have one, because then it is the only route', () => {
+    installXverse();
+    installShim({ bridged: true });
+
+    expect(collectProviders()[0].label).toBe('window.StacksProvider');
+  });
+
+  it('keeps the shim in the list either way, since it may be all there is', () => {
+    installShim({ bridged: false });
+    expect(collectProviders().map((entry) => entry.label)).toContain('window.StacksProvider');
+  });
+});

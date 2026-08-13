@@ -50,7 +50,7 @@ describe('connecting a wallet', () => {
     const session = await connectWallet({
       call,
       providerCount: () => 1,
-      underRuntime: () => false,
+      bridged: () => false,
       now: () => 1_000
     });
 
@@ -70,7 +70,7 @@ describe('connecting a wallet', () => {
     await connectWallet({
       call,
       providerCount: () => 3,
-      underRuntime: () => false,
+      bridged: () => false,
       now: () => 0
     });
 
@@ -98,7 +98,7 @@ describe('connecting a wallet', () => {
           return answer;
         },
         providerCount: () => 3,
-        underRuntime: () => false,
+        bridged: () => false,
         now: () => clock
       })
     ).rejects.toThrow(/did not give an address/);
@@ -121,7 +121,7 @@ describe('connecting a wallet', () => {
           return answer;
         },
         providerCount: () => 1,
-        underRuntime: () => false,
+        bridged: () => false,
         now: () => clock
       })
     ).rejects.toThrow(/did not give an address/);
@@ -131,10 +131,11 @@ describe('connecting a wallet', () => {
     expect(asked.map((entry) => entry.method)).toEqual(['wallet_connect']);
   });
 
-  it('asks the runtime what it already knows before opening anything', async () => {
-    // The shim answers this itself and remembers the last address, so a reload
-    // reconnects with no dialog. It has to be asked FIRST or the dialog opens
-    // for something already known.
+  it('asks the host what it already knows before opening anything', async () => {
+    // With a bridge the shim ranks first and answers by asking the Xtrata site,
+    // which is already connected - so the address arrives with nothing opening
+    // and nobody clicking. It has to be asked FIRST, or a dialog opens for
+    // something already known.
     const { call, asked } = recorder((method) =>
       method === 'stx_getAddresses' ? { address: ADDRESS } : refuses()
     );
@@ -142,7 +143,7 @@ describe('connecting a wallet', () => {
     const session = await connectWallet({
       call,
       providerCount: () => 1,
-      underRuntime: () => true,
+      bridged: () => true,
       now: () => 0
     });
 
@@ -155,13 +156,13 @@ describe('connecting a wallet', () => {
   });
 
   it('does not probe a real wallet that way, because reading may prompt it', async () => {
-    // Off the runtime there is no shim to answer, so the same question reaches
-    // an extension - which may open its own dialog for it. Probing that at six
-    // seconds is the bug this file exists for, one method along.
+    // With no bridge the shim ranks last, so the same question reaches an
+    // extension instead - which may open its own dialog for it. Probing that at
+    // six seconds is the bug this file exists for, one method along.
     const { call, asked } = recorder(() => refuses());
 
     await expect(
-      connectWallet({ call, providerCount: () => 1, underRuntime: () => false, now: () => 0 })
+      connectWallet({ call, providerCount: () => 1, bridged: () => false, now: () => 0 })
     ).rejects.toThrow();
 
     expect(asked[0].method, 'a real wallet was probed before being asked to connect').toBe(
@@ -175,11 +176,11 @@ describe('connecting a wallet', () => {
     const { call } = recorder(() => refuses());
 
     await expect(
-      connectWallet({ call, providerCount: () => 0, underRuntime: () => false, now: () => 0 })
+      connectWallet({ call, providerCount: () => 0, bridged: () => false, now: () => 0 })
     ).rejects.toMatchObject({ code: 'NO_WALLET' });
 
     await expect(
-      connectWallet({ call, providerCount: () => 2, underRuntime: () => false, now: () => 0 })
+      connectWallet({ call, providerCount: () => 2, bridged: () => false, now: () => 0 })
     ).rejects.toMatchObject({ code: 'NO_ADDRESS' });
   });
 
@@ -193,7 +194,7 @@ describe('connecting a wallet', () => {
     const session = await connectWallet({
       call,
       providerCount: () => 1,
-      underRuntime: () => false,
+      bridged: () => false,
       now: () => 0
     });
 

@@ -14,7 +14,7 @@
 // answered by a person reading it, and a person is slow. One number cannot serve
 // both, which is what the first two attempts at this each assumed in turn.
 
-import { collectProviders, shimInstalled } from './providers.js';
+import { collectProviders, usingHostBridge } from './providers.js';
 import { extractAddress, walletCall } from './requests.js';
 import type { RequestOptions } from './requests.js';
 
@@ -44,18 +44,21 @@ export interface ConnectDeps {
   /** Injected so the policy can be tested without a wallet. */
   call?: Call;
   providerCount?: () => number;
-  underRuntime?: () => boolean;
+  bridged?: () => boolean;
   now?: () => number;
 }
 
 /**
  * Questions that never open anything, asked only where that is guaranteed.
  *
- * Under the Xtrata runtime the shim answers these itself, instantly, and returns
- * the address it stored last time - so a reload reconnects with no dialog at
- * all. Off the runtime the same question goes to a real wallet, which may well
- * prompt for it, and a six-second probe would then abandon a dialog. So this
- * round is skipped entirely when there is no shim.
+ * The guarantee is a HOST BRIDGE. With one, the shim ranks first and answers
+ * these by asking the Xtrata site, which is already connected to the wallet - so
+ * the board learns the address with nothing opening and nobody clicking.
+ *
+ * Without one the shim ranks last (see collectProviders), so the same question
+ * reaches a real extension instead, which may well prompt for it - and a
+ * six-second probe would then abandon a dialog, which is the fault this whole
+ * file exists to stop. So the round is skipped rather than made careful.
  */
 const REMEMBERED = ['stx_getAddresses', 'wallet_getAccount'];
 
@@ -72,7 +75,7 @@ const DIALOGS = ['wallet_connect', 'stx_requestAccounts', 'stx_getAddresses', 'g
 export async function connectWallet({
   call = walletCall as Call,
   providerCount = () => collectProviders().length,
-  underRuntime = shimInstalled,
+  bridged = usingHostBridge,
   now = () => Date.now()
 }: ConnectDeps = {}): Promise<{ address: string }> {
   const ask = async (method: string, timeoutMs: number): Promise<string | null> => {
@@ -86,7 +89,7 @@ export async function connectWallet({
     }
   };
 
-  if (underRuntime()) {
+  if (bridged()) {
     for (const method of REMEMBERED) {
       const address = await ask(method, PROBE_MS);
       if (address) return { address };

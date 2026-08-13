@@ -135,6 +135,23 @@ export function collectProviders(): ProviderEntry[] {
   const shim = shimInstalled();
   const suppressGeneric = named && !shim;
 
+  /**
+   * Should the shim be preferred over a real extension?
+   *
+   * ONLY WITH A BRIDGE. The shim outranks everything because it may be the only
+   * route to a wallet — but that is true only when it has a host to forward to.
+   * Without one, its connect can offer nothing but the @stacks/connect modal,
+   * and that modal CANNOT RENDER HERE: the runtime assembles the document with
+   * document.write, and connect-ui's loader throws reading `$instanceValues$`
+   * before anything appears. The promise then pends until its own 90-second
+   * timeout, so the board waits on a dialog that will never exist.
+   *
+   * So on a runtime page with no bridge token the shim is the worst route
+   * available, not the best, and the real provider sitting beside it is the only
+   * thing that can open anything at all.
+   */
+  const preferShim = shim && usingHostBridge();
+
   const xverse = (w.XverseProviders ?? {}) as Record<string, WalletProvider | undefined>;
   const xverseLower = (w.xverseProviders ?? {}) as Record<string, WalletProvider | undefined>;
 
@@ -175,7 +192,7 @@ export function collectProviders(): ProviderEntry[] {
     }
   }
 
-  return out.sort((a, b) => score(b, shim) - score(a, shim));
+  return out.sort((a, b) => score(b, preferShim) - score(a, preferShim));
 }
 
 /**
@@ -191,7 +208,7 @@ export function collectProviders(): ProviderEntry[] {
  * Scoring `transactionRequest` - a capability we do not use - was what put
  * Xverse's stub above the provider that works.
  */
-function score(item: ProviderEntry, shim: boolean): number {
+function score(item: ProviderEntry, preferShim: boolean): number {
   const label = String(item.label || '').toLowerCase();
   let value = 0;
   if (item.hasRequest) value += 10;
@@ -199,9 +216,10 @@ function score(item: ProviderEntry, shim: boolean): number {
   if (label.includes('bitcoinprovider')) value += 40;
   if (label.includes('xverse')) value += 20;
   if (label.startsWith('registry:')) value += 15;
-  // Inside the runtime the shim IS window.StacksProvider and may be the only
-  // route to a wallet, so it outranks everything there.
-  if (shim && label === 'window.stacksprovider') value += 120;
+  // Inside the runtime WITH A BRIDGE the shim IS window.StacksProvider and is
+  // the only route to a wallet, so it outranks everything. See preferShim in
+  // collectProviders for why the bridge is the condition and not the shim.
+  if (preferShim && label === 'window.stacksprovider') value += 120;
   else if (label === 'window.stacksprovider') value -= 10;
   return value;
 }
