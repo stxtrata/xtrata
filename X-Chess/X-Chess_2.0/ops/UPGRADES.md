@@ -111,9 +111,20 @@ the commit, what was actually built, and what was learned doing it.
 | **24** | Every square is the wrong colour | ✅ **Done** | `a893ea24` |
 | **25** | The endpoint failover never comes back | ✅ **Done** | `fb7d2ced` |
 | **26** | Coordinates around the board | ✅ **Done** | `cbeae473` |
-| **27** | Deep links (the link half only) | ✅ **Already built**, pinned by tests | `bf8e8b01`, tests below |
+| **27** | Deep links (the link half only) | ✅ **Already built**, pinned by tests | `bf8e8b01` |
+| **4** | Reconcile ops/ with the chain | ✅ **Done** | `2a605bc4` |
+| **6** | Freeze the nine live games | ✅ **Done** | `fc9c0993` |
+| **7** | Stop the cold load overspending | ✅ **Done** | `489bdbe5` |
+| **8** | Copy link survives its page | ✅ **Done** | `f45e0131` |
+| **9** | A promotion you can back out of | ✅ **Done** | `e286dbcd` |
+| **10** | Five stylesheet faults | ✅ **Done** | `cafacb6b` |
+| **11** | Never guess a post condition | ✅ **Done** | `3a733c41` |
+| **12** | Follow a move to its end | ✅ **Done** | `ca4af332` |
+| **14** | The list says who can play | ✅ **Done** | `e418b97c` |
+| **15** | Sound that survives a phone | ✅ **Done** | `b960247a` |
+| **23** | Runbook and errata | ✅ **Done** | `25dc5ea3` |
 
-**Four of thirty-three built, plus one found already built.** Both defects the testers found are fixed in the tree.
+**Sixteen of thirty-three built, plus one found already built.** Every proposal scoring 4 or 5 on BOTH simplicity and safety is now implemented and tested. Both defects the testers found are fixed in the tree.
 Neither reaches a player until the next inscription, which is deliberate: they
 are small, and pushing a new inscription per fix is how a project ends up with a
 split user base.
@@ -177,18 +188,18 @@ disagreement is permanent.
 | **1** | ✅ [Price the artefact in Xtrata chunks](#1-price-the-artefact-in-xtrata-chunks-and-gate-on-the-boundary) | 5 | 5 | — | neither |
 | **2** | [Minify the shell CSS and HTML](#2-minify-the-shell-css-and-strip-its-html-comments-at-build-time) | 3 | 3 | **−9.2 KB** | inscription |
 | **3** | [Deterministic build, unstuck release gate, inscription ledger](#3-make-the-build-deterministic-unstick-the-release-gate-and-give-inscriptions-a-ledger) | 3 | 4 | — | neither |
-| **4** | [Reconcile `ops/` with the chain](#4-reconcile-ops-with-what-is-actually-on-chain) | 4 | 5 | — | neither |
+| **4** | ✅ [Reconcile `ops/` with the chain](#4-reconcile-ops-with-what-is-actually-on-chain) | 4 | 5 | — | neither |
 | **5** | [Restore the sponsorship constants](#5-restore-the-sponsorship-constants-and-stop-the-canary-breaking-them-again) | 4 | 3 | — | owner tx |
-| **6** | [Freeze the nine live games as regression fixtures](#6-freeze-the-nine-live-mainnet-games-and-regression-test-them-offline) | 4 | 5 | — | neither |
-| **7** | [Stop the cold load spending the whole allowance](#7-stop-the-cold-load-spending-the-whole-minutes-allowance) | 4 | 4 | ~0.4 KB | inscription |
-| **8** | [Make Copy link survive the page it was copied from](#8-make-copy-link-survive-the-page-it-was-copied-from) | 4 | 4 | ~0.4 KB | inscription |
-| **9** | [Make the promotion picker dismissable](#9-make-the-promotion-picker-dismissable-and-never-let-it-fire-a-stale-move) | 5 | 4 | ~0.3 KB | inscription |
-| **10** | [Fix the shell CSS: motion, contrast, landscape, targets](#10-fix-the-shell-css-a-dead-reduced-motion-selector-a-10061-selection-ring-and-a-board-taller-than-a-landscape-phone) | 4 | 4 | ~0.4 KB | inscription |
-| **11** | [Never write a post condition from a guess](#11-never-write-a-post-condition-from-a-guess) | 4 | 4 | ~net 0 | inscription |
-| **12** | [Watch the transaction to its end](#12-watch-the-transaction-to-its-end-so-a-burned-fee-is-never-silent) | 4 | 5 | ~1.0 KB | inscription |
+| **6** | ✅ [Freeze the nine live games as regression fixtures](#6-freeze-the-nine-live-mainnet-games-and-regression-test-them-offline) | 4 | 5 | — | neither |
+| **7** | ✅ [Stop the cold load spending the whole allowance](#7-stop-the-cold-load-spending-the-whole-minutes-allowance) | 4 | 4 | ~0.4 KB | inscription |
+| **8** | ✅ [Make Copy link survive the page it was copied from](#8-make-copy-link-survive-the-page-it-was-copied-from) | 4 | 4 | ~0.4 KB | inscription |
+| **9** | ✅ [Make the promotion picker dismissable](#9-make-the-promotion-picker-dismissable-and-never-let-it-fire-a-stale-move) | 5 | 4 | ~0.3 KB | inscription |
+| **10** | ✅ [Fix the shell CSS: motion, contrast, landscape, targets](#10-fix-the-shell-css-a-dead-reduced-motion-selector-a-10061-selection-ring-and-a-board-taller-than-a-landscape-phone) | 4 | 4 | ~0.4 KB | inscription |
+| **11** | ✅ [Never write a post condition from a guess](#11-never-write-a-post-condition-from-a-guess) | 4 | 4 | ~net 0 | inscription |
+| **12** | ✅ [Watch the transaction to its end](#12-watch-the-transaction-to-its-end-so-a-burned-fee-is-never-silent) | 4 | 5 | ~1.0 KB | inscription |
 | **13** | [Bound the rules-recovery search](#13-bound-the-rules-recovery-search-which-a-hostile-log-can-turn-into-a-permanent-freeze) | 4 | 3 | ~0.3 KB | inscription |
-| **14** | [Explorer rows that say who can play](#14-make-the-explorer-rows-say-who-can-play-and-whose-move-it-is) | 4 | 4 | ~0.9 KB | inscription |
-| **15** | [Make the sound survive a phone](#15-make-the-sound-survive-a-phone) | 4 | 4 | ~0.4 KB | inscription |
+| **14** | ✅ [Explorer rows that say who can play](#14-make-the-explorer-rows-say-who-can-play-and-whose-move-it-is) | 4 | 4 | ~0.9 KB | inscription |
+| **15** | ✅ [Make the sound survive a phone](#15-make-the-sound-survive-a-phone) | 4 | 4 | ~0.4 KB | inscription |
 | **16** | [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
 | **17** | [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) | 3 | 4 | — | neither |
 | **18** | [Run the artefact in a real browser as a gate](#18-run-the-built-artefact-in-a-real-browser-headless-as-a-gate) | 3 | 5 | — | neither |
@@ -196,7 +207,7 @@ disagreement is permanent.
 | **20** | [PGN, FEN and sealed games](#20-make-a-finished-game-portable-pgn-fen-and-a-sealed-page) | 3 | 4 | ~1.1 KB | inscription |
 | **21** | [A keyboard board, an announcer and game review](#21-a-keyboard-board-real-grid-semantics-an-announcer-and-game-review) | 3 | 3 | ~4 KB | inscription |
 | **22** | [`time!` — end abandoned games](#22-time--end-abandoned-games-with-a-block-height-deadline) | 2 | 4 | ~2 KB | inscription |
-| **23** | [Post-launch runbook and errata](#23-write-the-post-launch-runbook-and-a-permanent-errata-list) | 4 | 5 | — | neither |
+| **23** | ✅ [Post-launch runbook and errata](#23-write-the-post-launch-runbook-and-a-permanent-errata-list) | 4 | 5 | — | neither |
 
 **From the first testers** — see [`ops/feedback-2026-08-12/`](feedback-2026-08-12/README.md).
 
@@ -571,6 +582,10 @@ identical sha256.
 
 **Simplicity 4 · Safety 5 · Bytes none · Needs neither**
 
+> ### ✅ Implemented — commit `2a605bc4`
+>
+> Nine claims corrected against the manifest and the suite, and STATUS.md's fossil Not-started block replaced. The lasting part is harness/docs-audit.mjs, a layer-1 verify gate checking only what a machine can: byte figures against the manifest, test counts against each other, every suite in the README, and the specific "must not be inscribed" contradiction. Two false positives were designed out rather than tolerated.
+
 ### In plain terms
 
 Your two most authoritative documents currently tell a new reader that the
@@ -796,6 +811,10 @@ a non-zero exit naming the field.
 
 **Simplicity 4 · Safety 5 · Bytes none · Needs neither**
 
+> ### ✅ Implemented — commit `fc9c0993`
+>
+> Nine real games and 112 submissions frozen from the bound contract and replayed offline: the accepted/rejected split ADR-0007 moved a string across, whether each game's rules can be recovered, game 6's result and final position, and the leaderboard two real players see. Flipping a checkmate's winner fires both.
+
 ### In plain terms
 
 You have 662 tests. Not one of them checks a single game that a real person actually
@@ -906,6 +925,10 @@ the specific real game whose result moved.
 ## 7. Stop the cold load spending the whole minute's allowance
 
 **Simplicity 4 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `489bdbe5`
+>
+> Opening a shared link read seven games where it needed one. Both label resolvers now go through a three-wide pool, measured at 40 in flight before and 3 after. And both cached a REFUSAL as an answer, twelve lines below a sibling that deliberately does not and explains why.
 
 ### In plain terms
 
@@ -1024,6 +1047,10 @@ and the poll cadence bounds the retry rate.
 
 **Simplicity 4 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
 
+> ### ✅ Implemented — commit `f45e0131`
+>
+> linkForGame takes the whole href and keeps every parameter it does not own, dropping game, rules and the per-session bridge token. A deny list on purpose: a permanent artefact cannot learn the name of a parameter Xtrata adds next year.
+
 ### In plain terms
 
 The Copy link button produces a broken link for the only people who can actually
@@ -1139,6 +1166,10 @@ route to the game number.
 
 **Simplicity 5 · Safety 4 · Bytes ~0.3 KB · Needs a new inscription**
 
+> ### ✅ Implemented — commit `e286dbcd`
+>
+> hidePromotion() now exists and is called from all five ways out. Cancel and Escape added, the latter registered once and guarded on state - {once:true} fires on the first KEY, not the first Escape. Three of eight cases fail against the old code, including both money-losing ones.
+
 ### In plain terms
 
 When a pawn reaches the far end you choose what it becomes. There is no Cancel and no
@@ -1196,6 +1227,10 @@ hide it with no submission.
 ## 10. Fix the shell CSS: a dead reduced-motion selector, a 1.006:1 selection ring, and a board taller than a landscape phone
 
 **Simplicity 4 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `cafacb6b`
+>
+> Five measured faults: a dead reduced-motion selector, a ring at 1.006:1 against the light square, a board taller than a landscape phone, three untappable escape hatches, and a rule pointing at keyframes nobody wrote. tests/artifact/contrast.test.ts computes the ratios from the shipped bytes.
 
 ### In plain terms
 
@@ -1289,6 +1324,10 @@ Layout and ring changes verified by the browser gate (proposal 18) at 844×390,
 
 **Simplicity 4 · Safety 4 · Bytes ~net zero · Needs a new inscription**
 
+> ### ✅ Implemented — commit `3a733c41`
+>
+> Every submission declares the protocol ceiling rather than a guess at what this caller is owed - the board cannot know which account will sign. The pre-signing read is gone with it, and two tests encoding the old rule are superseded. The mirrored constant is pinned to the contract in Clarinet.
+
 ### In plain terms
 
 Before your wallet signs anything, the board declares the most money that can move.
@@ -1373,6 +1412,10 @@ payout.
 ## 12. Watch the transaction to its end, so a burned fee is never silent
 
 **Simplicity 4 · Safety 5 · Bytes ~1.0 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `ca4af332`
+>
+> Lifted the gates page's watcher into packages/chain/tx-status.ts and gave it the endpoint list. Success is silent; a failure says what the chain said, and whether the fee was spent. Degrades on a null or all-zero txid, one watch at a time, nothing polls while a wallet dialog is open.
 
 ### In plain terms
 
@@ -1531,6 +1574,10 @@ since only a timing test catches its return.
 
 **Simplicity 4 · Safety 4 · Bytes ~0.9 KB · Needs a new inscription**
 
+> ### ✅ Implemented — commit `e418b97c`
+>
+> Rows carry "Your move" and "Open seat", computed from checkSender so there is one rule and not a copy. Gated on rules being confirmed AND the game still being live. Recovery now runs for a game with no submissions - the only kind a stranger can walk up to. Costs no chain reads, asserted.
+
 ### In plain terms
 
 The game list already works out, for every game, whether you are allowed to play in
@@ -1600,6 +1647,10 @@ which is the line ADR-0012 draws.
 ## 15. Make the sound survive a phone
 
 **Simplicity 4 · Safety 4 · Bytes ~0.4 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `b960247a`
+>
+> The gesture listener was one-shot; it now persists. iOS's interrupted state is treated as asleep, because a context that is not running will not make a noise. A statechange listener re-renders the panel when the browser takes the sound away, recorded from observation rather than a user-agent sniff.
 
 ### In plain terms
 
@@ -2317,6 +2368,10 @@ ADR-0007 does for `resgn`.
 ## 23. Write the post-launch runbook and a permanent errata list
 
 **Simplicity 4 · Safety 5 · Bytes none · Needs neither**
+
+> ### ✅ Implemented — commit `25dc5ea3`
+>
+> ops/RUNBOOK.md organised by lever, with all five owner-gated functions, their bounds and what they do not affect. ops/ERRATA.md lists what is permanently wrong with 2988. The lever list is pinned by a Clarinet test that reads the contract, so a sixth setter fails with a message naming the runbook.
 
 ### In plain terms
 
