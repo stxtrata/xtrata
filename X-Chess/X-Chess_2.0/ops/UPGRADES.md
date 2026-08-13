@@ -123,8 +123,18 @@ the commit, what was actually built, and what was learned doing it.
 | **14** | The list says who can play | ✅ **Done** | `e418b97c` |
 | **15** | Sound that survives a phone | ✅ **Done** | `b960247a` |
 | **23** | Runbook and errata | ✅ **Done** | `25dc5ea3` |
+| **13** | Bound the rules-recovery search | ✅ **Done** | `6eb7d0a0` |
+| **16** | Keep a real host after the rewrite | ✅ **Done** | `784f70a9` |
 
-**Sixteen of thirty-three built, plus one found already built.** Every proposal scoring 4 or 5 on BOTH simplicity and safety is now implemented and tested. Both defects the testers found are fixed in the tree.
+**Eighteen of thirty-three built, plus one found already built.**
+
+Every proposal scoring 4 or 5 on both simplicity and safety is done, and so are
+the two rated 4/3 — proposals 13 and 16, both of which were actively wrong in the
+live inscription and both consensus-visible, which is what held their safety
+score down rather than any doubt about the fix.
+
+Proposal 2 (minify, −9.4 KB) is deliberately deferred to keep the source readable
+while this work continues. Both defects the testers found are fixed in the tree.
 Neither reaches a player until the next inscription, which is deliberate: they
 are small, and pushing a new inscription per fix is how a project ends up with a
 split user base.
@@ -197,10 +207,10 @@ disagreement is permanent.
 | **10** | ✅ [Fix the shell CSS: motion, contrast, landscape, targets](#10-fix-the-shell-css-a-dead-reduced-motion-selector-a-10061-selection-ring-and-a-board-taller-than-a-landscape-phone) | 4 | 4 | ~0.4 KB | inscription |
 | **11** | ✅ [Never write a post condition from a guess](#11-never-write-a-post-condition-from-a-guess) | 4 | 4 | ~net 0 | inscription |
 | **12** | ✅ [Watch the transaction to its end](#12-watch-the-transaction-to-its-end-so-a-burned-fee-is-never-silent) | 4 | 5 | ~1.0 KB | inscription |
-| **13** | [Bound the rules-recovery search](#13-bound-the-rules-recovery-search-which-a-hostile-log-can-turn-into-a-permanent-freeze) | 4 | 3 | ~0.3 KB | inscription |
+| **13** | ✅ [Bound the rules-recovery search](#13-bound-the-rules-recovery-search-which-a-hostile-log-can-turn-into-a-permanent-freeze) | 4 | 3 | ~0.3 KB | inscription |
 | **14** | ✅ [Explorer rows that say who can play](#14-make-the-explorer-rows-say-who-can-play-and-whose-move-it-is) | 4 | 4 | ~0.9 KB | inscription |
 | **15** | ✅ [Make the sound survive a phone](#15-make-the-sound-survive-a-phone) | 4 | 4 | ~0.4 KB | inscription |
-| **16** | [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
+| **16** | ✅ [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
 | **17** | [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) | 3 | 4 | — | neither |
 | **18** | [Run the artefact in a real browser as a gate](#18-run-the-built-artefact-in-a-real-browser-headless-as-a-gate) | 3 | 5 | — | neither |
 | **19** | [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) | 3 | 3 | ~1.0 KB | inscription |
@@ -1488,6 +1498,10 @@ interval, twenty-minute deadline, one watch at a time.
 
 **Simplicity 4 · Safety 3 · Bytes ~0.3 KB · Needs a new inscription · Consensus-visible**
 
+> ### ✅ Implemented — commit `6eb7d0a0`
+>
+> Six distinct senders past the opener, in SEQUENCE order, plus a hard stop at 512 candidates: 14.4 seconds becomes 3 milliseconds and stays there at any number of senders. Order matters as much as the number — sorting alphabetically is the wrong end to truncate, because an attacker chooses where in the alphabet they land. The viewer and any offered candidate stay outside the cap. ADR-0015, and consensus-visible.
+
 ### In plain terms
 
 This is the one genuine security problem in the list.
@@ -1736,6 +1750,10 @@ listener.
 ## 16. Stop the runtime's serve-time rewrite from eating the board's primary public fallback
 
 **Simplicity 4 · Safety 3 · Bytes ~0.05 KB · Needs a new inscription**
+
+> ### ✅ Implemented — commit `784f70a9`
+>
+> PUBLIC_API spells the first host as a join of two pieces, which defeats the rewrite pattern without changing the value. It must stay a join: esbuild folds string concatenation back into a matchable literal, which is why the test is over the BUILT file. The emulator was made faithful too — two of four rules and a relative path is why nobody noticed.
 
 ### In plain terms
 
