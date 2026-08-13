@@ -251,3 +251,51 @@ describe('the filter rule itself', () => {
     expect(matchesFilter(row({ mine: null }), 'your-move')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Search. The one part of the game list that can spend a chain read, so it
+// spends exactly one, and never walks.
+// ---------------------------------------------------------------------------
+
+const search = (doc: Document, text: string): void => {
+  (doc.getElementById('explore-search') as HTMLInputElement).value = text;
+  (doc.getElementById('explore-find') as HTMLButtonElement).click();
+};
+const found = (doc: Document): string => doc.getElementById('explore-found')!.textContent ?? '';
+
+describe('finding a game by number', () => {
+  it('says a game already on screen is already on screen, and reads nothing', async () => {
+    const doc = await explore(ALICE);
+    search(doc, '2');
+    await tick(60);
+    expect(found(doc)).toContain('in the list below');
+    expect(shownIds(doc), 'the list was replaced instead of pointed at').toContain('2');
+  });
+
+  it('says plainly when there is no such game', async () => {
+    const doc = await explore(ALICE);
+    search(doc, '99');
+    await tick(80);
+    expect(found(doc)).toMatch(/no game 99/i);
+  });
+
+  it('refuses to pretend it can search by player', async () => {
+    // The chain has no index of who has played what. Answering "no results" to
+    // a name would be a lie about the player rather than about the search.
+    const doc = await explore(ALICE);
+    search(doc, 'alice.btc');
+    await tick(60);
+    expect(found(doc)).toMatch(/game number/i);
+    expect(found(doc)).toMatch(/not possible/i);
+  });
+
+  it('puts the list back when the box is cleared', async () => {
+    const doc = await explore(ALICE);
+    search(doc, '99');
+    await tick(80);
+    search(doc, '');
+    await tick(60);
+    expect(found(doc)).toBe('');
+    expect(shownIds(doc).length).toBe(2);
+  });
+});

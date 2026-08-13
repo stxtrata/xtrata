@@ -144,6 +144,16 @@ const POLL_MS = 5_000;
 const EXPLORE_ENTRY_LIMIT = 200;
 
 /**
+ * How many games the list shows, newest first.
+ *
+ * A real bound, and one a player meets: their own game falls off it the moment
+ * twenty-five newer ones exist. That is why search does a direct lookup rather
+ * than filtering what is on screen - and why the count line says the window is
+ * there rather than letting it look like the whole contract.
+ */
+const EXPLORE_WINDOW = 25;
+
+/**
  * The other three rates.
  *
  * FAST is for the seconds around a move landing - the only time somebody is
@@ -213,6 +223,8 @@ export interface AppOptions {
   document?: Document;
   /** Injected so tests can hear what the board announced without a speaker. */
   sound?: Sound;
+  /** The clock, so staleness can be tested without waiting for it. */
+  now?: () => number;
 }
 
 /** Ids the shell defines. Every one must exist, or wiring throws. */
@@ -236,6 +248,7 @@ const IDS = [
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters',
+  'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'profile-who', 'profile-load', 'profile-body',
   'contract-label', 'endpoint-label'
@@ -268,6 +281,36 @@ export class ChessApp {
   private exploreFilter: ExploreFilter = 'all';
   /** How many games the contract reported when the list was last built. */
   private exploreTotal = 0;
+  /**
+   * A game found by number that the window does not contain.
+   *
+   * Kept beside the list rather than pushed into it, so that clearing the
+   * search restores exactly what was there before - and so a row fetched by
+   * searching is never mistaken for one the window actually holds.
+   */
+  private exploreFound: ExploreRow | null = null;
+  /** When the list was last built, for the staleness check in show(). */
+  private exploreBuiltAt = 0;
+
+  /**
+   * How long a game list stays worth showing without rebuilding.
+   *
+   * Half a minute. Long enough that moving between tabs is free, short enough
+   * that "open Explore to see where you owe a move" is a true sentence rather
+   * than a hopeful one. It is the whole of what this board can offer WITHOUT a
+   * background watcher: it cannot come and find you, but it can be right when
+   * you look.
+   */
+  private static readonly EXPLORE_STALE_MS = 30_000;
+
+  private now(): number {
+    return (this.options.now ?? Date.now)();
+  }
+
+  private exploreIsStale(): boolean {
+    if (this.exploreLoadedAt === null) return true;
+    return this.now() - this.exploreBuiltAt >= ChessApp.EXPLORE_STALE_MS;
+  }
   /** True while a broadcast move is being followed to its conclusion. */
   private watching = false;
   private flipped = false;
@@ -431,7 +474,8 @@ export class ChessApp {
       this.drawGame();
     });
     on('topUp', () => void this.topUp());
-    on('exploreRefresh', () => void this.loadExplore());
+    on('exploreRefresh', () => void this.reloadExplore());
+    on('exploreFind', () => void this.findGame());
     on('profileLoad', () => void this.loadProfile());
 
     for (const key of ['gameKind', 'rulesWhite', 'rulesBlack', 'rulesRanked']) {
@@ -957,9 +1001,21 @@ export class ChessApp {
       this.el[camel(`tab-${name}`)].setAttribute('aria-selected', String(name === tab));
     }
     if (tab === 'leaderboard') void this.loadLeaderboard();
-    // Memoised on the game count, so re-opening the tab is free while nothing
-    // has been opened since.
-    if (tab === 'explore' && this.exploreLoadedAt === null) void this.loadExplore();
+
+    // Rebuild the list when it has gone stale, which OPENING THE TAB is the
+    // signal for.
+    //
+    // The comment here used to claim it was memoised on the game count and the
+    // code checked only for null, so the list was built once and never again:
+    // you could play a move, come back, and be shown the board as it was when
+    // you first looked - with a "Your move" badge that had since moved
+    // elsewhere. The Refresh button was the only way out, and nothing said so.
+    //
+    // The staleness window is what keeps this honest without making it
+    // expensive. Opening the tab is a deliberate act, and a person doing it
+    // wants what is true now; flicking between tabs is not, and should not cost
+    // a read per flick.
+    if (tab === 'explore' && this.exploreIsStale()) void this.loadExplore();
   }
 
   get currentTab(): Tab {
@@ -2530,113 +2586,17 @@ export class ChessApp {
       const count = await this.chain.getGameCount();
       this.exploreLoadedAt = count;
       this.exploreTotal = count;
+      this.exploreBuiltAt = this.now();
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 
       // Newest first, and bounded: an unbounded walk on a busy contract would
       // make the first paint arbitrarily slow.
-      const first = Math.max(1, count - 24);
+      const first = Math.max(1, count - (EXPLORE_WINDOW - 1));
       const found: ExploreRow[] = [];
 
       for (let id = count; id >= first; id--) {
-        const game = await this.chain.getGame(id);
-        if (!game) continue;
-
-        const row: ExploreRow = {
-          id: game.id,
-          ranked: game.ranked,
-          entries: game.nextSeq,
-          white: null,
-          black: null,
-          confirmed: false,
-          state: game.nextSeq === 0 ? 'not started' : 'live',
-          mine: null,
-          seat: null,
-          over: false
-        };
-
-        try {
-          // Recovery runs for an EMPTY game too. A game with no submissions is
-          // exactly the kind a stranger can walk up to - the only kind - and it
-          // was the one kind the list refused to describe, because both this
-          // and the remembered-rules lookup sat inside a "has entries" guard.
-          // It costs no extra read: the entries are already fetched below.
-          // BOUNDED, because a game's length is attacker-controlled: anybody
-          // may submit to any game, and a thousand-entry game costs twenty
-          // rate-limited round trips for ONE row of a summary.
-          //
-          // But a bound must not make the summary WRONG. Past the bound this
-          // reads a single page - enough to recover the rules and name the
-          // players, since recovery only looks at the first few distinct
-          // senders - and then declines to state a position it has not seen all
-          // of. Saying "97 moves, open it" is honest; replaying the first fifty
-          // and announcing whose turn it is would not be.
-          // A game with no entries is whole: there is nothing to have missed.
-          const whole = game.nextSeq <= EXPLORE_ENTRY_LIMIT;
-          const entries =
-            game.nextSeq === 0
-              ? []
-              : whole
-                ? await this.chain.getAllEntries(id)
-                : (await this.chain.getPage(id, 0)).filter((e): e is EntryRow => e !== null);
-          const rules = recoverRules({
-            rulesHash: game.rulesHash,
-            openedBy: game.openedBy,
-            ranked: game.ranked,
-            senders: entries.map((e) => e.sender),
-            viewer: this.address,
-            candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
-          });
-          const state = replay(
-            entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
-            { rules: rules.rules }
-          );
-          row.white = rules.rules.white;
-          row.black = rules.rules.black;
-          row.confirmed = rules.confirmed;
-          row.over = state.status === 'over';
-          row.state = !whole && game.nextSeq > 0
-            ? `${game.nextSeq} submissions, open it to see`
-            : state.status === 'over'
-              ? `${state.result} ${state.termination}`
-              : game.nextSeq === 0
-                ? 'not started'
-                : `${state.turn} to move`;
-
-          // Only for a game whose rules this board can actually confirm, and
-          // only while it is still live. replay reports a turn for a FINISHED
-          // game too, so without the status check every game somebody happened
-          // to hold the side-to-move in would claim to be waiting for them.
-          // No badge from a partial replay. Whose turn it is depends on every
-          // move, so a board that has seen fifty of ninety cannot say.
-          if (whole && rules.confirmed && state.status !== 'over') {
-            if (this.address) {
-              const yours = checkSender(rules.rules, {
-                sender: this.address,
-                turn: state.turn,
-                history: state.accepted
-              }) === null;
-              const theirs = checkSender(rules.rules, {
-                sender: this.address,
-                turn: state.turn === 'white' ? 'black' : 'white',
-                history: state.accepted
-              }) === null;
-              row.mine = yours ? 'your-move' : theirs ? 'waiting' : null;
-            }
-            // A seat nobody has claimed: the side to move admits anyone.
-            const anyone = checkSender(rules.rules, {
-              // Somebody with no history here at all. If the side to move
-              // admits them, the seat is genuinely unclaimed.
-              sender: STRANGER,
-              turn: state.turn,
-              history: state.accepted
-            }) === null;
-            if (anyone && row.mine === null) row.seat = 'open';
-          }
-        } catch {
-          // A row that will not replay is still a row. Saying less about it
-          // beats dropping the game out of the list.
-        }
-        found.push(row);
+        const row = await this.buildExploreRow(id);
+        if (row) found.push(row);
       }
 
       // Sorted for whoever is looking: games waiting on them, then seats they
@@ -2666,6 +2626,193 @@ export class ChessApp {
    * returning nothing would read as "you have no games" to somebody who simply
    * has not connected a wallet.
    */
+  /**
+   * Everything the list knows about one game.
+   *
+   * Lifted out of the loop so that SEARCH can reuse it verbatim rather than
+   * growing a second, slightly different description of the same game - which
+   * is how a row found by searching would quietly start disagreeing with the
+   * same row found by scrolling.
+   */
+  /** Rebuild the list from the chain, discarding any search result with it. */
+  private async reloadExplore(): Promise<void> {
+    this.exploreLoadedAt = null;
+    this.exploreFound = null;
+    this.text('exploreFound', '');
+    await this.loadExplore();
+  }
+
+  /**
+   * Find one game by number, including one the window does not reach.
+   *
+   * The list shows the newest twenty-five, and a player's game falls off that
+   * window the moment twenty-five newer ones exist. A search that only searched
+   * what was already on screen would be worse than no search: it would answer
+   * "no such game" about a game that plainly exists.
+   *
+   * So exactly ONE direct lookup when the number is outside the window, and the
+   * result says how it was found. One, and never a walk: the number of games is
+   * unbounded and a search that scanned would be a way for anybody to make the
+   * board spend its whole allowance.
+   */
+  private async findGame(): Promise<void> {
+    const raw = String((this.el.exploreSearch as HTMLInputElement).value ?? '').trim();
+
+    // Clearing the box puts the list back rather than leaving a stale result.
+    if (!raw) {
+      this.exploreFound = null;
+      this.text('exploreFound', '');
+      this.drawExplore();
+      return;
+    }
+
+    const id = Number(raw);
+    if (!Number.isInteger(id) || id < 1) {
+      // Says what it accepts. Searching by player is a different question with a
+      // different answer - the chain has no index of who has played what - and
+      // pretending otherwise here would be the overclaim worth avoiding.
+      this.exploreFound = null;
+      this.text('exploreFound', 'Type a game number. Searching by player is not possible here.');
+      this.drawExplore();
+      return;
+    }
+
+    // Already on screen: no lookup at all.
+    if (this.exploreRows.some((row) => row.id === id)) {
+      this.exploreFound = null;
+      this.exploreFilter = 'all';
+      this.text('exploreFound', `Game ${id} is in the list below.`);
+      this.drawExplore();
+      this.highlightExplore(id);
+      return;
+    }
+
+    await this.guard(`finding game ${id}`, async () => {
+      const row = await this.buildExploreRow(id);
+      if (!row) {
+        this.exploreFound = null;
+        this.text('exploreFound', `There is no game ${id} on this contract.`);
+        this.drawExplore();
+        return false;
+      }
+      this.exploreFound = row;
+      // Say how it was found. A row that appeared from outside the window
+      // without explanation reads as the window having silently changed.
+      this.text('exploreFound', `Game ${id} is outside the newest ${EXPLORE_WINDOW}, fetched directly.`);
+      this.exploreFilter = 'all';
+      this.drawExplore();
+      return true;
+    });
+  }
+
+  /** Draw attention to a row already on screen. */
+  private highlightExplore(id: number): void {
+    const row = this.el.exploreRows.querySelector(`[data-game="${id}"]`);
+    row?.classList.add('found');
+  }
+
+  private async buildExploreRow(id: number): Promise<ExploreRow | null> {
+    const game = await this.chain.getGame(id);
+    if (!game) return null;
+
+    const row: ExploreRow = {
+        id: game.id,
+        ranked: game.ranked,
+        entries: game.nextSeq,
+        white: null,
+        black: null,
+        confirmed: false,
+        state: game.nextSeq === 0 ? 'not started' : 'live',
+        mine: null,
+        seat: null,
+        over: false
+      };
+
+      try {
+        // Recovery runs for an EMPTY game too. A game with no submissions is
+        // exactly the kind a stranger can walk up to - the only kind - and it
+        // was the one kind the list refused to describe, because both this
+        // and the remembered-rules lookup sat inside a "has entries" guard.
+        // It costs no extra read: the entries are already fetched below.
+        // BOUNDED, because a game's length is attacker-controlled: anybody
+        // may submit to any game, and a thousand-entry game costs twenty
+        // rate-limited round trips for ONE row of a summary.
+        //
+        // But a bound must not make the summary WRONG. Past the bound this
+        // reads a single page - enough to recover the rules and name the
+        // players, since recovery only looks at the first few distinct
+        // senders - and then declines to state a position it has not seen all
+        // of. Saying "97 moves, open it" is honest; replaying the first fifty
+        // and announcing whose turn it is would not be.
+        // A game with no entries is whole: there is nothing to have missed.
+        const whole = game.nextSeq <= EXPLORE_ENTRY_LIMIT;
+        const entries =
+          game.nextSeq === 0
+            ? []
+            : whole
+              ? await this.chain.getAllEntries(id)
+              : (await this.chain.getPage(id, 0)).filter((e): e is EntryRow => e !== null);
+        const rules = recoverRules({
+          rulesHash: game.rulesHash,
+          openedBy: game.openedBy,
+          ranked: game.ranked,
+          senders: entries.map((e) => e.sender),
+          viewer: this.address,
+          candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
+        });
+        const state = replay(
+          entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
+          { rules: rules.rules }
+        );
+        row.white = rules.rules.white;
+        row.black = rules.rules.black;
+        row.confirmed = rules.confirmed;
+        row.over = state.status === 'over';
+        row.state = !whole && game.nextSeq > 0
+          ? `${game.nextSeq} submissions, open it to see`
+          : state.status === 'over'
+            ? `${state.result} ${state.termination}`
+            : game.nextSeq === 0
+              ? 'not started'
+              : `${state.turn} to move`;
+
+        // Only for a game whose rules this board can actually confirm, and
+        // only while it is still live. replay reports a turn for a FINISHED
+        // game too, so without the status check every game somebody happened
+        // to hold the side-to-move in would claim to be waiting for them.
+        // No badge from a partial replay. Whose turn it is depends on every
+        // move, so a board that has seen fifty of ninety cannot say.
+        if (whole && rules.confirmed && state.status !== 'over') {
+          if (this.address) {
+            const yours = checkSender(rules.rules, {
+              sender: this.address,
+              turn: state.turn,
+              history: state.accepted
+            }) === null;
+            const theirs = checkSender(rules.rules, {
+              sender: this.address,
+              turn: state.turn === 'white' ? 'black' : 'white',
+              history: state.accepted
+            }) === null;
+            row.mine = yours ? 'your-move' : theirs ? 'waiting' : null;
+          }
+          // A seat nobody has claimed: the side to move admits anyone.
+          const anyone = checkSender(rules.rules, {
+            // Somebody with no history here at all. If the side to move
+            // admits them, the seat is genuinely unclaimed.
+            sender: STRANGER,
+            turn: state.turn,
+            history: state.accepted
+          }) === null;
+          if (anyone && row.mine === null) row.seat = 'open';
+        }
+      } catch {
+        // A row that will not replay is still a row. Saying less about it
+        // beats dropping the game out of the list.
+      }
+    return row;
+  }
+
   private drawExploreFilters(): void {
     const node = this.el.exploreFilters;
     node.replaceChildren();
@@ -2709,6 +2856,10 @@ export class ChessApp {
     const rows = this.el.exploreRows;
     rows.replaceChildren();
 
+    // A row fetched by number sits ABOVE the window rather than inside it, and
+    // is never filtered away: somebody who asked for game 4 by name should not
+    // have it hidden because the current filter is "Live".
+    const found = this.exploreFound;
     const showing = this.exploreRows.filter((row) => matchesFilter(row, this.exploreFilter));
 
     // One writer for this line, in both directions. Written only under the
@@ -2720,7 +2871,7 @@ export class ChessApp {
       this.text(
         'exploreCount',
         `${this.exploreTotal} game${this.exploreTotal === 1 ? '' : 's'} on this contract` +
-          (this.exploreTotal > 25 ? ', newest 25 shown' : '') +
+          (this.exploreTotal > EXPLORE_WINDOW ? `, newest ${EXPLORE_WINDOW} shown` : '') +
           (this.address ? ', yours first' : '')
       );
     } else {
@@ -2734,8 +2885,10 @@ export class ChessApp {
       );
     }
 
-    for (const row of showing) {
+    for (const row of found ? [found, ...showing.filter((r) => r.id !== found.id)] : showing) {
       const tr = this.doc.createElement('tr');
+      tr.dataset.game = String(row.id);
+      if (found && row.id === found.id) tr.classList.add('found');
       const cell = (node: Node): void => {
         const td = this.doc.createElement('td');
         td.appendChild(node);

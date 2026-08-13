@@ -498,6 +498,111 @@ describe('the badges the game list shows', () => {
     app.stopPolling();
   });
 
+  it('finds a game outside the window with exactly one lookup', async () => {
+    // The list shows the newest 25, and a player's game falls off that window
+    // the moment 25 newer ones exist. A search that only searched the screen
+    // would answer "no such game" about a game that plainly exists.
+    //
+    // But the number of games is unbounded, so the fix must not be a walk: a
+    // search that scanned would be a way for anybody to make the board spend
+    // its whole minute's allowance on one keystroke.
+    const { chain, reads } = counted();
+    chain.as(ALICE);
+    for (let n = 0; n < 30; n++) await chain.openGame(rulesHash(RULES), false);
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await tick(40);
+    (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+    await tick(200);
+
+    // Game 1 is the oldest of thirty, so the newest-25 window cannot reach it.
+    const ids = [...dom.window.document.querySelectorAll('#explore-rows tr')].map(
+      (tr) => tr.querySelector('td')?.textContent
+    );
+    expect(ids, 'game 1 should be outside the window for this test to mean anything')
+      .not.toContain('1');
+
+    reads.length = 0;
+    (dom.window.document.getElementById('explore-search') as HTMLInputElement).value = '1';
+    (dom.window.document.getElementById('explore-find') as HTMLButtonElement).click();
+    await tick(120);
+
+    const lookups = reads.filter((r) => r === 'getGame').length;
+    expect(
+      lookups,
+      `finding one game read ${lookups} games: ${reads.join(', ')}`
+    ).toBe(1);
+    expect(
+      dom.window.document.getElementById('explore-found')!.textContent,
+      'a row appeared from outside the window with no explanation'
+    ).toMatch(/outside the newest/i);
+    expect(
+      [...dom.window.document.querySelectorAll('#explore-rows tr')].map(
+        (tr) => tr.querySelector('td')?.textContent
+      ),
+      'the game that was asked for is not shown'
+    ).toContain('1');
+
+    app.stopPolling();
+  });
+
+  it('rebuilds a stale list when you open the tab, and not before', async () => {
+    // The list used to be built ONCE and never again: play a move, come back to
+    // Explore, and you were shown the board as it was when you first looked -
+    // with a "Your move" badge that had since moved elsewhere. The comment
+    // claimed it was memoised on the game count; the code checked only for null.
+    //
+    // This is the whole of what the board can offer without a background
+    // watcher. It cannot come and find you. It can be right when you look.
+    let clock = 0;
+    const { chain, reads } = counted();
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId },
+      now: () => clock
+    });
+    await tick(40);
+
+    const explore = dom.window.document.getElementById('tab-explore') as HTMLButtonElement;
+    const game = dom.window.document.getElementById('tab-game') as HTMLButtonElement;
+
+    explore.click();
+    await tick(120);
+    expect(reads.length, 'the first open did not build the list').toBeGreaterThan(0);
+
+    // Straight back and forth costs nothing: that is not somebody asking for
+    // fresh information, it is somebody moving around.
+    reads.length = 0;
+    clock = 5_000;
+    game.click();
+    explore.click();
+    await tick(120);
+    expect(reads, `flicking between tabs read the chain: ${reads.join(', ')}`).toEqual([]);
+
+    // Past the window it rebuilds, because now the answer might have changed.
+    reads.length = 0;
+    clock = 60_000;
+    game.click();
+    explore.click();
+    await tick(160);
+    expect(
+      reads.length,
+      'a stale list was shown again rather than rebuilt'
+    ).toBeGreaterThan(0);
+
+    app.stopPolling();
+  });
+
   it('costs nothing to filter, however many times', async () => {
     // THE ASSERTION THAT MATTERS for proposal 28a. Every filter reads a field
     // the row already carries, so pressing them can only be free. If this were

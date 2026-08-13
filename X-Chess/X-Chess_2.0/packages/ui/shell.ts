@@ -291,7 +291,7 @@ button.action:disabled { opacity: .45; cursor: not-allowed; }
 button.action--primary { background: var(--gold); color: #17130c; border-color: var(--gold); font-weight: 600; }
 
 label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
-input[type='text'], select {
+input[type='text'], input[type='search'], select {
   width: 100%; background: #14120f; color: var(--ink); border: 1px solid var(--line);
   border-radius: 6px; padding: 10px; font: inherit; min-height: 44px;
 }
@@ -351,6 +351,9 @@ th { color: var(--dim); font-weight: 600; font-size: 12px; }
 .filters .action[aria-pressed="true"] {
   background: var(--gold); color: var(--bg); border-color: var(--gold);
 }
+/* A row you asked for by name, so it is findable among the rest. */
+tr.found td { background: rgba(216, 162, 74, .10); }
+tr.found td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 .badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
          text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
          border: 1px solid var(--line-2); color: var(--dim); }
@@ -571,6 +574,13 @@ export const HTML = `
          entirely when nobody is connected, rather than shown empty: there is no
          you to answer for, and an empty result would read as "no such games". -->
     <div class="row filters" id="explore-filters" role="group" aria-label="filter the game list"></div>
+    <div class="row">
+      <label class="small muted" for="explore-search">Find a game</label>
+      <input id="explore-search" type="search" inputmode="numeric" placeholder="game number"
+             aria-describedby="explore-found">
+      <button class="action" id="explore-find">Find</button>
+      <span id="explore-found" class="muted small" role="status"></span>
+    </div>
     <table><thead><tr>
       <th>#</th><th>Players</th><th>Rules</th><th>Moves</th><th>State</th><th></th>
     </tr></thead><tbody id="explore-rows"></tbody></table>
