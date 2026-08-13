@@ -8,6 +8,22 @@ Patch = a fix. Minor = new or changed behaviour. No build step, so a hard refres
 
 ---
 
+## 13.2.2 — 2026-08-13
+
+**Fixed**
+
+- Connecting to ElevenLabs logged a bare `Connection failed` no matter what went
+  wrong, so a mistyped key, a revoked key, a key ID pasted instead of the key, and a
+  key lacking the right permission were all indistinguishable. The console panel now
+  reports the HTTP status and the real message, e.g. `401 Invalid API key`.
+- The fetch wrapper only understood our own backend's `{error}` error shape. ElevenLabs
+  replies with `{detail:{status,message}}`, which came out as a useless "Request failed".
+  Both shapes are now read.
+- `fetchVoices` names the missing permission when a key is valid but not scoped for
+  `voices_read`, which is easy to hit with a key created as text-to-speech only.
+
+---
+
 ## 13.2.1 — 2026-08-13
 
 **Added**

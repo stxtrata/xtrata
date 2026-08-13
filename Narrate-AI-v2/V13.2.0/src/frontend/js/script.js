@@ -833,11 +833,35 @@ class APIService {
             throw new Error(`Network error while calling ${target}. ${hint}`);
         }
         clearTimeout(timer);
-        if(!res.ok) throw new Error((await res.json().catch(()=>({error:res.statusText}))).error||"Request failed");
+        if (!res.ok) {
+            // Our own backend answers with {error}; ElevenLabs answers with
+            // {detail:{status,message}} (or a bare string detail). Read both, and keep the
+            // status code - "401 missing_permissions" is the difference between a key that
+            // is wrong and a key that is simply not scoped for this endpoint.
+            const body = await res.json().catch(() => null);
+            const detail = body && body.detail;
+            const msg = (body && body.error)
+                || (detail && (detail.message || detail.status))
+                || (typeof detail === 'string' ? detail : '')
+                || res.statusText
+                || 'Request failed';
+            throw new Error(`${res.status} ${msg}`);
+        }
         return res.json();
     }
     static async fetchVoices(key){
-        const d=await this.req('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':key}});
+        let d;
+        try {
+            d = await this.req('https://api.elevenlabs.io/v1/voices',{headers:{'xi-api-key':key}});
+        } catch (e) {
+            // /v1/voices needs the voices_read permission. A key scoped to text-to-speech
+            // only will 401 here even though it generates audio perfectly well, so name the
+            // missing permission instead of leaving it as a bare 401.
+            if (/missing_permissions|voices_read/i.test(e.message || '')) {
+                throw new Error(`${e.message} This key cannot read your voice list. Create a key with the "Voices: Read" permission at elevenlabs.io/app/developers/api-keys.`);
+            }
+            throw e;
+        }
         return d.voices.map(v=>({id:v.voice_id,name:v.name,labels:v.labels||{},lang:'en-US',type:'premium',source:'ElevenLabs'}));
     }
     static async generateAudio(text,voiceId,apiKey,modelId,ctx,force=false){
@@ -1079,7 +1103,7 @@ async function connectElevenLabs(silent=false){
     }catch(e){
         STATE.api.elevenLabs={key:'',name:'',voices:[],connected:false};
         document.getElementById('btn-connect-el').classList.remove('connected'); // N7: revert to orange
-        setElStatus('error','Error');LOG.add('Connection failed','error');
+        setElStatus('error','Error');LOG.add(`Connection failed: ${e.message}`,'error');
     }
 }
 function disconnectElevenLabs(){localStorage.removeItem('ab_api_el');STATE.api.elevenLabs={key:'',name:'',voices:[],connected:false};dom.elKey.value='';dom.elName.value='';setElStatus('idle','Not Connected');const cbtn=document.getElementById('btn-connect-el');cbtn.innerText="Connect & Fetch Voices";cbtn.classList.remove('connected');document.getElementById('btn-disconnect-el').style.display='none';refreshVoiceList();LOG.add('Disconnected')}
