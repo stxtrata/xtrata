@@ -202,6 +202,16 @@ Con lo poco que me gustaba conducir...</pre>
                 <input type="text" id="voice-name-2" placeholder="Chapter Start Name(s) (e.g. Drake, Gabe)" style="margin-top:5px; font-size: 0.8rem; padding: 6px;">
             </div>
 
+            <!-- Shown after analysis when the character/voice pairing looks wrong, or simply
+                 needs a second pair of eyes. Filled by checkVoicePairing() in script.js. -->
+            <div class="voice-check" id="voice-pairing-check" style="display:none;">
+                <div id="voice-pairing-msg"></div>
+                <div class="voice-check-actions">
+                    <button type="button" class="sm-btn" onclick="swapVoiceSlots()" title="Exchange the two ElevenLabs voices, keeping the character names where they are">⇄ Swap the two voices</button>
+                    <button type="button" class="sm-btn" onclick="acceptVoicePairing()" title="Dismiss this check for the current pairing">Pairing is correct</button>
+                </div>
+            </div>
+
             <div class="form-group" id="group-token" style="display:none">
                 <label>Voice Switch Token</label>
                 <input type="text" id="voice-token" value="* * *" placeholder="e.g. * * *">

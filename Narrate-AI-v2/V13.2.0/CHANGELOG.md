@@ -13,6 +13,48 @@ No build step, so a hard refresh (Cmd+Shift+R) is all that is needed to see a ne
 
 ---
 
+## 13.2.7 — 2026-08-13
+
+**Added — swapped-voice safety check**
+
+Cue names are assigned to voice slots in order of first appearance in the manuscript, which
+has nothing to do with which voice you chose for which slot. Get it backwards and the whole
+book narrates in swapped voices, and the only symptom is the finished audio.
+
+Two independent defences, because neither is sufficient alone:
+
+1. **The book is asked who the characters are.** `detectCharacterGender` in `core.js` counts
+   gendered pronouns near each lead's name. In a dual-POV novel each lead is narrated in
+   first person in their own chapters and in third person in the other's, so the signal is
+   everywhere. Works in English, French, Spanish, Italian, Portuguese, German and Dutch, and
+   returns `unknown` rather than guessing when evidence is thin or close to even.
+2. **A plain second look.** Whenever the two voices differ in sex, the pairing is shown for
+   confirmation regardless of what step 1 concluded. This one cannot be fooled, because it
+   does not try to be clever.
+
+**Added — one-click correction**
+
+- **⇄ Swap the two voices** exchanges the ElevenLabs voices while leaving the character names
+  in place, then re-points every ungenerated segment. Already-generated audio keeps the voice
+  it was made with, and you are told so before the swap.
+- **Pairing is correct** dismisses the check for the current pairing.
+- Generation is gated: a detected contradiction must be confirmed or corrected before any
+  money is spent.
+- The check re-runs when you pick a voice by hand, not only after analysis.
+
+On the manuscript that prompted this, the book refers to Logan as male in 81% of the
+gendered pronouns near his name while he was set to a female voice. The warning names the
+character, the evidence and the fix.
+
+**Detection notes.** Ambiguous pronouns are deliberately excluded: French `lui` and Italian
+`gli` are dative and serve both sexes, German `sie` is also "they" and formal "you". French
+impersonals like `il y a` and `il faut` are stripped, since they start with a gendered-looking
+pronoun but name nobody. Only the first pronoun after each mention votes, so one long sentence
+is one vote rather than six. Five unit tests cover the confident cases, the refusals and both
+traps.
+
+---
+
 ## 13.2.6 — 2026-08-13
 
 **Added**

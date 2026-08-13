@@ -30,6 +30,8 @@ const STATE = {
     },
     isProcessing: false,
     isPlaying: false,
+    // Result of the character/voice pairing check: ok | unverified | conflict | accepted.
+    voicePairing: { status: 'ok' },
     activePlaybackId: null,
     playingChapterIdx: null, // which chapter is currently playing (for the ⏹ toggle)
     editingChunkId: null, // Track which chunk is in the editor
@@ -1571,7 +1573,115 @@ function selectVoice(id){
     updateDropdownButtons();
     updateModelDropdownState();
     updateReceipt();
-    renderTimeline()
+    renderTimeline();
+    checkVoicePairing();   // picking a voice by hand re-opens the question
+}
+
+// --- CHARACTER / VOICE PAIRING CHECK ---
+//
+// Cue names are assigned to voice slots in order of first appearance in the manuscript,
+// which has nothing to do with which voice you picked for which slot. Get it wrong and you
+// narrate an entire book in swapped voices, and only find out after paying for it.
+//
+// Two lines of defence, because neither alone is enough:
+//   1. Work out each lead's sex from the prose (see NarrateCore.detectCharacterGender) and
+//      flag a definite contradiction. Confident, but silent when the text is ambiguous.
+//   2. Whenever the two voices differ in sex, ask for a glance anyway. Cannot be fooled,
+//      because it does not try to be clever.
+function checkVoicePairing(){
+    const el = document.getElementById('voice-pairing-check');
+    const msg = document.getElementById('voice-pairing-msg');
+    if (!el || !msg) return;
+
+    const hide = () => { el.style.display = 'none'; STATE.voicePairing = { status: 'ok' }; };
+    if (STATE.project.mode !== 'dual' || !STATE.chapters.length) return hide();
+
+    const slots = [0, 1].map(i => {
+        const voice = STATE.voices.find(v => v.id === STATE.project.voiceIds[i]);
+        return {
+            character: (STATE.project.voiceNames[i] || '').trim(),
+            voice,
+            voiceSex: voice ? getVoiceGender(voice) : 'other'
+        };
+    });
+    if (!slots[0].voice || !slots[1].voice) return hide();
+    if (slots[0].voiceSex === slots[1].voiceSex) return hide();   // nothing to get backwards
+
+    // Line 1: does the book contradict the pairing outright?
+    const text = dom.manuscript.value;
+    const lang = STATE.projectMeta.language;
+    const conflicts = [];
+    slots.forEach(s => {
+        if (!s.character) return;
+        const read = NarrateCore.detectCharacterGender(s.character, text, lang);
+        s.characterSex = read.sex;
+        s.confidence = read.confidence;
+        if (read.sex !== 'unknown' && s.voiceSex !== 'other' && read.sex !== s.voiceSex) conflicts.push(s);
+    });
+
+    const describe = s => `<strong>${escapeHtml(s.character || 'Voice')}</strong> → ${escapeHtml(s.voice.name)} (${s.voiceSex})`;
+    const pairing = `${describe(slots[0])}<br>${describe(slots[1])}`;
+
+    if (conflicts.length) {
+        const c = conflicts[0];
+        el.classList.remove('is-advisory');
+        msg.innerHTML =
+            `⚠️ <strong>These voices look swapped.</strong> The book refers to ` +
+            `${escapeHtml(c.character)} as <strong>${c.characterSex}</strong> ` +
+            `(${Math.round(c.confidence * 100)}% of gendered pronouns near the name), ` +
+            `but ${escapeHtml(c.character)} is set to read in a ${c.voiceSex} voice.<br><br>${pairing}`;
+        el.style.display = 'block';
+        STATE.voicePairing = { status: 'conflict', character: c.character, characterSex: c.characterSex, voiceSex: c.voiceSex };
+        LOG.add(`⚠️ ${c.character} reads as ${c.characterSex} in the text but is on a ${c.voiceSex} voice. Check the voice pairing before generating.`, 'warning');
+        return;
+    }
+
+    // Line 2: no contradiction found, but one voice is male and one female, so the order
+    // still matters and the app has no way to be sure. Ask, quietly.
+    el.classList.add('is-advisory');
+    msg.innerHTML = `Check the pairing before you generate:<br><br>${pairing}`;
+    el.style.display = 'block';
+    STATE.voicePairing = { status: 'unverified' };
+}
+
+// Exchange the two ElevenLabs voices, leaving the character names where they are. This is
+// the fix for a swapped pairing: the names are right, the voices behind them are not.
+function swapVoiceSlots(){
+    const generated = STATE.chapters.some(c => (c.chunks || []).some(k => k.status === 'done'));
+    if (generated && !confirm('Some segments are already generated. Those keep the voice they were made with until you regenerate them. Swap anyway?')) return;
+
+    const [a, b] = STATE.project.voiceIds;
+    STATE.project.voiceIds = [b, a];
+
+    // Re-point every not-yet-generated chunk at whatever now sits in its slot. Passing
+    // pendingOnly:false so the swap is not blocked by the locks that protect generated audio.
+    STATE.chapters.forEach(ch => (ch.chunks || []).forEach(chunk => {
+        if (chunk.status === 'done') return;
+        const idx = typeof chunk.voiceIndex === 'number' ? chunk.voiceIndex : 0;
+        chunk.voiceId = STATE.project.voiceIds[idx] || STATE.project.voiceIds[0];
+    }));
+
+    updateDropdownButtons();
+    updateModelDropdownState();
+    renderTimeline();
+    updateReceipt();
+    queueAutoSave('voice-swap');
+
+    const names = [0, 1].map(i => {
+        const v = STATE.voices.find(x => x.id === STATE.project.voiceIds[i]);
+        return `${(STATE.project.voiceNames[i] || `Voice ${i + 1}`)} → ${v ? v.name : 'none'} (${v ? getVoiceGender(v) : 'unknown'})`;
+    });
+    LOG.add(`Voices swapped. ${names.join('  ·  ')}`, 'success');
+    checkVoicePairing();
+}
+
+// "Pairing is correct" - the user has looked and is happy. Stops the generation gate below
+// from asking again for this pairing.
+function acceptVoicePairing(){
+    STATE.voicePairing = { status: 'accepted' };
+    const el = document.getElementById('voice-pairing-check');
+    if (el) el.style.display = 'none';
+    LOG.add('Voice pairing confirmed.', 'success');
 }
 
 function updateDropdownButtons(){[0,1].forEach(s=>{const v=STATE.voices.find(x=>x.id===STATE.project.voiceIds[s]),b=s===0?dom.voiceBtn1:dom.voiceBtn2;b.querySelector('span').innerText=v?v.name:"Select Voice...";b.classList.remove('voice-male','voice-female','voice-other');if(v)b.classList.add(getVoiceColorClassByVoice(v))})}
@@ -1663,10 +1773,8 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
         }
 
         // Say out loud which character ended up on which voice, and what sex that voice is.
-        // Cue names are assigned to slots in order of first appearance, and nothing here can
-        // know a character's sex, so a male POV can land on a female voice with no complaint
-        // from the app. Until now the only clue was the colour of the segment badges, which
-        // is easy to read as "the colours are wrong" rather than "the voices are swapped".
+        // Cue names are assigned to slots in order of first appearance, so a male POV can
+        // land on a female voice with nothing but the badge colour to give it away.
         [0, 1].forEach(slot => {
             const character = (STATE.project.voiceNames[slot] || '').trim() || `Voice ${slot + 1}`;
             const voice = STATE.voices.find(v => v.id === STATE.project.voiceIds[slot]);
@@ -1674,7 +1782,6 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
             const sex = getVoiceGender(voice);
             LOG.add(`Voice ${slot + 1}: ${character} will be read by ${voice.name} (${sex}).`, sex === 'other' ? 'info' : 'success');
         });
-        LOG.add('If a character is on the wrong-sounding voice, type the character names into the Voice 1 / Voice 2 name boxes in the order you want and re-analyze. Typed names that match the detected cues are never overwritten.');
     }
 
     // Iterate
@@ -1896,6 +2003,7 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
     const breakdown = summarizeChapterCounts();
     LOG.add(`Detected ${breakdown.chapters} chapter${breakdown.chapters===1?'':'s'}${breakdown.extras.length ? ' plus ' + breakdown.extras.join(', ') : ''}.`, 'success');
     LOG.add(`Analysis Complete in ${(endTime - startTime).toFixed(2)}ms.`);
+    checkVoicePairing();
 
     if(!STATE.chapters.length) {
         dom.timeline.innerHTML = `<div style="padding:20px; text-align:center; color: var(--text-dim); font-style:italic;">
@@ -1913,6 +2021,18 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
 
 async function initiateGeneration(){
     if(!STATE.project.voiceIds[0]){alert("Select Voice 1");return}
+    // Last chance to catch swapped voices. Past this point the wrong pairing costs real
+    // money and a full regeneration, and the only symptom is the finished audio.
+    if(STATE.voicePairing && STATE.voicePairing.status === 'conflict'){
+        const p = STATE.voicePairing;
+        const ok = confirm(
+            `The book refers to ${p.character} as ${p.characterSex}, but ${p.character} is set to read in a ${p.voiceSex} voice.\n\n` +
+            `Generating now narrates the whole book with the voices this way round.\n\n` +
+            `Cancel and use "Swap the two voices" in the Project tab, or press OK if this is deliberate.`
+        );
+        if(!ok) return;
+        acceptVoicePairing();
+    }
     dom.btnGenerate.innerText="Checking...";dom.btnGenerate.disabled=true;
     dom.btnGenerateTimeline.innerText="Checking...";dom.btnGenerateTimeline.disabled=true;
     if(dom.btnRebuildBook){dom.btnRebuildBook.disabled=true;dom.btnRebuildBook.innerText="Checking...";}

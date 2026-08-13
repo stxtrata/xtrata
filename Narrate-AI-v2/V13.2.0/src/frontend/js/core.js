@@ -35,9 +35,9 @@
     // APP_BUILD    ISO date of that commit.
     // APP_NOTE     one line describing the change, shown in the badge tooltip.
     // ---------------------------------------------------------------------
-    const APP_VERSION = '13.2.6';
+    const APP_VERSION = '13.2.7';
     const APP_BUILD = '2026-08-13';
-    const APP_NOTE = 'Analysis names the character/voice pairing and flags scene-break switches.';
+    const APP_NOTE = 'Catches swapped character voices and offers a one-click swap.';
 
     // Clamp the user-supplied chunk size into a safe range.
     function sanitizeChunkSize(v) {
@@ -161,6 +161,86 @@
         return Math.min(Math.max(n, 1), cap);
     }
 
+    // Third-person subject pronouns per language, used to work out whether a POV character
+    // is male or female. Only languages the chapter parser already recognises are listed;
+    // anything else returns "unknown" rather than guessing.
+    // Only unambiguously-gendered subject pronouns. Deliberately omitted: French "lui" and
+    // Italian "gli", which are dative and serve both sexes; German "sie", which is also
+    // "they" and the formal "you". A pronoun that can mean either sex is worse than none.
+    const GENDER_PRONOUNS = {
+        English:    { male: ['he', 'him', 'his'], female: ['she', 'her', 'hers'] },
+        French:     { male: ['il'],               female: ['elle'] },
+        Spanish:    { male: ['el'],               female: ['ella'] },
+        Italian:    { male: ['lui', 'egli'],      female: ['lei', 'ella'] },
+        Portuguese: { male: ['ele'],              female: ['ela'] },
+        German:     { male: ['er', 'ihn'],        female: [] },
+        Dutch:      { male: ['hij', 'hem'],       female: ['zij'] }
+    };
+
+    // Impersonal constructions that start with a gendered-looking pronoun but name no one.
+    // "il y a" is not a man. Left in, these swamp the count in French and Spanish.
+    const IMPERSONAL = {
+        French:  ['il y a', 'il y avait', 'il faut', 'il fallait', 'il est vrai', 'il s’agit', "il s'agit", 'il paraît', 'il semble'],
+        Spanish: ['el hecho', 'el que'],
+        English: ['it is', 'there is']
+    };
+
+    // Work out a character's sex from how the prose refers to them.
+    //
+    // In a dual-POV book each lead is narrated in first person in their own chapters and
+    // referred to in third person in the other's, so the name sits near a gendered pronoun
+    // over and over: "Logan ... il", "Nina ... elle". Counting those within a short window
+    // of each mention is a far better signal than guessing from the name itself, which
+    // cannot work across languages.
+    //
+    // Returns { sex: 'male' | 'female' | 'unknown', male, female, confidence }.
+    // confidence is the winning share (0.5 - 1). 'unknown' when the evidence is thin or
+    // close to an even split, so a wrong guess never drives a decision.
+    function detectCharacterGender(name, text, language, opts) {
+        const o = opts || {};
+        const minHits = o.minHits == null ? 8 : o.minHits;
+        const minConfidence = o.minConfidence == null ? 0.7 : o.minConfidence;
+        const windowChars = o.windowChars == null ? 60 : o.windowChars;
+
+        const table = GENDER_PRONOUNS[language];
+        const clean = String(name == null ? '' : name).trim();
+        if (!table || !clean || (!table.male.length && !table.female.length)) {
+            return { sex: 'unknown', male: 0, female: 0, confidence: 0 };
+        }
+
+        const body = String(text == null ? '' : text);
+        const esc = clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Word-boundary match on the name. \b is unreliable next to accented letters, so
+        // require a non-letter (or string edge) either side.
+        const nameRe = new RegExp(`(^|[^\\p{L}])${esc}([^\\p{L}]|$)`, 'giu');
+        const wordRe = (w) => new RegExp(`(^|[^\\p{L}])${w}([^\\p{L}]|$)`, 'iu');
+        const impersonal = IMPERSONAL[language] || [];
+
+        let male = 0, female = 0, m;
+        while ((m = nameRe.exec(body)) !== null) {
+            // Look only *after* the name: "Logan haussa les épaules. Il ..." is the pattern
+            // that carries the signal. Text before it usually belongs to another subject.
+            let after = body.slice(m.index + m[0].length, m.index + m[0].length + windowChars).toLowerCase();
+            impersonal.forEach(phrase => { after = after.split(phrase).join(' '); });
+
+            // Count only the FIRST gendered pronoun after each mention. One long sentence
+            // about one character should be one vote, not six.
+            let bestAt = Infinity, bestSex = null;
+            table.male.forEach(w => { const i = after.search(wordRe(w)); if (i >= 0 && i < bestAt) { bestAt = i; bestSex = 'male'; } });
+            table.female.forEach(w => { const i = after.search(wordRe(w)); if (i >= 0 && i < bestAt) { bestAt = i; bestSex = 'female'; } });
+            if (bestSex === 'male') male++;
+            else if (bestSex === 'female') female++;
+
+            if (nameRe.lastIndex <= m.index) nameRe.lastIndex = m.index + 1; // guard zero-width
+        }
+
+        const total = male + female;
+        if (total < minHits) return { sex: 'unknown', male, female, confidence: 0 };
+        const confidence = Math.max(male, female) / total;
+        if (confidence < minConfidence) return { sex: 'unknown', male, female, confidence };
+        return { sex: male > female ? 'male' : 'female', male, female, confidence };
+    }
+
     // Next available "Title (vN)" given the titles already taken. Strips an existing
     // "(vN)" suffix so versions don't stack (e.g. "Book (v2)" -> "Book (v3)").
     function nextVersionName(title, existingTitles) {
@@ -186,6 +266,8 @@
         toReadableFilename,
         classifyHeading,
         clampConcurrency,
-        nextVersionName
+        nextVersionName,
+        detectCharacterGender,
+        GENDER_PRONOUNS
     };
 });

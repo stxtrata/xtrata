@@ -129,3 +129,52 @@ test('nextVersionName: produces the next free "(vN)" and never stacks suffixes',
     assert.strictEqual(core.nextVersionName('My Book', []), 'My Book (v2)');
     assert.strictEqual(core.nextVersionName('Book', ['book']), 'Book (v2)'); // case-insensitive
 });
+
+// --- detectCharacterGender -------------------------------------------------
+// Backs the character/voice pairing check. It must be RIGHT when it speaks and
+// silent when it cannot tell: a wrong answer here swaps a whole book's voices.
+
+const rep = (name, pronoun, n) =>
+    Array.from({ length: n }, (_, i) => `${name} paused. ${pronoun} said something ${i}.`).join(' ');
+
+test('detectCharacterGender: reads sex from pronouns near the name', () => {
+    assert.strictEqual(core.detectCharacterGender('Marcus', rep('Marcus', 'He', 10), 'English').sex, 'male');
+    assert.strictEqual(core.detectCharacterGender('Sara', rep('Sara', 'She', 10), 'English').sex, 'female');
+    assert.strictEqual(core.detectCharacterGender('Logan', rep('Logan', 'Il', 10), 'French').sex, 'male');
+    assert.strictEqual(core.detectCharacterGender('Nina', rep('Nina', 'Elle', 10), 'French').sex, 'female');
+});
+
+test('detectCharacterGender: says "unknown" rather than guessing', () => {
+    // Too little evidence to be worth acting on.
+    assert.strictEqual(core.detectCharacterGender('Bob', 'Bob left. He waved.', 'English').sex, 'unknown');
+    // A genuine even split.
+    const mixed = rep('Alex', 'He', 8) + ' ' + rep('Alex', 'She', 8);
+    assert.strictEqual(core.detectCharacterGender('Alex', mixed, 'English').sex, 'unknown');
+    // Language we have no pronoun table for.
+    assert.strictEqual(core.detectCharacterGender('Marcus', rep('Marcus', 'He', 10), 'Klingon').sex, 'unknown');
+    // Name that never appears.
+    assert.strictEqual(core.detectCharacterGender('Ghost', rep('Marcus', 'He', 10), 'English').sex, 'unknown');
+    // Empty inputs.
+    assert.strictEqual(core.detectCharacterGender('', 'anything', 'English').sex, 'unknown');
+    assert.strictEqual(core.detectCharacterGender('Marcus', '', 'English').sex, 'unknown');
+});
+
+test('detectCharacterGender: French impersonal "il y a" is not a man', () => {
+    // Without the impersonal filter these would read as male.
+    const text = rep('Nina', 'Elle', 10).replace(/Elle/g, 'Il y a du bruit. Elle');
+    assert.strictEqual(core.detectCharacterGender('Nina', text, 'French').sex, 'female');
+});
+
+test('detectCharacterGender: one sentence is one vote, not one per pronoun', () => {
+    // A single mention followed by a pile-up of pronouns must not outvote everything else.
+    const stuffed = 'Chris stopped. He he he he he he he he he he said so.';
+    const balanced = rep('Chris', 'She', 9);
+    const r = core.detectCharacterGender('Chris', stuffed + ' ' + balanced, 'English');
+    assert.strictEqual(r.sex, 'female');
+});
+
+test('detectCharacterGender: ambiguous pronouns are excluded from the tables', () => {
+    // French "lui" and German "sie" serve both sexes, so they must never cast a vote.
+    assert.ok(!core.GENDER_PRONOUNS.French.male.includes('lui'));
+    assert.ok(!core.GENDER_PRONOUNS.German.female.includes('sie'));
+});
