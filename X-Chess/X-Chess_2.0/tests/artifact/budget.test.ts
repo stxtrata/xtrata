@@ -78,10 +78,14 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   { group: 'packages/chain', ceiling: 21_000, measured: 18_575 },
   { group: 'packages/protocol', ceiling: 11_500, measured: 10_411 },
   { group: 'packages/chess', ceiling: 10_000, measured: 9_199 },
-  { group: 'packages/wallet', ceiling: 6_000, measured: 5_447 },
-  { group: 'packages/replay', ceiling: 4_500, measured: 4_067 },
+  // Moved from 6,000 when connect.ts arrived: the connect policy left
+  // apps/chess, where it was untestable, and became 819 bytes of this package
+  // with a suite of its own. That is a fair trade and this is where it is
+  // recorded, but the row moving is a line in a diff either way.
+  { group: 'packages/wallet', ceiling: 6_900, measured: 6_266 },
+  { group: 'packages/replay', ceiling: 4_500, measured: 4_061 },
   { group: 'packages/ratings', ceiling: 2_700, measured: 2_393 },
-  { group: 'apps/chess', ceiling: 1_600, measured: 1_340 }
+  { group: 'apps/chess', ceiling: 1_600, measured: 1_044 }
 ];
 
 /** The same bundle the build produces, measured rather than guessed. */

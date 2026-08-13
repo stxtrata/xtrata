@@ -1,8 +1,11 @@
-# The two confirmed defects
+# The three confirmed defects
 
-Both were found by testers in ordinary play on mainnet, both are in inscription
-2988 now, and neither was visible to 662 tests, a 590-million-node perft run, or
-eight reviewers reading the source.
+The first two were found by testers in ordinary play on mainnet, are in
+inscription 2988 now, and were not visible to 662 tests, a 590-million-node
+perft run, or eight reviewers reading the source.
+
+The third was found on 2026-08-13 by clicking Connect on the staging board, and
+it is not in the board at all — it is in the Xtrata runtime that serves it.
 
 Each is reproduced below rather than asserted. Run them.
 
@@ -223,3 +226,62 @@ rate-limits by dropping the connection or answering 503 produces
 too often". The tester may have seen this rather than a genuine outage, and the
 two need different advice: one says wait a minute, the other says something is
 wrong. Worth distinguishing where the evidence allows.
+
+---
+
+## D-3 — Connect freezes the tab, and the runtime is what freezes it
+
+**Reported as:** "Loads ok but clicking connect wallet only starts audio context
+the wallet does not connect."
+**Actually:** the click starts an infinite loop inside the Xtrata runtime's
+wallet shim, made entirely of promise continuations. It does not merely hang —
+it starves the microtask queue, so from that moment **no timer in the tab ever
+fires again**. Every wallet timeout, every poll, every animation stops with it.
+**Severity:** high, and wider than this board — it is every inscription served
+through `/runtime/` without a `walletBridgeToken`.
+**Fix:** `xtrata-2.0/public/runtime/wallet-shim.js`. Not a board change.
+
+### The loop
+
+`shimRequest` answers a connect method with no host bridge by calling
+`connectViaShim` → `connectViaProviderRequest`, and that function asked
+`provider.request(...)`.
+
+By then `provider.request` **is the shim**. So the shim answered "connect" by
+asking itself to connect, ten spellings at a time, forever.
+
+It closes at the sixth attempt, `stx_requestAccounts`, which `isConnectMethod`
+matches — straight back into `connectViaShim`.
+
+### Reproduce it
+
+The page the tester was on: a runtime launcher URL with no bridge token, over
+Xverse's `StacksProvider` stub — the one whose `request` throws
+`request function is not implemented`.
+
+```bash
+npx vitest run src/lib/wallet/__tests__/runtime-shim-connect.test.ts
+```
+
+Against the fixed shim: six tests, under a second. Against the shim as it was on
+2026-08-13, **that command does not fail — it hangs**, and takes the vitest
+worker with it, because vitest's own timeout is a timer too. It was killed at
+3m20s. That is the defect, exactly as a person meets it.
+
+### Why nothing caught it
+
+No test anywhere covered the shim. It is a 29 KB file that decides whether any
+inscribed application can reach a wallet, and it was the only substantial piece
+of the runtime with no suite at all. There is one now.
+
+### The board's half of it
+
+Once the shim settles, the board's own connect had the opposite fault: a
+six-second timeout per method, introduced the same day to stop a different
+silence. Six seconds is a probe's patience, not a person's — it abandons a
+wallet dialog while it is still being read.
+
+That policy has moved out of `apps/chess/main.ts`, where nothing could test it,
+into `packages/wallet/connect.ts`, where `tests/wallet/connect.test.ts` asserts
+it against an injected clock: a probe gets six seconds, a dialog gets the budget,
+and one silent provider can never eat the time the next one needs.

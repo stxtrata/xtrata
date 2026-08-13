@@ -11,8 +11,9 @@ import { boot, whenReady } from '../../packages/ui/boot.js';
 import { LiveChain } from '../../packages/chain/client.js';
 import type { ContractCall, WriteResult } from '../../packages/chain/client.js';
 import { guardFor } from '../../packages/wallet/postconditions.js';
-import { collectProviders, signingBlockedReason, waitForProvider } from '../../packages/wallet/providers.js';
-import { contractCallParams, extractAddress, walletCall } from '../../packages/wallet/requests.js';
+import { signingBlockedReason, waitForProvider } from '../../packages/wallet/providers.js';
+import { connectWallet } from '../../packages/wallet/connect.js';
+import { contractCallParams, walletCall } from '../../packages/wallet/requests.js';
 import type { ProviderEntry } from '../../packages/wallet/providers.js';
 import type { Network } from '../../packages/chain/endpoint.js';
 
@@ -108,36 +109,9 @@ whenReady(document, () => {
     },
     signingBlocked: signingBlockedReason,
     connect: async () => {
-      // Method-first, provider-second: a wallet that cannot do one method may
-      // still answer another, and a provider that refuses everything must not
-      // stop us reaching the one beside it that works.
-      // SIX SECONDS, not the signing timeout.
-      //
-      // This is a probe, not a signature. A signature legitimately takes as long
-      // as a person takes to read it; asking a wallet whether it can answer at
-      // all should not. Four methods at fifteen seconds is a minute of a board
-      // that looks like it did not hear the click - which is exactly how this
-      // presented, because Xverse's BitcoinProvider never settles on
-      // `wallet_connect` and ranks first.
-      for (const method of ['wallet_connect', 'stx_requestAccounts', 'stx_getAddresses', 'getAddresses']) {
-        try {
-          const { result } = await walletCall(method, {}, { timeoutMs: 6_000 });
-          const address = extractAddress(result);
-          if (address) {
-            connected = address;
-            return { address };
-          }
-        } catch {
-          // Try the next method. A provider that cannot do one is not a failure.
-        }
-      }
-      const error: Error & { code?: string } = new Error(
-        collectProviders().length
-          ? 'a wallet answered but did not give an address'
-          : 'no Stacks wallet found'
-      );
-      error.code = collectProviders().length ? 'NO_ADDRESS' : 'NO_WALLET';
-      throw error;
+      const session = await connectWallet();
+      connected = session.address;
+      return session;
     },
     disconnect: async () => {
       connected = null;
