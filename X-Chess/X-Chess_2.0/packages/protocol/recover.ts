@@ -66,20 +66,70 @@ export interface Recovery {
 }
 
 /**
+ * How many distinct senders past the opener are worth considering.
+ *
+ * A rule set this application can create names at most two people, and the
+ * opener is one candidate already, so six is generous by any honest measure.
+ *
+ * It is a BOUND ON AN ATTACK, not a tuning parameter. Anybody may submit to any
+ * game - the contract filters on length and forms no opinion - so the sender
+ * list is chosen by whoever wants to fill it, and the search below is quadratic
+ * in its size. Measured on this machine: 100 distinct senders is 21,218
+ * candidates and 188ms; 1,000 is 2,012,018 and FOURTEEN SECONDS, synchronously,
+ * on the main thread. A phone is several times worse.
+ *
+ * That mattered far more than one game, because recovery runs for every game in
+ * the explorer and every ranked game on the leaderboard. One ranked game stuffed
+ * with junk froze the leaderboard for every visitor, permanently, in an artefact
+ * that cannot be patched.
+ */
+const MAX_SENDERS = 6;
+
+/**
+ * A hard stop on the whole search, whatever the side list turns out to be.
+ *
+ * The belt to MAX_SENDERS' braces: a bound that holds even if somebody later
+ * widens the side list without re-deriving the arithmetic.
+ */
+const MAX_CANDIDATES = 512;
+
+/**
  * The people who could plausibly be named in a two-player game's rules.
  *
- * The creator, and anybody who has submitted. That is a small set - two for an
- * ordinary game - and it is drawn entirely from the chain.
+ * The creator, and the first few distinct senders IN SEQUENCE ORDER. Order is
+ * load-bearing now and was not before: this took every sender and sorted them
+ * alphabetically, which is exactly the wrong end to truncate, because an
+ * attacker choosing addresses chooses where in the alphabet they land. The real
+ * players submit first, so the first entries in the log are the ones worth
+ * keeping.
+ *
+ * `senders` is fed from getAllEntries in every caller, which is sequence order.
+ * That is now part of the contract of this function rather than an incidental
+ * property, and it is CONSENSUS-VISIBLE: two boards disagreeing about the kept
+ * window would disagree about whether a game can be confirmed, and therefore
+ * about whether it is rated.
  */
 function participants(input: RecoveryInput): string[] {
-  const out = new Set<string>();
-  const add = (who: string | null | undefined): void => {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (who: string | null | undefined): boolean => {
     const value = String(who ?? '').trim().toUpperCase();
-    if (value) out.add(value);
+    if (!value || seen.has(value)) return false;
+    seen.add(value);
+    out.push(value);
+    return true;
   };
+
+  // The opener first, and never counted against the sender budget: they are
+  // named by the game itself rather than by anybody who chose to submit.
   add(input.openedBy);
-  for (const sender of input.senders) add(sender);
-  return [...out].sort();
+
+  let kept = 0;
+  for (const sender of input.senders) {
+    if (kept >= MAX_SENDERS) break;
+    if (add(sender)) kept++;
+  }
+  return out;
 }
 
 /**
@@ -117,6 +167,10 @@ export function recoverRules(input: RecoveryInput): Recovery {
   }
 
   const people = participants(input);
+  // The viewer is added AFTER the cap, never squeezed out by it. Recovery has
+  // always been reader-dependent in this one way - a board can confirm a game
+  // naming the person looking at it, where a stranger's board cannot - and
+  // truncating them out would turn that documented widening into a divergence.
   const viewer = String(input.viewer ?? '').toUpperCase();
   if (viewer && !people.includes(viewer)) people.push(viewer);
   // `anyone` and `anyone-else` are values a side can hold, so they belong in the
@@ -128,7 +182,14 @@ export function recoverRules(input: RecoveryInput): Recovery {
   // is designed to survive.
   const rankedOptions = input.ranked ? [true, false] : [false, true];
 
+  // Set once the hard stop is hit, so the loops below unwind rather than
+  // continuing to count.
+  let exhausted = false;
   const check = (candidate: Rules): Recovery | null => {
+    if (tried >= MAX_CANDIDATES) {
+      exhausted = true;
+      return null;
+    }
     tried++;
     return rulesMatchCommitment(candidate, committed)
       ? { rules: candidate, confirmed: true, tried }
@@ -136,13 +197,16 @@ export function recoverRules(input: RecoveryInput): Recovery {
   };
 
   for (const ranked of rankedOptions) {
+    if (exhausted) break;
     // The open board first: it is the commonest rule set and the cheapest test.
     const open = normaliseRules({ ...DEFAULT_RULES, ranked });
     const hit = check(open);
     if (hit) return hit;
 
     for (const white of sides) {
+      if (exhausted) break;
       for (const black of sides) {
+        if (exhausted) break;
         if (white === ANYONE && black === ANYONE) continue; // already tried
         const candidate = normaliseRules({
           ...DEFAULT_RULES,

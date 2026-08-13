@@ -1020,3 +1020,77 @@ budget, but a figure that catches a catastrophe rather than permitting one.
 - The per-package table will need re-seeding after any change that moves code
   between packages. That is the cost of having an address for a regression, and
   it is small because the rows are coarse.
+
+---
+
+## ADR-0015 — Rule recovery is bounded, and the bound is consensus-visible
+
+**Date** 2026-08-13
+**Status** accepted
+**Measured on** commit 25dc5ea3, with generated senders
+
+### Context
+
+`recoverRules` searched every ordered pair of sides, and the side list was every
+distinct sender in the log. Anybody may submit to any game — the contract filters
+on length and forms no opinion — so that list is chosen by whoever wants to fill
+it, and the search is quadratic in its size.
+
+Measured before the change:
+
+| distinct senders | candidates | time |
+|---:|---:|---:|
+| 100 | 21,218 | 188 ms |
+| 500 | 506,018 | 3,664 ms |
+| 1,000 | 2,012,018 | **14,388 ms** |
+
+Synchronous, on the main thread, and several times worse on a phone.
+
+That was never about one slow game. Recovery runs for every game in the explorer
+and every ranked game on the leaderboard, so **one ranked game stuffed with junk
+senders froze the leaderboard for every visitor** — permanently, in an artefact
+that cannot be patched. The cost of the attack is a few thousand five-character
+submissions.
+
+The read side was as bad: the list fetched every entry of every game at fifty per
+page, so a thousand-entry game cost twenty rate-limited round trips for one row.
+
+### Decision
+
+**Six distinct senders past the opener**, taken in sequence order, plus a hard
+stop at 512 candidates.
+
+**Sequence order, not sorted.** The previous code sorted alphabetically, which is
+exactly the wrong end to truncate: an attacker choosing addresses chooses where in
+the alphabet they land. The real players submit first, so the front of the log is
+what is worth keeping. `senders` is fed from `getAllEntries` in every caller, so
+this was already true — it is now load-bearing rather than incidental.
+
+**The viewer is added after the cap, never squeezed out by it.** Recovery has
+always been reader-dependent in one documented way: a board can confirm a game
+naming the person looking at it where a stranger's board cannot. Truncating them
+out would turn that documented widening into a divergence between two honest
+readers.
+
+**Offered candidates stay outside the cap and are tried first.** A remembered rule
+set, or one carried in a shared link, is already hash-checked and is what rescues
+a freshly-opened game.
+
+**The explorer reads at most four pages per game.** Past that it reads one page —
+enough to recover the rules and name the players — and then says how many
+submissions there are rather than claiming a position it has not seen all of. A
+bound must not make a summary wrong, and no badge is shown from a partial replay.
+
+### Consequences
+
+- 14.4 seconds becomes 3 milliseconds, and stays there at any number of senders.
+- **This is consensus-visible.** Confirmation gates ranked eligibility, so two
+  boards using different windows could disagree about whether a game is rated.
+  Every reader must adopt the same K and the same ordering, which is why the
+  ordering change and the cap must ship in the same inscription and never
+  separately.
+- A game whose real player is the seventh distinct sender would have recovered
+  before and will not now. No such game can exist for a two-player rule set
+  unless six other people have already submitted junk into it — which is the case
+  being defended against.
+- Inscription 2988 keeps the unbounded search. It is recorded in `ops/ERRATA.md`.

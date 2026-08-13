@@ -92,6 +92,23 @@ two later — with no explanation and no mention that a network fee was spent.
 
 *Fixed in the tree* by `ca4af332`.
 
+### Rule recovery can be frozen by anybody, permanently
+
+`recoverRules` searches every ordered pair of sides drawn from every distinct
+sender in a game's log — and anybody may submit to any game. The search is
+quadratic: 1,000 distinct senders is 2,012,018 candidates and **fourteen
+seconds**, synchronously, on the main thread.
+
+Recovery runs for every game in the explorer and every ranked game on the
+leaderboard, so one ranked game stuffed with a few thousand junk submissions
+makes the leaderboard unusable for every visitor to 2988, for as long as that
+inscription exists. The explorer also fetches every entry of every listed game,
+so the same game costs twenty rate-limited round trips for one row.
+
+Nobody has done this. It costs a few thousand five-character submissions.
+
+*Fixed in the tree* by ADR-0015. **2988 keeps it.**
+
 ### `?game=` deep links do nothing
 
 `openFromLink` was written on 2026-08-10, the day after this inscription was

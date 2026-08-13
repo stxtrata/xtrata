@@ -228,3 +228,129 @@ describe('the search stays small', () => {
     expect(found.rules.startFen).toBe(START_FEN);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The bound, and why it exists.
+//
+// Anybody may submit to any game: the contract filters on length and forms no
+// opinion. So the sender list is chosen by whoever wants to fill it, and this
+// search is QUADRATIC in its size. Measured before the cap, on a laptop:
+//
+//     100 distinct senders     21,218 candidates      188 ms
+//   1,000 distinct senders  2,012,018 candidates   14,388 ms
+//
+// synchronously, on the main thread, and several times worse on a phone. That
+// was not one slow game: recovery runs for every game in the explorer and every
+// ranked game on the leaderboard, so ONE ranked game stuffed with junk froze the
+// leaderboard for every visitor - permanently, in an artefact that cannot be
+// patched.
+// ---------------------------------------------------------------------------
+
+describe('the bound on the search', () => {
+  const C32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+  const junk = (i: number): string => {
+    let text = '';
+    let n = i;
+    for (let at = 0; at < 39; at++) {
+      text += C32[n % 32];
+      n = Math.floor(n / 32) + at;
+    }
+    return `SP${text}`;
+  };
+
+  it('still recovers a real game buried under a thousand junk senders', () => {
+    // The two real players submit FIRST, which is why the window is taken from
+    // the start of the log rather than from a sorted set: an attacker choosing
+    // addresses chooses where in the alphabet they land, and sorting hands them
+    // the truncation.
+    const rules = normaliseRules({ ...DEFAULT_RULES, white: ALICE, black: BOB });
+    const senders = [ALICE, BOB, ...Array.from({ length: 1000 }, (_, i) => junk(i))];
+
+    const found = recoverRules({
+      rulesHash: rulesHash(rules),
+      openedBy: ALICE,
+      ranked: false,
+      senders
+    });
+
+    expect(found.confirmed, 'a real game became unrecoverable').toBe(true);
+    expect(found.rules.white).toBe(ALICE);
+    expect(found.rules.black).toBe(BOB);
+  });
+
+  it('does the work in constant time however much junk is added', () => {
+    const senders = (n: number): string[] => [
+      ALICE,
+      BOB,
+      ...Array.from({ length: n }, (_, i) => junk(i))
+    ];
+    const cost = (n: number): number =>
+      recoverRules({
+        rulesHash: '00'.repeat(32),
+        openedBy: ALICE,
+        ranked: true,
+        senders: senders(n)
+      }).tried;
+
+    // Unbounded, these would be 21,218 and 2,012,018.
+    expect(cost(100)).toBe(cost(1000));
+    expect(cost(1000)).toBeLessThan(600);
+  });
+
+  it('finishes fast enough that a poisoned game cannot freeze a leaderboard', () => {
+    // A timing assertion, kept deliberately. Only a clock can catch this
+    // returning: every other property here would still hold at fourteen
+    // seconds a game.
+    const senders = [ALICE, BOB, ...Array.from({ length: 2000 }, (_, i) => junk(i))];
+    const started = Date.now();
+    recoverRules({ rulesHash: '00'.repeat(32), openedBy: ALICE, ranked: true, senders });
+    expect(Date.now() - started, 'the search got slow again').toBeLessThan(200);
+  });
+
+  it('never truncates the viewer out of the search', () => {
+    // Recovery has always been reader-dependent in one documented way: a board
+    // can confirm a game naming the person looking at it where a stranger's
+    // board cannot. Squeezing the viewer out with the cap would turn that
+    // widening into a divergence between two honest readers.
+    const rules = normaliseRules({ ...DEFAULT_RULES, white: ALICE, black: BOB });
+    const senders = Array.from({ length: 50 }, (_, i) => junk(i));
+
+    const stranger = recoverRules({
+      rulesHash: rulesHash(rules),
+      openedBy: ALICE,
+      ranked: false,
+      senders
+    });
+    expect(stranger.confirmed, 'a stranger should not be able to confirm this').toBe(false);
+
+    const bob = recoverRules({
+      rulesHash: rulesHash(rules),
+      openedBy: ALICE,
+      ranked: false,
+      senders,
+      viewer: BOB
+    });
+    expect(bob.confirmed, 'the viewer was squeezed out by the cap').toBe(true);
+  });
+
+  it('keeps trying an offered rule set even when the search is exhausted', () => {
+    // A remembered rule set or one carried in a shared link is already
+    // hash-checked and is what rescues a freshly-opened game. It must sit
+    // outside the cap, and be tried first.
+    const rules = normaliseRules({
+      ...DEFAULT_RULES,
+      white: ALICE,
+      black: BOB,
+      cooldown: 3
+    });
+    const found = recoverRules({
+      rulesHash: rulesHash(rules),
+      openedBy: ALICE,
+      ranked: false,
+      senders: Array.from({ length: 500 }, (_, i) => junk(i)),
+      candidates: [rules]
+    });
+    expect(found.confirmed, 'an offered rule set was lost behind the cap').toBe(true);
+    expect(found.tried, 'the offered candidate was not tried first').toBe(1);
+  });
+});

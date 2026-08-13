@@ -92,6 +92,20 @@ interface ExploreRow {
 const POLL_MS = 5_000;
 
 /**
+ * How much of a game the LIST will read before summarising it.
+ *
+ * A game's length is chosen by whoever submits to it, and the contract filters
+ * on length alone - so an unbounded read here means one hostile game costs
+ * twenty round trips for a single row, in a list of twenty-five. Four pages is
+ * longer than any game played on this contract so far.
+ *
+ * Past it the list reads one page, which is enough to recover the rules and
+ * name the players, and then says how many submissions there are rather than
+ * claiming a position it has not seen all of.
+ */
+const EXPLORE_ENTRY_LIMIT = 200;
+
+/**
  * The other three rates.
  *
  * FAST is for the seconds around a move landing - the only time somebody is
@@ -2510,7 +2524,24 @@ export class ChessApp {
           // was the one kind the list refused to describe, because both this
           // and the remembered-rules lookup sat inside a "has entries" guard.
           // It costs no extra read: the entries are already fetched below.
-          const entries = game.nextSeq > 0 ? await this.chain.getAllEntries(id) : [];
+          // BOUNDED, because a game's length is attacker-controlled: anybody
+          // may submit to any game, and a thousand-entry game costs twenty
+          // rate-limited round trips for ONE row of a summary.
+          //
+          // But a bound must not make the summary WRONG. Past the bound this
+          // reads a single page - enough to recover the rules and name the
+          // players, since recovery only looks at the first few distinct
+          // senders - and then declines to state a position it has not seen all
+          // of. Saying "97 moves, open it" is honest; replaying the first fifty
+          // and announcing whose turn it is would not be.
+          // A game with no entries is whole: there is nothing to have missed.
+          const whole = game.nextSeq <= EXPLORE_ENTRY_LIMIT;
+          const entries =
+            game.nextSeq === 0
+              ? []
+              : whole
+                ? await this.chain.getAllEntries(id)
+                : (await this.chain.getPage(id, 0)).filter((e): e is EntryRow => e !== null);
           const rules = recoverRules({
             rulesHash: game.rulesHash,
             openedBy: game.openedBy,
@@ -2526,8 +2557,9 @@ export class ChessApp {
           row.white = rules.rules.white;
           row.black = rules.rules.black;
           row.confirmed = rules.confirmed;
-          row.state =
-            state.status === 'over'
+          row.state = !whole && game.nextSeq > 0
+            ? `${game.nextSeq} submissions, open it to see`
+            : state.status === 'over'
               ? `${state.result} ${state.termination}`
               : game.nextSeq === 0
                 ? 'not started'
@@ -2537,7 +2569,9 @@ export class ChessApp {
           // only while it is still live. replay reports a turn for a FINISHED
           // game too, so without the status check every game somebody happened
           // to hold the side-to-move in would claim to be waiting for them.
-          if (rules.confirmed && state.status !== 'over') {
+          // No badge from a partial replay. Whose turn it is depends on every
+          // move, so a board that has seen fifty of ninety cannot say.
+          if (whole && rules.confirmed && state.status !== 'over') {
             if (this.address) {
               const yours = checkSender(rules.rules, {
                 sender: this.address,
