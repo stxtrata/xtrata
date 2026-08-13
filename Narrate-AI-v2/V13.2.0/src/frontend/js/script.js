@@ -1051,8 +1051,19 @@ function runDebouncedAutoSave(){
     });
 }
 
+// Paint the header version badge from core.js, the single source of truth. Kept out of
+// index.html so there is exactly one string to bump per release.
+function renderVersionBadge(){
+    const el = document.getElementById('app-version');
+    if (!el || typeof NarrateCore === 'undefined') return;
+    const { APP_VERSION, APP_BUILD, APP_NOTE } = NarrateCore;
+    if (!APP_VERSION) return;
+    el.innerText = `v${APP_VERSION}`;
+    el.title = `Narrate.AI Studio v${APP_VERSION}\nBuilt ${APP_BUILD}\n${APP_NOTE || ''}`.trim();
+}
+
 function setElStatus(s,t){if(dom.elStatusText)dom.elStatusText.innerText=t;if(dom.elDot){dom.elDot.className='status-dot';if(s==='active')dom.elDot.classList.add('active');if(s==='error')dom.elDot.classList.add('error')}}
-async function init(){probeIoChannel();await refreshVoiceList();const k=localStorage.getItem('ab_api_el');if(k){try{const p=JSON.parse(k);dom.elKey.value=p.key;dom.elName.value=p.name;connectElevenLabs(true)}catch(e){}}const t=localStorage.getItem('ab_manuscript');if(t)dom.manuscript.value=t;updateReceipt()}
+async function init(){renderVersionBadge();probeIoChannel();await refreshVoiceList();const k=localStorage.getItem('ab_api_el');if(k){try{const p=JSON.parse(k);dom.elKey.value=p.key;dom.elName.value=p.name;connectElevenLabs(true)}catch(e){}}const t=localStorage.getItem('ab_manuscript');if(t)dom.manuscript.value=t;updateReceipt()}
 async function connectElevenLabs(silent=false){
     const key=dom.elKey.value.trim(),name=dom.elName.value.trim()||"My ElevenLabs";if(!key)return;
     setElStatus('idle','Connecting...');
