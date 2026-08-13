@@ -42,6 +42,12 @@ const GATES = [
     run: ['node', ['harness/serverless-audit.mjs']]
   },
   {
+    layer: 1,
+    name: 'documents against the repository',
+    why: 'byte figures, test counts and the contradictions ops/ drifted into',
+    run: ['node', ['harness/docs-audit.mjs']]
+  },
+  {
     layer: '2-4',
     name: 'engine, replay, rules, codec, wallet, ratings',
     why: 'perft, replay totality, canonical hashing and the wallet conformance suite',

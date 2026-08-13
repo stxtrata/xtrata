@@ -5,7 +5,10 @@ Nothing here is a formality. Every unchecked line is a reason not to inscribe.
 An inscription is permanent and a deployed contract is immutable. There is no
 patch, no rollback and no "we will fix that next week".
 
-**Status: NOT READY.** Updated 2026-08-08.
+**Status: LAUNCHED 2026-08-09**, as Xtrata inscription 2988. Updated 2026-08-13.
+
+The gates below that are still unchecked are the ones a SECOND inscription
+should close, not reasons the first should not have happened. Read them that way.
 
 ---
 
@@ -48,7 +51,7 @@ patch, no rollback and no "we will fix that next week".
 
 ## Gate 4 — The artefact
 
-- [x] build produces a single self-contained HTML file (68KB)
+- [x] build produces a single self-contained HTML file (138,685 bytes)
 - [x] exactly one unescaped `</script>` in the output
 - [x] `dist/manifest.json` with reproducible provenance
 - [x] `tests/artifact` reads `dist/`, not source

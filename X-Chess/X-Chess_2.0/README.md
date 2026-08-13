@@ -47,7 +47,7 @@ To convince yourself it works rather than just looks like it:
 npm test
 ```
 
-That is about two minutes and roughly 345 tests. Nothing in it touches the
+That is about two minutes and 743 tests. Nothing in it touches the
 network, a wallet, or any money.
 
 ---
@@ -137,6 +137,8 @@ tests/clarity/      the contract, under Clarinet
 tests/economics/    solvency and accounting, over random operation sequences
 tests/sponsorship/  the zero-STX player, and the fee sweep
 tests/legacy/       that new protocol assumptions do not corrupt old games
+tests/ui/           the board's own rendering: square colour, coordinates, sound
+tests/engine/       the chess edge cases the rules audit turned up
 tests/artifact/     the BUILT html, not the source
 tests/runtime/      the artefact under the Xtrata runtime
 tests/e2e/          cache destruction, and the deployment gating
@@ -185,7 +187,7 @@ npm run build
 Produces:
 
 ```
-dist/xchess.html         ~69 KB   the board, self-contained
+dist/xchess.html      138,685 bytes   the board, self-contained
 dist/xchess-gates.html   ~98 KB   the deployment and inscription gates
 dist/manifest.json                provenance: hashes, protocol versions
 ```
@@ -212,7 +214,7 @@ placeholder contract, which does not exist on any network — so the board could
 read nothing, every game was "no such game", and the only clue was a warning
 several hundred lines up a harness log. `npm run verify` runs the build, so
 verifying your work was enough to break it. The memory lives in
-`dist/target.json`, which is build output and not committed; a fresh clone has
+`.xchess-build-target.json`, which is build output and not committed; a fresh clone has
 nothing to remember and falls back to the placeholder, loudly.
 
 The build refuses to emit a page with more than one unescaped `</script>`. That
@@ -432,7 +434,7 @@ game, position, result and rating without this repository existing.
 **Live on mainnet. Real games, real moves, real money.**
 
 The application is Xtrata inscription **2988**, version 2.0.0, built
-2026-08-09, build hash `c2861564`, 123,062 bytes. It is served at
+2026-08-09, build hash `c2861564`, and inscription 2988 is 123,062 bytes. Served at
 <https://xtrata.xyz/i/2988> and reconstructed from the chain on every load.
 
 It talks to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`

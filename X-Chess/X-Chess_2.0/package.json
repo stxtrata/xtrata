@@ -13,6 +13,7 @@
     "test:perft:deep": "PERFT_DEEP=1 vitest run tests/perft",
     "test:clarity": "vitest run -c vitest.clarinet.config.ts",
     "audit:serverless": "node harness/serverless-audit.mjs",
+    "audit:docs": "node harness/docs-audit.mjs",
     "verify": "node harness/verify.mjs",
     "release": "node harness/release.mjs",
     "build": "node packages/build/build.mjs",

@@ -1,11 +1,11 @@
 # Status
 
-Updated 2026-08-08.
+Updated 2026-08-13.
 
 ## Where this is
 
-Phases A to J complete. There is an application, it builds to a single 68KB
-self-contained HTML file, and that artefact has been tested as an artefact -
+Phases A to J complete. There is an application, it builds to a single
+138,685-byte self-contained HTML file, and that artefact has been tested as an artefact -
 including under a reproduction of the Xtrata runtime's injection and
 `document.write` sequence.
 
@@ -14,14 +14,19 @@ chain: the signed wallet matrix, live reads and writes, the mainnet canary, the
 canary inscription, and the two acceptance tests. See `ops/LAUNCH.md`: 34 of 57
 gate items are closed, and every open one is a reason not to inscribe.
 
-**This is not launch-ready and must not be inscribed.** The gates in
-`LAUNCH.md` that are not yet green are listed under "Not started" below.
+**It is launched.** Inscription 2988 has been live on mainnet since 2026-08-09,
+with real games and real money on it. What follows describes the tree, not the
+inscription: 2988 was built before most of this and carries none of it.
+
+This file said the opposite for four days, alongside a "Not started" list of nine
+things it called Done sixty lines earlier. `harness/docs-audit.mjs` now refuses
+that particular contradiction mechanically.
 
 ## Test counts
 
 Run `npm test`, `npm run test:perft:deep`, and `npm run test:clarity`.
 
-`npm run verify` passes end to end. **405 tests, 0 failing.**
+`npm run verify` passes end to end. **743 tests, 0 failing.**
 
 `npm run release` REFUSES this build, correctly, on five counts: a placeholder
 contract, a `dev` version string, 0 of 14 wallet matrix rows run, an unsigned
@@ -89,7 +94,8 @@ and `elo-v1` with a proof that its rounding can never be ambiguous.
 three kinds, explorer, leaderboard derived entirely from the chain, profile.
 Everything on screen is derived by replay and nothing is stored.
 
-**Build and artefact.** One self-contained HTML file, 68KB, with a manifest
+**Build and artefact.** One self-contained HTML file, 138,685 bytes - 9 of the
+32 Xtrata chunks that upload in a single transaction - with a manifest
 carrying protocol versions and source hashes. `tests/artifact` reads `dist/`
 rather than source, which is the only way the double-boot class of bug is
 visible at all.
@@ -148,20 +154,19 @@ games are frozen in `harness/fixtures/legacy-mainnet.json`.
    `<body>` existed; and a boot guard in module scope, which does nothing if the
    bundle itself executes twice.
 
-## Not started
+## Open after launch
 
-Every line is a launch gate and none is green. See `ops/LAUNCH.md`.
+Every line here is genuinely open. The list this replaced named nine things as
+"Not started" that this same file calls Done sixty lines above, because it was
+written before launch and never revisited.
 
-- The application and its screens
-- Local cache and the cache-destruction test
-- Legacy adapters and legacy golden games
-- Build, bundling, single-file artefact, manifest
-- The Xtrata runtime emulator (harness layer 10)
-- Artefact regression tests reading `dist/` (layer 11)
-- `npm run release` and its refusal conditions
-- The signed wallet matrix (layer 9)
-- Devnet, testnet, mainnet canary, canary inscription
-- Production contract and production inscription
+- The signed wallet matrix. Nothing has been signed by a real extension, and
+  there is still no way to RUN the fourteen rows (master proposal 17).
+- The artefact has never been driven by a real browser (master proposal 18).
+  Every layout and colour claim is arithmetic or jsdom.
+- A production contract, if the canary is not to be it. See the open point in
+  README.md: inscription 2988 cannot be repointed.
+- A post-launch runbook. Nothing written describes operating a permanent thing.
 
 ## The risk that matters most
 
