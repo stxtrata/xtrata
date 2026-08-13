@@ -59,6 +59,7 @@
 
   var connectModulePromise = null;
   var connectInFlight = null;
+  var connectFallbackInFlight = false;
   var hostBridgePending = new Map();
   var hostBridgeListenerInstalled = false;
   var hostBridgeSeq = 0;
@@ -388,6 +389,13 @@
   }
 
   function isMethodUnsupportedError(error) {
+    // -32601 is what JSON-RPC calls "method not found", and it is the code this
+    // shim itself raises when there is nothing underneath to ask. Reading only
+    // the message meant the shim's own refusal did not match, so it surfaced as
+    // a hard failure instead of falling through to the connect SDK.
+    if (error && typeof error.code !== 'undefined' && Number(error.code) === -32601) {
+      return true;
+    }
     var message = error && error.message ? String(error.message).toLowerCase() : '';
     return (
       message.indexOf('method not found') >= 0 ||
@@ -518,8 +526,37 @@
     return null;
   }
 
+  /**
+   * The wallet UNDERNEATH the shim, or null when there is nothing under it.
+   *
+   * By the time anything below runs, `provider.request` is the shim. Asking it
+   * a connect question is asking ourselves, so a patched provider must be asked
+   * through the function we kept at patch time. See connectViaProviderRequest.
+   */
+  function underlyingRequest(provider) {
+    if (!provider || typeof provider !== 'object') return null;
+    if (provider.__xtrataRuntimeWalletPatched) {
+      var kept = provider.__xtrataRuntimeWalletUnpatchedRequest;
+      return typeof kept === 'function' ? kept : null;
+    }
+    return typeof provider.request === 'function' ? provider.request.bind(provider) : null;
+  }
+
+  /**
+   * Ask the wallet to identify itself, by trying every spelling of the question.
+   *
+   * It asks the UNPATCHED request, and that distinction is the whole function.
+   * This runs as the shim's fallback when there is no host bridge; the shim
+   * answers a connect method by calling this; so calling `provider.request`
+   * here was a closed loop. And because every step is a promise continuation it
+   * was a loop of MICROTASKS - it never yielded, so no timer in the page ever
+   * fired again. Every wallet timeout, poll and animation stopped with it. A
+   * page with Xverse installed and no bridge token froze on the first click of
+   * Connect, and looked from the outside like a button that did nothing.
+   */
   function connectViaProviderRequest(provider) {
-    if (!provider || typeof provider.request !== 'function') {
+    var ask = underlyingRequest(provider);
+    if (!ask) {
       return Promise.reject(
         createShimError('Wallet provider does not support request-based connect.', -32601)
       );
@@ -549,7 +586,7 @@
       var method = attempts[index];
       return Promise.resolve()
         .then(function () {
-          return provider.request(method);
+          return ask(method);
         })
         .then(function (payload) {
           var session = resolveSessionFromPayload(payload);
@@ -689,20 +726,55 @@
     return connectInFlight;
   }
 
+  /**
+   * The fallback that runs when there is no host bridge to ask.
+   *
+   * The re-entry check is a backstop, not the fix - `underlyingRequest` is what
+   * stops this calling itself. It is here because of what re-entry COSTS: this
+   * whole path is promise continuations, so a second entry does not merely
+   * repeat work, it spins the microtask queue and no timer in the tab ever fires
+   * again. A refused connect can be clicked a second time; a frozen tab cannot.
+   */
   function connectViaShim(provider) {
-    if (!provider) {
-      return connectViaLegacySdk(provider);
+    if (connectFallbackInFlight) {
+      return Promise.reject(
+        createShimError('Wallet connect is already in progress.', -32601)
+      );
     }
 
-    return connectViaProviderRequest(provider).catch(function (error) {
-      if (isUserCancelledError(error)) {
-        return null;
-      }
-      if (!isMethodUnsupportedError(error)) {
+    connectFallbackInFlight = true;
+    var release = function () {
+      connectFallbackInFlight = false;
+    };
+
+    var attempt;
+    try {
+      attempt = provider
+        ? connectViaProviderRequest(provider).catch(function (error) {
+            if (isUserCancelledError(error)) {
+              return null;
+            }
+            if (!isMethodUnsupportedError(error)) {
+              throw error;
+            }
+            return connectViaLegacySdk(provider);
+          })
+        : connectViaLegacySdk(provider);
+    } catch (error) {
+      release();
+      throw error;
+    }
+
+    return attempt.then(
+      function (session) {
+        release();
+        return session;
+      },
+      function (error) {
+        release();
         throw error;
       }
-      return connectViaLegacySdk(provider);
-    });
+    );
   }
 
   function shimRequest(method, provider, params) {
@@ -846,6 +918,11 @@
     var originalRequest =
       typeof provider.request === 'function' ? provider.request.bind(provider) : null;
     var delegatedRequest = pickDelegatedRequest(provider, originalRequest);
+
+    // Kept because the line below replaces the only other way to reach it. The
+    // shim's connect fallback needs the real wallet, not a second copy of
+    // itself; without this it had no way to tell the two apart.
+    provider.__xtrataRuntimeWalletUnpatchedRequest = originalRequest || delegatedRequest || null;
 
     provider.request = function (methodOrPayload, maybeParams) {
       var parsed = parseRequestArgs(methodOrPayload, maybeParams);
