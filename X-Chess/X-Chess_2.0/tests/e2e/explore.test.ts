@@ -16,6 +16,7 @@ import { mountShell, resetForTests } from '../../packages/ui/boot.js';
 import { MockChain } from '../../packages/chain/mock.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
+import { matchesFilter } from '../../packages/ui/app.js';
 
 const ALICE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const BOB = 'SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W';
@@ -132,5 +133,121 @@ describe('the game list', () => {
   it('says the list is bounded and sorted, because both are true', async () => {
     const doc = await explore(ALICE);
     expect(doc.getElementById('explore-count')!.textContent).toContain('yours first');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Filtering. Every one of these reads a field the row already carries, so none
+// of it touches the chain - which is the point, and is asserted in
+// tests/e2e/request-budget.test.ts rather than hoped for here.
+// ---------------------------------------------------------------------------
+
+const filters = (doc: Document): HTMLButtonElement[] =>
+  [...doc.querySelectorAll('#explore-filters button')] as HTMLButtonElement[];
+const filterNamed = (doc: Document, label: string): HTMLButtonElement | undefined =>
+  filters(doc).find((b) => b.textContent === label);
+const shownIds = (doc: Document): string[] =>
+  [...doc.querySelectorAll('#explore-rows tr')].map(
+    (tr) => tr.querySelector('td')?.textContent ?? ''
+  );
+
+describe('filtering the game list', () => {
+  it('offers the filters, and starts on All', async () => {
+    const doc = await explore(ALICE);
+    expect(filters(doc).length, 'no filters were rendered').toBeGreaterThan(3);
+    expect(filterNamed(doc, 'All')!.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('narrows to the game waiting on you', async () => {
+    const doc = await explore(ALICE);
+    expect(shownIds(doc).length, 'both games should be listed to start with').toBe(2);
+
+    filterNamed(doc, 'Your move')!.click();
+    // Game 1 is White to move and White is Alice. Game 2 is Black's, and Black
+    // is anyone-but-Alice.
+    expect(shownIds(doc)).toEqual(['1']);
+    expect(filterNamed(doc, 'Your move')!.getAttribute('aria-pressed')).toBe('true');
+    expect(filterNamed(doc, 'All')!.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('goes back to everything, and says so again', async () => {
+    // Switching back must restore the ordinary count line. Written only under
+    // the filter branch, this would leave the narrowed sentence behind and the
+    // list would look permanently short.
+    const doc = await explore(ALICE);
+    filterNamed(doc, 'Your move')!.click();
+    expect(doc.getElementById('explore-count')!.textContent).toContain('of 2 shown');
+
+    filterNamed(doc, 'All')!.click();
+    expect(shownIds(doc).length).toBe(2);
+    expect(doc.getElementById('explore-count')!.textContent).toContain('on this contract');
+  });
+
+  it('says a filter is hiding things rather than showing a short list', async () => {
+    const doc = await explore(ALICE);
+    filterNamed(doc, 'Finished')!.click();
+    // Neither game is over.
+    expect(shownIds(doc)).toEqual([]);
+    expect(
+      doc.getElementById('explore-count')!.textContent,
+      'an empty list with no explanation reads as the games having gone'
+    ).toMatch(/no games match/i);
+  });
+
+  it('does not offer a filter about "you" when nobody is connected', async () => {
+    // Absent, not empty. There is no you to answer for, and a filter that
+    // returned nothing would read as "you have no games" to somebody who simply
+    // has not connected a wallet.
+    const doc = await explore(null);
+    expect(filterNamed(doc, 'Your move'), 'a filter about you with no you').toBeUndefined();
+    expect(filterNamed(doc, 'Yours')).toBeUndefined();
+    expect(filterNamed(doc, 'Open seat'), 'the filters that need no wallet should stay')
+      .toBeDefined();
+  });
+});
+
+describe('the filter rule itself', () => {
+  // Tested directly as a pure function, because every case below is a claim
+  // about MEANING - what somebody is asking when they press a button - and
+  // those are worth pinning without a DOM in the way.
+  const row = (over: Partial<Parameters<typeof matchesFilter>[0]> = {}) =>
+    ({
+      id: 1,
+      ranked: false,
+      entries: 0,
+      white: null,
+      black: null,
+      confirmed: true,
+      state: 'live',
+      mine: null,
+      seat: null,
+      over: false,
+      ...over
+    }) as Parameters<typeof matchesFilter>[0];
+
+  it('admits everything under All', () => {
+    expect(matchesFilter(row(), 'all')).toBe(true);
+    expect(matchesFilter(row({ over: true, ranked: true }), 'all')).toBe(true);
+  });
+
+  it('separates "yours" from "your move"', () => {
+    // A game you are in but are not holding up is still yours. Conflating the
+    // two would make "Yours" useless the moment you had replied.
+    expect(matchesFilter(row({ mine: 'waiting' }), 'mine')).toBe(true);
+    expect(matchesFilter(row({ mine: 'waiting' }), 'your-move')).toBe(false);
+    expect(matchesFilter(row({ mine: 'your-move' }), 'mine')).toBe(true);
+    expect(matchesFilter(row({ mine: 'your-move' }), 'your-move')).toBe(true);
+  });
+
+  it('treats live and finished as opposites, from the field and not the wording', () => {
+    expect(matchesFilter(row({ over: false }), 'live')).toBe(true);
+    expect(matchesFilter(row({ over: false }), 'over')).toBe(false);
+    expect(matchesFilter(row({ over: true }), 'over')).toBe(true);
+    expect(matchesFilter(row({ over: true }), 'live')).toBe(false);
+  });
+
+  it('never claims a game is yours when nobody is connected', () => {
+    expect(matchesFilter(row({ mine: null }), 'mine')).toBe(false);
+    expect(matchesFilter(row({ mine: null }), 'your-move')).toBe(false);
   });
 });

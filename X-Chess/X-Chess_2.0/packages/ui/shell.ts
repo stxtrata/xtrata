@@ -346,6 +346,11 @@ th { color: var(--dim); font-weight: 600; font-size: 12px; }
 .snd-list--off { opacity: .45; }
 
 .muted { color: var(--dim); }
+.filters { flex-wrap: wrap; gap: 6px; }
+.filters .action { padding: 6px 11px; min-height: 34px; font-size: 13px; }
+.filters .action[aria-pressed="true"] {
+  background: var(--gold); color: var(--bg); border-color: var(--gold);
+}
 .badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em;
          text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
          border: 1px solid var(--line-2); color: var(--dim); }
@@ -561,6 +566,11 @@ export const HTML = `
       <button class="action" id="explore-refresh">Refresh</button>
       <span id="explore-count" class="muted small"></span>
     </div>
+    <!-- Filters. Every one reads a field the row already carries, so none of
+         them touches the chain. The two that ask about "you" are removed
+         entirely when nobody is connected, rather than shown empty: there is no
+         you to answer for, and an empty result would read as "no such games". -->
+    <div class="row filters" id="explore-filters" role="group" aria-label="filter the game list"></div>
     <table><thead><tr>
       <th>#</th><th>Players</th><th>Rules</th><th>Moves</th><th>State</th><th></th>
     </tr></thead><tbody id="explore-rows"></tbody></table>

@@ -80,6 +80,44 @@ interface ExploreRow {
   mine: 'your-move' | 'waiting' | null;
   /** An unclaimed seat a stranger could walk into. */
   seat: 'open' | null;
+  /**
+   * Whether replay reached a result.
+   *
+   * A field rather than a reading of `state`, which is display text: a filter
+   * that parsed a sentence would break the first time the sentence was reworded,
+   * and would be wrong in the meantime rather than loudly broken.
+   */
+  over: boolean;
+}
+
+/**
+ * The ways somebody scans a game list, and what each one is actually asking.
+ *
+ * Every one of these reads a field the row ALREADY carries, so filtering costs
+ * no chain reads at all - there is an assertion in tests/e2e/request-budget
+ * that says so. That is the whole reason this is cheap: proposal 14 computed
+ * these answers and threw them away, and this only stops throwing them away.
+ */
+export type ExploreFilter = 'all' | 'your-move' | 'mine' | 'open' | 'live' | 'over' | 'ranked';
+
+/** Which rows a filter admits. Pure, and tested directly. */
+export function matchesFilter(row: ExploreRow, filter: ExploreFilter): boolean {
+  switch (filter) {
+    case 'your-move':
+      return row.mine === 'your-move';
+    case 'mine':
+      return row.mine !== null;
+    case 'open':
+      return row.seat === 'open';
+    case 'live':
+      return !row.over;
+    case 'over':
+      return row.over;
+    case 'ranked':
+      return row.ranked;
+    default:
+      return true;
+  }
 }
 
 /**
@@ -197,7 +235,7 @@ const IDS = [
   'verify', 'verify-game',
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
-  'explore-refresh', 'explore-count', 'explore-rows',
+  'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters',
   'leaderboard-note', 'leaderboard-rows',
   'profile-who', 'profile-load', 'profile-body',
   'contract-label', 'endpoint-label'
@@ -226,6 +264,10 @@ export class ChessApp {
   private pendingPromotion: { from: string; to: string } | null = null;
   /** The game count the explorer was last built for, or null if never. */
   private exploreLoadedAt: number | null = null;
+  /** Which rows the list is showing. Presentation only; it reads no chain. */
+  private exploreFilter: ExploreFilter = 'all';
+  /** How many games the contract reported when the list was last built. */
+  private exploreTotal = 0;
   /** True while a broadcast move is being followed to its conclusion. */
   private watching = false;
   private flipped = false;
@@ -2487,14 +2529,7 @@ export class ChessApp {
     await this.guard('reading the game list', async () => {
       const count = await this.chain.getGameCount();
       this.exploreLoadedAt = count;
-      // Both facts matter: the window is real, so a player's game can fall off
-      // it, and the order depends on who is looking.
-      this.text(
-        'exploreCount',
-        `${count} game${count === 1 ? '' : 's'} on this contract` +
-          (count > 25 ? ', newest 25 shown' : '') +
-          (this.address ? ', yours first' : '')
-      );
+      this.exploreTotal = count;
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 
       // Newest first, and bounded: an unbounded walk on a busy contract would
@@ -2515,7 +2550,8 @@ export class ChessApp {
           confirmed: false,
           state: game.nextSeq === 0 ? 'not started' : 'live',
           mine: null,
-          seat: null
+          seat: null,
+          over: false
         };
 
         try {
@@ -2557,6 +2593,7 @@ export class ChessApp {
           row.white = rules.rules.white;
           row.black = rules.rules.black;
           row.confirmed = rules.confirmed;
+          row.over = state.status === 'over';
           row.state = !whole && game.nextSeq > 0
             ? `${game.nextSeq} submissions, open it to see`
             : state.status === 'over'
@@ -2621,11 +2658,83 @@ export class ChessApp {
     });
   }
 
+  /**
+   * The filter buttons, rebuilt whenever the list is drawn.
+   *
+   * Rebuilt rather than toggled because the SET changes: the two that ask about
+   * "you" are absent entirely when nobody is connected. Showing them and
+   * returning nothing would read as "you have no games" to somebody who simply
+   * has not connected a wallet.
+   */
+  private drawExploreFilters(): void {
+    const node = this.el.exploreFilters;
+    node.replaceChildren();
+
+    const options: [ExploreFilter, string][] = [
+      ['all', 'All'],
+      ...(this.address
+        ? ([
+            ['your-move', 'Your move'],
+            ['mine', 'Yours']
+          ] as [ExploreFilter, string][])
+        : []),
+      ['open', 'Open seat'],
+      ['live', 'Live'],
+      ['over', 'Finished'],
+      ['ranked', 'Ranked']
+    ];
+
+    // A filter that is no longer offered must not keep filtering. Disconnecting
+    // while on "Your move" would otherwise leave an empty list and no visible
+    // reason for it.
+    if (!options.some(([key]) => key === this.exploreFilter)) this.exploreFilter = 'all';
+
+    for (const [key, label] of options) {
+      const button = this.doc.createElement('button');
+      button.type = 'button';
+      button.className = 'action';
+      button.textContent = label;
+      button.dataset.filter = key;
+      button.setAttribute('aria-pressed', String(this.exploreFilter === key));
+      button.addEventListener('click', () => {
+        this.exploreFilter = key;
+        this.drawExplore();
+      });
+      node.appendChild(button);
+    }
+  }
+
   private drawExplore(): void {
+    this.drawExploreFilters();
     const rows = this.el.exploreRows;
     rows.replaceChildren();
 
-    for (const row of this.exploreRows) {
+    const showing = this.exploreRows.filter((row) => matchesFilter(row, this.exploreFilter));
+
+    // One writer for this line, in both directions. Written only under the
+    // filter branch, switching back to All would leave the filtered sentence
+    // behind and the list would look permanently narrowed.
+    if (this.exploreFilter === 'all') {
+      // Both facts matter: the window is real, so a player's game can fall off
+      // it, and the order depends on who is looking.
+      this.text(
+        'exploreCount',
+        `${this.exploreTotal} game${this.exploreTotal === 1 ? '' : 's'} on this contract` +
+          (this.exploreTotal > 25 ? ', newest 25 shown' : '') +
+          (this.address ? ', yours first' : '')
+      );
+    } else {
+      // Say when a filter is hiding things, and say it in terms of the filter.
+      // A list that silently shortened would read as games having disappeared.
+      this.text(
+        'exploreCount',
+        showing.length === 0
+          ? `No games match that filter, out of ${this.exploreRows.length} shown.`
+          : `${showing.length} of ${this.exploreRows.length} shown.`
+      );
+    }
+
+    for (const row of showing) {
       const tr = this.doc.createElement('tr');
       const cell = (node: Node): void => {
         const td = this.doc.createElement('td');

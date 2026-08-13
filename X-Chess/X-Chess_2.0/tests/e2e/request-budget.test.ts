@@ -497,4 +497,46 @@ describe('the badges the game list shows', () => {
     ).toBe(perGame);
     app.stopPolling();
   });
+
+  it('costs nothing to filter, however many times', async () => {
+    // THE ASSERTION THAT MATTERS for proposal 28a. Every filter reads a field
+    // the row already carries, so pressing them can only be free. If this were
+    // hard to write, the feature would have been built wrong - a filter that
+    // re-read the chain would turn idle browsing into a way to starve the
+    // wallet, which proposals 7 and 19 both just landed to prevent.
+    const { chain, reads } = counted();
+    chain.as(ALICE);
+    for (let n = 0; n < 4; n++) await chain.openGame(rulesHash(RULES), false);
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId },
+      connect: async () => ({ address: ALICE })
+    });
+    await tick(40);
+    (dom.window.document.getElementById('connect') as HTMLButtonElement).click();
+    await tick(40);
+    (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+    await tick(120);
+
+    // Everything above is the list being built. From here, only presentation.
+    reads.length = 0;
+    const buttons = [
+      ...dom.window.document.querySelectorAll('#explore-filters button')
+    ] as HTMLButtonElement[];
+    expect(buttons.length, 'no filters to press').toBeGreaterThan(3);
+    for (const round of [0, 1, 2]) {
+      void round;
+      for (const button of buttons) button.click();
+    }
+    await tick(60);
+
+    expect(
+      reads,
+      `filtering read the chain ${reads.length} time(s): ${reads.join(', ')}`
+    ).toEqual([]);
+    app.stopPolling();
+  });
 });

@@ -74,7 +74,7 @@ const CHUNKS = 32;
  * started using the cache, which is a real change and worth noticing.
  */
 const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
-  { group: 'packages/ui', ceiling: 88_000, measured: 81_080 },
+  { group: 'packages/ui', ceiling: 95_000, measured: 88_630 },
   { group: 'packages/chain', ceiling: 21_000, measured: 18_575 },
   { group: 'packages/protocol', ceiling: 11_500, measured: 10_411 },
   { group: 'packages/chess', ceiling: 10_000, measured: 9_199 },
