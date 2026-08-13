@@ -2243,27 +2243,17 @@ export class ChessApp {
     if (parseUci(value)) this.showIntent(value);
 
     const result = await this.guard('submitting', async () => {
-      // The rebate has to be known BEFORE signing: under a deny-mode post
-      // condition every transfer must be covered, including every one the
-      // CONTRACT makes to anybody, and an uncovered rebate aborts the whole
-      // transaction after the contract has already succeeded.
+      // Under a deny-mode post condition every transfer must be covered,
+      // including every one the CONTRACT makes to anybody, and an uncovered
+      // rebate aborts the whole transaction after the contract has already
+      // succeeded - so the player pays the fee and the move does not count.
       //
-      // A FAILED READ IS NOT A ZERO. It used to be: the read was wrapped in
-      // `.catch(() => null)`, so a rate-limited or unreachable endpoint produced
-      // a rebate of zero, no condition covering the payout, and a transaction
-      // that aborts the moment the contract pays. The player was charged the
-      // network fee for a move that could never land. Failing here, before the
-      // wallet opens, costs nothing at all.
-      let rebate = 0n;
-      if (this.address) {
-        const row = await this.readSponsorship(game, this.address);
-        if (row && !row.settled && row.rebatesLeft > 0n && row.reserved >= row.rebate) {
-          rebate = row.rebate;
-        }
-      }
-
-      await (this.chain as Chain & { submit(g: number, v: string, r?: bigint): Promise<unknown> })
-        .submit(game, value, rebate);
+      // There is NO PRE-SIGNING READ any more. The guard declares the protocol's
+      // ceiling, so the board no longer needs to work out what this caller is
+      // owed - and could not have known anyway, since the wallet chooses the
+      // signer. The sponsorship read that used to be here is kept for the
+      // on-screen panel and nothing else.
+      await this.chain.submit!(game, value);
 
       this.selected = null;
       this.hidePromotion();

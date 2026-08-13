@@ -218,17 +218,24 @@ describe('spending the budget where it buys something', () => {
 });
 
 describe('a sponsorship that cannot be read', () => {
-  it('REFUSES to submit rather than sending a transaction that must abort', async () => {
-    // The old behaviour was `.catch(() => null)`, so a failed read meant a
-    // rebate of zero, which means no post condition covering what the contract
-    // pays out. Under deny mode an uncovered transfer aborts the transaction -
-    // after the player has paid its network fee for nothing.
-    //
-    // Failing here, before the wallet opens, costs nothing at all.
+  // SUPERSEDED, and the replacement is stronger.
+  //
+  // These two cases used to encode a careful rule: read the sponsorship before
+  // signing, and REFUSE to submit if the read failed, because a failed read
+  // produced a rebate of zero, no condition covering the contract's payout, and
+  // a transaction that aborts after the contract has already succeeded.
+  //
+  // The rule was right about the danger and wrong about the fix, because the
+  // board cannot know which account the wallet will sign with - so even a read
+  // that SUCCEEDS describes the wrong player whenever the signer differs. The
+  // guard now declares the protocol's own ceiling, which is always sufficient
+  // and never wrong, whoever signs.
+  //
+  // So a sponsorship that cannot be read is no longer a reason to refuse: it no
+  // longer has any bearing on whether the transaction can land. That removes a
+  // failure mode rather than adding one, and it is worth asserting.
+  it('submits even when the sponsorship cannot be read, because it no longer matters', async () => {
     const { chain } = counted();
-    // Installed BEFORE the game is watched, so nothing is cached. A read that
-    // succeeded once and said "no sponsorship" is a known zero, not a guess -
-    // that case is the next test.
     chain.getSponsorship = (async () => {
       const error: Error & { code?: string } = new Error('rate limited');
       error.code = 'RATE_LIMITED';
@@ -241,28 +248,13 @@ describe('a sponsorship that cannot be read', () => {
     await tick(40);
     const after = await chain.getAllEntries(1);
 
-    expect(after.length, 'nothing may be submitted on a guess').toBe(before.length);
-    const notice = dom.window.document.getElementById('chain-notice')!.textContent ?? '';
-    expect(notice).toMatch(/rate limit/i);
-    expect(notice, 'must not blame the chain').not.toMatch(/chain is unavailable/i);
+    expect(
+      after.length,
+      'a move was blocked by a read the guard no longer depends on'
+    ).toBe(before.length + 1);
     app.stopPolling();
   });
 
-  it('DOES submit when the read succeeded and said there is no sponsorship', async () => {
-    // The distinction that makes the rule above safe. A rebate of zero that was
-    // read is a fact: the contract will pay nothing, so no condition is needed
-    // and the transaction is sound. Only an UNKNOWN rebate is dangerous.
-    const { chain } = counted();
-    const app = await watching(chain);
-
-    const before = await chain.getAllEntries(1);
-    await (app as unknown as { submit(v: string): Promise<void> }).submit('e2e4');
-    await tick(40);
-    const after = await chain.getAllEntries(1);
-
-    expect(after.length).toBe(before.length + 1);
-    app.stopPolling();
-  });
 });
 
 describe('naming the players', () => {

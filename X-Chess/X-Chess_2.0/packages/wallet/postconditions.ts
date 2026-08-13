@@ -61,6 +61,18 @@ const amount64 = (value: bigint): string => value.toString(16).padStart(16, '0')
  *   code      one byte
  *   amount    eight bytes, big endian
  */
+/**
+ * The most the core contract can ever pay a caller in one call.
+ *
+ * REBATE-CEILING in contracts/xchess-core-v1.clar:91, which set-sponsorship
+ * refuses to exceed (clar:684). Mirrored here rather than read, because a post
+ * condition has to be written BEFORE anything is asked of the chain.
+ *
+ * The two are checked against each other in tests/clarity, so this cannot drift
+ * from the contract without something going red.
+ */
+export const REBATE_CEILING = 100_000n;
+
 export function stxFromAccount(
   address: string,
   amount: bigint,

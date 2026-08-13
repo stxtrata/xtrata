@@ -709,7 +709,7 @@ const handlers: Record<string, StepHandler> = {
     // The rebate is declared so the guard writes a condition for it. Without
     // that the contract's payout is uncovered and deny mode discards the whole
     // transaction after it has already succeeded.
-    await c.submit(game, 'e7e5', row.rebate);
+    await c.submit(game, 'e7e5');
     state.rebateSubmittedAt = Number(row.rebatesLeft);
 
     return no(

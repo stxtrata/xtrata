@@ -25,6 +25,7 @@ import {
 import type { ClarityJs } from './clarity.js';
 import { bytesToHex } from '../protocol/sha256.js';
 import { makeEndpoint } from './endpoint.js';
+import { REBATE_CEILING } from '../wallet/postconditions.js';
 import type { Endpoint, EndpointOptions, Network } from './endpoint.js';
 
 export const PAGE_SIZE = 50;
@@ -543,13 +544,31 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
    * including one the CONTRACT makes, so a sponsored player's rebate needs a
    * condition of its own or the transaction aborts. See the wallet layer.
    */
-  async submit(game: number, value: string, rebate = 0n): Promise<WriteResult> {
+  async submit(game: number, value: string): Promise<WriteResult> {
     return this.sign({
       functionName: 'submit',
       functionArgs: [serializeUint(game), serializeStringAscii(value)],
       sends: 0n,
-      // The rebate, back to whoever submitted.
-      contractSends: rebate
+      // THE PROTOCOL'S CEILING, not a guess at what this caller is owed.
+      //
+      // The board worked the rebate out from the sponsorship row for the
+      // account named at connect time - and it cannot know which account the
+      // wallet will sign with. Two places in this codebase say so in prose,
+      // which is why the SENDER side already uses the origin principal. If the
+      // signer turns out to be sponsored while the board believed otherwise,
+      // maybe-rebate pays them, the transfer is uncovered, and the transaction
+      // is discarded after the contract has already done the work: the player
+      // pays the fee and the move does not count. That is ADR-0008's exact
+      // shape, and it cost 0.1 STX on mainnet.
+      //
+      // The ceiling is always sufficient and never wrong, whoever signs, and it
+      // costs the player nothing: an upper bound on money moving TOWARDS them
+      // cannot take a satoshi from them.
+      //
+      // max(row.rebate, get-rebate-amount) is NOT a safe substitute - a row
+      // captures its rebate when it is funded (clar:176-179), so a signer may
+      // hold an older and larger one.
+      contractSends: REBATE_CEILING
     });
   }
 

@@ -6,6 +6,7 @@
 // checker's output.
 
 import { beforeEach, describe, expect, it } from 'vitest';
+import { REBATE_CEILING } from '../../packages/wallet/postconditions.js';
 import {
   ALICE,
   BOB,
@@ -574,6 +575,33 @@ describe('what is absent', () => {
         'withdraw'
       ].sort()
     );
+  });
+
+  it('refuses a rebate above the ceiling the wallet layer mirrors', () => {
+    // packages/wallet/postconditions.ts declares REBATE_CEILING and every
+    // submission's post condition is written for it, because the board cannot
+    // know which account the wallet will sign with and so cannot know what that
+    // signer is owed. If the contract's ceiling ever rose above the mirrored
+    // constant, the guard would stop covering a real payout and every affected
+    // move would abort AFTER the contract had already done the work.
+    //
+    // So the two are pinned to each other here. This is the assertion that makes
+    // mirroring the constant safe rather than merely convenient.
+    const above = simnet.callPublicFn(
+      CONTRACT,
+      'set-sponsorship',
+      [Cl.uint(60_000), Cl.uint(REBATE_CEILING + 1n), Cl.uint(45), Cl.uint(50_000)],
+      simnet.deployer
+    );
+    expect(ok(above), 'a rebate above the ceiling was accepted').toBe('(err u104)');
+
+    const at = simnet.callPublicFn(
+      CONTRACT,
+      'set-sponsorship',
+      [Cl.uint(60_000), Cl.uint(REBATE_CEILING), Cl.uint(1), Cl.uint(50_000)],
+      simnet.deployer
+    );
+    expect(ok(at), 'a rebate exactly at the ceiling was refused').toBe('(ok true)');
   });
 
   it('moves STX out in exactly one place', () => {

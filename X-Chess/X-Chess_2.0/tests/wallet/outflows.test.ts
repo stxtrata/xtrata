@@ -12,6 +12,7 @@
 // but "does the CONTRACT pay anyone at all".
 
 import { describe, expect, it } from 'vitest';
+import { REBATE_CEILING } from '../../packages/wallet/postconditions.js';
 import { LiveChain } from '../../packages/chain/client.js';
 import type { ContractCall } from '../../packages/chain/client.js';
 import { guardFor, stxFromContract } from '../../packages/wallet/postconditions.js';
@@ -25,7 +26,6 @@ const BOOTSTRAP = 60_000n;
 const LIABILITY = 450_000n;
 const MARGIN = 50_000n;
 const TOTAL = BOOTSTRAP + LIABILITY + MARGIN;
-const REBATE = 10_000n;
 
 /** A chain whose reads are answered locally and whose writes are captured. */
 function harness(): { chain: LiveChain; calls: ContractCall[] } {
@@ -80,13 +80,31 @@ describe('what the contract pays out, per call', () => {
     expect(calls[0].contractSends).toBe(BOOTSTRAP * 2n);
   });
 
-  it('pays the rebate on a sponsored submission, and nothing on an unsponsored one', async () => {
+  // INVERTED, deliberately. This used to assert that an unsponsored submit
+  // declares 0n, which is exactly the assumption that made the bug: the board
+  // cannot know which account the wallet will sign with, so a submit it believes
+  // is unsponsored may be signed by somebody the contract will pay. The transfer
+  // is then uncovered and the transaction is discarded after the contract has
+  // already done the work - ADR-0008's shape, which cost 0.1 STX on mainnet.
+  it('covers the protocol ceiling on EVERY submission, sponsored or not', async () => {
     const { chain, calls } = harness();
-    await chain.submit(1, 'e2e4', REBATE);
     await chain.submit(1, 'e2e4');
-    expect(calls[0].contractSends).toBe(REBATE);
-    expect(calls[1].contractSends).toBe(0n);
-    expect(calls[0].sends).toBe(0n);
+    await chain.submit(1, 'e2e4');
+    for (const call of calls) {
+      expect(
+        call.contractSends,
+        'a submission declared less than the contract can pay, so the signer decides whether it lands'
+      ).toBe(REBATE_CEILING);
+      expect(call.sends, 'a submission should never move money FROM the player').toBe(0n);
+    }
+  });
+
+  it('cannot be satisfied by a guard built from zero', async () => {
+    // The failure in miniature: a condition written for 0n does not cover a
+    // real payout, and deny mode throws the whole transaction away.
+    const guard = stxFromContract(CONTRACT_ID, 0n);
+    const covering = stxFromContract(CONTRACT_ID, REBATE_CEILING);
+    expect(guard).not.toBe(covering);
   });
 
   it('pays nothing on a top-up: the wallet already has its bootstrap', async () => {
