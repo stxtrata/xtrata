@@ -8,6 +8,23 @@ Patch = a fix. Minor = new or changed behaviour. No build step, so a hard refres
 
 ---
 
+## 13.2.3 — 2026-08-13
+
+**Fixed**
+
+- Creating a new project carried the previous project's spend into the receipt, so a
+  blank project could open reading `$84.68 / $0.00`. `createProjectFromSettings` reset
+  chapters, manuscript, ID, metadata, notes and the summary panel, but never the spend.
+- The same stale figure was checked against your budget limit before every segment, so a
+  new project could refuse to generate with "Budget Exceeded" and nothing on screen
+  explaining why.
+
+Spend is per-project: `loadProject` already restores it from the project file, so a new
+project starting at zero is what the rest of the app assumes. Re-analysing a project and
+saving it as a new version both keep their spend, which is correct in both cases.
+
+---
+
 ## 13.2.2 — 2026-08-13
 
 **Fixed**

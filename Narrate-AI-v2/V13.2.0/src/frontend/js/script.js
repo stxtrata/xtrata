@@ -2144,6 +2144,10 @@ function createProjectFromSettings() {
     STATE.chapters = [];
     dom.manuscript.value = "";
     localStorage.removeItem('ab_manuscript'); // Clear autosave for text
+    // Spend is per-project (loadProject restores it from the project file), so a new project
+    // starts at zero. Carrying it over also fed the stale total into the budget check in
+    // processChunkGeneration, which could refuse to generate anything in a fresh project.
+    STATE.sessionCost = 0;
 
     // 2. Generate New ID & Reset Meta
     STATE.project.id = generateProjectId(STATE.projectMeta);
