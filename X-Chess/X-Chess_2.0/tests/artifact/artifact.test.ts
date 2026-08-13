@@ -354,3 +354,58 @@ describe('the document the runtime will rewrite', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// No secret may be inscribed.
+//
+// A key compiled into this file is PUBLISHED FOREVER. It cannot be rotated out
+// of an inscription, it cannot be removed, and anybody who reads the bytes can
+// spend it. There is no incident response for it - only a revoked key and every
+// copy of the board broken with it.
+//
+// The board never needs one. Under the runtime its API calls are rewritten to
+// `/hiro/<network>`, which is a proxy, and the proxy is where a key belongs -
+// which is what production does in xtrata-2.0/functions/lib/hiro-proxy.ts and
+// what harness/runtime/serve.mjs now does locally.
+//
+// Written when the local harness gained key support, because that is exactly
+// when a key becomes ambient in the build environment and could be picked up by
+// something well meaning.
+// ---------------------------------------------------------------------------
+
+describe('what must never be in a permanent file', () => {
+  const built = {
+    board: readFileSync(resolve(ROOT, 'dist/xchess.html'), 'utf8'),
+    gates: readFileSync(resolve(ROOT, 'dist/xchess-gates.html'), 'utf8')
+  };
+
+  it('carries no API key header, so nothing can be sending one', () => {
+    for (const [name, text] of Object.entries(built)) {
+      expect(text.toLowerCase(), `${name} sends an API key header`).not.toContain('x-hiro-api-key');
+      expect(text.toLowerCase(), `${name} sends an API key header`).not.toContain('x-api-key');
+    }
+  });
+
+  it('carries no key-shaped value under a key-shaped name', () => {
+    // Deliberately about the NAME as well as the shape: a 32-character hex run
+    // is also what a transaction id or a hash looks like, and the artefact is
+    // full of those. A hex run introduced as a key is not.
+    const named = /(?:api[_-]?key|apikey|secret|token)["'\s:=]+["']?[A-Za-z0-9_-]{16,}/i;
+    for (const [name, text] of Object.entries(built)) {
+      const hit = named.exec(text);
+      expect(
+        hit,
+        `${name} contains something named like a secret: ${hit?.[0]?.slice(0, 40)}`
+      ).toBeNull();
+    }
+  });
+
+  it('names the proxy path rather than a key, which is how it gets its allowance', () => {
+    // Not a secret check - the reason the checks above can pass at all. If this
+    // ever fails, the board has stopped going through the proxy and the two
+    // tests above have become vacuous rather than satisfied.
+    expect(built.board, 'the board no longer reaches the chain through a rewritable host').toContain(
+      'hiro.so'
+    );
+  });
+});

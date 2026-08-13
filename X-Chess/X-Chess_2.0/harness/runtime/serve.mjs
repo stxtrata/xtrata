@@ -23,6 +23,7 @@
 
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +41,60 @@ const PORT = Number(process.env.PORT || 4331);
  */
 const PROXY_TTL_MS = 3_000;
 const PROXY_CACHE = new Map();
+
+/**
+ * The Hiro API keys, if this machine has any.
+ *
+ * THE KEY BELONGS TO THE PROXY AND NEVER TO THE BOARD. The board is inscribed
+ * and permanent: a key compiled into it would be published forever, to be spent
+ * by anybody who reads the bytes. It cannot be rotated out of an inscription and
+ * it cannot be removed. `tests/artifact/artifact.test.ts` asserts the built file
+ * carries no key, so this cannot happen by accident.
+ *
+ * The board never needs one either. Under the runtime its API calls are
+ * rewritten to `/hiro/<network>`, which is the proxy - so the proxy is exactly
+ * where a key can be attached, which is what production does in
+ * `xtrata-2.0/functions/lib/hiro-proxy.ts`. This reads the same names from the
+ * same places so that the harness and production agree.
+ */
+const HIRO_KEYS = (() => {
+  const found = [];
+  const add = (value) => {
+    for (const key of String(value ?? '').split(/[\s,]+/)) {
+      const trimmed = key.trim();
+      if (trimmed && !found.includes(trimmed)) found.push(trimmed);
+    }
+  };
+
+  // The shell first, then xtrata-2.0/.env.local - which is where the key already
+  // lives, and the same directory this harness takes the runtime scripts from.
+  const numbered = Object.entries(process.env)
+    .map(([name, value]) => [/^HIRO_API_KEY_(\d+)$/.exec(name), value])
+    .filter(([match]) => match)
+    .sort((a, b) => Number(a[0][1]) - Number(b[0][1]));
+  for (const [, value] of numbered) add(value);
+  for (const name of ['HIRO_API_KEYS', 'HIRO_API_KEY', 'VITE_HIRO_API_KEY']) add(process.env[name]);
+
+  try {
+    const file = readFileSync(resolve(ROOT, '..', '..', 'xtrata-2.0', '.env.local'), 'utf8');
+    for (const line of file.split('\n')) {
+      const match = /^\s*(HIRO_API_KEYS?|HIRO_API_KEY_\d+|VITE_HIRO_API_KEY)\s*=\s*(.*)$/.exec(line);
+      if (match) add(match[2].trim().replace(/^["']|["']$/g, ''));
+    }
+  } catch {
+    // No file, or not readable. Anonymous is a supported way to run this.
+  }
+  return found;
+})();
+
+/**
+ * Which key to use next.
+ *
+ * Advanced past a key that has just been refused or throttled, so a second
+ * request does not walk into the same wall. Production keeps a cooldown per key
+ * for the same reason; this is the small version of it.
+ */
+let hiroKeyIndex = 0;
 
 // A stand-in inscription number. Nothing depends on the value; it exists so the
 // board is reached by the same SHAPE of path it will be inscribed at, rather
@@ -398,21 +453,38 @@ const server = createServer(async (request, response) => {
         return send(response, hit.status, hit.text, hit.type);
       }
 
-      const upstreamResponse = await fetch(target, {
-        method: request.method,
-        headers: { 'Content-Type': request.headers['content-type'] || 'application/json' },
-        body
-      });
+      const apiKey = HIRO_KEYS.length ? HIRO_KEYS[hiroKeyIndex % HIRO_KEYS.length] : null;
+      const headers = {
+        'Content-Type': request.headers['content-type'] || 'application/json'
+      };
+      // Both spellings, as production sends both.
+      if (apiKey) {
+        headers['x-hiro-api-key'] = apiKey;
+        headers['x-api-key'] = apiKey;
+      }
+
+      const upstreamResponse = await fetch(target, { method: request.method, headers, body });
       const text = await upstreamResponse.text();
       const type = upstreamResponse.headers.get('content-type') || TYPES['.json'];
       const left = upstreamResponse.headers.get('x-ratelimit-remaining-minute');
       console.log(
         `  proxy ${request.method} ${path} -> ${upstreamResponse.status}` +
-          (left ? ` (${left} left this minute)` : '')
+          (left ? ` (${left} left this minute)` : '') +
+          (apiKey ? '' : ' [anonymous]')
       );
+      // 401 and 403 belong here with 429: a key that is wrong or revoked fails
+      // every request identically, and staying on it is the same stuck page.
+      if ([401, 403, 429].includes(upstreamResponse.status) && HIRO_KEYS.length > 1) {
+        hiroKeyIndex += 1;
+        console.log(`  .. switching to Hiro key ${(hiroKeyIndex % HIRO_KEYS.length) + 1} of ${HIRO_KEYS.length}`);
+      }
       if (upstreamResponse.status === 429) {
         console.log('  !! RATE LIMITED. The wallet shares this allowance, so a move may');
         console.log('  !! fail to broadcast until the minute rolls over.');
+        if (!HIRO_KEYS.length) {
+          console.log('  !! No Hiro API key found. Put HIRO_API_KEY in xtrata-2.0/.env.local');
+          console.log('  !! and restart: an anonymous caller gets about fifty requests a minute.');
+        }
       }
       // Only successes are cached. A 429 or a 5xx is a thing to retry, and
       // remembering one would turn a passing problem into a stuck page.
@@ -454,7 +526,13 @@ server.listen(PORT, () => {
   console.log(`  mode      ${framed ? `framed, wallet over the host bridge (${WALLET_MODE})` : 'top frame, no bridge'}`);
   console.log(`  artefact  ${ARTIFACT}  served as HTML, Hiro bases rewritten`);
   console.log(`  runtime   real scripts from ${RUNTIME_DIR}`);
-  console.log(`  proxy     /hiro/<network> -> the public API\n`);
+  console.log(
+    `  proxy     /hiro/<network> -> the public API, ` +
+      (HIRO_KEYS.length
+        ? `${HIRO_KEYS.length} Hiro key${HIRO_KEYS.length > 1 ? 's' : ''} attached AT THE PROXY`
+        : 'anonymous (about fifty requests a minute, shared with your wallet)') +
+      '\n'
+  );
   console.log('Every API request the board makes is logged below. If any of them go');
   console.log('straight to api.mainnet.hiro.so rather than through the proxy, that is');
   console.log('the rate-limit problem showing itself.');
