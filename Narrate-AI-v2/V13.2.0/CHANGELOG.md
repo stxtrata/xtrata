@@ -8,6 +8,22 @@ Patch = a fix. Minor = new or changed behaviour. No build step, so a hard refres
 
 ---
 
+## 13.3.0 — 2026-08-13
+
+**Changed**
+
+- **New Project** moved out of the Load modal and into the header, so the group reads
+  New · Save · Load. It was previously reachable only by opening Load first, which is an
+  odd place to look for it.
+- The Load modal footer now points at both header buttons instead of holding the button.
+
+Same `createProjectFromSettings()` behind it, confirmation dialog included, so a stray
+click still cannot wipe unsaved text. No JavaScript change was needed: the function ends
+with `closeProjectModal()`, which only removes a CSS class and is a no-op when no modal
+is open.
+
+---
+
 ## 13.2.3 — 2026-08-13
 
 **Fixed**
