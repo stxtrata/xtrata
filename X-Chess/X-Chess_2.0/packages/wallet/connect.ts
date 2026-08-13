@@ -24,10 +24,15 @@ export const PROBE_MS = 6_000;
 /**
  * How long the whole attempt gets, dialogs included.
  *
- * Longer than the runtime shim's own 90-second limit on the connect SDK, so the
- * board always hears the shim's answer rather than giving up just before it.
+ * Three minutes reads as a lot until it is divided: a page under the runtime
+ * offers three providers, so this is a minute each, and a minute is what a
+ * first-time connect actually costs - a wallet picker, then the extension, then
+ * choosing an account, then approving. Two of those steps are reading.
+ *
+ * Also longer than the runtime shim's own 90-second limit on the connect SDK,
+ * so the board hears the shim's answer rather than giving up just before it.
  */
-export const CONNECT_MS = 120_000;
+export const CONNECT_MS = 180_000;
 
 type Call = (
   method: string,
