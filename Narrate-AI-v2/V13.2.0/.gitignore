@@ -1,0 +1,18 @@
+# Generated audio and project data - large, reproducible, not source.
+output/
+logs/
+
+# Working input, not part of the app.
+manuscript/
+image-refs/
+
+# macOS
+.DS_Store
+._*
+
+# FUSE leftovers from deleted-but-open files
+.fuse_hidden*
+
+# Node
+node_modules/
+npm-debug.log*
