@@ -20,6 +20,7 @@ list of outstanding work and not two.
 | [`03-PLAN.md`](03-PLAN.md) | Sequencing, batching into inscriptions, and what blocks what | You are deciding what to start |
 | [`04-TESTING.md`](04-TESTING.md) | What proves each item, in this project's idiom | You are picking an item up |
 | [`05-DECISIONS.md`](05-DECISIONS.md) | The six questions only the owner can answer | Four items cannot start until these are settled |
+| [`06-PLAN-28-29.md`](06-PLAN-28-29.md) | How to build and test items 28 and 29 safely, step by step | You are about to start the Explore and cross-game work |
 
 ---
 
