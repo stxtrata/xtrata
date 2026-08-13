@@ -1661,6 +1661,20 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
                 LOG.add(`Detected dual POV cues: Voice 1 → ${detectedDualCueNames[0]}, Voice 2 → ${detectedDualCueNames[1]}.`, 'success');
             }
         }
+
+        // Say out loud which character ended up on which voice, and what sex that voice is.
+        // Cue names are assigned to slots in order of first appearance, and nothing here can
+        // know a character's sex, so a male POV can land on a female voice with no complaint
+        // from the app. Until now the only clue was the colour of the segment badges, which
+        // is easy to read as "the colours are wrong" rather than "the voices are swapped".
+        [0, 1].forEach(slot => {
+            const character = (STATE.project.voiceNames[slot] || '').trim() || `Voice ${slot + 1}`;
+            const voice = STATE.voices.find(v => v.id === STATE.project.voiceIds[slot]);
+            if (!voice) { LOG.add(`Voice ${slot + 1} (${character}): no voice selected.`, 'error'); return; }
+            const sex = getVoiceGender(voice);
+            LOG.add(`Voice ${slot + 1}: ${character} will be read by ${voice.name} (${sex}).`, sex === 'other' ? 'info' : 'success');
+        });
+        LOG.add('If a character is on the wrong-sounding voice, type the character names into the Voice 1 / Voice 2 name boxes in the order you want and re-analyze. Typed names that match the detected cues are never overwritten.');
     }
 
     // Iterate
@@ -1720,6 +1734,22 @@ document.getElementById('btn-analyze').addEventListener('click', () => {
                  const startName = STATE.project.voiceNames[startVoice] || (startVoice === 0 ? "Voice 1" : "Voice 2");
                  
                  segments = TextParser.parseDualVoiceSegments(fullText, STATE.project.token, startVoice, STATE.project.voiceNames);
+
+                 // A chapter whose POV is already declared in its heading ("Chapter Eight: Logan")
+                 // is single-speaker by construction, so a switch token inside it is far more
+                 // likely to be a scene break than a change of narrator. We still honour the
+                 // token, because books that alternate mid-chapter depend on it - but say so,
+                 // instead of silently handing half the chapter to the other voice.
+                 const headingCue = TextParser.extractVoiceCueFromChapterHeading(currentTitle);
+                 const tokenHits = (fullText.match(TextParser.getVoiceSwitchRegex(STATE.project.token)) || []).length;
+                 if (headingCue && tokenHits) {
+                     anomalies.push(
+                         `"${currentTitle}" names ${headingCue} as its POV, but the switch token ` +
+                         `"${STATE.project.token.trim()}" appears ${tokenHits} time${tokenHits > 1 ? 's' : ''} inside it, ` +
+                         `so part of the chapter is read by the other voice. If those are scene breaks, ` +
+                         `set the Voice Switch Token to something the book never uses.`
+                     );
+                 }
              } else {
                  segments = [{ text: fullText, voiceIndex: 0 }];
              }

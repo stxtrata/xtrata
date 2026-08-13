@@ -35,9 +35,9 @@
     // APP_BUILD    ISO date of that commit.
     // APP_NOTE     one line describing the change, shown in the badge tooltip.
     // ---------------------------------------------------------------------
-    const APP_VERSION = '13.2.5';
+    const APP_VERSION = '13.2.6';
     const APP_BUILD = '2026-08-13';
-    const APP_NOTE = 'core.js is plain text again, so its diffs are readable.';
+    const APP_NOTE = 'Analysis names the character/voice pairing and flags scene-break switches.';
 
     // Clamp the user-supplied chunk size into a safe range.
     function sanitizeChunkSize(v) {

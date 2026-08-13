@@ -13,6 +13,29 @@ No build step, so a hard refresh (Cmd+Shift+R) is all that is needed to see a ne
 
 ---
 
+## 13.2.6 — 2026-08-13
+
+**Added**
+
+- Analysis now states which character got which voice, and the sex of that voice:
+  `Voice 1: Logan will be read by Jessica Anne Bogart - Conversations (female).`
+  POV cue names are assigned to slots in order of first appearance, and nothing in the app
+  can know a character's sex, so a male lead could land on a female voice with no complaint.
+  The only previous clue was the colour of the segment badges, which reads as "the colours
+  are wrong" rather than "the voices are swapped".
+- A warning when the voice switch token appears inside a chapter that already names its POV
+  in the heading. Such a chapter is single-speaker by construction, so a token inside it is
+  far more likely to be a scene break. The token is still honoured, since books that
+  alternate mid-chapter depend on it, but the split is no longer silent.
+
+**Not changed**
+
+- Badge colours. They already come from `labels.gender` as reported by ElevenLabs, via
+  `getVoiceGender`, and were correct: a character shown in pink is on a female voice. The
+  fix for a wrong-looking colour is to fix the pairing, not the palette.
+
+---
+
 ## 13.2.5 — 2026-08-13
 
 **Fixed**
