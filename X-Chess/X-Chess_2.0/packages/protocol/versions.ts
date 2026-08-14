@@ -16,6 +16,26 @@ export const RULES_PROTOCOL = 'rules-v1';
 /** How a log becomes a position and a result. Committed on chain per game. */
 export const REPLAY_PROTOCOL = 'replay-v1';
 
+/**
+ * The same, plus seats that are claimed by playing them.
+ *
+ * `first-mover` is a side nobody holds until somebody moves it, after which
+ * only they may. That is a new answer to "who may submit", so it is a new
+ * REPLAY protocol and not an edit to the old one — a board that has never heard
+ * of the keyword would read the same log as a different game, and under v1 it
+ * would be reading it wrong.
+ *
+ * A game only commits to this if it USES the keyword. Everything else stays on
+ * v1, so every board that exists today goes on reading every game it can read
+ * today. A board that meets a v2 game and does not implement it says
+ * "unsupported protocol" and declines to derive anything, which is already what
+ * replay does with a protocol it does not know.
+ */
+export const REPLAY_PROTOCOL_V2 = 'replay-v2';
+
+/** Every replay protocol this build implements. */
+export const REPLAY_PROTOCOLS: readonly string[] = [REPLAY_PROTOCOL, REPLAY_PROTOCOL_V2];
+
 /** Which non-move strings mean something, and what. Committed per game. */
 export const EVENTS_PROTOCOL = 'events-v1';
 

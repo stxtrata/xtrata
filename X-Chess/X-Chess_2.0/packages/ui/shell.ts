@@ -377,8 +377,72 @@ tr.found td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
 /* Abbreviated, so a row is one line. The full value is on the element, so a
    copy or a screen reader still gets all of it. */
 .addr--short { white-space: nowrap; }
+/* An explainer, built from a details element rather than a hover tooltip: it
+   opens on a click and on a keyboard, a screen reader can read it, and it costs
+   no script. No backticks in here - this whole block is a template literal. */
+.info { display: inline-block; vertical-align: middle; margin-left: 6px; }
+.info > summary {
+  list-style: none; cursor: pointer; width: 17px; height: 17px; line-height: 17px;
+  border-radius: 50%; border: 1px solid var(--line-2); color: var(--dim);
+  font-size: 11px; font-weight: 700; text-align: center; font-style: italic;
+}
+.info > summary::-webkit-details-marker { display: none; }
+.info > summary:hover, .info[open] > summary { color: var(--gold); border-color: var(--gold); }
+.info > p {
+  margin: 6px 0 0; padding: 8px 10px; max-width: 46ch;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  color: var(--dim); font-size: 12px; font-style: normal; line-height: 1.45;
+}
+
+/* Who is connected. A standing fact rather than a message, so it is styled
+   apart from .notice on purpose: a notice is something that happened, and this
+   is something that is true until it stops being true. */
+.whoami {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 7px 11px; margin-bottom: 8px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12px;
+}
+.whoami-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--good); flex: none;
+}
+.whoami-name { color: var(--gold); font-weight: 600; }
+.whoami-addr { color: var(--dim); font-size: 11px; }
+
 .hide { display: none !important; }
 `;
+
+/**
+ * An explainer, as a plain `<details>`.
+ *
+ * No script, no positioning, no library, and it works with a keyboard and a
+ * screen reader because it is the element the platform already has for exactly
+ * this. A tooltip built out of a div and a hover handler would be none of those
+ * things and would cost bytes to be worse.
+ *
+ * NEVER a raw double quote in the text: this goes inside an attribute-bearing
+ * template and a stray quote truncates the sentence. There is a test.
+ */
+const info = (id: string, text: string): string =>
+  `<details class="info" id="${id}"><summary aria-label="What is this?">i</summary>` +
+  `<p>${text}</p></details>`;
+
+/**
+ * The seats a side can be given.
+ *
+ * The keywords first, because they are what most games use, and a specific
+ * person last because it is the one that needs typing. `named` is not a value
+ * the rules ever see - it reveals the text field beside it, and the address or
+ * name typed there is what gets committed.
+ */
+const seatOptions = [
+  ['anyone', 'Anyone, every move'],
+  ['first-mover', 'Whoever plays it first, then locked to them'],
+  ['anyone-else', 'Anyone except the other player'],
+  ['named', 'A specific address or .btc name']
+]
+  .map(([value, label]) => `<option value="${value}">${label}</option>`)
+  .join('');
 
 /**
  * The shell.
@@ -410,6 +474,18 @@ export const HTML = `
     </div>
   </div>
 
+  <!-- WHO YOU ARE, permanently.
+       Above every message and never replaced by one. This used to be a notice
+       like any other, so "Connected as SP3J..." was the thing that got
+       overwritten the moment anything else needed saying - and on a board where
+       one wallet is xtrata.btc and another is audionals.btc, whose turn it is
+       depends entirely on which one is connected. A player must be able to see
+       that without doing anything. -->
+  <div id="whoami" class="whoami hide">
+    <span class="whoami-dot" aria-hidden="true"></span>
+    <span id="whoami-name" class="whoami-name"></span>
+    <span id="whoami-addr" class="whoami-addr mono"></span>
+  </div>
   <div id="chain-notice" class="notice notice--info">Reading the chain.</div>
   <div id="sign-notice" class="notice notice--warn hide"></div>
 
@@ -424,17 +500,31 @@ export const HTML = `
       </select>
     </div>
     <div class="field">
-      <label for="rules-white">White</label>
-      <input type="text" id="rules-white" placeholder="a Stacks address, a .btc name, anyone, or anyone-else">
+      <label for="rules-white">White ${info(
+        'white-help',
+        'Who is allowed to play the white pieces. Every rule here is committed to the chain when the game is opened, and cannot be changed afterwards.'
+      )}</label>
+      <select id="rules-white">${seatOptions}</select>
+      <input type="text" id="rules-white-who" class="hide"
+             placeholder="a Stacks address or a .btc name">
     </div>
     <div class="field">
-      <label for="rules-black">Black</label>
-      <input type="text" id="rules-black" placeholder="a Stacks address, a .btc name, anyone, or anyone-else">
+      <label for="rules-black">Black ${info(
+        'black-help',
+        'Who is allowed to play the black pieces. A game can name one side and leave the other open, which is how a challenge anybody can accept is made.'
+      )}</label>
+      <select id="rules-black">${seatOptions}</select>
+      <input type="text" id="rules-black-who" class="hide"
+             placeholder="a Stacks address or a .btc name">
     </div>
     <div class="field">
       <label for="rules-ranked">
         <input type="checkbox" id="rules-ranked"> Ranked, this game counts towards ratings
       </label>
+      ${info(
+        'ranked-help',
+        'Ranked games are the only ones the leaderboard counts. Both sides have to be specific people by the end, the game has to reach a real result, and nobody can add this to a game afterwards: it is part of what the game committed to when it was opened.'
+      )}
     </div>
     <div id="rules-summary" class="notice notice--info"></div>
     <div id="price-summary" class="notice notice--loud"></div>
@@ -513,9 +603,9 @@ export const HTML = `
         <h2>Players</h2>
         <div id="players"></div>
       </div>
-      <div class="panel">
+      <div class="panel hide" id="sponsorship-panel">
         <h2>Your sponsorship</h2>
-        <div id="sponsorship" class="small muted">none on this game</div>
+        <div id="sponsorship" class="small muted"></div>
         <div class="row"><button class="action" id="top-up">Add more sponsorship</button></div>
       </div>
       <div class="panel">

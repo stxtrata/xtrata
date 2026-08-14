@@ -302,7 +302,11 @@ export class MockChain implements ChainReader, ChainWriter {
     this.payOut(row.rebate, who);
   }
 
-  async submit(game: number, value: string): Promise<WriteResult> {
+  async submit(
+    game: number,
+    value: string,
+    _opts: { expectRebate?: boolean } = {}
+  ): Promise<WriteResult> {
     const row = this.games.get(game);
     if (!row) throw new ContractError(100, 'no such game');
     // The only filter, exactly as on chain: length, and nothing else.

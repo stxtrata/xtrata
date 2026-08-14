@@ -53,6 +53,18 @@ export const ANYONE = 'anyone';
 export const ANYONE_ELSE = 'anyone-else';
 
 /**
+ * A seat nobody holds until somebody plays it.
+ *
+ * The first principal to have a move ACCEPTED for that colour holds it for the
+ * rest of the game. Before that it is open to anybody who is not already
+ * holding the other side, so one person cannot quietly play both.
+ *
+ * Hashable like the other two keywords, and it moves a game to replay-v2 -
+ * see versions.ts for why that is a new protocol and not an edit.
+ */
+export const FIRST_MOVER = 'first-mover';
+
+/**
  * The characters a FEN may contain.
  *
  * Letters, digits, the rank separator, the field separator and the "nothing
@@ -73,12 +85,12 @@ export class CanonicalError extends Error {
 }
 
 function checkSide(field: string, value: string): string {
-  if (value === ANYONE || value === ANYONE_ELSE) return value;
+  if (value === ANYONE || value === ANYONE_ELSE || value === FIRST_MOVER) return value;
   if (PRINCIPAL_PATTERN.test(value)) return value;
   throw new CanonicalError(
     field,
-    `"${value}" is neither a Stacks principal nor "${ANYONE}" nor "${ANYONE_ELSE}". ` +
-      'A BNS name must be resolved to an address before it is hashed.'
+    `"${value}" is not a Stacks principal, nor "${ANYONE}", "${ANYONE_ELSE}" or ` +
+      `"${FIRST_MOVER}". A BNS name must be resolved to an address before it is hashed.`
   );
 }
 

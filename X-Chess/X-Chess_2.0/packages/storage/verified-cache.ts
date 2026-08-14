@@ -312,8 +312,8 @@ export class CachingReader implements ChainReader {
   ): Promise<WriteResult> {
     return this.writer.openSponsoredBoth!(rulesHash, ranked, white, black);
   }
-  submit(game: number, value: string): Promise<WriteResult> {
-    return this.writer.submit!(game, value);
+  submit(game: number, value: string, opts?: { expectRebate?: boolean }): Promise<WriteResult> {
+    return this.writer.submit!(game, value, opts);
   }
   topUpSponsorship(game: number, who: string): Promise<WriteResult> {
     return this.writer.topUpSponsorship!(game, who);

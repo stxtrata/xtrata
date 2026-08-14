@@ -22,7 +22,7 @@ import { WHITE, pieceType } from '../chess/board.js';
 import { parseUci } from '../chess/uci.js';
 import { DEFAULT_RULES, checkSender, normaliseRules } from '../protocol/rules.js';
 import type { Rules } from '../protocol/rules.js';
-import { EVENTS_NONE, EVENTS_PROTOCOL, REPLAY_PROTOCOL } from '../protocol/versions.js';
+import { EVENTS_NONE, EVENTS_PROTOCOL, REPLAY_PROTOCOLS } from '../protocol/versions.js';
 import { parseEvent, sideOf } from './events.js';
 import type { EventKind } from './events.js';
 import { REJECTED } from './result.js';
@@ -164,7 +164,7 @@ export function replay(submissions: unknown, options: ReplayOptions = {}): Repla
   const eventsKnown = eventsActive || rules.eventsProtocol === EVENTS_NONE;
 
   // A protocol this build does not implement is not something to guess at.
-  if (rules.replayProtocol !== REPLAY_PROTOCOL || !eventsKnown) {
+  if (!REPLAY_PROTOCOLS.includes(rules.replayProtocol) || !eventsKnown) {
     rows.forEach((raw, index) => {
       const record = buildRejected(raw, index, 'unknown', REJECTED.UNSUPPORTED_PROTOCOL);
       log.push(record);

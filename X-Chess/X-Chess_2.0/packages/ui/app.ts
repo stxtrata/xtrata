@@ -284,8 +284,9 @@ const IDS = [
   'build-tag', 'chain-notice', 'sign-notice',
   'tab-play', 'tab-game', 'tab-explore', 'tab-leaderboard', 'tab-profile',
   'view-play', 'view-game', 'view-explore', 'view-leaderboard', 'view-profile',
-  'connect', 'disconnect',
+  'connect', 'disconnect', 'whoami', 'whoami-name', 'whoami-addr',
   'game-kind', 'rules-white', 'rules-black', 'rules-ranked',
+  'rules-white-who', 'rules-black-who',
   'rules-summary', 'price-summary', 'rules-problems', 'open-game',
   'join-game', 'load-game',
   'game-label', 'copy-link', 'flip', 'refresh', 'board', 'arrows', 'status', 'move-hint', 'promotion',
@@ -293,7 +294,7 @@ const IDS = [
   'override', 'override-why', 'override-yes',
   'game-rules-state', 'game-rules-summary', 'game-rules-hash',
   'claim-rules', 'claim-white', 'claim-black', 'claim-check',
-  'players', 'sponsorship', 'top-up',
+  'players', 'sponsorship', 'sponsorship-panel', 'top-up',
   'resign', 'offer-draw', 'accept-draw', 'moves',
   'moves-title', 'toggle-skipped', 'skipped-note',
   'verify', 'verify-game',
@@ -422,7 +423,15 @@ export class ChessApp {
   /** When the log was last read, so a refusal can insist on fresh evidence. */
   private lastReadAt = 0;
   /** A submission the player has been warned about and may yet confirm. */
-  private pendingForced: string | null = null;
+  /**
+   * A move waiting on "send it anyway", AND THE GAME IT WAS ARMED FOR.
+   *
+   * The game id is not decoration. Held as a bare string, this survived a switch
+   * to another game and then submitted into it: warned on game 2, opened game 1,
+   * pressed the button, and a black pawn went to g5 in the wrong game - stored,
+   * charged, and permanent. Reported from a real board on 2026-08-14.
+   */
+  private pendingForced: { game: number; value: string } | null = null;
   /**
    * The player has overruled the board about who may move.
    *
@@ -523,9 +532,22 @@ export class ChessApp {
       this.drawGame();
     });
     on('sendAnywayYes', () => {
-      const value = this.pendingForced;
+      const armed = this.pendingForced;
       this.clearAnyway();
-      if (value) void this.submit(value, true);
+      if (!armed) return;
+      // Refused rather than redirected. An override armed on another board is
+      // not a decision about this one, and guessing which game somebody meant
+      // is the one thing that cannot be undone afterwards.
+      if (armed.game !== this.gameId) {
+        this.notice(
+          'chainNotice',
+          'warn',
+          `That move was for game ${armed.game}, and you are looking at ` +
+            `${this.gameId === null ? 'no game' : `game ${this.gameId}`}. Nothing was sent.`
+        );
+        return;
+      }
+      void this.submit(armed.value, true);
     });
     on('sendAnywayNo', () => {
       this.clearAnyway();
@@ -546,10 +568,22 @@ export class ChessApp {
     on('exploreFind', () => void this.findGame());
     on('profileLoad', () => void this.loadProfile());
 
-    for (const key of ['gameKind', 'rulesWhite', 'rulesBlack', 'rulesRanked']) {
-      this.el[key].addEventListener('input', () => this.drawDraft());
-      this.el[key].addEventListener('change', () => this.drawDraft());
+    for (const key of [
+      'gameKind',
+      'rulesWhite',
+      'rulesBlack',
+      'rulesWhiteWho',
+      'rulesBlackWho',
+      'rulesRanked'
+    ]) {
+      const redraw = (): void => {
+        this.drawSeatFields();
+        this.drawDraft();
+      };
+      this.el[key].addEventListener('input', redraw);
+      this.el[key].addEventListener('change', redraw);
     }
+    this.drawSeatFields();
 
     this.wireSound();
   }
@@ -1094,10 +1128,32 @@ export class ChessApp {
   // Creating a game
   // ------------------------------------------------------------------
 
+  /**
+   * What a side is set to, from the two controls that describe it.
+   *
+   * The select carries the keywords; `named` is not a value the rules ever see,
+   * it only reveals the text field beside it. Returning the raw text when that
+   * field is empty rather than a keyword is deliberate: "a specific person,
+   * unnamed" is not ready to open, and readyToOpen is what should say so.
+   */
+  private seat(which: 'White' | 'Black'): string {
+    const choice = (this.el[`rules${which}`] as HTMLSelectElement).value;
+    if (choice !== 'named') return choice;
+    return (this.el[`rules${which}Who`] as HTMLInputElement).value.trim();
+  }
+
+  /** Show the address field only for the option that needs one. */
+  private drawSeatFields(): void {
+    for (const which of ['White', 'Black'] as const) {
+      const named = (this.el[`rules${which}`] as HTMLSelectElement).value === 'named';
+      this.el[`rules${which}Who`].classList.toggle('hide', !named);
+    }
+  }
+
   private draft(): Partial<Rules> {
     return {
-      white: (this.el.rulesWhite as HTMLInputElement).value,
-      black: (this.el.rulesBlack as HTMLInputElement).value,
+      white: this.seat('White'),
+      black: this.seat('Black'),
       ranked: (this.el.rulesRanked as HTMLInputElement).checked,
       allow: [],
       cooldown: 0,
@@ -1256,7 +1312,9 @@ export class ChessApp {
 
   private async resolveNames(names: readonly string[]): Promise<void> {
     if (!this.names) return;
-    const fields = [this.el.rulesWhite, this.el.rulesBlack] as HTMLInputElement[];
+    // The text fields, which is where a .btc name can have been typed. The
+    // selects hold keywords and a keyword is never resolved.
+    const fields = [this.el.rulesWhiteWho, this.el.rulesBlackWho] as HTMLInputElement[];
     let changed = false;
 
     // "Absent" and "could not ask" are different answers and must not be
@@ -1457,7 +1515,13 @@ export class ChessApp {
   async load(game: number): Promise<void> {
     // Switching games must not carry a half-finished promotion across. The
     // picker holds squares, and squares mean nothing on a different board.
+    //
+    // Nor an armed override, and for a stronger reason: the promotion picker
+    // only wastes a click, while "send it anyway" spends money on a permanent
+    // submission. It carries its own game id as well, so this is the second of
+    // two locks rather than the only one.
     this.hidePromotion();
+    this.clearAnyway();
     const loaded = await this.guard(`loading game ${game}`, async () => {
       const row = await this.chain.getGame(game);
       if (!row) {
@@ -2170,23 +2234,43 @@ export class ChessApp {
    * that changes it.
    */
   private async drawSponsorship(): Promise<void> {
+    // ABSENT, NOT EMPTY.
+    //
+    // Almost every game has no sponsorship, and a panel headed "Your
+    // sponsorship" saying you have none is a paragraph about a feature the
+    // reader is not using, on the screen they came to play chess on. Worse, the
+    // button under it could not have worked: `top-up-sponsorship` unwraps an
+    // existing row or fails with ERR-NO-SPONSORSHIP (clar:438), so on an
+    // unsponsored game it was an offer the contract would have refused.
+    //
+    // An EXHAUSTED sponsorship still shows. It is not the same as never having
+    // had one: somebody who has been playing for free is about to start paying,
+    // and meeting that as a surprise fee is worse than a line of text.
+    const show = (message: string | null): void => {
+      this.el.sponsorshipPanel.classList.toggle('hide', message === null);
+      if (message !== null) this.text('sponsorship', message);
+    };
+
     if (!this.address || this.gameId === null) {
-      this.text('sponsorship', 'connect a wallet to see your sponsorship on this game');
+      show(null);
       return;
     }
     const key = `${this.gameId}|${this.address}`;
     if (this.sponsorshipText?.key === key) {
-      this.text('sponsorship', this.sponsorshipText.message);
+      show(this.sponsorshipText.message);
       return;
     }
     const say = (message: string): void => {
       this.sponsorshipText = { key, message };
-      this.text('sponsorship', message);
+      show(message);
     };
     try {
       const row = await this.readSponsorship(this.gameId, this.address);
       if (!row) {
-        say('You have no sponsorship on this game, so you pay your own network fees.');
+        // Remembered as a message so the read is not repeated, and shown as
+        // nothing at all.
+        this.sponsorshipText = { key, message: '' };
+        show(null);
         return;
       }
       if (row.rebatesLeft === 0n || row.settled) {
@@ -2201,18 +2285,12 @@ export class ChessApp {
         `Sponsored transactions remaining: ${row.rebatesLeft}. ` +
           `Each one returns ${(Number(row.rebate) / 1_000_000).toFixed(6)} STX.`
       );
-    } catch (error) {
-      // NOT remembered: a failed read should be retried, and saying "could not
-      // read" forever would be worse than asking again. Rate limiting is named
-      // rather than blamed on the chain, because the chain is fine and the
-      // person can simply wait.
-      const code = (error as { code?: string })?.code;
-      this.text(
-        'sponsorship',
-        code === 'RATE_LIMITED'
-          ? 'The public Stacks endpoint is rate limiting this page, so the sponsorship is unread. It will be read again shortly.'
-          : 'could not read the sponsorship from the chain'
-      );
+    } catch {
+      // NOT remembered: a failed read should be retried. Shown as nothing
+      // rather than as an apology - a panel that appears only to say it could
+      // not read something is noise on a game with no sponsorship, which is
+      // almost all of them, and the next poll will say better.
+      show(null);
     }
   }
 
@@ -2230,6 +2308,28 @@ export class ChessApp {
     const row = await this.chain.getSponsorship(game, who);
     this.sponsorship = { key, row };
     return row;
+  }
+
+  /**
+   * Could the contract pay this player for this move?
+   *
+   * Only ever answered NO with confidence. `maybe-rebate` pays nothing without a
+   * Sponsorships row for (game, sender) (clar:490), so a row this board has read
+   * and found absent means no money can move - and the transaction can say so,
+   * instead of declaring a 0.1 STX ceiling the wallet then reads out to a player
+   * who is being charged nothing.
+   *
+   * Everything else is yes. Unread, unconnected, a different game: all unknown,
+   * and unknown must keep the ceiling. The board knows the sponsorship of the
+   * account named at CONNECT time and cannot know which account the wallet will
+   * sign with, so a wrong no costs the fee of an aborted move.
+   */
+  private rebatePossible(): boolean {
+    if (this.gameId === null || !this.address) return true;
+    const key = `${this.gameId}|${this.address}`;
+    if (this.sponsorship?.key !== key) return true;
+    const row = this.sponsorship.row;
+    return row !== null && !row.settled && row.rebatesLeft > 0n;
   }
 
   /** Forget the cached sponsorship. Called after anything that spends one. */
@@ -2410,7 +2510,8 @@ export class ChessApp {
    * an unplayable game is not.
    */
   private askAnyway(verdict: Verdict, value: string): void {
-    this.pendingForced = value;
+    if (this.gameId === null) return;
+    this.pendingForced = { game: this.gameId, value };
     const node = this.el.sendAnyway;
     node.classList.remove('hide');
     this.text('sendAnywayWhy', `${verdict.say} Send it anyway?`);
@@ -2458,7 +2559,9 @@ export class ChessApp {
       // owed - and could not have known anyway, since the wallet chooses the
       // signer. The sponsorship read that used to be here is kept for the
       // on-screen panel and nothing else.
-      const sent = await this.chain.submit!(game, value);
+      const sent = await this.chain.submit!(game, value, {
+        expectRebate: this.rebatePossible()
+      });
 
       // Follow it. The board used to say "Sent" and never look again, so a
       // transaction that failed made the move VANISH off the board a poll or
@@ -2579,6 +2682,31 @@ export class ChessApp {
   }
 
   /**
+   * The connected wallet, said once and left there.
+   *
+   * Both the name and the address, because they answer different questions: the
+   * name is the one a person recognises and the address is the one that has to
+   * match what the rules say. Showing only the name would hide exactly the
+   * detail that decides whether a move will be accepted.
+   *
+   * Redrawn when a BNS lookup lands, so a wallet that connects before its name
+   * resolves does not stay as a bare address for the rest of the session.
+   */
+  private drawWhoami(): void {
+    const address = this.address;
+    this.el.whoami.classList.toggle('hide', !address);
+    if (!address) {
+      this.text('whoamiName', '');
+      this.text('whoamiAddr', '');
+      return;
+    }
+    const name = this.names?.peek(address) ?? null;
+    this.text('whoamiName', name ?? 'Connected');
+    this.text('whoamiAddr', address);
+    this.el.whoamiAddr.setAttribute('title', address);
+  }
+
+  /**
    * Somebody else is asking now, so everything answered for a person is stale.
    *
    * Marking the game list stale is enough for somebody who arrives at that tab
@@ -2597,6 +2725,13 @@ export class ChessApp {
    * is the worst place to keep one.
    */
   private viewerChanged(): void {
+    this.drawWhoami();
+    // The name usually is not known yet at the moment of connecting, so ask and
+    // redraw. Never blocking: the address is already on screen and the name is
+    // an improvement to it, not a precondition for it.
+    if (this.address && this.names) {
+      void this.names.resolve(this.address).then(() => this.drawWhoami());
+    }
     this.drawGame();
     this.exploreLoadedAt = null;
     if (this.tab === 'explore') void this.reloadExplore();

@@ -177,7 +177,15 @@ export interface ChainWriter {
     white: string,
     black: string
   ): Promise<WriteResult>;
-  submit(game: number, value: string): Promise<WriteResult>;
+  /**
+   * Submit a value to a game.
+   *
+   * `expectRebate` is a HINT and only ever a negative one: false means the
+   * caller knows the contract cannot pay this player, so the transaction can
+   * declare that no money moves. Absent means unknown, and unknown covers the
+   * rebate ceiling. See the comment in LiveChain.submit for what that costs.
+   */
+  submit(game: number, value: string, opts?: { expectRebate?: boolean }): Promise<WriteResult>;
   topUpSponsorship(game: number, who: string): Promise<WriteResult>;
   settleSponsorship(game: number, who: string): Promise<WriteResult>;
   claimResult(game: number, result: string, terminalSeq: number): Promise<WriteResult>;
@@ -552,31 +560,43 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
    * including one the CONTRACT makes, so a sponsored player's rebate needs a
    * condition of its own or the transaction aborts. See the wallet layer.
    */
-  async submit(game: number, value: string): Promise<WriteResult> {
+  async submit(
+    game: number,
+    value: string,
+    { expectRebate }: { expectRebate?: boolean } = {}
+  ): Promise<WriteResult> {
     return this.sign({
       functionName: 'submit',
       functionArgs: [serializeUint(game), serializeStringAscii(value)],
       sends: 0n,
-      // THE PROTOCOL'S CEILING, not a guess at what this caller is owed.
+      // NOTHING, unless somebody is actually being paid.
       //
-      // The board worked the rebate out from the sponsorship row for the
-      // account named at connect time - and it cannot know which account the
-      // wallet will sign with. Two places in this codebase say so in prose,
-      // which is why the SENDER side already uses the origin principal. If the
-      // signer turns out to be sponsored while the board believed otherwise,
-      // maybe-rebate pays them, the transfer is uncovered, and the transaction
-      // is discarded after the contract has already done the work: the player
-      // pays the fee and the move does not count. That is ADR-0008's exact
-      // shape, and it cost 0.1 STX on mainnet.
+      // A move costs a network fee and not one microSTX more; the contract
+      // charges nothing for it. But a post condition covering the rebate made
+      // the wallet say "the contract will transfer less than or equal to 0.1
+      // STX" on every single move, and a player reading that reasonably fears a
+      // charge. It is a ceiling on money moving TOWARDS them and can never take
+      // anything from them - and being right about that is no use if the
+      // sentence in front of the person says otherwise.
       //
-      // The ceiling is always sufficient and never wrong, whoever signs, and it
-      // costs the player nothing: an upper bound on money moving TOWARDS them
-      // cannot take a satoshi from them.
+      // Sound because the contract says so: maybe-rebate matches on a
+      // Sponsorships entry for (game, sender) and pays nothing at all without
+      // one (clar:490). No row, no transfer, so nothing to cover. With zero
+      // conditions in deny mode the transaction asserts that NO money moves,
+      // which is both the truth and the strongest thing it could say.
       //
-      // max(row.rebate, get-rebate-amount) is NOT a safe substitute - a row
-      // captures its rebate when it is funded (clar:176-179), so a signer may
-      // hold an older and larger one.
-      contractSends: REBATE_CEILING
+      // THE COST, which is real and has been paid before. The board knows the
+      // sponsorship of the account named at CONNECT time and cannot know which
+      // account the wallet will sign with. If the signer turns out to be
+      // sponsored while the board believed otherwise, maybe-rebate pays them,
+      // the transfer is uncovered, and the transaction is discarded after the
+      // contract has done the work - the player pays the fee and the move does
+      // not count. That is ADR-0008's shape and it cost 0.1 STX on mainnet.
+      //
+      // So the ceiling is still sent whenever a rebate is POSSIBLE, and the
+      // hint is only ever a way to say "this one certainly is not". Absent, it
+      // means unknown, and unknown keeps the ceiling.
+      contractSends: expectRebate === false ? 0n : REBATE_CEILING
     });
   }
 

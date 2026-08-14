@@ -9,11 +9,11 @@
 // opened. Without that, two boards could claim different rules for the same game
 // and nothing would decide between them.
 
-import { ANYONE, ANYONE_ELSE, NAME_PATTERN, PRINCIPAL_PATTERN } from './canonical.js';
-import { EVENTS_PROTOCOL, REPLAY_PROTOCOL } from './versions.js';
+import { ANYONE, ANYONE_ELSE, FIRST_MOVER, NAME_PATTERN, PRINCIPAL_PATTERN } from './canonical.js';
+import { EVENTS_PROTOCOL, REPLAY_PROTOCOL, REPLAY_PROTOCOL_V2 } from './versions.js';
 import { START_FEN } from '../chess/fen.js';
 
-export { ANYONE, ANYONE_ELSE } from './canonical.js';
+export { ANYONE, ANYONE_ELSE, FIRST_MOVER } from './canonical.js';
 
 export interface Rules {
   /** Which replay definition applies. Committed, so a game says how to read it. */
@@ -84,6 +84,7 @@ export function normaliseRules(input: unknown): Rules {
     const lowered = trimmed.toLowerCase();
     if (lowered === ANYONE) return ANYONE;
     if (lowered === ANYONE_ELSE) return ANYONE_ELSE;
+    if (lowered === FIRST_MOVER) return FIRST_MOVER;
     // Everything else is treated as a principal and upper-cased. A value that is
     // not one will simply never match a sender, which is a side nobody can play
     // — refused at creation by readyToOpen, not silently corrected here.
@@ -100,11 +101,24 @@ export function normaliseRules(input: unknown): Rules {
   const text = (value: unknown, fallback: string): string =>
     typeof value === 'string' && value.trim() ? value.trim() : fallback;
 
+  const white = side(source.white);
+  const black = side(source.black);
+
   return {
-    replayProtocol: text(source.replayProtocol, REPLAY_PROTOCOL),
+    // DERIVED FROM THE SIDES, not taken from the source.
+    //
+    // A game that uses `first-mover` is played under replay-v2 whatever it was
+    // handed, because the keyword IS the difference between the two protocols.
+    // Letting a caller pass v1 alongside it would produce a rule set that hashes
+    // to a commitment no board could honour: v1 boards would read the keyword as
+    // a principal nobody holds and skip every move.
+    replayProtocol:
+      white === FIRST_MOVER || black === FIRST_MOVER
+        ? REPLAY_PROTOCOL_V2
+        : text(source.replayProtocol, REPLAY_PROTOCOL),
     eventsProtocol: text(source.eventsProtocol, EVENTS_PROTOCOL),
-    white: side(source.white),
-    black: side(source.black),
+    white,
+    black,
     allow,
     cooldown,
     noConsecutive: source.noConsecutive === true,
@@ -130,8 +144,15 @@ export interface SenderContext {
   sender: string | null;
   /** The colour to move in the position reached so far. */
   turn: 'white' | 'black';
-  /** Accepted moves so far, in order. Everything here is public. */
-  history: { sender: string | null }[];
+  /**
+   * Accepted moves so far, in order. Everything here is public.
+   *
+   * `color` is what `first-mover` reads: which side a past move was played for
+   * is how a claimed seat is identified. Optional because the two callers that
+   * predate it pass records that already carry it, and a caller that does not
+   * simply cannot use the keyword.
+   */
+  history: { sender: string | null; color?: 'white' | 'black' }[];
 }
 
 /**
@@ -144,6 +165,41 @@ export interface SenderContext {
  * break more than one rule at once, and which reason gets recorded is part of
  * the permanent record, so it must not depend on how the code happens to read.
  */
+/**
+ * Who has already played this colour, if anybody.
+ *
+ * The first accepted move for a colour is what claims it. Read from the record
+ * rather than counted from the length, because a game may start from a position
+ * where black moves first and because events sit in the same list.
+ */
+function claimedBy(
+  colour: 'white' | 'black',
+  history: SenderContext['history']
+): string | null {
+  for (const entry of history) {
+    if (entry.color !== colour) continue;
+    const who = String(entry.sender ?? '').trim().toUpperCase();
+    if (who) return who;
+  }
+  return null;
+}
+
+/**
+ * The principal bound to a side right now, or null while it is open.
+ *
+ * One function for the two ways a side becomes a specific person: named in the
+ * rules, or claimed by playing. `anyone` and `anyone-else` are never a person.
+ */
+function holderOf(
+  side: string,
+  colour: 'white' | 'black',
+  history: SenderContext['history']
+): string | null {
+  if (side === FIRST_MOVER) return claimedBy(colour, history);
+  if (side === ANYONE || side === ANYONE_ELSE) return null;
+  return side;
+}
+
 export function checkSender(rules: Rules, ctx: SenderContext): RuleRejection | null {
   const from = String(ctx.sender ?? '').toUpperCase();
 
@@ -151,15 +207,29 @@ export function checkSender(rules: Rules, ctx: SenderContext): RuleRejection | n
     return REJECTED_BY_RULE.NOT_ALLOWED;
   }
 
+  const other: 'white' | 'black' = ctx.turn === 'white' ? 'black' : 'white';
   const bound = ctx.turn === 'white' ? rules.white : rules.black;
   const opposite = ctx.turn === 'white' ? rules.black : rules.white;
 
-  if (bound === ANYONE_ELSE) {
+  if (bound === FIRST_MOVER) {
+    // A seat claimed by playing it. Once somebody has had a move accepted for
+    // this colour it is theirs for the rest of the game; until then it is open
+    // to anybody who does not already hold the other side, because a game
+    // where one person takes both seats is not a game.
+    const holder = claimedBy(ctx.turn, ctx.history);
+    if (holder) {
+      if (from !== holder) return REJECTED_BY_RULE.WRONG_PLAYER;
+    } else {
+      const rival = holderOf(opposite, other, ctx.history);
+      if (rival && from === rival) return REJECTED_BY_RULE.WRONG_PLAYER;
+    }
+  } else if (bound === ANYONE_ELSE) {
     // Everyone but the other side. When the other side is not a specific person
     // there is nobody to exclude, so this is simply "anyone" — the honest
-    // reading, not a special case being swallowed.
-    const named = opposite !== ANYONE && opposite !== ANYONE_ELSE;
-    if (named && from === opposite) return REJECTED_BY_RULE.WRONG_PLAYER;
+    // reading, not a special case being swallowed. A first-mover seat DOES
+    // become a specific person, so it is asked rather than assumed open.
+    const rival = holderOf(opposite, other, ctx.history);
+    if (rival && from === rival) return REJECTED_BY_RULE.WRONG_PLAYER;
   } else if (bound !== ANYONE && from !== bound) {
     return REJECTED_BY_RULE.WRONG_PLAYER;
   }
@@ -238,12 +308,14 @@ export function readyToOpen(draft: Partial<Rules>): Readiness {
     if (!value) {
       problems.push({
         field,
-        message: `${label} is not set. Type an address, a .btc name, "anyone", or "anyone-else".`
+        message:
+          `${label} is not set. Type an address, a .btc name, "anyone", ` +
+          '"anyone-else", or "first-mover".'
       });
       return;
     }
     const lowered = value.toLowerCase();
-    if (lowered === ANYONE || lowered === ANYONE_ELSE) return;
+    if (lowered === ANYONE || lowered === ANYONE_ELSE || lowered === FIRST_MOVER) return;
     if (looksLikePrincipal(value)) return;
     if (looksLikeName(value)) {
       // Replay compares principals, and a sealed board has no network, so a name
@@ -362,11 +434,16 @@ export function describeRules(rules: Rules, name?: (who: string) => string | nul
 
   const side = (colour: string, who: string): string => {
     if (who === ANYONE) return `${colour} can be played by anyone`;
+    if (who === FIRST_MOVER) {
+      return `${colour} belongs to whoever plays it first, and to nobody else after that`;
+    }
     if (who === ANYONE_ELSE) {
       const excluded = other(colour);
       return excluded === ANYONE || excluded === ANYONE_ELSE
         ? `${colour} can be played by anyone`
-        : `${colour} can be played by anyone except ${called(excluded)}`;
+        : excluded === FIRST_MOVER
+          ? `${colour} can be played by anyone except whoever claims the other side`
+          : `${colour} can be played by anyone except ${called(excluded)}`;
     }
     return `${colour} can only be played by ${called(who)}`;
   };

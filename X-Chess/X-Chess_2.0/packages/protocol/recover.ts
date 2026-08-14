@@ -14,7 +14,7 @@
 // log, the commitment, and nothing else - and that is enough.
 
 import { rulesMatchCommitment } from './canonical.js';
-import { ANYONE, ANYONE_ELSE, DEFAULT_RULES, normaliseRules } from './rules.js';
+import { ANYONE, ANYONE_ELSE, DEFAULT_RULES, FIRST_MOVER, normaliseRules } from './rules.js';
 import type { Rules } from './rules.js';
 import { START_FEN } from '../chess/fen.js';
 
@@ -173,9 +173,16 @@ export function recoverRules(input: RecoveryInput): Recovery {
   // truncating them out would turn that documented widening into a divergence.
   const viewer = String(input.viewer ?? '').toUpperCase();
   if (viewer && !people.includes(viewer)) people.push(viewer);
-  // `anyone` and `anyone-else` are values a side can hold, so they belong in the
-  // search alongside the named principals.
-  const sides = [...people, ANYONE, ANYONE_ELSE];
+  // `anyone`, `anyone-else` and `first-mover` are values a side can hold, so
+  // they belong in the search alongside the named principals.
+  //
+  // The third keyword costs: with seven people the pair space goes from 81 to
+  // 100, and doubled for the ranked flag that is 200 against a MAX_CANDIDATES of
+  // 512. Still inside it, and the bound is what makes that checkable rather than
+  // hopeful. Widening this again needs the arithmetic redone - it is
+  // CONSENSUS-VISIBLE, because two boards disagreeing about the search disagree
+  // about whether a game can be confirmed at all.
+  const sides = [...people, ANYONE, ANYONE_ELSE, FIRST_MOVER];
 
   // The ranked flag is a hint and the hash is the truth, so both are tried -
   // a game whose flag disagrees with its rules is exactly what the hint pattern

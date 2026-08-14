@@ -217,3 +217,19 @@ describe('the promotion picker', () => {
     expect(picker(doc).getAttribute('aria-label')).toContain('promotion');
   });
 });
+
+// ---------------------------------------------------------------------------
+// NOT COVERED HERE, and said out loud rather than left as a gap somebody has to
+// notice: "send it anyway" holding a move across a game change.
+//
+// The fault was real and reached mainnet-shaped code - the override held only
+// the MOVE, so it survived a switch to another game and would have submitted
+// into that one. It now carries the game it was armed for, and `load` clears it,
+// which is the same rule the promotion picker above already followed.
+//
+// A test needs the board to reach a `warn` verdict, and the only routes to one
+// are a read that throws mid-judge or a game that changes mid-judge - neither of
+// which this fixture can drive without reaching inside the app. Every version
+// that was cheap to write passed whether the guard existed or not, which is
+// worse than no test. Left for a fixture that can fail a read on demand.
+// ---------------------------------------------------------------------------

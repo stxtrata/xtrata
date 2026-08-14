@@ -387,9 +387,18 @@ describe('a sponsored game with nobody to sponsor', () => {
     const app = await watching(chain, ALICE);
     const doc = dom.window.document;
     (doc.getElementById('game-kind') as HTMLSelectElement).value = kind;
-    (doc.getElementById('rules-white') as HTMLInputElement).value = white;
-    (doc.getElementById('rules-black') as HTMLInputElement).value = black;
-    (doc.getElementById('rules-white') as HTMLInputElement).dispatchEvent(
+    // A side is a select plus a text field now: the keywords are options, and
+    // `named` is what reveals somewhere to type an address.
+    const seat = (which: 'white' | 'black', value: string): void => {
+      const keyword = ['anyone', 'anyone-else', 'first-mover'].includes(value);
+      (doc.getElementById(`rules-${which}`) as HTMLSelectElement).value = keyword
+        ? value
+        : 'named';
+      (doc.getElementById(`rules-${which}-who`) as HTMLInputElement).value = keyword ? '' : value;
+    };
+    seat('white', white);
+    seat('black', black);
+    (doc.getElementById('rules-white') as HTMLSelectElement).dispatchEvent(
       new dom.window.Event('input', { bubbles: true })
     );
     await tick(20);

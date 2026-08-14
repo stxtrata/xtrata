@@ -8,6 +8,7 @@
 import { Pc, postConditionToHex } from '@stacks/transactions';
 import { describe, expect, it } from 'vitest';
 import {
+  REBATE_CEILING,
   SENT_EQUAL_TO,
   SENT_LESS_THAN_OR_EQUAL,
   guardFor,
@@ -202,5 +203,54 @@ describe('the origin condition', () => {
     // Eleven bytes: asset type, principal type, condition code, and a u64.
     // Nothing that could name the wrong account.
     expect(stxFromOrigin(70_000n).length).toBe(22);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// What a move says about money.
+//
+// A move costs a network fee and not one microSTX more; the contract charges
+// nothing for it. But the transaction used to carry a post condition covering
+// the rebate ceiling, so the wallet told the player, on every single move:
+//
+//   "The contract will transfer less than or equal to 0.1 STX"
+//
+// It is a ceiling on money moving TOWARDS them and can never take anything from
+// them - and being right about that is no use when the sentence in front of the
+// person says otherwise. Read once, it looks like a charge on every move.
+// ---------------------------------------------------------------------------
+
+describe('a move that cannot be paid for', () => {
+  const ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+  const CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1';
+
+  it('declares that no money moves at all', () => {
+    // Sound because the contract says so: maybe-rebate matches on a
+    // Sponsorships entry for (game, sender) and pays nothing without one
+    // (clar:490). Zero conditions in deny mode asserts that NOTHING moves,
+    // which is the strongest statement available and also the truth.
+    const guard = guardFor({
+      sender: ADDRESS,
+      contractId: CONTRACT,
+      sends: 0n,
+      contractSends: 0n
+    });
+    expect(guard.postConditionMode).toBe('deny');
+    expect(guard.postConditions, 'a move with nothing to cover still declared a ceiling').toEqual(
+      []
+    );
+  });
+
+  it('still covers the ceiling when a rebate is possible', () => {
+    // The hint is only ever a negative one. Unknown keeps the ceiling, because
+    // an uncovered rebate aborts the transaction after the contract has done
+    // the work - the player pays the fee and the move does not count.
+    const guard = guardFor({
+      sender: ADDRESS,
+      contractId: CONTRACT,
+      sends: 0n,
+      contractSends: REBATE_CEILING
+    });
+    expect(guard.postConditions.length, 'a sponsored move lost its cover').toBe(1);
   });
 });
