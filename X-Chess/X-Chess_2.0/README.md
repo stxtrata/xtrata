@@ -187,7 +187,7 @@ npm run build
 Produces:
 
 ```
-dist/xchess.html      138,685 bytes   the board, self-contained
+dist/xchess.html      149,305 bytes   the board, self-contained
 dist/xchess-gates.html   ~98 KB   the deployment and inscription gates
 dist/manifest.json                provenance: hashes, protocol versions
 ```

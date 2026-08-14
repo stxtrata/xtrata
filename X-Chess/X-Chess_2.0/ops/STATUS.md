@@ -94,7 +94,7 @@ and `elo-v1` with a proof that its rounding can never be ambiguous.
 three kinds, explorer, leaderboard derived entirely from the chain, profile.
 Everything on screen is derived by replay and nothing is stored.
 
-**Build and artefact.** One self-contained HTML file, 138,685 bytes - 9 of the
+**Build and artefact.** One self-contained HTML file, 149,305 bytes - 10 of the
 32 Xtrata chunks that upload in a single transaction - with a manifest
 carrying protocol versions and source hashes. `tests/artifact` reads `dist/`
 rather than source, which is the only way the double-boot class of bug is

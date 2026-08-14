@@ -51,7 +51,7 @@ should close, not reasons the first should not have happened. Read them that way
 
 ## Gate 4 — The artefact
 
-- [x] build produces a single self-contained HTML file (138,685 bytes)
+- [x] build produces a single self-contained HTML file (149,305 bytes)
 - [x] exactly one unescaped `</script>` in the output
 - [x] `dist/manifest.json` with reproducible provenance
 - [x] `tests/artifact` reads `dist/`, not source
