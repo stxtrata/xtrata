@@ -81,6 +81,20 @@ interface ExploreRow {
   /** An unclaimed seat a stranger could walk into. */
   seat: 'open' | null;
   /**
+   * Whether the connected player is IN this game. Identity, not turn.
+   *
+   * A separate question from `mine`, and it has to be: `mine` is about whether
+   * you can act right now, so it is null while it is the other player's move and
+   * null once the game is over. Filtering "Yours" on it therefore hid every game
+   * you were waiting in and every game you had finished — which is most of
+   * somebody's games, most of the time.
+   *
+   * Named by the rules, or having actually submitted: the second is what makes
+   * an open-board seat yours once you have taken it. Not merely "the rules would
+   * admit you", or every viewer would own every open game.
+   */
+  participant: boolean;
+  /**
    * Whether replay reached a result.
    *
    * A field rather than a reading of `state`, which is display text: a filter
@@ -106,7 +120,7 @@ export function matchesFilter(row: ExploreRow, filter: ExploreFilter): boolean {
     case 'your-move':
       return row.mine === 'your-move';
     case 'mine':
-      return row.mine !== null;
+      return row.participant;
     case 'open':
       return row.seat === 'open';
     case 'live':
@@ -2495,11 +2509,8 @@ export class ChessApp {
       this.el.connect.classList.add('hide');
       this.el.disconnect.classList.remove('hide');
       this.notice('chainNotice', 'good', `Connected as ${session.address}`);
-      // Every "your move" answer depends on who is asking, so a list built
-      // before connecting was built for nobody.
-      this.exploreLoadedAt = null;
       (this.el.profileWho as HTMLInputElement).value = session.address;
-      this.drawGame();
+      this.viewerChanged();
       return true;
     });
   }
@@ -2510,7 +2521,31 @@ export class ChessApp {
     this.el.connect.classList.remove('hide');
     this.el.disconnect.classList.add('hide');
     this.notice('chainNotice', 'info', 'Disconnected.');
+    this.viewerChanged();
+  }
+
+  /**
+   * Somebody else is asking now, so everything answered for a person is stale.
+   *
+   * Marking the game list stale is enough for somebody who arrives at that tab
+   * LATER. It does nothing for somebody already looking at it — and that is the
+   * ordinary case, because the reason you connect is usually that you opened
+   * Explore, found none of your games, and reached for the wallet.
+   *
+   * What that left on screen was worse than an empty list. Every row carried
+   * `mine: null`, so the games the viewer is actually in were advertised back to
+   * them as an open seat, and the "Yours" filter matched nothing. Redrawing the
+   * filters is not the same as rebuilding the rows: the button appears,
+   * correctly, and then finds nothing.
+   *
+   * A row found by SEARCH goes with the rest. It was answered for the previous
+   * viewer too, and a wrong badge on the one row somebody deliberately asked for
+   * is the worst place to keep one.
+   */
+  private viewerChanged(): void {
     this.drawGame();
+    this.exploreLoadedAt = null;
+    if (this.tab === 'explore') void this.reloadExplore();
   }
 
   get connectedAddress(): string | null {
@@ -2729,6 +2764,7 @@ export class ChessApp {
         state: game.nextSeq === 0 ? 'not started' : 'live',
         mine: null,
         seat: null,
+        participant: false,
         over: false
       };
 
@@ -2779,6 +2815,17 @@ export class ChessApp {
             : game.nextSeq === 0
               ? 'not started'
               : `${state.turn} to move`;
+
+        // Are you in this game? Asked of the rules and the record, never of the
+        // turn — so it still answers while the other player is thinking, and it
+        // still answers after the game is over.
+        if (whole && rules.confirmed && this.address) {
+          const me = this.address.toUpperCase();
+          row.participant =
+            rules.rules.white === me ||
+            rules.rules.black === me ||
+            state.accepted.some((entry) => String(entry.sender ?? '').toUpperCase() === me);
+        }
 
         // Only for a game whose rules this board can actually confirm, and
         // only while it is still live. replay reports a turn for a FINISHED

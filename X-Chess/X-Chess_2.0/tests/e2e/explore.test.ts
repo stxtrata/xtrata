@@ -15,7 +15,7 @@ import { ChessApp } from '../../packages/ui/app.js';
 import { mountShell, resetForTests } from '../../packages/ui/boot.js';
 import { MockChain } from '../../packages/chain/mock.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
-import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
+import { DEFAULT_RULES, normaliseRules, readyToOpen } from '../../packages/protocol/rules.js';
 import { matchesFilter } from '../../packages/ui/app.js';
 
 const ALICE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
@@ -221,6 +221,7 @@ describe('the filter rule itself', () => {
       state: 'live',
       mine: null,
       seat: null,
+      participant: false,
       over: false,
       ...over
     }) as Parameters<typeof matchesFilter>[0];
@@ -233,10 +234,25 @@ describe('the filter rule itself', () => {
   it('separates "yours" from "your move"', () => {
     // A game you are in but are not holding up is still yours. Conflating the
     // two would make "Yours" useless the moment you had replied.
-    expect(matchesFilter(row({ mine: 'waiting' }), 'mine')).toBe(true);
-    expect(matchesFilter(row({ mine: 'waiting' }), 'your-move')).toBe(false);
-    expect(matchesFilter(row({ mine: 'your-move' }), 'mine')).toBe(true);
-    expect(matchesFilter(row({ mine: 'your-move' }), 'your-move')).toBe(true);
+    expect(matchesFilter(row({ participant: true, mine: 'waiting' }), 'mine')).toBe(true);
+    expect(matchesFilter(row({ participant: true, mine: 'waiting' }), 'your-move')).toBe(false);
+    expect(matchesFilter(row({ participant: true, mine: 'your-move' }), 'mine')).toBe(true);
+    expect(matchesFilter(row({ participant: true, mine: 'your-move' }), 'your-move')).toBe(true);
+  });
+
+  it('keeps a game you finished, which has no turn left to hold', () => {
+    // `mine` is null for a game that is over - there is nobody to be waiting
+    // for. Reading "Yours" off it therefore dropped every game you had played
+    // to a result, which is the half of somebody's history they are proudest
+    // of.
+    expect(matchesFilter(row({ participant: true, mine: null, over: true }), 'mine')).toBe(true);
+  });
+
+  it('does not hand you a game merely because its rules would admit you', () => {
+    // An open board admits anybody. If that counted as ownership, every viewer
+    // would find every unclaimed game under "Yours" and the filter would mean
+    // nothing at all.
+    expect(matchesFilter(row({ participant: false, seat: 'open' }), 'mine')).toBe(false);
   });
 
   it('treats live and finished as opposites, from the field and not the wording', () => {
@@ -247,8 +263,8 @@ describe('the filter rule itself', () => {
   });
 
   it('never claims a game is yours when nobody is connected', () => {
-    expect(matchesFilter(row({ mine: null }), 'mine')).toBe(false);
-    expect(matchesFilter(row({ mine: null }), 'your-move')).toBe(false);
+    expect(matchesFilter(row({ participant: false, mine: null }), 'mine')).toBe(false);
+    expect(matchesFilter(row({ participant: false, mine: null }), 'your-move')).toBe(false);
   });
 });
 
@@ -297,5 +313,124 @@ describe('finding a game by number', () => {
     await tick(60);
     expect(found(doc)).toBe('');
     expect(shownIds(doc).length).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Connecting while the list is already on screen.
+//
+// Reported 2026-08-13: "I have many live games for xtrata.btc but when I go to
+// the Yours tab it lists none of them."
+//
+// Every answer this list gives about ownership depends on who is asking, so a
+// list built before connecting was built for NOBODY - every row carries
+// `mine: null`, and the games the viewer is actually in are advertised to them
+// as an open seat.
+//
+// Connecting marked the list stale, which is enough for somebody who then
+// switches tabs, and does nothing at all for somebody already looking at it.
+// Redrawing the filters is not the same as rebuilding the rows: the Yours button
+// appears, correctly, and then matches nothing.
+// ---------------------------------------------------------------------------
+
+async function exploreThenConnect(as: string): Promise<Document> {
+  const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+  chain.as(ALICE);
+  await chain.openGame(rulesHash(OPEN), false);
+  await chain.openGame(rulesHash(OPEN), false);
+  await chain.submit(2, 'e2e4');
+
+  mountShell(dom.window.document);
+  const app = new ChessApp({
+    chain,
+    document: dom.window.document,
+    build: { network: 'devnet', contract: chain.contractId },
+    connect: async () => ({ address: as })
+  });
+  await tick();
+
+  // Look FIRST, connect second. That is the order the report came from.
+  (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+  await tick(120);
+  (dom.window.document.getElementById('connect') as HTMLButtonElement).click();
+  await tick(150);
+  void app;
+  return dom.window.document;
+}
+
+describe('connecting with the game list already open', () => {
+  it('finds the games you are in', async () => {
+    const doc = await exploreThenConnect(ALICE);
+    const yours = filterNamed(doc, 'Yours');
+    expect(yours, 'the Yours filter was never offered').toBeDefined();
+
+    yours!.click();
+    // Game 1 is Alice's move. Game 2 she has already moved in and is waiting.
+    // Both are hers, and neither depends on it being her turn.
+    expect(shownIds(doc), 'connecting did not rebuild the list').toEqual(['1', '2']);
+  });
+
+  it('stops offering your own game as an open seat', async () => {
+    // The same stale row, seen from the other side: with nobody connected the
+    // seat badge is right, and the moment somebody connects who is IN that game
+    // it is a lie told to the one person it cannot be true for.
+    const doc = await exploreThenConnect(ALICE);
+    expect(rowFor(doc, 2)!.textContent).not.toContain('Open seat');
+  });
+
+  it('answers for nobody again on disconnect', async () => {
+    const doc = await exploreThenConnect(ALICE);
+    (doc.getElementById('disconnect') as HTMLButtonElement).click();
+    await tick(150);
+    expect(doc.getElementById('explore-rows')!.textContent).not.toContain('Your move');
+    expect(filterNamed(doc, 'Yours'), 'a filter that cannot work is still offered').toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The BNS name is not the identity, and must never become it.
+//
+// Suspected 2026-08-13, on good evidence: the list says "xtrata.btc v
+// anyone-else", so it looks as though the row is matched by NAME and the name
+// simply is not being tied back to the connected address.
+//
+// It is not. `readyToOpen` refuses to open a game while a side is a `.btc` name
+// (`packages/protocol/rules.ts:249`) — a name has to become an address before it
+// is hashed, because replay compares principals and a sealed board has no
+// network to look anything up with. So the rules hold an ADDRESS, and the name
+// on screen is a reverse lookup done for display only.
+//
+// That is worth an assertion rather than an explanation, because the day a name
+// does reach the rules is the day this becomes true, and it would present
+// exactly like the bug it was mistaken for.
+// ---------------------------------------------------------------------------
+
+describe('a name on screen and an address in the rules', () => {
+  it('refuses to open a game whose player is still a name', () => {
+    const named = normaliseRules({ ...DEFAULT_RULES, white: 'xtrata.btc', black: BOB });
+    const check = readyToOpen(named);
+    expect(check.ready, 'a .btc name reached the rules hash').toBe(false);
+    // Reported in whatever case normalisation left it in - `side()` upper-cases
+    // anything that is not one of the keywords, and BNS lookup lowercases again
+    // before asking. The case is not the assertion; being reported is.
+    expect(
+      check.unresolved.map((name) => name.toLowerCase()),
+      'the name was not reported as needing a lookup'
+    ).toContain('xtrata.btc');
+  });
+
+  it('matches a game by address even when the row displays a name', async () => {
+    // The row is built from ALICE's address; whether a resolver later relabels
+    // it "xtrata.btc" is presentation and cannot change who is in the game.
+    const doc = await exploreThenConnect(ALICE);
+    filterNamed(doc, 'Yours')!.click();
+    expect(shownIds(doc)).toEqual(['1', '2']);
+  });
+
+  it('keeps the two apart in the rules themselves', () => {
+    // Upper-cased as a principal, and a name is left alone to fail loudly
+    // rather than be silently corrected into something unplayable.
+    expect(normaliseRules({ ...DEFAULT_RULES, white: ALICE.toLowerCase() }).white).toBe(ALICE);
+    expect(normaliseRules({ ...DEFAULT_RULES, white: 'xtrata.btc' }).white).toBe('XTRATA.BTC');
   });
 });
