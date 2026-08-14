@@ -434,3 +434,115 @@ describe('a name on screen and an address in the rules', () => {
     expect(normaliseRules({ ...DEFAULT_RULES, white: 'xtrata.btc' }).white).toBe('XTRATA.BTC');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Sponsored.
+//
+// Asked for 2026-08-13: a filter for games somebody is paying the moves for.
+//
+// It is the ONE filter whose answer is not already on the row, and it cannot be:
+// `get-sponsorship` takes `(game uint, who principal)`, so it answers about one
+// player you can already name. There is no function listing a game's
+// sponsorships and no event index to walk. That has two consequences, and both
+// are asserted here rather than described in a comment nobody reads:
+//
+//   * it costs chain reads, so it is spent by the person who asks for it and
+//     never on building the list;
+//   * a game open to "anyone" names nobody to ask about, so it is UNKNOWN and
+//     must be reported as unknown rather than counted as unsponsored.
+// ---------------------------------------------------------------------------
+
+async function exploreSponsored(): Promise<{ doc: Document; asked: string[] }> {
+  const chain = new MockChain({ balances: { [ALICE]: 1_000_000_000n, [BOB]: 1_000_000_000n } });
+  chain.as(ALICE);
+  // Alice-versus-anyone-else throughout, because that is the only shape a third
+  // party can RECOVER - and an unrecovered game names nobody, so there would be
+  // nobody to ask about and the test would pass for the wrong reason.
+  //
+  // 1: Alice's moves are paid for.
+  await chain.openSponsoredBoth(rulesHash(OPEN), false, ALICE, BOB);
+  // 2: same rules, nobody paying.
+  await chain.openGame(rulesHash(OPEN), false);
+  // 3: open to anyone, so there is no principal to ask about at all.
+  await chain.openGame(rulesHash(normaliseRules({ ...DEFAULT_RULES })), false);
+
+  // Counted the way the request-budget suite counts, because the assertion that
+  // matters here is a number of reads and not a rendering.
+  const asked: string[] = [];
+  const original = chain.getSponsorship.bind(chain);
+  (chain as unknown as Record<string, unknown>).getSponsorship = (game: number, who: string) => {
+    asked.push(`${game}|${who}`);
+    return original(game, who);
+  };
+
+  mountShell(dom.window.document);
+  const app = new ChessApp({
+    chain,
+    document: dom.window.document,
+    build: { network: 'devnet', contract: chain.contractId },
+    connect: async () => ({ address: ALICE })
+  });
+  await tick();
+  (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+  await tick(150);
+  void app;
+  return { doc: dom.window.document, asked };
+}
+
+describe('the sponsored filter', () => {
+  it('is offered without a wallet, because it is not about you', async () => {
+    const doc = await explore(null);
+    expect(filterNamed(doc, 'Sponsored'), 'the filter is missing').toBeDefined();
+  });
+
+  it('costs nothing until somebody presses it', async () => {
+    const { doc, asked } = await exploreSponsored();
+    filterNamed(doc, 'Live')!.click();
+    filterNamed(doc, 'Ranked')!.click();
+    filterNamed(doc, 'All')!.click();
+    await tick(80);
+    expect(asked, 'an ordinary filter spent a chain read').toEqual([]);
+  });
+
+  it('finds the game whose moves are being paid for', async () => {
+    const { doc } = await exploreSponsored();
+    filterNamed(doc, 'Sponsored')!.click();
+    await tick(200);
+    expect(shownIds(doc)).toEqual(['1']);
+  });
+
+  it('says what it could not ask, rather than calling it unsponsored', async () => {
+    // Game 3 is open to anyone. There is no principal to ask about, so the only
+    // honest answer is that it was not asked.
+    const { doc } = await exploreSponsored();
+    filterNamed(doc, 'Sponsored')!.click();
+    await tick(200);
+    expect(doc.getElementById('explore-count')!.textContent).toContain('could not be asked');
+  });
+
+  it('asks once, however many times it is pressed', async () => {
+    const { doc, asked } = await exploreSponsored();
+    filterNamed(doc, 'Sponsored')!.click();
+    await tick(200);
+    const spent = asked.length;
+    expect(spent, 'it never asked the chain at all').toBeGreaterThan(0);
+
+    filterNamed(doc, 'All')!.click();
+    filterNamed(doc, 'Sponsored')!.click();
+    await tick(200);
+    expect(asked.length, 'it asked the same question twice').toBe(spent);
+  });
+
+  it('asks only about the sides a game actually names', async () => {
+    const { doc, asked } = await exploreSponsored();
+    filterNamed(doc, 'Sponsored')!.click();
+    await tick(200);
+    // Games 1 and 2 name one principal each and a keyword. Game 3 names nobody,
+    // so it is never asked about - which is the bound, and the reason the cost
+    // is predictable.
+    expect(asked.length, `asked: ${asked.join(', ')}`).toBeLessThanOrEqual(2);
+    expect(asked.some((entry) => entry.startsWith('3|')), 'it asked about an open board').toBe(
+      false
+    );
+  });
+});

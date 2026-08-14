@@ -7,6 +7,7 @@
 import { renderBoard, destinationsFrom, promotionChoices, pieceGlyph, pieceName } from './board.js';
 import type { PendingMove } from './board.js';
 import { Names } from '../chain/bns.js';
+import { pool } from '../chain/pool.js';
 import { BlockTimes, formatClock } from '../chain/block-time.js';
 import { parseUci } from '../chess/uci.js';
 import { KING, WHITE } from '../chess/board.js';
@@ -95,6 +96,20 @@ interface ExploreRow {
    */
   participant: boolean;
   /**
+   * Whether somebody is paying for moves in this game.
+   *
+   * THREE STATES, and the third is the honest one. `get-sponsorship` takes
+   * `(game uint, who principal)` — it answers about one player you can already
+   * name. There is no function that lists a game's sponsorships and no event
+   * index to walk, so a game whose sides are "anyone" or "anyone-else" has
+   * nobody to ask about and cannot be answered at all. That is `null`, and it
+   * means UNKNOWN rather than no.
+   *
+   * Also null until asked: this costs a chain read per named player, so it is
+   * never spent on building the list. See `loadSponsorships`.
+   */
+  sponsored: boolean | null;
+  /**
    * Whether replay reached a result.
    *
    * A field rather than a reading of `state`, which is display text: a filter
@@ -112,7 +127,15 @@ interface ExploreRow {
  * that says so. That is the whole reason this is cheap: proposal 14 computed
  * these answers and threw them away, and this only stops throwing them away.
  */
-export type ExploreFilter = 'all' | 'your-move' | 'mine' | 'open' | 'live' | 'over' | 'ranked';
+export type ExploreFilter =
+  | 'all'
+  | 'your-move'
+  | 'mine'
+  | 'open'
+  | 'live'
+  | 'over'
+  | 'ranked'
+  | 'sponsored';
 
 /** Which rows a filter admits. Pure, and tested directly. */
 export function matchesFilter(row: ExploreRow, filter: ExploreFilter): boolean {
@@ -121,6 +144,10 @@ export function matchesFilter(row: ExploreRow, filter: ExploreFilter): boolean {
       return row.mine === 'your-move';
     case 'mine':
       return row.participant;
+    case 'sponsored':
+      // Strictly true. A row that could not be asked is unknown, and showing it
+      // here would be the list asserting something it does not know.
+      return row.sponsored === true;
     case 'open':
       return row.seat === 'open';
     case 'live':
@@ -316,6 +343,22 @@ export class ChessApp {
    * you look.
    */
   private static readonly EXPLORE_STALE_MS = 30_000;
+
+  /**
+   * How many games the Sponsored filter will ask about.
+   *
+   * Two reads each at most, so twenty-five games is fifty reads — spent once, by
+   * somebody who pressed the button, against a window of twenty-five. It is the
+   * whole window rather than a smaller slice because a filter that silently
+   * covered half the list would be worse than one that covered none.
+   */
+  private static readonly SPONSOR_LOOKUP_LIMIT = 25;
+
+  /** Sponsorship by `game|address`, so a filter is asked once and not per draw. */
+  private readonly sponsorSeen = new Map<string, boolean>();
+
+  /** Whether the chain has been asked yet, which is not the same as "none found". */
+  private sponsorLookedUp = false;
 
   private now(): number {
     return (this.options.now ?? Date.now)();
@@ -2673,6 +2716,70 @@ export class ChessApp {
    * is how a row found by searching would quietly start disagreeing with the
    * same row found by scrolling.
    */
+  /**
+   * Who a game's sponsorship can be asked about.
+   *
+   * The named sides, and nobody else. `get-sponsorship` wants a principal, so
+   * "anyone" and "anyone-else" are not questions the chain will take — and a
+   * player who claimed an open seat by moving is deliberately NOT included:
+   * finding them means reading every submission in the game, which is the walk
+   * this whole list is built to avoid.
+   */
+  private sponsorable(row: ExploreRow): string[] {
+    return [row.white, row.black].filter(
+      (side): side is string => typeof side === 'string' && /^S[PMTN][0-9A-Z]{20,}$/i.test(side)
+    );
+  }
+
+  /**
+   * Ask the chain who is being paid for, once, when somebody asks to see it.
+   *
+   * NEVER on the list build. Every other filter reads a field the row already
+   * carries and costs nothing; this one cannot, because the answer is only on
+   * the chain. So it is spent by the person who pressed the button, once, and
+   * cached — and the request-budget test asserts that pressing any OTHER filter
+   * still costs zero.
+   *
+   * Bounded twice over: at most two principals a game, and at most
+   * SPONSOR_LOOKUP_LIMIT games. Past that the list says what it did not ask
+   * rather than quietly answering for a subset.
+   */
+  private async loadSponsorships(): Promise<void> {
+    const pending = this.exploreRows.filter(
+      (row) => row.sponsored === null && this.sponsorable(row).length > 0
+    );
+    if (!pending.length) return;
+
+    const asking = pending.slice(0, ChessApp.SPONSOR_LOOKUP_LIMIT);
+    this.sponsorLookedUp = true;
+    await this.guard('reading sponsorships', async () => {
+      await pool(
+        3,
+        asking.map((row) => async () => {
+          const found = await Promise.all(
+            this.sponsorable(row).map(async (who) => {
+              const key = `${row.id}|${who.toUpperCase()}`;
+              if (!this.sponsorSeen.has(key)) {
+                const seat = await this.chain.getSponsorship(row.id, who);
+                // Funded, not spent, and not yet reclaimed. A settled or
+                // exhausted reserve pays for nothing, so calling it sponsored
+                // would send somebody to a game expecting free moves.
+                this.sponsorSeen.set(
+                  key,
+                  seat !== null && !seat.settled && seat.rebatesLeft > 0n
+                );
+              }
+              return this.sponsorSeen.get(key) === true;
+            })
+          );
+          row.sponsored = found.some(Boolean);
+        })
+      );
+      this.drawExplore();
+      return true;
+    });
+  }
+
   /** Rebuild the list from the chain, discarding any search result with it. */
   private async reloadExplore(): Promise<void> {
     this.exploreLoadedAt = null;
@@ -2765,6 +2872,7 @@ export class ChessApp {
         mine: null,
         seat: null,
         participant: false,
+        sponsored: null,
         over: false
       };
 
@@ -2883,7 +2991,8 @@ export class ChessApp {
       ['open', 'Open seat'],
       ['live', 'Live'],
       ['over', 'Finished'],
-      ['ranked', 'Ranked']
+      ['ranked', 'Ranked'],
+      ['sponsored', 'Sponsored']
     ];
 
     // A filter that is no longer offered must not keep filtering. Disconnecting
@@ -2901,6 +3010,9 @@ export class ChessApp {
       button.addEventListener('click', () => {
         this.exploreFilter = key;
         this.drawExplore();
+        // The one filter whose answer is not already on the row. Asked when it
+        // is asked for, and only then.
+        if (key === 'sponsored') void this.loadSponsorships();
       });
       node.appendChild(button);
     }
@@ -2928,6 +3040,20 @@ export class ChessApp {
         `${this.exploreTotal} game${this.exploreTotal === 1 ? '' : 's'} on this contract` +
           (this.exploreTotal > EXPLORE_WINDOW ? `, newest ${EXPLORE_WINDOW} shown` : '') +
           (this.address ? ', yours first' : '')
+      );
+    } else if (this.exploreFilter === 'sponsored') {
+      // This one has a third answer and has to say so. A game whose sides are
+      // "anyone" cannot be asked about at all, and a list that quietly dropped
+      // those would be reporting "not sponsored" for games it never asked.
+      const unasked = this.exploreRows.filter((row) => row.sponsored === null).length;
+      this.text(
+        'exploreCount',
+        !this.sponsorLookedUp
+          ? 'Asking the chain who is being paid for.'
+          : `${showing.length} sponsored, of ${this.exploreRows.length} shown` +
+            (unasked
+              ? `. ${unasked} could not be asked: a game open to anyone names nobody to ask about.`
+              : '.')
       );
     } else {
       // Say when a filter is hiding things, and say it in terms of the filter.

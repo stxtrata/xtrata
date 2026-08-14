@@ -12,7 +12,7 @@ import { LiveChain } from '../../packages/chain/client.js';
 import type { ContractCall, WriteResult } from '../../packages/chain/client.js';
 import { guardFor } from '../../packages/wallet/postconditions.js';
 import { signingBlockedReason, waitForProvider } from '../../packages/wallet/providers.js';
-import { connectWallet } from '../../packages/wallet/connect.js';
+import { connectWallet, disconnectWallet } from '../../packages/wallet/connect.js';
 import { contractCallParams, walletCall } from '../../packages/wallet/requests.js';
 import type { ProviderEntry } from '../../packages/wallet/providers.js';
 import type { Network } from '../../packages/chain/endpoint.js';
@@ -115,6 +115,8 @@ whenReady(document, () => {
     },
     disconnect: async () => {
       connected = null;
+      // Tell the wallet too, or the next connect reads the old session back.
+      await disconnectWallet();
     }
   });
 });

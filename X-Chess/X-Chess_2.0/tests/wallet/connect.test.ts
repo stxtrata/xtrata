@@ -12,7 +12,7 @@
 // against an injected clock. Nothing in this file waits for anything.
 
 import { describe, expect, it } from 'vitest';
-import { CONNECT_MS, PROBE_MS, connectWallet } from '../../packages/wallet/connect.js';
+import { CONNECT_MS, PROBE_MS, connectWallet, disconnectWallet } from '../../packages/wallet/connect.js';
 
 const ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 
@@ -200,5 +200,52 @@ describe('connecting a wallet', () => {
 
     expect(session.address).toBe(ADDRESS);
     expect(asked.map((entry) => entry.method)).toEqual(['wallet_connect', 'stx_requestAccounts']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Disconnecting.
+//
+// Reported 2026-08-13: disconnected from xtrata.btc, switched the wallet to
+// audionals.btc, reconnected — and came back as xtrata.btc. The console said
+// why, four times over: `stx_getAddresses -> ok`.
+//
+// Forgetting the address in this tab is not disconnecting. The runtime shim
+// keeps a session in local storage and the host keeps one too, so the next
+// connect opened by asking what they already knew and was told the old answer.
+// ---------------------------------------------------------------------------
+
+describe('disconnecting a wallet', () => {
+  it('tells the wallet, not just this tab', async () => {
+    const { call, asked } = recorder(() => ({ ok: true }));
+    await disconnectWallet({ call });
+    expect(asked.map((entry) => entry.method), 'the wallet was never told').toContain(
+      'wallet_disconnect'
+    );
+  });
+
+  it('tells every provider, not only the first that answers', async () => {
+    // The session that answers the next probe need not be the one that took the
+    // disconnect - under the runtime there is a shim, a host, and an extension,
+    // and they keep separate copies.
+    const { call, asked } = recorder(() => ({ ok: true }));
+    await disconnectWallet({ call });
+    expect(asked.map((entry) => entry.method)).toEqual([
+      'wallet_disconnect',
+      'stx_disconnect',
+      'disconnect'
+    ]);
+  });
+
+  it('is not held up by a wallet that has never heard of it', async () => {
+    const { call, asked } = recorder(() => new Error('method not found'));
+    await expect(disconnectWallet({ call })).resolves.toBeUndefined();
+    expect(asked.length, 'it gave up at the first refusal').toBe(3);
+  });
+
+  it('waits like a probe, because nothing here asks a person anything', async () => {
+    const { call, asked } = recorder(() => ({ ok: true }));
+    await disconnectWallet({ call });
+    for (const entry of asked) expect(entry.timeoutMs).toBe(PROBE_MS);
   });
 });

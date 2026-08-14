@@ -65,6 +65,34 @@ const REMEMBERED = ['stx_getAddresses', 'wallet_getAccount'];
 /** Questions that ask a person for something. */
 const DIALOGS = ['wallet_connect', 'stx_requestAccounts', 'stx_getAddresses', 'getAddresses'];
 
+/** Every spelling of "we are done here". */
+const FAREWELLS = ['wallet_disconnect', 'stx_disconnect', 'disconnect'];
+
+/**
+ * End the session, in the wallet and not only in this tab.
+ *
+ * Forgetting the address locally is not disconnecting. The runtime shim keeps a
+ * session of its own in local storage and the host keeps one too, so the next
+ * connect began by ASKING WHAT THEY ALREADY KNEW — `stx_getAddresses`, the free
+ * probe — and got the previous address straight back. Switching accounts in the
+ * wallet made no difference: the board reconnected as whoever it had been.
+ *
+ * Every provider is told, not just the first that answers, because the session
+ * that answers the next probe may not be the one that took the disconnect. A
+ * provider that has never heard of the method is not a failure — nothing to end.
+ */
+export async function disconnectWallet({
+  call = walletCall as Call
+}: Pick<ConnectDeps, 'call'> = {}): Promise<void> {
+  for (const method of FAREWELLS) {
+    try {
+      await call(method, {}, { timeoutMs: PROBE_MS });
+    } catch {
+      // Nothing to end here, or this provider does not know the word.
+    }
+  }
+}
+
 /**
  * Connect, or say why not.
  *
