@@ -136,3 +136,128 @@ describe('the colours the artefact actually ships', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// A label that vanishes under the cursor.
+//
+// Reported 2026-08-13: "only the selected button loses its text while the cursor
+// is hovering". `button.action:hover` sets `color: var(--gold)`, and both
+// gold-BACKGROUND rules lose to it on specificity - (0,3,1) against (0,3,0) for
+// a pressed filter and (0,1,1) for the primary. So hovering either painted gold
+// on gold: 1:1, no text at all. "Open game" had it too; the only reason that
+// went unreported is that a label you are hovering over is one you have already
+// read.
+//
+// Same family as --gold on the light square at 1.006:1, and the same reason it
+// survived: nothing measured a colour in a STATE. These do, by working out which
+// rule actually wins rather than which one is written last.
+// ---------------------------------------------------------------------------
+
+/** The stylesheet with comments removed, so a comment cannot read as a selector. */
+const stylesheet = (): string => html.replace(/\/\*[\s\S]*?\*\//g, ' ');
+
+interface Rule {
+  selector: string;
+  body: string;
+}
+
+/** Every `selector { body }`, one entry per comma-separated selector. */
+function rules(): Rule[] {
+  const out: Rule[] = [];
+  for (const match of stylesheet().matchAll(/([^{}@]+)\{([^{}]*)\}/g)) {
+    for (const selector of match[1].split(',')) {
+      const trimmed = selector.trim().replace(/\s+/g, ' ');
+      if (trimmed && !trimmed.startsWith('/')) out.push({ selector: trimmed, body: match[2] });
+    }
+  }
+  return out;
+}
+
+/**
+ * How strongly a selector binds, as one comparable number.
+ *
+ * Sufficient for this stylesheet and not a general implementation: no rule here
+ * carries an id, and every `:not()` argument is a single simple selector.
+ */
+function specificity(selector: string): number {
+  let classes = 0;
+  const rest = selector.replace(/:not\(([^)]*)\)/g, (_whole, inner: string) => {
+    classes += (inner.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) ?? []).length;
+    return ' ';
+  });
+  classes += (rest.match(/\.[\w-]+|\[[^\]]+\]|:[\w-]+/g) ?? []).length;
+  const elements = (rest.match(/(?:^|[\s>+~])[a-z][\w-]*/g) ?? []).length;
+  return classes * 100 + elements;
+}
+
+/** `color:`, and never `border-color:` or `background-color:`. */
+const textColour = (body: string): string | null =>
+  /(?:^|[;{\s])color:\s*(#[0-9a-fA-F]{3,8}|var\(--[\w-]+\))/.exec(body)?.[1] ?? null;
+
+/** The classes and attributes of a selector's last compound, quotes normalised. */
+const marks = (selector: string): string[] =>
+  ((selector.split(/[\s>+~]+/).pop() ?? '').match(/\.[\w-]+|\[[^\]]+\]/g) ?? []).map((mark) =>
+    mark.replace(/["']/g, '"')
+  );
+
+describe('colour in a state, not only at rest', () => {
+  it('measures gold on gold as the non-colour it is', () => {
+    // The premise. If this stops being true the two tests below prove nothing.
+    expect(ratio(token('gold'), token('gold'))).toBe(1);
+  });
+
+  it('keeps the label on every button that is painted gold', () => {
+    const all = rules();
+    const goldBacked = all.filter(
+      (rule) => /background:\s*var\(--gold\)/.test(rule.body) && rule.selector.includes('action')
+    );
+    const goldText = all.filter(
+      (rule) =>
+        rule.selector.includes(':hover') &&
+        rule.selector.includes('action') &&
+        textColour(rule.body) === 'var(--gold)'
+    );
+
+    expect(goldBacked.length, 'no gold button found, so this proves nothing').toBeGreaterThan(0);
+    expect(goldText.length, 'no gold-text hover rule found, so this proves nothing').toBeGreaterThan(0);
+
+    for (const gold of goldBacked) {
+      const wanted = marks(gold.selector);
+      for (const painter of goldText) {
+        const rescued = all.some((rule) => {
+          if (!rule.selector.includes(':hover')) return false;
+          const colour = textColour(rule.body);
+          if (!colour || colour === 'var(--gold)') return false;
+          // It must bind at least as narrowly as the gold rule it is defending,
+          // and more narrowly than the rule painting over it.
+          const covers = wanted.every((mark) => marks(rule.selector).includes(mark));
+          return covers && specificity(rule.selector) > specificity(painter.selector);
+        });
+
+        expect(
+          rescued,
+          `"${painter.selector}" (${specificity(painter.selector)}) paints gold text over ` +
+            `"${gold.selector}" (${specificity(gold.selector)}), and nothing more specific puts ` +
+            'a readable colour back. Hovering that button shows an empty one.'
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('gives every hovered button a label that is legible against its own background', () => {
+    const hovered = rules().filter(
+      (rule) => rule.selector.includes(':hover') && /background:\s*#[0-9a-fA-F]{3,8}/.test(rule.body)
+    );
+    expect(hovered.length, 'no hovered background rule found').toBeGreaterThan(0);
+
+    for (const rule of hovered) {
+      const background = /background:\s*(#[0-9a-fA-F]{3,8})/.exec(rule.body)?.[1];
+      const colour = textColour(rule.body);
+      if (!background || !colour?.startsWith('#')) continue;
+      expect(
+        ratio(background, colour),
+        `"${rule.selector}" hovers to ${colour} on ${background}`
+      ).toBeGreaterThan(4.5);
+    }
+  });
+});

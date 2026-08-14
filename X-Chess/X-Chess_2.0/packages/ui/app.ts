@@ -2855,7 +2855,11 @@ export class ChessApp {
             turn: state.turn,
             history: state.accepted
           }) === null;
-          if (anyone && row.mine === null) row.seat = 'open';
+          // Not `mine === null`. Whether a seat is free TO YOU is about whether
+          // you are already in the game, and `mine` goes null the moment a
+          // cooldown or a no-two-in-a-row rule stops you moving - at which point
+          // your own game would be advertised back to you as an empty chair.
+          if (anyone && !row.participant) row.seat = 'open';
         }
       } catch {
         // A row that will not replay is still a row. Saying less about it

@@ -290,6 +290,20 @@ button.action:hover:not(:disabled) { border-color: var(--gold); color: var(--gol
 button.action:disabled { opacity: .45; cursor: not-allowed; }
 button.action--primary { background: var(--gold); color: #17130c; border-color: var(--gold); font-weight: 600; }
 
+/* A gold button, hovered.
+   The rule above turns the LABEL gold, which on a gold background is the same
+   colour twice: 1:1, and the text disappears at the exact moment somebody is
+   pointing at it. It reached a person on the filter row, and "Open game" had it
+   too - the only reason that went unreported is that a label you are hovering
+   over is one you have already read.
+   It wins on specificity, (0,3,1) against (0,3,0) for the filters and (0,1,1)
+   for the primary, so these two have to outrank it rather than merely follow
+   it. Both are written to do that without relying on source order. */
+button.action.action--primary:hover:not(:disabled),
+.filters button.action[aria-pressed='true']:hover:not(:disabled) {
+  background: #e6b264; border-color: #e6b264; color: #17130c;
+}
+
 label { display: block; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
 input[type='text'], input[type='search'], select {
   width: 100%; background: #14120f; color: var(--ink); border: 1px solid var(--line);
