@@ -9,6 +9,7 @@
 //
 //   an entry at (game, seq)   once written, never changes
 //   a game's rules hash       written once, at creation
+//   ranked index -> game id   one map-set at creation, no delete anywhere
 //
 // What is deliberately NOT cached:
 //
@@ -248,8 +249,31 @@ export class CachingReader implements ChainReader {
   getRankedCount() {
     return this.inner.getRankedCount();
   }
-  getRankedGame(index: number) {
-    return this.inner.getRankedGame(index);
+  /**
+   * Which game is at a place in the ranked index. Cached forever.
+   *
+   * `(define-map RankedIndex uint uint)` is written exactly once, at creation,
+   * at the index the counter is currently on - one `map-set` in the whole
+   * contract and no `map-delete` anywhere. So position N is a game id that
+   * cannot change.
+   *
+   * This is what the leaderboard spends a third of its reads on: it walks
+   * 0..rankedCount asking the same question every time, and the answer was the
+   * same on every visit anybody has ever made.
+   */
+  async getRankedGame(index: number): Promise<number | null> {
+    const key = this.key('ranked', index);
+    const cached = await this.store.get(key);
+    if (cached !== null) {
+      this.hits++;
+      return JSON.parse(cached) as number;
+    }
+    this.misses++;
+    const id = await this.inner.getRankedGame(index);
+    // A miss is not cached, for the same reason an absent entry is not: an
+    // index that holds nothing yet is exactly the one that will hold something.
+    if (id !== null) await this.store.set(key, JSON.stringify(id));
+    return id;
   }
   getResultHint(game: number) {
     return this.inner.getResultHint(game);

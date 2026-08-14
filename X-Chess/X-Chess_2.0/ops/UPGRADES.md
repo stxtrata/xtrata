@@ -149,7 +149,8 @@ the commit, what was actually built, and what was learned doing it.
 | **28a** | Filter the game list | ✅ **Done** | `d2f5fe1c` |
 | **28b** | Find a game outside the window | ✅ **Done** | `17ccc106` |
 | **28e** | Sponsored filter | ✅ **Done** | `5cfbc568` |
-| **19** | Tail reads (the cache half only) | ◐ **Half** | `7d95eee6` |
+| **19** | Tail reads and a memoised leaderboard | ✅ **Done** | `7d95eee6`, `2e1d381d` |
+| **34** | The leaderboard walk, made affordable | ◐ **Half** | `2e1d381d` |
 | **35** | En passant drawn as the capture it is | ✅ **Done** | `07742dde` |
 | **36** | The tab says which game | ✅ **Done** | `18e18f6b` |
 | **17** | A wallet matrix runner | ✅ **Done** | `18e18f6b`, `+` |
@@ -291,7 +292,7 @@ disagreement is permanent.
 | **16** | ✅ [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
 | **17** | ✅ [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) | 3 | 4 | — | neither |
 | **18** | [Run the artefact in a real browser as a gate](#18-run-the-built-artefact-in-a-real-browser-headless-as-a-gate) | 3 | 5 | — | neither |
-| **19** | ◐ [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) — cache done, leaderboard not | 3 | 3 | ~1.0 KB | inscription |
+| **19** | ✅ [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) | 3 | 3 | ~1.0 KB | inscription |
 | **20** | [PGN, FEN and sealed games](#20-make-a-finished-game-portable-pgn-fen-and-a-sealed-page) | 3 | 4 | ~1.1 KB | inscription |
 | **21** | [A keyboard board, an announcer and game review](#21-a-keyboard-board-real-grid-semantics-an-announcer-and-game-review) | 3 | 3 | ~4 KB | inscription |
 | **22** | [`time!` — end abandoned games](#22-time--end-abandoned-games-with-a-block-height-deadline) | 2 | 4 | ~2 KB | inscription |
@@ -317,7 +318,7 @@ disagreement is permanent.
 
 | # | Proposal | Simp | Safe | Bytes | Needs |
 |---|---|:---:|:---:|---|---|
-| **34** | [Bound the leaderboard walk](#34-bound-the-leaderboard-walk-which-grows-without-limit) | 3 | 2 | ~0.5 KB | **decision** |
+| **34** | ◐ [Bound the leaderboard walk](#34-bound-the-leaderboard-walk-which-grows-without-limit) — affordable now; bounding it is still a **decision** | 3 | 2 | ~0.5 KB | **decision** |
 | **35** | ✅ [Make en passant reachable by the obvious click](#35-make-en-passant-reachable-by-the-obvious-click) | 4 | 5 | ~0.2 KB | inscription |
 | **36** | ✅ [Say which game you are looking at](#36-say-which-game-you-are-looking-at) **incident** | 5 | 5 | ~0.3 KB | inscription |
 
@@ -3283,6 +3284,35 @@ So this needs a decision about what the leaderboard MEANS, not just a bound:
 should cost one read a game rather than three, and the walk should be three-wide
 like the explorer. That is proposal 19's other half, and it buys the time to
 decide the third question rather than being forced into it.
+
+### ✅ Implemented — the affordable half
+
+Both of the first two, measured in `tests/e2e/leaderboard-scale.test.ts`:
+
+```
+9 ranked games   cold 28 reads -> warm 10      peak in flight 1 -> 3
+4 ranked -> 13 reads, 12 ranked -> 37          still linear
+```
+
+Three of the reads a game were two too many. `getRankedGame` is a position in an
+append-only index — one `map-set` at creation and no `map-delete` anywhere in the
+contract (`clar:300`) — so it is cached forever. The entries were already
+immutable and cached, and passing `nextSeq` lets a whole cached log be recognised
+without asking for it. What is left is one game row each, which is the only thing
+that can have changed.
+
+**Nothing derived is cached.** Every rating is recomputed from the log on every
+visit, because recomputing is the proof: the cache removes the fetching and never
+the deriving. There is a test that fails if a warm visit produces a table without
+having derived it.
+
+**THE THIRD QUESTION IS STILL OPEN, and this did not answer it.** The walk is now
+affordable, not bounded: at a hundred ranked games it is roughly 300 reads cold
+and 100 warm, and it still grows for the life of the contract. Windowing it is
+the only thing that bounds it, and windowing it changes every rating on the page
+— so it stays a decision about what the leaderboard MEANS, and the measurement
+above is what it should be decided against. The growth is asserted rather than
+assumed, so the day somebody does window it, a test says so.
 
 ---
 

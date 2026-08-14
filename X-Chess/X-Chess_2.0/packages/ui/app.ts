@@ -217,6 +217,15 @@ const EXPLORE_WINDOW = 25;
 const EXPLORE_READ_WIDTH = 3;
 
 /**
+ * How many ranked games the leaderboard reads at once.
+ *
+ * The same three, and deliberately not more. This walk is the only one in the
+ * board with no window on it, so it is the one place where being greedy scales
+ * with the contract rather than with a page.
+ */
+const LEADERBOARD_READ_WIDTH = 3;
+
+/**
  * The other three rates.
  *
  * FAST is for the seconds around a move landing - the only time somebody is
@@ -3380,34 +3389,61 @@ export class ChessApp {
   async loadLeaderboard(): Promise<void> {
     await this.guard('computing ratings', async () => {
       const count = await this.chain.getRankedCount();
-      const rated: RatedGame[] = [];
       let skipped = 0;
 
-      for (let index = 0; index < count; index++) {
-        const id = await this.chain.getRankedGame(index);
-        if (id === null) continue;
-        const row = await this.chain.getGame(id);
-        if (!row) continue;
+      // ONE GAME AT A TIME, FOREVER, was what this did: three round trips each,
+      // sequentially, with no window at all. Nine games is fine. A hundred is
+      // about three hundred sequential reads and roughly forty-five seconds, and
+      // it grows for the life of the contract - not a thing that gets slowly
+      // worse, a thing that stops working.
+      //
+      // Three at a time, the same width as the explorer and the resolvers, and
+      // for the same reason: the rate limit is per address and the wallet spends
+      // from it too.
+      //
+      // The reads themselves are now mostly avoidable rather than merely
+      // parallel. `getRankedGame` is a position in an append-only index, cached
+      // forever; the entries of a game are immutable and cached; and passing
+      // `nextSeq` lets a whole cached log be recognised without asking. What is
+      // left on a return visit is one game row each, which is the only part that
+      // can have changed.
+      //
+      // NOTHING DERIVED IS CACHED. Every rating is recomputed from the log every
+      // time, because recomputing is the proof - the cache only removes the
+      // fetching, never the deriving.
+      const judged = await pool(
+        LEADERBOARD_READ_WIDTH,
+        Array.from({ length: count }, (_, index) => async (): Promise<RatedGame | null> => {
+          const id = await this.chain.getRankedGame(index);
+          if (id === null) return null;
+          const row = await this.chain.getGame(id);
+          if (!row) return null;
 
-        const entries = await this.chain.getAllEntries(id);
-        const state = replay(
-          entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
-          { rules: this.rulesForRanked(row, entries) }
-        );
-        const check = checkEligibility(row, state.rules, state);
-        if (!check.eligible || state.result === null) {
-          skipped++;
-          continue;
-        }
-        const terminal = state.accepted.find((e) => e.seq === state.terminalSequence);
-        rated.push({
-          game: id,
-          white: check.white!,
-          black: check.black!,
-          result: state.result,
-          terminalHeight: terminal?.height ?? row.openedAt
-        });
-      }
+          const entries = await this.chain.getAllEntries(id, row.nextSeq);
+          const state = replay(
+            entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
+            { rules: this.rulesForRanked(row, entries) }
+          );
+          const check = checkEligibility(row, state.rules, state);
+          if (!check.eligible || state.result === null) {
+            skipped++;
+            return null;
+          }
+          const terminal = state.accepted.find((e) => e.seq === state.terminalSequence);
+          return {
+            game: id,
+            white: check.white!,
+            black: check.black!,
+            result: state.result,
+            terminalHeight: terminal?.height ?? row.openedAt
+          };
+        })
+      );
+
+      // In index order, which pool preserves. Elo is PATH DEPENDENT: the same
+      // games in another order give different ratings, so the order this arrives
+      // in is part of the answer rather than a presentation detail.
+      const rated: RatedGame[] = judged.filter((game): game is RatedGame => game !== null);
 
       const table = computeRatings(rated);
       const rows = leaderboard(table);
