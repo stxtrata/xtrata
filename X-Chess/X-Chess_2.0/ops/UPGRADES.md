@@ -19,6 +19,8 @@ and the function underneath it breaks the rule.
 
 - [How this was produced](#how-this-was-produced)
 - [The state of the tree as reviewed](#the-state-of-the-tree-as-reviewed)
+- [Progress](#progress)
+- [What was built that this review never proposed](#what-was-built-that-this-review-never-proposed)
 - [The three constraints that price everything](#the-three-constraints-that-price-everything)
 - [How to read each proposal](#how-to-read-each-proposal)
 - [Everything, at a glance](#everything-at-a-glance)
@@ -27,6 +29,7 @@ and the function underneath it breaks the rule.
 - [Tier 3 — strategic, needs a decision](#tier-3--strategic-needs-a-decision)
 - [Tier 4 — worth knowing about](#tier-4--worth-knowing-about)
 - [Part two — from the first testers](#part-two--from-the-first-testers)
+- [Tier 5 — found by using it, 2026-08-14](#tier-5--found-by-using-it-2026-08-14)
 - [Suggested order of work](#suggested-order-of-work)
 
 ---
@@ -68,6 +71,24 @@ Measured, not quoted:
 | `dist/xchess-gates.html` | 128,615 bytes |
 | live inscription | 2988, 123,062 bytes, build hash `c2861564` |
 | bound contract | `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary` |
+
+**That table is a record of the moment this review was written, and stays as
+one.** Correcting it would falsify the thing it exists to be. Where the tree is
+now, measured the same way on 2026-08-14:
+
+| | |
+|---|---|
+| commit | `0b9eb2a8` "A finished game should not read like a live one" |
+| `npx vitest run` | **839 passed, 17 skipped**, 93 s |
+| `npm run typecheck` | clean |
+| `dist/xchess.html` | **156,029 bytes** — 10 of 32 chunks, 368,259 to spare |
+| `dist/xchess-gates.html` | 149,631 bytes |
+| live inscription | 2988, 123,062 bytes, build hash `c2861564`, **unchanged** |
+
+Two figures worth reading together. The artefact has grown 25,247 bytes since the
+review — two chunks — and 177 tests have arrived with it. Nothing has reached a
+player: **2988 is exactly what it was**, and everything below that says "needs an
+inscription" still does.
 
 The engineering here is unusually good, and the review reflects that: almost
 nothing below is "you forgot to build X". Most of it is either a rule this
@@ -125,8 +146,13 @@ the commit, what was actually built, and what was learned doing it.
 | **23** | Runbook and errata | ✅ **Done** | `25dc5ea3` |
 | **13** | Bound the rules-recovery search | ✅ **Done** | `6eb7d0a0` |
 | **16** | Keep a real host after the rewrite | ✅ **Done** | `784f70a9` |
+| **28a** | Filter the game list | ✅ **Done** | `d2f5fe1c` |
+| **28b** | Find a game outside the window | ✅ **Done** | `17ccc106` |
+| **28e** | Sponsored filter | ✅ **Done** | `5cfbc568` |
+| **19** | Tail reads (the cache half only) | ◐ **Half** | `7d95eee6` |
 
-**Eighteen of thirty-three built, plus one found already built.**
+**Twenty-one of thirty-three built, plus one found already built, plus one
+half.**
 
 Every proposal scoring 4 or 5 on both simplicity and safety is done, and so are
 the two rated 4/3 — proposals 13 and 16, both of which were actively wrong in the
@@ -134,10 +160,59 @@ live inscription and both consensus-visible, which is what held their safety
 score down rather than any doubt about the fix.
 
 Proposal 2 (minify, −9.4 KB) is deliberately deferred to keep the source readable
-while this work continues. Both defects the testers found are fixed in the tree.
+while this work continues. It has got MORE attractive rather than less: the
+artefact has grown two chunks since this review, so the same saving now buys back
+most of one. Both defects the testers found are fixed in the tree.
 Neither reaches a player until the next inscription, which is deliberate: they
 are small, and pushing a new inscription per fix is how a project ends up with a
 split user base.
+
+---
+
+## What was built that this review never proposed
+
+Between 2026-08-13 and 2026-08-14 the board was put in front of a person on a
+real wallet for the first time. That found eleven things, none of which is a
+proposal below, and several of which were more serious than anything that is.
+Recorded here because a reader comparing the tree to this document otherwise
+cannot account for the difference.
+
+| what | where it was | commit |
+|---|---|---|
+| **The runtime shim answered "connect" by asking itself to connect** — an infinite loop of promise continuations that starved the microtask queue, so no timer in the tab ever fired again | `xtrata-2.0/public/runtime/wallet-shim.js` | `888b33af` |
+| The connect timeout was a probe's patience, then a dialog's, and never both | `packages/wallet/connect.ts` | `94563203`, `754eba47` |
+| The shim outranked every real wallet even with no bridge to forward to | `packages/wallet/providers.ts` | `b066f4ea` |
+| Disconnect forgot the address locally and told nobody, so reconnecting read the old session straight back | `packages/wallet/connect.ts` | `5cfbc568` |
+| Disconnect then took up to fifty-four seconds, sequentially | same | `0b9eb2a8` |
+| A game list built before connecting was built for nobody, and advertised your own games back to you as open seats | `packages/ui/app.ts` | `7d5f947f` |
+| "Yours" read whether you could act, not whether you were in the game | same | `7d5f947f` |
+| Gold text on a gold button: every pressed filter lost its label under the cursor | `packages/ui/shell.ts` | `a80c6015` |
+| `--line-2` used twice, defined nowhere, so every plain badge had no border | same | `0b9eb2a8` |
+| "Send it anyway" held the move but not the game, so it could submit into a different one | `packages/ui/app.ts` | `46a78d8e` |
+| A move declared a 0.1 STX ceiling it could never use, and the wallet read it out as a charge | `packages/chain/client.ts` | `46a78d8e` |
+
+Two of those are worth generalising from.
+
+**The wallet shim had no tests at all.** It is 29 KB, it decides whether any
+inscribed application can reach a wallet, and it was the only substantial piece
+of the runtime with no suite. The fault in it could not be found by a timeout,
+because it had eaten the timers. That is the strongest argument this repository
+has yet produced for **proposal 17**.
+
+**Nothing here was findable by reading.** Every one was found by a person
+clicking, and eight reviewers had already read the same code. **Proposal 18** is
+the standing form of that lesson.
+
+### And one feature
+
+**A seat claimed by playing it** (`first-mover`, `46a78d8e`). Neither `anyone`
+nor `anyone-else` ever locked a game to two people: the first is anybody on every
+move, and the second excludes only a NAMED opponent. `first-mover` gives a colour
+to whoever plays it and to nobody afterwards, on one side or both. It commits the
+game to **replay-v2**, so inscription 2988 says "unsupported protocol" rather
+than misreading the keyword as a principal and skipping every move.
+
+---
 
 **The free check is done.** `https://xtrata.xyz/i/2988?game=8` was opened in a
 browser on 2026-08-12 and does **not** work — but only because inscription 2988
@@ -213,7 +288,7 @@ disagreement is permanent.
 | **16** | ✅ [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
 | **17** | [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) | 3 | 4 | — | neither |
 | **18** | [Run the artefact in a real browser as a gate](#18-run-the-built-artefact-in-a-real-browser-headless-as-a-gate) | 3 | 5 | — | neither |
-| **19** | [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) | 3 | 3 | ~1.0 KB | inscription |
+| **19** | ◐ [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) — cache done, leaderboard not | 3 | 3 | ~1.0 KB | inscription |
 | **20** | [PGN, FEN and sealed games](#20-make-a-finished-game-portable-pgn-fen-and-a-sealed-page) | 3 | 4 | ~1.1 KB | inscription |
 | **21** | [A keyboard board, an announcer and game review](#21-a-keyboard-board-real-grid-semantics-an-announcer-and-game-review) | 3 | 3 | ~4 KB | inscription |
 | **22** | [`time!` — end abandoned games](#22-time--end-abandoned-games-with-a-block-height-deadline) | 2 | 4 | ~2 KB | inscription |
@@ -227,12 +302,21 @@ disagreement is permanent.
 | **25** | ✅ [The endpoint failover never comes back](#25-the-endpoint-failover-never-comes-back) **defect** | 4 | 4 | ~0.2 KB | inscription |
 | **26** | ✅ [Coordinates around the board](#26-coordinates-around-the-board) | 5 | 4 | ~0.4 KB | inscription |
 | **27** | [Deep links, and getting back to a game](#27-deep-links-to-a-game-and-getting-back-to-one) | 4 | 4 | ~0.8 KB | inscription |
-| **28** | [Explore: search, filter, spectator facts](#28-explore-search-filter-and-the-facts-a-spectator-needs) | 3 | 4 | ~1.5 KB | inscription |
+| **28** | ◐ [Explore: search, filter, spectator facts](#28-explore-search-filter-and-the-facts-a-spectator-needs) — a, b and sponsored done; c, d and the expiry not | 3 | 4 | ~1.5 KB | inscription |
 | **29** | [Which game am I in, is it my move elsewhere](#29-which-game-am-i-watching-and-is-it-my-move-somewhere-else) | 3 | 4 | ~1.2 KB | inscription |
 | **30** | [Chat, comments and presence](#30-chat-comments-and-presence) | 2 | 2 | tbd | **decision** + contract |
 | **31** | [Wagers, winner takes the pot](#31-wagers-winner-takes-the-pot) | 1 | 1 | tbd | **decision** + contract |
 | **32** | [Tournaments](#32-tournaments) | 2 | 3 | tbd | pot needs **decision** |
 | **33** | [A faster game mode](#33-a-faster-game-mode-inscribed-at-the-end) | 1 | 2 | tbd | **decision** + contract |
+
+**Found by using it** — 2026-08-14, and see
+[what was built that this review never proposed](#what-was-built-that-this-review-never-proposed).
+
+| # | Proposal | Simp | Safe | Bytes | Needs |
+|---|---|:---:|:---:|---|---|
+| **34** | [Bound the leaderboard walk](#34-bound-the-leaderboard-walk-which-grows-without-limit) | 3 | 2 | ~0.5 KB | **decision** |
+| **35** | [Make en passant reachable by the obvious click](#35-make-en-passant-reachable-by-the-obvious-click) | 4 | 5 | ~0.2 KB | inscription |
+| **36** | [Say which game you are looking at](#36-say-which-game-you-are-looking-at) **incident** | 5 | 5 | ~0.3 KB | inscription |
 
 **Eight of the thirty-three need no new inscription and no new contract** — 1, 3,
 4, 5, 6, 17, 18 and 23. They are the cheapest and safest work in this document,
@@ -3148,8 +3232,122 @@ change here that could lose somebody real money.
 
 ---
 
-*Produced 2026-08-12 against commit `c0dd8d8d`. Every measurement in this document
-was taken from the tree at that commit; re-measure before quoting any of it.*
+# Tier 5 — found by using it, 2026-08-14
+
+Three proposals that this review could not have produced, because each came from
+watching the board be used rather than from reading it.
+
+---
+
+## 34. Bound the leaderboard walk, which grows without limit
+
+**Simplicity 3 · Safety 2 · needs a decision · ~0.5 KB**
+
+### In plain terms
+
+The leaderboard reads **every ranked game there has ever been**, one after
+another, every time somebody opens the tab. That is fine with nine games. It is
+not a thing that gets slowly worse; it is a thing that stops working.
+
+### The problem
+
+`loadLeaderboard` walks `0..getRankedCount()` and for each one reads the ranked
+index, the game row and its whole log — about three round trips a game,
+sequentially, with no window at all.
+
+Measured today: the explorer costs **51 reads** for its 25-game window and the
+same 51 for a contract with 100 games, because the window bounds it. The
+leaderboard has no equivalent. At 100 ranked games it is roughly 300 sequential
+reads: **around forty-five seconds**, and it grows for the life of the contract.
+
+### Why this is not simply "add a window"
+
+Ratings computed over the newest N games are a **different number** from ratings
+computed over all of them. Elo is path-dependent: it is the whole sequence that
+produces a rating, and truncating the sequence silently changes every figure on
+the page.
+
+So this needs a decision about what the leaderboard MEANS, not just a bound:
+
+| option | what it costs | what it changes |
+|---|---|---|
+| Read concurrently, keep it complete | ~3× faster, still unbounded | nothing |
+| Cache per game, recompute the table | after the first visit, near free | nothing — the entries are immutable and already cached |
+| Window it | bounded forever | **every rating on the page** |
+
+**Recommendation: the second, then the first.** The entry cache landed today
+(`7d95eee6`), and a finished ranked game can never change — so the second visit
+should cost one read a game rather than three, and the walk should be three-wide
+like the explorer. That is proposal 19's other half, and it buys the time to
+decide the third question rather than being forced into it.
+
+---
+
+## 35. Make en passant reachable by the obvious click
+
+**Simplicity 4 · Safety 5 · needs an inscription · ~0.2 KB**
+
+### In plain terms
+
+En passant is the one capture in chess where you do not move onto the piece you
+are taking. A player tried it, found nothing happened, and reasonably concluded
+the board did not implement the rule.
+
+### The problem
+
+It is implemented and it was offered. Replaying the real game 2 at the moment it
+mattered, the legal moves from f5 were `f5f6, f5g6` and the position carried
+`g6` as the en passant square. The player clicked **g5** — where the enemy pawn
+is — and g5 is not a square their pawn can reach, so nothing happened and there
+was no way to tell that from "not implemented".
+
+### The proposal
+
+Two small things, either alone worth having:
+
+1. When a pawn is picked up and an en passant capture is available, **highlight
+   the captured pawn as well as the destination**. It is the only capture where
+   those are different squares, and nothing on the board says so.
+2. **Accept the click on the captured pawn** when the en passant capture is the
+   only legal interpretation of it. Unambiguous, and it removes the one place
+   where knowing the rules is not enough to play the move.
+
+### Why it is worth doing
+
+It is a rule every club player knows and almost no casual player does, on a
+board whose whole claim is that the rules are refereed correctly. Getting it
+right and appearing not to is the worst of both.
+
+---
+
+## 36. Say which game you are looking at
+
+**Simplicity 5 · Safety 5 · needs an inscription · ~0.3 KB**
+
+This is **proposal 29a**, and it is repeated here because it stopped being a
+convenience.
+
+On 2026-08-14 the same move was submitted to two different games, three minutes
+apart, by the same wallet. The chain shows it plainly: `g7g5` in game 2 at block
+8757147 and in game 1 at block 8757168. Both games were `xtrata.btc v
+anyone-else`, both black to move, both opened 1.e4, and the board says which one
+you are in exactly once, in small text, above a board that looks identical.
+
+It was not a software fault — there is no automatic resubmission anywhere, and a
+duplicate listener fires in the same tick rather than three minutes later. It was
+two deliberate clicks in a board that could not tell two games apart.
+
+**Raise 29a to the top of the navigation work.** The permanent connected-wallet
+line landed the same day (`46a78d8e`) for the same reason; the game needs the
+same treatment, and the document title is the cheapest place to put it.
+
+---
+
+*Produced 2026-08-12 against commit `c0dd8d8d`. Every measurement in that first
+pass was taken from the tree at that commit; re-measure before quoting any of it.
+**Audited and extended 2026-08-14 against `0b9eb2a8`**, which is where every
+figure in "the state of the tree now", "what was built that this review never
+proposed", and proposals 34 to 36 comes from.*
 
 *A browsable version of this document, with the same twenty-three proposals
 sortable and filterable by what they cost, is published at
