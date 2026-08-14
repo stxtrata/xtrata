@@ -17,7 +17,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { build as esbuild } from 'esbuild';
+import { build as esbuild, transform } from 'esbuild';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const DIST = resolve(ROOT, 'dist');
@@ -139,6 +139,83 @@ function assertOneScriptClose(html, label) {
   }
 }
 
+/**
+ * Minify the shell's CSS and HTML, which live as template literals.
+ *
+ * The board carries every byte of them forever, and about 12 KB of that is
+ * PROSE: comments explaining why a grid row is explicit, why a ring is two-tone,
+ * why there are no backticks in a comment. Every one of those is worth keeping -
+ * they are the reason the same bug has not been reintroduced three times - and
+ * none of them is worth inscribing.
+ *
+ * Done as an onLoad over shell.ts rather than by splitting the strings into
+ * .css and .html files. The file split is what proposal 2 described and it costs
+ * three configs (esbuild, tsc, vitest) plus module shims; this costs one plugin
+ * and leaves the source exactly as a developer reads it. Nothing but the BUILD
+ * sees the minified form.
+ *
+ * THE TRAP, and it is the reason this is not a one-line regex: the CSS literal
+ * interpolates `${SCALE_CSS}` in the middle of itself, and the HTML literal
+ * interpolates the explainers and the seat options. Handing any of that to a CSS
+ * parser fails, and handing it to a text transform risks eating it. So the
+ * literals are split on their interpolations, only the static parts are touched,
+ * and the plugin asserts every interpolation survived.
+ */
+function shellAssets() {
+  const SPLIT = /(\$\{[^{}]*\})/;
+
+  const minifyCss = async (text) => {
+    const out = await transform(text, { loader: 'css', minify: true });
+    return out.code;
+  };
+
+  // Comments and leading indentation only. NEVER all whitespace runs: the space
+  // between two inline elements is a space on screen, and collapsing it moves
+  // the page.
+  const minifyHtml = (text) =>
+    text
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .split('\n')
+      .map((line) => line.replace(/^\s+/, ''))
+      .filter((line) => line.length > 0)
+      .join('\n');
+
+  const rewrite = async (source, name, minify) => {
+    const found = new RegExp(`export const ${name} = \`([\\s\\S]*?)\`;`).exec(source);
+    if (!found) throw new Error(`build: shell.ts has no ${name} literal to minify`);
+
+    const parts = found[1].split(SPLIT);
+    const holes = parts.filter((part) => SPLIT.test(part));
+    const done = [];
+    for (const part of parts) {
+      done.push(SPLIT.test(part) ? part : await minify(part));
+    }
+    const rebuilt = done.join('');
+
+    // Every interpolation still there, and in order. Losing one is silent: the
+    // per-piece font sizes would simply vanish and the pieces would render at
+    // the default size, which looks like a design choice.
+    for (const hole of holes) {
+      if (!rebuilt.includes(hole)) {
+        throw new Error(`build: minifying ${name} dropped the interpolation ${hole}`);
+      }
+    }
+    return source.replace(found[0], `export const ${name} = \`${rebuilt}\`;`);
+  };
+
+  return {
+    name: 'shell-assets',
+    setup(build) {
+      build.onLoad({ filter: /packages[\\/]ui[\\/]shell\.ts$/ }, async (args) => {
+        let source = await readFile(args.path, 'utf8');
+        source = await rewrite(source, 'CSS', minifyCss);
+        source = await rewrite(source, 'HTML', async (text) => minifyHtml(text));
+        return { contents: source, loader: 'ts' };
+      });
+    }
+  };
+}
+
 async function bundle(entry) {
   const result = await esbuild({
     entryPoints: [resolve(ROOT, entry)],
@@ -149,6 +226,7 @@ async function bundle(entry) {
     minify: true,
     write: false,
     legalComments: 'none',
+    plugins: [shellAssets()],
     define: {
       // Baked in, so an inscribed board cannot be pointed somewhere else by a
       // URL parameter. See `exact` below.

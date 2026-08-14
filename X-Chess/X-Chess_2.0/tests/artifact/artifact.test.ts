@@ -415,3 +415,76 @@ describe('what must never be in a permanent file', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// The shell's prose is not inscribed.
+//
+// The CSS and HTML carry about 12 KB of comments explaining why a grid row is
+// explicit, why the selection ring is two-tone, why there are no backticks in a
+// comment. Every one of them is worth keeping - they are why the same bug has
+// not been reintroduced three times - and none of them is worth paying for
+// forever. They stay in source and are stripped at build time.
+//
+// The trap, and the reason this is not one regex: the CSS literal interpolates
+// SCALE_CSS in the middle of itself. Lose that and the per-piece font sizes
+// simply vanish, and every piece renders at the default size - which looks like
+// a design choice rather than a fault.
+// ---------------------------------------------------------------------------
+
+describe('what the shell costs to inscribe', () => {
+  it('carries none of the prose that explains it', () => {
+    for (const [name, text] of Object.entries({
+      board: readFileSync(resolve(ROOT, 'dist/xchess.html'), 'utf8'),
+      gates: readFileSync(resolve(ROOT, 'dist/xchess-gates.html'), 'utf8')
+    })) {
+      expect(text, `${name} still inscribes the stylesheet's comments`).not.toContain(
+        'NOTE: no backticks'
+      );
+      expect(text, `${name} still inscribes an HTML comment`).not.toContain(
+        'WHO YOU ARE, permanently'
+      );
+    }
+  });
+
+  it('keeps the source readable, which is the whole reason this is a build step', () => {
+    // If the comments ever leave `packages/ui/shell.ts` the saving has been
+    // taken twice, and the second time it cost the explanations.
+    const source = readFileSync(resolve(ROOT, 'packages/ui/shell.ts'), 'utf8');
+    expect(source, 'the stylesheet has lost its own explanations').toContain('NOTE: no backticks');
+  });
+
+  it('did not eat the interpolation that sizes the pieces', () => {
+    // SCALE_CSS is generated at runtime from SCALE, so it is never literal CSS
+    // in the artefact - what has to survive is the GENERATOR. The proposal that
+    // asked for this suggested asserting a `.pc--wk { font-size:` rule, which
+    // could never have been there.
+    expect(html, 'the per-piece font sizes are no longer generated at all').toMatch(
+      /\.pc--\$\{[^}]*\}[^`]*font-size/
+    );
+  });
+
+  it('still ships every rule the board depends on', () => {
+    // A minifier that dropped a block would be silent. These are the ones whose
+    // absence is a fault somebody already found the hard way.
+    for (const rule of [
+      'sq--dark',
+      'sq--selected',
+      'sq--en-passant',
+      'co--rank',
+      '--line-2',
+      'board--loading'
+    ]) {
+      expect(html, `${rule} did not survive minification`).toContain(rule);
+    }
+  });
+
+  it('is smaller for it, in the unit that costs money', () => {
+    const manifest = JSON.parse(readFileSync(resolve(ROOT, 'dist/manifest.json'), 'utf8')) as {
+      xtrataChunks: number;
+    };
+    // 156,029 bytes and ten chunks before this; 141,690 and nine after. The
+    // chunk is the unit Xtrata charges for, so crossing back over one is the
+    // saving that can actually be felt.
+    expect(manifest.xtrataChunks, 'the shell minifier stopped paying for itself').toBeLessThan(10);
+  });
+});

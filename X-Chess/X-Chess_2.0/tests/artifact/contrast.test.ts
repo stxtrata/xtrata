@@ -48,6 +48,29 @@ function luminance(hex: string): number {
   return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2];
 }
 
+/**
+ * The darkness of a colour, whatever notation it is written in.
+ *
+ * The build minifies the stylesheet now, and esbuild rewrites colours: rgba(0,
+ * 0, 0, .55) ships as #0000008c and #ffffff as #fff. Three assertions in this
+ * file were pinned to the SPELLING rather than the colour, and minification is
+ * exactly the change that should have forced them to be written properly - a
+ * test that breaks when a colour is written more briefly was testing the wrong
+ * thing.
+ */
+function isDark(colour: string): boolean {
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(colour.trim());
+  if (hex) {
+    const value = hex[1];
+    const six = value.length <= 4 ? [...value.slice(0, 3)].map((c) => c + c).join('') : value.slice(0, 6);
+    return luminance(`#${six}`) < 0.1;
+  }
+  const rgb = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(colour);
+  if (!rgb) return false;
+  const [, r, g, b] = rgb;
+  return Number(r) < 60 && Number(g) < 60 && Number(b) < 60;
+}
+
 function ratio(a: string, b: string): number {
   const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
   return (high + 0.05) / (low + 0.05);
@@ -85,16 +108,26 @@ describe('the colours the artefact actually ships', () => {
 
     const selected = html.match(/\.sq--selected\s*\{([^}]*)\}/);
     expect(selected, 'no .sq--selected rule ships').not.toBeNull();
+    // A DARK inset inside the gold ring, so one edge always resolves on either
+    // square colour and in greyscale. Asserted as darkness rather than as a
+    // notation: the minifier is free to write the same colour more briefly.
+    const inset = /inset 0 0 0 \d+px (#[0-9a-fA-F]{3,8}|rgba?\([^)]*\))/.exec(selected![1]);
+    expect(inset, 'the selected ring has no second tone at all').not.toBeNull();
     expect(
-      selected![1],
-      'the selected ring is gold alone, which is invisible on a light square'
-    ).toMatch(/inset 0 0 0 \d+px rgba\(0, ?0, ?0/);
+      isDark(inset![1]),
+      `the selected ring's second tone is ${inset![1]}, which is not dark - so it is gold alone, ` +
+        'and invisible on a light square'
+    ).toBe(true);
   });
 
   it('marks the last move with something other than hue too', () => {
     const last = html.match(/\.sq--last\s*\{([^}]*)\}/);
     expect(last, 'no .sq--last rule ships').not.toBeNull();
-    expect(last![1], 'the last-move ring is gold alone').toMatch(/rgba\(0, ?0, ?0/);
+    const tones = last![1].match(/#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)/g) ?? [];
+    expect(
+      tones.some((tone) => isDark(tone)),
+      `the last-move ring is ${tones.join(', ')}, with no dark tone among them`
+    ).toBe(true);
   });
 
   it('keeps body text well clear of the ground it sits on', () => {
@@ -111,7 +144,8 @@ describe('the colours the artefact actually ships', () => {
     // The overlay must be capped with it, or every pending arrow stretches off
     // its squares.
     expect(html).toMatch(/\.board,\s*\.board-wrap/);
-    expect(html, 'nothing keys on viewport height').toContain('max-height: 560px');
+    // Whitespace is the minifier's to choose.
+    expect(html, 'nothing keys on viewport height').toMatch(/max-height:\s*560px/);
   });
 
   it('gives every escape hatch a real tap target', () => {

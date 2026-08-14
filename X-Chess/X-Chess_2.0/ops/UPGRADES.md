@@ -151,6 +151,7 @@ the commit, what was actually built, and what was learned doing it.
 | **28e** | Sponsored filter | ✅ **Done** | `5cfbc568` |
 | **19** | Tail reads and a memoised leaderboard | ✅ **Done** | `7d95eee6`, `2e1d381d` |
 | **34** | The leaderboard walk, made affordable | ◐ **Half** | `2e1d381d` |
+| **2** | Minify the shell CSS and HTML | ✅ **Done** | `c7f15129` |
 | **35** | En passant drawn as the capture it is | ✅ **Done** | `07742dde` |
 | **36** | The tab says which game | ✅ **Done** | `18e18f6b` |
 | **17** | A wallet matrix runner | ✅ **Done** | `18e18f6b`, `+` |
@@ -275,7 +276,7 @@ disagreement is permanent.
 | # | Proposal | Simp | Safe | Bytes | Needs |
 |---|---|:---:|:---:|---|---|
 | **1** | ✅ [Price the artefact in Xtrata chunks](#1-price-the-artefact-in-xtrata-chunks-and-gate-on-the-boundary) | 5 | 5 | — | neither |
-| **2** | [Minify the shell CSS and HTML](#2-minify-the-shell-css-and-strip-its-html-comments-at-build-time) | 3 | 3 | **−9.2 KB** | inscription |
+| **2** | ✅ [Minify the shell CSS and HTML](#2-minify-the-shell-css-and-strip-its-html-comments-at-build-time) — **−14.3 KB**, ten chunks to nine | 3 | 3 | **−9.2 KB** | inscription |
 | **3** | [Deterministic build, unstuck release gate, inscription ledger](#3-make-the-build-deterministic-unstick-the-release-gate-and-give-inscriptions-a-ledger) | 3 | 4 | — | neither |
 | **4** | ✅ [Reconcile `ops/` with the chain](#4-reconcile-ops-with-what-is-actually-on-chain) | 4 | 5 | — | neither |
 | **5** | [Restore the sponsorship constants](#5-restore-the-sponsorship-constants-and-stop-the-canary-breaking-them-again) | 4 | 3 | — | owner tx |

@@ -47,7 +47,7 @@ To convince yourself it works rather than just looks like it:
 npm test
 ```
 
-That is about two minutes and 839 tests. Nothing in it touches the
+That is about two minutes and 867 tests. Nothing in it touches the
 network, a wallet, or any money.
 
 ---
@@ -187,7 +187,7 @@ npm run build
 Produces:
 
 ```
-dist/xchess.html      156,029 bytes   the board, self-contained
+dist/xchess.html      141,690 bytes   the board, self-contained
 dist/xchess-gates.html   ~98 KB   the deployment and inscription gates
 dist/manifest.json                provenance: hashes, protocol versions
 ```

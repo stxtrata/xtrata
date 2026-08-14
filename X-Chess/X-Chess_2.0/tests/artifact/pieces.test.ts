@@ -95,6 +95,8 @@ describe('the built artefact', () => {
   });
 
   it('fills white solid', () => {
-    expect(HTML).toMatch(/\.pc--white\s*\{[^}]*color:\s*#ffffff/i);
+    // #fff and #ffffff are the same white, and the minifier picks. The colour
+    // is the assertion; how briefly it is written is not.
+    expect(HTML).toMatch(/\.pc--white\s*\{[^}]*color:\s*#(fff|ffffff)\b/i);
   });
 });
