@@ -94,8 +94,9 @@ all carry THIS build's hash. The hash is per row rather than once at the bottom
 because rows get re-run one at a time, and a single signature cannot say which
 rows were run against what.
 
-**Do not write these by hand.** Run the wallet track in `dist/xchess-gates.html`
-and paste what it prints. It uses the board's own `connectWallet`, `walletCall`,
+**Do not write these by hand.** Open `dist/xchess-gates.html?track=wallet`
+and work down it, then paste what the last step prints. It uses the board's own
+`connectWallet`, `walletCall`,
 `contractCallParams` and `guardFor` rather than its own copies — a page that
 signs through its own code proves things about that code — and it records which
 provider actually served each call, which is what every wallet fault found so far

@@ -3,7 +3,7 @@
 // Each handler does two things and they are kept apart on purpose: it ACTS, and
 // then it READS BACK. A step is only ever marked done by the read.
 
-import { INSCRIBE_STEPS } from '../../packages/ui/gates.js';
+import { INSCRIBE_STEPS, WALLET_STEPS } from '../../packages/ui/gates.js';
 import { Canary } from '../../packages/ui/canary.js';
 import type { CanaryContext, StepHandler, StepResult } from '../../packages/ui/canary.js';
 import { LiveChain } from '../../packages/chain/client.js';
@@ -19,7 +19,8 @@ import {
   waitForProvider
 } from '../../packages/wallet/providers.js';
 import type { ProviderEntry } from '../../packages/wallet/providers.js';
-import { contractCallParams, extractAddress, walletCall } from '../../packages/wallet/requests.js';
+import { contractCallParams, extractAddress, userCancelled, walletCall } from '../../packages/wallet/requests.js';
+import { connectWallet } from '../../packages/wallet/connect.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
 import { replay } from '../../packages/replay/replay.js';
@@ -36,6 +37,8 @@ interface Config {
   source: string;
   /** The clarity version the contract must be deployed as. */
   clarityVersion: number;
+  /** sha256 of dist/xchess.html - what a wallet matrix row is signed against. */
+  boardSha256?: string | null;
 }
 
 const CONFIG: Config = ((globalThis as Record<string, unknown>).__XCHESS_CANARY__ as Config) ?? {
@@ -205,7 +208,304 @@ async function balanceOf(
     .then((b: { stx?: { balance?: string } }) => BigInt(b.stx?.balance ?? '0'));
 }
 
+// ---------------------------------------------------------------------------
+// The wallet matrix, run rather than asserted.
+//
+// Every handler here calls the BOARD'S OWN wallet code - `connectWallet`,
+// `walletCall`, `contractCallParams`, `guardFor` - imported, never
+// reimplemented. A page that signs through its own copy proves things about the
+// copy, which is the one way a runner like this can be worse than no runner.
+//
+// And every result records WHICH PROVIDER served the call. On a page offering
+// three of them "it worked" is not a result: every wallet fault found by hand in
+// the last two days was a fault about which provider answered.
+// ---------------------------------------------------------------------------
+
+interface RowResult {
+  provider: string;
+  outcome: 'pass' | 'fail';
+  txid: string;
+}
+
+const matrix = new Map<number, RowResult>();
+
+const mark = (row: number, provider: string, outcome: 'pass' | 'fail', txid = '-'): void => {
+  matrix.set(row, { provider: provider || 'unknown', outcome, txid: txid || '-' });
+};
+
+/** What the board would try first, which is the thing a result is true within. */
+const providerNames = (): string => {
+  const found = collectProviders();
+  return found.length ? found.map((entry) => entry.label).join(', ') : 'none';
+};
+
+/**
+ * A manual row: the operator sets the browser up and says what happened.
+ *
+ * `pass` is the only thing that satisfies the release gate, and it has to be
+ * typed - there is no button that means "it was fine". Anything else is recorded
+ * verbatim as the failure, because "what happened instead" is the whole value of
+ * a row somebody had to arrange by hand.
+ */
+const manualRow = (row: number, expectation: string): StepHandler => {
+  return async (ctx: CanaryContext): Promise<StepResult> => {
+    const said = ctx.input('outcome').trim();
+    if (!said) return no(`${expectation}\n\nType what happened: "pass", or what it did instead.`);
+    const passed = said.toLowerCase() === 'pass';
+    mark(row, providerNames(), passed ? 'pass' : 'fail', '-');
+    return passed
+      ? ok(`row ${row}: pass\nproviders: ${providerNames()}`, { row, outcome: 'pass' })
+      : no(`row ${row} recorded as FAILED: ${said}`);
+  };
+};
+
+const walletHandlers: Record<string, StepHandler> = {
+  'w-survey': async () => {
+    const found = collectProviders();
+    const lines = [
+      `providers      ${providerNames()}`,
+      `board picks    ${found[0]?.label ?? 'nothing'}`,
+      `xtrata shim    ${shimInstalled()}`,
+      `framed         ${isFramed()}`,
+      `host bridge    ${usingHostBridge()}`,
+      `can sign       ${signingBlockedReason() === null}`,
+      `board sha256   ${CONFIG.boardSha256 ?? 'MISSING - rebuild'}`
+    ];
+    if (!CONFIG.boardSha256) {
+      return no(
+        `${lines.join('\n')}\n\nThis canary was built without the board's hash, so no row it ` +
+          'records can be signed against an artefact. Rebuild with `npm run build`.'
+      );
+    }
+    return ok(lines.join('\n'));
+  },
+
+  'w-connect': async (ctx) => {
+    // Row 1. The board's own connect, so what is proven is the board's.
+    const before = Date.now();
+    try {
+      const session = await connectWallet();
+      signer = session.address;
+      const took = Math.round((Date.now() - before) / 100) / 10;
+      mark(1, providerNames(), 'pass');
+      ctx.state.walletAddress = session.address;
+      return ok(`row 1: pass\naddress   ${session.address}\ntook      ${took}s`, {
+        row: 1,
+        address: session.address
+      });
+    } catch (error) {
+      mark(1, providerNames(), 'fail');
+      return no(`row 1 FAILED: ${(error as Error).message}`);
+    }
+  },
+
+  'w-no-wallet': manualRow(
+    10,
+    'Disable every wallet extension, reload, and press Connect on the board. It must say there ' +
+      'is no wallet and must not hang.'
+  ),
+
+  'w-locked': manualRow(
+    11,
+    'Lock the wallet, reload, and press Connect. It must wait for the unlock screen and then ' +
+      'connect - not report that no wallet is installed.'
+  ),
+
+  'w-late': manualRow(
+    14,
+    'Reload and press Connect before the extension has injected its provider. `waitForProvider` ' +
+      'exists for this and nothing has ever exercised it.'
+  ),
+
+  'w-network': manualRow(
+    13,
+    'Switch the wallet to testnet and connect. It must refuse and say WHICH network it wanted.'
+  ),
+
+  'w-bridge': async () => {
+    // Rows 8 and 9 are one question asked from two places, and this page can
+    // only ever be standing in one of them. So it records the half it is in and
+    // says plainly that the other needs the other page.
+    const framed = isFramed();
+    const bridged = usingHostBridge();
+    const blocked = signingBlockedReason();
+
+    if (bridged) {
+      mark(8, providerNames(), 'pass');
+      return ok(
+        `row 8: pass - framed with a host bridge, so signing goes through the host.\n` +
+          `framed ${framed}, bridge ${bridged}\n\n` +
+          'Row 9 needs this page opened OFF the runtime, or on it without a walletBridgeToken.',
+        { row: 8 }
+      );
+    }
+
+    // Unframed. The board must refuse UP FRONT rather than produce a failed
+    // transaction, and that is what costs a fee when it is wrong.
+    if (shimInstalled() && blocked === 'no-bridge') {
+      mark(9, providerNames(), 'pass');
+      return ok(
+        `row 9: pass - the shim is installed with no bridge, and signing is refused up front ` +
+          `rather than attempted.\nframed ${framed}, bridge ${bridged}\n\n` +
+          'Row 8 needs this page opened through the Xtrata site.',
+        { row: 9 }
+      );
+    }
+    return no(
+      `Neither row can be judged here: framed ${framed}, shim ${shimInstalled()}, bridge ` +
+        `${bridged}, blocked ${String(blocked)}. Row 8 wants the Xtrata site; row 9 wants the ` +
+        'runtime with no bridge token.'
+    );
+  },
+
+  'w-open': async (ctx) => {
+    // Row 2. One prompt, one transaction, 1.00 STX capped by a post condition.
+    const chain = requireChain();
+    const rules = normaliseRules({ ...DEFAULT_RULES });
+    try {
+      const sent = await chain.openGame(rulesHash(rules), false);
+      const outcome = await ctx.confirm(sent.txid ?? '', 'the game to open');
+      const passed = outcome.status === 'success';
+      mark(2, sent.provider ?? providerNames(), passed ? 'pass' : 'fail', sent.txid ?? '-');
+      if (!passed) return no(`row 2 FAILED: ${outcome.status}`);
+      const count = await chain.getGameCount();
+      ctx.state.walletGame = count;
+      return ok(
+        `row 2: pass\ngame      ${count}\nprovider  ${sent.provider}\ntxid      ${sent.txid}`,
+        { row: 2, game: count, txid: sent.txid }
+      );
+    } catch (error) {
+      mark(2, providerNames(), 'fail');
+      return no(`row 2 FAILED: ${(error as Error).message}`);
+    }
+  },
+
+  'w-move': async (ctx) => {
+    // Row 3. One prompt, one transaction, and NOTHING sent - the wallet should
+    // now say nothing whatever about a transfer, because with no sponsorship the
+    // call declares that no money moves.
+    const chain = requireChain();
+    const game = Number(ctx.state.walletGame);
+    if (!game) return no('Row 2 has to open a game first.');
+    try {
+      const sent = await chain.submit(game, 'e2e4', { expectRebate: false });
+      const outcome = await ctx.confirm(sent.txid ?? '', 'the move to land');
+      const passed = outcome.status === 'success';
+      mark(3, sent.provider ?? providerNames(), passed ? 'pass' : 'fail', sent.txid ?? '-');
+      return passed
+        ? ok(
+            `row 3: pass\nprovider  ${sent.provider}\ntxid      ${sent.txid}\n\n` +
+              'Check what the wallet SAID: with no sponsorship it should have mentioned no ' +
+              'transfer at all.',
+            { row: 3, txid: sent.txid }
+          )
+        : no(`row 3 FAILED: ${outcome.status}`);
+    } catch (error) {
+      mark(3, providerNames(), 'fail');
+      return no(`row 3 FAILED: ${(error as Error).message}`);
+    }
+  },
+
+  'w-cancel': async (ctx) => {
+    // Row 12. Cancelling is an ANSWER, so the board must report it and must not
+    // go round the provider list asking the same question again.
+    const chain = requireChain();
+    const game = Number(ctx.state.walletGame) || 1;
+    try {
+      await chain.submit(game, 'a2a3', { expectRebate: false });
+      mark(12, providerNames(), 'fail');
+      return no('row 12 FAILED: the request was not cancelled. Press Cancel in the wallet.');
+    } catch (error) {
+      const message = String((error as Error).message || '');
+      const cancelled = userCancelled(error);
+      mark(12, providerNames(), cancelled ? 'pass' : 'fail');
+      return cancelled
+        ? ok(`row 12: pass - reported as a cancellation.\n${message}`, { row: 12 })
+        : no(`row 12 FAILED: the refusal was not read as a cancellation.\n${message}`);
+    }
+  },
+
+  'w-sponsored': async (ctx) => {
+    // Row 4. The one that has never run anywhere.
+    const chain = requireChain();
+    const game = Number(ctx.state.walletGame);
+    if (!game) return no('Row 2 has to open a game first.');
+    if (!signer) return no('Connect first.');
+    try {
+      const before = await chain.getSponsorship(game, signer);
+      if (!before) {
+        return no(
+          `No sponsorship exists for ${signer} on game ${game}. Fund one from the launch track ` +
+            'first - this row proves the post condition is ACCEPTED, which needs a rebate to be ' +
+            'possible at all.'
+        );
+      }
+      const sent = await chain.submit(game, 'e7e5');
+      const outcome = await ctx.confirm(sent.txid ?? '', 'the sponsored move to land');
+      const after = await chain.getSponsorship(game, signer);
+      const spent = after && before.rebatesLeft > after.rebatesLeft;
+      const passed = outcome.status === 'success' && Boolean(spent);
+      mark(4, sent.provider ?? providerNames(), passed ? 'pass' : 'fail', sent.txid ?? '-');
+      if (outcome.status !== 'success') {
+        return no(
+          `row 4 FAILED: ${outcome.status}\n\nIf this aborted, the ` +
+            'contract-principal post condition was rejected - which is exactly what this row ' +
+            'exists to find out.'
+        );
+      }
+      return passed
+        ? ok(
+            `row 4: pass - the post condition was accepted and the rebate arrived.\n` +
+              `rebates   ${before.rebatesLeft} -> ${after?.rebatesLeft}\n` +
+              `provider  ${sent.provider}\ntxid      ${sent.txid}`,
+            { row: 4, txid: sent.txid }
+          )
+        : no('row 4 FAILED: the transaction succeeded but no rebate was spent.');
+    } catch (error) {
+      mark(4, providerNames(), 'fail');
+      return no(`row 4 FAILED: ${(error as Error).message}`);
+    }
+  },
+
+  'w-record': async (ctx) => {
+    // Rows 5 to 7 are this whole track run on another wallet or another device,
+    // so they cannot be a step here - they are a second and third run of this
+    // page, and what this one can do is carry their outcome across.
+    const elsewhere: [number, string][] = [
+      [5, 'xverse-mobile'],
+      [6, 'leather-desktop'],
+      [7, 'leather-mobile']
+    ];
+    for (const [row, field] of elsewhere) {
+      const said = ctx.input(field).trim();
+      if (said) mark(row, field, said.toLowerCase() === 'pass' ? 'pass' : 'fail', '-');
+    }
+
+    const build = CONFIG.boardSha256 ?? 'UNKNOWN';
+    const lines: string[] = [];
+    const missing: number[] = [];
+    for (let row = 1; row <= 14; row++) {
+      const found = matrix.get(row);
+      if (!found) {
+        missing.push(row);
+        continue;
+      }
+      lines.push(
+        `RESULT row=${row} build=${build} provider=${found.provider} outcome=${found.outcome} ` +
+          `txid=${found.txid}`
+      );
+    }
+
+    const block = lines.join('\n');
+    const note = missing.length
+      ? `\n\nStill missing: ${missing.join(', ')}. The release gate wants all fourteen.`
+      : '\n\nAll fourteen. Paste this into the Results block in harness/wallets/MATRIX.md.';
+    return ok(`${block}${note}`, { rows: lines.length, missing });
+  }
+};
+
 const handlers: Record<string, StepHandler> = {
+  ...walletHandlers,
   wallet: async () => {
     const providers = collectProviders();
     const blocked = signingBlockedReason();
@@ -1189,6 +1489,15 @@ const handlers: Record<string, StepHandler> = {
 };
 
 const inputs = {
+  'w-no-wallet': [{ name: 'outcome', label: 'pass, or what it did instead' }],
+  'w-locked': [{ name: 'outcome', label: 'pass, or what it did instead' }],
+  'w-late': [{ name: 'outcome', label: 'pass, or what it did instead' }],
+  'w-network': [{ name: 'outcome', label: 'pass, or what it did instead' }],
+  'w-record': [
+    { name: 'xverse-mobile', label: 'Row 5 - this track on Xverse mobile', placeholder: 'pass' },
+    { name: 'leather-desktop', label: 'Row 6 - this track on Leather desktop', placeholder: 'pass' },
+    { name: 'leather-mobile', label: 'Row 7 - this track on Leather mobile', placeholder: 'pass' }
+  ],
   configure: [
     {
       name: 'rebate-count',
@@ -1228,7 +1537,8 @@ function start(): void {
   new Canary({
     handlers,
     inputs,
-    steps: track === 'inscribe' ? INSCRIBE_STEPS : undefined,
+    steps:
+      track === 'inscribe' ? INSCRIBE_STEPS : track === 'wallet' ? WALLET_STEPS : undefined,
     build: {
       version: CONFIG.version,
       built: CONFIG.built,

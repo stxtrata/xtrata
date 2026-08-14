@@ -575,7 +575,7 @@ export const INSCRIBE_STEPS: StepDef[] = [
 
 export const WALLET_STEPS: StepDef[] = [
   {
-    id: 'survey',
+    id: 'w-survey',
     phase: 'reading',
     title: 'What is on this page',
     why:
@@ -586,94 +586,94 @@ export const WALLET_STEPS: StepDef[] = [
     irreversible: false
   },
   {
-    id: 'connect',
+    id: 'w-connect',
     phase: 'reading',
     title: 'Row 1 - connect',
     why: 'The wallet opens and an address comes back, through the board\'s own connectWallet.',
-    needs: ['survey'],
+    needs: ['w-survey'],
     irreversible: false
   },
   {
-    id: 'no-wallet',
+    id: 'w-no-wallet',
     phase: 'refusing',
     title: 'Row 10 - no wallet installed',
     why:
       'Says there is no wallet and does not hang. Run this in a browser with the extensions ' +
       'disabled; it is the one row that is meaningless anywhere else.',
-    needs: ['survey'],
+    needs: ['w-survey'],
     irreversible: false,
     manual: true
   },
   {
-    id: 'locked',
+    id: 'w-locked',
     phase: 'refusing',
     title: 'Row 11 - wallet locked',
     why: 'Waits for the unlock screen and then connects, rather than reporting no wallet.',
-    needs: ['survey'],
+    needs: ['w-survey'],
     irreversible: false,
     manual: true
   },
   {
-    id: 'late',
+    id: 'w-late',
     phase: 'refusing',
     title: 'Row 14 - a provider that appears late',
     why:
       'Reload and press Connect before the extension has injected. waitForProvider exists for ' +
       'this and nothing has ever exercised it.',
-    needs: ['survey'],
+    needs: ['w-survey'],
     irreversible: false,
     manual: true
   },
   {
-    id: 'network',
+    id: 'w-network',
     phase: 'refusing',
     title: 'Row 13 - wrong network',
     why: 'Refuses, and says which network it wanted. Switch the wallet to testnet first.',
-    needs: ['connect'],
+    needs: ['w-connect'],
     irreversible: false,
     manual: true
   },
   {
-    id: 'bridge',
+    id: 'w-bridge',
     phase: 'refusing',
     title: 'Rows 8 and 9 - framed and unframed',
     why:
       'Framed with a bridge token it signs through the host. Unframed it must refuse UP FRONT ' +
       'with a clear message rather than producing a failed transaction. Both halves, and the ' +
       'unframed half is the one that costs a fee when it is wrong.',
-    needs: ['survey'],
+    needs: ['w-survey'],
     irreversible: false
   },
   {
-    id: 'open',
+    id: 'w-open',
     phase: 'signing',
     title: 'Row 2 - open a Standard game',
     why: 'One prompt, one transaction, and the 1.00 STX capped by a post condition.',
-    needs: ['connect'],
+    needs: ['w-connect'],
     irreversible: true
   },
   {
-    id: 'move',
+    id: 'w-move',
     phase: 'signing',
     title: 'Row 3 - submit a move',
     why:
       'One prompt, one transaction, and NOTHING sent. With no sponsorship the transaction now ' +
       'declares that no money moves at all, so the wallet should say nothing about a transfer.',
-    needs: ['open'],
+    needs: ['w-open'],
     irreversible: true
   },
   {
-    id: 'cancel',
+    id: 'w-cancel',
     phase: 'signing',
     title: 'Row 12 - the user cancels',
     why:
       'Reports the cancellation and does NOT go round the provider list asking the same ' +
       'question again. Cancelling is an answer.',
-    needs: ['connect'],
+    needs: ['w-connect'],
     irreversible: false
   },
   {
-    id: 'sponsored',
+    id: 'w-sponsored',
     phase: 'signing',
     title: 'Row 4 - a SPONSORED move',
     why:
@@ -681,11 +681,11 @@ export const WALLET_STEPS: StepDef[] = [
       'contract\'s rebate is a transfer needing its own post condition, in a contract-principal ' +
       'encoding no previous X Chess build ever sent. The bytes match @stacks/transactions, ' +
       'which proves the encoding and not that any wallet accepts it.',
-    needs: ['open'],
+    needs: ['w-open'],
     irreversible: true
   },
   {
-    id: 'record',
+    id: 'w-record',
     phase: 'signing',
     title: 'Write the results out',
     why:

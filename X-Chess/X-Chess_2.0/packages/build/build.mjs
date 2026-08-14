@@ -167,7 +167,7 @@ async function bundle(entry) {
  * open. Built into dist/ alongside the board so a run can check that the
  * contract it deploys is the one the board was built against.
  */
-async function buildCanary() {
+async function buildCanary(boardSha256) {
   const source = await readFile(resolve(ROOT, 'contracts/xchess-core-v1.clar'), 'utf8');
   const code = await bundle('apps/canary/main.ts');
 
@@ -178,6 +178,11 @@ async function buildCanary() {
     built: BUILT,
     hash: sha256(code).slice(0, 8),
     clarityVersion: 4,
+    // THE BOARD'S hash, not the canary's. A wallet matrix is signed against the
+    // artefact players will open, and `harness/release.mjs` compares every
+    // RESULT line to `manifest.htmlSha256`. The canary carries it so the runner
+    // can stamp each row without anybody copying a hash by hand.
+    boardSha256: boardSha256 ?? null,
     source
   };
 
@@ -333,7 +338,10 @@ async function main() {
 
   // The canary is built by default: an artefact whose deploy page was never
   // built is an artefact nobody can get on chain.
-  const canary = CANARY || !process.argv.includes('--board-only') ? await buildCanary() : null;
+  const canary =
+    CANARY || !process.argv.includes('--board-only')
+      ? await buildCanary(manifest.htmlSha256)
+      : null;
   if (canary) manifest.canary = canary;
 
   await writeFile(resolve(DIST, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
