@@ -488,3 +488,30 @@ describe('what the shell costs to inscribe', () => {
     expect(manifest.xtrataChunks, 'the shell minifier stopped paying for itself').toBeLessThan(10);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The same source, built twice, is the same artefact.
+//
+// A wall-clock timestamp is baked into the build, so two builds of identical
+// source disagreed the moment they straddled a minute. That is not a tidiness
+// complaint: the wallet matrix signs every row against `manifest.htmlSha256`,
+// and `verify` rebuilds as its LAST layer - so running verify after the matrix
+// silently invalidated every row somebody had just earned by hand, and the gate
+// would then refuse with no way to tell that from a real regression.
+//
+// Worse, quietly: you could inscribe an artefact that is not the one you tested.
+// ---------------------------------------------------------------------------
+
+describe('building the same thing twice', () => {
+  it('can be pinned, so a release and its evidence agree', () => {
+    const source = readFileSync(resolve(ROOT, 'packages/build/build.mjs'), 'utf8');
+    expect(source, 'the build time is no longer pinnable').toContain('SOURCE_DATE_EPOCH');
+    expect(source, 'a person cannot say the build time plainly').toContain("arg('built'");
+  });
+
+  it('says when it was built, which is what makes pinning necessary', () => {
+    // If the stamp ever leaves the artefact this whole problem goes away and
+    // these tests should go with it.
+    expect(html, 'the build no longer stamps itself').toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+  });
+});

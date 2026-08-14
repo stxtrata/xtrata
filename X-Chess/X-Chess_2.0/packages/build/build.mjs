@@ -78,7 +78,28 @@ const VERSION = arg('version', '2.0.0-dev');
  * fresh one. The timestamp and the content hash together answer "am I looking
  * at what I just built" without anybody having to guess.
  */
-const BUILT = new Date().toISOString().slice(0, 16).replace('T', ' ');
+/**
+ * When this build says it was made.
+ *
+ * PINNABLE, because it is baked into the artefact and therefore into its hash.
+ * Left to the clock, two builds of identical source disagree the moment they
+ * straddle a minute - and the wallet matrix signs each row against
+ * `manifest.htmlSha256`, while `verify` rebuilds as its last layer. So running
+ * verify after the matrix silently invalidated every row that had just been
+ * earned by hand, and the gate would refuse with no way to tell that from a
+ * real regression.
+ *
+ * `SOURCE_DATE_EPOCH` is the reproducible-builds convention and is understood by
+ * other toolchains; `--built` is here for a person who wants to say it plainly.
+ * With neither, the clock, which is what an ordinary development build wants.
+ */
+const BUILT = (() => {
+  const said = arg('built', '');
+  if (said) return said;
+  const epoch = Number(process.env.SOURCE_DATE_EPOCH);
+  const when = Number.isFinite(epoch) && epoch > 0 ? new Date(epoch * 1000) : new Date();
+  return when.toISOString().slice(0, 16).replace('T', ' ');
+})();
 const CANARY = process.argv.includes('--canary');
 const CANARY_NAME = arg('canary-name', 'xchess-core-v1-canary');
 
