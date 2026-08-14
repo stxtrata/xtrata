@@ -117,6 +117,17 @@ interface ExploreRow {
    * and would be wrong in the meantime rather than loudly broken.
    */
   over: boolean;
+  /**
+   * The result and how it was reached, as fields.
+   *
+   * Held apart from `state` for the reason that field already gives: `state` is
+   * DISPLAY TEXT, and anything that parsed a sentence would break the first time
+   * the sentence was reworded and be wrong in the meantime rather than loudly
+   * broken. A finished game deserves to say who won, in the names the reader
+   * knows, and that cannot be recovered from "1-0 checkmate".
+   */
+  result: string | null;
+  termination: string | null;
 }
 
 /**
@@ -3033,7 +3044,9 @@ export class ChessApp {
         seat: null,
         participant: false,
         sponsored: null,
-        over: false
+        over: false,
+        result: null,
+        termination: null
       };
 
       try {
@@ -3079,6 +3092,8 @@ export class ChessApp {
         row.black = rules.rules.black;
         row.confirmed = rules.confirmed;
         row.over = state.status === 'over';
+        row.result = state.result;
+        row.termination = state.termination;
         row.state = !whole && game.nextSeq > 0
           ? `${game.nextSeq} submissions, open it to see`
           : state.status === 'over'
@@ -3274,19 +3289,45 @@ export class ChessApp {
       // this game is waiting for YOU. A correspondence player with four games
       // had to open all four to find out where they owed a move.
       const state = this.doc.createElement('span');
-      if (row.mine === 'your-move') {
-        state.appendChild(text('Your move', 'badge badge--turn'));
+      if (row.over && row.result) {
+        // A FINISHED GAME SHOULD NOT READ LIKE A LIVE ONE. "1-0 checkmate" sat
+        // in the same weight and colour as "white to move", so a game that had
+        // been over for days looked like one waiting for somebody.
+        //
+        // Three signals rather than one, because any single one can be missed:
+        // the score as a badge, the winner BY NAME, and the row itself tinted.
+        // The button says Review, since Open on a finished game promises
+        // something to do.
+        const score =
+          row.result === '1/2-1/2' ? '\u00bd\u2013\u00bd' : row.result.replace('-', '\u2013');
+        state.appendChild(text(score, 'badge badge--over'));
         state.appendChild(text(' ', ''));
-      } else if (row.seat === 'open') {
-        state.appendChild(text('Open seat', 'badge'));
-        state.appendChild(text(' ', ''));
+
+        const winner = row.result === '1-0' ? row.white : row.result === '0-1' ? row.black : null;
+        if (winner) {
+          state.appendChild(this.addressNode(winner));
+          state.appendChild(text(` won${row.termination ? ` by ${row.termination}` : ''}`, 'muted'));
+        } else {
+          state.appendChild(
+            text(`drawn${row.termination ? ` by ${row.termination}` : ''}`, 'muted')
+          );
+        }
+        tr.classList.add('over');
+      } else {
+        if (row.mine === 'your-move') {
+          state.appendChild(text('Your move', 'badge badge--turn'));
+          state.appendChild(text(' ', ''));
+        } else if (row.seat === 'open') {
+          state.appendChild(text('Open seat', 'badge'));
+          state.appendChild(text(' ', ''));
+        }
+        state.appendChild(text(row.state));
       }
-      state.appendChild(text(row.state));
       cell(state);
 
       const open = this.doc.createElement('button');
       open.className = 'action';
-      open.textContent = 'Open';
+      open.textContent = row.over ? 'Review' : 'Open';
       open.addEventListener('click', () => {
         this.show('game');
         void this.load(row.id);

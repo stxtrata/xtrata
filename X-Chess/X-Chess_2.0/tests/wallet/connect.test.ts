@@ -12,7 +12,13 @@
 // against an injected clock. Nothing in this file waits for anything.
 
 import { describe, expect, it } from 'vitest';
-import { CONNECT_MS, PROBE_MS, connectWallet, disconnectWallet } from '../../packages/wallet/connect.js';
+import {
+  CONNECT_MS,
+  FAREWELL_MS,
+  PROBE_MS,
+  connectWallet,
+  disconnectWallet
+} from '../../packages/wallet/connect.js';
 
 const ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 
@@ -243,9 +249,48 @@ describe('disconnecting a wallet', () => {
     expect(asked.length, 'it gave up at the first refusal').toBe(3);
   });
 
-  it('waits like a probe, because nothing here asks a person anything', async () => {
+  it('waits far less than a probe, because it asks nobody anything', async () => {
     const { call, asked } = recorder(() => ({ ok: true }));
     await disconnectWallet({ call });
-    for (const entry of asked) expect(entry.timeoutMs).toBe(PROBE_MS);
+    for (const entry of asked) expect(entry.timeoutMs).toBe(FAREWELL_MS);
+    expect(FAREWELL_MS, 'a farewell waits as long as a probe').toBeLessThan(PROBE_MS);
+  });
+
+  it('says all three at once rather than one after another', async () => {
+    // The regression that made disconnecting feel broken. Three spellings at
+    // six seconds each, across three providers, is fifty-four seconds of a
+    // board that has already forgotten who you are. Asserted as CONCURRENCY
+    // rather than as elapsed time, so the test does not wait for anything.
+    let live = 0;
+    let peak = 0;
+    const { call } = recorder(() => ({ ok: true }));
+
+    await disconnectWallet({
+      call: async (method, params, options) => {
+        live++;
+        peak = Math.max(peak, live);
+        try {
+          return await call(method, params, options);
+        } finally {
+          live--;
+        }
+      }
+    });
+
+    expect(peak, 'the farewells were sent one at a time').toBe(3);
+  });
+
+  it('is bounded by one farewell however many providers refuse', async () => {
+    // Each call is capped at FAREWELL_MS and they overlap, so the whole thing
+    // costs one of them - not one per method, and not one per provider.
+    const granted: number[] = [];
+    await disconnectWallet({
+      call: async (_method, _params, options) => {
+        granted.push(options?.timeoutMs ?? 0);
+        throw new Error('method not found');
+      }
+    });
+    expect(Math.max(...granted)).toBe(FAREWELL_MS);
+    expect(granted.length).toBe(3);
   });
 });

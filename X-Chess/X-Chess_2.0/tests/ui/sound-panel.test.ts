@@ -45,14 +45,15 @@ function unlocked(): Sound {
 }
 
 describe('the settings', () => {
-  it('starts with sound on and background listening off', () => {
-    // Opposite defaults on purpose. A sound is a small surprise anybody can
-    // switch off in one click, and a board silent until you find a panel is a
-    // board where nobody finds the feature. Reading a tab nobody is looking at
-    // spends somebody's rate limit, so it is asked for rather than assumed.
+  it('starts with sound on, and listening in the background too', () => {
+    // Background listening was off, on the argument that reading a tab nobody
+    // is looking at spends somebody's rate limit. The proxy carries an API key
+    // now, and correspondence chess is played in other tabs by definition - a
+    // board that only tells you your opponent moved while you are staring at it
+    // is telling you something you can already see. Off is one click away.
     const state = defaultState();
     expect(state.master).toBe(true);
-    expect(state.background).toBe(false);
+    expect(state.background).toBe(true);
     expect(state.volume).toBeGreaterThan(0);
   });
 

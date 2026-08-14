@@ -20,6 +20,12 @@ export const CSS = `
   --bg: #12100e;
   --panel: #1b1815;
   --line: #2e2924;
+  /* A second line tone, one step up from --line.
+     It was used by .badge and never defined: an invalid var() in a shorthand
+     makes the whole declaration invalid at computed-value time, so every plain
+     badge had NO BORDER and "Open seat" rendered as bare uppercase text. It
+     looked deliberate, which is why it survived. */
+  --line-2: #453d33;
   --ink: #e8e2d9;
   --dim: #9a9187;
   --gold: #d8a24a;
@@ -372,6 +378,18 @@ tr.found td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
          text-transform: uppercase; padding: 2px 6px; border-radius: 4px;
          border: 1px solid var(--line-2); color: var(--dim); }
 .badge--turn { color: var(--bg); background: var(--gold); border-color: var(--gold); }
+/* A result. Legible rather than dimmed - the result is the most interesting
+   thing about a finished game, so it gets MORE contrast than the row around it
+   and not less. Neutral rather than gold, because gold means "you can act". */
+.badge--over {
+  color: var(--ink); background: #322c25; border-color: var(--line-2);
+  letter-spacing: .02em;
+}
+/* The row itself. A tint and an edge rather than opacity: dimming a whole row
+   takes contrast away from the text as well, which is the fault this stylesheet
+   has already been caught with twice. */
+tr.over td { background: rgba(255, 255, 255, .022); }
+tr.over td:first-child { box-shadow: inset 3px 0 0 var(--line-2); }
 .small { font-size: 12px; }
 .addr { font-family: ui-monospace, monospace; font-size: 12px; color: var(--dim); }
 /* Abbreviated, so a row is one line. The full value is on the element, so a

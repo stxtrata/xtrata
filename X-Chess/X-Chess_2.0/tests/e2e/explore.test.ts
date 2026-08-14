@@ -546,3 +546,77 @@ describe('the sponsored filter', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// A finished game should not read like a live one.
+//
+// "1-0 checkmate" sat in the same weight and colour as "white to move", so a
+// game that had been over for days looked like one waiting for somebody. Three
+// signals rather than one, because any single one can be missed: the score as a
+// badge, the winner BY NAME, and the row itself marked.
+// ---------------------------------------------------------------------------
+
+async function exploreFinished(): Promise<Document> {
+  const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+  chain.as(ALICE);
+  await chain.openGame(rulesHash(OPEN), false);
+  // Fool's mate, so the game is genuinely over by replay and not by assertion.
+  const mate: [string, string][] = [
+    ['f2f3', ALICE],
+    ['e7e5', BOB],
+    ['g2g4', ALICE],
+    ['d8h4', BOB]
+  ];
+  for (const [move, who] of mate) {
+    chain.as(who);
+    await chain.submit(1, move);
+  }
+
+  mountShell(dom.window.document);
+  const app = new ChessApp({
+    chain,
+    document: dom.window.document,
+    build: { network: 'devnet', contract: chain.contractId }
+  });
+  await tick();
+  (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+  await tick(150);
+  void app;
+  return dom.window.document;
+}
+
+describe('a game that is over', () => {
+  it('shows the score as a badge rather than as a sentence', async () => {
+    const doc = await exploreFinished();
+    const badge = rowFor(doc, 1)!.querySelector('.badge--over');
+    expect(badge, 'a finished game has no result badge').not.toBeNull();
+    expect(badge!.textContent, 'black won, so the score reads from white').toBe('0–1');
+  });
+
+  it('says who won, in the name the reader knows', async () => {
+    // "0-1 checkmate" is notation. A person wants to know who won.
+    const doc = await exploreFinished();
+    const row = rowFor(doc, 1)!;
+    expect(row.textContent).toContain('won by checkmate');
+  });
+
+  it('marks the row itself, so it is obvious without reading the words', async () => {
+    const doc = await exploreFinished();
+    expect(rowFor(doc, 1)!.classList.contains('over')).toBe(true);
+  });
+
+  it('offers to review it rather than to open it', async () => {
+    // Open promises something to do. There is nothing to do here.
+    const doc = await exploreFinished();
+    const button = rowFor(doc, 1)!.querySelector('button');
+    expect(button!.textContent).toBe('Review');
+  });
+
+  it('leaves a live game exactly as it was', async () => {
+    const doc = await explore(null);
+    const row = rowFor(doc, 2)!;
+    expect(row.classList.contains('over')).toBe(false);
+    expect(row.querySelector('.badge--over')).toBeNull();
+    expect(row.querySelector('button')!.textContent).toBe('Open');
+  });
+});

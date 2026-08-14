@@ -69,6 +69,17 @@ const DIALOGS = ['wallet_connect', 'stx_requestAccounts', 'stx_getAddresses', 'g
 const FAREWELLS = ['wallet_disconnect', 'stx_disconnect', 'disconnect'];
 
 /**
+ * How long a farewell waits.
+ *
+ * Much shorter than a probe, and far shorter than a dialog, because a
+ * disconnect asks nobody anything: it either lands immediately or the provider
+ * has never heard of the method. Three spellings at six seconds each, across
+ * three providers, was up to fifty-four seconds of a board that had already
+ * forgotten who you were - which is exactly how it presented.
+ */
+export const FAREWELL_MS = 2_000;
+
+/**
  * End the session, in the wallet and not only in this tab.
  *
  * Forgetting the address locally is not disconnecting. The runtime shim keeps a
@@ -84,13 +95,19 @@ const FAREWELLS = ['wallet_disconnect', 'stx_disconnect', 'disconnect'];
 export async function disconnectWallet({
   call = walletCall as Call
 }: Pick<ConnectDeps, 'call'> = {}): Promise<void> {
-  for (const method of FAREWELLS) {
-    try {
-      await call(method, {}, { timeoutMs: PROBE_MS });
-    } catch {
-      // Nothing to end here, or this provider does not know the word.
-    }
-  }
+  // AT ONCE, not one after another. These are three names for the same act and
+  // none of them depends on the answer to the last, so waiting for each in turn
+  // only added its timeout to the total. The whole thing is now bounded by one
+  // FAREWELL_MS rather than by three times the number of providers.
+  await Promise.all(
+    FAREWELLS.map(async (method) => {
+      try {
+        await call(method, {}, { timeoutMs: FAREWELL_MS });
+      } catch {
+        // Nothing to end here, or this provider does not know the word.
+      }
+    })
+  );
 }
 
 /**

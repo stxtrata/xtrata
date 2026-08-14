@@ -69,13 +69,18 @@ export interface SoundState {
 export const BLACK_TRANSPOSE = 2 ** (-4 / 12);
 
 /**
- * Sound is ON by default, and the background option is OFF.
+ * Sound is ON by default, and so is listening in the background.
  *
- * Opposite defaults on purpose. A sound is a small surprise that a person can
- * turn off in one click, and a board that is silent until you find a panel is a
- * board where nobody discovers the feature at all. Background polling is not
- * that: it spends somebody's rate limit on a tab they are not looking at, so it
- * is asked for rather than assumed.
+ * Background listening was off, on the argument that it spends somebody's rate
+ * limit on a tab they are not looking at. Two things changed. The proxy the
+ * board reads through carries an API key now, so the anonymous fifty-a-minute
+ * ceiling is not what a viewer meets; and correspondence chess is played in
+ * other tabs by definition - a board that only tells you your opponent moved
+ * while you are staring at it is telling you something you can already see.
+ *
+ * It is still gated at the point of use rather than merely defaulted:
+ * `listeningInBackground` requires a game loaded and that game live, and hidden
+ * tabs poll at the slow rate. Off is one click away in the sound panel.
  */
 export function defaultState(): SoundState {
   const events = {} as Record<SoundEvent, EventSetting>;
@@ -83,7 +88,7 @@ export function defaultState(): SoundState {
     const spec = EVENTS[name];
     events[name] = { on: spec.on, gain: 1, voice: spec.voice };
   }
-  return { master: true, volume: 0.7, background: false, sides: false, events };
+  return { master: true, volume: 0.7, background: true, sides: false, events };
 }
 
 const clamp = (value: number): number => Math.min(1, Math.max(0, Number(value) || 0));

@@ -26,7 +26,7 @@ that particular contradiction mechanically.
 
 Run `npm test`, `npm run test:perft:deep`, and `npm run test:clarity`.
 
-`npm run verify` passes end to end. **743 tests, 0 failing.**
+`npm run verify` passes end to end. **839 tests, 0 failing.**
 
 `npm run release` REFUSES this build, correctly, on five counts: a placeholder
 contract, a `dev` version string, 0 of 14 wallet matrix rows run, an unsigned
@@ -94,7 +94,7 @@ and `elo-v1` with a proof that its rounding can never be ambiguous.
 three kinds, explorer, leaderboard derived entirely from the chain, profile.
 Everything on screen is derived by replay and nothing is stored.
 
-**Build and artefact.** One self-contained HTML file, 149,305 bytes - 10 of the
+**Build and artefact.** One self-contained HTML file, 156,029 bytes - 10 of the
 32 Xtrata chunks that upload in a single transaction - with a manifest
 carrying protocol versions and source hashes. `tests/artifact` reads `dist/`
 rather than source, which is the only way the double-boot class of bug is

@@ -175,7 +175,13 @@ describe('the bytes', () => {
     //
     // It used to be 250,000 - sixteen chunks - which let the artefact double
     // without anybody being told.
-    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(150_000);
+    //
+    // 150,000 -> 170,000 on 2026-08-14, deliberately. The board gained the entry
+    // cache, a seat that locks to its first mover, a sponsored filter and the
+    // explainers, and crossed the old figure at 154,435. Still ten of the
+    // thirty-two chunks that upload in one transaction, which is the gate that
+    // costs money; this one only has to catch a catastrophe.
+    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(170_000);
   });
 });
 

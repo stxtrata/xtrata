@@ -186,8 +186,13 @@ describe('a board that is being watched', () => {
 });
 
 describe('a board in a background tab', () => {
-  it('does not read a hidden tab when nobody asked it to', async () => {
+  it('does not read a hidden tab when it has been switched off', async () => {
+    // Background listening DEFAULTS ON now, so this test says what it always
+    // meant to: the switch works. Turning it off must stop the reads dead, or
+    // the setting is decoration and somebody who asked for quiet does not get
+    // it. The default is asserted in tests/ui/sound-panel.test.ts.
     const { app, chain, sound } = await board(BOB);
+    sound.setBackground(false);
     hidden = true;
 
     let reads = 0;
