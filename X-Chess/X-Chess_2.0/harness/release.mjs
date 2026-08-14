@@ -112,14 +112,56 @@ if (!existsSync(MATRIX)) {
 } else {
   const matrix = readFileSync(MATRIX, 'utf8');
 
-  if (/\|\s*not run\s*\|/.test(matrix)) {
-    const remaining = (matrix.match(/\|\s*not run\s*\|/g) || []).length;
-    refuse(`${remaining} wallet matrix row(s) have not been run`);
+  // EVIDENCE, NOT THE ABSENCE OF A PHRASE.
+  //
+  // This used to refuse when the file contained "not run", which made the
+  // table's only machine-readable property a string whose absence was treated
+  // as proof of work done. Editing fourteen cells to "done" satisfied it with
+  // no evidence whatsoever, and typing "pending" satisfied it by accident.
+  //
+  // A row now passes only if it carries a RESULT LINE, which the runner in the
+  // gates page writes and a person would have to forge deliberately:
+  //
+  //   RESULT row=4 build=<hash> provider=<label> outcome=pass txid=<id>
+  //
+  // The build hash is per row rather than once at the bottom, because a matrix
+  // is signed against an artefact and rows get re-run one at a time - a single
+  // signature at the end cannot tell which rows were run against what.
+  const ROW_COUNT = 14;
+  const results = new Map();
+  for (const line of matrix.split('\n')) {
+    const found = /^\s*RESULT\s+row=(\d+)\s+build=(\S+)\s+provider=(\S+)\s+outcome=(\S+)/.exec(line);
+    if (!found) continue;
+    const [, row, build, provider, outcome] = found;
+    results.set(Number(row), { build, provider, outcome });
   }
-  // Signed against THIS build, not some earlier one. A matrix signed against a
-  // different artefact proves nothing about this one.
-  if (htmlHash && !matrix.includes(htmlHash)) {
-    refuse('the wallet matrix is not signed against this build hash');
+
+  const missing = [];
+  const stale = [];
+  const failed = [];
+  for (let row = 1; row <= ROW_COUNT; row++) {
+    const found = results.get(row);
+    if (!found) {
+      missing.push(row);
+      continue;
+    }
+    if (found.outcome !== 'pass') failed.push(`${row} (${found.outcome})`);
+    if (htmlHash && found.build !== htmlHash) stale.push(`${row} (${found.build})`);
+  }
+
+  if (missing.length) {
+    refuse(
+      `wallet matrix row(s) ${missing.join(', ')} carry no RESULT line. Run the wallet track in ` +
+        'dist/xchess-gates.html and paste what it writes; editing the table by hand no longer ' +
+        'satisfies this gate.'
+    );
+  }
+  if (failed.length) refuse(`wallet matrix row(s) did not pass: ${failed.join(', ')}`);
+  if (stale.length) {
+    refuse(
+      `wallet matrix row(s) were run against a different build: ${stale.join(', ')}. This build ` +
+        `is ${htmlHash}.`
+    );
   }
 }
 

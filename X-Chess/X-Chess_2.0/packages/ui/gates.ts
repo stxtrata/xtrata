@@ -28,7 +28,11 @@ export type Phase =
   // than borrowing names from a sequence it is not running.
   | 'before'
   | 'inscribe'
-  | 'after';
+  | 'after'
+  // The wallet matrix's own, for the same reason.
+  | 'reading'
+  | 'signing'
+  | 'refusing';
 
 export type StepState = 'waiting' | 'running' | 'ok' | 'failed' | 'skipped';
 
@@ -424,7 +428,10 @@ export const PHASE_TITLES: Record<Phase, string> = {
   production: 'Production',
   before: 'Rehearsal, before anything is permanent',
   inscribe: 'The inscription',
-  after: 'The real thing'
+  after: 'The real thing',
+  reading: 'What is here, and who it says you are',
+  signing: 'Signing, which spends real money',
+  refusing: 'Refusing well, which is most of the work'
 };
 
 /**
@@ -537,5 +544,155 @@ export const INSCRIBE_STEPS: StepDef[] = [
       'proves the bridge.',
     needs: ['inscription-live'],
     irreversible: true
+  }
+];
+
+// ---------------------------------------------------------------------------
+// The wallet matrix, as steps rather than as a table nobody can run.
+//
+// `harness/wallets/MATRIX.md` is fourteen rows that have every one said "not
+// run" since the day it was written, and the release gate checked it by
+// searching the file for that string - so the table's only machine-readable
+// property was a phrase whose ABSENCE was treated as proof of work done.
+// Editing it to "done" satisfied the gate with no evidence at all.
+//
+// These are the same fourteen rows, executable. Two rules make the result mean
+// something:
+//
+//   IT USES THE BOARD'S OWN CODE. `connectWallet`, `walletCall`,
+//   `contractCallParams` and `guardFor`, imported rather than reimplemented. A
+//   page that signs through its own copy proves things about the copy.
+//
+//   IT RECORDS WHICH PROVIDER SERVED EACH CALL. On a page with three providers
+//   "it worked" is not a result; "it worked through window.XverseProviders
+//   .BitcoinProvider" is. Every fault found by hand in the last two days was a
+//   fault about WHICH provider answered.
+//
+// Rows 5 to 7 are the same four scenarios on another wallet or another device,
+// so they are not steps here - they are this whole track, run again over there,
+// and the sign-off records which.
+// ---------------------------------------------------------------------------
+
+export const WALLET_STEPS: StepDef[] = [
+  {
+    id: 'survey',
+    phase: 'reading',
+    title: 'What is on this page',
+    why:
+      'Every provider, in the order the board would try them, plus whether the Xtrata shim is ' +
+      'installed and whether there is a host bridge. This is the context every row below is ' +
+      'true or false WITHIN, and a result recorded without it cannot be compared to anything.',
+    needs: [],
+    irreversible: false
+  },
+  {
+    id: 'connect',
+    phase: 'reading',
+    title: 'Row 1 - connect',
+    why: 'The wallet opens and an address comes back, through the board\'s own connectWallet.',
+    needs: ['survey'],
+    irreversible: false
+  },
+  {
+    id: 'no-wallet',
+    phase: 'refusing',
+    title: 'Row 10 - no wallet installed',
+    why:
+      'Says there is no wallet and does not hang. Run this in a browser with the extensions ' +
+      'disabled; it is the one row that is meaningless anywhere else.',
+    needs: ['survey'],
+    irreversible: false,
+    manual: true
+  },
+  {
+    id: 'locked',
+    phase: 'refusing',
+    title: 'Row 11 - wallet locked',
+    why: 'Waits for the unlock screen and then connects, rather than reporting no wallet.',
+    needs: ['survey'],
+    irreversible: false,
+    manual: true
+  },
+  {
+    id: 'late',
+    phase: 'refusing',
+    title: 'Row 14 - a provider that appears late',
+    why:
+      'Reload and press Connect before the extension has injected. waitForProvider exists for ' +
+      'this and nothing has ever exercised it.',
+    needs: ['survey'],
+    irreversible: false,
+    manual: true
+  },
+  {
+    id: 'network',
+    phase: 'refusing',
+    title: 'Row 13 - wrong network',
+    why: 'Refuses, and says which network it wanted. Switch the wallet to testnet first.',
+    needs: ['connect'],
+    irreversible: false,
+    manual: true
+  },
+  {
+    id: 'bridge',
+    phase: 'refusing',
+    title: 'Rows 8 and 9 - framed and unframed',
+    why:
+      'Framed with a bridge token it signs through the host. Unframed it must refuse UP FRONT ' +
+      'with a clear message rather than producing a failed transaction. Both halves, and the ' +
+      'unframed half is the one that costs a fee when it is wrong.',
+    needs: ['survey'],
+    irreversible: false
+  },
+  {
+    id: 'open',
+    phase: 'signing',
+    title: 'Row 2 - open a Standard game',
+    why: 'One prompt, one transaction, and the 1.00 STX capped by a post condition.',
+    needs: ['connect'],
+    irreversible: true
+  },
+  {
+    id: 'move',
+    phase: 'signing',
+    title: 'Row 3 - submit a move',
+    why:
+      'One prompt, one transaction, and NOTHING sent. With no sponsorship the transaction now ' +
+      'declares that no money moves at all, so the wallet should say nothing about a transfer.',
+    needs: ['open'],
+    irreversible: true
+  },
+  {
+    id: 'cancel',
+    phase: 'signing',
+    title: 'Row 12 - the user cancels',
+    why:
+      'Reports the cancellation and does NOT go round the provider list asking the same ' +
+      'question again. Cancelling is an answer.',
+    needs: ['connect'],
+    irreversible: false
+  },
+  {
+    id: 'sponsored',
+    phase: 'signing',
+    title: 'Row 4 - a SPONSORED move',
+    why:
+      'The one that has never run anywhere, and the whole product. Under deny mode the ' +
+      'contract\'s rebate is a transfer needing its own post condition, in a contract-principal ' +
+      'encoding no previous X Chess build ever sent. The bytes match @stacks/transactions, ' +
+      'which proves the encoding and not that any wallet accepts it.',
+    needs: ['open'],
+    irreversible: true
+  },
+  {
+    id: 'record',
+    phase: 'signing',
+    title: 'Write the results out',
+    why:
+      'Emits the rows in the matrix\'s own format, with the build hash, the provider that served ' +
+      'each call and every transaction id. Paste it into harness/wallets/MATRIX.md; the release ' +
+      'gate reads THAT rather than searching for the absence of a phrase.',
+    needs: [],
+    irreversible: false
   }
 ];

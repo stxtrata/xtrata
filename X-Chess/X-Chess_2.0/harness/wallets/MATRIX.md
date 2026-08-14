@@ -75,6 +75,38 @@ Each of these was live at some point in the legacy project.
 
 ---
 
+## Results
+
+**This is the part the release gate reads.** It used to search this file for the
+words `not run` and refuse if it found them — which made the table's only
+machine-readable property a phrase whose ABSENCE was treated as proof of work
+done. Editing fourteen cells to "done" satisfied it with no evidence at all, and
+typing "pending" satisfied it by accident.
+
+Each row now needs a line in this block, in this shape:
+
+```
+RESULT row=<n> build=<htmlSha256> provider=<label> outcome=pass|fail txid=<id or ->
+```
+
+`npm run release` refuses unless all fourteen are present, all say `pass`, and
+all carry THIS build's hash. The hash is per row rather than once at the bottom
+because rows get re-run one at a time, and a single signature cannot say which
+rows were run against what.
+
+**Do not write these by hand.** Run the wallet track in `dist/xchess-gates.html`
+and paste what it prints. It uses the board's own `connectWallet`, `walletCall`,
+`contractCallParams` and `guardFor` rather than its own copies — a page that
+signs through its own code proves things about that code — and it records which
+provider actually served each call, which is what every wallet fault found so far
+has turned on.
+
+```
+(no results yet)
+```
+
+---
+
 ## Sign-off
 
 ```

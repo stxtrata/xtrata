@@ -151,6 +151,8 @@ the commit, what was actually built, and what was learned doing it.
 | **28e** | Sponsored filter | ✅ **Done** | `5cfbc568` |
 | **19** | Tail reads (the cache half only) | ◐ **Half** | `7d95eee6` |
 | **35** | En passant drawn as the capture it is | ✅ **Done** | `07742dde` |
+| **36** | The tab says which game | ✅ **Done** | `18e18f6b` |
+| **17** | Wallet matrix: evidence gate and steps | ◐ **Half** | `18e18f6b` |
 
 **Twenty-one of thirty-three built, plus one found already built, plus one
 half.**
@@ -287,7 +289,7 @@ disagreement is permanent.
 | **14** | ✅ [Explorer rows that say who can play](#14-make-the-explorer-rows-say-who-can-play-and-whose-move-it-is) | 4 | 4 | ~0.9 KB | inscription |
 | **15** | ✅ [Make the sound survive a phone](#15-make-the-sound-survive-a-phone) | 4 | 4 | ~0.4 KB | inscription |
 | **16** | ✅ [Stop the runtime rewrite eating the primary fallback](#16-stop-the-runtimes-serve-time-rewrite-from-eating-the-boards-primary-public-fallback) | 4 | 3 | ~0.05 KB | inscription |
-| **17** | [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) | 3 | 4 | — | neither |
+| **17** | ◐ [A wallet matrix runner](#17-a-wallet-matrix-runner-built-from-the-step-machinery-that-already-exists) — gate and steps done, handlers not | 3 | 4 | — | neither |
 | **18** | [Run the artefact in a real browser as a gate](#18-run-the-built-artefact-in-a-real-browser-headless-as-a-gate) | 3 | 5 | — | neither |
 | **19** | ◐ [Tail reads and a memoised leaderboard](#19-read-the-log-from-where-you-left-off-and-memoise-the-leaderboard-walk) — cache done, leaderboard not | 3 | 3 | ~1.0 KB | inscription |
 | **20** | [PGN, FEN and sealed games](#20-make-a-finished-game-portable-pgn-fen-and-a-sealed-page) | 3 | 4 | ~1.1 KB | inscription |
@@ -317,7 +319,7 @@ disagreement is permanent.
 |---|---|:---:|:---:|---|---|
 | **34** | [Bound the leaderboard walk](#34-bound-the-leaderboard-walk-which-grows-without-limit) | 3 | 2 | ~0.5 KB | **decision** |
 | **35** | ✅ [Make en passant reachable by the obvious click](#35-make-en-passant-reachable-by-the-obvious-click) | 4 | 5 | ~0.2 KB | inscription |
-| **36** | [Say which game you are looking at](#36-say-which-game-you-are-looking-at) **incident** | 5 | 5 | ~0.3 KB | inscription |
+| **36** | ✅ [Say which game you are looking at](#36-say-which-game-you-are-looking-at) **incident** | 5 | 5 | ~0.3 KB | inscription |
 
 **Eight of the thirty-three need no new inscription and no new contract** — 1, 3,
 4, 5, 6, 17, 18 and 23. They are the cheapest and safest work in this document,

@@ -1666,8 +1666,46 @@ export class ChessApp {
    * background tab hard enough to delay the sound. It is also the only part of
    * this that survives the tab being muted.
    */
+  /**
+   * The tab says which game it is looking at.
+   *
+   * WHY THIS IS NOT A NICETY. On 2026-08-14 the same move was submitted to two
+   * different games three minutes apart, by the same wallet, and the chain shows
+   * it: g7g5 into game 2 at block 8757147 and into game 1 at 8757168. Both were
+   * `xtrata.btc v anyone-else`, both black to move, both opened 1.e4. Nothing
+   * was wrong with the software - there is no automatic resubmission anywhere,
+   * and a duplicate listener fires in the same tick rather than three minutes
+   * later. It was two deliberate clicks in a board that could not be told apart
+   * from itself.
+   *
+   * Every tab looked identical, and a browser tab shows a title before it shows
+   * anything else. So: `Game 8 - black to move - X Chess`.
+   *
+   * The order matters. `baseTitle` is what a turn flash restores to, so it has
+   * to be recomputed HERE rather than captured once at boot - captured once, the
+   * flash would restore whatever game happened to be open first and quietly
+   * relabel the tab.
+   */
+  private drawTitle(): void {
+    const name = this.gameId === null ? 'X Chess' : `Game ${this.gameId}`;
+    const turn =
+      this.gameId === null || !this.state
+        ? null
+        : this.state.status === 'over'
+          ? this.state.result
+          : `${this.state.turn} to move`;
+
+    this.baseTitle = [name, turn, this.gameId === null ? null : 'X Chess']
+      .filter(Boolean)
+      .join(' \u00b7 ');
+    // A flash in progress owns the title until it is put back. Rewriting it here
+    // would drop the (your turn) prefix on the next poll, which is the one
+    // moment it exists for.
+    if (!this.flashing) this.doc.title = this.baseTitle;
+  }
+
   private flashTitle(on: boolean): void {
-    if (!this.baseTitle) this.baseTitle = this.doc.title || 'X Chess';
+    if (!this.baseTitle) this.drawTitle();
     if (on && this.doc.visibilityState === 'hidden') {
       this.flashing = true;
       this.doc.title = `(your turn) ${this.baseTitle}`;
@@ -1700,6 +1738,7 @@ export class ChessApp {
     if (!state || this.gameId === null) return;
 
     this.text('gameLabel', `Game ${this.gameId}`);
+    this.drawTitle();
 
     const canSubmit =
       Boolean(this.address) && state.status === 'live' && !this.options.signingBlocked?.();

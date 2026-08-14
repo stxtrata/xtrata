@@ -240,7 +240,10 @@ describe('a board in a background tab', () => {
     dom.window.document.dispatchEvent(new dom.window.Event('visibilitychange'));
     await vi.advanceTimersByTimeAsync(50);
 
-    expect(dom.window.document.title).toBe('X Chess');
+    // Back to the game's own title rather than to a bare app name: the tab
+    // says which game it is looking at now, and the flash restores THAT.
+    expect(dom.window.document.title).not.toContain('your turn');
+    expect(dom.window.document.title).toContain('Game 1');
     app.stopPolling();
   });
 
@@ -298,6 +301,56 @@ describe('a board in a background tab', () => {
     await vi.advanceTimersByTimeAsync(90_000);
 
     expect(reads).toBe(0);
+    app.stopPolling();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The tab says which game it is looking at.
+//
+// On 2026-08-14 the same move was submitted to two different games three minutes
+// apart, by the same wallet, and the chain shows it. Nothing was wrong with the
+// software: there is no automatic resubmission anywhere, and a duplicate
+// listener fires in the same tick rather than three minutes later. It was two
+// deliberate clicks in a board that could not be told apart from itself.
+//
+// A browser tab shows a title before it shows anything else.
+// ---------------------------------------------------------------------------
+
+describe('what the tab is called', () => {
+  it('names the game and whose move it is', async () => {
+    const { app } = await board(ALICE);
+    expect(document.title).toContain('Game 1');
+    expect(document.title).toContain('to move');
+    app.stopPolling();
+  });
+
+  it('changes when the turn changes, which is the whole point', async () => {
+    // Asserted as a CHANGE and not as a value. A title that is right once and
+    // then frozen is the same tab it was before.
+    const { app, chain } = await board(ALICE);
+    const before = document.title;
+    await movedOnChain(chain, ALICE, 'e2e4');
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(document.title, 'the title did not follow the game').not.toBe(before);
+    app.stopPolling();
+  });
+
+  it('restores the right title after a turn flash, not a stale one', async () => {
+    // `baseTitle` is what a flash puts back. Captured once at boot it would
+    // restore whatever game happened to be open first, quietly relabelling the
+    // tab - which is worse than never having said anything.
+    const { app, chain } = await board(BOB);
+    hidden = true;
+    await movedOnChain(chain, ALICE, 'e2e4');
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(document.title, 'a hidden tab was not flagged').toContain('your turn');
+
+    hidden = false;
+    document.dispatchEvent(new dom.window.Event('visibilitychange'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(document.title, 'the flash was never cleared').not.toContain('your turn');
+    expect(document.title, 'it restored a title with no game in it').toContain('Game 1');
     app.stopPolling();
   });
 });

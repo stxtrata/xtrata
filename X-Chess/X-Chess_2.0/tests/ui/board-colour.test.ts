@@ -135,9 +135,9 @@ describe('an en passant capture', () => {
       selected: 'e5',
       flipped: false,
       lastMove: null,
-      pending: null,
+      pending: [],
       readOnly: false
-    });
+    }, { onSquare: () => {} });
     return dom.window.document;
   };
 
