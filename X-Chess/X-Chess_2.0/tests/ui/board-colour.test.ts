@@ -109,3 +109,61 @@ describe('the colour of the squares', () => {
     expect(root.querySelectorAll('.sq--light')).toHaveLength(32);
   });
 });
+
+// ---------------------------------------------------------------------------
+// En passant, which is the only capture that lands on an empty square.
+//
+// The destination marker asked whether the target square held a piece, so the
+// one capture a player cannot work out from the geometry was drawn as a quiet
+// pawn push - a plain dot, beside a real capture wearing a ring. Two players in
+// two days concluded the board had not implemented the rule. It always had:
+// replaying the real game showed `f5g6` in the legal moves and `g6` in the FEN.
+// ---------------------------------------------------------------------------
+
+describe('an en passant capture', () => {
+  // 1.e4 d6 2.e5 f5 - white's e5 pawn may take on f6, and the pawn it takes
+  // stands on f5. That is the whole difficulty: three squares, and the two a
+  // player looks at are not the one the piece is on.
+  const FEN = 'rnbqkbnr/ppp1p1pp/3p4/4Pp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3';
+
+  const shown = (): Document => {
+    const dom = new JSDOM('<!doctype html><html><body><div id="board"></div></body></html>');
+    const position = new Position(FEN);
+    renderBoard(dom.window.document.getElementById('board') as HTMLElement, {
+      position,
+      legalMoves: position.movesUci(),
+      selected: 'e5',
+      flipped: false,
+      lastMove: null,
+      pending: null,
+      readOnly: false
+    });
+    return dom.window.document;
+  };
+
+  const at = (doc: Document, square: string): DOMTokenList =>
+    (doc.querySelector(`[data-square="${square}"]`) as HTMLElement).classList;
+
+  it('is drawn as a capture, not as a quiet move', () => {
+    expect(at(shown(), 'f6').contains('sq--capture'), 'en passant still looks like a push').toBe(
+      true
+    );
+    expect(at(shown(), 'f6').contains('sq--target')).toBe(false);
+  });
+
+  it('marks the pawn it would take, which is on neither square', () => {
+    expect(at(shown(), 'f5').contains('sq--en-passant'), 'the taken pawn is unmarked').toBe(true);
+  });
+
+  it('leaves an ordinary quiet move a quiet move', () => {
+    // e6 is a push onto an empty square and must not now claim to capture.
+    expect(at(shown(), 'e6').contains('sq--target')).toBe(true);
+    expect(at(shown(), 'e6').contains('sq--capture')).toBe(false);
+  });
+
+  it('leaves an ordinary capture alone', () => {
+    // e5 takes d6, a pawn that is actually there.
+    expect(at(shown(), 'd6').contains('sq--capture')).toBe(true);
+    expect(at(shown(), 'd6').contains('sq--en-passant')).toBe(false);
+  });
+});

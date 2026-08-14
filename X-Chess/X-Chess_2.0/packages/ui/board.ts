@@ -9,7 +9,7 @@
 // glyphs, and how they are sized, is the interesting part - see pieces.ts, and
 // the two problems it exists to solve.
 
-import { KING, WHITE, algebraic, parseSquare } from '../chess/board.js';
+import { KING, PAWN, WHITE, algebraic, parseSquare } from '../chess/board.js';
 import { GLYPH, KEY_BY_TYPE, pieceKeyName } from './pieces.js';
 import type { Color, PieceType } from '../chess/board.js';
 import type { Position } from '../chess/engine.js';
@@ -163,6 +163,32 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
 
   const ordered = view.flipped ? [...squares].reverse() : squares;
 
+  /**
+   * The pawn an en passant capture would take, if one is on offer.
+   *
+   * EN PASSANT IS THE ONLY CAPTURE THAT LANDS ON AN EMPTY SQUARE, and the
+   * marker below chooses between "capture" and "quiet move" by asking whether
+   * the destination holds a piece. So the one capture in chess that a player
+   * cannot work out from the geometry was the one drawn as a quiet pawn push -
+   * a plain dot, beside a real capture wearing a ring. Two players in two days
+   * concluded the board had not implemented the rule.
+   *
+   * The test is exactly the definition: a pawn, moving to a different file,
+   * onto a square with nothing on it. The pawn taken stands on the destination
+   * FILE at the moving pawn's RANK, which is what makes it invisible - it is
+   * not on the square being moved to.
+   */
+  const from = view.selected;
+  const mover = from ? squares.find((cell) => cell.square === from)?.piece ?? null : null;
+  const enPassantTo =
+    from && mover?.type === PAWN
+      ? [...destinations].find(
+          (square) =>
+            square[0] !== from[0] && !squares.find((cell) => cell.square === square)?.piece
+        ) ?? null
+      : null;
+  const enPassantTakes = enPassantTo && from ? `${enPassantTo[0]}${from[1]}` : null;
+
   for (const [at, cell] of ordered.entries()) {
     const file = FILES.indexOf(cell.square[0]);
     const rank = Number(cell.square[1]);
@@ -187,8 +213,12 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
 
     if (view.selected === cell.square) button.classList.add('sq--selected');
     if (destinations.has(cell.square)) {
-      button.classList.add(cell.piece ? 'sq--capture' : 'sq--target');
+      const takes = Boolean(cell.piece) || cell.square === enPassantTo;
+      button.classList.add(takes ? 'sq--capture' : 'sq--target');
     }
+    // And the pawn it would take, which is on neither of the two squares a
+    // player is looking at.
+    if (cell.square === enPassantTakes) button.classList.add('sq--en-passant');
     if (view.lastMove && (view.lastMove.from === cell.square || view.lastMove.to === cell.square)) {
       button.classList.add('sq--last');
     }

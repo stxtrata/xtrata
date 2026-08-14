@@ -165,6 +165,12 @@ body { overflow-wrap: anywhere; }
   background: rgba(0, 0, 0, 0.35);
 }
 .sq--capture { outline: 3px solid var(--warn); outline-offset: -3px; }
+/* The pawn an en passant capture would take.
+   Dashed rather than solid, because it is not a square you can move to - it is
+   the piece that disappears if you take the square beside it. En passant is the
+   only capture in chess where those are different squares, and nothing else on
+   the board had ever needed to say so. */
+.sq--en-passant { outline: 3px dashed var(--warn); outline-offset: -3px; }
 /* The king that is in check. Loud on purpose: it is the one fact on the board
    that changes which moves are legal, and a player who misses it will try
    moves that get skipped and cost a fee for nothing. */

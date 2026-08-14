@@ -150,6 +150,7 @@ the commit, what was actually built, and what was learned doing it.
 | **28b** | Find a game outside the window | ✅ **Done** | `17ccc106` |
 | **28e** | Sponsored filter | ✅ **Done** | `5cfbc568` |
 | **19** | Tail reads (the cache half only) | ◐ **Half** | `7d95eee6` |
+| **35** | En passant drawn as the capture it is | ✅ **Done** | `07742dde` |
 
 **Twenty-one of thirty-three built, plus one found already built, plus one
 half.**
@@ -315,7 +316,7 @@ disagreement is permanent.
 | # | Proposal | Simp | Safe | Bytes | Needs |
 |---|---|:---:|:---:|---|---|
 | **34** | [Bound the leaderboard walk](#34-bound-the-leaderboard-walk-which-grows-without-limit) | 3 | 2 | ~0.5 KB | **decision** |
-| **35** | [Make en passant reachable by the obvious click](#35-make-en-passant-reachable-by-the-obvious-click) | 4 | 5 | ~0.2 KB | inscription |
+| **35** | ✅ [Make en passant reachable by the obvious click](#35-make-en-passant-reachable-by-the-obvious-click) | 4 | 5 | ~0.2 KB | inscription |
 | **36** | [Say which game you are looking at](#36-say-which-game-you-are-looking-at) **incident** | 5 | 5 | ~0.3 KB | inscription |
 
 **Eight of the thirty-three need no new inscription and no new contract** — 1, 3,
