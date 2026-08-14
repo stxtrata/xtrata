@@ -23,7 +23,8 @@
 // re-deriving it, which is the one thing this whole architecture exists to
 // avoid.
 
-import type { ChainReader, EntryRow, GameRow } from '../chain/client.js';
+import { PAGE_SIZE } from '../chain/client.js';
+import type { ChainReader, ChainWriter, EntryRow, GameRow, WriteResult } from '../chain/client.js';
 
 /** The smallest thing a store has to do. IndexedDB, a Map, or nothing at all. */
 export interface Store {
@@ -170,32 +171,54 @@ export class CachingReader implements ChainReader {
   }
 
   /**
-   * The whole log, one page at a time, with the settled part served from cache.
+   * The whole log, with the settled part served from cache.
    *
-   * The last partial page is always re-read: it is the one that grows.
+   * Two things here that an earlier version of this file got wrong, and both
+   * are the difference between a cache that saves round trips and one that only
+   * saves JSON parsing:
+   *
+   * 1. IT RESUMES. The old version read the cached prefix and then called
+   *    `inner.getAllEntries`, which pages from seq 0 regardless — so every byte
+   *    came off the chain anyway and the cache saved nothing anybody could
+   *    measure.
+   *
+   * 2. IT CAN STOP BEFORE ASKING AT ALL. Given `knownNextSeq` — which a caller
+   *    that has just read the game row already has — a complete cached log needs
+   *    NO read. That is the case that matters: a game shorter than one page
+   *    costs exactly one read whether cached or not, so resuming alone would do
+   *    nothing for the ordinary game. Skipping does.
+   *
+   * Entries are contiguous: `next-seq` increments once per submission and each
+   * writes exactly one entry, so holding 0..n-1 IS holding the whole log.
    */
-  async getAllEntries(game: number): Promise<EntryRow[]> {
+  async getAllEntries(game: number, knownNextSeq?: number): Promise<EntryRow[]> {
     const out: EntryRow[] = [];
-    let seq = 0;
-    for (;;) {
+    for (let seq = 0; ; seq++) {
       const cachedRow = await this.store.get(this.key('entry', game, seq));
-      if (cachedRow) {
-        this.hits++;
-        out.push(JSON.parse(cachedRow) as EntryRow);
-        seq++;
-        continue;
-      }
-      break;
+      if (!cachedRow) break;
+      this.hits++;
+      out.push(JSON.parse(cachedRow) as EntryRow);
     }
 
-    // Everything from the first gap onwards comes from the chain.
     const settled = out.length;
-    const page = await this.inner.getAllEntries(game);
-    for (const row of page) {
-      if (row.seq < settled) continue;
-      out.push(row);
-      this.misses++;
-      await this.store.set(this.key('entry', game, row.seq), JSON.stringify(row));
+    // The log is already whole. Nothing to ask.
+    if (knownNextSeq !== undefined && settled >= knownNextSeq) return out;
+
+    // Resume at the page holding the first entry we do not have, rather than at
+    // the beginning. A partly-cached page is re-read, which is unavoidable: the
+    // rest of it was never cached.
+    let start = Math.floor(settled / PAGE_SIZE) * PAGE_SIZE;
+    for (;;) {
+      const page = await this.inner.getPage(game, start);
+      const rows = page.filter((entry): entry is EntryRow => entry !== null);
+      for (const row of rows) {
+        if (row.seq < settled) continue;
+        out.push(row);
+        this.misses++;
+        await this.store.set(this.key('entry', game, row.seq), JSON.stringify(row));
+      }
+      if (rows.length < PAGE_SIZE) break;
+      start += PAGE_SIZE;
     }
     return out.sort((a, b) => a.seq - b.seq);
   }
@@ -253,5 +276,52 @@ export class CachingReader implements ChainReader {
     await this.store.clear();
     this.hits = 0;
     this.misses = 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // Everything past here is not caching at all. It is what makes this object
+  // usable AS the chain rather than only as a reader.
+  //
+  // The board holds one chain and both reads and writes through it, so a
+  // wrapper that implemented only ChainReader could never be the thing it
+  // holds. Each of these is a straight forward, and none of them may ever grow
+  // a cache: a write is the opposite of an immutable fact, and `reader` carries
+  // the live rate-limit headroom, which is stale the moment it is copied.
+  // -------------------------------------------------------------------------
+
+  /** The endpoint, for the rate-limit headroom the board reports. */
+  get reader(): unknown {
+    return (this.inner as { reader?: unknown }).reader;
+  }
+
+  private get writer(): Partial<ChainWriter> {
+    return this.inner as unknown as Partial<ChainWriter>;
+  }
+
+  openGame(rulesHash: string | null, ranked: boolean): Promise<WriteResult> {
+    return this.writer.openGame!(rulesHash, ranked);
+  }
+  openSponsoredGame(rulesHash: string | null, ranked: boolean, opponent: string): Promise<WriteResult> {
+    return this.writer.openSponsoredGame!(rulesHash, ranked, opponent);
+  }
+  openSponsoredBoth(
+    rulesHash: string | null,
+    ranked: boolean,
+    white: string,
+    black: string
+  ): Promise<WriteResult> {
+    return this.writer.openSponsoredBoth!(rulesHash, ranked, white, black);
+  }
+  submit(game: number, value: string): Promise<WriteResult> {
+    return this.writer.submit!(game, value);
+  }
+  topUpSponsorship(game: number, who: string): Promise<WriteResult> {
+    return this.writer.topUpSponsorship!(game, who);
+  }
+  settleSponsorship(game: number, who: string): Promise<WriteResult> {
+    return this.writer.settleSponsorship!(game, who);
+  }
+  claimResult(game: number, result: string, terminalSeq: number): Promise<WriteResult> {
+    return this.writer.claimResult!(game, result, terminalSeq);
   }
 }

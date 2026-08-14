@@ -9,6 +9,7 @@
 
 import { boot, whenReady } from '../../packages/ui/boot.js';
 import { LiveChain } from '../../packages/chain/client.js';
+import { CachingReader, IndexedDbStore } from '../../packages/storage/verified-cache.js';
 import type { ContractCall, WriteResult } from '../../packages/chain/client.js';
 import { guardFor } from '../../packages/wallet/postconditions.js';
 import { signingBlockedReason, waitForProvider } from '../../packages/wallet/providers.js';
@@ -86,13 +87,27 @@ async function sign(call: ContractCall): Promise<WriteResult> {
   return { ok: true, txid, provider: entry.label, raw: result };
 }
 
-const chain = new LiveChain({
+const live = new LiveChain({
   contractAddress,
   contractName,
   network: CONFIG.network,
   override: CONFIG.api ?? null,
   signer: sign
 });
+
+/**
+ * The same chain, with the parts that can never change remembered locally.
+ *
+ * Only immutable facts: an entry at (game, seq) is written once and there is no
+ * map-delete in the contract. Nothing derived is stored — the position, the
+ * result and every rating are recomputed every time, because recomputing is the
+ * proof. DELETING THIS CACHE CHANGES NOTHING, which is the property that makes
+ * it safe to have at all.
+ *
+ * What it buys: a return visitor's game list skips the entry read for every game
+ * that has not moved since they last looked, which is most of them.
+ */
+const chain = new CachingReader(live, new IndexedDbStore('xchess')) as unknown as typeof live;
 
 // Deferred until the document has a body. The single inlined script block sits
 // above it, and under the Xtrata runtime the document is assembled with

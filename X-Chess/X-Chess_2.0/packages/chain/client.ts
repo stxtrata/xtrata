@@ -106,7 +106,15 @@ export interface ChainReader {
   getGame(game: number): Promise<GameRow | null>;
   getEntry(game: number, seq: number): Promise<EntryRow | null>;
   getPage(game: number, start: number): Promise<(EntryRow | null)[]>;
-  getAllEntries(game: number): Promise<EntryRow[]>;
+  /**
+   * The whole log for a game.
+   *
+   * `knownNextSeq` is a HINT, not a promise: a caller that has just read the
+   * game row already knows how many entries exist, and a reader with a cache can
+   * use that to skip the chain entirely. Every implementation is free to ignore
+   * it, and the plain ones do.
+   */
+  getAllEntries(game: number, knownNextSeq?: number): Promise<EntryRow[]>;
   getOpenFee(): Promise<bigint>;
   getSponsorPrice(): Promise<SponsorPrice>;
   getSponsorship(game: number, who: string): Promise<SponsorshipRow | null>;

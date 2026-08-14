@@ -69,12 +69,15 @@ const CHUNKS = 32;
  * and the point is that raising a row is a deliberate line in a diff. Coarse on purpose - one row per package - so that
  * moving a file between modules does not churn the table.
  *
- * `packages/storage` is deliberately absent: it is tree-shaken out entirely,
- * because nothing imports `CachingReader`. If it ever appears here, something
- * started using the cache, which is a real change and worth noticing.
+ * `packages/storage` was deliberately absent until 2026-08-14: it was
+ * tree-shaken out entirely, because nothing imported `CachingReader`. It is here
+ * now, which was exactly the change this note was written to make visible.
  */
 const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
-  { group: 'packages/ui', ceiling: 95_000, measured: 88_630 },
+  // Moved from 95,000 on 2026-08-14. The list grew a filter row, an identity
+  // field, a sponsorship lookup and a concurrent read path in one day; the row
+  // did its job by stopping just short, and this is the deliberate line.
+  { group: 'packages/ui', ceiling: 102_000, measured: 93_344 },
   { group: 'packages/chain', ceiling: 21_000, measured: 18_575 },
   { group: 'packages/protocol', ceiling: 11_500, measured: 10_411 },
   { group: 'packages/chess', ceiling: 10_000, measured: 9_199 },
@@ -82,10 +85,14 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // apps/chess, where it was untestable, and became 819 bytes of this package
   // with a suite of its own. That is a fair trade and this is where it is
   // recorded, but the row moving is a line in a diff either way.
-  { group: 'packages/wallet', ceiling: 6_900, measured: 6_266 },
+  { group: 'packages/wallet', ceiling: 6_900, measured: 6_417 },
   { group: 'packages/replay', ceiling: 4_500, measured: 4_061 },
+  // Arrived 2026-08-14. This row is the note below coming true: something
+  // started using the cache. 3 KB, and it takes a return visitor's game list
+  // from 51 reads to 26 by not asking for entries that cannot have changed.
+  { group: 'packages/storage', ceiling: 3_400, measured: 3_020 },
   { group: 'packages/ratings', ceiling: 2_700, measured: 2_393 },
-  { group: 'apps/chess', ceiling: 1_600, measured: 1_044 }
+  { group: 'apps/chess', ceiling: 1_600, measured: 1_086 }
 ];
 
 /** The same bundle the build produces, measured rather than guessed. */

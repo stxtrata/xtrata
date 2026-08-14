@@ -195,6 +195,17 @@ const EXPLORE_ENTRY_LIMIT = 200;
 const EXPLORE_WINDOW = 25;
 
 /**
+ * How many games the list reads at once.
+ *
+ * Three, the same width the name and block-time resolvers use, and chosen for
+ * the same reason rather than for throughput: the public rate limit is per
+ * address and the wallet spends from the same allowance for its nonce, its fee
+ * estimate and the broadcast. A board that empties the bucket loading a list is
+ * a board whose player then cannot move.
+ */
+const EXPLORE_READ_WIDTH = 3;
+
+/**
  * The other three rates.
  *
  * FAST is for the seconds around a move landing - the only time somebody is
@@ -2674,12 +2685,26 @@ export class ChessApp {
       // Newest first, and bounded: an unbounded walk on a busy contract would
       // make the first paint arbitrarily slow.
       const first = Math.max(1, count - (EXPLORE_WINDOW - 1));
-      const found: ExploreRow[] = [];
+      const ids: number[] = [];
+      for (let id = count; id >= first; id--) ids.push(id);
 
-      for (let id = count; id >= first; id--) {
-        const row = await this.buildExploreRow(id);
-        if (row) found.push(row);
-      }
+      // A FEW AT A TIME, because the cost here is latency and not bandwidth.
+      // Twenty-five games is fifty-one round trips, and one after another that
+      // is about eight seconds at a realistic hundred and fifty milliseconds
+      // each - which is the whole of why the list felt slow. Nothing about the
+      // reads changes; only whether they wait for each other.
+      //
+      // Three, matching the name and block-time resolvers, and for the same
+      // reason: the rate limit is per address and THE WALLET SPENDS FROM THE
+      // SAME ALLOWANCE. A board that empties it in one burst is a board whose
+      // player cannot then move.
+      const built = await pool(
+        EXPLORE_READ_WIDTH,
+        ids.map((id) => () => this.buildExploreRow(id))
+      );
+      // pool preserves input order, so this is still newest-first before the
+      // sort below - which is a stable sort and depends on that.
+      const found = built.filter((row): row is ExploreRow => row !== null);
 
       // Sorted for whoever is looking: games waiting on them, then seats they
       // could take, then the rest in the order the chain gave them. Stable, so
@@ -2898,7 +2923,10 @@ export class ChessApp {
           game.nextSeq === 0
             ? []
             : whole
-              ? await this.chain.getAllEntries(id)
+              // The game row is already read, so how many entries exist is
+              // already known. A reader with a cache can use that to skip the
+              // chain entirely for a game that has not moved since last time.
+              ? await this.chain.getAllEntries(id, game.nextSeq)
               : (await this.chain.getPage(id, 0)).filter((e): e is EntryRow => e !== null);
         const rules = recoverRules({
           rulesHash: game.rulesHash,
