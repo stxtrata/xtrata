@@ -282,6 +282,12 @@ async function buildCanary(boardSha256) {
     // RESULT line to `manifest.htmlSha256`. The canary carries it so the runner
     // can stamp each row without anybody copying a hash by hand.
     boardSha256: boardSha256 ?? null,
+    // WHERE THE CONTRACT ALREADY IS, which is not where the wallet track's
+    // operator is standing. The launch track deploys, so it derives the address
+    // from whoever is connected; the wallet track exercises a contract that
+    // exists, and must point at the one the BOARD is built against or it is
+    // testing something else.
+    contractAddress: CONTRACT.split('.')[0],
     source
   };
 

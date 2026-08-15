@@ -521,7 +521,10 @@ export class Canary {
         const go = this.doc.createElement('button');
         go.type = 'button';
         go.className = 'action action--primary';
-        go.textContent = step.manual ? 'Record the result' : 'Run';
+        // A manual step still needs a person to ARRANGE the browser - extensions
+        // off, wallet locked, wallet on another network - but the page does the
+        // judging. Asking somebody to type "pass" made the evidence a claim.
+        go.textContent = step.manual ? 'I have set it up — check it' : 'Run';
         go.disabled = !available;
         go.addEventListener('click', () => void this.run(step));
         row.appendChild(go);

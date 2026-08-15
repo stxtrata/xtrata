@@ -103,8 +103,16 @@ describe('the fourteen rows, as steps', () => {
     // Five rows need a browser set up a particular way BEFORE the page loads:
     // no wallet, locked, late provider, wrong network. A runner that claimed to
     // automate those would be worse than one that says it cannot.
+    // Three, not four. Row 14 stopped needing one: the page hides the providers
+    // and puts them back mid-wait, which is the scenario exactly and does not
+    // need a reload raced by hand.
+    //
+    // And what "manual" means has changed. It is the browser that has to be
+    // ARRANGED - extensions off, wallet locked, wallet on another network - and
+    // the page still does the judging. A row whose evidence was a person typing
+    // "pass" is the checklist this runner exists to replace.
     const manual = WALLET_STEPS.filter((step) => step.manual).map((step) => step.id);
-    expect(manual).toEqual(['w-no-wallet', 'w-locked', 'w-late', 'w-network']);
+    expect(manual).toEqual(['w-no-wallet', 'w-locked', 'w-network']);
   });
 
   it('marks the three that spend real money as irreversible', () => {
@@ -118,6 +126,18 @@ describe('the fourteen rows, as steps', () => {
       for (const need of step.needs) {
         expect(ids, `${step.id} needs ${need}, which is not a step`).toContain(need);
       }
+    }
+  });
+
+  it('judges the arranged rows rather than asking somebody to type the answer', () => {
+    const canary = read('apps/canary/main.ts');
+    // Every one of the four calls the board's code and marks a row from what
+    // came back. None of them reads a typed outcome.
+    expect(canary, 'a row still takes its result from a text field').not.toContain(
+      "ctx.input('outcome')"
+    );
+    for (const id of ['w-no-wallet', 'w-locked', 'w-late', 'w-network']) {
+      expect(canary, `${id} is not implemented`).toContain(`'${id}': async`);
     }
   });
 

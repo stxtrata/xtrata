@@ -598,8 +598,9 @@ export const WALLET_STEPS: StepDef[] = [
     phase: 'refusing',
     title: 'Row 10 - no wallet installed',
     why:
-      'Says there is no wallet and does not hang. Run this in a browser with the extensions ' +
-      'disabled; it is the one row that is meaningless anywhere else.',
+      'ARRANGE IT: disable every wallet extension and reload this page. Then press the button ' +
+      'and it will judge for itself - a wallet-less connect must refuse quickly and say there is ' +
+      'no wallet, rather than hanging or eventually giving up.',
     needs: ['w-survey'],
     irreversible: false,
     manual: true
@@ -608,7 +609,10 @@ export const WALLET_STEPS: StepDef[] = [
     id: 'w-locked',
     phase: 'refusing',
     title: 'Row 11 - wallet locked',
-    why: 'Waits for the unlock screen and then connects, rather than reporting no wallet.',
+    why:
+      'ARRANGE IT: lock the wallet, leaving the extension installed. Then press the button. It ' +
+      'connects for you; what is judged is that the board WAITS through the unlock screen ' +
+      'instead of mistaking a locked wallet for an absent one.',
     needs: ['w-survey'],
     irreversible: false,
     manual: true
@@ -618,17 +622,19 @@ export const WALLET_STEPS: StepDef[] = [
     phase: 'refusing',
     title: 'Row 14 - a provider that appears late',
     why:
-      'Reload and press Connect before the extension has injected. waitForProvider exists for ' +
-      'this and nothing has ever exercised it.',
+      'Nothing to arrange. The page hides every provider, starts waitForProvider, and puts them ' +
+      'back while it is still waiting - which is the scenario exactly, without racing a reload ' +
+      'by hand. waitForProvider exists for this and nothing has ever exercised it.',
     needs: ['w-survey'],
-    irreversible: false,
-    manual: true
+    irreversible: false
   },
   {
     id: 'w-network',
     phase: 'refusing',
     title: 'Row 13 - wrong network',
-    why: 'Refuses, and says which network it wanted. Switch the wallet to testnet first.',
+    why:
+      'ARRANGE IT: switch the wallet to testnet. Then press the button. It connects and works ' +
+      'the network out from the address; what is judged is whether anything refuses.',
     needs: ['w-connect'],
     irreversible: false,
     manual: true

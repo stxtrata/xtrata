@@ -19,7 +19,13 @@ import {
   waitForProvider
 } from '../../packages/wallet/providers.js';
 import type { ProviderEntry } from '../../packages/wallet/providers.js';
-import { contractCallParams, extractAddress, userCancelled, walletCall } from '../../packages/wallet/requests.js';
+import {
+  contractCallParams,
+  extractAddress,
+  networkFromAddress,
+  userCancelled,
+  walletCall
+} from '../../packages/wallet/requests.js';
 import { connectWallet } from '../../packages/wallet/connect.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
@@ -39,6 +45,8 @@ interface Config {
   clarityVersion: number;
   /** sha256 of dist/xchess.html - what a wallet matrix row is signed against. */
   boardSha256?: string | null;
+  /** Where the contract the board is built against already lives. */
+  contractAddress?: string | null;
 }
 
 const CONFIG: Config = ((globalThis as Record<string, unknown>).__XCHESS_CANARY__ as Config) ?? {
@@ -240,24 +248,19 @@ const providerNames = (): string => {
 };
 
 /**
- * A manual row: the operator sets the browser up and says what happened.
+ * A row a person has to ARRANGE but not judge.
  *
- * `pass` is the only thing that satisfies the release gate, and it has to be
- * typed - there is no button that means "it was fine". Anything else is recorded
- * verbatim as the failure, because "what happened instead" is the whole value of
- * a row somebody had to arrange by hand.
+ * These four need a browser in a particular state before the page can say
+ * anything - extensions off, wallet locked, wallet on testnet. That part cannot
+ * be automated and is not pretended to be.
+ *
+ * What was wrong with the first version is that it then asked the operator to
+ * TYPE the answer. Nobody knows better than the page whether connect returned an
+ * address, whether it took four seconds or forty, or which provider served it -
+ * and a row whose evidence is a person typing "pass" is exactly the checklist
+ * this runner exists to replace. So: you arrange it, you press Run, and the page
+ * decides.
  */
-const manualRow = (row: number, expectation: string): StepHandler => {
-  return async (ctx: CanaryContext): Promise<StepResult> => {
-    const said = ctx.input('outcome').trim();
-    if (!said) return no(`${expectation}\n\nType what happened: "pass", or what it did instead.`);
-    const passed = said.toLowerCase() === 'pass';
-    mark(row, providerNames(), passed ? 'pass' : 'fail', '-');
-    return passed
-      ? ok(`row ${row}: pass\nproviders: ${providerNames()}`, { row, outcome: 'pass' })
-      : no(`row ${row} recorded as FAILED: ${said}`);
-  };
-};
 
 const walletHandlers: Record<string, StepHandler> = {
   'w-survey': async () => {
@@ -287,6 +290,27 @@ const walletHandlers: Record<string, StepHandler> = {
       const session = await connectWallet();
       signer = session.address;
       const took = Math.round((Date.now() - before) / 100) / 10;
+
+      // AND THE CHAIN, pointed at the contract that already exists rather than
+      // at whoever just connected. The launch track derives the address from
+      // the connected account because that track DEPLOYS it; here the contract
+      // is a fact and the wallet is the variable. Without this every signing
+      // row refused with `connect an account first` - which is exactly what the
+      // first real run reported.
+      const at = CONFIG.contractAddress;
+      if (!at) {
+        return no(
+          'This canary was built without the contract address, so the signing rows have nothing ' +
+            'to sign against. Rebuild with `npm run build`.'
+        );
+      }
+      deployer = at;
+      chain = new LiveChain({
+        contractAddress: at,
+        contractName: CONFIG.contractName,
+        network: CONFIG.network,
+        signer: sign
+      });
       mark(1, providerNames(), 'pass');
       ctx.state.walletAddress = session.address;
       return ok(`row 1: pass\naddress   ${session.address}\ntook      ${took}s`, {
@@ -299,28 +323,136 @@ const walletHandlers: Record<string, StepHandler> = {
     }
   },
 
-  'w-no-wallet': manualRow(
-    10,
-    'Disable every wallet extension, reload, and press Connect on the board. It must say there ' +
-      'is no wallet and must not hang.'
-  ),
+  'w-no-wallet': async () => {
+    // Row 10. Judged, not reported: the page can see whether any provider is
+    // here and whether connect refuses quickly.
+    const found = collectProviders();
+    if (found.length) {
+      return no(
+        `${found.length} provider(s) are still here: ${providerNames()}.
 
-  'w-locked': manualRow(
-    11,
-    'Lock the wallet, reload, and press Connect. It must wait for the unlock screen and then ' +
-      'connect - not report that no wallet is installed.'
-  ),
+` +
+          'Disable every wallet extension, reload this page, and run it again. This row is the ' +
+          'only one that is meaningless with a wallet present.'
+      );
+    }
+    const started = Date.now();
+    try {
+      await connectWallet();
+      mark(10, 'none', 'fail');
+      return no('row 10 FAILED: it returned an address with no wallet installed.');
+    } catch (error) {
+      const took = Date.now() - started;
+      const code = (error as { code?: string }).code;
+      const said = String((error as Error).message || '');
+      // Fast AND specific. "It eventually gave up" is not the same as "it said
+      // there is no wallet", and only one of them is a good experience.
+      const passed = code === 'NO_WALLET' && took < 10_000;
+      mark(10, 'none', passed ? 'pass' : 'fail');
+      return passed
+        ? ok(`row 10: pass - said so in ${Math.round(took / 100) / 10}s.
+${said}`, { row: 10 })
+        : no(`row 10 FAILED after ${Math.round(took / 100) / 10}s with code ${String(code)}: ${said}`);
+    }
+  },
 
-  'w-late': manualRow(
-    14,
-    'Reload and press Connect before the extension has injected its provider. `waitForProvider` ' +
-      'exists for this and nothing has ever exercised it.'
-  ),
+  'w-locked': async () => {
+    // Row 11. The wallet puts its own unlock screen up; what is being judged is
+    // that the board WAITS for it rather than reporting no wallet.
+    if (!collectProviders().length) {
+      return no('No provider is here at all, so a locked one cannot be told from an absent one.');
+    }
+    const started = Date.now();
+    try {
+      const session = await connectWallet();
+      const took = Math.round((Date.now() - started) / 100) / 10;
+      mark(11, providerNames(), 'pass');
+      return ok(
+        `row 11: pass - waited ${took}s through the unlock and connected.
+${session.address}`,
+        { row: 11 }
+      );
+    } catch (error) {
+      const said = String((error as Error).message || '');
+      mark(11, providerNames(), 'fail');
+      return no(
+        `row 11 FAILED: ${said}
 
-  'w-network': manualRow(
-    13,
-    'Switch the wallet to testnet and connect. It must refuse and say WHICH network it wanted.'
-  ),
+If this says there is no wallet, the board mistook a LOCKED ` +
+          'wallet for an absent one, which is the fault this row exists to catch.'
+      );
+    }
+  },
+
+  'w-late': async () => {
+    // Row 14, simulated exactly rather than raced by hand. `waitForProvider` is
+    // the code under test, so the providers are hidden, the wait is started, and
+    // they are put back while it is still waiting. Nothing about reload timing
+    // is involved, and the thing being proven is the same.
+    const w = globalThis as unknown as Record<string, unknown>;
+    const hidden: [string, unknown][] = [];
+    for (const key of ['XverseProviders', 'xverseProviders', 'LeatherProvider', 'StacksProvider', 'btc']) {
+      if (w[key] !== undefined) {
+        hidden.push([key, w[key]]);
+        delete w[key];
+      }
+    }
+    if (!hidden.length) {
+      return no('No provider is here to hide, so a late one cannot be simulated.');
+    }
+    try {
+      if (collectProviders().length) {
+        return no('Hiding the providers did not work, so this would prove nothing.');
+      }
+      const waiting = waitForProvider({ timeoutMs: 8_000 });
+      setTimeout(() => {
+        for (const [key, value] of hidden) w[key] = value;
+      }, 1_200);
+      const found = await waiting;
+      const passed = found !== null;
+      mark(14, found?.label ?? 'none', passed ? 'pass' : 'fail');
+      return passed
+        ? ok(`row 14: pass - found ${found!.label} after it appeared.`, { row: 14 })
+        : no('row 14 FAILED: a provider that appeared late was never picked up.');
+    } finally {
+      for (const [key, value] of hidden) w[key] = value;
+    }
+  },
+
+  'w-network': async () => {
+    // Row 13. Connect, work out the network from the address, and see whether
+    // anything refuses.
+    let address: string;
+    try {
+      address = (await connectWallet()).address;
+    } catch (error) {
+      mark(13, providerNames(), 'fail');
+      return no(`row 13: could not connect at all: ${(error as Error).message}`);
+    }
+    const on = networkFromAddress(address);
+    if (on === CONFIG.network) {
+      return no(
+        `Connected on ${on}, which is what this build is for - so there is nothing to refuse.
+` +
+          `${address}
+
+Switch the wallet to the other network and run this again.`
+      );
+    }
+    // The board does not read the network anywhere. `networkFromAddress` is
+    // exported and called by nothing, so a testnet wallet on a mainnet build is
+    // simply used. That is the row failing, and it is a real finding rather than
+    // a box to tick.
+    mark(13, providerNames(), 'fail');
+    return no(
+      `row 13 FAILED: connected on ${String(on)} against a ${CONFIG.network} build and NOTHING ` +
+        `refused.
+${address}
+
+The board never reads the network: networkFromAddress is ` +
+        'exported and called by nothing. Until something does, this row cannot pass.'
+    );
+  },
 
   'w-bridge': async () => {
     // Rows 8 and 9 are one question asked from two places, and this page can
@@ -1489,10 +1621,6 @@ const handlers: Record<string, StepHandler> = {
 };
 
 const inputs = {
-  'w-no-wallet': [{ name: 'outcome', label: 'pass, or what it did instead' }],
-  'w-locked': [{ name: 'outcome', label: 'pass, or what it did instead' }],
-  'w-late': [{ name: 'outcome', label: 'pass, or what it did instead' }],
-  'w-network': [{ name: 'outcome', label: 'pass, or what it did instead' }],
   'w-record': [
     { name: 'xverse-mobile', label: 'Row 5 - this track on Xverse mobile', placeholder: 'pass' },
     { name: 'leather-desktop', label: 'Row 6 - this track on Leather desktop', placeholder: 'pass' },
