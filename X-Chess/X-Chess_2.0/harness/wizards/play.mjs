@@ -164,10 +164,31 @@ const hiroHeaders = (extra = {}) =>
     ? { ...extra, 'x-hiro-api-key': HIRO_KEYS[0], 'x-api-key': HIRO_KEYS[0] }
     : { ...extra };
 
-export const api = async (path) => {
-  const response = await fetch(`${API}${path}`, { headers: hiroHeaders() });
-  if (!response.ok) {
-    const error = new Error(
+/**
+ * A read, retried.
+ *
+ * WAITING IS THE CORRECT RESPONSE TO A RATE LIMIT, and this used to throw on the
+ * first one. That is defensible for a four-move script and wrong for anything
+ * that runs for hours: a tournament makes thousands of reads, so it will meet a
+ * 429, and dying on it abandons a run that had done nothing wrong. The first
+ * live tournament game died exactly here — on a balance check, before a single
+ * transaction was signed.
+ *
+ * ONLY READS COME THROUGH HERE. Broadcasting goes through the library's own
+ * client, so nothing in this retry can resend a transaction — which is the one
+ * thing a retry must never do.
+ *
+ * Backoff is generous because the budget refills on a clock rather than on
+ * demand; asking again immediately is how a rate limit becomes a longer rate
+ * limit.
+ */
+export const api = async (path, tries = 5) => {
+  let last = null;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    const response = await fetch(`${API}${path}`, { headers: hiroHeaders() });
+    if (response.ok) return response.json();
+
+    last = new Error(
       response.status === 429
         ? `${path} -> 429 rate limited` +
           (HIRO_KEYS.length
@@ -175,10 +196,18 @@ export const api = async (path) => {
             : '. No Hiro API key found — put HIRO_API_KEY in harness/wizards/.env.wizards.')
         : `${path} -> ${response.status}`
     );
-    error.status = response.status;
-    throw error;
+    last.status = response.status;
+
+    // A 4xx that is not 429 is the API answering. Asking again gets the same
+    // answer and spends the budget that the next real read needs.
+    if (response.status !== 429 && response.status < 500) throw last;
+    if (attempt === tries) break;
+
+    const waitMs = 5_000 * 2 ** (attempt - 1);
+    console.log(`  (${response.status} on ${path.slice(0, 48)}…, waiting ${waitMs / 1000}s)`);
+    await new Promise((done) => setTimeout(done, waitMs));
   }
-  return response.json();
+  throw last;
 };
 
 export const balanceOf = async (address) => {
@@ -216,19 +245,41 @@ export const nextNonce = async (address) => {
  * used `call-read` (packages/chain/client.ts), so this is not a discovery so
  * much as a reminder to look at what already works.
  */
-export async function readOnly(functionName, args = []) {
-  const response = await fetch(
-    `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
-    {
-      method: 'POST',
-      headers: hiroHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: args })
+export async function readOnly(functionName, args = [], tries = 5) {
+  // Retried for the same reason `api` is, and it matters more here: a
+  // tournament reads the log before EVERY move, so this is the call most likely
+  // to meet a rate limit and the one whose failure loses a game in progress.
+  //
+  // A read-only call cannot change anything, so retrying it is free of the
+  // hazard that makes retrying a write unacceptable.
+  let last = null;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    const response = await fetch(
+      `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
+      {
+        method: 'POST',
+        headers: hiroHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: args })
+      }
+    );
+    if (response.ok) {
+      const body = await response.json();
+      // `okay: false` is the CONTRACT answering - a runtime error in the read.
+      // Asking again produces the same answer, so it is not retried.
+      if (!body?.okay) throw new Error(`${functionName}: ${body?.cause ?? 'read failed'}`);
+      return Cl.deserialize(body.result);
     }
-  );
-  if (!response.ok) throw new Error(`${functionName}: HTTP ${response.status}`);
-  const body = await response.json();
-  if (!body?.okay) throw new Error(`${functionName}: ${body?.cause ?? 'read failed'}`);
-  return Cl.deserialize(body.result);
+
+    last = new Error(`${functionName}: HTTP ${response.status}`);
+    last.status = response.status;
+    if (response.status !== 429 && response.status < 500) throw last;
+    if (attempt === tries) break;
+
+    const waitMs = 5_000 * 2 ** (attempt - 1);
+    console.log(`  (${response.status} on ${functionName}, waiting ${waitMs / 1000}s)`);
+    await new Promise((done) => setTimeout(done, waitMs));
+  }
+  throw last;
 }
 
 /**
