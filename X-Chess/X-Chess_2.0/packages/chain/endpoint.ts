@@ -190,6 +190,21 @@ const BUDGET_HEADERS = ['x-ratelimit-remaining-minute', 'ratelimit-remaining'];
 const BUDGET_NEARLY_GONE = 4;
 
 /**
+ * How long the whole page stays quiet after concluding it is rate limited.
+ *
+ * The allowance refills per minute, so a full minute would be the certain
+ * answer and a bad one: it stops a board dead for a minute over one unlucky
+ * burst. Twelve seconds is about a block, long enough for a per-second limit to
+ * clear completely and for a per-minute one to recover a usable slice, and
+ * short enough that a game being watched picks up again within a move.
+ *
+ * If it is still exhausted the next attempt costs one sweep and puts the wall
+ * straight back up, so being wrong here is self-correcting in the cheap
+ * direction.
+ */
+const COOLDOWN_MS = 12_000;
+
+/**
  * A fetch that tries every base, preferring the one that last answered.
  *
  * The choice is remembered, so one bad response does not make every later call
@@ -205,6 +220,25 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
   const now = options.now ?? (() => Date.now());
   let index = 0;
   let remaining: number | null = null;
+
+  /**
+   * When it is worth asking again, after concluding we are rate limited.
+   *
+   * A SHARED SILENCE, and that is the point. Eight call sites reach for this
+   * endpoint - the log, the mempool, names, block times, the game list, the
+   * leaderboard - and each one previously discovered the rate limit for itself,
+   * by spending requests on it. Labelling the failure correctly stopped the
+   * RETRIES; it did nothing about the other seven callers still firing into an
+   * allowance everybody already knew was gone. In a browser each of those lands
+   * as a CORS error, so the console fills with them while the board is doing
+   * nothing wrong except asking.
+   *
+   * So the first caller to find the wall puts it up for everybody, and until it
+   * comes down nothing reaches the network at all. Failing without a request is
+   * the only response that actually helps: the allowance refills on a clock,
+   * and every request made meanwhile is one the refill has to outrun.
+   */
+  let coolUntil = 0;
   /** When the current preference stopped being the first base. */
   let preferredAt = 0;
 
@@ -323,6 +357,17 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
      * provider, so nothing in this retry can resend a transaction.
      */
     async request(path: string, init?: RequestInit): Promise<Response> {
+      // Refuse without touching the network while the wall is up. Every caller
+      // meets it, which is what makes the silence worth anything.
+      if (now() < coolUntil) {
+        const error = new Error(
+          'this page is rate limited and is waiting rather than asking again. ' +
+            'The chain is fine; it will resume on its own in a few seconds.'
+        );
+        (error as Error & { code?: string }).code = 'RATE_LIMITED';
+        throw error;
+      }
+
       let lastFailure: unknown = null;
       for (let sweep = 1; sweep <= SWEEPS; sweep++) {
         try {
@@ -456,6 +501,7 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
       // this page having asked too often, which is a thing the person reading
       // can actually wait out.
       if (limited) {
+        coolUntil = now() + COOLDOWN_MS;
         const error = new Error(
           `every endpoint is rate limiting this address (tried ${bases.length}). ` +
             'The chain is fine. This page has asked too many times in the last minute.'

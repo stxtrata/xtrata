@@ -425,8 +425,13 @@ describe('being polite with a shared allowance', () => {
       return ok('{"okay":true,"result":"0x09"}');
     });
 
+    const clock = { t: 0 };
     const names = new Names({
-      endpoint: makeEndpoint({ fetch: fetchMock as unknown as typeof fetch, document: plainDocument() })
+      endpoint: makeEndpoint({
+        fetch: fetchMock as unknown as typeof fetch,
+        document: plainDocument(),
+        now: () => clock.t
+      })
     });
     const who = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 
@@ -437,7 +442,13 @@ describe('being polite with a shared allowance', () => {
     // The host stops refusing. A cached refusal would mean this address is
     // never asked about again for the life of the page, so one busy moment
     // would leave every name blank until a reload.
+    //
+    // The clock moves past the endpoint's cooldown first. A refusal now buys
+    // twelve seconds of silence across the whole page, deliberately — but that
+    // is a pause, and this test is about the difference between a pause and a
+    // permanent blank.
     refuse = false;
+    clock.t += 15_000;
     await names.resolve(who);
     expect(
       fetchMock.mock.calls.length,
@@ -529,5 +540,90 @@ describe('a rate limit the browser is not allowed to see', () => {
       fetch: fetchMock as unknown as typeof fetch
     });
     await expect(endpoint.request('/cold')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+  });
+});
+
+describe('going quiet, rather than each caller finding the wall alone', () => {
+  // Eight call sites reach for this endpoint — log, mempool, names, block
+  // times, game list, leaderboard. Labelling a rate limit correctly stopped the
+  // retries and did nothing about the other seven callers, each of which went
+  // on firing into an allowance everybody already knew was spent. In a browser
+  // every one of those lands as a CORS error, which is what fills a console
+  // while the board is doing nothing wrong except asking.
+  const okWithBudget = (left: number): Response =>
+    new Response('{}', { status: 200, headers: { 'x-ratelimit-remaining-minute': String(left) } });
+
+  function endpointAt(clock: { t: number }, fetchMock: unknown) {
+    return makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as typeof fetch,
+      now: () => clock.t
+    } as Parameters<typeof makeEndpoint>[0]);
+  }
+
+  it('makes no request at all while the wall is up', async () => {
+    const clock = { t: 0 };
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      if (calls === 1) return okWithBudget(0);
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = endpointAt(clock, fetchMock);
+
+    await endpoint.request('/warm');
+    await expect(endpoint.request('/hits-the-wall')).rejects.toMatchObject({
+      code: 'RATE_LIMITED'
+    });
+
+    // Everything after this costs nothing, which is the entire point: a request
+    // made now is one the refill has to outrun.
+    const spent = fetchMock.mock.calls.length;
+    for (let i = 0; i < 6; i++) {
+      await expect(endpoint.request('/quiet')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    }
+    expect(fetchMock.mock.calls.length, 'it kept asking while rate limited').toBe(spent);
+  });
+
+  it('comes back on its own, without anybody clearing it', async () => {
+    const clock = { t: 0 };
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      if (calls === 1) return okWithBudget(0);
+      if (calls <= 4) throw new TypeError('Failed to fetch');
+      return okWithBudget(50);
+    });
+    const endpoint = endpointAt(clock, fetchMock);
+
+    await endpoint.request('/warm');
+    await expect(endpoint.request('/wall')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+
+    clock.t += 12_000;
+    const response = await endpoint.request('/later');
+    expect(response.status, 'the wall never came down').toBe(200);
+  });
+
+  it('never silences a page that is merely offline', async () => {
+    // The mistake that would be worse than the noise. A dead host is not a rate
+    // limit, and a board that went quiet for it would look broken while the
+    // fallback hosts sat untried.
+    const clock = { t: 0 };
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      if (calls === 1) return okWithBudget(48);
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = endpointAt(clock, fetchMock);
+
+    await endpoint.request('/warm');
+    await expect(endpoint.request('/down')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+
+    const spent = fetchMock.mock.calls.length;
+    await expect(endpoint.request('/again')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+    expect(fetchMock.mock.calls.length, 'an outage was treated as a rate limit').toBeGreaterThan(
+      spent
+    );
   });
 });
