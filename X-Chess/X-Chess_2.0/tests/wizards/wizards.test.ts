@@ -1,0 +1,381 @@
+// The wizards, and the rules that keep them disposable.
+//
+// Three mainnet wallets holding a few STX, signing real transactions with real
+// money, run unattended. Every safety property they have is a line of code that
+// could be deleted, so every one of them is asserted here rather than described
+// in a comment.
+//
+// The one that matters most is the first: DRY BY DEFAULT. A tool that spends
+// money unless told not to is a tool that eventually spends money nobody meant
+// to spend.
+
+import { readFileSync, existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import {
+  ALLOWED_CONTRACT,
+  ALLOWED_FUNCTIONS,
+  BALANCE_FLOOR_USTX,
+  DEFAULT_SPEND_CAP_USTX,
+  DIRECTOR,
+  KEY_SHAPED,
+  MAX_TRANSFER_USTX,
+  TARGET_FLOAT_USTX,
+  assertTransferAllowed,
+  planFunding,
+  PERSONAS,
+  RESERVED_ADDRESSES,
+  SCRIPTED_GAME,
+  WizardSafetyError,
+  addressEnvName,
+  assertBroadcastAllowed,
+  keyEnvName,
+  planRun,
+  readFleet,
+  scrub
+} from '../../harness/wizards/wizards-core.mjs';
+
+const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
+const read = (path: string): string => readFileSync(resolve(ROOT, path), 'utf8');
+
+const ADDRESS = 'SP11Z278A6XJH57GGRH98NRVV1VCAZE5TDRC6GDX9';
+
+/** Everything a legal broadcast needs, so a test can spoil exactly one thing. */
+const fine = {
+  live: true,
+  contract: ALLOWED_CONTRACT,
+  functionName: 'submit',
+  network: 'mainnet',
+  senderAddress: ADDRESS,
+  balanceUstx: 5_000_000n,
+  plannedSpendUstx: 5_000n,
+  spentSoFarUstx: 0n
+};
+
+describe('what stops a wizard spending money by accident', () => {
+  it('refuses without --live, which is the whole default', () => {
+    expect(() => assertBroadcastAllowed({ ...fine, live: false })).toThrow(WizardSafetyError);
+    expect(() => assertBroadcastAllowed({ ...fine, live: false })).toThrow(/dry run/i);
+  });
+
+  it('allows the ordinary case, or every test above passes for the wrong reason', () => {
+    const allowed = assertBroadcastAllowed(fine);
+    expect(allowed.plannedSpendUstx).toBe(5_000n);
+    expect(allowed.spentAfterUstx).toBe(5_000n);
+  });
+
+  it('will only ever call the one contract', () => {
+    // An allow-list rather than a check on the argument, because the argument is
+    // what is most likely to be wrong. A key with STX on it that can call ANY
+    // contract can be talked into calling one that empties it.
+    expect(() =>
+      assertBroadcastAllowed({ ...fine, contract: 'SP000000000000000000002Q6VF78.something' })
+    ).toThrow(/may only call/);
+  });
+
+  it('will only ever call the four functions it needs', () => {
+    expect(() => assertBroadcastAllowed({ ...fine, functionName: 'set-open-fee' })).toThrow(
+      /Allowed:/
+    );
+  });
+
+  it('cannot settle a sponsorship, which is permanent and belongs to nobody', () => {
+    // Any principal may settle an expired reserve, and doing so bars that player
+    // from ever being sponsored on that game again. A robot must not be able to
+    // do that at all, let alone by accident.
+    expect(ALLOWED_FUNCTIONS).not.toContain('settle-sponsorship');
+    expect(() => assertBroadcastAllowed({ ...fine, functionName: 'settle-sponsorship' })).toThrow(
+      WizardSafetyError
+    );
+  });
+
+  it('stops at the spend cap, counting what the run has already spent', () => {
+    expect(() =>
+      assertBroadcastAllowed({
+        ...fine,
+        plannedSpendUstx: 1_000_000n,
+        spentSoFarUstx: DEFAULT_SPEND_CAP_USTX
+      })
+    ).toThrow(/over the cap/);
+  });
+
+  it('leaves enough to send the remainder somewhere', () => {
+    // Not politeness. A wallet at zero cannot pay the fee to move its own float,
+    // so the money is stranded and the wizard is dead.
+    expect(() =>
+      assertBroadcastAllowed({
+        ...fine,
+        balanceUstx: BALANCE_FLOOR_USTX + 1_000n,
+        plannedSpendUstx: 5_000n
+      })
+    ).toThrow(/floor/);
+  });
+
+  it('refuses a testnet run, because these wallets are mainnet', () => {
+    expect(() => assertBroadcastAllowed({ ...fine, network: 'testnet' })).toThrow(/mainnet only/);
+  });
+
+  it('refuses to sign as a project wallet', () => {
+    // The deployer holds the contract and is not disposable. A wizard key that
+    // turned out to be it would be the most expensive possible mistake here.
+    for (const reserved of RESERVED_ADDRESSES) {
+      expect(() => assertBroadcastAllowed({ ...fine, senderAddress: reserved })).toThrow(
+        /project wallet/
+      );
+    }
+  });
+
+  it('refuses an address that is not one', () => {
+    expect(() => assertBroadcastAllowed({ ...fine, senderAddress: 'ST1NOTMAINNET' })).toThrow(
+      /not a mainnet address/
+    );
+    expect(() => assertBroadcastAllowed({ ...fine, senderAddress: '' })).toThrow(WizardSafetyError);
+  });
+
+  it('refuses a call that plans to spend nothing, which means it was not priced', () => {
+    expect(() => assertBroadcastAllowed({ ...fine, plannedSpendUstx: 0n })).toThrow(/spend/);
+  });
+});
+
+describe('keys, and where they are not', () => {
+  it('never writes a key to disk, in any script here', () => {
+    for (const file of ['make-wizards.mjs', 'play.mjs', 'wizards-core.mjs']) {
+      const source = read(`harness/wizards/${file}`);
+      // The example file is the only thing written, and it is placeholders.
+      const writes = [...source.matchAll(/writeFileSync\(([^,]+)/g)].map((m) => m[1].trim());
+      for (const target of writes) {
+        expect(target, `${file} writes to ${target}, which is not the example file`).toBe('EXAMPLE');
+      }
+    }
+  });
+
+  it('keeps the example file free of anything real', () => {
+    // A committed file, so a real key pasted here would be published. The test
+    // is the reason that is a build failure rather than a discovery.
+    if (!existsSync(resolve(ROOT, 'harness/wizards/.env.wizards.example'))) return;
+    const example = read('harness/wizards/.env.wizards.example');
+    expect(KEY_SHAPED.test(example), 'the example file contains something key-shaped').toBe(false);
+    expect(example, 'the example file contains a real address').not.toMatch(
+      /^\s*[A-Z0-9_]+=S[PM][0-9A-HJKMNP-TV-Z]{20,}/m
+    );
+  });
+
+  it('is not committing the real file', () => {
+    const ignored = read('.gitignore');
+    expect(ignored, 'real wizard keys are not gitignored').toContain(
+      'harness/wizards/.env.wizards'
+    );
+  });
+
+  it('scrubs anything key-shaped on its way to a log', () => {
+    const leaky = `broadcast failed for ${'a1b2c3d4'.repeat(8)} on mainnet`;
+    expect(scrub(leaky)).not.toMatch(KEY_SHAPED);
+    expect(scrub(leaky)).toContain('<key redacted>');
+    // And leaves an address alone: it is public, and hiding it would make every
+    // failure unreadable.
+    expect(scrub(`sender ${ADDRESS}`)).toContain(ADDRESS);
+  });
+});
+
+describe('the fleet, and what it intends', () => {
+  it('reports what is missing rather than refusing to start', () => {
+    // A dry run is useful with no wallets at all. A tool that will not start
+    // until it is fully provisioned is one only its author ever runs.
+    const empty = readFleet({});
+    expect(empty.ready).toBe(false);
+    expect(empty.missing).toEqual([DIRECTOR.id, ...PERSONAS.map((p) => p.id)]);
+    expect(empty.wizards.length).toBe(PERSONAS.length + 1);
+  });
+
+  it('reads a provisioned fleet', () => {
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    const fleet = readFleet(env);
+    expect(fleet.ready).toBe(true);
+    expect(fleet.missing).toEqual([]);
+  });
+
+  it('refuses an address that is not a mainnet one, at load rather than at spend', () => {
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = 'not-an-address';
+    }
+    expect(() => readFleet(env)).toThrow(WizardSafetyError);
+  });
+
+  it('plans a run that fits inside its own cap', () => {
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    const plan = planRun({ fleet: readFleet(env), openFeeUstx: 1_000_000n });
+    expect(plan.steps.length, 'the plan does not cover the game').toBe(1 + SCRIPTED_GAME.length);
+    expect(
+      plan.totalUstx,
+      `a default run plans ${plan.totalUstx} uSTX against a cap of ${DEFAULT_SPEND_CAP_USTX}`
+    ).toBeLessThan(DEFAULT_SPEND_CAP_USTX);
+  });
+
+  it('plays a game that actually finishes', () => {
+    // Fool's mate. Four moves to a real checkmate, derived by replay rather than
+    // asserted - a longer game costs more fees and proves the same things.
+    expect(SCRIPTED_GAME.map((m) => m.move)).toEqual(['f2f3', 'e7e5', 'g2g4', 'd8h4']);
+    expect(SCRIPTED_GAME.filter((m) => m.by === 'wizard-1').length).toBe(2);
+    expect(SCRIPTED_GAME.filter((m) => m.by === 'wizard-2').length).toBe(2);
+  });
+});
+
+describe('what the wizards are honest about', () => {
+  it('says in its own source that it cannot stand in for the wallet matrix', () => {
+    // The failure this whole fleet could cause is somebody concluding the
+    // wallets are proven because a robot signed something. It signs through
+    // @stacks/transactions; a player signs through an extension that parses,
+    // re-shapes and forwards. Different paths.
+    for (const file of ['wizards-core.mjs', 'play.mjs', 'README.md']) {
+      const source = read(`harness/wizards/${file}`);
+      expect(source, `${file} does not say what it cannot prove`).toMatch(/MATRIX|matrix/);
+    }
+  });
+
+  it('points at the canary contract and not at anything live to a player', () => {
+    expect(ALLOWED_CONTRACT).toContain('canary');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The commands the documents promise.
+//
+// `sweep` was described in the README and in play.mjs's own header before it
+// existed. That is the worst kind of gap: the way to get the money back out of
+// three disposable wallets, documented and absent, discovered on the day
+// somebody needs it.
+// ---------------------------------------------------------------------------
+
+describe('every command the documents name', () => {
+  const play = read('harness/wizards/play.mjs');
+  const readme = read('harness/wizards/README.md');
+
+  for (const command of ['balances', 'sweep']) {
+    it(`implements ${command}, which both documents promise`, () => {
+      expect(readme, `the README does not mention ${command}`).toContain(command);
+      expect(play, `play.mjs does not handle ${command}`).toContain(`command === '${command}'`);
+    });
+  }
+
+  it('guards the sweep separately, because a transfer is not a contract call', () => {
+    // The function allow-list is about contract calls and does not apply. What
+    // matters instead is that the destination is real and that --live is still
+    // required.
+    const body = play.slice(play.indexOf('async function sweep'));
+    expect(body, 'sweep does not check where it is sending').toContain('looksLikeMainnetAddress');
+    expect(body, 'sweep would broadcast without --live').toContain('if (!LIVE)');
+  });
+
+  it('does not claim a price it did not read', () => {
+    // The dry run printed "(read from the contract)" over a constant when there
+    // was no fleet to read for. A small untruth in the output makes every other
+    // line in it suspect.
+    expect(play).toContain('ASSUMED');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The Director.
+//
+// One address to fund, instead of three transfers by hand with one of them
+// mistyped. It is also the riskiest wallet in the fleet — it holds the whole
+// float rather than a third of one — and the rule that makes that acceptable is
+// the only one worth testing hard:
+//
+//   A DIRECTOR MAY ONLY PAY ITS OWN WIZARDS.
+//
+// A hot wallet that can send anywhere is a hot wallet. One that can only top up
+// a known list is a float with a spout.
+// ---------------------------------------------------------------------------
+
+describe('the Director', () => {
+  const PLAYER = 'SP3DXAJVTKDE92CBPM1CPS7CMTB9EYBZ4Y86YY8B9';
+  const STRANGER = 'SP359RJKXFNRAXH295E5JPD3N7RMD9GMAYTF2PRCE';
+  const ok = {
+    live: true,
+    from: ADDRESS,
+    to: PLAYER,
+    amountUstx: 2_000_000n,
+    balanceUstx: 8_000_000n,
+    fleetAddresses: [ADDRESS, PLAYER]
+  };
+
+  it('pays a wizard it knows', () => {
+    expect(assertTransferAllowed(ok).amountUstx).toBe(2_000_000n);
+  });
+
+  it('refuses to pay anybody else, which is the whole point of it', () => {
+    expect(() => assertTransferAllowed({ ...ok, to: STRANGER })).toThrow(
+      /may only pay its own wizards/
+    );
+  });
+
+  it('refuses without --live, like everything else here', () => {
+    expect(() => assertTransferAllowed({ ...ok, live: false })).toThrow(/dry run/i);
+  });
+
+  it('has a ceiling on a single transfer, whatever it was asked for', () => {
+    expect(() =>
+      assertTransferAllowed({ ...ok, amountUstx: MAX_TRANSFER_USTX + 1n, balanceUstx: 100_000_000n })
+    ).toThrow(/ceiling/);
+  });
+
+  it('keeps enough to pay a fee, or it cannot fund anybody again', () => {
+    expect(() =>
+      assertTransferAllowed({ ...ok, balanceUstx: 2_100_000n, amountUstx: 2_000_000n })
+    ).toThrow(/floor/);
+  });
+
+  it('will not send a wallet its own money', () => {
+    expect(() => assertTransferAllowed({ ...ok, to: ADDRESS })).toThrow(/its own money/);
+  });
+
+  it('lets money LEAVE the fleet only through sweep, which says so', () => {
+    // The single exception, and it takes a different door: an address typed on
+    // the command line, and `sweeping` set explicitly.
+    expect(() => assertTransferAllowed({ ...ok, to: STRANGER })).toThrow();
+    expect(assertTransferAllowed({ ...ok, to: STRANGER, sweeping: true }).amountUstx).toBe(
+      2_000_000n
+    );
+  });
+
+  it('tops up to a float rather than sending a fixed amount', () => {
+    // So running it twice costs nothing. For something meant to run unattended,
+    // the safe response to being unsure must be to run it again.
+    const env: Record<string, string> = {};
+    for (const persona of [{ id: 'director' }, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    const fleet = readFleet(env);
+    const full = planFunding({
+      fleet,
+      balances: Object.fromEntries(fleet.wizards.map((w) => [w.address, TARGET_FLOAT_USTX]))
+    });
+    expect(full.transfers, 'a fleet already at its float would be paid again').toEqual([]);
+
+    const empty = planFunding({ fleet, balances: {} });
+    expect(empty.transfers.length, 'an empty fleet is not topped up').toBeGreaterThan(0);
+    for (const transfer of empty.transfers) {
+      expect(transfer.amountUstx).toBe(TARGET_FLOAT_USTX);
+    }
+  });
+
+  it('never plays a game itself', () => {
+    // It holds the float. A wallet that both holds the money and signs the
+    // experiments is one mistake away from being the only wallet.
+    const plan = planRun({ fleet: readFleet({}) });
+    expect(plan.steps.map((s) => s.who?.id)).not.toContain('director');
+  });
+});

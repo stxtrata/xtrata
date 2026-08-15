@@ -22,7 +22,12 @@
     "test:artifact": "vitest run tests/artifact tests/runtime",
     "test:live": "LIVE=1 vitest run tests/legacy/fetch-live.test.ts",
     "test:live:canary": "LIVE=1 vitest run tests/legacy/fetch-canary.test.ts",
-    "serve": "node harness/serve.mjs"
+    "serve": "node harness/serve.mjs",
+    "wizards": "node harness/wizards/play.mjs",
+    "wizards:make": "node harness/wizards/make-wizards.mjs",
+    "wizards:fund": "node harness/wizards/play.mjs fund",
+    "wizards:balances": "node harness/wizards/play.mjs balances",
+    "wizards:sweep": "node harness/wizards/play.mjs sweep"
   },
   "devDependencies": {
     "@stacks/clarinet-sdk": "^3.9.0",
