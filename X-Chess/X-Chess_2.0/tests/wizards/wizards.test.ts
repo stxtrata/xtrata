@@ -476,3 +476,44 @@ describe('signing more than one thing at a time', () => {
     expect(play, 'a dropped transfer would leave no trace to read').toContain('(nonce ${nonce})');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Resuming, and the fee.
+//
+// The first live game died two moves in, on a 429 from the library's OWN fetch —
+// `/v2/fees/transaction`, a call this file never makes and cannot put a header
+// on. Restarting would have cost another 1 STX to prove the same thing twice.
+//
+// And the fee exposed something worse than the rate limit: the plan said every
+// move costs 3,000 uSTX and the spend cap was checked against that, while the
+// library asked the network what to pay and used THAT instead. The cap was
+// counting a number nobody was spending.
+// ---------------------------------------------------------------------------
+
+describe('paying for a transaction', () => {
+  const play = read('harness/wizards/play.mjs');
+
+  it('sets the fee rather than asking what it should be', () => {
+    expect(play, 'the fee is still estimated, so the plan and the spend differ').toContain(
+      'fee: MINER_FEE_USTX'
+    );
+  });
+
+  it('keys the library’s own fetch, which our headers never touched', () => {
+    expect(play).toContain('createApiKeyMiddleware');
+    expect(play, 'a builder call still uses the default client').toMatch(/client: CLIENT/);
+  });
+
+  it('does not quote an open fee for a run that opens nothing', () => {
+    const fleet = readFleet({});
+    const fresh = planRun({ fleet, openFeeUstx: 1_000_000n });
+    const resumed = planRun({ fleet, openFeeUstx: 1_000_000n, resuming: true });
+    expect(fresh.steps.some((s) => s.act === 'open')).toBe(true);
+    expect(resumed.steps.some((s) => s.act === 'open'), 'a resume plans an open it will not do').toBe(
+      false
+    );
+    expect(resumed.totalUstx, 'a resume is priced as though it opened a game').toBeLessThan(
+      fresh.totalUstx
+    );
+  });
+});

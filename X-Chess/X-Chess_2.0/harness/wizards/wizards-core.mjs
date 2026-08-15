@@ -322,17 +322,28 @@ export function readFleet(env = {}) {
  * walks — so what you read is what happens, rather than a description of it
  * that can drift.
  */
-export function planRun({ fleet, openFeeUstx = 1_000_000n, sponsorTotalUstx = 0n, minerFeeUstx = 3_000n }) {
+export function planRun({
+  fleet,
+  openFeeUstx = 1_000_000n,
+  sponsorTotalUstx = 0n,
+  minerFeeUstx = 3_000n,
+  resuming = false
+}) {
   const by = (id) => fleet.wizards.find((w) => w.id === id) ?? null;
   const steps = [];
 
-  steps.push({
-    act: 'open',
-    who: by('wizard-1'),
-    fn: 'open-game',
-    spendUstx: BigInt(openFeeUstx) + BigInt(minerFeeUstx),
-    what: 'open a ranked game, wizard-1 as white and wizard-2 as black'
-  });
+  // A resumed run joins a game that already exists, so it pays no open fee. The
+  // plan has to say so: one that quotes a price nobody pays is a plan the spend
+  // cap cannot be checked against.
+  if (!resuming) {
+    steps.push({
+      act: 'open',
+      who: by('wizard-1'),
+      fn: 'open-game',
+      spendUstx: BigInt(openFeeUstx) + BigInt(minerFeeUstx),
+      what: 'open a ranked game, wizard-1 as white and wizard-2 as black'
+    });
+  }
 
   for (const move of SCRIPTED_GAME) {
     steps.push({

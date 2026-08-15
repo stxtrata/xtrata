@@ -23,6 +23,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
 import {
   Cl,
   Pc,
@@ -112,6 +113,36 @@ const HIRO_KEYS = (() => {
   }
   return found;
 })();
+
+/**
+ * The library's OWN fetch, keyed.
+ *
+ * @stacks/transactions makes its own network calls - the fee estimate, the
+ * nonce - through a fetch this file never sees, so keying our own requests did
+ * nothing for those. The first live game got two moves in and then died on a 429
+ * from `/v2/fees/transaction`, which is a call we never make and cannot header.
+ *
+ * `client` is the injection point the library provides for exactly this.
+ */
+const CLIENT = HIRO_KEYS.length
+  ? {
+      baseUrl: API,
+      fetch: createFetchFn(createApiKeyMiddleware({ apiKey: HIRO_KEYS[0] }))
+    }
+  : { baseUrl: API };
+
+/**
+ * What a transaction pays the miner.
+ *
+ * SET, NOT ESTIMATED, and the reason is not only the rate limit. The plan says
+ * every move costs 3,000 uSTX and the spend cap is checked against that - while
+ * the library was quietly asking the network what to pay and using THAT. So the
+ * cap was notional: it counted a number nobody was spending.
+ *
+ * A fixed fee makes the plan and the spend the same thing, and removes a network
+ * call per transaction on the way.
+ */
+const MINER_FEE_USTX = 3_000n;
 
 /** Both spellings, as the proxy sends both. */
 const hiroHeaders = (extra = {}) =>
@@ -218,10 +249,12 @@ async function send({ wizard, functionName, functionArgs, spendUstx, postConditi
     functionArgs,
     senderKey: wizard.key,
     network: 'mainnet',
+    client: CLIENT,
+    fee: MINER_FEE_USTX,
     postConditionMode: PostConditionMode.Deny,
     postConditions
   });
-  const result = await broadcastTransaction({ transaction: tx, network: 'mainnet' });
+  const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
   if (result.error) throw new Error(scrub(JSON.stringify(result)));
   return { txid: result.txid, spentAfterUstx: allowed.spentAfterUstx };
 }
@@ -316,9 +349,10 @@ async function sweep(fleet, to) {
       amount,
       senderKey: wizard.key,
       network: 'mainnet',
+      client: CLIENT,
       fee
     });
-    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet' });
+    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
     if (result.error) {
       console.log(`${wizard.name.padEnd(10)} FAILED: ${scrub(JSON.stringify(result))}`);
       process.exitCode = 1;
@@ -393,10 +427,11 @@ async function fund(fleet) {
       amount: transfer.amountUstx,
       senderKey: director.key,
       network: 'mainnet',
+      client: CLIENT,
       fee,
       nonce
     });
-    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet' });
+    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
     if (result.error) {
       console.log(`  ${transfer.who} FAILED: ${scrub(JSON.stringify(result))}`);
       process.exitCode = 1;
@@ -457,7 +492,11 @@ async function main() {
   // constant is the kind of small untruth that makes every other line suspect.
   const priced = fleet.ready;
   const openFee = priced ? await readOpenFee() : 1_000_000n;
-  const plan = planRun({ fleet, openFeeUstx: openFee });
+  // A resumed run does not open anything, so it must not quote an open fee. The
+  // first resume printed "total 1.015 STX" and then spent 0.010 - a plan that
+  // disagrees with the spend is a plan nobody can check the cap against.
+  const resuming = Boolean(arg('game'));
+  const plan = planRun({ fleet, openFeeUstx: openFee, resuming });
   const cap = BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX)));
 
   console.log(
@@ -492,6 +531,25 @@ async function main() {
   const white = fleet.wizards.find((w) => w.id === 'wizard-1');
   const black = fleet.wizards.find((w) => w.id === 'wizard-2');
 
+  // RESUME, rather than pay to start again.
+  //
+  // A run that dies partway has already spent the open fee, and the moves it
+  // managed are on chain forever. Starting over costs another 1 STX to prove
+  // the same thing twice - so `--game 10` skips the open, reads how far that
+  // game got, and plays only what is missing. The first live run died after two
+  // moves and this is what it cost to learn that.
+  const resume = arg('game') ? Number(arg('game')) : null;
+  let game = resume;
+
+  if (resume) {
+    const row = await readOnly('get-game', [Cl.serialize(Cl.uint(resume))]);
+    if (!row?.value) {
+      console.log(`\nThere is no game ${resume}.`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`\nResuming game ${resume} rather than opening another.`);
+  } else {
   console.log(`\nOpening a game: ${white.address} v ${black.address}`);
   const opened = await send({
     wizard: white,
@@ -515,10 +573,17 @@ async function main() {
     return;
   }
 
-  const game = Number((await readOnly('get-game-count')).value);
+  game = Number((await readOnly('get-game-count')).value);
   console.log(`  game ${game}`);
+  }
 
-  for (const move of SCRIPTED_GAME) {
+  // How far it already got, so a resumed run plays only what is missing and a
+  // fresh one plays everything.
+  const played = Number((await readOnly('get-game', [Cl.serialize(Cl.uint(game))])).value.value['next-seq'].value);
+  if (played > 0) console.log(`  ${played} submission(s) already on it`);
+
+  for (const [at, move] of SCRIPTED_GAME.entries()) {
+    if (at < played) continue;
     const wizard = fleet.wizards.find((w) => w.id === move.by);
     console.log(`\n${wizard.name}: ${move.move} — ${move.note}`);
     const sent = await send({
