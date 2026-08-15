@@ -25,3 +25,6 @@ ops/upgrades.html
 # harness/wizards/.env.wizards.example holds the placeholders and IS committed;
 # a test asserts it contains nothing key-shaped and no mainnet address.
 harness/wizards/.env.wizards
+
+# A BIP39 phrase. Never committed, never anywhere but mode 600 on one machine.
+harness/bns/.seed
