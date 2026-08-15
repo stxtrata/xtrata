@@ -27,6 +27,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { DERIVATION_PATHS, deriveAllAccounts, readSeeds, scrub } from './rescue.mjs';
+import { lookup, normaliseLabel } from './check-names.mjs';
 
 const arg = (name, fallback = null) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -64,7 +65,37 @@ function writeCanary(addresses) {
   return { path: out.pathname, count: addresses.length };
 }
 
-function main() {
+/**
+ * The wallets that hold your names, asked of the registry.
+ *
+ * A names file holds NAMES, not addresses. A first version regexed it for
+ * principals, found none, and folded in zero owners while reporting success -
+ * so the page would have been pre-loaded with derived addresses only, and the
+ * six wallets no seed reaches would have gone uninventoried. Silence that reads
+ * as completeness is the failure this whole area keeps producing.
+ */
+async function ownersOf(namesFile) {
+  const labels = [
+    ...new Set(
+      readFileSync(namesFile, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#'))
+        .map(normaliseLabel)
+    )
+  ].filter(Boolean);
+
+  const owners = new Set();
+  let missing = 0;
+  for (const label of labels) {
+    const row = await lookup(label);
+    if (row.found && row.owner) owners.add(row.owner);
+    else missing++;
+  }
+  return { owners: [...owners], asked: labels.length, missing };
+}
+
+async function main() {
   const depth = Number(arg('depth', '100'));
   const only = arg('seed');
   const seeds = readSeeds().filter((seed) => !only || seed.label === only);
@@ -82,8 +113,18 @@ function main() {
     // assumed.
     const namesFile = arg('names');
     let owners = [];
+    let missing = 0;
     if (namesFile) {
-      owners = [...new Set(readFileSync(namesFile, 'utf8').match(/\bS[PM][0-9A-HJKMNP-TV-Z]{20,}\b/g) ?? [])];
+      console.error(`reading name owners from the registry...`);
+      const found = await ownersOf(namesFile);
+      owners = found.owners;
+      missing = found.missing;
+      if (!owners.length) {
+        throw new Error(
+          `${namesFile} produced no owners at all. That is a broken run, not an ` +
+            'empty collection - check the file has one name per line.'
+        );
+      }
     }
 
     const all = [...new Set([...derived, ...owners])];
@@ -91,7 +132,12 @@ function main() {
     console.error(
       `\nWrote ${written.path}\n` +
         `  ${derived.length} derived from ${seeds.length} seed(s) at depth ${depth}\n` +
-        (namesFile ? `  ${owners.length} name owners from ${namesFile}\n` : '') +
+        (namesFile
+          ? `  ${owners.length} name owners from ${namesFile}` +
+            (missing ? ` (${missing} name(s) not in the registry)` : '') +
+            '\n'
+          : '') +
+        `  ${owners.filter((o) => !derived.includes(o)).length} of those no seed reaches\n` +
         `  ${all.length} unique addresses in the box\n\n` +
         'Gitignored. Open it, put your Hiro key in, and take the inventory.\n'
     );
@@ -135,7 +181,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   // Scrubbed by shape, because a phrase can reach a stack trace through a
   // library that never meant to put it there.
