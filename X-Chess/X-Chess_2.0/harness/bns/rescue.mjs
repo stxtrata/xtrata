@@ -176,16 +176,36 @@ export function assertRescueAllowed({
 /* ------------------------------------------------------------------ */
 
 /**
- * Both conventions, because this project has already met both.
+ * Both conventions, LEATHER'S FIRST, because that is what people read.
  *
- * Stacks wallets have used the account index in two different positions. The
- * inscription scripts here derive at `m/44'/5757'/0'/0/N`; the mainnet deployer
- * for this repo lives at `m/44'/5757'/3'/0/0`. A tool that searched only one
- * would report half a collection as unreachable and be believed.
+ * Stacks wallets have used the account index in two positions:
+ *
+ *   m/44'/5757'/0'/0/N   Leather and Hiro. "Account N+1" on their screen.
+ *   m/44'/5757'/N'/0/0   the other one. This repo's mainnet deployer lives at
+ *                        index 3 of it, so it is not hypothetical.
+ *
+ * SEARCHING BOTH IS NOT THE SAME AS PRESENTING BOTH THE SAME WAY. A first
+ * version listed the account-hardened set first, so the top of the report was a
+ * hundred addresses no wallet had ever shown anybody, and the ones matching
+ * Leather's "Account 2, 3, 4, 5" were a hundred lines further down. The list was
+ * correct and read as broken, which is worse than being wrong loudly: it invites
+ * you to distrust a tool that is telling the truth.
+ *
+ * So Leather's is first and both are labelled. `accountLabel` gives the ONE-BASED
+ * number Leather shows, because matching a report against a wallet screen is the
+ * only way anybody checks this.
  */
 export const DERIVATION_PATHS = Object.freeze([
-  (n) => `m/44'/5757'/${n}'/0/0`,
-  (n) => `m/44'/5757'/0'/0/${n}`
+  Object.freeze({
+    name: 'leather',
+    path: (n) => `m/44'/5757'/0'/0/${n}`,
+    accountLabel: (n) => `Account ${n + 1}`
+  }),
+  Object.freeze({
+    name: 'account-hardened',
+    path: (n) => `m/44'/5757'/${n}'/0/0`,
+    accountLabel: (n) => `hardened ${n}`
+  })
 ]);
 
 /**
@@ -200,14 +220,24 @@ export function deriveAccounts(phrase, depth = 100) {
   }
   const root = HDKey.fromMasterSeed(mnemonicToSeedSync(phrase));
   const found = new Map();
-  for (const path of DERIVATION_PATHS) {
+  for (const convention of DERIVATION_PATHS) {
     for (let n = 0; n < depth; n++) {
-      const at = path(n);
+      const at = convention.path(n);
       const node = root.derive(at);
       if (!node.privateKey) continue;
       const key = `${Buffer.from(node.privateKey).toString('hex')}01`;
       const address = privateKeyToAddress(key);
-      if (!found.has(address)) found.set(address, { address, key, path: at });
+      // First convention wins on a tie, which is why Leather's is first: index 0
+      // is the same address on both, and it should be reported as "Account 1".
+      if (!found.has(address)) {
+        found.set(address, {
+          address,
+          key,
+          path: at,
+          convention: convention.name,
+          account: convention.accountLabel(n)
+        });
+      }
     }
   }
   return found;

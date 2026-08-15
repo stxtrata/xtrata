@@ -139,14 +139,36 @@ describe('the seed, and where it is not', () => {
 
 describe('finding the wallets at all', () => {
   it('searches BOTH derivation conventions', () => {
-    // This project has met both: the inscription scripts use the account index
-    // last, and the mainnet deployer for this repo is at m/44'/5757'/3'/0/0. A
-    // tool that searched one would report half a collection as unreachable, and
-    // be believed.
+    // This project has met both: Leather and Hiro put the account index last,
+    // and this repo's mainnet deployer is at m/44'/5757'/3'/0/0. A tool that
+    // searched one would report half a collection as unreachable, and be
+    // believed.
     expect(DERIVATION_PATHS).toHaveLength(2);
-    const rendered = DERIVATION_PATHS.map((path) => path(3));
+    const rendered = DERIVATION_PATHS.map((c) => c.path(3));
     expect(rendered).toContain("m/44'/5757'/3'/0/0");
     expect(rendered).toContain("m/44'/5757'/0'/0/3");
+  });
+
+  it("puts LEATHER'S convention first, because that is what people read", () => {
+    // Reported from a real wallet: account 1 matched and 2 through 5 did not,
+    // because the report led with a hundred hardened addresses no wallet has
+    // ever displayed and Leather's were further down. The list was correct and
+    // read as broken, which invites distrust of a tool telling the truth.
+    expect(DERIVATION_PATHS[0].name).toBe('leather');
+    expect(DERIVATION_PATHS[0].path(1)).toBe("m/44'/5757'/0'/0/1");
+  });
+
+  it('labels accounts the way the wallet numbers them, from one', () => {
+    // Matching a report against a wallet screen is the only way anybody checks
+    // this, and Leather calls index 0 "Account 1".
+    expect(DERIVATION_PATHS[0].accountLabel(0)).toBe('Account 1');
+    expect(DERIVATION_PATHS[0].accountLabel(4)).toBe('Account 5');
+    const accounts = [...deriveAccounts(PHRASE, 5).values()];
+    expect(accounts[0].account).toBe('Account 1');
+    expect(accounts[0].path).toBe("m/44'/5757'/0'/0/0");
+    // Index 0 is the same address on both conventions. The first one wins, so
+    // the shared address is reported as Account 1 rather than as a hardened 0.
+    expect(accounts[0].convention).toBe('leather');
   });
 
   it('derives real, distinct mainnet addresses', () => {

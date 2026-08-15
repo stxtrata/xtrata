@@ -165,7 +165,11 @@ async function main() {
     const accounts = deriveAllAccounts([seed], depth);
     console.error(`--- ${seed.label} — ${accounts.size} addresses ---`);
     for (const account of accounts.values()) {
-      console.log(`${account.address}\t${account.path}\t${seed.label}`);
+      // The account label first, because that is the column you check against
+      // your wallet's own account list.
+      console.log(
+        `${account.account.padEnd(14)}\t${account.address}\t${account.path}\t${seed.label}`
+      );
     }
     console.error('');
     total += accounts.size;
