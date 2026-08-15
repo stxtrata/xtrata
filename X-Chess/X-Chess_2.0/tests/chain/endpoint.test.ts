@@ -17,6 +17,7 @@ import {
 const ok = (body = '{}'): Response => new Response(body, { status: 200 });
 const notFound = (): Response => new Response('{}', { status: 404 });
 const serverError = (): Response => new Response('nope', { status: 503 });
+const rateLimited = (): Response => new Response('slow down', { status: 429 });
 
 function runtimeDocument(): Document {
   // The four scripts the Xtrata runtime injects into the head before it writes
@@ -182,8 +183,10 @@ describe('degrading', () => {
       fetch: fetchMock as unknown as typeof fetch
     });
     await expect(endpoint.request('/v2/info')).rejects.toThrow();
-    // Proxy plus every public host.
-    expect(tried.length).toBe(endpoint.all.length);
+    // Proxy plus every public host, once per sweep. Sweeping is what stops a
+    // single bad moment showing as "could not reach any Stacks endpoint".
+    expect(tried.length).toBe(endpoint.all.length * 3);
+    expect(new Set(tried).size, 'a base was skipped').toBe(endpoint.all.length);
   });
 
   it('does not fall away from an explicit override even when it fails', async () => {
@@ -193,7 +196,8 @@ describe('degrading', () => {
       fetch: fetchMock as unknown as typeof fetch
     });
     await expect(endpoint.request('/v2/info')).rejects.toThrow();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Retried, but never anywhere else: three sweeps of a one-base list.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(endpoint.all).toEqual(['https://node.example']);
   });
 
@@ -333,10 +337,15 @@ describe('degrading', () => {
     await expect(endpoint.request('/one')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
   });
 
-  it('tries every base exactly once per call, and no more', async () => {
-    // The wrap must not turn one dead host into an unbounded retry loop. Every
-    // call costs at most one attempt per base, which is what bounds the time a
-    // caller waits when the network really is gone.
+  it('sweeps every base, and retries the sweep a bounded number of times', async () => {
+    // The wrap must not turn one dead host into an unbounded retry loop. What
+    // bounds the time a caller waits is that the sweeps are counted: three
+    // passes over the bases and then the failure is reported.
+    //
+    // Sweeping again at all is the fix for a real complaint - a local board
+    // showing "Could not reach any Stacks endpoint" during one bad moment,
+    // while working a second either side of it. Three hosts sharing one
+    // rate-limit bucket are not three chances; they are one, tried three ways.
     const tried: string[] = [];
     const fetchMock = vi.fn(async (url: string) => {
       tried.push(url);
@@ -348,8 +357,27 @@ describe('degrading', () => {
     });
 
     await expect(endpoint.request('/one')).rejects.toThrow();
-    expect(tried).toHaveLength(PUBLIC_API.mainnet.length);
-    expect(new Set(tried).size, 'a base was tried twice in one call').toBe(tried.length);
+    expect(tried, 'the sweep is no longer bounded').toHaveLength(PUBLIC_API.mainnet.length * 3);
+    // Every base still gets tried within each sweep, rather than one host
+    // absorbing all the attempts.
+    for (const base of PUBLIC_API.mainnet) {
+      expect(tried.filter((url) => url.startsWith(base))).toHaveLength(3);
+    }
+  });
+
+  it('does NOT retry a rate limit, which retrying can only make worse', async () => {
+    // The exclusion that keeps the retry honest. A 429 window is a minute, so a
+    // second sweep cannot succeed - it can only triple the load on hosts that
+    // are already refusing us. The board's answer to a rate limit is the
+    // poller's back-off, measured in minutes, not another request now.
+    const fetchMock = vi.fn(async () => rateLimited());
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await expect(endpoint.request('/one')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    expect(fetchMock, 'a rate limit was retried').toHaveBeenCalledTimes(PUBLIC_API.mainnet.length);
   });
 
 });

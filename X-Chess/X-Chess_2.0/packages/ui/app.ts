@@ -3155,8 +3155,25 @@ export class ChessApp {
           entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
           { rules: rules.rules }
         );
-        row.white = rules.rules.white;
-        row.black = rules.rules.black;
+        // ONLY WHEN CONFIRMED, and the bug this fixes was visible on screen.
+        //
+        // `recoverRules` returns DEFAULT_RULES when it cannot confirm anything -
+        // an OPEN BOARD - so assigning them here published "anyone v anyone" as
+        // the game's players, in the same row that went on to say "rules
+        // unconfirmed". The row made two claims that contradict each other and
+        // stated the guess as the confident one.
+        //
+        // It is not a cosmetic difference. A ranked game MUST name two different
+        // players - `readyToOpen` refuses to open one otherwise and
+        // `checkEligibility` refuses to rate one - so a row reading "anyone v
+        // anyone · ranked" describes a game that cannot exist, and invites the
+        // reader to conclude the rule is not being applied.
+        //
+        // The unconfirmed case is common and will get more so: recovery searches
+        // the opener and whoever has SUBMITTED, so a game whose second player has
+        // not moved yet cannot be confirmed by a stranger at all.
+        row.white = rules.confirmed ? rules.rules.white : null;
+        row.black = rules.confirmed ? rules.rules.black : null;
         row.confirmed = rules.confirmed;
         row.over = state.status === 'over';
         row.result = state.result;
@@ -3337,7 +3354,13 @@ export class ChessApp {
         players.appendChild(text(' v ', 'muted'));
         players.appendChild(this.addressNode(row.black));
       } else {
-        players.appendChild(text(row.entries === 0 ? 'not yet known' : 'anyone', 'muted'));
+        // Three different silences, and they are not interchangeable. "anyone"
+        // is a fact about a game whose open rules this board CONFIRMED. The
+        // other two are admissions that it does not know, and printing a rule
+        // set in place of one is how the row came to contradict itself.
+        players.appendChild(
+          text(!row.confirmed ? 'not yet known' : row.entries === 0 ? 'not yet known' : 'anyone', 'muted')
+        );
       }
       cell(players);
 

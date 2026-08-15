@@ -211,6 +211,24 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
   const PREFER_MS = 60_000;
 
   /**
+   * How many times to sweep every base before reporting a failure, and how long
+   * to wait between sweeps.
+   *
+   * Three sweeps at 600ms and 1200ms adds under two seconds to the worst case
+   * and removes nearly every transient banner - the board polls every few
+   * seconds, so two seconds of quiet retrying is invisible where a red notice
+   * is not. Deliberately small: this must never turn one struggling page into a
+   * page hammering a host that is already struggling, which is how a rate limit
+   * becomes a longer rate limit.
+   */
+  const SWEEPS = 3;
+  const RETRY_MS = 600;
+  const pause = (ms: number): Promise<void> =>
+    new Promise((done) => {
+      setTimeout(done, ms);
+    });
+
+  /**
    * 429 IS NOT AN ANSWER, and this is the one place that distinction is made.
    *
    * A 404 is the contract saying "no such thing" and must be believed. A 429 is
@@ -272,7 +290,55 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
     get remaining(): number | null {
       return remaining;
     },
+    /**
+     * One read, across every base, retried.
+     *
+     * A SWEEP OF THREE HOSTS THAT SHARE ONE RATE-LIMIT BUCKET IS NOT THREE
+     * CHANCES. It is one, tried three ways - the comment on `PUBLIC_API` says so
+     * - and this used to sweep once and give up. So a single bad moment produced
+     * "Could not reach any Stacks endpoint" on a page that was working a second
+     * earlier and would work a second later. Reported from a local board while
+     * something else on the same address was reading hard.
+     *
+     * Sweeping again after a pause is the whole fix. The budget refills on a
+     * clock, so the second sweep is not the same attempt repeated - it is an
+     * attempt under different conditions, which is the only kind worth making.
+     *
+     * ONLY READS COME THROUGH HERE. A wallet broadcasts through its own
+     * provider, so nothing in this retry can resend a transaction.
+     */
     async request(path: string, init?: RequestInit): Promise<Response> {
+      let lastFailure: unknown = null;
+      for (let sweep = 1; sweep <= SWEEPS; sweep++) {
+        try {
+          return await sweepBases(path, init);
+        } catch (error) {
+          lastFailure = error;
+          const code = (error as Error & { code?: string }).code;
+
+          // ONLY UNREACHABILITY IS RETRIED, and the exclusion is the important
+          // half.
+          //
+          // A rate limit does not refill in a second - the window is a minute -
+          // so sweeping again cannot succeed, and it triples the load on hosts
+          // that are already refusing us. Retrying there would make the very
+          // condition it was trying to survive worse, and the board has a
+          // separate, slower answer for it: the poller reads `remaining` and
+          // backs off by minutes, not milliseconds.
+          //
+          // A misconfiguration is not transient either, and sweeping would only
+          // make the same complaint twice, more slowly.
+          if (code !== 'CHAIN_UNAVAILABLE') throw error;
+          if (sweep === SWEEPS) break;
+          await pause(RETRY_MS * sweep);
+        }
+      }
+      throw lastFailure;
+    }
+  };
+
+  async function sweepBases(path: string, init?: RequestInit): Promise<Response> {
+    {
       if (bases.length === 0) {
         // Only reachable on devnet with no override. Say what to do rather than
         // failing as though the network were down.
@@ -367,5 +433,5 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
       (error as Error & { code?: string }).code = 'CHAIN_UNAVAILABLE';
       throw error;
     }
-  };
+  }
 }
