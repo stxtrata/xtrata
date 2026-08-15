@@ -347,7 +347,7 @@ export function parseSeedFile(text) {
   return seeds;
 }
 
-function readSeeds() {
+export function readSeeds() {
   if (!existsSync(SEED_FILE)) {
     throw new RescueError(
       'no seed file. Copy harness/bns/.seed.example to harness/bns/.seed, put your\n' +
