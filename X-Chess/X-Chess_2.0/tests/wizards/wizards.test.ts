@@ -437,3 +437,42 @@ describe('talking to the chain', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Three transfers in a row.
+//
+// The library fetches the nonce per transaction, and the API answers with the
+// same number until the first one is MINED — so three transfers signed in a
+// loop all carry the same nonce, one is accepted and the other two are silently
+// replaced. Not a hypothetical: the first funded run sent three and exactly one
+// arrived, with two txids that had never been anything.
+//
+// The gates page has warned about this in its own words since it was written.
+// This loop was built without reading it.
+// ---------------------------------------------------------------------------
+
+describe('signing more than one thing at a time', () => {
+  const play = read('harness/wizards/play.mjs');
+
+  it('reads the nonce once and counts it up itself', () => {
+    const fund = play.slice(play.indexOf('async function fund'), play.indexOf('async function main'));
+    expect(fund, 'the funding loop does not manage a nonce at all').toContain('nextNonce(');
+    expect(fund, 'it passes no nonce, so the library guesses each time').toMatch(/\bnonce\b/);
+    expect(fund, 'the nonce never advances between transfers').toContain('nonce += 1n');
+  });
+
+  it('asks for the nonce outside the loop, not inside it', () => {
+    // Inside, it would fetch the same number every time and change nothing.
+    const fund = play.slice(play.indexOf('async function fund'), play.indexOf('async function main'));
+    // The LAST of the two loops over the transfers: the first only prints them,
+    // and reading the nonce after that one would prove nothing. A test that
+    // takes the first match is testing the wrong loop.
+    const asked = fund.indexOf('nextNonce(');
+    const loop = fund.lastIndexOf('for (const transfer of plan.transfers)');
+    expect(asked, 'the nonce is read inside the loop, which is the same bug').toBeLessThan(loop);
+  });
+
+  it('says which nonce each transfer used, so a silent replacement is visible', () => {
+    expect(play, 'a dropped transfer would leave no trace to read').toContain('(nonce ${nonce})');
+  });
+});

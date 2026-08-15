@@ -77,15 +77,89 @@ function readEnvFile(path = ENV_FILE) {
   return out;
 }
 
+/**
+ * The Hiro API key, if this machine has one.
+ *
+ * Anonymous is about fifty requests a minute, shared with everything else on the
+ * IP — and a fleet that reads four balances, a fee and a game count trips it
+ * mid-run, which is exactly how the first funded run ended: three transfers
+ * sent, and a 429 reading back the third wallet.
+ *
+ * Same names and same places the proxy reads (xtrata-2.0/functions/lib/
+ * hiro-keys.ts), so a machine set up for one is set up for both. The key is
+ * NEVER printed: it is attached to a header and nothing here logs headers.
+ */
+const HIRO_KEYS = (() => {
+  const found = [];
+  const add = (value) => {
+    for (const key of String(value ?? '').split(/[\s,]+/)) {
+      const trimmed = key.trim();
+      if (trimmed && !found.includes(trimmed)) found.push(trimmed);
+    }
+  };
+  for (const name of ['HIRO_API_KEYS', 'HIRO_API_KEY', 'VITE_HIRO_API_KEY']) add(process.env[name]);
+  // The wizards' own file first, then the site's, so a fleet can carry its own
+  // key without touching anything else.
+  for (const path of [ENV_FILE, join(HERE, '..', '..', '..', '..', 'xtrata-2.0', '.env.local')]) {
+    try {
+      for (const line of readFileSync(path, 'utf8').split('\n')) {
+        const match = /^\s*(HIRO_API_KEYS?|VITE_HIRO_API_KEY)\s*=\s*(.*)$/.exec(line);
+        if (match) add(match[2].trim().replace(/^["']|["']$/g, ''));
+      }
+    } catch {
+      // No file, or unreadable. Anonymous is a supported way to run this.
+    }
+  }
+  return found;
+})();
+
+/** Both spellings, as the proxy sends both. */
+const hiroHeaders = (extra = {}) =>
+  HIRO_KEYS.length
+    ? { ...extra, 'x-hiro-api-key': HIRO_KEYS[0], 'x-api-key': HIRO_KEYS[0] }
+    : { ...extra };
+
 const api = async (path) => {
-  const response = await fetch(`${API}${path}`);
-  if (!response.ok) throw new Error(`${path} -> ${response.status}`);
+  const response = await fetch(`${API}${path}`, { headers: hiroHeaders() });
+  if (!response.ok) {
+    const error = new Error(
+      response.status === 429
+        ? `${path} -> 429 rate limited` +
+          (HIRO_KEYS.length
+            ? '. Even with a key, which means something is asking far too often.'
+            : '. No Hiro API key found — put HIRO_API_KEY in harness/wizards/.env.wizards.')
+        : `${path} -> ${response.status}`
+    );
+    error.status = response.status;
+    throw error;
+  }
   return response.json();
 };
 
 const balanceOf = async (address) => {
   const body = await api(`/extended/v1/address/${address}/balances`);
   return BigInt(body?.stx?.balance ?? '0');
+};
+
+/**
+ * The next nonce this account may use.
+ *
+ * Needed because SIGNING THREE TRANSACTIONS IN A ROW DOES NOT WORK if you let
+ * the library fetch the nonce each time. It asks the API, and the API answers
+ * with the same number until the first one is MINED — so all three come out
+ * carrying nonce 0, one is accepted and the other two are silently replaced.
+ *
+ * Which is not a hypothetical: the first funded run sent three transfers, and
+ * exactly one arrived. The Director's balance had moved by one transfer's worth
+ * and two txids simply did not exist on chain, having never been anything.
+ *
+ * The gates page has warned about this in its own words since it was written -
+ * "two transactions signed close together take the same nonce, and the second
+ * replaces the first" - and this loop was written without reading it.
+ */
+const nextNonce = async (address) => {
+  const body = await api(`/extended/v1/address/${address}/nonces`);
+  return BigInt(body?.possible_next_nonce ?? 0);
 };
 
 /**
@@ -102,7 +176,7 @@ async function readOnly(functionName, args = []) {
     `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: hiroHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: args })
     }
   );
@@ -174,9 +248,20 @@ async function balances(fleet) {
       console.log(`${wizard.name.padEnd(10)} not provisioned`);
       continue;
     }
-    const held = await balanceOf(wizard.address);
-    console.log(`${wizard.name.padEnd(10)} ${wizard.address}  ${ustx(held)}`);
+    // Per row, because one wallet that cannot be read is not a reason to stop
+    // reporting the other three - and the row that failed is the one you most
+    // want to see when a transfer has just gone out to it.
+    try {
+      const held = await balanceOf(wizard.address);
+      console.log(`${wizard.name.padEnd(10)} ${wizard.address}  ${ustx(held)}`);
+    } catch (error) {
+      console.log(`${wizard.name.padEnd(10)} ${wizard.address}  unread: ${scrub(error.message)}`);
+      process.exitCode = 1;
+    }
   }
+  console.log(
+    HIRO_KEYS.length ? '\n(reads are keyed)' : '\n(reads are anonymous — about 50 a minute)'
+  );
   console.log('');
 }
 
@@ -291,6 +376,9 @@ async function fund(fleet) {
 
   const fee = 3_000n;
   let balance = held;
+  // Read ONCE and counted up by hand. Asking again between transfers returns the
+  // same answer until the first is mined, which is the whole fault.
+  let nonce = await nextNonce(director.address);
   for (const transfer of plan.transfers) {
     assertTransferAllowed({
       live: LIVE,
@@ -305,7 +393,8 @@ async function fund(fleet) {
       amount: transfer.amountUstx,
       senderKey: director.key,
       network: 'mainnet',
-      fee
+      fee,
+      nonce
     });
     const result = await broadcastTransaction({ transaction: tx, network: 'mainnet' });
     if (result.error) {
@@ -314,7 +403,8 @@ async function fund(fleet) {
       return;
     }
     balance -= transfer.amountUstx + fee;
-    console.log(`  ${transfer.who.padEnd(10)} sent — ${result.txid}`);
+    console.log(`  ${transfer.who.padEnd(10)} sent — ${result.txid}  (nonce ${nonce})`);
+    nonce += 1n;
   }
   console.log('\nWait for these to confirm, then: node harness/wizards/play.mjs --live\n');
 }
