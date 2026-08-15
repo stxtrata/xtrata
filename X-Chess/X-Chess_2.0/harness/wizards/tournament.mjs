@@ -186,6 +186,33 @@ export function findExisting(pairing, games) {
 }
 
 /**
+ * The game a pairing already has, found by its RULES HASH.
+ *
+ * THIS IS THE ONE THE RUNNER USES, and the reason is a live incident. The
+ * contract does not store who is playing — the players are inside the hashed
+ * rules — so `readGames` cannot report white and black, and the runner
+ * fabricated them: it stamped the CURRENT pairing's addresses onto every game
+ * in the list before searching. Every pairing then matched the first row.
+ * Three characters resumed into game 1, a stranger's game, and put
+ * twenty-eight submissions into it before anybody noticed. They were rejected
+ * by replay and changed nothing, but they are on chain forever and they cost
+ * real fees.
+ *
+ * A hash cannot do that. `rulesHash(white, black, ranked)` is one value per
+ * pairing, it is on the game row, and comparing it needs no recovery, no
+ * guessing, and no data the runner has to invent.
+ */
+export function findByRulesHash(hash, games) {
+  const want = String(hash ?? '').toLowerCase().replace(/^0x/, '');
+  if (!/^[0-9a-f]{64}$/.test(want)) return null;
+  return (
+    games.find(
+      (game) => String(game.rulesHash ?? '').toLowerCase().replace(/^0x/, '') === want
+    ) ?? null
+  );
+}
+
+/**
  * Standings, from results that came off the chain.
  *
  * Takes results rather than fetching them, so the arithmetic is testable and so

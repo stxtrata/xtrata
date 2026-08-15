@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
+  findByRulesHash,
   findExisting,
   historyFrom,
   planTournament,
@@ -306,5 +307,55 @@ describe('what a tournament will cost before it starts', () => {
     // planTournament asserts on every round it builds, so a format added later
     // cannot quietly reintroduce the nonce collision.
     expect(() => planTournament({ ids: ['a', 'a', 'b', 'c'] })).toThrow(WizardSafetyError);
+  });
+});
+
+describe('finding the game a pairing already has', () => {
+  // THE INCIDENT. The contract does not store who is playing — the players are
+  // inside the hashed rules — so `readGames` cannot report white and black. The
+  // runner fabricated them: it stamped the current pairing's addresses onto
+  // EVERY game before searching, so every pairing matched the first row. Three
+  // characters resumed into game 1, a stranger's game, and put twenty-eight
+  // submissions into it. Replay rejected all of them, so the game was unharmed,
+  // but they are on chain forever and they cost real fees.
+  const chain = [
+    { id: 1, rulesHash: 'aa'.repeat(32), nextSeq: 26 },
+    { id: 11, rulesHash: 'bb'.repeat(32), nextSeq: 4 },
+    { id: 12, rulesHash: 'cc'.repeat(32), nextSeq: 52 }
+  ];
+
+  it('matches on the rules hash, which is one value per pairing', () => {
+    expect(findByRulesHash('bb'.repeat(32), chain)?.id).toBe(11);
+    expect(findByRulesHash('cc'.repeat(32), chain)?.id).toBe(12);
+  });
+
+  it('finds nothing for a pairing that has not played', () => {
+    // The case that must open a NEW game rather than adopt somebody else's.
+    expect(findByRulesHash('dd'.repeat(32), chain)).toBe(null);
+  });
+
+  it('never returns the first game as a fallback', () => {
+    // Exactly the failure. A lookup that cannot find its game must say so, not
+    // hand back whatever was at the top of the list.
+    for (const bogus of ['dd'.repeat(32), '', null, undefined, 'not-a-hash', '0x']) {
+      expect(findByRulesHash(bogus as string, chain), `${String(bogus)} matched something`).toBe(
+        null
+      );
+    }
+  });
+
+  it('tolerates the 0x prefix and case, since the chain and the codec differ', () => {
+    expect(findByRulesHash('0x' + 'BB'.repeat(32), chain)?.id).toBe(11);
+  });
+
+  it('cannot be fooled by two pairings sharing a hash it was handed', () => {
+    // A hash commits white, black AND ranked, so two different pairings cannot
+    // produce one. If they ever could, this would be the test that noticed.
+    const dupes = [
+      { id: 5, rulesHash: 'ee'.repeat(32) },
+      { id: 6, rulesHash: 'ee'.repeat(32) }
+    ];
+    // Deterministic: the first, never an arbitrary one.
+    expect(findByRulesHash('ee'.repeat(32), dupes)?.id).toBe(5);
   });
 });

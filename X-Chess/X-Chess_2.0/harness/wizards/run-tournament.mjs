@@ -40,6 +40,7 @@ import { anthropicAsker, chooseMove } from './chooser.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
+  findByRulesHash,
   findExisting,
   planTournament,
   roundRobin,
@@ -158,7 +159,31 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
-async function playGame({ gameId, white, black, replay, ask, budget }) {
+async function playGame({ gameId, white, black, replay, ask, budget, expectHash = null }) {
+  // NEVER SUBMIT INTO A GAME WITHOUT CHECKING IT IS OURS.
+  //
+  // The lookup above is now exact, and this is here anyway — because the
+  // lookup was exact-looking last time too. Twenty-eight submissions went into
+  // game 1, a game belonging to somebody else, and nothing between the bad
+  // match and the chain asked whether the game was the right one.
+  //
+  // The rules hash on the game row is the answer: it commits white, black and
+  // ranked, so a game whose hash is not ours is not ours, whatever the lookup
+  // decided. Checked once per game rather than per move, because a game's rules
+  // cannot change.
+  if (expectHash) {
+    const row = (await readOnly('get-game', [Cl.serialize(Cl.uint(gameId))])).value?.value;
+    const onChain = String(row?.['rules-hash']?.value?.value ?? '')
+      .toLowerCase()
+      .replace(/^0x/, '');
+    if (onChain !== String(expectHash).toLowerCase().replace(/^0x/, '')) {
+      throw new WizardSafetyError(
+        `game ${gameId} commits to rules ${onChain.slice(0, 16)}… but this pairing is ` +
+          `${String(expectHash).slice(0, 16)}…. Refusing to play into a game that is not ours.`
+      );
+    }
+  }
+
   // DESTRUCTURED. `wizardRules` returns { rules, hash }, and passing the wrapper
   // to replay hands it an object with no white, no black and no protocol - which
   // normalises to an OPEN BOARD. The game would have run, looked fine, and
@@ -507,12 +532,15 @@ async function main() {
       round.pairings.map(async (pairing) => {
         const white = agents[pairing.white];
         const black = agents[pairing.black];
-        const already = findExisting(
-          { white: white.address, black: black.address },
-          existing.map((g) => ({ ...g, white: white.address, black: black.address }))
-        );
+
+        // BY THE RULES HASH, which is one value per pairing and is on the game
+        // row. This used to fabricate white and black onto every game before
+        // searching, so every pairing matched the first row and three
+        // characters played twenty-eight submissions into a stranger's game.
+        const { hash } = await wizardRules(white.address, black.address);
+        const already = findByRulesHash(hash, existing);
         const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
-        await playGame({ gameId, white, black, replay, ask, budget });
+        await playGame({ gameId, white, black, replay, ask, budget, expectHash: hash });
       })
     );
   }
