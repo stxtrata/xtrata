@@ -65,6 +65,13 @@ export const ALLOWED_FUNCTIONS = Object.freeze([
   'top-up-sponsorship'
 ]);
 
+/** The two that create a game, and so the two that must commit rules. */
+export const OPENING_FUNCTIONS = Object.freeze(['open-game', 'open-sponsored-game']);
+
+/** 32 bytes of hex, which is what the contract's `(optional (buff 32))` holds. */
+export const isRulesHash = (value) =>
+  typeof value === 'string' && /^[0-9a-f]{64}$/.test(value.trim().toLowerCase());
+
 /** Per run, across every wizard. The float is small; this is smaller. */
 export const DEFAULT_SPEND_CAP_USTX = 3_000_000n;
 
@@ -232,6 +239,7 @@ export function assertBroadcastAllowed({
   live = false,
   contract,
   functionName,
+  rulesHash = /** @type {string | null | undefined} */ (undefined),
   network = 'mainnet',
   senderAddress,
   balanceUstx,
@@ -256,6 +264,23 @@ export function assertBroadcastAllowed({
   if (!ALLOWED_FUNCTIONS.includes(functionName)) {
     throw new WizardSafetyError(
       `refusing to call ${functionName}. Allowed: ${ALLOWED_FUNCTIONS.join(', ')}.`
+    );
+  }
+
+  // NO GAME WITHOUT RULES. `open-game` takes an OPTIONAL rules hash, and none is
+  // a legal thing to send - it opens a board that commits to nothing, which any
+  // reader can replay and no reader can referee. That is a real mode and it is
+  // not this fleet's job.
+  //
+  // A wizard game exists to be checked by somebody else's board: the rules have
+  // to be recoverable, the sides have to be named, and the result has to be
+  // eligible to count. All three start with a commitment, so a game opened
+  // without one is not a smaller test - it is a different one, silently.
+  if (OPENING_FUNCTIONS.includes(functionName) && !isRulesHash(rulesHash)) {
+    throw new WizardSafetyError(
+      `refusing to ${functionName} with no rules committed. A wizard game must commit a rules ` +
+        'hash, or nothing can referee it afterwards. Got: ' +
+        (rulesHash === undefined ? 'nothing' : JSON.stringify(rulesHash))
     );
   }
   if (!looksLikeMainnetAddress(senderAddress)) {

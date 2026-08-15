@@ -517,3 +517,73 @@ describe('paying for a transaction', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// No game without rules.
+//
+// `open-game` takes an OPTIONAL rules hash, and none is a legal thing to send:
+// it opens a board that commits to nothing, which any reader can replay and no
+// reader can referee. That is a real mode and it is not this fleet's job.
+//
+// A wizard game exists to be checked by somebody else's board — the rules have
+// to be recoverable, the sides named, the result eligible to count. All three
+// start with a commitment, so a game opened without one is not a smaller test.
+// It is a different one, silently.
+// ---------------------------------------------------------------------------
+
+describe('rules, without which there is no game', () => {
+  const HASH = 'a'.repeat(64);
+  const opening = { ...fine, functionName: 'open-game', plannedSpendUstx: 1_003_000n };
+
+  it('refuses to open a game with nothing committed', () => {
+    expect(() => assertBroadcastAllowed(opening)).toThrow(/no rules committed/);
+    expect(() => assertBroadcastAllowed({ ...opening, rulesHash: null })).toThrow(
+      /no rules committed/
+    );
+  });
+
+  it('refuses a sponsored game with nothing committed either', () => {
+    expect(() =>
+      assertBroadcastAllowed({ ...opening, functionName: 'open-sponsored-game' })
+    ).toThrow(/no rules committed/);
+  });
+
+  it('opens one when the rules are there', () => {
+    expect(assertBroadcastAllowed({ ...opening, rulesHash: HASH }).plannedSpendUstx).toBe(
+      1_003_000n
+    );
+  });
+
+  it('refuses something that is not a hash at all', () => {
+    // 32 bytes of hex, which is what the contract's (optional (buff 32)) holds.
+    for (const wrong of ['', 'not-a-hash', 'ab', HASH + 'ff', '0x' + HASH]) {
+      expect(() => assertBroadcastAllowed({ ...opening, rulesHash: wrong })).toThrow(
+        /no rules committed/
+      );
+    }
+  });
+
+  it('leaves a move alone, which commits nothing and should not', () => {
+    // Only the two functions that CREATE a game are gated. A submit carries no
+    // rules and never could.
+    expect(() => assertBroadcastAllowed({ ...fine, functionName: 'submit' })).not.toThrow();
+  });
+
+  it('uses the board’s own encoder rather than a second copy of it', () => {
+    // A rules hash is a commitment: one byte different and the game is opened
+    // against rules no board will ever recover, permanently. So play.mjs bundles
+    // packages/protocol and imports the real thing.
+    const play = read('harness/wizards/play.mjs');
+    expect(play, 'the wizards reimplement the rules encoding').not.toMatch(/function canonicalRules/);
+    expect(play, 'the wizards no longer load the real encoder').toContain('loadProtocol');
+    expect(play).toContain("'packages', 'protocol', 'canonical.ts'");
+  });
+
+  it('names both sides and marks the game ranked', () => {
+    const play = read('harness/wizards/play.mjs');
+    expect(play, 'the wizards open a game nobody is named in').toMatch(
+      /normaliseRules\(\{ \.\.\.DEFAULT_RULES, white, black, ranked: true \}\)/
+    );
+    expect(play, 'the open still sends none for its rules').not.toContain('Cl.none()');
+  });
+});

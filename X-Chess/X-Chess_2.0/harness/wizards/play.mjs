@@ -23,6 +23,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { build as esbuild } from 'esbuild';
 import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
 import {
   Cl,
@@ -35,6 +36,7 @@ import {
 
 import {
   ALLOWED_CONTRACT,
+  isRulesHash,
   DEFAULT_SPEND_CAP_USTX,
   DIRECTOR,
   PERSONAS,
@@ -217,6 +219,67 @@ async function readOnly(functionName, args = []) {
   return Cl.deserialize(body.result);
 }
 
+/**
+ * The board's OWN rules encoding, not a second copy of it.
+ *
+ * A rules hash is a commitment: get one byte different and the game is opened
+ * against rules no board will ever recover, permanently. So this does not
+ * reimplement the encoding — it bundles `packages/protocol` on the fly and
+ * imports the real thing. Same principle as the wallet track using the board's
+ * connectWallet: a copy proves things about the copy.
+ *
+ * The cost is about fifty milliseconds at startup, once, and the alternative is
+ * a duplicate of a canonical serialiser that nothing would notice drifting.
+ */
+let protocol = null;
+async function loadProtocol() {
+  if (protocol) return protocol;
+  const out = await esbuild({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'protocol', 'rules.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error'
+  });
+  const rules = await import(
+    `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`
+  );
+  const canonicalOut = await esbuild({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'protocol', 'canonical.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error'
+  });
+  const canonical = await import(
+    `data:text/javascript;base64,${Buffer.from(canonicalOut.outputFiles[0].text).toString('base64')}`
+  );
+  protocol = { ...rules, ...canonical };
+  return protocol;
+}
+
+/**
+ * The rules a wizard game commits to.
+ *
+ * Both sides NAMED, and ranked. Named because a game whose players are known is
+ * the only kind a rating can come from, and because it is what makes the result
+ * checkable by somebody who was not there. Ranked because the ranked index, the
+ * eligibility check and elo-v1 are otherwise never touched by anything that runs
+ * unattended.
+ *
+ * A third party can recover these once BOTH have moved: recovery builds its
+ * candidates from the opener and the first few senders, so black is not a
+ * candidate until black has played. Before that the game reads as "rules
+ * unconfirmed", which is correct rather than a fault.
+ */
+async function wizardRules(white, black) {
+  const { DEFAULT_RULES, normaliseRules, rulesHash } = await loadProtocol();
+  const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
+  return { rules, hash: rulesHash(rules) };
+}
+
 /** The open fee, from the contract rather than from a constant here. */
 async function readOpenFee() {
   return BigInt((await readOnly('get-open-fee')).value);
@@ -228,12 +291,22 @@ async function readOpenFee() {
  * The gate runs FIRST and every refusal is a throw. Nothing below this line
  * happens for a dry run, which is what makes a dry run free.
  */
-async function send({ wizard, functionName, functionArgs, spendUstx, postConditions, spent, cap }) {
+async function send({
+  wizard,
+  functionName,
+  functionArgs,
+  spendUstx,
+  postConditions,
+  spent,
+  cap,
+  rulesHash
+}) {
   const balance = await balanceOf(wizard.address);
   const allowed = assertBroadcastAllowed({
     live: LIVE,
     contract: ALLOWED_CONTRACT,
     functionName,
+    rulesHash,
     network: 'mainnet',
     senderAddress: wizard.address,
     balanceUstx: balance,
@@ -551,15 +624,17 @@ async function main() {
     console.log(`\nResuming game ${resume} rather than opening another.`);
   } else {
   console.log(`\nOpening a game: ${white.address} v ${black.address}`);
+  const { rules, hash } = await wizardRules(white.address, black.address);
+  console.log(`  rules  ${hash}`);
+  console.log(`         white ${rules.white}`);
+  console.log(`         black ${rules.black}   ranked ${rules.ranked}`);
+
   const opened = await send({
     wizard: white,
     functionName: 'open-game',
-    // A game that commits to no rules, so any board can read it and none has to
-    // recover anything. The rules hash is what a real board would send; this
-    // fleet is proving the CALL works, not the rule encoding, which
-    // tests/rules already pins to golden vectors.
-    functionArgs: [Cl.none(), Cl.bool(false)],
-    spendUstx: BigInt(openFee) + 5_000n,
+    functionArgs: [Cl.some(Cl.bufferFromHex(hash)), Cl.bool(rules.ranked)],
+    rulesHash: hash,
+    spendUstx: BigInt(openFee) + MINER_FEE_USTX,
     postConditions: [Pc.principal(white.address).willSendLte(openFee).ustx()],
     spent,
     cap
