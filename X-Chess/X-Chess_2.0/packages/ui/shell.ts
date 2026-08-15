@@ -396,6 +396,15 @@ tr.found td:first-child { box-shadow: inset 3px 0 0 var(--gold); }
    has already been caught with twice. */
 tr.over td { background: rgba(255, 255, 255, .022); }
 tr.over td:first-child { box-shadow: inset 3px 0 0 var(--line-2); }
+/* A live game nobody has touched in hours. Deliberately QUIETER than a result:
+   this is an observation about elapsed blocks, not an outcome, and a badge
+   loud enough to compete with "1-0 checkmate" would read as one. Outlined
+   rather than filled for the same reason. */
+.badge--quiet {
+  color: var(--dim); background: transparent; border-color: var(--line-2);
+  letter-spacing: .02em;
+}
+tr.quiet td:first-child { box-shadow: inset 3px 0 0 var(--line); }
 .small { font-size: 12px; }
 .addr { font-family: ui-monospace, monospace; font-size: 12px; color: var(--dim); }
 /* Abbreviated, so a row is one line. The full value is on the element, so a

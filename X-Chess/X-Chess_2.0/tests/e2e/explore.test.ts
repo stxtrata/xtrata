@@ -620,3 +620,104 @@ describe('a game that is over', () => {
     expect(row.querySelector('button')!.textContent).toBe('Open');
   });
 });
+
+describe('a decisive result whose winner cannot be named', () => {
+  // The regression this exists to stop: when `white`/`black` stopped being
+  // published for a game whose rules the board could not confirm, the winner
+  // lookup returned null and the row fell into the DRAW branch — printing
+  // "0–1 drawn by checkmate", a row contradicting itself in six words.
+  async function unconfirmedMate(): Promise<Document> {
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+    chain.as(ALICE);
+    // A commitment nothing can be recovered against, so the board is honest
+    // that it does not know the players — while replay still reaches a result.
+    await chain.openGame('11'.repeat(32), false);
+    const mate: [string, string][] = [
+      ['f2f3', ALICE],
+      ['e7e5', BOB],
+      ['g2g4', ALICE],
+      ['d8h4', BOB]
+    ];
+    for (const [move, who] of mate) {
+      chain.as(who);
+      await chain.submit(1, move);
+    }
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await tick();
+    (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+    await tick(150);
+    void app;
+    return dom.window.document;
+  }
+
+  it('never calls a decisive game a draw', async () => {
+    const doc = await unconfirmedMate();
+    const row = rowFor(doc, 1)!;
+    expect(row.querySelector('.badge--over')!.textContent).toBe('0–1');
+    expect(row.textContent, 'a 0-1 game was described as drawn').not.toContain('drawn');
+  });
+
+  it('says which side won, and declines only to name them', async () => {
+    // The colour is in the result and is never in doubt. Only the principal
+    // behind it is unknown, so that is the only thing withheld.
+    const doc = await unconfirmedMate();
+    const row = rowFor(doc, 1)!;
+    expect(row.textContent).toContain('black won by checkmate');
+  });
+});
+
+describe('a live game nobody has touched', () => {
+  // NOT a forfeit. The contract has no resignation by absence and no clock, so
+  // a runner that gave up, a player who walked away, and a player thinking hard
+  // are one state on chain. The board reports elapsed blocks — a fact — and
+  // leaves the conclusion to the reader.
+  async function quiet(blocksSince: number): Promise<Document> {
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(OPEN), false);
+    await chain.submit(1, 'e2e4');
+    chain.height += blocksSince;
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await tick();
+    (dom.window.document.getElementById('tab-explore') as HTMLButtonElement).click();
+    await tick(150);
+    void app;
+    return dom.window.document;
+  }
+
+  it('says how long it has been quiet, once that is worth remarking on', async () => {
+    const doc = await quiet(20_000); // ~2.9 days at 12.5s a block
+    const row = rowFor(doc, 1)!;
+    const badge = row.querySelector('.badge--quiet');
+    expect(badge, 'a game silent for days carries no signal').not.toBeNull();
+    expect(badge!.textContent).toMatch(/quiet for \d+ days/);
+  });
+
+  it('stays silent about a game somebody is plausibly still thinking about', async () => {
+    // Correspondence chess is legitimately slow. Flagging an overnight think
+    // would be noise, and noise is how a real signal stops being read.
+    const doc = await quiet(200); // ~40 minutes
+    expect(rowFor(doc, 1)!.querySelector('.badge--quiet')).toBeNull();
+  });
+
+  it('does not call it a forfeit, a loss, or over', async () => {
+    // The words the board is not entitled to. It knows elapsed blocks and
+    // nothing else about why.
+    const doc = await quiet(20_000);
+    const row = rowFor(doc, 1)!;
+    expect(row.textContent).not.toMatch(/forfeit|abandoned|lost|resigned/i);
+    expect(row.classList.contains('over'), 'a live game was styled as finished').toBe(false);
+    expect(row.textContent, 'it is still black to move, and still says so').toContain('to move');
+  });
+});

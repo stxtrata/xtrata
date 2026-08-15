@@ -128,6 +128,19 @@ interface ExploreRow {
    */
   result: string | null;
   termination: string | null;
+  /**
+   * The block the last accepted submission landed in, and how long ago that is.
+   *
+   * THE ONLY HONEST ANSWER TO "HAS THIS GAME BEEN ABANDONED", which is a
+   * question the contract cannot answer at all. There is no resignation by
+   * absence and no timeout: a game whose player walked away a year ago is,
+   * on chain, live and waiting. So the board reports the fact it has - nothing
+   * has happened for this long - and lets the reader draw the conclusion.
+   *
+   * Null on a game with no submissions, or when the chain height could not be
+   * read; both mean "cannot say", which is different from "recent".
+   */
+  quietFor: number | null;
 }
 
 /**
@@ -264,6 +277,28 @@ const BACKGROUND_POLL_MS = 20_000;
  * would be an assertion nothing supports.
  */
 const PENDING_HOLD_MS = 90_000;
+
+/**
+ * Blocks of silence before a live game is worth remarking on.
+ *
+ * Post-Nakamoto a Stacks block is roughly twelve and a half seconds, so this is
+ * about six hours. Correspondence chess is legitimately slow - somebody thinking
+ * overnight is playing, not gone - and a threshold that flagged that would be
+ * noise. Six hours is long enough that a game which SHOULD be moving is not.
+ *
+ * The number this is measured against is deliberately not a clock: block heights
+ * are on chain and a wall clock is not.
+ */
+const QUIET_BLOCKS = 1_800;
+
+/** Roughly how long a run of Stacks blocks took, for a reader rather than a machine. */
+function describeBlocks(blocks: number): string {
+  const minutes = (blocks * 12.5) / 60;
+  if (minutes < 90) return `${Math.round(minutes)} min`;
+  const hours = minutes / 60;
+  if (hours < 36) return `${Math.round(hours)} hr`;
+  return `${Math.round(hours / 24)} days`;
+}
 
 /**
  * A principal, short enough to read.
@@ -465,6 +500,8 @@ export class ChessApp {
    */
   private pendingForced: { game: number; value: string } | null = null;
   private exploreRows: ExploreRow[] = [];
+  /** Chain tip as of the last list build. Null when it could not be read. */
+  private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
   /**
    * The sponsorship row itself, against the game and wallet it belongs to.
@@ -2895,6 +2932,16 @@ export class ChessApp {
       this.exploreBuiltAt = this.now();
       this.notice('chainNotice', 'info', `Reading ${this.chain.contractId}.`);
 
+      // ONE read for the whole list, not one per row. Every row needs the same
+      // number to say how long it has been quiet, and a failure here costs the
+      // staleness column and nothing else - which is why it is caught rather
+      // than allowed to take the list down with it.
+      try {
+        this.chainHeight = await this.chain.getHeight();
+      } catch {
+        this.chainHeight = null;
+      }
+
       // Newest first, and bounded: an unbounded walk on a busy contract would
       // make the first paint arbitrarily slow.
       const first = Math.max(1, count - (EXPLORE_WINDOW - 1));
@@ -3113,7 +3160,8 @@ export class ChessApp {
         sponsored: null,
         over: false,
         result: null,
-        termination: null
+        termination: null,
+        quietFor: null
       };
 
       try {
@@ -3178,6 +3226,14 @@ export class ChessApp {
         row.over = state.status === 'over';
         row.result = state.result;
         row.termination = state.termination;
+
+        // How long nothing has happened. Read from the last entry that
+        // actually landed, against a chain height fetched ONCE for the whole
+        // list rather than per row.
+        const last = entries.length ? entries[entries.length - 1].height : null;
+        if (last !== null && this.chainHeight !== null && this.chainHeight > last) {
+          row.quietFor = this.chainHeight - last;
+        }
         row.state = !whole && game.nextSeq > 0
           ? `${game.nextSeq} submissions, open it to see`
           : state.status === 'over'
@@ -3393,14 +3449,27 @@ export class ChessApp {
         state.appendChild(text(score, 'badge badge--over'));
         state.appendChild(text(' ', ''));
 
-        const winner = row.result === '1-0' ? row.white : row.result === '0-1' ? row.black : null;
-        if (winner) {
-          state.appendChild(this.addressNode(winner));
-          state.appendChild(text(` won${row.termination ? ` by ${row.termination}` : ''}`, 'muted'));
+        // THREE CASES, NOT TWO. A decisive result whose winner cannot be NAMED
+        // is not a draw, and this printed one as "0-1 drawn by checkmate" - a
+        // row contradicting itself in six words.
+        //
+        // The cause was a fix earlier the same day: `white` and `black` stopped
+        // being published for a game whose rules this board could not confirm,
+        // which is right, and this branch read "no name" as "no winner". The
+        // colour is never in doubt - it is in the result - so an unconfirmed
+        // game says which SIDE won and declines only to name them.
+        const by = row.termination ? ` by ${row.termination}` : '';
+        if (row.result === '1/2-1/2') {
+          state.appendChild(text(`drawn${by}`, 'muted'));
         } else {
-          state.appendChild(
-            text(`drawn${row.termination ? ` by ${row.termination}` : ''}`, 'muted')
-          );
+          const side = row.result === '1-0' ? 'white' : 'black';
+          const winner = side === 'white' ? row.white : row.black;
+          if (winner) {
+            state.appendChild(this.addressNode(winner));
+            state.appendChild(text(` won${by}`, 'muted'));
+          } else {
+            state.appendChild(text(`${side} won${by}`, 'muted'));
+          }
         }
         tr.classList.add('over');
       } else {
@@ -3412,6 +3481,27 @@ export class ChessApp {
           state.appendChild(text(' ', ''));
         }
         state.appendChild(text(row.state));
+
+        // NOT A FORFEIT, AND IT MUST NOT PRETEND TO BE ONE.
+        //
+        // The contract has no resignation by absence and no clock: a game
+        // nobody has touched for a year is, on chain, live and waiting for a
+        // move anybody may still play. So a runner that gave up, a player who
+        // walked away, and a player thinking hard are the same state here, and
+        // the board cannot tell them apart because the difference is not
+        // recorded anywhere.
+        //
+        // What IS recorded is when the last submission landed. Saying how long
+        // ago that was is a fact; calling it abandoned would be a guess wearing
+        // a badge. The reader can draw the conclusion the board is not entitled
+        // to.
+        if (row.quietFor !== null && row.quietFor >= QUIET_BLOCKS) {
+          state.appendChild(text(' · ', 'muted'));
+          state.appendChild(
+            text(`quiet for ${describeBlocks(row.quietFor)}`, 'badge badge--quiet')
+          );
+          tr.classList.add('quiet');
+        }
       }
       cell(state);
 
