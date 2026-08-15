@@ -53,8 +53,17 @@ Prints four keys and addresses **once**, and forgets them. Nothing in this
 directory writes a key to disk, touches the network, or derives anything from a
 wallet you already own.
 
-Paste the block it prints into `harness/wizards/.env.wizards`, which is
-gitignored and which no script here will ever write.
+It prints the keys once. To have it write the file for you:
+
+```bash
+node harness/wizards/make-wizards.mjs --write
+```
+
+That puts them in `harness/wizards/.env.wizards` at mode 600, having first
+checked the file is gitignored — and **refuses to overwrite one that already
+exists**, because that file may belong to a funded fleet whose keys are the only
+thing that can move its money. Without `--write` it prints and forgets, and the
+file is yours to create by hand.
 
 Then send **the Director** a few STX — one address, one transfer — and let it do
 the rest:

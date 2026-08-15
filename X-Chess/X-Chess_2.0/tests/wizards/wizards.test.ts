@@ -139,15 +139,40 @@ describe('what stops a wizard spending money by accident', () => {
 });
 
 describe('keys, and where they are not', () => {
-  it('never writes a key to disk, in any script here', () => {
+  it('writes a key only where it was told to, and nowhere else', () => {
+    // Two write targets in the whole directory: the placeholder example, always,
+    // and the real env file, only behind --write. Anything else appearing here
+    // is a key going somewhere nobody asked for.
     for (const file of ['make-wizards.mjs', 'play.mjs', 'wizards-core.mjs']) {
       const source = read(`harness/wizards/${file}`);
-      // The example file is the only thing written, and it is placeholders.
-      const writes = [...source.matchAll(/writeFileSync\(([^,]+)/g)].map((m) => m[1].trim());
+      const writes = [...source.matchAll(/writeFileSync\(\s*([A-Za-z_]+)/g)].map((m) => m[1]);
       for (const target of writes) {
-        expect(target, `${file} writes to ${target}, which is not the example file`).toBe('EXAMPLE');
+        expect(['EXAMPLE', 'ENV_FILE'], `${file} writes keys to ${target}`).toContain(target);
       }
     }
+  });
+
+  it('does not write the real file unless asked out loud', () => {
+    const source = read('harness/wizards/make-wizards.mjs');
+    expect(source, 'the env file is written unconditionally').toContain("includes('--write')");
+    expect(source, 'writing is not gated on the flag').toMatch(/if \(WRITE\) writeEnvFile/);
+  });
+
+  it('refuses to overwrite a fleet that may be funded', () => {
+    // The one guard that cannot be got wrong. A .env.wizards that exists belongs
+    // to wallets whose keys are the ONLY thing that can move their money;
+    // replacing it strands whatever they hold, permanently.
+    const source = read('harness/wizards/make-wizards.mjs');
+    expect(source, 'it would clobber an existing fleet').toContain('REFUSING to overwrite');
+    expect(source).toMatch(/existsSync\(ENV_FILE\)/);
+  });
+
+  it('checks the file is ignored before writing it, rather than assuming', () => {
+    // Being wrong about this publishes the keys, so it is read rather than
+    // trusted.
+    const source = read('harness/wizards/make-wizards.mjs');
+    expect(source).toContain('.gitignore');
+    expect(source, 'the written file is world-readable').toContain('0o600');
   });
 
   it('keeps the example file free of anything real', () => {
@@ -377,5 +402,38 @@ describe('the Director', () => {
     // experiments is one mistake away from being the only wallet.
     const plan = planRun({ fleet: readFleet({}) });
     expect(plan.steps.map((s) => s.who?.id)).not.toContain('director');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The read-only path that actually exists.
+//
+// `call-read`, NOT `call-read-only`. The second reads like the right name, is
+// what you would guess, and 404s — returning "No such file", which arrives as a
+// JSON parse error several frames from the mistake. The board has always used
+// `call-read` (packages/chain/client.ts), so this was not a discovery so much as
+// a reminder to look at what already works.
+// ---------------------------------------------------------------------------
+
+describe('talking to the chain', () => {
+  it('uses the path the board uses', () => {
+    // Read out of the FETCH, not out of the file: the comment above it names the
+    // wrong path in order to warn about it, and a test that matched prose would
+    // fail on its own explanation.
+    const play = read('harness/wizards/play.mjs');
+    const used = [...play.matchAll(/`\$\{API\}(\/v2\/contracts\/[a-z-]+)\//g)].map((m) => m[1]);
+    expect(used.length, 'the wizards no longer read the contract at all').toBeGreaterThan(0);
+    for (const path of used) {
+      expect(path, 'the wizards read on a path that 404s').toBe('/v2/contracts/call-read');
+    }
+  });
+
+  it('agrees with the board about it, rather than having its own idea', () => {
+    const client = read('packages/chain/client.ts');
+    const play = read('harness/wizards/play.mjs');
+    const pathOf = (source: string) => /\/v2\/contracts\/call-read[a-z-]*\//.exec(source)?.[0];
+    expect(pathOf(play), 'the wizards and the board disagree about the read path').toBe(
+      pathOf(client)
+    );
   });
 });

@@ -88,18 +88,33 @@ const balanceOf = async (address) => {
   return BigInt(body?.stx?.balance ?? '0');
 };
 
-/** The open fee, from the contract rather than from a constant here. */
-async function readOpenFee() {
-  const body = await fetch(
-    `${API}/v2/contracts/call-read-only/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/get-open-fee`,
+/**
+ * A read-only call, on the path that actually exists.
+ *
+ * `call-read`, NOT `call-read-only`. The second reads like the right name, is
+ * what the docs suggest, and 404s — returning "No such file", which arrives as a
+ * JSON parse error several frames away from the mistake. The board has always
+ * used `call-read` (packages/chain/client.ts), so this is not a discovery so
+ * much as a reminder to look at what already works.
+ */
+async function readOnly(functionName, args = []) {
+  const response = await fetch(
+    `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: [] })
+      body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: args })
     }
-  ).then((r) => r.json());
-  if (!body?.okay) throw new Error(`get-open-fee: ${JSON.stringify(body).slice(0, 200)}`);
-  return BigInt(Cl.deserialize(body.result).value);
+  );
+  if (!response.ok) throw new Error(`${functionName}: HTTP ${response.status}`);
+  const body = await response.json();
+  if (!body?.okay) throw new Error(`${functionName}: ${body?.cause ?? 'read failed'}`);
+  return Cl.deserialize(body.result);
+}
+
+/** The open fee, from the contract rather than from a constant here. */
+async function readOpenFee() {
+  return BigInt((await readOnly('get-open-fee')).value);
 }
 
 /**
@@ -410,15 +425,7 @@ async function main() {
     return;
   }
 
-  const count = await fetch(
-    `${API}/v2/contracts/call-read-only/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/get-game-count`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sender: CONTRACT_ADDRESS, arguments: [] })
-    }
-  ).then((r) => r.json());
-  const game = Number(Cl.deserialize(count.result).value);
+  const game = Number((await readOnly('get-game-count')).value);
   console.log(`  game ${game}`);
 
   for (const move of SCRIPTED_GAME) {
