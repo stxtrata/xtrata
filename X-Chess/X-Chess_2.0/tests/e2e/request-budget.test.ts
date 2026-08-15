@@ -654,3 +654,110 @@ describe('the badges the game list shows', () => {
     app.stopPolling();
   });
 });
+
+describe('what one spectator costs, per minute', () => {
+  // THE AUDIENCE LIMIT, and it is arithmetic rather than opinion. A spectator
+  // polls every five seconds. At two reads a poll that is twenty-four a minute
+  // against an anonymous allowance of fifty — so one person watching one game
+  // very nearly exhausts the whole per-IP budget alone, which is exactly what a
+  // local board does within a minute of opening.
+  //
+  // Halving it doubles the audience the same budget supports.
+  async function watch(polls: number): Promise<number> {
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    chain.as(ALICE);
+    await chain.submit(1, 'e2e4');
+
+    let reads = 0;
+    const counted = new Proxy(chain, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        // Only the calls that actually reach the network. `getAllEntries` is
+        // counted through `getPage`, so a cached log costs nothing here — which
+        // is the point of passing it what it is looking for.
+        // Both of the calls a poll actually makes. On the mock `getAllEntries`
+        // is one logical read; against the chain it is one `getPage` for a game
+        // shorter than a page, which every game here is.
+        if (prop === 'getAllEntries' || prop === 'getPending') {
+          return (...args: unknown[]) => {
+            reads++;
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+      }
+    });
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: counted as unknown as MockChain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await app.load(1);
+    await tick(30);
+
+    reads = 0; // count steady-state polling only, not the initial load
+    for (let i = 0; i < polls; i++) await app.readNow();
+    app.stopPolling();
+    return reads;
+  }
+
+  it('costs about one read a poll on a quiet game, not two', async () => {
+    // Twelve polls is one minute at the five-second spectator cadence.
+    const reads = await watch(12);
+    // Twelve log reads, and the mempool on half of them.
+    expect(reads, `a minute of watching cost ${reads} reads`).toBe(18);
+    expect(reads, 'the mempool stopped being read at all').toBeGreaterThan(12);
+  });
+
+  it('stays inside the anonymous allowance for a whole minute', async () => {
+    // Fifty a minute, measured from x-ratelimit-limit-minute. A spectator that
+    // cannot watch for one minute without exhausting it cannot watch at all.
+    const reads = await watch(12);
+    // Was 24 a minute against an allowance of 50. Eighteen is not a fix for
+    // the audience ceiling — it is a quarter off it, and the honest number.
+    expect(reads, 'one spectator still exhausts the per-IP budget').toBeLessThan(20);
+  });
+
+  it('still reads the mempool while a move is in flight', async () => {
+    // The saving must not cost the pending ghost. When something IS on its way,
+    // every poll asks — that is the moment the answer changes.
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    chain.pending = [
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+    ];
+
+    let mempoolReads = 0;
+    const counted = new Proxy(chain, {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        if (prop === 'getPending') {
+          return (...args: unknown[]) => {
+            mempoolReads++;
+            return (value as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return typeof value === 'function' ? (value as () => unknown).bind(target) : value;
+      }
+    });
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: counted as unknown as MockChain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await app.load(1);
+    await tick(30);
+
+    mempoolReads = 0;
+    for (let i = 0; i < 4; i++) await app.readNow();
+    app.stopPolling();
+    expect(mempoolReads, 'the ghost went unwatched while a move was in flight').toBe(4);
+  });
+});

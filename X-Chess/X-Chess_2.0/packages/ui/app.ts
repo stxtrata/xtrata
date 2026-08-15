@@ -452,6 +452,8 @@ export class ChessApp {
   private pending: PendingRow[] = [];
   /** When the mempool was last read SUCCESSFULLY, which is not every poll. */
   private pendingReadAt = 0;
+  /** Alternates, so a quiet board reads the mempool every other poll. */
+  private mempoolTurn = false;
   /**
    * The move this board is in the middle of making.
    *
@@ -953,12 +955,40 @@ export class ChessApp {
     if (this.gameId === null) return;
     const game = this.gameId;
     try {
+      // TWO READS A POLL WAS THE AUDIENCE LIMIT, and it is worth being plain
+      // about the arithmetic. A spectator polls every five seconds; at two
+      // requests each that is twenty-four a minute, against an anonymous
+      // allowance of fifty. One person watching one game very nearly exhausts
+      // the whole per-IP budget by themselves, which is why a local board
+      // watching a live game fails within a minute of opening.
+      //
+      // The one worth cutting is the mempool, and only that one.
+      //
+      // Reading the game row first to learn `next-seq` looks like it should let
+      // a cached log skip its read entirely, and it does - but `getAllEntries`
+      // costs one request either way, so the row read replaces the entries read
+      // rather than removing it. Same average, a worse worst case, more code.
+      // The log read stays as it was.
+      //
+      // The mempool only ever answers a question about the next few seconds.
+      // Asking on every poll is how a board spends its whole allowance watching
+      // for something that has not happened. Asking when something IS in
+      // flight, and every other poll otherwise, sees the same moves one beat
+      // later for half the cost - and a beat is nothing against a twelve-second
+      // block.
+      this.mempoolTurn = !this.mempoolTurn;
+      const wantMempool = this.pending.length > 0 || this.mempoolTurn;
+
       const [entries, read] = await Promise.all([
         this.chain.getAllEntries(game),
-        this.chain.getPending(game)
+        wantMempool ? this.chain.getPending(game) : Promise.resolve(null)
       ]);
       if (this.gameId !== game) return; // moved on while we were waiting
       this.lastReadAt = Date.now();
+      // A skipped read is `null`, which `heldPending` already means "could not
+      // tell" - so a poll that did not ask keeps what it had rather than
+      // reporting an empty mempool. That distinction was worth building for a
+      // rate limit and turns out to be exactly what a deliberate skip needs.
       const pending = this.heldPending(read, entries);
 
       // A poll may not SHORTEN the log.
