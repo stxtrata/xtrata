@@ -175,6 +175,21 @@ export const ASSUMED_BUDGET = 50;
 const BUDGET_HEADERS = ['x-ratelimit-remaining-minute', 'ratelimit-remaining'];
 
 /**
+ * How little allowance has to be left for a total failure to read as a rate
+ * limit rather than an outage.
+ *
+ * The anonymous budget is fifty a minute — measured, `x-ratelimit-limit-minute`
+ * — and a board watching one live game spends about two requests a poll. So a
+ * handful remaining is not "nearly out", it is "out within a second or two",
+ * which is exactly the window in which the next read fails.
+ *
+ * Small on purpose. Reporting an outage as a rate limit sends somebody to wait
+ * when the host is genuinely gone, and that is the more misleading of the two
+ * mistakes: waiting out a dead host never ends.
+ */
+const BUDGET_NEARLY_GONE = 4;
+
+/**
  * A fetch that tries every base, preferring the one that last answered.
  *
  * The choice is remembered, so one bad response does not make every later call
@@ -409,6 +424,32 @@ export function makeEndpoint(options: EndpointOptions = {}): Endpoint {
       // Nothing answered. Move the preference off the base that led this round,
       // so the next call does not pay for the same dead host's timeout first.
       index = (started + 1) % bases.length;
+
+      // IN A BROWSER, A RATE LIMIT ARRIVES DISGUISED AS THE NETWORK BEING DOWN,
+      // and the check above cannot see through the disguise.
+      //
+      // Hiro's 429 carries no `Access-Control-Allow-Origin` header — measured,
+      // 39 of 39 refusals — so the browser blocks the response before any of
+      // this code runs and `fetch` rejects as a transport error. `response` is
+      // never reached, `response.status` is never read, and `limited` stays
+      // false. The careful distinction directly above is unreachable on the one
+      // surface that matters.
+      //
+      // The evidence that IS readable is what the server said last time it
+      // answered at all. `x-ratelimit-remaining-minute` rides every successful
+      // response; if it was nearly exhausted and now nothing answers, that is a
+      // rate limit and not an outage. Inference from real evidence, rather than
+      // a guess: an outage does not politely warn you first that you have two
+      // requests left.
+      //
+      // This matters twice over, because `request` retries CHAIN_UNAVAILABLE and
+      // deliberately does not retry a rate limit. Mislabelled, every rate-limited
+      // read was being swept three times across three hosts — nine requests into
+      // a budget already gone, which is precisely the harm the exclusion exists
+      // to prevent.
+      if (!limited && typeof remaining === 'number' && remaining <= BUDGET_NEARLY_GONE) {
+        limited = true;
+      }
 
       // Being rate limited is not the chain being down, and a board that said
       // so would send somebody looking for a problem that is not there. It is

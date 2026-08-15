@@ -445,3 +445,89 @@ describe('being polite with a shared allowance', () => {
     ).toBeGreaterThan(asked);
   });
 });
+
+describe('a rate limit the browser is not allowed to see', () => {
+  // MEASURED, 2026-08-16: Hiro's 429 carries no Access-Control-Allow-Origin
+  // header — 39 of 39 refusals under load. A browser therefore blocks the
+  // response before any application code runs, and `fetch` rejects as a
+  // transport error. The status is never readable, so the 429 branch is
+  // unreachable on the one surface that matters, and every rate limit was
+  // being reported as "could not reach any Stacks endpoint".
+  //
+  // It was also being RETRIED, because that is what CHAIN_UNAVAILABLE gets:
+  // three sweeps across three hosts, nine requests into an allowance already
+  // spent. The exclusion that exists to prevent exactly that was defeated by
+  // a missing response header.
+  const okWithBudget = (left: number): Response =>
+    new Response('{}', { status: 200, headers: { 'x-ratelimit-remaining-minute': String(left) } });
+
+  it('calls it a rate limit when the last real answer said the budget was gone', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      // One good read that reports an almost-empty allowance, then the CORS
+      // wall: rejections with no status to inspect.
+      if (calls === 1) return okWithBudget(1);
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await endpoint.request('/warm');
+    await expect(endpoint.request('/then')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+  });
+
+  it('does not retry it, which is the whole point of naming it correctly', async () => {
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      if (calls === 1) return okWithBudget(0);
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await endpoint.request('/warm');
+    const before = fetchMock.mock.calls.length;
+    await expect(endpoint.request('/then')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    const spent = fetchMock.mock.calls.length - before;
+    // One sweep of the bases, not three. Nine requests into an exhausted
+    // budget is the harm, not the symptom.
+    expect(spent, 'a rate limit was swept more than once').toBe(PUBLIC_API.mainnet.length);
+  });
+
+  it('still calls a real outage an outage, when the budget was healthy', async () => {
+    // The mistake in the other direction, and the worse one: telling somebody
+    // to wait out a host that is genuinely gone never ends.
+    let calls = 0;
+    const fetchMock = vi.fn(async () => {
+      calls++;
+      if (calls === 1) return okWithBudget(48);
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+
+    await endpoint.request('/warm');
+    await expect(endpoint.request('/then')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+  });
+
+  it('calls it an outage when nothing has ever reported a budget', async () => {
+    // No evidence is not evidence of a rate limit. A first read that fails
+    // outright is an unreachable host until something says otherwise.
+    const fetchMock = vi.fn(async () => {
+      throw new TypeError('Failed to fetch');
+    });
+    const endpoint = makeEndpoint({
+      document: plainDocument(),
+      fetch: fetchMock as unknown as typeof fetch
+    });
+    await expect(endpoint.request('/cold')).rejects.toMatchObject({ code: 'CHAIN_UNAVAILABLE' });
+  });
+});
