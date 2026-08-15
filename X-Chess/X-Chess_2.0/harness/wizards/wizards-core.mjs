@@ -162,9 +162,22 @@ export const looksLikeMainnetAddress = (value) =>
  */
 export const KEY_SHAPED = /\b[0-9a-fA-F]{64,66}\b/;
 
-/** Never print a key, even by accident, even in an error. */
+/**
+ * A model API key, which is the second kind of secret this directory holds.
+ *
+ * The tournament Director needs one to play the characters, and it lives in the
+ * same .env.wizards at the same mode as the wallet keys. So it needs the same
+ * treatment on the way to a log — and it needs its OWN pattern, because it is
+ * not hex and `KEY_SHAPED` would sail straight past it. A redaction that covers
+ * one of two secrets in a file is the more dangerous kind: it reads as solved.
+ */
+export const API_KEY_SHAPED = /sk-ant-[A-Za-z0-9_-]{12,}/;
+
+/** Never print a key, even by accident, even in an error. Either kind. */
 export const scrub = (text) =>
-  String(text ?? '').replace(new RegExp(KEY_SHAPED.source, 'g'), '<key redacted>');
+  String(text ?? '')
+    .replace(new RegExp(KEY_SHAPED.source, 'g'), '<key redacted>')
+    .replace(new RegExp(API_KEY_SHAPED.source, 'g'), '<api key redacted>');
 
 /* ------------------------------------------------------------------ */
 /* the game the fleet plays                                            */
