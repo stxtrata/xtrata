@@ -119,6 +119,34 @@ const firstUint = (repr) => {
   return m ? m[1] : null;
 };
 
+/**
+ * What the holding wallet is carrying.
+ *
+ * Reported because a name is rarely the only thing in its wallet, and because
+ * the answer bears on whether a seed is being watched: an address holding real
+ * STX untouched for years is evidence, though not proof, that nobody else is
+ * draining it. It also says whether a wallet can pay its own way - a transfer
+ * costs a miner fee and an empty wallet cannot make one.
+ */
+async function balanceOf(address) {
+  // Retried with backoff, and SERIALLY by the caller. The extended API has a
+  // tighter allowance than the read-only endpoint, and a first version fired 62
+  // of these at once: fifty-four came back 429 and printed as `?`, which reads
+  // as an empty wallet. A rate limit that renders as "you own nothing" is the
+  // same failure this whole tool exists to avoid.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const r = await fetch(`${API}/extended/v1/address/${address}/stx`, { headers });
+      if (r.ok) return Number((await r.json()).balance) / 1e6;
+      if (r.status !== 429) return null;
+    } catch {
+      // Transport. Same treatment as a 429.
+    }
+    await new Promise((done) => setTimeout(done, 400 * 2 ** attempt));
+  }
+  return null;
+}
+
 async function burnTip() {
   const info = await fetch(`${API}/v2/info`, { headers }).then((r) => r.json());
   return Number(info.burn_block_height);
@@ -242,9 +270,28 @@ async function main() {
   }
 
   const owners = [...new Set(held.map((r) => r.owner).filter(Boolean))];
-  console.log(`\nHeld across ${owners.length} address(es):`);
-  for (const owner of owners) {
-    console.log(`  ${owner}  ${held.filter((r) => r.owner === owner).length}`);
+  const balances = await pool(owners, 1, balanceOf);
+  let total = 0;
+  let broke = 0;
+
+  console.log(`\nHeld across ${owners.length} address(es):\n`);
+  console.log(`${'address'.padEnd(42)} ${'names'.padStart(5)} ${'STX'.padStart(14)}`);
+  console.log('-'.repeat(64));
+  owners.forEach((owner, at) => {
+    const stx = balances[at];
+    if (typeof stx === 'number') total += stx;
+    // A transfer costs a miner fee. Below this a wallet cannot move its own
+    // name without being funded first, which is a separate and slower job.
+    if (typeof stx === 'number' && stx < 0.01) broke++;
+    const count = held.filter((r) => r.owner === owner).length;
+    console.log(
+      `${owner.padEnd(42)} ${String(count).padStart(5)} ${(stx === null ? '?' : stx.toFixed(6)).padStart(14)}`
+    );
+  });
+  console.log('-'.repeat(64));
+  console.log(`${'total'.padEnd(42)} ${String(held.length).padStart(5)} ${total.toFixed(6).padStart(14)}`);
+  if (broke) {
+    console.log(`\n${broke} wallet(s) hold under 0.01 STX and cannot pay to move their own name.`);
   }
   console.log('');
 }
