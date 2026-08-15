@@ -274,6 +274,84 @@ organiser and lists which entries are ADMITTED. The chain keeps everything; the
 tournament shows what it chose to admit. Decide this before the entry window
 opens, not during it.
 
+### The entry rules
+
+**One inscribed prompt is one entry.** Anyone may enter. The Director reads
+every entry and plays every character, so an entrant needs no software, no node,
+and no model access of their own.
+
+#### Size: 2,000 characters, and the reason is not cost
+
+Roughly 300 words, or one screen.
+
+The tempting justification is model cost, and it is the wrong one — even a
+20,000 character prompt is affordable across a tournament. **The real
+constraint is that an entry nobody reads is not auditable, and auditability is
+the entire premise.** Sixteen entries at 2,000 characters is about twenty
+minutes of reading, so any spectator can hold the whole field in their head
+before round one. Sixteen at 20,000 is a corpus, and "publicly auditable"
+quietly becomes "technically available".
+
+It also decides what the competition is a competition IN. A cap makes it a test
+of how well you can say something. No cap makes it a test of who will write the
+most, which is a worse sport and a worse experiment.
+
+#### The rules themselves
+
+1. **2,000 characters maximum.** Counted on the inscribed bytes, UTF-8.
+2. **Plain text.** No markup, no code, no encoding tricks. It is read by a
+   model and by people.
+3. **Self-contained.** *No external references* — no URLs, no "use the strategy
+   described at", no pointers to another inscription. This is the rule that
+   protects the whole thing: a prompt that fetches its real instructions from
+   somewhere else is not a player anybody audited, and the ledger would be
+   recording a wrapper rather than a competitor.
+4. **A character, not an instruction to the harness.** Anything addressed to the
+   Director is read as data and has no effect, so text spent on it is entry
+   wasted. See the security note below for why this is enforced rather than
+   requested.
+5. **The prompt is the whole player.** No opening book, no engine, no tools. The
+   model, the legal-move list and the harness are identical for everybody; your
+   text is the only thing that differs.
+6. **One prompt, one entry, one name, one wallet.** Enter twice if you like —
+   it is two entries and two names.
+
+#### Then it names itself
+
+An entry's first act is not a move. **The agent is shown its own prompt
+inscription and asked what it wants to be called**, then buys that name.
+
+This is a real search rather than a formality: five of the six names we picked
+for the exhibition characters were already registered. So the agent proposes,
+the harness checks availability against the BNS-V2 registry, and it proposes
+again — a few times, then it takes a suffixed fallback rather than stalling the
+tournament.
+
+**A `.btc` name is 2 STX flat, whatever its length** — checked against
+`get-name-price`, not assumed. That is the entry fee, and it is the only one:
+
+> The fee is not a fee. It is your agent's name, it is bought in your agent's
+> first decision, and it outlives the tournament.
+
+Gas is covered by `open-sponsored-both`, so 2 STX is the whole cost of entering.
+
+**"Forever" means five years and a renewal.** The `.btc` namespace has a
+lifetime of 262,800 blocks counted in *Bitcoin* blocks — verified, because
+counted in post-Nakamoto Stacks blocks the same number would be about five
+weeks, and that confusion is already a recorded bug elsewhere in this project.
+Five years is a real horizon and renewal is cheap, but the tournament should say
+so rather than promise permanence it does not control.
+
+#### The one thing still to decide: who holds the agent's key
+
+The Director signs as each agent, so the Director holds every agent's wallet
+key — which means the organiser holds the names the entrants paid for. For an
+exhibition run by the contract owner that is fine and should simply be stated.
+For an open tournament it is the first question a thoughtful entrant asks, and
+the honest options are: transfer the name to the entrant when the tournament
+ends, hand over the agent's key at the same time, or have entrants run their own
+signer and let only moves cross the wire. Decide before the entry window opens.
+
 ### Three things this does NOT prove, and they matter
 
 Claiming more than this is true would be worse than not doing it.
