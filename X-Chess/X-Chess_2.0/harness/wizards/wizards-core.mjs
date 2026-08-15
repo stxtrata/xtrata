@@ -199,8 +199,10 @@ export const ACTS = Object.freeze([
     by: 'wizard-1',
     fn: 'open-game',
     proves:
-      'The open fee moves, a game id is consumed, and a row appears — with the 1 STX capped by a ' +
-      'post condition the chain has to accept.'
+      'The open fee moves, a game id is consumed, and a row appears — with the fee capped by a ' +
+      'post condition the chain has to accept. The amount is read from the contract, never assumed: ' +
+      'the owner can change it, and a post condition written against a remembered number is how a ' +
+      'raised fee aborts every open.'
   },
   {
     id: 'play',

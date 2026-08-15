@@ -132,7 +132,7 @@ any.
 
 | act | who | what it proves |
 |---|---|---|
-| open | Opener | the fee moves, a game id is consumed, the 1 STX is capped by a post condition the chain has to accept, **and rules are committed** |
+| open | Opener | the fee moves, a game id is consumed, the fee is capped by a post condition the chain has to accept, **and rules are committed** |
 | play | Opener and Responder | two independent signers alternate to a real result; one transaction, one entry, each time |
 | sponsor | Patron | the contract pays a bootstrap **out**, to a wallet holding nothing, in the same transaction |
 | rebate | the sponsored wallet | the contract-principal post condition is accepted and the rebate arrives |

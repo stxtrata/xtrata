@@ -572,11 +572,23 @@ async function main() {
     return;
   }
 
-  // Read from the chain when there is a fleet to read for, and clearly labelled
-  // as a guess when there is not. Saying "read from the contract" over a
-  // constant is the kind of small untruth that makes every other line suspect.
-  const priced = fleet.ready;
-  const openFee = priced ? await readOpenFee() : 1_000_000n;
+  // Read from the chain whenever the chain will answer, and clearly labelled as
+  // a guess when it will not. Saying "read from the contract" over a constant is
+  // the kind of small untruth that makes every other line suspect.
+  //
+  // This used to be gated on having a provisioned fleet, which was wrong twice:
+  // `get-open-fee` is a read-only call and needs no key at all, and the fee is
+  // an owner-settable var - so the constant here is not a fact, it is whatever
+  // the fee happened to be when somebody typed it. A dry run with no .env would
+  // quote that number forever, including after the fee had changed.
+  let openFee = 1_000_000n;
+  let priced = false;
+  try {
+    openFee = await readOpenFee();
+    priced = true;
+  } catch {
+    // Left as the last known default, and said out loud below.
+  }
   // A resumed run does not open anything, so it must not quote an open fee. The
   // first resume printed "total 1.015 STX" and then spent 0.010 - a plan that
   // disagrees with the spend is a plan nobody can check the cap against.
@@ -586,7 +598,7 @@ async function main() {
 
   console.log(
     `open fee  ${ustx(openFee)}   ` +
-      (priced ? '(read from the contract)' : '(ASSUMED - no fleet to price it against)')
+      (priced ? '(read from the contract)' : '(ASSUMED - the contract would not answer)')
   );
   console.log(`spend cap ${ustx(cap)}`);
   console.log(`game plan ${plan.plan} — ${plan.proves}`);
@@ -622,7 +634,7 @@ async function main() {
   // RESUME, rather than pay to start again.
   //
   // A run that dies partway has already spent the open fee, and the moves it
-  // managed are on chain forever. Starting over costs another 1 STX to prove
+  // managed are on chain forever. Starting over costs another open fee to prove
   // the same thing twice - so `--game 10` skips the open, reads how far that
   // game got, and plays only what is missing. The first live run died after two
   // moves and this is what it cost to learn that.
