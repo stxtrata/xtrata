@@ -29,20 +29,37 @@
  * signing a transfer.
  */
 
-import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { privateKeyToAddress, randomPrivateKey } from '@stacks/transactions';
 
-import { DIRECTOR, PERSONAS, addressEnvName, keyEnvName } from './wizards-core.mjs';
+import { DIRECTOR, PERSONAS, PERSONALITIES, addressEnvName, keyEnvName } from './wizards-core.mjs';
 
 /** The Director first: it is the one you fund, so it is the one you read first. */
 const ALL = [DIRECTOR, ...PERSONAS];
+
+/**
+ * Everything a tournament needs a wallet for: the fleet, plus one per character.
+ *
+ * A character is a persona in the only sense this file cares about — an id that
+ * needs a key and an address — so it is described the same way rather than
+ * given a second mechanism.
+ */
+const TOURNAMENT = [
+  ...ALL,
+  ...PERSONALITIES.map((c) => ({
+    id: c.id,
+    name: c.name,
+    concern: `Tournament character (${c.style}). Signs its own moves and owns its name.`
+  }))
+];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EXAMPLE = join(HERE, '.env.wizards.example');
 const ENV_FILE = join(HERE, '.env.wizards');
 const WRITE = process.argv.includes('--write');
+const ADD = process.argv.includes('--add');
 
 /** One wallet. The key exists in memory for as long as it takes to print it. */
 export function makeWizard(persona, generate = randomPrivateKey, toAddress = privateKeyToAddress) {
@@ -130,7 +147,78 @@ function writeEnvFile(made) {
   console.log(`Wrote ${ENV_FILE} — real keys, gitignored, readable only by you.`);
 }
 
+/**
+ * Add wallets for anybody in the roster who does not have one yet.
+ *
+ * The opposite guard to `writeEnvFile`, and for the same reason. That one
+ * refuses when the file EXISTS, because rewriting it strands funded money.
+ * This one refuses when it does not, because there is nothing to add to — and
+ * between them there is no path where a key already on disk is rewritten.
+ *
+ * APPEND, NEVER REWRITE. `appendFileSync` cannot corrupt what is already
+ * there; a read-modify-write could, and the failure mode is losing the only
+ * copy of a key holding real money. So the existing bytes are never read for
+ * anything except deciding who is missing.
+ *
+ * Rerunning is safe and does nothing: a persona with a key is skipped, so this
+ * is the same shape as `fund`, where the answer to being unsure is "run it
+ * again".
+ */
+function addMissing() {
+  if (!existsSync(ENV_FILE)) {
+    console.log(`\nNo ${ENV_FILE} to add to. Generate a fleet first:`);
+    console.log('  node harness/wizards/make-wizards.mjs --write\n');
+    process.exitCode = 1;
+    return;
+  }
+
+  const ignore = join(HERE, '..', '..', '.gitignore');
+  const ignored =
+    existsSync(ignore) && readFileSync(ignore, 'utf8').includes('harness/wizards/.env.wizards');
+  if (!ignored) {
+    console.log('\nREFUSING to write: harness/wizards/.env.wizards is not in .gitignore.\n');
+    process.exitCode = 1;
+    return;
+  }
+
+  const existing = readFileSync(ENV_FILE, 'utf8');
+  const missing = TOURNAMENT.filter((p) => !existing.includes(`${keyEnvName(p.id)}=`));
+
+  if (!missing.length) {
+    console.log('\nEvery character already has a wallet. Nothing to add.\n');
+    return;
+  }
+
+  const made = missing.map((persona) => makeWizard(persona));
+  appendFileSync(
+    ENV_FILE,
+    [
+      '',
+      `# Added by make-wizards.mjs --add`,
+      '',
+      ...made.flatMap((w) => [
+        `# ${w.name} — ${w.concern}`,
+        `${keyEnvName(w.id)}=${w.key}`,
+        `${addressEnvName(w.id)}=${w.address}`,
+        ''
+      ])
+    ].join('\n'),
+    { mode: 0o600 }
+  );
+  chmodSync(ENV_FILE, 0o600);
+
+  console.log(`\nAdded ${made.length} wallet(s) to ${ENV_FILE}. Existing keys untouched.\n`);
+  for (const w of made) console.log(`  ${w.name.padEnd(10)} ${w.address}`);
+  console.log('\nFund them from the Director:');
+  console.log('  node harness/wizards/play.mjs fund          (what it would send)');
+  console.log('  node harness/wizards/play.mjs fund --live   (sends it)\n');
+}
+
 function main() {
+  if (ADD) {
+    addMissing();
+    return;
+  }
   const made = ALL.map((persona) => makeWizard(persona));
 
   console.log('\nFour disposable mainnet wallets. Printed once, stored nowhere.\n');

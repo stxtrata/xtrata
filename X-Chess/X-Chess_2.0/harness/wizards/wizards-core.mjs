@@ -27,8 +27,9 @@
  */
 
 import { GAME_PLANS, DEFAULT_PLAN, PLAN_NAMES, planNamed } from './games.mjs';
+import { PERSONALITIES } from './personalities.mjs';
 
-export { GAME_PLANS, DEFAULT_PLAN, PLAN_NAMES, planNamed };
+export { GAME_PLANS, DEFAULT_PLAN, PLAN_NAMES, planNamed, PERSONALITIES };
 
 /** Refused before anything was signed. Never thrown after a broadcast. */
 export class WizardSafetyError extends Error {
@@ -343,10 +344,22 @@ export function assertBroadcastAllowed({
  * missing key: a dry run is useful with no wallets at all, and refusing to
  * start is how a tool ends up only ever run by the person who wrote it.
  */
-export function readFleet(env = {}) {
+export function readFleet(env = {}, { characters = false } = {}) {
   const wizards = [];
   const missing = [];
-  for (const persona of [DIRECTOR, ...PERSONAS]) {
+  // The tournament characters are opt-in here, and that is deliberate: a plain
+  // `balances` or `fund` on a fleet that has not been extended yet should not
+  // report six wallets as missing when nobody asked for them. `--characters`
+  // is how you say the tournament is the thing being funded.
+  const roster = characters
+    ? [DIRECTOR, ...PERSONAS, ...PERSONALITIES.map((c) => ({
+        id: c.id,
+        name: c.name,
+        plays: 'either',
+        concern: `Tournament character (${c.style}).`
+      }))]
+    : [DIRECTOR, ...PERSONAS];
+  for (const persona of roster) {
     const key = env[keyEnvName(persona.id)];
     const address = env[addressEnvName(persona.id)];
     if (!key || !address) {

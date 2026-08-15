@@ -582,7 +582,10 @@ async function fund(fleet) {
 
 async function main() {
   const env = { ...readEnvFile(), ...process.env };
-  const fleet = readFleet(env);
+  // `--characters` widens the fleet to the six tournament characters, so
+  // `balances` and `fund` cover them. Off by default: a plain run should not
+  // report six wallets as missing on a fleet nobody has extended yet.
+  const fleet = readFleet(env, { characters: process.argv.includes('--characters') });
   const command = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'play';
 
   console.log(`\nX Chess wizards — ${LIVE ? 'LIVE, spending real STX' : 'dry run, nothing is sent'}`);
