@@ -253,6 +253,47 @@ describe('the example file', () => {
   });
 });
 
+describe('the inventory page, which must never be able to take a seed', () => {
+  const PAGE = readFileSync(resolve(ROOT, 'harness/bns/inventory.html'), 'utf8');
+
+  it('has no input a phrase could be typed into', () => {
+    // The boundary this whole area is built around. A browser page is the worst
+    // place a seed can be, and an inventory needs only addresses - so the page
+    // is not merely discouraged from taking one, it has no field for it and no
+    // code that could use one. Asserted rather than promised, because the promise
+    // is written on the page itself and prose does not fail a build.
+    const script = PAGE.slice(PAGE.indexOf('<script>'));
+    for (const forbidden of ['mnemonic', 'privateKey', 'senderKey', 'makeSTXTokenTransfer']) {
+      expect(script, `the page references ${forbidden}`).not.toContain(forbidden);
+    }
+    // The only password field is the API key, and it is named as such.
+    const passwords = [...PAGE.matchAll(/<input[^>]*type="password"[^>]*>/g)].map((m) => m[0]);
+    expect(passwords).toHaveLength(1);
+    expect(passwords[0]).toContain('id="apikey"');
+  });
+
+  it('reads and never writes — no signing library reaches it', () => {
+    // An inventory that could also broadcast would be a page that needs a key.
+    expect(PAGE).not.toMatch(/broadcastTransaction|makeContractCall|signTransaction/);
+    // POSTs go to call-read only, which cannot change anything.
+    for (const post of [...PAGE.matchAll(/method:\s*'POST'/g)]) expect(post).toBeTruthy();
+    expect(PAGE).toContain('/v2/contracts/call-read/');
+    expect(PAGE).not.toContain('/v2/transactions');
+  });
+
+  it('is self-contained, so it cannot rot or phone home', () => {
+    const external = PAGE.match(/https?:\/\/(?!api\.mainnet\.hiro\.so)[a-z0-9.-]+/gi) ?? [];
+    expect(external, `the page fetches from ${external.join(', ')}`).toHaveLength(0);
+  });
+
+  it('never renders an unread wallet as an empty one', () => {
+    // The failure this whole area keeps meeting. "You own nothing" and "nobody
+    // answered" look identical in a table and mean opposite things.
+    expect(PAGE).toContain("row.error ? 'unread'");
+    expect(PAGE).toMatch(/NOT counted as empty/);
+  });
+});
+
 describe('the order of operations, which only works one way', () => {
   it('sweeps AFTER transferring, and re-reads the balance first', () => {
     // The CALL SITES, not the imports. A first version of this test matched

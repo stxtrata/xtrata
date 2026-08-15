@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet inventory</title>
+<!--
+  What every wallet holds, before and after moving any of it.
+
+  THIS PAGE NEVER SEES A SEED, A PHRASE, OR A PRIVATE KEY. It takes addresses
+  and reads public chain data about them. There is no field to type a phrase
+  into and no code here that could use one. That is not squeamishness: a browser
+  page is the worst place a seed can be, and the rescue that DOES need one runs
+  in a terminal, from a file at mode 600, on one machine.
+
+  Two jobs:
+
+    1. INVENTORY. Step through a list of addresses and list what each holds -
+       STX, BNS names, other NFTs, fungible tokens.
+    2. COMPARE. Save the result, run the rescue, load the saved file back, and
+       the page diffs it. "Everything moved" is a claim; a diff is evidence.
+
+  Self-contained on purpose. One file, no CDN, no build step, no dependency that
+  can rot. Open it from disk.
+-->
+<style>
+  :root {
+    --bg: #f6f5f2; --ink: #1b1a17; --muted: #6b675f; --line: #d9d5cc;
+    --panel: #fffefb; --accent: #8a6a2f; --good: #2f6a3f; --bad: #8a2f2f;
+    --warn: #8a5a2f; --code: #efece5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+      --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+      --warn: #d8a76a; --code: #232119;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+    --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+    --warn: #d8a76a; --code: #232119;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.1rem; margin-bottom: 1rem;
+  }
+  .never {
+    border-left: 3px solid var(--accent); background: var(--code);
+    padding: .75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1.5rem;
+  }
+  .never strong { color: var(--accent); }
+  label { display: block; font-weight: 600; margin-bottom: .35rem; font-size: .9rem; }
+  .hint { color: var(--muted); font-size: .85rem; margin: .3rem 0 0; }
+  textarea, input[type="text"], input[type="password"] {
+    width: 100%; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: .6rem .7rem;
+  }
+  textarea { min-height: 8.5rem; resize: vertical; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-top: .9rem; }
+  button {
+    font: inherit; font-weight: 600; padding: .55rem 1rem; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; min-height: 2.5rem;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .bar { height: 5px; background: var(--code); border-radius: 3px; overflow: hidden; margin-top: .9rem; }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .status { font-size: .88rem; color: var(--muted); margin-top: .5rem; min-height: 1.4em; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
+  .tag {
+    display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
+    font-size: .78rem; margin: .1rem .2rem .1rem 0; font-family: ui-monospace, Menlo, monospace;
+  }
+  .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .totals { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: .8rem; }
+  .totals div { font-size: .85rem; color: var(--muted); }
+  .totals b { display: block; font-size: 1.3rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wallet inventory</h1>
+  <p class="sub">What every address holds, and what changed after you moved it.</p>
+
+  <div class="never">
+    <strong>This page never sees a seed, a phrase, or a private key.</strong>
+    It takes addresses and reads public chain data about them. There is no field
+    to type a phrase into. The rescue that <em>does</em> need one runs in a
+    terminal, from a file at mode 600 — a browser page is the worst place a seed
+    can be, and this one is deliberately not capable of using it.
+  </div>
+
+  <div class="panel">
+    <label for="addresses">Addresses, one per line</label>
+    <textarea id="addresses" spellcheck="false"
+      placeholder="SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7&#10;SP3XCSEFE1F63CP3BEYNK1B1CTQ3HV5CWGCE7WB4P&#10;&#10;Paste the owner column from check-names.mjs, or the addresses from a rescue dry run."></textarea>
+    <p class="hint">
+      Anything that is not an <span class="mono">SP…</span> / <span class="mono">SM…</span>
+      principal is ignored, so you can paste a whole table and let it pick the addresses out.
+    </p>
+
+    <label for="apikey" style="margin-top:1rem">Hiro API key (optional)</label>
+    <input id="apikey" type="password" autocomplete="off" spellcheck="false" placeholder="blank is fine for a few wallets">
+    <p class="hint">
+      Kept in this tab only — never stored, never sent anywhere but api.hiro.so.
+      Without one you get roughly fifty requests a minute shared with everything
+      else on your connection, which is enough for a handful of wallets and not
+      for sixty. Each wallet costs two requests, plus one per BNS name.
+    </p>
+
+    <div class="row">
+      <button id="run" class="primary" type="button">Take inventory</button>
+      <button id="stop" type="button" disabled>Stop</button>
+      <button id="save" type="button" disabled>Save snapshot</button>
+      <button id="load" type="button">Load snapshot to compare</button>
+      <input id="file" type="file" accept="application/json" hidden>
+    </div>
+    <div class="bar"><i id="progress"></i></div>
+    <p class="status" id="status">Ready.</p>
+  </div>
+
+  <div id="totals" class="panel" hidden>
+    <div class="totals">
+      <div>wallets<b id="t-wallets">0</b></div>
+      <div>STX<b id="t-stx">0</b></div>
+      <div>BNS names<b id="t-bns">0</b></div>
+      <div>other NFTs<b id="t-nft">0</b></div>
+      <div>token types<b id="t-ft">0</b></div>
+    </div>
+  </div>
+
+  <div id="diff-panel" class="panel" hidden>
+    <h2 style="margin-top:0">Against the saved snapshot</h2>
+    <div id="diff"></div>
+  </div>
+
+  <div id="results" class="scroll"></div>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  const API = 'https://api.mainnet.hiro.so';
+  const BNS_V2 = 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF.BNS-V2';
+  const BNS_ASSET = BNS_V2 + '::BNS-V2';
+  const [BNS_ADDR, BNS_NAME] = BNS_V2.split('.');
+
+  const $ = (id) => document.getElementById(id);
+  const PRINCIPAL = /\bS[PM][0-9A-HJKMNP-TV-Z]{20,}\b/g;
+
+  let stopped = false;
+  let current = null;   // the inventory just taken
+  let baseline = null;  // a snapshot loaded from disk
+
+  /* --------------------------------------------------------------- */
+
+  const headers = () => {
+    const key = $('apikey').value.trim();
+    return key ? { 'x-api-key': key } : {};
+  };
+
+  /**
+   * Retried with backoff, and a failure is reported as a FAILURE.
+   *
+   * The one thing this page must never do is render a rate limit as an empty
+   * wallet. "You own nothing here" and "nobody answered" look identical in a
+   * table and mean opposite things, so a read that could not be made is marked
+   * rather than counted as zero.
+   */
+  async function get(path, tries = 5) {
+    for (let attempt = 0; attempt < tries; attempt++) {
+      if (stopped) throw new Error('stopped');
+      try {
+        const response = await fetch(API + path, { headers: headers() });
+        if (response.ok) return await response.json();
+        if (response.status === 404) return null;
+        if (response.status !== 429) throw new Error('HTTP ' + response.status);
+      } catch (error) {
+        if (attempt === tries - 1) throw error;
+      }
+      await new Promise((done) => setTimeout(done, 500 * 2 ** attempt));
+    }
+    throw new Error('rate limited after ' + tries + ' attempts');
+  }
+
+  /** Clarity buff / uint arguments, hand-encoded. Bare hex, no 0x prefix. */
+  const uintArg = (n) => '01' + BigInt(n).toString(16).padStart(32, '0');
+
+  async function readOnly(fn, args) {
+    const response = await fetch(`${API}/v2/contracts/call-read/${BNS_ADDR}/${BNS_NAME}/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers() },
+      body: JSON.stringify({ sender: BNS_ADDR, arguments: args })
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    return body.okay ? body.result : null;
+  }
+
+  /**
+   * A BNS token id back into a readable name.
+   *
+   * `get-bns-from-id` returns a tuple of two buffers. Decoding the serialised
+   * form by hand beats shipping a Clarity deserialiser in a page that has no
+   * build step: find the two length-prefixed buffers and read them as ASCII.
+   */
+  async function nameOfToken(id) {
+    const hex = await readOnly('get-bns-from-id', [uintArg(id)]);
+    if (!hex) return null;
+    const bytes = hex.replace(/^0x/, '');
+    const found = [];
+    // 0x02 then a 4-byte length then the bytes. Scan for that shape.
+    for (let at = 0; at + 10 <= bytes.length; ) {
+      if (bytes.slice(at, at + 2) !== '02') { at += 2; continue; }
+      const length = parseInt(bytes.slice(at + 2, at + 10), 16);
+      if (!Number.isFinite(length) || length === 0 || length > 48) { at += 2; continue; }
+      const body = bytes.slice(at + 10, at + 10 + length * 2);
+      if (body.length < length * 2) { at += 2; continue; }
+      let text = '';
+      for (let i = 0; i < body.length; i += 2) text += String.fromCharCode(parseInt(body.slice(i, i + 2), 16));
+      if (/^[\x20-\x7e]+$/.test(text)) { found.push(text); at += 10 + length * 2; } else { at += 2; }
+    }
+    if (found.length >= 2) return `${found[0]}.${found[1]}`;
+    return found[0] ?? null;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  async function inventory(address) {
+    const row = { address, stx: null, bns: [], nfts: [], fts: [], error: null };
+    try {
+      const balances = await get(`/extended/v1/address/${address}/balances`);
+      row.stx = balances ? Number(balances.stx.balance) / 1e6 : 0;
+      row.fts = Object.entries(balances?.fungible_tokens ?? {})
+        .filter(([, v]) => BigInt(v.balance) > 0n)
+        .map(([id, v]) => ({ id, balance: v.balance }));
+
+      const holdings = await get(
+        `/extended/v1/tokens/nft/holdings?principal=${address}&limit=200`
+      );
+      for (const item of holdings?.results ?? []) {
+        const asset = item.asset_identifier ?? '';
+        const idMatch = /u(\d+)/.exec(item.value?.repr ?? '');
+        const id = idMatch ? Number(idMatch[1]) : null;
+        if (asset === BNS_ASSET && id !== null) {
+          row.bns.push({ id, name: await nameOfToken(id) });
+        } else {
+          row.nfts.push({ asset, id });
+        }
+      }
+    } catch (error) {
+      // Marked, never silently zeroed. See `get`.
+      row.error = String(error.message ?? error);
+    }
+    return row;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  function render(rows) {
+    const wrap = $('results');
+    wrap.innerHTML = '';
+    const table = document.createElement('table');
+    table.innerHTML =
+      '<thead><tr><th>address</th><th class="num">STX</th><th>BNS names</th>' +
+      '<th>other NFTs</th><th>tokens</th></tr></thead>';
+    const body = document.createElement('tbody');
+
+    for (const row of rows) {
+      const tr = document.createElement('tr');
+      const names = row.bns.map((b) => `<span class="tag">${b.name ?? '#' + b.id}</span>`).join('');
+      const nfts = row.nfts.length
+        ? `<span class="tag">${row.nfts.length} from ${new Set(row.nfts.map((n) => n.asset)).size} contract(s)</span>`
+        : '<span style="color:var(--muted)">—</span>';
+      const fts = row.fts.length
+        ? row.fts.map((f) => `<span class="tag">${f.id.split('::').pop()}</span>`).join('')
+        : '<span style="color:var(--muted)">—</span>';
+      tr.innerHTML =
+        `<td class="mono">${row.address}</td>` +
+        `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
+        `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
+        `<td>${nfts}</td><td>${fts}</td>`;
+      body.appendChild(tr);
+    }
+    table.appendChild(body);
+    wrap.appendChild(table);
+
+    const unread = rows.filter((r) => r.error);
+    if (unread.length) {
+      const note = document.createElement('p');
+      note.className = 'status bad';
+      note.textContent =
+        `${unread.length} wallet(s) could not be read and are NOT counted as empty. ` +
+        'Add an API key, or run again.';
+      wrap.appendChild(note);
+    }
+
+    $('totals').hidden = false;
+    $('t-wallets').textContent = rows.length;
+    $('t-stx').textContent = rows.reduce((s, r) => s + (r.stx ?? 0), 0).toFixed(6);
+    $('t-bns').textContent = rows.reduce((s, r) => s + r.bns.length, 0);
+    $('t-nft').textContent = rows.reduce((s, r) => s + r.nfts.length, 0);
+    $('t-ft').textContent = new Set(rows.flatMap((r) => r.fts.map((f) => f.id))).size;
+  }
+
+  /**
+   * What moved, and what did not.
+   *
+   * The whole reason to take an inventory twice. "The rescue worked" is a claim;
+   * a wallet that still holds a name it was supposed to have moved is evidence,
+   * and it is the only way to notice one transaction of a hundred and twenty
+   * having quietly failed.
+   */
+  function renderDiff(before, after) {
+    const byAddress = new Map(after.rows.map((r) => [r.address, r]));
+    const lines = [];
+    let stillHolding = 0;
+
+    for (const was of before.rows) {
+      const now = byAddress.get(was.address);
+      if (!now) continue;
+      if (now.error) {
+        lines.push(`<tr><td class="mono">${was.address}</td><td class="bad">unread now — not proof of anything</td></tr>`);
+        continue;
+      }
+      const namesBefore = was.bns.length, namesAfter = now.bns.length;
+      const stxMoved = (was.stx ?? 0) - (now.stx ?? 0);
+      if (namesAfter > 0 || (now.stx ?? 0) > 0.01) {
+        stillHolding++;
+        lines.push(
+          `<tr><td class="mono">${was.address}</td><td class="warn">still holds ` +
+          `${namesAfter} name(s) and ${(now.stx ?? 0).toFixed(6)} STX</td></tr>`
+        );
+      } else if (namesBefore > 0 || stxMoved > 0) {
+        lines.push(
+          `<tr><td class="mono">${was.address}</td><td class="good">emptied — ` +
+          `${namesBefore} name(s) and ${stxMoved.toFixed(6)} STX moved</td></tr>`
+        );
+      }
+    }
+
+    $('diff-panel').hidden = false;
+    $('diff').innerHTML =
+      `<p class="status">${stillHolding === 0
+        ? '<span class="good">Every wallet in the snapshot is empty.</span>'
+        : `<span class="warn">${stillHolding} wallet(s) still hold something.</span>`}</p>` +
+      `<div class="scroll"><table><tbody>${lines.join('')}</tbody></table></div>`;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  $('run').addEventListener('click', async () => {
+    const text = $('addresses').value;
+    const addresses = [...new Set(text.match(PRINCIPAL) ?? [])];
+    if (!addresses.length) { $('status').textContent = 'No addresses found in that.'; return; }
+
+    stopped = false;
+    $('run').disabled = true; $('stop').disabled = false; $('save').disabled = true;
+    const rows = [];
+    for (let at = 0; at < addresses.length; at++) {
+      if (stopped) break;
+      $('status').textContent = `Reading ${at + 1} of ${addresses.length} — ${addresses[at]}`;
+      $('progress').style.width = `${((at) / addresses.length) * 100}%`;
+      rows.push(await inventory(addresses[at]));
+      render(rows);
+    }
+    $('progress').style.width = '100%';
+    current = { takenAt: new Date().toISOString(), rows };
+    $('status').textContent = stopped
+      ? `Stopped after ${rows.length} of ${addresses.length}.`
+      : `Done. ${rows.length} wallet(s).`;
+    $('run').disabled = false; $('stop').disabled = true; $('save').disabled = false;
+    if (baseline) renderDiff(baseline, current);
+  });
+
+  $('stop').addEventListener('click', () => { stopped = true; $('status').textContent = 'Stopping…'; });
+
+  $('save').addEventListener('click', () => {
+    if (!current) return;
+    const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `inventory-${current.takenAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $('load').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      baseline = JSON.parse(await file.text());
+      $('status').textContent =
+        `Snapshot loaded: ${baseline.rows.length} wallet(s) from ${baseline.takenAt}. ` +
+        'Take an inventory now and it will be compared.';
+      // Prefill, so comparing does not need the addresses pasted twice.
+      if (!$('addresses').value.trim()) {
+        $('addresses').value = baseline.rows.map((r) => r.address).join('\n');
+      }
+      if (current) renderDiff(baseline, current);
+    } catch {
+      $('status').textContent = 'That file is not an inventory snapshot.';
+    }
+  });
+})();
+</script>
+</body>
+</html>
