@@ -63,6 +63,18 @@ const arg = (name, fallback = null) => {
 };
 const LIVE = process.argv.includes('--live');
 const ustx = (micro) => `${(Number(micro) / 1_000_000).toFixed(6)} STX`;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Seconds between moves, for a game somebody is meant to watch.
+ *
+ * Zero by default: a test run wants to be quick, and the wizards' own job is to
+ * answer a question rather than put on a show. `--pace 45` turns the same plan
+ * into an exhibition, and on a long one it is also the cheapest defence against
+ * the rate limit - forty-five seconds a move is well inside any budget, and all
+ * three mainnet hosts share one.
+ */
+const PACE_MS = Math.max(0, Number(arg('pace', '0')) * 1000);
 
 /**
  * The env file, read here rather than by a dependency.
@@ -569,14 +581,17 @@ async function main() {
   // first resume printed "total 1.015 STX" and then spent 0.010 - a plan that
   // disagrees with the spend is a plan nobody can check the cap against.
   const resuming = Boolean(arg('game'));
-  const plan = planRun({ fleet, openFeeUstx: openFee, resuming });
+  const plan = planRun({ fleet, openFeeUstx: openFee, resuming, plan: arg('plan') });
   const cap = BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX)));
 
   console.log(
     `open fee  ${ustx(openFee)}   ` +
       (priced ? '(read from the contract)' : '(ASSUMED - no fleet to price it against)')
   );
-  console.log(`spend cap ${ustx(cap)}\n`);
+  console.log(`spend cap ${ustx(cap)}`);
+  console.log(`game plan ${plan.plan} — ${plan.proves}`);
+  if (PACE_MS > 0) console.log(`pace      ${PACE_MS / 1000}s between moves`);
+  console.log('');
   for (const step of plan.steps) {
     console.log(
       `  ${String(step.act).padEnd(8)} ${(step.who?.name ?? '?').padEnd(10)} ` +
@@ -657,10 +672,14 @@ async function main() {
   const played = Number((await readOnly('get-game', [Cl.serialize(Cl.uint(game))])).value.value['next-seq'].value);
   if (played > 0) console.log(`  ${played} submission(s) already on it`);
 
-  for (const [at, move] of SCRIPTED_GAME.entries()) {
+  for (const [at, move] of plan.moves.entries()) {
     if (at < played) continue;
     const wizard = fleet.wizards.find((w) => w.id === move.by);
-    console.log(`\n${wizard.name}: ${move.move} — ${move.note}`);
+    console.log(`\n${wizard.name}: ${move.move}${move.note ? ` — ${move.note}` : ''}`);
+    // Watchable pacing. A run that blasts every move into the mempool at once
+    // is a run nobody can follow, and on a long plan it is also the fastest way
+    // to be rate limited. Zero by default, so the fleet's own tests stay quick.
+    if (at > played && PACE_MS > 0) await sleep(PACE_MS);
     const sent = await send({
       wizard,
       functionName: 'submit',
@@ -690,9 +709,12 @@ async function main() {
 
 if (Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.meta.url) {
   main().catch((error) => {
-    console.error(
-      `\n${error instanceof WizardSafetyError ? error.message : scrub(error?.stack ?? error)}`
-    );
+    // By name as well as by class. A refusal raised in a module that cannot
+    // import the class without a cycle is still a refusal, and printing a stack
+    // trace over a sentence somebody wrote for this exact moment helps nobody.
+    const refusal =
+      error instanceof WizardSafetyError || error?.name === 'WizardSafetyError';
+    console.error(`\n${refusal ? error.message : scrub(error?.stack ?? error)}`);
     process.exitCode = 1;
   });
 }

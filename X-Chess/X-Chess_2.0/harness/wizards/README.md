@@ -132,14 +132,52 @@ any.
 
 | act | who | what it proves |
 |---|---|---|
-| open | Opener | the fee moves, a game id is consumed, and the 1 STX is capped by a post condition the chain has to accept |
-| play | Opener and Responder | two independent signers alternate to a real checkmate; one transaction, one entry, each time |
+| open | Opener | the fee moves, a game id is consumed, the 1 STX is capped by a post condition the chain has to accept, **and rules are committed** |
+| play | Opener and Responder | two independent signers alternate to a real result; one transaction, one entry, each time |
 | sponsor | Patron | the contract pays a bootstrap **out**, to a wallet holding nothing, in the same transaction |
 | rebate | the sponsored wallet | the contract-principal post condition is accepted and the rebate arrives |
 
-The game is fool's mate — four moves to a genuine checkmate, derived by replay
-rather than asserted. A longer game costs more in fees and proves the same
-things.
+### Which game they play
+
+```bash
+node harness/wizards/play.mjs --plan en-passant
+node harness/wizards/play.mjs --plan immortal --pace 45 --live
+```
+
+The default is fool's mate: four moves to a genuine checkmate, derived by replay
+rather than asserted, and the cheapest thing that ends in a real result — which
+is what you want from the run that answers "can this fleet still sign".
+
+**It used to be the only one, and this README used to say a longer game "costs
+more in fees and proves the same things".** That was true of the four things in
+the table and false of nearly everything else, because fool's mate contains no
+capture, no castle, no en passant, no promotion, no control event and no
+rejected submission. So the fleet could run green forever while every one of
+those was broken — and two of them **were**. En passant was reported twice from
+a real board, by a person, because nothing automated had ever tried it.
+
+| plan | moves | the only one to exercise |
+|---|---|---|
+| `fools-mate` | 4 | the floor: a fee moves and replay derives a checkmate |
+| `scholars-mate` | 7 | a capture, and a second mating pattern |
+| `en-passant` | 5 | the capture that lands on an empty square |
+| `castling` | 10 | a rook moved by the rules rather than by a submission, both sides |
+| `promotion` | 9 | a five-character submission, and a piece that changes on arrival |
+| `stalemate` | 19 | a game ended by the position alone, with no winner |
+| `resignation` | 4 | a control event, sent on the sender's own turn |
+| `draw-agreed` | 4 | an offer remembered across a submission, and accepted |
+| `rejected` | 6 | submissions that are stored, charged, and skipped by every reader |
+| `immortal` | 45 | a long game, worth watching, and the nearest thing to a second page |
+
+**Every plan is verified by replay, not by whoever typed it.**
+`tests/wizards/game-plans.test.ts` runs each move list through the board's own
+engine and asserts the terminal status, the result, and how many submissions
+were accepted and thrown away. A mistranscribed famous game fails there rather
+than on mainnet, having spent an open fee to find out.
+
+`--pace <seconds>` puts a gap between moves. Zero by default, because a test run
+wants to be quick; `--pace 45` turns the same plan into something a person can
+watch, and on a long plan it is also the cheapest defence against the rate limit.
 
 ---
 

@@ -27,6 +27,7 @@ import {
   PERSONAS,
   RESERVED_ADDRESSES,
   SCRIPTED_GAME,
+  PLAN_NAMES,
   WizardSafetyError,
   addressEnvName,
   assertBroadcastAllowed,
@@ -247,12 +248,47 @@ describe('the fleet, and what it intends', () => {
     ).toBeLessThan(DEFAULT_SPEND_CAP_USTX);
   });
 
-  it('plays a game that actually finishes', () => {
+  it('plays a game that actually finishes, by default', () => {
     // Fool's mate. Four moves to a real checkmate, derived by replay rather than
-    // asserted - a longer game costs more fees and proves the same things.
+    // asserted, and the cheapest thing that ends in a real result - which is
+    // what the run that answers "can this fleet still sign" wants.
     expect(SCRIPTED_GAME.map((m) => m.move)).toEqual(['f2f3', 'e7e5', 'g2g4', 'd8h4']);
     expect(SCRIPTED_GAME.filter((m) => m.by === 'wizard-1').length).toBe(2);
     expect(SCRIPTED_GAME.filter((m) => m.by === 'wizard-2').length).toBe(2);
+  });
+
+  it('will plan any of the other games too, and prices each one', () => {
+    // The default is a floor, not the whole fleet. Every plan is replayed
+    // against the board's own engine in `game-plans.test.ts`; this is only that
+    // the runner can be pointed at one and gets the arithmetic right.
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    const fleet = readFleet(env);
+
+    for (const name of PLAN_NAMES) {
+      const plan = planRun({ fleet, openFeeUstx: 1_000_000n, plan: name });
+      expect(plan.plan, `${name} planned something else`).toBe(name);
+      expect(plan.steps.length, `${name} is not fully covered`).toBe(1 + plan.moves.length);
+      // Open fee plus a miner fee per move, and nothing else invented.
+      const expected = 1_000_000n + 3_000n * BigInt(plan.moves.length + 1);
+      expect(plan.totalUstx, `${name} is mispriced`).toBe(expected);
+    }
+  });
+
+  it('refuses a plan name it does not have, before pricing anything', () => {
+    // A run that fell back to the default would spend real money proving
+    // something nobody asked about - and it would look like it had worked.
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    expect(() => planRun({ fleet: readFleet(env), plan: 'kasparov-topalov' })).toThrow(
+      /no game plan called/
+    );
   });
 });
 

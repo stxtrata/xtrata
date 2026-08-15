@@ -26,6 +26,10 @@
  * is what makes the safety rules testable rather than merely stated.
  */
 
+import { GAME_PLANS, DEFAULT_PLAN, PLAN_NAMES, planNamed } from './games.mjs';
+
+export { GAME_PLANS, DEFAULT_PLAN, PLAN_NAMES, planNamed };
+
 /** Refused before anything was signed. Never thrown after a broadcast. */
 export class WizardSafetyError extends Error {
   constructor(message) {
@@ -170,15 +174,18 @@ export const scrub = (text) =>
  * Fool's mate, which is the shortest real result in chess.
  *
  * Four moves and the game is genuinely over — checkmate, derived by replay,
- * eligible for a rating if the rules say ranked. A longer game would cost more
- * fees and prove exactly the same things.
+ * eligible for a rating if the rules say ranked. Kept as the default because it
+ * is the cheapest thing that ends in a real result, which is what you want from
+ * the run that answers "can this fleet still sign".
+ *
+ * It is no longer the only one. This used to say that a longer game "would cost
+ * more fees and prove exactly the same things", which was true of the four
+ * things listed above it and false of nearly everything else — fool's mate has
+ * no capture, no castle, no en passant, no promotion, no control event and no
+ * rejected submission. See `games.mjs`, where each plan names what it is the
+ * only plan to exercise.
  */
-export const SCRIPTED_GAME = Object.freeze([
-  { by: 'wizard-1', move: 'f2f3', note: 'white opens' },
-  { by: 'wizard-2', move: 'e7e5', note: 'black answers' },
-  { by: 'wizard-1', move: 'g2g4', note: 'white blunders, on purpose' },
-  { by: 'wizard-2', move: 'd8h4', note: 'checkmate' }
-]);
+export const SCRIPTED_GAME = GAME_PLANS[DEFAULT_PLAN].moves;
 
 /**
  * The acts a run performs, in order.
@@ -352,9 +359,11 @@ export function planRun({
   openFeeUstx = 1_000_000n,
   sponsorTotalUstx = 0n,
   minerFeeUstx = 3_000n,
-  resuming = false
+  resuming = false,
+  plan = DEFAULT_PLAN
 }) {
   const by = (id) => fleet.wizards.find((w) => w.id === id) ?? null;
+  const game = planNamed(plan);
   const steps = [];
 
   // A resumed run joins a game that already exists, so it pays no open fee. The
@@ -366,17 +375,17 @@ export function planRun({
       who: by('wizard-1'),
       fn: 'open-game',
       spendUstx: BigInt(openFeeUstx) + BigInt(minerFeeUstx),
-      what: 'open a ranked game, wizard-1 as white and wizard-2 as black'
+      what: `open a ranked game (${game.name}), wizard-1 as white and wizard-2 as black`
     });
   }
 
-  for (const move of SCRIPTED_GAME) {
+  for (const move of game.moves) {
     steps.push({
       act: 'play',
       who: by(move.by),
       fn: 'submit',
       spendUstx: BigInt(minerFeeUstx),
-      what: `${move.move} — ${move.note}`
+      what: move.note ? `${move.move} — ${move.note}` : move.move
     });
   }
 
@@ -391,7 +400,7 @@ export function planRun({
   }
 
   const total = steps.reduce((sum, step) => sum + step.spendUstx, 0n);
-  return { steps, totalUstx: total };
+  return { steps, totalUstx: total, plan: game.name, proves: game.proves, moves: game.moves };
 }
 
 /* ------------------------------------------------------------------ */
