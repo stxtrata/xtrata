@@ -153,9 +153,29 @@ async function playGame({ gameId, white, black, replay, ask, budget }) {
   // refereed nothing: no turn alternation, either character free to move at any
   // time, and the position drifting away from what the committed rules describe.
   const { rules } = await wizardRules(white.address, black.address);
+  let lastLength = -1;
 
   for (;;) {
     const entries = await readEntries(gameId);
+
+    // THE LOG MUST GROW. Every pass sends exactly one submission and waits for
+    // it, so the next read must see more than the last one did. When it does
+    // not, something is wrong in a way this loop cannot see - a misparsed page,
+    // a submission the contract stored but replay throws away, a wallet signing
+    // into the wrong game - and the correct response to all of them is to stop.
+    //
+    // Without this, game 12 played e2e4 five times. Each one was accepted by the
+    // contract, skipped by replay as landing on an empty square, and charged.
+    // A loop that cannot tell it is making no progress will spend right up to
+    // its cap making none.
+    if (entries.length <= lastLength) {
+      throw new WizardSafetyError(
+        `game ${gameId}: the log did not grow after a submission (${entries.length} entries, ` +
+          `was ${lastLength}). Stopping rather than playing the same move again.`
+      );
+    }
+    lastLength = entries.length;
+
     const state = replay(entries, { rules });
 
     if (state.status !== 'live') {
@@ -205,16 +225,41 @@ async function readEntries(gameId) {
   // reads the same function; there is only one way to page this log.
   const out = [];
   for (let start = 0; ; start += 50) {
-    const page = (
-      await readOnly('get-page', [Cl.serialize(Cl.uint(gameId)), Cl.serialize(Cl.uint(start))])
-    ).list;
-    const rows = (page ?? []).filter((row) => row?.value);
+    const page = await readOnly('get-page', [
+      Cl.serialize(Cl.uint(gameId)),
+      Cl.serialize(Cl.uint(start))
+    ]);
+
+    // THROWS RATHER THAN RETURNING NOTHING, and that is the whole lesson of
+    // game 12. This read `page.list`, which is undefined - the list is at
+    // `page.value` - so it returned [] every time. An empty log is
+    // indistinguishable from a new game, so replay said "white to move from the
+    // start" after every move, Gambit chose e2e4 again, and it was broadcast and
+    // PAID FOR five times before anybody noticed.
+    //
+    // A read that cannot be parsed is not an empty game. Saying so out loud is
+    // the difference between one confusing error and five wasted fees.
+    if (!Array.isArray(page?.value)) {
+      throw new WizardSafetyError(
+        `get-page(${gameId}, ${start}) did not come back as a list. Refusing to treat an ` +
+          'unreadable log as an empty one, which is how the same move gets played twice.'
+      );
+    }
+
+    const rows = page.value.filter((row) => row?.value);
     for (const row of rows) {
-      const entry = row.value;
+      const fields = row.value?.value;
+      const mv = fields?.value?.value;
+      if (typeof mv !== 'string') {
+        throw new WizardSafetyError(
+          `game ${gameId} entry ${out.length} has no readable value. Same reason as above: a ` +
+            'submission this cannot read must not silently become one that never happened.'
+        );
+      }
       out.push({
-        mv: entry.value?.value,
-        sender: entry.sender?.value,
-        height: Number(entry.height?.value ?? 0),
+        mv,
+        sender: fields.sender?.value ?? null,
+        height: Number(fields.height?.value ?? 0),
         seq: out.length
       });
     }
@@ -455,4 +500,4 @@ if (Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.m
   });
 }
 
-export { readField, readGames };
+export { readField, readGames, readEntries };
