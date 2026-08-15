@@ -160,15 +160,30 @@ At the open fee you set on 2026-08-15 (0.01 STX) and a 3,000 µSTX miner fee:
 | open a game | 0.013 STX |
 | one move | 0.003 STX |
 | a 45-ply game | **0.148 STX** |
-| 15 games | **~2.2 STX** |
-| the sponsored game, extra | +0.26 STX |
+| a `.btc` name, any length | **2 STX** |
+| the sponsored showcase game, extra | +0.26 STX |
 
-The fleet holds 5.96 STX, so the whole event fits with room for a second one.
-At the old 1 STX fee it was 15 STX in opening fees alone, which is why this was
-not worth planning last week.
+Names dominate everything else, which is worth seeing plainly:
 
-Model calls are the other cost and are not on chain: roughly 45 per game, 675
-for the tournament, each carrying a position and a legal-move list.
+| | six characters, round robin | sixteen entrants, 5-round Swiss |
+|---|---|---|
+| games | 15 | 40 |
+| **names** | **12 STX** | **32 STX** |
+| opens + moves | ~2.2 STX | ~5.8 STX |
+| **total** | **~14 STX** | **~38 STX** |
+
+The fleet holds 5.96 STX today, so the exhibition needs roughly 9 STX more and
+the open tournament rather more than that. **Play chess first and buy names
+second** if that ordering matters: the games cost two STX and prove the whole
+machine works, and the names are the part that cannot be undone.
+
+At last week's 1 STX open fee the exhibition's games alone were 15 STX, which is
+why this was not worth planning until you dropped the fee.
+
+Model calls are the other cost and are not on chain: roughly 45 per game — 675
+for the exhibition, ~1,800 for the Swiss — each carrying a position, a
+legal-move list and a prompt capped at 2,000 characters. The cap is why that
+number is small.
 
 ---
 
@@ -342,15 +357,46 @@ weeks, and that confusion is already a recorded bug elsewhere in this project.
 Five years is a real horizon and renewal is cheap, but the tournament should say
 so rather than promise permanence it does not control.
 
-#### The one thing still to decide: who holds the agent's key
+#### Who owns what: the entrant writes the character, the creator provides the body
 
-The Director signs as each agent, so the Director holds every agent's wallet
-key — which means the organiser holds the names the entrants paid for. For an
-exhibition run by the contract owner that is fine and should simply be stated.
-For an open tournament it is the first question a thoughtful entrant asks, and
-the honest options are: transfer the name to the entrant when the tournament
-ends, hand over the agent's key at the same time, or have entrants run their own
-signer and let only moves cross the wire. Decide before the entry window opens.
+**Settled.** The tournament creator generates every wallet and holds every key.
+The creator is whoever provides the API key and pays for the tokens — you for
+the first one, somebody else for theirs.
+
+So the division is clean, and it is worth stating as a division rather than as a
+limitation:
+
+| | entrant | tournament creator |
+|---|---|---|
+| writes the personality | ✅ | |
+| owns the inscription | ✅ | |
+| generates the wallet | | ✅ |
+| holds the key | | ✅ |
+| owns the `.btc` name | | ✅ |
+| pays for names, gas and tokens | | ✅ |
+
+**An entrant needs no STX at all.** The barrier to entry is one inscription. But
+say the ownership out loud in the entry rules, because the natural assumption on
+reading "your agent names itself" is that the name is yours, and it is not. The
+entrant authors a character; the creator gives it a body, a name and a wallet to
+sign with.
+
+**The consequence is a field cap, and it has to be declared before the window
+opens.** Free entry means the creator's cost scales linearly with entrants — 2
+STX a name — so an uncapped open tournament is an uncapped bill. The tournament
+record already lists what was admitted; the cap is the number it stops at.
+
+#### Which also means sponsorship is no longer the cheap path
+
+`open-sponsored-both` exists so a player holding NOTHING can play. Every agent
+here is funded by the creator who owns it, so that problem does not arise, and
+sponsoring both sides of forty games costs about ten STX against roughly five to
+fund the agents directly.
+
+So it stays in the plan for **one showcase game** and for the reason it was
+always worth doing — it is the only way to exercise matrix row 4, the
+contract-principal post condition, which has never run anywhere. Not as the
+funding model.
 
 ### Three things this does NOT prove, and they matter
 
