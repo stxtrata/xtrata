@@ -385,29 +385,65 @@ If this says there is no wallet, the board mistook a LOCKED ` +
   },
 
   'w-late': async () => {
-    // Row 14, simulated exactly rather than raced by hand. `waitForProvider` is
-    // the code under test, so the providers are hidden, the wait is started, and
-    // they are put back while it is still waiting. Nothing about reload timing
-    // is involved, and the thing being proven is the same.
+    // Row 14, simulated rather than raced by hand: hide every provider, start
+    // waitForProvider, and put them back while it is still waiting.
+    //
+    // THIS BROKE A REAL RUN, and the way it broke is worth keeping written down.
+    // The hiding loop used to sit OUTSIDE the try, and `delete` on a
+    // non-configurable property THROWS in strict mode - which is how a wallet
+    // that defines its own globals injects them. So it deleted the first one,
+    // threw on the next, never reached the `finally`, and left the page with no
+    // providers for the rest of its life. Every row after it reported "no wallet
+    // found" on a machine with an unlocked wallet sitting right there.
+    //
+    // So: hide inside the try, never hide PARTIALLY, restore per key, and then
+    // CHECK the restore worked. A diagnostic that silently breaks the page it is
+    // diagnosing is worse than one that refuses to run.
     const w = globalThis as unknown as Record<string, unknown>;
+    const KEYS = ['XverseProviders', 'xverseProviders', 'LeatherProvider', 'StacksProvider', 'btc', 'stacks'];
     const hidden: [string, unknown][] = [];
-    for (const key of ['XverseProviders', 'xverseProviders', 'LeatherProvider', 'StacksProvider', 'btc']) {
-      if (w[key] !== undefined) {
-        hidden.push([key, w[key]]);
-        delete w[key];
+
+    const restore = (): void => {
+      for (const [key, value] of hidden) {
+        try {
+          w[key] = value;
+        } catch {
+          // Recorded by the check below rather than swallowed.
+        }
       }
-    }
-    if (!hidden.length) {
-      return no('No provider is here to hide, so a late one cannot be simulated.');
-    }
+    };
+
     try {
-      if (collectProviders().length) {
-        return no('Hiding the providers did not work, so this would prove nothing.');
+      for (const key of KEYS) {
+        const value = w[key];
+        if (value === undefined) continue;
+        try {
+          delete w[key];
+        } catch {
+          // Cannot be hidden. Anything already hidden goes straight back.
+          restore();
+          return no(
+            `${key} cannot be removed, so this row cannot be simulated without leaving the page ` +
+              'in a worse state than it found it. Test row 14 by hand instead: reload and press ' +
+              'Connect before the extension has injected.'
+          );
+        }
+        if (w[key] !== undefined) {
+          restore();
+          return no(`${key} would not stay hidden, so this would prove nothing.`);
+        }
+        hidden.push([key, value]);
       }
+
+      if (!hidden.length) {
+        return no('No provider is here to hide, so a late one cannot be simulated.');
+      }
+      if (collectProviders().length) {
+        return no('Something is still visible after hiding, so this would prove nothing.');
+      }
+
       const waiting = waitForProvider({ timeoutMs: 8_000 });
-      setTimeout(() => {
-        for (const [key, value] of hidden) w[key] = value;
-      }, 1_200);
+      setTimeout(restore, 1_200);
       const found = await waiting;
       const passed = found !== null;
       mark(14, found?.label ?? 'none', passed ? 'pass' : 'fail');
@@ -415,7 +451,16 @@ If this says there is no wallet, the board mistook a LOCKED ` +
         ? ok(`row 14: pass - found ${found!.label} after it appeared.`, { row: 14 })
         : no('row 14 FAILED: a provider that appeared late was never picked up.');
     } finally {
-      for (const [key, value] of hidden) w[key] = value;
+      restore();
+      // Said loudly, because the alternative is every row after this one
+      // reporting "no wallet" on a machine that plainly has one.
+      if (hidden.length && !collectProviders().length) {
+        // eslint-disable-next-line no-console
+        console.error(
+          'X Chess gates: the providers could not be put back. RELOAD THIS PAGE before running ' +
+            'anything else - every row after this one would report that there is no wallet.'
+        );
+      }
     }
   },
 

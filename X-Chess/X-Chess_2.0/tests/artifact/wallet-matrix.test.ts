@@ -210,3 +210,53 @@ describe('a track that is not the launch sequence', () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// A step must not break the page it is diagnosing.
+//
+// Row 14 hides every wallet provider, starts `waitForProvider`, and puts them
+// back. The hiding loop sat OUTSIDE the try, and `delete` on a non-configurable
+// property THROWS in strict mode - which is how a wallet that defines its own
+// globals injects them. So it deleted the first provider, threw on the next,
+// never reached the `finally`, and left the page with none for the rest of its
+// life.
+//
+// Reported from a real run as "the wallet is not detected even when connected
+// and unlocked", with the survey at the top of the same page listing two
+// providers. Every row after 14 was reading a page that row 14 had broken.
+// ---------------------------------------------------------------------------
+
+describe('hiding the providers, and putting them back', () => {
+  const canary = read('apps/canary/main.ts');
+  const late = canary.slice(canary.indexOf("'w-late': async"), canary.indexOf("'w-network': async"));
+
+  it('hides inside the try, so the restore always runs', () => {
+    const tryAt = late.indexOf('try {');
+    const deleteAt = late.indexOf('delete w[key]');
+    expect(tryAt, 'w-late no longer has a try block').toBeGreaterThan(-1);
+    expect(
+      deleteAt > tryAt,
+      'a provider is deleted before the try, so a throw skips the restore entirely'
+    ).toBe(true);
+  });
+
+  it('refuses rather than hiding only some of them', () => {
+    // A partial hide is the state that broke the page: some providers gone,
+    // nothing restored, and no error anybody saw.
+    expect(late, 'a failed delete no longer restores what was already hidden').toContain(
+      'restore();'
+    );
+    expect(late, 'a provider that cannot be hidden is not reported').toContain('cannot be removed');
+  });
+
+  it('checks the restore worked, and says so loudly when it did not', () => {
+    expect(late, 'nothing verifies the providers came back').toContain(
+      '!collectProviders().length'
+    );
+    expect(late, 'a broken page fails silently').toContain('RELOAD THIS PAGE');
+  });
+
+  it('puts back every key it took, not just the first', () => {
+    expect(late).toMatch(/for \(const \[key, value\] of hidden\)/);
+  });
+});
