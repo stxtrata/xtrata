@@ -141,9 +141,20 @@ export async function chooseMove({ character, position, ask, attempts = MAX_ATTE
       `Reply with exactly one move from the list and nothing else.`;
   }
 
-  throw new WizardSafetyError(
+  // MARKED, not string-matched. The caller resigns on chain for this and only
+  // this, and every other way a move can fail must not reach that branch: a
+  // rate limit, a dead API, a broadcast that failed, a crashed harness. Those
+  // are the tournament's problems and are fixed by running it again. THIS one
+  // is the character's problem, and running it again produces the same answer.
+  //
+  // A string match would have quietly become a resignation the day somebody
+  // reworded this message.
+  const forfeit = new WizardSafetyError(
     `${character.name} did not give a legal move in ${attempts} attempts: ${refusals.join(' | ')}`
   );
+  forfeit.forfeit = true;
+  forfeit.character = character.name;
+  throw forfeit;
 }
 
 /**

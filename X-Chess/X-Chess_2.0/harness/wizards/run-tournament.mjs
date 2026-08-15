@@ -70,6 +70,18 @@ const LIVE = process.argv.includes('--live');
 const FORMAT = arg('format', 'double-round-robin');
 const MINER_FEE_USTX = 3_000n;
 
+/**
+ * Whether a character that cannot play concedes on chain.
+ *
+ * On by default, because the alternative is what game 12 did: exit, and leave a
+ * live game waiting for a move that is never coming, with nothing on chain to
+ * say why. A resignation is the honest end — a real result anybody can derive.
+ *
+ * `--no-resign` is for debugging a chooser, where you want the position kept
+ * exactly as it was rather than ended under you.
+ */
+const RESIGN_ON_FORFEIT = !process.argv.includes('--no-resign');
+
 function env() {
   const found = {};
   try {
@@ -188,16 +200,33 @@ async function playGame({ gameId, white, black, replay, ask, budget }) {
     }
 
     const mover = state.turn === 'white' ? white : black;
-    const chosen = await chooseMove({
-      character: mover,
-      position: {
-        fen: state.fen,
-        legalMoves: state.legalMoves,
-        turn: state.turn,
-        history: state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci)
-      },
-      ask
-    });
+
+    let chosen;
+    try {
+      chosen = await chooseMove({
+        character: mover,
+        position: {
+          fen: state.fen,
+          legalMoves: state.legalMoves,
+          turn: state.turn,
+          history: state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci)
+        },
+        ask
+      });
+    } catch (error) {
+      // A character that cannot play RESIGNS, rather than leaving the game
+      // open forever. Game 12 is why: 46 good moves, then Ledger offered a
+      // rook move through its own bishop three times, the runner exited, and
+      // the game sat on chain as "black to move" with nobody coming. Nothing
+      // recorded what had happened, because nothing had — the forfeit existed
+      // only in an exit code.
+      //
+      // A resignation is a real event with a real result. The leaderboard
+      // counts it, replay derives it, and a spectator sees a finished game.
+      if (!error?.forfeit) throw error;
+      await resign({ gameId, mover, rules, budget });
+      return state.turn === 'white' ? '0-1' : '1-0';
+    }
 
     console.log(`  game ${gameId}: ${mover.name} plays ${chosen.move}`);
     const sent = await send({
@@ -216,6 +245,60 @@ async function playGame({ gameId, white, black, replay, ask, budget }) {
       throw new WizardSafetyError(`game ${gameId}: ${chosen.move} ${status} (${sent.txid})`);
     }
   }
+}
+
+/**
+ * Concede, on chain, because this character cannot produce a legal move.
+ *
+ * PERMANENT AND UNDOABLE, so it is fenced by three things rather than one.
+ *
+ * `--live`, like every other spend — inherited, since `send` refuses a dry run
+ * before this function can do anything.
+ *
+ * `--no-resign`, because somebody debugging a chooser wants the run to stop and
+ * the position preserved, not a game ended under them.
+ *
+ * And EVENTS-V1, checked against the game's own committed rules. A game that
+ * did not agree to resignations reads `resgn` as a move, and as a move it is
+ * malformed: stored, charged, and skipped by every reader. Sending one there
+ * would be the exact waste the board's eligibility gate was rebuilt to stop
+ * people doing by hand.
+ *
+ * No new permission is needed and that is worth saying out loud: a resignation
+ * IS a `submit`, which the fleet could already call, on the one contract it
+ * could already call. The safety boundary does not widen here.
+ */
+async function resign({ gameId, mover, rules, budget }) {
+  if (!RESIGN_ON_FORFEIT) {
+    throw new WizardSafetyError(
+      `game ${gameId}: ${mover.name} has no legal move and --no-resign is set. ` +
+        'The game is left open and it is still their turn.'
+    );
+  }
+  if (rules.eventsProtocol !== 'events-v1') {
+    throw new WizardSafetyError(
+      `game ${gameId}: ${mover.name} cannot play, and this game did not agree to ` +
+        'resignations — `resgn` would be stored, charged, and skipped. Left open.'
+    );
+  }
+
+  console.log(`  game ${gameId}: ${mover.name} resigns — no legal move in 3 attempts`);
+  const sent = await send({
+    wizard: mover,
+    functionName: 'submit',
+    functionArgs: [Cl.uint(gameId), Cl.stringAscii('resgn')],
+    spendUstx: MINER_FEE_USTX,
+    postConditions: [],
+    spent: budget.spent,
+    cap: budget.cap
+  });
+  budget.spent = sent.spentAfterUstx;
+
+  const status = await settle(sent.txid);
+  if (status !== 'success') {
+    throw new WizardSafetyError(`game ${gameId}: resignation ${status} (${sent.txid})`);
+  }
+  console.log(`  game ${gameId}: resignation confirmed (${sent.txid})`);
 }
 
 async function readEntries(gameId) {
@@ -356,6 +439,13 @@ async function main() {
   console.log(`format    ${plan.format}`);
   console.log(`field     ${ids.join(', ')}`);
   console.log(`open fee  ${ustx(openFee)}`);
+  console.log(
+    `forfeits  ${
+      RESIGN_ON_FORFEIT
+        ? 'a character with no legal move RESIGNS on chain (permanent)'
+        : 'left open, --no-resign is set'
+    }`
+  );
   console.log(
     `schedule  ${plan.plannedRounds} rounds, ${plan.plannedGames} games, ` +
       `${ustx(plan.chainUstx)} of chess\n`
