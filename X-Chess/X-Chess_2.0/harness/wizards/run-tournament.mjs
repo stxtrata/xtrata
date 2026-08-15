@@ -1,0 +1,345 @@
+#!/usr/bin/env node
+// Run a tournament: six characters, a double round robin, one move at a time.
+//
+//   node harness/wizards/run-tournament.mjs                 dry: the schedule and what it costs
+//   node harness/wizards/run-tournament.mjs --live          play it
+//   node harness/wizards/run-tournament.mjs --round 4       one round
+//   node harness/wizards/run-tournament.mjs standings       read the table off the chain
+//
+// Dry by default, like everything else here, and for the same reason: every act
+// spends real STX and none of it can be undone.
+//
+// WHAT PACES THIS IS THE CHAIN, not a --pace flag. A move cannot be chosen until
+// the previous one has landed, because a character choosing against a stale
+// position is choosing in a game that no longer exists. So each game is strictly
+// sequential and takes as long as its moves take to confirm - roughly twenty
+// minutes for a short one. The three games of a round run alongside each other,
+// which is exactly as much parallelism as the nonce rule allows: three games,
+// six characters, nobody signing twice at once.
+//
+// RESUME IS FROM THE CHAIN AND NEEDS NO FILE. A round that died halfway left its
+// games on chain, and they are found by matching the rules, which name both
+// sides. Re-running is the correct response to any failure here.
+
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Cl, Pc, PostConditionMode } from '@stacks/transactions';
+
+import {
+  ALLOWED_CONTRACT,
+  DEFAULT_SPEND_CAP_USTX,
+  WizardSafetyError,
+  addressEnvName,
+  keyEnvName,
+  looksLikeMainnetAddress,
+  scrub
+} from './wizards-core.mjs';
+import { PERSONALITIES, personalityNamed } from './personalities.mjs';
+import { anthropicAsker, chooseMove } from './chooser.mjs';
+import {
+  assertNoDoubleBooking,
+  doubleRoundRobin,
+  findExisting,
+  planTournament,
+  roundRobin,
+  standingsFrom
+} from './tournament.mjs';
+import {
+  balanceOf,
+  loadProtocol,
+  nextNonce,
+  readOnly,
+  readOpenFee,
+  send,
+  settle,
+  ustx,
+  wizardRules
+} from './play.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ENV_FILE = join(HERE, '.env.wizards');
+const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
+
+const arg = (name, fallback = null) => {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
+};
+const LIVE = process.argv.includes('--live');
+const FORMAT = arg('format', 'double-round-robin');
+const MINER_FEE_USTX = 3_000n;
+
+function env() {
+  const found = {};
+  try {
+    for (const line of readFileSync(ENV_FILE, 'utf8').split('\n')) {
+      const at = line.indexOf('=');
+      if (at < 1 || line.trim().startsWith('#')) continue;
+      found[line.slice(0, at).trim()] = line.slice(at + 1).trim().replace(/^["']|["']$/g, '');
+    }
+  } catch {
+    // No file. The dry run works without one, which is what makes it useful
+    // before you have a fleet.
+  }
+  return found;
+}
+
+/**
+ * The field: a personality, and the wallet that signs for it.
+ *
+ * An agent with no wallet is still listed, so a dry run can show the whole
+ * schedule to somebody who has not generated a fleet yet.
+ */
+function readField(vars = env()) {
+  const agents = PERSONALITIES.map((character) => {
+    const key = vars[keyEnvName(character.id)] ?? null;
+    const address = vars[addressEnvName(character.id)] ?? null;
+    if (address && !looksLikeMainnetAddress(address)) {
+      throw new WizardSafetyError(`${addressEnvName(character.id)} is not a mainnet address`);
+    }
+    return { ...character, key, address, ready: Boolean(key && address) };
+  });
+  return { agents, ready: agents.every((a) => a.ready) };
+}
+
+const byId = (agents) => Object.fromEntries(agents.map((a) => [a.id, a]));
+
+/** Every game on the contract, with the rules that name its players. */
+async function readGames() {
+  const count = Number((await readOnly('get-game-count')).value);
+  const games = [];
+  for (let id = 1; id <= count; id++) {
+    try {
+      const row = (await readOnly('get-game', [Cl.serialize(Cl.uint(id))])).value.value;
+      games.push({
+        id,
+        nextSeq: Number(row['next-seq'].value),
+        openedBy: row['opened-by'].value,
+        rulesHash: row['rules-hash']?.value?.value ?? null
+      });
+    } catch {
+      // A game that will not read is one we cannot claim as ours, which is the
+      // safe way round: worst case a pairing is replayed rather than skipped.
+    }
+  }
+  return games;
+}
+
+/**
+ * Play one game to its end, or until nothing more can be played.
+ *
+ * The loop is: read the log, replay it, ask whoever is to move, sign, wait.
+ * Reading first every time is what makes this resumable at any point - the
+ * position is never carried in a variable across a failure.
+ */
+async function playGame({ gameId, white, black, replay, ask, budget }) {
+  const rules = await wizardRules(white.address, black.address);
+
+  for (;;) {
+    const entries = await readEntries(gameId);
+    const state = replay(entries, { rules });
+
+    if (state.status !== 'live') {
+      console.log(`  game ${gameId}: ${state.result ?? 'over'}`);
+      return state.result ?? null;
+    }
+    if (!state.legalMoves.length) {
+      console.log(`  game ${gameId}: no legal moves, stopping`);
+      return null;
+    }
+
+    const mover = state.turn === 'white' ? white : black;
+    const chosen = await chooseMove({
+      character: mover,
+      position: {
+        fen: state.fen,
+        legalMoves: state.legalMoves,
+        turn: state.turn,
+        history: state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci)
+      },
+      ask
+    });
+
+    console.log(`  game ${gameId}: ${mover.name} plays ${chosen.move}`);
+    const sent = await send({
+      wizard: mover,
+      functionName: 'submit',
+      functionArgs: [Cl.uint(gameId), Cl.stringAscii(chosen.move)],
+      spendUstx: MINER_FEE_USTX,
+      postConditions: [],
+      spent: budget.spent,
+      cap: budget.cap
+    });
+    budget.spent = sent.spentAfterUstx;
+
+    const status = await settle(sent.txid);
+    if (status !== 'success') {
+      throw new WizardSafetyError(`game ${gameId}: ${chosen.move} ${status} (${sent.txid})`);
+    }
+  }
+}
+
+async function readEntries(gameId) {
+  const out = [];
+  for (let start = 0; ; start += 50) {
+    const page = (
+      await readOnly('get-entries', [Cl.serialize(Cl.uint(gameId)), Cl.serialize(Cl.uint(start))])
+    ).value;
+    const rows = (page?.list ?? []).filter((row) => row?.value);
+    for (const row of rows) {
+      const entry = row.value;
+      out.push({
+        mv: entry.value?.value ?? entry.value,
+        sender: entry.sender?.value,
+        seq: out.length
+      });
+    }
+    if (rows.length < 50) break;
+  }
+  return out;
+}
+
+async function main() {
+  const command = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'play';
+  const field = readField();
+  const ids = field.agents.map((a) => a.id);
+
+  console.log(`\nX Chess tournament — ${LIVE ? 'LIVE' : 'dry run, nothing is sent'}`);
+  console.log(`contract  ${ALLOWED_CONTRACT}`);
+
+  let openFee = 10_000n;
+  try {
+    openFee = await readOpenFee();
+  } catch {
+    console.log('(could not read the open fee; using the last known default)');
+  }
+
+  const plan = planTournament({
+    ids,
+    format: FORMAT,
+    openFeeUstx: openFee,
+    minerFeeUstx: MINER_FEE_USTX,
+    buyNames: false
+  });
+
+  console.log(`format    ${plan.format}`);
+  console.log(`field     ${ids.join(', ')}`);
+  console.log(`open fee  ${ustx(openFee)}`);
+  console.log(
+    `schedule  ${plan.plannedRounds} rounds, ${plan.plannedGames} games, ` +
+      `${ustx(plan.chainUstx)} of chess\n`
+  );
+
+  if (command === 'standings') {
+    const games = await readGames();
+    console.log(`${games.length} games on the contract. Standings need replay per game.\n`);
+    return;
+  }
+
+  for (const round of plan.rounds) {
+    assertNoDoubleBooking(round);
+    const only = arg('round');
+    const mark = only && Number(only) !== round.number ? '   (skipped)' : '';
+    console.log(`round ${String(round.number).padStart(2)}${mark}`);
+    for (const p of round.pairings) {
+      console.log(`  ${p.white.padEnd(9)} (white)  v  ${p.black}`);
+    }
+  }
+
+  if (!LIVE) {
+    console.log('\nDry run. Nothing was signed and nothing was sent.');
+    console.log('Add --live to play. Every game above is real and none of it can be undone.');
+    if (!field.ready) {
+      const missing = field.agents.filter((a) => !a.ready).map((a) => a.id);
+      console.log(`\nNo wallet yet for: ${missing.join(', ')}.`);
+      console.log('Generate a fleet before --live; the schedule above needs none.');
+    }
+    return;
+  }
+
+  if (!field.ready) {
+    throw new WizardSafetyError(
+      `no wallet for ${field.agents.filter((a) => !a.ready).map((a) => a.id).join(', ')}. ` +
+        'Every character in the field needs one before anything is signed.'
+    );
+  }
+
+  const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
+  const ask = anthropicAsker({ apiKey });
+  const { replay } = await loadReplay();
+  const agents = byId(field.agents);
+  const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
+  const existing = await readGames();
+
+  for (const round of plan.rounds) {
+    if (arg('round') && Number(arg('round')) !== round.number) continue;
+    console.log(`\n=== round ${round.number} ===`);
+
+    // The three games of a round, alongside each other. This is the only
+    // parallelism here and it is bounded by the nonce rule rather than by taste.
+    await Promise.all(
+      round.pairings.map(async (pairing) => {
+        const white = agents[pairing.white];
+        const black = agents[pairing.black];
+        const already = findExisting(
+          { white: white.address, black: black.address },
+          existing.map((g) => ({ ...g, white: white.address, black: black.address }))
+        );
+        const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
+        await playGame({ gameId, white, black, replay, ask, budget });
+      })
+    );
+  }
+
+  console.log(`\nSpent ${ustx(budget.spent)} of ${ustx(budget.cap)}.\n`);
+}
+
+async function openGame({ white, black, openFee, budget }) {
+  const { rules, hash } = await tournamentRules(white.address, black.address);
+  console.log(`  opening ${white.name} v ${black.name}  rules ${hash.slice(0, 16)}…`);
+  const sent = await send({
+    wizard: white,
+    functionName: 'open-game',
+    functionArgs: [Cl.some(Cl.bufferFromHex(hash)), Cl.bool(rules.ranked)],
+    spendUstx: openFee + MINER_FEE_USTX,
+    postConditions: [Pc.principal(white.address).willSendLte(openFee).ustx()],
+    spent: budget.spent,
+    cap: budget.cap,
+    rulesHash: hash
+  });
+  budget.spent = sent.spentAfterUstx;
+  const status = await settle(sent.txid);
+  if (status !== 'success') throw new WizardSafetyError(`opening failed: ${status}`);
+  const count = Number((await readOnly('get-game-count')).value);
+  return count;
+}
+
+async function tournamentRules(white, black) {
+  return wizardRules(white, black);
+}
+
+/** The board's replay engine, bundled the way the rules codec already is. */
+async function loadReplay() {
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'replay', 'replay.ts')],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    write: false,
+    logLevel: 'error'
+  });
+  return import(
+    `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`
+  );
+}
+
+if (Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((error) => {
+    const refusal = error instanceof WizardSafetyError || error?.name === 'WizardSafetyError';
+    console.error(`\n${refusal ? error.message : scrub(error?.stack ?? error)}`);
+    process.exitCode = 1;
+  });
+}
+
+export { readField, readGames };

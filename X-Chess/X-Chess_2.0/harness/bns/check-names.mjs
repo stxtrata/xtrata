@@ -165,7 +165,7 @@ function lenPrefixed(ascii) {
 // every name came back `none` and the report said sixty names did not exist.
 const buffArg = (ascii) => `02${lenPrefixed(ascii)}`;
 
-async function lookup(label) {
+export async function lookup(label) {
   const row = { label, found: false, owner: null, renewal: null, resolves: false, error: null };
   try {
     const idRepr = await readOnly('get-id-from-bns', [buffArg(label), buffArg('btc')]);
@@ -296,7 +296,13 @@ async function main() {
   console.log('');
 }
 
-main().catch((error) => {
-  console.error(`\n${error?.stack ?? error}`);
-  process.exitCode = 1;
-});
+// Only when run directly. Without this guard, importing anything from here -
+// which `rescue.mjs` does, for `lookup` - runs the whole report as a side
+// effect and fails on the missing argument.
+const invoked = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop());
+if (invoked) {
+  main().catch((error) => {
+    console.error(`\n${error?.stack ?? error}`);
+    process.exitCode = 1;
+  });
+}

@@ -62,7 +62,7 @@ const arg = (name, fallback = null) => {
   return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
 };
 const LIVE = process.argv.includes('--live');
-const ustx = (micro) => `${(Number(micro) / 1_000_000).toFixed(6)} STX`;
+export const ustx = (micro) => `${(Number(micro) / 1_000_000).toFixed(6)} STX`;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -181,7 +181,7 @@ const api = async (path) => {
   return response.json();
 };
 
-const balanceOf = async (address) => {
+export const balanceOf = async (address) => {
   const body = await api(`/extended/v1/address/${address}/balances`);
   return BigInt(body?.stx?.balance ?? '0');
 };
@@ -202,7 +202,7 @@ const balanceOf = async (address) => {
  * "two transactions signed close together take the same nonce, and the second
  * replaces the first" - and this loop was written without reading it.
  */
-const nextNonce = async (address) => {
+export const nextNonce = async (address) => {
   const body = await api(`/extended/v1/address/${address}/nonces`);
   return BigInt(body?.possible_next_nonce ?? 0);
 };
@@ -216,7 +216,7 @@ const nextNonce = async (address) => {
  * used `call-read` (packages/chain/client.ts), so this is not a discovery so
  * much as a reminder to look at what already works.
  */
-async function readOnly(functionName, args = []) {
+export async function readOnly(functionName, args = []) {
   const response = await fetch(
     `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
     {
@@ -244,7 +244,7 @@ async function readOnly(functionName, args = []) {
  * a duplicate of a canonical serialiser that nothing would notice drifting.
  */
 let protocol = null;
-async function loadProtocol() {
+export async function loadProtocol() {
   if (protocol) return protocol;
   const out = await esbuild({
     entryPoints: [join(HERE, '..', '..', 'packages', 'protocol', 'rules.ts')],
@@ -286,14 +286,14 @@ async function loadProtocol() {
  * candidate until black has played. Before that the game reads as "rules
  * unconfirmed", which is correct rather than a fault.
  */
-async function wizardRules(white, black) {
+export async function wizardRules(white, black) {
   const { DEFAULT_RULES, normaliseRules, rulesHash } = await loadProtocol();
   const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
   return { rules, hash: rulesHash(rules) };
 }
 
 /** The open fee, from the contract rather than from a constant here. */
-async function readOpenFee() {
+export async function readOpenFee() {
   return BigInt((await readOnly('get-open-fee')).value);
 }
 
@@ -303,7 +303,7 @@ async function readOpenFee() {
  * The gate runs FIRST and every refusal is a throw. Nothing below this line
  * happens for a dry run, which is what makes a dry run free.
  */
-async function send({
+export async function send({
   wizard,
   functionName,
   functionArgs,
@@ -345,7 +345,7 @@ async function send({
 }
 
 /** Wait for a transaction to leave the mempool. */
-async function settle(txid, tries = 40) {
+export async function settle(txid, tries = 40) {
   for (let n = 0; n < tries; n++) {
     await new Promise((done) => setTimeout(done, 15_000));
     try {

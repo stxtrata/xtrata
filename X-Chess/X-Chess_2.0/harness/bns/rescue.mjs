@@ -26,8 +26,8 @@
 // scrubbed by shape on its way to any output. A key in shell history is a key in
 // a backup you forgot about.
 //
-//   node harness/bns/rescue.mjs --plan            what it would move, and from where
-//   node harness/bns/rescue.mjs --live --to SP…   moves it
+//   node harness/bns/rescue.mjs --names names.txt
+//   node harness/bns/rescue.mjs --names names.txt --live --to SP…
 //
 // Dry by default. This spends real money and moves permanent assets, so the
 // default has to be the one that costs nothing.
@@ -47,6 +47,7 @@ import {
   fetchNonce
 } from '@stacks/transactions';
 import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
+import { lookup, normaliseLabel } from './check-names.mjs';
 
 const BNS_V2 = 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF.BNS-V2';
 const [BNS_ADDRESS, BNS_NAME] = BNS_V2.split('.');
@@ -176,7 +177,7 @@ export const DERIVATION_PATHS = Object.freeze([
  * Returns addresses paired with their keys. The caller matches against the
  * addresses; the keys never leave this process.
  */
-export function deriveAccounts(phrase, depth = 80) {
+export function deriveAccounts(phrase, depth = 100) {
   if (!validateMnemonic(phrase, wordlist)) {
     throw new RescueError('that is not a valid BIP39 phrase (checksum failed).');
   }
@@ -316,19 +317,78 @@ async function main() {
   console.log(LIVE ? 'mode       LIVE — this signs and broadcasts\n' : 'mode       dry run, nothing is sent\n');
 
   const phrase = readPhrase();
-  const accounts = deriveAccounts(phrase, Number(arg('depth', '80')));
+  const accounts = deriveAccounts(phrase, Number(arg('depth', '100')));
   console.log(`derived    ${accounts.size} addresses across ${DERIVATION_PATHS.length} conventions`);
 
-  // What each derived address actually holds. Serial, because the extended API
-  // throttles hard and a throttled read here reads as an empty wallet.
+  // THE NAME LIST FIRST, then the seed, then the intersection.
+  //
+  // A first version asked the network what every derived address held, which at
+  // a depth worth using is eight hundred requests for sixty-two answers - and
+  // the extended API throttles long before that. Derivation is local and free
+  // (four hundred addresses in a second), and the owners are already known from
+  // the registry, so matching happens in memory and only the HITS are queried.
+  //
+  // It also produces the report that matters more than the balances: which of
+  // your names this seed cannot reach at all.
+  const namesFile = arg('names');
+  if (!namesFile) {
+    throw new RescueError(
+      'needs --names <file>, the same list you gave check-names.mjs.\n' +
+        'Without it this would have to ask the network about every derived address.'
+    );
+  }
+  const labels = [
+    ...new Set(
+      readFileSync(namesFile, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#'))
+        .map(normaliseLabel)
+    )
+  ].filter(Boolean);
+
+  console.log(`reading    ${labels.length} names from the registry...`);
+  const registry = [];
+  for (const label of labels) {
+    const row = await lookup(label);
+    if (row.found && row.owner) registry.push(row);
+  }
+
+  const reachable = registry.filter((row) => accounts.has(row.owner));
+  const unreachable = registry.filter((row) => !accounts.has(row.owner));
+  console.log(
+    `matched    ${reachable.length} of ${registry.length} names to this seed\n`
+  );
+
+  if (unreachable.length) {
+    console.log(`NOT REACHABLE FROM THIS SEED — a different wallet holds these:`);
+    for (const row of unreachable) console.log(`  ${row.label}.btc  ${row.owner}`);
+    console.log(`  (try a greater --depth before concluding they are elsewhere)\n`);
+  }
+
+  // Only the matched addresses are asked about, and only once each.
+  const byAddress = new Map();
+  for (const row of reachable) {
+    if (!byAddress.has(row.owner)) byAddress.set(row.owner, []);
+    byAddress.get(row.owner).push(Number(row.id));
+  }
+
+  // EVERY derived address is balance-checked, not only the ones holding a name.
+  //
+  // Some of these wallets hold STX and no name at all - a name was sold, or one
+  // was never bought there. Scanning only the name-holders would sweep the
+  // collection and quietly leave money behind on the same suspect seed, which
+  // is the failure that looks like success.
+  //
+  // Serial with backoff: the extended API throttles hard, and a throttled read
+  // here reads as an empty wallet.
+  console.log(`checking   ${accounts.size} derived addresses for STX...`);
   const rows = [];
   for (const account of accounts.values()) {
-    const [balance, names] = await Promise.all([
-      balanceOf(account.address),
-      namesHeldBy(account.address)
-    ]);
-    if (!names.length && (balance ?? 0n) === 0n) continue;
-    rows.push({ ...account, balance: balance ?? 0n, names });
+    const names = byAddress.get(account.address) ?? [];
+    const balance = (await balanceOf(account.address)) ?? 0n;
+    if (!names.length && balance === 0n) continue;
+    rows.push({ ...account, balance, names });
   }
 
   const withNames = rows.filter((r) => r.names.length);

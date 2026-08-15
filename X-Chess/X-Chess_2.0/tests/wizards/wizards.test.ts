@@ -623,3 +623,39 @@ describe('rules, without which there is no game', () => {
     expect(play, 'the open still sends none for its rules').not.toContain('Cl.none()');
   });
 });
+
+describe('a second script that spends money', () => {
+  // run-tournament.mjs signs and broadcasts too. The danger of a second sender
+  // is not that its plumbing differs - it is that it quietly skips the gate,
+  // and every safety property above becomes a property of one file rather than
+  // of the harness. Checked at the source, because that is where it would go
+  // wrong.
+  const senders = ['play.mjs', 'run-tournament.mjs'];
+
+  it('routes every broadcast through the same gate', () => {
+    for (const file of senders) {
+      const source = read(`harness/wizards/${file}`);
+      if (!/makeContractCall|broadcastTransaction/.test(source)) continue;
+      expect(source, `${file} broadcasts without asserting anything`).toMatch(
+        /assertBroadcastAllowed/
+      );
+    }
+  });
+
+  it('keeps every sender dry by default', () => {
+    for (const file of senders) {
+      const source = read(`harness/wizards/${file}`);
+      expect(source, `${file} has no --live gate`).toContain("includes('--live')");
+    }
+  });
+
+  it('talks to one contract, named from the shared constant', () => {
+    // A second script with its own hardcoded contract id is a second place for
+    // that id to be wrong.
+    const source = read('harness/wizards/run-tournament.mjs');
+    expect(source).toContain('ALLOWED_CONTRACT');
+    expect(source, 'a contract id is hardcoded here as well').not.toMatch(
+      /'SP[0-9A-HJKMNP-TV-Z]{20,}\.[a-z0-9-]+'/
+    );
+  });
+});
