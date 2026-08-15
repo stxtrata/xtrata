@@ -23,6 +23,8 @@ import {
   RescueError,
   assertRescueAllowed,
   deriveAccounts,
+  deriveAllAccounts,
+  parseSeedFile,
   looksLikeMainnetAddress,
   scrub
 } from '../../harness/bns/rescue.mjs';
@@ -168,6 +170,86 @@ describe('finding the wallets at all', () => {
     // nothing, and the report would read "you own nothing here" - which is
     // indistinguishable from having the wrong seed and far more alarming.
     expect(() => deriveAccounts('abandon '.repeat(11) + 'abandon', 2)).toThrow(/checksum/);
+  });
+});
+
+describe('a file of seeds, and stepping through all of them', () => {
+  const SECOND =
+    'legal winner thank year wave sausage worth useful legal winner thank yellow';
+
+  it('reads one phrase per line and labels what it can', () => {
+    const seeds = parseSeedFile(`# a comment\n\nold-hiro: ${PHRASE}\n${SECOND}\n`);
+    expect(seeds).toHaveLength(2);
+    expect(seeds[0].label).toBe('old-hiro');
+    expect(seeds[0].phrase).toBe(PHRASE);
+    // Unlabelled phrases are counted by POSITION, never named by their words.
+    expect(seeds[1].label).toBe('seed-2');
+  });
+
+  it('stops on a bad line by NUMBER, without echoing it', () => {
+    // A mistyped word derives valid addresses holding nothing, so continuing
+    // would report the names as unreachable when one word is wrong.
+    let message = '';
+    try {
+      parseSeedFile(`${PHRASE}\nabandon abandon abandon\n`);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toMatch(/line 2/);
+    expect(message, 'the bad line was echoed back').not.toContain('abandon');
+  });
+
+  it('refuses a file with no phrases rather than reporting nothing found', () => {
+    expect(() => parseSeedFile('# all comments\n\n')).toThrow(/no phrases/);
+  });
+
+  it('tags every account with the seed that reached it', () => {
+    const all = deriveAllAccounts(
+      [
+        { label: 'first', phrase: PHRASE },
+        { label: 'second', phrase: SECOND }
+      ],
+      3
+    );
+    const labels = new Set([...all.values()].map((a) => a.seed));
+    expect(labels, 'a multi-seed report cannot say which seed to fetch').toEqual(
+      new Set(['first', 'second'])
+    );
+  });
+
+  it('deduplicates an address two seeds both reach', () => {
+    // The same phrase twice, which is what a copy-paste mistake looks like. One
+    // wallet must not be reported, funded or swept as two.
+    const twice = deriveAllAccounts(
+      [
+        { label: 'a', phrase: PHRASE },
+        { label: 'b', phrase: PHRASE }
+      ],
+      3
+    );
+    const once = deriveAllAccounts([{ label: 'a', phrase: PHRASE }], 3);
+    expect(twice.size).toBe(once.size);
+    for (const account of twice.values()) expect(account.seed).toBe('a');
+  });
+});
+
+describe('the example file', () => {
+  it('contains nothing that is actually a seed', () => {
+    // Committed, unlike `.seed`. A real phrase pasted here would be published,
+    // and this test is the reason that is a build failure rather than a
+    // discovery. The placeholders fail the checksum on purpose.
+    const example = readFileSync(resolve(ROOT, 'harness/bns/.seed.example'), 'utf8');
+    for (const line of example.split('\n')) {
+      const bare = line.trim();
+      if (!bare || bare.startsWith('#')) continue;
+      expect(() => parseSeedFile(bare), `the example file line "${bare}" validates`).toThrow();
+    }
+  });
+
+  it('tells the reader to lock the file down and delete it afterwards', () => {
+    const example = readFileSync(resolve(ROOT, 'harness/bns/.seed.example'), 'utf8');
+    expect(example).toContain('chmod 600');
+    expect(example, 'nothing says to delete it when done').toMatch(/rm harness\/bns\/\.seed/);
   });
 });
 

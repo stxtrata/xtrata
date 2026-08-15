@@ -1,0 +1,64 @@
+# Copy this to `.seed`, replace the placeholders, and chmod 600 it.
+#
+#     cp harness/bns/.seed.example harness/bns/.seed
+#     chmod 600 harness/bns/.seed
+#
+# `.seed` is gitignored and `.seed.example` is not, so NEVER put a real phrase
+# in this file. There is a test that fails the build if anything here validates
+# as a BIP39 phrase, which is why the placeholders below are deliberately not
+# real words — they fail the checksum on purpose.
+#
+# The tool refuses to read `.seed` at all if its permissions let anyone else on
+# the machine read it. It never prints a phrase, never logs one, never accepts
+# one as a command-line argument, and never sends one anywhere. Shell history is
+# a file too, and it is not mode 600.
+
+# ---------------------------------------------------------------------------
+# ONE SEED
+# ---------------------------------------------------------------------------
+#
+# One BIP39 phrase on one line. Twelve or twenty-four words, lowercase,
+# single-spaced. Nothing else needed.
+
+placeholderone placeholdertwo placeholderthree placeholderfour placeholderfive placeholdersix placeholderseven placeholdereight placeholdernine placeholderten placeholdereleven placeholdertwelve
+
+# ---------------------------------------------------------------------------
+# SEVERAL SEEDS
+# ---------------------------------------------------------------------------
+#
+# One phrase per line, and the tool walks them in order: it derives every
+# account from every seed, matches them all against your name list at once, and
+# reports which seed reached what.
+#
+# LABEL THEM. A label is anything before the first colon, and it is the only
+# thing that makes a multi-seed report actionable — "twelve names unreachable"
+# is a fact you cannot do anything with, while "unreachable, and the ledger seed
+# was not in the file" tells you what to fetch next. Labels are printed; phrases
+# are not.
+#
+#   old-hiro-2019:  word word word …
+#   ledger-backup:  word word word …
+#   phone-wallet:   word word word …
+#
+# An unlabelled line still works and is reported as `seed-2`, `seed-3` and so
+# on — counted by position, so a phrase is never identified by its own words.
+#
+# A line whose checksum fails stops the whole run, by line number, without
+# echoing the line. That is deliberate: a mistyped word derives a perfectly
+# valid set of addresses that hold nothing, so continuing would report your
+# names as unreachable when the truth is one word is wrong. Being told "line 4
+# is not a valid phrase" is recoverable. Being told "you own nothing" is not.
+#
+# Blank lines and lines starting with # are ignored.
+
+# old-hiro-2019: placeholderone placeholdertwo placeholderthree placeholderfour placeholderfive placeholdersix placeholderseven placeholdereight placeholdernine placeholderten placeholdereleven placeholdertwelve
+# ledger-backup: placeholderone placeholdertwo placeholderthree placeholderfour placeholderfive placeholdersix placeholderseven placeholdereight placeholdernine placeholderten placeholdereleven placeholdertwelve
+
+# ---------------------------------------------------------------------------
+# AFTERWARDS
+# ---------------------------------------------------------------------------
+#
+# Delete `.seed` when the rescue is done. It has served its purpose and it is
+# the highest-value file on the machine while it exists.
+#
+#     rm harness/bns/.seed

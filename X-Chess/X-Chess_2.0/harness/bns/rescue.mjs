@@ -29,6 +29,10 @@
 //   node harness/bns/rescue.mjs --names names.txt
 //   node harness/bns/rescue.mjs --names names.txt --live --to SP…
 //
+// Several seeds is one phrase per line in the same file, optionally labelled.
+// See `.seed.example`. Every seed is walked, every account matched against the
+// name list at once, and the report says which seed reached what.
+//
 // Dry by default. This spends real money and moves permanent assets, so the
 // default has to be the one that costs nothing.
 
@@ -299,16 +303,56 @@ const LIVE = process.argv.includes('--live');
 const ustx = (micro) => `${(Number(micro) / 1e6).toFixed(6)} STX`;
 
 /**
- * The phrase, from a file, checked for permissions before it is read.
+ * Every phrase in the file, labelled, checked before any of it is read.
  *
  * A world-readable seed file on a machine that may already have leaked one is
- * not a thing to warn about after the fact.
+ * not a thing to warn about after the fact, so the mode is checked first and
+ * the file is not opened if it fails.
+ *
+ * ONE PHRASE PER LINE, with an optional `label:` prefix. Labels exist because a
+ * multi-seed report is only actionable with them: "twelve names unreachable" is
+ * a fact nobody can act on, while "unreachable, and the ledger seed was not in
+ * the file" says what to fetch next. Labels are printed. Phrases never are.
  */
-function readPhrase() {
+export function parseSeedFile(text) {
+  const seeds = [];
+  const lines = String(text).split('\n');
+  for (let at = 0; at < lines.length; at++) {
+    const line = lines[at].trim();
+    if (!line || line.startsWith('#')) continue;
+
+    // A BIP39 word is lowercase a-z and never contains a colon, so the first
+    // colon unambiguously ends a label.
+    const colon = line.indexOf(':');
+    const label = colon > -1 ? line.slice(0, colon).trim() : '';
+    const phrase = (colon > -1 ? line.slice(colon + 1) : line).trim().replace(/\s+/g, ' ');
+
+    if (!validateMnemonic(phrase, wordlist)) {
+      // BY LINE NUMBER, NEVER BY CONTENT, and it stops the run.
+      //
+      // A mistyped word derives a perfectly valid set of addresses holding
+      // nothing, so carrying on would report the names as unreachable when the
+      // truth is that one word is wrong. "Line 4 is not a valid phrase" is
+      // recoverable. "You own nothing" is not.
+      throw new RescueError(
+        `line ${at + 1} of the seed file is not a valid BIP39 phrase (checksum failed).\n` +
+          'Nothing has been derived. Fix that line and run again — the phrase itself is not\n' +
+          'printed here, and nor is any part of it.'
+      );
+    }
+    // Counted by position, so an unlabelled phrase is never named by its words.
+    seeds.push({ label: label || `seed-${seeds.length + 1}`, phrase });
+  }
+  if (!seeds.length) throw new RescueError('the seed file has no phrases in it.');
+  return seeds;
+}
+
+function readSeeds() {
   if (!existsSync(SEED_FILE)) {
     throw new RescueError(
-      `no seed file. Write the phrase to harness/bns/.seed and chmod 600 it.\n` +
-        'It is gitignored. It is never printed, logged, or sent anywhere.'
+      'no seed file. Copy harness/bns/.seed.example to harness/bns/.seed, put your\n' +
+        'phrase(s) in it, and chmod 600 it. It is gitignored, and it is never printed,\n' +
+        'logged, or sent anywhere.'
     );
   }
   const mode = statSync(SEED_FILE).mode & 0o777;
@@ -318,9 +362,23 @@ function readPhrase() {
         'chmod 600 it first.'
     );
   }
-  const phrase = readFileSync(SEED_FILE, 'utf8').trim().replace(/\s+/g, ' ');
-  if (!phrase) throw new RescueError('harness/bns/.seed is empty.');
-  return phrase;
+  return parseSeedFile(readFileSync(SEED_FILE, 'utf8'));
+}
+
+/**
+ * Every account every seed can reach, tagged with which seed reached it.
+ *
+ * Deduplicated across seeds: two lines that are the same phrase, or two seeds
+ * that happen to share an account, must not make a wallet look like two.
+ */
+export function deriveAllAccounts(seeds, depth) {
+  const all = new Map();
+  for (const seed of seeds) {
+    for (const [address, account] of deriveAccounts(seed.phrase, depth)) {
+      if (!all.has(address)) all.set(address, { ...account, seed: seed.label });
+    }
+  }
+  return all;
 }
 
 async function main() {
@@ -329,9 +387,13 @@ async function main() {
   console.log(`registry   ${BNS_V2}`);
   console.log(LIVE ? 'mode       LIVE — this signs and broadcasts\n' : 'mode       dry run, nothing is sent\n');
 
-  const phrase = readPhrase();
-  const accounts = deriveAccounts(phrase, Number(arg('depth', '100')));
-  console.log(`derived    ${accounts.size} addresses across ${DERIVATION_PATHS.length} conventions`);
+  const seeds = readSeeds();
+  const depth = Number(arg('depth', '100'));
+  const accounts = deriveAllAccounts(seeds, depth);
+  console.log(
+    `seeds      ${seeds.length} (${seeds.map((s) => s.label).join(', ')})\n` +
+      `derived    ${accounts.size} addresses, depth ${depth} on ${DERIVATION_PATHS.length} conventions`
+  );
 
   // THE NAME LIST FIRST, then the seed, then the intersection.
   //
@@ -370,13 +432,16 @@ async function main() {
   const reachable = registry.filter((row) => accounts.has(row.owner));
   const unreachable = registry.filter((row) => !accounts.has(row.owner));
   console.log(
-    `matched    ${reachable.length} of ${registry.length} names to this seed\n`
+    `matched    ${reachable.length} of ${registry.length} names to ` +
+      `${seeds.length === 1 ? 'this seed' : 'these seeds'}\n`
   );
 
   if (unreachable.length) {
-    console.log(`NOT REACHABLE FROM THIS SEED — a different wallet holds these:`);
+    console.log(
+      `NOT REACHABLE FROM ${seeds.length === 1 ? 'THIS SEED' : 'THESE SEEDS'} — a different wallet holds these:`
+    );
     for (const row of unreachable) console.log(`  ${row.label}.btc  ${row.owner}`);
-    console.log(`  (try a greater --depth before concluding they are elsewhere)\n`);
+    console.log(`  (raise --depth before concluding they are on a seed you have not loaded)\n`);
   }
 
   // Only the matched addresses are asked about, and only once each.
@@ -408,12 +473,16 @@ async function main() {
   const totalStx = rows.reduce((sum, r) => sum + r.balance, 0n);
 
   console.log(`holding    ${withNames.length} wallets with names, ${ustx(totalStx)} across ${rows.length}\n`);
-  console.log(`${'path'.padEnd(24)} ${'address'.padEnd(42)} ${'names'.padStart(5)} ${'STX'.padStart(12)}`);
-  console.log('-'.repeat(88));
+  const seedWidth = Math.max(4, ...rows.map((r) => r.seed.length));
+  console.log(
+    `${'seed'.padEnd(seedWidth)} ${'path'.padEnd(22)} ${'address'.padEnd(42)} ` +
+      `${'names'.padStart(5)} ${'STX'.padStart(12)}`
+  );
+  console.log('-'.repeat(90 + seedWidth));
   for (const row of rows) {
-    const flag = row.balance < MINIMUM_USTX && row.names.length ? '!' : ' ';
+    const flag = row.balance < minimumFor(row.names.length) ? '!' : ' ';
     console.log(
-      `${flag}${row.path.padEnd(23)} ${row.address.padEnd(42)} ` +
+      `${flag}${row.seed.padEnd(seedWidth - 1)} ${row.path.padEnd(22)} ${row.address.padEnd(42)} ` +
         `${String(row.names.length).padStart(5)} ${ustx(row.balance).padStart(12)}`
     );
   }
