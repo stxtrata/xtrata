@@ -28,3 +28,6 @@ harness/wizards/.env.wizards
 
 # A BIP39 phrase. Never committed, never anywhere but mode 600 on one machine.
 harness/bns/.seed
+
+# A personal holdings inventory. Public per-name on chain; not as one list.
+harness/bns/names.txt
