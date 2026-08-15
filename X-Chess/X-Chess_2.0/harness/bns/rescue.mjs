@@ -109,6 +109,17 @@ export const FEE_USTX = 3_000n;
  */
 export const MINIMUM_USTX = FEE_USTX * 2n;
 
+/**
+ * What a wallet needs, given how much it has to do.
+ *
+ * A wallet with a name pays twice: once to move it, once to sweep. A wallet
+ * holding only STX pays once. Charging every wallet the two-fee minimum would
+ * skip name-less wallets that can perfectly well afford their single sweep, and
+ * leave their money on the suspect seed.
+ */
+export const minimumFor = (namesToMove) =>
+  BigInt(namesToMove) > 0n ? FEE_USTX * 2n : FEE_USTX * 1n;
+
 /** Never move a name to a destination that is not a mainnet principal. */
 const MAINNET_ADDRESS = /^S[PM][0-9A-HJKMNP-TV-Z]{20,}$/;
 export const looksLikeMainnetAddress = (value) =>
@@ -125,7 +136,8 @@ export function assertRescueAllowed({
   functionName,
   senderAddress,
   destination,
-  balanceUstx
+  balanceUstx,
+  namesToMove = 1
 }) {
   if (!live) throw new RescueError('dry run: nothing is signed without --live.');
   if (contract !== undefined && contract !== ALLOWED_CONTRACT) {
@@ -145,10 +157,11 @@ export function assertRescueAllowed({
   if (senderAddress === destination) {
     throw new RescueError(`destination ${destination} is the wallet being rescued.`);
   }
-  if (balanceUstx !== undefined && BigInt(balanceUstx) < MINIMUM_USTX) {
+  const needed = minimumFor(namesToMove);
+  if (balanceUstx !== undefined && BigInt(balanceUstx) < needed) {
     throw new RescueError(
-      `${senderAddress} holds ${balanceUstx} uSTX, under the ${MINIMUM_USTX} needed for a ` +
-        'transfer and a sweep. Fund it first, deliberately.'
+      `${senderAddress} holds ${balanceUstx} uSTX, under the ${needed} it needs. ` +
+        'Fund it first, deliberately.'
     );
   }
   return true;
@@ -405,7 +418,7 @@ async function main() {
     );
   }
 
-  const stranded = rows.filter((r) => r.names.length && r.balance < MINIMUM_USTX);
+  const stranded = rows.filter((r) => r.balance < minimumFor(r.names.length));
   if (stranded.length) {
     console.log(
       `\n! ${stranded.length} wallet(s) hold a name but under ${ustx(MINIMUM_USTX)} — ` +
@@ -415,11 +428,18 @@ async function main() {
     );
   }
 
-  const movable = rows.filter((r) => r.names.length && r.balance >= MINIMUM_USTX);
+  // Includes wallets holding only STX. Their sweep is the whole point of
+  // checking every derived address rather than only the name-holders.
+  const movable = rows.filter((r) => r.balance >= minimumFor(r.names.length));
+  const nameCount = movable.reduce((n, r) => n + r.names.length, 0);
+  const sweepTotal = movable.reduce(
+    (sum, r) => sum + r.balance - minimumFor(r.names.length),
+    0n
+  );
   console.log(
-    `\nWould move ${movable.reduce((n, r) => n + r.names.length, 0)} name(s) ` +
-      `and sweep ${ustx(movable.reduce((s, r) => s + r.balance - FEE_USTX * 2n, 0n))} ` +
-      `from ${movable.length} wallet(s).`
+    `\nWould move ${nameCount} name(s) and sweep ${ustx(sweepTotal)} ` +
+      `from ${movable.length} wallet(s), of which ` +
+      `${movable.filter((r) => !r.names.length).length} hold STX and no name.`
   );
 
   if (!LIVE) {
@@ -439,7 +459,8 @@ async function main() {
         functionName: ALLOWED_FUNCTION,
         senderAddress: row.address,
         destination,
-        balanceUstx: row.balance
+        balanceUstx: row.balance,
+        namesToMove: row.names.length
       });
       const tx = await makeContractCall({
         contractAddress: BNS_ADDRESS,
@@ -461,8 +482,15 @@ async function main() {
       nonce += 1n;
     }
 
-    // SECOND, always. The transfers above have each spent a fee, so sweep what
-    // is actually left rather than what the wallet held when we read it.
+    // SECOND, always - and for wallets with no name at all this is the only
+    // step. The transfers above have each spent a fee, so sweep what is
+    // actually left rather than what the wallet held when we read it.
+    assertRescueAllowed({
+      live: LIVE,
+      senderAddress: row.address,
+      destination,
+      namesToMove: 0
+    });
     const left = await balanceOf(row.address);
     const amount = (left ?? 0n) - FEE_USTX;
     if (amount <= 0n) {

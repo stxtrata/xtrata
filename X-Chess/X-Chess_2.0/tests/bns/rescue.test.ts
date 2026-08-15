@@ -18,6 +18,7 @@ import {
   FEE_USTX,
   KEY_SHAPED,
   MINIMUM_USTX,
+  minimumFor,
   PHRASE_SHAPED,
   RescueError,
   assertRescueAllowed,
@@ -78,6 +79,17 @@ describe('what stops the rescue losing what it is rescuing', () => {
     for (const bad of ['ST1NOTMAINNET', '', 'not-an-address', SAFE.slice(0, 10)]) {
       expect(() => assertRescueAllowed({ ...fine, destination: bad })).toThrow(RescueError);
     }
+  });
+
+  it('lets a wallet holding STX and no name sweep on a single fee', () => {
+    // These exist: a name was sold, or none was ever bought there. Charging the
+    // two-fee minimum would skip them and leave their money on the suspect
+    // seed - a rescue that reports success and abandons the cash.
+    expect(minimumFor(0)).toBe(FEE_USTX);
+    expect(minimumFor(1)).toBe(FEE_USTX * 2n);
+    expect(
+      assertRescueAllowed({ ...fine, namesToMove: 0, balanceUstx: FEE_USTX })
+    ).toBe(true);
   });
 
   it('skips a wallet that cannot pay for both a transfer AND a sweep', () => {
