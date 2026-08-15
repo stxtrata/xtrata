@@ -10,6 +10,9 @@
 // safety property nobody checks.
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   MAX_ATTEMPTS,
   SYSTEM_PROMPT,
@@ -205,5 +208,53 @@ describe('the second secret in the env file', () => {
   it('still redacts a wallet key, or the addition broke the original', () => {
     const wallet = 'a'.repeat(64);
     expect(scrub(`key=${wallet}`)).not.toContain(wallet);
+  });
+});
+
+describe('room to think and still answer', () => {
+  // The defect that actually ended game 12, and it was invisible on an opening
+  // position. `max_tokens` caps thinking and text TOGETHER, adaptive thinking is
+  // on by default, and the cap was 64. On a quiet position the model does not
+  // think and 64 is plenty; on a real middlegame it thinks, the budget is gone
+  // before it writes anything, and the reply is `stop_reason: max_tokens` with a
+  // thinking block and no text. Three of those scored as three illegal moves and
+  // forfeited a game the character could have played.
+  it('asks for enough tokens that thinking cannot eat the answer', () => {
+    const source = readFileSync(
+      resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/chooser.mjs'),
+      'utf8'
+    );
+    const cap = /const MAX_TOKENS = (\d+)/.exec(source);
+    expect(cap, 'no MAX_TOKENS to check').not.toBeNull();
+    // Measured: the longest real answer on the position that broke game 12 was
+    // 165 output tokens at low effort. Anything near 64 silences the character.
+    expect(Number(cap![1]), 'a thinking model needs more than a move-sized budget')
+      .toBeGreaterThanOrEqual(512);
+  });
+
+  it('reins thinking in with effort rather than switching it off', () => {
+    // Disabling thinking is the worse lever on Opus 5: a thinking-off request
+    // can write a tool call into visible text or leak internal tags, and `low`
+    // buys most of the saving without either.
+    const source = readFileSync(
+      resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/chooser.mjs'),
+      'utf8'
+    );
+    expect(source).toMatch(/output_config: \{ effort: EFFORT \}/);
+    expect(source, 'thinking was disabled rather than dialled down').not.toMatch(
+      /thinking:\s*\{\s*type:\s*'disabled'/
+    );
+  });
+
+  it('treats an empty reply as no move, not as a move', async () => {
+    // What a truncated turn actually looks like coming back. It must fail the
+    // legality check rather than reaching the chain as something.
+    expect(extractMove('', ['e2e4', 'd2d4'])).toBe(null);
+    const error = await chooseMove({
+      character: PERSONALITIES[0],
+      position: start(),
+      ask: async () => ''
+    }).catch((e) => e);
+    expect(error.forfeit).toBe(true);
   });
 });

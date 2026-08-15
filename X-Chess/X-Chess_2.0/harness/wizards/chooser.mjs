@@ -30,8 +30,38 @@ import { WizardSafetyError, scrub } from './wizards-core.mjs';
 /** How many times a character may answer with something that is not a legal move. */
 export const MAX_ATTEMPTS = 3;
 
-/** Small on purpose. The reply is one move; room to ramble is room to truncate one. */
-const MAX_TOKENS = 64;
+/**
+ * Room to think AND answer, which is not the same as room to ramble.
+ *
+ * This was 64, on the reasoning that the reply is one move. That reasoning is
+ * wrong on every current model, because `max_tokens` caps thinking and text
+ * TOGETHER, and adaptive thinking is on by default. On a quiet opening the
+ * model does not think and 64 was plenty; on a real middlegame it thinks, the
+ * cap is consumed before it writes anything, and the reply comes back as
+ * `stop_reason: max_tokens` with a thinking block and NO TEXT.
+ *
+ * That is what actually ended game 12. Ledger was not misreading the board — it
+ * was cut off mid-thought, three times, and the empty replies were scored as
+ * illegal moves. Measured on the exact position afterwards: at 64 both Sonnet 5
+ * and Opus 5 return empty; at 1024 Opus 5 thinks for 165 tokens and plays a
+ * legal move.
+ *
+ * A truncated character forfeits a game it could have played, so the cap has to
+ * be generous. It still bounds a runaway: 1024 is about six times the longest
+ * measured answer.
+ */
+const MAX_TOKENS = 1024;
+
+/**
+ * How hard a character thinks before answering.
+ *
+ * `low` on purpose. Choosing from a list the board already generated is not a
+ * task that rewards deliberation — the hard part is reading the position, not
+ * searching it — and low effort still solved the position that ended game 12
+ * where no amount of budget at 64 tokens could. Higher settings mostly buy
+ * longer thinking for the same move.
+ */
+const EFFORT = 'low';
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const ANTHROPIC_VERSION = '2023-06-01';
@@ -182,6 +212,12 @@ export function anthropicAsker({ apiKey, fetchImpl = fetch }) {
       body: JSON.stringify({
         model,
         max_tokens: MAX_TOKENS,
+        // Thinking is left ON — the default on current models — and reined in
+        // with effort instead. Disabling it is the worse lever: on Opus 5 a
+        // thinking-off request can write a tool call into its visible text or
+        // leak internal tags, and `low` already buys most of the saving without
+        // either. It is also what makes the hard positions playable at all.
+        output_config: { effort: EFFORT },
         system,
         messages: [{ role: 'user', content: user }]
       })

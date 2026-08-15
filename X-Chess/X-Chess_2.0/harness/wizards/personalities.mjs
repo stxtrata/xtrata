@@ -30,7 +30,7 @@
  * and a provider may change what answers to a name. An entry that did not say
  * which model it meant would be claiming an audit it does not have.
  */
-export const DEFAULT_MODEL = 'claude-sonnet-5';
+export const DEFAULT_MODEL = 'claude-opus-5';
 
 /** Entry format version. Inscribed with every entry, so a reader knows the shape. */
 export const ENTRY_FORMAT = 'xchess-player-v1';
