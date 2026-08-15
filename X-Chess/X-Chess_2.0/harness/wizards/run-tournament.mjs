@@ -147,7 +147,12 @@ async function readGames() {
  * position is never carried in a variable across a failure.
  */
 async function playGame({ gameId, white, black, replay, ask, budget }) {
-  const rules = await wizardRules(white.address, black.address);
+  // DESTRUCTURED. `wizardRules` returns { rules, hash }, and passing the wrapper
+  // to replay hands it an object with no white, no black and no protocol - which
+  // normalises to an OPEN BOARD. The game would have run, looked fine, and
+  // refereed nothing: no turn alternation, either character free to move at any
+  // time, and the position drifting away from what the committed rules describe.
+  const { rules } = await wizardRules(white.address, black.address);
 
   for (;;) {
     const entries = await readEntries(gameId);
