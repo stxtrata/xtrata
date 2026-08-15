@@ -255,6 +255,17 @@ const STARVED_POLL_MS = 30_000;
 const BACKGROUND_POLL_MS = 20_000;
 
 /**
+ * How long a pending move may be shown on memory alone.
+ *
+ * Chosen against the block time rather than the poll interval: post-Nakamoto a
+ * block is roughly twelve seconds, so ninety is several chances for anything
+ * real to have landed. A submission still showing as pending after that is one
+ * the board has not been able to see for a long time, and continuing to draw it
+ * would be an assertion nothing supports.
+ */
+const PENDING_HOLD_MS = 90_000;
+
+/**
  * A principal, short enough to read.
  *
  *   SP1CVH5EWQPTH2J7CWZ7JBHEJPDHA0G4C4QKXFF6W  ->  SP1C...KXFF6W
@@ -404,6 +415,8 @@ export class ChessApp {
   private flipped = false;
   private busy = false;
   private pending: PendingRow[] = [];
+  /** When the mempool was last read SUCCESSFULLY, which is not every poll. */
+  private pendingReadAt = 0;
   /**
    * The move this board is in the middle of making.
    *
@@ -903,12 +916,13 @@ export class ChessApp {
     if (this.gameId === null) return;
     const game = this.gameId;
     try {
-      const [entries, pending] = await Promise.all([
+      const [entries, read] = await Promise.all([
         this.chain.getAllEntries(game),
         this.chain.getPending(game)
       ]);
       if (this.gameId !== game) return; // moved on while we were waiting
       this.lastReadAt = Date.now();
+      const pending = this.heldPending(read, entries);
 
       // A poll may not SHORTEN the log.
       //
@@ -935,6 +949,40 @@ export class ChessApp {
       // A poll that failed is not worth saying anything about. The next one is
       // a few seconds away, and the board is still showing the last good read.
     }
+  }
+
+  /**
+   * What to show as pending, given a mempool read that may not have happened.
+   *
+   * `null` from `getPending` means the read failed - a 429, which all three
+   * mainnet hosts return together, or a host without the extended API. Drawing
+   * that as an empty mempool is what made a broadcast move appear when the game
+   * was opened and then disappear a few seconds later, which reads as the move
+   * having been lost. It had not been. Nobody had asked.
+   *
+   * So a failed read keeps the last list rather than clearing it, with two
+   * corrections, because being wrong in the other direction - a phantom pending
+   * move that never lands - is its own kind of lie:
+   *
+   *   * anything that has since CONFIRMED is dropped, or a landed move would be
+   *     drawn twice, once in the log and once below it. Matched on sender and
+   *     value because the log does not carry a txid.
+   *   * anything held longer than `PENDING_HOLD_MS` is dropped. Past that we are
+   *     not remembering the mempool, we are guessing about it - a dropped or
+   *     replaced transaction looks exactly like one we cannot see.
+   */
+  private heldPending(read: PendingRow[] | null, entries: EntryRow[]): PendingRow[] {
+    if (read !== null) {
+      this.pendingReadAt = Date.now();
+      return read;
+    }
+    if (!this.pending.length) return [];
+    if (Date.now() - this.pendingReadAt > PENDING_HOLD_MS) return [];
+    const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+    return this.pending.filter(
+      (row) =>
+        !entries.some((entry) => same(entry.sender, row.sender) && same(entry.value, row.value))
+    );
   }
 
   /**
@@ -1536,12 +1584,15 @@ export class ChessApp {
       }
       this.gameId = game;
       this.game = row;
-      const [entries, pending] = await Promise.all([
+      const [entries, read] = await Promise.all([
         this.chain.getAllEntries(game),
         this.chain.getPending(game)
       ]);
       this.entries = entries;
-      this.pending = pending;
+      // Nothing to hold on to on a first load, so a failed read shows nothing
+      // pending - which is all it can honestly show.
+      this.pending = read ?? [];
+      if (read !== null) this.pendingReadAt = Date.now();
       this.lastReadAt = Date.now();
       return true;
     });

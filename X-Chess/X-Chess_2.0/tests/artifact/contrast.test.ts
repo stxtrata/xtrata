@@ -149,14 +149,27 @@ describe('the colours the artefact actually ships', () => {
   });
 
   it('gives every escape hatch a real tap target', () => {
-    // These three are what stop the move lock becoming a trap, and they were
-    // the smallest targets in the application because they never had the class
-    // that sets a minimum height.
-    for (const id of ['override-yes', 'send-anyway-yes', 'send-anyway-no']) {
+    // What stops a warning becoming a trap, and they were the smallest targets
+    // in the application because they never had the class that sets a minimum
+    // height.
+    for (const id of ['send-anyway-yes', 'send-anyway-no']) {
       const button = html.match(new RegExp(`<button id="${id}"[^>]*>`));
       expect(button, `#${id} is not in the artefact`).not.toBeNull();
       expect(button![0], `#${id} is not a full-size tap target`).toContain('class="action');
     }
+  });
+
+  it('ships no way to send a submission the board has proved is doomed', () => {
+    // The deleted third hatch. "Let me try anyway" unlocked a board the referee
+    // had locked, and every refusal strong enough to lock one is now provable -
+    // so the button offered to spend real money on a submission the sentence
+    // above it had just called stored, charged, and skipped.
+    //
+    // Asserted over the ARTEFACT because that is what somebody loads. A panel
+    // deleted from the source and left in a stale build is still on their
+    // screen, and this test is the only thing that reads what shipped.
+    expect(html, 'the override panel is back in the artefact').not.toContain('id="override"');
+    expect(html, 'the override button is back in the artefact').not.toContain('id="override-yes"');
   });
 
   it('ships no rule pointing at an animation that does not exist', () => {

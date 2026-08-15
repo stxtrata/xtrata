@@ -214,6 +214,80 @@ describe('what somebody else watching sees', () => {
     app.stopPolling();
   });
 
+  it('keeps the ghost when the mempool cannot be read, rather than dropping it', async () => {
+    // Reported from a real board: game 11 showed the opponent's broadcast move
+    // when it was opened, and a few seconds later showed nothing pending.
+    //
+    // Nothing had happened to the transaction. All three mainnet hosts share one
+    // rate-limit bucket and 429 together, and a 429 was being reported to the
+    // board as an empty mempool - so the first poll after opening the game threw
+    // the move away. To somebody watching, a move that had been broadcast looked
+    // like a move that had been lost.
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    chain.pending = [
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+    ];
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await app.load(1);
+    await tick(30);
+    expect(ghosts(), 'the move was never shown in the first place').toContain('e5');
+
+    chain.mempoolUnreadable = true;
+    await app.readNow();
+    await tick(30);
+
+    expect(ghosts(), 'a rate limit erased a move nobody had touched').toContain('e5');
+    expect(dom.window.document.getElementById('status')!.textContent).toContain(
+      'broadcast, not yet in a block'
+    );
+    app.stopPolling();
+  });
+
+  it('drops the ghost once the move it was standing in for has landed', async () => {
+    // The other way of being wrong. Holding across a failed read must not
+    // outlive the thing being held: once the move is in the log it would be
+    // drawn twice, once as history and once as still on its way.
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    chain.pending = [
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+    ];
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain,
+      document: dom.window.document,
+      build: { network: 'devnet', contract: chain.contractId }
+    });
+    await app.load(1);
+    await tick(30);
+    expect(ghosts()).toContain('e5');
+
+    // It lands, and the mempool goes unreadable in the same breath - which is
+    // the ordinary case, because a busy board is what rate limits it.
+    chain.as(ALICE);
+    await chain.submit(1, 'e2e4');
+    chain.as(BOB);
+    await chain.submit(1, 'e7e5');
+    chain.mempoolUnreadable = true;
+    await app.readNow();
+    await tick(30);
+
+    expect(ghosts(), 'a landed move was still drawn as pending').not.toContain('e5');
+    const moves = dom.window.document.getElementById('moves')!.textContent ?? '';
+    expect(moves.match(/pending/g) ?? [], 'the move was listed twice').toHaveLength(0);
+    app.stopPolling();
+  });
+
   it('ignores a pending submission that is not a move', async () => {
     // A pending `resgn` has no square to draw at, and inventing one would show
     // something that is not going to happen.

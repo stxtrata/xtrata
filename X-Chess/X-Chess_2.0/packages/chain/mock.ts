@@ -194,8 +194,16 @@ export class MockChain implements ChainReader, ChainWriter {
 
   /** Driven by tests; a real write in memory lands instantly. */
   pending: PendingRow[] = [];
+  /**
+   * Set by a test to make the mempool unreadable, as a 429 does on mainnet.
+   *
+   * A real client returns `null` there, and the difference between that and an
+   * empty mempool is load bearing enough to be reachable from a test.
+   */
+  mempoolUnreadable = false;
 
-  async getPending(): Promise<PendingRow[]> {
+  async getPending(): Promise<PendingRow[] | null> {
+    if (this.mempoolUnreadable) return null;
     return [...this.pending];
   }
 

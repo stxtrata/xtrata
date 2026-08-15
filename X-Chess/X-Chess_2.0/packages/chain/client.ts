@@ -125,8 +125,13 @@ export interface ChainReader {
   isSolvent(): Promise<boolean>;
   getWithdrawable(): Promise<bigint>;
   getHeight(): Promise<number>;
-  /** Broadcast but unconfirmed submissions for a game. Never throws. */
-  getPending(game: number): Promise<PendingRow[]>;
+  /**
+   * Broadcast but unconfirmed submissions for a game. Never throws.
+   *
+   * `null` means the mempool could not be read, which is NOT the same as an
+   * empty one and must never be drawn as though it were.
+   */
+  getPending(game: number): Promise<PendingRow[] | null>;
 }
 
 export interface WriteResult {
@@ -405,13 +410,22 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
    *
    * Never throws. The mempool is a convenience: a board that broke because a
    * node would not answer this would be worse than one showing nothing pending.
+   *
+   * It returns `null` rather than `[]` when it could not ask, and the difference
+   * is the whole point. All three mainnet hosts share one rate-limit bucket and
+   * 429 together, so "no answer" is an ordinary event on a busy board - and
+   * reporting it as an empty mempool made a pending move VANISH from a game that
+   * was showing it a moment earlier. An empty list is a fact about the chain. A
+   * failed read is a fact about us.
    */
-  async getPending(game: number): Promise<PendingRow[]> {
+  async getPending(game: number): Promise<PendingRow[] | null> {
     try {
       const response = await this.endpoint.request(
         `/extended/v1/address/${this.contractId}/mempool?limit=50`
       );
-      if (!response.ok) return [];
+      // Includes 404 from a base without the extended API. That is a host that
+      // cannot answer the question, not a host answering "nothing".
+      if (!response.ok) return null;
       const body = (await response.json()) as { results?: unknown[] };
 
       const out: PendingRow[] = [];
@@ -454,7 +468,7 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
       // Oldest first, roughly the order they will land in.
       return out.sort((a, b) => (a.receivedAt ?? 0) - (b.receivedAt ?? 0));
     } catch {
-      return [];
+      return null;
     }
   }
 
