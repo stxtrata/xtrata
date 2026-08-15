@@ -167,13 +167,17 @@ describe('what the gate MUST NOT block', () => {
     expect(verdict.tier, 'an unconfirmed board must never LOCK').toBe('warn');
   });
 
-  it('a wrong-side move, softly - because the wallet may sign as somebody else', () => {
-    // The board is told an address at connect time. The wallet chooses
-    // tx-sender when it signs, and the request carries no sender field, so a
-    // switched account is invisible here. Every address-derived refusal is
-    // therefore a warning with a way past it, never a lock.
+  it('a wrong-side move FIRMLY, because reconnecting is free and a wasted fee is not', () => {
+    // The board is told an address at connect time and the wallet chooses
+    // tx-sender when it signs, so a switched account is invisible here. That
+    // used to make every address-derived refusal a warning with a way past it.
+    //
+    // It is a lock now: reconnecting with the right account is free, and the
+    // thing on the other side of that button is a permanent charged submission
+    // that every reader skips. The unconfirmed case is still soft, and is
+    // covered below.
     const state = game({ white: ALICE, black: BOB }, [[ALICE, 'e2e4']]);
-    expect(judgeMove(ctx(state, ALICE)).tier).toBe('warn');
+    expect(judgeMove(ctx(state, ALICE)).tier).toBe('no');
   });
 });
 
@@ -228,15 +232,39 @@ describe('control events are judged separately, and turn is not an input', () =>
     expect(judgeEvent(ctx(state, BOB), EVENT_STRINGS.DRAW_OFFER).reason).toBe('offer-pending');
   });
 
-  it('refuses accepting nothing, and refuses accepting your OWN offer softly', () => {
+  it('refuses accepting nothing, and refuses accepting your OWN offer', () => {
     expect(judgeEvent(ctx(game(duel), ALICE), EVENT_STRINGS.DRAW_ACCEPT).tier).toBe('no');
 
+    // This was a warning for as long as address-derived meant soft. Replay
+    // rejects it by name - accepting your own offer is not agreement - so the
+    // board is reading ahead rather than guessing, and the only way it can be
+    // wrong is if the wallet signs as the other player. That costs a reconnect
+    // to fix and a permanent charged submission to be wrong about.
     const standing = game(duel, [[ALICE, EVENT_STRINGS.DRAW_OFFER]]);
     const own = judgeEvent(ctx(standing, ALICE), EVENT_STRINGS.DRAW_ACCEPT);
     expect(own.reason).toBe('no-offer');
-    expect(own.tier, 'address-derived, so a warning').toBe('warn');
+    expect(own.tier).toBe('no');
+    expect(own.say, 'refused without saying what ends it').toContain('the other side accepts');
+
+    // ...and still soft on a game the board could not confirm, where it is
+    // refereeing a guess about who offered what.
+    expect(judgeEvent(ctx(standing, ALICE, false), EVENT_STRINGS.DRAW_ACCEPT).tier).toBe('warn');
 
     expect(judgeEvent(ctx(standing, BOB), EVENT_STRINGS.DRAW_ACCEPT).tier).toBe('yes');
+  });
+
+  it('refuses a control event from someone holding neither side', () => {
+    // Same reasoning, and the same rejection: `sideOf` is the function replay
+    // uses too, so this is not the board's opinion about the game.
+    const state = game(duel);
+    const verdict = judgeEvent(ctx(state, CAROL), EVENT_STRINGS.RESIGN);
+    expect(verdict.reason).toBe('not-a-player');
+    expect(verdict.tier).toBe('no');
+    expect(verdict.say, 'refused without naming the account').toContain(CAROL);
+    expect(verdict.say, 'refused without saying how to fix it').toContain('reconnect');
+
+    // Unconfirmed, the board does not know who the players are and may not say.
+    expect(judgeEvent(ctx(state, CAROL, false), EVENT_STRINGS.RESIGN).tier).toBe('warn');
   });
 
   it('lets an acceptance through when the offer is only in the MEMPOOL', () => {
@@ -261,18 +289,49 @@ describe('control events are judged separately, and turn is not an input', () =>
 // The lock, and the way out of it.
 // ---------------------------------------------------------------------------
 
-describe('the override', () => {
-  // The board locks the squares on a confirmed wrong-side verdict, which is
-  // what the reported bug asked for. That lock is only safe because it comes
-  // with a way past it, on screen, always. The board cannot know which account
-  // the wallet will sign with - the request carries no sender field - so it
-  // will sometimes be wrong, and being wrong must cost a click rather than a
-  // game.
-  it('is a documented property of the design, not an accident', () => {
-    // Held at the DOM level in tests/e2e/pending-move.test.ts. Stated here so
-    // the reasoning sits beside the verdict function it protects.
+describe('the override, and what it is for now', () => {
+  // THIS REVERSED on 2026-08-15, deliberately, and the old reasoning is kept
+  // because it was not wrong - it was weighed wrong.
+  //
+  // It used to be: the board cannot know which account the wallet will sign
+  // with, so every address-derived refusal stays soft and carries a "send it
+  // anyway" button, because being wrong must cost a click rather than a game.
+  //
+  // What that missed is which way the asymmetry runs. Being wrong in one
+  // direction costs a click - the player reconnects with the account they
+  // meant, free and instant. Being wrong in the other costs a real transaction,
+  // stored forever, charged for, and skipped by every reader. And the board said
+  // "it would be stored, charged, and skipped" IN THE SAME BREATH as offering
+  // the button that did it. That is not a warning; it is a dare.
+  //
+  // So a confirmed refusal now refuses, and says to reconnect instead.
+
+  it('refuses a wrong-side move outright when it can referee the game', () => {
     const state = game({ white: ALICE, black: BOB }, [[ALICE, 'e2e4']]);
     const verdict = judgeMove(ctx(state, ALICE));
-    expect(verdict.tier, 'the verdict itself must stay soft').toBe('warn');
+    expect(verdict.tier, 'a certain refusal still offers a way to spend money on it').toBe('no');
+    expect(verdict.say, 'it refuses without saying what to do instead').toContain('reconnect');
+  });
+
+  it('still only warns when it CANNOT referee the game', () => {
+    // The case the override was really built for. A board that cannot confirm a
+    // game's rules has no business refusing moves in it: it would be enforcing
+    // rules nobody agreed to, and that is a worse failure than a wasted fee.
+    const state = game({ white: ALICE, black: BOB }, [[ALICE, 'e2e4']]);
+    const verdict = judgeMove({ ...ctx(state, ALICE), rulesConfirmed: false });
+    expect(verdict.tier, 'an unconfirmed game locks the board it cannot referee').toBe('warn');
+  });
+
+  it('refuses the other three address-derived cases the same way', () => {
+    // not-allowed, consecutive and cooldown were soft for the same reason and
+    // are firm for the same reason. Left as one test because they are one
+    // decision.
+    const notAllowed = game({ white: ALICE, black: BOB, allow: [BOB] }, []);
+    expect(judgeMove(ctx(notAllowed, ALICE)).tier).toBe('no');
+
+    const consecutive = game({ white: ALICE, black: 'anyone', noConsecutive: true }, [
+      [ALICE, 'e2e4']
+    ]);
+    expect(judgeMove(ctx(consecutive, ALICE)).tier).toBe('no');
   });
 });

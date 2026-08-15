@@ -311,7 +311,6 @@ const IDS = [
   'join-game', 'load-game',
   'game-label', 'copy-link', 'flip', 'refresh', 'board', 'arrows', 'status', 'move-hint', 'promotion',
   'send-anyway', 'send-anyway-why', 'send-anyway-yes', 'send-anyway-no',
-  'override', 'override-why', 'override-yes',
   'game-rules-state', 'game-rules-summary', 'game-rules-hash',
   'claim-rules', 'claim-white', 'claim-black', 'claim-check',
   'players', 'sponsorship', 'sponsorship-panel', 'top-up',
@@ -452,15 +451,6 @@ export class ChessApp {
    * charged, and permanent. Reported from a real board on 2026-08-14.
    */
   private pendingForced: { game: number; value: string } | null = null;
-  /**
-   * The player has overruled the board about who may move.
-   *
-   * The board can be wrong about this in two ways it cannot detect: the wallet
-   * may sign as an account it was never told about, and a game whose rules it
-   * could not confirm is not one it is refereeing. So the lock is always
-   * accompanied by a way out, and taking it is remembered for the session.
-   */
-  private overridden = false;
   private exploreRows: ExploreRow[] = [];
   private sponsorshipText: { key: string; message: string } | null = null;
   /**
@@ -545,10 +535,6 @@ export class ChessApp {
     on('verifyGame', () => void this.reverify());
     on('flip', () => {
       this.flipped = !this.flipped;
-      this.drawGame();
-    });
-    on('overrideYes', () => {
-      this.overridden = true;
       this.drawGame();
     });
     on('sendAnywayYes', () => {
@@ -1536,7 +1522,7 @@ export class ChessApp {
     // Switching games must not carry a half-finished promotion across. The
     // picker holds squares, and squares mean nothing on a different board.
     //
-    // Nor an armed override, and for a stronger reason: the promotion picker
+    // Nor an armed "send anyway", and for a stronger reason: the promotion picker
     // only wastes a click, while "send it anyway" spends money on a permanent
     // submission. It carries its own game id as well, so this is the second of
     // two locks rather than the only one.
@@ -1550,7 +1536,6 @@ export class ChessApp {
       }
       this.gameId = game;
       this.game = row;
-      this.overridden = false;
       const [entries, pending] = await Promise.all([
         this.chain.getAllEntries(game),
         this.chain.getPending(game)
@@ -1759,17 +1744,20 @@ export class ChessApp {
     const ctx = this.eligibility(state);
     const verdict = judgeMove(ctx);
 
-    // Squares are locked when the board is confident AND has been given an
-    // address to be confident about. That covers the reported case - a wallet
-    // holding White should not be able to pick up a black piece - without ever
-    // becoming a trap, because `drawOverride` always offers the way past.
-    const locked =
-      !this.overridden &&
-      verdict.tier !== 'yes' &&
-      (verdict.tier === 'no' || (this.rulesConfirmed && Boolean(this.address)));
+    // Squares are locked exactly when the board can PROVE the submission is
+    // doomed, which is what `no` means and the only thing it means. That covers
+    // the reported case - a wallet holding White should not be able to pick up
+    // a black piece - and the way past it is to reconnect with the account you
+    // meant, which each of those verdicts says in its own sentence.
+    //
+    // This clause used to also lock on a warning when the rules were confirmed,
+    // and pair it with a "Let me try anyway" panel. Both halves are gone: under
+    // confirmed rules a doomed submission is now refused outright rather than
+    // warned about, so the warning-that-locks no longer exists and the panel had
+    // nothing left to appear for. A warning still leaves the squares live.
+    const locked = verdict.tier === 'no';
 
     this.drawWhyNot(canSubmit, verdict);
-    this.drawOverride(verdict, locked);
     this.drawEventButtons(ctx, canSubmit);
 
     renderBoard(this.el.board, {
@@ -1963,26 +1951,6 @@ export class ChessApp {
       node.textContent +=
         ' This board could not confirm this game\u2019s rules, so that is a guess rather than a ruling.';
     }
-  }
-
-  /**
-   * The way past a refusal.
-   *
-   * On screen whenever the board has locked the squares, and never hidden
-   * behind the thing it has locked. This is what makes the lock safe: the board
-   * cannot know which account the wallet will sign with, so it will sometimes
-   * be wrong about whose turn it is, and a player who could not overrule it
-   * would be stuck in a game the contract is perfectly willing to accept their
-   * move in.
-   */
-  private drawOverride(verdict: Verdict, locked: boolean): void {
-    const node = this.el.override;
-    if (!locked || verdict.tier === 'no') {
-      node.classList.add('hide');
-      return;
-    }
-    node.classList.remove('hide');
-    this.text('overrideWhy', verdict.say);
   }
 
   /**

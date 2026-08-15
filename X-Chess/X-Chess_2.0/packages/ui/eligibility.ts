@@ -20,14 +20,28 @@
 // The second is far worse, so refusals come in two strengths rather than one:
 //
 //   yes   nothing objects
-//   warn  this looks doomed, say why, and let it through on a second click
-//   no    provably doomed, and provable WITHOUT knowing who will sign
+//   warn  this MIGHT be doomed, say why, and let it through on a second click
+//   no    provably doomed given what the board has been told
 //
-// A hard `no` requires two things the board usually does not have: rules it has
-// confirmed against the on-chain commitment, and a fact that does not depend on
-// which account the wallet will actually sign with. The board cannot know the
-// signer - the wallet chooses `tx-sender` and the request deliberately carries
-// no sender field - so ANY address-derived refusal is a `warn`, always.
+// A hard `no` requires ONE thing the board does not always have: rules it has
+// confirmed against the on-chain commitment. Without them it is refereeing a
+// guess, and a guess may speak but may not lock a control - which is what
+// `firm` is for, and the only reason `warn` still exists at the move level.
+//
+// It used to require a second thing, and dropping that is the substance of this
+// file's history. The board cannot know which account will sign - the wallet
+// chooses `tx-sender` and the request deliberately carries no sender field - so
+// every address-derived refusal was a `warn` with a "send it anyway" button
+// behind it. That reasoning has an unstated premise: that the two ways of being
+// wrong cost about the same. They do not. Being wrong about the account costs a
+// reconnect, which is free, instant, and undoable. Acting on the button costs a
+// transaction that is stored forever, charged for, and skipped by every reader.
+// So the address-derived cases are firm too, and the sentence that used to sit
+// next to the button now sits next to a locked board and says to reconnect.
+//
+// What is left as a genuine `warn` is the case where the board is not wrong and
+// not right but EARLY: a draw offer in the mempool that may or may not land
+// first. Nothing there is provable yet, so nothing there is refused.
 //
 // Everything here calls checkSender() and sideOf() rather than reimplementing
 // them. That is the point. The board and its referee disagreeing about the
@@ -135,36 +149,55 @@ export function judgeMove(ctx: Ctx): Verdict {
     };
   }
 
-  // Every one of these is address-derived, so every one is a warning however
-  // confident it looks. The wallet may sign as somebody else entirely, and a
-  // board that locked the squares against an account the player is about to
-  // switch away from would be refusing a move that is perfectly legal.
+  // These are address-derived, and the board cannot know which account the
+  // wallet will actually sign with - so for a long time every one of them was a
+  // warning with a "send it anyway" button behind it, on the reasoning that
+  // locking the squares against an account somebody was about to switch away
+  // from would refuse a move that is perfectly legal.
+  //
+  // THE ASYMMETRY IS THE OTHER WAY ROUND, and that is why they are firm now.
+  //
+  // Being wrong in one direction costs a click: the player reconnects with the
+  // account they meant, which is free and instant. Being wrong in the other
+  // costs a real transaction that is stored forever, charged for, and skipped by
+  // every reader - and the board says so IN THE SAME BREATH as offering the
+  // button. "It would be stored, charged, and skipped" is not a warning if there
+  // is a control next to it that does exactly that.
+  //
+  // So when the rules are CONFIRMED these lock the board and say what to do
+  // instead. When they are not, `firm` downgrades them to a warning by itself,
+  // because a board that cannot referee a game has no business refusing moves in
+  // it - which is the case the override was really built for.
   const bound = state.turn === 'white' ? rules.white : rules.black;
+  const RECONNECT = 'If your wallet is set to a different account, reconnect with that one.';
 
   if (broken === 'not-allowed') {
-    return warn(
+    return firm(
+      rulesConfirmed,
       broken,
-      `This game is restricted to a named list, and ${address} is not on it. ${CHARGED}`
+      `This game is restricted to a named list, and ${address} is not on it. ${CHARGED} ${RECONNECT}`
     );
   }
   if (broken === 'consecutive') {
-    return warn(
+    return firm(
+      rulesConfirmed,
       broken,
       `This game does not allow the same player to move twice running, and the last move was yours. ${CHARGED}`
     );
   }
   if (broken === 'cooldown') {
-    return warn(
+    return firm(
+      rulesConfirmed,
       broken,
       `This game makes you wait ${rules.cooldown} move${rules.cooldown === 1 ? '' : 's'} between your own, and you have not waited that long. ${CHARGED}`
     );
   }
 
-  // wrong-player: the reported bug. Wallet holds one colour, the other is to
-  // move, and the board offered the move anyway.
-  return warn(
+  // wrong-player: the wallet holds one colour and the other is to move.
+  return firm(
+    rulesConfirmed,
     broken,
-    `It is ${state.turn} to move, and ${state.turn} is ${bound}. You are connected as ${address}. ${CHARGED}`
+    `It is ${state.turn} to move, and ${state.turn} is ${bound}. You are connected as ${address}. ${CHARGED} ${RECONNECT}`
   );
 }
 
@@ -239,20 +272,35 @@ export function judgeEvent(ctx: Ctx, value: string): Verdict {
     return firm(rulesConfirmed, 'no-offer', 'There is no draw offer to accept.');
   }
 
-  // Everything from here reads `address`, so everything from here is a warning.
+  // Everything from here reads `address`. That used to make it a warning; see
+  // the header for why it no longer does. Both of these are rejections replay
+  // performs by name - `sideOf` is the same function on both sides of the
+  // question - so the board is not guessing, it is reading ahead.
   if (side === null) {
-    return warn(
+    // No wallet connected is not the same as a wallet that holds neither side,
+    // and only the second is evidence of anything. A board that locked Resign
+    // before connect would be refusing on the strength of having asked nobody -
+    // and connecting is the next step regardless, exactly as in `judgeMove`.
+    if (!address) {
+      return warn(
+        'not-a-player',
+        'No wallet is connected, so this board cannot tell whether you hold a side here.'
+      );
+    }
+    return firm(
+      rulesConfirmed,
       'not-a-player',
-      address
-        ? `This game is between ${rules.white} and ${rules.black}. A control submission from anyone else ${CHARGED.toLowerCase()}`
-        : 'No wallet is connected, so this board cannot tell whether you hold a side here.'
+      `Resigning and agreeing a draw belong to the two players, and ${address} holds neither side here. ` +
+        `${CHARGED} If your wallet is set to a different account, reconnect with that one.`
     );
   }
 
   if (kind === 'draw-accept' && state.pendingOffer === side) {
-    return warn(
+    return firm(
+      rulesConfirmed,
       'no-offer',
-      'That offer is yours. Accepting your own offer is not agreement, and replay skips it.'
+      'That offer is yours. Accepting your own offer is not agreement, and replay skips it. ' +
+        'It ends when the other side accepts, or lapses when either of you plays a move.'
     );
   }
 

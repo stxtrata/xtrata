@@ -582,17 +582,17 @@ export const HTML = `
         <div id="status" class="notice notice--info"></div>
         <div id="move-hint" class="small muted"></div>
         <div id="promotion" class="notice notice--loud hide" role="group" aria-label="choose a promotion piece"></div>
-        <!-- A submission the board thinks is doomed, and the way past it.
-             The override is not a courtesy: the board cannot know which account
-             the wallet will sign with, and it cannot always confirm a game's
-             rules, so it will sometimes be wrong. Being warned is worth a click.
-             Being locked out of a game is not. -->
-        <div id="override" class="notice notice--warn hide">
-          <div id="override-why"></div>
-          <div class="row">
-            <button id="override-yes" type="button" class="action action--primary">Let me try anyway</button>
-          </div>
-        </div>
+        <!-- There was a second panel here - "Let me try anyway" - that unlocked
+             a board the referee had locked. It is gone, and the reasoning is in
+             eligibility.ts: every refusal strong enough to lock the squares is
+             now one the board can prove, and the fix for the case it was built
+             for is to reconnect with the account you meant, which each verdict
+             says in its own sentence. It became unreachable before it was
+             deleted; the deletion is bookkeeping.
+
+             What survives is below: a warning the board is genuinely unsure
+             about, which never locks anything and can be sent on a second
+             click. -->
         <div id="send-anyway" class="notice notice--warn hide">
           <div id="send-anyway-why"></div>
           <div class="row">

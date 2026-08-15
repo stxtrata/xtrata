@@ -443,12 +443,19 @@ describe('THE REPORTED BUG: a move for the wrong colour', () => {
   });
 });
 
-describe('overruling the board about whose turn it is', () => {
-  // The lock has to have a way out. The board is told an address at connect
-  // time and the wallet chooses tx-sender when it signs, so a player who
-  // switched accounts holds a side the board does not know about. Without an
-  // override that player cannot move at all, and the contract would have
-  // accepted every one of their moves.
+describe('a board locked against the wrong account', () => {
+  // ALICE is White. Three moves in it is Black's turn, so every square on this
+  // board is a move ALICE cannot make: replay would store it, charge her, and
+  // skip it.
+  //
+  // There used to be a "Let me try anyway" panel here, on the reasoning that
+  // the board cannot know which account the wallet will sign with and must
+  // never trap a player. It is gone. The trap it guarded against has a cheaper
+  // exit - reconnect with the account you meant - and the button it offered
+  // instead spent real money on a submission the board had, in the sentence
+  // directly above it, just finished calling doomed.
+  //
+  // These tests exist to keep it gone.
   async function locked(): Promise<ChessApp> {
     const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
     chain.as(ALICE);
@@ -473,39 +480,56 @@ describe('overruling the board about whose turn it is', () => {
     return app;
   }
 
-  it('is offered whenever the board locks the squares', async () => {
+  it('says whose turn it is, which account is connected, and what to do', async () => {
+    // A locked board with no explanation IS the trap the override guarded
+    // against. What replaces the button is the sentence: the fix has to be on
+    // screen, or the lock is just a dead board.
     const app = await locked();
-    const node = dom.window.document.getElementById('override')!;
-    expect(node.classList.contains('hide'), 'locked with no way out').toBe(false);
-    expect(node.textContent).toContain('black to move');
+    const said = dom.window.document.getElementById('move-hint')!.textContent ?? '';
+
+    expect(said, 'does not say whose turn it is').toContain('black to move');
+    expect(said, 'does not name the connected account').toContain(ALICE);
+    expect(said, 'does not say how to fix it').toContain('reconnect');
     app.stopPolling();
   });
 
-  it('unlocks the board when taken', async () => {
+  it('offers nothing that would spend money on the doomed move', async () => {
     const app = await locked();
-    expect(square('d7').disabled).toBe(true);
+    const doc = dom.window.document;
 
-    (dom.window.document.getElementById('override-yes') as HTMLButtonElement).click();
-    await tick(30);
-
-    expect(square('d7').disabled, 'the override did not unlock the board').toBe(false);
+    expect(square('d7').disabled, 'a black piece was clickable').toBe(true);
+    expect(doc.getElementById('override'), 'the override panel came back').toBe(null);
+    expect(doc.getElementById('override-yes'), 'the override button came back').toBe(null);
+    expect(
+      doc.getElementById('send-anyway')!.classList.contains('hide'),
+      'send-anyway offered on a proven-doomed board'
+    ).toBe(true);
     app.stopPolling();
   });
 
-  it('then warns once more before spending anything', async () => {
-    // Overruling the lock is not the same as waiving the warning. The player
-    // gets the sentence and one more click, and only then a wallet.
+  it('cannot be talked past by anything left on the page', async () => {
+    // The panel was deleted rather than hidden, and the difference matters: a
+    // hidden control that still works is not hidden. Nothing on this page - no
+    // stale node, no leftover handler - can put a black piece back in reach.
     const app = await locked();
-    (dom.window.document.getElementById('override-yes') as HTMLButtonElement).click();
-    await tick(30);
-    square('d7').click();
-    await tick();
-    square('d5').click();
+    const doc = dom.window.document;
+
+    let clicked = 0;
+    for (const button of Array.from(doc.querySelectorAll('button'))) {
+      const id = button.id;
+      // Not these two: one navigates away from the game entirely and the other
+      // turns the board round, and neither claims to unlock anything.
+      if (id === 'load-game' || id === 'flip') continue;
+      button.click();
+      clicked++;
+    }
     await tick(40);
 
-    const ask = dom.window.document.getElementById('send-anyway')!;
-    expect(ask.classList.contains('hide'), 'no confirmation before paying').toBe(false);
-    expect(ask.textContent).toContain('Send it anyway?');
+    // Or the loop above proves nothing. A selector that stops matching is how a
+    // test like this quietly becomes a pass with no work in it.
+    expect(clicked, 'nothing was clicked').toBeGreaterThan(10);
+
+    expect(square('d7').disabled, `a button unlocked the board`).toBe(true);
     app.stopPolling();
   });
 });
