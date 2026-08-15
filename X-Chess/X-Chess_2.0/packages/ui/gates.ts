@@ -407,7 +407,7 @@ export interface Progress {
   complete: boolean;
 }
 
-export function progress(states: StepStates, steps: StepDef[] = STEPS): Progress {
+export function progress(states: StepStates, steps: readonly StepDef[] = STEPS): Progress {
   const done = steps.filter((s) => states[s.id] === 'ok').length;
   const failed = steps.filter((s) => states[s.id] === 'failed').length;
   return {

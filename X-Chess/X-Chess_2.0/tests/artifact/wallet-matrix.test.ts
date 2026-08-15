@@ -18,7 +18,8 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { WALLET_STEPS } from '../../packages/ui/gates.js';
+import { WALLET_STEPS, progress } from '../../packages/ui/gates.js';
+import type { StepStates } from '../../packages/ui/gates.js';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const read = (path: string): string => readFileSync(resolve(ROOT, path), 'utf8');
@@ -147,6 +148,45 @@ describe('the matrix file itself', () => {
     const gates = read('dist/xchess-gates.html');
     expect(gates, 'the gates page cannot sign a row against this build').toContain(
       manifest.htmlSha256
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The page counts the track it is running.
+//
+// Found by opening `?track=wallet` for the first time: a twelve-step track
+// reported "0 of 26 verified" and named a step that was not on the page.
+// `progress` defaults its step list to the full launch sequence and the caller
+// omitted the argument, so BOTH short tracks had it - `?track=inscribe` has
+// been wrong since the day it was added.
+//
+// Worse than a wrong number: `complete` is `done === steps.length`, so "every
+// gate is closed" was unreachable on any track but the long one, and a runner
+// that cannot say it has finished is a runner nobody finishes.
+// ---------------------------------------------------------------------------
+
+describe('a track that is not the launch sequence', () => {
+  it('counts its own steps', () => {
+    const states: StepStates = {};
+    for (const step of WALLET_STEPS) states[step.id] = 'ok';
+    const p = progress(states, WALLET_STEPS);
+    expect(p.total, 'the summary counted a different list of steps').toBe(WALLET_STEPS.length);
+    expect(p.done).toBe(WALLET_STEPS.length);
+  });
+
+  it('can reach the end, which is the part that was unreachable', () => {
+    const states: StepStates = {};
+    for (const step of WALLET_STEPS) states[step.id] = 'ok';
+    expect(progress(states, WALLET_STEPS).complete, 'the track can never report finished').toBe(
+      true
+    );
+  });
+
+  it('is asked for the track, rather than defaulting to the long one', () => {
+    const canary = read('packages/ui/canary.ts');
+    expect(canary, 'the summary is computed against the default step list again').toContain(
+      'progress(this.states, this.steps)'
     );
   });
 });

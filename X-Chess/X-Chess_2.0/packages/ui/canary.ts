@@ -539,7 +539,15 @@ export class Canary {
       this.root.appendChild(card);
     }
 
-    const p = progress(this.states);
+    // AGAINST THE TRACK BEING RUN, not against the default list.
+    //
+    // `progress` defaults its steps to the full twenty-six-step launch
+    // sequence, and this omitted the argument - so a short track reported "0 of
+    // 26" and named a step that was not on the page. Worse than a wrong number:
+    // `complete` is `done === steps.length`, so "every gate is closed" was
+    // unreachable on any track but the long one, and the runner could never say
+    // it had finished.
+    const p = progress(this.states, this.steps);
     this.doc.getElementById('progress')!.textContent =
       `${p.done} of ${p.total} verified` +
       (p.failed ? `, ${p.failed} failed` : '') +
