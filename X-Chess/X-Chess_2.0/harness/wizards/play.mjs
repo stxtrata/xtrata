@@ -164,7 +164,7 @@ const hiroHeaders = (extra = {}) =>
     ? { ...extra, 'x-hiro-api-key': HIRO_KEYS[0], 'x-api-key': HIRO_KEYS[0] }
     : { ...extra };
 
-const api = async (path) => {
+export const api = async (path) => {
   const response = await fetch(`${API}${path}`, { headers: hiroHeaders() });
   if (!response.ok) {
     const error = new Error(

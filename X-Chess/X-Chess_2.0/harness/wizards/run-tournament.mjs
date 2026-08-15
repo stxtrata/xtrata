@@ -46,6 +46,7 @@ import {
   standingsFrom
 } from './tournament.mjs';
 import {
+  api,
   balanceOf,
   loadProtocol,
   nextNonce,
@@ -90,14 +91,27 @@ function env() {
  * An agent with no wallet is still listed, so a dry run can show the whole
  * schedule to somebody who has not generated a fleet yet.
  */
-function readField(vars = env()) {
+function readField(vars = env(), borrow = {}) {
   const agents = PERSONALITIES.map((character) => {
-    const key = vars[keyEnvName(character.id)] ?? null;
-    const address = vars[addressEnvName(character.id)] ?? null;
+    // A character may be given a wallet that belongs to somebody else for a
+    // one-off game. That is a TEST arrangement and not how a tournament runs:
+    // in one the character owns its wallet and the name bought with it. It
+    // exists so the first end-to-end run can use wallets that already hold
+    // money, rather than making six new ones the answer to "does this work at
+    // all".
+    const from = borrow[character.id] ?? character.id;
+    const key = vars[keyEnvName(from)] ?? null;
+    const address = vars[addressEnvName(from)] ?? null;
     if (address && !looksLikeMainnetAddress(address)) {
-      throw new WizardSafetyError(`${addressEnvName(character.id)} is not a mainnet address`);
+      throw new WizardSafetyError(`${addressEnvName(from)} is not a mainnet address`);
     }
-    return { ...character, key, address, ready: Boolean(key && address) };
+    return {
+      ...character,
+      key,
+      address,
+      borrowedFrom: from === character.id ? null : from,
+      ready: Boolean(key && address)
+    };
   });
   return { agents, ready: agents.every((a) => a.ready) };
 }
@@ -180,23 +194,90 @@ async function playGame({ gameId, white, black, replay, ask, budget }) {
 }
 
 async function readEntries(gameId) {
+  // `get-page`, which is what the contract actually has. This asked for
+  // `get-entries` for its whole first draft - a function that does not exist -
+  // and would have failed on the first move of the first live game. The board
+  // reads the same function; there is only one way to page this log.
   const out = [];
   for (let start = 0; ; start += 50) {
     const page = (
-      await readOnly('get-entries', [Cl.serialize(Cl.uint(gameId)), Cl.serialize(Cl.uint(start))])
-    ).value;
-    const rows = (page?.list ?? []).filter((row) => row?.value);
+      await readOnly('get-page', [Cl.serialize(Cl.uint(gameId)), Cl.serialize(Cl.uint(start))])
+    ).list;
+    const rows = (page ?? []).filter((row) => row?.value);
     for (const row of rows) {
       const entry = row.value;
       out.push({
-        mv: entry.value?.value ?? entry.value,
+        mv: entry.value?.value,
         sender: entry.sender?.value,
+        height: Number(entry.height?.value ?? 0),
         seq: out.length
       });
     }
     if (rows.length < 50) break;
   }
   return out;
+}
+
+/**
+ * One game, two characters, end to end.
+ *
+ * The thing you run before thirty of them. It proves the parts that only a real
+ * game can: that a model handed the board's legal moves answers with one of
+ * them, that the answer signs and lands, and that replay makes the same game of
+ * it afterwards.
+ *
+ *   node harness/wizards/run-tournament.mjs game --white gambit --black ledger \
+ *     --white-wallet wizard-1 --black-wallet wizard-2 --live
+ */
+async function oneGame({ openFee }) {
+  const white = personalityNamed(arg('white', 'gambit')).id;
+  const black = personalityNamed(arg('black', 'ledger')).id;
+  if (white === black) {
+    throw new WizardSafetyError('a character cannot play itself; --white and --black must differ.');
+  }
+
+  const borrow = {};
+  if (arg('white-wallet')) borrow[white] = arg('white-wallet');
+  if (arg('black-wallet')) borrow[black] = arg('black-wallet');
+
+  const agents = byId(readField(env(), borrow).agents);
+  const w = agents[white];
+  const b = agents[black];
+
+  console.log(`one game: ${w.name} (white) v ${b.name} (black)`);
+  for (const agent of [w, b]) {
+    const where = agent.borrowedFrom ? `  [wallet borrowed from ${agent.borrowedFrom}]` : '';
+    console.log(`  ${agent.name.padEnd(9)} ${agent.address ?? 'NO WALLET'}${where}`);
+  }
+  const cost = openFee + MINER_FEE_USTX * 46n;
+  console.log(`  costs about ${ustx(cost)} for a 45 move game\n`);
+
+  if (!LIVE) {
+    console.log('Dry run. Nothing was signed and nothing was sent. Add --live to play it.');
+    if (!w.ready || !b.ready) {
+      console.log('\nBoth characters need a wallet before --live. Either generate one each, or');
+      console.log('lend them existing ones with --white-wallet and --black-wallet.');
+    }
+    return;
+  }
+  if (!w.ready || !b.ready) {
+    throw new WizardSafetyError(
+      `no wallet for ${[w, b].filter((a) => !a.ready).map((a) => a.id).join(' and ')}.`
+    );
+  }
+
+  const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
+  const ask = anthropicAsker({ apiKey });
+  const { replay } = await loadReplay();
+  const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
+
+  const gameId = arg('game')
+    ? Number(arg('game'))
+    : await openGame({ white: w, black: b, openFee, budget });
+  console.log(`game ${gameId}\n`);
+
+  const result = await playGame({ gameId, white: w, black: b, replay, ask, budget });
+  console.log(`\nresult ${result ?? 'unfinished'}, spent ${ustx(budget.spent)}\n`);
 }
 
 async function main() {
@@ -229,6 +310,11 @@ async function main() {
     `schedule  ${plan.plannedRounds} rounds, ${plan.plannedGames} games, ` +
       `${ustx(plan.chainUstx)} of chess\n`
   );
+
+  if (command === 'game') {
+    await oneGame({ openFee });
+    return;
+  }
 
   if (command === 'standings') {
     const games = await readGames();
@@ -310,8 +396,30 @@ async function openGame({ white, black, openFee, budget }) {
   budget.spent = sent.spentAfterUstx;
   const status = await settle(sent.txid);
   if (status !== 'success') throw new WizardSafetyError(`opening failed: ${status}`);
-  const count = Number((await readOnly('get-game-count')).value);
-  return count;
+
+  // FROM THE TRANSACTION, not from `get-game-count`.
+  //
+  // `open-game` returns the id it consumed, and asking the contract how many
+  // games exist afterwards answers a different question. It is the same answer
+  // when one game opens at a time, and the wrong one the moment three do - the
+  // three opens of a round would all read the same count and two of them would
+  // then play into a stranger's game. There is no version of that which fails
+  // loudly.
+  const id = await gameIdFrom(sent.txid);
+  if (id === null) {
+    throw new WizardSafetyError(
+      `opened in ${sent.txid} but its result did not name a game id. Nothing is lost - the game ` +
+        'exists - but this run cannot tell which one it is. Find it and pass --game.'
+    );
+  }
+  return id;
+}
+
+/** The id `open-game` returned, read out of its own transaction result. */
+async function gameIdFrom(txid) {
+  const body = await api(`/extended/v1/tx/0x${String(txid).replace(/^0x/, '')}`);
+  const match = /\(ok u(\d+)\)/.exec(body?.tx_result?.repr ?? '');
+  return match ? Number(match[1]) : null;
 }
 
 async function tournamentRules(white, black) {
