@@ -262,6 +262,29 @@ const providerNames = (): string => {
  * decides.
  */
 
+/**
+ * Connect, but bounded — a diagnostic must not hold the page for three minutes.
+ *
+ * `connectWallet` budgets CONNECT_MS across the providers, which is right for a
+ * BOARD: a dialog is read by a person and a person is slow. It is wrong here.
+ * These rows run one at a time, and a row that sits for three minutes blocks
+ * every row behind it — which is exactly what happened on the first real run,
+ * with row 11 holding the page and four rows refusing to start behind it.
+ *
+ * The cause underneath is familiar: asked to connect while it is ALREADY
+ * connected, Xverse settles nothing at all. The board survives that because it
+ * moves on when a provider says nothing; a diagnostic just has to stop asking.
+ *
+ * The policy itself is untouched — `connectWallet` is the board's, and only the
+ * patience is overridden, through the injection point it already has.
+ */
+async function connectBriefly(ms: number): Promise<{ address: string }> {
+  return connectWallet({
+    call: (method, params, options) =>
+      walletCall(method, params, { ...options, timeoutMs: Math.min(options?.timeoutMs ?? ms, ms) })
+  });
+}
+
 const walletHandlers: Record<string, StepHandler> = {
   'w-survey': async () => {
     const found = collectProviders();
@@ -338,7 +361,7 @@ const walletHandlers: Record<string, StepHandler> = {
     }
     const started = Date.now();
     try {
-      await connectWallet();
+      await connectBriefly(8_000);
       mark(10, 'none', 'fail');
       return no('row 10 FAILED: it returned an address with no wallet installed.');
     } catch (error) {
@@ -364,13 +387,23 @@ ${said}`, { row: 10 })
     }
     const started = Date.now();
     try {
-      const session = await connectWallet();
+      const session = await connectBriefly(45_000);
       const took = Math.round((Date.now() - started) / 100) / 10;
       mark(11, providerNames(), 'pass');
+      // SAID RATHER THAN HIDDEN. An unlocked wallet answers instantly, and this
+      // row cannot tell that from a locked one unlocked in no time - so it
+      // reports what it saw and lets the operator judge whether the thing it is
+      // meant to prove actually happened.
       return ok(
-        `row 11: pass - waited ${took}s through the unlock and connected.
-${session.address}`,
-        { row: 11 }
+        `row 11: pass - connected in ${took}s.
+${session.address}
+
+` +
+          (took < 2
+            ? 'THAT WAS INSTANT. If you did not have to unlock anything, this row was not ' +
+              'exercised: lock the wallet, press Redo, and watch for the unlock screen.'
+            : 'It waited through the unlock rather than reporting no wallet, which is the row.'),
+        { row: 11, seconds: took }
       );
     } catch (error) {
       const said = String((error as Error).message || '');
@@ -469,7 +502,7 @@ If this says there is no wallet, the board mistook a LOCKED ` +
     // anything refuses.
     let address: string;
     try {
-      address = (await connectWallet()).address;
+      address = (await connectBriefly(45_000)).address;
     } catch (error) {
       mark(13, providerNames(), 'fail');
       return no(`row 13: could not connect at all: ${(error as Error).message}`);

@@ -260,3 +260,62 @@ describe('hiding the providers, and putting them back', () => {
     expect(late).toMatch(/for \(const \[key, value\] of hidden\)/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// A diagnostic must not hold the page.
+//
+// The steps run one at a time - two wallet dialogs at once is chaos, and two
+// signings close together take the same nonce. That is correct. What is not
+// correct is a step that runs for three minutes behind that guard.
+//
+// `connectWallet` budgets CONNECT_MS across the providers, which is right for a
+// BOARD: a dialog is read by a person. On the first real run it meant row 11
+// held the page while four rows behind it refused to start, because Xverse
+// settles nothing at all when asked to connect while already connected.
+// ---------------------------------------------------------------------------
+
+describe('how long a row may take', () => {
+  const canary = read('apps/canary/main.ts');
+
+  it('overrides the patience without touching the policy', () => {
+    // The board's own connectWallet, through the injection point it already
+    // has. A second copy of the connect logic here would prove things about the
+    // copy, which is the failure this whole runner is built to avoid.
+    expect(canary, 'the bounded connect is gone').toContain('async function connectBriefly');
+    expect(canary, 'it no longer goes through the board’s connect').toMatch(
+      /connectBriefly[\s\S]{0,400}return connectWallet\(/
+    );
+  });
+
+  it('bounds every row that opens a wallet', () => {
+    // Sliced from one handler to the NEXT HANDLER, found by its declaration
+    // rather than by indentation - a quoted string at the start of a line looks
+    // exactly like the start of a handler, which is how the first version of
+    // this test cut row 11 in half and failed on its own arithmetic.
+    const at = (id: string): number => canary.indexOf(`'${id}': async`);
+    const bounds: [string, string, string][] = [
+      ['10', 'w-no-wallet', 'w-locked'],
+      ['11', 'w-locked', 'w-late'],
+      ['13', 'w-network', 'w-open']
+    ];
+    for (const [row, id, next] of bounds) {
+      const from = at(id);
+      const to = at(next);
+      expect(from, `${id} is not a handler`).toBeGreaterThan(-1);
+      expect(to, `${next} is not a handler, so ${id} cannot be bounded`).toBeGreaterThan(from);
+      expect(
+        canary.slice(from, to),
+        `row ${row} can still hold the page for the board's full budget`
+      ).toContain('connectBriefly(');
+    }
+  });
+
+  it('says when a row passed without being exercised', () => {
+    // An unlocked wallet answers instantly, and row 11 cannot tell that from a
+    // locked one unlocked in no time. Reporting the elapsed time is the honest
+    // way out: a pass that proves nothing should say so.
+    expect(canary, 'an instant row 11 pass is silent about being meaningless').toContain(
+      'THAT WAS INSTANT'
+    );
+  });
+});
