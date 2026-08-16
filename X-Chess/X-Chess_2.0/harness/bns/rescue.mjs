@@ -40,6 +40,9 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import { mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english.js';
 import { HDKey } from '@scure/bip32';
+import { ripemd160 } from '@noble/hashes/ripemd160';
+import { sha256 } from '@noble/hashes/sha256';
+import { bech32 } from '@scure/base';
 import {
   Cl,
   privateKeyToAddress,
@@ -209,6 +212,37 @@ export const DERIVATION_PATHS = Object.freeze([
 ]);
 
 /**
+ * The Bitcoin account paired with a Stacks one, in Leather.
+ *
+ * THE TWO CHAINS DO NOT SHARE A PATH SHAPE, and that is the whole trap. For the
+ * SAME "Account N" on the same screen, Leather derives:
+ *
+ *   Stacks    m/44'/5757'/0'/0/N     index last
+ *   Bitcoin   m/84'/0'/N'/0/0        account hardened
+ *
+ * So reusing the Stacks shape for Bitcoin gives a valid, funded-looking,
+ * completely wrong address from account 2 onwards - and account 1 matches under
+ * both, which is exactly enough to make it look verified.
+ *
+ * Verified against a real wallet: five accounts, five matching bech32 addresses,
+ * including the two that only this shape produces.
+ */
+export const BTC_PATH = (n) => `m/84'/0'/${n}'/0/0`;
+
+/**
+ * A P2WPKH address: hash160 of the public key, bech32 with witness version 0.
+ *
+ * Native segwit because that is what Leather shows and what the screenshot
+ * carried. A taproot or a legacy address from the same key is a DIFFERENT
+ * address holding different money, so this deliberately produces one shape
+ * rather than guessing between them.
+ */
+export function btcAddress(publicKey) {
+  const hash = ripemd160(sha256(publicKey));
+  return bech32.encode('bc', [0, ...bech32.toWords(hash)]);
+}
+
+/**
  * Every address this seed can reach, up to `depth` on each convention.
  *
  * Returns addresses paired with their keys. The caller matches against the
@@ -230,12 +264,22 @@ export function deriveAccounts(phrase, depth = 100) {
       // First convention wins on a tie, which is why Leather's is first: index 0
       // is the same address on both, and it should be reported as "Account 1".
       if (!found.has(address)) {
+        // The paired Bitcoin address, for the Leather convention only. The
+        // hardened-Stacks convention is a different wallet layout and pairing it
+        // with a BIP84 account number would be an invention rather than a fact.
+        let btc = null;
+        if (convention.name === 'leather') {
+          const bitcoin = root.derive(BTC_PATH(n));
+          if (bitcoin.publicKey) btc = btcAddress(bitcoin.publicKey);
+        }
         found.set(address, {
           address,
           key,
           path: at,
           convention: convention.name,
-          account: convention.accountLabel(n)
+          account: convention.accountLabel(n),
+          btc,
+          btcPath: btc ? BTC_PATH(n) : null
         });
       }
     }

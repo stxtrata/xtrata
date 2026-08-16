@@ -11,6 +11,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { HDKey } from '@scure/bip32';
+import { mnemonicToSeedSync } from '@scure/bip39';
 import {
   ALLOWED_CONTRACT,
   ALLOWED_FUNCTION,
@@ -24,6 +26,8 @@ import {
   assertRescueAllowed,
   deriveAccounts,
   deriveAllAccounts,
+  BTC_PATH,
+  btcAddress,
   parseSeedFile,
   looksLikeMainnetAddress,
   scrub
@@ -192,6 +196,40 @@ describe('finding the wallets at all', () => {
     // nothing, and the report would read "you own nothing here" - which is
     // indistinguishable from having the wrong seed and far more alarming.
     expect(() => deriveAccounts('abandon '.repeat(11) + 'abandon', 2)).toThrow(/checksum/);
+  });
+});
+
+describe('the Bitcoin address paired with each Stacks one', () => {
+  it('uses a DIFFERENT path shape from Stacks at the same account number', () => {
+    // The whole trap. For the same "Account N" on the same screen Leather
+    // derives Stacks at m/44'/5757'/0'/0/N - index last - and Bitcoin at
+    // m/84'/0'/N'/0/0 - account hardened. Reusing the Stacks shape gives a
+    // valid, completely wrong address from account 2 onwards, and account 1
+    // matches under BOTH shapes, which is exactly enough to look verified.
+    expect(BTC_PATH(0)).toBe("m/84'/0'/0'/0/0");
+    expect(BTC_PATH(1)).toBe("m/84'/0'/1'/0/0");
+    expect(BTC_PATH(1), 'Bitcoin is using the Stacks shape').not.toBe("m/84'/0'/0'/0/1");
+  });
+
+  it('produces a real P2WPKH address for a known key', () => {
+    // A BIP84 test vector: the standard phrase at m/84'/0'/0'/0/0.
+    const root = HDKey.fromMasterSeed(mnemonicToSeedSync(PHRASE));
+    const node = root.derive(BTC_PATH(0));
+    expect(btcAddress(node.publicKey!)).toBe('bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu');
+  });
+
+  it('pairs a Bitcoin address with every Leather account, and none with the others', () => {
+    // The hardened-Stacks convention is a different wallet layout, so pairing it
+    // with a BIP84 account number would be an invention rather than a fact.
+    const accounts = [...deriveAccounts(PHRASE, 4).values()];
+    for (const account of accounts) {
+      if (account.convention === 'leather') {
+        expect(account.btc, `${account.account} has no BTC address`).toMatch(/^bc1q[0-9a-z]{38}$/);
+        expect(account.btcPath).toBe(BTC_PATH(Number(account.account.split(' ')[1]) - 1));
+      } else {
+        expect(account.btc, 'a hardened account invented a BTC pairing').toBeNull();
+      }
+    }
   });
 });
 

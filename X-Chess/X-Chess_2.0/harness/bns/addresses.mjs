@@ -12,6 +12,7 @@
 //   node harness/bns/addresses.mjs                 grouped, with seed and path
 //   node harness/bns/addresses.mjs --depth 100     how many accounts per seed
 //   node harness/bns/addresses.mjs --plain         bare list, for pasting
+//   node harness/bns/addresses.mjs --plain --btc   the paired Bitcoin addresses
 //   node harness/bns/addresses.mjs --seed old-hiro just one of them
 //   node harness/bns/addresses.mjs --canary        write a pre-loaded inventory page
 //
@@ -35,6 +36,8 @@ const arg = (name, fallback = null) => {
 };
 const PLAIN = process.argv.includes('--plain');
 const CANARY = process.argv.includes('--canary');
+/** Print the paired Bitcoin addresses instead of the Stacks ones. */
+const BTC = process.argv.includes('--btc');
 
 /**
  * The page, with the addresses already in it.
@@ -204,7 +207,14 @@ async function main() {
   if (PLAIN) {
     // Deduplicated across seeds, because that is what the inventory page wants:
     // a wallet reached by two seeds is still one wallet.
-    for (const address of deriveAllAccounts(seeds, depth).keys()) console.log(address);
+    const accounts = deriveAllAccounts(seeds, depth);
+    if (BTC) {
+      // Only the Leather convention pairs with a Bitcoin account, so the others
+      // print nothing rather than a made-up address.
+      for (const account of accounts.values()) if (account.btc) console.log(account.btc);
+      return;
+    }
+    for (const address of accounts.keys()) console.log(address);
     return;
   }
 
@@ -225,7 +235,8 @@ async function main() {
       // The account label first, because that is the column you check against
       // your wallet's own account list.
       console.log(
-        `${account.account.padEnd(14)}\t${account.address}\t${account.path}\t${seed.label}`
+        `${account.account.padEnd(14)}\t${account.address}\t` +
+          `${(account.btc ?? '—').padEnd(44)}\t${account.path}\t${seed.label}`
       );
     }
     console.error('');
