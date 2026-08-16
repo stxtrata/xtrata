@@ -37,6 +37,7 @@ import {
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
 import { annotateMoves, anthropicAsker, chooseMove, claudeCodeAsker } from './chooser.mjs';
+import { adjudicate, adjudicationReason } from './adjudicate.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -256,6 +257,11 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
       return null;
     }
 
+    // ADJUDICATION IS NOT WIRED IN, DELIBERATELY. See adjudicate.mjs: the
+    // sustained-lead rule was written, replayed against the games that
+    // motivated it, and got game 18 backwards — it would have called 1-0 to
+    // White at move 55, and White was losing by move 68. Left unconnected until
+    // the rule is one the evidence supports.
     const mover = state.turn === 'white' ? white : black;
 
     // WHAT EACH MOVE COSTS, worked out here rather than in the model's head.
@@ -346,21 +352,21 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
  * IS a `submit`, which the fleet could already call, on the one contract it
  * could already call. The safety boundary does not widen here.
  */
-async function resign({ gameId, mover, rules, budget }) {
+async function resign({ gameId, mover, rules, budget, why = 'no legal move in 3 attempts' }) {
   if (!RESIGN_ON_FORFEIT) {
     throw new WizardSafetyError(
-      `game ${gameId}: ${mover.name} has no legal move and --no-resign is set. ` +
-        'The game is left open and it is still their turn.'
+      `game ${gameId}: ${mover.name} would resign (${why}) and --no-resign is set. ` +
+        'The game is left open.'
     );
   }
   if (rules.eventsProtocol !== 'events-v1') {
     throw new WizardSafetyError(
-      `game ${gameId}: ${mover.name} cannot play, and this game did not agree to ` +
-        'resignations — `resgn` would be stored, charged, and skipped. Left open.'
+      `game ${gameId}: ${mover.name} would resign (${why}), and this game did not agree ` +
+        'to resignations — `resgn` would be stored, charged, and skipped. Left open.'
     );
   }
 
-  console.log(`  game ${gameId}: ${mover.name} resigns — no legal move in 3 attempts`);
+  console.log(`  game ${gameId}: ${mover.name} resigns — ${why}`);
   const sent = await send({
     wizard: mover,
     functionName: 'submit',
