@@ -495,6 +495,25 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE).toContain('>not read</td>');
   });
 
+  it('says which seed reached each address, using the labels from the file', () => {
+    // The labels are the user's own, from before the colon on each line of
+    // .seed. Without them a multi-seed table cannot answer the one question
+    // worth asking of it: which key do I need to move this.
+    expect(PAGE).toContain("id=\"address-sources\"");
+    expect(PAGE).toContain('function sourceCell(');
+    expect(PAGE, 'the column is shown even with one seed and no labels').toContain(
+      'HAS_SOURCES ?'
+    );
+  });
+
+  it('marks an address no seed reaches, rather than leaving it blank', () => {
+    // That column doubles as "can the rescue touch this wallet at all". Six of
+    // these hold names, including jim.btc and audionals.btc, and a blank cell
+    // would read as a formatting gap rather than as the answer.
+    expect(PAGE).toContain('not derived');
+    expect(PAGE).toMatch(/only the.*owner can sign/s);
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.

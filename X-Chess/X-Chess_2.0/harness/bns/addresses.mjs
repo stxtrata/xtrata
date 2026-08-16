@@ -84,7 +84,7 @@ function hiroKey() {
 const attr = (value) =>
   String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-function writeCanary(addresses, btcPairs = {}) {
+function writeCanary(addresses, btcPairs = {}, sources = {}) {
   const template = new URL('./inventory.html', import.meta.url);
   const out = new URL('./inventory-loaded.html', import.meta.url);
   const html = readFileSync(template, 'utf8');
@@ -122,6 +122,15 @@ function writeCanary(addresses, btcPairs = {}) {
       /(<script type="application\/json" id="btc-pairs">)[\s\S]*?(<\/script>)/,
       (all, head, tail) =>
         `${head}${JSON.stringify(btcPairs).replace(/</g, '\\u003c')}${tail}`
+    );
+  }
+
+  // Which seed reached which address, by your own labels from the seed file.
+  if (Object.keys(sources).length) {
+    page = page.replace(
+      /(<script type="application\/json" id="address-sources">)[\s\S]*?(<\/script>)/,
+      (all, head, tail) =>
+        `${head}${JSON.stringify(sources).replace(/</g, '\\u003c')}${tail}`
     );
   }
 
@@ -197,12 +206,14 @@ async function main() {
     // convention does not, so it contributes nothing here rather than a guess.
     const accounts = deriveAllAccounts(seeds, depth);
     const btcPairs = {};
+    const sources = {};
     for (const account of accounts.values()) {
       if (account.btc) btcPairs[account.address] = account.btc;
+      sources[account.address] = { seed: account.seed, account: account.account };
     }
 
     const all = [...new Set([...derived, ...owners])];
-    const written = writeCanary(all, btcPairs);
+    const written = writeCanary(all, btcPairs, sources);
     console.error(
       `\nWrote ${written.path}\n` +
         `  ${derived.length} derived from ${seeds.length} seed(s) at depth ${depth}\n` +
@@ -213,7 +224,8 @@ async function main() {
           : '') +
         `  ${owners.filter((o) => !derived.includes(o)).length} of those no seed reaches\n` +
         `  ${all.length} unique addresses in the box\n` +
-        `  ${Object.keys(btcPairs).length} paired Bitcoin addresses (BIP84 m/84'/0'/N'/0/0)\n\n` +
+        `  ${Object.keys(btcPairs).length} paired Bitcoin addresses (BIP84 m/84'/0'/N'/0/0)\n` +
+        `  labelled by seed: ${[...new Set(Object.values(sources).map((s) => s.seed))].join(', ')}\n\n` +
         (written.keyed
           ? '  Hiro API key baked in, so nothing comes back `unread` for want of one\n'
           : '  NO HIRO KEY FOUND — an unkeyed run of this size returns `unread` rows.\n' +

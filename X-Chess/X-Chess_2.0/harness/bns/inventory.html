@@ -93,6 +93,10 @@
   /* Numbers are narrow and fixed; the columns that vary get what is left. */
   th.num, td.num { width: 1%; white-space: nowrap; }
   .more { margin-top: .35rem; }
+  td.src { font-size: .8rem; line-height: 1.3; white-space: nowrap; cursor: help; }
+  /* An address no seed reaches is the one the rescue cannot touch, so it is
+     marked rather than merely left blank. */
+  td.src.none { color: var(--warn); font-style: italic; }
   code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
   .tag {
     display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
@@ -178,6 +182,7 @@
       <div>wallets<b id="t-wallets">0</b></div>
       <div>STX<b id="t-stx">0</b></div>
       <div id="t-headline-wrap"></div>
+      <div id="t-sources"></div>
       <div>BNS names<b id="t-bns">0</b></div>
       <div>other NFTs<b id="t-nft">0</b></div>
       <div>token types<b id="t-ft">0</b></div>
@@ -195,6 +200,10 @@
        bc1 address belongs to which principal, and guessing one would be worse
        than omitting it. -->
   <script type="application/json" id="btc-pairs">{}</script>
+  <!-- Which seed reached each address, also filled by `--canary`. An address
+       that is NOT in here was found some other way - a name owner the seeds
+       cannot derive - and saying so is the point rather than a gap. -->
+  <script type="application/json" id="address-sources">{}</script>
 </main>
 
 <script>
@@ -281,6 +290,24 @@
     try { return JSON.parse($('btc-pairs')?.textContent || '{}'); } catch { return {}; }
   })();
   const HAS_BTC = Object.keys(BTC_PAIRS).length > 0;
+
+  /**
+   * Stacks principal -> { seed, account }, from the labels in the seed file.
+   *
+   * The labels are yours: whatever sits before the colon on each line of
+   * `.seed`. They exist because a multi-seed report without them says "twelve
+   * unreachable", which is a fact nobody can act on, while "unreachable, and the
+   * OG-Hiro seed was not loaded" says what to fetch next.
+   *
+   * AN ADDRESS MISSING FROM THIS MAP IS THE INTERESTING CASE. It got into the
+   * list some other way - a name owner no seed derives - so the column says so
+   * rather than leaving a blank, and that column doubles as "can the rescue
+   * touch this wallet at all".
+   */
+  const SOURCES = (() => {
+    try { return JSON.parse($('address-sources')?.textContent || '{}'); } catch { return {}; }
+  })();
+  const HAS_SOURCES = Object.keys(SOURCES).length > 0;
 
   /**
    * Bitcoin balance, from an Esplora API.
@@ -558,12 +585,35 @@
     );
   }
 
+  /**
+   * Which seed this address came from, or that none did.
+   *
+   * Derived from the injected map rather than stored on the row, so a snapshot
+   * taken before this column existed still fills it in.
+   */
+  function sourceCell(address) {
+    const from = SOURCES[address];
+    if (!from) {
+      return (
+        '<td class="src none" title="No loaded seed derives this address. It is here ' +
+        'because it holds one of your names.\n\nThe rescue cannot move it: only the ' +
+        'owner can sign, and that key is on a seed not in the file.">not derived</td>'
+      );
+    }
+    return (
+      `<td class="src" title="${esc(`${from.seed}\n${from.account}`)}">` +
+      `${esc(from.seed)}<br><span class="who">${esc(from.account)}</span></td>`
+    );
+  }
+
   function render(rows) {
     const wrap = $('results');
     wrap.innerHTML = '';
     const table = document.createElement('table');
     table.innerHTML =
-      '<thead><tr><th>address</th><th class="num">STX</th>' +
+      '<thead><tr><th>address</th>' +
+      (HAS_SOURCES ? '<th>from</th>' : '') +
+      '<th class="num">STX</th>' +
       HEADLINE.map((t) => `<th class="num">${t.label}</th>`).join('') +
       (HAS_BTC ? '<th class="num">BTC (sats)</th>' : '') +
       '<th>BNS names</th><th>other NFTs</th><th>tokens</th></tr></thead>';
@@ -637,6 +687,7 @@
         `<td class="mono addr" title="${esc(row.address)}">${esc(
           `${row.address.slice(0, 6)}…${row.address.slice(-5)}`
         )}</td>` +
+        (HAS_SOURCES ? sourceCell(row.address) : '') +
         `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
         (row.error
           ? `<td colspan="${HEADLINE.length + (HAS_BTC ? 4 : 3)}" class="bad" style="font-size:.82rem">${row.error
@@ -669,6 +720,21 @@
     // A headline token with nothing in it anywhere is not worth a total, but the
     // COLUMN stays: an empty column is an answer, and a missing one is a
     // question about whether it was ever checked.
+    if (HAS_SOURCES) {
+      const bySeed = new Map();
+      let orphans = 0;
+      for (const row of rows) {
+        const from = SOURCES[row.address];
+        if (!from) { orphans++; continue; }
+        bySeed.set(from.seed, (bySeed.get(from.seed) ?? 0) + 1);
+      }
+      $('t-sources').innerHTML =
+        [...bySeed]
+          .map(([seed, n]) => `<div style="margin-right:2rem">${esc(seed)}<b>${n}</b></div>`)
+          .join('') +
+        (orphans ? `<div style="margin-right:2rem">no seed<b class="warn">${orphans}</b></div>` : '');
+      $('t-sources').style.display = 'flex';
+    }
     $('t-headline-wrap').innerHTML = HEADLINE.map((t) => {
       const holders = rows.filter((r) => r.headline?.[t.label]).length;
       return holders
