@@ -319,6 +319,25 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(external, `the page fetches from ${external.join(', ')}`).toHaveLength(0);
   });
 
+  it('retries what failed without re-reading what did not', () => {
+    // A retry that started over would re-fetch four hundred wallets to reach
+    // three, and on a shared rate limit that is how a retry becomes the reason
+    // for the next failure. Rows are replaced in place, so the successes from
+    // the first pass are neither re-fetched nor lost.
+    expect(PAGE).toContain('rows[existing] = row');
+    expect(PAGE).toMatch(/failed\.map\(\(r\) => r\.address\)/);
+  });
+
+  it('retries once automatically, then stops and asks', () => {
+    // `Failed to fetch` is usually transient, so one unprompted retry saves the
+    // common case. Retrying forever would turn a genuinely unreachable address
+    // into an infinite loop that looks like progress.
+    expect(PAGE).toContain('ONE AUTOMATIC SECOND PASS');
+    expect(PAGE, 'no retry control is offered after the automatic pass').toContain(
+      "id=\"retry\""
+    );
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.

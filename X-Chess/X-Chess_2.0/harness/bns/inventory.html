@@ -129,6 +129,7 @@
       <button id="run" class="primary" type="button">Take inventory</button>
       <button id="stop" type="button" disabled>Stop</button>
       <button id="save" type="button" disabled>Save snapshot</button>
+      <button id="retry" type="button" hidden>Retry failed</button>
       <button id="load" type="button">Load snapshot to compare</button>
       <input id="file" type="file" accept="application/json" hidden>
     </div>
@@ -169,6 +170,17 @@
   let stopped = false;
   let current = null;   // the inventory just taken
   let baseline = null;  // a snapshot loaded from disk
+
+  /**
+   * How long to wait before a retry pass, in ms.
+   *
+   * Longer than the in-request backoff on purpose. `Failed to fetch` is the
+   * browser refusing or a connection dying rather than a server saying no, and
+   * that clears on a fresh connection rather than on a fast retry - so the
+   * second pass is a genuinely separate attempt, not another rung of the same
+   * ladder.
+   */
+  const RETRY_PAUSE_MS = 3000;
 
   /* --------------------------------------------------------------- */
 
@@ -390,27 +402,92 @@
 
   /* --------------------------------------------------------------- */
 
-  $('run').addEventListener('click', async () => {
-    const text = $('addresses').value;
-    const addresses = [...new Set(text.match(PRINCIPAL) ?? [])];
-    if (!addresses.length) { $('status').textContent = 'No addresses found in that.'; return; }
-
-    stopped = false;
-    $('run').disabled = true; $('stop').disabled = false; $('save').disabled = true;
-    const rows = [];
+  /**
+   * Read a list of addresses into `rows`, replacing any row already there.
+   *
+   * Takes the rows it is updating rather than starting fresh, which is what
+   * makes a retry pass possible: a failed wallet is re-read and its row
+   * REPLACED, so the successes from the first pass are never re-fetched and
+   * never lost.
+   */
+  async function pass(addresses, rows, label) {
     for (let at = 0; at < addresses.length; at++) {
       if (stopped) break;
-      $('status').textContent = `Reading ${at + 1} of ${addresses.length} — ${addresses[at]}`;
-      $('progress').style.width = `${((at) / addresses.length) * 100}%`;
-      rows.push(await inventory(addresses[at]));
+      $('status').textContent = `${label} ${at + 1} of ${addresses.length} — ${addresses[at]}`;
+      $('progress').style.width = `${(at / addresses.length) * 100}%`;
+      const row = await inventory(addresses[at]);
+      const existing = rows.findIndex((r) => r.address === row.address);
+      if (existing === -1) rows.push(row);
+      else rows[existing] = row;
       render(rows);
     }
     $('progress').style.width = '100%';
+    return rows;
+  }
+
+  /** Enable or hide the retry button according to what actually failed. */
+  function offerRetry(rows) {
+    const failed = rows.filter((r) => r.error);
+    $('retry').hidden = failed.length === 0;
+    $('retry').textContent = `Retry ${failed.length} failed`;
+    return failed;
+  }
+
+  function busy(on) {
+    $('run').disabled = on;
+    $('retry').disabled = on;
+    $('stop').disabled = !on;
+    $('save').disabled = on || !current;
+  }
+
+  $('run').addEventListener('click', async () => {
+    const addresses = [...new Set($('addresses').value.match(PRINCIPAL) ?? [])];
+    if (!addresses.length) { $('status').textContent = 'No addresses found in that.'; return; }
+
+    stopped = false;
+    busy(true);
+    const rows = await pass(addresses, [], 'Reading');
+
+    // ONE AUTOMATIC SECOND PASS, then it is offered rather than repeated.
+    //
+    // A `Failed to fetch` is usually transient and clears on a fresh
+    // connection, so retrying once without being asked saves the common case.
+    // Retrying forever would turn a genuinely unreachable address into an
+    // infinite loop that looks like progress, which is why it stops at one and
+    // hands the decision back.
+    const failed = rows.filter((r) => r.error);
+    if (failed.length && !stopped) {
+      $('status').textContent =
+        `${failed.length} failed. Waiting ${RETRY_PAUSE_MS / 1000}s, then trying those again…`;
+      await new Promise((done) => setTimeout(done, RETRY_PAUSE_MS));
+      if (!stopped) await pass(failed.map((r) => r.address), rows, 'Retrying');
+    }
+
     current = { takenAt: new Date().toISOString(), rows };
+    const left = offerRetry(rows);
     $('status').textContent = stopped
-      ? `Stopped after ${rows.length} of ${addresses.length}.`
-      : `Done. ${rows.length} wallet(s).`;
-    $('run').disabled = false; $('stop').disabled = true; $('save').disabled = false;
+      ? `Stopped. ${rows.length} of ${addresses.length} read.`
+      : left.length
+        ? `Done, but ${left.length} wallet(s) still unread. Retry them, or run again later.`
+        : `Done. ${rows.length} wallet(s), all read.`;
+    busy(false);
+    if (baseline) renderDiff(baseline, current);
+  });
+
+  $('retry').addEventListener('click', async () => {
+    if (!current) return;
+    const failed = current.rows.filter((r) => r.error);
+    if (!failed.length) { $('retry').hidden = true; return; }
+
+    stopped = false;
+    busy(true);
+    await pass(failed.map((r) => r.address), current.rows, 'Retrying');
+    current.takenAt = new Date().toISOString();
+    const left = offerRetry(current.rows);
+    $('status').textContent = left.length
+      ? `${left.length} wallet(s) still unread. These may need a different network or a later run.`
+      : 'Done. Every wallet read.';
+    busy(false);
     if (baseline) renderDiff(baseline, current);
   });
 
