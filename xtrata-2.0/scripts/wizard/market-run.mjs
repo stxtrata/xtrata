@@ -749,6 +749,9 @@ function usage() {
   say('  --listing-id <n>         act on this listing (makes any scenario runnable alone)');
   say('  --price-ustx <n>         listing price, in microSTX, scaled per market (default ' + groupDigits(DEFAULT_PRICE_USTX) + ')');
   say('  --relist-price-ustx <n>  price for the relist scenario (default ' + groupDigits(DEFAULT_RELIST_PRICE_USTX) + ')');
+  say('  --real-listing           list-sbtc / list-usdcx list for real instead of proving');
+  say('                           the seller needs none of the payment token. Use once a');
+  say('                           wizard has earned some and can no longer prove zero');
   say('  --fee-budget-ustx <n>    sponsorship deposit, always STX (default ' + groupDigits(MIN_FEE_BUDGET_USTX) + ', the contract minimum)');
   say('  --no-onchain-failure-proof  scenario 8 stops at the free read-only proof');
   say('  --sponsor-api <url>      relayer base (default ' + DEFAULT_SPONSOR_BASE + ')');
