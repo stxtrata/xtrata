@@ -464,16 +464,45 @@ export async function send({
   return { txid: result.txid, spentAfterUstx: allowed.spentAfterUstx };
 }
 
-/** Wait for a transaction to leave the mempool. */
-export async function settle(txid, tries = 40) {
-  for (let n = 0; n < tries; n++) {
-    await new Promise((done) => setTimeout(done, 15_000));
+/**
+ * Wait for a transaction to leave the mempool.
+ *
+ * THE WINDOW WAS TEN MINUTES AND THAT IS NOT LONG ENOUGH. Round 2, game 16:
+ * Ledger's b2g2 was broadcast at 13:24 and mined about twenty-five minutes
+ * later, having been perfectly good the whole time. The wait gave up at ten,
+ * the caller threw, and that game's loop died while 17 and 18 played on. From
+ * the board it looked frozen; the board was right and we were wrong.
+ *
+ * A SLOW CHAIN IS NOT A FAILED MOVE - the same mistake as treating a 429 as a
+ * reason to stop. Our fee is not the problem either: 3,000 uSTX is exactly the
+ * median confirmed contract-call fee, measured the same afternoon. Stacks was
+ * simply slow.
+ *
+ * So the window is generous now. Waiting costs nothing but time, and time is
+ * what a tournament has: the alternative is throwing away a game that was fine.
+ * Progress is printed while it waits, because a silent forty-minute pause is
+ * indistinguishable from a hang and that is how somebody kills a healthy run.
+ */
+const SETTLE_MS = 45 * 60_000;
+const SETTLE_EVERY_MS = 15_000;
+
+export async function settle(txid, { maxMs = SETTLE_MS, everyMs = SETTLE_EVERY_MS } = {}) {
+  const until = Date.now() + maxMs;
+  const started = Date.now();
+  let said = 0;
+  while (Date.now() < until) {
+    await new Promise((done) => setTimeout(done, everyMs));
     try {
       const body = await api(`/extended/v1/tx/0x${txid.replace(/^0x/, '')}`);
       if (body.tx_status === 'success') return 'success';
       if (body.tx_status && body.tx_status !== 'pending') return body.tx_status;
     } catch {
       // Not indexed yet. Asking again is the whole strategy.
+    }
+    const waited = Math.floor((Date.now() - started) / 60_000);
+    if (waited >= 5 && waited > said) {
+      said = waited;
+      console.log(`  (still waiting on ${txid.slice(0, 10)}…, ${waited}m — the chain is slow, not stuck)`);
     }
   }
   return 'timed out';

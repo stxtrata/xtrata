@@ -2138,6 +2138,12 @@ export class ChessApp {
       if (!from || !to) continue;
       const isSigning = signing === `${move.from}${move.to}`;
 
+      // STOPPED SHORT OF THE GHOST, and pointed at it.
+      //
+      // A line that runs to the centre of the destination ends underneath the
+      // piece it is describing, so the two cues fight: the arrow hides the
+      // thing it is pointing at. Backing off by a third of a square leaves the
+      // ghost clear and makes the head readable as a head.
       const line = this.doc.createElementNS(SVG_NS, 'line');
       line.setAttribute('x1', String(from.x));
       line.setAttribute('y1', String(from.y));
@@ -2146,15 +2152,11 @@ export class ChessApp {
       line.setAttribute('class', isSigning ? 'ar--signing' : 'ar--sent');
       // Scaled by the viewBox, so the stroke has to be given in those units.
       line.setAttribute('vector-effect', 'non-scaling-stroke');
+      // The head is a marker defined once in the shell, so this is the whole
+      // cost of drawing one. Its refX sits it back off the destination square,
+      // which keeps it from covering the ghost it is pointing at.
+      line.setAttribute('marker-end', isSigning ? 'url(#ah-signing)' : 'url(#ah-sent)');
       svg.appendChild(line);
-
-      const dot = this.doc.createElementNS(SVG_NS, 'circle');
-      dot.setAttribute('cx', String(from.x));
-      dot.setAttribute('cy', String(from.y));
-      dot.setAttribute('r', '0.09');
-      dot.setAttribute('fill', 'currentColor');
-      dot.setAttribute('class', isSigning ? 'ar--signing' : 'ar--sent');
-      svg.appendChild(dot);
     }
   }
 

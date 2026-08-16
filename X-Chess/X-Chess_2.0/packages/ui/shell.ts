@@ -15,6 +15,30 @@ import { SCALE_CSS } from './pieces.js';
 //   NEVER PUT A RAW DOUBLE QUOTE IN AN ATTRIBUTE. It terminates the attribute
 //   early, truncating text mid-sentence and leaving stray attributes behind.
 
+/**
+ * The two arrowheads a pending move can wear, built once as markup.
+ *
+ * A MARKER, NOT A DRAWN TRIANGLE, for two reasons that are both about cost.
+ * Its `refX` sits the head back off the destination in stroke-width units, so
+ * the drawing code needs no per-arrow trigonometry to keep the head from
+ * covering the ghost it points at - and a marker is immune to
+ * preserveAspectRatio="none" on the overlay, which stretches every coordinate
+ * inside the viewBox and would skew a hand-drawn triangle on any board that is
+ * not exactly square.
+ *
+ * Two of them because a marker cannot be two colours at once, and the colour is
+ * the difference between "being signed" and "sent".
+ *
+ * WRITTEN ON ONE LINE ON PURPOSE. This is a template literal: its newlines,
+ * indentation and any HTML comment inside it are shipped bytes, inscribed
+ * permanently. The first version of this cost 1,276 bytes and most of that was
+ * an explanation - which is why the explanation is out here, where the minifier
+ * takes it away.
+ */
+const arrowhead = (id: string, fill: string): string =>
+  `<marker id="${id}" viewBox="0 0 10 10" refX="16" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 1L9 5L0 9z" fill="var(${fill})"/></marker>`;
+const ARROWHEADS = arrowhead('ah-sent', '--good') + arrowhead('ah-signing', '--gold');
+
 export const CSS = `
 :root {
   --bg: #12100e;
@@ -239,10 +263,14 @@ ${SCALE_CSS}
 }
 @keyframes trace { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
 
-/* The square the piece left. Empty, with a faint ring saying why. */
+/* The square the piece left. Empty, with a small ring saying why.
+   This was inset 22% - a disc more than half the square - which read as a
+   piece rather than as an absence, and drew the eye away from the ghost that
+   is the actual news. The arrow now says where the move came from; this only
+   has to mark the spot, so it is a third the area and stays out of the way. */
 .sq--vacated::before {
-  content: ''; position: absolute; inset: 22%; border-radius: 50%;
-  border: 2px dashed rgba(216, 162, 74, 0.4);
+  content: ''; position: absolute; inset: 38%; border-radius: 50%;
+  border: 1.5px dashed rgba(216, 162, 74, 0.35);
 }
 .sq--pending { outline: 2px dashed var(--gold); outline-offset: -2px; }
 .sq--signing { outline: 3px solid var(--gold); outline-offset: -3px;
@@ -253,10 +281,13 @@ ${SCALE_CSS}
    it came from. */
 .board-wrap { position: relative; }
 .arrows { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
-.arrows line { stroke-width: 1.6; stroke-linecap: round; opacity: .85; }
+.arrows line { stroke-width: 2.4; stroke-linecap: round; opacity: .9; }
 .arrows .ar--signing { stroke: var(--gold); stroke-dasharray: 4 3; }
 .arrows .ar--sent { stroke: var(--good); }
-.arrows circle { opacity: .85; }
+/* The heads are markers in the shell markup and carry their own fill, so there
+   is nothing to style here. Left as a note because looking for the arrowhead
+   rule and finding nothing is otherwise a minute wasted.
+   NOTE: no backticks in here. This is a template literal and one ends it. */
 
 @media (prefers-reduced-motion: reduce) {
   /* This block used to aim at a path element inside a ghost piece. There is no
@@ -586,7 +617,7 @@ export const HTML = `
           <!-- Drawn over the grid, not in it: an arrow that lived inside a
                square would be clipped by it. -->
           <svg id="arrows" class="arrows" viewBox="0 0 8 8" preserveAspectRatio="none"
-               aria-hidden="true" focusable="false"></svg>
+               aria-hidden="true" focusable="false"><defs>${ARROWHEADS}</defs></svg>
         </div>
         <div id="status" class="notice notice--info"></div>
         <div id="move-hint" class="small muted"></div>

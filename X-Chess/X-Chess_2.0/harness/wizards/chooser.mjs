@@ -208,6 +208,11 @@ export function annotateMoves(Position, fen, legalMoves) {
  *
  * So: exactly one distinct legal move mentioned, or nothing.
  */
+/**
+ * @param {unknown} reply
+ * @param {string[]} legalMoves
+ * @param {Array<{ uci: string, san?: string, note?: string }> | null} [annotations]
+ */
 export function extractMove(reply, legalMoves, annotations = null) {
   const raw = String(reply ?? '');
   const text = raw.toLowerCase();
@@ -260,6 +265,11 @@ export function extractMove(reply, legalMoves, annotations = null) {
  * deliberate and it is not a crash: a character that will not play is a
  * forfeit, and the alternative - broadcasting a guess - spends the entrant's
  * money on a submission every reader will skip.
+ */
+/**
+ * @param {{ character: any, position: any, ask: any,
+ *           annotations?: Array<{ uci: string, san?: string, note?: string }> | null,
+ *           attempts?: number }} options
  */
 export async function chooseMove({
   character,
@@ -336,7 +346,11 @@ export async function chooseMove({
  * against a chain that takes twelve to confirm one. The bottleneck is
  * unchanged.
  */
-export function claudeCodeAsker({ exec, cwd = tmpdir() } = {}) {
+/**
+ * @param {{ exec?: ((args: string[], input: string) => Promise<string>) | null,
+ *           cwd?: string }} [options]
+ */
+export function claudeCodeAsker({ exec = null, cwd = tmpdir() } = {}) {
   const run =
     exec ??
     ((args, input) =>

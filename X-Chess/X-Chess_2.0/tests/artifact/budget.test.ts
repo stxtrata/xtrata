@@ -77,7 +77,19 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // Moved from 95,000 on 2026-08-14. The list grew a filter row, an identity
   // field, a sponsorship lookup and a concurrent read path in one day; the row
   // did its job by stopping just short, and this is the deliberate line.
-  { group: 'packages/ui', ceiling: 102_000, measured: 93_344 },
+  //
+  // Moved again to 103,500 on 2026-08-16, and the reason to record is that the
+  // row had 71 BYTES LEFT before this change. At that margin it had stopped
+  // being a regression detector and become a tripwire on the next edit of any
+  // size, whatever that edit was.
+  //
+  // What the 632 bytes bought: an arrowhead on the pending-move arrow, so a
+  // move sitting in the mempool reads as "this piece is going there" rather
+  // than a line between two squares. Built as two SVG markers in the shell
+  // markup rather than a triangle drawn per arrow - which was tried first and
+  // cost 734, and a version with the explanation inside the template literal
+  // cost 1,276, because a comment in a template literal is an inscribed byte.
+  { group: 'packages/ui', ceiling: 103_500, measured: 102_561 },
   { group: 'packages/chain', ceiling: 21_000, measured: 18_575 },
   { group: 'packages/protocol', ceiling: 11_500, measured: 10_411 },
   { group: 'packages/chess', ceiling: 10_000, measured: 9_199 },

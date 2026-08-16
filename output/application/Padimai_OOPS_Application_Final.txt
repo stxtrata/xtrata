@@ -1,0 +1,49 @@
+PADIMAI OOPS ONCHAIN ARTIST RESIDENCY
+FINAL APPLICATION TEXT
+
+FULL NAME
+Jim Crane
+
+EMAIL
+jimdotbtc@gmail.com
+
+PHONE
++447765241717
+
+COUNTRY / LOCATION
+United Kingdom
+
+ARTIST STATEMENT / BIO
+
+I'm a Brighton, UK-based artist, sound engineer and creative technologist. I spent the first part of my career on stages and tour buses as a musician, front-of-house engineer and tour manager, and the second building infrastructure that keeps creative work from disappearing. In 2014 I imported the UK's first two-way Bitcoin ATM. In 2021 I co-founded This Is Number One, the first NFT marketplace on Stacks, working with artists including Fatboy Slim, Orbital, Cara Delevingne, Dave Stewart and Chemical X. In 2023 I built Audionals, a Bitcoin-based protocol for producing and rights-managing music on-chain; its flagship release TRUTH, the first recursive music collection on Bitcoin, sold out in just over an hour. I now run Xtrata, a permanent on-chain data layer on Stacks, and its Forever Twins strand, which gives an existing NFT collection a hash-verified twin inscribed on Bitcoin so the artwork survives when its original off-chain link dies. Forever Twins holds a Stacks Community DeGrants Cohort 4 award, and its first public collection, Bitcoin Pepes, is already live with holders claiming twins. I'm also building KP Loops with Kieron Pepper (The Prodigy), an on-chain drum loop library that treats stems, loops, credits and usage history as native cultural data, and I use AI tools as working collaborators throughout my production pipeline. Across all of it, the same question keeps returning: what actually counts as a work's origin, and what does it take to make that origin something you can check, not just something you're told?
+
+LINKS / URLS
+
+https://xtrata.xyz
+https://audionals.com
+https://audionals.com/BAM/kp-loops
+https://x.com/jimdotbtc
+
+PROPOSAL
+
+Padimai frames OOPS through inheritance, abstraction, encapsulation and polymorphism - the vocabulary of object-oriented programming, repurposed as a way of thinking about how artworks originate, are organised and made legible on-chain. I want to take that literally rather than metaphorically, because Forever Twins, the on-chain preservation system I run in production on Stacks, is already built from exactly those four mechanics, applied to cultural preservation rather than conventional software architecture:
+
+Inheritance: each Forever Twin inherits its identity through a recorded hash lineage back to the original file, and the core contract hands its ID sequence forward from one version to the next so continuity survives an upgrade.
+
+Abstraction: every collection differs underneath - metadata shape, hosting and age - but a single helper-contract interface - inscribe, swap in, swap out - abstracts those differences away so the preservation logic never needs to know what it is preserving.
+
+Encapsulation: each helper keeps its binding state isolated within its own contract scope, so one collection's twin can never leak into or collide with another's - enforced in the contract, not by convention.
+
+Polymorphism: the same interface preserves widely different collections - a 2021 Stacks NFT set, a Bitcoin Ordinals collection, a piece of generative code - each instantiating the pattern in its own way while remaining checkable against the same rule.
+
+During the residency I want to build three fully on-chain works that make this apparatus visible instead of invisible, using it as artistic material rather than only infrastructure:
+
+A twin whose inheritance is deliberately broken - inscribed from a corrupted or partial source file, so the hash records the damage instead of erasing it, testing what verification does with nothing clean to check against.
+
+A piece with two divergent, equally legitimate source candidates inscribed side by side under the same interface - a polymorphism failure case, where the abstraction cannot actually tell you which one is real.
+
+A recursive work built with the Audionals on-chain audio method I developed on Bitcoin in 2023, where the source being inherited is itself an earlier on-chain artefact, sampled and re-inscribed - collapsing the distinction between origin and copy that the whole framework depends on. This extends the same thinking behind KP Loops, the on-chain drum-loop library I'm building with Kieron Pepper, where a stem's usage history is treated as part of what it is, not separate from it.
+
+Each piece will be documented as it is built, using the same AI-assisted documentation workflow I already run in my production practice, on the premise that a system's failures deserve the same careful record as its successes. Expected outcomes are three inscribed works, a public source map and process record, and a short write-up on what "primary source" means when tested against a preservation system already live in production.
+
+Over six weeks, I would map sources and prototype the failure cases in weeks 1-2, build and inscribe the works in weeks 3-4, and complete documentation, critique and public presentation in weeks 5-6. Grant support would cover inscription and contract-deployment costs; I would particularly value feedback on metadata, provenance design and the public-facing presentation.

@@ -311,7 +311,15 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
 
     const status = await settle(sent.txid);
     if (status !== 'success') {
-      throw new WizardSafetyError(`game ${gameId}: ${chosen.move} ${status} (${sent.txid})`);
+      // A TIMEOUT IS NOT A REJECTION, and saying so matters: the move may well
+      // land after this. Game 16's did, twenty-five minutes after a ten-minute
+      // wait gave up on it. Re-running the round is the right response either
+      // way — it re-reads the log, and a move that landed is simply there.
+      const advice =
+        status === 'timed out'
+          ? ' — it may still land. Re-run this round; the log is the record, not this process.'
+          : '';
+      throw new WizardSafetyError(`game ${gameId}: ${chosen.move} ${status} (${sent.txid})${advice}`);
     }
   }
 }
