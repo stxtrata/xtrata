@@ -38,7 +38,7 @@ import {
   scrub
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
-import { annotateMoves, anthropicAsker, chooseMove, claudeCodeAsker } from './chooser.mjs';
+import { anthropicAsker, chooseMove, claudeCodeAsker, rankedNotes } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
 import { readLedger, summarise } from './fee-log.mjs';
 import {
@@ -193,10 +193,12 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
-async function playGame({ gameId, white, black, replay, ask, budget, Position, expectHash = null }) {
+async function playGame({ gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash = null }) {
   // REQUIRED, not defaulted to null. A default here is what let fifteen games
   // be played from an unannotated list without one line of output saying so.
-  if (!Position) throw new WizardSafetyError('playGame needs the engine to annotate moves');
+  if (!Position || !rankMoves) {
+    throw new WizardSafetyError('playGame needs the engine and the search to rank moves');
+  }
   // NEVER SUBMIT INTO A GAME WITHOUT CHECKING IT IS OURS.
   //
   // The lookup above is now exact, and this is here anyway — because the
@@ -277,8 +279,17 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
     // It was written, tested, and then not connected — `Position` arrived here
     // and went nowhere, so every game since has been played from the plain
     // list, and nothing said so because a worse move is still a legal move.
+    // RANKED BY THE SEARCH, not by a one-ply material test.
+    //
+    // The one-ply version annotated a checkmate as "nothing hangs" and could not
+    // form a plan, because a plan IS a search. On the ending that ran a hundred
+    // moves on chain without a mate and cost 1.008 STX to concede by hand, the
+    // search mates in nine plies.
+    //
+    // Every legal move still comes back, scored, in engine order. A character
+    // chooses among them by style; the list informs and never decides.
     const history = state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci);
-    const annotations = annotateMoves(Position, state.fen, state.legalMoves, history);
+    const annotations = rankedNotes({ rankMoves, Position, fen: state.fen, played: history });
 
     let chosen;
     try {
@@ -492,6 +503,7 @@ async function oneGame({ openFee }) {
   const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
+  const { rankMoves } = await loadSearch();
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
 
   const gameId = arg('game')
@@ -499,7 +511,7 @@ async function oneGame({ openFee }) {
     : await openGame({ white: w, black: b, openFee, budget });
   console.log(`game ${gameId}\n`);
 
-  const result = await playGame({ gameId, white: w, black: b, replay, ask, budget, Position });
+  const result = await playGame({ gameId, white: w, black: b, replay, ask, budget, Position, rankMoves });
   console.log(`\nresult ${result ?? 'unfinished'}, spent ${ustx(budget.spent)}\n`);
 }
 
@@ -722,6 +734,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
   const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
+  const { rankMoves } = await loadSearch();
   const agents = byId(field.agents);
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
   const existing = await readGames();
@@ -744,7 +757,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         const { hash } = await wizardRules(white.address, black.address);
         const already = findByRulesHash(hash, existing);
         const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
-        await playGame({ gameId, white, black, replay, ask, budget, Position, expectHash: hash });
+        await playGame({ gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash });
       })
     );
   }
@@ -829,9 +842,24 @@ function credentials() {
 
 /** The engine, for working out what each legal move costs. Same source as the board. */
 async function loadEngine() {
+  return loadBundled('engine.ts');
+}
+
+/**
+ * The SEARCH, which is what makes these characters able to play at all.
+ *
+ * Bundled from source like everything else here rather than reimplemented, so a
+ * tournament and the lab are analysing positions with the same code — and so
+ * the thing that gets inscribed is the thing that played.
+ */
+async function loadSearch() {
+  return loadBundled('search.ts');
+}
+
+async function loadBundled(file) {
   const { build } = await import('esbuild');
   const out = await build({
-    entryPoints: [join(HERE, '..', '..', 'packages', 'chess', 'engine.ts')],
+    entryPoints: [join(HERE, '..', '..', 'packages', 'chess', file)],
     bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
   });
   return import(
