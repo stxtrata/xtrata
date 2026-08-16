@@ -315,9 +315,16 @@ describe('what somebody else watching sees', () => {
 });
 
 describe('what a pending move does to the square it left', () => {
-  it('EMPTIES the origin rather than fading it', async () => {
-    // Two glyphs of the same piece on the board at once reads as two pieces.
-    // The eye counts material long before it reads opacity.
+  it('keeps the piece there too, because it really is still there', async () => {
+    // A BROADCAST MOVE HAS NOT HAPPENED YET. It may be mined and it may be
+    // dropped, and until one of those the piece is genuinely on both squares.
+    //
+    // This used to empty the origin, on the reasoning that a piece drawn twice
+    // reads as two pieces because the eye counts material before it reads
+    // opacity. That reasoning is right, and emptiness was the wrong answer to
+    // it: the fix is three states that look nothing like each other. Real is
+    // filled and steady, departing is filled and FADING, arriving is a HOLLOW
+    // outline. Only one of the three can be mistaken for material.
     const { chain, release } = heldChain();
     const app = await boardWithGame(chain);
 
@@ -326,15 +333,22 @@ describe('what a pending move does to the square it left', () => {
     square('e4').click();
     await tick();
 
-    expect(square('e2').querySelectorAll('.pc').length, 'e2 still has a piece on it').toBe(0);
+    expect(square('e2').querySelectorAll('.pc--leaving').length, 'e2 lost its piece').toBe(1);
     expect(square('e2').classList.contains('sq--vacated')).toBe(true);
     expect(square('e4').querySelectorAll('.pc--ghost').length).toBe(1);
 
-    // Seven SOLID white pawns and one hollow one. The piece that is leaving is
-    // drawn once, at its destination, as a shape that is not there yet.
+    // Nine pawn glyphs for eight pawns, and only seven of them countable:
+    // seven steady, one fading out of e2, one tracing in at e4.
     const pawns = [...dom.window.document.querySelectorAll('.pc--white.pc--p')];
-    expect(pawns.filter((n) => !n.classList.contains('pc--ghost')).length).toBe(7);
+    const plain = (n: Element) =>
+      !n.classList.contains('pc--ghost') && !n.classList.contains('pc--leaving');
+    expect(pawns.filter(plain).length, 'a departing pawn still counts as material').toBe(7);
+    expect(pawns.filter((n) => n.classList.contains('pc--leaving')).length).toBe(1);
     expect(pawns.filter((n) => n.classList.contains('pc--ghost')).length).toBe(1);
+
+    // The departing piece must never be mistaken for one that is simply there:
+    // it carries a class of its own, so nothing that counts material sees it.
+    expect(square('e2').querySelector('.pc--leaving')!.classList.contains('pc--ghost')).toBe(false);
 
     release(true);
     await tick(30);
@@ -646,8 +660,10 @@ describe('a castle in the mempool', () => {
 
     expect(ghosts(), 'the king').toContain('g1');
     expect(ghosts(), 'the rook, which the submission never names').toContain('f1');
-    expect(square('e1').querySelectorAll('.pc').length, 'e1 emptied').toBe(0);
-    expect(square('h1').querySelectorAll('.pc').length, 'h1 emptied').toBe(0);
+    // Both origins keep their piece, fading — a castle is still two pieces in
+    // superposition, and the rook's half is the half nobody submitted.
+    expect(square('e1').querySelectorAll('.pc--leaving').length, 'the king left e1').toBe(1);
+    expect(square('h1').querySelectorAll('.pc--leaving').length, 'the rook left h1').toBe(1);
     app.stopPolling();
   });
 

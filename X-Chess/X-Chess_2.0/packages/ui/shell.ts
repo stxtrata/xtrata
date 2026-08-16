@@ -263,15 +263,15 @@ ${SCALE_CSS}
 }
 @keyframes trace { 0%,100% { opacity: .6; } 50% { opacity: 1; } }
 
-/* The square the piece left. Empty, with a small ring saying why.
-   This was inset 22% - a disc more than half the square - which read as a
-   piece rather than as an absence, and drew the eye away from the ghost that
-   is the actual news. The arrow now says where the move came from; this only
-   has to mark the spot, so it is a third the area and stays out of the way. */
-.sq--vacated::before {
-  content: ''; position: absolute; inset: 38%; border-radius: 50%;
-  border: 1.5px dashed rgba(216, 162, 74, 0.35);
-}
+/* The piece that is on its way out, still standing where it is.
+   THREE STATES THAT MUST NOT LOOK ALIKE: a real piece is filled and steady, a
+   departing one is filled and FADING, an arriving one is a hollow outline. The
+   fade goes low enough that it cannot be counted as material at a glance, which
+   was the whole objection to drawing it at all.
+   The ring that used to mark this square is gone: it said "something left here"
+   and the piece now says it better. */
+.pc--leaving { animation: leaving 1.9s ease-in-out infinite; }
+@keyframes leaving { 0%, 100% { opacity: .34; } 50% { opacity: .13; } }
 .sq--pending { outline: 2px dashed var(--gold); outline-offset: -2px; }
 .sq--signing { outline: 3px solid var(--gold); outline-offset: -3px;
                background-image: linear-gradient(rgba(216,162,74,.16), rgba(216,162,74,.16)); }
@@ -296,7 +296,10 @@ ${SCALE_CSS}
      their device for stillness, for as long as a move sat in the mempool. The
      ghost stays identifiable without the pulse: the stroke colour already
      separates signing from sent. */
-  .pc--ghost, .sq--check, .live { animation: none; }
+  .pc--ghost, .pc--leaving, .sq--check, .live { animation: none; }
+  /* Stillness must not mean invisible: without the pulse this needs a fixed
+     opacity, or a departing piece would sit at whatever the last frame was. */
+  .pc--leaving { opacity: .3; }
   .board--loading { transition: none; }
 }
 

@@ -134,9 +134,22 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
 
   // Where a ghost should appear, and which square the piece is leaving.
   //
-  // The origin is drawn EMPTY rather than faded. A pending move is a claim
-  // about where a piece is going, and showing the piece in both places at once
-  // reads as two pieces - the eye counts material before it reads opacity.
+  // THE PIECE IS IN BOTH PLACES UNTIL THE CHAIN SAYS OTHERWISE, and that is not
+  // a compromise, it is the truth. A broadcast move has not happened yet: it may
+  // be mined, and it may be dropped, and until one of those the piece is really
+  // on the square it came from.
+  //
+  // This was drawn empty at the origin, on the reasoning that a piece in two
+  // places reads as two pieces because the eye counts material before it reads
+  // opacity. The reasoning is sound and the fix is not emptiness - it is making
+  // the two look nothing like each other, and neither of them like a real piece.
+  // Departing is a SOLID GLYPH FADING OUT; arriving is a HOLLOW OUTLINE tracing
+  // in. Only one of the three states is filled and steady, and that is a piece
+  // that is actually there.
+  //
+  // The collapse needs no code. When the move lands, replay puts the piece on
+  // its new square and `pending` is empty, so both ghosts stop being drawn; when
+  // it is dropped, the same thing happens with the piece back where it started.
   const ghostTo = new Map<string, { type: PieceType; color: Color }>();
   const ghostFrom = new Set<string>();
   for (const move of view.pending ?? []) {
@@ -234,17 +247,21 @@ export function renderBoard(root: HTMLElement, view: BoardView, handlers: BoardH
 
     if (checkedKing === cell.square) button.classList.add('sq--check');
 
-    // The square a pending move is leaving is marked but drawn empty, so the
-    // board reads as "the piece went there" and not "there are two of them".
     const leaving = ghostFrom.has(cell.square);
     if (leaving) button.classList.add('sq--vacated');
     if (view.signing && view.signing.slice(0, 2) === cell.square) {
       button.classList.add('sq--signing');
     }
 
-    if (cell.piece && !leaving) {
-      const node = pieceNode(cell.piece.type, cell.piece.color);
+    if (cell.piece) {
+      // Still here, and on its way out. Faded and fading, so it cannot be
+      // counted as material at a glance, and clearly not the hollow outline
+      // waiting at the other end of the arrow.
+      const node = pieceNode(cell.piece.type, cell.piece.color, leaving ? 'pc--leaving' : '');
       if (node) button.appendChild(node);
+      if (leaving) {
+        button.setAttribute('aria-label', `${description}, a move from here is pending`);
+      }
     }
 
     const ghost = ghostTo.get(cell.square);
