@@ -366,6 +366,24 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE, 'the expander needs script to work').not.toMatch(/addEventListener\('toggle'/);
   });
 
+  it('matches headline tokens by CONTRACT, never by symbol', () => {
+    // Not theoretical. Hiro's token index returns thirty-two results for the
+    // symbol "sBTC", including several "Mock sBTC" and one called buttcoin that
+    // simply claims it. A symbol is a string a contract asserts about itself, so
+    // a column headed sBTC matching on it would eventually show a scam token as
+    // a Bitcoin balance.
+    expect(PAGE).toContain('SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token');
+    expect(PAGE).toContain("f.id.split('::')[0] === token.contract");
+    expect(PAGE, 'a headline token is being matched on its symbol').not.toMatch(
+      /symbol\s*===\s*['"]sBTC/i
+    );
+  });
+
+  it('takes a headline token out of the shared token list', () => {
+    // Or it appears twice, and the column stops meaning "this is where sBTC is".
+    expect(PAGE).toContain("HEADLINE_CONTRACTS.has(f.id.split('::')[0])");
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.

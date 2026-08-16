@@ -83,6 +83,8 @@
   th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* A zero is a fact and should not shout as loudly as a balance. */
+  td.zero { color: var(--muted); }
   code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
   .tag {
     display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
@@ -134,6 +136,9 @@
       <strong>Hover a token</strong> for its amount and full contract;
       <strong>click an NFT row</strong> to expand it into every contract with a count.
       Both are kept off screen so four hundred rows stay scannable.
+      sBTC, xBTC, aeUSDC and USDC get their own columns and are matched on the
+      exact contract, never the symbol — several tokens on Stacks claim the
+      <span class="mono">sBTC</span> symbol and are not it.
     </p>
 
     <label for="apikey" style="margin-top:1rem">Hiro API key (optional)</label>
@@ -159,9 +164,10 @@
   </div>
 
   <div id="totals" class="panel" hidden>
-    <div class="totals">
+    <div class="totals" style="align-items:flex-start">
       <div>wallets<b id="t-wallets">0</b></div>
       <div>STX<b id="t-stx">0</b></div>
+      <div id="t-headline-wrap"></div>
       <div>BNS names<b id="t-bns">0</b></div>
       <div>other NFTs<b id="t-nft">0</b></div>
       <div>token types<b id="t-ft">0</b></div>
@@ -217,6 +223,28 @@
    * missing should still show its raw balance rather than vanishing.
    */
   const ftMeta = new Map();
+
+  /**
+   * The tokens that get their own column, BY EXACT CONTRACT.
+   *
+   * NEVER BY SYMBOL, and the reason is not theoretical. Searching Hiro's token
+   * index for "sBTC" returns thirty-two results including several "Mock sBTC"
+   * and one called *buttcoin* that simply claims the symbol. A symbol is a
+   * string a contract asserts about itself and anybody may assert any string, so
+   * a column headed sBTC that matched on it would eventually show somebody's
+   * scam token as a Bitcoin balance.
+   *
+   * Every entry below was verified on chain: the contract is deployed, and the
+   * decimals and symbol were read from the contract itself rather than an index
+   * describing it.
+   */
+  const HEADLINE = Object.freeze([
+    { label: 'sBTC', contract: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token', decimals: 8 },
+    { label: 'xBTC', contract: 'SP3DX3H4FEYZJZ586MFBS25ZW3HZDMEW92260R2PR.Wrapped-Bitcoin', decimals: 8 },
+    { label: 'aeUSDC', contract: 'SP31MH65V85NDTM30FJBKP4JNC39HR1ZX3CRW9Z97.token-aeusdc', decimals: 6 },
+    { label: 'USDC', contract: 'SP2DBFGMT7SATSJPCCA38SDDPBNNQ86QWADJ3E6WT.usdc', decimals: 6 }
+  ]);
+  const HEADLINE_CONTRACTS = new Set(HEADLINE.map((t) => t.contract));
 
   async function metaFor(assetId) {
     const contract = assetId.split('::')[0];
@@ -361,8 +389,21 @@
       row.fts = Object.entries(balances?.fungible_tokens ?? {})
         .filter(([, v]) => BigInt(v.balance) > 0n)
         .map(([id, v]) => ({ id, balance: v.balance }));
-      // Decimals, so the hover shows a number rather than a digit soup. Cached
-      // per contract, so this costs nothing after the first wallet holding it.
+      // The headline tokens come out of the shared list and into their own
+      // columns. Matched on the CONTRACT half of the asset identifier, so a
+      // token claiming the symbol cannot land in the wrong column.
+      row.headline = {};
+      for (const token of HEADLINE) {
+        const held = row.fts.find((f) => f.id.split('::')[0] === token.contract);
+        row.headline[token.label] = held
+          ? formatAmount(held.balance, { decimals: token.decimals })
+          : null;
+      }
+      row.fts = row.fts.filter((f) => !HEADLINE_CONTRACTS.has(f.id.split('::')[0]));
+
+      // Decimals for everything left, so the hover shows a number rather than a
+      // digit soup. Cached per contract, so this costs nothing after the first
+      // wallet holding it.
       for (const ft of row.fts) {
         const meta = await metaFor(ft.id);
         ft.amount = formatAmount(ft.balance, meta);
@@ -399,8 +440,9 @@
     wrap.innerHTML = '';
     const table = document.createElement('table');
     table.innerHTML =
-      '<thead><tr><th>address</th><th class="num">STX</th><th>BNS names</th>' +
-      '<th>other NFTs</th><th>tokens</th></tr></thead>';
+      '<thead><tr><th>address</th><th class="num">STX</th>' +
+      HEADLINE.map((t) => `<th class="num">${t.label}</th>`).join('') +
+      '<th>BNS names</th><th>other NFTs</th><th>tokens</th></tr></thead>';
     const body = document.createElement('tbody');
 
     for (const row of rows) {
@@ -449,9 +491,13 @@
         `<td class="mono">${row.address}</td>` +
         `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
         (row.error
-          ? `<td colspan="3" class="bad" style="font-size:.82rem">${row.error
+          ? `<td colspan="${HEADLINE.length + 3}" class="bad" style="font-size:.82rem">${row.error
               .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`
-          : `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
+          : HEADLINE.map((t) => {
+              const held = row.headline?.[t.label];
+              return `<td class="num${held ? '' : ' zero'}">${held ?? '—'}</td>`;
+            }).join('') +
+            `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
             `<td>${nfts}</td><td>${fts}</td>`);
       body.appendChild(tr);
     }
@@ -471,6 +517,15 @@
     $('totals').hidden = false;
     $('t-wallets').textContent = rows.length;
     $('t-stx').textContent = rows.reduce((s, r) => s + (r.stx ?? 0), 0).toFixed(6);
+    // A headline token with nothing in it anywhere is not worth a total, but the
+    // COLUMN stays: an empty column is an answer, and a missing one is a
+    // question about whether it was ever checked.
+    $('t-headline-wrap').innerHTML = HEADLINE.map((t) => {
+      const holders = rows.filter((r) => r.headline?.[t.label]).length;
+      return holders
+        ? `<div style="margin-right:2rem">${t.label} holders<b>${holders}</b></div>`
+        : '';
+    }).join('');
     $('t-bns').textContent = rows.reduce((s, r) => s + r.bns.length, 0);
     $('t-nft').textContent = rows.reduce((s, r) => s + r.nfts.length, 0);
     $('t-ft').textContent = new Set(rows.flatMap((r) => r.fts.map((f) => f.id))).size;
