@@ -659,3 +659,60 @@ describe('a second script that spends money', () => {
     );
   });
 });
+
+describe('a rate limit must not end a tournament', () => {
+  // Round 2 died here: three good moves, then a balance check that could not
+  // be read, five backoffs, and out. On a READ, with nothing wrong on chain.
+  //
+  // Hiro's address endpoints are the tight ones. Measured with a key:
+  // /v2/info and /extended/v1/status answer 200 while
+  // /extended/v1/address/…/balances answers 429 for minutes at a stretch —
+  // and the board a spectator watches polls that same family to show pending
+  // moves, so watching a game competes with playing it.
+  const source = read('harness/wizards/play.mjs');
+
+  it('reads the balance from a route that is not deprecated', () => {
+    // THE PATH WAS THE BUG. Measured the same minute on the same machine:
+    // /extended/v1/address/{a}/balances -> 429, forever, keyed or not, while
+    // /extended/v2/addresses/{a}/balances/stx -> 200 and every other path was
+    // fine. A 429 that no waiting fixes is a wrong address, not a rate limit.
+    expect(source).toMatch(/extended\/v2\/addresses\/\$\{address\}\/balances\/stx/);
+    expect(source, 'the deprecated route must not come back').not.toMatch(
+      /extended\/v1\/address\/\$\{address\}\/balances/
+    );
+  });
+
+  it('reads the figure from where v2 puts it', () => {
+    // v2 says `balance`, v1 said `stx.balance`. The wrong key yields 0, which
+    // refuses every move as unaffordable instead of failing loudly.
+    expect(source).toMatch(/body\?\.balance \?\? body\?\.stx\?\.balance/);
+  });
+
+  it('keeps a balance rather than asking for it every move', () => {
+    expect(source, 'balanceOf should serve a cached figure').toMatch(/balanceCache/);
+  });
+
+  it('books what it spends instead of re-reading the chain', () => {
+    // A read moments after a broadcast still shows the old number anyway: the
+    // transaction is not mined. Our own count is the more honest figure.
+    expect(source).toMatch(/debitBalance\(wizard\.address/);
+  });
+
+  it('debits only after the broadcast succeeded', () => {
+    const broadcast = source.indexOf('const result = await broadcastTransaction');
+    const debit = source.indexOf('debitBalance(wizard.address');
+    expect(broadcast).toBeGreaterThan(-1);
+    expect(debit, 'money must not be counted as spent before it is sent').toBeGreaterThan(broadcast);
+  });
+
+  it('falls back to the known balance on 429, and only on 429', () => {
+    const guard = source.slice(source.indexOf('export const balanceOf'), source.indexOf('export const nextNonce'));
+    expect(guard).toMatch(/error\?\.status === 429 && held/);
+    expect(guard, 'any other failure is still a failure').toMatch(/throw error/);
+  });
+
+  it('does not do the same for a nonce, where stale means replaced', () => {
+    const nonce = source.slice(source.indexOf('export const nextNonce'));
+    expect(nonce.slice(0, 300)).not.toMatch(/429/);
+  });
+});

@@ -210,9 +210,69 @@ export const api = async (path, tries = 5) => {
   throw last;
 };
 
-export const balanceOf = async (address) => {
-  const body = await api(`/extended/v1/address/${address}/balances`);
-  return BigInt(body?.stx?.balance ?? '0');
+/**
+ * What each wallet holds.
+ *
+ * THE PATH IS THE WHOLE BUG, and it looked exactly like a rate limit. Round 2
+ * died three moves in on a balance check, backed off 5s, 10s, 20s, 40s, and
+ * gave up - on a READ, with nothing wrong on chain. Measured afterwards against
+ * api.hiro.so, same machine, same minute:
+ *
+ *   /extended/v1/address/{a}/balances        429   <- what this used
+ *   /extended/v2/addresses/{a}/balances/stx  200
+ *   /extended/v1/address/{a}/nonces          200
+ *   /v2/info                                 200
+ *
+ * The v1 balances route is deprecated and throttled to almost nothing. It is
+ * not our volume: a key made no difference (0/70 with it, 0/8 without), and
+ * ninety seconds of complete silence did not refill it, while every other path
+ * answered normally throughout.
+ *
+ * A 429 THAT NO AMOUNT OF WAITING FIXES IS NOT A RATE LIMIT, it is a wrong
+ * address - and backing off is the worst possible response, because it looks
+ * like patience is working right up until the run dies.
+ *
+ * THE SHAPE DIFFERS TOO: v2 puts the figure at `balance`, v1 at `stx.balance`.
+ * Reading the wrong key yields 0, which refuses every move as unaffordable
+ * rather than crashing, so both are read and v2 comes first.
+ *
+ * The cache stays on top because it is worth having regardless: we know exactly
+ * what we spend, and a read moments after a broadcast still shows the old
+ * number, since the transaction is not mined yet. Our own count is the truer one.
+ */
+const CACHED_BALANCE_MS = 5 * 60_000;
+const balanceCache = new Map();
+
+export const balanceOf = async (address, { maxAgeMs = CACHED_BALANCE_MS } = {}) => {
+  const held = balanceCache.get(address);
+  if (held && Date.now() - held.at < maxAgeMs) return held.ustx;
+
+  try {
+    const body = await api(`/extended/v2/addresses/${address}/balances/stx`);
+    const ustx = BigInt(body?.balance ?? body?.stx?.balance ?? '0');
+    balanceCache.set(address, { ustx, at: Date.now() });
+    return ustx;
+  } catch (error) {
+    // A RATE LIMIT MUST NOT END A TOURNAMENT. With the path fixed this should
+    // be rare, but the run that dies on a read it could have survived is the
+    // failure this harness keeps repeating. If the address has ever been read,
+    // the figure we hold is stale by a known amount and nothing else - every
+    // debit since came from us and was subtracted - and spending stays bounded
+    // because the cap is counted locally and this number only ever falls.
+    if (error?.status === 429 && held) {
+      console.log(`  (balance for ${address.slice(0, 8)}… rate limited, using our own count)`);
+      return held.ustx;
+    }
+    throw error;
+  }
+};
+
+/** Subtract what we just spent, so the next check needs no network call. */
+export const debitBalance = (address, ustx) => {
+  const held = balanceCache.get(address);
+  if (!held) return;
+  const left = held.ustx - BigInt(ustx);
+  balanceCache.set(address, { ustx: left < 0n ? 0n : left, at: held.at });
 };
 
 /**
@@ -231,6 +291,11 @@ export const balanceOf = async (address) => {
  * "two transactions signed close together take the same nonce, and the second
  * replaces the first" - and this loop was written without reading it.
  */
+// NOT CACHED, unlike the balance above, and not given a 429 fallback either.
+// A stale nonce is not a slightly wrong number — it is a transaction that
+// silently replaces another one. This is read once per funding run and then
+// incremented by hand, so there is never a previous value worth falling back
+// to: the first read either works or the run has not started.
 export const nextNonce = async (address) => {
   const body = await api(`/extended/v1/address/${address}/nonces`);
   return BigInt(body?.possible_next_nonce ?? 0);
@@ -392,6 +457,10 @@ export async function send({
   });
   const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
   if (result.error) throw new Error(scrub(JSON.stringify(result)));
+
+  // Booked immediately, and only after the broadcast succeeded. The next check
+  // then needs no network call, and it is counting the same money the cap does.
+  debitBalance(wizard.address, BigInt(spendUstx) + MINER_FEE_USTX);
   return { txid: result.txid, spentAfterUstx: allowed.spentAfterUstx };
 }
 
