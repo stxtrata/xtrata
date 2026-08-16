@@ -24,6 +24,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build as esbuild } from 'esbuild';
+import { recordBroadcast } from './fee-log.mjs';
 import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
 import {
   Cl,
@@ -37,6 +38,8 @@ import {
 import {
   ALLOWED_CONTRACT,
   isRulesHash,
+  FEE_LADDER,
+  FEE_BUMP_AFTER_MS,
   DEFAULT_SPEND_CAP_USTX,
   DIRECTOR,
   PERSONAS,
@@ -156,7 +159,7 @@ const CLIENT = HIRO_KEYS.length
  * A fixed fee makes the plan and the spend the same thing, and removes a network
  * call per transaction on the way.
  */
-const MINER_FEE_USTX = 3_000n;
+
 
 /** Both spellings, as the proxy sends both. */
 const hiroHeaders = (extra = {}) =>
@@ -427,7 +430,11 @@ export async function send({
   postConditions,
   spent,
   cap,
-  rulesHash
+  rulesHash,
+  fee = FEE_LADDER[0],
+  nonce = null,
+  rung = 0,
+  game = null
 }) {
   const balance = await balanceOf(wizard.address);
   const allowed = assertBroadcastAllowed({
@@ -451,7 +458,10 @@ export async function send({
     senderKey: wizard.key,
     network: 'mainnet',
     client: CLIENT,
-    fee: MINER_FEE_USTX,
+    fee,
+    // Pinned when a ladder is climbing, so the replacement lands on the SAME
+    // nonce and displaces the rung below rather than queueing behind it.
+    ...(nonce === null ? {} : { nonce }),
     postConditionMode: PostConditionMode.Deny,
     postConditions
   });
@@ -460,8 +470,12 @@ export async function send({
 
   // Booked immediately, and only after the broadcast succeeded. The next check
   // then needs no network call, and it is counting the same money the cap does.
-  debitBalance(wizard.address, BigInt(spendUstx) + MINER_FEE_USTX);
-  return { txid: result.txid, spentAfterUstx: allowed.spentAfterUstx };
+  debitBalance(wizard.address, BigInt(spendUstx) + BigInt(fee));
+  // The one thing the chain will never know: when this was OFFERED. Written
+  // before anything awaits, so the timestamp is the broadcast and not the
+  // settle. See fee-log.mjs.
+  recordBroadcast({ txid: result.txid, fee, rung, game, who: wizard.name });
+  return { txid: result.txid, spentAfterUstx: allowed.spentAfterUstx, fee };
 }
 
 /**
@@ -485,6 +499,86 @@ export async function send({
  */
 const SETTLE_MS = 45 * 60_000;
 const SETTLE_EVERY_MS = 15_000;
+
+
+/**
+ * Send a call, and pay more only if nobody takes it.
+ *
+ * Broadcasts at the bottom rung, waits, and if the transaction is still pending
+ * re-signs the SAME call on the SAME nonce at the next rung. The node drops the
+ * cheaper one — `dropped_replace_by_fee`, verified on this chain before this was
+ * written — so exactly one of them is ever mined and exactly one fee is ever
+ * paid.
+ *
+ * THE SAFETY GATE RUNS ON EVERY RUNG, not once at the bottom. Each broadcast is
+ * a real transaction that could be mined, so each one is checked against the
+ * balance floor and the spend cap at the fee it actually offers. A ladder that
+ * gated only its first attempt would let the cap be exceeded by the rung that
+ * finally lands.
+ *
+ * A replacement REFUSED is not a failure. The usual reason is that the original
+ * was mined a moment earlier, which is the outcome we wanted — so it is treated
+ * as "stop climbing" rather than as an error, and the settle below finds it.
+ */
+export async function sendClimbing({
+  wizard,
+  functionName,
+  functionArgs,
+  spendUstx,
+  postConditions,
+  spent,
+  cap,
+  rulesHash,
+  label = '',
+  game = null
+}) {
+  // Read once. Every rung reuses it, which is what makes them replacements
+  // rather than a queue of separate transactions.
+  const nonce = await nextNonce(wizard.address);
+  let sent = null;
+  let spentAfter = spent;
+
+  for (const [rung, fee] of FEE_LADDER.entries()) {
+    if (rung > 0) {
+      console.log(`  ${label}fee ${FEE_LADDER[rung - 1]} did not move it — replacing at ${fee}`);
+    }
+    try {
+      sent = await send({
+        wizard,
+        functionName,
+        functionArgs,
+        spendUstx,
+        postConditions,
+        spent: spentAfter,
+        cap,
+        rulesHash,
+        fee,
+        nonce,
+        rung,
+        game
+      });
+      spentAfter = sent.spentAfterUstx;
+    } catch (error) {
+      if (rung === 0) throw error;
+      // Could not replace. Almost always because the rung below is already in a
+      // block, which is the good ending.
+      console.log(`  ${label}could not replace (${String(error?.message ?? error).slice(0, 60)})`);
+      break;
+    }
+
+    const status = await settle(sent.txid, {
+      maxMs: rung === FEE_LADDER.length - 1 ? undefined : FEE_BUMP_AFTER_MS
+    });
+    if (status === 'success') return { ...sent, spentAfterUstx: spentAfter, status, nonce };
+    if (status !== 'timed out' && status !== 'pending') {
+      return { ...sent, spentAfterUstx: spentAfter, status, nonce };
+    }
+  }
+
+  // Out of rungs, or stopped climbing. Wait properly on whatever is out there.
+  const status = await settle(sent.txid);
+  return { ...sent, spentAfterUstx: spentAfter, status, nonce };
+}
 
 export async function settle(txid, { maxMs = SETTLE_MS, everyMs = SETTLE_EVERY_MS } = {}) {
   const until = Date.now() + maxMs;

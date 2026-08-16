@@ -18,6 +18,8 @@ import {
   ALLOWED_FUNCTIONS,
   BALANCE_FLOOR_USTX,
   DEFAULT_SPEND_CAP_USTX,
+  FEE_LADDER,
+  MINER_FEE_USTX,
   DIRECTOR,
   KEY_SHAPED,
   MAX_TRANSFER_USTX,
@@ -530,9 +532,22 @@ describe('paying for a transaction', () => {
   const play = read('harness/wizards/play.mjs');
 
   it('sets the fee rather than asking what it should be', () => {
-    expect(play, 'the fee is still estimated, so the plan and the spend differ').toContain(
-      'fee: MINER_FEE_USTX'
+    // The property, not the constant. It used to be a literal `fee:
+    // MINER_FEE_USTX`; it is now a rung passed in from the ladder. What must
+    // stay true is that a fee is always SUPPLIED — the moment the library is
+    // left to estimate one, the plan and the spend are different numbers and
+    // the cap is checking money nobody is spending.
+    expect(play, 'a builder call was left to estimate its own fee').toMatch(
+      /makeContractCall\(\{[\s\S]{0,400}?\n\s*fee,/
     );
+    expect(play, 'the fee is estimated somewhere').not.toMatch(/fee:\s*(undefined|null)/);
+  });
+
+  it('records what it offered, because the chain will not', () => {
+    // A confirmed transaction carries `block_time` and no `receipt_time`: the
+    // moment a move was OFFERED is nowhere on chain. Without the local half,
+    // latency by fee cannot be measured at all and the ladder stays a guess.
+    expect(play, 'nothing records the broadcast moment').toContain('recordBroadcast');
   });
 
   it('keys the library’s own fetch, which our headers never touched', () => {
@@ -714,5 +729,50 @@ describe('a rate limit must not end a tournament', () => {
   it('does not do the same for a nonce, where stale means replaced', () => {
     const nonce = source.slice(source.indexOf('export const nextNonce'));
     expect(nonce.slice(0, 300)).not.toMatch(/429/);
+  });
+});
+
+describe('what a move offers a miner', () => {
+  // The flat 3,000 was about five times what the network wants. Measured
+  // against 97 confirmed contract calls on mainnet: median 585, 25th percentile
+  // 417, cheapest confirmed 201. Our `submit` is a small call, so we sat at the
+  // cheap end of the size distribution paying above the 75th percentile of the
+  // fee one.
+  it('starts well below what the flat fee used to be', () => {
+    expect(FEE_LADDER[0], 'the bottom rung is not a saving').toBeLessThan(1_000n);
+    // Above the cheapest fee observed to confirm, so the bottom rung is a real
+    // offer rather than a bid the mempool will never take.
+    expect(FEE_LADDER[0]).toBeGreaterThan(200n);
+  });
+
+  it('climbs, so a rung can actually replace the one below it', () => {
+    // Replacement requires a HIGHER fee. Equal rungs would be rejected as a
+    // duplicate and the ladder would silently be a flat fee with extra steps.
+    for (let i = 1; i < FEE_LADDER.length; i++) {
+      expect(FEE_LADDER[i], `rung ${i} does not outbid rung ${i - 1}`).toBeGreaterThan(
+        FEE_LADDER[i - 1]
+      );
+    }
+  });
+
+  it('tops out at the old flat fee, so nothing got slower in the worst case', () => {
+    // The ceiling is what we used to pay every time. A move that climbs the
+    // whole way costs exactly what every move cost before.
+    expect(FEE_LADDER[FEE_LADDER.length - 1]).toBe(3_000n);
+    expect(MINER_FEE_USTX, 'the plan quotes something other than the worst case').toBe(3_000n);
+  });
+
+  it('prices a plan at the worst case, never the hoped-for one', () => {
+    // A spend cap checked against the bottom rung would be a cap on the good
+    // case only — precisely the fault the fixed fee was introduced to fix, when
+    // the library estimated a fee nobody was counting.
+    const env: Record<string, string> = {};
+    for (const persona of [DIRECTOR, ...PERSONAS]) {
+      env[keyEnvName(persona.id)] = 'a'.repeat(64);
+      env[addressEnvName(persona.id)] = ADDRESS;
+    }
+    const plan = planRun({ fleet: readFleet(env), openFeeUstx: 1_000_000n });
+    const worst = 1_000_000n + MINER_FEE_USTX * BigInt(plan.moves.length + 1);
+    expect(plan.totalUstx, 'the plan quotes the optimistic fee').toBe(worst);
   });
 });

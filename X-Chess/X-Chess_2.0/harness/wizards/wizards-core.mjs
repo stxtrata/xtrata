@@ -77,6 +77,40 @@ export const OPENING_FUNCTIONS = Object.freeze(['open-game', 'open-sponsored-gam
 export const isRulesHash = (value) =>
   typeof value === 'string' && /^[0-9a-f]{64}$/.test(value.trim().toLowerCase());
 
+/**
+ * What a move offers a miner, and what it offers next if nobody takes it.
+ *
+ * WAS A FLAT 3,000, which is about five times what the network actually wants.
+ * Measured against 97 confirmed contract calls on mainnet: the median is 585,
+ * the 25th percentile 417, and the cheapest that confirmed was 201. Our
+ * `submit` is a small call — one uint and a five-character string — so we sit
+ * at the cheap end of the size distribution while paying above the 75th
+ * percentile of the fee one. Over a thirty-game double round robin that is
+ * roughly four STX where one would do.
+ *
+ * A LADDER RATHER THAN A LOWER FLAT FEE, because the runner can afford to be
+ * patient in a way a wallet cannot. It is strictly sequential per game —
+ * broadcast, wait, choose the next move — so a slow transaction delays one game
+ * and nothing else. That is exactly the condition where starting low pays: most
+ * moves land at the bottom rung, and only the unlucky ones cost more.
+ *
+ * The replacement mechanism is real and was verified on this chain before any
+ * of this was built: broadcasting the same nonce at a higher fee returns
+ * `dropped_replace_by_fee` on the original within ten seconds. Without that
+ * evidence a ladder silently degrades into "wait longer and also waste a
+ * signature", which is worse than a flat fee and looks like it is working.
+ *
+ * Only ONE of these is ever paid — the rungs replace each other rather than
+ * accumulating, because they share a nonce.
+ */
+export const FEE_LADDER = Object.freeze([400n, 1_200n, 3_000n]);
+
+/** How long a rung gets before the next one replaces it. */
+export const FEE_BUMP_AFTER_MS = 20_000;
+
+/** The rung a plan quotes and a spend cap is checked against: the worst case. */
+export const MINER_FEE_USTX = FEE_LADDER[FEE_LADDER.length - 1];
+
 /** Per run, across every wizard. The float is small; this is smaller. */
 export const DEFAULT_SPEND_CAP_USTX = 3_000_000n;
 

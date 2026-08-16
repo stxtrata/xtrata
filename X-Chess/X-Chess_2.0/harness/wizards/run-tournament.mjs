@@ -5,6 +5,7 @@
 //   node harness/wizards/run-tournament.mjs --live          play it
 //   node harness/wizards/run-tournament.mjs --round 4       one round
 //   node harness/wizards/run-tournament.mjs standings       read the table off the chain
+//   node harness/wizards/run-tournament.mjs fees            what each fee actually bought
 //
 // Dry by default, like everything else here, and for the same reason: every act
 // spends real STX and none of it can be undone.
@@ -29,6 +30,7 @@ import { Cl, Pc, PostConditionMode } from '@stacks/transactions';
 import {
   ALLOWED_CONTRACT,
   DEFAULT_SPEND_CAP_USTX,
+  MINER_FEE_USTX,
   WizardSafetyError,
   addressEnvName,
   keyEnvName,
@@ -38,6 +40,7 @@ import {
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
 import { annotateMoves, anthropicAsker, chooseMove, claudeCodeAsker } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
+import { readLedger, summarise } from './fee-log.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -56,6 +59,7 @@ import {
   readOpenFee,
   send,
   settle,
+  sendClimbing,
   ustx,
   wizardRules
 } from './play.mjs';
@@ -70,7 +74,7 @@ const arg = (name, fallback = null) => {
 };
 const LIVE = process.argv.includes('--live');
 const FORMAT = arg('format', 'double-round-robin');
-const MINER_FEE_USTX = 3_000n;
+
 
 /**
  * Whether a character that cannot play concedes on chain.
@@ -305,18 +309,19 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
     }
 
     console.log(`  game ${gameId}: ${mover.name} plays ${chosen.move}`);
-    const sent = await send({
+    const sent = await sendClimbing({
       wizard: mover,
       functionName: 'submit',
       functionArgs: [Cl.uint(gameId), Cl.stringAscii(chosen.move)],
-      spendUstx: MINER_FEE_USTX,
+      spendUstx: 0n,
       postConditions: [],
       spent: budget.spent,
-      cap: budget.cap
+      cap: budget.cap,
+      label: `game ${gameId}: `
     });
     budget.spent = sent.spentAfterUstx;
 
-    const status = await settle(sent.txid);
+    const status = sent.status;
     if (status !== 'success') {
       // A TIMEOUT IS NOT A REJECTION, and saying so matters: the move may well
       // land after this. Game 16's did, twenty-five minutes after a ten-minute
@@ -367,18 +372,19 @@ async function resign({ gameId, mover, rules, budget, why = 'no legal move in 3 
   }
 
   console.log(`  game ${gameId}: ${mover.name} resigns — ${why}`);
-  const sent = await send({
+  const sent = await sendClimbing({
     wizard: mover,
     functionName: 'submit',
     functionArgs: [Cl.uint(gameId), Cl.stringAscii('resgn')],
-    spendUstx: MINER_FEE_USTX,
+    spendUstx: 0n,
     postConditions: [],
     spent: budget.spent,
-    cap: budget.cap
+    cap: budget.cap,
+    label: `game ${gameId}: `
   });
   budget.spent = sent.spentAfterUstx;
 
-  const status = await settle(sent.txid);
+  const status = sent.status;
   if (status !== 'success') {
     throw new WizardSafetyError(`game ${gameId}: resignation ${status} (${sent.txid})`);
   }
@@ -497,6 +503,67 @@ async function oneGame({ openFee }) {
   console.log(`\nresult ${result ?? 'unfinished'}, spent ${ustx(budget.spent)}\n`);
 }
 
+
+/**
+ * What every fee we have offered actually bought, read back off the chain.
+ *
+ * THE FEEDBACK HALF OF THE LADDER. The rungs started as a guess from one
+ * afternoon's mempool sample; this is how they stop being one. Offer the bottom
+ * rung a few hundred times, then look at what fraction a miner took and how
+ * long they waited, and move the rungs to fit.
+ *
+ * Reads the local ledger for what was offered and when, and the chain for
+ * whether it landed and in which block. Neither half can answer alone: the
+ * chain does not record a broadcast time, and a local log must not be trusted
+ * about outcomes.
+ */
+async function fees() {
+  const entries = readLedger();
+  if (!entries.length) {
+    console.log('\nNothing recorded yet. Fees are logged as moves are broadcast.\n');
+    return;
+  }
+
+  console.log(`\n${entries.length} broadcasts recorded. Reading each back off the chain…\n`);
+  const rows = await summarise(entries, async (txid) => {
+    try {
+      const body = await api(`/extended/v1/tx/0x${txid}`);
+      return { status: body.tx_status ?? 'unknown', blockTime: body.block_time ?? null };
+    } catch {
+      return { status: 'not found', blockTime: null };
+    }
+  });
+
+  console.log('   fee   offered  mined  replaced   landed   median wait   90th');
+  for (const r of rows) {
+    console.log(
+      `  ${String(r.fee).padStart(5)}  ${String(r.offered).padStart(7)}  ${String(r.mined).padStart(5)}` +
+        `  ${String(r.replaced).padStart(8)}  ${String(r.landedPct === null ? '-' : r.landedPct + '%').padStart(7)}` +
+        `  ${String(r.medianWait === null ? '-' : r.medianWait + 's').padStart(11)}` +
+        `  ${String(r.p90Wait === null ? '-' : r.p90Wait + 's').padStart(5)}`
+    );
+  }
+
+  const bottom = rows[0];
+  console.log('');
+  if (bottom && bottom.landedPct !== null && bottom.offered >= 20) {
+    if (bottom.landedPct >= 80) {
+      console.log(`  The bottom rung (${bottom.fee}) lands ${bottom.landedPct}% of the time.`);
+      console.log('  There is room to try lower.');
+    } else if (bottom.landedPct < 40) {
+      console.log(`  The bottom rung (${bottom.fee}) only lands ${bottom.landedPct}% of the time,`);
+      console.log('  so most moves are paying for two signatures to reach the rung above.');
+      console.log('  Raise it, or lengthen FEE_BUMP_AFTER_MS to give it longer.');
+    } else {
+      console.log(`  The bottom rung (${bottom.fee}) lands ${bottom.landedPct}% of the time —`);
+      console.log('  roughly where a ladder wants to be. Most moves cheap, some climb.');
+    }
+  } else {
+    console.log('  Too few at the bottom rung to conclude anything yet. Keep playing.');
+  }
+  console.log('');
+}
+
 async function main() {
   const command = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'play';
   const field = readField();
@@ -610,6 +677,11 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
       budget: { spent: 0n, cap: DEFAULT_SPEND_CAP_USTX },
       why: 'conceded by hand: the game could not reach a result'
     });
+    return;
+  }
+
+  if (command === 'fees') {
+    await fees();
     return;
   }
 
