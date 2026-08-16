@@ -19,6 +19,31 @@ export const PRF_SALT = new TextEncoder().encode('xtrata.wallet.v1.seed-encrypti
 /** HKDF domain separator. Changing this orphans every existing wallet. Never edit. */
 const HKDF_INFO = 'xtrata-seed-v1';
 
+/**
+ * CALLER INVARIANT: userVerification is key material, not a UI toggle.
+ *
+ * The UV and non-UV PRF outputs are different values. This module never runs the
+ * WebAuthn ceremony itself — `prfOutput` arrives as a parameter — so nothing here
+ * can enforce it. Every caller must use the SAME userVerification setting for the
+ * seal and for every later open. `recursive-apps/23-passkey-canary` pins
+ * `userVerification: 'required'` on both create and get, and any new caller must
+ * do the same.
+ *
+ * This bites us harder than it bites a design that derives its wallet from the
+ * PRF. There, a wrong PRF yields a different, empty wallet: visible immediately,
+ * and the real wallet is still reachable once the ceremony is corrected. Here a
+ * wrong PRF means `openSeed` throws OPEN_FAILED against an intact ciphertext for
+ * a FUNDED wallet, and the only way back in is the 24 words.
+ *
+ * Related mechanic, for anyone debugging a PRF that "changed" on its own: the
+ * salt reaching the authenticator is not the salt passed here. The browser
+ * transforms it first, as SHA-256("WebAuthn PRF" || 0x00 || salt). That is
+ * handled for us, but it explains why raw-salt comparisons across
+ * implementations do not line up.
+ *
+ * Both constants credit DeOrganized (builds-with-xtrata#11).
+ */
+
 /** AES-GCM nonce length in bytes. */
 const IV_BYTES = 12;
 
