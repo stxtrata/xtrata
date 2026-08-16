@@ -9,6 +9,9 @@
 // dropped, which is how two of three funding transfers went missing earlier.
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -357,5 +360,28 @@ describe('finding the game a pairing already has', () => {
     ];
     // Deterministic: the first, never an arbitrary one.
     expect(findByRulesHash('ee'.repeat(32), dupes)?.id).toBe(5);
+  });
+});
+
+describe('running the field on a different model', () => {
+  // An entry names its model because that is the part of a player nobody can
+  // inscribe — you can commit a prompt, not weights. So a run that quietly
+  // substituted one would produce a result that does not match the entries it
+  // claims to be between. The flag exists for tuning the exhibition, and the
+  // rule is that it announces itself.
+  const source = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('uses the entry’s own model when nothing is overridden', () => {
+    expect(source).toMatch(/model: MODEL_OVERRIDE \?\? character\.model/);
+  });
+
+  it('says so in the header when a run overrides it', () => {
+    // Silent substitution is the failure this guards against, not the
+    // substitution itself.
+    expect(source).toMatch(/OVERRIDDEN/);
+    expect(source).toMatch(/entries name/);
   });
 });

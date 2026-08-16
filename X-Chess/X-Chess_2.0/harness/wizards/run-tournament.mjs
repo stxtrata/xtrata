@@ -83,6 +83,22 @@ const MINER_FEE_USTX = 3_000n;
  */
 const RESIGN_ON_FORFEIT = !process.argv.includes('--no-resign');
 
+/**
+ * Run every character on one model, whatever their entry says.
+ *
+ * A TUNING TOOL, AND IT HAS TO ANNOUNCE ITSELF. An entry names its model
+ * because that is the part of a player nobody can inscribe — you can commit a
+ * prompt, not weights — so a run that quietly substituted a different one would
+ * produce a result that does not match the entries it claims to be between.
+ *
+ * For a real tournament this flag should not be used. For the exhibition it is
+ * how two models get compared on the same characters, same annotation, same
+ * positions — which is the only way to find out whether the extra tier is
+ * paying for anything. So it is allowed, and it is printed in the header of
+ * every run that uses it.
+ */
+const MODEL_OVERRIDE = arg('model');
+
 function env() {
   const found = {};
   try {
@@ -120,6 +136,9 @@ function readField(vars = env(), borrow = {}) {
     }
     return {
       ...character,
+      // The entry's own model unless a run explicitly overrides it, which the
+      // header then says out loud.
+      model: MODEL_OVERRIDE ?? character.model,
       key,
       address,
       borrowedFrom: from === character.id ? null : from,
@@ -465,6 +484,11 @@ async function main() {
   console.log(`format    ${plan.format}`);
   console.log(`field     ${ids.join(', ')}`);
   console.log(`open fee  ${ustx(openFee)}`);
+  console.log(
+    `model     ${MODEL_OVERRIDE ?? PERSONALITIES[0].model}${
+      MODEL_OVERRIDE ? '   (OVERRIDDEN — entries name ' + PERSONALITIES[0].model + ')' : ''
+    }`
+  );
   console.log(
     `forfeits  ${
       RESIGN_ON_FORFEIT
