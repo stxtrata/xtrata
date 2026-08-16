@@ -25,7 +25,7 @@
 // Reads `harness/bns/.seed`. Same file, same mode-600 check, same refusal to
 // continue past a line whose checksum fails.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { DERIVATION_PATHS, deriveAllAccounts, readSeeds, scrub } from './rescue.mjs';
 import { lookup, normaliseLabel } from './check-names.mjs';
 
@@ -44,6 +44,43 @@ const CANARY = process.argv.includes('--canary');
  * one, and nothing here has to know. Escaped, because an address that closed the
  * tag early would produce a page that silently inventories half a list.
  */
+/**
+ * The Hiro key, from the same places every other tool here looks.
+ *
+ * 404 addresses is roughly 800 requests. Anonymous is about fifty a minute
+ * shared with everything else on the connection, so an unkeyed run does not
+ * merely go slowly - it returns `unread` for wallets it could not reach, and an
+ * unread wallet is the one thing this page must never let you mistake for an
+ * empty one. Baking the key in removes the step where somebody forgets.
+ */
+function hiroKey() {
+  for (const name of ['HIRO_API_KEYS', 'HIRO_API_KEY', 'VITE_HIRO_API_KEY']) {
+    const value = process.env[name];
+    if (value) return String(value).split(/[\s,]+/)[0];
+  }
+  for (const file of [
+    new URL('../wizards/.env.wizards', import.meta.url),
+    new URL('../../../../xtrata-2.0/.env.local', import.meta.url)
+  ]) {
+    try {
+      for (const line of readFileSync(file, 'utf8').split('\n')) {
+        const match = /^\s*(HIRO_API_KEYS?|VITE_HIRO_API_KEY)\s*=\s*(.*)$/.exec(line);
+        if (match) {
+          const value = match[2].trim().replace(/^["']|["']$/g, '').split(/[\s,]+/)[0];
+          if (value) return value;
+        }
+      }
+    } catch {
+      // Next file.
+    }
+  }
+  return '';
+}
+
+/** Never let a key out through an attribute it could close early. */
+const attr = (value) =>
+  String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
 function writeCanary(addresses) {
   const template = new URL('./inventory.html', import.meta.url);
   const out = new URL('./inventory-loaded.html', import.meta.url);
@@ -61,8 +98,23 @@ function writeCanary(addresses) {
   const end = html.indexOf('</textarea>', start);
   if (end === -1) throw new Error('inventory.html has an unclosed textarea.');
 
-  writeFileSync(out, html.slice(0, start) + escaped + html.slice(end), 'utf8');
-  return { path: out.pathname, count: addresses.length };
+  let page = html.slice(0, start) + escaped + html.slice(end);
+
+  // The key goes into the generated page only. `inventory.html` is committed
+  // and must never carry one; `inventory-loaded.html` is gitignored and already
+  // carries a personal address list, so it is the right place for it.
+  const key = hiroKey();
+  if (key) {
+    page = page.replace(
+      /(<input id="apikey"[^>]*?)(\s*>)/,
+      (all, head, tail) => `${head} value="${attr(key)}"${tail}`
+    );
+  }
+
+  writeFileSync(out, page, 'utf8');
+  // It holds an API key and a holdings list now. Same treatment as the seed file.
+  chmodSync(out, 0o600);
+  return { path: out.pathname, count: addresses.length, keyed: Boolean(key) };
 }
 
 /**
@@ -139,7 +191,12 @@ async function main() {
           : '') +
         `  ${owners.filter((o) => !derived.includes(o)).length} of those no seed reaches\n` +
         `  ${all.length} unique addresses in the box\n\n` +
-        'Gitignored. Open it, put your Hiro key in, and take the inventory.\n'
+        (written.keyed
+          ? '  Hiro API key baked in, so nothing comes back `unread` for want of one\n'
+          : '  NO HIRO KEY FOUND — an unkeyed run of this size returns `unread` rows.\n' +
+            '  Put HIRO_API_KEY in harness/wizards/.env.wizards and regenerate.\n') +
+        '\nGitignored and mode 600, because it now holds a key as well as a list.\n' +
+        'Open it and take the inventory.\n'
     );
     return;
   }

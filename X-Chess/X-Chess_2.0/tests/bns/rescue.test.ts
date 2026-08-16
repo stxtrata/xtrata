@@ -303,6 +303,17 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE).not.toContain('/v2/transactions');
   });
 
+  it('carries no API key of its own — the generated copy gets one, this does not', () => {
+    // `inventory.html` is committed. `inventory-loaded.html` is gitignored, mode
+    // 600, and already holds a personal address list, so the key belongs there
+    // and only there. A key committed to a repo is a key you cannot un-commit.
+    expect(PAGE, 'the committed page has a key baked into it').not.toMatch(
+      /value="[A-Za-z0-9_-]{16,}"/
+    );
+    // And the field is empty, so an unkeyed reader is asked rather than assumed.
+    expect(PAGE).toMatch(/<input id="apikey"[^>]*placeholder=/);
+  });
+
   it('is self-contained, so it cannot rot or phone home', () => {
     const external = PAGE.match(/https?:\/\/(?!api\.mainnet\.hiro\.so)[a-z0-9.-]+/gi) ?? [];
     expect(external, `the page fetches from ${external.join(', ')}`).toHaveLength(0);
