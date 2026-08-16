@@ -545,6 +545,74 @@ async function main() {
     return;
   }
 
+  // Concede one game, by hand, from outside a run.
+  //
+  //   node harness/wizards/run-tournament.mjs concede --game 18 --side white --live
+  //
+  // THE ESCAPE HATCH FOR A GAME THAT CANNOT END ITSELF, and it exists because
+  // game 18 needed it. Two hundred moves in, White had a bare king against a
+  // queen and Black could not deliver mate: 1.008 STX of miner fees and no
+  // prospect of a result. Nothing in the harness could end that. The fifty-move
+  // rule would have, eventually, and only after another forty moves of it.
+  //
+  // Deliberately manual. It is a permanent on-chain concession that hands
+  // somebody a win, so it is a thing a person does on purpose, with the losing
+  // side named on the command line — not something a run decides while nobody
+  // is watching. The automatic version of this is `adjudicate.mjs`, which is
+  // written, disconnected, and stays that way until its rule is one the
+  // evidence supports.
+  if (command === 'concede') {
+    const gameId = Number(arg('game'));
+    const side = arg('side');
+    if (!gameId || (side !== 'white' && side !== 'black')) {
+      throw new WizardSafetyError('concede needs --game <id> and --side white|black');
+    }
+
+    const games = await readGames();
+    const row = games.find((g) => g.id === gameId);
+    if (!row) throw new WizardSafetyError(`game ${gameId} is not on the contract`);
+
+    // The same rules-hash check every submission goes through. A concession is
+    // the one submission that cannot be taken back, so it is the last place to
+    // start trusting a game id typed on a command line.
+    const agents = byId(field.agents);
+    let found = null;
+    for (const round of plan.rounds) {
+      for (const pairing of round.pairings) {
+        const { hash } = await wizardRules(
+          agents[pairing.white]?.address,
+          agents[pairing.black]?.address
+        );
+        if (hash === row.rulesHash) found = pairing;
+      }
+      if (found) break;
+    }
+    if (!found) {
+      throw new WizardSafetyError(
+        `game ${gameId} does not match any pairing in this tournament. Refusing to ` +
+          'concede a game that may belong to somebody else.'
+      );
+    }
+
+    const conceding = agents[side === 'white' ? found.white : found.black];
+    const { rules } = await wizardRules(agents[found.white].address, agents[found.black].address);
+    console.log(`
+game ${gameId}: ${found.white} (white) v ${found.black}`);
+    console.log(`${conceding.name} concedes, making it ${side === 'white' ? '0-1' : '1-0'}`);
+    if (!LIVE) {
+      console.log('dry run — nothing sent. Add --live to mean it.');
+      return;
+    }
+    await resign({
+      gameId,
+      mover: conceding,
+      rules,
+      budget: { spent: 0n, cap: DEFAULT_SPEND_CAP_USTX },
+      why: 'conceded by hand: the game could not reach a result'
+    });
+    return;
+  }
+
   if (command === 'standings') {
     const games = await readGames();
     console.log(`${games.length} games on the contract. Standings need replay per game.\n`);

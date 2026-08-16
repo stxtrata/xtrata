@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+// Playing whole games with no chain under them.
+//
+//   node harness/wizards/lab.mjs                        one game, both sides Sonnet
+//   node harness/wizards/lab.mjs --games 12             twelve at once
+//   node harness/wizards/lab.mjs --games 12 --plain     the same, annotation stripped
+//   node harness/wizards/lab.mjs --from "<fen>"         from a position rather than the start
+//
+// WHY THIS EXISTS. Everything learned about how these characters play was
+// learned from mainnet, one move per block, three games at a time because the
+// nonce rule allows no more, at 0.003 STX a move. Round 2 cost about 2 STX and
+// four hours to discover that nobody could convert a won game.
+//
+// None of that is needed to find that out. The chain is what makes a result
+// PUBLIC and checkable by a stranger; it has nothing to do with whether the
+// move was any good. Take it away and the same experiment runs in minutes:
+//
+//   on chain   ~12s per move, 3 games at once, real STX, permanent
+//   here       ~5s per move, as many games at once as the box will take, free
+//
+// So the loop is: tune here until the players can actually play, then put a
+// tournament on chain because a tournament is a thing people watch. Not the
+// other way round, which is what we were doing.
+//
+// SAME CHOOSER, SAME ENGINE, SAME ANNOTATION as the tournament — this imports
+// them rather than reimplementing, so a result here means something about the
+// thing that will actually run. The only piece missing is the chain.
+
+import { build } from 'esbuild';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { annotateMoves, chooseMove, claudeCodeAsker, materialBalance } from './chooser.mjs';
+import { PERSONALITIES, personalityNamed } from './personalities.mjs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, '..', '..');
+
+const arg = (name, fallback = null) => {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
+};
+const GAMES = Number(arg('games', '1'));
+const PLIES = Number(arg('plies', '200'));
+const MODEL = arg('model', 'claude-sonnet-5');
+const FROM = arg('from');
+const PLAIN = process.argv.includes('--plain');
+
+/**
+ * How many games run at once.
+ *
+ * Bounded because every one of these is a `claude -p` subprocess against a
+ * subscription whose limits are shaped for a person typing, not for a fleet.
+ * Twelve is comfortable; the flag is there because the right number depends on
+ * whose plan it is.
+ */
+const CONCURRENCY = Number(arg('at-once', '6'));
+
+async function loadEngine() {
+  const out = await build({
+    entryPoints: [join(ROOT, 'packages', 'chess', 'engine.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent'
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+}
+
+/** One complete game, and everything worth counting about it. */
+async function playOne({ Position, white, black, ask, seed }) {
+  const board = seed ? new Position(seed) : new Position();
+  const history = [];
+  const counted = { blunders: 0, moves: 0, missedMates: 0, stalematesTaken: 0 };
+
+  for (let ply = 0; ply < PLIES; ply++) {
+    if (board.isCheckmate()) {
+      return { ...counted, result: board.turn === 0 ? '0-1' : '1-0', by: 'checkmate', plies: ply, history };
+    }
+    for (const [is, by] of [['isStalemate', 'stalemate'], ['isRepetition', 'repetition'], ['isFiftyMoveDraw', 'fifty-move'], ['isInsufficientMaterial', 'insufficient']]) {
+      if (board[is]()) return { ...counted, result: '1/2-1/2', by, plies: ply, history };
+    }
+
+    const legal = board.movesUci();
+    if (!legal.length) return { ...counted, result: '1/2-1/2', by: 'no moves', plies: ply, history };
+
+    let notes = annotateMoves(Position, board.fen(), legal, history);
+
+    // Was a mate on offer, and did they take it? Counted before the note is
+    // stripped, so the --plain arm is measured on the same footing.
+    const mate = notes.find((n) => n.ends === 'mate');
+    if (PLAIN) {
+      notes = notes.map((n) => ({ ...n, note: '' }));
+    }
+
+    const mover = board.turn === 0 ? white : black;
+    let move;
+    try {
+      ({ move } = await chooseMove({
+        character: mover, ask, annotations: PLAIN ? null : notes,
+        position: {
+          fen: board.fen(), legalMoves: legal,
+          turn: board.turn === 0 ? 'white' : 'black', history
+        }
+      }));
+    } catch (error) {
+      // A character that cannot produce a legal move loses, exactly as it would
+      // on chain — where it resigns. No point pretending that is a draw.
+      return {
+        ...counted, result: board.turn === 0 ? '0-1' : '1-0', by: 'forfeit',
+        plies: ply, history, note: String(error.message).slice(0, 80)
+      };
+    }
+
+    const chosenNote = annotateMoves(Position, board.fen(), [move], history)[0];
+    if (mate && move !== mate.uci) counted.missedMates++;
+    if (chosenNote?.ends === 'stalemate') counted.stalematesTaken++;
+    if ((chosenNote?.worst ?? 0) > 0) counted.blunders++;
+    counted.moves++;
+
+    board.applyUci(move);
+    history.push(move);
+  }
+
+  const { white: w, black: b } = materialBalance(board.fen());
+  return { ...counted, result: null, by: `unfinished at ${PLIES} plies`, plies: PLIES, history, material: w - b };
+}
+
+/** Run `thunks` with at most `limit` in flight. */
+async function pool(thunks, limit) {
+  const out = [];
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, thunks.length) }, async () => {
+    while (next < thunks.length) {
+      const mine = next++;
+      out[mine] = await thunks[mine]();
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+async function main() {
+  const { Position } = await loadEngine();
+  const ask = claudeCodeAsker();
+  const pair = (n) => {
+    const all = PERSONALITIES;
+    return { white: all[n % all.length], black: all[(n + 1) % all.length] };
+  };
+
+  console.log(`\nlab — ${GAMES} game${GAMES === 1 ? '' : 's'}, no chain`);
+  console.log(`model     ${MODEL}`);
+  console.log(`notes     ${PLAIN ? 'STRIPPED (control arm)' : 'full annotation'}`);
+  console.log(`from      ${FROM ?? 'the starting position'}`);
+  console.log(`at once   ${CONCURRENCY}\n`);
+
+  const started = Date.now();
+  const games = await pool(
+    Array.from({ length: GAMES }, (_, n) => async () => {
+      const { white, black } = pair(n);
+      const out = await playOne({
+        Position, ask, seed: FROM,
+        white: { ...white, model: MODEL },
+        black: { ...black, model: MODEL }
+      });
+      console.log(
+        `  ${white.name.padEnd(8)} v ${black.name.padEnd(8)} ${String(out.result ?? '—').padEnd(8)} ` +
+          `${out.by.padEnd(22)} ${out.plies} plies`
+      );
+      return out;
+    }),
+    CONCURRENCY
+  );
+
+  const total = (k) => games.reduce((n, g) => n + (g[k] ?? 0), 0);
+  const decisive = games.filter((g) => g.result === '1-0' || g.result === '0-1').length;
+  const mates = games.filter((g) => g.by === 'checkmate').length;
+  const moves = total('moves');
+
+  console.log(`\n${GAMES} games in ${((Date.now() - started) / 60000).toFixed(1)} minutes, ${moves} moves`);
+  console.log(`  decided                : ${decisive}/${GAMES}  (${mates} by checkmate)`);
+  console.log(`  unfinished at ${PLIES} plies : ${games.filter((g) => !g.result).length}`);
+  console.log(`  moves that hang material: ${moves ? Math.round((total('blunders') / moves) * 100) : 0}%`);
+  console.log(`  mates missed            : ${total('missedMates')}`);
+  console.log(`  stalemates walked into  : ${total('stalematesTaken')}`);
+  console.log(`\nOn chain this would have been ${(moves * 3000 / 1e6).toFixed(3)} STX and about ${Math.round(moves * 12.5 / 60)} minutes of blocks.\n`);
+}
+
+main().catch((error) => {
+  console.error(`\n${error.message}\n`);
+  process.exit(1);
+});

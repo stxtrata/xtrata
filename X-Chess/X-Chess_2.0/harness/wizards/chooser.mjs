@@ -127,6 +127,16 @@ export function buildRequest({ character, fen, history, legalMoves, turn, annota
     ? annotations.map((a) => `${a.uci}  ${a.san ? `(${a.san})  ` : ''}${a.note}`).join('\n')
     : legalMoves.join(' ');
 
+  // Said out loud when the list is ranked, because an ordered list invites the
+  // reading "the first one is the answer" — and that reading would end the
+  // experiment. The engine is there so a style has something to choose BETWEEN,
+  // not to choose for anybody.
+  const ordering = annotations?.[0]?.score !== undefined
+    ? '\nThe list is in engine order, best first, scored in pawns from your point of ' +
+      'view. It is information, not an instruction: play the move your character ' +
+      'would play. A worse move that fits who you are is the right answer here.'
+    : '';
+
   const { white, black } = materialBalance(fen);
   const mine = turn === 'white' ? white : black;
   const theirs = turn === 'white' ? black : white;
@@ -147,9 +157,12 @@ Position (FEN): ${fen}
 ${edge}
 Moves so far: ${moves}
 
-Legal moves, and your reply must be exactly one of them:
+Legal moves, and your reply must be exactly one of them:${ordering}
 ${list}`;
 }
+
+
+
 
 /**
  * Who is ahead, and by how much.
@@ -173,6 +186,64 @@ export function materialBalance(fen) {
     else black += worth;
   }
   return { white, black };
+}
+
+/**
+ * Every legal move, ranked by the engine, as the character will see it.
+ *
+ * THE ENGINE INFORMS, IT DOES NOT PLAY. The whole list comes back, in the
+ * engine's order, with a number against each — not a recommendation, and never
+ * a shortened list. A character handed one move is an engine playing, and
+ * nobody entered a tournament to watch that.
+ *
+ * What this replaces is the one-ply test, which was the best available before
+ * and is strictly weaker: it saw a hanging piece and could not see a plan,
+ * because a plan is a search. On the ending that ran for a hundred moves
+ * without a mate, this finds mate in nine.
+ *
+ * Scores are in PAWNS, rounded to one decimal, from the mover's point of view.
+ * Centipawns are the engine's unit and mean nothing to a reader; "+2.4" is a
+ * quantity a chess player already understands.
+ */
+export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }) {
+  const board = new Position(fen);
+  const ranked = rankMoves(board.state, depth);
+
+  // Repetition still has to be checked here: it is a fact about the GAME, and
+  // the engine only ever sees a position.
+  const seen = [];
+  if (played.length) {
+    try {
+      const walk = new Position();
+      seen.push(walk.key());
+      for (const uci of played) {
+        walk.applyUci(uci);
+        seen.push(walk.key());
+      }
+      if (walk.fen() !== fen) seen.length = 0;
+    } catch {
+      seen.length = 0;
+    }
+  }
+
+  return ranked.map((row, place) => {
+    const after = new Position(fen);
+    const moved = after.applyUci(row.uci);
+
+    let note;
+    if (row.mateIn && row.mateIn > 0) note = `MATE IN ${row.mateIn}`;
+    else if (row.mateIn && row.mateIn < 0) note = `mated in ${-row.mateIn}`;
+    else note = `${row.score >= 0 ? '+' : ''}${(row.score / 100).toFixed(1)}`;
+
+    if (after.isStalemate()) note += ' — STALEMATE, draws now';
+    else if (seen.length) {
+      const key = after.key();
+      const again = seen.reduce((n, k) => n + (k === key ? 1 : 0), 0);
+      if (again >= 2) note += ' — DRAWS NOW by repetition';
+    }
+
+    return { uci: row.uci, san: moved?.san ?? null, note, score: row.score, place, mateIn: row.mateIn };
+  });
 }
 
 /**
@@ -261,6 +332,22 @@ export function annotateMoves(Position, fen, legalMoves, played = []) {
         }
       }
 
+      // HOW THE GAME ENDS COMES FIRST, and for a long time it did not come at
+      // all. A mate in one was annotated "— nothing hangs", which is true and
+      // is the least useful true thing available: identical to every quiet
+      // move on the list. Six games were played with mate unmarked.
+      //
+      // Stalemate matters as much and in the other direction. A player with a
+      // queen against a bare king stalemates by accident constantly, and
+      // throwing away a won game is a worse outcome than any blunder this
+      // function was built to catch.
+      if (before.isCheckmate()) {
+        return { uci, san: moved?.san ?? null, note: '— CHECKMATE, this wins the game now', worst: 0, repeats: 0, ends: 'mate' };
+      }
+      if (before.isStalemate()) {
+        return { uci, san: moved?.san ?? null, note: '— STALEMATE, this draws the game now', worst: 0, repeats: 0, ends: 'stalemate' };
+      }
+
       // A third occurrence ENDS THE GAME as a draw, whatever the position is
       // worth. Said plainly, because "repeats" is a chess term and "this draws
       // the game now" is what actually follows.
@@ -273,7 +360,8 @@ export function annotateMoves(Position, fen, legalMoves, played = []) {
           : worst > 0
             ? `— drops a pawn to ${by}`
             : '— nothing hangs';
-      return { uci, san: moved?.san ?? null, note: `${danger}${repeats}`, worst, repeats: again };
+
+      return { uci, san: moved?.san ?? null, note: `${danger}${repeats}`, worst, repeats: again, ends: null };
     } catch {
       return { uci, san: null, note: '', worst: 0, repeats: 0 };
     }
