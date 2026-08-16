@@ -84,7 +84,7 @@ function hiroKey() {
 const attr = (value) =>
   String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
-function writeCanary(addresses) {
+function writeCanary(addresses, btcPairs = {}) {
   const template = new URL('./inventory.html', import.meta.url);
   const out = new URL('./inventory-loaded.html', import.meta.url);
   const html = readFileSync(template, 'utf8');
@@ -111,6 +111,17 @@ function writeCanary(addresses) {
     page = page.replace(
       /(<input id="apikey"[^>]*?)(\s*>)/,
       (all, head, tail) => `${head} value="${attr(key)}"${tail}`
+    );
+  }
+
+  // The Stacks -> Bitcoin pairing. The page cannot derive this: the pairing
+  // comes from a seed and the page never sees one. Injected as JSON in a
+  // non-executing script block, so an address cannot become code.
+  if (Object.keys(btcPairs).length) {
+    page = page.replace(
+      /(<script type="application\/json" id="btc-pairs">)[\s\S]*?(<\/script>)/,
+      (all, head, tail) =>
+        `${head}${JSON.stringify(btcPairs).replace(/</g, '\\u003c')}${tail}`
     );
   }
 
@@ -182,8 +193,16 @@ async function main() {
       }
     }
 
+    // Every Leather account carries its paired Bitcoin address. The hardened
+    // convention does not, so it contributes nothing here rather than a guess.
+    const accounts = deriveAllAccounts(seeds, depth);
+    const btcPairs = {};
+    for (const account of accounts.values()) {
+      if (account.btc) btcPairs[account.address] = account.btc;
+    }
+
     const all = [...new Set([...derived, ...owners])];
-    const written = writeCanary(all);
+    const written = writeCanary(all, btcPairs);
     console.error(
       `\nWrote ${written.path}\n` +
         `  ${derived.length} derived from ${seeds.length} seed(s) at depth ${depth}\n` +
@@ -193,7 +212,8 @@ async function main() {
             '\n'
           : '') +
         `  ${owners.filter((o) => !derived.includes(o)).length} of those no seed reaches\n` +
-        `  ${all.length} unique addresses in the box\n\n` +
+        `  ${all.length} unique addresses in the box\n` +
+        `  ${Object.keys(btcPairs).length} paired Bitcoin addresses (BIP84 m/84'/0'/N'/0/0)\n\n` +
         (written.keyed
           ? '  Hiro API key baked in, so nothing comes back `unread` for want of one\n'
           : '  NO HIRO KEY FOUND — an unkeyed run of this size returns `unread` rows.\n' +

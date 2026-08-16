@@ -47,6 +47,10 @@
     font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
   }
   main { max-width: 1100px; margin: 0 auto; }
+  /* The results table is the one thing allowed to use the whole window. Capping
+     it at the prose width is what made it scroll sideways in the first place. */
+  #results { max-width: none; margin-left: calc((100% - 96vw) / 2); width: 96vw; }
+  @media (max-width: 1180px) { #results { margin-left: 0; width: 100%; } }
   h1 { font-size: 1.5rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
   h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
   .sub { color: var(--muted); margin: 0 0 1.5rem; }
@@ -85,6 +89,10 @@
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   /* A zero is a fact and should not shout as loudly as a balance. */
   td.zero { color: var(--muted); }
+  td.addr { cursor: help; white-space: nowrap; }
+  /* Numbers are narrow and fixed; the columns that vary get what is left. */
+  th.num, td.num { width: 1%; white-space: nowrap; }
+  .more { margin-top: .35rem; }
   code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
   .tag {
     display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
@@ -134,7 +142,9 @@
       Anything that is not an <span class="mono">SP…</span> / <span class="mono">SM…</span>
       principal is ignored, so you can paste a whole table and let it pick the addresses out.
       <strong>Hover a token</strong> for its amount and full contract;
-      <strong>click an NFT row</strong> to expand it into every contract with a count.
+      <strong>click "N more"</strong> on tokens or NFTs to expand the rest.
+      The address is shortened — hover it for the full principal, and the saved
+      snapshot always keeps it in full.
       Both are kept off screen so four hundred rows stay scannable.
       sBTC, xBTC, aeUSDC and USDC get their own columns and are matched on the
       exact contract, never the symbol — several tokens on Stacks claim the
@@ -180,6 +190,11 @@
   </div>
 
   <div id="results" class="scroll"></div>
+  <!-- Filled by `addresses.mjs --canary`. Absent means no Bitcoin column, which
+       is the right default: without the pairing this page cannot know which
+       bc1 address belongs to which principal, and guessing one would be worse
+       than omitting it. -->
+  <script type="application/json" id="btc-pairs">{}</script>
 </main>
 
 <script>
@@ -254,6 +269,56 @@
     { label: 'USDC', contract: 'SP2DBFGMT7SATSJPCCA38SDDPBNNQ86QWADJ3E6WT.usdc', decimals: 6 }
   ]);
   const HEADLINE_CONTRACTS = new Set(HEADLINE.map((t) => t.contract));
+
+  /**
+   * Stacks principal -> the Bitcoin address Leather pairs with it.
+   *
+   * Supplied by the generator, because this page cannot derive it: the pairing
+   * comes from a seed, and this page never sees one. No pairing means no Bitcoin
+   * column, which is the honest default.
+   */
+  const BTC_PAIRS = (() => {
+    try { return JSON.parse($('btc-pairs')?.textContent || '{}'); } catch { return {}; }
+  })();
+  const HAS_BTC = Object.keys(BTC_PAIRS).length > 0;
+
+  /**
+   * Bitcoin balance, from an Esplora API.
+   *
+   * NOT HIRO, and not for want of trying: their Ordinals, Runes and BRC-20 APIs
+   * all answer 410 Gone - deprecated - and the Stacks balances endpoint rejects
+   * a bech32 address outright. So this is a second host, added deliberately,
+   * with a fallback to a second implementation of the same API.
+   *
+   * Both send `access-control-allow-origin: *`, so a file:// page can call them.
+   */
+  const BTC_HOSTS = ['https://mempool.space/api', 'https://blockstream.info/api'];
+
+  async function btcBalance(address) {
+    let last = null;
+    for (const host of BTC_HOSTS) {
+      try {
+        const response = await fetch(`${host}/address/${address}`);
+        if (!response.ok) { last = `HTTP ${response.status}`; continue; }
+        const body = await response.json();
+        const confirmed =
+          BigInt(body.chain_stats.funded_txo_sum) - BigInt(body.chain_stats.spent_txo_sum);
+        const pending =
+          BigInt(body.mempool_stats.funded_txo_sum) - BigInt(body.mempool_stats.spent_txo_sum);
+        return {
+          sats: confirmed + pending,
+          txCount: body.chain_stats.tx_count + body.mempool_stats.tx_count,
+          utxos: body.chain_stats.funded_txo_count - body.chain_stats.spent_txo_count
+        };
+      } catch (error) {
+        last = error.message;
+      }
+    }
+    return { error: last ?? 'unreachable' };
+  }
+
+  /** Sats, shown as sats. A number in BTC hides the ones that matter. */
+  const sats = (n) => `${n.toLocaleString('en-US')}`;
 
   async function metaFor(assetId) {
     const contract = assetId.split('::')[0];
@@ -440,10 +505,58 @@
       row.error = String(error.message ?? error);
       console.error(`[inventory] ${address}: ${row.error}`);
     }
+
+    // Bitcoin last and separately: a different host, and a failure there must
+    // not mark the whole Stacks row unread.
+    const btcAddress = BTC_PAIRS[address];
+    if (btcAddress) {
+      row.btcAddress = btcAddress;
+      row.btc = await btcBalance(btcAddress);
+    }
     return row;
   }
 
   /* --------------------------------------------------------------- */
+
+  /**
+   * The Bitcoin cell, with the warning that belongs on it.
+   *
+   * A busy address is very likely an ORDINALS address, and on one of those a
+   * "balance" is not spendable money - it is inscriptions sitting in UTXOs, and
+   * sweeping it destroys them. The tooltip says so wherever the transaction
+   * count suggests it, because a number labelled "balance" invites exactly the
+   * action that loses the thing.
+   */
+  function btcCell(row) {
+    // DERIVED, not trusted. A row carried over from a snapshot has no
+    // `btcAddress` - the same failure that printed "undefined" for token
+    // amounts - so the pairing is looked up here and the cell says whether the
+    // balance was actually fetched.
+    const paired = row.btcAddress ?? BTC_PAIRS[row.address] ?? null;
+    if (!paired) return '<td class="num zero">—</td>';
+    if (!row.btc) {
+      return (
+        `<td class="num zero" title="${esc(paired)}\n\nNot read in this run. ` +
+        `Resume or retry to fetch it.">not read</td>`
+      );
+    }
+    if (row.btc?.error) {
+      return `<td class="num bad" title="${esc(row.btc.error)}">unread</td>`;
+    }
+    const value = row.btc?.sats ?? 0n;
+    const busy = (row.btc?.txCount ?? 0) > 20;
+    const note =
+      `${paired}\n${row.btc?.utxos ?? 0} UTXO(s), ${row.btc?.txCount ?? 0} tx` +
+      (busy
+        ? '\n\nWARNING: heavily used, so this is very likely an ordinals address.' +
+          '\nA balance here may BE inscriptions sitting in UTXOs. Sweeping it' +
+          '\nspends them, and they do not come back. Check before moving anything.'
+        : '');
+    return (
+      `<td class="num${value === 0n ? ' zero' : ''}${busy ? ' warn' : ''}" ` +
+      `title="${esc(note)}">${value === 0n ? '—' : sats(value)}${busy ? ' ⚠' : ''}</td>`
+    );
+  }
 
   function render(rows) {
     const wrap = $('results');
@@ -452,6 +565,7 @@
     table.innerHTML =
       '<thead><tr><th>address</th><th class="num">STX</th>' +
       HEADLINE.map((t) => `<th class="num">${t.label}</th>`).join('') +
+      (HAS_BTC ? '<th class="num">BTC (sats)</th>' : '') +
       '<th>BNS names</th><th>other NFTs</th><th>tokens</th></tr></thead>';
     const body = document.createElement('tbody');
 
@@ -485,9 +599,7 @@
             })
             .join('')}</ul></details>`
         : '<span style="color:var(--muted)">—</span>';
-      const fts = row.fts.length
-        ? row.fts
-            .map((f) => {
+      const tokenTag = (f) => {
               // DERIVED AT RENDER TIME, never trusted from the row.
               //
               // A row carried over from a snapshot was written by whatever
@@ -496,27 +608,44 @@
               // same token that showed 40,000 one row below. A number nobody can
               // rely on is worse than a raw one, and a snapshot is a file that
               // outlives the code that wrote it.
-              const amount =
-                f.amount ??
-                formatAmount(f.balance, ftMeta.get(f.id.split('::')[0]) ?? null);
-              return `<span class="tag tag--hover" title="${esc(
-                `${amount}\n${f.id}`
-              )}">${esc(f.id.split('::').pop())}</span>`;
-            })
-            .join('')
-        : '<span style="color:var(--muted)">—</span>';
+        const amount =
+          f.amount ?? formatAmount(f.balance, ftMeta.get(f.id.split('::')[0]) ?? null);
+        return `<span class="tag tag--hover" title="${esc(
+          `${amount}\n${f.id}`
+        )}">${esc(f.id.split('::').pop())}</span>`;
+      };
+
+      // A few on screen, the rest one click away. One wallet here holds
+      // eighty-seven token types, which as a wall of tags is a screenful for a
+      // single row and pushes every other column out of view.
+      const TOKENS_SHOWN = 4;
+      const fts = !row.fts.length
+        ? '<span style="color:var(--muted)">—</span>'
+        : row.fts.length <= TOKENS_SHOWN
+          ? row.fts.map(tokenTag).join('')
+          : row.fts.slice(0, TOKENS_SHOWN).map(tokenTag).join('') +
+            `<details class="nfts"><summary>${row.fts.length - TOKENS_SHOWN} more</summary>` +
+            `<div class="more">${row.fts.slice(TOKENS_SHOWN).map(tokenTag).join('')}</div>` +
+            '</details>';
       // A failed row spans the remaining columns with its reason rather than
       // showing three empty dashes that look like an answer.
+      // ABBREVIATED, with the whole thing on hover and in the saved snapshot.
+      // A 41 character principal in every row forced the table sideways and
+      // pushed the columns that carry the answers off the edge - so the one
+      // value nobody reads character by character is the one that gets short.
       tr.innerHTML =
-        `<td class="mono">${row.address}</td>` +
+        `<td class="mono addr" title="${esc(row.address)}">${esc(
+          `${row.address.slice(0, 6)}…${row.address.slice(-5)}`
+        )}</td>` +
         `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
         (row.error
-          ? `<td colspan="${HEADLINE.length + 3}" class="bad" style="font-size:.82rem">${row.error
+          ? `<td colspan="${HEADLINE.length + (HAS_BTC ? 4 : 3)}" class="bad" style="font-size:.82rem">${row.error
               .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`
           : HEADLINE.map((t) => {
               const held = row.headline?.[t.label];
               return `<td class="num${held ? '' : ' zero'}">${held ?? '—'}</td>`;
             }).join('') +
+            (HAS_BTC ? btcCell(row) : '') +
             `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
             `<td>${nfts}</td><td>${fts}</td>`);
       body.appendChild(tr);

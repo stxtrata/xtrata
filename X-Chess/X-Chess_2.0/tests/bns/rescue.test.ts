@@ -352,9 +352,35 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE).toMatch(/<input id="apikey"[^>]*placeholder=/);
   });
 
-  it('is self-contained, so it cannot rot or phone home', () => {
-    const external = PAGE.match(/https?:\/\/(?!api\.mainnet\.hiro\.so)[a-z0-9.-]+/gi) ?? [];
+  it('talks to a named list of hosts and nothing else', () => {
+    // Three, each added deliberately. Hiro cannot answer for Bitcoin - its
+    // Ordinals, Runes and BRC-20 APIs all return 410 Gone, and the Stacks
+    // balances endpoint rejects a bech32 address - so an Esplora host was added
+    // with a second implementation of the same API behind it. This test is what
+    // makes a FOURTH host a decision rather than an accident.
+    const allowed = ['api.mainnet.hiro.so', 'mempool.space', 'blockstream.info'];
+    const pattern = new RegExp(
+      `https?://(?!${allowed.map((h) => h.replace(/\./g, '\\.')).join('|')})[a-z0-9.-]+`,
+      'gi'
+    );
+    const external = PAGE.match(pattern) ?? [];
     expect(external, `the page fetches from ${external.join(', ')}`).toHaveLength(0);
+  });
+
+  it('warns that a busy Bitcoin address is probably holding inscriptions', () => {
+    // A number labelled "balance" invites spending it. On an ordinals address
+    // that balance IS the inscriptions, sitting in UTXOs, and sweeping it
+    // destroys them permanently. The first address checked here had 747
+    // transactions and 580 sats.
+    expect(PAGE).toContain('very likely an ordinals address');
+    expect(PAGE).toMatch(/do not come back/);
+  });
+
+  it('shows no Bitcoin column without a pairing, rather than guessing one', () => {
+    // The pairing comes from a seed and the page never sees one, so an
+    // unpaired page must omit the column instead of inventing an address.
+    expect(PAGE).toContain('const HAS_BTC =');
+    expect(PAGE).toMatch(/HAS_BTC \? '<th class="num">BTC/);
   });
 
   it('retries what failed without re-reading what did not', () => {
@@ -440,6 +466,33 @@ describe('the inventory page, which must never be able to take a seed', () => {
     // as a bug in the chain data rather than an old file.
     expect(PAGE).toContain('const SNAPSHOT_FORMAT');
     expect(PAGE).toMatch(/baseline\.format \?\? 1\) < SNAPSHOT_FORMAT/);
+  });
+
+  it('shortens the address but never loses it', () => {
+    // A 41 character principal in every row forced the table sideways and
+    // pushed the columns carrying the answers off the edge. The address is the
+    // one value nobody reads character by character, so it is the one that got
+    // short - with the whole thing on hover, and untouched in the snapshot.
+    expect(PAGE).toContain('class="mono addr"');
+    expect(PAGE).toMatch(/row\.address\.slice\(0, 6\)/);
+    expect(PAGE, 'the full address is not recoverable from the row').toMatch(
+      /title="\$\{esc\(row\.address\)\}"/
+    );
+  });
+
+  it('truncates a long token list instead of unrolling it across the table', () => {
+    // One wallet here holds eighty-seven token types. As a wall of tags that is
+    // a screenful for one row, and every other column goes off the edge.
+    expect(PAGE).toContain('const TOKENS_SHOWN');
+    expect(PAGE).toMatch(/row\.fts\.length - TOKENS_SHOWN\} more/);
+  });
+
+  it('distinguishes a Bitcoin address not read from one holding nothing', () => {
+    // Same failure as the undefined amounts: a row carried over from a snapshot
+    // has no btc field, and rendering that as an em dash claims a zero balance
+    // for an address nobody asked about.
+    expect(PAGE).toContain('BTC_PAIRS[row.address]');
+    expect(PAGE).toContain('>not read</td>');
   });
 
   it('never renders an unread wallet as an empty one', () => {
