@@ -44,6 +44,44 @@ a log — `KEY_SHAPED` already redacts 64-character hex; it gains a rule for
 `sk-ant-` prefixes. A future user does exactly what you do: their key, their
 file, their machine, and nothing about it travels.
 
+### Two accounts, and the run picks the cheaper one first
+
+**A Claude subscription and a Console credit balance are billed separately.**
+This is not obvious and it cost us a round: the plan sat at 5% used while the
+`sk-ant-` key was refused for want of credit. The key was not broken. It was
+drawing on a different, empty account.
+
+So the Director prefers a subscription when one is signed in:
+
+```bash
+brew install --cask anthropics/tap/ant
+ant auth login          # browser OAuth, once — a run cannot do this for you
+```
+
+`run-tournament.mjs` probes by asking for a token, not by reading `ant auth
+status`. Status prints prose for a person, and matching prose is how you decide
+a live profile is absent because the wording changed. If a token comes back the
+run uses it and says so in its header; if not it falls back to the key and says
+that instead. **Read the `auth` line before a long run** — it is the difference
+between spending a subscription somebody already pays for and spending credit
+that has to be topped up.
+
+The token goes in `Authorization: Bearer` with `anthropic-beta:
+oauth-2025-04-20`. It does **not** go in `x-api-key`; that is rejected in a way
+that reads like anything but the actual cause. It is minted once and cached for
+ten minutes rather than fetched per move — a tournament is hundreds of moves,
+and `print-credentials` refreshes a near-expiry token itself, which is what
+makes a run lasting hours survive an expiry in the middle of it.
+
+Two failure modes worth naming, because both are quiet:
+
+* `print-credentials` **without** `--access-token` prints the whole credentials
+  JSON. As a Bearer header that yields a protocol error, not an auth error.
+  The harness rejects a `{`-shaped answer for exactly this reason.
+* **Subscription rate limits are shaped for interactive use.** A 27-game
+  unattended run is not that. If a round stalls on limits rather than on chain,
+  that is the cause, and the fix is fewer games at once — not a bigger key.
+
 **What the artefact does instead** is what it is good at: read the games, replay
 them, show the standings. A spectator needs no key and no permission, because
 every result is derivable from chain by anybody. That separation is the feature,

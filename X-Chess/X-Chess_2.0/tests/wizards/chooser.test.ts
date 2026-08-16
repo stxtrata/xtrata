@@ -18,6 +18,8 @@ import {
   SYSTEM_PROMPT,
   buildRequest,
   annotateMoves,
+  anthropicAsker,
+  antOAuth,
   chooseMove,
   extractMove
 } from '../../harness/wizards/chooser.mjs';
@@ -353,5 +355,90 @@ describe('the tactical facts the harness works out for you', () => {
   it('survives a move the engine cannot apply, rather than losing the move', () => {
     const notes = annotateMoves(Position, START_FEN, ['zzzz']);
     expect(notes[0].uci, 'a bad move was dropped from the list').toBe('zzzz');
+  });
+});
+
+describe('paying for the thinking', () => {
+  // Two accounts, not one. A Max subscription at 5% used and a Console credit
+  // balance at zero are both true at the same time, and the harness stopped
+  // mid-tournament because it was drawing on the second while the person
+  // paying £90 a month owned the first. Which credential goes in which header
+  // is the whole of the difference.
+
+  const headersOf = async (auth: Record<string, unknown>) => {
+    let sent: any = null;
+    const fetchImpl = async (_url: string, init: any) => {
+      sent = init;
+      return { ok: true, json: async () => ({ content: [{ text: 'e4' }] }) };
+    };
+    const ask = anthropicAsker({ ...auth, fetchImpl } as any);
+    await ask({ system: 's', user: 'u', model: 'claude-opus-5' });
+    return sent.headers as Record<string, string>;
+  };
+
+  it('sends a subscription token as Bearer, never as the key header', async () => {
+    const headers = await headersOf({ oauth: async () => 'oat-live' });
+    expect(headers.authorization).toBe('Bearer oat-live');
+    expect(headers['anthropic-beta']).toBe('oauth-2025-04-20');
+    // The rejection for putting it here is opaque, so assert it never happens.
+    expect(headers['x-api-key']).toBeUndefined();
+  });
+
+  it('sends a Console key as the key header, with no oauth beta', async () => {
+    const headers = await headersOf({ apiKey: 'sk-ant-test' });
+    expect(headers['x-api-key']).toBe('sk-ant-test');
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['anthropic-beta']).toBeUndefined();
+  });
+
+  it('prefers the subscription when both are present', async () => {
+    // Nobody runs `ant auth login` by accident. A key can sit in a file for
+    // months, so the deliberate act is the one that wins.
+    const headers = await headersOf({ apiKey: 'sk-ant-stale', oauth: async () => 'oat-live' });
+    expect(headers.authorization).toBe('Bearer oat-live');
+    expect(headers['x-api-key']).toBeUndefined();
+  });
+
+  it('refuses to run with neither, and names both ways to fix it', () => {
+    expect(() => anthropicAsker({} as any)).toThrow(/ANTHROPIC_API_KEY[\s\S]*ant auth login/);
+  });
+});
+
+describe('the subscription token', () => {
+  it('is minted once and reused, not fetched per move', async () => {
+    let mints = 0;
+    const oauth = antOAuth({
+      exec: async () => `token-${++mints}\n`,
+      now: () => 0
+    });
+    expect(await oauth()).toBe('token-1');
+    await oauth();
+    await oauth();
+    // A tournament is hundreds of moves. One subprocess each would be absurd.
+    expect(mints).toBe(1);
+  });
+
+  it('is re-minted before it can go stale', async () => {
+    let mints = 0;
+    let clock = 0;
+    const oauth = antOAuth({ exec: async () => `token-${++mints}`, ttlMs: 1000, now: () => clock });
+    expect(await oauth()).toBe('token-1');
+    clock = 999;
+    expect(await oauth()).toBe('token-1');
+    clock = 1001;
+    // A run lasting hours must not die on an expiry halfway through.
+    expect(await oauth()).toBe('token-2');
+  });
+
+  it('rejects the whole credentials blob, which is the easy mistake', async () => {
+    // `ant auth print-credentials` without --access-token prints JSON. As a
+    // Bearer header that fails in a way that looks like anything but this.
+    const oauth = antOAuth({ exec: async () => '{"accessToken":"oat-01"}' });
+    await expect(oauth()).rejects.toThrow(/--access-token/);
+  });
+
+  it('rejects an empty answer rather than sending "Bearer "', async () => {
+    const oauth = antOAuth({ exec: async () => '  \n' });
+    await expect(oauth()).rejects.toThrow(/no access token/);
   });
 });

@@ -31,6 +31,42 @@ import { WizardSafetyError, scrub } from './wizards-core.mjs';
 export const MAX_ATTEMPTS = 3;
 
 /**
+ * A short-lived subscription token, re-minted before it can go stale.
+ *
+ * `ant auth print-credentials --access-token` refreshes the token itself when it
+ * needs to, so the only job here is to ask often enough and not on every single
+ * request. A tournament runs for hours across hundreds of moves; a token that
+ * expires halfway would end the run, and that is exactly the class of failure
+ * this harness has already been caught by twice.
+ *
+ * Cached for ten minutes, which is well inside any token lifetime and turns
+ * hundreds of subprocess calls into a handful.
+ *
+ * NEVER LOGGED. It is a credential and `scrub` does not know its shape, so the
+ * only safe handling is for it not to reach a string anybody prints.
+ */
+export function antOAuth({ exec, ttlMs = 10 * 60_000, now = () => Date.now() } = {}) {
+  let token = null;
+  let mintedAt = 0;
+  return async () => {
+    if (token && now() - mintedAt < ttlMs) return token;
+    const fresh = (await exec()).trim();
+    if (!fresh || fresh.startsWith('{')) {
+      // The no-flag form of `print-credentials` prints the whole credentials
+      // JSON, which as a Bearer header yields an empty response or a protocol
+      // error rather than an auth failure - a confusing way to spend an hour.
+      throw new WizardSafetyError(
+        'ant returned no access token. Use `ant auth print-credentials --access-token`, ' +
+          'and check `ant auth status` shows an active profile.'
+      );
+    }
+    token = fresh;
+    mintedAt = now();
+    return token;
+  };
+}
+
+/**
  * Room to think AND answer, which is not the same as room to ramble.
  *
  * This was 64, on the reasoning that the reply is one move. That reasoning is
@@ -281,19 +317,45 @@ export async function chooseMove({ character, position, ask, attempts = MAX_ATTE
  * countable should buy more than that. The key is read by the caller from the
  * env file and passed in, so nothing here reaches for a global.
  */
-export function anthropicAsker({ apiKey, fetchImpl = fetch }) {
-  if (!apiKey) {
+export function anthropicAsker({ apiKey, oauth = null, fetchImpl = fetch }) {
+  if (!apiKey && !oauth) {
     throw new WizardSafetyError(
-      'no ANTHROPIC_API_KEY. The Director needs one to play the characters; put it in ' +
-        'harness/wizards/.env.wizards, which is gitignored and mode 600.'
+      'no credentials. Either put ANTHROPIC_API_KEY in harness/wizards/.env.wizards ' +
+        '(gitignored, mode 600), or sign in with `ant auth login` to run on a Claude ' +
+        'subscription instead of Console credits.'
     );
   }
+
+  // TWO WAYS TO PAY, and they are different accounts entirely.
+  //
+  // An `sk-ant-` key bills the Console's prepaid credit balance. An OAuth token
+  // from `ant auth login` bills the Claude subscription the person already has.
+  // A Max plan sitting at 5% used and a Console balance at zero are both true at
+  // once, which is confusing enough to be worth saying in code: the key is not
+  // broken, it is drawing on an empty second account.
+  //
+  // OAuth wins when present, because it is the one somebody chose deliberately
+  // - nobody signs in with `ant auth login` by accident, whereas a stale key
+  // can sit in a file for months.
+  const authHeaders = async () => {
+    if (oauth) {
+      const token = await oauth();
+      return {
+        // Bearer, not x-api-key: sending an OAuth token in the key header is
+        // rejected, and the beta header is required on /v1/messages.
+        authorization: `Bearer ${token}`,
+        'anthropic-beta': 'oauth-2025-04-20'
+      };
+    }
+    return { 'x-api-key': apiKey };
+  };
+
   return async ({ system, user, model }) => {
     const response = await fetchImpl(ANTHROPIC_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-api-key': apiKey,
+        ...(await authHeaders()),
         'anthropic-version': ANTHROPIC_VERSION
       },
       body: JSON.stringify({

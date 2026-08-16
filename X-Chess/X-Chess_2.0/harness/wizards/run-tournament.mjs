@@ -36,7 +36,7 @@ import {
   scrub
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
-import { annotateMoves, anthropicAsker, chooseMove } from './chooser.mjs';
+import { annotateMoves, anthropicAsker, antOAuth, chooseMove } from './chooser.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -443,8 +443,7 @@ async function oneGame({ openFee }) {
     );
   }
 
-  const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
-  const ask = anthropicAsker({ apiKey });
+  const ask = anthropicAsker(await credentials());
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
@@ -540,8 +539,7 @@ async function main() {
     );
   }
 
-  const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
-  const ask = anthropicAsker({ apiKey });
+  const ask = anthropicAsker(await credentials());
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
   const agents = byId(field.agents);
@@ -618,6 +616,50 @@ async function gameIdFrom(txid) {
 
 async function tournamentRules(white, black) {
   return wizardRules(white, black);
+}
+
+
+/**
+ * How this run pays for its thinking.
+ *
+ * TWO ACCOUNTS, NOT ONE, and this is the part that cost us a round. A Claude
+ * subscription and a Console credit balance are billed separately: the plan can
+ * sit at 5% used while the key gets refused for want of credit. `ant auth
+ * login` stores a profile, and a token from that profile draws on the plan
+ * somebody is already paying for.
+ *
+ * So the subscription goes first, and the key is the fallback. That ordering is
+ * the point: a key sitting in a file for months should not quietly outrank the
+ * account somebody deliberately signed into.
+ *
+ * THE PROBE IS A REAL MINT, not a reading of `ant auth status`. Status prints
+ * prose for a person, and matching prose is how you end up deciding a live
+ * profile is absent because the wording changed. Asking for the token asks the
+ * only question that matters, and the answer is the token we were going to
+ * need anyway.
+ */
+async function credentials() {
+  const { execFile } = await import('node:child_process');
+  const run = (args) =>
+    new Promise((resolve, reject) => {
+      execFile('ant', args, { timeout: 20_000 }, (error, stdout) =>
+        error ? reject(error) : resolve(String(stdout))
+      );
+    });
+
+  const mint = () => run(['auth', 'print-credentials', '--access-token']);
+  try {
+    const oauth = antOAuth({ exec: mint });
+    await oauth(); // Cached, so the run itself does not pay for this.
+    console.log('auth      Claude subscription, via `ant auth login`');
+    return { oauth };
+  } catch {
+    // No `ant`, not signed in, or it could not answer. The key is the fallback.
+  }
+
+  const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
+  if (apiKey) console.log('auth      ANTHROPIC_API_KEY, billed to Console credits');
+  return { apiKey };
 }
 
 /** The engine, for working out what each legal move costs. Same source as the board. */
