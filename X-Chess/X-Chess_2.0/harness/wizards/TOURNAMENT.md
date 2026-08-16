@@ -44,43 +44,57 @@ a log — `KEY_SHAPED` already redacts 64-character hex; it gains a rule for
 `sk-ant-` prefixes. A future user does exactly what you do: their key, their
 file, their machine, and nothing about it travels.
 
-### Two accounts, and the run picks the cheaper one first
+### Two accounts that look like one
 
-**A Claude subscription and a Console credit balance are billed separately.**
-This is not obvious and it cost us a round: the plan sat at 5% used while the
-`sk-ant-` key was refused for want of credit. The key was not broken. It was
-drawing on a different, empty account.
+**A Claude subscription and a Developer Platform organisation are billed
+separately, and only the second has an API.** A plan sitting at 5% used cannot
+pay for a `/v1/messages` request. The request comes back
 
-So the Director prefers a subscription when one is signed in:
+> Your credit balance is too low to access the Anthropic API.
+
+which names credit rather than the account, and that is why this took a day to
+see. The key was not broken. It was drawing on a different, empty account.
+
+**`ant auth login` is not the bridge, and it is worth writing down that we tried
+it.** `ant` is the Console's CLI. The token it mints is `sk-ant-oat01-…`, scoped
+to an organisation and a workspace — the same organisation as the key — so it
+is refused for exactly the same missing credit. `ant auth status` says
+`organization:` and `Workspace:` right there in its output, which was the tell.
+
+What spends a subscription is **Claude Code**, so a move can be chosen by
+running it:
 
 ```bash
-brew install --cask anthropics/tap/ant
-ant auth login          # browser OAuth, once — a run cannot do this for you
+node harness/wizards/run-tournament.mjs --live --round 2 --via-claude-code
 ```
 
-`run-tournament.mjs` probes by asking for a token, not by reading `ant auth
-status`. Status prints prose for a person, and matching prose is how you decide
-a live profile is absent because the wording changed. If a token comes back the
-run uses it and says so in its header; if not it falls back to the key and says
-that instead. **Read the `auth` line before a long run** — it is the difference
-between spending a subscription somebody already pays for and spending credit
-that has to be topped up.
+Off by default and named in the run header, because it changes which account a
+run empties and nobody should discover that from a bill. **Read the `auth` line
+before a long run.**
 
-The token goes in `Authorization: Bearer` with `anthropic-beta:
-oauth-2025-04-20`. It does **not** go in `x-api-key`; that is rejected in a way
-that reads like anything but the actual cause. It is minted once and cached for
-ten minutes rather than fetched per move — a tournament is hundreds of moves,
-and `print-credentials` refreshes a near-expiry token itself, which is what
-makes a run lasting hours survive an expiry in the middle of it.
+Each move shells out to `claude -p`, constrained hard — the default shape of
+that tool is an agent with a filesystem, and this needs a sentence:
 
-Two failure modes worth naming, because both are quiet:
+| flag | why |
+| --- | --- |
+| `--allowed-tools ""` | no tools; it answers from the position or not at all |
+| `--setting-sources ""` | no user, project or local settings, so a `CLAUDE.md` in the repo cannot reach into a chess move |
+| `--strict-mcp-config` | no MCP servers |
+| cwd: a temp dir | nothing to read even if the above ever softened |
 
-* `print-credentials` **without** `--access-token` prints the whole credentials
-  JSON. As a Bearer header that yields a protocol error, not an auth error.
-  The harness rejects a `{`-shaped answer for exactly this reason.
-* **Subscription rate limits are shaped for interactive use.** A 27-game
-  unattended run is not that. If a round stalls on limits rather than on chain,
-  that is the cause, and the fix is fewer games at once — not a bigger key.
+The prompt goes over **stdin, never argv**: an entry may be two thousand
+characters, argv has a length limit, and a long entry must become a move rather
+than a crash. The answer is validated against the same closed set as the API
+path — a different way of asking is not a different set of things that may come
+back.
+
+Measured, six characters on one real middlegame: 4.4–9.0s per move, all six
+legal on the first attempt. Slower than the API and it does not matter, against
+a chain that takes twelve seconds to confirm.
+
+**Subscription rate limits are shaped for interactive use.** A 27-game
+unattended run is not that. If a round stalls on limits rather than on chain,
+that is the cause, and the fix is fewer games at once.
 
 **What the artefact does instead** is what it is good at: read the games, replay
 them, show the standings. A spectator needs no key and no permission, because

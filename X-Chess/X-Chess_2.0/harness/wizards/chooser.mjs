@@ -24,47 +24,14 @@
 // so the validation is testable without a network or a key, which is the same
 // discipline the rest of `wizards-core.mjs` follows.
 
+import { execFile } from 'node:child_process';
+import { tmpdir } from 'node:os';
+
 import { HOUSE_RULES } from './personalities.mjs';
 import { WizardSafetyError, scrub } from './wizards-core.mjs';
 
 /** How many times a character may answer with something that is not a legal move. */
 export const MAX_ATTEMPTS = 3;
-
-/**
- * A short-lived subscription token, re-minted before it can go stale.
- *
- * `ant auth print-credentials --access-token` refreshes the token itself when it
- * needs to, so the only job here is to ask often enough and not on every single
- * request. A tournament runs for hours across hundreds of moves; a token that
- * expires halfway would end the run, and that is exactly the class of failure
- * this harness has already been caught by twice.
- *
- * Cached for ten minutes, which is well inside any token lifetime and turns
- * hundreds of subprocess calls into a handful.
- *
- * NEVER LOGGED. It is a credential and `scrub` does not know its shape, so the
- * only safe handling is for it not to reach a string anybody prints.
- */
-export function antOAuth({ exec, ttlMs = 10 * 60_000, now = () => Date.now() } = {}) {
-  let token = null;
-  let mintedAt = 0;
-  return async () => {
-    if (token && now() - mintedAt < ttlMs) return token;
-    const fresh = (await exec()).trim();
-    if (!fresh || fresh.startsWith('{')) {
-      // The no-flag form of `print-credentials` prints the whole credentials
-      // JSON, which as a Bearer header yields an empty response or a protocol
-      // error rather than an auth failure - a confusing way to spend an hour.
-      throw new WizardSafetyError(
-        'ant returned no access token. Use `ant auth print-credentials --access-token`, ' +
-          'and check `ant auth status` shows an active profile.'
-      );
-    }
-    token = fresh;
-    mintedAt = now();
-    return token;
-  };
-}
 
 /**
  * Room to think AND answer, which is not the same as room to ramble.
@@ -241,12 +208,38 @@ export function annotateMoves(Position, fen, legalMoves) {
  *
  * So: exactly one distinct legal move mentioned, or nothing.
  */
-export function extractMove(reply, legalMoves) {
-  const text = String(reply ?? '').toLowerCase();
+export function extractMove(reply, legalMoves, annotations = null) {
+  const raw = String(reply ?? '');
+  const text = raw.toLowerCase();
   const legal = new Set(legalMoves.map((m) => m.toLowerCase()));
 
   const exact = text.trim();
   if (legal.has(exact)) return exact;
+
+  // SAN IS ACCEPTED BECAUSE THE MOVE LIST SHOWS IT.
+  //
+  // Every annotated line reads `g1f3  (Nf3)  - nothing hangs`, so a model that
+  // answers `Nf3` is echoing something the harness put in front of it. Marking
+  // that a refusal, three times, ends the game in a resignation - which is what
+  // happened to Plumb on the first live position tried.
+  //
+  // WHOLE-REPLY ONLY, never a substring. UCI can be scanned for safely because
+  // `g1f3` does not occur by accident; SAN cannot, because `b4` and `c5` appear
+  // inside ordinary prose and inside other moves. So this matches a reply that
+  // IS a move and never a reply that mentions one.
+  if (annotations?.length) {
+    const bare = (m) => m.trim().replace(/[+#!?.,]+$/, '');
+    const bySan = new Map();
+    for (const a of annotations) {
+      if (!a.san) continue;
+      // Case-sensitively: in SAN `b` is a file and `B` is a bishop, and
+      // lowercasing would make `bxc3` and `Bxc3` the same move.
+      bySan.set(a.san, a.uci);
+      bySan.set(bare(a.san), a.uci);
+    }
+    const hit = bySan.get(raw.trim()) ?? bySan.get(bare(raw));
+    if (hit) return hit.toLowerCase();
+  }
 
   const found = new Set();
   for (const move of legal) {
@@ -268,7 +261,13 @@ export function extractMove(reply, legalMoves) {
  * forfeit, and the alternative - broadcasting a guess - spends the entrant's
  * money on a submission every reader will skip.
  */
-export async function chooseMove({ character, position, ask, attempts = MAX_ATTEMPTS }) {
+export async function chooseMove({
+  character,
+  position,
+  ask,
+  annotations = null,
+  attempts = MAX_ATTEMPTS
+}) {
   const { fen, legalMoves, turn } = position;
   const history = position.history ?? [];
 
@@ -278,12 +277,12 @@ export async function chooseMove({ character, position, ask, attempts = MAX_ATTE
     );
   }
 
-  let request = buildRequest({ character, fen, history, legalMoves, turn });
+  let request = buildRequest({ character, fen, history, legalMoves, turn, annotations });
   const refusals = [];
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const reply = await ask({ system: SYSTEM_PROMPT, user: request, model: character.model });
-    const move = extractMove(reply, legalMoves);
+    const move = extractMove(reply, legalMoves, annotations);
     if (move) return { move, attempts: attempt, refusals };
 
     // Kept for the record, scrubbed because a model's reply is text this harness
@@ -311,51 +310,108 @@ export async function chooseMove({ character, position, ask, attempts = MAX_ATTE
 }
 
 /**
+ * The other account: a Claude subscription, spent through Claude Code.
+ *
+ * WHY A SUBPROCESS AND NOT A POST. A subscription is not an API credential and
+ * has no header you can send. `/v1/messages` only knows about Developer
+ * Platform organisations, so a plan that is 5% used cannot pay for a request
+ * made that way — it will be refused for credit it was never going to have.
+ * Claude Code is the supported way to spend the plan, so a move is chosen by
+ * running it.
+ *
+ * Constrained hard, because the default shape of that tool is an agent with a
+ * filesystem and this needs a sentence:
+ *
+ *   --allowed-tools ""     no tools. It answers from the position or not at all.
+ *   --setting-sources ""   no user, project or local settings, so a CLAUDE.md
+ *                          sitting in the repo cannot reach into a chess move.
+ *   --strict-mcp-config    no MCP servers.
+ *   cwd: a neutral dir     nothing to read even if the above ever softened.
+ *
+ * The prompt goes over STDIN, never argv. A personality is text an entrant
+ * wrote, it can be thousands of characters, and argv has a length limit that
+ * would turn a long entry into a crash rather than a move.
+ *
+ * SLOWER PER MOVE THAN THE API, AND IT DOES NOT MATTER: about five seconds
+ * against a chain that takes twelve to confirm one. The bottleneck is
+ * unchanged.
+ */
+export function claudeCodeAsker({ exec, cwd = tmpdir() } = {}) {
+  const run =
+    exec ??
+    ((args, input) =>
+      new Promise((resolve, reject) => {
+        const child = execFile(
+          'claude',
+          args,
+          { cwd, timeout: 180_000, maxBuffer: 8 * 1024 * 1024 },
+          (error, stdout, stderr) => {
+            if (error) {
+              // scrub, because a failure can echo the prompt back, and the
+              // prompt is an entrant's text.
+              reject(new Error(scrub(`claude -p failed: ${stderr || error.message}`)));
+              return;
+            }
+            resolve(String(stdout));
+          }
+        );
+        child.stdin.end(input);
+      }));
+
+  return async ({ system, user, model }) => {
+    const text = await run(
+      [
+        '-p',
+        '--model',
+        model,
+        // Replaces the coding-agent prompt rather than appending to it. A
+        // character's personality is the whole of who is playing.
+        '--system-prompt',
+        system,
+        '--allowed-tools',
+        '',
+        '--setting-sources',
+        '',
+        '--strict-mcp-config'
+      ],
+      user
+    );
+    return text.trim();
+  };
+}
+
+/**
  * The real model call.
  *
  * No SDK: this is one POST, and a dependency in a project that keeps them
  * countable should buy more than that. The key is read by the caller from the
  * env file and passed in, so nothing here reaches for a global.
  */
-export function anthropicAsker({ apiKey, oauth = null, fetchImpl = fetch }) {
-  if (!apiKey && !oauth) {
+export function anthropicAsker({ apiKey, fetchImpl = fetch }) {
+  if (!apiKey) {
     throw new WizardSafetyError(
       'no credentials. Either put ANTHROPIC_API_KEY in harness/wizards/.env.wizards ' +
-        '(gitignored, mode 600), or sign in with `ant auth login` to run on a Claude ' +
-        'subscription instead of Console credits.'
+        '(gitignored, mode 600), or run on a Claude subscription with --via-claude-code.'
     );
   }
 
-  // TWO WAYS TO PAY, and they are different accounts entirely.
+  // BOTH OF THESE BILL THE SAME ACCOUNT. That is worth saying plainly, because
+  // a day was spent on the assumption that they did not.
   //
-  // An `sk-ant-` key bills the Console's prepaid credit balance. An OAuth token
-  // from `ant auth login` bills the Claude subscription the person already has.
-  // A Max plan sitting at 5% used and a Console balance at zero are both true at
-  // once, which is confusing enough to be worth saying in code: the key is not
-  // broken, it is drawing on an empty second account.
+  // An `sk-ant-` key and an `sk-ant-oat01-` token from `ant auth login` are two
+  // credentials for one Developer Platform organisation, and they draw on the
+  // same prepaid credit balance. `ant` is the Console's CLI; its OAuth scopes
+  // name an org and a workspace. If the key is refused for want of credit, the
+  // token is refused for want of the same credit.
   //
-  // OAuth wins when present, because it is the one somebody chose deliberately
-  // - nobody signs in with `ant auth login` by accident, whereas a stale key
-  // can sit in a file for months.
-  const authHeaders = async () => {
-    if (oauth) {
-      const token = await oauth();
-      return {
-        // Bearer, not x-api-key: sending an OAuth token in the key header is
-        // rejected, and the beta header is required on /v1/messages.
-        authorization: `Bearer ${token}`,
-        'anthropic-beta': 'oauth-2025-04-20'
-      };
-    }
-    return { 'x-api-key': apiKey };
-  };
-
+  // A Claude subscription is a DIFFERENT account, and nothing here reaches it.
+  // What spends a subscription is Claude Code — see `claudeCodeAsker` below.
   return async ({ system, user, model }) => {
     const response = await fetchImpl(ANTHROPIC_URL, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        ...(await authHeaders()),
+        'x-api-key': apiKey,
         'anthropic-version': ANTHROPIC_VERSION
       },
       body: JSON.stringify({

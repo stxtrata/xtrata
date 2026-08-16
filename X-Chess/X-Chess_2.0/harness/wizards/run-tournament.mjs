@@ -36,7 +36,7 @@ import {
   scrub
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
-import { annotateMoves, anthropicAsker, antOAuth, chooseMove } from './chooser.mjs';
+import { annotateMoves, anthropicAsker, chooseMove, claudeCodeAsker } from './chooser.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -98,6 +98,16 @@ const RESIGN_ON_FORFEIT = !process.argv.includes('--no-resign');
  * every run that uses it.
  */
 const MODEL_OVERRIDE = arg('model');
+
+/**
+ * Spend the Claude subscription instead of Developer Platform credits.
+ *
+ * OFF BY DEFAULT AND NAMED IN THE HEADER, because it changes which account a
+ * run empties. See `credentials()` for why the two cannot be told apart from
+ * the error message alone.
+ */
+const VIA_CLAUDE_CODE = process.argv.includes('--via-claude-code');
+
 
 function env() {
   const found = {};
@@ -178,7 +188,10 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
-async function playGame({ gameId, white, black, replay, ask, budget, Position = null, expectHash = null }) {
+async function playGame({ gameId, white, black, replay, ask, budget, Position, expectHash = null }) {
+  // REQUIRED, not defaulted to null. A default here is what let fifteen games
+  // be played from an unannotated list without one line of output saying so.
+  if (!Position) throw new WizardSafetyError('playGame needs the engine to annotate moves');
   // NEVER SUBMIT INTO A GAME WITHOUT CHECKING IT IS OURS.
   //
   // The lookup above is now exact, and this is here anyway — because the
@@ -245,6 +258,17 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position = 
 
     const mover = state.turn === 'white' ? white : black;
 
+    // WHAT EACH MOVE COSTS, worked out here rather than in the model's head.
+    //
+    // Measured over twenty-four positions from three real games: 29% of moves
+    // hang a piece from a plain list, 8% from an annotated one. Effort and
+    // prompting moved neither number; this moved both.
+    //
+    // It was written, tested, and then not connected — `Position` arrived here
+    // and went nowhere, so every game since has been played from the plain
+    // list, and nothing said so because a worse move is still a legal move.
+    const annotations = annotateMoves(Position, state.fen, state.legalMoves);
+
     let chosen;
     try {
       chosen = await chooseMove({
@@ -255,6 +279,7 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position = 
           turn: state.turn,
           history: state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci)
         },
+        annotations,
         ask
       });
     } catch (error) {
@@ -443,7 +468,7 @@ async function oneGame({ openFee }) {
     );
   }
 
-  const ask = anthropicAsker(await credentials());
+  const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
@@ -539,7 +564,7 @@ async function main() {
     );
   }
 
-  const ask = anthropicAsker(await credentials());
+  const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
   const agents = byId(field.agents);
@@ -620,46 +645,31 @@ async function tournamentRules(white, black) {
 
 
 /**
- * How this run pays for its thinking.
+ * Which account pays for the thinking, and it has to be chosen deliberately.
  *
- * TWO ACCOUNTS, NOT ONE, and this is the part that cost us a round. A Claude
- * subscription and a Console credit balance are billed separately: the plan can
- * sit at 5% used while the key gets refused for want of credit. `ant auth
- * login` stores a profile, and a token from that profile draws on the plan
- * somebody is already paying for.
+ * TWO ACCOUNTS THAT LOOK LIKE ONE. A Claude subscription and a Developer
+ * Platform organisation are billed separately, and only the second has an API
+ * to call. So a plan sitting at 5% used cannot pay for a `/v1/messages`
+ * request; the request is refused for credit the plan was never going to have,
+ * and the error names credit rather than the account, which is what made this
+ * take a day to see.
  *
- * So the subscription goes first, and the key is the fallback. That ordering is
- * the point: a key sitting in a file for months should not quietly outrank the
- * account somebody deliberately signed into.
+ * `ant auth login` does NOT bridge them. It is the Console's CLI: the token it
+ * mints is scoped to the same organisation and workspace as the key, so it is
+ * refused for exactly the same reason. That was tried and it failed live.
  *
- * THE PROBE IS A REAL MINT, not a reading of `ant auth status`. Status prints
- * prose for a person, and matching prose is how you end up deciding a live
- * profile is absent because the wording changed. Asking for the token asks the
- * only question that matters, and the answer is the token we were going to
- * need anyway.
+ * What spends a subscription is Claude Code, so `--via-claude-code` runs each
+ * move through it. Explicit rather than automatic, because it is a real change
+ * in what is being spent and nobody should discover it from a bill.
  */
-async function credentials() {
-  const { execFile } = await import('node:child_process');
-  const run = (args) =>
-    new Promise((resolve, reject) => {
-      execFile('ant', args, { timeout: 20_000 }, (error, stdout) =>
-        error ? reject(error) : resolve(String(stdout))
-      );
-    });
-
-  const mint = () => run(['auth', 'print-credentials', '--access-token']);
-  try {
-    const oauth = antOAuth({ exec: mint });
-    await oauth(); // Cached, so the run itself does not pay for this.
-    console.log('auth      Claude subscription, via `ant auth login`');
-    return { oauth };
-  } catch {
-    // No `ant`, not signed in, or it could not answer. The key is the fallback.
+function credentials() {
+  if (VIA_CLAUDE_CODE) {
+    console.log('auth      Claude subscription, via `claude -p`');
+    return claudeCodeAsker();
   }
-
   const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
-  if (apiKey) console.log('auth      ANTHROPIC_API_KEY, billed to Console credits');
-  return { apiKey };
+  console.log('auth      ANTHROPIC_API_KEY, billed to Developer Platform credits');
+  return anthropicAsker({ apiKey });
 }
 
 /** The engine, for working out what each legal move costs. Same source as the board. */

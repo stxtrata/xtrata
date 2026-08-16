@@ -19,8 +19,8 @@ import {
   buildRequest,
   annotateMoves,
   anthropicAsker,
-  antOAuth,
   chooseMove,
+  claudeCodeAsker,
   extractMove
 } from '../../harness/wizards/chooser.mjs';
 import { PERSONALITIES, HOUSE_RULES, ENTRY_FORMAT } from '../../harness/wizards/personalities.mjs';
@@ -359,86 +359,162 @@ describe('the tactical facts the harness works out for you', () => {
 });
 
 describe('paying for the thinking', () => {
-  // Two accounts, not one. A Max subscription at 5% used and a Console credit
-  // balance at zero are both true at the same time, and the harness stopped
-  // mid-tournament because it was drawing on the second while the person
-  // paying £90 a month owned the first. Which credential goes in which header
-  // is the whole of the difference.
+  // TWO ACCOUNTS THAT LOOK LIKE ONE, and telling them apart cost a round.
+  //
+  // A Claude subscription and a Developer Platform organisation are billed
+  // separately, and only the second has an API. `ant auth login` looks like the
+  // bridge and is not one: its token is scoped to the same organisation as the
+  // key, so both are refused for the same missing credit. That was tried live.
+  // What spends a subscription is Claude Code.
 
-  const headersOf = async (auth: Record<string, unknown>) => {
+  it('sends a Console key as the key header', async () => {
     let sent: any = null;
     const fetchImpl = async (_url: string, init: any) => {
       sent = init;
       return { ok: true, json: async () => ({ content: [{ text: 'e4' }] }) };
     };
-    const ask = anthropicAsker({ ...auth, fetchImpl } as any);
+    const ask = anthropicAsker({ apiKey: 'sk-ant-test', fetchImpl } as any);
     await ask({ system: 's', user: 'u', model: 'claude-opus-5' });
-    return sent.headers as Record<string, string>;
-  };
-
-  it('sends a subscription token as Bearer, never as the key header', async () => {
-    const headers = await headersOf({ oauth: async () => 'oat-live' });
-    expect(headers.authorization).toBe('Bearer oat-live');
-    expect(headers['anthropic-beta']).toBe('oauth-2025-04-20');
-    // The rejection for putting it here is opaque, so assert it never happens.
-    expect(headers['x-api-key']).toBeUndefined();
+    expect(sent.headers['x-api-key']).toBe('sk-ant-test');
   });
 
-  it('sends a Console key as the key header, with no oauth beta', async () => {
-    const headers = await headersOf({ apiKey: 'sk-ant-test' });
-    expect(headers['x-api-key']).toBe('sk-ant-test');
-    expect(headers.authorization).toBeUndefined();
-    expect(headers['anthropic-beta']).toBeUndefined();
+  it('refuses to run with no key at all', () => {
+    expect(() => anthropicAsker({} as any)).toThrow(/ANTHROPIC_API_KEY/);
   });
 
-  it('prefers the subscription when both are present', async () => {
-    // Nobody runs `ant auth login` by accident. A key can sit in a file for
-    // months, so the deliberate act is the one that wins.
-    const headers = await headersOf({ apiKey: 'sk-ant-stale', oauth: async () => 'oat-live' });
-    expect(headers.authorization).toBe('Bearer oat-live');
-    expect(headers['x-api-key']).toBeUndefined();
-  });
-
-  it('refuses to run with neither, and names both ways to fix it', () => {
-    expect(() => anthropicAsker({} as any)).toThrow(/ANTHROPIC_API_KEY[\s\S]*ant auth login/);
+  it('points at the subscription route when there is no key', () => {
+    // The wrong lesson from a credit error is "buy credit". Name the other way.
+    expect(() => anthropicAsker({} as any)).toThrow(/--via-claude-code/);
   });
 });
 
-describe('the subscription token', () => {
-  it('is minted once and reused, not fetched per move', async () => {
-    let mints = 0;
-    const oauth = antOAuth({
-      exec: async () => `token-${++mints}\n`,
-      now: () => 0
+describe('spending a subscription instead', () => {
+  const spy = () => {
+    const calls: Array<{ args: string[]; input: string }> = [];
+    const asker = claudeCodeAsker({
+      exec: async (args: string[], input: string) => {
+        calls.push({ args, input });
+        return '  Nf3\n';
+      }
     });
-    expect(await oauth()).toBe('token-1');
-    await oauth();
-    await oauth();
-    // A tournament is hundreds of moves. One subprocess each would be absurd.
-    expect(mints).toBe(1);
+    return { calls, asker };
+  };
+
+  const flag = (args: string[], name: string) => args[args.indexOf(name) + 1];
+
+  it('returns the move, trimmed of the newline a CLI adds', async () => {
+    const { asker } = spy();
+    expect(await asker({ system: 's', user: 'u', model: 'claude-sonnet-5' })).toBe('Nf3');
   });
 
-  it('is re-minted before it can go stale', async () => {
-    let mints = 0;
-    let clock = 0;
-    const oauth = antOAuth({ exec: async () => `token-${++mints}`, ttlMs: 1000, now: () => clock });
-    expect(await oauth()).toBe('token-1');
-    clock = 999;
-    expect(await oauth()).toBe('token-1');
-    clock = 1001;
-    // A run lasting hours must not die on an expiry halfway through.
-    expect(await oauth()).toBe('token-2');
+  it('gives it no tools, so a move is all it can produce', async () => {
+    const { calls, asker } = spy();
+    await asker({ system: 's', user: 'u', model: 'claude-sonnet-5' });
+    expect(flag(calls[0].args, '--allowed-tools')).toBe('');
+    expect(calls[0].args).toContain('--strict-mcp-config');
   });
 
-  it('rejects the whole credentials blob, which is the easy mistake', async () => {
-    // `ant auth print-credentials` without --access-token prints JSON. As a
-    // Bearer header that fails in a way that looks like anything but this.
-    const oauth = antOAuth({ exec: async () => '{"accessToken":"oat-01"}' });
-    await expect(oauth()).rejects.toThrow(/--access-token/);
+  it('loads no settings, so a CLAUDE.md cannot reach into a chess move', async () => {
+    // The repo this runs in has one, and it is about inscribing contracts.
+    const { calls, asker } = spy();
+    await asker({ system: 's', user: 'u', model: 'claude-sonnet-5' });
+    expect(flag(calls[0].args, '--setting-sources')).toBe('');
   });
 
-  it('rejects an empty answer rather than sending "Bearer "', async () => {
-    const oauth = antOAuth({ exec: async () => '  \n' });
-    await expect(oauth()).rejects.toThrow(/no access token/);
+  it('sends the prompt over stdin, never argv', async () => {
+    // An entry may be two thousand characters. argv has a limit; stdin does
+    // not, and a long entry must be a move rather than a crash.
+    const entry = 'x'.repeat(4000);
+    const { calls, asker } = spy();
+    await asker({ system: 'sys', user: entry, model: 'claude-sonnet-5' });
+    expect(calls[0].input).toBe(entry);
+    expect(calls[0].args.join(' ')).not.toContain(entry);
+  });
+
+  it('replaces the coding-agent prompt rather than appending to it', async () => {
+    const { calls, asker } = spy();
+    await asker({ system: SYSTEM_PROMPT, user: 'u', model: 'claude-sonnet-5' });
+    expect(flag(calls[0].args, '--system-prompt')).toBe(SYSTEM_PROMPT);
+    expect(calls[0].args).not.toContain('--append-system-prompt');
+  });
+
+  it('passes the model through, so an override still means something', async () => {
+    const { calls, asker } = spy();
+    await asker({ system: 's', user: 'u', model: 'claude-sonnet-5' });
+    expect(flag(calls[0].args, '--model')).toBe('claude-sonnet-5');
+  });
+
+  it('is validated like any other answer, so it cannot smuggle a move', async () => {
+    // Same closed set as the API path. A different way of asking is not a
+    // different set of things that may come back.
+    const asker = claudeCodeAsker({ exec: async () => 'Kd5 — trust me, it is legal' });
+    await expect(
+      chooseMove({ character: GAMBIT, position: start(), ask: asker })
+    ).rejects.toThrow(/did not give a legal move/);
+  }, 20_000);
+});
+
+describe('answering in the notation you were shown', () => {
+  // The annotated list reads `g1f3  (Nf3)  — nothing hangs`. A model that
+  // replies `Nf3` is echoing the harness's own text, and it was scored a
+  // refusal — three of those resign the game on chain. Plumb hit this on the
+  // first live position tried.
+  const ANNOTATED = [
+    { uci: 'g1f3', san: 'Nf3', note: '— nothing hangs' },
+    { uci: 'b1c3', san: 'Nc3', note: '— nothing hangs' },
+    { uci: 'b2b4', san: 'b4', note: '— loses a pawn' }
+  ];
+  const LEGAL = ANNOTATED.map((a) => a.uci);
+
+  it('takes SAN when the list showed SAN', () => {
+    expect(extractMove('Nf3', LEGAL, ANNOTATED)).toBe('g1f3');
+  });
+
+  it('takes SAN with a check or a full stop on the end', () => {
+    expect(extractMove('Nc3+', LEGAL, ANNOTATED)).toBe('b1c3');
+    expect(extractMove('Nf3.', LEGAL, ANNOTATED)).toBe('g1f3');
+  });
+
+  it('still prefers UCI, which is what the reply is meant to be', () => {
+    expect(extractMove('g1f3', LEGAL, ANNOTATED)).toBe('g1f3');
+  });
+
+  it('does not read SAN out of prose, only out of a bare reply', () => {
+    // `b4` occurs inside ordinary sentences and inside other moves. Scanning
+    // for it the way UCI is scanned for would invent moves nobody chose.
+    expect(extractMove('I would consider b4 but it looks loose', LEGAL, ANNOTATED)).toBeNull();
+  });
+
+  it('keeps SAN case-sensitive, where b and B are different pieces', () => {
+    const pair = [
+      { uci: 'b2c3', san: 'bxc3', note: '' },
+      { uci: 'f1c3', san: 'Bxc3', note: '' }
+    ];
+    expect(extractMove('bxc3', ['b2c3', 'f1c3'], pair)).toBe('b2c3');
+    expect(extractMove('Bxc3', ['b2c3', 'f1c3'], pair)).toBe('f1c3');
+  });
+
+  it('is unchanged when no annotations are given', () => {
+    expect(extractMove('Nf3', LEGAL)).toBeNull();
+  });
+});
+
+describe('the annotation actually reaching the model', () => {
+  // It was written, measured at 29% -> 8%, and then not connected: the engine
+  // arrived at the game loop and went nowhere. Fifteen games were played from
+  // the plain list, and nothing said so, because a worse move is still legal.
+  it('is passed through chooseMove into the prompt', async () => {
+    const seen: string[] = [];
+    const ask = async ({ user }: any) => {
+      seen.push(user);
+      return 'e2e4';
+    };
+    await chooseMove({
+      character: GAMBIT,
+      position: start(),
+      ask,
+      annotations: [{ uci: 'e2e4', san: 'e4', note: '— nothing hangs' }]
+    });
+    expect(seen[0]).toContain('— nothing hangs');
   });
 });
