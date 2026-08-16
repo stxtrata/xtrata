@@ -94,6 +94,10 @@ Your entire reply is one move from the legal move list. Nothing else.`;
  * The character is fenced and named. The fence is not security by itself —
  * validation is — but a model that can see where the quoted text starts and
  * stops is markedly harder to talk out of its own instructions.
+ *
+ * @param {{ character: any, fen: string, history: string[], legalMoves: string[],
+ *           turn: string,
+ *           annotations?: Array<{ uci: string, san?: string|null, note?: string }> | null }} options
  */
 export function buildRequest({ character, fen, history, legalMoves, turn, annotations = null }) {
   const moves = history.length ? history.join(' ') : '(none yet)';
@@ -123,6 +127,16 @@ export function buildRequest({ character, fen, history, legalMoves, turn, annota
     ? annotations.map((a) => `${a.uci}  ${a.san ? `(${a.san})  ` : ''}${a.note}`).join('\n')
     : legalMoves.join(' ');
 
+  const { white, black } = materialBalance(fen);
+  const mine = turn === 'white' ? white : black;
+  const theirs = turn === 'white' ? black : white;
+  const edge =
+    mine === theirs
+      ? 'Material: level.'
+      : mine > theirs
+        ? `Material: YOU ARE AHEAD by ${mine - theirs}.`
+        : `Material: you are behind by ${theirs - mine}.`;
+
   return `<character>
 ${character.prompt}
 </character>
@@ -130,10 +144,35 @@ ${character.prompt}
 You are playing ${turn}.
 
 Position (FEN): ${fen}
+${edge}
 Moves so far: ${moves}
 
 Legal moves, and your reply must be exactly one of them:
 ${list}`;
+}
+
+/**
+ * Who is ahead, and by how much.
+ *
+ * A FACT, not advice, and the one Plumb was missing. It drew game 17 from a
+ * queen, a rook, two bishops, a knight and five pawns against a queen and two
+ * pawns, because nothing in front of it ever said it was winning. Its entry
+ * says a draw is acceptable, and on the evidence it had, a draw was.
+ *
+ * Counted from the placement field, which is the same arithmetic the move
+ * notes use. Kings are excluded: both sides always have exactly one.
+ */
+export function materialBalance(fen) {
+  const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  let white = 0;
+  let black = 0;
+  for (const ch of fen.split(' ')[0]) {
+    const worth = VALUE[ch.toLowerCase()];
+    if (!worth) continue;
+    if (ch === ch.toUpperCase()) white += worth;
+    else black += worth;
+  }
+  return { white, black };
 }
 
 /**
@@ -147,8 +186,46 @@ ${list}`;
  * `Position` is passed in rather than imported so this file stays free of the
  * engine and its tests keep running with no bundler.
  */
-export function annotateMoves(Position, fen, legalMoves) {
+/**
+ * @param {any} Position
+ * @param {string} fen
+ * @param {string[]} legalMoves
+ * @param {string[]} [played] every UCI move of the game so far, from the start
+ */
+export function annotateMoves(Position, fen, legalMoves, played = []) {
   const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+
+  // WHAT HAS ALREADY HAPPENED, which the one-ply test cannot see.
+  //
+  // `new Position(fen)` starts with an empty key history, so on its own it
+  // cannot answer "has this position occurred before" - and a harness that
+  // cannot answer it hands every character a board where repeating is free.
+  // Game 17 drew from plus seventeen because of exactly that: sixteen checks,
+  // every one annotated "nothing hangs", because a check never does. The
+  // one-ply test measures danger and knows nothing about progress.
+  //
+  // Collected once per turn as keys rather than by replaying for every
+  // candidate move: one pass instead of one per legal move, and the count is
+  // all that a third occurrence depends on.
+  const seen = [];
+  if (played.length) {
+    try {
+      const from = new Position();
+      seen.push(from.key());
+      for (const uci of played) {
+        from.applyUci(uci);
+        seen.push(from.key());
+      }
+      // A history that does not arrive at the position we were handed is a
+      // history of some other game. Better to lose the repetition note than to
+      // tell a character something false about the board in front of it.
+      if (from.fen() !== fen) seen.length = 0;
+    } catch {
+      seen.length = 0;
+    }
+  }
+  const timesSeen = (key) => seen.reduce((n, k) => n + (k === key ? 1 : 0), 0);
+
   const board = (f) => {
     const out = {};
     let rank = 8;
@@ -165,7 +242,7 @@ export function annotateMoves(Position, fen, legalMoves) {
   return legalMoves.map((uci) => {
     try {
       const before = new Position(fen);
-      const played = before.applyUci(uci);
+      const moved = before.applyUci(uci);
       const after = before.fen();
       const squares = board(after);
 
@@ -184,15 +261,21 @@ export function annotateMoves(Position, fen, legalMoves) {
         }
       }
 
-      const note =
+      // A third occurrence ENDS THE GAME as a draw, whatever the position is
+      // worth. Said plainly, because "repeats" is a chess term and "this draws
+      // the game now" is what actually follows.
+      const again = seen.length ? timesSeen(before.key()) : 0;
+      const repeats = again >= 2 ? ' — DRAWS THE GAME NOW by repetition' : again === 1 ? ' — repeats a position' : '';
+
+      const danger =
         worst >= 3
           ? `— loses ${worst >= 9 ? 'the queen' : worst >= 5 ? 'a rook' : 'a piece'} to ${by}`
           : worst > 0
             ? `— drops a pawn to ${by}`
             : '— nothing hangs';
-      return { uci, san: played?.san ?? null, note, worst };
+      return { uci, san: moved?.san ?? null, note: `${danger}${repeats}`, worst, repeats: again };
     } catch {
-      return { uci, san: null, note: '', worst: 0 };
+      return { uci, san: null, note: '', worst: 0, repeats: 0 };
     }
   });
 }

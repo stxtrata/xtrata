@@ -267,7 +267,8 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
     // It was written, tested, and then not connected — `Position` arrived here
     // and went nowhere, so every game since has been played from the plain
     // list, and nothing said so because a worse move is still a legal move.
-    const annotations = annotateMoves(Position, state.fen, state.legalMoves);
+    const history = state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci);
+    const annotations = annotateMoves(Position, state.fen, state.legalMoves, history);
 
     let chosen;
     try {
@@ -277,7 +278,7 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, e
           fen: state.fen,
           legalMoves: state.legalMoves,
           turn: state.turn,
-          history: state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci)
+          history
         },
         annotations,
         ask

@@ -21,6 +21,7 @@ import {
   anthropicAsker,
   chooseMove,
   claudeCodeAsker,
+  materialBalance,
   extractMove
 } from '../../harness/wizards/chooser.mjs';
 import { PERSONALITIES, HOUSE_RULES, ENTRY_FORMAT } from '../../harness/wizards/personalities.mjs';
@@ -31,6 +32,16 @@ import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js'
 
 const RULES = normaliseRules({ ...DEFAULT_RULES });
 const GAMBIT = PERSONALITIES[0];
+
+/** The board's own engine, bundled on the fly — same source the runner uses. */
+async function loadEngine(): Promise<any> {
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [resolve(fileURLToPath(new URL('../..', import.meta.url)), 'packages/chess/engine.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+}
 
 /** The opening position, from the board's own engine rather than a fixture. */
 function start() {
@@ -516,5 +527,92 @@ describe('the annotation actually reaching the model', () => {
       annotations: [{ uci: 'e2e4', san: 'e4', note: '— nothing hangs' }]
     });
     expect(seen[0]).toContain('— nothing hangs');
+  });
+});
+
+describe('the facts that stop a won game being shuffled away', () => {
+  // Game 17 drew by repetition from a queen, rook, two bishops, knight and five
+  // pawns against a queen and two pawns. Eighty-nine moves, sixteen of them
+  // checks, 0.267 STX of miner fees, and every one of those checks annotated
+  // "nothing hangs" — because a check never does. The one-ply test measures
+  // danger and knows nothing about progress.
+  //
+  // Plumb was playing its entry correctly: it says a draw is acceptable. The
+  // problem was that nothing ever told it that it was winning, or that the move
+  // it kept choosing ended the game.
+
+  const line = (notes: any[], uci: string) => notes.find((n) => n.uci === uci)?.note ?? '';
+
+  it('counts who is ahead, from the position alone', () => {
+    expect(materialBalance(START_FEN)).toEqual({ white: 39, black: 39 });
+    // Game 17's final position, which is what +17 actually looked like.
+    expect(materialBalance('8/2Q1p2p/8/2k5/3q4/8/PP1BPPP1/RN2KB2 b - - 10 45')).toEqual({
+      white: 28,
+      black: 11
+    });
+  });
+
+  it('puts the balance in front of the character, and shouts only when ahead', () => {
+    const ahead = buildRequest({
+      character: GAMBIT, fen: '8/2Q1p2p/8/2k5/3q4/8/PP1BPPP1/RN2KB2 w - - 10 45',
+      history: [], legalMoves: ['c7c8'], turn: 'white'
+    });
+    expect(ahead).toContain('YOU ARE AHEAD by 17');
+    expect(buildRequest({ character: GAMBIT, ...start() } as any)).toContain('Material: level.');
+  });
+
+  it('says a third occurrence ends the game, not merely that it repeats', async () => {
+    const engine = await loadEngine();
+    // Knights out and back, twice: the next return is the third occurrence.
+    const shuffle = ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1'];
+    const board = new engine.Position();
+    for (const uci of shuffle) board.applyUci(uci);
+    const notes = annotateMoves(engine.Position, board.fen(), board.movesUci(), shuffle);
+    expect(line(notes, 'f6g8')).toContain('DRAWS THE GAME NOW by repetition');
+    // A move that is not the repetition says nothing about one.
+    expect(line(notes, 'e7e5')).not.toContain('repetition');
+  });
+
+  it('marks a second occurrence more quietly, because it is not a result yet', async () => {
+    const engine = await loadEngine();
+    // Five plies in, both knights have been out and back once and White's is
+    // out again, so it is Black's knight on g8 that can repeat.
+    const shuffle = ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3'];
+    const board = new engine.Position();
+    for (const uci of shuffle) board.applyUci(uci);
+    const notes = annotateMoves(engine.Position, board.fen(), board.movesUci(), shuffle);
+    expect(line(notes, 'g8f6')).toContain('repeats a position');
+    expect(line(notes, 'g8f6')).not.toContain('DRAWS THE GAME NOW');
+  });
+
+  it('keeps the danger note alongside, since a repetition can also hang a piece', async () => {
+    const engine = await loadEngine();
+    const shuffle = ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1'];
+    const board = new engine.Position();
+    for (const uci of shuffle) board.applyUci(uci);
+    const notes = annotateMoves(engine.Position, board.fen(), board.movesUci(), shuffle);
+    expect(line(notes, 'f6g8')).toMatch(/nothing hangs.*DRAWS THE GAME NOW/);
+  });
+
+  it('drops the repetition note rather than trust a history of another game', async () => {
+    const engine = await loadEngine();
+    // A history that does not arrive at the FEN it is handed. Telling a
+    // character something false about the board is worse than telling it less.
+    const notes = annotateMoves(engine.Position, START_FEN, ['e2e4', 'd2d4'], ['g1f3', 'g8f6']);
+    expect(notes.every((n: any) => !n.note.includes('repetition'))).toBe(true);
+    expect(line(notes, 'e2e4'), 'the rest of the note survives').toContain('nothing hangs');
+  });
+
+  it('is a house rule, so it binds every entry equally', () => {
+    // In HOUSE_RULES rather than in anyone's prompt: an entry cannot switch it
+    // off, and it costs no entrant their style. It bites in one place only —
+    // ahead, and the move draws on the spot.
+    expect(HOUSE_RULES).toContain('DRAWS THE GAME NOW by repetition');
+    expect(HOUSE_RULES).toMatch(/ahead on material, do not play it/);
+    for (const character of PERSONALITIES) {
+      expect(character.prompt, `${character.name} should not carry the house rule`).not.toContain(
+        'repetition'
+      );
+    }
   });
 });

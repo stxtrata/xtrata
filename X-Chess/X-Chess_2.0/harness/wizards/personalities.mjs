@@ -51,13 +51,36 @@ const entry = ({ id, name, model = DEFAULT_MODEL, style, prompt }) =>
  * speaking, and it is the same for every entrant, which is what makes the
  * comparison fair. An entrant's inscription is only the character.
  */
+/**
+ * What the tournament requires of everybody, as opposed to what an entry asks
+ * for. This is the house speaking, so it is identical for every character and
+ * an entry cannot alter it.
+ *
+ * The last paragraph is a COMPETITION RULE, not chess advice, and it is here
+ * rather than in anyone's prompt for that reason. Game 17 drew by repetition
+ * from a queen, rook, two bishops, knight and five pawns against a queen and
+ * two pawns: eighty-nine moves, sixteen of them checks, and 0.267 STX of miner
+ * fees to reach a result neither side had to accept. Plumb was playing its
+ * entry correctly - it says a draw is acceptable - and that is the point. The
+ * problem was not the personality, it was that repeating cost nothing.
+ *
+ * It bites in one place only: you are ahead, and the move draws on the spot.
+ * Everything else - how to open, when to sacrifice, whether to trade - is still
+ * entirely the character's, which is what the tournament is trying to measure.
+ */
 export const HOUSE_RULES = `
 You are playing one side of a chess game. You will be given the position in FEN,
-the moves so far, and a list of every legal move available to you right now.
+who is ahead on material, the moves so far, and a list of every legal move
+available to you right now.
 
 Reply with exactly one move from that list, in the same notation, and nothing
 else. No explanation, no commentary, no alternative. A reply that is not one of
 the listed moves will be discarded and you will be asked again.
+
+A move marked "DRAWS THE GAME NOW by repetition" ends the game as a draw
+immediately. If you are ahead on material, do not play it: choose any other
+move, even a worse one, unless every alternative loses material. Being ahead and
+agreeing to a draw is a result you have to earn, not one to stumble into.
 `.trim();
 
 export const PERSONALITIES = Object.freeze([
