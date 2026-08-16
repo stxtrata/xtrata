@@ -213,6 +213,15 @@
   const RETRY_PAUSE_MS = 3000;
 
   /**
+   * Bumped when a row gains a field the renderer reads.
+   *
+   * A snapshot is a file that outlives the code that wrote it, and resuming
+   * from one mixes old rows with new. Stamping it means a stale one is
+   * SAID rather than inferred from a column reading "undefined".
+   */
+  const SNAPSHOT_FORMAT = 2;
+
+  /**
    * Token metadata, cached by contract for the life of the tab.
    *
    * A balance without decimals is a number nobody can read: the same holding is
@@ -283,6 +292,7 @@
 
   /** A balance, in whatever units the token actually uses. */
   function formatAmount(raw, meta) {
+    if (raw === undefined || raw === null || raw === '') return 'amount not recorded';
     const decimals = meta?.decimals ?? 0;
     if (!decimals) return `${BigInt(raw).toLocaleString('en-US')} (raw)`;
     const negative = BigInt(raw) < 0n;
@@ -477,12 +487,22 @@
         : '<span style="color:var(--muted)">—</span>';
       const fts = row.fts.length
         ? row.fts
-            .map(
-              (f) =>
-                `<span class="tag tag--hover" title="${esc(
-                  `${f.amount}\n${f.id}`
-                )}">${esc(f.id.split('::').pop())}</span>`
-            )
+            .map((f) => {
+              // DERIVED AT RENDER TIME, never trusted from the row.
+              //
+              // A row carried over from a snapshot was written by whatever
+              // version took it, and an older one has no `amount` field at all -
+              // so this printed the string "undefined" as a balance, for the
+              // same token that showed 40,000 one row below. A number nobody can
+              // rely on is worse than a raw one, and a snapshot is a file that
+              // outlives the code that wrote it.
+              const amount =
+                f.amount ??
+                formatAmount(f.balance, ftMeta.get(f.id.split('::')[0]) ?? null);
+              return `<span class="tag tag--hover" title="${esc(
+                `${amount}\n${f.id}`
+              )}">${esc(f.id.split('::').pop())}</span>`;
+            })
             .join('')
         : '<span style="color:var(--muted)">—</span>';
       // A failed row spans the remaining columns with its reason rather than
@@ -638,7 +658,7 @@
       if (!stopped) await pass(failed.map((r) => r.address), rows, 'Retrying');
     }
 
-    current = { takenAt: new Date().toISOString(), rows };
+    current = { format: SNAPSHOT_FORMAT, takenAt: new Date().toISOString(), rows };
     const left = offerRetry(rows);
     $('status').textContent = stopped
       ? `Stopped. ${rows.length} of ${addresses.length} read.`
@@ -727,12 +747,18 @@
       baseline = JSON.parse(await file.text());
       if (!Array.isArray(baseline?.rows)) throw new Error('no rows');
       const good = baseline.rows.filter((r) => !r.error).length;
+      const stale = (baseline.format ?? 1) < SNAPSHOT_FORMAT;
       $('resume').hidden = false;
       $('resume').textContent = `Resume from snapshot (${good} already read)`;
       $('status').textContent =
         `Snapshot loaded: ${baseline.rows.length} wallet(s) from ${baseline.takenAt}, ` +
         `${good} read successfully. RESUME to carry those over and read only the rest, ` +
-        'or take a fresh inventory and it will be compared against this one.';
+        'or take a fresh inventory and it will be compared against this one.' +
+        (stale
+          ? ' NOTE: this snapshot predates token amounts, so carried-over rows show ' +
+            'raw balances rather than decimal-adjusted ones. A fresh run fixes that; ' +
+            'nothing about it is wrong, only less precise.'
+          : '');
       // Prefill, so comparing does not need the addresses pasted twice.
       if (!$('addresses').value.trim()) {
         $('addresses').value = baseline.rows.map((r) => r.address).join('\n');

@@ -422,6 +422,26 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE).toContain("HEADLINE_CONTRACTS.has(f.id.split('::')[0])");
   });
 
+  it('never prints a field a carried-over row might not carry', () => {
+    // Reported from a real run: the same token showed 40,000 on one wallet and
+    // the string "undefined" on another, one row apart. Not a data problem - the
+    // second row came from a snapshot written before amounts existed, and the
+    // renderer printed a field that row never had. A snapshot is a file that
+    // outlives the code that wrote it.
+    expect(PAGE).toContain('f.amount ??');
+    expect(PAGE, 'a raw amount is still printed unguarded').not.toMatch(
+      /\$\{f\.amount\}/
+    );
+    expect(PAGE).toContain("return 'amount not recorded'");
+  });
+
+  it('stamps snapshots so a stale one is said, not inferred', () => {
+    // Otherwise the only evidence is a column reading "undefined", which reads
+    // as a bug in the chain data rather than an old file.
+    expect(PAGE).toContain('const SNAPSHOT_FORMAT');
+    expect(PAGE).toMatch(/baseline\.format \?\? 1\) < SNAPSHOT_FORMAT/);
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.
