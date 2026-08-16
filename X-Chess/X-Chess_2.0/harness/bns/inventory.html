@@ -174,7 +174,10 @@
 
   const headers = () => {
     const key = $('apikey').value.trim();
-    return key ? { 'x-api-key': key } : {};
+    // Both spellings, because the proxy in this project sends both and it costs
+    // nothing to match it. Hiro lists X-Api-Key AND X-Hiro-Api-Key in its
+    // Access-Control-Allow-Headers, so neither breaks the preflight.
+    return key ? { 'x-api-key': key, 'x-hiro-api-key': key } : {};
   };
 
   /**
@@ -185,20 +188,32 @@
    * table and mean opposite things, so a read that could not be made is marked
    * rather than counted as zero.
    */
-  async function get(path, tries = 5) {
+  async function get(path, tries = 6) {
+    let last = 'no attempt made';
     for (let attempt = 0; attempt < tries; attempt++) {
       if (stopped) throw new Error('stopped');
       try {
         const response = await fetch(API + path, { headers: headers() });
         if (response.ok) return await response.json();
         if (response.status === 404) return null;
-        if (response.status !== 429) throw new Error('HTTP ' + response.status);
+        // Kept, not collapsed. A 429 and a 502 and a blocked request all used to
+        // arrive in the table as the single word "unread", which meant the one
+        // question worth asking - WHY - could not be answered from the screen.
+        last = `HTTP ${response.status}`;
+        if (response.status !== 429 && response.status !== 502 && response.status !== 503) {
+          throw new Error(`${last} on ${path.split('?')[0]}`);
+        }
       } catch (error) {
-        if (attempt === tries - 1) throw error;
+        // A fetch that rejects rather than answering is a different animal from
+        // one that answered badly: it is CORS, a dropped connection, or the
+        // browser refusing. TypeError is what fetch throws for all three, and
+        // the message is the only clue there is.
+        last = error.name === 'TypeError' ? `blocked or dropped (${error.message})` : error.message;
+        if (attempt === tries - 1) throw new Error(last);
       }
-      await new Promise((done) => setTimeout(done, 500 * 2 ** attempt));
+      await new Promise((done) => setTimeout(done, 600 * 2 ** attempt));
     }
-    throw new Error('rate limited after ' + tries + ' attempts');
+    throw new Error(`${last} after ${tries} attempts`);
   }
 
   /** Clarity buff / uint arguments, hand-encoded. Bare hex, no 0x prefix. */
@@ -267,8 +282,11 @@
         }
       }
     } catch (error) {
-      // Marked, never silently zeroed. See `get`.
+      // Marked, never silently zeroed, and marked with WHAT WENT WRONG. See
+      // `get`. Also to the console, because a long run scrolls and the console
+      // keeps every one of them.
       row.error = String(error.message ?? error);
+      console.error(`[inventory] ${address}: ${row.error}`);
     }
     return row;
   }
@@ -293,11 +311,16 @@
       const fts = row.fts.length
         ? row.fts.map((f) => `<span class="tag">${f.id.split('::').pop()}</span>`).join('')
         : '<span style="color:var(--muted)">—</span>';
+      // A failed row spans the remaining columns with its reason rather than
+      // showing three empty dashes that look like an answer.
       tr.innerHTML =
         `<td class="mono">${row.address}</td>` +
         `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
-        `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
-        `<td>${nfts}</td><td>${fts}</td>`;
+        (row.error
+          ? `<td colspan="3" class="bad" style="font-size:.82rem">${row.error
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`
+          : `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
+            `<td>${nfts}</td><td>${fts}</td>`);
       body.appendChild(tr);
     }
     table.appendChild(body);
@@ -309,7 +332,7 @@
       note.className = 'status bad';
       note.textContent =
         `${unread.length} wallet(s) could not be read and are NOT counted as empty. ` +
-        'Add an API key, or run again.';
+        'The reason is on each row, and every one is also in the browser console.';
       wrap.appendChild(note);
     }
 
