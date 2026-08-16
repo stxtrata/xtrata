@@ -514,6 +514,42 @@ describe('the inventory page, which must never be able to take a seed', () => {
     expect(PAGE).toMatch(/only the.*owner can sign/s);
   });
 
+  it('keeps BigInt off a row, because a row has to survive JSON.stringify', () => {
+    // This is what broke Save. Bitcoin balances arrived as BigInt, the snapshot
+    // is JSON.stringify(current), and that THROWS on a BigInt - so the button
+    // did nothing at all, silently, with no error anywhere a person would look.
+    expect(PAGE).toContain('(confirmed + pending).toString()');
+    expect(PAGE, 'a BigInt is being stored on a row again').not.toMatch(
+      /sats: confirmed \+ pending\b/
+    );
+    // Belt and braces: a replacer, so the next one cannot break saving either.
+    expect(PAGE).toContain("typeof value === 'bigint'");
+  });
+
+  it('downloads through an anchor in the document, revoked later', () => {
+    // A detached anchor does not reliably trigger a download in every browser,
+    // and revoking the object URL in the same tick races the download that was
+    // just requested.
+    expect(PAGE).toContain('document.body.appendChild(a)');
+    expect(PAGE, 'the object URL is revoked in the same tick').not.toMatch(
+      /a\.click\(\);\s*URL\.revokeObjectURL/
+    );
+  });
+
+  it('never fails to save in silence', () => {
+    // The whole reason this took a report rather than being noticed: an
+    // exception on a button that simply appeared to do nothing.
+    expect(PAGE).toContain('Could not save the snapshot');
+    expect(PAGE).toContain('[inventory] save failed:');
+  });
+
+  it('totals the headline tokens from raw balances, and says when partial', () => {
+    // A total cannot be built by parsing formatted numbers back, and one
+    // quietly missing a wallet is worse than one that admits it.
+    expect(PAGE).toContain('row.headlineRaw');
+    expect(PAGE).toMatch(/predating these totals and are not counted/);
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.

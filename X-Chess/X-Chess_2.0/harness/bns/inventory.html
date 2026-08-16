@@ -182,12 +182,15 @@
       <div>wallets<b id="t-wallets">0</b></div>
       <div>STX<b id="t-stx">0</b></div>
       <div id="t-headline-wrap"></div>
+      <div id="t-btc"></div>
       <div id="t-sources"></div>
       <div>BNS names<b id="t-bns">0</b></div>
       <div>other NFTs<b id="t-nft">0</b></div>
       <div>token types<b id="t-ft">0</b></div>
     </div>
   </div>
+
+  <p class="status warn" id="t-stale" style="display:none"></p>
 
   <div id="diff-panel" class="panel" hidden>
     <h2 style="margin-top:0">Against the saved snapshot</h2>
@@ -333,7 +336,12 @@
         const pending =
           BigInt(body.mempool_stats.funded_txo_sum) - BigInt(body.mempool_stats.spent_txo_sum);
         return {
-          sats: confirmed + pending,
+          // A STRING, not a BigInt. Anything stored on a row ends up in
+          // JSON.stringify when the snapshot is saved, and a BigInt makes that
+          // THROW - which is exactly how the Save button stopped working the
+          // moment Bitcoin balances arrived. A row must be serialisable by
+          // construction, not by luck.
+          sats: (confirmed + pending).toString(),
           txCount: body.chain_stats.tx_count + body.mempool_stats.tx_count,
           utxos: body.chain_stats.funded_txo_count - body.chain_stats.spent_txo_count
         };
@@ -495,11 +503,17 @@
       // columns. Matched on the CONTRACT half of the asset identifier, so a
       // token claiming the symbol cannot land in the wrong column.
       row.headline = {};
+      // The RAW balance too, kept alongside the display string. A total cannot
+      // be built by parsing formatted numbers back - "1,234.5" and "1234.5" and
+      // "0 (raw)" are three different parsing problems - so the number that gets
+      // summed is the one the chain returned.
+      row.headlineRaw = {};
       for (const token of HEADLINE) {
         const held = row.fts.find((f) => f.id.split('::')[0] === token.contract);
         row.headline[token.label] = held
           ? formatAmount(held.balance, { decimals: token.decimals })
           : null;
+        row.headlineRaw[token.label] = held ? String(held.balance) : null;
       }
       row.fts = row.fts.filter((f) => !HEADLINE_CONTRACTS.has(f.id.split('::')[0]));
 
@@ -570,7 +584,7 @@
     if (row.btc?.error) {
       return `<td class="num bad" title="${esc(row.btc.error)}">unread</td>`;
     }
-    const value = row.btc?.sats ?? 0n;
+    const value = BigInt(row.btc?.sats ?? 0);
     const busy = (row.btc?.txCount ?? 0) > 20;
     const note =
       `${paired}\n${row.btc?.utxos ?? 0} UTXO(s), ${row.btc?.txCount ?? 0} tx` +
@@ -735,12 +749,59 @@
         (orphans ? `<div style="margin-right:2rem">no seed<b class="warn">${orphans}</b></div>` : '');
       $('t-sources').style.display = 'flex';
     }
+    // A TOTAL, not a holder count. Summed from the raw balances, and it says
+    // when it is partial: a row carried over from a snapshot written before
+    // headlineRaw existed contributes nothing, and a total quietly missing a
+    // wallet is worse than one that admits it.
+    let stale = 0;
+    for (const row of rows) if (row.headline && !row.headlineRaw) stale++;
+
     $('t-headline-wrap').innerHTML = HEADLINE.map((t) => {
-      const holders = rows.filter((r) => r.headline?.[t.label]).length;
-      return holders
-        ? `<div style="margin-right:2rem">${t.label} holders<b>${holders}</b></div>`
-        : '';
+      let sum = 0n;
+      let holders = 0;
+      for (const row of rows) {
+        const raw = row.headlineRaw?.[t.label];
+        if (!raw) continue;
+        sum += BigInt(raw);
+        holders++;
+      }
+      if (!holders) return '';
+      const shown = formatAmount(sum.toString(), { decimals: t.decimals });
+      return (
+        `<div style="margin-right:2rem" title="${esc(`${holders} wallet(s) hold ${t.label}`)}">` +
+        `${t.label}<b>${shown}</b></div>`
+      );
     }).join('');
+
+    // Bitcoin, in sats, across every paired address that was actually read.
+    if (HAS_BTC) {
+      let sats = 0n;
+      let read = 0;
+      let unread = 0;
+      for (const row of rows) {
+        if (row.btc?.error) { unread++; continue; }
+        if (row.btc?.sats === undefined) continue;
+        sats += BigInt(row.btc.sats);
+        read++;
+      }
+      $('t-btc').innerHTML = read
+        ? `<div title="${esc(
+            `${read} address(es) read${unread ? `, ${unread} unread and NOT counted` : ''}` +
+              `\n${(Number(sats) / 1e8).toFixed(8)} BTC`
+          )}">BTC (sats)<b${unread ? ' class="warn"' : ''}>${sats.toLocaleString('en-US')}${
+            unread ? ' *' : ''
+          }</b></div>`
+        : '';
+    }
+
+    if (stale) {
+      $('t-stale').textContent =
+        `* ${stale} wallet(s) came from a snapshot predating these totals and are not counted. ` +
+        'A fresh run includes them.';
+      $('t-stale').style.display = 'block';
+    } else {
+      $('t-stale').style.display = 'none';
+    }
     $('t-bns').textContent = rows.reduce((s, r) => s + r.bns.length, 0);
     $('t-nft').textContent = rows.reduce((s, r) => s + r.nfts.length, 0);
     $('t-ft').textContent = new Set(rows.flatMap((r) => r.fts.map((f) => f.id))).size;
@@ -884,13 +945,42 @@
   $('stop').addEventListener('click', () => { stopped = true; $('status').textContent = 'Stopping…'; });
 
   $('save').addEventListener('click', () => {
-    if (!current) return;
-    const blob = new Blob([JSON.stringify(current, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `inventory-${current.takenAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(a.href);
+    if (!current) {
+      $('status').textContent = 'Nothing to save yet — take an inventory first.';
+      return;
+    }
+    try {
+      // A replacer as well as the fix at source, because the next person to put
+      // a BigInt on a row should not silently break saving for a third time.
+      const json = JSON.stringify(
+        current,
+        (key, value) => (typeof value === 'bigint' ? value.toString() : value),
+        2
+      );
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-${current.takenAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      // IN THE DOCUMENT, and revoked LATER. A detached anchor does not reliably
+      // trigger a download in every browser, and revoking the object URL in the
+      // same tick races the download that was just asked for.
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 30_000);
+      $('status').textContent = `Saved ${current.rows.length} wallet(s) to ${a.download}.`;
+    } catch (error) {
+      // Never silent. The failure that prompted this was an exception nobody
+      // saw, on a button that simply appeared to do nothing.
+      const message = String(error?.message ?? error);
+      console.error('[inventory] save failed:', error);
+      $('status').textContent = `Could not save the snapshot: ${message}`;
+      $('status').className = 'status bad';
+    }
   });
 
   /**
