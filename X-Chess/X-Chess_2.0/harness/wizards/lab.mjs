@@ -116,11 +116,26 @@ async function playOne({ Position, rankMoves, white, black, ask, seed }) {
         }
       }));
     } catch (error) {
+      // A FORFEIT IS THE CHARACTER'S FAILURE. Anything else is ours, and this
+      // caught both — so a `claude -p` that hit a rate limit, timed out, or died
+      // was recorded as a player who could not find a legal move.
+      //
+      // The engine arm reported three forfeits on that basis, and they were the
+      // most alarming number in the run. Probing afterwards found 0 refusals in
+      // 16 asks across ordinary, in-check and hopeless positions, which is what
+      // sent me looking here. run-tournament.mjs has always drawn this line
+      // properly, with the same `error.forfeit` marker; the lab never did.
+      if (!error?.forfeit) {
+        return {
+          ...counted, result: null, by: 'ABORTED (harness, not the player)',
+          plies: ply, history, note: String(error.message).slice(0, 120)
+        };
+      }
       // A character that cannot produce a legal move loses, exactly as it would
       // on chain — where it resigns. No point pretending that is a draw.
       return {
         ...counted, result: board.turn === 0 ? '0-1' : '1-0', by: 'forfeit',
-        plies: ply, history, note: String(error.message).slice(0, 80)
+        plies: ply, history, note: String(error.message).slice(0, 120)
       };
     }
 
@@ -183,8 +198,12 @@ async function main() {
       });
       console.log(
         `  ${white.name.padEnd(8)} v ${black.name.padEnd(8)} ${String(out.result ?? '—').padEnd(8)} ` +
-          `${out.by.padEnd(22)} ${out.plies} plies`
+          `${out.by.padEnd(34)} ${out.plies} plies`
       );
+      // Printed, because a forfeit is a claim about a PLAYER and deserves to be
+      // checkable. Three of them went unexamined for exactly as long as the
+      // reason stayed inside the object.
+      if (out.note) console.log(`      ${out.note}`);
       return out;
     }),
     CONCURRENCY
@@ -197,7 +216,10 @@ async function main() {
 
   console.log(`\n${GAMES} games in ${((Date.now() - started) / 60000).toFixed(1)} minutes, ${moves} moves`);
   console.log(`  decided                : ${decisive}/${GAMES}  (${mates} by checkmate)`);
-  console.log(`  unfinished at ${PLIES} plies : ${games.filter((g) => !g.result).length}`);
+  const aborted = games.filter((g) => g.by?.startsWith('ABORTED')).length;
+  console.log(`  unfinished at ${PLIES} plies : ${games.filter((g) => !g.result && !g.by?.startsWith('ABORTED')).length}`);
+  console.log(`  forfeited by a character: ${games.filter((g) => g.by === 'forfeit').length}`);
+  if (aborted) console.log(`  ABORTED by the harness  : ${aborted}  <- not a chess result, do not count these`);
   console.log(`  moves 2+ pawns worse than best: ${moves ? Math.round((total('blunders') / moves) * 100) : 0}%`);
   console.log(`  mates missed            : ${total('missedMates')}`);
   console.log(`  stalemates walked into  : ${total('stalematesTaken')}`);
