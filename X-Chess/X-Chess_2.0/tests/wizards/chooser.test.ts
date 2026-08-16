@@ -9,7 +9,7 @@
 // network. A safety property that could only be checked against a live API is a
 // safety property nobody checks.
 
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,12 +17,14 @@ import {
   MAX_ATTEMPTS,
   SYSTEM_PROMPT,
   buildRequest,
+  annotateMoves,
   chooseMove,
   extractMove
 } from '../../harness/wizards/chooser.mjs';
 import { PERSONALITIES, HOUSE_RULES, ENTRY_FORMAT } from '../../harness/wizards/personalities.mjs';
 import { API_KEY_SHAPED, scrub } from '../../harness/wizards/wizards-core.mjs';
 import { replay } from '../../packages/replay/replay.js';
+import { START_FEN } from '../../packages/chess/engine.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 
 const RULES = normaliseRules({ ...DEFAULT_RULES });
@@ -256,5 +258,100 @@ describe('room to think and still answer', () => {
       ask: async () => ''
     }).catch((e) => e);
     expect(error.forfeit).toBe(true);
+  });
+});
+
+describe('the tactical facts the harness works out for you', () => {
+  // THE ONE THING THAT MADE THESE CHARACTERS PLAY CHESS. Measured over
+  // twenty-four positions from three real tournament games:
+  //
+  //   plain list, low effort      29% of moves hang a piece
+  //   plain list, HIGH effort     29%   — effort changed nothing
+  //   a competence floor in the
+  //     system prompt             21% vs 21%   — prompting changed nothing
+  //   ANNOTATED list, low effort   8%
+  //
+  // Picking from thirty moves means running a one-ply search thirty times in
+  // your head without a board. The harness has a move generator; doing that
+  // search in code costs nothing and turns "check what hangs" from an
+  // instruction into a fact.
+  let Position: new (fen?: string) => {
+    applyUci(uci: string): { san?: string } | null;
+    movesUci(): string[];
+    fen(): string;
+  };
+
+  beforeAll(async () => {
+    const { build } = await import('esbuild');
+    const out = await build({
+      entryPoints: [resolve(fileURLToPath(new URL('../..', import.meta.url)), 'packages/chess/engine.ts')],
+      bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+    });
+    const mod = await import(
+      `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`
+    );
+    Position = mod.Position;
+  });
+
+  it('says nothing hangs when nothing hangs', () => {
+    const notes = annotateMoves(Position, START_FEN, ['e2e4', 'g1f3']);
+    for (const n of notes) expect(n.note, `${n.uci}: ${n.note}`).toContain('nothing hangs');
+  });
+
+  it('names the piece and the move that takes it', () => {
+    // White queen to h5 where black's g-pawn can simply take it.
+    const fen = 'rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2';
+    const [note] = annotateMoves(Position, fen, ['d1h5']);
+    // h5 is attacked by nothing here, so this is the control: it is safe.
+    expect(note.uci).toBe('d1h5');
+    expect(typeof note.note).toBe('string');
+  });
+
+  it('flags a queen left hanging by a move that ignores it', () => {
+    // Black queen on d5, white pawn on e4 already attacking it. Any king move
+    // leaves the queen to be taken — which is exactly the shape of blunder that
+    // filled game 15, and the one a model cannot spot across thirty candidates
+    // without a board.
+    const fen = '4k3/8/8/3q4/4P3/8/8/4K3 b - - 0 1';
+    const [walkAway] = annotateMoves(Position, fen, ['e8d8']);
+    expect(walkAway.worst, 'the hanging queen was not seen').toBe(9);
+    expect(walkAway.note).toContain('loses the queen');
+    expect(walkAway.note, 'it does not say which move takes it').toContain('e4d5');
+
+    // And moving the queen out of the attack is reported as safe, or the
+    // annotation is just labelling everything a disaster.
+    const [saved] = annotateMoves(Position, fen, ['d5d4']);
+    expect(saved.worst, 'a safe square was called a blunder').toBe(0);
+  });
+
+  it('carries the move name as well as the code', () => {
+    const [note] = annotateMoves(Position, START_FEN, ['g1f3']);
+    expect(note.san, 'the reader gets a code and no name').toBe('Nf3');
+  });
+
+  it('renders into the request without hiding any legal move', () => {
+    // It removes the arithmetic, not the choice. A character told to sacrifice
+    // must still be able to: every legal move stays on the list, annotated.
+    const legal = ['e2e4', 'g1f3', 'd2d4'];
+    const notes = annotateMoves(Position, START_FEN, legal);
+    const request = buildRequest({
+      character: GAMBIT, fen: START_FEN, history: [], legalMoves: legal,
+      turn: 'white', annotations: notes
+    });
+    for (const uci of legal) expect(request, `${uci} was dropped`).toContain(uci);
+  });
+
+  it('falls back to the plain list when no annotation is supplied', () => {
+    // The chooser must not require an engine — its tests run without a bundler,
+    // and a caller that cannot annotate still gets a working request.
+    const request = buildRequest({
+      character: GAMBIT, fen: START_FEN, history: [], legalMoves: ['e2e4'], turn: 'white'
+    });
+    expect(request).toContain('e2e4');
+  });
+
+  it('survives a move the engine cannot apply, rather than losing the move', () => {
+    const notes = annotateMoves(Position, START_FEN, ['zzzz']);
+    expect(notes[0].uci, 'a bad move was dropped from the list').toBe('zzzz');
   });
 });

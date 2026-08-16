@@ -36,7 +36,7 @@ import {
   scrub
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
-import { anthropicAsker, chooseMove } from './chooser.mjs';
+import { annotateMoves, anthropicAsker, chooseMove } from './chooser.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -159,7 +159,7 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
-async function playGame({ gameId, white, black, replay, ask, budget, expectHash = null }) {
+async function playGame({ gameId, white, black, replay, ask, budget, Position = null, expectHash = null }) {
   // NEVER SUBMIT INTO A GAME WITHOUT CHECKING IT IS OURS.
   //
   // The lookup above is now exact, and this is here anyway — because the
@@ -427,6 +427,7 @@ async function oneGame({ openFee }) {
   const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
   const ask = anthropicAsker({ apiKey });
   const { replay } = await loadReplay();
+  const { Position } = await loadEngine();
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
 
   const gameId = arg('game')
@@ -434,7 +435,7 @@ async function oneGame({ openFee }) {
     : await openGame({ white: w, black: b, openFee, budget });
   console.log(`game ${gameId}\n`);
 
-  const result = await playGame({ gameId, white: w, black: b, replay, ask, budget });
+  const result = await playGame({ gameId, white: w, black: b, replay, ask, budget, Position });
   console.log(`\nresult ${result ?? 'unfinished'}, spent ${ustx(budget.spent)}\n`);
 }
 
@@ -518,6 +519,7 @@ async function main() {
   const apiKey = env().ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_API_KEY ?? null;
   const ask = anthropicAsker({ apiKey });
   const { replay } = await loadReplay();
+  const { Position } = await loadEngine();
   const agents = byId(field.agents);
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
   const existing = await readGames();
@@ -540,7 +542,7 @@ async function main() {
         const { hash } = await wizardRules(white.address, black.address);
         const already = findByRulesHash(hash, existing);
         const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
-        await playGame({ gameId, white, black, replay, ask, budget, expectHash: hash });
+        await playGame({ gameId, white, black, replay, ask, budget, Position, expectHash: hash });
       })
     );
   }
@@ -592,6 +594,18 @@ async function gameIdFrom(txid) {
 
 async function tournamentRules(white, black) {
   return wizardRules(white, black);
+}
+
+/** The engine, for working out what each legal move costs. Same source as the board. */
+async function loadEngine() {
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'chess', 'engine.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+  });
+  return import(
+    `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`
+  );
 }
 
 /** The board's replay engine, bundled the way the rules codec already is. */
