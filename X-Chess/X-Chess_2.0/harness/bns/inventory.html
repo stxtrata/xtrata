@@ -88,6 +88,23 @@
     display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
     font-size: .78rem; margin: .1rem .2rem .1rem 0; font-family: ui-monospace, Menlo, monospace;
   }
+  /* A tag carrying a number behind it says so, or nobody hovers. */
+  .tag[title] { cursor: help; border-bottom: 1px dotted var(--muted); }
+  /* Closed it is one line; open it names every contract. No script involved. */
+  .nfts > summary {
+    cursor: pointer; font-size: .8rem; padding: .05rem .4rem; border-radius: 4px;
+    background: var(--code); display: inline-block; list-style: none;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .nfts > summary::-webkit-details-marker { display: none; }
+  .nfts > summary::before { content: '▸ '; color: var(--muted); }
+  .nfts[open] > summary::before { content: '▾ '; }
+  .nfts > ul { margin: .4rem 0 .2rem; padding-left: 1rem; list-style: none; }
+  .nfts > ul > li { margin-bottom: .35rem; font-size: .8rem; line-height: 1.35; }
+  .nfts .count { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .nfts .who {
+    color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+  }
   .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
   .totals { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: .8rem; }
   .totals div { font-size: .85rem; color: var(--muted); }
@@ -114,6 +131,9 @@
     <p class="hint">
       Anything that is not an <span class="mono">SP…</span> / <span class="mono">SM…</span>
       principal is ignored, so you can paste a whole table and let it pick the addresses out.
+      <strong>Hover a token</strong> for its amount and full contract;
+      <strong>click an NFT row</strong> to expand it into every contract with a count.
+      Both are kept off screen so four hundred rows stay scannable.
     </p>
 
     <label for="apikey" style="margin-top:1rem">Hiro API key (optional)</label>
@@ -130,6 +150,7 @@
       <button id="stop" type="button" disabled>Stop</button>
       <button id="save" type="button" disabled>Save snapshot</button>
       <button id="retry" type="button" hidden>Retry failed</button>
+      <button id="resume" type="button" hidden>Resume from snapshot</button>
       <button id="load" type="button">Load snapshot to compare</button>
       <input id="file" type="file" accept="application/json" hidden>
     </div>
@@ -165,6 +186,9 @@
   const [BNS_ADDR, BNS_NAME] = BNS_V2.split('.');
 
   const $ = (id) => document.getElementById(id);
+  /** Attribute-safe. A token name is contract-authored and may contain anything. */
+  const esc = (text) =>
+    String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const PRINCIPAL = /\bS[PM][0-9A-HJKMNP-TV-Z]{20,}\b/g;
 
   let stopped = false;
@@ -181,6 +205,64 @@
    * ladder.
    */
   const RETRY_PAUSE_MS = 3000;
+
+  /**
+   * Token metadata, cached by contract for the life of the tab.
+   *
+   * A balance without decimals is a number nobody can read: the same holding is
+   * "1000000" or "1.0" depending on a field the balances endpoint does not
+   * return. Fetched once per CONTRACT rather than once per wallet - eighty-seven
+   * token types across four hundred wallets is eighty-seven requests, not
+   * thousands - and best effort throughout, because a token whose metadata is
+   * missing should still show its raw balance rather than vanishing.
+   */
+  const ftMeta = new Map();
+
+  async function metaFor(assetId) {
+    const contract = assetId.split('::')[0];
+    if (ftMeta.has(contract)) return ftMeta.get(contract);
+    let meta = null;
+    try {
+      // THE CONTRACT, not the metadata endpoint. `/metadata/v1/ft/...` answers
+      // 200 with a name, a symbol and a total supply and NO decimals field at
+      // all for plenty of real tokens - so a run built on it silently formatted
+      // every balance as though it had none. SIP-010 defines `get-decimals` on
+      // the token itself, which is the authority rather than an index of it.
+      const [address, name] = contract.split('.');
+      const response = await fetch(
+        `${API}/v2/contracts/call-read/${address}/${name}/get-decimals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers() },
+          body: JSON.stringify({ sender: address, arguments: [] })
+        }
+      );
+      if (response.ok) {
+        const body = await response.json();
+        // (ok uN) serialises as 0x07 01 <16 bytes big-endian>.
+        const hex = String(body.result ?? '').replace(/^0x/, '');
+        if (body.okay && hex.startsWith('0701')) {
+          meta = { decimals: parseInt(hex.slice(4, 36), 16) };
+        }
+      }
+    } catch {
+      // Best effort throughout. A raw number beats no number, and a token whose
+      // contract will not answer should still show what it holds.
+    }
+    ftMeta.set(contract, meta);
+    return meta;
+  }
+
+  /** A balance, in whatever units the token actually uses. */
+  function formatAmount(raw, meta) {
+    const decimals = meta?.decimals ?? 0;
+    if (!decimals) return `${BigInt(raw).toLocaleString('en-US')} (raw)`;
+    const negative = BigInt(raw) < 0n;
+    const digits = (negative ? -BigInt(raw) : BigInt(raw)).toString().padStart(decimals + 1, '0');
+    const whole = digits.slice(0, -decimals);
+    const part = digits.slice(-decimals).replace(/0+$/, '');
+    return `${negative ? '-' : ''}${BigInt(whole).toLocaleString('en-US')}${part ? '.' + part : ''}`;
+  }
 
   /* --------------------------------------------------------------- */
 
@@ -279,6 +361,13 @@
       row.fts = Object.entries(balances?.fungible_tokens ?? {})
         .filter(([, v]) => BigInt(v.balance) > 0n)
         .map(([id, v]) => ({ id, balance: v.balance }));
+      // Decimals, so the hover shows a number rather than a digit soup. Cached
+      // per contract, so this costs nothing after the first wallet holding it.
+      for (const ft of row.fts) {
+        const meta = await metaFor(ft.id);
+        ft.amount = formatAmount(ft.balance, meta);
+        ft.decimals = meta?.decimals ?? null;
+      }
 
       const holdings = await get(
         `/extended/v1/tokens/nft/holdings?principal=${address}&limit=200`
@@ -317,11 +406,42 @@
     for (const row of rows) {
       const tr = document.createElement('tr');
       const names = row.bns.map((b) => `<span class="tag">${b.name ?? '#' + b.id}</span>`).join('');
+      // Everything detailed lives in a title rather than on screen. The table
+      // has to stay scannable across four hundred rows, and a wallet holding
+      // eighty tokens would otherwise be a page of its own.
+      const byContract = new Map();
+      for (const nft of row.nfts) {
+        byContract.set(nft.asset, (byContract.get(nft.asset) ?? 0) + 1);
+      }
+      // A DETAILS ELEMENT, not a tooltip and not a column.
+      //
+      // One wallet here holds 53 NFTs across 9 contracts. On screen that is a
+      // page; in a title attribute it is a nine-line hover you cannot select,
+      // cannot scroll and cannot read on a phone. Closed it costs one line, open
+      // it names every contract with its count, and it needs no script - so it
+      // survives whatever else changes here.
       const nfts = row.nfts.length
-        ? `<span class="tag">${row.nfts.length} from ${new Set(row.nfts.map((n) => n.asset)).size} contract(s)</span>`
+        ? `<details class="nfts"><summary>${row.nfts.length} from ${byContract.size} contract(s)</summary>` +
+          `<ul>${[...byContract]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([asset, n]) => {
+              const [contract, token] = asset.split('::');
+              return (
+                `<li><b>${esc(token ?? asset)}</b> <span class="count">(${n})</span>` +
+                `<br><span class="who">${esc(contract)}</span></li>`
+              );
+            })
+            .join('')}</ul></details>`
         : '<span style="color:var(--muted)">—</span>';
       const fts = row.fts.length
-        ? row.fts.map((f) => `<span class="tag">${f.id.split('::').pop()}</span>`).join('')
+        ? row.fts
+            .map(
+              (f) =>
+                `<span class="tag tag--hover" title="${esc(
+                  `${f.amount}\n${f.id}`
+                )}">${esc(f.id.split('::').pop())}</span>`
+            )
+            .join('')
         : '<span style="color:var(--muted)">—</span>';
       // A failed row spans the remaining columns with its reason rather than
       // showing three empty dashes that look like an answer.
@@ -503,15 +623,61 @@
     URL.revokeObjectURL(a.href);
   });
 
+  /**
+   * Carry on from a snapshot instead of reading it all again.
+   *
+   * Four hundred wallets is an eight hundred request run, and a run that dies
+   * near the end used to mean starting from zero. A snapshot already holds every
+   * answer it got, so resuming reads only what is NOT already there: the
+   * addresses in the box that the snapshot never covered, plus the ones it
+   * covered and failed on. Successful rows are carried straight across.
+   */
+  $('resume').addEventListener('click', async () => {
+    if (!baseline) return;
+    const addresses = [...new Set($('addresses').value.match(PRINCIPAL) ?? [])];
+    const done = new Map(baseline.rows.filter((r) => !r.error).map((r) => [r.address, r]));
+    const todo = addresses.filter((a) => !done.has(a));
+
+    // Everything the snapshot got, kept as-is. This is the whole point: those
+    // rows are answers, and re-fetching them would spend the budget that made
+    // the run fail in the first place.
+    const rows = addresses.filter((a) => done.has(a)).map((a) => done.get(a));
+    render(rows);
+
+    if (!todo.length) {
+      current = { takenAt: new Date().toISOString(), rows };
+      $('status').textContent = `Nothing to resume — the snapshot already covers all ${rows.length}.`;
+      offerRetry(rows);
+      $('save').disabled = false;
+      return;
+    }
+
+    stopped = false;
+    busy(true);
+    $('status').textContent = `Resuming: ${rows.length} carried over, ${todo.length} to read.`;
+    await pass(todo, rows, 'Reading');
+    current = { takenAt: new Date().toISOString(), rows };
+    const left = offerRetry(rows);
+    $('status').textContent = left.length
+      ? `Resumed. ${rows.length} wallet(s), ${left.length} still unread.`
+      : `Resumed. ${rows.length} wallet(s), all read.`;
+    busy(false);
+  });
+
   $('load').addEventListener('click', () => $('file').click());
   $('file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     try {
       baseline = JSON.parse(await file.text());
+      if (!Array.isArray(baseline?.rows)) throw new Error('no rows');
+      const good = baseline.rows.filter((r) => !r.error).length;
+      $('resume').hidden = false;
+      $('resume').textContent = `Resume from snapshot (${good} already read)`;
       $('status').textContent =
-        `Snapshot loaded: ${baseline.rows.length} wallet(s) from ${baseline.takenAt}. ` +
-        'Take an inventory now and it will be compared.';
+        `Snapshot loaded: ${baseline.rows.length} wallet(s) from ${baseline.takenAt}, ` +
+        `${good} read successfully. RESUME to carry those over and read only the rest, ` +
+        'or take a fresh inventory and it will be compared against this one.';
       // Prefill, so comparing does not need the addresses pasted twice.
       if (!$('addresses').value.trim()) {
         $('addresses').value = baseline.rows.map((r) => r.address).join('\n');

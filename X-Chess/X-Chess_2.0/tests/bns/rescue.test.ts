@@ -338,6 +338,34 @@ describe('the inventory page, which must never be able to take a seed', () => {
     );
   });
 
+  it('takes decimals from the token contract, not the metadata index', () => {
+    // `/metadata/v1/ft/...` answers 200 with a name, a symbol and a total supply
+    // and NO decimals field for plenty of real tokens - so a run built on it
+    // formats every balance as though the token had none, silently. SIP-010
+    // defines get-decimals on the token itself, which is the authority.
+    expect(PAGE).toContain('get-decimals');
+    expect(PAGE, 'the metadata index is being read as a source').not.toMatch(
+      /await get\(`\/metadata\/v1\/ft\//
+    );
+  });
+
+  it('resumes from a snapshot without re-reading what it already has', () => {
+    // Four hundred wallets is an eight hundred request run, and one that dies
+    // near the end used to mean starting from zero. Re-fetching answers you
+    // already hold spends exactly the budget that made it fail.
+    expect(PAGE).toContain("id=\"resume\"");
+    expect(PAGE).toContain('const todo = addresses.filter((a) => !done.has(a))');
+    // Only SUCCESSFUL rows carry over. A row that failed is work still to do.
+    expect(PAGE).toMatch(/baseline\.rows\.filter\(\(r\) => !r\.error\)/);
+  });
+
+  it('expands NFT holdings rather than hiding them in a hover', () => {
+    // One wallet here holds 53 across 9 contracts. In a title attribute that is
+    // a nine-line tooltip you cannot select, scroll, or read on a phone.
+    expect(PAGE).toContain('<details class="nfts">');
+    expect(PAGE, 'the expander needs script to work').not.toMatch(/addEventListener\('toggle'/);
+  });
+
   it('never renders an unread wallet as an empty one', () => {
     // The failure this whole area keeps meeting. "You own nothing" and "nobody
     // answered" look identical in a table and mean opposite things.
