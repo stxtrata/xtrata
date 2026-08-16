@@ -30,7 +30,7 @@ import { build } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { annotateMoves, chooseMove, claudeCodeAsker, materialBalance } from './chooser.mjs';
+import { annotateMoves, chooseMove, claudeCodeAsker, materialBalance, rankedNotes } from './chooser.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -47,6 +47,17 @@ const FROM = arg('from');
 const PLAIN = process.argv.includes('--plain');
 
 /**
+ * Use the one-ply annotation instead of the engine.
+ *
+ * THE CONTROL ARM. Everything before today ran this way, so it is what the
+ * engine has to beat, and beating "no notes at all" would prove nothing.
+ */
+const ONE_PLY = process.argv.includes('--one-ply');
+
+/** Plies the engine searches. Three is about 12ms and sees a mate in two. */
+const DEPTH = Number(arg('depth', '3'));
+
+/**
  * How many games run at once.
  *
  * Bounded because every one of these is a `claude -p` subprocess against a
@@ -56,16 +67,16 @@ const PLAIN = process.argv.includes('--plain');
  */
 const CONCURRENCY = Number(arg('at-once', '6'));
 
-async function loadEngine() {
+async function loadFrom(...parts) {
   const out = await build({
-    entryPoints: [join(ROOT, 'packages', 'chess', 'engine.ts')],
+    entryPoints: [join(ROOT, ...parts)],
     bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent'
   });
   return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 }
 
 /** One complete game, and everything worth counting about it. */
-async function playOne({ Position, white, black, ask, seed }) {
+async function playOne({ Position, rankMoves, white, black, ask, seed }) {
   const board = seed ? new Position(seed) : new Position();
   const history = [];
   const counted = { blunders: 0, moves: 0, missedMates: 0, stalematesTaken: 0 };
@@ -81,20 +92,24 @@ async function playOne({ Position, white, black, ask, seed }) {
     const legal = board.movesUci();
     if (!legal.length) return { ...counted, result: '1/2-1/2', by: 'no moves', plies: ply, history };
 
-    let notes = annotateMoves(Position, board.fen(), legal, history);
+    // The engine unless asked for the old behaviour. Both produce the same
+    // shape — a note per legal move, every move present — so the only thing
+    // that differs between arms is what the note KNOWS.
+    let notes = ONE_PLY
+      ? annotateMoves(Position, board.fen(), legal, history)
+      : rankedNotes({ rankMoves, Position, fen: board.fen(), played: history, depth: DEPTH });
 
-    // Was a mate on offer, and did they take it? Counted before the note is
-    // stripped, so the --plain arm is measured on the same footing.
-    const mate = notes.find((n) => n.ends === 'mate');
-    if (PLAIN) {
-      notes = notes.map((n) => ({ ...n, note: '' }));
-    }
+    // Was a mate on offer, and did they take it? Measured from the engine
+    // either way, so both arms are marked by the same examiner.
+    const truth = rankMoves(board.state, DEPTH);
+    const mate = truth.find((r) => r.mateIn === 1);
+    if (PLAIN) notes = null;
 
     const mover = board.turn === 0 ? white : black;
     let move;
     try {
       ({ move } = await chooseMove({
-        character: mover, ask, annotations: PLAIN ? null : notes,
+        character: mover, ask, annotations: notes,
         position: {
           fen: board.fen(), legalMoves: legal,
           turn: board.turn === 0 ? 'white' : 'black', history
@@ -109,10 +124,15 @@ async function playOne({ Position, white, black, ask, seed }) {
       };
     }
 
-    const chosenNote = annotateMoves(Position, board.fen(), [move], history)[0];
+    // Scored by the ENGINE in both arms, not by whichever note the player saw.
+    // A blunder is a move the search says drops material against best play, so
+    // the two arms are being marked to one standard.
     if (mate && move !== mate.uci) counted.missedMates++;
-    if (chosenNote?.ends === 'stalemate') counted.stalematesTaken++;
-    if ((chosenNote?.worst ?? 0) > 0) counted.blunders++;
+    const chosen = truth.find((r) => r.uci === move);
+    if (chosen && truth[0] && truth[0].score - chosen.score >= 200) counted.blunders++;
+    const after = new Position(board.fen());
+    after.applyUci(move);
+    if (after.isStalemate()) counted.stalematesTaken++;
     counted.moves++;
 
     board.applyUci(move);
@@ -138,7 +158,8 @@ async function pool(thunks, limit) {
 }
 
 async function main() {
-  const { Position } = await loadEngine();
+  const { Position } = await loadFrom('packages', 'chess', 'engine.ts');
+  const { rankMoves } = await loadFrom('packages', 'chess', 'search.ts');
   const ask = claudeCodeAsker();
   const pair = (n) => {
     const all = PERSONALITIES;
@@ -147,7 +168,7 @@ async function main() {
 
   console.log(`\nlab — ${GAMES} game${GAMES === 1 ? '' : 's'}, no chain`);
   console.log(`model     ${MODEL}`);
-  console.log(`notes     ${PLAIN ? 'STRIPPED (control arm)' : 'full annotation'}`);
+  console.log(`notes     ${PLAIN ? 'STRIPPED' : ONE_PLY ? 'one-ply annotation (control)' : `engine, depth ${DEPTH}`}`);
   console.log(`from      ${FROM ?? 'the starting position'}`);
   console.log(`at once   ${CONCURRENCY}\n`);
 
@@ -156,7 +177,7 @@ async function main() {
     Array.from({ length: GAMES }, (_, n) => async () => {
       const { white, black } = pair(n);
       const out = await playOne({
-        Position, ask, seed: FROM,
+        Position, rankMoves, ask, seed: FROM,
         white: { ...white, model: MODEL },
         black: { ...black, model: MODEL }
       });
@@ -177,7 +198,7 @@ async function main() {
   console.log(`\n${GAMES} games in ${((Date.now() - started) / 60000).toFixed(1)} minutes, ${moves} moves`);
   console.log(`  decided                : ${decisive}/${GAMES}  (${mates} by checkmate)`);
   console.log(`  unfinished at ${PLIES} plies : ${games.filter((g) => !g.result).length}`);
-  console.log(`  moves that hang material: ${moves ? Math.round((total('blunders') / moves) * 100) : 0}%`);
+  console.log(`  moves 2+ pawns worse than best: ${moves ? Math.round((total('blunders') / moves) * 100) : 0}%`);
   console.log(`  mates missed            : ${total('missedMates')}`);
   console.log(`  stalemates walked into  : ${total('stalematesTaken')}`);
   console.log(`\nOn chain this would have been ${(moves * 3000 / 1e6).toFixed(3)} STX and about ${Math.round(moves * 12.5 / 60)} minutes of blocks.\n`);
