@@ -23,6 +23,9 @@
 // lies is a manifest that fails to verify, and the board shows it failing
 // rather than repeating the claim.
 
+import { rulesMatchCommitment } from './canonical.js';
+import { DEFAULT_RULES, normaliseRules } from './rules.js';
+
 /** The first line of a valid manifest. Exact, so a chain sweep is a string compare. */
 export const TOURNAMENT_HEADER = 'X-CHESS-TOURNAMENT/1';
 
@@ -417,4 +420,120 @@ export function honours(
       `${provenanceNote(kind)} Refused: games opened at or after block ` +
       `${compiledAcceptedBefore.toLocaleString()} must be named by a manifest inscribed before play.`
   };
+}
+
+/**
+ * What the chain says about one game the manifest names.
+ *
+ * Deliberately not a `GameRow`: this layer stays free of the chain client, so
+ * the check is a pure function of two documents and can be tested without a
+ * network or a mock. The caller fetches; this decides.
+ */
+export interface GameFacts {
+  /** The hash the game committed to, or null for a game that committed to none. */
+  rulesHash: string | null;
+  /** Replayed, or null for a game that has not finished. */
+  result: '1-0' | '0-1' | '1/2-1/2' | null;
+}
+
+/**
+ * `missing` is a fact about the chain; the manifest naming a non-entrant is a
+ * fact about the manifest, and `parseTournament` has already refused that — so
+ * a Tournament reaching this point is internally consistent and the only
+ * question left is whether the chain agrees with it.
+ */
+export type Verdict = 'verified' | 'unverified' | 'missing';
+
+export interface CheckedGame {
+  id: number;
+  round: number;
+  /** Entrant names, as the manifest claims them. */
+  white: string;
+  black: string;
+  verdict: Verdict;
+  /** Why, in words. Empty when verified — there is nothing to explain. */
+  says: string;
+  result: '1-0' | '0-1' | '1/2-1/2' | null;
+}
+
+/**
+ * Check every claimed pairing against what its game actually committed to.
+ *
+ * THIS IS THE POINT OF THE WHOLE FORMAT. A manifest asserts that game 25 was
+ * Mason against Plumb. It cannot prove that by saying it — but the game's rules
+ * hash commits white, black and ranked, so rebuilding those rules from the
+ * claimed addresses and hashing them either reproduces the commitment or does
+ * not. Nothing else in a manifest is load-bearing.
+ *
+ * It is also what turns the Leaderboard's "7 candidates failing verification"
+ * into verifiable games: recovery could not guess which wallet was which player,
+ * and now it does not have to guess, it has a candidate to test.
+ *
+ * KEYED BY GAME ID, NEVER BY POSITION. Three games open concurrently and
+ * whichever transaction lands first takes the lower id, so schedule order and id
+ * order are unrelated. Reading a pairing off a list index once put games 13 and
+ * 15 the wrong way round and silently dropped two results from a table that
+ * looked complete.
+ */
+export function checkGames(
+  tournament: Tournament,
+  facts: ReadonlyMap<number, GameFacts>
+): CheckedGame[] {
+  return tournament.games.map((game) => {
+    const seen = facts.get(game.id);
+    const base = { id: game.id, round: game.round, white: game.white, black: game.black };
+
+    if (!seen) {
+      return { ...base, verdict: 'missing' as const, says: 'no such game on this contract', result: null };
+    }
+
+    const white = addressOf(tournament, game.white);
+    const black = addressOf(tournament, game.black);
+    if (!white || !black) {
+      // Unreachable through parseTournament, which refuses a non-entrant. Kept
+      // because this function is exported and a caller may build a Tournament
+      // by hand, and "silently scored as verified" is the wrong way to fail.
+      return { ...base, verdict: 'unverified' as const, says: 'the manifest has no address for one side', result: null };
+    }
+
+    if (!seen.rulesHash) {
+      return {
+        ...base,
+        verdict: 'unverified' as const,
+        says: 'this game committed to no rules, so there is nothing to check the claim against',
+        result: seen.result
+      };
+    }
+
+    const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
+    if (!rulesMatchCommitment(rules, seen.rulesHash)) {
+      return {
+        ...base,
+        verdict: 'unverified' as const,
+        says: 'the rules this game committed to are not this pairing',
+        result: seen.result
+      };
+    }
+
+    return { ...base, verdict: 'verified' as const, says: '', result: seen.result };
+  });
+}
+
+/**
+ * Results from checked games, for `standings`.
+ *
+ * ONLY VERIFIED GAMES SCORE, and that is the whole reason this exists rather
+ * than the caller passing results straight through. A table built from
+ * unverified games would be repeating a claim as though it had been checked,
+ * which is exactly the failure the manifest was introduced to end. An
+ * unverified game is still shown — it is simply not counted.
+ */
+export function verifiedResults(
+  checked: readonly CheckedGame[]
+): Map<number, '1-0' | '0-1' | '1/2-1/2' | null> {
+  const out = new Map<number, '1-0' | '0-1' | '1/2-1/2' | null>();
+  for (const game of checked) {
+    if (game.verdict === 'verified') out.set(game.id, game.result);
+  }
+  return out;
 }
