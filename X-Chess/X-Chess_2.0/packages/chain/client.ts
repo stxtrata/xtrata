@@ -84,6 +84,17 @@ export interface PendingRow {
   /** Milliseconds since the epoch, or null if the node did not say. */
   receivedAt: number | null;
   fee: number | null;
+  /**
+   * The nonce this transaction took, or null if the node did not say.
+   *
+   * CARRIED BECAUSE IT IS THE ONLY WAY OUT of a move that will not confirm. A
+   * stuck transaction is replaced by signing the SAME nonce at a higher fee;
+   * signing a new one takes the next nonce and queues behind the stuck one
+   * instead of replacing it. Both wallets can do the replacement and neither
+   * can tell you the number, because neither knows which of your pending
+   * transactions is the chess move — the board does.
+   */
+  nonce: number | null;
 }
 
 export interface ResultHintRow {
@@ -459,6 +470,7 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
           sender_address?: string;
           receipt_time?: number;
           fee_rate?: string | number;
+          nonce?: number;
           contract_call?: {
             contract_id?: string;
             function_name?: string;
@@ -480,7 +492,9 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
             sender: String(tx.sender_address ?? ''),
             value: String(deserialize(String(args[1].hex))),
             receivedAt: tx.receipt_time ? tx.receipt_time * 1000 : null,
-            fee: Number(tx.fee_rate) || null
+            fee: Number(tx.fee_rate) || null,
+            // Zero is a real nonce, so this cannot use `|| null`.
+            nonce: Number.isFinite(Number(tx.nonce)) ? Number(tx.nonce) : null
           });
         } catch {
           // A malformed argument is somebody else's problem. Skipping it beats

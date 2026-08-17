@@ -195,7 +195,7 @@ describe('what somebody else watching sees', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000, nonce: 701 }
     ];
 
     mountShell(dom.window.document);
@@ -227,7 +227,7 @@ describe('what somebody else watching sees', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000, nonce: 702 }
     ];
 
     mountShell(dom.window.document);
@@ -259,7 +259,7 @@ describe('what somebody else watching sees', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000, nonce: 703 }
     ];
 
     mountShell(dom.window.document);
@@ -295,7 +295,7 @@ describe('what somebody else watching sees', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'resgn', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'resgn', receivedAt: Date.now(), fee: 3000, nonce: 704 }
     ];
 
     mountShell(dom.window.document);
@@ -653,7 +653,7 @@ describe('a castle in the mempool', () => {
     const app = await readyToCastle(BOB);
     const chain = (app as unknown as { chain: MockChain }).chain;
     chain.pending = [
-      { txid: '0xabc', sender: ALICE, value: 'e1g1', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: ALICE, value: 'e1g1', receivedAt: Date.now(), fee: 3000, nonce: 705 }
     ];
     await app.load(1);
     await tick(30);
@@ -678,7 +678,7 @@ describe('a castle in the mempool', () => {
       await chain.submit(1, uci);
     }
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'e8c8', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'e8c8', receivedAt: Date.now(), fee: 3000, nonce: 706 }
     ];
     mountShell(dom.window.document);
     const app = new ChessApp({
@@ -701,7 +701,7 @@ describe('a castle in the mempool', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: ALICE, value: 'e2e4', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: ALICE, value: 'e2e4', receivedAt: Date.now(), fee: 3000, nonce: 707 }
     ];
     mountShell(dom.window.document);
     const app = new ChessApp({

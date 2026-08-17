@@ -176,7 +176,7 @@ describe('spending the budget where it buys something', () => {
     const { chain } = counted();
     const app = await watching(chain);
     chain.pending = [
-      { txid: '0xabc', sender: ALICE, value: 'e2e4', receivedAt: 0, fee: 3000 }
+      { txid: '0xabc', sender: ALICE, value: 'e2e4', receivedAt: 0, fee: 3000, nonce: 801 }
     ];
     await (app as unknown as Pollable).refreshQuietly();
     expect((app as unknown as Pollable).nextPollMs()).toBeLessThanOrEqual(2_500);
@@ -729,7 +729,7 @@ describe('what one spectator costs, per minute', () => {
     chain.as(ALICE);
     await chain.openGame(rulesHash(RULES), false);
     chain.pending = [
-      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000 }
+      { txid: '0xabc', sender: BOB, value: 'e7e5', receivedAt: Date.now(), fee: 3000, nonce: 802 }
     ];
 
     let mempoolReads = 0;

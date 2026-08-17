@@ -442,6 +442,7 @@ const IDS = [
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
+  'fee-advice',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -659,6 +660,8 @@ export class ChessApp {
       this.yours = new YourGames({ endpoint: endpoint as never, contractId: this.chain.contractId });
     }
     this.wire();
+    // After wire(), which is what puts the element in `this.el`.
+    this.drawFeeAdvice();
     this.start();
   }
 
@@ -2170,6 +2173,109 @@ export class ChessApp {
    * reasons are all different: not connected, not your turn, not your game,
    * already over. Each wants a different response.
    */
+  /**
+   * What a move costs here, said in every game rather than only at signing.
+   *
+   * A wallet estimates from the whole network and knows nothing about this
+   * contract, so it has quoted between eight and fifteen times the price every
+   * move here actually confirms at. The board cannot correct that — a network
+   * fee is not one of the six parameters `stx_callContract` accepts — so the
+   * only thing it can do is make sure nobody meets the number for the first
+   * time while a wallet is already open and waiting on them.
+   *
+   * Written once at start-up. It never changes, and redrawing an unchanging
+   * sentence on every board update is how a static note starts costing frames.
+   */
+  private feeAdviceKey = '';
+
+  private drawFeeAdvice(): void {
+    // YOUR OWN pending moves, not everybody's. The status line already counts
+    // all of them; this is about the one you can do something about.
+    const mine = this.address
+      ? this.pending.filter((p) => String(p.sender ?? '').toUpperCase() === this.address!.toUpperCase())
+      : [];
+    const stuck = mine[0] ?? null;
+
+    // Rebuilt only when it would actually differ. This sits in every game and
+    // the board redraws on every poll, so an unconditional rebuild is a static
+    // sentence costing frames forever.
+    const key = stuck ? `${stuck.txid}:${stuck.nonce}:${stuck.fee}` : 'none';
+    if (key === this.feeAdviceKey) return;
+    this.feeAdviceKey = key;
+
+    const node = this.el.feeAdvice;
+    node.replaceChildren();
+    node.classList.toggle('notice--warn', stuck !== null);
+    node.classList.toggle('notice--info', stuck === null);
+
+    const line = (className = 'how'): HTMLElement => {
+      const span = this.doc.createElement('span');
+      span.className = className;
+      node.appendChild(span);
+      return span;
+    };
+    const loud = (text: string, into: HTMLElement = node): void => {
+      const b = this.doc.createElement('b');
+      b.textContent = text;
+      into.appendChild(b);
+    };
+    const key_ = (text: string, into: HTMLElement): void => {
+      const em = this.doc.createElement('em');
+      em.textContent = text;
+      into.appendChild(em);
+    };
+
+    if (!stuck) {
+      loud(`Moves on this contract cost ${MOVE_FEE_STX} STX.`);
+      node.appendChild(
+        this.doc.createTextNode(
+          ' Your wallet estimates from the whole network rather than from this contract, ' +
+            'so it will usually suggest several times more. The fee is yours to set.'
+        )
+      );
+      const how = line();
+      how.appendChild(this.doc.createTextNode('Xverse: '));
+      key_('Edit', how);
+      how.appendChild(this.doc.createTextNode(' then '));
+      key_('Custom', how);
+      how.appendChild(this.doc.createTextNode(' · Leather: the '));
+      key_('Custom', how);
+      how.appendChild(this.doc.createTextNode(' tab'));
+      return;
+    }
+
+    // A MOVE OF YOURS IS IN THE MEMPOOL, so the useful thing is no longer the
+    // price — it is the nonce.
+    //
+    // Replacing a stuck transaction means signing the SAME nonce at a higher
+    // fee. Signing a new one takes the next nonce, which queues BEHIND the
+    // stuck move rather than replacing it: two fees, and the second cannot
+    // confirm until the first does. Both wallets can do the replacement and
+    // neither can say which pending transaction is the chess move, because
+    // neither knows what this contract is. The board does, so it says the
+    // number rather than sending somebody to an explorer to find it.
+    const waited = stuck.receivedAt ? Math.round((this.now() - stuck.receivedAt) / 60_000) : null;
+    node.appendChild(this.doc.createTextNode(`Your move ${stuck.value} is broadcast and not yet in a block`));
+    node.appendChild(this.doc.createTextNode(waited !== null && waited > 0 ? `, ${waited} minute${waited === 1 ? '' : 's'} ago. ` : '. '));
+    node.appendChild(this.doc.createTextNode('To replace it, sign again at the '));
+    loud(stuck.nonce === null ? 'same nonce' : `same nonce, ${stuck.nonce}`);
+    node.appendChild(
+      this.doc.createTextNode(
+        `, with a fee above ${((stuck.fee ?? MOVE_FEE_USTX) / 1_000_000).toFixed(4)} STX. ` +
+          'A new nonce queues behind this one instead of replacing it, and you would pay for both.'
+      )
+    );
+
+    const how = line();
+    how.appendChild(this.doc.createTextNode('Xverse: '));
+    key_('Speed Up', how);
+    how.appendChild(this.doc.createTextNode(' on the Stacks dashboard, or '));
+    key_('Edit nonce', how);
+    how.appendChild(this.doc.createTextNode(' when signing · Leather extension: '));
+    key_('Activity', how);
+    how.appendChild(this.doc.createTextNode(', then increase the fee (Leather desktop cannot)'));
+  }
+
   private drawWhyNot(canSubmit: boolean, verdict: Verdict): void {
     const node = this.el.moveHint;
 
@@ -2598,6 +2704,9 @@ export class ChessApp {
       );
     }
     this.notice('status', state.inCheck ? 'warn' : 'info', bits.join(' · '));
+    // Here because this is the one place `pending` is known to be current. The
+    // note itself is cheap: it rebuilds only when your own pending move changes.
+    this.drawFeeAdvice();
   }
 
   private drawRules(): void {

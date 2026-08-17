@@ -357,6 +357,15 @@ ${SCALE_CSS}
    this block and was quietly repainting the border back to --line. Checked with
    getComputedStyle rather than by eye: the class was applied and the colour was
    not. Exactly the collision the note at the top of this file describes. */
+/* The fee note. Quiet by default and legible on purpose: it is present in
+   every game, so it has to survive being seen a hundred times without becoming
+   either noise or wallpaper. The number is the only loud part. */
+.fee-advice { font-size: 12px; line-height: 1.5; }
+.fee-advice b { color: var(--gold); font-weight: 600; }
+.fee-advice em { font-style: normal; color: var(--text); background: var(--line);
+                 border-radius: 3px; padding: 0 4px; }
+.fee-advice .how { display: block; margin-top: 4px; color: var(--dim); }
+
 /* A count beside a tab name. Not a dot: the number is the useful part, and a
    player with one game waiting and a player with nine need different urgency. */
 .tab-count { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px;
@@ -687,6 +696,11 @@ export const HTML = `
         </div>
         <div id="status" class="notice notice--info"></div>
         <div id="move-hint" class="small muted"></div>
+        <!-- Filled from MOVE_FEE_USTX in app.ts so the number has one source.
+             Present in every game rather than only while a wallet is open,
+             because the moment the wallet IS open is a bad moment to be
+             reading something for the first time. -->
+        <div id="fee-advice" class="notice notice--info fee-advice"></div>
         <div id="promotion" class="notice notice--loud hide" role="group" aria-label="choose a promotion piece"></div>
         <!-- There was a second panel here - "Let me try anyway" - that unlocked
              a board the referee had locked. It is gone, and the reasoning is in
