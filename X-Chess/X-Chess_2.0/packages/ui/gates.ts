@@ -131,8 +131,10 @@ export const STEPS: StepDef[] = [
     phase: 'configure',
     title: 'Set the fee and the sponsorship constants',
     why:
-      'The launch values from ADR-0004, measured rather than guessed. Set here rather than ' +
-      'compiled in, so a fee regime change never needs a new contract.',
+      'The launch values from ADR-0016, measured against a fee distribution rather than a fee. ' +
+      'Set here rather than compiled in, so a fee regime change never needs a new contract - and ' +
+      'this is the step that applies one. Running it also repairs the rebate count, which step 14 ' +
+      'lowers to spend an allowance by hand.',
     needs: ['deployed'],
     irreversible: true
   },
