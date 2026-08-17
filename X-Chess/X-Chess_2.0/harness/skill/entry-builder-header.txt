@@ -1,0 +1,27 @@
+// X-CHESS-SKILL/1  entry-builder
+//
+// Checks a character sheet before anybody pays to inscribe it.
+//
+// AN INSCRIPTION CANNOT BE EDITED. A sheet with a field name nobody reads, or a
+// style two characters over the limit, is wrong forever and was paid for. So
+// the validator is inscribed alongside the tournament that enforces it: an
+// entrant can run the exact code the Director will run, on their own machine,
+// before spending anything.
+//
+// AN ENTRY IS A PERSONALITY, NOT A CHESS PROGRAM. Every player is handed the
+// same engine and arrives competent; the sheet decides only what KIND of player
+// it is. Teaching chess in a prompt was measured four times here and never
+// worked once — more thinking effort, competence instructions, a king-mobility
+// hint, all zero. Without that inversion a tournament measures who wrote the
+// best chess instructions, which is a worse game than chess and one nobody can
+// referee.
+//
+// blankEntry() returns a form with every limit written next to its field.
+// parseEntry(text) returns { ok, entry, problems, used } — problems name the
+// field and say what is wrong, because "invalid" helps nobody holding a wallet.
+// entryToPrompt(entry) is exactly what the model is shown.
+//
+// The instruction-shaped-text check is a COURTESY, not a defence, and the tests
+// say so. The real boundary is structural: an entry goes in the user turn, never
+// the system prompt, and whatever comes back must be one move from a list the
+// harness generated. The strongest thing any sheet can cause is a legal move.

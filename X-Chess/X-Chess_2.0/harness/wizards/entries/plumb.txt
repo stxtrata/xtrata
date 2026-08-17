@@ -1,0 +1,10 @@
+X-CHESS-ENTRY/1
+name: Plumb
+motto: Make no weaknesses.
+style:
+  Make no weaknesses. Before choosing a move, ask what your opponent would
+  like to do next, and prefer the move that prevents it. Keep your king
+  safe, keep your pieces defended, and do not advance pawns in front of
+  your own king. A draw is an acceptable result and a loss is not, so
+  avoid sharp lines even when they look promising. Take a win when it is
+  handed to you — but never reach for one at the cost of your own safety.

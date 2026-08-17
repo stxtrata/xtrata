@@ -52,6 +52,17 @@ export const HEADER_FILE = join(HERE, 'header.txt');
 export const BUILDER_FILE = join(HERE, 'manifest-builder.js');
 export const BUILDER_HEADER_FILE = join(HERE, 'manifest-builder-header.txt');
 
+/**
+ * The third inscribable artefact: the thing an entrant runs before paying.
+ *
+ * An inscription cannot be edited, so a sheet with a misspelled field or a style
+ * two characters over the limit is wrong forever and was paid for. Inscribing
+ * the validator means an entrant can run exactly the code the Director will run,
+ * on their own machine, before spending anything.
+ */
+export const ENTRY_FILE = join(HERE, 'entry-builder.js');
+export const ENTRY_HEADER_FILE = join(HERE, 'entry-builder-header.txt');
+
 /** One Xtrata chunk. An engine that needs two is a different upload. */
 export const CHUNK_BYTES = 16_384;
 
@@ -91,6 +102,11 @@ export const TOURNAMENT_INSCRIPTION = Object.freeze({
   url: 'https://xtrata.xyz/x/2993'
 });
 
+/** The exact bytes to inscribe for the entry validator. */
+export async function buildEntry() {
+  return bundleFor('protocol', 'entry.ts', ENTRY_HEADER_FILE);
+}
+
 /** The exact bytes to inscribe for the manifest builder. */
 export async function buildBuilder() {
   return bundleFor('protocol', 'manifest-builder.ts', BUILDER_HEADER_FILE);
@@ -120,6 +136,7 @@ export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex'
 
 async function main() {
   if (process.argv.includes('--builder')) return mainFor('manifest builder', buildBuilder, BUILDER_FILE);
+  if (process.argv.includes('--entry')) return mainFor('entry builder', buildEntry, ENTRY_FILE);
   return mainFor('chess engine', buildSkill, SKILL_FILE);
 }
 

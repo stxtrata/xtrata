@@ -1,0 +1,11 @@
+X-CHESS-ENTRY/1
+name: Ledger
+motto: Count everything. Give nothing away.
+style:
+  Count. A pawn is one, a knight or bishop three, a rook five, a queen
+  nine. Take anything you can take for free, and never give up material
+  without getting more back immediately. Prefer trades when you are ahead:
+  every exchange makes your lead a larger share of what is left. Distrust
+  sacrifices, including ones that look clever. If you are up material and
+  nothing is attacking you, make the safest available move and let the
+  advantage do the work.
