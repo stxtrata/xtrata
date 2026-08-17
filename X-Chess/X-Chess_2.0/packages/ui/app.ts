@@ -6,6 +6,7 @@
 
 import { renderBoard, destinationsFrom, promotionChoices, pieceGlyph, pieceName } from './board.js';
 import type { PendingMove } from './board.js';
+import { buildPlayer, parsePlayer } from '../protocol/player.js';
 import { Names } from '../chain/bns.js';
 import { XtrataReader } from '../chain/xtrata.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
@@ -400,6 +401,8 @@ const IDS = [
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-load', 'profile-body',
+  'claim-name-why', 'claim-name', 'claim-pronouns', 'claim-about',
+  'claim-build', 'claim-problems', 'claim-manifest',
   'contract-label', 'endpoint-label'
 ] as const;
 
@@ -664,6 +667,7 @@ export class ChessApp {
     on('exploreRefresh', () => void this.reloadExplore());
     on('exploreFind', () => void this.findGame());
     on('tournamentLoad', () => void this.loadTournamentTab());
+    on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
 
     for (const key of [
@@ -2254,6 +2258,59 @@ export class ChessApp {
     });
   }
 
+/**
+   * Build the manifest that lets an address name itself.
+   *
+   * THE BOARD DOES NOT INSCRIBE IT, and cannot: it holds no key and never will,
+   * being an inscription itself. So this produces the exact bytes and the person
+   * inscribes them from the wallet being named — which is not a limitation, it
+   * is the entire mechanism. An inscription made BY an address is that key
+   * attesting; one made by anybody else is a stranger writing your name down.
+   *
+   * The address is taken from the connected wallet rather than typed, because a
+   * manifest naming an address you do not control is refused by `attested` and
+   * would be 0.3 STX spent on nothing.
+   */
+  private buildNameClaim(): void {
+    const why = this.el.claimNameWhy;
+    const problems = this.el.claimProblems;
+    const output = this.el.claimManifest;
+    problems.classList.add('hide');
+    output.classList.add('hide');
+
+    if (!this.address) {
+      why.textContent =
+        'Connect the wallet you want to name. A name only counts when the address itself ' +
+        'inscribes it, so this has to be built for the wallet you are holding.';
+      return;
+    }
+
+    const draft = {
+      address: this.address,
+      name: String((this.el.claimName as HTMLInputElement).value ?? '').trim(),
+      pronouns: String((this.el.claimPronouns as HTMLInputElement).value ?? '').trim(),
+      about: String((this.el.claimAbout as HTMLInputElement).value ?? '').trim()
+    };
+
+    // Validated by PARSING WHAT WAS BUILT, rather than by checking the draft
+    // against the same rules twice. If the text this produces does not read back
+    // as a valid manifest, it is not one, whatever the form thought.
+    const text = buildPlayer(draft);
+    const parsed = parsePlayer(text);
+    if (!parsed.ok) {
+      problems.classList.remove('hide');
+      problems.textContent = parsed.problems.map((p) => `${p.field}: ${p.says}`).join(' · ');
+      return;
+    }
+
+    output.classList.remove('hide');
+    output.textContent = text;
+    why.textContent =
+      `Inscribe this from ${this.address} on Xtrata, as text/plain. It costs about 0.3 STX. ` +
+      'Once it is on chain this board will call you ' + draft.name +
+      ' anywhere it currently shows your address — unless you register a BNS name, which wins.';
+  }
+
   private drawTournament(): void {
     const view = this.tournament;
     const body = this.el.tournamentBody;
@@ -2335,8 +2392,30 @@ export class ChessApp {
         id.className = 'tn-id';
         id.textContent = String(game.id);
 
-        const who = this.doc.createElement('span');
-        who.textContent = `${game.whoWhite} v ${game.whoBlack}`;
+        // THE PAIRING OPENS THE GAME. It is the obvious thing to click and it
+        // names what you get, so it is a real button rather than a span with a
+        // handler — a keyboard reaches it, a screen reader announces it, and
+        // the browser's own focus ring applies.
+        //
+        // A game that is not on chain has nothing to open, so it stays a span.
+        // A control that looks live and does nothing is worse than plain text.
+        const pairing = `${game.whoWhite} v ${game.whoBlack}`;
+        let who: HTMLElement;
+        if (game.verdict === 'missing') {
+          who = this.doc.createElement('span');
+          who.textContent = pairing;
+        } else {
+          const open = this.doc.createElement('button');
+          open.type = 'button';
+          open.className = 'tn-open';
+          open.textContent = pairing;
+          open.setAttribute('aria-label', `${pairing} — open game ${game.id}`);
+          open.addEventListener('click', () => {
+            this.show('game');
+            void this.load(game.id);
+          });
+          who = open;
+        }
 
         const result = this.doc.createElement('span');
         result.className = 'tn-result';

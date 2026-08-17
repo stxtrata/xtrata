@@ -345,6 +345,25 @@ ${SCALE_CSS}
 .tn-mark--unverified { color: var(--warn); }
 .tn-mark--missing { color: var(--dim); }
 .tn-live { color: var(--dim); font-size: 12px; }
+/* The manifest a person copies out and inscribes themselves. Monospace because
+   every character of it matters and a proportional font hides a stray space. */
+.claim-out {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+  padding: 10px; margin: 8px 0 0; overflow-x: auto;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
+  white-space: pre; color: var(--ink);
+}
+/* The pairing, which opens the game. Styled as text rather than as a button so
+   a round reads as a list and not as a wall of controls, but it IS a button, so
+   it is reachable by keyboard and announced as one.
+   Underlined on hover and focus rather than by default: twenty-one underlined
+   rows is noise, and an underline that appears on interaction still tells a
+   mouse user it is live. */
+.tn-open {
+  background: none; border: 0; padding: 0; margin: 0; font: inherit;
+  color: var(--ink); cursor: pointer; text-align: left;
+}
+.tn-open:hover, .tn-open:focus-visible { color: var(--gold); text-decoration: underline; }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .row + .row { margin-top: 8px; }
@@ -809,6 +828,24 @@ export const HTML = `
     </div>
     <div class="row"><button class="action" id="profile-load">Show</button></div>
     <div id="profile-body"></div>
+
+    <h2 style="margin-top:18px">Claim a name</h2>
+    <div id="claim-name-why" class="small muted"></div>
+    <div class="field">
+      <label for="claim-name">Name</label>
+      <input type="text" id="claim-name" maxlength="24" placeholder="what the board should call you">
+    </div>
+    <div class="field">
+      <label for="claim-pronouns">Pronouns</label>
+      <input type="text" id="claim-pronouns" maxlength="20" placeholder="optional">
+    </div>
+    <div class="field">
+      <label for="claim-about">About</label>
+      <input type="text" id="claim-about" maxlength="140" placeholder="optional, one line">
+    </div>
+    <div class="row"><button class="action" id="claim-build">Build my manifest</button></div>
+    <div id="claim-problems" class="notice notice--warn hide"></div>
+    <pre id="claim-manifest" class="claim-out hide"></pre>
   </section>
 
   <footer class="small muted" style="padding:12px 0">
