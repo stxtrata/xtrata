@@ -802,3 +802,36 @@ describe('what a broadcast costs, once the fee climbs', () => {
     expect(source).not.toMatch(/plannedSpendUstx: spendUstx\b/);
   });
 });
+
+describe('what round 3 taught the fee ladder', () => {
+  const core = read('harness/wizards/wizards-core.mjs');
+  const runner = read('harness/wizards/run-tournament.mjs');
+
+  it('gives the bottom rung longer, because 11 of 13 raises were wasted', () => {
+    // 374 moves. The ledger recorded 13 climbs and only 2 moves were actually
+    // paid for at 1,200 — a climb REPLACES rather than adds, and eleven times
+    // the 400 transaction was mined anyway while we bid against ourselves.
+    // One of those replacements ended a round that had played 166 clean moves.
+    expect(core).toMatch(/FEE_BUMP_AFTER_MS = 30_000/);
+  });
+
+  it('leaves the rungs alone, because those were right', () => {
+    // 99% of moves landed at the bottom rung and none ever reached the top.
+    // The rungs were not the problem; how long we waited before leaving one was.
+    expect(core).toMatch(/FEE_LADDER = Object\.freeze\(\[400n, 1_200n, 3_000n\]\)/);
+  });
+
+  it('writes the game id into the ledger', () => {
+    // Every row from round 3 says `game: null`, so the analysis had to
+    // attribute broadcasts by wallet and clock. The field existed the whole
+    // time and nothing filled it in.
+    const submits = runner.split('sendClimbing({').slice(1);
+    expect(submits.length, 'expected both submit paths').toBeGreaterThanOrEqual(2);
+    for (const call of submits) {
+      // To the end of the call, not a fixed slice: a comment inside it pushed
+      // the field past 400 characters and failed a correct implementation.
+      const body = call.slice(0, call.indexOf('});'));
+      expect(body, 'a broadcast that cannot be attributed').toMatch(/game: gameId/);
+    }
+  });
+});

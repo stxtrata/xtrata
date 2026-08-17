@@ -105,8 +105,25 @@ export const isRulesHash = (value) =>
  */
 export const FEE_LADDER = Object.freeze([400n, 1_200n, 3_000n]);
 
-/** How long a rung gets before the next one replaces it. */
-export const FEE_BUMP_AFTER_MS = 20_000;
+/**
+ * How long a rung gets before the next one replaces it.
+ *
+ * TWENTY WAS TOO IMPATIENT, and round 3 is the first sample large enough to say
+ * so. Across 374 moves the ledger recorded THIRTEEN climbs, and only TWO moves
+ * were actually paid for at 1,200 - because a climb replaces rather than adds,
+ * and eleven times the 400 transaction was mined anyway while we were busy
+ * bidding against ourselves. Eleven of thirteen raises were wasted signatures.
+ *
+ * Not merely wasted, either: one of them came back `dropped_replace_by_fee` and
+ * ended a round that had played 166 clean moves, because the runner was holding
+ * the receipt for the transaction its own replacement had superseded.
+ *
+ * Thirty against a ~12.5s block leaves room for two blocks plus indexing lag,
+ * which is where those eleven were lost. The RUNGS were right - 99% of moves
+ * landed at the bottom one - so this changes only how long the bottom rung gets
+ * to work before we give up on it.
+ */
+export const FEE_BUMP_AFTER_MS = 30_000;
 
 /** The rung a plan quotes and a spend cap is checked against: the worst case. */
 export const MINER_FEE_USTX = FEE_LADDER[FEE_LADDER.length - 1];

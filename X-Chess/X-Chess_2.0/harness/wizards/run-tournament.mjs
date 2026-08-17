@@ -328,7 +328,11 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
       postConditions: [],
       spent: budget.spent,
       cap: budget.cap,
-      label: `game ${gameId}: `
+      label: `game ${gameId}: `,
+      // The ledger can only be read per game if the game is written down. Every
+      // row from round 3 says `game: null`, so the fee analysis had to attribute
+      // broadcasts by wallet and clock instead of just reading them.
+      game: gameId
     });
     budget.spent = sent.spentAfterUstx;
 
@@ -414,7 +418,8 @@ async function resign({ gameId, mover, rules, budget, why = 'no legal move in 3 
     postConditions: [],
     spent: budget.spent,
     cap: budget.cap,
-    label: `game ${gameId}: `
+    label: `game ${gameId}: `,
+    game: gameId
   });
   budget.spent = sent.spentAfterUstx;
 
