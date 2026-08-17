@@ -73,23 +73,27 @@ const CHUNKS = 32;
  * tree-shaken out entirely, because nothing imported `CachingReader`. It is here
  * now, which was exactly the change this note was written to make visible.
  */
-// EVERY ROW RAISED 25% ON 2026-08-16, and the reason is the shape of the table
-// rather than any one package. Seven of the nine rows were at or above 90% of
-// their ceiling, and packages/protocol was at 99.3% — one edit from breaking on
-// something unrelated to whatever that edit was.
+// RE-BASED ONCE ON 2026-08-17, because these rows had stopped measuring
+// anything useful and started taxing ordinary work.
 //
-// A row that tight has stopped being a regression detector and become a
-// tripwire. The failure it produces says "you are 200 bytes over" and points at
-// a diff that is not the problem, so the honest response is to raise the line
-// deliberately rather than to nudge it every time somebody touches the UI.
+// The number that matters is not on this table. `add-chunk-batch` takes 32
+// chunks of 16,384 bytes, so ONE TRANSACTION CARRIES 524,288 BYTES — and the
+// artefact is 161,397, which is ten chunks, thirty-one per cent, twenty-two
+// chunks spare. Meanwhile three rows below sat at 88, 96 and 89 per cent of
+// their ceiling, and packages/protocol had been raised TWICE in one day and was
+// already back at 96.
 //
-// The two rows with real room — ratings at 88.7% and apps/chess at 67.9% — were
-// left where they are. They are still doing their job.
+// A row that moves every time somebody adds a feature is not a regression
+// detector, it is a tripwire: it fails saying "you are 200 bytes over" and
+// points at a diff that is not the problem. That happened twice in one day.
 //
-// THIS DOES NOT LOOSEN THE REAL LIMIT, which is the chunk test above: 32 chunks
-// of 16,384 bytes, and it is a hard property of add-chunk-batch rather than a
-// number anybody chose. Every row at its new ceiling still totals about 204,000
-// against 524,288, so the artefact remains a one-transaction upload.
+// So each row is now roughly 1.5x what it uses — quiet for ordinary work, loud
+// for a package that doubles unexpectedly. The check that makes this safe is
+// the sum: every row at its NEW ceiling totals 268,850 bytes, which is
+// seventeen chunks, still one transaction and still half the real limit.
+//
+// The chunk test above stays the only hard gate, because it is the only one
+// describing a property of the contract rather than a preference of ours.
 const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // Moved from 95,000 on 2026-08-14. The list grew a filter row, an identity
   // field, a sponsorship lookup and a concurrent read path in one day; the row
@@ -106,8 +110,8 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // markup rather than a triangle drawn per arrow - which was tried first and
   // cost 734, and a version with the explanation inside the template literal
   // cost 1,276, because a comment in a template literal is an inscribed byte.
-  { group: 'packages/ui', ceiling: 129_500, measured: 106_000 },
-  { group: 'packages/chain', ceiling: 26_250, measured: 19_133 },
+  { group: 'packages/ui', ceiling: 170_000, measured: 113_602 },
+  { group: 'packages/chain', ceiling: 33_000, measured: 21_825 },
   // Raised to 18,000 on 2026-08-17, and this one was arithmetic rather than a
   // surprise: step 0 of the Tournaments tab measured it before any UI existed.
   //
@@ -119,20 +123,20 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // Headroom to 18,000 rather than to the nearest round number above 15,946,
   // because the tab is not finished and a ceiling that has to move again next
   // week is not a ceiling.
-  { group: 'packages/protocol', ceiling: 18_000, measured: 15_946 },
-  { group: 'packages/chess', ceiling: 12_500, measured: 9_207 },
+  { group: 'packages/protocol', ceiling: 26_000, measured: 17_364 },
+  { group: 'packages/chess', ceiling: 14_000, measured: 9_207 },
   // Moved from 6,000 when connect.ts arrived: the connect policy left
   // apps/chess, where it was untestable, and became 819 bytes of this package
   // with a suite of its own. That is a fair trade and this is where it is
   // recorded, but the row moving is a line in a diff either way.
-  { group: 'packages/wallet', ceiling: 8_700, measured: 6_446 },
-  { group: 'packages/replay', ceiling: 5_700, measured: 4_057 },
+  { group: 'packages/wallet', ceiling: 9_700, measured: 6_446 },
+  { group: 'packages/replay', ceiling: 6_100, measured: 4_057 },
   // Arrived 2026-08-14. This row is the note below coming true: something
   // started using the cache. 3 KB, and it takes a return visitor's game list
   // from 51 reads to 26 by not asking for entries that cannot have changed.
-  { group: 'packages/storage', ceiling: 4_300, measured: 3_208 },
-  { group: 'packages/ratings', ceiling: 2_700, measured: 2_395 },
-  { group: 'apps/chess', ceiling: 1_600, measured: 1_086 }
+  { group: 'packages/storage', ceiling: 4_800, measured: 3_208 },
+  { group: 'packages/ratings', ceiling: 3_600, measured: 2_395 },
+  { group: 'apps/chess', ceiling: 1_650, measured: 1_086 }
 ];
 
 /** The same bundle the build produces, measured rather than guessed. */
