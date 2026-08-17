@@ -115,6 +115,24 @@ const MODEL_OVERRIDE = arg('model');
 const VIA_CLAUDE_CODE = process.argv.includes('--via-claude-code');
 
 /**
+ * Play the games a manifest names, rather than pairings this script invented.
+ *
+ * THE INVERSION THAT MAKES A TOURNAMENT COMMITTED. Without it the runner decides
+ * who plays whom and a manifest is written afterwards to describe what happened
+ * — which is a record, not a commitment, and the board labels it `compiled`.
+ * With it the manifest is fixed on chain before a move is played, and every
+ * pairing was promised in advance.
+ *
+ * In this mode the runner NEVER OPENS A GAME. A manifest names games by id, so
+ * a game it names that does not exist is an error and not an invitation: opening
+ * one would create a game the manifest never promised, which is the whole thing
+ * this mode exists to prevent. Games are opened first, by `open`, and the ids
+ * that produces are what the manifest is built from.
+ */
+const MANIFEST = arg('manifest');
+
+
+/**
  * Play from local source instead of the inscription.
  *
  * FOR DEVELOPMENT ONLY, and it announces itself. The default is to run the
@@ -175,6 +193,84 @@ function readField(vars = env(), borrow = {}) {
 }
 
 const byId = (agents) => Object.fromEntries(agents.map((a) => [a.id, a]));
+
+/**
+ * The manifest, read through the same code the board uses.
+ *
+ * Bundled on the fly rather than reimplemented, for the reason `loadProtocol`
+ * gives: a second parser would drift from the one that decides what a reader
+ * sees, and the two disagreeing about a tournament is exactly the failure
+ * nobody would notice until it mattered.
+ */
+async function loadManifest(id) {
+  const { build } = await import('esbuild');
+  const bundle = async (...parts) => {
+    const out = await build({
+      entryPoints: [join(HERE, '..', '..', ...parts)],
+      bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+    });
+    return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+  };
+  const { XtrataReader } = await bundle('packages', 'chain', 'xtrata.ts');
+  const { resolveTournament } = await bundle('packages', 'protocol', 'tournament.ts');
+
+  // Paced, because a manifest read is a handful of calls against the same
+  // budget the game reads spend from.
+  const endpoint = {
+    request: async (path, init) => {
+      await new Promise((done) => setTimeout(done, 1200));
+      return fetch(`https://api.mainnet.hiro.so${path}`, init);
+    }
+  };
+  const resolved = await resolveTournament(Number(id), new XtrataReader({ endpoint }));
+  if (!resolved.ok || !resolved.tournament) {
+    throw new WizardSafetyError(
+      `manifest ${id} is not readable: ${resolved.problems.map((p) => `${p.where} ${p.says}`).join('; ')}`
+    );
+  }
+  return { tournament: resolved.tournament, rootId: resolved.tournamentId };
+}
+
+/**
+ * Rounds as the manifest states them, in the shape the runner already plays.
+ *
+ * MATCHED ON ADDRESS, NOT ON NAME. A manifest calls somebody "Mason" and this
+ * fleet keys its characters by the id "mason", so a name lookup returns
+ * undefined and the run dies mid-round — which the dry run caught before any
+ * money moved. Case-folding would paper over it; the real point is that a NAME
+ * IS DISPLAY AND AN ADDRESS IS IDENTITY. Two tournaments may call one wallet
+ * different things, and neither is who it is.
+ */
+function roundsFromManifest(tournament, agents) {
+  const byAddress = new Map(
+    Object.values(agents)
+      .filter((a) => a.address)
+      .map((a) => [a.address.toUpperCase(), a.id])
+  );
+  const idFor = (entrantName) => {
+    const entrant = tournament.entrants.find((e) => e.name === entrantName);
+    const id = entrant && byAddress.get(entrant.address.toUpperCase());
+    if (!id) {
+      throw new WizardSafetyError(
+        `the manifest names "${entrantName}" at ${entrant?.address ?? 'no address'}, and this ` +
+          'fleet holds no key for that wallet. A tournament can only be played by whoever can sign for it.'
+      );
+    }
+    return id;
+  };
+
+  const byRound = new Map();
+  for (const game of tournament.games) {
+    const list = byRound.get(game.round) ?? [];
+    // `id` is what makes this different from a generated plan: the game is
+    // named, so nothing has to be searched for and nothing may be opened.
+    list.push({ white: idFor(game.white), black: idFor(game.black), id: game.id });
+    byRound.set(game.round, list);
+  }
+  return [...byRound.keys()]
+    .sort((a, b) => a - b)
+    .map((number) => ({ number, pairings: byRound.get(number) }));
+}
 
 /** Every game on the contract, with the rules that name its players. */
 async function readGames() {
@@ -637,13 +733,39 @@ async function main() {
     console.log('(could not read the open fee; using the last known default)');
   }
 
-  const plan = planTournament({
-    ids,
-    format: FORMAT,
-    openFeeUstx: openFee,
-    minerFeeUstx: MINER_FEE_USTX,
-    buyNames: false
-  });
+  // THE MANIFEST DECIDES, when there is one. Otherwise this script does, which
+  // is how every tournament so far was run and is why they can only ever be
+  // described afterwards.
+  let manifest = null;
+  let plan;
+  if (MANIFEST) {
+    const loaded = await loadManifest(MANIFEST);
+    manifest = loaded.tournament;
+    const rounds = roundsFromManifest(manifest, byId(field.agents));
+    // The same shape planTournament returns, so the header and the play loop
+    // below cannot tell the two apart — which is the point. Nothing about
+    // PLAYING a tournament should depend on where the pairings came from.
+    plan = {
+      format: manifest.format,
+      rounds,
+      plannedRounds: rounds.length,
+      plannedGames: manifest.games.length,
+      perGameUstx: MINER_FEE_USTX * 45n,
+      chainUstx: BigInt(manifest.games.length) * MINER_FEE_USTX * 45n,
+      namesUstx: 0n,
+      totalUstx: BigInt(manifest.games.length) * MINER_FEE_USTX * 45n
+    };
+    console.log(`\nmanifest  ${loaded.rootId} — ${manifest.name}`);
+    console.log(`          games are NAMED, so none will be opened by this run`);
+  } else {
+    plan = planTournament({
+      ids,
+      format: FORMAT,
+      openFeeUstx: openFee,
+      minerFeeUstx: MINER_FEE_USTX,
+      buyNames: false
+    });
+  }
 
   console.log(`format    ${plan.format}`);
   console.log(`field     ${ids.join(', ')}`);
@@ -802,8 +924,34 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         // searching, so every pairing matched the first row and three
         // characters played twenty-eight submissions into a stranger's game.
         const { hash } = await wizardRules(white.address, black.address);
-        const already = findByRulesHash(hash, existing);
-        const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
+
+        // A NAMED GAME IS NEVER OPENED AND NEVER SEARCHED FOR. The manifest
+        // said which game this is, so the only question is whether that game
+        // agrees — and if it does not, something is wrong that opening a new
+        // game would paper over. The rules hash is the same check the board
+        // does; failing it here costs nothing, and failing it after a
+        // submission costs a fee and a permanent entry in a stranger's log.
+        let gameId;
+        if (pairing.id !== undefined) {
+          const row = (await readGames()).find((g) => g.id === pairing.id);
+          if (!row) {
+            throw new WizardSafetyError(
+              `the manifest names game ${pairing.id} and it is not on this contract. ` +
+                'Games are opened before a manifest is inscribed, so this manifest describes ' +
+                'a tournament that was never set up.'
+            );
+          }
+          if (String(row.rulesHash ?? '').toLowerCase() !== hash.toLowerCase()) {
+            throw new WizardSafetyError(
+              `game ${pairing.id} committed to different rules than the manifest claims for ` +
+                `${pairing.white} v ${pairing.black}. Refusing to play into it.`
+            );
+          }
+          gameId = pairing.id;
+        } else {
+          const already = findByRulesHash(hash, existing);
+          gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
+        }
         const result = await playGame({
           gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash
         });
