@@ -53,6 +53,25 @@ const ENGINE = Number(arg('engine', '2991'));
  */
 const MAX_ROUNDS = arg('rounds') ? Number(arg('rounds')) : null;
 
+/**
+ * The first round of the format to include, counting from one.
+ *
+ * A tournament need not start where its FORMAT starts. Exhibition One took
+ * rounds one to seven of a double round robin, which left rounds eight to ten
+ * as the only pairings this field has never played - a second event made
+ * entirely of games the first one did not reach.
+ *
+ * Without this, `--rounds` could only ever slice from the beginning, so the
+ * only expressible tournaments were prefixes. That made the second exhibition
+ * impossible to describe: naming rounds eight to ten meant also naming rounds
+ * one to seven, whose games belong to Exhibition One and are already played.
+ *
+ * A pairing's identity is its RULES HASH, which is why this matters at all. The
+ * same two characters in the same colours is not a similar game, it is the same
+ * game, so a format cannot simply be re-run to make a new event.
+ */
+const FROM_ROUND = arg('from') ? Number(arg('from')) : 1;
+
 function env() {
   const found = {};
   try {
@@ -116,7 +135,15 @@ async function main() {
   const byName = new Map(entrants.map((e) => [e.name, e.address]));
   const ids = PERSONALITIES.map((c) => c.id);
   const all = format === 'double-round-robin' ? doubleRoundRobin(ids) : roundRobin(ids);
-  const rounds = MAX_ROUNDS ? all.slice(0, MAX_ROUNDS) : all;
+  if (!Number.isInteger(FROM_ROUND) || FROM_ROUND < 1 || FROM_ROUND > all.length) {
+    throw new WizardSafetyError(
+      `--from ${arg('from')} is not a round of a ${format}, which has ${all.length}.`
+    );
+  }
+  const rounds = all.slice(FROM_ROUND - 1, MAX_ROUNDS ? FROM_ROUND - 1 + MAX_ROUNDS : undefined);
+  if (!rounds.length) {
+    throw new WizardSafetyError('that leaves no rounds at all, so there is no tournament to describe.');
+  }
   const nameOf = Object.fromEntries(PERSONALITIES.map((c) => [c.id, c.name]));
 
   console.log(`\nbuilding "${name}" — ${format}, ${entrants.length} entrants`);
@@ -185,7 +212,10 @@ async function main() {
 
   const out = arg('out', join(HERE, `manifest-${format}.json`));
   writeFileSync(out, text);
-  console.log(`${games.length} games across ${rounds.length} rounds, all ${checked.length} verified against chain`);
+  console.log(
+    `${games.length} games across rounds ${rounds[0].number}-${rounds[rounds.length - 1].number}, ` +
+      `all ${checked.length} verified against chain`
+  );
   console.log(`${Buffer.byteLength(text, 'utf8')} bytes, ${Math.ceil(Buffer.byteLength(text, 'utf8') / 16384)} chunk`);
   console.log(`written to ${out}`);
   console.log('\nInscribe it, then play with:');
