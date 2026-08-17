@@ -385,3 +385,38 @@ describe('running the field on a different model', () => {
     expect(source).toMatch(/entries name/);
   });
 });
+
+describe('the fee ladder replacing its own transaction', () => {
+  // Round 3 ran 82 moves in game 19 and 47 in game 20, then died on
+  // `dropped_replace_by_fee` — a status that means "a higher rung took this
+  // transaction's place on the same nonce", which is the ladder working. The
+  // move was very likely on chain under the replacement's txid.
+  const runner = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('is not treated as a failed move', () => {
+    expect(runner).toMatch(/status === 'dropped_replace_by_fee'/);
+    // It must not reach the throw that ends the game.
+    const at = runner.indexOf("status === 'dropped_replace_by_fee'");
+    const thrown = runner.indexOf("if (status !== 'success')", at);
+    const continued = runner.indexOf('continue;', at);
+    expect(continued, 'it must continue before it can throw').toBeLessThan(thrown);
+  });
+
+  it('waits for the replacement to be indexed before re-reading', () => {
+    // Reading immediately finds a log that has not grown yet and trips the
+    // growth guard — a working ladder turned into a stopped tournament, which
+    // is the same mistake one layer down.
+    const block = runner.slice(runner.indexOf("status === 'dropped_replace_by_fee'"));
+    expect(block.slice(0, 800)).toMatch(/setTimeout\(done, 45_000\)/);
+  });
+
+  it('still refuses to play the same move twice', () => {
+    // The growth guard is what makes the re-read safe: if the replacement did
+    // NOT land, the log has not grown and the run stops loudly rather than
+    // paying for the same move again.
+    expect(runner).toMatch(/the log did not grow after a submission/);
+  });
+});

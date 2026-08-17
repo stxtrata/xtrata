@@ -333,6 +333,29 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
     budget.spent = sent.spentAfterUstx;
 
     const status = sent.status;
+
+    // REPLACED BY OUR OWN LADDER IS NOT A FAILURE. `dropped_replace_by_fee`
+    // means a higher rung took this transaction's place on the same nonce,
+    // which is the fee ladder working exactly as designed. The move is very
+    // likely on chain under the replacement's txid.
+    //
+    // Round 3 died here after 82 moves in game 19 and 47 in game 20, on a
+    // status that meant "the thing you asked for happened, by another route".
+    //
+    // The right response is the one the loop already implements: go round
+    // again and READ. The log is the record. If the move landed, the next pass
+    // sees it and plays on; if it did not, the growth guard at the top refuses
+    // to play the same move twice and stops us loudly.
+    if (status === 'dropped_replace_by_fee') {
+      console.log(`  game ${gameId}: ${chosen.move} was replaced by its own higher rung — re-reading`);
+      // Give the replacement time to be mined and INDEXED before looking. Going
+      // straight round would read a log that has not grown yet and trip the
+      // growth guard, turning a working fee ladder into a stopped tournament —
+      // the same mistake as before, one layer down.
+      await new Promise((done) => setTimeout(done, 45_000));
+      continue;
+    }
+
     if (status !== 'success') {
       // A TIMEOUT IS NOT A REJECTION, and saying so matters: the move may well
       // land after this. Game 16's did, twenty-five minutes after a ten-minute
