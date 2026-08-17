@@ -449,19 +449,27 @@ on mainnet.
 | Distinct addresses that have opened a game | 9 |
 | `get-ranked-count` | 25 |
 | `get-open-fee` | 10000 uSTX (0.01 STX) |
-| `get-rebate-amount` | 10000 uSTX |
-| `get-rebate-count` | 2 |
+| `get-bootstrap-amount` | 250000 uSTX |
+| `get-rebate-amount` | 2000 uSTX |
+| `get-rebate-count` | 45 |
+| `get-sponsor-price` total | 390000 uSTX (0.39 STX) |
 | `is-solvent` | true |
 
 The longest game so far is game 18 at 340 submissions. Every one of those 1,691
 moves is a signed transaction, so the claim that a move is a transaction is no
 longer a design statement.
 
-**The two rebate readings are wrong and are the reason for ADR-0016.** The
-launch values are a rebate of 2,000 µSTX and a count of 45; what is live is the
-old 10,000 and the count of 2 that canary step 14 lowers it to in order to spend
-an allowance by hand. One `set-sponsorship` from the owner fixes both, and the
-step now restores what it lowers.
+**The sponsorship readings are ADR-0016's, applied the same day in
+`0x85cdc6dd21c3f4e674f1607bc89b419dcee06a3218eacfb1f3d307f15cd2800b`.** Until
+that transaction the contract was selling a rebate of 10,000 µSTX with a count
+of 2 — 0.02 STX of allowance under a document promising 0.45 — because canary
+step 14 lowers the count to spend an allowance by hand and nothing put it back.
+The step now restores what it lowers.
+
+That transaction cost **0.019870 STX** in network fees, quoted by the wallet at
+"Medium". It is worth keeping next to the numbers it set: ten times the rebate
+it was writing, and a fair sample of why the rebate is no longer asked to track
+the fee on its own.
 
 **These numbers are a snapshot and go stale.** Re-read them from the contract
 before quoting them anywhere. The commands are in

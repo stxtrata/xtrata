@@ -162,6 +162,15 @@ export class MockChain implements ChainReader, ChainWriter {
     return this.openFee;
   }
 
+  /**
+   * Nothing to forget: this double reads its own fields every time.
+   *
+   * Present so that code which must not read a remembered price can call it
+   * against either implementation. The double being incapable of the bug is
+   * why it never showed it - see LiveChain.refreshPrices.
+   */
+  refreshPrices(): void {}
+
   async getSponsorPrice(): Promise<SponsorPrice> {
     const liability = this.rebate * this.rebateCount;
     return {

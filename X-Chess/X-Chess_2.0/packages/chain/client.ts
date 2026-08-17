@@ -248,9 +248,32 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
   readonly network: Network;
   private readonly endpoint: Endpoint;
   private readonly signer: Signer | null;
-  /** Read once and remembered. The fee does not change mid-session. */
+  /**
+   * Read once and remembered, because a player's session does not change them.
+   *
+   * "Does not change" is a statement about the READER, not the contract. Both
+   * are owner-mutable at any height, so a page that sets one and then reads it
+   * back gets the number it already had - which is exactly what the gates page
+   * did: it sent a correct `set-sponsorship`, the chain accepted it, and the
+   * differ built to verify the change reported the pre-change price and failed.
+   *
+   * So anything that writes them clears them, and a reader that must not be
+   * wrong calls `refreshPrices` first. See `configured` in apps/canary/main.ts.
+   */
   private openFee: bigint | undefined;
   private price: SponsorPrice | undefined;
+
+  /**
+   * Forget both cached prices, so the next read comes from the chain.
+   *
+   * Cheap and worth calling before any decision that turns on the CURRENT
+   * value rather than a session-stable one - verifying a change, or quoting a
+   * price for a transaction somebody is about to sign.
+   */
+  refreshPrices(): void {
+    this.openFee = undefined;
+    this.price = undefined;
+  }
 
   constructor(options: LiveChainOptions) {
     if (!options.contractAddress) throw new Error('contractAddress is required');
@@ -646,6 +669,8 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
     count: bigint,
     margin: bigint
   ): Promise<WriteResult> {
+    // See setOpenFee: cleared on the way out, not on the way back.
+    this.refreshPrices();
     return this.sign({
       functionName: 'set-sponsorship',
       functionArgs: [
@@ -660,6 +685,10 @@ export class LiveChain implements ChainReader, Partial<ChainWriter> {
   }
 
   async setOpenFee(amount: bigint): Promise<WriteResult> {
+    // Before the broadcast, not after it. The cached value is stale the moment
+    // this is SENT, and clearing it only on success would leave a page that
+    // could not tell a rejection from a stale read.
+    this.refreshPrices();
     return this.sign({
       functionName: 'set-open-fee',
       functionArgs: [serializeUint(amount)],

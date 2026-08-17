@@ -1056,6 +1056,14 @@ const handlers: Record<string, StepHandler> = {
 
   configured: async () => {
     const c = requireChain();
+
+    // FROM THE CHAIN, NOT FROM MEMORY. This step exists to check a value the
+    // step before it just changed, and the client remembers both prices for the
+    // session - so without this it read the price from before the transaction
+    // and reported the change had not happened. It had: 0x85cdc6dd set them
+    // correctly and this said "not the launch values" underneath it.
+    c.refreshPrices();
+
     const price = await c.getSponsorPrice();
     const fee = await c.getOpenFee();
     const expected = {
