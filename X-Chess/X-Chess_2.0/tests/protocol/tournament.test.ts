@@ -15,6 +15,7 @@ import {
   MAX_REVISIONS,
   TOURNAMENT_HEADER,
   addressOf,
+  checkGames,
   honours,
   parseTournament,
   provenance,
@@ -22,8 +23,11 @@ import {
   resolveTournament,
   revisedInTime,
   rounds,
-  standings
+  standings,
+  verifiedResults
 } from '../../packages/protocol/tournament.js';
+import { rulesHash } from '../../packages/protocol/canonical.js';
+import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { COMPILED_ACCEPTED_BEFORE } from '../../packages/ui/app.js';
 
 const good = {
@@ -233,6 +237,19 @@ describe('which kind of manifest a reader is holding', () => {
     expect(provenance(100, 200)).toBe('committed');
   });
 
+  it('is anchored on the first MOVE, not the first game opened', () => {
+    // A manifest names its games by id, and ids do not exist until games are
+    // opened — so a genuinely committed tournament must open its games, then
+    // inscribe, then play. Anchored on "first game opened" that reads compiled,
+    // which is exactly backwards, and would have mislabelled every prospective
+    // tournament there will ever be.
+    const gamesOpened = 100;
+    const manifest = 110;
+    const firstMove = 120;
+    expect(provenance(manifest, firstMove), 'inscribed before any move was played').toBe('committed');
+    expect(provenance(manifest, gamesOpened), 'the wrong anchor').toBe('compiled');
+  });
+
   it('calls it compiled when the games came first', () => {
     expect(provenance(200, 100)).toBe('compiled');
   });
@@ -256,7 +273,7 @@ describe('which kind of manifest a reader is holding', () => {
   });
 
   it('says which it is in words, not a term of art', () => {
-    expect(provenanceNote('committed')).toContain('before its first game');
+    expect(provenanceNote('committed')).toContain('before the first move');
     expect(provenanceNote('compiled')).toContain('already existed');
   });
 });
@@ -301,5 +318,106 @@ describe('the compiled fallback has an end date', () => {
 
   it('is the number the board actually holds', () => {
     expect(COMPILED_ACCEPTED_BEFORE).toBe(CUTOFF);
+  });
+});
+
+describe('checking a claimed pairing against the chain', () => {
+  // THE POINT OF THE WHOLE FORMAT. A manifest asserts that game 25 was Mason
+  // against Plumb. Saying so proves nothing — but the game's rules hash commits
+  // white, black and ranked, so rebuilding those rules from the claimed
+  // addresses either reproduces the commitment or does not.
+
+  const WHITE = 'SP1AZT4GMWSX8EHM321YVHD8QVR7WFXK6TCN0W2A';
+  const BLACK = 'SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX';
+  const manifest = {
+    name: 'T', format: 'double-round-robin', contract: 'SP.x',
+    entrants: [{ name: 'Mason', address: WHITE }, { name: 'Plumb', address: BLACK }],
+    games: [{ id: 25, white: 'Mason', black: 'Plumb', round: 5 }]
+  } as unknown as Parameters<typeof checkGames>[0];
+
+  /** The hash game 25 would have committed to if the manifest is telling the truth. */
+  const trueHash = (): string =>
+    rulesHash(normaliseRules({ ...DEFAULT_RULES, white: WHITE, black: BLACK, ranked: true }));
+
+  it('verifies a pairing the chain agrees with', () => {
+    const checked = checkGames(manifest, new Map([[25, { rulesHash: trueHash(), result: '1-0' as const }]]));
+    expect(checked[0].verdict).toBe('verified');
+    expect(checked[0].says, 'a verified game has nothing to explain').toBe('');
+  });
+
+  it('refuses a pairing the chain does not agree with', () => {
+    const checked = checkGames(manifest, new Map([[25, { rulesHash: 'de'.repeat(32), result: '1-0' as const }]]));
+    expect(checked[0].verdict).toBe('unverified');
+    expect(checked[0].says).toContain('not this pairing');
+  });
+
+  it('says so when a game committed to no rules at all', () => {
+    const checked = checkGames(manifest, new Map([[25, { rulesHash: null, result: '1-0' as const }]]));
+    expect(checked[0].verdict).toBe('unverified');
+    expect(checked[0].says).toContain('nothing to check the claim against');
+  });
+
+  it('reports a game that is not on the contract as missing, not unverified', () => {
+    // Different failures deserve different words: one is a manifest naming a
+    // game that does not exist, the other is a game that exists and disagrees.
+    const checked = checkGames(manifest, new Map());
+    expect(checked[0].verdict).toBe('missing');
+    expect(checked[0].result).toBeNull();
+  });
+
+  it('tolerates an 0x prefix and upper case on the committed hash', () => {
+    const checked = checkGames(
+      manifest,
+      new Map([[25, { rulesHash: `0x${trueHash().toUpperCase()}`, result: null }]])
+    );
+    expect(checked[0].verdict).toBe('verified');
+  });
+
+  it('is keyed by game id and never by position', () => {
+    // Three games open at once and whichever lands first takes the lower id, so
+    // schedule order and id order are unrelated. Reading a pairing off a list
+    // index once put games 13 and 15 the wrong way round.
+    const two = {
+      ...manifest,
+      games: [
+        { id: 25, white: 'Mason', black: 'Plumb', round: 5 },
+        { id: 13, white: 'Plumb', black: 'Mason', round: 1 }
+      ]
+    } as typeof manifest;
+    const facts = new Map([[25, { rulesHash: trueHash(), result: '1-0' as const }]]);
+    const checked = checkGames(two, facts);
+    expect(checked.find((g) => g.id === 25)?.verdict).toBe('verified');
+    expect(checked.find((g) => g.id === 13)?.verdict, 'position 1 must not inherit game 25').toBe('missing');
+  });
+});
+
+describe('only verified games score', () => {
+  // A table built from unverified games repeats a claim as though it had been
+  // checked, which is the exact failure the manifest exists to end. An
+  // unverified game is still SHOWN; it is simply not counted.
+  const rows = [
+    { id: 1, round: 1, white: 'A', black: 'B', verdict: 'verified' as const, says: '', result: '1-0' as const },
+    { id: 2, round: 1, white: 'A', black: 'B', verdict: 'unverified' as const, says: 'no', result: '0-1' as const },
+    { id: 3, round: 2, white: 'A', black: 'B', verdict: 'missing' as const, says: 'gone', result: null }
+  ];
+
+  it('passes a verified result through', () => {
+    expect(verifiedResults(rows).get(1)).toBe('1-0');
+  });
+
+  it('drops an unverified result even though it has one', () => {
+    expect(verifiedResults(rows).has(2), 'an unverified result was counted').toBe(false);
+  });
+
+  it('drops a missing game', () => {
+    expect(verifiedResults(rows).has(3)).toBe(false);
+  });
+
+  it('keeps a verified but unfinished game, as unfinished', () => {
+    // Distinct from "not verified": the pairing checks out, the game is simply
+    // still being played, and `standings` skips a null result on its own.
+    const live = [{ ...rows[0], id: 9, result: null }];
+    expect(verifiedResults(live).has(9)).toBe(true);
+    expect(verifiedResults(live).get(9)).toBeNull();
   });
 });

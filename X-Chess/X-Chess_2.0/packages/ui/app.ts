@@ -7,6 +7,9 @@
 import { renderBoard, destinationsFrom, promotionChoices, pieceGlyph, pieceName } from './board.js';
 import type { PendingMove } from './board.js';
 import { Names } from '../chain/bns.js';
+import { XtrataReader } from '../chain/xtrata.js';
+import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
+import type { TournamentView } from './tournaments.js';
 import { pool } from '../chain/pool.js';
 import { BlockTimes, formatClock } from '../chain/block-time.js';
 import { parseUci } from '../chess/uci.js';
@@ -48,7 +51,7 @@ import type {
   SponsorshipRow
 } from '../chain/client.js';
 
-export type Tab = 'play' | 'game' | 'explore' | 'leaderboard' | 'profile';
+export type Tab = 'play' | 'game' | 'explore' | 'leaderboard' | 'tournaments' | 'profile';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -240,6 +243,9 @@ const EXPLORE_ENTRY_LIMIT = 200;
  */
 export const COMPILED_ACCEPTED_BEFORE = 8_787_816;
 
+/** What the tab shows when nobody has typed anything. The exhibition. */
+const DEFAULT_TOURNAMENT = 2993;
+
 const EXPLORE_WINDOW = 25;
 
 /**
@@ -372,8 +378,8 @@ export interface AppOptions {
 /** Ids the shell defines. Every one must exist, or wiring throws. */
 const IDS = [
   'build-tag', 'chain-notice', 'sign-notice',
-  'tab-play', 'tab-game', 'tab-explore', 'tab-leaderboard', 'tab-profile',
-  'view-play', 'view-game', 'view-explore', 'view-leaderboard', 'view-profile',
+  'tab-play', 'tab-game', 'tab-explore', 'tab-leaderboard', 'tab-tournaments', 'tab-profile',
+  'view-play', 'view-game', 'view-explore', 'view-leaderboard', 'view-tournaments', 'view-profile',
   'connect', 'disconnect', 'whoami', 'whoami-name', 'whoami-addr',
   'game-kind', 'rules-white', 'rules-black', 'rules-ranked',
   'rules-white-who', 'rules-black-who',
@@ -392,6 +398,7 @@ const IDS = [
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
+  'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-load', 'profile-body',
   'contract-label', 'endpoint-label'
 ] as const;
@@ -543,6 +550,8 @@ export class ChessApp {
   private sponsorship: { key: string; row: SponsorshipRow | null } | null = null;
   /** Names already looked up this session. null means "asked, and no owner". */
   private readonly resolvedNames = new Map<string, string | null>();
+  private tournament: TournamentView | null = null;
+  private xtrata: XtrataReader | null = null;
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
@@ -573,6 +582,12 @@ export class ChessApp {
     if (endpoint) {
       this.names = new Names({ endpoint: endpoint as never, network: options.build?.network as never });
       this.times = new BlockTimes(endpoint as never);
+      // Built here for the same reason as those two: this is the only place the
+      // endpoint is in scope, and an inscription reader has nothing to set up.
+      this.xtrata = new XtrataReader({
+        endpoint: endpoint as never,
+        network: (options.build?.network as 'mainnet' | 'testnet') ?? 'mainnet'
+      });
     }
     this.wire();
     this.start();
@@ -599,7 +614,7 @@ export class ChessApp {
       });
     };
 
-    for (const tab of ['play', 'game', 'explore', 'leaderboard', 'profile'] as Tab[]) {
+    for (const tab of ['play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile'] as Tab[]) {
       on(camel(`tab-${tab}`), () => this.show(tab));
     }
 
@@ -648,6 +663,7 @@ export class ChessApp {
     on('topUp', () => void this.topUp());
     on('exploreRefresh', () => void this.reloadExplore());
     on('exploreFind', () => void this.findGame());
+    on('tournamentLoad', () => void this.loadTournamentTab());
     on('profileLoad', () => void this.loadProfile());
 
     for (const key of [
@@ -1243,11 +1259,14 @@ export class ChessApp {
 
   show(tab: Tab): void {
     this.tab = tab;
-    for (const name of ['play', 'game', 'explore', 'leaderboard', 'profile'] as Tab[]) {
+    for (const name of ['play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile'] as Tab[]) {
       this.el[camel(`view-${name}`)].classList.toggle('hide', name !== tab);
       this.el[camel(`tab-${name}`)].setAttribute('aria-selected', String(name === tab));
     }
     if (tab === 'leaderboard') void this.loadLeaderboard();
+    // Only on first open. A tournament is a manifest plus a couple of dozen
+    // reads, and flicking between tabs should not re-spend that.
+    if (tab === 'tournaments' && !this.tournament) void this.loadTournamentTab();
 
     // Rebuild the list when it has gone stale, which OPENING THE TAB is the
     // signal for.
@@ -2182,6 +2201,165 @@ export class ChessApp {
       line.setAttribute('marker-end', isSigning ? 'url(#ah-signing)' : 'url(#ah-sent)');
       svg.appendChild(line);
     }
+  }
+
+// ------------------------------------------------------------------
+  // Tournaments
+  // ------------------------------------------------------------------
+
+  /**
+   * Show a tournament, in two passes.
+   *
+   * The first is one game row each and renders immediately. The second replays
+   * every game — 1,700 entries for the exhibition, 340 of them in one game —
+   * and only then can the table be scored or the manifest dated, because
+   * provenance needs the height of the earliest MOVE and a game row only says
+   * when a game was opened.
+   */
+  private async loadTournamentTab(): Promise<void> {
+    if (!this.xtrata) {
+      // No endpoint means no inscription reader, and a tournament is nothing
+      // but an inscription. Say that rather than drawing an empty tab.
+      this.notice('tournamentNote', 'warn', 'This board has no chain endpoint, so it cannot read a manifest.');
+      return;
+    }
+    const typed = String((this.el.tournamentId as HTMLInputElement).value ?? '').trim();
+    const id = Number(typed || DEFAULT_TOURNAMENT);
+    if (!Number.isInteger(id) || id < 1) {
+      this.notice('tournamentNote', 'warn', 'Type the inscription number of a tournament manifest.');
+      return;
+    }
+
+    const deps = {
+      chain: this.chain,
+      reader: this.xtrata!,
+      compiledAcceptedBefore: COMPILED_ACCEPTED_BEFORE,
+      bnsFor: (address: string) => this.names?.peek(address) ?? null
+    };
+
+    await this.guard(`reading tournament ${id}`, async () => {
+      this.notice('tournamentNote', 'info', `Reading manifest ${id} and checking every pairing against the chain.`);
+      const view = await loadTournament(id, deps);
+      this.tournament = view;
+      this.drawTournament();
+      if (!view.ok) return false;
+
+      // Names for everybody, once, before the expensive pass — so the first
+      // full paint already reads as people rather than principals.
+      await this.names?.resolveAll(view.tournament?.entrants.map((e) => e.address) ?? []);
+      this.notice('tournamentNote', 'info', 'Replaying every game to score it. This is the slow part.');
+      this.tournament = await scoreTournament(view, deps);
+      this.drawTournament();
+      return true;
+    });
+  }
+
+  private drawTournament(): void {
+    const view = this.tournament;
+    const body = this.el.tournamentBody;
+    body.replaceChildren();
+    const banner = this.el.tournamentProvenance;
+    banner.classList.add('hide');
+    if (!view) return;
+
+    if (!view.ok) {
+      this.notice(
+        'tournamentNote',
+        'warn',
+        `That is not a readable tournament manifest. ${view.problems.join(' ')}`
+      );
+      return;
+    }
+
+    const t = view.tournament!;
+    this.notice(
+      'tournamentNote',
+      'info',
+      `${t.name} — ${t.format}, ${t.entrants.length} entrants, ${t.games.length} games. ` +
+        `Manifest ${view.tournamentId}` +
+        (view.lineage.length > 1 ? `, revised ${view.lineage.length - 1} time(s)` : '') +
+        (t.engine ? `, engine inscription ${t.engine}.` : '.')
+    );
+
+    // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.
+    if (view.scored) {
+      banner.classList.remove('hide');
+      banner.className = `notice notice--${view.honoured ? 'info' : 'warn'}`;
+      banner.textContent = view.says;
+      if (!view.honoured) return;
+    }
+
+    if (view.table.length) {
+      const table = this.doc.createElement('table');
+      table.className = 'tn-standings';
+      table.innerHTML =
+        '<thead><tr><th>Player</th><th class="num">Pts</th><th class="num">P</th>' +
+        '<th class="num">W</th><th class="num">D</th><th class="num">L</th></tr></thead>';
+      const tbody = this.doc.createElement('tbody');
+      for (const row of view.table) {
+        const tr = this.doc.createElement('tr');
+        for (const [value, numeric] of [
+          [this.tournamentName(t, row.name), false],
+          [String(row.points), true], [String(row.played), true],
+          [String(row.won), true], [String(row.drawn), true], [String(row.lost), true]
+        ] as [string, boolean][]) {
+          const td = this.doc.createElement('td');
+          td.textContent = value;
+          if (numeric) td.className = 'num';
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      body.appendChild(table);
+    } else if (!view.scored) {
+      const waiting = this.doc.createElement('p');
+      waiting.className = 'tn-live';
+      waiting.textContent = 'Pairings checked. Replaying games to score them…';
+      body.appendChild(waiting);
+    }
+
+    for (const round of view.rounds) {
+      const section = this.doc.createElement('div');
+      section.className = 'tn-round';
+      const heading = this.doc.createElement('h3');
+      heading.textContent = `Round ${round.number}`;
+      section.appendChild(heading);
+
+      for (const game of round.games) {
+        const row = this.doc.createElement('div');
+        row.className = 'tn-game';
+        row.dataset.game = String(game.id);
+
+        const id = this.doc.createElement('span');
+        id.className = 'tn-id';
+        id.textContent = String(game.id);
+
+        const who = this.doc.createElement('span');
+        who.textContent = `${game.whoWhite} v ${game.whoBlack}`;
+
+        const result = this.doc.createElement('span');
+        result.className = 'tn-result';
+        result.textContent = resultLabel(game);
+
+        // A WORD, NOT ONLY A COLOUR. This is the thing a reader came to check,
+        // and colour alone fails anyone who cannot separate these two hues.
+        const mark = this.doc.createElement('span');
+        mark.className = `tn-mark tn-mark--${game.verdict}`;
+        mark.textContent = verdictLabel(game);
+        if (game.says) mark.title = game.says;
+
+        row.append(id, who, result, mark);
+        section.appendChild(row);
+      }
+      body.appendChild(section);
+    }
+  }
+
+  /** BNS if the address has one, else the manifest's name for that entrant. */
+  private tournamentName(t: { entrants: Array<{ name: string; address: string }> }, entrant: string): string {
+    const address = t.entrants.find((e) => e.name === entrant)?.address;
+    return (address ? this.names?.peek(address) : null) ?? entrant;
   }
 
   private drawStatus(state: ReplayState): void {

@@ -324,6 +324,28 @@ ${SCALE_CSS}
 .mv-rejected .mv-san { color: var(--dim); text-decoration: line-through; }
 .mv-reason { color: var(--warn); font-size: 11px; margin-left: 6px; }
 
+/* The tournament tab.
+   A verdict is a fact about a game and gets a word, not only a colour: colour
+   alone fails for anyone who cannot separate these two hues, and this is
+   precisely the information a reader came to check.
+   NOTE: no backticks in this comment. It sits inside a template literal, and
+   one backtick ends the string. */
+.tn-standings { width: 100%; margin: 10px 0 16px; }
+.tn-round { margin: 14px 0 0; }
+.tn-round h3 { font-size: 13px; margin: 0 0 6px; color: var(--gold); font-weight: 600; }
+.tn-game {
+  display: grid; grid-template-columns: 3.4ch 1fr auto auto; gap: 8px;
+  align-items: baseline; padding: 5px 8px; border-bottom: 1px solid var(--line);
+}
+.tn-game:last-child { border-bottom: 0; }
+.tn-id { color: var(--dim); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tn-result { font-variant-numeric: tabular-nums; }
+.tn-mark { font-size: 11px; white-space: nowrap; }
+.tn-mark--verified { color: var(--good); }
+.tn-mark--unverified { color: var(--warn); }
+.tn-mark--missing { color: var(--dim); }
+.tn-live { color: var(--dim); font-size: 12px; }
+
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .row + .row { margin-top: 8px; }
 .spacer { flex: 1; }
@@ -528,6 +550,7 @@ export const HTML = `
       <button class="tab" id="tab-game" role="tab" aria-selected="false">Game</button>
       <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore</button>
       <button class="tab" id="tab-leaderboard" role="tab" aria-selected="false">Leaderboard</button>
+      <button class="tab" id="tab-tournaments" role="tab" aria-selected="false">Tournaments</button>
       <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>
     </nav>
     <div class="row">
@@ -764,6 +787,18 @@ export const HTML = `
       <th>#</th><th>Player</th><th class="num">Rating</th><th class="num">Games</th>
       <th class="num">W</th><th class="num">D</th><th class="num">L</th>
     </tr></thead><tbody id="leaderboard-rows"></tbody></table>
+  </section>
+
+  <section id="view-tournaments" class="panel hide">
+    <h2>Tournaments</h2>
+    <div class="field">
+      <label for="tournament-id">Manifest inscription</label>
+      <input type="text" id="tournament-id" inputmode="numeric" placeholder="2993">
+    </div>
+    <div class="row"><button class="action" id="tournament-load">Show</button></div>
+    <div id="tournament-note" class="notice notice--info"></div>
+    <div id="tournament-provenance" class="notice notice--info hide"></div>
+    <div id="tournament-body"></div>
   </section>
 
   <section id="view-profile" class="panel hide">

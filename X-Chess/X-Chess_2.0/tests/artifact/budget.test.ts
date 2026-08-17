@@ -106,9 +106,20 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // markup rather than a triangle drawn per arrow - which was tried first and
   // cost 734, and a version with the explanation inside the template literal
   // cost 1,276, because a comment in a template literal is an inscribed byte.
-  { group: 'packages/ui', ceiling: 129_500, measured: 102_938 },
+  { group: 'packages/ui', ceiling: 129_500, measured: 106_000 },
   { group: 'packages/chain', ceiling: 26_250, measured: 19_133 },
-  { group: 'packages/protocol', ceiling: 14_500, measured: 11_423 },
+  // Raised to 18,000 on 2026-08-17, and this one was arithmetic rather than a
+  // surprise: step 0 of the Tournaments tab measured it before any UI existed.
+  //
+  // tournament.ts was in the tree but imported by nothing, so it cost zero and
+  // the row looked healthy at 11,423. The tab imports it — the manifest parser,
+  // standings, rounds, revision walking, provenance and the pairing check — and
+  // that is 4,523 bytes, landing at 15,946.
+  //
+  // Headroom to 18,000 rather than to the nearest round number above 15,946,
+  // because the tab is not finished and a ceiling that has to move again next
+  // week is not a ceiling.
+  { group: 'packages/protocol', ceiling: 18_000, measured: 15_946 },
   { group: 'packages/chess', ceiling: 12_500, measured: 9_207 },
   // Moved from 6,000 when connect.ts arrived: the connect policy left
   // apps/chess, where it was untestable, and became 819 bytes of this package
