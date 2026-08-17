@@ -437,6 +437,22 @@ export async function send({
   game = null
 }) {
   const balance = await balanceOf(wizard.address);
+  // THE FEE IS PART OF WHAT THIS COSTS, and it stopped being counted when the
+  // ladder arrived. Before that the miner fee WAS `spendUstx`, so a submit
+  // planned to spend 3,000 and the guard was satisfied. Now the fee travels
+  // separately as `fee`, a submit has no contract-level spend at all, and
+  // `spendUstx: 0n` tripped "a broadcast must plan to spend something" — which
+  // it does, it just spends it on the miner.
+  //
+  // Round 3 died on this after opening three games and playing three moves.
+  //
+  // Counting the total also fixes the quieter half: the spend cap was ignoring
+  // every miner fee, so a run that believed it had spent nothing had in fact
+  // spent 3,000 uSTX a move. Game 18 alone was 1.008 STX of fees the cap never
+  // saw. `debitBalance` below has always charged the total; only the cap and
+  // the guard disagreed.
+  const costUstx = BigInt(spendUstx) + BigInt(fee);
+
   const allowed = assertBroadcastAllowed({
     live: LIVE,
     contract: ALLOWED_CONTRACT,
@@ -445,7 +461,7 @@ export async function send({
     network: 'mainnet',
     senderAddress: wizard.address,
     balanceUstx: balance,
-    plannedSpendUstx: spendUstx,
+    plannedSpendUstx: costUstx,
     spentSoFarUstx: spent,
     spendCapUstx: cap
   });
@@ -470,7 +486,7 @@ export async function send({
 
   // Booked immediately, and only after the broadcast succeeded. The next check
   // then needs no network call, and it is counting the same money the cap does.
-  debitBalance(wizard.address, BigInt(spendUstx) + BigInt(fee));
+  debitBalance(wizard.address, costUstx);
   // The one thing the chain will never know: when this was OFFERED. Written
   // before anything awaits, so the timestamp is the broadcast and not the
   // settle. See fee-log.mjs.

@@ -776,3 +776,29 @@ describe('what a move offers a miner', () => {
     expect(plan.totalUstx, 'the plan quotes the optimistic fee').toBe(worst);
   });
 });
+
+describe('what a broadcast costs, once the fee climbs', () => {
+  // Round 3 opened three games, played three moves and died on "a broadcast
+  // must plan to spend something". A submit HAS no contract-level spend — it
+  // pays a miner and nothing else — and the fee ladder had moved the fee out of
+  // `spendUstx` into its own argument, so the guard was shown a zero.
+  const source = read('harness/wizards/play.mjs');
+
+  it('counts the miner fee as part of the spend', () => {
+    expect(source).toMatch(/const costUstx = BigInt\(spendUstx\) \+ BigInt\(fee\)/);
+    expect(source, 'the guard must see the total').toMatch(/plannedSpendUstx: costUstx/);
+  });
+
+  it('charges the balance the same figure the guard checked', () => {
+    // These were the same number by accident before the ladder, and different
+    // by accident after it. One expression now, so they cannot drift again.
+    expect(source).toMatch(/debitBalance\(wizard\.address, costUstx\)/);
+  });
+
+  it('means the spend cap stops ignoring every fee it ever paid', () => {
+    // The quieter half of the same bug: a run believed it had spent nothing on
+    // moves while paying 3,000 uSTX each. Game 18 was 1.008 STX the cap never
+    // saw, on a game that was already lost.
+    expect(source).not.toMatch(/plannedSpendUstx: spendUstx\b/);
+  });
+});
