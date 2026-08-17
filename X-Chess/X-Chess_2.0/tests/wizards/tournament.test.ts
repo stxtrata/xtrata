@@ -420,3 +420,36 @@ describe('the fee ladder replacing its own transaction', () => {
     expect(runner).toMatch(/the log did not grow after a submission/);
   });
 });
+
+describe('saying that a round is over', () => {
+  const runner = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('prints every result when the round finishes', () => {
+    // A finished round used to end on a blank line, which in a terminal looks
+    // exactly like a round that has HUNG — and this harness has hung, at
+    // length, printing nothing. Telling the two apart meant reading the
+    // mempool, which is a lot to ask of somebody who only wants to know
+    // whether to keep waiting.
+    expect(runner).toMatch(/round \$\{round\.number\} complete/);
+    expect(runner).toMatch(/game \$\{String\(game\.gameId\)/);
+  });
+
+  it('says a silent terminal is finished rather than stuck', () => {
+    expect(runner).toMatch(/finished, not stuck/);
+  });
+
+  it('names an unfinished game as unfinished, not as a result', () => {
+    // playGame returns null when it stops without a result. Printing that as a
+    // blank, or as a win, would be the summary lying about the chain.
+    expect(runner).toMatch(/unfinished — re-run this round, the log is the record/);
+  });
+
+  it('collects what playGame actually returned', () => {
+    // The summary must read real results rather than restate the schedule.
+    expect(runner).toMatch(/const played = await Promise\.all\(/);
+    expect(runner).toMatch(/return \{ gameId, white, black, result \}/);
+  });
+});

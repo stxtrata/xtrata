@@ -85,10 +85,15 @@ finishes leaves no room for the review the form is explicitly asking you to allo
 > computes the hash chain and emits the seeding transactions.
 >
 > Completion evidence: a public repository and commit hash with an open licence, the
-> test suite green, a testnet contract that has been through the full lifecycle of
-> seed, finalise, inscribe and swap in both directions, and a published diff report
-> showing the harvester reproduces Bitcoin Pepes' existing on-chain canonical hashes
-> byte for byte across all 2,089 tokens, with zero mismatches. Anyone can rerun it.
+> test suite green, and a testnet contract that has been through the full lifecycle of
+> seed, finalise, inscribe and swap in both directions.
+>
+> Plus a published replay report against Bitcoin Pepes, the only collection whose
+> correct answer is already on chain. For every one of the 2,089 tokens whose source
+> art is still retrievable, the harvester's computed hash matches the on-chain
+> canonical hash exactly, with zero mismatches. Tokens whose source art can no longer
+> be fetched are counted and published separately as a link-rot measurement, because
+> that number is itself a finding worth having. Anyone can rerun the whole thing.
 >
 > Target: end of week 4, Sunday 13 September 2026.
 
@@ -114,19 +119,30 @@ rigorous proof available. It passes or it does not.
 > Open the service to the public and publish the educational material.
 >
 > A public preservation registry, one row per collection, showing source contract,
-> twin contract, tokens preserved, whether the canonical set is finalised, and whether
-> the deployed source hash matches the published template. A public preservation
-> service on mainnet. Successor twin contracts for LEO Cats and Miami Degens, seeded
-> and finalised, which makes a frozen canonical set true for those collections for the
-> first time. Four long-form documents fact verified against live contract state, plus
-> a preserve-your-collection how-to and onboarding docs written from a real run.
+> twin contract, tokens preserved, whether the canonical set is finalised, the deployed
+> source hash, and whether that hash matches the published template. A public
+> preservation service on mainnet where a collection's twin contract can be found,
+> verified and used. Four long-form documents fact verified against live contract state
+> and published: the state of link rot in 2026, a verify-it-yourself guide, a
+> repoint-your-collection playbook, and the Bitcoin Pepes case study. A
+> preserve-your-collection how-to and onboarding docs, written from a real run rather
+> than from theory. Live counters instrumented from this point rather than reconstructed
+> at the end: collections preserved, twins minted, distinct wallets holding a twin, and
+> contracts deployed through the tool.
 >
-> Completion evidence: registry URL listing every collection with its verification
-> status, mainnet contract ids and finalise transaction ids for the two successor
-> contracts, six published document URLs, and a public repository with a licence
-> covering the template, harvester and registry.
+> Completion evidence: registry URL, live, listing every collection with its twin
+> contract id and its template verification status. Six published document URLs, four
+> long form plus the how-to and the onboarding docs. A public repository with a licence
+> covering the template, the harvester and the registry.
 >
 > Target: end of week 8, Sunday 11 October 2026.
+
+**Why the LEO Cats and Miami Degens successors are not in this milestone.** They pin the
+new core as a Clarity constant, so they cannot be written until its address is final or
+deployed until it is live, and the core cutover is separate work this grant does not pay
+for. Everything left in milestone 2 is deliverable without waiting on anyone. The
+successors sit in milestone 3, where a preserved collection belongs anyway as evidence
+of use rather than evidence of build.
 
 ---
 
@@ -147,22 +163,38 @@ rigorous proof available. It passes or it does not.
 > A public deployer where any wallet can generate a Forever Twins contract for a
 > Stacks collection, deploy it from their own wallet, seed the canonical hashes and
 > finalise the set, with no action from me at any point and no key held by me. An
-> automatically generated claim page for every registry entry. At least two collections
-> beyond the three already live, preserved on template-generated contracts. A payment
-> and access path that removes the requirement to hold STX. A public metrics page and
-> a recap post.
+> automatically generated claim page for every registry entry.
 >
-> Completion evidence: deployer URL, a mainnet contract id generated end to end through
-> the tool with its deploy transaction, one mainnet preservation completed by a wallet
-> holding no STX, the metrics page, the recap post, and a preservation ledger showing
-> every piece of at-risk artwork saved with grant money, with transaction ids and the
-> holders it now binds to.
+> At least two collections beyond the three already live, preserved on
+> template-generated contracts, selected by evidence of fragile art hosting with that
+> evidence recorded in the registry. Successor twin contracts for LEO Cats and Miami
+> Degens, seeded and finalised, which makes a frozen canonical set true for those two
+> collections for the first time. A public metrics page and a recap post.
+>
+> Completion evidence: deployer URL, public and working. A mainnet contract id
+> generated end to end through the tool, with its deploy transaction. Mainnet contract
+> ids and finalise transaction ids for the new collections and for the two successor
+> contracts. The metrics page and the recap post.
+>
+> Plus evidence the work benefited someone: one mainnet preservation completed on
+> behalf of a holder who held no STX and signed nothing, with the transaction id and
+> the resulting binding, and a preservation ledger listing every piece of at-risk
+> artwork saved with grant money, with transaction ids and the holders each twin now
+> binds to.
 >
 > Target: end of week 12, Sunday 8 November 2026.
 
 **Note on numbers.** Completion is the metrics page being live and accurate. The
 values it reports are outcomes, not commitments. Third-party deployments are reported
 with transaction ids, never made a condition of completion.
+
+**Why the no-STX criterion is safe to commit to.** Inscribing is permissionless in the
+helper contract. Anyone can inscribe any token's twin, the caller pays both fees, the
+twin mints into escrow, and the binding resolves ownership to the current holder of the
+original. So a holder with an empty wallet who signs nothing still ends up with their
+artwork on Bitcoin and their twin bound to them. This needs no sponsor relayer and no
+passkey wallet, both of which are currently poor bets. See
+`MILESTONE-FEASIBILITY.md` for why.
 
 ---
 

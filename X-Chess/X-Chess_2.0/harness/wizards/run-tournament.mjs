@@ -773,7 +773,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
 
     // The three games of a round, alongside each other. This is the only
     // parallelism here and it is bounded by the nonce rule rather than by taste.
-    await Promise.all(
+    const played = await Promise.all(
       round.pairings.map(async (pairing) => {
         const white = agents[pairing.white];
         const black = agents[pairing.black];
@@ -785,12 +785,34 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         const { hash } = await wizardRules(white.address, black.address);
         const already = findByRulesHash(hash, existing);
         const gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
-        await playGame({ gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash });
+        const result = await playGame({
+          gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash
+        });
+        return { gameId, white, black, result };
       })
     );
+
+    // SAY THE ROUND IS OVER, out loud and in one place.
+    //
+    // A finished round used to end on a blank line, which in a terminal looks
+    // exactly like a round that has hung — and this harness has hung, at
+    // length, while printing nothing. Telling the two apart meant reading the
+    // mempool. That is a lot to ask of somebody who just wants to know whether
+    // to wait.
+    console.log(`\n--- round ${round.number} complete ---`);
+    for (const game of played) {
+      const how = game.result
+        ? `${game.result}`
+        : 'unfinished — re-run this round, the log is the record';
+      console.log(
+        `  game ${String(game.gameId).padEnd(3)} ${game.white.name.padEnd(8)} v ` +
+          `${game.black.name.padEnd(8)} ${how}`
+      );
+    }
   }
 
-  console.log(`\nSpent ${ustx(budget.spent)} of ${ustx(budget.cap)}.\n`);
+  console.log(`\nSpent ${ustx(budget.spent)} of ${ustx(budget.cap)}.`);
+  console.log('Nothing is running now. A silent terminal from here is finished, not stuck.\n');
 }
 
 async function openGame({ white, black, openFee, budget }) {
