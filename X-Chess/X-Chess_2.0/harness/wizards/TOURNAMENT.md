@@ -524,3 +524,53 @@ rather than protocol changes.
   makes the exhibition a working example of the entry format rather than a
   rehearsal for one, and it is six small inscriptions. Doing it first is
   probably how the format gets found to be wrong while it is still cheap.
+
+---
+
+## The engine, inscribed
+
+Every player in an X Chess tournament is handed the same chess engine before any
+personality is applied. It is on chain, so that is checkable by a stranger
+rather than a claim we make:
+
+| | |
+| --- | --- |
+| token | **#2991** on `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3` |
+| hash | `0xfa2cb6a95c31c57bfdce27fde13e06b662c790ad8e4a0a435f3a19550314ded3` |
+| size | 16,314 bytes, one chunk |
+| parent | Genesis #107, so it sits in Agent 27's identity chain |
+| mint tx | `96c4982f075b1921eadbc5aba1a391e316fc90afc0fab4d531615057960ad19b` |
+
+`rankMoves(state, depth)` returns EVERY legal move with a score in centipawns
+from the mover's point of view, best first, and a `mateIn` where one exists. It
+is never a recommendation — a character reads the list and picks by style, which
+is the only thing an entry controls.
+
+**Why it exists, measured rather than assumed.** A language model cannot play
+chess from a list of legal moves, and no prompt makes it. Over six on-chain
+games: more thinking effort moved the blunder rate from 29% to 29%, competence
+instructions moved it 21% to 21%, a king-mobility hint produced no mate in fifty
+plies where doing nothing mated in twenty-three. The engine halved it, 24% to
+12%, replicated across three twelve-game runs.
+
+It does NOT make games finish — the one-ply arm mated more often, 8 to 6. What
+ended round 2 was chain-side failure, not move quality.
+
+### What it cost to inscribe, and what went wrong
+
+0.32 STX, and the two failed attempts are worth recording because both are easy
+to repeat:
+
+* **`xtrata-v2-1-0` is a migration target, never a mint target.** A recursive
+  mint there aborted with `u101 ERR-NOT-FOUND`: Genesis #107 lives on v3-2-3,
+  and on v2-1-0 that token belongs to the v3 contract, so the dependency could
+  not resolve. Mined, so the miner fee burned.
+* **`xtrata-small-mint-v1-0` will not take v3.** Passing the v3 core to the
+  helper is rejected at broadcast with `BadFunctionArgument` — free, but it
+  costs a round trip. The core's own `mint-single-tx-recursive` needs no helper
+  and no trait argument, and is the route that works.
+
+The fee unit differs by two orders of magnitude between cores: 1,000 uSTX on
+v2-1-0, **100,000** on v3-2-3. `begin_fee = fee-unit` and
+`seal_fee = fee-unit * (1 + ceil(chunks / 50))`, so one chunk is 0.3 STX. Read
+it live from `get-fee-unit` on the core you are actually minting to.

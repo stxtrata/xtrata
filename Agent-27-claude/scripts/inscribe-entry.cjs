@@ -37,21 +37,34 @@ const { deriveAgent27SenderKey, getAgent27SignerSource } = require('./agent27-si
 // --- Config -----------------------------------------------------------------
 
 const CONTRACT_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
-const CONTRACT_NAME = 'xtrata-v2-1-0';
+// The LIVE core. v2-1-0 is superseded and is a migration target only, never a
+// mint target — the skill doc says so and a recursive mint proved it: Genesis
+// #107 exists on v3-2-3 and belongs to the v3 contract on v2-1-0, so the
+// dependency could not resolve and the transaction aborted with u101
+// ERR-NOT-FOUND, burning its miner fee. Overridable, but the default is now the
+// one that works.
+const CONTRACT_NAME = process.env.XTRATA_CONTRACT_NAME || 'xtrata-v3-2-3';
 const HELPER_CONTRACT_ADDRESS = process.env.XTRATA_HELPER_CONTRACT_ADDRESS || CONTRACT_ADDRESS;
 const HELPER_CONTRACT_NAME = process.env.XTRATA_HELPER_CONTRACT_NAME || 'xtrata-small-mint-v1-0';
 const REPO_ROOT = path.resolve(__dirname, '..');
 const GENESIS_TOKEN = 107;
 const ENTRY_NUM = parseInt(process.env.ENTRY_NUM || '2', 10);
-const TOKEN_URI = `data:text/html,agent-27-entry-${ENTRY_NUM}`;
-const MIME_TYPE = 'text/html';
+// Overridable so this script can inscribe something that is not an HTML entry,
+// without a second copy of the upload flow existing to drift away from this one.
+// Defaults are exactly what they always were, so every existing use is untouched.
+const TOKEN_URI = process.env.TOKEN_URI || `data:text/html,agent-27-entry-${ENTRY_NUM}`;
+const MIME_TYPE = process.env.MIME_TYPE || 'text/html';
 const CHUNK_SIZE = 16_384;
 const MAX_BATCH_SIZE = 50;
 const MAX_SMALL_MINT_CHUNKS = 30;
 const POLL_INTERVAL = 10_000;
 const MAX_POLLS = 60;
 const USE_SMALL_MINT_HELPER = envFlag('XTRATA_USE_SMALL_MINT_HELPER', true);
-const STX_FEE = 250_000n; // 0.25 STX safety cap
+// The miner fee. Overridable, because 250,000 is roughly eighty times the
+// median confirmed contract-call fee and is a lot to pay by default for a
+// one-chunk inscription. The default is unchanged so nothing that relied on it
+// moves; set XTRATA_TX_FEE to spend less deliberately.
+const STX_FEE = BigInt(process.env.XTRATA_TX_FEE || 250_000);
 
 function resolveHtmlFile() {
   if (process.env.HTML_FILE) {
