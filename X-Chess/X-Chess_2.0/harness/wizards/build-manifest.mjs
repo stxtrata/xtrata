@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+// Build the manifest a tournament is played from.
+//
+//   node harness/wizards/build-manifest.mjs --name "Exhibition Two" --format round-robin
+//   node harness/wizards/build-manifest.mjs --name "…" --out /tmp/two.json
+//
+// THE ORDER MATTERS AND IS FORCED BY THE FORMAT. A manifest names its games by
+// id, and ids do not exist until games are opened. So a committed tournament
+// goes: open the games, build this, inscribe it, then play. Opening settles no
+// result, and `provenance` compares the manifest against the first MOVE, which
+// is why that sequence reads as committed rather than compiled.
+//
+// IT REFUSES TO WRITE A MANIFEST THE BOARD WOULD REJECT. Every pairing is
+// checked against the rules hash its game actually committed to, using the same
+// `checkGames` the Tournaments tab uses — not a second implementation of the
+// same idea. A manifest that would show as `unverified` on the board is a
+// manifest nobody should inscribe, and finding that out costs 0.3 STX if this
+// script does not find it first.
+//
+// Games are located BY RULES HASH rather than by id order. Three games open
+// concurrently and whichever transaction lands first takes the lower id, so
+// position in a list says nothing about who is playing.
+
+import { writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Cl } from '@stacks/transactions';
+
+import { ALLOWED_CONTRACT, WizardSafetyError, addressEnvName, keyEnvName } from './wizards-core.mjs';
+import { PERSONALITIES } from './personalities.mjs';
+import { doubleRoundRobin, findByRulesHash, roundRobin } from './tournament.mjs';
+import { readOnly, wizardRules } from './play.mjs';
+import { readFileSync } from 'node:fs';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
+
+const arg = (name, fallback = null) => {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
+};
+
+/** The inscribed engine every player is handed. See TOURNAMENT.md. */
+const ENGINE = Number(arg('engine', '2991'));
+
+/**
+ * Stop after this many rounds.
+ *
+ * A format says how many rounds a tournament WOULD have; a tournament may be
+ * shorter on purpose, and Exhibition One is — twenty-one games of a
+ * thirty-game double round robin, stopped at round seven. Without this the
+ * builder can only describe a format run to completion.
+ */
+const MAX_ROUNDS = arg('rounds') ? Number(arg('rounds')) : null;
+
+function env() {
+  const found = {};
+  try {
+    for (const line of readFileSync(join(HERE, '.env.wizards'), 'utf8').split('\n')) {
+      const at = line.indexOf('=');
+      if (at > 0 && !line.trim().startsWith('#')) {
+        found[line.slice(0, at).trim()] = line.slice(at + 1).trim().replace(/^["']|["']$/g, '');
+      }
+    }
+  } catch {
+    // No file. A dry build still shows the shape.
+  }
+  return found;
+}
+
+/** The protocol's own parser and checker, bundled rather than reimplemented. */
+async function loadProtocolTypes() {
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'protocol', 'tournament.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+}
+
+/** Every game on the contract, with the hash that says who is playing. */
+async function readGames() {
+  const count = Number((await readOnly('get-game-count')).value);
+  const games = [];
+  for (let id = 1; id <= count; id++) {
+    try {
+      const row = (await readOnly('get-game', [Cl.serialize(Cl.uint(id))])).value.value;
+      games.push({ id, rulesHash: row['rules-hash']?.value?.value ?? null });
+    } catch {
+      // A row that will not read is one we cannot claim, which is the safe way
+      // round: worst case a pairing is reported missing rather than mismatched.
+    }
+    await new Promise((done) => setTimeout(done, 250));
+  }
+  return games;
+}
+
+async function main() {
+  const name = arg('name');
+  if (!name) throw new WizardSafetyError('--name is required: a tournament has to be called something');
+  const format = arg('format', 'round-robin');
+  const vars = env();
+
+  const entrants = PERSONALITIES.map((character) => ({
+    name: character.name,
+    address: vars[addressEnvName(character.id)] ?? null
+  }));
+  const missing = entrants.filter((e) => !e.address);
+  if (missing.length) {
+    throw new WizardSafetyError(
+      `no address for ${missing.map((e) => e.name).join(', ')}. A manifest names wallets, ` +
+        'so every entrant needs one before it can be written.'
+    );
+  }
+
+  const byName = new Map(entrants.map((e) => [e.name, e.address]));
+  const ids = PERSONALITIES.map((c) => c.id);
+  const all = format === 'double-round-robin' ? doubleRoundRobin(ids) : roundRobin(ids);
+  const rounds = MAX_ROUNDS ? all.slice(0, MAX_ROUNDS) : all;
+  const nameOf = Object.fromEntries(PERSONALITIES.map((c) => [c.id, c.name]));
+
+  console.log(`\nbuilding "${name}" — ${format}, ${entrants.length} entrants`);
+  console.log('reading every game on the contract to match pairings by rules hash…\n');
+  const onChain = await readGames();
+
+  const games = [];
+  const unopened = [];
+  for (const round of rounds) {
+    for (const pairing of round.pairings) {
+      const white = nameOf[pairing.white];
+      const black = nameOf[pairing.black];
+      const { hash } = await wizardRules(byName.get(white), byName.get(black));
+      const found = findByRulesHash(hash, onChain);
+      if (!found) {
+        unopened.push(`round ${round.number}: ${white} v ${black}`);
+        continue;
+      }
+      games.push({ id: found.id, white, black, round: round.number });
+    }
+  }
+
+  if (unopened.length) {
+    // NOT A WARNING. A manifest naming a game that does not exist is refused by
+    // the runner and shows as `missing` on the board, so writing one would be
+    // producing a document whose only purpose is to be rejected.
+    throw new WizardSafetyError(
+      `${unopened.length} pairing(s) have no game on chain yet:\n  ${unopened.join('\n  ')}\n` +
+        'Open the games first — a manifest names them by id, and ids do not exist until then.'
+    );
+  }
+
+  const manifest = {
+    name,
+    format,
+    contract: ALLOWED_CONTRACT,
+    engine: ENGINE,
+    entrants,
+    games: games.sort((a, b) => a.round - b.round || a.id - b.id)
+  };
+  const text = `X-CHESS-TOURNAMENT/1\n${JSON.stringify(manifest, null, 2)}\n`;
+
+  // VERIFIED BEFORE IT IS WRITTEN, with the board's own code. A manifest that
+  // would read as unverified is one nobody should pay to inscribe.
+  const { parseTournament, checkGames } = await loadProtocolTypes();
+  const parsed = parseTournament(text);
+  if (!parsed.ok) {
+    throw new WizardSafetyError(
+      `this builder produced something the parser refuses: ${parsed.problems
+        .map((p) => `${p.where} ${p.says}`)
+        .join('; ')}`
+    );
+  }
+
+  const facts = new Map(
+    onChain.filter((g) => games.some((x) => x.id === g.id)).map((g) => [g.id, { rulesHash: g.rulesHash, result: null }])
+  );
+  const checked = checkGames(parsed.tournament, facts);
+  const bad = checked.filter((g) => g.verdict !== 'verified');
+  if (bad.length) {
+    throw new WizardSafetyError(
+      `${bad.length} pairing(s) do not match the chain:\n  ` +
+        bad.map((g) => `game ${g.id} ${g.white} v ${g.black}: ${g.says}`).join('\n  ')
+    );
+  }
+
+  const out = arg('out', join(HERE, `manifest-${format}.json`));
+  writeFileSync(out, text);
+  console.log(`${games.length} games across ${rounds.length} rounds, all ${checked.length} verified against chain`);
+  console.log(`${Buffer.byteLength(text, 'utf8')} bytes, ${Math.ceil(Buffer.byteLength(text, 'utf8') / 16384)} chunk`);
+  console.log(`written to ${out}`);
+  console.log('\nInscribe it, then play with:');
+  console.log('  node harness/wizards/run-tournament.mjs --manifest <inscription id> --live');
+}
+
+main().catch((error) => {
+  console.error(`\n${error.message}\n`);
+  process.exit(1);
+});
