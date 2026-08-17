@@ -6,7 +6,7 @@
 
 import { renderBoard, destinationsFrom, promotionChoices, pieceGlyph, pieceName } from './board.js';
 import type { PendingMove } from './board.js';
-import { buildPlayer, parsePlayer } from '../protocol/player.js';
+import { buildPlayer, displayName, nameSourceNote, parsePlayer } from '../protocol/player.js';
 import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
 import { XtrataReader } from '../chain/xtrata.js';
@@ -559,6 +559,8 @@ export class ChessApp {
   private players: PlayerNames | null = null;
   /** game id -> the manifest that names it. Built from tournaments loaded. */
   private readonly inTournament = new Map<number, { id: number; name: string }>();
+  /** address -> the name a loaded tournament gave it. The weakest source. */
+  private readonly entrantNames = new Map<string, string>();
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
@@ -2045,11 +2047,31 @@ export class ChessApp {
    */
   private who(address: string | null): string {
     if (!address) return 'unknown';
-    // ORDERED BY WHAT STANDS BEHIND IT, not by convention. A BNS name is owned
-    // on chain. A player manifest is a signature from the key being named. A
-    // tournament name is an organiser's word, and is applied by the tournament
-    // view rather than here, because it is only true inside that tournament.
-    return this.names?.peek(address) ?? this.players?.peek(address) ?? shortPrincipal(address);
+    return this.nameOf(address).name;
+  }
+
+  /**
+   * The strongest name available for an address, and where it came from.
+   *
+   * ORDERED BY WHAT STANDS BEHIND IT. A BNS name is owned on chain. A player
+   * manifest is a signature from the key being named. A tournament name is an
+   * organiser's word.
+   *
+   * The tournament rung was left out at first, on the reasoning that such a
+   * name is only true inside its tournament — which is right in principle and
+   * unhelpful in practice. Following a link from the Tournaments tab to game 13
+   * showed two truncated addresses for players the board had just finished
+   * calling Mason and Wager. If the board knows a name, withholding it is not
+   * caution, it is a worse answer; the honest part is saying where it came from,
+   * which `nameSourceNote` does in the tooltip.
+   */
+  private nameOf(address: string): { name: string; source: ReturnType<typeof displayName>['source'] } {
+    return displayName({
+      address,
+      bns: this.names?.peek(address) ?? null,
+      player: this.players?.peek(address) ?? null,
+      tournament: this.entrantNames.get(address) ?? null
+    });
   }
 
   /**
@@ -2064,8 +2086,11 @@ export class ChessApp {
     node.className = className;
     node.textContent = this.who(address);
     if (address) {
-      const name = this.names?.peek(address);
-      const full = name ? `${name} - ${address}` : address;
+      const shown = this.nameOf(address);
+      const full =
+        shown.source === 'address'
+          ? address
+          : `${shown.name} - ${address} (${nameSourceNote(shown.source)})`;
       node.title = full;
       node.setAttribute('aria-label', full);
       node.dataset.principal = address;
@@ -2266,6 +2291,13 @@ export class ChessApp {
               // column, which says nothing rather than "not in a tournament".
               for (const game of view.tournament?.games ?? []) {
                 this.inTournament.set(game.id, { id, name: view.tournament!.name });
+              }
+              // So a game reached from here can name its players. Two
+              // tournaments could name one address differently; the most
+              // recently loaded wins, and the tooltip says the name is an
+              // organiser's rather than the address's own.
+              for (const entrant of view.tournament?.entrants ?? []) {
+                this.entrantNames.set(entrant.address, entrant.name);
               }
               this.tournament = await scoreTournament(view, deps);
       this.drawTournament();
