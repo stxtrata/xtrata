@@ -111,53 +111,75 @@ rule invites a yes.
 disbursement while explicitly keeping the two documented milestones intact. That asks
 for nothing any document forbids.
 
-### Primary ask
+### Primary ask (revised 12 August, three milestones)
 
-**Split the $4,000 into $2,000 on Milestone 1 and $2,000 on Milestone 2, and move
-Milestone 1 from week 8 to week 6 by re-cutting it to contain only work Jim
-controls.**
+**Keep the cohort's two milestones exactly as they are, add an earlier tooling
+milestone in front of them, and price all three.**
 
-Resulting shape: $1,000 on blueprint approval (unchanged), $2,000 at week 6, $2,000
-at week 12. Same total, same two milestones, same twelve week outer window.
+| | Gate | Week | Amount | Cumulative |
+|---|---|---|---|---|
+| Blueprint approval | Blueprint approved | now | $1,000 | $1,000 |
+| Milestone 1 | Tooling proven and open sourced | 4 | $1,000 | $2,000 |
+| Milestone 2 | Delivery: service, registry, docs live | 8 | $1,500 | $3,500 |
+| Milestone 3 | Impact: deployer public, art saved | 12 | $1,500 | $5,000 |
 
-The re-cut is the part that makes the ask about delivery rather than about money.
-Milestone 1 currently mixes two kinds of work and puts the payment gate after both:
+**Why this shape rather than an even split or a back-loaded one.**
 
-| Currently in M1 | Who controls the date |
+- **Ascending, so risk stays with the grantee.** The smallest tranche sits on the
+  least publicly legible deliverable. The larger ones sit where a steward can click
+  something and see it.
+- **Thirty per cent stays contingent on the impact report.** That is the steward's
+  real protection. The classic grant failure is a grantee going quiet once the
+  meaningful money has landed, and a final tranche that is too small invites it.
+- **Round numbers.** An even three-way split is $1,333.33 and reads as unconsidered.
+  The difference is about $170 by week 8, which is not worth what it costs in tone.
+- **It is additive, not a restructure.** The two documented milestones survive
+  untouched. The tooling milestone goes in front of them and already exists in the
+  blueprint as the week 4 checkpoint, so nothing new is being invented.
+
+**Acceptable alternative if a softer ask is wanted:** $1,000 / $1,000 / $2,000 across
+the three milestones. More conservative, more likely to be waved through without
+discussion, and it costs $500 of mid-grant cash.
+
+**The precedent worth knowing before asking.** The pilot cohort paid 40 to 50 per cent
+**up front** on $5,000-size grants, before any delivery. Rising Tide Protocol took
+$2,000 before starting. $1,000 on blueprint approval is 20 per cent. This ask moves
+toward the programme's own historical practice, not away from it.
+
+### Optional refinement, worth doing on its own merits
+
+Milestone 2 as drafted mixes work Jim controls with work he does not, and puts the
+payment gate after both:
+
+| Currently in Milestone 2 | Who controls the date |
 |---|---|
-| Template, tests, harvester, Pepes replay proof, open repo | Jim |
 | Registry live with source-hash verification | Jim |
 | Six published documents | Jim |
 | At least two new collections deployed and finalised | founders |
 | LEO Cats and Miami Degens successors | the core cutover |
 
-Cut at that line. Everything Jim controls lands at end of week 6. The collections and
-the successors move to Milestone 2, where they belong anyway because they are
-evidence of use rather than evidence of build.
+Cut at that line. The collections and the successors move to Milestone 3, where they
+belong anyway because they are evidence of use rather than evidence of build.
 
-This is a better plan regardless of the money. A payment gate a stranger can delay by
-not replying is a badly designed payment gate, and that argument is one a steward can
+This is a better plan regardless of the money. A payment gate a founder can delay by
+not replying is a badly designed payment gate, and that is an argument a steward can
 agree with without granting a favour.
 
-Honest cost, worth knowing before proposing it: it thins the publicly visible
-artefacts in the delivery milestone. Mitigate by keeping the registry live and the
-Bitcoin Pepes byte-exact diff report in M1. Those are the two most reviewable things
-in the whole grant and both are entirely Jim's.
+Honest cost: it thins the publicly visible artefacts in the delivery milestone.
+Mitigate by keeping the live registry and the Bitcoin Pepes byte-exact diff report in
+Milestone 2. Those are the two most reviewable things in the whole grant and both are
+entirely Jim's.
+
+Raise this only if the pricing ask lands easily. Two requests in one message is fine.
+Three starts to look like renegotiation.
 
 ### Fallback, offered in the same message
 
-**Keep the milestone dates exactly as the blueprint has them (week 8 and week 12) and
-still split the $4,000 into $2,000 and $2,000.** This changes nothing except which
-row the money sits on, and gets $2,000 at week 8 instead of week 12.
+**If three milestones is a problem, keep the cohort's two exactly as documented and
+split the $4,000 into $2,000 at week 8 and $2,000 at week 12.** Nothing changes except
+which row the money sits on, and it still moves $2,000 forward by four weeks.
 
 Offering both in one message means one reply settles it.
-
-### A third option, only if the steward is receptive
-
-The week 4 checkpoint **already exists** in the blueprint, is already artefact-based,
-and is already scheduled as a Progress Update. Ask whether a tranche can attach to it.
-That is $1,000 at week 4 with zero schedule change and zero new promises. Do not lead
-with this. It implies four payments and needs more permission than the primary ask.
 
 ### Ask in the same breath, because they cost nothing
 
@@ -220,7 +242,7 @@ fallback (if the cutover slips past week 7, ship on the current core and let the
 successors follow) needs a week 7 to exist. Compression deletes it.
 
 **Better middle option, and it is the primary ask above:** keep the 12 week outer
-window, re-cut Milestone 1 to week 6, move the third-party-dependent items into
+window, price the week 4 tooling checkpoint as a milestone, move the third-party-dependent items into
 Milestone 2, and re-phase the tranches. That gets paid earlier without promising
 anything new.
 
@@ -238,27 +260,33 @@ Ready to send. 245 words.
 
 Hi mrwagmi,
 
-Blueprint is nearly ready. There is one thing I would rather agree now than
-restructure later.
+Blueprint is nearly ready. One thing I would rather agree now than restructure later.
 
 The panel shows $1,000 on blueprint approval and $4,000 after the final impact
-report. Could the $4,000 be split across the two milestones instead, $2,000 on each?
-Same two milestones the cohort requires, same total, same twelve week window. Only
-the tranche moves.
+report. Could the $4,000 be phased across the milestones instead?
 
-The reason is a change I want to make to milestone 1 anyway. As drafted it mixes work
-I control with work I do not, and the payment gate sits after both. So I have re-cut
-it to contain only what I can finish on my own: the contract template, the test
-suite, the harvester with a byte-exact replay proof against Bitcoin Pepes, the open
-repository, the live registry and the six published documents. That lands at week 6
-rather than week 8. The new collections and the successor contracts move to milestone
-2, where they fit better anyway because they are evidence of use rather than evidence
-of build. A milestone a founder can hold up by not replying is a poor gate for both
-of us.
+What I would propose, keeping the cohort's two milestones exactly as they are and
+putting one earlier checkpoint in front of them:
 
-If re-cutting is awkward, I am happy to leave the dates at week 8 and week 12 and
-just split the money. Either version works and I will deliver on the current
-structure if neither does.
+- $1,000 on blueprint approval
+- $1,000 at week 4, tooling proven and open sourced
+- $1,500 at week 8, delivery: service, registry and documentation live
+- $1,500 at week 12, impact
+
+Same total, same twelve week window, same two milestones you already have. The week 4
+one is already in my blueprint as a checkpoint, so it is not new work, just a gate
+with something attached to it.
+
+The reason for putting a milestone there is that the riskiest engineering in the whole
+grant happens first. It is a harvester that has to read artwork out of collections
+that all store it differently, and I am proving it by reproducing Bitcoin Pepes'
+existing on-chain hashes byte for byte across all 2,089 tokens. That either passes or
+it does not, so it is about as checkable as a milestone gets, and I would rather it
+were visible early than buried in a progress note.
+
+If three is awkward, I am happy to keep the two milestones and split the money
+$2,000 and $2,000. Either works, and I will deliver on the current structure if
+neither does.
 
 Two quick ones while we are here. Is my KYC cleared, and what asset is the $5,000
 paid in?
