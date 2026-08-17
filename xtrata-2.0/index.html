@@ -102,7 +102,10 @@
       <a href="/drops" data-nav="drops" target="_self">Free drops</a>
       <a href="/market" data-nav="market" target="_self">Buy &amp; sell</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
-      <a href="/#build" data-nav="build" target="_self">Developers</a>
+      <!-- #docs, not #build. Both sit in the same section, but #docs is the
+           .anchor-target span offset -116px so the heading clears the 107px
+           sticky header. Landing on #build tucks the title under it. -->
+      <a href="/#docs" data-nav="build" target="_self">Developers</a>
       <div class="radio-slot" id="radioSlot" aria-label="Xtrata FM radio"></div>
     </nav>
     </div>
