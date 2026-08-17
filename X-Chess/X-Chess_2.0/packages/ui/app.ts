@@ -8,6 +8,7 @@ import { renderBoard, destinationsFrom, promotionChoices, pieceGlyph, pieceName 
 import type { PendingMove } from './board.js';
 import { buildPlayer, parsePlayer } from '../protocol/player.js';
 import { Names } from '../chain/bns.js';
+import { PlayerNames } from '../chain/players.js';
 import { XtrataReader } from '../chain/xtrata.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import type { TournamentView } from './tournaments.js';
@@ -555,6 +556,9 @@ export class ChessApp {
   private readonly resolvedNames = new Map<string, string | null>();
   private tournament: TournamentView | null = null;
   private xtrata: XtrataReader | null = null;
+  private players: PlayerNames | null = null;
+  /** game id -> the manifest that names it. Built from tournaments loaded. */
+  private readonly inTournament = new Map<number, { id: number; name: string }>();
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
@@ -591,6 +595,7 @@ export class ChessApp {
         endpoint: endpoint as never,
         network: (options.build?.network as 'mainnet' | 'testnet') ?? 'mainnet'
       });
+      this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata });
     }
     this.wire();
     this.start();
@@ -2040,7 +2045,11 @@ export class ChessApp {
    */
   private who(address: string | null): string {
     if (!address) return 'unknown';
-    return this.names?.peek(address) ?? shortPrincipal(address);
+    // ORDERED BY WHAT STANDS BEHIND IT, not by convention. A BNS name is owned
+    // on chain. A player manifest is a signature from the key being named. A
+    // tournament name is an organiser's word, and is applied by the tournament
+    // view rather than here, because it is only true inside that tournament.
+    return this.names?.peek(address) ?? this.players?.peek(address) ?? shortPrincipal(address);
   }
 
   /**
@@ -2252,7 +2261,13 @@ export class ChessApp {
       // full paint already reads as people rather than principals.
       await this.names?.resolveAll(view.tournament?.entrants.map((e) => e.address) ?? []);
       this.notice('tournamentNote', 'info', 'Replaying every game to score it. This is the slow part.');
-      this.tournament = await scoreTournament(view, deps);
+      // Remembered so Explore can say a game belongs to something. The board
+              // can only ever know about tournaments it has loaded — see the
+              // column, which says nothing rather than "not in a tournament".
+              for (const game of view.tournament?.games ?? []) {
+                this.inTournament.set(game.id, { id, name: view.tournament!.name });
+              }
+              this.tournament = await scoreTournament(view, deps);
       this.drawTournament();
       return true;
     });
@@ -3753,6 +3768,28 @@ export class ChessApp {
         rules.appendChild(text(' \u00b7 rules unconfirmed', 'muted'));
       }
       cell(rules);
+
+      // EVENT. The board can only know about tournaments it has loaded, so this
+      // either says something or says nothing — it never says "not in a
+      // tournament", because no manifest naming a game is not evidence that
+      // none exists. The index points one way only: a manifest names its games,
+      // a game names no manifest, and nothing on chain closes that loop.
+      const event = this.inTournament.get(row.id);
+      if (event) {
+        const open = this.doc.createElement('button');
+        open.type = 'button';
+        open.className = 'tn-open';
+        open.textContent = event.name;
+        open.setAttribute('aria-label', `${event.name} — open this tournament`);
+        open.addEventListener('click', () => {
+          (this.el.tournamentId as HTMLInputElement).value = String(event.id);
+          this.show('tournaments');
+          void this.loadTournamentTab();
+        });
+        cell(open);
+      } else {
+        cell(text('', 'muted'));
+      }
 
       cell(text(String(row.entries)));
 

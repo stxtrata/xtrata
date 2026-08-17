@@ -795,7 +795,7 @@ export const HTML = `
       <span id="explore-found" class="muted small" role="status"></span>
     </div>
     <table><thead><tr>
-      <th>#</th><th>Players</th><th>Rules</th><th>Moves</th><th>State</th><th></th>
+      <th>#</th><th>Players</th><th>Rules</th><th>Event</th><th>Moves</th><th>State</th><th></th>
     </tr></thead><tbody id="explore-rows"></tbody></table>
   </section>
 
