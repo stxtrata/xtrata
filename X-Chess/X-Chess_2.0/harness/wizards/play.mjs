@@ -576,9 +576,28 @@ export async function sendClimbing({
       spentAfter = sent.spentAfterUstx;
     } catch (error) {
       if (rung === 0) throw error;
-      // Could not replace. Almost always because the rung below is already in a
-      // block, which is the good ending.
-      console.log(`  ${label}could not replace (${String(error?.message ?? error).slice(0, 60)})`);
+
+      // COULD NOT REPLACE MEANS A LOWER RUNG WON, and that is the good ending —
+      // but only if we then stop waiting on the transaction it beat.
+      //
+      // `BadNonce` says the nonce is already spent, which on a shared-nonce
+      // ladder means one of the rungs below is in a block. The one we are
+      // holding a receipt for is not it: it was superseded and will never
+      // confirm. Falling through to the unbounded settle below therefore waits
+      // for something that cannot happen.
+      //
+      // Round 4 did exactly that. All three games climbed 400 -> 1200 -> 3000,
+      // the 3000 was refused for BadNonce, and the runner sat on the 1200 for
+      // half an hour while the 400 had ALREADY LANDED and the moves were on
+      // chain: d4c5, g7g5 and a4c3, all present in the log it was ignoring.
+      // Every one of those txids returned 404 because it never existed.
+      const why = String(error?.message ?? error);
+      console.log(`  ${label}could not replace (${why.slice(0, 60)})`);
+      if (/BadNonce/i.test(why)) {
+        // Say so rather than guess which rung it was. The log is the record,
+        // and the caller re-reads it — that is the whole resume design.
+        return { ...sent, spentAfterUstx: spentAfter, status: 'superseded', nonce };
+      }
       break;
     }
 

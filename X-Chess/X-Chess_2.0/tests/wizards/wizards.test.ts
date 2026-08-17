@@ -835,3 +835,36 @@ describe('what round 3 taught the fee ladder', () => {
     }
   });
 });
+
+describe('when a lower rung of the ladder wins the race', () => {
+  const play = read('harness/wizards/play.mjs');
+  const runner = read('harness/wizards/run-tournament.mjs');
+
+  it('stops waiting on the transaction that was beaten', () => {
+    // ROUND 4 SAT FOR HALF AN HOUR ON THIS. All three games climbed
+    // 400 -> 1200 -> 3000, the 3000 was refused for BadNonce, and the runner
+    // then waited on the 1200 — which had been superseded and could never
+    // confirm. Every one of those txids returned 404. Meanwhile the 400 had
+    // landed and the moves were on chain the whole time: d4c5, g7g5, a4c3.
+    expect(play).toMatch(/BadNonce/i);
+    expect(play).toMatch(/status: 'superseded'/);
+  });
+
+  it('returns before the unbounded wait, not after it', () => {
+    // The bug was entirely one of ORDER: the code already knew the replacement
+    // had failed, then fell through to `settle` with no deadline.
+    const ladder = play.slice(play.indexOf('for (const [rung, fee] of FEE_LADDER.entries())'));
+    const returns = ladder.indexOf("status: 'superseded'");
+    const unbounded = ladder.indexOf('const status = await settle(sent.txid);');
+    expect(returns).toBeGreaterThan(-1);
+    expect(returns, 'it must return before reaching the unbounded settle').toBeLessThan(unbounded);
+  });
+
+  it('sends the caller back to the log, which is the record', () => {
+    // Not an error: the move is very probably already on chain under a rung we
+    // are not holding a receipt for. Re-reading is the whole resume design, and
+    // the growth guard still refuses to play the same move twice.
+    expect(runner).toMatch(/status === 'dropped_replace_by_fee' \|\| status === 'superseded'/);
+    expect(runner).toMatch(/the log did not grow after a submission/);
+  });
+});

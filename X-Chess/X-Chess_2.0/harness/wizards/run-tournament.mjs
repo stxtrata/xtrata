@@ -350,8 +350,8 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
     // again and READ. The log is the record. If the move landed, the next pass
     // sees it and plays on; if it did not, the growth guard at the top refuses
     // to play the same move twice and stops us loudly.
-    if (status === 'dropped_replace_by_fee') {
-      console.log(`  game ${gameId}: ${chosen.move} was replaced by its own higher rung — re-reading`);
+    if (status === 'dropped_replace_by_fee' || status === 'superseded') {
+      console.log(`  game ${gameId}: ${chosen.move} was settled by a different rung — re-reading`);
       // Give the replacement time to be mined and INDEXED before looking. Going
       // straight round would read a log that has not grown yet and trip the
       // growth guard, turning a working fee ladder into a stopped tournament —
