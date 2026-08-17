@@ -216,6 +216,30 @@ const EXPLORE_ENTRY_LIMIT = 200;
  * than filtering what is on screen - and why the count line says the window is
  * there rather than letting it look like the whole contract.
  */
+/**
+ * The last block for which this board honours a manifest written after the fact.
+ *
+ * THIS BOARD'S POLICY, not a rule of the format. A manifest compiled after its
+ * games is the only way to describe a tournament played before manifests
+ * existed — games 13 to 30 among them — and refusing those would make eighteen
+ * real games permanently unreadable. Accepting them forever would be worse: an
+ * organiser could skip the manifest, play, and write one afterwards, which is
+ * the whole thing the rule prevents.
+ *
+ * So the fallback has an end date. 8,787,816 is the chain tip on the day the
+ * rule was written: everything already played is covered, and nothing opened
+ * from that block on can be described retrospectively. "It can never happen
+ * again" becomes a property of this reader rather than a promise about anyone.
+ *
+ * Another board is entitled to choose a different number, which is exactly why
+ * this is here and not in `packages/protocol/tournament.ts`.
+ *
+ * Exported because the Tournaments view is not built yet and this is the number
+ * it will hand to `honours()`. A policy with no consumer is still a policy, and
+ * a test asserts it rather than letting it drift unnoticed until the tab lands.
+ */
+export const COMPILED_ACCEPTED_BEFORE = 8_787_816;
+
 const EXPLORE_WINDOW = 25;
 
 /**

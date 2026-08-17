@@ -339,3 +339,82 @@ export function revisedInTime(
   // not clearly earlier, and the tie should not favour the organiser.
   return revisionHeight < firstMoveHeight;
 }
+
+/**
+ * Whether a manifest committed to its games or described them afterwards.
+ *
+ * TWO DIFFERENT OBJECTS WEARING ONE FORMAT. A manifest inscribed before any of
+ * its games were opened is a commitment: the organiser named the pairings and
+ * then had to play them. One inscribed afterwards is a claim about games that
+ * already exist, and anybody can make it about any games — including games
+ * somebody else's manifest also claims.
+ *
+ * Both are useful and only one is binding, so a reader has to be told which it
+ * is holding rather than left to work it out.
+ *
+ * DERIVED, NEVER DECLARED. A `"retrospective": true` field could lie; block
+ * ordering cannot. The manifest is not consulted about its own provenance.
+ *
+ * Heights come from the caller because they come from the Stacks API rather
+ * than from Xtrata, the same arrangement `revisedInTime` uses. Null in, null
+ * out, and null means "not checked" — never "fine".
+ */
+export type Provenance = 'committed' | 'compiled';
+
+export function provenance(
+  manifestHeight: number | null,
+  firstGameHeight: number | null
+): Provenance | null {
+  if (manifestHeight === null || firstGameHeight === null) return null;
+  // Strictly before, and the tie goes against the organiser: a manifest landing
+  // in the same block as the first game it names did not demonstrably precede
+  // it, and "probably committed" is not a thing worth telling a reader.
+  return manifestHeight < firstGameHeight ? 'committed' : 'compiled';
+}
+
+/** What to show a reader, in words rather than a term of art. */
+export function provenanceNote(kind: Provenance | null): string {
+  if (kind === 'committed') {
+    return 'Committed before play: this manifest was inscribed before its first game was opened.';
+  }
+  if (kind === 'compiled') {
+    return 'Compiled after play: this manifest describes games that already existed when it was written.';
+  }
+  return 'Provenance not checked: the block heights needed to tell were not available.';
+}
+
+/**
+ * Whether a reader should honour this manifest at all.
+ *
+ * A COMPILED MANIFEST IS A FALLBACK WITH AN END DATE. Tournaments played before
+ * the rule existed have no prospective manifest and never can, so they need one
+ * written afterwards or they are unreadable forever. Accepting that indefinitely
+ * would be worse: it would let a future organiser skip the manifest entirely and
+ * write one later, which is the exact thing the rule exists to prevent.
+ *
+ * So a compiled manifest is honoured only for games opened before a cutoff. That
+ * makes "it can never happen again" a property of the reader rather than a
+ * promise about anybody's behaviour.
+ *
+ * The cutoff is the CALLER'S, passed in rather than defined here: it is one
+ * board's policy about what it will render, and another reader is entitled to
+ * choose differently. Writing it into the format would claim a consensus that
+ * does not exist.
+ */
+export function honours(
+  kind: Provenance | null,
+  firstGameHeight: number | null,
+  compiledAcceptedBefore: number
+): { ok: boolean; says: string } {
+  if (kind === 'committed') return { ok: true, says: provenanceNote(kind) };
+  if (kind === null) return { ok: true, says: provenanceNote(kind) };
+  if (firstGameHeight !== null && firstGameHeight < compiledAcceptedBefore) {
+    return { ok: true, says: `${provenanceNote(kind)} Accepted because its games predate the manifest rule.` };
+  }
+  return {
+    ok: false,
+    says:
+      `${provenanceNote(kind)} Refused: games opened at or after block ` +
+      `${compiledAcceptedBefore.toLocaleString()} must be named by a manifest inscribed before play.`
+  };
+}

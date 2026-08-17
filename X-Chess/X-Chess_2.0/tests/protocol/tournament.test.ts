@@ -12,9 +12,19 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  MAX_REVISIONS, TOURNAMENT_HEADER, addressOf, parseTournament,
-  resolveTournament, revisedInTime, rounds, standings
+  MAX_REVISIONS,
+  TOURNAMENT_HEADER,
+  addressOf,
+  honours,
+  parseTournament,
+  provenance,
+  provenanceNote,
+  resolveTournament,
+  revisedInTime,
+  rounds,
+  standings
 } from '../../packages/protocol/tournament.js';
+import { COMPILED_ACCEPTED_BEFORE } from '../../packages/ui/app.js';
 
 const good = {
   name: 'Exhibition One',
@@ -209,5 +219,87 @@ describe('whether a revision was made in time', () => {
     // Stacks API, and a caller that cannot get them must not be told it is fine.
     expect(revisedInTime(null, 120)).toBeNull();
     expect(revisedInTime(100, null)).toBeNull();
+  });
+});
+
+describe('which kind of manifest a reader is holding', () => {
+  // TWO DIFFERENT OBJECTS WEARING ONE FORMAT. Inscribed before its games, a
+  // manifest is a commitment — the organiser named the pairings and then had to
+  // play them. Inscribed after, it is a claim about games that already exist,
+  // and anybody can make it about any games, including games another manifest
+  // also claims. Only one of those is binding, so a reader must be told which.
+
+  it('calls it committed when the manifest came first', () => {
+    expect(provenance(100, 200)).toBe('committed');
+  });
+
+  it('calls it compiled when the games came first', () => {
+    expect(provenance(200, 100)).toBe('compiled');
+  });
+
+  it('gives the tie against the organiser', () => {
+    // Same block is not demonstrably earlier, and "probably committed" is not
+    // worth telling anybody.
+    expect(provenance(150, 150)).toBe('compiled');
+  });
+
+  it('says not checked rather than fine when a height is missing', () => {
+    expect(provenance(null, 200)).toBeNull();
+    expect(provenance(100, null)).toBeNull();
+    expect(provenanceNote(null)).toContain('not checked');
+  });
+
+  it('never asks the manifest about its own provenance', () => {
+    // A `retrospective: true` field could lie; block ordering cannot. Asserted
+    // by signature: the derivation takes two numbers and no document.
+    expect(provenance.length).toBe(2);
+  });
+
+  it('says which it is in words, not a term of art', () => {
+    expect(provenanceNote('committed')).toContain('before its first game');
+    expect(provenanceNote('compiled')).toContain('already existed');
+  });
+});
+
+describe('the compiled fallback has an end date', () => {
+  const CUTOFF = 8_787_816;
+
+  it('honours a committed manifest whenever it was made', () => {
+    expect(honours('committed', CUTOFF + 50_000, CUTOFF).ok).toBe(true);
+  });
+
+  it('honours a compiled manifest for games that predate the rule', () => {
+    // Games 13 to 30 were played before manifests existed and can only ever be
+    // described afterwards. Refusing them would make eighteen real games
+    // permanently unreadable.
+    const verdict = honours('compiled', CUTOFF - 1, CUTOFF);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.says).toContain('predate the manifest rule');
+  });
+
+  it('REFUSES a compiled manifest for games played after it', () => {
+    // Otherwise an organiser skips the manifest, plays, and writes one
+    // afterwards — the exact thing the rule exists to prevent. The end date is
+    // what makes "it can never happen again" a property of the reader rather
+    // than a promise about behaviour.
+    const verdict = honours('compiled', CUTOFF, CUTOFF);
+    expect(verdict.ok).toBe(false);
+    expect(verdict.says).toContain('must be named by a manifest inscribed before play');
+  });
+
+  it('does not refuse when provenance could not be established', () => {
+    // Unknown is not guilty. A reader that cannot reach the heights should say
+    // so and carry on, not withhold a tournament on a failed lookup.
+    expect(honours(null, null, CUTOFF).ok).toBe(true);
+  });
+
+  it('takes the cutoff from the caller, so it is one board’s policy', () => {
+    // Writing it into the format would claim a consensus that does not exist.
+    expect(honours('compiled', 500, 1_000).ok).toBe(true);
+    expect(honours('compiled', 500, 100).ok).toBe(false);
+  });
+
+  it('is the number the board actually holds', () => {
+    expect(COMPILED_ACCEPTED_BEFORE).toBe(CUTOFF);
   });
 });

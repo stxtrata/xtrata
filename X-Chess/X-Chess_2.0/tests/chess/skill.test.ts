@@ -12,7 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  CHUNK_BYTES, INSCRIBED_SHA256, INSCRIPTION, SKILL_FILE, buildSkill, sha256
+  BUILDER_FILE, BUILDER_INSCRIPTION, CHUNK_BYTES, INSCRIBED_SHA256, INSCRIPTION,
+  SKILL_FILE, TOURNAMENT_INSCRIPTION, buildBuilder, buildSkill, sha256
 } from '../../harness/skill/build-skill.mjs';
 
 describe('the inscription-ready build', () => {
@@ -114,5 +115,30 @@ describe('running code from a chain', () => {
 
   it('pins the hash that is actually on chain', () => {
     expect(skill).toContain(INSCRIBED_SHA256);
+  });
+});
+
+describe('what is on chain, and what it descends from', () => {
+  it('pins the builder that derived the manifest', async () => {
+    // Inscribing the builder rather than only its output is what makes the
+    // manifest reproducible: fetch 2992, run it against the same public chain
+    // with the same public addresses, get the same 2,817 bytes.
+    expect(BUILDER_INSCRIPTION.id).toBe(2992);
+    expect(sha256(await buildBuilder())).toBe(BUILDER_INSCRIPTION.sha256);
+  });
+
+  it('names 2993 as the tournament, owned by the Director', () => {
+    // The organiser owns the tournament — a different wallet from the one that
+    // created the engine, and the only one that can ever revise this manifest.
+    expect(TOURNAMENT_INSCRIPTION.id).toBe(2993);
+    expect(TOURNAMENT_INSCRIPTION.creator).toBe('SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S');
+  });
+
+  it('keeps the builder artefact identical to its source', async () => {
+    const built = await buildBuilder();
+    expect(
+      Buffer.compare(readFileSync(BUILDER_FILE), built),
+      'harness/skill/manifest-builder.js is stale — rebuild and commit'
+    ).toBe(0);
   });
 });

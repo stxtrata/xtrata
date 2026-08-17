@@ -62,6 +62,35 @@ export const INSCRIPTION = Object.freeze({
   url: 'https://xtrata.xyz/x/2991'
 });
 
+/**
+ * The manifest builder, and what it derived.
+ *
+ * 2993 IS THE TOURNAMENT ID. It is the root — nothing supersedes it — and under
+ * the revision rule it is also final, because every game it names had already
+ * started before it was inscribed. A tournament whose results exist cannot have
+ * its field rewritten, which is the property the rule is for.
+ *
+ * The chain of provenance is the point of inscribing the builder rather than
+ * only its output: 2993 declares 2992, so anybody can fetch the code, run it
+ * against the same public chain with the same public addresses, and get the
+ * same 2,817 bytes. The manifest is reproducible rather than asserted.
+ *
+ * Owned by the DIRECTOR, not by the wallet that created the engine. The
+ * organiser owns the tournament, and only that wallet can ever revise it.
+ */
+export const BUILDER_INSCRIPTION = Object.freeze({
+  id: 2992,
+  sha256: '7c859df81e21c253cbbd78d8be99d292188af3cb0f6c39d57da24fd7c991b850',
+  url: 'https://xtrata.xyz/x/2992'
+});
+
+export const TOURNAMENT_INSCRIPTION = Object.freeze({
+  id: 2993,
+  sha256: '0041a84a8f46c6c6e31d972ffe1cfd7eb0d3014f89a6da6f9a1d3cdff2f7aa7a',
+  creator: 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S',
+  url: 'https://xtrata.xyz/x/2993'
+});
+
 /** The exact bytes to inscribe for the manifest builder. */
 export async function buildBuilder() {
   return bundleFor('protocol', 'manifest-builder.ts', BUILDER_HEADER_FILE);
