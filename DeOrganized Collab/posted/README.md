@@ -1,18 +1,30 @@
 # Posted
 
-Move a draft here once it has actually gone out, and add a line to the table so
-there is a record of what was said where.
+What has actually gone out. Fetched verbatim from GitHub rather than copied from
+our drafts, because the draft is what we meant to say and the comment is what we
+said.
 
-Keeping this honest matters more than it looks. Twice already we have needed to
-know exactly what we told them and when: once when a reply landed on the wrong
-issue and was deleted, and once when a claim in a draft went stale between
-writing and posting.
+Each file holds the whole exchange: their question, our reply, their answer back.
 
-| Date | Where | What | File |
+| Date | Where | File | Outcome |
 |---|---|---|---|
-| 2026-08-?? | builds-with-xtrata#1 | recipient parameter, and the delegate design | not archived |
-| 2026-08-?? | builds-with-xtrata#2 | fee guards as the answer, timelock proposed | not archived |
-| 2026-08-?? | builds-with-xtrata#11 | our passkey design, device results, runtime findings | not archived |
+| 2026-08-04 | [#1 recipient parameter](https://github.com/DeOrganized/builds-with-xtrata/issues/1) | [issue-01-recipient-parameter.md](issue-01-recipient-parameter.md) | They confirmed the delegate design is right and asked us not to weaken it |
+| 2026-08-04 | [#2 fee notification](https://github.com/DeOrganized/builds-with-xtrata/issues/2) | [issue-02-fee-notification.md](issue-02-fee-notification.md) | Steve called the guard table the answer and said he would close it with our table |
+| 2026-08-15 | [#11 passkey / mobile](https://github.com/DeOrganized/builds-with-xtrata/issues/11) | [issue-11-passkey-mobile.md](issue-11-passkey-mobile.md) | Opened the whole passkey strand. Our reply moved their `rpId` design |
 
-The first three went out before this folder existed, so they are recorded here
-without files. Everything from now on gets archived.
+## Why keep this
+
+Twice already it has mattered. A reply landed on the wrong issue and was deleted,
+but GitHub had already emailed it to Steve. And a claim in a draft went stale
+between writing and posting, because it was a chain reading.
+
+Keeping the posted text separate from the drafts is also what stops a
+double-post. `drafts/` now holds only #3, #4 and #5, so anything in there is
+genuinely still to send.
+
+## When you post something
+
+1. Fetch the comment back from GitHub and save it here, do not archive the draft.
+2. Remove it from `drafts/`.
+3. Add a row above.
+4. Update [../STATUS.md](../STATUS.md), which is the file that says whose turn it is.

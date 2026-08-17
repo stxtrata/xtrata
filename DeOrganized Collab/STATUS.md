@@ -10,16 +10,17 @@ The one question this file answers: *what is open, and whose turn is it?*
 
 | | Thread | State | Turn |
 |---|---|---|---|
-| #1 | recipient parameter | Answered, they replied. Settled | closed in practice |
-| #2 | fee-change notification | Answered. Steve said he would close it with our guard table as the documented answer | **theirs** |
+| #1 | recipient parameter | Answered, they replied. Settled. [Archived](posted/issue-01-recipient-parameter.md) | closed in practice |
+| #2 | fee-change notification | Answered. Steve said he would close it with our guard table. [Archived](posted/issue-02-fee-notification.md) | **theirs** |
 | #3 | testnet 3-2-3 | **Reply drafted, not posted.** Needs a date from Jim | **ours** |
 | #4 | staged path details | **Reply drafted, not posted.** Grew after the expiry bug | **ours** |
 | #5 | mint idempotency | **Reply drafted, not posted** | **ours** |
-| #11 | passkey / mobile | **Reply drafted, not posted** | **ours** |
+| #11 | passkey / mobile | First exchange [archived](posted/issue-11-passkey-mobile.md). **Second reply drafted, not posted** | **ours** |
 | #12 | signing API | Their repo. Surface locked with Skullcoin 8 Aug | ours, if we want in |
 | DM | WhatsApp to Steve | **Drafted, not sent** | **ours** |
 
-Everything in **bold** is sitting in `drafts/` waiting on Jim.
+Everything in **bold** is sitting in `drafts/` waiting on Jim. That folder now
+holds only what is genuinely unsent, so nothing in it can be posted twice.
 
 ---
 

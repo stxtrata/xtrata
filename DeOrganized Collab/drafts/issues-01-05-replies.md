@@ -1,82 +1,14 @@
 Copy each block below into the matching issue on
 github.com/DeOrganized/builds-with-xtrata. Nothing here is posted.
 
+#1 and #2 have been posted and are archived in ../posted/. They are no longer
+in this file, so anything here is genuinely still to send.
+
 One edit needed before posting: **issue #3 has a `[DATE]` placeholder.**
 
 ═══════════════════════════════════════════════════════════════════════
-ISSUE #1 — recipient parameter on mint-single-tx
-═══════════════════════════════════════════════════════════════════════
-
-Good news. This exists in a candidate core, and it does a bit more than you asked for.
-
-Three new functions, each mirroring an existing one with `recipient` added as the first argument:
-
-| Existing | New |
-|---|---|
-| `mint-single-tx` | `mint-single-tx-to` |
-| `mint-single-tx-recursive` | `mint-single-tx-recursive-to` |
-| `mint-single-tx-with-relationships` | `mint-single-tx-with-relationships-to` |
-
-The recipient becomes **both owner and creator**. You asked for payer to differ from owner. You also get payer differing from creator, so your writer holds full on-chain authorship and the platform appears only as a `payer` field on the emitted event. That closes the provenance caveat I raised in DM in July.
-
-The fee still leaves `tx-sender`, so your existing `<=` post-condition pattern needs no change.
-
-It is a candidate, not a deployment. Written and tested, never deployed. No date from me yet. Your use case is the reason it exists, so you will hear when that changes.
-
-**Parent links needed more thought than the mint did.** A parent link is gated on ownership, so today the children of your inscription are exactly the ones you made. We did not want to weaken that just to make sponsored minting work, because it would mean anyone could hang junk off your collection and gift it to you.
-
-So the default does not move. Instead an owner can opt in, once:
-
-```clarity
-(set-parent-delegate (delegate principal) (allowed bool))
-```
-
-After your author calls that naming your signer, your signer can attach children to inscriptions that author owns, but only children that mint back to that author. It cannot be used to build someone else's lineage, it is specific to one delegate rather than a blanket opt-in, and it is revocable at any time. It is not an admin function, so we are not in the middle of it.
-
-It transfers no STX, which matters for you. Sponsored transactions do cover the miner fee on a call like this, unlike the protocol fee. So it is a one-time handshake your author signs and you sponsor, and they still never need a funded wallet.
-
-Question back to you. Is a one-time opt-in per author acceptable in your flow, or does even that extra signature hurt? The design is still open and yours is the use case driving it.
-
-═══════════════════════════════════════════════════════════════════════
-ISSUE #2 — fee-schedule change notification practice
-═══════════════════════════════════════════════════════════════════════
-
-Straight answer first. There is no announcement channel today. Polling the read-onlys is the intended practice, and you are right that it is not much of a practice.
-
-But there is more protection already deployed than either of us mentioned, and it is better than a notice period because nobody has to remember it. `assert-valid-fee-update` runs on every fee setter in the live core:
-
-| Guard | Value |
-|---|---|
-| Absolute ceiling per fee unit | 1 STX. The transaction reverts above it |
-| Most a fee can rise in one change | 2x |
-| Most a fee can fall in one change | to one tenth |
-
-So no single transaction can more than double a fee, and there is a hard ceiling nobody can cross. From today's `single-tx-fee-unit` of 10,000 microSTX it would take seven separate owner transactions to reach that ceiling.
-
-Current live values, read at Stacks tip 8,702,017:
-
-```
-single-tx-fee-unit     10000
-upload-chunk-fee-unit   1000
-begin-fee-unit        100000
-upload-batch-fee-unit 100000
-seal-fee-unit         100000
-paused                 false
-```
-
-A typical article at one chunk quotes 11,000 microSTX single-tx, which matches what you measured.
-
-**What is missing, and what we are doing about it.** Rate limiting is not notice. A change still lands in the block it is sent in, you cannot see it coming, and we cannot take back a mistake.
-
-Rather than promise a notice period, which is only as good as one person's memory, we are looking at putting it in the contract. Increases proposed then confirmed after a wait, decreases instant, a cancel, and a read-only so you can ask the contract whether a change is pending and when it lands.
-
-That last part is what actually answers your question, because it makes the notice machine-readable instead of depending on us posting.
-
-No commitment on timing. It is a proposal, not a promise.
-
-═══════════════════════════════════════════════════════════════════════
 ISSUE #3 — testnet 3-2-3 instance
-═══════════════════════════════════════════════════════════════════════
+
 
 Not up yet. Holiday got in the way of the deploy, so this is still owed. Targeting [DATE].
 
@@ -86,7 +18,7 @@ One thing worth flagging ahead of it, since it will affect how you deploy anythi
 
 ═══════════════════════════════════════════════════════════════════════
 ISSUE #4 — staged path practical details
-═══════════════════════════════════════════════════════════════════════
+
 
 All three answerable from the contract, so here they are.
 
@@ -142,7 +74,7 @@ Those are live `quote-staged-fee` readings at tip 8,702,017, not arithmetic. As 
 
 ═══════════════════════════════════════════════════════════════════════
 ISSUE #5 — mint path has no idempotency
-═══════════════════════════════════════════════════════════════════════
+
 
 Your read is correct, and thank you for writing it up properly. Confirming against the deployed source rather than from memory:
 
