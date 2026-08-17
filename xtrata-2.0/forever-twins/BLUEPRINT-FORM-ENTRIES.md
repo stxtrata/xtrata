@@ -1,7 +1,7 @@
 # Blueprint form: field-by-field entries
 
 Paste-ready text for the DeGrants "Your Project Blueprint" form.
-Prepared 12 August 2026.
+Prepared 17 August 2026.
 
 Payment shape: $1,000 on blueprint approval (a separate row, not a milestone), then
 $4,000 divided across three milestones.
@@ -148,8 +148,8 @@ does not.
 new core as a Clarity constant, so they cannot be written until its address is final or
 deployed until it is live, and the core cutover is separate work this grant does not pay
 for. Everything left in milestone 2 is deliverable without waiting on anyone. The
-successors sit in milestone 3, where a preserved collection belongs anyway as evidence
-of use rather than evidence of build.
+successors are not in milestone 3 either. See the sequencing note near the end of this
+file for where they went and why.
 
 ---
 
@@ -174,14 +174,20 @@ of use rather than evidence of build.
 >
 > At least two collections beyond the three already live, preserved on
 > template-generated contracts, selected by evidence of fragile art hosting with that
-> evidence recorded in the registry. Successor twin contracts for LEO Cats and Miami
-> Degens, seeded and finalised, which makes a frozen canonical set true for those two
-> collections for the first time. A public metrics page and a recap post.
+> evidence recorded in the registry. A public metrics page and a recap post.
+>
+> What "preserved" means here, stated now rather than argued in November: the twin
+> contract is live on mainnet, the collection's canonical hash set is seeded and
+> frozen, and at least one twin has been inscribed against it. It does not mean every
+> token in the collection has been claimed. Claiming costs a fee and is the holder's
+> choice, so no amount of work on my side can compel it. A collection whose canonical
+> set is frozen is permanently preservable by anyone, for ever, which is the durable
+> thing this grant is buying.
 >
 > Completion evidence: deployer URL, public and working. A mainnet contract id
-> generated end to end through the tool, with its deploy transaction. Mainnet contract
-> ids and finalise transaction ids for the new collections and for the two successor
-> contracts. The metrics page and the recap post.
+> generated end to end through the tool, with its deploy transaction. For each new
+> collection, a mainnet contract id, a finalise transaction id, and at least one
+> inscription transaction id. The metrics page and the recap post.
 >
 > Plus evidence the work benefited someone: one mainnet preservation completed on
 > behalf of a holder who held no STX and signed nothing, with the transaction id and
@@ -194,6 +200,14 @@ of use rather than evidence of build.
 **Note on numbers.** Completion is the metrics page being live and accurate. The
 values it reports are outcomes, not commitments. Third-party deployments are reported
 with transaction ids, never made a condition of completion.
+
+**Where the LEO Cats and Miami Degens successor contracts went.** They are no longer a
+milestone deliverable anywhere, deliberately. They only become *necessary* if the Xtrata
+core is superseded during the grant window, because the existing helpers pin the old
+core as a Clarity constant and stop minting when it is paused. If the core upgrade does
+not happen in these twelve weeks, the existing helpers keep working and the successors
+are not needed at all. So they are reported as a Progress Update if they happen, never
+as a payment gate. See the sequencing note at the end of this file.
 
 **Why the no-STX criterion is safe to commit to.** Inscribing is permissionless in the
 helper contract. Anyone can inscribe any token's twin, the caller pays both fees, the
@@ -233,6 +247,66 @@ stalls the $1,000 regardless of whether the blueprint is approved.
 3. **Confirm the start date**, because every milestone date depends on it.
 4. **Send the phasing message** in `STEWARD-CONVERSATION.md`, or fill the amounts in
    as above and let the form make the proposal for you. Do one or the other, not both.
+
+## Sequencing: the core upgrade versus milestone 1
+
+**The question.** The Xtrata core is due to be superseded from `xtrata-v3-2-3` to
+either `v3-2-4` or `v3-4-1`. That is unpaid work with its own audited 26-step plan, and
+if it takes the first fortnight it eats half of milestone 1's window. Should it be a
+milestone 1 deliverable instead?
+
+**No, and it should not be in any milestone. Here is why, and what to do instead.**
+
+### No milestone technically needs the new core
+
+- The harvester does not touch the core at all.
+- The contract template works against `v3-2-3` today, which is live and unpaused.
+- The lifecycle proof can run on mainnet against `v3-2-3` right now.
+- The two new collections are small. Wasteland Apes is about 6.5 KB per item and one
+  chunk, Bitcoin Bulls OG is 1,688 bytes. Neither needs v3.2.4's larger size cap.
+
+### The upgrade creates grant work rather than enabling it
+
+The LEO Cats and Miami Degens successor contracts exist **only because** pausing
+`v3-2-3` stops the existing helpers minting. No upgrade, no successors needed, and the
+existing helpers carry on exactly as today. So doing the cutover inside the grant window
+adds two contract deploys, roughly 53 seeding transactions and a holder communications
+obligation, in exchange for nothing any milestone requires.
+
+### Putting it in a milestone imports the worst risk in the project
+
+`set-next-id` can be called exactly once and cannot be corrected. Getting it wrong forks
+the inscription id space permanently. The target version is still undecided between
+v3.2.4 and v3.4.1, three ordering defects in the cutover plan are unmerged, and a
+faithful testnet rehearsal needs four large contract deploys in strict order. None of
+that belongs behind a payment gate.
+
+### Recommendation
+
+**Do the grant first. Do the cutover after week 12, or in gaps once milestone 2 has
+landed.** The cutover has no external deadline. The grant has three dates and a steward.
+
+Two consequences worth accepting knowingly:
+
+1. **DeOrganized is waiting on `mint-single-tx-to`**, which only ships with the new core.
+   They have a working path today, minting from a temporary wallet and transferring on,
+   which costs an extra transaction and records the wrong creator. So deferral has a
+   relationship cost, not a technical one. Tell them a date rather than letting it drift.
+2. **If DeOrganized turns out to be time-critical**, then the cutover has to happen
+   inside the window and the honest response is to move the milestone dates, not to
+   absorb it silently. Milestone 1 to week 6 and milestone 2 to week 10 would be the
+   shape. Raise that with the steward before submitting rather than filing a Risk update
+   in October.
+
+That is the fork. It depends on one fact this document cannot settle: how soon
+DeOrganized actually needs the recipient split.
+
+### Either way, do this in week 1
+
+Spike whether Clarinet can compile a Clarity 4 helper at all. It gates milestone 1's
+whole test suite, nobody has measured it, and it is independent of the core question.
+
+---
 
 ## What is deliberately not in the form
 

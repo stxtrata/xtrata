@@ -12,11 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  CHUNK_BYTES, INSCRIPTION, SKILL_FILE, buildSkill, sha256
+  CHUNK_BYTES, INSCRIBED_SHA256, INSCRIPTION, SKILL_FILE, buildSkill, sha256
 } from '../../harness/skill/build-skill.mjs';
-
-/** The hash on chain, and the one this build has to keep reproducing. */
-const INSCRIBED_SHA256 = 'f40fa65a4fb2f102769526f023ff520bb8b7ed6882d11a99ab60540858d2ad29';
 
 describe('the inscription-ready build', () => {
   it('reproduces the bytes that are on chain', async () => {
@@ -65,30 +62,57 @@ describe('the inscription-ready build', () => {
   });
 });
 
-describe('the runner says which engine is about to play', () => {
+describe('the runner plays the inscribed engine', () => {
   const runner = readFileSync(
     new URL('../../harness/wizards/run-tournament.mjs', import.meta.url),
     'utf8'
   );
 
-  it('checks before anything is spent, and in a dry run too', () => {
-    expect(runner).toMatch(/await reportSkill\(\)/);
-    const at = runner.indexOf('await reportSkill()');
-    const dry = runner.indexOf('Dry run. Nothing was signed and nothing was sent.', at);
-    expect(at, 'the check must come before the dry-run exit').toBeLessThan(dry);
+  it('executes what is on chain, not a local copy that happens to match', () => {
+    // The claim the tournament makes is that an entrant can fetch inscription
+    // 2991, hash it, and know which engine played. A local build that agrees
+    // today cannot support that claim tomorrow.
+    expect(runner).toMatch(/fetchInscribedSkill/);
+    expect(runner).toMatch(/const \{ rankMoves \} = await loadSkill\(\)/);
   });
 
-  it('does not fetch the engine per move, only checks it once', () => {
-    // A tournament that read the chain to make each move would gain a failure
-    // mode, and three rounds have already been lost to that class of thing.
-    // It plays from local source and PROVES the source is what is inscribed.
-    expect(runner).toMatch(/loadSearch/);
-    expect((runner.match(/reportSkill\(\)/g) ?? []).length).toBeLessThanOrEqual(2);
+  it('keeps a local escape hatch that announces itself', () => {
+    // Development needs it. A run using it must say so, or the games it
+    // produces make a claim they cannot keep.
+    expect(runner).toMatch(/--local-engine/);
+    expect(runner).toMatch(/NOT played by the inscribed engine/);
   });
 
-  it('is never fatal, because a hash check is not a reason to refuse to play', () => {
-    const block = runner.slice(runner.indexOf('async function reportSkill'));
-    expect(block.slice(0, 2400)).toMatch(/catch \(error\)/);
-    expect(block.slice(0, 2400)).not.toMatch(/throw new WizardSafetyError/);
+  it('fetches once, not per move', () => {
+    // Three rounds have been lost to a chain read in a hot path. After startup
+    // the run is local and offline for the rest of its life.
+    expect((runner.match(/fetchInscribedSkill\(/g) ?? []).length).toBe(1);
+  });
+});
+
+describe('running code from a chain', () => {
+  const skill = readFileSync(
+    new URL('../../harness/skill/build-skill.mjs', import.meta.url),
+    'utf8'
+  );
+
+  it('verifies the hash BEFORE importing anything', () => {
+    // WHAT MAKES THIS SAFE IS THE PIN, not the chain. Executing bytes because
+    // they are on a blockchain is executing whatever the owner of that id
+    // decided to put there.
+    const check = skill.indexOf('hash !== INSCRIBED_SHA256');
+    const run = skill.indexOf('await import(`data:text/javascript');
+    expect(check).toBeGreaterThan(-1);
+    expect(check, 'the hash must be checked before the import').toBeLessThan(run);
+  });
+
+  it('refuses on a mismatch rather than warning', () => {
+    const block = skill.slice(skill.indexOf('hash !== INSCRIBED_SHA256'));
+    expect(block.slice(0, 600)).toMatch(/throw new Error/);
+    expect(block.slice(0, 600)).toMatch(/Refusing to run code that is not the pinned engine/);
+  });
+
+  it('pins the hash that is actually on chain', () => {
+    expect(skill).toContain(INSCRIBED_SHA256);
   });
 });

@@ -1,7 +1,7 @@
 # v3.2.4 canary readiness
 
 Synthesis of six parallel audits (clarinet, satellites, deps, wallet, apprefs, template),
-each with adversarial verification of its blocking claims. Date: 2026-08-10.
+each with adversarial verification of its blocking claims. Date: 2026-08-17.
 
 ---
 

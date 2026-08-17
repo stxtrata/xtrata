@@ -122,7 +122,7 @@ Six things. None can be decided by research.
 
 5. **Whether the floor is two or three collections.** Two is written. Three is defensible if the week 0 harvest goes well and the prospect list firms up. Do not raise it above three under any circumstances.
 
-6. **KYC.** Verified 2026-08-12 against <https://stacksendowment.co/blog/degrants-cohort-4-now-open>, which states: "Selected grantees must be willing and able to complete individual KYC before payment can be processed." Note this is the applications post, not the results post at `/blog/degrants-cohort-4`, which does not mention KYC at all. Nothing in the grant panel mentions it either. It gates the $1,000. Start it now, in parallel with the blueprint, not after approval.
+6. **KYC.** Verified 2026-08-17 against <https://stacksendowment.co/blog/degrants-cohort-4-now-open>, which states: "Selected grantees must be willing and able to complete individual KYC before payment can be processed." Note this is the applications post, not the results post at `/blog/degrants-cohort-4`, which does not mention KYC at all. Nothing in the grant panel mentions it either. It gates the $1,000. Start it now, in parallel with the blueprint, not after approval.
 
 7. **The cohort requires exactly two milestones, and the second must show impact.** Same source: "Each funded project requires two specific milestones." The first demonstrates concrete delivery, for example a live tool or published content. The second measures real-world impact through metrics such as user numbers, engagement or community feedback, proving somebody actually used or benefited from the work.
 

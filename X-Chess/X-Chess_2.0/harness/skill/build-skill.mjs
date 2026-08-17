@@ -111,3 +111,75 @@ if (process.argv[1] && process.argv[1].endsWith('build-skill.mjs')) {
     process.exit(1);
   });
 }
+
+/**
+ * The engine, fetched from chain and run.
+ *
+ * WHAT MAKES THIS SAFE IS THE PIN, not the chain. Executing bytes because they
+ * are on a blockchain would be executing whatever the owner of that id decided
+ * to put there. So the hash is checked BEFORE anything is imported, against a
+ * value committed in this repository, and a mismatch refuses rather than warns:
+ * the whole point of running the inscribed engine is to be able to say which
+ * engine ran, and code that might be something else cannot say that.
+ *
+ * FETCHED ONCE PER RUN. A tournament that read the chain per move would gain a
+ * failure mode, and three rounds have already gone to that class of bug. This
+ * happens before the first game is opened, and after it the run is local and
+ * offline for the rest of its life.
+ */
+export const INSCRIBED_SHA256 =
+  'f40fa65a4fb2f102769526f023ff520bb8b7ed6882d11a99ab60540858d2ad29';
+
+export async function fetchInscribedSkill({ Cl, fetchImpl = fetch } = {}) {
+  if (!Cl) throw new Error('fetchInscribedSkill needs Cl from @stacks/transactions');
+  const [addr, name] = INSCRIPTION.contract.split('.');
+
+  const chunkCount = async () => {
+    const body = await callRead(fetchImpl, addr, name, 'get-inscription-chunks', [
+      Cl.serialize(Cl.uint(INSCRIPTION.id))
+    ]);
+    const v = Cl.deserialize(body.result);
+    return Number(v?.value?.value ?? v?.value ?? 1);
+  };
+
+  const chunks = await chunkCount();
+  const parts = [];
+  for (let index = 0; index < chunks; index++) {
+    const body = await callRead(fetchImpl, addr, name, 'get-chunk', [
+      Cl.serialize(Cl.uint(INSCRIPTION.id)),
+      Cl.serialize(Cl.uint(index))
+    ]);
+    const v = Cl.deserialize(body.result);
+    const raw = v?.value?.value ?? v?.value;
+    parts.push(Buffer.from(typeof raw === 'string' ? raw.replace(/^0x/, '') : raw, 'hex'));
+  }
+  const bytes = Buffer.concat(parts);
+
+  const hash = sha256(bytes);
+  if (hash !== INSCRIBED_SHA256) {
+    throw new Error(
+      `inscription ${INSCRIPTION.id} hashes to ${hash}, and this build expects ` +
+        `${INSCRIBED_SHA256}. Refusing to run code that is not the pinned engine. ` +
+        'If the engine was deliberately re-inscribed, update INSCRIBED_SHA256 and ' +
+        'the artefact together.'
+    );
+  }
+
+  // Imported only after the hash matched.
+  const module = await import(`data:text/javascript;base64,${bytes.toString('base64')}`);
+  return { module, bytes, hash };
+}
+
+async function callRead(fetchImpl, addr, name, fn, args) {
+  const response = await fetchImpl(
+    `https://api.hiro.so/v2/contracts/call-read/${addr}/${name}/${fn}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender: addr, arguments: args })
+    }
+  );
+  const body = await response.json();
+  if (!body?.okay) throw new Error(`${fn}: ${body?.cause ?? `HTTP ${response.status}`}`);
+  return body;
+}

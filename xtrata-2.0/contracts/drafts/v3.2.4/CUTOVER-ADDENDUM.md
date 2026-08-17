@@ -81,7 +81,7 @@ the id fork, and it is silent. No transaction errors, nothing reverts,
 By HC3 the contract cannot tell you who is on the list, so it has to be
 reconstructed from transaction history.
 
-### Verified on chain, 2026-08-10
+### Verified on chain, 2026-08-17
 
 All 1,281 transactions against
 `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3` were scanned:

@@ -1,6 +1,6 @@
 # How many Stacks collections can actually get a Forever Twin?
 
-Measured 12 August 2026. Two samples: a 32-contract static analysis of NFT contract
+Measured 17 August 2026. Two samples: a 32-contract static analysis of NFT contract
 source fetched from mainnet, and the 19-collection art measurement in
 `COLLECTION-SIZING.md`.
 

@@ -1,7 +1,7 @@
 # Milestone feasibility: can we actually hit the minimums?
 
 Assessment of the three milestones in `BLUEPRINT-FORM-ENTRIES.md` against what is
-actually in the repo and on chain. 12 August 2026.
+actually in the repo and on chain. 17 August 2026.
 
 Verdict per milestone, then the three wording changes that matter.
 

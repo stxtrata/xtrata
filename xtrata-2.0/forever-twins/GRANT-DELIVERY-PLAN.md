@@ -6,7 +6,7 @@ Steward: mrwagmi.btc. Solo delivery (Jim Crane).
 This is the execution spine for the grant. It tracks what was promised, what the
 repo already has, what is genuinely unbuilt, and the order to build it in.
 
-Status as of 2026-08-10: **award announced, grant not yet confirmed.** The
+Status as of 2026-08-17: **award announced, grant not yet confirmed.** The
 DeGrants panel still shows stage "Initial Pitch", $0 received, and "No action
 required at this time." The 12 week clock anchors to the confirmed start date,
 so it has not started. Week numbers below are relative (W1 = first week after

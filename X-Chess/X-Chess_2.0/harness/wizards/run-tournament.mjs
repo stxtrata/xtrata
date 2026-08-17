@@ -41,7 +41,7 @@ import { PERSONALITIES, personalityNamed } from './personalities.mjs';
 import { anthropicAsker, chooseMove, claudeCodeAsker, rankedNotes } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
 import { readLedger, summarise } from './fee-log.mjs';
-import { INSCRIPTION, buildSkill, sha256 } from '../skill/build-skill.mjs';
+import { INSCRIPTION, buildSkill, fetchInscribedSkill, sha256 } from '../skill/build-skill.mjs';
 import {
   assertNoDoubleBooking,
   doubleRoundRobin,
@@ -113,6 +113,16 @@ const MODEL_OVERRIDE = arg('model');
  * the error message alone.
  */
 const VIA_CLAUDE_CODE = process.argv.includes('--via-claude-code');
+
+/**
+ * Play from local source instead of the inscription.
+ *
+ * FOR DEVELOPMENT ONLY, and it announces itself. The default is to run the
+ * engine that is on chain, because that is the claim the tournament makes: an
+ * entrant can fetch inscription 2991, hash it, and know which engine played
+ * every game. A run from local source cannot say that, so it says so instead.
+ */
+const LOCAL_ENGINE = process.argv.includes('--local-engine');
 
 
 function env() {
@@ -532,7 +542,7 @@ async function oneGame({ openFee }) {
   const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
-  const { rankMoves } = await loadSearch();
+  const { rankMoves } = await loadSkill();
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
 
   const gameId = arg('game')
@@ -732,9 +742,6 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
     return;
   }
 
-  // Before the schedule, and in a dry run as well as a live one. Checking which
-  // engine is about to play should not require spending anything.
-  await reportSkill();
 
   for (const round of plan.rounds) {
     assertNoDoubleBooking(round);
@@ -767,7 +774,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
   const ask = credentials();
   const { replay } = await loadReplay();
   const { Position } = await loadEngine();
-  const { rankMoves } = await loadSearch();
+  const { rankMoves } = await loadSkill();
   const agents = byId(field.agents);
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
   const existing = await readGames();
@@ -880,41 +887,36 @@ async function tournamentRules(white, black) {
  * that can play chess, and refusing to start would be trading a real capability
  * for a reassurance. It says what it knows and gets on with it.
  */
-async function reportSkill() {
+async function loadSkill() {
   const built = await buildSkill();
   const local = sha256(built);
-  console.log(`skill     ${local.slice(0, 16)}…  ${built.length.toLocaleString()} bytes, built from source`);
 
-  try {
-    const [addr, name] = INSCRIPTION.contract.split('.');
-    const response = await fetch(`https://api.hiro.so/v2/contracts/call-read/${addr}/${name}/get-chunk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sender: addr,
-        arguments: [Cl.serialize(Cl.uint(INSCRIPTION.id)), Cl.serialize(Cl.uint(0))]
-      })
-    });
-    const body = await response.json();
-    if (!body?.okay) throw new Error(body?.cause ?? `HTTP ${response.status}`);
-    const value = Cl.deserialize(body.result);
-    const raw = value?.value?.value ?? value?.value;
-    const bytes = Buffer.from(typeof raw === 'string' ? raw.replace(/^0x/, '') : raw, 'hex');
-    const chain = sha256(bytes);
-
-    if (chain === local) {
-      console.log(`          MATCHES inscription ${INSCRIPTION.id} — this is the inscribed engine`);
-    } else {
-      // Not a refusal to play. It is a statement about what the games about to
-      // be recorded were played by, which is the thing a spectator would want
-      // to know and cannot work out afterwards.
-      console.log(`          DIFFERS from inscription ${INSCRIPTION.id} (${chain.slice(0, 16)}…)`);
-      console.log('          The games below are played by the LOCAL engine. Re-inscribe to match.');
-    }
-  } catch (error) {
-    console.log(`          (could not read inscription ${INSCRIPTION.id}: ${String(error.message).slice(0, 60)})`);
+  if (LOCAL_ENGINE) {
+    console.log(`skill     ${local.slice(0, 16)}…  LOCAL SOURCE (--local-engine)`);
+    console.log('          These games are NOT played by the inscribed engine.');
+    return loadSearch();
   }
+
+  // ON CHAIN, AND EXECUTED — not merely compared against. The point of the
+  // change is that the games below are played by the bytes anybody can fetch,
+  // rather than by a local copy that happens to match today.
+  //
+  // Fetched once, here, before a game is opened. A tournament that read the
+  // chain per move would gain a failure mode, and three rounds have already
+  // gone to that class of bug.
+  const { module, bytes, hash } = await fetchInscribedSkill({ Cl });
+  console.log(`skill     ${hash.slice(0, 16)}…  ${bytes.length.toLocaleString()} bytes from inscription ${INSCRIPTION.id}`);
+  console.log(`          ${INSCRIPTION.url}`);
+  if (hash === local) {
+    console.log('          local source builds to the same bytes');
+  } else {
+    // Not fatal: the inscription is what plays, so a local difference is
+    // information about the working tree rather than about the games.
+    console.log(`          note: local source differs (${local.slice(0, 16)}…) and is NOT being used`);
+  }
+  return module;
 }
+
 
 /**
  * Which account pays for the thinking, and it has to be chosen deliberately.

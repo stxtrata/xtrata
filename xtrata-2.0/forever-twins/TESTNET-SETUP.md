@@ -1,6 +1,6 @@
 # Standing up a testnet Xtrata for the milestone 1 lifecycle proof
 
-Checked 12 August 2026. Short answer: yes, it is easy, roughly half a day, and most
+Checked 17 August 2026. Short answer: yes, it is easy, roughly half a day, and most
 pieces already exist. But read section 3 first, because there is a better option for
 the milestone evidence specifically.
 

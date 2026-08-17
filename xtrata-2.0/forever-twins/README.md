@@ -2,7 +2,7 @@
 
 Working pack for the Forever Twins permanence project: campaign documents, contract references, and the DeGrants delivery plan.
 
-Status: **grant awarded, not yet confirmed.** Forever Twins was awarded $5,000 in Stacks Community DeGrants Cohort 4, announced 2026-08-05. As of 2026-08-10 the DeGrants panel still shows stage "Initial Pitch" and $0 received, so the 12 week delivery clock has not started.
+Status: **grant awarded, not yet confirmed.** Forever Twins was awarded $5,000 in Stacks Community DeGrants Cohort 4, announced 2026-08-05. As of 2026-08-17 the DeGrants panel still shows stage "Initial Pitch" and $0 received, so the 12 week delivery clock has not started.
 
 Separately, the campaign side is in post-launch live operations. The Bitcoin Pepes helper contract is live, holders have already started claiming Forever Twins on Fak.fun, and the campaign is a live Xtrata case study. Exact public numbers, promo terms, helper-contract read-only values, and partner wording still need fresh verification before formal publication.
 
@@ -29,7 +29,7 @@ Your NFT can survive while the art disappears.
 ## Sizing and Candidate Collections
 
 - `COLLECTION-SIZING.md`: how much data each collection actually puts on chain,
-  measured 2026-08-12. Covers the three live Forever Twin collections, the cost model,
+  measured 2026-08-17. Covers the three live Forever Twin collections, the cost model,
   the Crash Punks recursive-parts proposal, and a ranked survey of other Stacks
   collections by popularity against total data size. Read this before scoping any new
   collection.

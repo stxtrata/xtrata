@@ -1,6 +1,6 @@
 # Steward conversation: payment phasing and delivery window
 
-Prepared 12 August 2026, before the blueprint is submitted.
+Prepared 17 August 2026, before the blueprint is submitted.
 Counterpart: mrwagmi.btc, steward, DeGrants Cohort 4.
 
 ---
