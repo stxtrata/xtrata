@@ -237,6 +237,19 @@ describe('which kind of manifest a reader is holding', () => {
     expect(provenance(100, 200)).toBe('committed');
   });
 
+  it('is anchored on the first MOVE, not the first game opened', () => {
+    // A manifest names its games by id, and ids do not exist until games are
+    // opened — so a genuinely committed tournament must open its games, then
+    // inscribe, then play. Anchored on "first game opened" that reads compiled,
+    // which is exactly backwards, and would have mislabelled every prospective
+    // tournament there will ever be.
+    const gamesOpened = 100;
+    const manifest = 110;
+    const firstMove = 120;
+    expect(provenance(manifest, firstMove), 'inscribed before any move was played').toBe('committed');
+    expect(provenance(manifest, gamesOpened), 'the wrong anchor').toBe('compiled');
+  });
+
   it('calls it compiled when the games came first', () => {
     expect(provenance(200, 100)).toBe('compiled');
   });
@@ -260,7 +273,7 @@ describe('which kind of manifest a reader is holding', () => {
   });
 
   it('says which it is in words, not a term of art', () => {
-    expect(provenanceNote('committed')).toContain('before its first game');
+    expect(provenanceNote('committed')).toContain('before the first move');
     expect(provenanceNote('compiled')).toContain('already existed');
   });
 });

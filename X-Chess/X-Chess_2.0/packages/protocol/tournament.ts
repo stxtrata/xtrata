@@ -358,6 +358,15 @@ export function revisedInTime(
  * DERIVED, NEVER DECLARED. A `"retrospective": true` field could lie; block
  * ordering cannot. The manifest is not consulted about its own provenance.
  *
+ * ANCHORED ON THE FIRST MOVE, NOT THE FIRST GAME OPENED, and getting that
+ * wrong would mislabel every prospective tournament there will ever be. A
+ * manifest names its games by id, and ids do not exist until games are opened —
+ * so a genuinely committed tournament MUST open its games, then inscribe, then
+ * play. Measured against "first game opened" that reads `compiled`, which is
+ * exactly backwards. Opening a game commits a rules hash and settles no result;
+ * the first move is when the outcome starts being determined, and it is the
+ * anchor `revisedInTime` directly below already uses.
+ *
  * Heights come from the caller because they come from the Stacks API rather
  * than from Xtrata, the same arrangement `revisedInTime` uses. Null in, null
  * out, and null means "not checked" — never "fine".
@@ -366,19 +375,19 @@ export type Provenance = 'committed' | 'compiled';
 
 export function provenance(
   manifestHeight: number | null,
-  firstGameHeight: number | null
+  firstMoveHeight: number | null
 ): Provenance | null {
-  if (manifestHeight === null || firstGameHeight === null) return null;
+  if (manifestHeight === null || firstMoveHeight === null) return null;
   // Strictly before, and the tie goes against the organiser: a manifest landing
-  // in the same block as the first game it names did not demonstrably precede
-  // it, and "probably committed" is not a thing worth telling a reader.
-  return manifestHeight < firstGameHeight ? 'committed' : 'compiled';
+  // in the same block as the first move did not demonstrably precede it, and
+  // "probably committed" is not a thing worth telling a reader.
+  return manifestHeight < firstMoveHeight ? 'committed' : 'compiled';
 }
 
 /** What to show a reader, in words rather than a term of art. */
 export function provenanceNote(kind: Provenance | null): string {
   if (kind === 'committed') {
-    return 'Committed before play: this manifest was inscribed before its first game was opened.';
+    return 'Committed before play: this manifest was inscribed before the first move was played.';
   }
   if (kind === 'compiled') {
     return 'Compiled after play: this manifest describes games that already existed when it was written.';
@@ -406,12 +415,12 @@ export function provenanceNote(kind: Provenance | null): string {
  */
 export function honours(
   kind: Provenance | null,
-  firstGameHeight: number | null,
+  firstMoveHeight: number | null,
   compiledAcceptedBefore: number
 ): { ok: boolean; says: string } {
   if (kind === 'committed') return { ok: true, says: provenanceNote(kind) };
   if (kind === null) return { ok: true, says: provenanceNote(kind) };
-  if (firstGameHeight !== null && firstGameHeight < compiledAcceptedBefore) {
+  if (firstMoveHeight !== null && firstMoveHeight < compiledAcceptedBefore) {
     return { ok: true, says: `${provenanceNote(kind)} Accepted because its games predate the manifest rule.` };
   }
   return {
