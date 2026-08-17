@@ -607,12 +607,60 @@ describe('the facts that stop a won game being shuffled away', () => {
     // In HOUSE_RULES rather than in anyone's prompt: an entry cannot switch it
     // off, and it costs no entrant their style. It bites in one place only —
     // ahead, and the move draws on the spot.
-    expect(HOUSE_RULES).toContain('DRAWS THE GAME NOW by repetition');
-    expect(HOUSE_RULES).toMatch(/ahead on material, do not play it/);
+    // Stated as a VERDICT the harness has already reached, not a condition for
+    // the model to evaluate — evaluating one is what produced the narration
+    // forfeit. The annotation carries "DO NOT PLAY" only when the mover is
+    // ahead; behind or level, a repetition draw is the character's to take.
+    expect(HOUSE_RULES).toContain('DO NOT PLAY');
+    expect(HOUSE_RULES.toLowerCase()).not.toMatch(/if you are ahead/);
     for (const character of PERSONALITIES) {
       expect(character.prompt, `${character.name} should not carry the house rule`).not.toContain(
         'repetition'
       );
     }
+  });
+});
+
+describe('a player that narrates instead of answering', () => {
+  // One forfeit in 950 lab moves, and the reply was a player thinking out loud:
+  //
+  //   "b2b2 isn't in the list, so: b2c1
+  //    Wait, checking material lead rule — I'"
+  //
+  // The cause was a house rule I wrote as a CONDITION — "if you are ahead on
+  // material, do not play it" — which asks a model to evaluate something, and a
+  // model evaluates out loud. The harness knows whether you are ahead, so it
+  // now resolves that itself and marks the move DO NOT PLAY. These tests hold
+  // both halves: the rule states a verdict, and a conclusion on its own line is
+  // still readable if one gets written anyway.
+  const LEGAL = ['e2e4', 'd2d4', 'g1f3'];
+
+  it('takes a move that sits alone on a line', () => {
+    expect(extractMove('Let me think about the centre.\ne2e4', LEGAL)).toBe('e2e4');
+  });
+
+  it('takes the LAST such line, because working out comes first', () => {
+    expect(extractMove('d2d4\nActually no.\ne2e4', LEGAL)).toBe('e2e4');
+  });
+
+  it('tolerates a bullet or trailing punctuation around it', () => {
+    expect(extractMove('thinking...\n- g1f3.', LEGAL)).toBe('g1f3');
+  });
+
+  it('still refuses two moves inside one sentence', () => {
+    // Choosing between them would be guessing, with real money and a permanent
+    // record on the other side of the guess.
+    expect(extractMove('not e2e4, I play d2d4', LEGAL)).toBeNull();
+  });
+
+  it('still refuses a reply with no move in it', () => {
+    expect(extractMove('I would rather not say.', LEGAL)).toBeNull();
+  });
+
+  it('states a verdict in the house rules, never a test', () => {
+    expect(HOUSE_RULES).toContain('DO NOT PLAY');
+    expect(HOUSE_RULES.toLowerCase(), 'a condition invites narration').not.toMatch(
+      /if you are ahead/
+    );
   });
 });

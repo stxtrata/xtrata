@@ -64,6 +64,18 @@ const entry = ({ id, name, model = DEFAULT_MODEL, style, prompt }) =>
  * entry correctly - it says a draw is acceptable - and that is the point. The
  * problem was not the personality, it was that repeating cost nothing.
  *
+ * IT STATES A VERDICT, NOT A TEST, and the first version got that wrong. It read
+ * "if you are ahead on material, do not play it", which asks the model to
+ * evaluate a condition - and evaluating a condition is something a model does
+ * OUT LOUD. Measured: one forfeit in 950 moves, and the reply was
+ * "b2b2 isn't in the list, so: b2c1 / Wait, checking material lead rule - I'",
+ * a player narrating the check instead of answering with a move.
+ *
+ * The harness already knows whether you are ahead and which move draws, so it
+ * resolves the condition itself and marks the move DO NOT PLAY. Nothing is left
+ * to work out, which is the same lesson as everywhere else here: a computed fact
+ * lands, an instruction to reason does not.
+ *
  * It bites in one place only: you are ahead, and the move draws on the spot.
  * Everything else - how to open, when to sacrifice, whether to trade - is still
  * entirely the character's, which is what the tournament is trying to measure.
@@ -74,13 +86,11 @@ who is ahead on material, the moves so far, and a list of every legal move
 available to you right now.
 
 Reply with exactly one move from that list, in the same notation, and nothing
-else. No explanation, no commentary, no alternative. A reply that is not one of
-the listed moves will be discarded and you will be asked again.
+else. No explanation, no commentary, no alternative, no working out. If you find
+yourself writing a sentence, stop and write the move instead.
 
-A move marked "DRAWS THE GAME NOW by repetition" ends the game as a draw
-immediately. If you are ahead on material, do not play it: choose any other
-move, even a worse one, unless every alternative loses material. Being ahead and
-agreeing to a draw is a result you have to earn, not one to stumble into.
+A move marked DO NOT PLAY is one the tournament has already ruled out for you.
+Choose any other move.
 `.trim();
 
 export const PERSONALITIES = Object.freeze([

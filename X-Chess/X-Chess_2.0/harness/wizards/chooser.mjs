@@ -209,6 +209,18 @@ export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }
   const board = new Position(fen);
   const ranked = rankMoves(board.state, depth);
 
+  // THE HARNESS RESOLVES THE CONDITION, so the model never has to. The house
+  // rule used to read "if you are ahead on material, do not play it", which
+  // asks a model to evaluate something — and a model evaluates out loud. One
+  // forfeit in 950 moves came back as "Wait, checking material lead rule — I'",
+  // a player narrating the test instead of answering with a move.
+  //
+  // Whether you are ahead is a fact this file already computes. Working it out
+  // here turns a rule into a verdict.
+  const { white, black } = materialBalance(fen);
+  const mine = board.turn === 0 ? white : black;
+  const ahead = mine > (board.turn === 0 ? black : white);
+
   // Repetition still has to be checked here: it is a fact about the GAME, and
   // the engine only ever sees a position.
   const seen = [];
@@ -235,11 +247,16 @@ export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }
     else if (row.mateIn && row.mateIn < 0) note = `mated in ${-row.mateIn}`;
     else note = `${row.score >= 0 ? '+' : ''}${(row.score / 100).toFixed(1)}`;
 
-    if (after.isStalemate()) note += ' — STALEMATE, draws now';
-    else if (seen.length) {
+    if (after.isStalemate()) {
+      note += ahead ? ' — STALEMATE, draws now. DO NOT PLAY' : ' — STALEMATE, draws now';
+    } else if (seen.length) {
       const key = after.key();
       const again = seen.reduce((n, k) => n + (k === key ? 1 : 0), 0);
-      if (again >= 2) note += ' — DRAWS NOW by repetition';
+      // Ruled out only when it throws a game away. Behind or level, a draw by
+      // repetition is a legitimate result and taking it is the character's call.
+      if (again >= 2) {
+        note += ahead ? ' — DRAWS NOW by repetition. DO NOT PLAY' : ' — DRAWS NOW by repetition';
+      }
     }
 
     return { uci: row.uci, san: moved?.san ?? null, note, score: row.score, place, mateIn: row.mateIn };
@@ -415,6 +432,22 @@ export function extractMove(reply, legalMoves, annotations = null) {
     }
     const hit = bySan.get(raw.trim()) ?? bySan.get(bare(raw));
     if (hit) return hit.toLowerCase();
+  }
+
+  // A LINE THAT IS ONLY A MOVE IS AN ANSWER, not a guess.
+  //
+  // A model that narrates usually still lands its conclusion on a line of its
+  // own. Reading that is not the same as picking one of two moves out of a
+  // sentence, which this deliberately still refuses to do: "not e2e4, I play
+  // d2d4" names two moves and choosing between them would be guessing with real
+  // money and a permanent record on the other side of the guess.
+  //
+  // Last such line wins, because deliberation comes before the conclusion and
+  // never after it.
+  const lines = raw.split('\n').map((line) => line.trim()).filter(Boolean);
+  for (let at = lines.length - 1; at >= 0; at--) {
+    const bare = lines[at].toLowerCase().replace(/^[-*>\s]+|[.,!]+$/g, '');
+    if (legal.has(bare)) return bare;
   }
 
   const found = new Set();
