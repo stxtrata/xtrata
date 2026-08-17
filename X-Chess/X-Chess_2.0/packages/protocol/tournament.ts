@@ -205,3 +205,137 @@ export function rounds(tournament: Tournament): Array<{ number: number; games: T
     .sort((a, b) => a[0] - b[0])
     .map(([number, games]) => ({ number, games: games.slice().sort((a, b) => a.id - b.id) }));
 }
+
+
+// ---------------------------------------------------------------------------
+// Revisions
+// ---------------------------------------------------------------------------
+
+/**
+ * A manifest that supersedes an earlier one.
+ *
+ * THE PROBLEM IS REWRITING HISTORY. A tournament's field and pairings have to be
+ * fixed before results exist, or the organiser can drop the entrant who lost and
+ * publish a manifest that never mentions them. But a manifest also has to be
+ * correctable — a wrong address, a missing entrant — right up until play starts.
+ *
+ * So a revision is an inscription that declares the one it replaces as a
+ * DEPENDENCY. Xtrata already carries dependencies and already uses them, so this
+ * invents nothing: `get-dependencies` gives the link and `get-inscription-creator`
+ * gives who made it. Same creator plus a dependency edge is what makes a revision
+ * a revision rather than somebody else's fork.
+ *
+ * THE TOURNAMENT ID IS THE ROOT, never the newest. Walk the chain back and the
+ * inscription with no tournament ancestor is the identity, so a tournament that
+ * has been revised four times still has one id and old links keep working.
+ *
+ * RESOLVED FORWARD, NOT BACKWARD, and this is where the design differs from the
+ * obvious one. There is no reverse index — nothing answers "what declares me as a
+ * dependency" without scanning every inscription ever made. So the id you hand
+ * out is the current one, and it names its own ancestry. A board given the root
+ * shows the original; given a revision, it shows the revision and reports the
+ * root as the tournament id.
+ *
+ * WHAT CANNOT BE CHECKED FROM THE CONTRACT. Inscription metadata carries creator,
+ * hash, mime type, owner, sealed, chunks and size — and no block height. So
+ * "inscribed before the first move" needs the height of the transaction that
+ * sealed it, which is public chain data but comes from the Stacks API rather than
+ * from Xtrata. `resolveTournament` reports what it verified and what it could
+ * not, rather than implying it checked something it did not.
+ */
+export interface Inscribed {
+  /** The manifest text at an inscription id. */
+  text(id: number): Promise<string | null>;
+  /** Inscription ids this one declares as dependencies. */
+  dependencies(id: number): Promise<number[]>;
+  /** Who created it. Same creator is what makes a revision legitimate. */
+  creator(id: number): Promise<string | null>;
+}
+
+export interface ResolvedTournament {
+  ok: boolean;
+  /** The root inscription — the tournament's identity, whatever the revision. */
+  tournamentId: number | null;
+  /** The manifest that applies. */
+  tournament: Tournament | null;
+  /** Root first, newest last. */
+  lineage: number[];
+  problems: ManifestProblem[];
+}
+
+/** How far back a revision chain is followed before it is treated as hostile. */
+export const MAX_REVISIONS = 20;
+
+export async function resolveTournament(id: number, chain: Inscribed): Promise<ResolvedTournament> {
+  const problems: ManifestProblem[] = [];
+  const lineage: number[] = [];
+
+  const text = await chain.text(id);
+  if (text === null) {
+    return { ok: false, tournamentId: null, tournament: null, lineage: [], problems: [{ where: `inscription ${id}`, says: 'could not be read' }] };
+  }
+  const parsed = parseTournament(text);
+  if (!parsed.ok) {
+    return { ok: false, tournamentId: null, tournament: null, lineage: [], problems: parsed.problems };
+  }
+
+  const creator = await chain.creator(id);
+  lineage.unshift(id);
+
+  // Walk back to the root. Only a dependency that is itself a manifest counts —
+  // the engine declares a dependency too, and that is not an ancestor.
+  let at = id;
+  for (let step = 0; step < MAX_REVISIONS; step++) {
+    const deps = await chain.dependencies(at);
+    let ancestor: number | null = null;
+    for (const dep of deps) {
+      const depText = await chain.text(dep);
+      if (depText !== null && parseTournament(depText).ok) { ancestor = dep; break; }
+    }
+    if (ancestor === null) break;
+
+    // A revision by somebody else is a fork, not a correction. Same creator is
+    // the whole of the ownership proof, and it has to hold at every link.
+    const ancestorCreator = await chain.creator(ancestor);
+    if (creator && ancestorCreator && creator !== ancestorCreator) {
+      problems.push({
+        where: `inscription ${at}`,
+        says: `claims inscription ${ancestor} but was made by a different creator — this is a fork, not a revision`
+      });
+      break;
+    }
+
+    lineage.unshift(ancestor);
+    at = ancestor;
+    if (lineage.length > MAX_REVISIONS) {
+      problems.push({ where: 'lineage', says: `more than ${MAX_REVISIONS} revisions deep` });
+      break;
+    }
+  }
+
+  return {
+    ok: problems.length === 0,
+    tournamentId: lineage[0] ?? id,
+    tournament: parsed.tournament,
+    lineage,
+    problems
+  };
+}
+
+/**
+ * Whether a revision was made in time, given heights the caller looked up.
+ *
+ * Kept separate and given its numbers rather than fetching them, because the
+ * heights come from the Stacks API rather than from Xtrata — see above. A caller
+ * that cannot get them passes null and gets `null` back, which means "not
+ * checked" and never "fine".
+ */
+export function revisedInTime(
+  revisionHeight: number | null,
+  firstMoveHeight: number | null
+): boolean | null {
+  if (revisionHeight === null || firstMoveHeight === null) return null;
+  // Strictly before: a revision landing in the same block as the first move is
+  // not clearly earlier, and the tie should not favour the organiser.
+  return revisionHeight < firstMoveHeight;
+}

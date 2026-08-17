@@ -12,7 +12,8 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  TOURNAMENT_HEADER, addressOf, parseTournament, rounds, standings
+  MAX_REVISIONS, TOURNAMENT_HEADER, addressOf, parseTournament,
+  resolveTournament, revisedInTime, rounds, standings
 } from '../../packages/protocol/tournament.js';
 
 const good = {
@@ -117,5 +118,96 @@ describe('what the board draws from it', () => {
     const structure = rounds(t);
     expect(structure.map((r) => r.number)).toEqual([5, 6]);
     expect(structure[0].games.map((g) => g.id)).toEqual([25, 27]);
+  });
+});
+
+describe('revising a manifest before play starts', () => {
+  // A tournament's field has to be fixed before results exist, or the organiser
+  // drops the entrant who lost and publishes a manifest that never mentions
+  // them. It also has to be correctable — a wrong address, a missing entrant —
+  // right up until the first move.
+
+  const CREATOR = 'SP15T1W26JTNS26VG17HM468KW7TQD3124KTYA9EJ';
+  const OTHER = 'SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN';
+
+  const chainOf = (
+    texts: Record<number, unknown>,
+    deps: Record<number, number[]> = {},
+    creators: Record<number, string> = {}
+  ) => ({
+    async text(id: number) {
+      const t = texts[id];
+      return t === undefined ? null : typeof t === 'string' ? t : manifest(t);
+    },
+    async dependencies(id: number) { return deps[id] ?? []; },
+    async creator(id: number) { return creators[id] ?? CREATOR; }
+  });
+
+  it('treats the root as the tournament id, however many revisions later', async () => {
+    // Old links keep working. A tournament revised four times still has one id.
+    const chain = chainOf({ 100: good, 101: good, 102: good }, { 102: [101], 101: [100] });
+    const r = await resolveTournament(102, chain);
+    expect(r.ok).toBe(true);
+    expect(r.tournamentId).toBe(100);
+    expect(r.lineage).toEqual([100, 101, 102]);
+  });
+
+  it('shows the revision you asked for, not the root', async () => {
+    const revised = { ...good, name: 'Exhibition One (corrected)' };
+    const chain = chainOf({ 100: good, 101: revised }, { 101: [100] });
+    const r = await resolveTournament(101, chain);
+    expect(r.tournament!.name).toBe('Exhibition One (corrected)');
+    expect(r.tournamentId).toBe(100);
+  });
+
+  it('refuses a revision by somebody else, which is a fork', async () => {
+    // Same creator is the whole of the ownership proof. Without it anyone could
+    // inscribe a manifest claiming to supersede yours.
+    const chain = chainOf({ 100: good, 101: good }, { 101: [100] }, { 100: CREATOR, 101: OTHER });
+    const r = await resolveTournament(101, chain);
+    expect(r.ok).toBe(false);
+    expect(r.problems[0].says).toContain('fork, not a revision');
+  });
+
+  it('ignores a dependency that is not a manifest', async () => {
+    // The engine declares a dependency too. An ancestor is an ancestor only if
+    // it is itself a tournament.
+    const chain = chainOf({ 100: good, 101: '// some inscribed javascript' }, { 100: [101] });
+    const r = await resolveTournament(100, chain);
+    expect(r.ok).toBe(true);
+    expect(r.lineage).toEqual([100]);
+  });
+
+  it('stops rather than following a hostile chain forever', async () => {
+    const texts: Record<number, unknown> = {};
+    const deps: Record<number, number[]> = {};
+    for (let n = 0; n <= MAX_REVISIONS + 5; n++) { texts[n] = good; if (n > 0) deps[n] = [n - 1]; }
+    const r = await resolveTournament(MAX_REVISIONS + 5, chainOf(texts, deps));
+    expect(r.ok).toBe(false);
+    expect(r.problems.some((p) => p.says.includes('revisions deep'))).toBe(true);
+  });
+
+  it('says so when the manifest itself will not read', async () => {
+    const r = await resolveTournament(100, chainOf({}));
+    expect(r.ok).toBe(false);
+    expect(r.problems[0].says).toContain('could not be read');
+  });
+});
+
+describe('whether a revision was made in time', () => {
+  it('is true only strictly before the first move', () => {
+    expect(revisedInTime(100, 120)).toBe(true);
+    expect(revisedInTime(120, 100)).toBe(false);
+    // Same block is not clearly earlier, and the tie must not favour whoever
+    // wrote the revision.
+    expect(revisedInTime(100, 100)).toBe(false);
+  });
+
+  it('returns null for "not checked" rather than pretending', () => {
+    // Inscription metadata carries no block height — creator, hash, mime, owner,
+    // sealed, chunks, size, and nothing about when. The heights come from the
+    // Stacks API, and a caller that cannot get them must not be told it is fine.
+    expect(revisedInTime(null, 120)).toBeNull();
+    expect(revisedInTime(100, null)).toBeNull();
   });
 });

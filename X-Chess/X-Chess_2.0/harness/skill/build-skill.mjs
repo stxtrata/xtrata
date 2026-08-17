@@ -40,6 +40,18 @@ const ROOT = join(HERE, '..', '..');
 export const SKILL_FILE = join(HERE, 'chess-engine.js');
 export const HEADER_FILE = join(HERE, 'header.txt');
 
+/**
+ * The second inscribable artefact, and the reason there is a second.
+ *
+ * A manifest says which games form a tournament and who played them, and it is
+ * worth exactly as much as whatever produced it. Produced on the Director's
+ * machine, a tournament's identity rests on trusting the Director. Produced by
+ * inscribed code from public inputs, anybody can run it against the same chain
+ * and get the same answer — and a manifest that disagrees is simply wrong.
+ */
+export const BUILDER_FILE = join(HERE, 'manifest-builder.js');
+export const BUILDER_HEADER_FILE = join(HERE, 'manifest-builder-header.txt');
+
 /** One Xtrata chunk. An engine that needs two is a different upload. */
 export const CHUNK_BYTES = 16_384;
 
@@ -50,10 +62,19 @@ export const INSCRIPTION = Object.freeze({
   url: 'https://xtrata.xyz/x/2991'
 });
 
+/** The exact bytes to inscribe for the manifest builder. */
+export async function buildBuilder() {
+  return bundleFor('protocol', 'manifest-builder.ts', BUILDER_HEADER_FILE);
+}
+
 /** The exact bytes to inscribe, built from the current source. */
 export async function buildSkill() {
+  return bundleFor('chess', 'search.ts', HEADER_FILE);
+}
+
+async function bundleFor(pkg, file, headerFile) {
   const out = await build({
-    entryPoints: [join(ROOT, 'packages', 'chess', 'search.ts')],
+    entryPoints: [join(ROOT, 'packages', pkg, file)],
     bundle: true,
     write: false,
     format: 'esm',
@@ -63,17 +84,23 @@ export async function buildSkill() {
   // Drop the first banner: it names a path on whoever's machine ran the build,
   // and an inscription should describe the program and nothing else.
   const body = out.outputFiles[0].text.split('\n').slice(1).join('\n');
-  return Buffer.concat([readFileSync(HEADER_FILE), Buffer.from(body, 'utf8')]);
+  return Buffer.concat([readFileSync(headerFile), Buffer.from(body, 'utf8')]);
 }
 
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
 async function main() {
-  const built = await buildSkill();
+  if (process.argv.includes('--builder')) return mainFor('manifest builder', buildBuilder, BUILDER_FILE);
+  return mainFor('chess engine', buildSkill, SKILL_FILE);
+}
+
+async function mainFor(label, make, file) {
+  const built = await make();
   const hash = sha256(built);
   const fits = built.length <= CHUNK_BYTES;
 
-  console.log(`\nbuilt   ${built.length.toLocaleString()} bytes  sha256 ${hash}`);
+  console.log(`\n${label}`);
+  console.log(`built   ${built.length.toLocaleString()} bytes  sha256 ${hash}`);
   console.log(`chunk   ${CHUNK_BYTES.toLocaleString()} bytes  ${fits ? `fits, ${CHUNK_BYTES - built.length} to spare` : 'DOES NOT FIT'}`);
   if (!fits) {
     console.log('\nAn engine over one chunk is a two-transaction upload. Take bytes out,');
@@ -84,9 +111,9 @@ async function main() {
   if (process.argv.includes('--check')) {
     let onDisk = null;
     try {
-      onDisk = readFileSync(SKILL_FILE);
+      onDisk = readFileSync(file);
     } catch {
-      console.log(`\nMISSING ${SKILL_FILE}. Run this without --check to write it.`);
+      console.log(`\nMISSING ${file}. Run this without --check to write it.`);
       process.exitCode = 1;
       return;
     }
@@ -100,8 +127,8 @@ async function main() {
     return;
   }
 
-  writeFileSync(SKILL_FILE, built);
-  console.log(`\nwrote ${SKILL_FILE}`);
+  writeFileSync(file, built);
+  console.log(`\nwrote ${file}`);
   console.log('Commit it: an inscription is permanent, so its bytes belong in a diff first.');
 }
 

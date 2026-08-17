@@ -1,0 +1,23 @@
+// X-CHESS-SKILL/1  tournament-manifest-builder
+//
+// Derives which games form a tournament, and who played them, from the chain.
+//
+// A manifest is worth exactly as much as whatever produced it. Produced on one
+// machine, a tournament's identity rests on trusting that machine. Produced by
+// this, anybody can run it against the same public chain and get the same
+// answer — and a manifest that disagrees with what this produces is wrong.
+//
+// EVERY INPUT IS PUBLIC. Entrants are names and wallet addresses, and an address
+// is already on chain as the sender of every move it signed. Nothing secret goes
+// in, so nobody's answer should differ from anybody else's.
+//
+// FROM THE RULES HASH, NEVER FROM A SCHEDULE. A game commits a hash of its
+// rules and those rules name both players, so a pairing is recoverable exactly.
+// Schedule order is not id order — three games open at once and whichever
+// transaction lands first takes the lower id — and reading a tournament by
+// schedule once put two games the wrong way round, losing two real results from
+// a table that looked complete.
+//
+// deriveManifest({ name, format, contract, engine, entrants, source }) where
+// source supplies gameCount() and rulesHashOf(id). Returns the tournament;
+// asManifest() renders the bytes to inscribe.

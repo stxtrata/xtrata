@@ -1,0 +1,161 @@
+X-CHESS-TOURNAMENT/1
+{
+  "name": "X Chess Exhibition One",
+  "format": "double-round-robin",
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "engine": 2991,
+  "entrants": [
+    {
+      "name": "Gambit",
+      "address": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB"
+    },
+    {
+      "name": "Ledger",
+      "address": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN"
+    },
+    {
+      "name": "Mason",
+      "address": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2"
+    },
+    {
+      "name": "Wager",
+      "address": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN"
+    },
+    {
+      "name": "Plumb",
+      "address": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX"
+    },
+    {
+      "name": "Oblique",
+      "address": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM"
+    }
+  ],
+  "games": [
+    {
+      "id": 13,
+      "white": "Mason",
+      "black": "Wager",
+      "round": 1
+    },
+    {
+      "id": 14,
+      "white": "Ledger",
+      "black": "Plumb",
+      "round": 1
+    },
+    {
+      "id": 15,
+      "white": "Gambit",
+      "black": "Oblique",
+      "round": 1
+    },
+    {
+      "id": 16,
+      "white": "Mason",
+      "black": "Ledger",
+      "round": 2
+    },
+    {
+      "id": 17,
+      "white": "Plumb",
+      "black": "Gambit",
+      "round": 2
+    },
+    {
+      "id": 18,
+      "white": "Wager",
+      "black": "Oblique",
+      "round": 2
+    },
+    {
+      "id": 19,
+      "white": "Oblique",
+      "black": "Ledger",
+      "round": 3
+    },
+    {
+      "id": 20,
+      "white": "Plumb",
+      "black": "Mason",
+      "round": 3
+    },
+    {
+      "id": 21,
+      "white": "Gambit",
+      "black": "Wager",
+      "round": 3
+    },
+    {
+      "id": 22,
+      "white": "Mason",
+      "black": "Gambit",
+      "round": 4
+    },
+    {
+      "id": 23,
+      "white": "Ledger",
+      "black": "Wager",
+      "round": 4
+    },
+    {
+      "id": 24,
+      "white": "Oblique",
+      "black": "Plumb",
+      "round": 4
+    },
+    {
+      "id": 25,
+      "white": "Mason",
+      "black": "Oblique",
+      "round": 5
+    },
+    {
+      "id": 26,
+      "white": "Gambit",
+      "black": "Ledger",
+      "round": 5
+    },
+    {
+      "id": 27,
+      "white": "Wager",
+      "black": "Plumb",
+      "round": 5
+    },
+    {
+      "id": 28,
+      "white": "Oblique",
+      "black": "Gambit",
+      "round": 6
+    },
+    {
+      "id": 29,
+      "white": "Plumb",
+      "black": "Ledger",
+      "round": 6
+    },
+    {
+      "id": 30,
+      "white": "Wager",
+      "black": "Mason",
+      "round": 6
+    },
+    {
+      "id": 31,
+      "white": "Oblique",
+      "black": "Wager",
+      "round": 7
+    },
+    {
+      "id": 32,
+      "white": "Ledger",
+      "black": "Mason",
+      "round": 7
+    },
+    {
+      "id": 33,
+      "white": "Gambit",
+      "black": "Plumb",
+      "round": 7
+    }
+  ]
+}
