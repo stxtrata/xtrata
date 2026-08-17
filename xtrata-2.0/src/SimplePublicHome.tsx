@@ -175,9 +175,9 @@ const resolveSectionScrollBlock = (
   section: SimpleHomeSectionKey
 ): ScrollLogicalPosition => (section === 'home-viewer' ? 'center' : 'start');
 
-const DOCS_BASE_URL = 'https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0';
+const DOCS_BASE_URL = 'https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0';
 const DOCS_INDEX_URL =
-  'https://github.com/stxtrata/xtrata/blob/main-staging/xtrata-1.0/docs/documentation-index.md';
+  'https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/docs/documentation-index.md';
 
 const buildDocsUrl = (path: string) => `${DOCS_BASE_URL}/${path}`;
 
