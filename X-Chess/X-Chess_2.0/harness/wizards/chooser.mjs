@@ -205,6 +205,51 @@ export function materialBalance(fen) {
 }
 
 /**
+ * How deep to search, from how much is left on the board.
+ *
+ * THE FLAT-SIGNAL FIX. A search that cannot see the mate scores every move on
+ * material instead, and material does not change when you shuffle a rook. Game
+ * 30 is what that looks like: Mason a rook and four pawns up, twenty-six of
+ * twenty-eight moves within half a pawn of the best, and twenty moves of
+ * shuffling before it converted. Measured at depth 3 and depth 5 on that exact
+ * position:
+ *
+ *   depth 3    26 of 28 moves within half a pawn of best     17ms
+ *   depth 5     1 of 28                                     122ms
+ *
+ * From "everything is fine" to "this move, obviously", for a tenth of a second.
+ *
+ * THE ASYMMETRY IS WHAT MAKES IT AFFORDABLE. Depth is expensive in a middlegame
+ * and cheap in an endgame, because the tree is narrow when the board is empty —
+ * depth 6 costs 23 SECONDS with 26 pieces and half a second with five. So the
+ * position that needs more depth is the position that can pay for it, and the
+ * one that cannot afford it does not need it.
+ *
+ * Measured costs at each tier, worst case in that band:
+ *
+ *   30 pieces  depth 3     55ms        7 pieces  depth 5    187ms
+ *   26 pieces  depth 4    294ms        5 pieces  depth 6    535ms
+ *                                      2 pieces  depth 7  2,652ms
+ *
+ * All of it sits inside a twelve-second block, and beside the five seconds a
+ * model already takes to answer, none of it is the bottleneck.
+ *
+ * A PURE FUNCTION OF THE POSITION, which keeps the whole thing deterministic:
+ * same board, same depth, same ranking, on any machine.
+ */
+export function depthFor(fen) {
+  const pieces = String(fen).split(' ')[0].replace(/[^a-zA-Z]/g, '').length - 2;
+  if (pieces >= 20) return 3;
+  if (pieces >= 12) return 4;
+  if (pieces >= 6) return 5;
+  if (pieces >= 3) return 6;
+  // Two pieces or fewer is a bare king being hunted, and it needs SEVEN before
+  // the list sharpens at all: at depth 3 through 6, twenty-four of twenty-four
+  // moves stayed within half a pawn. At depth 7, one.
+  return 7;
+}
+
+/**
  * Every legal move, ranked by the engine, as the character will see it.
  *
  * THE ENGINE INFORMS, IT DOES NOT PLAY. The whole list comes back, in the
@@ -229,9 +274,9 @@ export function materialBalance(fen) {
  *   depth?: number
  * }} options
  */
-export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }) {
+export function rankedNotes({ rankMoves, Position, fen, played = [], depth = null }) {
   const board = new Position(fen);
-  const ranked = rankMoves(board.state, depth);
+  const ranked = rankMoves(board.state, depth ?? depthFor(fen));
 
   // THE HARNESS RESOLVES THE CONDITION, so the model never has to. The house
   // rule used to read "if you are ahead on material, do not play it", which

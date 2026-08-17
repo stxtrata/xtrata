@@ -30,7 +30,7 @@ import { build } from 'esbuild';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { annotateMoves, chooseMove, claudeCodeAsker, materialBalance, rankedNotes } from './chooser.mjs';
+import { annotateMoves, chooseMove, claudeCodeAsker, depthFor, materialBalance, rankedNotes } from './chooser.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -54,8 +54,14 @@ const PLAIN = process.argv.includes('--plain');
  */
 const ONE_PLY = process.argv.includes('--one-ply');
 
-/** Plies the engine searches. Three is about 12ms and sees a mate in two. */
-const DEPTH = Number(arg('depth', '3'));
+/**
+ * Plies the engine searches, or null to scale it by how much is on the board.
+ *
+ * Null by default so the lab uses the SAME policy as the tournament. A lab that
+ * searched to a fixed depth would produce numbers that describe nothing anybody
+ * plays.
+ */
+const DEPTH = arg('depth') ? Number(arg('depth')) : null;
 
 /**
  * How many games run at once.
@@ -101,7 +107,7 @@ async function playOne({ Position, rankMoves, white, black, ask, seed }) {
 
     // Was a mate on offer, and did they take it? Measured from the engine
     // either way, so both arms are marked by the same examiner.
-    const truth = rankMoves(board.state, DEPTH);
+    const truth = rankMoves(board.state, DEPTH ?? depthFor(board.fen()));
     const mate = truth.find((r) => r.mateIn === 1);
     if (PLAIN) notes = null;
 
@@ -183,7 +189,7 @@ async function main() {
 
   console.log(`\nlab — ${GAMES} game${GAMES === 1 ? '' : 's'}, no chain`);
   console.log(`model     ${MODEL}`);
-  console.log(`notes     ${PLAIN ? 'STRIPPED' : ONE_PLY ? 'one-ply annotation (control)' : `engine, depth ${DEPTH}`}`);
+  console.log(`notes     ${PLAIN ? 'STRIPPED' : ONE_PLY ? 'one-ply annotation (control)' : `engine, depth ${DEPTH ?? 'scaled by piece count'}`}`);
   console.log(`from      ${FROM ?? 'the starting position'}`);
   console.log(`at once   ${CONCURRENCY}\n`);
 

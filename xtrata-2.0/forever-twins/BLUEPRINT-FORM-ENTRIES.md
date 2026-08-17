@@ -123,44 +123,34 @@ does not.
 
 **Scope of work**
 
-> Open the service to the public and publish the educational material.
+> The public record, and the first collection preserved on the grant's own template.
 >
-> **The public registry.** One row per collection: source contract, twin contract, tokens
-> preserved, whether the canonical set is finalised, the deployed source hash, and
-> whether that hash matches the published template. New contracts appear here as they are
-> added, so it is the place to watch as the preserved set grows, and the template
-> verification column is what makes a listing mean something rather than just exist.
+> **Registry.** One row per collection: source contract, twin contract, tokens preserved,
+> whether the canonical set is finalised, the deployed source hash, and whether that hash
+> matches the published template. New contracts appear as they are added.
 >
-> **What this milestone lets someone do.** Find a collection that already has a twin
-> contract, check it is genuine, and preserve their own piece of it. Creating a contract
-> for a collection that does not have one yet is milestone 3. This milestone is the
-> public record and the way in. Milestone 3 is the ability to start a new one.
+> **Where the line sits.** Here someone can find a collection that already has a twin
+> contract, check it is genuine, and preserve their own piece. Starting a contract for a
+> collection that has none is milestone 3.
 >
-> **The first collection on the new template.** One collection beyond the three already
-> live, preserved on an Xtrata-native contract generated from the milestone 1 template,
-> deployed and seeded by me. This is the step that proves the template works in
-> production rather than only in tests, and it gives the registry its first row that is
-> verifiable against the published source.
+> **First new collection.** One beyond the three already live, on a contract from the
+> milestone 1 template, deployed by me. Proves the template in production.
 >
-> **The documentation.** Four long-form documents, fact verified against live contract
-> state and published: the state of link rot in 2026, a verify-it-yourself guide, a
-> repoint-your-collection playbook, and the Bitcoin Pepes case study. Plus a
-> preserve-your-collection how-to and onboarding docs, written from the real run above
-> rather than from theory.
+> **Documentation.** Four long-form documents fact verified against live contract state:
+> the state of link rot in 2026, a verify-it-yourself guide, a repoint-your-collection
+> playbook, and the Bitcoin Pepes case study. Plus a preserve-your-collection how-to and
+> onboarding docs written from that real run.
 >
-> **Instrumentation.** Live counters from this point rather than reconstructed at the
-> end: collections preserved, twins minted, wallets holding a twin, and contracts
-> deployed through the tool.
+> **Counters** instrumented from this point.
 >
 > Completion evidence:
 >
-> 1. Registry URL, live, listing every collection with its twin contract id and its
->    template verification status.
-> 2. For the first new collection: contract id, finalise transaction id, and at least one
->    inscription transaction id.
-> 3. Six published document URLs, four long form plus the how-to and the onboarding docs.
-> 4. A public repository with a licence covering the template, the harvester and the
->    registry.
+> 1. Registry URL, listing every collection with its twin contract id and verification
+>    status.
+> 2. First new collection: contract id, finalise transaction id, one inscription
+>    transaction id.
+> 3. Six published document URLs.
+> 4. Public repository with a licence covering the template, harvester and registry.
 >
 > Target: end of week 8, Sunday 11 October 2026.
 
@@ -185,55 +175,34 @@ file for where they went and why.
 
 **Scope of work**
 
-> Let anyone start a new one, remove the need to hold STX, and show what it saved.
+> Let anyone start a new contract.
 >
-> **The deployer, which is the whole point of this milestone.** Milestone 2 published the
-> record and let holders preserve pieces of collections that already had a contract. This
-> milestone removes me from the process entirely: a public tool where any wallet can
-> generate a Forever Twins contract for a collection that has none, deploy it from their
-> own wallet, seed the canonical hashes and finalise the set. I hold no key and no step
-> waits on me. It also generates that collection's claim page automatically, so a working
-> contract arrives with a working front end. It opens to a short allow list first and goes
-> fully public after three clean deployments, which is a deliberate rollout rather than a
-> caveat.
+> **The deployer.** Any wallet can generate a Forever Twins contract for a collection that
+> has none, deploy it from their own wallet, seed the hashes and finalise the set. I hold
+> no key. No step waits on me. It builds the claim page too.
 >
-> **A second collection preserved, making two beyond the three already live.** The first
-> was delivered in milestone 2 by me, which proved the template. This one is selected on
-> measured evidence published in the registry: how the artwork is hosted, how many public
-> gateways currently serve it, and what share of the collection is already unreachable.
-> Every collection with off-chain art is at risk in principle, and the survey behind this
-> grant found two of nineteen already unreachable, so the useful question is not whether a
-> collection is at risk but which are closest to failing and how many people would lose
-> something. That measurement is published whether or not a collection is selected.
+> **A second collection**, making two beyond the three already live. Picked on measured
+> fragility: how the art is hosted, how many gateways still serve it, how much is already
+> gone.
 >
-> What "preserved" means here, stated now rather than argued in November: the twin
-> contract is live on mainnet, the canonical hash set is seeded and frozen, and at least
-> one twin has been inscribed against it. It does not mean every token has been claimed.
-> Claiming costs a fee and is the holder's choice, so nothing I do can compel it. A
-> collection whose canonical set is frozen is permanently preservable by anyone, for
-> ever, and that is the durable thing this grant buys.
+> **What preserved means.** The twin contract is live, the canonical set is frozen, and at
+> least one twin is inscribed. It does not mean every token is claimed. Claiming costs a
+> fee and that is the holder's call.
 >
-> **No STX required.** An access path so a holder can have their artwork preserved
-> without holding, spending or signing anything. See the note below on why this is
-> already possible rather than something that has to be invented.
+> **No STX needed.** A holder can have their art preserved without holding, spending or
+> signing anything.
 >
-> **The public record.** A metrics page reading live chain state, and a recap post
-> covering what shipped, what changed, and what the fee revenue sustains after the grant.
+> **The public record.** A metrics page reading live chain state, and a recap post.
 >
-> Completion evidence, all of it clickable:
+> Completion evidence:
 >
 > 1. Deployer URL, public and working.
-> 2. One mainnet twin contract generated end to end through the tool, with its deploy
->    transaction id.
-> 3. For the second new collection: contract id, finalise transaction id, and at least
->    one inscription transaction id. With milestone 2's collection this makes two beyond
->    the three already live.
-> 4. One mainnet preservation where the holder paid nothing and signed nothing, with the
->    transaction id showing me as payer and the binding resolving to them as owner.
-> 5. A preservation ledger of every piece of artwork saved with grant money, with
->    transaction ids and the holder each twin now binds to.
-> 6. The published fragility measurement across the collections surveyed.
-> 7. Metrics page URL and recap post URL.
+> 2. One mainnet twin contract built end to end through the tool, with its deploy
+>    transaction.
+> 3. Second collection: contract id, finalise transaction, one inscription transaction.
+> 4. A ledger of every piece saved with grant money, with transaction ids, including at
+>    least one where the holder paid nothing and signed nothing.
+> 5. Metrics page and recap post URLs.
 >
 > Target: end of week 12, Sunday 8 November 2026.
 

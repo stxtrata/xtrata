@@ -21,6 +21,7 @@ import {
   anthropicAsker,
   chooseMove,
   claudeCodeAsker,
+  depthFor,
   materialBalance,
   rankedNotes,
   extractMove
@@ -768,5 +769,51 @@ describe('what a forfeit costs and what it tells you', () => {
     const fen = 'r1bqkb1r/pp2ppp1/2p4p/7Q/6n1/8/PPP1PPPP/R1B1KBNR b KQkq - 1 8';
     const notes = rankedNotes({ rankMoves: search.rankMoves, Position: engine.Position, fen });
     expect(extractMove('e5', notes.map((n: any) => n.uci), notes)).toBe('e7e5');
+  });
+});
+
+describe('how deep to look, and why it depends on the position', () => {
+  // Game 30: Mason a rook and four pawns up, 26 of 28 moves within half a pawn
+  // of the best, twenty moves of shuffling before it converted. A search that
+  // cannot see the mate scores everything on material, and material does not
+  // change when you shuffle a rook.
+  const pieces = (fen: string) => fen.split(' ')[0].replace(/[^a-zA-Z]/g, '').length - 2;
+
+  it('searches shallow when the board is full', () => {
+    // Depth 6 with 26 pieces costs 23 SECONDS. It is not on offer.
+    const opening = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    expect(pieces(opening)).toBe(30);
+    expect(depthFor(opening)).toBe(3);
+  });
+
+  it('searches deeper as the board empties', () => {
+    expect(depthFor('8/ppp3p1/8/4k2K/8/8/2r5/8 b - - 23 51')).toBe(6);
+    expect(depthFor('8/8/8/3p4/5K2/2k5/8/q7 b - - 22 169')).toBe(7);
+  });
+
+  it('goes deepest against a bare king, which needs it most', () => {
+    // At depth 3 through 6, twenty-four of twenty-four moves stayed within half
+    // a pawn. At depth 7, one. And with two pieces that costs 2.6 seconds.
+    expect(depthFor('7k/8/8/8/8/8/5Q2/6K1 w - - 0 1')).toBe(7);
+  });
+
+  it('sharpens the ranking that went flat', async () => {
+    // The measurement this whole change exists for.
+    const engine = await loadEngine();
+    const search = await loadSearch();
+    const FEN = '8/ppp3p1/8/4k2K/8/8/2r5/8 b - - 23 51';
+    const near = (depth: number) => {
+      const r = search.rankMoves(new engine.Position(FEN).state, depth);
+      return r.filter((x: any) => r[0].score - x.score <= 50).length;
+    };
+    expect(near(3), 'depth 3 should be flat').toBeGreaterThan(20);
+    expect(near(depthFor(FEN)), 'the scaled depth should discriminate').toBeLessThan(5);
+  });
+
+  it('is a pure function of the position, so the ranking stays deterministic', () => {
+    const fen = '8/ppp3p1/8/4k2K/8/8/2r5/8 b - - 23 51';
+    expect(depthFor(fen)).toBe(depthFor(fen));
+    // The move counters must not change it — same board, same depth.
+    expect(depthFor(fen)).toBe(depthFor(fen.replace('23 51', '4 12')));
   });
 });
