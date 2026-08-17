@@ -250,6 +250,31 @@ describe('which kind of manifest a reader is holding', () => {
     expect(provenance(manifest, gamesOpened), 'the wrong anchor').toBe('compiled');
   });
 
+  it('calls a tournament nobody has started committed, not unknown', () => {
+    // The state Exhibition Two was in the moment it was inscribed: nine games
+    // open, a manifest on chain, and not a move played. The board said
+    // "provenance not checked", which reads as something having gone wrong at
+    // exactly the moment everything had gone right.
+    //
+    // It is provable rather than merely likely. The manifest is confirmed at a
+    // height that has passed and no move exists anywhere, so every move that
+    // will ever be played must land in a later block.
+    expect(provenance(8_789_734, null, true)).toBe('committed');
+  });
+
+  it('will not call it committed when the reads simply failed', () => {
+    // The distinction the flag exists for. A null first-move height covers both
+    // "nobody has moved" and "we could not find out", and only the first of
+    // those is evidence. Collapsing them is the same mistake as reading a 429
+    // on a balance as a balance of zero.
+    expect(provenance(8_789_734, null, false)).toBe(null);
+  });
+
+  it('says which kind of committed it is', () => {
+    expect(provenanceNote('committed', true)).toMatch(/no move has been played/);
+    expect(provenanceNote('committed', false)).toMatch(/before the first move/);
+  });
+
   it('calls it compiled when the games came first', () => {
     expect(provenance(200, 100)).toBe('compiled');
   });

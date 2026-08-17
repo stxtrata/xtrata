@@ -121,12 +121,34 @@ export async function scoreTournament(
   const facts = new Map<number, GameFacts>();
   let firstMove: number | null = null;
 
+  // EARNED, NOT ASSUMED. "No move has been played" is only sayable if every
+  // game was actually read and every one of them was empty. A failed read looks
+  // identical to an empty game from here, and letting the two collapse would
+  // turn "the endpoint was rate limiting us" into "this tournament is provably
+  // committed" - which is the exact shape of mistake this project has made
+  // before, reading a 429 on a balance as a balance of zero.
+  let readEverything = true;
+  let entriesSeen = 0;
+
   for (const game of tournament.games) {
     await deps.pace?.();
     const row = await deps.chain.getGame(game.id).catch(() => null);
-    if (!row) continue;
+    if (!row) {
+      readEverything = false;
+      continue;
+    }
 
-    const entries = await deps.chain.getAllEntries(game.id, row.nextSeq).catch(() => []);
+    const entries = await deps.chain
+      .getAllEntries(game.id, row.nextSeq)
+      .catch(() => {
+        readEverything = false;
+        return [];
+      });
+    entriesSeen += entries.length;
+    // A short log is a failed read too. `getAllEntries` pages, and a page that
+    // does not arrive returns what it has - so a game reporting forty entries
+    // and handing back four has not been read, however quietly.
+    if (entries.length < row.nextSeq) readEverything = false;
     for (const entry of entries) {
       if (typeof entry.height === 'number' && (firstMove === null || entry.height < firstMove)) {
         firstMove = entry.height;
@@ -147,8 +169,13 @@ export async function scoreTournament(
   }
 
   const checked = checkGames(tournament, facts);
-  const kind = provenance(await deps.reader.mintedAt(view.tournamentId ?? 0), firstMove);
-  const verdict = honours(kind, firstMove, deps.compiledAcceptedBefore);
+  const noMovesYet = readEverything && entriesSeen === 0;
+  const kind = provenance(
+    await deps.reader.mintedAt(view.tournamentId ?? 0),
+    firstMove,
+    noMovesYet
+  );
+  const verdict = honours(kind, firstMove, deps.compiledAcceptedBefore, noMovesYet);
 
   return {
     ...view,

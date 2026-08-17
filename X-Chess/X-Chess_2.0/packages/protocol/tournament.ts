@@ -375,9 +375,32 @@ export type Provenance = 'committed' | 'compiled';
 
 export function provenance(
   manifestHeight: number | null,
-  firstMoveHeight: number | null
+  firstMoveHeight: number | null,
+  /**
+   * True only when every game was READ and every one of them was empty.
+   *
+   * NOT the same as `firstMoveHeight === null`, and the difference is the whole
+   * reason this argument exists. A null height means "no move height was
+   * found", which covers both a tournament nobody has started and a run of
+   * failed reads — and those must not produce the same answer, because one of
+   * them is provable and the other is ignorance.
+   */
+  noMovesYet = false
 ): Provenance | null {
-  if (manifestHeight === null || firstMoveHeight === null) return null;
+  if (manifestHeight === null) return null;
+
+  // A TOURNAMENT NOBODY HAS STARTED IS COMMITTED, and this is the strongest
+  // form of it rather than a missing answer.
+  //
+  // The manifest is confirmed at a height that has already passed. No move
+  // exists anywhere in it. So every move that will ever be played must land in
+  // a later block than the manifest - not probably, necessarily. Reporting
+  // "provenance not checked" for that case understated the one situation the
+  // whole mechanism is designed to produce, and read as though something had
+  // gone wrong at the very moment everything had gone right.
+  if (noMovesYet) return 'committed';
+
+  if (firstMoveHeight === null) return null;
   // Strictly before, and the tie goes against the organiser: a manifest landing
   // in the same block as the first move did not demonstrably precede it, and
   // "probably committed" is not a thing worth telling a reader.
@@ -385,9 +408,14 @@ export function provenance(
 }
 
 /** What to show a reader, in words rather than a term of art. */
-export function provenanceNote(kind: Provenance | null): string {
+export function provenanceNote(kind: Provenance | null, noMovesYet = false): string {
   if (kind === 'committed') {
-    return 'Committed before play: this manifest was inscribed before the first move was played.';
+    // Two different situations, and the second is worth its own sentence: a
+    // reader looking at a tournament that has not started wants to know that
+    // nothing is missing, rather than wondering where the games went.
+    return noMovesYet
+      ? 'Committed before play: this manifest was inscribed and no move has been played in any of its games yet.'
+      : 'Committed before play: this manifest was inscribed before the first move was played.';
   }
   if (kind === 'compiled') {
     return 'Compiled after play: this manifest describes games that already existed when it was written.';
@@ -416,9 +444,10 @@ export function provenanceNote(kind: Provenance | null): string {
 export function honours(
   kind: Provenance | null,
   firstMoveHeight: number | null,
-  compiledAcceptedBefore: number
+  compiledAcceptedBefore: number,
+  noMovesYet = false
 ): { ok: boolean; says: string } {
-  if (kind === 'committed') return { ok: true, says: provenanceNote(kind) };
+  if (kind === 'committed') return { ok: true, says: provenanceNote(kind, noMovesYet) };
   if (kind === null) return { ok: true, says: provenanceNote(kind) };
   if (firstMoveHeight !== null && firstMoveHeight < compiledAcceptedBefore) {
     return { ok: true, says: `${provenanceNote(kind)} Accepted because its games predate the manifest rule.` };
