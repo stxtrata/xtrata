@@ -30,8 +30,24 @@ import { tmpdir } from 'node:os';
 import { HOUSE_RULES } from './personalities.mjs';
 import { WizardSafetyError, scrub } from './wizards-core.mjs';
 
-/** How many times a character may answer with something that is not a legal move. */
-export const MAX_ATTEMPTS = 3;
+/**
+ * How many times a character may answer with something that is not a legal move.
+ *
+ * FIVE, NOT THREE, and the arithmetic is the argument. Re-asking the position
+ * that forfeited game 29 gave two good answers and one bad one — the failure is
+ * stochastic and roughly one in three THERE, which is far worse than typical.
+ * At that rate three strikes forfeits about 4% of the time, and over a
+ * fifty-move game that is most of a forfeit per game.
+ *
+ * The bad reply is not confusion about chess. Ledger wanted e5, which was the
+ * top-ranked move on the list, and wrote "e5e5" — the destination square twice
+ * instead of from and to. It knew the move and mangled the notation.
+ *
+ * Attempts are nearly free: five seconds each, and only spent when something
+ * already went wrong. A forfeit is a permanent on-chain result, so the trade is
+ * lopsided in favour of asking again.
+ */
+export const MAX_ATTEMPTS = 5;
 
 /**
  * Room to think AND answer, which is not the same as room to ramble.

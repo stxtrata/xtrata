@@ -326,7 +326,14 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
       // A resignation is a real event with a real result. The leaderboard
       // counts it, replay derives it, and a spectator sees a finished game.
       if (!error?.forfeit) throw error;
-      await resign({ gameId, mover, rules, budget });
+      // WHAT IT ACTUALLY SAID, carried into the log and the console. The error
+      // has the refusals and this used to drop them for a fixed phrase, so the
+      // most diagnostic fact about a forfeit — the reply that caused it — was
+      // thrown away at the moment it was recorded.
+      //
+      // Game 29 cost a live game to find out, and the answer was worth having:
+      // Ledger wanted e5, the top-ranked move, and wrote "e5e5".
+      await resign({ gameId, mover, rules, budget, why: scrub(String(error.message)) });
       return state.turn === 'white' ? '0-1' : '1-0';
     }
 

@@ -153,7 +153,7 @@ describe('what a hostile entry can cause', () => {
     };
     await expect(
       chooseMove({ character: GAMBIT, position: start(), ask: counting })
-    ).rejects.toThrow(/did not give a legal move in 3 attempts/);
+    ).rejects.toThrow(new RegExp(`did not give a legal move in ${MAX_ATTEMPTS} attempts`));
     expect(asked, 'it did not use its attempts').toBe(MAX_ATTEMPTS);
   });
 
@@ -728,5 +728,45 @@ describe('a move that draws is priced as a draw', () => {
     const once = await notesFor(knightShuffle);
     const twice = await notesFor(knightShuffle);
     expect(once.map((n: any) => n.uci)).toEqual(twice.map((n: any) => n.uci));
+  });
+});
+
+describe('what a forfeit costs and what it tells you', () => {
+  // GAME 29 was the first real forfeit on chain — every earlier one turned out
+  // to be the harness failing and being recorded as a player. Ledger wanted
+  // e5, which was the TOP-RANKED move at +1.2, and wrote "e5e5": the
+  // destination square twice instead of from and to. It knew the move and
+  // mangled the notation.
+
+  it('gives five attempts, because the failure is stochastic', () => {
+    // Re-asking that exact position gave two good answers and one bad one.
+    // At one in three, three strikes forfeits about 4% of moves, which over a
+    // fifty-move game is most of a forfeit per game. Attempts cost five
+    // seconds; a forfeit is a permanent on-chain result.
+    expect(MAX_ATTEMPTS).toBe(5);
+  });
+
+  it('refuses a reply that names two possible moves rather than guessing', async () => {
+    // "e5e5" was unresolvable and refusing was CORRECT: in that position both
+    // the e7 pawn and the g4 knight could reach e5, so picking one would be
+    // inventing a move. This is the property that makes the whole arrangement
+    // safe — the worst an entry can cause is one move from a closed set.
+    const engine = await loadEngine();
+    const fen = 'r1bqkb1r/pp2ppp1/2p4p/7Q/6n1/8/PPP1PPPP/R1B1KBNR b KQkq - 1 8';
+    const board = new engine.Position(fen);
+    const legal = board.movesUci();
+    const toE5 = legal.filter((uci: string) => uci.slice(2, 4) === 'e5');
+    expect(toE5.length, 'the fixture must be genuinely ambiguous').toBeGreaterThan(1);
+    expect(extractMove('e5e5', legal)).toBeNull();
+  });
+
+  it('still takes the SAN, which does disambiguate', async () => {
+    // "e5" means the pawn move and nothing else — the knight capture would be
+    // written Nxe5. So the notation the model reached for second was fine.
+    const engine = await loadEngine();
+    const search = await loadSearch();
+    const fen = 'r1bqkb1r/pp2ppp1/2p4p/7Q/6n1/8/PPP1PPPP/R1B1KBNR b KQkq - 1 8';
+    const notes = rankedNotes({ rankMoves: search.rankMoves, Position: engine.Position, fen });
+    expect(extractMove('e5', notes.map((n: any) => n.uci), notes)).toBe('e7e5');
   });
 });

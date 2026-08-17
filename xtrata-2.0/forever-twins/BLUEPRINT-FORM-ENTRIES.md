@@ -115,7 +115,7 @@ does not.
 
 **Name**
 
-> Preservation service, registry and documentation live
+> Public registry, documentation, and the first collection on the new template
 
 **Amount**
 
@@ -125,22 +125,42 @@ does not.
 
 > Open the service to the public and publish the educational material.
 >
-> A public preservation registry, one row per collection, showing source contract,
-> twin contract, tokens preserved, whether the canonical set is finalised, the deployed
-> source hash, and whether that hash matches the published template. A public
-> preservation service on mainnet where a collection's twin contract can be found,
-> verified and used. Four long-form documents fact verified against live contract state
-> and published: the state of link rot in 2026, a verify-it-yourself guide, a
-> repoint-your-collection playbook, and the Bitcoin Pepes case study. A
-> preserve-your-collection how-to and onboarding docs, written from a real run rather
-> than from theory. Live counters instrumented from this point rather than reconstructed
-> at the end: collections preserved, twins minted, distinct wallets holding a twin, and
-> contracts deployed through the tool.
+> **The public registry.** One row per collection: source contract, twin contract, tokens
+> preserved, whether the canonical set is finalised, the deployed source hash, and
+> whether that hash matches the published template. New contracts appear here as they are
+> added, so it is the place to watch as the preserved set grows, and the template
+> verification column is what makes a listing mean something rather than just exist.
 >
-> Completion evidence: registry URL, live, listing every collection with its twin
-> contract id and its template verification status. Six published document URLs, four
-> long form plus the how-to and the onboarding docs. A public repository with a licence
-> covering the template, the harvester and the registry.
+> **What this milestone lets someone do.** Find a collection that already has a twin
+> contract, check it is genuine, and preserve their own piece of it. Creating a contract
+> for a collection that does not have one yet is milestone 3. This milestone is the
+> public record and the way in. Milestone 3 is the ability to start a new one.
+>
+> **The first collection on the new template.** One collection beyond the three already
+> live, preserved on an Xtrata-native contract generated from the milestone 1 template,
+> deployed and seeded by me. This is the step that proves the template works in
+> production rather than only in tests, and it gives the registry its first row that is
+> verifiable against the published source.
+>
+> **The documentation.** Four long-form documents, fact verified against live contract
+> state and published: the state of link rot in 2026, a verify-it-yourself guide, a
+> repoint-your-collection playbook, and the Bitcoin Pepes case study. Plus a
+> preserve-your-collection how-to and onboarding docs, written from the real run above
+> rather than from theory.
+>
+> **Instrumentation.** Live counters from this point rather than reconstructed at the
+> end: collections preserved, twins minted, wallets holding a twin, and contracts
+> deployed through the tool.
+>
+> Completion evidence:
+>
+> 1. Registry URL, live, listing every collection with its twin contract id and its
+>    template verification status.
+> 2. For the first new collection: contract id, finalise transaction id, and at least one
+>    inscription transaction id.
+> 3. Six published document URLs, four long form plus the how-to and the onboarding docs.
+> 4. A public repository with a licence covering the template, the harvester and the
+>    registry.
 >
 > Target: end of week 8, Sunday 11 October 2026.
 
@@ -165,41 +185,67 @@ file for where they went and why.
 
 **Scope of work**
 
-> Open preservation to anyone and show what it saved.
+> Let anyone start a new one, remove the need to hold STX, and show what it saved.
 >
-> A public deployer where any wallet can generate a Forever Twins contract for a
-> Stacks collection, deploy it from their own wallet, seed the canonical hashes and
-> finalise the set, with no action from me at any point and no key held by me. An
-> automatically generated claim page for every registry entry.
+> **The deployer, which is the whole point of this milestone.** Milestone 2 published the
+> record and let holders preserve pieces of collections that already had a contract. This
+> milestone removes me from the process entirely: a public tool where any wallet can
+> generate a Forever Twins contract for a collection that has none, deploy it from their
+> own wallet, seed the canonical hashes and finalise the set. I hold no key and no step
+> waits on me. It also generates that collection's claim page automatically, so a working
+> contract arrives with a working front end. It opens to a short allow list first and goes
+> fully public after three clean deployments, which is a deliberate rollout rather than a
+> caveat.
 >
-> At least two collections beyond the three already live, preserved on
-> template-generated contracts, selected by evidence of fragile art hosting with that
-> evidence recorded in the registry. A public metrics page and a recap post.
+> **A second collection preserved, making two beyond the three already live.** The first
+> was delivered in milestone 2 by me, which proved the template. This one is selected on
+> measured evidence published in the registry: how the artwork is hosted, how many public
+> gateways currently serve it, and what share of the collection is already unreachable.
+> Every collection with off-chain art is at risk in principle, and the survey behind this
+> grant found two of nineteen already unreachable, so the useful question is not whether a
+> collection is at risk but which are closest to failing and how many people would lose
+> something. That measurement is published whether or not a collection is selected.
 >
 > What "preserved" means here, stated now rather than argued in November: the twin
-> contract is live on mainnet, the collection's canonical hash set is seeded and
-> frozen, and at least one twin has been inscribed against it. It does not mean every
-> token in the collection has been claimed. Claiming costs a fee and is the holder's
-> choice, so no amount of work on my side can compel it. A collection whose canonical
-> set is frozen is permanently preservable by anyone, for ever, which is the durable
-> thing this grant is buying.
+> contract is live on mainnet, the canonical hash set is seeded and frozen, and at least
+> one twin has been inscribed against it. It does not mean every token has been claimed.
+> Claiming costs a fee and is the holder's choice, so nothing I do can compel it. A
+> collection whose canonical set is frozen is permanently preservable by anyone, for
+> ever, and that is the durable thing this grant buys.
 >
-> Completion evidence: deployer URL, public and working. A mainnet contract id
-> generated end to end through the tool, with its deploy transaction. For each new
-> collection, a mainnet contract id, a finalise transaction id, and at least one
-> inscription transaction id. The metrics page and the recap post.
+> **No STX required.** An access path so a holder can have their artwork preserved
+> without holding, spending or signing anything. See the note below on why this is
+> already possible rather than something that has to be invented.
 >
-> Plus evidence the work benefited someone: one mainnet preservation completed on
-> behalf of a holder who held no STX and signed nothing, with the transaction id and
-> the resulting binding, and a preservation ledger listing every piece of at-risk
-> artwork saved with grant money, with transaction ids and the holders each twin now
-> binds to.
+> **The public record.** A metrics page reading live chain state, and a recap post
+> covering what shipped, what changed, and what the fee revenue sustains after the grant.
+>
+> Completion evidence, all of it clickable:
+>
+> 1. Deployer URL, public and working.
+> 2. One mainnet twin contract generated end to end through the tool, with its deploy
+>    transaction id.
+> 3. For the second new collection: contract id, finalise transaction id, and at least
+>    one inscription transaction id. With milestone 2's collection this makes two beyond
+>    the three already live.
+> 4. One mainnet preservation where the holder paid nothing and signed nothing, with the
+>    transaction id showing me as payer and the binding resolving to them as owner.
+> 5. A preservation ledger of every piece of artwork saved with grant money, with
+>    transaction ids and the holder each twin now binds to.
+> 6. The published fragility measurement across the collections surveyed.
+> 7. Metrics page URL and recap post URL.
 >
 > Target: end of week 12, Sunday 8 November 2026.
 
 **Note on numbers.** Completion is the metrics page being live and accurate. The
 values it reports are outcomes, not commitments. Third-party deployments are reported
 with transaction ids, never made a condition of completion.
+
+For the record, so the number is not disputed later: "wallets holding a Forever Twin"
+counts the resolved owner, not the raw NFT holder. A twin sitting in escrow is owned
+on chain by the helper contract, and the registry resolves it to whoever holds the
+original. Counting raw holders would report the helper as one wallet and everybody
+else as none, which would be true on chain and useless as a measure.
 
 **Where the LEO Cats and Miami Degens successor contracts went.** They are no longer a
 milestone deliverable anywhere, deliberately. They only become *necessary* if the Xtrata
@@ -281,25 +327,33 @@ v3.2.4 and v3.4.1, three ordering defects in the cutover plan are unmerged, and 
 faithful testnet rehearsal needs four large contract deploys in strict order. None of
 that belongs behind a payment gate.
 
-### Recommendation
+### Decided, 17 August 2026
 
-**Do the grant first. Do the cutover after week 12, or in gaps once milestone 2 has
-landed.** The cutover has no external deadline. The grant has three dates and a steward.
+**Grant first. The mainnet cutover waits until after the grant, or for gaps once
+milestone 2 has landed.** The cutover has no external deadline. The grant has three dates
+and a steward.
 
-Two consequences worth accepting knowingly:
+**DeOrganized gets a testnet v3.2.4 instead**, within the next few days. They are waiting
+on `mint-single-tx-to`, which only ships with the new core, and today they work around it
+by minting from a temporary wallet and transferring on, which costs an extra transaction
+and records the wrong creator. A testnet deployment lets them build against the real
+interface immediately, at no risk to mainnet and no cost to the grant timeline. It also
+doubles as the T-phase rehearsal the cutover needs later, so none of it is throwaway.
 
-1. **DeOrganized is waiting on `mint-single-tx-to`**, which only ships with the new core.
-   They have a working path today, minting from a temporary wallet and transferring on,
-   which costs an extra transaction and records the wrong creator. So deferral has a
-   relationship cost, not a technical one. Tell them a date rather than letting it drift.
-2. **If DeOrganized turns out to be time-critical**, then the cutover has to happen
-   inside the window and the honest response is to move the milestone dates, not to
-   absorb it silently. Milestone 1 to week 6 and milestone 2 to week 10 would be the
-   shape. Raise that with the steward before submitting rather than filing a Risk update
-   in October.
+This is why **milestone 1 stays at week 4**. The decision was originally going to cost
+that week, and this route avoids it.
 
-That is the fork. It depends on one fact this document cannot settle: how soon
-DeOrganized actually needs the recipient split.
+Three things to do this week, none of them grant work:
+
+1. Settle whether the successor is v3.2.4 or v3.4.1. Nothing can be deployed until this
+   is decided, even to testnet.
+2. Port the `mint-single-tx-to` tests into the runnable tree. It has zero coverage today
+   and it is the exact function DeOrganized will be exercising, so testnet is where a
+   defect should surface.
+3. Deploy to testnet and tell them. See `contracts/drafts/v3.2.4/DEPLOY-THIS-WEEK.md`
+   for the ordered steps, and `forever-twins/TESTNET-SETUP.md` for the trait gotcha:
+   the `[TESTNET]` address baked into the source does not exist and has to be deployed
+   first.
 
 ### Either way, do this in week 1
 
