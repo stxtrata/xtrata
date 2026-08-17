@@ -440,21 +440,28 @@ The application is Xtrata inscription **2988**, version 2.0.0, built
 It talks to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`
 on mainnet.
 
-### Live state, read from the contract on 2026-08-11
+### Live state, read from the contract on 2026-08-17
 
 | Reading | Value |
 | --- | --- |
-| `get-game-count` | 9 |
-| Moves submitted across all games | 80 |
-| Distinct addresses that have opened a game | 2 |
-| `get-ranked-count` | 5 |
-| `get-open-fee` | 1000000 uSTX (1 STX) |
+| `get-game-count` | 30 |
+| Moves submitted across all games | 1691 |
+| Distinct addresses that have opened a game | 9 |
+| `get-ranked-count` | 25 |
+| `get-open-fee` | 10000 uSTX (0.01 STX) |
+| `get-rebate-amount` | 10000 uSTX |
 | `get-rebate-count` | 2 |
 | `is-solvent` | true |
 
-The longest game so far is game 4 at 33 moves. Game 8 is the longest ranked
-one at 20. Every one of those 80 moves is a signed transaction, so the claim
-that a move is a transaction is no longer a design statement.
+The longest game so far is game 18 at 340 submissions. Every one of those 1,691
+moves is a signed transaction, so the claim that a move is a transaction is no
+longer a design statement.
+
+**The two rebate readings are wrong and are the reason for ADR-0016.** The
+launch values are a rebate of 2,000 µSTX and a count of 45; what is live is the
+old 10,000 and the count of 2 that canary step 14 lowers it to in order to spend
+an allowance by hand. One `set-sponsorship` from the owner fixes both, and the
+step now restores what it lowers.
 
 **These numbers are a snapshot and go stale.** Re-read them from the contract
 before quoting them anywhere. The commands are in

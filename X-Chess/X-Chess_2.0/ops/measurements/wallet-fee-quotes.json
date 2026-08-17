@@ -1,0 +1,48 @@
+{
+  "note": "What the Hiro fee estimator would quote a wallet for one xchess submit, sampled every 20 seconds.",
+  "why": "The rebate has to cover what a WALLET charges a human, not what the tournament runner pays. The runner pays 400 uSTX because it can replace its own transaction; a board cannot.",
+  "call": "submit(uint, string-ascii) against SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary, 196 bytes",
+  "endpoint": "POST /v2/fees/transaction",
+  "samples": 46,
+  "spanMinutes": 15,
+  "unit": "microSTX",
+  "tiers": [
+    {
+      "tier": "low",
+      "min": 196,
+      "p25": 329,
+      "median": 329,
+      "p75": 526,
+      "p90": 2058,
+      "max": 23893
+    },
+    {
+      "tier": "middle",
+      "min": 198,
+      "p25": 515,
+      "median": 646,
+      "p75": 1619,
+      "p90": 11854,
+      "max": 46104
+    },
+    {
+      "tier": "high",
+      "min": 268,
+      "p25": 2301,
+      "median": 11206,
+      "p75": 31714,
+      "p90": 64010,
+      "max": 312472
+    }
+  ],
+  "middleAtOrBelow": {
+    "1000": "67%",
+    "2000": "78%",
+    "3000": "83%",
+    "5000": "87%",
+    "8000": "89%",
+    "15000": "93%"
+  },
+  "chosenRebate": 2000,
+  "chosenRebateNote": "Set here because 78% of middle quotes are at or below it. The rest are what the 0.25 STX bootstrap is for."
+}

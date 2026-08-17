@@ -60,6 +60,40 @@ const CONFIG: Config = ((globalThis as Record<string, unknown>).__XCHESS_CANARY_
 const state: Record<string, unknown> = {};
 
 /**
+ * The launch sponsorship constants, in one place.
+ *
+ * They were written out three times - in `configure`, in `configured`, and in
+ * the exhaustion step's temporary override - and that is how the live contract
+ * came to be selling two rebates. Step 14 lowers the count so an allowance can
+ * be spent by hand, and nothing ever put it back, so every sponsorship sold
+ * since 2026-08-11 has bought a beneficiary exactly two rebates against a
+ * published forty-five. The `configured` step below is a differ that would have
+ * caught it, and nobody had run it since.
+ *
+ * A single record does not by itself stop that. What stops it is the exhaustion
+ * step restoring THESE numbers when it finishes, which it can only do if there
+ * is a "these numbers" to restore.
+ *
+ * The values are ADR-0016's, measured against a fee distribution rather than a
+ * fee. They must match contracts/xchess-core-v1.clar:115-119.
+ */
+const LAUNCH_SPONSORSHIP = {
+  bootstrap: 250_000n,
+  rebate: 2_000n,
+  count: 45n,
+  margin: 50_000n
+} as const;
+
+/**
+ * A rebate count small enough that a person can spend the whole allowance.
+ *
+ * Two, because the exhaustion step is one signature per rebate and its subject
+ * is what happens AFTER the last one. Forty-five signatures to reach a
+ * three-signature assertion is not thoroughness, it is a step nobody runs.
+ */
+const SPENDABLE_BY_HAND = 2n;
+
+/**
  * Where the contract lives, and who is currently signing. Two different things.
  *
  * They start out the same, because the account that deploys is the account that
@@ -714,6 +748,123 @@ The board never reads the network: networkFromAddress is ` +
   }
 };
 
+/**
+ * Spend a sponsorship allowance to nothing, then submit once more.
+ *
+ * Lifted out of the handler so that the handler is nothing but the guarantee
+ * that whatever this lowers gets put back. See `exhaustion`.
+ */
+async function exhaustAllowance(ctx: CanaryContext): Promise<StepResult> {
+  const c = requireChain();
+  const who = String(state.opponent);
+  if (!who) return no('run the sponsored steps first');
+
+  // A submission that is deliberately not a move. Length is all the contract
+  // checks, so this is stored, charged and rebated exactly like a real move,
+  // and every reader skips it. Said out loud so that nobody reading the log
+  // later thinks the canary played nonsense chess by accident.
+  const JUNK = 'zzzz';
+
+  const asSponsored = async (): Promise<string | null> => {
+    if (signer === who) return null;
+    const found = await connect({ forcePrompt: true });
+    if (!found) return 'the wallet did not answer';
+    if (found !== who) {
+      return `this must be signed by ${who}, but the wallet offered ${found}. Switch account.`;
+    }
+    return null;
+  };
+
+  // Which game is being drained? A small one made for the purpose if there is
+  // one, otherwise whatever the sponsored steps used.
+  let game = Number(state.exhaustGame || state.sponsoredGame);
+  let row = game ? await c.getSponsorship(game, who) : null;
+
+  // Too big to spend by hand, and it cannot be reached by draining the wallet
+  // either whenever the rebate is at or above what the wallet quotes, because
+  // then the balance climbs. Build a small one instead, in this step, rather
+  // than sending somebody away to do it.
+  //
+  // WHAT IS LOWERED HERE IS PUT BACK. It was not, once, and the live contract
+  // has been selling two-rebate sponsorships ever since under a document
+  // promising forty-five. The `finally` in the `exhaustion` handler that calls
+  // this is the other half, and it runs on every exit from here.
+  if (!row || row.rebatesLeft > 6n) {
+    const price = await c.getSponsorPrice();
+    if (price.liability > LAUNCH_SPONSORSHIP.rebate * SPENDABLE_BY_HAND) {
+      ctx.log('info', `setting the rebate count to ${SPENDABLE_BY_HAND} so an allowance can be spent by hand`);
+      const set = await c.setSponsorship(
+        LAUNCH_SPONSORSHIP.bootstrap,
+        LAUNCH_SPONSORSHIP.rebate,
+        SPENDABLE_BY_HAND,
+        LAUNCH_SPONSORSHIP.margin
+      );
+      const done = await ctx.confirm(set.txid ?? '', 'set-sponsorship');
+      if (!done.ok) return no(`set-sponsorship ended as ${done.status}`);
+      state.countLowered = true;
+    }
+
+    ctx.log('info', `opening a small sponsored game for ${who}`);
+    const rules = normaliseRules({ ...DEFAULT_RULES, white: signer!, black: who });
+    const opened = await c.openSponsoredGame(rulesHash(rules), false, who);
+    const done = await ctx.confirm(opened.txid ?? '', 'the sponsored open');
+    if (!done.ok) return no(`the sponsored open ended as ${done.status}`);
+
+    game = await c.getGameCount();
+    row = await c.getSponsorship(game, who);
+    if (!row) return no(`opened game ${game} but it carries no sponsorship for ${who}`);
+    state.exhaustGame = game;
+    ctx.log('ok', `game ${game} has ${row.rebatesLeft} rebates to spend`);
+  }
+
+  // Spend whatever is left, one signature each, waiting between so the
+  // allowance read is never stale.
+  while (row && row.rebatesLeft > 0n) {
+    const wrong = await asSponsored();
+    if (wrong) return no(wrong);
+    ctx.log('info', `spending a rebate: ${row.rebatesLeft} left`);
+    const sent = await c.submit(game, JUNK);
+    const done = await ctx.confirm(sent.txid ?? '', `submission of ${JUNK}`);
+    if (!done.ok) return no(`the submission ended as ${done.status}`);
+    row = await c.getSponsorship(game, who);
+  }
+
+  // The assertion this step exists for: with no allowance left, a submission
+  // must still land, paying its own gas.
+  const before = await balanceOf(c, who);
+  const wrong = await asSponsored();
+  if (wrong) return no(wrong);
+  ctx.log('info', 'allowance is gone; submitting once more with no rebate behind it');
+  const last = await c.submit(game, JUNK);
+  const settled = await ctx.confirm(last.txid ?? '', 'the unsponsored submission');
+  if (!settled.ok) return no(`the last submission ended as ${settled.status}`);
+
+  const after = await balanceOf(c, who);
+  const entries = await c.getAllEntries(game);
+  const stored = entries.filter((e) => e.sender === who).length;
+  const finalRow = await c.getSponsorship(game, who);
+
+  return ok(
+    `RUNNING OUT DID NOT END THE GAME.\n\n` +
+      `game        ${game}\n` +
+      `allowance   ${finalRow?.rebatesLeft ?? 0n} rebates left\n` +
+      `submissions ${stored} stored from ${who}\n` +
+      `balance     ${stx(before)} -> ${stx(after)}\n` +
+      `last txid   ${settled.txid}\n\n` +
+      'The final submission carried no rebate. It was stored anyway and the wallet paid its ' +
+      'own gas, which is the whole claim: a sponsorship running out is an ordinary economic ' +
+      'state, not the end of a game.\n\n' +
+      'The submissions are four characters that are not legal moves. The contract checks ' +
+      'length and nothing else, so they were stored and charged exactly like moves, and every ' +
+      'reader skips them.',
+    {
+      exhaustedGame: String(game),
+      exhaustedSubmissions: String(stored),
+      balanceAfterExhaustion: String(after)
+    }
+  );
+}
+
 const handlers: Record<string, StepHandler> = {
   ...walletHandlers,
   wallet: async () => {
@@ -867,29 +1018,37 @@ const handlers: Record<string, StepHandler> = {
     // Already set? A second set-sponsorship writes the same numbers for another
     // network fee and proves nothing.
     const current = await c.getSponsorPrice();
-    const wanted = BigInt(ctx.input('rebate-count') || '45');
+    const wanted = BigInt(ctx.input('rebate-count') || String(LAUNCH_SPONSORSHIP.count));
     if (
-      current.bootstrap === 60_000n &&
-      current.liability === 10_000n * wanted &&
-      current.margin === 50_000n
+      current.bootstrap === LAUNCH_SPONSORSHIP.bootstrap &&
+      current.liability === LAUNCH_SPONSORSHIP.rebate * wanted &&
+      current.margin === LAUNCH_SPONSORSHIP.margin
     ) {
       ctx.log('warn', 'the launch constants are already set; nothing was sent');
       return ok('Already at the launch values. NOTHING WAS SENT. Read them back next.');
     }
 
-    // The launch values from ADR-0004, measured rather than guessed.
+    // The launch values from ADR-0016, measured rather than guessed.
     //
     // The count is the one that is worth overriding. At 45 the allowance takes
     // 45 signatures to spend, which makes the exhaustion step impractical to
-    // reach - and it CANNOT be reached by draining the wallet instead, because
-    // the rebate is larger than the median fee and the balance climbs. Setting
-    // a small count and opening a fresh sponsored game exhausts one in three.
-    // Existing rows keep the count they were funded with, so this is safe.
-    const count = BigInt(ctx.input('rebate-count') || '45');
-    const result = await c.setSponsorship(60_000n, 10_000n, count, 50_000n);
+    // reach - and it CANNOT be reached by draining the wallet instead whenever
+    // the rebate is at or above what the wallet is quoting, because then the
+    // balance climbs. Setting a small count and opening a fresh sponsored game
+    // exhausts one in three. Existing rows keep the count they were funded
+    // with, so this is safe.
+    const count = BigInt(ctx.input('rebate-count') || String(LAUNCH_SPONSORSHIP.count));
+    const result = await c.setSponsorship(
+      LAUNCH_SPONSORSHIP.bootstrap,
+      LAUNCH_SPONSORSHIP.rebate,
+      count,
+      LAUNCH_SPONSORSHIP.margin
+    );
     ctx.log('ok', 'set-sponsorship submitted', result.txid);
     return ok(
-      `txid ${result.txid}\n\nbootstrap 0.060  rebate 0.010  count ${count}  margin 0.050\n\n` +
+      `txid ${result.txid}\n\nbootstrap ${stx(LAUNCH_SPONSORSHIP.bootstrap)}  ` +
+        `rebate ${stx(LAUNCH_SPONSORSHIP.rebate)}  count ${count}  ` +
+        `margin ${stx(LAUNCH_SPONSORSHIP.margin)}\n\n` +
         'Submitted, NOT verified. Read it back next.',
       { configureTxid: result.txid }
     );
@@ -899,7 +1058,11 @@ const handlers: Record<string, StepHandler> = {
     const c = requireChain();
     const price = await c.getSponsorPrice();
     const fee = await c.getOpenFee();
-    const expected = { bootstrap: 60_000n, rebate: 10_000n, liability: 450_000n, margin: 50_000n };
+    const expected = {
+      bootstrap: LAUNCH_SPONSORSHIP.bootstrap,
+      liability: LAUNCH_SPONSORSHIP.rebate * LAUNCH_SPONSORSHIP.count,
+      margin: LAUNCH_SPONSORSHIP.margin
+    };
     const problems: string[] = [];
     if (price.bootstrap !== expected.bootstrap) problems.push(`bootstrap is ${price.bootstrap}`);
     if (price.liability !== expected.liability) problems.push(`liability is ${price.liability}`);
@@ -1251,104 +1414,46 @@ const handlers: Record<string, StepHandler> = {
    * that must never be automated, and everything around them now is.
    */
   exhaustion: async (ctx) => {
-    const c = requireChain();
-    const who = String(state.opponent);
-    if (!who) return no('run the sponsored steps first');
-
-    // A submission that is deliberately not a move. Length is all the contract
-    // checks, so this is stored, charged and rebated exactly like a real move,
-    // and every reader skips it. Said out loud so that nobody reading the log
-    // later thinks the canary played nonsense chess by accident.
-    const JUNK = 'zzzz';
-
-    const asSponsored = async (): Promise<string | null> => {
-      if (signer === who) return null;
-      const found = await connect({ forcePrompt: true });
-      if (!found) return 'the wallet did not answer';
-      if (found !== who) {
-        return `this must be signed by ${who}, but the wallet offered ${found}. Switch account.`;
+    // Whatever this step lowers, it puts back.
+    //
+    // A `finally` and not a line at the end, because the step has a dozen ways
+    // out: a wallet on the wrong account, a transaction that aborts, a person
+    // closing the tab. Every one of them used to leave the contract selling a
+    // two-rebate sponsorship, and the ones that fail early are exactly the ones
+    // nobody goes back to tidy up after.
+    try {
+      return await exhaustAllowance(ctx);
+    } finally {
+      if (state.countLowered) {
+        try {
+          const c = requireChain();
+          const price = await c.getSponsorPrice();
+          const wanted = LAUNCH_SPONSORSHIP.rebate * LAUNCH_SPONSORSHIP.count;
+          if (price.liability !== wanted) {
+            ctx.log('info', `restoring the rebate count to ${LAUNCH_SPONSORSHIP.count}`);
+            const back = await c.setSponsorship(
+              LAUNCH_SPONSORSHIP.bootstrap,
+              LAUNCH_SPONSORSHIP.rebate,
+              LAUNCH_SPONSORSHIP.count,
+              LAUNCH_SPONSORSHIP.margin
+            );
+            ctx.log('ok', 'set-sponsorship restoring the launch count', back.txid);
+          }
+          state.countLowered = false;
+        } catch (error) {
+          // Loud, and it has to be: the contract is now selling a test fixture,
+          // and the next thing anybody does with this page should be to fix it.
+          ctx.log(
+            'error',
+            'THE REBATE COUNT IS STILL LOWERED. Run the configure step before selling another ' +
+              'sponsorship.',
+            error
+          );
+        }
       }
-      return null;
-    };
-
-    // Which game is being drained? A small one made for the purpose if there is
-    // one, otherwise whatever the sponsored steps used.
-    let game = Number(state.exhaustGame || state.sponsoredGame);
-    let row = game ? await c.getSponsorship(game, who) : null;
-
-    // Too big to spend by hand, and it cannot be reached by draining the wallet
-    // either - the rebate is larger than the median fee, so the balance climbs.
-    // Build a small one instead, in this step, rather than sending somebody
-    // away to do it.
-    if (!row || row.rebatesLeft > 6n) {
-      const price = await c.getSponsorPrice();
-      if (price.liability > 20_000n) {
-        ctx.log('info', 'setting the rebate count to 2 so an allowance can be spent by hand');
-        const set = await c.setSponsorship(60_000n, 10_000n, 2n, 50_000n);
-        const done = await ctx.confirm(set.txid ?? '', 'set-sponsorship');
-        if (!done.ok) return no(`set-sponsorship ended as ${done.status}`);
-      }
-
-      ctx.log('info', `opening a small sponsored game for ${who}`);
-      const rules = normaliseRules({ ...DEFAULT_RULES, white: signer!, black: who });
-      const opened = await c.openSponsoredGame(rulesHash(rules), false, who);
-      const done = await ctx.confirm(opened.txid ?? '', 'the sponsored open');
-      if (!done.ok) return no(`the sponsored open ended as ${done.status}`);
-
-      game = await c.getGameCount();
-      row = await c.getSponsorship(game, who);
-      if (!row) return no(`opened game ${game} but it carries no sponsorship for ${who}`);
-      state.exhaustGame = game;
-      ctx.log('ok', `game ${game} has ${row.rebatesLeft} rebates to spend`);
     }
-
-    // Spend whatever is left, one signature each, waiting between so the
-    // allowance read is never stale.
-    while (row && row.rebatesLeft > 0n) {
-      const wrong = await asSponsored();
-      if (wrong) return no(wrong);
-      ctx.log('info', `spending a rebate: ${row.rebatesLeft} left`);
-      const sent = await c.submit(game, JUNK);
-      const done = await ctx.confirm(sent.txid ?? '', `submission of ${JUNK}`);
-      if (!done.ok) return no(`the submission ended as ${done.status}`);
-      row = await c.getSponsorship(game, who);
-    }
-
-    // The assertion this step exists for: with no allowance left, a submission
-    // must still land, paying its own gas.
-    const before = await balanceOf(c, who);
-    const wrong = await asSponsored();
-    if (wrong) return no(wrong);
-    ctx.log('info', 'allowance is gone; submitting once more with no rebate behind it');
-    const last = await c.submit(game, JUNK);
-    const settled = await ctx.confirm(last.txid ?? '', 'the unsponsored submission');
-    if (!settled.ok) return no(`the last submission ended as ${settled.status}`);
-
-    const after = await balanceOf(c, who);
-    const entries = await c.getAllEntries(game);
-    const stored = entries.filter((e) => e.sender === who).length;
-    const finalRow = await c.getSponsorship(game, who);
-
-    return ok(
-      `RUNNING OUT DID NOT END THE GAME.\n\n` +
-        `game        ${game}\n` +
-        `allowance   ${finalRow?.rebatesLeft ?? 0n} rebates left\n` +
-        `submissions ${stored} stored from ${who}\n` +
-        `balance     ${stx(before)} -> ${stx(after)}\n` +
-        `last txid   ${settled.txid}\n\n` +
-        'The final submission carried no rebate. It was stored anyway and the wallet paid its ' +
-        'own gas, which is the whole claim: a sponsorship running out is an ordinary economic ' +
-        'state, not the end of a game.\n\n' +
-        'The submissions are four characters that are not legal moves. The contract checks ' +
-        'length and nothing else, so they were stored and charged exactly like moves, and every ' +
-        'reader skips them.',
-      {
-        exhaustedGame: String(game),
-        exhaustedSubmissions: String(stored),
-        balanceAfterExhaustion: String(after)
-      }
-    );
   },
+
 
   /**
    * The three things that only go wrong once the bytes are permanent.

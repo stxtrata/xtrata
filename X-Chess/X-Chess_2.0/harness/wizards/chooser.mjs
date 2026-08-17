@@ -220,6 +220,14 @@ export function materialBalance(fen) {
  * Scores are in PAWNS, rounded to one decimal, from the mover's point of view.
  * Centipawns are the engine's unit and mean nothing to a reader; "+2.4" is a
  * quantity a chess player already understands.
+ *
+ * @param {{
+ *   rankMoves: Function,
+ *   Position: Function,
+ *   fen: string,
+ *   played?: string[],
+ *   depth?: number
+ * }} options
  */
 export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }) {
   const board = new Position(fen);

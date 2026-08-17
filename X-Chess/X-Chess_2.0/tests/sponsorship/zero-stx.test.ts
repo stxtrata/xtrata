@@ -122,7 +122,14 @@ describe('a wallet holding exactly nothing', () => {
   it('can then play, and is topped up by the contract as it goes', () => {
     const game = openSponsored(ALICE, ZERO);
     const rebate = sponsorship(game, ZERO)!.rebate;
-    const fee = 10000n;
+
+    // The design point, read from the row rather than written down here. It was
+    // written down here, as 10000n, and that made this test a check that the
+    // constants had not moved rather than a check that a sponsored player can
+    // play - so lowering the rebate failed it for the wrong reason. At the
+    // design fee the rebate covers the move exactly and the bootstrap is
+    // untouched, which is the claim.
+    const fee = rebate;
 
     let played = 0;
     for (let i = 0; i < 40; i++) {
@@ -141,8 +148,16 @@ describe('a wallet holding exactly nothing', () => {
     // paying their own gas, which they can do because they have been paid
     // rebates all game and the bootstrap is still theirs.
     const game = openSponsored(ALICE, ZERO);
-    const count = Number(sponsorship(game, ZERO)!.rebatesLeft);
-    const fee = 8000n;
+    const row = sponsorship(game, ZERO)!;
+    const count = Number(row.rebatesLeft);
+
+    // At the design fee, so that what is being measured is the ALLOWANCE
+    // running out and not the wallet running dry. Those are different states
+    // and only one of them is this test's subject: spending the whole count at
+    // a fee above the rebate would strand the player on the bootstrap first,
+    // and the assertion below would then pass or fail on arithmetic the sweep
+    // already covers.
+    const fee = row.rebate;
 
     for (let i = 0; i < count; i++) {
       expect(payNetworkFee(ZERO, fee), `fee at submission ${i}`).toBe(true);
@@ -165,7 +180,13 @@ describe('the fee sweep that fixes the launch constants', () => {
   // Spanning well past the design point on purpose. The rows above the rebate
   // are not failures, they are the documented behaviour under a fee spike, and
   // the UI quotes them.
-  const FEES = [2000n, 4000n, 6000n, 8000n, 10000n, 12000n, 15000n, 20000n, 30000n];
+  //
+  // It starts at 400 because that is where the fee actually lives now. The
+  // original range began at 2,000 and so measured only the spike: the estimator
+  // quoted this exact `submit` at a median of 721 uSTX over 24 samples, and 400
+  // is what the tournament runner pays and gets mined 98% of the time. A sweep
+  // whose cheapest row is three times the median is a sweep of the tail.
+  const FEES = [400n, 800n, 1500n, 2000n, 3000n, 5000n, 8000n, 10000n, 15000n, 20000n, 30000n];
 
   it('carries a player through a full game at every fee up to the design point', () => {
     const results: Sweep[] = [];

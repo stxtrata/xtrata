@@ -64,30 +64,41 @@ already paid for.
 
 Measured, not guessed. `tests/sponsorship/zero-stx.test.ts` runs a genuinely
 zero-balance wallet through a full game at a range of network fees; the results
-are in `ops/measurements/sponsorship-sweep.json` and ADR-0004.
+are in `ops/measurements/sponsorship-sweep.json`, and the calibration is
+ADR-0004 as revised by ADR-0016.
 
 | constant | value |
 |---|---|
-| bootstrap | 0.060 STX |
-| rebate | 0.010 STX |
+| bootstrap | 0.250 STX |
+| rebate | 0.002 STX |
 | rebate count | 45 |
 | margin | 0.050 STX |
 | game fee | 1.000 STX |
 | expiry | 4320 blocks |
 
-**The rebate is set TO the observed mainnet fee, not below it.** That is the
-load-bearing choice. At or under the design fee the player is never out of
-pocket, so the bootstrap is never touched and is still theirs at the end — the
-sweep confirms it, ending at exactly 0.060 STX after a full game at 0.010. The
-bootstrap is then pure headroom against a fee spike rather than the thing being
-slowly consumed.
+**There is no such thing as "the mainnet fee".** Asked 46 times over fifteen
+minutes what it would charge for this exact `submit`, the Hiro estimator — which
+is what a wallet quotes from — answered between 198 and 46,104 µSTX, median 646
+(`ops/measurements/wallet-fee-quotes.json`). A single fixed number cannot track
+that, so the two constants are given different jobs:
+
+- the **rebate** covers the typical move, at a level 78% of quotes come in
+  under, so most moves cost no more than it pays back and the balance holds;
+- the **bootstrap** absorbs the rest.
+
+**Weight belongs in the bootstrap, because it is paid once and the rebate is
+paid forty-five times.** At any given package price, more bootstrap and less
+rebate carries a player further under every spike. That is also why the rebate
+is the number to keep small for a second reason: a rebate is paid on any stored
+string, legal move or not, so `rebate × count` is what a beneficiary can draw by
+submitting junk — 0.09 STX here, where the old 0.010 rebate made it 0.45.
 
 Prices:
 
 ```
 Standard Game          1.00 STX
-Sponsor Opponent       1.56 STX     (1.00 + 0.060 + 0.450 + 0.050)
-Sponsor Both           2.12 STX     (1.00 + two packages)
+Sponsor Opponent       1.39 STX     (1.00 + 0.250 + 0.090 + 0.050)
+Sponsor Both           1.78 STX     (1.00 + two packages)
 ```
 
 **A move costs no X Chess fee.** The only cost of playing is the network's own.
@@ -100,10 +111,12 @@ The reach on the bootstrap alone is exactly
 floor((bootstrap - fee) / (fee - rebate)) + 1
 ```
 
-asserted as an equality in the suite: 25 submissions at 0.012 STX, 10 at 0.015,
-5 at 0.020, 2 at 0.030. A sustained spike above 0.010 shortens sponsored play.
-The owner can raise the rebate to the 0.1 STX ceiling in response, which covers a
-tenfold spike, and games already funded keep their own terms.
+asserted as an equality in the suite. A sponsorship carries a full 41-submission
+game at every fee up to 0.008 STX, then 31 submissions at 0.010, 19 at 0.015, 13
+at 0.020 and 8 at 0.030.
+
+The owner can raise the rebate to the 0.1 STX ceiling in response to a sustained
+spike, and games already funded keep their own terms.
 
 ---
 
@@ -122,8 +135,9 @@ stores, and the contract must never form one.
 So there is one counter, and the concern is answered by the bootstrap instead:
 
 1. At or below the design fee the player is never out of pocket, so after all 45
-   rebates they still hold the entire 0.060 STX bootstrap — six more
-   transactions' worth. Resigning is always affordable.
+   rebates they still hold the entire 0.250 STX bootstrap — nearly four hundred
+   more transactions' worth at the median quote, and five even at the worst
+   quote in the sample. Resigning is always affordable.
 2. Running out never blocks a submission. The exhaustion test proves it by
    playing a `resgn` past the end of the allowance.
 

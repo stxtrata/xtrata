@@ -103,17 +103,30 @@
 (define-data-var open-fee uint u1000000)        ;; 1 STX to open a game
 
 ;; The sponsorship constants, set from ops/measurements/sponsorship-sweep.json
-;; and recorded in ADR-0004. They are not guesses and they are not the brief's
-;; illustrative figures, which assumed a network fee this chain does not have.
+;; and recorded in ADR-0004, recalibrated against a measured fee distribution in
+;; ADR-0016. They are not guesses and they are not the brief's illustrative
+;; figures, which assumed a network fee this chain does not have.
 ;;
-;; The rebate is set TO the observed mainnet fee for a contract call rather than
-;; below it. That is the whole design: at or under the design fee a sponsored
-;; player is never out of pocket, so the bootstrap is never touched and is still
-;; theirs at the end. Setting the rebate below the fee would make every move
-;; drain the bootstrap a little, and the sweep shows exactly how fast that ends
-;; a game.
-(define-data-var bootstrap-amount uint u60000)  ;; 0.06 STX, six transactions of headroom
-(define-data-var rebate-amount uint u10000)     ;; 0.01 STX, the measured mainnet fee
+;; THE REBATE IS THE TYPICAL FEE AND THE BOOTSTRAP IS THE TAIL. There is no
+;; single "the mainnet fee" to set a rebate to. Asked 46 times over fifteen
+;; minutes what it would charge for this exact `submit`, the estimator a wallet
+;; quotes from answered between 198 and 46,104 uSTX, median 646
+;; (ops/measurements/wallet-fee-quotes.json). A fixed number cannot track that,
+;; so the two constants are given different jobs: the rebate covers the typical
+;; move, at a level 78% of quotes come in under, and the bootstrap absorbs the
+;; rest.
+;;
+;; Weight belongs in the BOOTSTRAP because it is paid once and the rebate is paid
+;; forty-five times. Every comparison at a fixed package price says the same
+;; thing: at 0.39 STX, 2,000 with a 0.25 bootstrap carries a player further under
+;; every spike than 3,000 with 0.20 does. ADR-0009 reasoned this out; the sweep
+;; now measures it.
+;;
+;; It is also the farmable number. A rebate is paid on any stored string, legal
+;; move or not, so rebate x count is what a beneficiary can draw by submitting
+;; junk: 0.09 STX here, where the old 10,000 made it 0.45.
+(define-data-var bootstrap-amount uint u250000) ;; 0.25 STX, the buffer against a fee spike
+(define-data-var rebate-amount uint u2000)      ;; 0.002 STX, above 78% of quotes
 (define-data-var rebate-count uint u45)         ;; a full game for one player, plus a margin
 (define-data-var sponsor-margin uint u50000)    ;; 0.05 STX
 (define-data-var expiry-blocks uint u4320)      ;; when an unused reserve may be released

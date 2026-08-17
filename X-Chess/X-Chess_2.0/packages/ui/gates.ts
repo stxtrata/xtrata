@@ -207,9 +207,9 @@ export const STEPS: StepDef[] = [
       'Running out must not end the game. The allowance reaches zero, the next submission is ' +
       'still stored, and the player simply pays their own gas. ' +
       'READ THE WORD ALLOWANCE LITERALLY: it is rebates-left reaching zero, NOT the balance. ' +
-      'The balance cannot be drained by playing, and trying is a trap that has cost real time. ' +
-      'At a rebate of 0.010 against a median mainnet fee of 0.003, every move pays the wallet ' +
-      'about 0.007 MORE than it costs, so a sponsored player gets richer the longer they play. ' +
+      'The balance cannot reliably be drained by playing, and trying is a trap that has cost ' +
+      'real time. The rebate is set at the 75th percentile of what a wallet quotes for a move, ' +
+      'so four moves in five pay the player back more than they cost and the balance climbs. ' +
       'The fast way to reach this state is not a long game: set-sponsorship with a count of 2, ' +
       'open a NEW sponsored game, and it exhausts in three moves. A sponsorship row captures ' +
       'its rebate and count at funding time, so changing the setting never alters a game already ' +

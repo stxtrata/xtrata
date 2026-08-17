@@ -1,31 +1,49 @@
 {
   "note": "Submissions the bootstrap alone absorbs when the network fee exceeds the rebate.",
-  "bootstrap": "60000",
-  "rebate": "10000",
+  "bootstrap": "250000",
+  "rebate": "2000",
   "formula": "floor((bootstrap - fee) / (fee - rebate)) + 1",
   "rows": [
     {
-      "feeStx": "0.012000",
-      "shortfallMicroStx": "2000",
-      "reaches": 25,
+      "feeStx": "0.003000",
+      "shortfallMicroStx": "1000",
+      "reaches": 41,
+      "ofFullGame": 41
+    },
+    {
+      "feeStx": "0.005000",
+      "shortfallMicroStx": "3000",
+      "reaches": 41,
+      "ofFullGame": 41
+    },
+    {
+      "feeStx": "0.008000",
+      "shortfallMicroStx": "6000",
+      "reaches": 41,
+      "ofFullGame": 41
+    },
+    {
+      "feeStx": "0.010000",
+      "shortfallMicroStx": "8000",
+      "reaches": 31,
       "ofFullGame": 41
     },
     {
       "feeStx": "0.015000",
-      "shortfallMicroStx": "5000",
-      "reaches": 10,
+      "shortfallMicroStx": "13000",
+      "reaches": 19,
       "ofFullGame": 41
     },
     {
       "feeStx": "0.020000",
-      "shortfallMicroStx": "10000",
-      "reaches": 5,
+      "shortfallMicroStx": "18000",
+      "reaches": 13,
       "ofFullGame": 41
     },
     {
       "feeStx": "0.030000",
-      "shortfallMicroStx": "20000",
-      "reaches": 2,
+      "shortfallMicroStx": "28000",
+      "reaches": 8,
       "ofFullGame": 41
     }
   ]

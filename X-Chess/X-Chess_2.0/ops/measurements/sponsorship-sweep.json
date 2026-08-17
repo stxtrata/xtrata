@@ -1,72 +1,86 @@
 {
   "note": "How far one sponsorship carries a zero-STX player, by network fee.",
   "fullGameSubmissions": 41,
-  "bootstrap": "60000",
-  "rebate": "10000",
+  "bootstrap": "250000",
+  "rebate": "2000",
   "rebateCount": "45",
   "rows": [
+    {
+      "feeMicroStx": "400",
+      "feeStx": "0.000400",
+      "submissions": 41,
+      "completedFullGame": true,
+      "leftMicroStx": "315600"
+    },
+    {
+      "feeMicroStx": "800",
+      "feeStx": "0.000800",
+      "submissions": 41,
+      "completedFullGame": true,
+      "leftMicroStx": "299200"
+    },
+    {
+      "feeMicroStx": "1500",
+      "feeStx": "0.001500",
+      "submissions": 41,
+      "completedFullGame": true,
+      "leftMicroStx": "270500"
+    },
     {
       "feeMicroStx": "2000",
       "feeStx": "0.002000",
       "submissions": 41,
       "completedFullGame": true,
-      "leftMicroStx": "388000"
+      "leftMicroStx": "250000"
     },
     {
-      "feeMicroStx": "4000",
-      "feeStx": "0.004000",
+      "feeMicroStx": "3000",
+      "feeStx": "0.003000",
       "submissions": 41,
       "completedFullGame": true,
-      "leftMicroStx": "306000"
+      "leftMicroStx": "209000"
     },
     {
-      "feeMicroStx": "6000",
-      "feeStx": "0.006000",
+      "feeMicroStx": "5000",
+      "feeStx": "0.005000",
       "submissions": 41,
       "completedFullGame": true,
-      "leftMicroStx": "224000"
+      "leftMicroStx": "127000"
     },
     {
       "feeMicroStx": "8000",
       "feeStx": "0.008000",
       "submissions": 41,
       "completedFullGame": true,
-      "leftMicroStx": "142000"
+      "leftMicroStx": "4000"
     },
     {
       "feeMicroStx": "10000",
       "feeStx": "0.010000",
-      "submissions": 41,
-      "completedFullGame": true,
-      "leftMicroStx": "60000"
-    },
-    {
-      "feeMicroStx": "12000",
-      "feeStx": "0.012000",
-      "submissions": 25,
+      "submissions": 31,
       "completedFullGame": false,
-      "leftMicroStx": "10000"
+      "leftMicroStx": "2000"
     },
     {
       "feeMicroStx": "15000",
       "feeStx": "0.015000",
-      "submissions": 10,
+      "submissions": 19,
       "completedFullGame": false,
-      "leftMicroStx": "10000"
+      "leftMicroStx": "3000"
     },
     {
       "feeMicroStx": "20000",
       "feeStx": "0.020000",
-      "submissions": 5,
+      "submissions": 13,
       "completedFullGame": false,
-      "leftMicroStx": "10000"
+      "leftMicroStx": "16000"
     },
     {
       "feeMicroStx": "30000",
       "feeStx": "0.030000",
-      "submissions": 2,
+      "submissions": 8,
       "completedFullGame": false,
-      "leftMicroStx": "20000"
+      "leftMicroStx": "26000"
     }
   ]
 }

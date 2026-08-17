@@ -11,6 +11,8 @@
 // release. This suite is what makes that manual pass short rather than a
 // rediscovery from scratch.
 
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   canSignHere,
@@ -434,6 +436,37 @@ describe('the payload', () => {
     // orders of magnitude too large rather than ignoring it.
     for (const label of ['window.LeatherProvider', 'window.XverseProviders.BitcoinProvider']) {
       expect(contractCallParams(entry(label), request)).not.toHaveProperty('feeRate');
+    }
+  });
+
+  it('names no network fee when the caller does not, which is every board path', () => {
+    // The tournament runner pays 400 uSTX for this same call. That is not a
+    // better price, it is replace-by-fee: the runner holds the nonce and can
+    // re-sign it a rung higher when nothing takes the cheap offer. A board
+    // holds no nonce, so a fee named here would be a floor no stuck move could
+    // be lifted off, and re-submitting through a wallet takes the NEXT nonce -
+    // two fees, one move, stored twice. See CallRequest.fee.
+    const { fee: _named, ...unpriced } = request;
+    for (const label of ['window.LeatherProvider', 'window.XverseProviders.BitcoinProvider']) {
+      expect(contractCallParams(entry(label), unpriced as typeof request), label).not.toHaveProperty(
+        'fee'
+      );
+    }
+  });
+
+  it('is not given one by either app, which is where a cheap rung would get pasted in', () => {
+    // The behavioural test above proves the layer is honest about an absent
+    // fee. This one proves the absence, because the temptation is specific and
+    // has a number attached to it.
+    for (const app of ['chess', 'canary']) {
+      const source = readFileSync(
+        fileURLToPath(new URL(`../../apps/${app}/main.ts`, import.meta.url)),
+        'utf8'
+      );
+      const at = source.indexOf('const request = {');
+      expect(at, `${app} builds a wallet request`).toBeGreaterThan(-1);
+      const built = source.slice(at, source.indexOf('walletCall', at));
+      expect(built, `${app} names a network fee`).not.toMatch(/\bfee(Micro[Ss]tx)?\s*:/);
     }
   });
 

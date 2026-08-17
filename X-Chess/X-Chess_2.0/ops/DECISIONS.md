@@ -1094,3 +1094,109 @@ bound must not make a summary wrong, and no badge is shown from a partial replay
   unless six other people have already submitted junk into it — which is the case
   being defended against.
 - Inscription 2988 keeps the unbounded search. It is recorded in `ops/ERRATA.md`.
+
+---
+
+## ADR-0016 — The rebate is the typical fee and the bootstrap is the tail
+
+**Date** 2026-08-17
+**Status** accepted
+**Revises** ADR-0004, completes ADR-0009, supersedes the constants half of ADR-0013
+**Measured on** `ops/measurements/wallet-fee-quotes.json` and `sponsorship-sweep.json`
+
+### Context
+
+Two things prompted this and only one of them is about sponsorship.
+
+The tournament runner now pays **400 µSTX** for a `submit` where it used to pay
+3,000, and lands 98% of moves at that rung. The obvious next question is whether
+the same saving belongs in the board and in the sponsorship constants.
+
+For the board the answer is no, and the reason is worth stating because it is
+the reason for everything below: **the runner's price is not a better estimate,
+it is replace-by-fee.** It holds the nonce, so forty-five seconds later it
+re-signs the same one a rung higher, and a fee that turned out to be too low has
+cost it some waiting. A board holds no nonce. A move left unmined stays unmined,
+and re-submitting through a wallet takes the NEXT nonce — two fees, one move,
+stored twice. The cheap number is only safe for the party that can withdraw it.
+So no board path names a network fee, and `tests/wallet/conformance.test.ts`
+pins that in both directions.
+
+Sponsorship reimburses **wallet-signed** moves, so it has to be calibrated
+against what a wallet charges, which is not what the runner pays.
+
+### What was measured
+
+The Hiro fee estimator, asked 46 times over fifteen minutes what it would quote
+for this exact 196-byte `submit`. Middle tier, which is what a wallet shows by
+default:
+
+| | µSTX |
+|---|---|
+| minimum | 198 |
+| median | 646 |
+| 75th percentile | 1,619 |
+| 90th percentile | 11,854 |
+| maximum | 46,104 |
+
+**A factor of 233 inside a quarter of an hour.** ADR-0009 found a factor of ten
+across two transactions and said the fee "is not a number but a distribution".
+This is that distribution, sampled rather than inferred, and it is wider.
+
+### Decision
+
+| constant | was | now |
+|---|---|---|
+| rebate | 0.010 | **0.002** |
+| bootstrap | 0.060 | **0.250** |
+| count | 45 | 45 |
+| margin | 0.050 | 0.050 |
+| sponsor package | 0.560 | **0.390** |
+
+The two constants get different jobs. The rebate covers the typical move — 78%
+of quotes are at or below 2,000 µSTX — and the bootstrap absorbs the tail.
+
+**Weight belongs in the bootstrap because it is paid once and the rebate is paid
+forty-five times.** ADR-0009 reasoned this out and the sweep now measures it: at
+a fixed package price, every shift from rebate to bootstrap carries a player
+further under every spike. 0.002/0.250 beats 0.003/0.200 at the same price, at
+every fee.
+
+It is also the farmable number. A rebate is paid on any stored string, legal
+move or not — the exhaustion step spends its allowance on `zzzz` — so
+`rebate × count` is what a beneficiary can draw by submitting junk. That falls
+from 0.45 STX to 0.09.
+
+### The trade, stated rather than hidden
+
+From `sponsorship-sweep.json`, submissions reached out of a 41-submission game:
+
+| fee | old | new |
+|---|---|---|
+| 0.0004 – 0.008 | full game | full game |
+| 0.010 | full game | **31** |
+| 0.015 | 10 | **19** |
+| 0.020 | 5 | **13** |
+| 0.030 | 2 | **8** |
+
+The new configuration is worse in one band — between 0.008 and 0.010, where the
+old rebate happened to sit — and better everywhere above it, at 30% less to the
+sponsor. Since 89% of quotes come in under 0.008 and the spikes that do happen
+are large, that is the right side of the trade to be on.
+
+### Consequences
+
+- **The live contract is not at these values and never was at the published
+  ones.** It is selling `rebate 10,000 × count 2` — 0.02 STX of allowance under a
+  document promising 0.45 — because canary step 14 lowers the count to spend an
+  allowance by hand and nothing put it back. `LAUNCH_SPONSORSHIP` in
+  `apps/canary/main.ts` is now the single source of those numbers, and the
+  exhaustion step restores them in a `finally`, so every way out of that step
+  puts back what it lowered.
+- One `set-sponsorship` from the owner applies this. No redeploy: all four are
+  data vars, and all four are inside the compiled ceilings.
+- Rows already funded keep the rebate and count they were funded with
+  (`clar:176-179`), so nobody's sponsorship changes underneath them.
+- Fees move. These constants are a snapshot of one fifteen-minute window, which
+  is why the sample is committed as an artefact and the sweep starts at 400 µSTX
+  rather than at 2,000 — the old range measured only the spike.

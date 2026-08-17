@@ -74,8 +74,10 @@ export class MockChain implements ChainReader, ChainWriter {
     this.sender = options.sender ?? 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
     this.height = options.height ?? 1000;
     this.openFee = options.openFee ?? 1_000_000n;
-    this.bootstrap = options.bootstrap ?? 60_000n;
-    this.rebate = options.rebate ?? 10_000n;
+    // The launch values, so a test that does not care still sees a shape the
+    // contract could actually be in. See contracts/xchess-core-v1.clar:115-119.
+    this.bootstrap = options.bootstrap ?? 250_000n;
+    this.rebate = options.rebate ?? 2_000n;
     this.rebateCount = options.rebateCount ?? 45n;
     this.margin = options.margin ?? 50_000n;
     this.expiryBlocks = options.expiryBlocks ?? 4320;

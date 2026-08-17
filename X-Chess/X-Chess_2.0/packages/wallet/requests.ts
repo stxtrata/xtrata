@@ -232,11 +232,26 @@ export interface CallRequest {
   /**
    * The NETWORK fee to suggest, in microSTX, or undefined to leave it alone.
    *
-   * Worth being plain about the limit: under the Xtrata runtime this never
-   * reaches the wallet. The host parses the request and keeps only the
-   * contract, the function, its arguments, the network and the post conditions.
-   * An inscribed board cannot set the network fee. What it can do is not send
-   * fields that might get it rejected, and say clearly what the fee ought to be.
+   * NOTHING IN THIS PROJECT SETS IT, AND A BOARD MUST NOT. The tournament
+   * runner pays 400 uSTX for the same `submit` a wallet would quote thousands
+   * for, and that saving is not a better guess at the price — it is bought with
+   * replace-by-fee. The runner holds the nonce, so forty-five seconds later it
+   * re-signs the same one a rung higher and a fee that turned out to be too low
+   * has cost it some waiting and nothing else.
+   *
+   * A board holds no nonce. A move left unmined stays unmined, and submitting
+   * it again through a wallet takes the NEXT nonce rather than replacing
+   * anything — two transactions, two fees, the same move stored twice. So the
+   * cheap number is only safe for the party that can withdraw it, and the
+   * remedy for a stuck move belongs to the wallet, which is the only party
+   * holding the nonce at all.
+   *
+   * Where it would go if it were ever set, since the plumbing has moved:
+   * `contractCallParams` sends it as `fee`, and a wallet that validates against
+   * the sats-connect schema drops it. Under the Xtrata runtime the host rebuilds
+   * the request itself and reads `feeMicroStx` — so this spelling would not
+   * reach a wallet through the bridge either. Both are facts about plumbing.
+   * The reason not to set it is the two paragraphs above.
    */
   fee?: number;
 }
