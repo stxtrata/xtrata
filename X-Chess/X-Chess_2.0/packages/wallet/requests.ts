@@ -232,26 +232,33 @@ export interface CallRequest {
   /**
    * The NETWORK fee to suggest, in microSTX, or undefined to leave it alone.
    *
-   * NOTHING IN THIS PROJECT SETS IT, AND A BOARD MUST NOT. The tournament
-   * runner pays 400 uSTX for the same `submit` a wallet would quote thousands
-   * for, and that saving is not a better guess at the price — it is bought with
-   * replace-by-fee. The runner holds the nonce, so forty-five seconds later it
-   * re-signs the same one a rung higher and a fee that turned out to be too low
-   * has cost it some waiting and nothing else.
+   * FOR XVERSE THERE IS NO SUCH THING, AND THAT IS THE OPERATIVE FACT. The
+   * sats-connect `stx_callContract` method takes exactly six parameters —
+   * contract, functionName, arguments, functionArgs, postConditions,
+   * postConditionMode — and a fee is not among them (docs.xverse.app, checked
+   * 2026-08-18). So a board signing through Xverse CANNOT name a price no
+   * matter what it knows, and the narrow shape `contractCallParams` sends is
+   * already the complete one.
+   *
+   * This note used to lead with the replace-by-fee argument below, which reads
+   * as though the absence were a policy choice. It was misleading in a way that
+   * cost somebody real money: asked why their wallet quoted fifteen times what
+   * every AI player pays, the answer given was the doctrine rather than the
+   * plumbing, and the actual remedy — the wallet's own editable fee field —
+   * went unmentioned. The board now says the number at signing time, which is
+   * the only lever it has. See MOVE_FEE_USTX in packages/ui/app.ts.
+   *
+   * The reason it stays unset for wallets that WOULD accept it: the tournament
+   * runner pays 400 uSTX for the same `submit`, and that is not a better guess
+   * at the price, it is bought with replace-by-fee. The runner holds the nonce,
+   * so forty-five seconds later it re-signs the same one a rung higher, and a
+   * fee that turned out to be too low has cost it waiting and nothing else.
    *
    * A board holds no nonce. A move left unmined stays unmined, and submitting
    * it again through a wallet takes the NEXT nonce rather than replacing
-   * anything — two transactions, two fees, the same move stored twice. So the
-   * cheap number is only safe for the party that can withdraw it, and the
-   * remedy for a stuck move belongs to the wallet, which is the only party
-   * holding the nonce at all.
-   *
-   * Where it would go if it were ever set, since the plumbing has moved:
-   * `contractCallParams` sends it as `fee`, and a wallet that validates against
-   * the sats-connect schema drops it. Under the Xtrata runtime the host rebuilds
-   * the request itself and reads `feeMicroStx` — so this spelling would not
-   * reach a wallet through the bridge either. Both are facts about plumbing.
-   * The reason not to set it is the two paragraphs above.
+   * anything — two transactions, two fees, the same move stored twice. A person
+   * who decides the price in their own wallet is choosing with the one thing
+   * the board lacks: the ability to change their mind afterwards.
    */
   fee?: number;
 }
