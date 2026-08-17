@@ -3612,6 +3612,20 @@ export class ChessApp {
       const table = computeRatings(rated);
       const rows = leaderboard(table);
 
+      // NAMES, WHICH THIS TAB NEVER ASKED FOR. Every row is drawn with
+      // `addressNode`, which reads `Names.peek` — a cache lookup and nothing
+      // more. Explore fills that cache for its own list and the game view fills
+      // it for the players in one game, so a name appeared on the leaderboard
+      // only if some other tab had already fetched it. Opening the leaderboard
+      // first showed principals for everybody, permanently.
+      //
+      // Awaited before the rows are built rather than redrawn afterwards: this
+      // function has already made several reads per game, so one resolution
+      // round is cheap next to them, and it means the first paint is right.
+      // Resolution failing is not an error here — `who()` falls back to the
+      // principal, which is the truth anyway.
+      await this.names?.resolveAll(rows.map((row) => row.principal));
+
       this.notice(
         'leaderboardNote',
         'info',
