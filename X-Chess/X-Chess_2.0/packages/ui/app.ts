@@ -11,6 +11,8 @@ import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
 import { XtrataReader } from '../chain/xtrata.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
+import { parseTournament } from '../protocol/tournament.js';
+import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
 import { pool } from '../chain/pool.js';
 import { BlockTimes, formatClock } from '../chain/block-time.js';
@@ -36,7 +38,7 @@ import type { Rules } from '../protocol/rules.js';
 import { rulesHash } from '../protocol/canonical.js';
 import { recoverRules } from '../protocol/recover.js';
 import { knownRules, linkForGame, rememberRules, rulesFromLink } from '../protocol/known-rules.js';
-import { checkEligibility } from '../ratings/eligibility.js';
+import { checkEligibility, describeIneligibility } from '../ratings/eligibility.js';
 import { judge, judgeEvent, judgeMove } from './eligibility.js';
 import type { Ctx, Verdict } from './eligibility.js';
 import { computeRatings, leaderboard } from '../ratings/elo-v1.js';
@@ -249,6 +251,32 @@ export const COMPILED_ACCEPTED_BEFORE = 8_787_816;
 const DEFAULT_TOURNAMENT = 2993;
 
 const EXPLORE_WINDOW = 25;
+
+/**
+ * How many entrants may be paired against each other during rules recovery.
+ *
+ * Quadratic: twelve entrants is 132 ordered pairs, and `recoverRules` caps
+ * candidates at 512 before its own search begins. Past this the offer is
+ * dropped entirely rather than truncated, because a truncated pair list makes
+ * recovery depend on map iteration order — two boards would disagree about
+ * whether a game can be confirmed, which is the one property this must not have.
+ */
+const MAX_PAIRED_ENTRANTS = 12;
+
+/**
+ * The reasons that mean "we cannot say who played this", as opposed to "this
+ * game does not qualify".
+ *
+ * The difference matters to a reader. A game nobody can identify will never
+ * become ratable, because the evidence that would settle it was never put on
+ * chain — the absent player simply never submitted. A game that is merely
+ * ineligible failed a rule, and the rule can be read.
+ */
+const IDENTITY_REASONS = new Set<string>([
+  'no-rules-commitment',
+  'rules-do-not-match-commitment',
+  'side-not-a-principal'
+]);
 
 /**
  * How many games the list reads at once.
@@ -561,6 +589,10 @@ export class ChessApp {
   private readonly inTournament = new Map<number, { id: number; name: string }>();
   /** address -> the name a loaded tournament gave it. The weakest source. */
   private readonly entrantNames = new Map<string, string>();
+  /** game id -> the two addresses a loaded manifest says played it. */
+  private readonly manifestPairings = new Map<number, { white: string; black: string }>();
+  /** Every address any loaded manifest has named as an entrant. */
+  private readonly knownEntrants = new Set<string>();
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
@@ -2299,6 +2331,8 @@ export class ChessApp {
               for (const entrant of view.tournament?.entrants ?? []) {
                 this.entrantNames.set(entrant.address, entrant.name);
               }
+              // The candidate the Leaderboard cannot guess. See rulesForRanked.
+              if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
       this.drawTournament();
       return true;
@@ -2388,7 +2422,16 @@ export class ChessApp {
     // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.
     if (view.scored) {
       banner.classList.remove('hide');
-      banner.className = `notice notice--${view.honoured ? 'info' : 'warn'}`;
+      // THE BANNER ENCODES WHICH KIND OF DOCUMENT THIS IS, and looked identical
+      // to the descriptive note above it — same notice--info, so the sentence
+      // that actually matters read as more of the same prose.
+      //
+      // The accent carries the meaning rather than merely being different:
+      // committed is the strong case, compiled is weaker but accepted, refused
+      // is neither. Colour is the accent only; the words say it all anyway, so
+      // nobody has to separate two hues to know what they are looking at.
+      const kind = !view.honoured ? 'refused' : view.provenance === 'committed' ? 'committed' : 'compiled';
+      banner.className = `notice notice--${view.honoured ? 'info' : 'warn'} tn-prov tn-prov--${kind}`;
       banner.textContent = view.says;
       if (!view.honoured) return;
     }
@@ -3913,9 +3956,14 @@ export class ChessApp {
   }
 
   async loadLeaderboard(): Promise<void> {
+    // Before the walk, because every row's rules recovery consults them.
+    await this.ensureManifestPairings();
     await this.guard('computing ratings', async () => {
       const count = await this.chain.getRankedCount();
-      let skipped = 0;
+      let unfinished = 0;
+      let unidentified = 0;
+      let ineligible = 0;
+      const ineligibleWhy = new Set<string>();
 
       // ONE GAME AT A TIME, FOREVER, was what this did: three round trips each,
       // sequentially, with no window at all. Nine games is fine. A hundred is
@@ -3946,13 +3994,39 @@ export class ChessApp {
           if (!row) return null;
 
           const entries = await this.chain.getAllEntries(id, row.nextSeq);
+          const recovered = this.rulesForRanked(row, entries);
           const state = replay(
             entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
-            { rules: this.rulesForRanked(row, entries) }
+            { rules: recovered }
           );
           const check = checkEligibility(row, state.rules, state);
           if (!check.eligible || state.result === null) {
-            skipped++;
+            // COUNTED BY REASON, because they are not the same thing and the
+            // single number said they were. "5 candidates failing verification"
+            // covered two games whose players could not be identified and three
+            // that are simply still being played — and reported both as though
+            // the board had tried to check something and failed. A game in
+            // progress has not failed anything; it has not finished.
+            //
+            // Worth separating because they lead somewhere different. Unfinished
+            // resolves itself when somebody moves. Unidentified never resolves,
+            // because the missing player never submitted and nothing on chain
+            // will ever say who they were.
+            //
+            // CLASSIFIED FROM THE REASONS, not re-derived. `checkEligibility`
+            // has already worked out exactly what is wrong and returns a list;
+            // asking a second time — as a first attempt here did — both repeats
+            // the work and invents a second opinion that can disagree with the
+            // first. It also gets `no-result` wrong, because an unfinished game
+            // is ALREADY ineligible for that reason, so "eligible but no result"
+            // is a state that never occurs.
+            const why = check.reasons;
+            if (why.some((r) => IDENTITY_REASONS.has(r))) unidentified++;
+            else if (why.length === 1 && why[0] === 'no-result') unfinished++;
+            else {
+              ineligible++;
+              for (const reason of why) ineligibleWhy.add(describeIneligibility(reason));
+            }
             return null;
           }
           const terminal = state.accepted.find((e) => e.seq === state.terminalSequence);
@@ -3988,11 +4062,23 @@ export class ChessApp {
       // principal, which is the truth anyway.
       await this.names?.resolveAll(rows.map((row) => row.principal));
 
+      const aside: string[] = [];
+      if (unfinished) aside.push(`${unfinished} still being played`);
+      if (unidentified) aside.push(
+        `${unidentified} whose players cannot be identified from the chain`
+      );
+      if (ineligible) {
+        // NAMED, not just counted. "3 not eligible" invites the reader to
+        // assume the board is hiding something; the reasons are computed
+        // already and are the interesting part.
+        aside.push(`${ineligible} not eligible (${[...ineligibleWhy].join('; ')})`);
+      }
+
       this.notice(
         'leaderboardNote',
         'info',
         `Derived from ${rated.length} verified ranked game${rated.length === 1 ? '' : 's'}` +
-          (skipped ? `, with ${skipped} candidate${skipped === 1 ? '' : 's'} failing verification.` : '.') +
+          (aside.length ? `. Not counted: ${aside.join(', ')}.` : '.') +
           ' Nothing here is stored; it is recomputed from the chain each time.'
       );
 
@@ -4044,14 +4130,101 @@ export class ChessApp {
    * to the open board and is refused by eligibility, which is correct: a rating
    * must never rest on rules nobody can check.
    */
+  /** A manifest's pairings as addresses, for anything that needs a candidate. */
+  private rememberPairings(tournament: Tournament): void {
+    const addressOfName = new Map(tournament.entrants.map((e) => [e.name, e.address]));
+    for (const entrant of tournament.entrants) this.knownEntrants.add(entrant.address.toUpperCase());
+    for (const game of tournament.games) {
+      const white = addressOfName.get(game.white);
+      const black = addressOfName.get(game.black);
+      if (white && black) this.manifestPairings.set(game.id, { white, black });
+    }
+  }
+
+  /**
+   * Pairings without the tab.
+   *
+   * The Leaderboard was the tab reporting failures and the Tournaments tab was
+   * the one holding the answer, so whether verification succeeded depended on
+   * WHICH TAB YOU HAPPENED TO OPEN FIRST — the same games, the same chain, two
+   * different verdicts. That is not a gap in what is knowable, it is a gap in
+   * plumbing, and the fix is to stop making the reader do the plumbing.
+   *
+   * Only the manifest is read, not the verification pass the tab runs. Nothing
+   * here is trusted: a pairing is a candidate, and `rulesForRanked` still
+   * requires it to reproduce the game's own committed hash. So the cheap read
+   * is enough, and a manifest that lies changes nothing.
+   */
+  private manifestPairingsAsked = false;
+  private async ensureManifestPairings(): Promise<void> {
+    if (this.manifestPairingsAsked || !this.xtrata) return;
+    this.manifestPairingsAsked = true;
+    try {
+      const text = await this.xtrata.text(DEFAULT_TOURNAMENT);
+      const parsed = text === null ? null : parseTournament(text);
+      if (parsed?.ok && parsed.tournament) this.rememberPairings(parsed.tournament);
+    } catch {
+      // Asked and could not reach it. Allowed to try again rather than being
+      // remembered as "this tournament has no pairings" — the same distinction
+      // PlayerNames draws between a failed lookup and a real absence.
+      this.manifestPairingsAsked = false;
+    }
+  }
+
   private rulesForRanked(row: GameRow, entries: readonly EntryRow[]): Rules {
+    // A MANIFEST SUPPLIES THE CANDIDATE RECOVERY CANNOT GUESS.
+    //
+    // `recoverRules` searches the opener and whoever has submitted, which fails
+    // whenever neither is a player or the log is short — and that is why the
+    // Leaderboard reported "5 candidates failing verification" while the
+    // Tournaments tab verified all twenty-one of the same games. The tab was not
+    // doing something cleverer; it had a candidate to test.
+    //
+    // This is NOT trusting the manifest. A candidate is proposed and the rules
+    // hash either reproduces it or it does not, exactly as before. All the
+    // manifest does is supply a guess worth checking, which is the one thing
+    // recovery could not do for itself.
+    const claimed = this.manifestPairings.get(row.id);
+    const fromManifest = claimed
+      ? normaliseRules({ ...DEFAULT_RULES, white: claimed.white, black: claimed.black, ranked: true })
+      : null;
+
+    // AND THE ENTRANTS, FOR THE GAMES NO MANIFEST NAMES.
+    //
+    // The five games still failing were round one, played before there was a
+    // manifest, so the exact pairing above finds nothing for them. What they
+    // have in common is a player who never submitted — a forfeit, an abort —
+    // and recovery builds its pair space from whoever HAS submitted, so the
+    // absent side is missing from the search entirely. The game is
+    // unrecoverable not because the answer is unknowable but because the one
+    // address that would settle it never appeared on chain.
+    //
+    // A manifest names those addresses. Trying every ordered pair of known
+    // entrants offers the missing side back to a search that could not reach
+    // it. Thirty pairs for six entrants, all local hashing, no reads.
+    //
+    // Still not trust. Every pair is a guess and the committed hash is the
+    // judge, so offering a wrong pair costs one hash and confirms nothing.
+    const pairs: Rules[] = [];
+    const entrants = [...this.knownEntrants];
+    // Bounded because it is quadratic and `recoverRules` has a hard candidate
+    // cap it would otherwise eat before reaching its own search.
+    if (entrants.length <= MAX_PAIRED_ENTRANTS) {
+      for (const white of entrants) {
+        for (const black of entrants) {
+          if (white === black) continue;
+          pairs.push(normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true }));
+        }
+      }
+    }
+
     const found = recoverRules({
       rulesHash: row.rulesHash,
       openedBy: row.openedBy,
       ranked: row.ranked,
       senders: entries.map((e) => e.sender),
       viewer: this.address,
-      candidates: [knownRules(row.rulesHash)].filter((r): r is Rules => r !== null)
+      candidates: [fromManifest, ...pairs, knownRules(row.rulesHash)].filter((r): r is Rules => r !== null)
     });
     return found.confirmed ? found.rules : { ...DEFAULT_RULES, ranked: true };
   }

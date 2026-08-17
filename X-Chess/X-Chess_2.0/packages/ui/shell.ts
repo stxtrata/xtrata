@@ -345,6 +345,22 @@ ${SCALE_CSS}
 .tn-mark--unverified { color: var(--warn); }
 .tn-mark--missing { color: var(--dim); }
 .tn-live { color: var(--dim); font-size: 12px; }
+/* Which kind of manifest this is, which is a claim about the DOCUMENT rather
+   than about the tournament — so it should not read as more of the same prose
+   as the description above it.
+   The accent carries the strength: committed was promised before a move was
+   played, compiled was written afterwards and is accepted only because its
+   games predate the rule, refused is neither. The words say all of that, so the
+   colour is an accent and never the message. */
+/* Written .notice.tn-prov, not .tn-prov, and that is the whole trick. Both are
+   one class, so specificity ties and the LATER rule wins — .notice comes after
+   this block and was quietly repainting the border back to --line. Checked with
+   getComputedStyle rather than by eye: the class was applied and the colour was
+   not. Exactly the collision the note at the top of this file describes. */
+.notice.tn-prov { border-left-width: 3px; border-left-color: var(--line-2); }
+.notice.tn-prov--committed { border-left-color: var(--good); }
+.notice.tn-prov--compiled { border-left-color: var(--gold); }
+.notice.tn-prov--refused { border-left-color: var(--warn); }
 /* The manifest a person copies out and inscribes themselves. Monospace because
    every character of it matters and a proportional font hides a stray space. */
 .claim-out {
