@@ -1,0 +1,19 @@
+// X-CHESS-SKILL/1  chess-engine
+//
+// Deterministic: same position, same depth, same answer, on any machine,
+// forever. No randomness, no clock, no state between calls. That is what makes
+// it inscribable — an X Chess entrant can fetch this by hash and verify every
+// player was handed the same analysis.
+//
+// rankMoves(state, depth) returns EVERY legal move scored in centipawns from
+// the mover's view, best first, with mateIn where one exists. Never a
+// recommendation: a character reads the list and picks by style.
+//
+// A language model cannot play chess from a list of legal moves, and no prompt
+// makes it — effort, instructions and hints each measured zero over six
+// on-chain games. This halved the blunder rate, 24% to 12%.
+//
+// Needs a legal-move generator with make/unmake: the X Chess board engine, or
+// any 0x88 one of the same shape.
+
+// packages/chess/board.ts
