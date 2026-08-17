@@ -95,6 +95,30 @@ export const BUILDER_INSCRIPTION = Object.freeze({
   url: 'https://xtrata.xyz/x/2992'
 });
 
+/**
+ * The validator an entrant runs before paying, and the six sheets it checked.
+ *
+ * Verified the whole way round: the on-chain validator was fetched and used to
+ * parse the on-chain sheets, so nothing local was trusted at any point. All six
+ * are byte-identical to harness/wizards/entries/.
+ *
+ * Each sheet declares 2994, so the record carries not just the character but the
+ * validator that passed it — the same reasoning as the manifest declaring the
+ * builder that derived it.
+ *
+ * NOT REFERENCED BY 2993. That manifest was inscribed after every game it names
+ * had started, so it is final and its entrants carry no entry ids. These are a
+ * record of what played and the input to the next tournament, whose manifest can
+ * name them from the start.
+ */
+export const ENTRY_INSCRIPTION = Object.freeze({
+  validator: 2994,
+  sheets: Object.freeze({
+    Gambit: 2995, Ledger: 2996, Mason: 2997,
+    Wager: 2998, Plumb: 2999, Oblique: 3000
+  })
+});
+
 export const TOURNAMENT_INSCRIPTION = Object.freeze({
   id: 2993,
   sha256: '0041a84a8f46c6c6e31d972ffe1cfd7eb0d3014f89a6da6f9a1d3cdff2f7aa7a',

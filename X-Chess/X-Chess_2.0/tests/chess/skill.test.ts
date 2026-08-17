@@ -12,8 +12,8 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  BUILDER_FILE, BUILDER_INSCRIPTION, CHUNK_BYTES, INSCRIBED_SHA256, INSCRIPTION,
-  SKILL_FILE, TOURNAMENT_INSCRIPTION, buildBuilder, buildSkill, sha256
+  BUILDER_FILE, BUILDER_INSCRIPTION, CHUNK_BYTES, ENTRY_FILE, ENTRY_INSCRIPTION, INSCRIBED_SHA256, INSCRIPTION,
+  SKILL_FILE, TOURNAMENT_INSCRIPTION, buildBuilder, buildEntry, buildSkill, sha256
 } from '../../harness/skill/build-skill.mjs';
 
 describe('the inscription-ready build', () => {
@@ -140,5 +140,31 @@ describe('what is on chain, and what it descends from', () => {
       Buffer.compare(readFileSync(BUILDER_FILE), built),
       'harness/skill/manifest-builder.js is stale — rebuild and commit'
     ).toBe(0);
+  });
+});
+
+describe('the character sheets on chain', () => {
+  it('names the validator and all six sheets', () => {
+    expect(ENTRY_INSCRIPTION.validator).toBe(2994);
+    expect(Object.keys(ENTRY_INSCRIPTION.sheets)).toHaveLength(6);
+  });
+
+  it('keeps the validator artefact identical to its source', async () => {
+    const built = await buildEntry();
+    expect(
+      Buffer.compare(readFileSync(ENTRY_FILE), built),
+      'harness/skill/entry-builder.js is stale — rebuild and commit'
+    ).toBe(0);
+  });
+
+  it('has a sheet for every personality that played', async () => {
+    // A character with no sheet is a player the record cannot describe.
+    const { PERSONALITIES } = await import('../../harness/wizards/personalities.mjs');
+    for (const character of PERSONALITIES) {
+      expect(
+        ENTRY_INSCRIPTION.sheets[character.name as keyof typeof ENTRY_INSCRIPTION.sheets],
+        `${character.name} has no inscribed sheet`
+      ).toBeGreaterThan(0);
+    }
   });
 });
