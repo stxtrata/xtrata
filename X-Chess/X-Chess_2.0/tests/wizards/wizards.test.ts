@@ -807,12 +807,12 @@ describe('what round 3 taught the fee ladder', () => {
   const core = read('harness/wizards/wizards-core.mjs');
   const runner = read('harness/wizards/run-tournament.mjs');
 
-  it('gives the bottom rung longer, because 11 of 13 raises were wasted', () => {
-    // 374 moves. The ledger recorded 13 climbs and only 2 moves were actually
-    // paid for at 1,200 — a climb REPLACES rather than adds, and eleven times
-    // the 400 transaction was mined anyway while we bid against ourselves.
-    // One of those replacements ended a round that had played 166 clean moves.
-    expect(core).toMatch(/FEE_BUMP_AFTER_MS = 30_000/);
+  it('gives the bottom rung three blocks, not one', () => {
+    // Twenty seconds climbed on 19% of moves; thirty climbed on 12%; both to
+    // buy two actual raises. A climb REPLACES rather than adds, so almost every
+    // one was a wasted signature — and before the superseded fix, one of them
+    // stranded a round that had played 166 clean moves.
+    expect(core).toMatch(/FEE_BUMP_AFTER_MS = 45_000/);
   });
 
   it('leaves the rungs alone, because those were right', () => {

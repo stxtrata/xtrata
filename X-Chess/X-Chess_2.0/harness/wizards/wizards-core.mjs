@@ -118,12 +118,21 @@ export const FEE_LADDER = Object.freeze([400n, 1_200n, 3_000n]);
  * ended a round that had played 166 clean moves, because the runner was holding
  * the receipt for the transaction its own replacement had superseded.
  *
- * Thirty against a ~12.5s block leaves room for two blocks plus indexing lag,
- * which is where those eleven were lost. The RUNGS were right - 99% of moves
- * landed at the bottom one - so this changes only how long the bottom rung gets
- * to work before we give up on it.
+ * Thirty helped and did not finish the job. Round 4 climbed on 19% of moves at
+ * twenty seconds; round 5 climbed on 12% at thirty, for two raises actually
+ * paid. So one move in eight was still being bid on twice to buy almost
+ * nothing.
+ *
+ * Forty-five is what the round 3 numbers pointed at before it was set to
+ * thirty, and three blocks of patience is the right shape for a chain that
+ * confirms in twelve seconds and indexes some time after that. The RUNGS remain
+ * untouched and remain right: 98% of moves land on the bottom one and nothing
+ * has ever needed the top.
+ *
+ * Climbing is cheap now that a superseded rung no longer strands the run, so
+ * this is about noise rather than money - the whole of round 5 cost 0.0496 STX.
  */
-export const FEE_BUMP_AFTER_MS = 30_000;
+export const FEE_BUMP_AFTER_MS = 45_000;
 
 /** The rung a plan quotes and a spend cap is checked against: the worst case. */
 export const MINER_FEE_USTX = FEE_LADDER[FEE_LADDER.length - 1];

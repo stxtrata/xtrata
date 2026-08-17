@@ -85,22 +85,29 @@ finishes leaves no room for the review the form is explicitly asking you to allo
 > computes the hash chain and emits the seeding transactions.
 >
 > Completion evidence: a public repository and commit hash with an open licence, the
-> test suite green, and a testnet contract that has been through the full lifecycle of
-> seed, finalise, inscribe and swap in both directions.
+> test suite green, and a twin contract that has been through the full lifecycle of
+> seed, finalise, inscribe, swap out and swap back, with the contract id and every
+> transaction id published. Rehearsed on testnet and evidenced on mainnet against the
+> live core, so the artefact is permanent and independently checkable.
 >
-> Plus a published replay report against Bitcoin Pepes, the only collection whose
-> correct answer is already on chain. For every one of the 2,089 tokens whose source
-> art is still retrievable, the harvester's computed hash matches the on-chain
-> canonical hash exactly, with zero mismatches. Tokens whose source art can no longer
-> be fetched are counted and published separately as a link-rot measurement, because
-> that number is itself a finding worth having. Anyone can rerun the whole thing.
+> Plus a published replay report against Bitcoin Pepes, which is the reference set
+> because it is fully preserved: all 2,089 of its twins were minted through a contract
+> that refuses any bytes not matching the token's recorded hash, so every one of those
+> hashes has already been confirmed by a successful mint rather than merely asserted.
+> For every token whose source art is still retrievable, the harvester's computed hash
+> matches that recorded hash exactly, with zero mismatches. Tokens whose source art can
+> no longer be fetched are counted and published separately as a link-rot measurement,
+> because that number is itself a finding worth having. Anyone can rerun the whole thing.
 >
 > Target: end of week 4, Sunday 13 September 2026.
 
 **Why this milestone is worth money.** Reading art out of arbitrary collections is the
 hardest engineering in the grant and everything downstream waits on it. Bitcoin Pepes
-is the only test where the correct answer is already on chain, which makes it the only
-rigorous proof available. It passes or it does not.
+gives a complete reference set to test against, for free, because all 2,089 of its
+hashes were validated by the contract at mint time. LEO Cats offers 101 such
+validations and Miami Degens one, so Pepes is the only collection that can check the
+harvester across a whole collection rather than a handful of tokens. It passes or it
+does not.
 
 ---
 
