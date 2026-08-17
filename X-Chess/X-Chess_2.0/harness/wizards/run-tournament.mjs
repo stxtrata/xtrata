@@ -865,6 +865,11 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
     return;
   }
 
+  if (command === 'open') {
+    await openOnly({ field, plan, openFee, manifest });
+    return;
+  }
+
   if (command === 'standings') {
     const games = await readGames();
     console.log(`${games.length} games on the contract. Standings need replay per game.\n`);
@@ -980,6 +985,95 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
 
   console.log(`\nSpent ${ustx(budget.spent)} of ${ustx(budget.cap)}.`);
   console.log('Nothing is running now. A silent terminal from here is finished, not stuck.\n');
+}
+
+/**
+ * Open every game a format calls for, and play none of them.
+ *
+ * THE ORDER A COMMITTED TOURNAMENT NEEDS, and the step that was missing. A
+ * manifest names its games by id; ids do not exist until games are opened; and
+ * `provenance` reads a manifest as `committed` only when it was inscribed
+ * before the first MOVE. So the sequence is open, build, inscribe, play - and
+ * until now the runner could only open a game on its way to playing it, which
+ * makes that sequence impossible to carry out.
+ *
+ * Opening settles nothing. A game with no submissions has no result, no first
+ * move and no rating consequence, so this is the one part of a tournament that
+ * can be done early without deciding anything about it.
+ *
+ * IDEMPOTENT, because the alternative is paying twice. Every pairing is looked
+ * up by its rules hash first, exactly as the play loop does, so a re-run after
+ * a failure opens only what is genuinely missing. That matters more here than
+ * anywhere else in this file: a duplicate game is not an error the contract
+ * will refuse, it is a second real game that costs a real fee and then sits
+ * there looking like the first one.
+ */
+async function openOnly({ field, plan, openFee, manifest }) {
+  if (manifest) {
+    // A manifest names games that already exist. Opening more would create a
+    // second set nothing refers to, and the play loop would ignore them.
+    throw new WizardSafetyError(
+      'a manifest names its games, so there is nothing to open. Drop --manifest to set up a new tournament.'
+    );
+  }
+  const rounds = arg('rounds') ? plan.rounds.slice(0, Number(arg('rounds'))) : plan.rounds;
+  const pairings = rounds.flatMap((round) => round.pairings.map((p) => ({ ...p, round: round.number })));
+
+  console.log(`\nopening ${pairings.length} games across ${rounds.length} rounds`);
+  console.log(`open fee  ${ustx(BigInt(openFee) * BigInt(pairings.length))} total, before miner fees\n`);
+
+  const agents = byId(field.agents);
+  const existing = await readGames();
+  const found = [];
+  for (const pairing of pairings) {
+    const white = agents[pairing.white];
+    const black = agents[pairing.black];
+    if (!white?.address || !black?.address) {
+      throw new WizardSafetyError(
+        `no wallet for ${!white?.address ? pairing.white : pairing.black}. ` +
+          'A game names both addresses in its rules, so it cannot be opened without them.'
+      );
+    }
+    const { hash } = await wizardRules(white.address, black.address);
+    const already = findByRulesHash(hash, existing);
+    found.push({ ...pairing, white, black, hash, id: already?.id ?? null });
+  }
+
+  const missing = found.filter((g) => g.id === null);
+  for (const game of found) {
+    const where = game.id === null ? 'to open' : `game ${game.id}`;
+    console.log(`  round ${String(game.round).padStart(2)}  ${game.white.name.padEnd(8)} v ${game.black.name.padEnd(8)}  ${where}`);
+  }
+
+  if (!missing.length) {
+    console.log('\nEvery pairing already has a game. Build the manifest next:');
+    console.log('  node harness/wizards/build-manifest.mjs --name "…" --format ' + plan.format);
+    return;
+  }
+
+  if (!LIVE) {
+    console.log(`\n${missing.length} still to open. Dry run — nothing was signed.`);
+    console.log('Add --live to open them. Opening is permanent and costs the fee above.');
+    return;
+  }
+
+  const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
+  const opened = [];
+  for (const game of missing) {
+    // ONE AT A TIME, not the round-parallel three the play loop uses. That
+    // parallelism is bounded by the nonce rule - three games, six characters,
+    // nobody signing twice at once - and it does not hold here, because opening
+    // is always signed by WHITE and one character is white in several pairings
+    // of the same round. Two opens from one wallet at once is a nonce clash.
+    const id = await openGame({ white: game.white, black: game.black, openFee, budget });
+    opened.push({ ...game, id });
+    console.log(`  opened game ${id}  ${game.white.name} v ${game.black.name}`);
+  }
+
+  console.log(`\nOpened ${opened.length}. Spent ${ustx(budget.spent)} of ${ustx(budget.cap)}.`);
+  console.log('Now build the manifest, inscribe it, and only then play:');
+  console.log(`  node harness/wizards/build-manifest.mjs --name "…" --format ${plan.format}` +
+    (arg('rounds') ? ` --rounds ${arg('rounds')}` : ''));
 }
 
 async function openGame({ white, black, openFee, budget }) {
