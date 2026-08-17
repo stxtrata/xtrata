@@ -3159,6 +3159,18 @@ export class ChessApp {
         return false;
       }
       this.exploreFound = row;
+
+      // NAMES FOR A ROW THAT CAME IN THROUGH THE SIDE DOOR. `loadExplore`
+      // resolves every player in the list it just built; this row was fetched
+      // one at a time and was never in that list, so nothing had ever asked for
+      // its name. Game 2 is `xtrata.btc` everywhere else on the board and a bare
+      // principal here, which is how this was spotted — the same game reading
+      // two different ways depending on how you arrived at it.
+      //
+      // Awaited before the draw rather than redrawn after, because there is
+      // exactly one row and the lookup is one read.
+      await this.names?.resolveAll([row.white, row.black].filter((who): who is string => Boolean(who)));
+
       // Say how it was found. A row that appeared from outside the window
       // without explanation reads as the window having silently changed.
       this.text('exploreFound', `Game ${id} is outside the newest ${EXPLORE_WINDOW}, fetched directly.`);
