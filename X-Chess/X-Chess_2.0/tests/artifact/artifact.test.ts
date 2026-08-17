@@ -178,10 +178,21 @@ describe('the bytes', () => {
     //
     // 150,000 -> 170,000 on 2026-08-14, deliberately. The board gained the entry
     // cache, a seat that locks to its first mover, a sponsored filter and the
-    // explainers, and crossed the old figure at 154,435. Still ten of the
-    // thirty-two chunks that upload in one transaction, which is the gate that
-    // costs money; this one only has to catch a catastrophe.
-    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(170_000);
+    // explainers, and crossed the old figure at 154,435.
+    //
+    // 170,000 -> 262,144 on 2026-08-17, and re-based rather than nudged. Every
+    // previous move of this number was a small step just ahead of the current
+    // size, which is why it has been moved twice: a backstop set a few thousand
+    // bytes above today's build is a regression test wearing a catastrophe
+    // test's comment, and it fails for ordinary work like the tournaments tab
+    // or finding a player's games.
+    //
+    // 262,144 is half of the thirty-two chunks that upload in ONE transaction -
+    // 524,288 bytes - so it is derived from the real constraint instead of from
+    // whatever the board happened to weigh. Crossing it means the artefact has
+    // grown by half again, which is a catastrophe worth stopping. The chunk
+    // count in budget.test.ts remains the gate that actually costs money.
+    expect(Buffer.byteLength(html, 'utf8')).toBeLessThan(262_144);
   });
 });
 

@@ -357,6 +357,11 @@ ${SCALE_CSS}
    this block and was quietly repainting the border back to --line. Checked with
    getComputedStyle rather than by eye: the class was applied and the colour was
    not. Exactly the collision the note at the top of this file describes. */
+/* A count beside a tab name. Not a dot: the number is the useful part, and a
+   player with one game waiting and a player with nine need different urgency. */
+.tab-count { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px;
+             font-weight: 600; background: var(--gold); color: #1a1713; }
+
 .notice.tn-prov { border-left-width: 3px; border-left-color: var(--line-2); }
 .notice.tn-prov--committed { border-left-color: var(--good); }
 .notice.tn-prov--compiled { border-left-color: var(--gold); }
@@ -583,7 +588,7 @@ export const HTML = `
     <nav class="tabs" role="tablist" aria-label="sections">
       <button class="tab" id="tab-play" role="tab" aria-selected="true">Play</button>
       <button class="tab" id="tab-game" role="tab" aria-selected="false">Game</button>
-      <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore</button>
+      <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore<span class="tab-count hide" id="explore-waiting"></span></button>
       <button class="tab" id="tab-leaderboard" role="tab" aria-selected="false">Leaderboard</button>
       <button class="tab" id="tab-tournaments" role="tab" aria-selected="false">Tournaments</button>
       <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>

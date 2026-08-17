@@ -9,6 +9,7 @@ import type { PendingMove } from './board.js';
 import { buildPlayer, displayName, nameSourceNote, parsePlayer } from '../protocol/player.js';
 import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
+import { YourGames } from '../chain/yours.js';
 import { XtrataReader } from '../chain/xtrata.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament } from '../protocol/tournament.js';
@@ -425,7 +426,7 @@ const IDS = [
   'verify', 'verify-game',
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
-  'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters',
+  'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -585,6 +586,16 @@ export class ChessApp {
   private tournament: TournamentView | null = null;
   private xtrata: XtrataReader | null = null;
   private players: PlayerNames | null = null;
+  private yours: YourGames | null = null;
+  /**
+   * Ids known to be this player's that the window cannot show.
+   *
+   * Kept apart from `exploreRows` because they are found differently and can
+   * outlive a redraw of the list.
+   */
+  private yoursOutside: number[] = [];
+  /** False once discovery hit its page cap, so the set may be short. */
+  private yoursComplete = true;
   /** game id -> the manifest that names it. Built from tournaments loaded. */
   private readonly inTournament = new Map<number, { id: number; name: string }>();
   /** address -> the name a loaded tournament gave it. The weakest source. */
@@ -630,6 +641,7 @@ export class ChessApp {
         network: (options.build?.network as 'mainnet' | 'testnet') ?? 'mainnet'
       });
       this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata });
+      this.yours = new YourGames({ endpoint: endpoint as never, contractId: this.chain.contractId });
     }
     this.wire();
     this.start();
@@ -3351,6 +3363,25 @@ export class ChessApp {
       const ids: number[] = [];
       for (let id = count; id >= first; id--) ids.push(id);
 
+      // AND YOUR OWN, WHEREVER THEY ARE.
+      //
+      // The window is the newest twenty-five ids, which is a fact about the
+      // list and not about anybody's games. A game drops off it as soon as
+      // twenty-five newer ones are opened, so the longer a game runs the more
+      // certain it is to disappear from the board of the player whose move it
+      // is — and the board then said nothing rather than "your move", which is
+      // the one thing a chess board must not get wrong.
+      //
+      // These come from `YourGames`: remembered in this browser, and discovered
+      // from your own transaction history, since a move is a transaction you
+      // sent. Read exactly like the window ids and replayed exactly the same
+      // way, so the turn badge on a game from 2024 is derived from its log
+      // rather than from anything remembered about it.
+      this.yoursOutside = this.address
+        ? (this.yours?.known(this.address) ?? []).filter((id) => id < first && id <= count)
+        : [];
+      ids.push(...this.yoursOutside);
+
       // A FEW AT A TIME, because the cost here is latency and not bandwidth.
       // Twenty-five games is fifty-one round trips, and one after another that
       // is about eight seconds at a realistic hundred and fifty milliseconds
@@ -3369,23 +3400,96 @@ export class ChessApp {
       // sort below - which is a stable sort and depends on that.
       const found = built.filter((row): row is ExploreRow => row !== null);
 
+      // REMEMBERED NOW, so it is still findable when it falls off the window.
+      // `participant` is set by replay from rules that hash to the game's own
+      // commitment, so this records something established rather than guessed —
+      // and it is the half that survives the limit transaction history has: a
+      // game you were NAMED in but have never moved in is invisible to
+      // discovery, and this is the moment it stops needing to be discovered.
+      if (this.address && this.yours) {
+        for (const row of found) if (row.participant) this.yours.remember(this.address, row.id);
+      }
+
       // Sorted for whoever is looking: games waiting on them, then seats they
       // could take, then the rest in the order the chain gave them. Stable, so
       // two games in the same class keep their newest-first order.
-      const rank = (row: ExploreRow): number =>
-        row.mine === 'your-move' ? 0 : row.seat === 'open' ? 1 : 2;
-      this.exploreRows = found
-        .map((row, at) => ({ row, at }))
-        .sort((a, b) => rank(a.row) - rank(b.row) || a.at - b.at)
-        .map((entry) => entry.row);
+      this.exploreRows = this.sortForViewer(found);
       this.drawExplore();
 
       // Names for everyone on the list, in one go, then draw again if it
       // learned anything. No further chain reads.
       const players = found.flatMap((r) => [r.white, r.black]).filter((p): p is string => !!p);
       if (await (this.names?.resolveAll(players) ?? Promise.resolve(false))) this.drawExplore();
+
+      // LAST, because it is the slowest part and the list is useful without it.
+      // Everything above is remembered locally and paints with no lookup at all;
+      // this is the round trip that finds a game this browser has never seen.
+      await this.discoverYours(first, count);
       return true;
     });
+  }
+
+  /**
+   * Games waiting on you first, then seats you could take, then the rest.
+   *
+   * Stable, so two rows in the same class keep the order they arrived in —
+   * which is newest-first for the window, and is why this must not be a plain
+   * comparator on id. A game found outside the window sorts by what it needs
+   * from you, not by how old it is: a 2024 game where it is your move belongs
+   * at the top, which is the entire reason it was fetched.
+   */
+  private sortForViewer(rows: readonly ExploreRow[]): ExploreRow[] {
+    const rank = (row: ExploreRow): number =>
+      row.mine === 'your-move' ? 0 : row.seat === 'open' ? 1 : 2;
+    return rows
+      .map((row, at) => ({ row, at }))
+      .sort((a, b) => rank(a.row) - rank(b.row) || a.at - b.at)
+      .map((entry) => entry.row);
+  }
+
+  /**
+   * Ask the chain for games this browser has never seen.
+   *
+   * Only what is NEW is read. The remembered ids were already in the list
+   * before this ran, so a returning player pays one page of history and no game
+   * reads at all — and the common case of "nothing has changed" costs a single
+   * request.
+   *
+   * A failure here is deliberately quiet. It leaves the list exactly as it was,
+   * which is the whole list as far as this browser knows; saying "could not
+   * reach the chain" over a list that is already correct would be alarming
+   * about nothing.
+   */
+  private async discoverYours(first: number, count: number): Promise<void> {
+    if (!this.address || !this.yours) return;
+
+    let fresh: number[];
+    try {
+      const found = await this.yours.discover(this.address);
+      this.yoursComplete = found.complete;
+      fresh = found.fresh.filter((id) => id <= count && id < first);
+    } catch {
+      return;
+    }
+    if (!fresh.length) {
+      if (!this.yoursComplete) this.drawExplore();
+      return;
+    }
+
+    const built = (
+      await pool(
+        EXPLORE_READ_WIDTH,
+        fresh.map((id) => () => this.buildExploreRow(id))
+      )
+    ).filter((row): row is ExploreRow => row !== null);
+    if (!built.length) return;
+
+    this.yoursOutside = [...new Set([...this.yoursOutside, ...fresh])].sort((a, b) => b - a);
+    this.exploreRows = this.sortForViewer([...this.exploreRows, ...built]);
+    this.drawExplore();
+
+    const players = built.flatMap((r) => [r.white, r.black]).filter((p): p is string => !!p);
+    if (await (this.names?.resolveAll(players) ?? Promise.resolve(false))) this.drawExplore();
   }
 
   /**
@@ -3660,12 +3764,24 @@ export class ChessApp {
         // Are you in this game? Asked of the rules and the record, never of the
         // turn — so it still answers while the other player is thinking, and it
         // still answers after the game is over.
-        if (whole && rules.confirmed && this.address) {
+        //
+        // NOT GATED ON THE RULES, for the half that does not depend on them.
+        // Whether the rules NAME you is only meaningful once they are confirmed,
+        // because an unconfirmed guess must never put your address on a game.
+        // Whether you SUBMITTED to it is a different kind of fact: it is in the
+        // log, you signed it, and no recovery is involved.
+        //
+        // Sharing one guard hid a game whose rules could not be recovered from
+        // the player who had demonstrably moved in it — the "Yours" filter
+        // dropped a game they had played, which is exactly the disappearance
+        // this whole change is about.
+        if (whole && this.address) {
           const me = this.address.toUpperCase();
-          row.participant =
-            rules.rules.white === me ||
-            rules.rules.black === me ||
-            state.accepted.some((entry) => String(entry.sender ?? '').toUpperCase() === me);
+          const named = rules.confirmed && (rules.rules.white === me || rules.rules.black === me);
+          const moved = state.accepted.some(
+            (entry) => String(entry.sender ?? '').toUpperCase() === me
+          );
+          row.participant = named || moved;
         }
 
         // Only for a game whose rules this board can actually confirm, and
@@ -3751,8 +3867,34 @@ export class ChessApp {
     }
   }
 
+  /**
+   * How many games are waiting on you, beside the tab name.
+   *
+   * The row badge only tells somebody who is already looking at the list, and
+   * the title flash only covers the game currently open — so a player whose
+   * turn came up in an older game had to go looking to find out. That is the
+   * failure the window made permanent: the game fell off the list, and nothing
+   * anywhere said it was your move.
+   *
+   * Counted from replayed rows, so it means "this board has confirmed the rules
+   * of this game and derived that it is your turn", never a guess. It cannot
+   * count a game this browser has never seen, which is the same limit the list
+   * has and is stated there rather than implied by a number.
+   */
+  private drawWaiting(): void {
+    const node = this.el.exploreWaiting;
+    const waiting = this.exploreRows.filter((row) => row.mine === 'your-move').length;
+    node.textContent = waiting ? String(waiting) : '';
+    node.classList.toggle('hide', waiting === 0);
+    node.setAttribute(
+      'title',
+      waiting === 1 ? '1 game is waiting for your move' : `${waiting} games are waiting for your move`
+    );
+  }
+
   private drawExplore(): void {
     this.drawExploreFilters();
+    this.drawWaiting();
     const rows = this.el.exploreRows;
     rows.replaceChildren();
 
@@ -3768,10 +3910,16 @@ export class ChessApp {
     if (this.exploreFilter === 'all') {
       // Both facts matter: the window is real, so a player's game can fall off
       // it, and the order depends on who is looking.
+      const outside = this.yoursOutside.length;
       this.text(
         'exploreCount',
         `${this.exploreTotal} game${this.exploreTotal === 1 ? '' : 's'} on this contract` +
           (this.exploreTotal > EXPLORE_WINDOW ? `, newest ${EXPLORE_WINDOW} shown` : '') +
+          // Said because the count above stops being the whole story: the list
+          // is no longer "the newest twenty-five" once your own older games are
+          // in it, and a reader counting rows would otherwise find more than
+          // the sentence admits to.
+          (outside ? `, plus ${outside} of yours from further back` : '') +
           (this.address ? ', yours first' : '')
       );
     } else if (this.exploreFilter === 'sponsored') {
@@ -3791,11 +3939,21 @@ export class ChessApp {
     } else {
       // Say when a filter is hiding things, and say it in terms of the filter.
       // A list that silently shortened would read as games having disappeared.
+      // WHAT THE FILTER SEARCHED, not just what it found. "Yours" over the
+      // newest twenty-five and "Yours" over every game you have ever played are
+      // different questions with the same answer shape, and somebody who has
+      // played eighty games needs to know which one they are looking at.
+      const mine = this.exploreFilter === 'mine' || this.exploreFilter === 'your-move';
+      const reach = !mine
+        ? ''
+        : this.yoursComplete
+          ? ' Every game this browser can find is included, however old.'
+          : ' Older games may be missing: the search stopped before the end of your history.';
       this.text(
         'exploreCount',
-        showing.length === 0
+        (showing.length === 0
           ? `No games match that filter, out of ${this.exploreRows.length} shown.`
-          : `${showing.length} of ${this.exploreRows.length} shown.`
+          : `${showing.length} of ${this.exploreRows.length} shown.`) + reach
       );
     }
 
