@@ -238,28 +238,59 @@ export function rankedNotes({ rankMoves, Position, fen, played = [], depth = 3 }
     }
   }
 
-  return ranked.map((row, place) => {
+  // A MOVE THAT DRAWS IS WORTH A DRAW, whatever the pieces say.
+  //
+  // This is the fix for game 20, and the diagnosis is worth keeping. Plumb was
+  // +7 - a rook and four pawns against two - and repeated. The harness had done
+  // everything right: it computed the material, resolved the condition itself,
+  // and labelled the move
+  //
+  //   e7d7  +7.5 — DRAWS NOW by repetition. DO NOT PLAY
+  //
+  // Twenty of twenty-three moves were unmarked. It played the marked one.
+  //
+  // The reason is in that line. The list is ordered by SCORE, and a depth-3
+  // search has no idea the position has occurred twice - it sees a rook up and
+  // says +7.5, so the drawing move sits at the TOP with the best number while a
+  // suffix asks the model to overrule it. We were printing a contradiction and
+  // hoping the reader resolved it our way.
+  //
+  // So the score is corrected instead of annotated. A move that ends the game
+  // as a draw is worth 0.0, which is simply true, and it sinks to where a draw
+  // belongs when you are winning. The marker stays for the reader; the ORDER
+  // now agrees with it.
+  const priced = ranked.map((row) => {
     const after = new Position(fen);
     const moved = after.applyUci(row.uci);
+    const stalemate = after.isStalemate();
+    let repeats = 0;
+    if (!stalemate && seen.length) {
+      const key = after.key();
+      repeats = seen.reduce((n, k) => n + (k === key ? 1 : 0), 0);
+    }
+    const drawsNow = stalemate || repeats >= 2;
+    return { row, moved, stalemate, drawsNow, score: drawsNow ? 0 : row.score };
+  });
 
+  // Re-sorted on the corrected score, ties broken by the engine's own order so
+  // two runs of this cannot disagree about equal moves.
+  priced.sort((a, b) => b.score - a.score || ranked.indexOf(a.row) - ranked.indexOf(b.row));
+
+  return priced.map(({ row, moved, stalemate, drawsNow, score }, place) => {
     let note;
     if (row.mateIn && row.mateIn > 0) note = `MATE IN ${row.mateIn}`;
     else if (row.mateIn && row.mateIn < 0) note = `mated in ${-row.mateIn}`;
-    else note = `${row.score >= 0 ? '+' : ''}${(row.score / 100).toFixed(1)}`;
+    else note = `${score >= 0 ? '+' : ''}${(score / 100).toFixed(1)}`;
 
-    if (after.isStalemate()) {
+    if (stalemate) {
       note += ahead ? ' — STALEMATE, draws now. DO NOT PLAY' : ' — STALEMATE, draws now';
-    } else if (seen.length) {
-      const key = after.key();
-      const again = seen.reduce((n, k) => n + (k === key ? 1 : 0), 0);
+    } else if (drawsNow) {
       // Ruled out only when it throws a game away. Behind or level, a draw by
       // repetition is a legitimate result and taking it is the character's call.
-      if (again >= 2) {
-        note += ahead ? ' — DRAWS NOW by repetition. DO NOT PLAY' : ' — DRAWS NOW by repetition';
-      }
+      note += ahead ? ' — DRAWS NOW by repetition. DO NOT PLAY' : ' — DRAWS NOW by repetition';
     }
 
-    return { uci: row.uci, san: moved?.san ?? null, note, score: row.score, place, mateIn: row.mateIn };
+    return { uci: row.uci, san: moved?.san ?? null, note, score, place, mateIn: row.mateIn };
   });
 }
 

@@ -22,6 +22,7 @@ import {
   chooseMove,
   claudeCodeAsker,
   materialBalance,
+  rankedNotes,
   extractMove
 } from '../../harness/wizards/chooser.mjs';
 import { PERSONALITIES, HOUSE_RULES, ENTRY_FORMAT } from '../../harness/wizards/personalities.mjs';
@@ -34,6 +35,15 @@ const RULES = normaliseRules({ ...DEFAULT_RULES });
 const GAMBIT = PERSONALITIES[0];
 
 /** The board's own engine, bundled on the fly — same source the runner uses. */
+async function loadSearch(): Promise<any> {
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [resolve(fileURLToPath(new URL('../..', import.meta.url)), 'packages/chess/search.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'silent'
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+}
+
 async function loadEngine(): Promise<any> {
   const { build } = await import('esbuild');
   const out = await build({
@@ -662,5 +672,61 @@ describe('a player that narrates instead of answering', () => {
     expect(HOUSE_RULES.toLowerCase(), 'a condition invites narration').not.toMatch(
       /if you are ahead/
     );
+  });
+});
+
+describe('a move that draws is priced as a draw', () => {
+  // GAME 20, and the harness was not at fault until you look at the ordering.
+  // Plumb was +7 — a rook and four pawns against two — and repeated. Every
+  // computed fact was correct and present:
+  //
+  //   e7d7  +7.5 — DRAWS NOW by repetition. DO NOT PLAY
+  //
+  // Twenty of twenty-three moves were unmarked and it played the marked one.
+  // The list is ordered by SCORE, and a depth-3 search cannot see that the
+  // position has occurred twice, so the drawing move sat at the TOP with the
+  // best number while a suffix asked the model to overrule it. We printed a
+  // contradiction and hoped the reader resolved it our way.
+  const knightShuffle = ['g1f3', 'g8f6', 'f3g1', 'f6g8', 'g1f3', 'g8f6', 'f3g1'];
+
+  const notesFor = async (played: string[], fen?: string) => {
+    const engine = await loadEngine();
+    const search = await loadSearch();
+    const board = new engine.Position();
+    for (const uci of played) board.applyUci(uci);
+    return rankedNotes({
+      rankMoves: search.rankMoves, Position: engine.Position,
+      fen: fen ?? board.fen(), played
+    });
+  };
+
+  it('scores an immediate repetition at zero, not at the material', async () => {
+    const notes = await notesFor(knightShuffle);
+    const repeat = notes.find((n: any) => n.note.includes('DRAWS NOW'));
+    expect(repeat, 'no repetition was available to test').toBeTruthy();
+    expect(repeat.score, 'a draw is worth a draw').toBe(0);
+    expect(repeat.note).toContain('+0.0');
+  });
+
+  it('sinks it in the ranking, so the order agrees with the marker', async () => {
+    const notes = await notesFor(knightShuffle);
+    const at = notes.findIndex((n: any) => n.note.includes('DRAWS NOW'));
+    // Not merely present — BELOW the moves that keep the game alive. A model
+    // taking the top move must get one of those.
+    expect(at).toBeGreaterThan(0);
+    expect(notes[0].note, 'the top move must not be the drawing one').not.toContain('DRAWS NOW');
+  });
+
+  it('still lists it, because a draw can be the right result', async () => {
+    // Behind or level, taking a repetition is a legitimate choice and the
+    // character's to make. Removing the move would be the engine playing.
+    const notes = await notesFor(knightShuffle);
+    expect(notes.some((n: any) => n.note.includes('DRAWS NOW'))).toBe(true);
+  });
+
+  it('keeps ties in the engine order, so two runs cannot disagree', async () => {
+    const once = await notesFor(knightShuffle);
+    const twice = await notesFor(knightShuffle);
+    expect(once.map((n: any) => n.uci)).toEqual(twice.map((n: any) => n.uci));
   });
 });
