@@ -746,12 +746,29 @@ async function fund(fleet) {
     if (wizard.address) balances[wizard.address] = await balanceOf(wizard.address);
   }
   const held = balances[director.address] ?? 0n;
-  const plan = planFunding({ fleet, balances });
+
+  // A SMALLER FLOAT THAN THE HOUSE ONE, when the tournament is costed and the
+  // house figure would be idle capital. `planFunding` has always taken this;
+  // only the CLI had no way to say it, so every top-up went to 2 STX whatever
+  // the run actually needed.
+  //
+  // Capped at the house float rather than left open. This tops up ten wallets
+  // in one go from a key that holds everything, so a fat-fingered `--float 20`
+  // should be refused here rather than caught one transfer at a time by
+  // `assertTransferAllowed`.
+  const floatUstx = arg('float') ? BigInt(Math.round(Number(arg('float')) * 1e6)) : TARGET_FLOAT_USTX;
+  if (floatUstx <= 0n || floatUstx > TARGET_FLOAT_USTX) {
+    throw new WizardSafetyError(
+      `--float must be above 0 and no more than the house float of ${ustx(TARGET_FLOAT_USTX)}; ` +
+        `got ${ustx(floatUstx)}.`
+    );
+  }
+  const plan = planFunding({ fleet, balances, targetFloatUstx: floatUstx });
   const fleetAddresses = fleet.wizards.map((w) => w.address).filter(Boolean);
 
   console.log(`\nDirector holds ${ustx(held)}`);
   if (!plan.transfers.length) {
-    console.log(`Every player is at its float of ${ustx(TARGET_FLOAT_USTX)}. Nothing to do.\n`);
+    console.log(`Every player is at its float of ${ustx(floatUstx)}. Nothing to do.\n`);
     return;
   }
   for (const transfer of plan.transfers) {
