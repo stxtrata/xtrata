@@ -945,6 +945,10 @@ export const HTML = `
 
   <section id="view-leaderboard" class="panel hide">
     <h2>Leaderboard</h2>
+    <!-- The full walk, offered rather than forced. A checkpoint is a claim, and a
+         claim nobody can test is just an assertion. -->
+    <div class="row"><button class="action hide" id="leaderboard-verify"
+      title="Replay every ranked game from the first, ignoring any published checkpoint">Verify from scratch</button></div>
     <div id="leaderboard-note" class="notice notice--info"></div>
     <table><thead><tr>
       <th>#</th><th>Player</th><th class="num">Rating</th><th class="num">Games</th>

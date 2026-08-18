@@ -262,6 +262,62 @@ tournament manifest. The board links it beside that player, so anybody reading
 the tournament can open the character and see what that competitor was told to
 do.
 
+## Rating checkpoints
+
+Ratings are derived by replaying every ranked game in order, and that walk grows
+for the life of the contract. At nine games it was free. At thirty-eight it is
+half a minute. It does not stop growing.
+
+A checkpoint is a walk somebody already did, inscribed so nobody has to do it
+again from the beginning. The board reads the newest one, continues from where
+it stopped, and replays everything after it exactly as before.
+
+### It is a claim, and the board says so
+
+Nothing before the checkpoint was replayed by the board showing it. That is
+stated on the leaderboard, and Verify from scratch does the full walk and
+ignores every checkpoint. A claim nobody can test is only an assertion.
+
+So a checkpoint must name its inputs. Elo is path dependent — the same games in
+another order give different ratings — and a table on its own could not be
+checked against anything. Listing the games, in the order they were consumed,
+makes any single claim checkable with one game's replay instead of all of them.
+
+### Who may write one
+
+Only xtrata.btc. Every other document this board reads is verified against the
+chain or is prose, so it is enough to say who inscribed it and let the reader
+judge. A checkpoint is different: the table is believed rather than checked. So
+the board requires that the wallet MINTED it, and refuses one that merely arrived
+there, which anybody can arrange.
+
+That holds until a contract or a later board can do better.
+
+### The format
+
+$ X-CHESS-RATINGS/1
+$ { "contract": "SP3JN....xchess-core-v1-canary",
+$   "rankedIndex": 38, "block": 8795901,
+$   "table": [{ "who": "SP...", "rating": 1290, "games": 10, "won": 7, "drawn": 3, "lost": 0 }],
+$   "games": [{ "id": 13, "white": "SP...", "black": "SP...", "result": "0-1" }],
+$   "note": "chain the next one to this inscription" }
+
+rankedIndex is a position in the contract's ranked index, not a game id and not a
+block: a reader continues at that position and needs no arithmetic. It must equal
+the number of games listed, and the board refuses it otherwise. block is the
+height the walk was made at, so a reader can see how stale it is.
+
+### Chaining them
+
+Every checkpoint after the first names the one before it as a dependency:
+
+$ node harness/wizards/inscribe-manifest.mjs --file checkpoint.json --after <previous id> --live
+
+That makes the series walkable backwards from any one of them, without being
+told an address and without the wallet still holding anything. It cannot be
+added afterwards. When checkpoints are no longer needed the chain simply stops;
+nothing has to be withdrawn, because nothing ever can be.
+
 ## What the board refuses to do
 
 - It will not say a game is yours unless the rules hashing to that game's own

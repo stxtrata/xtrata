@@ -157,6 +157,7 @@ async function main() {
   const KINDS = [
     { starts: 'X-CHESS-TOURNAMENT/1', kind: 'tournament manifest', mime: 'text/plain' },
     { starts: 'X-CHESS-DOCS/1', kind: 'manual', mime: 'text/plain' },
+    { starts: 'X-CHESS-RATINGS/1', kind: 'rating checkpoint', mime: 'text/plain' },
     { starts: '<!doctype html', kind: 'page', mime: 'text/html' }
   ];
   const header = text.split('\n')[0].trim();
@@ -168,6 +169,40 @@ async function main() {
     );
   }
   const { kind, mime } = match;
+
+  // A CHECKPOINT IS REGENERATED BEFORE IT IS SIGNED, and refused if it differs.
+  //
+  // Every other document here is checked for shape. This one is checked for
+  // TRUTH, because it is the only one a board believes without replaying: the
+  // rating table it carries is taken on trust by everybody who reads it. So the
+  // walk is done again, now, against the chain, and the bytes are compared.
+  //
+  // The comparison is only meaningful because the writing is canonical - fixed
+  // key order, games in ranked-index order, no timestamp. Two honest walks
+  // produce identical bytes or one of them is wrong, and the diff says which.
+  //
+  // A file that is merely STALE fails this too, which is correct: the chain has
+  // moved, and inscribing a table that no longer follows from it would be
+  // publishing a claim that was true once.
+  if (kind === 'rating checkpoint') {
+    console.log('\nregenerating the walk to check this file against the chain...\n');
+    const { execFileSync } = await import('node:child_process');
+    const fresh = execFileSync(
+      process.execPath,
+      [join(HERE, 'build-checkpoint.mjs')],
+      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }
+    );
+    const emitted = fresh.slice(fresh.indexOf('X-CHESS-RATINGS/1'));
+    if (emitted.trim() !== text.trim()) {
+      throw new WizardSafetyError(
+        'this checkpoint does not match a walk of the chain done just now.\n\n' +
+          'Either the chain has moved since the file was written, or the file was not ' +
+          'produced by build-checkpoint.mjs. Regenerate it and inscribe that:\n\n' +
+          `  node harness/wizards/build-checkpoint.mjs --out ${file}`
+      );
+    }
+    console.log('the file matches the chain exactly.\n');
+  }
 
   // A page that reaches for anything off its own bytes is broken the moment the
   // host it reaches for goes away, and an inscription outlives hosts.

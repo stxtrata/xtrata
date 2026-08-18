@@ -15,6 +15,8 @@ import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament, stageOf } from '../protocol/tournament.js';
+import { checkpointNote, parseCheckpoint, usable } from '../protocol/checkpoint.js';
+import type { Checkpoint } from '../protocol/checkpoint.js';
 import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
@@ -275,6 +277,22 @@ const DEFAULT_TOURNAMENT = 2993;
  * here.
  */
 const TOURNAMENT_DIRECTORY = 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S';
+
+/**
+ * The one wallet whose rating checkpoints this board will continue from.
+ *
+ * A DIFFERENT AND STRICTER RULE THAN THE OTHERS, because the stakes are not the
+ * same. A tournament manifest is checked pairing by pairing against the chain
+ * and a manual is prose, so both can be found in a wallet, labelled by who
+ * minted them, and left to the reader. A checkpoint seeds the entire rating
+ * table from a claim nobody replayed — so being able to say who wrote it is not
+ * enough; it has to be the only person who could have.
+ *
+ * Which is why this is xtrata.btc rather than the tournament directory: the
+ * authority for a board is the authority for what a board takes on trust, and
+ * it stays that way until a contract or a later board can do better.
+ */
+const CHECKPOINT_AUTHORITY = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 
 /**
  * What a move on this contract actually costs to get mined, in microSTX.
@@ -569,7 +587,7 @@ const IDS = [
   'picker-filters', 'picker-who', 'picker-shown', 'tournament-field',
   'tab-help', 'view-help', 'help-body', 'help-note',
   'explore-search', 'explore-find', 'explore-found',
-  'leaderboard-note', 'leaderboard-rows',
+  'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-load', 'profile-body',
   'claim-name-why', 'claim-name', 'claim-about',
@@ -753,6 +771,12 @@ export class ChessApp {
   private docs: ManifestDirectory<{ title: string }> | null = null;
   private docsFound: Found<{ title: string }>[] = [];
   private docsAsked = false;
+  private checkpoints: ManifestDirectory<Checkpoint> | null = null;
+  /** The checkpoint being continued from, and what it is. */
+  private checkpoint: { id: number; official: boolean; it: Checkpoint } | null = null;
+  private checkpointAsked = false;
+  /** Set by Verify, which does the walk a checkpoint lets a reader skip. */
+  private verifyEverything = false;
   /**
    * Ids known to be this player's that the window cannot show.
    *
@@ -839,6 +863,17 @@ export class ChessApp {
           if (!/^\s*<!doctype html/i.test(text)) return null;
           const title = /<title[^>]*>([^<]*X Chess manual[^<]*)<\/title>/i.exec(text);
           return title ? { title: title[1].trim() } : null;
+        }
+      });
+      // Published rating walks, found the same way everything else is.
+      this.checkpoints = new ManifestDirectory<Checkpoint>({
+        endpoint: endpoint as never,
+        reader: this.xtrata,
+        address: CHECKPOINT_AUTHORITY,
+        kind: 'ratings',
+        parse: (text) => {
+          const parsed = parseCheckpoint(text);
+          return parsed.ok ? parsed.checkpoint : null;
         }
       });
       this.index = new ManifestDirectory<Tournament>({
@@ -930,6 +965,12 @@ export class ChessApp {
     on('topUp', () => void this.topUp());
     on('exploreRefresh', () => void this.reloadExplore());
     on('exploreFind', () => void this.findGame());
+    on('leaderboardVerify', () => {
+      // One way only. Having verified, a reader should not be quietly put back
+      // onto the claim by the next redraw.
+      this.verifyEverything = true;
+      void this.loadLeaderboard();
+    });
     on('tournamentLoad', () => {
       const typed = String((this.el.tournamentId as HTMLInputElement).value ?? '').trim();
       this.clearTournament(
@@ -5398,6 +5439,63 @@ export class ChessApp {
     }
   }
 
+  /**
+   * Where the rating walk may start, given what has been published.
+   *
+   * Returns 0 — the whole walk, exactly as before — unless a checkpoint exists,
+   * is about THIS contract, and is not ahead of the chain. Both of those are
+   * cheap to check and both are ways a well-formed document can still be about
+   * something else.
+   *
+   * Asked once per session. A checkpoint is an inscription, so it cannot change;
+   * only a NEWER one can appear, and that is worth a page load.
+   */
+  private async checkpointStart(rankedCount: number): Promise<number> {
+    if (!this.checkpointAsked && this.checkpoints) {
+      this.checkpointAsked = true;
+      try {
+        const found = await this.checkpoints.list();
+        // Newest first, and the first that this board may actually use. A
+        // checkpoint for another contract is not an error, it is somebody
+        // else's, so it is skipped rather than complained about.
+        for (const entry of found) {
+          // MINTED BY THE AUTHORITY, not merely sitting in its wallet. Anybody
+          // may send an inscription to any address, and everywhere else on this
+          // board that is handled by saying who minted it and letting the
+          // reader judge. Not here: a checkpoint is believed rather than
+          // checked, so a document that only ARRIVED at the right wallet is
+          // refused outright and the full walk happens instead.
+          if (!entry.official) continue;
+          if (usable(entry.manifest, this.chain.contractId, rankedCount).ok) {
+            this.checkpoint = { id: entry.id, official: true, it: entry.manifest };
+            break;
+          }
+        }
+      } catch {
+        // No checkpoint means the full walk, which is what this board did for
+        // its whole life before now. Slower, never wrong.
+        this.checkpointAsked = false;
+      }
+    }
+    return this.checkpoint?.it.rankedIndex ?? 0;
+  }
+
+  /** The table a checkpoint starts everybody from, as rated games cannot be. */
+  private checkpointSeed(): RatedGame[] {
+    const it = this.checkpoint?.it;
+    if (!it) return [];
+    // REPLAYED AS GAMES, not spliced in as ratings. `computeRatings` is the only
+    // thing that knows how a rating is made, and handing it the same shape it
+    // always gets means a checkpoint cannot introduce a second way of counting.
+    return it.games.map((game) => ({
+      game: game.id,
+      white: game.white,
+      black: game.black,
+      result: game.result,
+      terminalHeight: it.block
+    }));
+  }
+
   async loadLeaderboard(): Promise<void> {
     // Before the walk, because every row's rules recovery consults them.
     await this.ensureManifestPairings();
@@ -5425,12 +5523,24 @@ export class ChessApp {
       // left on a return visit is one game row each, which is the only part that
       // can have changed.
       //
-      // NOTHING DERIVED IS CACHED. Every rating is recomputed from the log every
-      // time, because recomputing is the proof - the cache only removes the
-      // fetching, never the deriving.
+      // NOTHING DERIVED IS CACHED, unless somebody has published the derivation
+      // and this reader has chosen to continue from it.
+      //
+      // That rule was written when this contract had nine ranked games. It has
+      // thirty-eight, and the walk grows for the life of the contract — so the
+      // choice is not between recomputing and caching, it is between a board
+      // that recomputes and a board people wait for.
+      //
+      // A checkpoint does not repeal the rule; it makes obeying it OPTIONAL and
+      // says so on screen. Everything after `from` is replayed here exactly as
+      // before. Everything before it is a claim, labelled as one, with the full
+      // walk one button away. See packages/protocol/checkpoint.ts.
+      const from = this.verifyEverything ? 0 : await this.checkpointStart(count);
+
       const judged = await pool(
         LEADERBOARD_READ_WIDTH,
-        Array.from({ length: count }, (_, index) => async (): Promise<RatedGame | null> => {
+        Array.from({ length: count - from }, (_, at) => async (): Promise<RatedGame | null> => {
+          const index = from + at;
           const id = await this.chain.getRankedGame(index);
           if (id === null) return null;
           const row = await this.chain.getGame(id);
@@ -5486,7 +5596,11 @@ export class ChessApp {
       // In index order, which pool preserves. Elo is PATH DEPENDENT: the same
       // games in another order give different ratings, so the order this arrives
       // in is part of the answer rather than a presentation detail.
-      const rated: RatedGame[] = judged.filter((game): game is RatedGame => game !== null);
+      const walked: RatedGame[] = judged.filter((game): game is RatedGame => game !== null);
+
+      // ORDER IS PART OF THE ANSWER. Elo is path dependent, so the checkpoint's
+      // games go first and in the order it listed them, and the walk's follow.
+      const rated: RatedGame[] = [...this.checkpointSeed(), ...walked];
 
       const table = computeRatings(rated);
       const rows = leaderboard(table);
@@ -5505,6 +5619,13 @@ export class ChessApp {
       // principal, which is the truth anyway.
       await this.names?.resolveAll(rows.map((row) => row.principal));
 
+      const seeded = this.checkpoint;
+      // Offered only when a claim is actually being relied on. A board doing the
+      // whole walk has nothing to verify against.
+      this.el.leaderboardVerify.classList.toggle(
+        'hide',
+        !seeded || this.verifyEverything
+      );
       const aside: string[] = [];
       if (unfinished) aside.push(`${unfinished} still being played`);
       if (unidentified) aside.push(
@@ -5522,7 +5643,9 @@ export class ChessApp {
         'info',
         `Derived from ${rated.length} verified ranked game${rated.length === 1 ? '' : 's'}` +
           (aside.length ? `. Not counted: ${aside.join(', ')}.` : '.') +
-          ' Nothing here is stored; it is recomputed from the chain each time.'
+          (seeded && !this.verifyEverything
+            ? ` ${checkpointNote(seeded.it, seeded.id)}`
+            : ' Nothing here is stored; it is recomputed from the chain each time.')
       );
 
       const body = this.el.leaderboardRows;
