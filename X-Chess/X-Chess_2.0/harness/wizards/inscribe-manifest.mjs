@@ -44,6 +44,7 @@ import {
 } from '@stacks/transactions';
 
 import { WizardSafetyError } from './wizards-core.mjs';
+import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -190,6 +191,46 @@ async function readFeeUnit() {
   return inner.value;
 }
 
+/**
+ * The entry validator, fetched and executed from chain.
+ *
+ * NOT THE LOCAL COPY, deliberately, and the distinction is the whole point. A
+ * sheet is read by whoever fetches 2994, so that is what must accept it. A
+ * repo that had drifted ahead of the chain would happily approve a sheet no
+ * reader could parse, and the sheet would be permanent before anybody noticed.
+ */
+async function fetchInscribedEntryValidator() {
+  const id = ENTRY_INSCRIPTION.validator;
+  const read = async (fn, args) => {
+    const response = await fetch(
+      `https://api.hiro.so/v2/contracts/call-read/${XTRATA_ADDRESS}/${XTRATA_NAME}/${fn}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender: XTRATA_ADDRESS, arguments: args })
+      }
+    );
+    const body = await response.json();
+    if (!body.okay) throw new WizardSafetyError(`${fn} on ${id} failed: ${JSON.stringify(body).slice(0, 200)}`);
+    return Cl.deserialize(String(body.result));
+  };
+
+  const counted = await read('get-inscription-chunks', [Cl.serialize(Cl.uint(id))]);
+  const chunks = Number(counted?.value?.value ?? counted?.value ?? 1);
+  const parts = [];
+  for (let index = 0; index < chunks; index++) {
+    const piece = await read('get-chunk', [Cl.serialize(Cl.uint(id)), Cl.serialize(Cl.uint(index))]);
+    const raw = piece?.value?.value ?? piece?.value;
+    parts.push(Buffer.from(String(raw).replace(/^0x/, ''), 'hex'));
+  }
+  const bytes = Buffer.concat(parts);
+  const module = await import(`data:text/javascript;base64,${bytes.toString('base64')}`);
+  if (typeof module.parseEntry !== 'function') {
+    throw new WizardSafetyError(`inscription ${id} has no parseEntry, so it is not the entry validator.`);
+  }
+  return { module, bytes };
+}
+
 async function main() {
   const file = arg('file');
   if (!file) throw new WizardSafetyError('--file is required: the manifest to inscribe');
@@ -204,6 +245,7 @@ async function main() {
   // renders as its own source, and there is no correcting that afterwards.
   const KINDS = [
     { starts: 'X-CHESS-TOURNAMENT/1', kind: 'tournament manifest', mime: 'text/plain' },
+    { starts: 'X-CHESS-ENTRY/1', kind: 'character sheet', mime: 'text/plain' },
     { starts: 'X-CHESS-DOCS/1', kind: 'manual', mime: 'text/plain' },
     { starts: 'X-CHESS-RATINGS/1', kind: 'rating checkpoint', mime: 'text/plain' },
     { starts: '<!doctype html', kind: 'page', mime: 'text/html' }
@@ -250,6 +292,29 @@ async function main() {
       );
     }
     console.log('the file matches the chain exactly.\n');
+  }
+
+  // A SHEET IS PARSED BY THE INSCRIBED VALIDATOR BEFORE IT IS PAID FOR.
+  //
+  // Same reasoning as the checkpoint above, one step stronger. The local copy
+  // of the entry format is not the one an entrant will be judged by — 2994 is,
+  // because that is what a stranger fetches to read this sheet. So the check
+  // uses the validator ON CHAIN, not the file in this repo, and a sheet that
+  // passes here is one that will parse for everybody forever.
+  //
+  // It is worth the two reads. A sheet that fails to parse is a character no
+  // board can display and no tournament can cite, bought permanently.
+  if (kind === 'character sheet') {
+    console.log(`\nparsing this sheet with the validator at ${ENTRY_INSCRIPTION.validator}...\n`);
+    const { module } = await fetchInscribedEntryValidator();
+    const parsed = module.parseEntry(text);
+    if (!parsed.ok) {
+      throw new WizardSafetyError(
+        `the inscribed validator refuses this sheet:\n` +
+          parsed.problems.map((problem) => `  ${problem.field ?? '?'}: ${problem.says}`).join('\n')
+      );
+    }
+    console.log(`  ${parsed.entry.name} parses, using ${parsed.used} of the character budget.\n`);
   }
 
   // A page that reaches for anything off its own bytes is broken the moment the
@@ -331,7 +396,15 @@ async function main() {
   const txFee = txFeeFor(chunks.length);
   console.log(`spend cap ${spendCap} uSTX protocol fee, capped by post-condition`);
   console.log(`miner fee ${txFee} uSTX opening bid, raised to what the node asks`);
-  console.log(`depends   ${DEPENDS_ON.length ? `#${DEPENDS_ON.join(', #')}` : 'nothing'}`);
+  // A SHEET DECLARES THE VALIDATOR THAT PASSED IT, unless told otherwise.
+  //
+  // The same reasoning as the manifest declaring the builder that derived it:
+  // the record should carry not just the character but the thing that says the
+  // character is well formed. The six sheets at 2995-3000 all declare 2994, and
+  // a seventh that did not would be the odd one out for no reason.
+  const dependsOn =
+    kind === 'character sheet' && !AFTER ? [ENTRY_INSCRIPTION.validator] : DEPENDS_ON;
+  console.log(`depends   ${dependsOn.length ? `#${dependsOn.join(', #')}` : 'nothing'}`);
   if (!AFTER) {
     console.log('          (no --after, so a reader who finds this cannot walk back to an');
     console.log('           earlier one. Correct for a first document, worth setting otherwise)');
@@ -354,7 +427,7 @@ async function main() {
         Cl.uint(bytes.length),
         Cl.list(chunks.map((c) => Cl.buffer(c))),
         Cl.stringAscii(`data:text/plain,x-chess-${kind.replace(/\s+/g, '-')}`),
-        Cl.list(DEPENDS_ON.map((id) => Cl.uint(id)))
+        Cl.list(dependsOn.map((id) => Cl.uint(id)))
       ],
       senderKey,
       network: 'mainnet',
