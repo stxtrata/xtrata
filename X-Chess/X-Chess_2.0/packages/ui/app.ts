@@ -14,7 +14,7 @@ import { XtrataReader } from '../chain/xtrata.js';
 import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
-import { parseTournament } from '../protocol/tournament.js';
+import { parseTournament, stageOf } from '../protocol/tournament.js';
 import { parseDocs, splitRefs } from '../protocol/docs.js';
 import type { Block, Docs } from '../protocol/docs.js';
 import type { CheckedGame } from '../protocol/tournament.js';
@@ -739,7 +739,10 @@ export class ChessApp {
   private warmedFor: string | null = null;
   private waitingCheckedAt = 0;
   /** game id -> the manifest that names it. Built from tournaments loaded. */
-  private readonly inTournament = new Map<number, { id: number; name: string }>();
+  private readonly inTournament = new Map<
+    number,
+    { id: number; name: string; stage?: string | null }
+  >();
   /** address -> the name a loaded tournament gave it. The weakest source. */
   private readonly entrantNames = new Map<string, string>();
   /** game id -> the two addresses a loaded manifest says played it. */
@@ -1952,7 +1955,7 @@ export class ChessApp {
     button.textContent = 'Finding\u2026';
     this.notice('chainNotice', 'info', `Looking for game ${value} on ${this.chain.contractId}.`);
     this.show('game');
-    this.text('gameLabel', `Game ${value}`);
+    this.text('gameLabel', this.gameHeading());
     this.el.board.classList.add('board--loading');
 
     try {
@@ -2134,8 +2137,26 @@ export class ChessApp {
    * flash would restore whatever game happened to be open first and quietly
    * relabel the tab.
    */
+  /**
+   * What the board calls the game on screen.
+   *
+   * Two places used to write this string independently, which is how one of
+   * them ends up saying "Game 41" while the other says "Final". One function
+   * now, and the tab title uses the same source.
+   */
+  private gameHeading(): string {
+    if (this.gameId === null) return 'no game loaded';
+    const stage = this.inTournament.get(this.gameId)?.stage;
+    return stage ? `${stage} — Game ${this.gameId}` : `Game ${this.gameId}`;
+  }
+
   private drawTitle(): void {
-    const name = this.gameId === null ? 'X Chess' : `Game ${this.gameId}`;
+    // NAMED BY WHAT IT IS, when the board has been told. "Final" in a browser
+    // tab is worth more than a number, and somebody with several games open is
+    // the person who needs it most.
+    const stage = this.gameId === null ? null : this.inTournament.get(this.gameId)?.stage;
+    const name =
+      this.gameId === null ? 'X Chess' : stage ? `${stage} · Game ${this.gameId}` : `Game ${this.gameId}`;
     const turn =
       this.gameId === null || !this.state
         ? null
@@ -2185,7 +2206,7 @@ export class ChessApp {
     const state = this.state;
     if (!state || this.gameId === null) return;
 
-    this.text('gameLabel', `Game ${this.gameId}`);
+    this.text('gameLabel', this.gameHeading());
     this.drawTitle();
 
     const canSubmit =
@@ -3160,7 +3181,14 @@ export class ChessApp {
               // can only ever know about tournaments it has loaded — see the
               // column, which says nothing rather than "not in a tournament".
               for (const game of view.tournament?.games ?? []) {
-                this.inTournament.set(game.id, { id, name: view.tournament!.name });
+                this.inTournament.set(game.id, {
+                  id,
+                  name: view.tournament!.name,
+                  // So a game opened from here can say what it is, and so the
+                  // browser tab does. A board that knows a game is a final and
+                  // shows it as "Game 41" is withholding the interesting part.
+                  stage: stageOf(view.tournament!, game)
+                });
               }
               // So a game reached from here can name its players. Two
               // tournaments could name one address differently; the most
@@ -3491,6 +3519,16 @@ export class ChessApp {
 
         // WHOSE MOVE, in the same word the Explore list uses. It is the same
         // fact, and a second wording would read as a second fact.
+        // WHAT THIS GAME IS, when it is something. Placed before the players
+        // because "Final" changes how the rest of the row reads.
+        if (game.stage) {
+          const stage = this.doc.createElement('span');
+          stage.className = 'tn-stage';
+          stage.textContent = game.stage;
+          who.insertBefore(stage, who.firstChild);
+          who.insertBefore(this.doc.createTextNode(' '), stage.nextSibling);
+        }
+
         const mineNow =
           this.address && String(game.toMove ?? '').toUpperCase() === this.address.toUpperCase();
         if (mineNow) {

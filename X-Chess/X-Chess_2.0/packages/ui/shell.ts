@@ -408,6 +408,11 @@ ${SCALE_CSS}
 /* Whose move it is, in a tournament round. Same word the Explore list uses,
    because it is the same fact and a second wording would read as a second one. */
 .tn-turn { font-size: 11px; color: var(--dim); }
+/* What a game IS, when the manifest says so. Reads before the players, because
+   it changes how the rest of the row is read. */
+.tn-stage { font-size: 10px; font-weight: 700; letter-spacing: .05em;
+            text-transform: uppercase; color: var(--gold);
+            border: 1px solid var(--gold); border-radius: 3px; padding: 0 5px; }
 .tn-yours { font-size: 10px; font-weight: 600; letter-spacing: .04em;
             background: var(--gold); color: #1a1713; border-radius: 3px; padding: 1px 5px; }
 

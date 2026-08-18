@@ -126,67 +126,119 @@ by somebody else.
 
 ## Running your own tournament
 
-The tooling signs transactions, so it lives in the repository rather than in this
-page. A board holds no keys and never will, being an inscription itself.
+Most tournaments are between people, and nothing about that needs an engine, a
+program or a director sitting at a keyboard. Start here; AI players are an
+addition to this, not a different thing.
+
+The tooling signs transactions, so it lives in the repository rather than in the
+board. A board holds no keys and never will, being an inscription itself.
+
+### A tournament between people
+
+An entrant is a name and a Stacks address, and that is the whole requirement.
+Each player moves from their own wallet, whenever they like, paying their own
+network fee. Nobody has to be online for the tournament to progress, and there is
+no server that could stop it.
+
+Collect the addresses of everybody playing. Decide the format: a round robin
+plays every pair once, a double round robin plays every pair twice so both have
+White once. Six entrants is fifteen games as a single round robin, thirty as a
+double.
+
+You do not have to run a format to completion. A tournament may be any number of
+its rounds, and the second exhibition was rounds eight to ten of a double round
+robin, played long after the first seven.
 
 ### The order, and why it is forced
 
 $ node harness/wizards/run-tournament.mjs open --live
 $ node harness/wizards/build-manifest.mjs --name "Your Event" --format round-robin
 $ node harness/wizards/inscribe-manifest.mjs --file harness/wizards/manifest-round-robin.json --live
-$ node harness/wizards/run-tournament.mjs --manifest <id> --live
 
 Open the games first, because a manifest names them by id and ids do not exist
 until they are opened. Build the manifest from what is actually on chain.
-Inscribe it. Only then play.
+Inscribe it. Then the players play.
 
-Opening does not spoil it: a game with no submissions has no first move, so a
-manifest inscribed while every game sits empty is still committed.
+Opening does not spoil the order: a game with no submissions has no first move,
+so a manifest inscribed while every game sits empty still reads as committed.
 
 ### Opening the games
 
 The open command computes each pairing's rules hash, looks for a game already
-carrying it, and opens only what is missing. It is safe to re-run: it will not
-open a second copy of a pairing that already exists, because it matches on the
-hash rather than on who opened what.
+carrying it, and opens only what is missing. It is safe to re-run, because it
+matches on the hash rather than on who opened what, so it will not open a second
+copy of a pairing that already exists.
+
+Opening costs the contract's open fee per game and settles nothing else.
 
 ### Building the manifest
 
 The builder reads every game on the contract and matches pairings BY RULES HASH
-rather than by position in a list. Three games opened at once land in whatever
+rather than by position in a list. Several games opened at once land in whatever
 order the chain mines them, so a game's number says nothing about who is in it.
 
 It refuses to write a manifest naming a game that does not exist, and refuses one
 whose pairings do not match the chain. Either would be a document whose only
 purpose is to be rejected.
 
-Use --from and --rounds to take part of a format. A tournament need not run a
-format to completion, and the second exhibition was rounds eight to ten of a
-double round robin.
+Use --from and --rounds to take part of a format.
 
 ### Inscribing it
 
 $ node harness/wizards/inscribe-manifest.mjs --file <path> --after <previous id> --live
 
-The fee unit is read live rather than remembered. --after names the previous
-manifest as a dependency, which lets a reader walk backwards through every
-earlier tournament without being told an address. It cannot be added later, so
-decide before inscribing.
+The fee unit is read live rather than remembered. --after names an earlier
+manifest, which lets a reader walk backwards through previous tournaments without
+being told an address. It cannot be added later, so decide before inscribing.
 
-Send the finished inscription to the wallet the board watches, or it will only be
+Send the finished inscription to the wallet the board reads, or it will only be
 findable by number.
 
-## AI players
+### Naming the important games
 
-### The engine
+A manifest may say what a game is: Final, Semi-final, Quarter-final, or anything
+else a tournament calls its stages. The board shows that beside the players, in
+the game itself, and in the browser tab, so a reader who opens one game knows
+which it is.
 
-Every player is handed the same engine, inscription #2991. It is deterministic,
-and it is not a recommendation: it ranks every legal move with a score in
-centipawns from the mover's point of view, best first, and marks any mate.
+Most formats do not have a final, and the board will not invent one. A round
+robin plays every pair against every pair, so its last round is simply the last
+round. A knockout is different: there the structure means it, and the board works
+the stages out from the rounds without being told.
+
+### Telling the players
+
+Give them the tournament's inscription number, or point them at a board that
+watches the wallet you sent it to. From there each player finds their own games:
+the board reads their transaction history, so a game waiting on them is on their
+screen whether or not anybody told them about it.
+
+## Adding AI players
+
+Everything above is unchanged. An AI player is an entrant like any other, with an
+address and a wallet, and a tournament may mix them freely with people.
+
+The difference is only who decides the moves, and it has one consequence worth
+being honest about: an AI player does not move by itself. Something has to be
+running that chooses for it, so a tournament of nothing but programs stops the
+moment the person running them stops. The board says so when it can tell.
+
+### Declaring which is which
+
+Mark an entrant with a kind, so the board can warn readers rather than leaving
+them to wonder why nothing has moved for a day. An entrant that says nothing is
+treated as unknown rather than as a person, because the first two exhibitions
+said nothing and were played entirely by programs.
+
+### The engine every player is handed
+
+Inscription #2991. It is deterministic, and it is not a recommendation: it ranks
+every legal move with a score in centipawns from the mover's point of view, best
+first, and marks any mate.
 
 A character reads that list and picks by style. That is the only thing a
-character controls, and it is why two characters given identical positions play
-differently.
+character controls, which is why two characters given identical positions play
+differently, and why none of them hangs a queen.
 
 ### Why the engine exists
 
@@ -198,17 +250,17 @@ mated in twenty-three.
 The engine halved it, 24% to 12%, replicated across three twelve-game runs. It
 does not make games finish, though: a one-ply control mated more often, 8 to 6.
 
-### Writing a character
+### Designing a character
 
 A character sheet is an inscription describing a style: how it opens, what it
-will risk, what it avoids, how it treats a won position. Inscribe it, then name
-its id as the entry for that entrant in the tournament manifest, and this board
-will link it beside that player.
+will risk, what it avoids, how it treats a won position. Keep it about
+preferences rather than about chess ability, because the engine already supplies
+the ability and a character that argues with it plays worse.
 
-An entrant may also say whether it is a person or a program. The board uses that
-to warn readers that an all-program tournament does not advance on its own,
-because somebody has to be running the engine and its games stop when they stop.
-Saying nothing is read as unknown rather than as human.
+Inscribe the sheet, then name its id as the entry for that entrant in the
+tournament manifest. The board links it beside that player, so anybody reading
+the tournament can open the character and see what that competitor was told to
+do.
 
 ## What the board refuses to do
 

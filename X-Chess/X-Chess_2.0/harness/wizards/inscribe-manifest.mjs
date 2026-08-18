@@ -50,9 +50,6 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const XTRATA = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 const [XTRATA_ADDRESS, XTRATA_NAME] = XTRATA.split('.');
 
-/** Agent 27's identity chain. Every tournament hangs off it. */
-const GENESIS = 107;
-
 const CHUNK = 16_384;
 const TX_FEE = 20_000n;
 
@@ -80,6 +77,22 @@ const arg = (name, fallback = null) => {
  * reason - the idea arrived after they were both permanent.
  */
 const AFTER = arg('after') ? Number(arg('after')) : null;
+
+/**
+ * NOTHING HANGS OFF GENESIS ANY MORE.
+ *
+ * Every document this script inscribed used to declare #107 as a dependency, so
+ * a tournament manifest and a manual both claimed to depend on an identity
+ * inscription they do not read and cannot be checked against. A dependency is a
+ * statement that one document needs another to be understood, and none of these
+ * needed that one.
+ *
+ * What remains is `--after`, which is a real relationship: this document follows
+ * that one, and a reader holding either can walk the chain. When it is absent
+ * there are no dependencies at all, which is the honest shape for the first of
+ * anything.
+ */
+const DEPENDS_ON = AFTER ? [AFTER] : [];
 
 function env() {
   const found = {};
@@ -180,10 +193,10 @@ async function main() {
   console.log(`hash      0x${running.toString('hex')}`);
   console.log(`fee unit  ${feeUnit} uSTX (read live)`);
   console.log(`spend cap ${spendCap} uSTX + ${TX_FEE} miner fee`);
-  console.log(`parent    Genesis #${GENESIS}${AFTER ? `, and manifest #${AFTER}` : ''}`);
+  console.log(`depends   ${DEPENDS_ON.length ? `#${DEPENDS_ON.join(', #')}` : 'nothing'}`);
   if (!AFTER) {
-    console.log('          (no --after: this manifest names no earlier tournament, so a reader');
-    console.log('           who finds it cannot walk back to the previous one)');
+    console.log('          (no --after, so a reader who finds this cannot walk back to an');
+    console.log('           earlier one. Correct for a first document, worth setting otherwise)');
   }
 
   if (!LIVE) {
@@ -206,7 +219,7 @@ async function main() {
           ? 'data:text/plain,x-chess-manual'
           : 'data:text/plain,x-chess-tournament-manifest'
       ),
-      Cl.list(AFTER ? [Cl.uint(GENESIS), Cl.uint(AFTER)] : [Cl.uint(GENESIS)])
+      Cl.list(DEPENDS_ON.map((id) => Cl.uint(id)))
     ],
     senderKey,
     network: 'mainnet',

@@ -61,6 +61,46 @@ export interface TournamentGame {
   black: string;
   /** 1-based. Rounds are a real structure here, not decoration. */
   round: number;
+  /**
+   * What this game is, when it is something: Final, Semi-final, and so on.
+   *
+   * SAID BY THE MANIFEST, because most formats do not have one. A round robin
+   * has no final - every pair plays every pair, and the last round is simply the
+   * last round. Calling a game there a final would invent a structure the format
+   * does not have, and the two exhibitions on this contract are round robins.
+   *
+   * Free text rather than a fixed set, because tournaments have stages this
+   * board should not be arbitrating: Round of 16, Plate Final, Repechage. The
+   * board shows what it is told and does not decide what counts as a stage.
+   */
+  stage?: string;
+}
+
+/**
+ * What to call this game, if anything.
+ *
+ * Two honest sources and no third. The manifest may say outright, which works
+ * for any format including one run by hand. Failing that, a KNOCKOUT can be
+ * derived, because there the structure really does mean it: the last round is
+ * the final, the one before it the semi-finals, and so on.
+ *
+ * Nothing is derived for a round robin or a swiss. Those formats do not have a
+ * final, and a board that labelled one would be making it up — which matters
+ * more here than usual, because the label would then appear in a page title and
+ * in a game view where it reads as a fact about the game rather than a guess.
+ */
+export function stageOf(tournament: Tournament, game: TournamentGame): string | null {
+  const said = String(game.stage ?? '').trim();
+  if (said) return said.slice(0, 24);
+
+  if (!/knock|elimination|cup/i.test(tournament.format)) return null;
+  const last = Math.max(...tournament.games.map((g) => g.round));
+  if (!Number.isFinite(last)) return null;
+  const away = last - game.round;
+  if (away === 0) return 'Final';
+  if (away === 1) return 'Semi-final';
+  if (away === 2) return 'Quarter-final';
+  return null;
 }
 
 export interface Tournament {
@@ -545,6 +585,8 @@ export interface CheckedGame {
   toMove?: string | null;
   /** Which side is to move, for a reader who is neither player. */
   turn?: 'white' | 'black' | null;
+  /** Final, Semi-final and so on, when this game is one. See `stageOf`. */
+  stage?: string | null;
 }
 
 /**
@@ -579,7 +621,8 @@ export function checkGames(
       black: game.black,
       moves: seen?.moves,
       toMove: seen?.toMove ?? null,
-      turn: seen?.turn ?? null
+      turn: seen?.turn ?? null,
+      stage: stageOf(tournament, game)
     };
 
     if (!seen) {

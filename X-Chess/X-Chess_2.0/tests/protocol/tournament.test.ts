@@ -12,6 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  stageOf,
   MAX_REVISIONS,
   TOURNAMENT_HEADER,
   addressOf,
@@ -480,5 +481,46 @@ describe('what a tournament programs, per tournament', () => {
     );
     expect(parsed.ok, parsed.problems.map((p) => `${p.where} ${p.says}`).join('; ')).toBe(true);
     expect((parsed.tournament as unknown as Record<string, unknown>).prizePool).toBe('10 STX');
+  });
+});
+
+describe('naming a game that is a final', () => {
+  // Most formats do not have one. A round robin plays every pair against every
+  // pair, so its last round is the last round and nothing more — and a board
+  // that called a game there a Final would be inventing a structure, in a page
+  // title where it reads as a fact.
+
+  const knockout = (games: Array<Record<string, unknown>>, format = 'knockout') =>
+    parseTournament(manifest({ ...good, format, games })).tournament!;
+
+  it('says nothing about a round robin, however late the round', () => {
+    const t = parseTournament(manifest(good)).tournament!;
+    for (const game of t.games) expect(stageOf(t, game)).toBe(null);
+  });
+
+  it('derives the stages of a knockout from its structure', () => {
+    const t = knockout([
+      { id: 1, white: 'Plumb', black: 'Mason', round: 1 },
+      { id: 2, white: 'Plumb', black: 'Wager', round: 2 },
+      { id: 3, white: 'Mason', black: 'Wager', round: 3 }
+    ]);
+    expect(t.games.map((g) => stageOf(t, g))).toEqual(['Quarter-final', 'Semi-final', 'Final']);
+  });
+
+  it('takes the manifest at its word over anything derived', () => {
+    // A tournament may have stages this board should not arbitrate — Round of
+    // 16, Plate Final, Repechage — so what the manifest says wins.
+    const t = knockout([{ id: 1, white: 'Plumb', black: 'Mason', round: 1, stage: 'Plate Final' }]);
+    expect(stageOf(t, t.games[0])).toBe('Plate Final');
+  });
+
+  it('labels a round robin game the manifest names', () => {
+    const t = parseTournament(
+      manifest({
+        ...good,
+        games: [{ id: 25, white: 'Mason', black: 'Plumb', round: 5, stage: 'Title decider' }]
+      })
+    ).tournament!;
+    expect(stageOf(t, t.games[0])).toBe('Title decider');
   });
 });
