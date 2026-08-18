@@ -36,6 +36,21 @@ export interface TournamentEntrant {
   address: string;
   /** Inscription id of the entry that defines the character, when there is one. */
   entry?: number;
+  /**
+   * Whether a person or a program is playing this seat.
+   *
+   * WORTH SAYING OUT LOUD because it changes what a reader should expect. An
+   * all-AI tournament does not advance on its own: somebody has to be running
+   * the engine, and when they stop, the games stop — for hours or for good. A
+   * human opponent may simply be slow. Those look identical on a board that
+   * only shows "still playing", and the second is a game and the first is a
+   * queue.
+   *
+   * Optional, and absent means UNKNOWN rather than human. A board that guessed
+   * would be labelling the first two exhibitions, which name no kinds at all,
+   * as tournaments between people.
+   */
+  kind?: 'ai' | 'human';
 }
 
 export interface TournamentGame {

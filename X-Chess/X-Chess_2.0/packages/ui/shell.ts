@@ -910,6 +910,14 @@ export const HTML = `
     <!-- Filled from the director's wallet, so a reader never has to know a
          number. See TournamentIndex: holdings finds them, the mint says which
          the organiser actually made. -->
+    <!-- Filters over the PICKER, not over a tournament's games. Entrant search
+         is free; state comes from what has been opened before. -->
+    <div id="picker-filters" class="tn-list"></div>
+    <div class="row tn-controls">
+      <label for="picker-who">Find a tournament</label>
+      <input type="text" id="picker-who" class="tn-manifest" placeholder="entrant name or address">
+      <span id="picker-shown" class="muted small" role="status"></span>
+    </div>
     <div id="tournament-list" class="tn-list"></div>
     <!-- Filters over what is already on screen. Nothing here reads the chain:
          every field they test was computed when the tournament was scored. -->
@@ -920,6 +928,7 @@ export const HTML = `
       <span id="tournament-shown" class="muted small" role="status"></span>
     </div>
     <div id="tournament-note" class="notice notice--info"></div>
+    <div id="tournament-field" class="notice hide"></div>
     <div id="tournament-provenance" class="notice notice--info hide"></div>
     <div id="tournament-body"></div>
   </section>

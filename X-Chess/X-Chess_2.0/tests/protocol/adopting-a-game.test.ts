@@ -63,3 +63,36 @@ describe('which game the launch track may adopt', () => {
     expect(adopts(SIGNER, rulesHash(trackRules(OTHER)))).toBe(false);
   });
 });
+
+describe('who is playing, and whether anything will happen', () => {
+  // An all-AI tournament does not advance on its own: somebody has to be
+  // running the engine. A human opponent may simply be slow. Those look
+  // identical on a board that only says "still playing", and one is a game
+  // while the other is a queue.
+
+  const kinds = (entrants: Array<Record<string, unknown>>) => {
+    const tally = { ai: 0, human: 0, unknown: 0 };
+    for (const e of entrants) {
+      if (e.kind === 'ai' || typeof e.entry === 'number') tally.ai++;
+      else if (e.kind === 'human') tally.human++;
+      else tally.unknown++;
+    }
+    return tally;
+  };
+
+  it('reads an inscribed character sheet as a program', () => {
+    // Nobody inscribes a character to describe how a person moves.
+    expect(kinds([{ entry: 2995 }, { kind: 'human' }])).toEqual({ ai: 1, human: 1, unknown: 0 });
+  });
+
+  it('takes an explicit kind at its word', () => {
+    expect(kinds([{ kind: 'ai' }, { kind: 'ai' }])).toEqual({ ai: 2, human: 0, unknown: 0 });
+  });
+
+  it('calls silence unknown rather than human', () => {
+    // The first two exhibitions name no kinds and carry no entries, and were
+    // played entirely by programs. Reading silence as "human" would state the
+    // opposite of the truth about the only two tournaments that exist.
+    expect(kinds([{}, {}, {}])).toEqual({ ai: 0, human: 0, unknown: 3 });
+  });
+});
