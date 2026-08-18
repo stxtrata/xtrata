@@ -967,6 +967,9 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
   const budget = { spent: 0n, cap: BigInt(arg('spend-cap-ustx', String(DEFAULT_SPEND_CAP_USTX))) };
   const existing = await readGames();
 
+  /** Rounds that lost a game, so the exit code can say so. */
+  const stopped = [];
+
   for (const round of plan.rounds) {
     if (arg('round') && Number(arg('round')) !== round.number) continue;
     console.log(`\n=== round ${round.number} ===`);
@@ -1040,6 +1043,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
     // mempool. That is a lot to ask of somebody who just wants to know whether
     // to wait.
     console.log(`\n--- round ${round.number} complete ---`);
+    if (played.some((game) => game.failed)) stopped.push(round.number);
     for (const game of played) {
       if (game.failed) {
         // Named, not swallowed. A game that stopped is a game somebody has to
@@ -1062,6 +1066,26 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
 
   console.log(`\nSpent ${ustx(budget.spent)} of ${ustx(budget.cap)}.`);
   console.log('Nothing is running now. A silent terminal from here is finished, not stuck.\n');
+
+  // A STOPPED GAME MUST NOT EXIT ZERO.
+  //
+  // The bug this run was fixing is a normal outcome reported as a failure. Its
+  // mirror arrived with the fix: `Promise.all` used to reject, so a stopped
+  // game ended `main` and the process exited 1. `settleAll` cannot reject —
+  // that is the whole point — so a round in which every game died was reported
+  // to the shell as a success.
+  //
+  // The summary says STOPPED on screen, which is enough for somebody reading it
+  // and no use at all to a `&&`, a loop, or anybody who comes back to a
+  // finished terminal and checks. Unfinished stays zero: a game that has not
+  // ended is a normal outcome and the log is the record. Stopped is not.
+  if (stopped.length) {
+    console.error(
+      `Round ${stopped.join(', ')} stopped a game. Re-run it — the chain is the ` +
+        'record and nothing is replayed.\n'
+    );
+    process.exitCode = 1;
+  }
 }
 
 /**
@@ -1323,4 +1347,4 @@ if (Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.m
   });
 }
 
-export { readField, readGames, readEntries };
+export { readField, readGames, readEntries, settleAll };

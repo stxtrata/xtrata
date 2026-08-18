@@ -9,6 +9,7 @@
 // dropped, which is how two of three funding transfers went missing earlier.
 
 import { describe, expect, it } from 'vitest';
+import { settleAll } from '../../harness/wizards/run-tournament.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -453,8 +454,27 @@ describe('saying that a round is over', () => {
 
   it('collects what playGame actually returned', () => {
     // The summary must read real results rather than restate the schedule.
-    expect(runner).toMatch(/const played = await Promise\.all\(/);
+    //
+    // This used to assert `await Promise.all(` — the implementation rather than
+    // the property — and in doing so it pinned a bug. Round 10 lost games 41
+    // and 42, forty-nine and fifteen moves in and both entirely healthy,
+    // because `Promise.all` rejects on the first failure and game 40 had a
+    // problem they shared nothing with. The test would have failed the fix.
+    //
+    // What is worth pinning is that the summary reads returned values, and that
+    // a game which stopped is NAMED rather than swallowed. The independence
+    // itself is tested properly below, against the function.
+    expect(runner).toMatch(/const played = await settleAll\(/);
     expect(runner).toMatch(/return \{ gameId, white, black, result \}/);
+    expect(runner).toMatch(/STOPPED/);
+  });
+
+  it('does not report a round that stopped a game as a success', () => {
+    // The mirror of the bug the fix was for. `Promise.all` rejecting was what
+    // made the process exit 1; `settleAll` cannot reject, so without this a
+    // round in which every game died exits 0 and tells a script it worked.
+    expect(runner).toMatch(/process\.exitCode = 1/);
+    expect(runner).toMatch(/stopped\.push\(round\.number\)/);
   });
 });
 
@@ -543,5 +563,41 @@ describe('one game stopping must not kill the other two', () => {
   it('still reports the round as complete with the failures in it', () => {
     const summary = runner.slice(runner.indexOf('round ${round.number} complete'));
     expect(summary.slice(0, 700)).toMatch(/game\.failed/);
+  });
+});
+
+describe('one game failing does not take the others down', () => {
+  // The property, tested rather than described. `settleAll` is exported for
+  // exactly this: the regexes above can only say what the source looks like.
+
+  it('keeps every fulfilled result when one rejects', async () => {
+    const out = await settleAll([
+      Promise.resolve({ gameId: 41, result: '1-0' }),
+      Promise.reject(new Error('the log did not grow')),
+      Promise.resolve({ gameId: 42, result: null })
+    ]);
+    expect(out).toHaveLength(3);
+    expect(out[0]).toEqual({ gameId: 41, result: '1-0' });
+    expect(out[2]).toEqual({ gameId: 42, result: null });
+  });
+
+  it('turns a rejection into something the summary can print', async () => {
+    // A bare rejection is an error with no game attached, and "something
+    // failed" is not a thing anybody can act on.
+    const [outcome] = await settleAll([Promise.reject(new Error('boom'))]);
+    expect(outcome.failed).toContain('boom');
+  });
+
+  it('never rejects, whatever it is given', async () => {
+    await expect(
+      settleAll([Promise.reject(new Error('a')), Promise.reject(new Error('b'))])
+    ).resolves.toHaveLength(2);
+  });
+
+  it('does not hide a rejection by returning nothing for it', async () => {
+    // Dropping the failures would make a dead round look like a short one.
+    const out = await settleAll([Promise.reject(new Error('x'))]);
+    expect(out).toHaveLength(1);
+    expect(out[0].failed).toBeTruthy();
   });
 });
