@@ -115,7 +115,13 @@ export const ENTRY_INSCRIPTION = Object.freeze({
   validator: 2994,
   sheets: Object.freeze({
     Gambit: 2995, Ledger: 2996, Mason: 2997,
-    Wager: 2998, Plumb: 2999, Oblique: 3000
+    Wager: 2998, Plumb: 2999, Oblique: 3000,
+    // Exhibition three's four, inscribed 2026-08-18 and verified the whole way
+    // round: fetched back from chain, parsed by 2994, and byte-identical to
+    // harness/wizards/entries/. Unlike the six above, these were written as
+    // sheets FIRST, so what is inscribed is exactly what the harness plays —
+    // there is no paragraph-break drift to declare.
+    Fathom: 3010, Cadence: 3011, Bulwark: 3012, Canon: 3013
   })
 });
 

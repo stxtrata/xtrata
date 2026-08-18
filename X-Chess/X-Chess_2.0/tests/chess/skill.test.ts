@@ -143,13 +143,21 @@ describe('what is on chain, and what it descends from', () => {
   });
 });
 
-/** Characters written for exhibition three whose sheets are not inscribed yet. */
-const AWAITING_INSCRIPTION = ['Fathom', 'Cadence', 'Bulwark', 'Canon'];
+/**
+ * Characters written but not yet inscribed.
+ *
+ * EMPTY, AND KEPT. It held Fathom, Cadence, Bulwark and Canon between the
+ * commit that wrote them and the four inscriptions at 3010-3013, which is
+ * exactly the window it exists for: a character whose sheet is a file on one
+ * machine must not play, and an exception nobody can see is one that becomes
+ * permanent.
+ */
+const AWAITING_INSCRIPTION: string[] = [];
 
 describe('the character sheets on chain', () => {
-  it('names the validator and all six sheets', () => {
+  it('names the validator and all ten sheets', () => {
     expect(ENTRY_INSCRIPTION.validator).toBe(2994);
-    expect(Object.keys(ENTRY_INSCRIPTION.sheets)).toHaveLength(6);
+    expect(Object.keys(ENTRY_INSCRIPTION.sheets)).toHaveLength(10);
   });
 
   it('keeps the validator artefact identical to its source', async () => {
@@ -181,6 +189,6 @@ describe('the character sheets on chain', () => {
     //
     // Emptying this list is a step in setting up exhibition three, not a
     // formality, and the assertion is here so that finishing it is visible.
-    expect(AWAITING_INSCRIPTION).toEqual(['Fathom', 'Cadence', 'Bulwark', 'Canon']);
+    expect(AWAITING_INSCRIPTION, 'every character has a sheet on chain').toEqual([]);
   });
 });
