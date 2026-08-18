@@ -387,6 +387,10 @@ ${SCALE_CSS}
 .tn-yours { font-size: 10px; font-weight: 600; letter-spacing: .04em;
             background: var(--gold); color: #1a1713; border-radius: 3px; padding: 1px 5px; }
 
+/* Set apart, because it is the way in for a tournament the board could not
+   find rather than the way in. */
+.tn-byhand { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+
 /* The list form of the picker, used once buttons stop fitting. */
 .tn-picker { max-width: 100%; margin: 8px 0 2px; }
 
@@ -900,19 +904,21 @@ export const HTML = `
 
   <section id="view-tournaments" class="panel hide">
     <h2>Tournaments</h2>
-    <!-- One row: the number is at most a few figures, and a full-width box for
-         it pushed the two buttons that act on it onto their own line. -->
+    <!-- ORDERED BY WHAT PEOPLE DO. The picker is how a tournament is chosen now
+         that the board finds them itself, so it comes first; typing an
+         inscription number is the fallback and sits at the bottom.
+
+         Refresh stays HERE, apart from that box, because the two are unrelated:
+         the number opens a different tournament, Refresh re-reads the one
+         already on screen. It belongs beside the line that says how old that
+         reading is, which is what prompts anybody to press it. -->
     <div class="row tn-controls">
-      <label for="tournament-id">Manifest inscription</label>
-      <input type="text" id="tournament-id" class="tn-manifest" inputmode="numeric"
-             maxlength="12" size="12" placeholder="2993">
-      <button class="action" id="tournament-load">Show</button>
       <button class="action" id="tournament-refresh"
               title="Read every game again. A tournament in progress changes on chain, not here.">Refresh</button>
       <span id="tournament-fresh" class="muted small" role="status"></span>
     </div>
     <!-- Filled from the director's wallet, so a reader never has to know a
-         number. See TournamentIndex: holdings finds them, the mint says which
+         number. See ManifestDirectory: holdings finds them, the mint says which
          the organiser actually made. -->
     <!-- Filters over the PICKER, not over a tournament's games. Entrant search
          is free; state comes from what has been opened before. -->
@@ -935,6 +941,15 @@ export const HTML = `
     <div id="tournament-field" class="notice hide"></div>
     <div id="tournament-provenance" class="notice notice--info hide"></div>
     <div id="tournament-body"></div>
+    <!-- The fallback, and last because it is one: for a tournament this board
+         cannot find - inscribed to a wallet it does not watch, or newer than
+         the directory has read - and for anybody who already knows the number. -->
+    <div class="row tn-controls tn-byhand">
+      <label for="tournament-id">Open by inscription number</label>
+      <input type="text" id="tournament-id" class="tn-manifest" inputmode="numeric"
+             maxlength="12" size="12" placeholder="2993">
+      <button class="action" id="tournament-load">Show</button>
+    </div>
   </section>
 
   <section id="view-profile" class="panel hide">
