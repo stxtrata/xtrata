@@ -481,6 +481,22 @@ export interface GameFacts {
    * answers and only one of them is the game.
    */
   moves?: number;
+  /**
+   * The address whose move it is, or null when nothing is waiting on one.
+   *
+   * Derived rather than read: the caller has already replayed the game against
+   * the pairing the manifest claims, so it holds both the side to move and the
+   * address on that side. Carrying it costs nothing, and it is the difference
+   * between a tab that lists games and one that says which of them is yours.
+   */
+  toMove?: string | null;
+  /**
+   * Which side is to move, for a reader who is not either player.
+   *
+   * `toMove` answers "is this mine"; this answers "what is happening", which is
+   * what almost every visitor is asking. Both come from the same replay.
+   */
+  turn?: 'white' | 'black' | null;
 }
 
 /**
@@ -503,6 +519,17 @@ export interface CheckedGame {
   result: '1-0' | '0-1' | '1/2-1/2' | null;
   /** Moves replay accepted, when the caller counted them. */
   moves?: number;
+  /**
+   * The address whose move it is, or null when the game is not waiting on one.
+   *
+   * Derived rather than read: the caller has already replayed the game against
+   * the pairing the manifest claims, so it holds both the side to move and the
+   * address on that side. Carrying it costs nothing and is the difference
+   * between a tab that lists games and one that tells you which is yours.
+   */
+  toMove?: string | null;
+  /** Which side is to move, for a reader who is neither player. */
+  turn?: 'white' | 'black' | null;
 }
 
 /**
@@ -535,7 +562,9 @@ export function checkGames(
       round: game.round,
       white: game.white,
       black: game.black,
-      moves: seen?.moves
+      moves: seen?.moves,
+      toMove: seen?.toMove ?? null,
+      turn: seen?.turn ?? null
     };
 
     if (!seen) {

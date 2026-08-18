@@ -169,7 +169,15 @@ export async function scoreTournament(
       rulesHash: row.rulesHash,
       result: state.result,
       // Accepted, not submitted. See GameFacts.moves.
-      moves: state.accepted.length
+      moves: state.accepted.length,
+      // Whose move, from the replay that has just run. Null for a finished
+      // game, and null when the manifest gave no address for that side — a
+      // pairing this board cannot name is one it must not claim is waiting.
+      toMove:
+        state.status === 'live' && state.result === null
+          ? (state.turn === 'white' ? white : black)
+          : null,
+      turn: state.status === 'live' && state.result === null ? state.turn : null
     });
   }
 

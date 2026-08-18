@@ -87,6 +87,18 @@ export class ManifestDirectory<T> {
   private readonly asset: string;
   private readonly maxCandidates: number;
 
+  /**
+   * How many inscriptions the wallet holds, and how many were looked at.
+   *
+   * NEVER TRUNCATE SILENTLY. This reads the newest `maxCandidates` inscriptions,
+   * which is a bound on READS and not a statement about how many tournaments
+   * exist. A wallet holding thirty inscriptions shows what it found in the
+   * newest twenty-five, and a list that quietly stops is indistinguishable from
+   * a complete one — the reader would conclude the older tournaments were never
+   * inscribed.
+   */
+  lastScan: { scanned: number; held: number } = { scanned: 0, held: 0 };
+
   constructor(options: DirectoryOptions<T>) {
     this.endpoint = options.endpoint;
     this.reader = options.reader;
@@ -152,14 +164,21 @@ export class ManifestDirectory<T> {
     const response = await this.endpoint.request(path);
     if (!response.ok) throw new Error(`${this.kind} holdings: HTTP ${response.status}`);
 
-    const body = (await response.json()) as { results?: Array<{ value?: { hex?: string } }> };
+    const body = (await response.json()) as {
+      results?: Array<{ value?: { hex?: string } }>;
+      total?: number;
+    };
     const ids: number[] = [];
     for (const row of body.results ?? []) {
       const hex = String(row.value?.hex ?? '').replace(/^0x01/, '');
       const id = Number.parseInt(hex, 16);
       if (Number.isSafeInteger(id) && id > 0) ids.push(id);
     }
-    return [...new Set(ids)].sort((a, b) => b - a).slice(0, this.maxCandidates);
+    const unique = [...new Set(ids)].sort((a, b) => b - a);
+    const taken = unique.slice(0, this.maxCandidates);
+    // `total` is what the wallet holds; `taken` is what this will read.
+    this.lastScan = { scanned: taken.length, held: Number(body.total ?? taken.length) };
+    return taken;
   }
 
   /**

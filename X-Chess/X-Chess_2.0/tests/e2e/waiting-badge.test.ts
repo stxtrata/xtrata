@@ -169,3 +169,60 @@ describe('the count of games waiting on you', () => {
     expect(badge().textContent).toBe('');
   });
 });
+
+describe('the row and the count say the same thing', () => {
+  // They are two renderings of one fact. Making a move cleared the number
+  // beside the tab and left "your move" on the row underneath it, which is the
+  // board contradicting itself on one screen.
+
+  it('clears the row badge when the game ends, not just the count', async () => {
+    const { chain, game } = await seedFinished();
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: chain as never,
+      document: dom.window.document,
+      connect: async () => ({ address: BOB }),
+      disconnect: async () => {}
+    });
+    (app as unknown as { address: string }).address = BOB;
+
+    // A list already built, holding the stale answer — which is what the row is.
+    const rows = (app as unknown as { exploreRows: Array<Record<string, unknown>> }).exploreRows;
+    rows.push({
+      id: game, ranked: true, entries: 4, white: ALICE, black: BOB, confirmed: true,
+      state: 'black to move', mine: 'your-move', seat: null, participant: true,
+      sponsored: null, over: false, result: null, termination: null, quietFor: null
+    });
+    (app as unknown as { waitingOn: Set<number> }).waitingOn.add(game);
+
+    await app.load(game);
+    (app as unknown as { noteOpenGame(): void }).noteOpenGame();
+
+    expect(rows[0].mine, 'the row still claimed the move').toBe(null);
+    expect(rows[0].over).toBe(true);
+    expect((app as unknown as { waitingOn: Set<number> }).waitingOn.has(game)).toBe(false);
+  });
+
+  it('leaves a row alone when nothing about it changed', async () => {
+    // The poll runs every few seconds and the list is not cheap to paint.
+    const { chain, game } = await seedFinished();
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: chain as never,
+      document: dom.window.document,
+      connect: async () => ({ address: BOB }),
+      disconnect: async () => {}
+    });
+    (app as unknown as { address: string }).address = BOB;
+    await app.load(game);
+
+    let draws = 0;
+    const inner = app as unknown as { drawExplore(): void };
+    const real = inner.drawExplore.bind(inner);
+    inner.drawExplore = () => { draws++; real(); };
+
+    (app as unknown as { noteOpenGame(): void }).noteOpenGame();
+    (app as unknown as { noteOpenGame(): void }).noteOpenGame();
+    expect(draws, 'redrew for a row it is not even showing').toBe(0);
+  });
+});

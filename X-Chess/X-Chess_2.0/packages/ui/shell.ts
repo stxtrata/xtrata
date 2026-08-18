@@ -381,6 +381,15 @@ ${SCALE_CSS}
 .tn-controls #tournament-fresh { flex: 1 0 100%; margin-top: 2px; }
 .tn-moves { color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
+/* Whose move it is, in a tournament round. Same word the Explore list uses,
+   because it is the same fact and a second wording would read as a second one. */
+.tn-turn { font-size: 11px; color: var(--dim); }
+.tn-yours { font-size: 10px; font-weight: 600; letter-spacing: .04em;
+            background: var(--gold); color: #1a1713; border-radius: 3px; padding: 1px 5px; }
+
+/* The list form of the picker, used once buttons stop fitting. */
+.tn-picker { max-width: 100%; margin: 8px 0 2px; }
+
 /* The inscriptions a tournament is made of, offered rather than described. */
 .tn-entry { font-size: 11px; color: var(--dim); text-decoration: none;
             border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
@@ -902,6 +911,14 @@ export const HTML = `
          number. See TournamentIndex: holdings finds them, the mint says which
          the organiser actually made. -->
     <div id="tournament-list" class="tn-list"></div>
+    <!-- Filters over what is already on screen. Nothing here reads the chain:
+         every field they test was computed when the tournament was scored. -->
+    <div id="tournament-filters" class="tn-list"></div>
+    <div class="row tn-controls">
+      <label for="tournament-who">Entrant</label>
+      <input type="text" id="tournament-who" class="tn-manifest" placeholder="address or name">
+      <span id="tournament-shown" class="muted small" role="status"></span>
+    </div>
     <div id="tournament-note" class="notice notice--info"></div>
     <div id="tournament-provenance" class="notice notice--info hide"></div>
     <div id="tournament-body"></div>

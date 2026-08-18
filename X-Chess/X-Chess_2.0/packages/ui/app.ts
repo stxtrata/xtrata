@@ -15,6 +15,7 @@ import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament } from '../protocol/tournament.js';
+import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
 import { pool } from '../chain/pool.js';
@@ -297,6 +298,25 @@ const EXPLORE_WINDOW = 25;
 const MAX_PAIRED_ENTRANTS = 12;
 
 /**
+ * Above this many tournaments, the picker becomes a list rather than buttons.
+ *
+ * Six is roughly what fits on one line at a readable size, and buttons past that
+ * wrap into a block of similar chips nobody can scan. Chosen from the layout
+ * rather than from taste: below it, buttons are one click and everything is
+ * visible at once; above it, that stops being true and a list is plainly better.
+ */
+const MANY_TOURNAMENTS = 6;
+
+/**
+ * What a reader can narrow a tournament's games down to.
+ *
+ * Every one is a property already computed when the tournament was scored, so
+ * filtering costs nothing and can never disagree with the rows it hides — which
+ * is the failure a filter that re-derived anything would have.
+ */
+type TournamentFilter = 'all' | 'your-move' | 'live' | 'finished' | 'unverified';
+
+/**
  * The reasons that mean "we cannot say who played this", as opposed to "this
  * game does not qualify".
  *
@@ -480,6 +500,7 @@ const IDS = [
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
   'fee-advice', 'tournament-list', 'tournament-refresh', 'tournament-fresh',
+  'tournament-filters', 'tournament-who', 'tournament-shown',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -647,6 +668,9 @@ export class ChessApp {
   private tournamentSeenRaw = '';
   private tournamentPoll: ReturnType<typeof setTimeout> | null = null;
   private found: Found<Tournament>[] = [];
+  private tournamentFilter: TournamentFilter = 'all';
+  /** An address or entrant name to narrow by, from the box beside the filters. */
+  private tournamentWho = '';
   /**
    * Ids known to be this player's that the window cannot show.
    *
@@ -808,6 +832,12 @@ export class ChessApp {
     // intentions and a person with a tournament already on screen should not
     // have to wonder whether pressing Show will do anything.
     on('tournamentRefresh', () => void this.loadTournamentTab({ again: true }));
+    // Filtering is local, so it can redraw on every keystroke without asking
+    // the chain anything.
+    this.el.tournamentWho.addEventListener('input', () => {
+      this.tournamentWho = String((this.el.tournamentWho as HTMLInputElement).value ?? '');
+      this.drawTournament();
+    });
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
 
@@ -2641,6 +2671,97 @@ export class ChessApp {
     this.scheduleTournamentPoll();
   }
 
+  /**
+   * Does this game survive the current filter?
+   *
+   * Pure, and every field it reads was computed during scoring. A filter that
+   * asked the chain anything would be able to disagree with the row it is
+   * hiding, which is the one thing a filter must never do.
+   */
+  private tournamentShows(game: CheckedGame): boolean {
+    const who = this.tournamentWho.trim().toUpperCase();
+    if (who) {
+      // An address or an entrant name, because a reader has whichever they have.
+      // Substring, so a BNS name or a partial address both work; names in a
+      // manifest are short and chosen by an organiser, not user input.
+      const named =
+        game.white.toUpperCase().includes(who) ||
+        game.black.toUpperCase().includes(who) ||
+        String(game.toMove ?? '').toUpperCase().includes(who);
+      if (!named) return false;
+    }
+    switch (this.tournamentFilter) {
+      case 'your-move':
+        return Boolean(
+          this.address && String(game.toMove ?? '').toUpperCase() === this.address.toUpperCase()
+        );
+      case 'live':
+        return game.result === null;
+      case 'finished':
+        return game.result !== null;
+      case 'unverified':
+        return game.verdict !== 'verified';
+      default:
+        return true;
+    }
+  }
+
+  private drawTournamentFilters(): void {
+    const node = this.el.tournamentFilters;
+    node.replaceChildren();
+    const view = this.tournament;
+    if (!view?.ok || !view.rounds?.length) {
+      this.text('tournamentShown', '');
+      return;
+    }
+    const games = view.rounds.flatMap((round) => round.games);
+
+    const options: [TournamentFilter, string][] = [
+      ['all', 'All'],
+      // Offered only when there is somebody to be. A filter that always returns
+      // nothing reads as a broken tab rather than an empty answer.
+      ...(this.address ? ([['your-move', 'Your move']] as [TournamentFilter, string][]) : []),
+      ['live', 'Still playing'],
+      ['finished', 'Finished'],
+      ...(games.some((g) => g.verdict !== 'verified')
+        ? ([['unverified', 'Unverified']] as [TournamentFilter, string][])
+        : [])
+    ];
+    if (!options.some(([key]) => key === this.tournamentFilter)) this.tournamentFilter = 'all';
+
+    for (const [key, label] of options) {
+      const button = this.doc.createElement('button');
+      button.type = 'button';
+      button.className = 'tn-pick';
+      button.textContent = label;
+      const many = games.filter((g) => {
+        const was = this.tournamentFilter;
+        this.tournamentFilter = key;
+        const shows = this.tournamentShows(g);
+        this.tournamentFilter = was;
+        return shows;
+      }).length;
+      const count = this.doc.createElement('span');
+      count.className = 'n';
+      count.textContent = String(many);
+      button.appendChild(count);
+      button.setAttribute('aria-pressed', String(this.tournamentFilter === key));
+      button.addEventListener('click', () => {
+        this.tournamentFilter = key;
+        this.drawTournament();
+      });
+      node.appendChild(button);
+    }
+
+    const showing = games.filter((g) => this.tournamentShows(g)).length;
+    this.text(
+      'tournamentShown',
+      showing === games.length
+        ? `${games.length} game${games.length === 1 ? '' : 's'}`
+        : `${showing} of ${games.length} shown`
+    );
+  }
+
   private drawTournamentList(): void {
     const node = this.el.tournamentList;
     node.replaceChildren();
@@ -2650,16 +2771,61 @@ export class ChessApp {
     // next step, and a reader who has never seen this before should not have to
     // infer it.
     if (!this.tournament) {
+      // SAY WHAT WAS NOT LOOKED AT. The directory reads the newest inscriptions
+      // in the wallet, which bounds READS rather than tournaments — so once the
+      // wallet holds more than that, a list that stopped quietly would read as a
+      // complete one, and the older tournaments would look as though they had
+      // never been inscribed.
+      const scan = this.index?.lastScan;
+      const unread = scan ? Math.max(0, scan.held - scan.scanned) : 0;
       this.notice(
         'tournamentNote',
         'info',
-        this.found.length === 1
-          ? 'One tournament found on chain. Choose it, or type the number of another.'
-          : `${this.found.length} tournaments found on chain. Choose one, or type the number of another.`
+        `${this.found.length} tournament${this.found.length === 1 ? '' : 's'} found on chain. ` +
+          'Choose one, or type the number of another.' +
+          (unread
+            ? ` ${unread} older inscription${unread === 1 ? '' : 's'} in that wallet ` +
+              'were not read; type a number to open one directly.'
+            : '')
       );
     }
 
     const showing = this.tournament?.tournamentId ?? null;
+
+    // PILLS DO NOT SCALE, and the point at which they stop is low: about six fit
+    // on one line, and past that they wrap into a wall of similar-looking chips
+    // that has to be read left to right to find anything. A list is worse for
+    // three and better for thirty, so the shape follows the number rather than
+    // being chosen once.
+    //
+    // The typed field beside it is what actually scales, and is why this can
+    // stay simple: somebody who knows the number never needs the list at all.
+    if (this.found.length > MANY_TOURNAMENTS) {
+      const picker = this.doc.createElement('select');
+      picker.className = 'tn-picker';
+      picker.setAttribute('aria-label', 'Tournaments found on chain');
+      const first = this.doc.createElement('option');
+      first.textContent = `${this.found.length} tournaments — choose one`;
+      first.value = '';
+      picker.appendChild(first);
+      for (const entry of this.found) {
+        const option = this.doc.createElement('option');
+        option.value = String(entry.id);
+        option.selected = entry.id === showing;
+        option.textContent =
+          `${entry.manifest.name} · ${entry.id} · ${entry.manifest.games.length} games` +
+          (entry.official ? '' : ' · not inscribed by the organiser');
+        picker.appendChild(option);
+      }
+      picker.addEventListener('change', () => {
+        if (!picker.value) return;
+        (this.el.tournamentId as HTMLInputElement).value = picker.value;
+        void this.loadTournamentTab();
+      });
+      node.appendChild(picker);
+      return;
+    }
+
     for (const entry of this.found) {
       const button = this.doc.createElement('button');
       button.type = 'button';
@@ -2811,6 +2977,7 @@ export class ChessApp {
     const view = this.tournament;
     const body = this.el.tournamentBody;
     body.replaceChildren();
+    this.drawTournamentFilters();
     const banner = this.el.tournamentProvenance;
     banner.classList.add('hide');
     if (!view) return;
@@ -2946,7 +3113,9 @@ export class ChessApp {
       heading.textContent = `Round ${round.number}`;
       section.appendChild(heading);
 
-      for (const game of round.games) {
+      const showing = round.games.filter((game) => this.tournamentShows(game));
+      if (!showing.length) continue;
+      for (const game of showing) {
         const row = this.doc.createElement('div');
         row.className = 'tn-game';
         row.dataset.game = String(game.id);
@@ -3006,6 +3175,28 @@ export class ChessApp {
           moves.title =
             'Moves replay accepted. A submission that did not count is stored on ' +
             'chain and charged for, and is not a move.';
+        }
+
+        // WHOSE MOVE, in the same word the Explore list uses. It is the same
+        // fact, and a second wording would read as a second fact.
+        const mineNow =
+          this.address && String(game.toMove ?? '').toUpperCase() === this.address.toUpperCase();
+        if (mineNow) {
+          const yours = this.doc.createElement('span');
+          yours.className = 'tn-yours';
+          yours.textContent = 'YOUR MOVE';
+          yours.title = 'This game is waiting for you';
+          who.appendChild(this.doc.createTextNode(' '));
+          who.appendChild(yours);
+        } else if (game.turn) {
+          // WHAT A WATCHER CAME TO SEE. Most people reading a tournament are
+          // neither player, and for them "in play" is the least interesting
+          // true thing that could be said about a live game.
+          const turn = this.doc.createElement('span');
+          turn.className = 'tn-turn';
+          turn.textContent = `${game.turn} to move`;
+          who.appendChild(this.doc.createTextNode(' '));
+          who.appendChild(turn);
         }
 
         row.append(id, who, moves, result, mark);
@@ -4462,17 +4653,44 @@ export class ChessApp {
     if (id === null || !state || !this.address) return;
 
     const before = this.waitingOn.size;
-    if (state.status === 'over') {
+    const over = state.status === 'over';
+    const mine = !over && judgeMove(this.eligibility(state)).tier === 'yes';
+
+    if (over) {
       this.waitingOn.delete(id);
       // Over is forever, so this game need never be read again.
       if (this.rulesConfirmed) this.yours?.markFinished(this.address, id);
-    } else if (judgeMove(this.eligibility(state)).tier === 'yes') {
+    } else if (mine) {
       this.waitingOn.add(id);
       this.yours?.remember(this.address, id);
     } else {
       this.waitingOn.delete(id);
     }
     if (this.waitingOn.size !== before) this.drawWaiting();
+
+    // AND THE ROW SAYING THE SAME THING, which is the half this missed.
+    //
+    // The count beside the tab and the "your move" badge on the row are two
+    // renderings of one fact, and only the count was being kept up. So making a
+    // move cleared the number and left the badge sitting on the row underneath
+    // it — the board contradicting itself on one screen, which is worse than
+    // either being stale alone.
+    //
+    // The row is a snapshot taken when the list was built; the poll has just
+    // re-read and replayed this game, so the fresh answer is already in hand and
+    // costs nothing. Redrawn only when it actually changed, because the poll
+    // runs every few seconds and the list is not cheap to paint.
+    const row = this.exploreRows.find((candidate) => candidate.id === id);
+    if (!row) return;
+    const was = `${row.mine}|${row.over}|${row.result}`;
+    row.mine = mine ? 'your-move' : over ? null : row.mine === 'your-move' ? 'waiting' : row.mine;
+    row.over = over;
+    if (over) {
+      row.result = state.result;
+      row.termination = state.termination;
+      row.seat = null;
+    }
+    if (`${row.mine}|${row.over}|${row.result}` !== was) this.drawExplore();
   }
 
   /**
