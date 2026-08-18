@@ -91,7 +91,7 @@ const MAX_SENDERS = 6;
  * The belt to MAX_SENDERS' braces: a bound that holds even if somebody later
  * widens the side list without re-deriving the arithmetic.
  */
-const MAX_CANDIDATES = 512;
+export const MAX_CANDIDATES = 512;
 
 /**
  * The people who could plausibly be named in a two-player game's rules.
@@ -178,10 +178,22 @@ export function recoverRules(input: RecoveryInput): Recovery {
   //
   // The third keyword costs: with seven people the pair space goes from 81 to
   // 100, and doubled for the ranked flag that is 200 against a MAX_CANDIDATES of
-  // 512. Still inside it, and the bound is what makes that checkable rather than
-  // hopeful. Widening this again needs the arithmetic redone - it is
-  // CONSENSUS-VISIBLE, because two boards disagreeing about the search disagree
-  // about whether a game can be confirmed at all.
+  // 512. The bound is what makes that checkable rather than hopeful. Widening
+  // this again needs the arithmetic redone - it is CONSENSUS-VISIBLE, because
+  // two boards disagreeing about the search disagree about whether a game can
+  // be confirmed at all.
+  //
+  // AND THE 200 IS NOT THE WHOLE BILL. Everything `input.candidates` carries is
+  // checked first and spends the same 512, so the headroom here is whatever the
+  // caller left. That was harmless while callers passed a handful; it stopped
+  // being harmless when the board began offering every entrant pair at every
+  // cooldown it had seen. Twelve entrants is 132 ordered pairs, so three
+  // cooldowns is 396 and this search gets 114 of the 200 it wants - and the
+  // failure is SILENT, because a truncated search returns unconfirmed, which is
+  // indistinguishable from a game that genuinely cannot be recovered.
+  //
+  // So the caller's share is bounded on its side, at MAX_PAIR_CANDIDATES in
+  // app.ts, and this comment is the other half of that arithmetic.
   const sides = [...people, ANYONE, ANYONE_ELSE, FIRST_MOVER];
 
   // The ranked flag is a hint and the hash is the truth, so both are tried -

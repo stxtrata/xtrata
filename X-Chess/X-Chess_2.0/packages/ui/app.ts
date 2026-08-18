@@ -323,6 +323,23 @@ const EXPLORE_WINDOW = 25;
 const MAX_PAIRED_ENTRANTS = 12;
 
 /**
+ * How many pair candidates this board may spend of recovery's 512.
+ *
+ * CONSENSUS-VISIBLE ARITHMETIC, and the reason it is a named constant rather
+ * than an emergent property of two loops. Candidates supplied here are checked
+ * BEFORE recover's own search and spend the same budget, so an unbounded pair
+ * space silently starves the fallback that finds games no manifest names —
+ * and a starved search returns unconfirmed, which reads exactly like a game
+ * that cannot be recovered at all.
+ *
+ * Twelve entrants is 132 ordered pairs. One cooldown fits easily; three would
+ * be 396, leaving recover's ~200-candidate search 114 and truncating it. 254
+ * leaves 256 for that search plus margin, and is enough for twelve entrants at
+ * one cooldown or eight at two.
+ */
+export const MAX_PAIR_CANDIDATES = 254;
+
+/**
  * Above this many tournaments, the picker becomes a list rather than buttons.
  *
  * Six is roughly what fits on one line at a readable size, and buttons past that
@@ -5825,12 +5842,15 @@ export class ChessApp {
     // Bounded because it is quadratic and `recoverRules` has a hard candidate
     // cap it would otherwise eat before reaching its own search.
     if (entrants.length <= MAX_PAIRED_ENTRANTS) {
-      for (const white of entrants) {
-        for (const black of entrants) {
-          if (white === black) continue;
-          // At every cooldown a manifest has declared, because a pairing whose
-          // tournament varied its rules hashes to none of the default ones.
-          for (const cooldown of this.knownCooldowns) {
+      // THIS GAME'S OWN COOLDOWN FIRST, then the others. If the budget runs
+      // out it should run out on the least likely guesses, not on the one the
+      // manifest actually declared for the tournament this game is in.
+      const ordered = [...new Set([claimed?.cooldown ?? 0, ...this.knownCooldowns])];
+      outer: for (const cooldown of ordered) {
+        for (const white of entrants) {
+          for (const black of entrants) {
+            if (white === black) continue;
+            if (pairs.length >= MAX_PAIR_CANDIDATES) break outer;
             pairs.push(normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true, cooldown }));
           }
         }
