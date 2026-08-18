@@ -6,6 +6,46 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.1.1 — 2026-08-18
+
+The proxy fix. **Inscribe this, not 3008.**
+
+* **201,569 bytes, 13 chunks.** 0.30 STX protocol + ~0.21 STX miner.
+* `htmlSha256` `639d47223ab83b38bf577ec56a9f8f0e0c7da215e4c186c080352b15d9abdc43`
+* xtrata chunk hash `b7b6e6c51702c1af883c61e6e67c4ed9bfdea0d84b47e51cdd00aa2e0102e4c6`
+* 1,439 tests passing, 70 files.
+
+### What 3008 got wrong, and 2988 before it
+
+`underXtrataRuntime()` decided whether to use the runtime's caching proxy by
+looking for injected support scripts. **A served inscription has none.** Checked
+directly: `https://xtrata.xyz/i/3008` and `/i/2988` both arrive with zero script
+tags.
+
+So detection returned false on every real viewer, `/hiro/mainnet` was never
+tried, and each reader went straight to `api.mainnet.hiro.so` from their own
+address. The public allowance goes quickly against 43 games and 2,604
+submissions, and a rate-limit refusal carries no `Access-Control-Allow-Origin`,
+so the browser reports it as a CORS failure rather than a 429. That is the 384
+"CORS" errors and the "could not reach any Stacks endpoint" banner — with the
+chain fine and `https://xtrata.xyz/hiro/mainnet/v2/info` answering 200 the whole
+time.
+
+It also explains 2988 being slow rather than broken: same fault, less data to
+exhaust the allowance with.
+
+**Detection now reads the injected `<base href="null">`**, which IS present in
+both, is the same tag the UI already works around for relative links, and is
+not something an un-rewritten page would ever set.
+
+### Why the tests passed
+
+The fixture was a runtime that injects scripts — a shape no inscription has ever
+been served in. It proved detection against a page that does not exist, so it
+passed while the function returned false on every live viewer. The fixture is
+now copied from the served bytes of 3008, and the assertion is on the base
+CHOSEN rather than on the boolean, because the boolean was never the point.
+
 ## 2.1.0 — 2026-08-18
 
 Prepared for inscription, not yet inscribed.

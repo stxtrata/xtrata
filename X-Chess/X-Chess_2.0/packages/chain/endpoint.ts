@@ -98,6 +98,31 @@ export const PROXY_PATH: Record<Network, string> = {
 export function underXtrataRuntime(doc?: Document): boolean {
   const target = doc ?? (globalThis as { document?: Document }).document;
   if (!target?.querySelectorAll) return false;
+
+  // THE INJECTED BASE TAG, which is the signal that is actually there.
+  //
+  // This function used to look only for the runtime's support scripts, and on a
+  // real inscription there are none: `https://xtrata.xyz/i/3008` and
+  // `/i/2988` both arrive with no script tags injected at all. So detection
+  // returned false on every viewer, the proxy was never tried, and every reader
+  // hammered `api.mainnet.hiro.so` from their own address until it refused them
+  // — which a browser reports as a CORS failure rather than a 429, because a
+  // refusal carries no `Access-Control-Allow-Origin`. Hundreds of "CORS" errors
+  // and a board saying it could not reach any endpoint, with the chain fine and
+  // the proxy answering 200 the whole time.
+  //
+  // `<base href="null">` IS injected, into both. It is the same tag that breaks
+  // relative links and bare fragments, documented in the manual and worked
+  // around throughout the UI — so it is already known to be there, and no page
+  // that was not rewritten would ever set it. Reading it costs nothing and needs
+  // no network.
+  //
+  // The ATTRIBUTE and not `baseURI`, which is the resolved value and would read
+  // as an ordinary URL.
+  const base = target.querySelector?.('base');
+  if (base && String(base.getAttribute('href') ?? '').trim().toLowerCase() === 'null') return true;
+
+  // Kept because it is free and describes a runtime that does inject them.
   for (const script of target.querySelectorAll('script[src]')) {
     const src = String(script.getAttribute('src') || '');
     if (/(^|\/)runtime\/(wallet-shim|url-support|module-bootstrap)\.js/.test(src)) return true;

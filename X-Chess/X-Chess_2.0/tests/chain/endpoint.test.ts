@@ -33,10 +33,54 @@ function runtimeDocument(): Document {
 
 const plainDocument = (): Document => new JSDOM('<!doctype html><html><head></head><body></body></html>').window.document;
 
+/**
+ * What an inscription ACTUALLY arrives as, copied from the served bytes of
+ * `https://xtrata.xyz/i/3008` on 2026-08-18.
+ *
+ * The fixture above it is a runtime that injects support scripts, and no real
+ * inscription has ever been served that way — 3008 and 2988 both arrive with
+ * zero script tags. That is the whole reason the proxy went unused for
+ * months: detection was proved against a shape that does not occur, so it
+ * passed while returning false on every real viewer.
+ *
+ * A rewritten page is recognisable anyway. `<base href="null">` is injected
+ * into both, it is the same tag that breaks relative links throughout the UI,
+ * and nothing that was not rewritten would ever set it.
+ */
+const inscribedDocument = (): Document =>
+  new JSDOM(
+    `<!doctype html><html lang="en"><head><base href="null">
+<meta charset="utf-8"><title>X Chess</title></head><body></body></html>`
+  ).window.document;
+
 describe('choosing a base', () => {
   it('sees the runtime by its injected scripts', () => {
     expect(underXtrataRuntime(runtimeDocument())).toBe(true);
     expect(underXtrataRuntime(plainDocument())).toBe(false);
+  });
+
+  it('sees a real inscription, which injects no scripts at all', () => {
+    // The bug this exists to prevent, and it cost an inscription to find.
+    // Detection returned false on every live viewer, so `/hiro/mainnet` was
+    // never tried and every reader went straight to the public host from their
+    // own address. The refusals arrive without an Access-Control-Allow-Origin
+    // header, so a browser reports them as CORS failures rather than as the
+    // rate limit they are: hundreds of them, and a board saying it could not
+    // reach any endpoint while the proxy answered 200 throughout.
+    expect(underXtrataRuntime(inscribedDocument())).toBe(true);
+  });
+
+  it('puts the proxy first for a real inscription', () => {
+    // The consequence that matters. Detection is only interesting because of
+    // which base it chooses, so assert the base and not the boolean.
+    expect(endpointsFor({ document: inscribedDocument() })[0]).toBe('/hiro/mainnet');
+  });
+
+  it('does not mistake an ordinary base tag for the runtime', () => {
+    const ordinary = new JSDOM(
+      '<!doctype html><html><head><base href="https://example.test/app/"></head><body></body></html>'
+    ).window.document;
+    expect(underXtrataRuntime(ordinary)).toBe(false);
   });
 
   it('prefers the runtime proxy when running under the runtime', () => {
