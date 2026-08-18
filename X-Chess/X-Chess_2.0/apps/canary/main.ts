@@ -1195,6 +1195,31 @@ const handlers: Record<string, StepHandler> = {
       return no('type the address of a wallet holding exactly zero STX');
     }
 
+    // V1, AND IT MUST STAY V1. Do not "modernise" this.
+    //
+    // `/extended/v1/address/{a}/balances` is deprecated and throttled, and every
+    // other balance read in this project has been moved to
+    // `/extended/v2/addresses/{a}/balances/stx` for exactly that reason. This
+    // one cannot move, because V2 SILENTLY IGNORES `until_block`.
+    //
+    // Measured against mainnet on 2026-08-18, same address, same query:
+    //
+    //   block 8789734   v1 28,715,484   v2 28,714,684
+    //   block 8700000   v1 79,917,430   v2 28,714,684
+    //   block 8000000   v1  4,980,308   v2 28,714,684
+    //   block  500000   v1          0   v2 28,714,684
+    //
+    // v2 returns the CURRENT balance whatever block it is asked for. It does not
+    // error and it does not warn; it answers a different question in the same
+    // shape. Swapped in here, "held nothing in the block before the contract
+    // paid it" quietly becomes "holds nothing right now" — and the wallet this
+    // step is about has by then been bootstrapped, played and paid rebates, so
+    // it can never hold nothing again. The gate would fail on its own success,
+    // which is the precise failure the comment above this function describes
+    // and was rewritten to remove.
+    //
+    // If v1 is ever withdrawn, this needs a real replacement rather than a
+    // rename: the question is historical and only a historical answer will do.
     const balanceAt = async (who: string, block?: number): Promise<bigint> =>
       fetch(
         `${c.apiBase}/extended/v1/address/${who}/balances${block ? `?until_block=${block}` : ''}`
@@ -1218,6 +1243,25 @@ const handlers: Record<string, StepHandler> = {
 
       const before = await balanceAt(opponent, game.openedAt - 1);
       const after = await balanceAt(opponent, game.openedAt);
+
+      // Did the endpoint actually answer about those blocks?
+      //
+      // An API that ignores `until_block` returns the same number three times,
+      // and the step would then report a wallet that genuinely started from zero
+      // as one that did not — a false negative that looks exactly like a real
+      // finding. Cheap to rule out: ask what it holds NOW, and if all three
+      // agree, the block was not honoured.
+      const live = await balanceAt(opponent);
+      if (before === after && after === live && live !== 0n) {
+        return no(
+          `the balance endpoint returned ${stx(live)} for block ${game.openedAt - 1}, block ` +
+            `${game.openedAt} and now — the same number three times, which means it ignored ` +
+            'the block and answered about today instead.\n\nThis step needs a HISTORICAL ' +
+            'balance. See the note on balanceAt: v2 does this silently, so if somebody has ' +
+            'moved this read off v1, move it back.'
+        );
+      }
+
       if (before !== 0n) {
         ctx.log(
           'warn',
