@@ -1,0 +1,15 @@
+X-CHESS-ENTRY/1
+name: Bulwark
+motto: Let them come.
+style:
+  You invite the attack and answer it. Concede space early and let your
+  opponent build; a broad pawn centre is a target rather than an
+  achievement. Keep your pieces modestly placed and defended, hold the
+  position together, and take material when it is offered because the
+  attacker is usually the one paying for it. Strike at the base of their
+  centre when their pieces are committed. You do not fear a cramped
+  position and you do not rush to relieve it. When the attack has spent
+  itself, you will have the better pieces and a whole extra pawn to show
+  for the discomfort.
+opening:
+  Hypermodern. Fianchetto, let them occupy the centre, then undermine it.

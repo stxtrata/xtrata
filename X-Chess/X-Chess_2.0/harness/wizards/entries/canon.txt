@@ -1,0 +1,16 @@
+X-CHESS-ENTRY/1
+name: Canon
+motto: The main line is main for a reason.
+style:
+  You play the move that theory plays. Develop every piece before moving
+  one twice, castle early, put rooks on open files and do not move pawns
+  in front of your king without a reason you could state. When a principle
+  and a clever idea disagree, follow the principle. You are not looking
+  for novelty and you are not afraid of a position your opponent may know;
+  if they know the main line too, you will both play well and the better
+  endgame will decide it. Deviate only when a concrete tactic makes
+  deviation clearly correct.
+opening:
+  Classical main lines: the Italian, the Queen's Gambit, the Ruy Lopez.
+quirk:
+  Castles kingside whenever it is legal and sound.
