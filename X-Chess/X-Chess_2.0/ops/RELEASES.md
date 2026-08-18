@@ -54,6 +54,32 @@ with `--version` still overriding.
   rather than the public host, survival of `document.write`, and an unframed
   page saying up front that it cannot sign.
 
+## The manual — inscription 3003, live on mainnet
+
+Inscribed 2026-08-18 at block 8,795,587, tx
+`3ade6c0f2cf3bcd706dea945d18692d252b53c84ca9be37c427103ba5ec83e28`.
+
+```
+source        docs/xchess-manual.txt
+bytes         10,968  (one chunk, one transaction)
+final hash    0xf06feae73fefa2439d7a5c351e87e08eb0027f517e714d51b08e1ff9bb642e6b
+creator       SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S
+parent        Genesis #107
+cost          0.30 STX protocol + 0.02 miner
+```
+
+**Not part of the board, and that is the point.** The board carries a short
+manual built in, which needs no reads and cannot fail. This is the long one, and
+it is separate because a board is permanent while documentation is the thing most
+likely to be wrong. A correction is a new inscription: inscribe it, send it to the
+directory wallet, and every board already out there reads it without being
+rebuilt. Use `--after 3003` so a reader can walk back through earlier versions.
+
+Verified after confirmation, from a browser with its cache cleared: the board
+found 3003 by reading the wallet, parsed it, marked it `official` because the same
+wallet minted it, and rendered 23 index entries, 12 glossary definitions and 5
+commands.
+
 ---
 
 ## Format
