@@ -233,9 +233,25 @@ async function main() {
     );
   }
 
+  // WHICH WALLET SIGNS, because it is not always the same one and the choice
+  // is not cosmetic. Tournament manifests and the manual come from the
+  // director. The board and any rating checkpoint come from xtrata.btc, which
+  // is the wallet a reader's board requires for a checkpoint and the one that
+  // holds the board's parent — a child inscribed by a different key than its
+  // parent is a relationship nobody can vouch for.
+  //
+  //   --as director   XCHESS_DIRECTOR_KEY   (the default)
+  //   --as xtrata     XCHESS_XTRATA_KEY
   const vars = env();
-  const senderKey = vars.XCHESS_DIRECTOR_KEY;
-  if (!senderKey) throw new WizardSafetyError('no XCHESS_DIRECTOR_KEY in .env.wizards');
+  const who = arg('as', 'director').toLowerCase();
+  const keyName = `XCHESS_${who.toUpperCase()}_KEY`;
+  const senderKey = vars[keyName];
+  if (!senderKey) {
+    throw new WizardSafetyError(
+      `no ${keyName} in .env.wizards, so nothing can be signed as "${who}".\n\n` +
+        `Available: ${Object.keys(vars).filter((k) => k.endsWith('_KEY')).join(', ') || 'none'}`
+    );
+  }
   const senderAddress = getAddressFromPrivateKey(senderKey, 'mainnet');
 
   const feeUnit = await readFeeUnit();
