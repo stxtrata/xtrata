@@ -165,7 +165,12 @@ export async function scoreTournament(
       entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
       { rules }
     );
-    facts.set(game.id, { rulesHash: row.rulesHash, result: state.result });
+    facts.set(game.id, {
+      rulesHash: row.rulesHash,
+      result: state.result,
+      // Accepted, not submitted. See GameFacts.moves.
+      moves: state.accepted.length
+    });
   }
 
   const checked = checkGames(tournament, facts);

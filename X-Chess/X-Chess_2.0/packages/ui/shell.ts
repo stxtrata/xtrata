@@ -334,7 +334,10 @@ ${SCALE_CSS}
 .tn-round { margin: 14px 0 0; }
 .tn-round h3 { font-size: 13px; margin: 0 0 6px; color: var(--gold); font-weight: 600; }
 .tn-game {
-  display: grid; grid-template-columns: 3.4ch 1fr auto auto; gap: 8px;
+  /* id · players · moves · result · verdict. The moves column was added after
+     the fact and the grid still said four, so the verdict wrapped to a line of
+     its own on every row. */
+  display: grid; grid-template-columns: 3.4ch 1fr auto auto auto; gap: 8px;
   align-items: baseline; padding: 5px 8px; border-bottom: 1px solid var(--line);
 }
 .tn-game:last-child { border-bottom: 0; }
@@ -357,6 +360,27 @@ ${SCALE_CSS}
    this block and was quietly repainting the border back to --line. Checked with
    getComputedStyle rather than by eye: the class was applied and the colour was
    not. Exactly the collision the note at the top of this file describes. */
+/* The manifest number and the two buttons that act on it, on one line. */
+.tn-controls { align-items: center; gap: 8px; flex-wrap: wrap; }
+.tn-controls label { color: var(--dim); font-size: 12px; }
+/* Sized to what it holds. An inscription id is four figures today and the
+   field allows twelve, which is more than Xtrata will mint this century.
+
+   Qualified by .tn-controls and by the element, and the specificity is the
+   point rather than fussiness: the base rule is input[type='text'] at (0,1,1)
+   and a bare class is (0,1,0), so it loses and the box stays full width. Same
+   collision the provenance banner had, caught the same way, by measuring the
+   element rather than trusting the class to be applied.
+
+   No backticks in here. This stylesheet lives inside a template literal, so one
+   ends the string and the error arrives as a TypeScript parse failure hundreds
+   of lines away with nothing to do with CSS. */
+.tn-controls input.tn-manifest { width: 8.5em; flex: 0 0 auto; }
+/* Its own line, deliberately. It is a sentence, and letting it share a row with
+   the controls is what pushes the buttons away from the box they act on. */
+.tn-controls #tournament-fresh { flex: 1 0 100%; margin-top: 2px; }
+.tn-moves { color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 8px; }
+
 /* The inscriptions a tournament is made of, offered rather than described. */
 .tn-entry { font-size: 11px; color: var(--dim); text-decoration: none;
             border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
@@ -863,11 +887,17 @@ export const HTML = `
 
   <section id="view-tournaments" class="panel hide">
     <h2>Tournaments</h2>
-    <div class="field">
+    <!-- One row: the number is at most a few figures, and a full-width box for
+         it pushed the two buttons that act on it onto their own line. -->
+    <div class="row tn-controls">
       <label for="tournament-id">Manifest inscription</label>
-      <input type="text" id="tournament-id" inputmode="numeric" placeholder="2993">
+      <input type="text" id="tournament-id" class="tn-manifest" inputmode="numeric"
+             maxlength="12" size="12" placeholder="2993">
+      <button class="action" id="tournament-load">Show</button>
+      <button class="action" id="tournament-refresh"
+              title="Read every game again. A tournament in progress changes on chain, not here.">Refresh</button>
+      <span id="tournament-fresh" class="muted small" role="status"></span>
     </div>
-    <div class="row"><button class="action" id="tournament-load">Show</button></div>
     <!-- Filled from the director's wallet, so a reader never has to know a
          number. See TournamentIndex: holdings finds them, the mint says which
          the organiser actually made. -->

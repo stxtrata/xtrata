@@ -372,6 +372,15 @@ const BACKGROUND_POLL_MS = 20_000;
 const WAITING_RECHECK_MS = 60_000;
 
 /**
+ * How often to ask whether a tournament in progress has moved.
+ *
+ * A move takes a block to confirm and a tournament game takes minutes between
+ * them, so this is well inside what anybody notices. It costs one read per
+ * UNFINISHED game and nothing whatever once they all have results.
+ */
+const TOURNAMENT_POLL_MS = 30_000;
+
+/**
  * How long a pending move may be shown on memory alone.
  *
  * Chosen against the block time rather than the poll interval: post-Nakamoto a
@@ -470,7 +479,7 @@ const IDS = [
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
-  'fee-advice', 'tournament-list',
+  'fee-advice', 'tournament-list', 'tournament-refresh', 'tournament-fresh',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -632,6 +641,11 @@ export class ChessApp {
   private players: PlayerNames | null = null;
   private yours: YourGames | null = null;
   private index: ManifestDirectory<Tournament> | null = null;
+  /** When the tournament on screen was last read from chain. */
+  private tournamentReadAt = 0;
+  /** The same question asked of submissions, which is what a row can answer. */
+  private tournamentSeenRaw = '';
+  private tournamentPoll: ReturnType<typeof setTimeout> | null = null;
   private found: Found<Tournament>[] = [];
   /**
    * Ids known to be this player's that the window cannot show.
@@ -789,6 +803,11 @@ export class ChessApp {
     on('exploreRefresh', () => void this.reloadExplore());
     on('exploreFind', () => void this.findGame());
     on('tournamentLoad', () => void this.loadTournamentTab());
+    // Same read, said out loud. Refresh and Show do the same work; the two
+    // exist because "show me 3001" and "show me 3001 AGAIN" are different
+    // intentions and a person with a tournament already on screen should not
+    // have to wonder whether pressing Show will do anything.
+    on('tournamentRefresh', () => void this.loadTournamentTab({ again: true }));
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
 
@@ -1406,12 +1425,17 @@ export class ChessApp {
     if (tab === 'leaderboard') void this.loadLeaderboard();
     // Only on first open. A tournament is a manifest plus a couple of dozen
     // reads, and flicking between tabs should not re-spend that.
-    if (tab === 'tournaments' && !this.tournament) {
-      void this.loadTournamentTab();
-      // Alongside, not before: the list is a convenience and must not delay the
-      // tournament itself appearing.
-      void this.loadTournamentList();
-    }
+    // ONLY THE LIST. Opening the tab used to read a tournament nobody had
+    // asked for — the default, Exhibition One — which is twenty-one games,
+    // twenty-odd reads and half a minute of somebody else's rate limit spent
+    // before the reader has said what they want. It also meant the first thing
+    // on screen was the OLDEST event, and the newest sat behind a button
+    // labelled with its own name.
+    //
+    // The directory is cheap and is the thing that lets somebody choose: one
+    // holdings call, then reads that are remembered for ever. So that runs, and
+    // nothing is scored until a button is pressed or a number is typed.
+    if (tab === 'tournaments' && !this.found.length) void this.loadTournamentList();
 
     // Rebuild the list when it has gone stale, which OPENING THE TAB is the
     // signal for.
@@ -2528,10 +2552,112 @@ export class ChessApp {
     this.drawTournamentList();
   }
 
+  /**
+   * When this was read, and whether anything can still change.
+   *
+   * A tournament tab is a photograph of a chain that moves. Saying when the
+   * photograph was taken is the difference between "nothing has happened" and
+   * "nothing has been asked" — which look identical and are not.
+   */
+  private drawTournamentFresh(): void {
+    const view = this.tournament;
+    const live = (view?.rounds ?? [])
+      .flatMap((round) => round.games)
+      .filter((game) => game.result === null).length;
+
+    if (!view?.ok || !this.tournamentReadAt) {
+      this.text('tournamentFresh', '');
+      return;
+    }
+    const mins = Math.floor((this.now() - this.tournamentReadAt) / 60_000);
+    const when = mins < 1 ? 'just now' : `${mins} minute${mins === 1 ? '' : 's'} ago`;
+    this.text(
+      'tournamentFresh',
+      live
+        ? `Read ${when}. ${live} game${live === 1 ? '' : 's'} still being played, so this updates itself.`
+        : `Read ${when}. Every game has finished, so nothing here will change.`
+    );
+  }
+
+  /**
+   * Watch a tournament that is still being played, without paying to.
+   *
+   * A tournament on chain changes while somebody is looking at it, and the tab
+   * used to be a photograph — Refresh exists for that, and having to press it
+   * to find out whether anything happened is the same as not knowing.
+   *
+   * So this reads ONLY the unfinished games, and only their row, which is one
+   * read each and no replay. If nothing moved it costs that and stops. If
+   * something did, the full score runs, because the standings are derived and
+   * cannot be patched from a row.
+   *
+   * Nothing at all is read when every game has a result, when the tab is not
+   * on screen, or when the page is hidden. A finished tournament is a static
+   * document and should cost what one costs.
+   */
+  private scheduleTournamentPoll(): void {
+    if (this.tournamentPoll) clearTimeout(this.tournamentPoll);
+    if (this.stopped) return;
+    this.tournamentPoll = setTimeout(() => void this.pollTournament(), TOURNAMENT_POLL_MS);
+  }
+
+  private async pollTournament(): Promise<void> {
+    const view = this.tournament;
+    const live = (view?.rounds ?? [])
+      .flatMap((round) => round.games)
+      .filter((game) => game.result === null);
+
+    // Every reason to do nothing, checked before anything is read.
+    if (
+      this.tab !== 'tournaments' ||
+      this.busy ||
+      this.doc.visibilityState === 'hidden' ||
+      !view?.ok ||
+      !live.length
+    ) {
+      this.scheduleTournamentPoll();
+      return;
+    }
+
+    try {
+      const rows = await pool(
+        EXPLORE_READ_WIDTH,
+        live.map((game) => () => this.chain.getGame(game.id).catch(() => null))
+      );
+      const now = rows
+        .map((row, at) => `${live[at].id}:${row?.nextSeq ?? live[at].moves ?? 0}`)
+        .join(',');
+      // Compared against submissions rather than accepted moves, which is the
+      // conservative direction: a submission replay will skip still counts as
+      // "something happened", so the worst case is one rescore that changes
+      // nothing, and never a board that sat still while the game moved.
+      if (now !== this.tournamentSeenRaw) {
+        this.tournamentSeenRaw = now;
+        await this.loadTournamentTab({ again: true });
+      }
+    } catch {
+      // A poll that fails changes nothing on screen and says nothing about it.
+    }
+    this.scheduleTournamentPoll();
+  }
+
   private drawTournamentList(): void {
     const node = this.el.tournamentList;
     node.replaceChildren();
     if (!this.found.length) return;
+
+    // An empty tab with buttons on it does not say that pressing one is the
+    // next step, and a reader who has never seen this before should not have to
+    // infer it.
+    if (!this.tournament) {
+      this.notice(
+        'tournamentNote',
+        'info',
+        this.found.length === 1
+          ? 'One tournament found on chain. Choose it, or type the number of another.'
+          : `${this.found.length} tournaments found on chain. Choose one, or type the number of another.`
+      );
+    }
 
     const showing = this.tournament?.tournamentId ?? null;
     for (const entry of this.found) {
@@ -2563,7 +2689,7 @@ export class ChessApp {
     }
   }
 
-  private async loadTournamentTab(): Promise<void> {
+  private async loadTournamentTab(options: { again?: boolean } = {}): Promise<void> {
     if (!this.xtrata) {
       // No endpoint means no inscription reader, and a tournament is nothing
       // but an inscription. Say that rather than drawing an empty tab.
@@ -2585,7 +2711,13 @@ export class ChessApp {
     };
 
     await this.guard(`reading tournament ${id}`, async () => {
-      this.notice('tournamentNote', 'info', `Reading manifest ${id} and checking every pairing against the chain.`);
+      this.notice(
+        'tournamentNote',
+        'info',
+        options.again
+          ? `Reading manifest ${id} again, and every game with it.`
+          : `Reading manifest ${id} and checking every pairing against the chain.`
+      );
       const view = await loadTournament(id, deps);
       this.tournament = view;
       this.drawTournament();
@@ -2611,9 +2743,13 @@ export class ChessApp {
               // The candidate the Leaderboard cannot guess. See rulesForRanked.
               if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
+      this.tournamentReadAt = this.now();
+      this.tournamentSeenRaw = '';
       this.drawTournament();
       // So the button for what is now on screen reads as selected.
       this.drawTournamentList();
+      this.drawTournamentFresh();
+      this.scheduleTournamentPoll();
       return true;
     });
   }
@@ -2855,7 +2991,24 @@ export class ChessApp {
         mark.textContent = verdictLabel(game);
         if (game.says) mark.title = game.says;
 
-        row.append(id, who, result, mark);
+        // HOW FAR ALONG, which is the question a finished result answers and a
+        // game in progress does not. "In play" says nothing about whether it
+        // started an hour ago or is about to end.
+        //
+        // Accepted moves, not submissions: the contract stores whatever it is
+        // sent, and game 12 holds five copies of one move, each charged and
+        // each skipped by replay. Counting those would report a game as further
+        // along than it has actually been played.
+        const moves = this.doc.createElement('span');
+        moves.className = 'tn-moves';
+        if (typeof game.moves === 'number') {
+          moves.textContent = `${game.moves} move${game.moves === 1 ? '' : 's'}`;
+          moves.title =
+            'Moves replay accepted. A submission that did not count is stored on ' +
+            'chain and charged for, and is not a move.';
+        }
+
+        row.append(id, who, moves, result, mark);
         section.appendChild(row);
       }
       body.appendChild(section);

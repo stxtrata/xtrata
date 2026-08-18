@@ -472,6 +472,15 @@ export interface GameFacts {
   rulesHash: string | null;
   /** Replayed, or null for a game that has not finished. */
   result: '1-0' | '0-1' | '1/2-1/2' | null;
+  /**
+   * Moves replay ACCEPTED, which is not the number of submissions.
+   *
+   * A game may be submitted to by anybody, and the contract stores whatever it
+   * is sent — game 12 has five copies of `e2e4`, each charged and each skipped
+   * by replay as landing on an empty square. So "how far along is this" has two
+   * answers and only one of them is the game.
+   */
+  moves?: number;
 }
 
 /**
@@ -492,6 +501,8 @@ export interface CheckedGame {
   /** Why, in words. Empty when verified — there is nothing to explain. */
   says: string;
   result: '1-0' | '0-1' | '1/2-1/2' | null;
+  /** Moves replay accepted, when the caller counted them. */
+  moves?: number;
 }
 
 /**
@@ -519,7 +530,13 @@ export function checkGames(
 ): CheckedGame[] {
   return tournament.games.map((game) => {
     const seen = facts.get(game.id);
-    const base = { id: game.id, round: game.round, white: game.white, black: game.black };
+    const base = {
+      id: game.id,
+      round: game.round,
+      white: game.white,
+      black: game.black,
+      moves: seen?.moves
+    };
 
     if (!seen) {
       return { ...base, verdict: 'missing' as const, says: 'no such game on this contract', result: null };
