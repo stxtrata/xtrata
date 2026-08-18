@@ -60,10 +60,58 @@ const CHUNK = 16_384;
  * chunk is sixteen kilobytes of them, so a constant was always going to fail at
  * whatever size crossed the line first.
  *
- * Free to get wrong in this direction - the node refuses it at broadcast and
- * nothing is spent - but it costs a round trip and looks like a failure.
+ * This is an OPENING BID and no longer a guess that has to be right. It was
+ * right for one, two and eleven chunks and short by 1,862 uSTX at thirteen -
+ * about one percent - which is exactly how a fitted line behaves as it gets
+ * further from the points it was fitted to. Rather than re-fit it and wait for
+ * the next size to drift, `broadcastWithFee` now asks the node and pays what it
+ * says.
+ *
+ * Free to get wrong in this direction: the node refuses it at broadcast and
+ * nothing is spent, which is what makes ask-then-pay safe to automate.
  */
 const txFeeFor = (chunks) => 20_000n + 15_000n * BigInt(Math.max(0, chunks - 1));
+
+/** Never pay more than this multiple of the opening bid without being asked. */
+const FEE_CEILING = 3n;
+
+/**
+ * Broadcast, and if the only complaint is the fee, pay what the node asked for.
+ *
+ * THE NODE KNOWS AND WILL TELL YOU, but only by refusing: `FeeTooLow` carries
+ * `reason_data.expected`, which is the exact minimum at that moment. A rejected
+ * broadcast costs nothing - no transaction was mined, so there is nothing to
+ * burn - so the cheapest way to learn the number is to be told it.
+ *
+ * Retried ONCE, with a five percent margin because the mempool moves between
+ * the refusal and the retry, and never above `FEE_CEILING` times the opening
+ * bid. A runaway mempool should stop this and print, rather than quietly
+ * spending whatever it takes.
+ */
+async function broadcastWithFee(build, openingBid) {
+  let fee = openingBid;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const out = await broadcastTransaction({ transaction: await build(fee), network: 'mainnet' });
+    if (!out.error && !out.reason) return { out, fee };
+
+    const wanted = out.reason === 'FeeTooLow' ? BigInt(out.reason_data?.expected ?? 0) : 0n;
+    if (!wanted || attempt > 0) {
+      throw new WizardSafetyError(`rejected: ${JSON.stringify(out).slice(0, 300)}`);
+    }
+
+    fee = wanted + wanted / 20n;
+    const ceiling = openingBid * FEE_CEILING;
+    if (fee > ceiling) {
+      throw new WizardSafetyError(
+        `the node wants ${wanted} uSTX, over ${FEE_CEILING}x the ${openingBid} estimated.\n` +
+          'Nothing was spent. Either the mempool is busy or the estimate is badly wrong;\n' +
+          'check the fee market before raising FEE_CEILING.'
+      );
+    }
+    console.log(`\nfee       ${openingBid} refused, node wants ${wanted}. Retrying at ${fee}.`);
+  }
+  throw new WizardSafetyError('unreachable');
+}
 
 const LIVE = process.argv.includes('--live');
 const arg = (name, fallback = null) => {
@@ -281,7 +329,8 @@ async function main() {
   console.log(`hash      0x${running.toString('hex')}`);
   console.log(`fee unit  ${feeUnit} uSTX (read live)`);
   const txFee = txFeeFor(chunks.length);
-  console.log(`spend cap ${spendCap} uSTX + ${txFee} miner fee`);
+  console.log(`spend cap ${spendCap} uSTX protocol fee, capped by post-condition`);
+  console.log(`miner fee ${txFee} uSTX opening bid, raised to what the node asks`);
   console.log(`depends   ${DEPENDS_ON.length ? `#${DEPENDS_ON.join(', #')}` : 'nothing'}`);
   if (!AFTER) {
     console.log('          (no --after, so a reader who finds this cannot walk back to an');
@@ -294,31 +343,37 @@ async function main() {
     return;
   }
 
-  const tx = await makeContractCall({
-    contractAddress: XTRATA_ADDRESS,
-    contractName: XTRATA_NAME,
-    functionName: 'mint-single-tx-recursive',
-    functionArgs: [
-      Cl.buffer(running),
-      Cl.stringAscii(mime),
-      Cl.uint(bytes.length),
-      Cl.list(chunks.map((c) => Cl.buffer(c))),
-      Cl.stringAscii(`data:text/plain,x-chess-${kind.replace(/\s+/g, '-')}`),
-      Cl.list(DEPENDS_ON.map((id) => Cl.uint(id)))
-    ],
-    senderKey,
-    network: 'mainnet',
-    fee: txFee,
-    nonce: await fetchNonce({ address: senderAddress, network: 'mainnet' }),
-    postConditions: [Pc.principal(senderAddress).willSendLte(spendCap).ustx()],
-    postConditionMode: PostConditionMode.Deny
-  });
+  const build = (fee) =>
+    makeContractCall({
+      contractAddress: XTRATA_ADDRESS,
+      contractName: XTRATA_NAME,
+      functionName: 'mint-single-tx-recursive',
+      functionArgs: [
+        Cl.buffer(running),
+        Cl.stringAscii(mime),
+        Cl.uint(bytes.length),
+        Cl.list(chunks.map((c) => Cl.buffer(c))),
+        Cl.stringAscii(`data:text/plain,x-chess-${kind.replace(/\s+/g, '-')}`),
+        Cl.list(DEPENDS_ON.map((id) => Cl.uint(id)))
+      ],
+      senderKey,
+      network: 'mainnet',
+      fee,
+      nonce,
+      // The cap covers the PROTOCOL fee only. A miner fee is not a transfer and
+      // is not what this condition is about, so raising the fee on a retry does
+      // not loosen the guarantee that matters: the contract cannot take more
+      // than the seal was quoted at.
+      postConditions: [Pc.principal(senderAddress).willSendLte(spendCap).ustx()],
+      postConditionMode: PostConditionMode.Deny
+    });
 
-  const out = await broadcastTransaction({ transaction: tx, network: 'mainnet' });
-  if (out.error || out.reason) {
-    throw new WizardSafetyError(`rejected: ${JSON.stringify(out).slice(0, 300)}`);
-  }
-  console.log(`\ntxid ${out.txid}`);
+  // Read ONCE and reused across the retry. The retry replaces a transaction the
+  // node never accepted, so it belongs at the same nonce - re-reading would
+  // return the same number anyway, and would silently skip a slot if it did not.
+  const nonce = await fetchNonce({ address: senderAddress, network: 'mainnet' });
+  const { out, fee: paid } = await broadcastWithFee(build, txFee);
+  console.log(`\ntxid ${out.txid}  (miner fee ${paid} uSTX)`);
   console.log('Once it confirms, read the token id off the mint event and play with:');
   console.log('  node harness/wizards/run-tournament.mjs --manifest <id> --live');
 }
