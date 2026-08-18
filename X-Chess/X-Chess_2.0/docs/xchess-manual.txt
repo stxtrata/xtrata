@@ -1,123 +1,260 @@
 X-CHESS-DOCS/1
 The X Chess manual
 
-This is the long version. The board carries a short one built in, so that it
-still says something when nothing can be read; this is inscribed separately so
-it can be corrected without rebuilding a page that cannot be rebuilt.
+This is the long version. The board carries a short one built in, so it still
+says something when nothing can be read. This is inscribed separately so it can
+be corrected without rebuilding a page that cannot be rebuilt.
 
-## Making a tournament
+## What X Chess is
 
-A tournament is one inscribed document. It names its entrants, and it says which
-game id on the contract is which pairing. That is all it is, and everything else
-the board shows about a tournament is derived from the chain rather than from the
-document.
+A chess board that is itself an inscription, reading a contract on Stacks. Every
+move is a transaction. Every position on screen is replayed from the chain rather
+than stored anywhere, which is why the board says so much about what it is
+reading: it is deriving what you see, not being handed it.
 
-The order is forced by what a manifest is. Open the games first, because a
-manifest names them by id and ids do not exist until they are opened. Build the
-manifest from what is actually on chain. Inscribe it. Only then play.
+There is no server. Nothing here can be taken down, and nothing here can be
+edited either, which is the same property read twice.
 
-Inscribing after the first move is not an error, and the board will read it, but
-it reads as compiled rather than committed. A compiled manifest is a description
-of games that already existed; a committed one is a promise made before anybody
-knew how the games would go. Both are honest and only one is binding.
+### What the contract stores, and what it does not
 
-Opening games does not spoil that order. A game with no submissions has no first
-move, so a manifest inscribed while every game sits empty is still committed.
+The contract stores a game's opener, the block it opened at, whether it was
+offered as ranked, a 32-byte commitment to its rules, and every submission sent
+to it in order. That is all.
 
-## Building the manifest
+It does NOT store the players. Their addresses live inside the rules that the
+commitment hashes, and nowhere else, which is why a game with no submissions
+cannot be attributed to anybody by reading the chain.
 
-The tooling signs transactions, so it lives in the repository rather than in the
-board. A board holds no keys and never will, being an inscription itself.
+It does not store results either. A result is replayed from the submissions by
+whoever is looking, and two boards that disagree about a result disagree about
+their own code rather than about the chain.
 
-Open the games: run the tournament runner with the open command, which computes
-each pairing's rules hash, looks for a game already carrying it, and opens only
-what is missing. It is safe to re-run; it will not open a second copy of a
-pairing that already exists.
+## Playing a game
 
-Build it: the manifest builder reads every game on the contract and matches
-pairings BY RULES HASH rather than by position in a list. Three games opened at
-once land in whatever order the chain mines them, so a game's number says nothing
-about who is in it. The builder refuses to write a manifest naming a game that
-does not exist, and refuses one whose pairings do not match the chain, because
-either would be a document whose only purpose is to be rejected.
+### Opening one
 
-Inscribe it: the inscribe script mints on the Xtrata core with the manifest as
-text, reading the fee unit live rather than trusting a remembered figure.
+Open a game from the Play tab. You choose who may play each side: a named
+address, anyone, anyone but you, or whoever moves first. Those choices are hashed
+into the rules commitment, so they are fixed at the moment the game opens and
+cannot be revised afterwards.
 
-## Naming the players
+A ranked game must name both players by address. That is what makes a rating
+meaningful, and the board refuses to open a ranked game any other way.
 
-An entrant is a name and an address. The name is what the board shows when the
-address has nothing better; a BNS name wins over it, and a player manifest that
-the address inscribed about itself wins over that.
+### Making a move
 
-An entrant may also name an entry: the inscription that defines how that player
-chooses. The board links it beside the player, so a reader can open the character
-sheet and see what that competitor was told to do.
+Click the piece, click the destination. The board refuses moves it can prove will
+not count, and warns about ones it merely doubts, and the warning can always be
+overruled on a second click.
 
-An entrant may say whether it is a person or a program. The board uses that to
-warn readers that an all-program tournament does not advance on its own. Saying
-nothing is read as unknown rather than as human, because the first two
-exhibitions said nothing and were played entirely by programs.
+A move costs a network fee and nothing the contract charges.
 
-## Programming a player
+### Fees, and why your wallet is wrong
 
-Every player is handed the same engine, inscription #2991. It is deterministic
-and it is not a recommendation: it ranks every legal move with a score, and a
-character reads that list and picks by style. That is the only thing a character
-controls, and it is why two characters handed identical positions play
-differently.
+Wallets estimate a fee from the whole network rather than from this contract, and
+have quoted between eight and fifteen times what moves here actually confirm at.
+The number to use is on screen in every game.
 
-A character sheet is an inscription describing that style in the entry format:
-how it opens, what it will risk, what it avoids. Inscribe it, then name its id as
-the entry for that entrant in the tournament manifest.
+The board cannot propose it. The wallet method it signs through takes six
+parameters and a fee is not one of them, so the figure in your wallet is the
+wallet's own, and yours to change.
 
-The engine exists because the alternative was measured and does not work. Across
-six on-chain games, more thinking effort moved the blunder rate from 29% to 29%,
-competence instructions moved it from 21% to 21%, and a king-mobility hint
-produced no mate in fifty plies where doing nothing mated in twenty-three. The
-engine halved it, 24% to 12%, replicated across three twelve-game runs.
+- Xverse: press Edit, then Custom.
+- Leather: choose the Custom tab.
 
-## Fees
+### When a move will not confirm
 
-A move costs a network fee and nothing the contract charges. Wallets estimate
-that fee from the whole network rather than from this contract, and have quoted
-between eight and fifteen times what moves here actually confirm at.
+Replace it at the SAME nonce with a higher fee. The board shows that nonce
+whenever a move of yours is pending, because it is the one thing neither wallet
+can tell you: they know your pending transactions, and not which of them is a
+chess move.
 
-The board cannot propose a fee. The wallet method it signs through takes six
-parameters and a fee is not one of them, so the number in your wallet is the
-wallet's own and yours to change.
+Signing a new move instead takes the next nonce, which queues behind the stuck
+one rather than replacing it. Two fees, and the second cannot confirm until the
+first does.
 
-If a move sits unconfirmed, replace it at the same nonce with a higher fee.
-Signing a new one takes the next nonce, which queues behind the stuck move
-instead of replacing it: two fees, and the second cannot confirm until the first
-does. The board shows the nonce of a pending move of yours for exactly this.
+- Xverse: Speed Up on the Stacks dashboard, or Edit nonce when signing.
+- Leather extension: the Activity tab, then increase the fee. Leather desktop
+  cannot.
 
-## When a game will not finish
+### Games that never end
 
 The contract has no clock and no resignation by absence. A game nobody has
-touched for a year is, on chain, live and waiting. So a board cannot tell a
-player who walked away from a player who is thinking, and it does not pretend to;
-it says how long it has been quiet and leaves the conclusion to the reader.
+touched for a year is, on chain, live and waiting for a move anybody may still
+make.
+
+So a board cannot tell a player who walked away from a player who is thinking,
+and this one does not pretend to. It says how long a game has been quiet and
+leaves the conclusion to you.
 
 A game ends when the chain says so: checkmate, stalemate, a draw by repetition or
 the fifty-move rule, a resignation, or a draw offered and accepted. There is no
-other way, and in particular an organiser cannot declare a result. Results are
-replayed from the log, never taken from a claim, which is what stops a tournament
-being decided by whoever wrote the manifest.
+other way, and in particular no organiser can declare one.
 
-If a program stalls, the fair remedy is for that player to resign or agree a
-draw from its own wallet. That is a real act on chain, permanent, and anybody can
-check it.
+## Tournaments
 
-## What the board will not do
+### What a tournament actually is
 
-It will not tell you a game is yours unless the rules that hash to the game's own
-commitment name you.
+One inscribed document naming its entrants and saying which game id is which
+pairing. Nothing else. Everything the board shows about a tournament is derived
+from the chain.
 
-It will not count a tournament game whose pairing does not match the chain.
+Nothing in it is trusted. Every pairing is checked against the rules hash its
+game committed to, and a claim that does not match reads as unverified and scores
+nothing. A manifest that lies fails; it does not mislead.
 
-It will not report a result it has not replayed.
+### Committed and compiled
 
-It will not say a tournament is finished, or crown a winner, until every game has
-a result and every pairing is verified, and it will not break a tie to award a
-place that was shared.
+A manifest inscribed BEFORE the first move of any of its games reads as
+committed. One written afterwards reads as compiled.
+
+Both are honest. Only the first is a promise: it was written when nobody knew how
+the games would go. A compiled manifest is a description of games that already
+existed, and anybody can write one of those about any games, including games
+another manifest also claims.
+
+### How the board finds them
+
+By reading a wallet the organiser sends manifests to, newest first. You never
+need to know a number, though you can type one at the bottom of the Tournaments
+tab for a tournament this board does not watch for.
+
+Holding finds it; creating proves it. Anybody may send an inscription to any
+wallet, so a document arriving there is a claim. The board reports whether the
+wallet MINTED it, which a transfer cannot fake, and marks the rest as inscribed
+by somebody else.
+
+## Running your own tournament
+
+The tooling signs transactions, so it lives in the repository rather than in this
+page. A board holds no keys and never will, being an inscription itself.
+
+### The order, and why it is forced
+
+$ node harness/wizards/run-tournament.mjs open --live
+$ node harness/wizards/build-manifest.mjs --name "Your Event" --format round-robin
+$ node harness/wizards/inscribe-manifest.mjs --file harness/wizards/manifest-round-robin.json --live
+$ node harness/wizards/run-tournament.mjs --manifest <id> --live
+
+Open the games first, because a manifest names them by id and ids do not exist
+until they are opened. Build the manifest from what is actually on chain.
+Inscribe it. Only then play.
+
+Opening does not spoil it: a game with no submissions has no first move, so a
+manifest inscribed while every game sits empty is still committed.
+
+### Opening the games
+
+The open command computes each pairing's rules hash, looks for a game already
+carrying it, and opens only what is missing. It is safe to re-run: it will not
+open a second copy of a pairing that already exists, because it matches on the
+hash rather than on who opened what.
+
+### Building the manifest
+
+The builder reads every game on the contract and matches pairings BY RULES HASH
+rather than by position in a list. Three games opened at once land in whatever
+order the chain mines them, so a game's number says nothing about who is in it.
+
+It refuses to write a manifest naming a game that does not exist, and refuses one
+whose pairings do not match the chain. Either would be a document whose only
+purpose is to be rejected.
+
+Use --from and --rounds to take part of a format. A tournament need not run a
+format to completion, and the second exhibition was rounds eight to ten of a
+double round robin.
+
+### Inscribing it
+
+$ node harness/wizards/inscribe-manifest.mjs --file <path> --after <previous id> --live
+
+The fee unit is read live rather than remembered. --after names the previous
+manifest as a dependency, which lets a reader walk backwards through every
+earlier tournament without being told an address. It cannot be added later, so
+decide before inscribing.
+
+Send the finished inscription to the wallet the board watches, or it will only be
+findable by number.
+
+## AI players
+
+### The engine
+
+Every player is handed the same engine, inscription #2991. It is deterministic,
+and it is not a recommendation: it ranks every legal move with a score in
+centipawns from the mover's point of view, best first, and marks any mate.
+
+A character reads that list and picks by style. That is the only thing a
+character controls, and it is why two characters given identical positions play
+differently.
+
+### Why the engine exists
+
+Measured rather than assumed. Across six on-chain games, more thinking effort
+moved the blunder rate from 29% to 29%. Competence instructions moved it from 21%
+to 21%. A king-mobility hint produced no mate in fifty plies where doing nothing
+mated in twenty-three.
+
+The engine halved it, 24% to 12%, replicated across three twelve-game runs. It
+does not make games finish, though: a one-ply control mated more often, 8 to 6.
+
+### Writing a character
+
+A character sheet is an inscription describing a style: how it opens, what it
+will risk, what it avoids, how it treats a won position. Inscribe it, then name
+its id as the entry for that entrant in the tournament manifest, and this board
+will link it beside that player.
+
+An entrant may also say whether it is a person or a program. The board uses that
+to warn readers that an all-program tournament does not advance on its own,
+because somebody has to be running the engine and its games stop when they stop.
+Saying nothing is read as unknown rather than as human.
+
+## What the board refuses to do
+
+- It will not say a game is yours unless the rules hashing to that game's own
+  commitment name you.
+- It will not count a tournament game whose pairing does not match the chain.
+- It will not report a result it has not replayed itself.
+- It will not call a tournament finished, or crown a winner, until every game has
+  a result and every pairing is verified.
+- It will not break a tie to award a place that was shared.
+- It will not treat a rate limit as an answer: a lookup that failed is never
+  recorded as a thing that does not exist.
+
+## Glossary
+
+commitment :: The 32-byte hash a game stores instead of its rules. The rules are
+recovered by proposing candidates and testing them against it.
+
+compiled :: A manifest inscribed after play began. A description of games that
+already existed, rather than a promise made before them.
+
+committed :: A manifest inscribed before the first move of any of its games.
+
+directory :: A wallet that manifests are sent to, so a board can find them. The
+board knows one address per group and nothing else.
+
+entry :: The inscription defining how an AI player chooses among ranked moves.
+
+manifest :: An inscribed document naming a tournament's entrants and which game
+id is which pairing.
+
+nonce :: The number ordering transactions from one account. Replacing a stuck
+move means signing the same one again at a higher fee.
+
+ranked :: A game that counts towards ratings. It must name both players by
+address, start from the standard position, and be decided by those two alone.
+
+replay :: Deriving the position and result from the submissions in order. The
+board does this every time rather than storing an answer.
+
+rules hash :: The commitment, used as a pairing's identity. The same two players
+on the same colours produce the same hash, which is how a tournament's games are
+found.
+
+skipped :: A submission the contract stored and replay did not accept. It is on
+chain permanently and it cost its sender a fee.
+
+unverified :: A tournament pairing whose claim does not match the chain. Listed,
+never counted.

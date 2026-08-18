@@ -16,7 +16,7 @@ import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament } from '../protocol/tournament.js';
 import { parseDocs, splitRefs } from '../protocol/docs.js';
-import type { Docs } from '../protocol/docs.js';
+import type { Block, Docs } from '../protocol/docs.js';
 import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
@@ -538,7 +538,7 @@ const IDS = [
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-load', 'profile-body',
-  'claim-name-why', 'claim-name', 'claim-pronouns', 'claim-about',
+  'claim-name-why', 'claim-name', 'claim-about',
   'claim-build', 'claim-problems', 'claim-manifest',
   'contract-label', 'endpoint-label'
 ] as const;
@@ -3225,7 +3225,6 @@ export class ChessApp {
     const draft = {
       address: this.address,
       name: String((this.el.claimName as HTMLInputElement).value ?? '').trim(),
-      pronouns: String((this.el.claimPronouns as HTMLInputElement).value ?? '').trim(),
       about: String((this.el.claimAbout as HTMLInputElement).value ?? '').trim()
     };
 
@@ -5690,25 +5689,100 @@ export class ChessApp {
     return p;
   }
 
-  /** Whatever manual has been inscribed, appended to the built-in one. */
+  /**
+   * Whatever manual has been inscribed, with an index for getting into it.
+   *
+   * A manual long enough to be worth inscribing is long enough to be unusable
+   * as one column of prose. The index is BUILT from the headings rather than
+   * written beside them, so it cannot fall out of step with the document it
+   * describes — and it moves the page rather than the address bar, because the
+   * fragment already means something here: `openFromLink` reads it for a game.
+   */
   private drawHelpDocs(): void {
+    const body = this.el.helpBody;
+
     for (const found of this.docsFound) {
-      const h = this.doc.createElement('h3');
-      h.className = 'help-h';
-      h.textContent = found.manifest.title;
-      this.el.helpBody.appendChild(h);
-      for (const part of found.manifest.sections) {
-        if (part.title) {
-          const sub = this.doc.createElement('h4');
-          sub.className = 'help-h4';
-          sub.textContent = part.title;
-          this.el.helpBody.appendChild(sub);
+      const manual = found.manifest;
+
+      const title = this.doc.createElement('h3');
+      title.className = 'help-h';
+      title.textContent = manual.title;
+      body.appendChild(title);
+
+      for (const block of manual.intro) body.appendChild(this.helpBlock(block));
+
+      if (manual.sections.length > 2) {
+        const index = this.doc.createElement('nav');
+        index.className = 'help-index';
+        index.setAttribute('aria-label', `Contents of ${manual.title}`);
+        for (const section of manual.sections) {
+          const jump = this.doc.createElement('button');
+          jump.type = 'button';
+          jump.className = `help-jump help-jump--${section.level}`;
+          jump.textContent = section.title;
+          jump.addEventListener('click', () => {
+            const target = this.doc.getElementById(`doc-${found.id}-${section.id}`);
+            target?.scrollIntoView({ block: 'start' });
+          });
+          index.appendChild(jump);
         }
-        for (const text of part.paragraphs) {
-          this.el.helpBody.appendChild(this.helpParagraph(text));
-        }
+        body.appendChild(index);
+      }
+
+      for (const section of manual.sections) {
+        const heading = this.doc.createElement(section.level === 2 ? 'h4' : 'h5');
+        heading.className = section.level === 2 ? 'help-h4' : 'help-h5';
+        // Scoped by inscription id, so two manuals cannot collide.
+        heading.id = `doc-${found.id}-${section.id}`;
+        heading.textContent = section.title;
+        body.appendChild(heading);
+        for (const block of section.blocks) body.appendChild(this.helpBlock(block));
       }
     }
+  }
+
+  /** One block of an inscribed manual, built as nodes and never as markup. */
+  private helpBlock(block: Block): HTMLElement {
+    if (block.kind === 'command') {
+      const pre = this.doc.createElement('pre');
+      pre.className = 'help-cmd';
+      // textContent, so a manual cannot put anything but text on the page.
+      pre.textContent = block.text;
+      return pre;
+    }
+    if (block.kind === 'define') {
+      const row = this.doc.createElement('p');
+      row.className = 'help-def';
+      const term = this.doc.createElement('b');
+      term.textContent = block.term;
+      row.appendChild(term);
+      row.appendChild(this.doc.createTextNode(' '));
+      for (const node of this.helpPieces(block.text)) row.appendChild(node);
+      return row;
+    }
+    const p = this.helpParagraph(block.text);
+    if (block.kind === 'item') p.className = 'help-p help-item';
+    return p;
+  }
+
+  /** Text with inscription references turned into links. */
+  private helpPieces(text: string): Node[] {
+    const out: Node[] = [];
+    for (const piece of splitRefs(text)) {
+      if (piece.inscription === null) {
+        out.push(this.doc.createTextNode(piece.text));
+        continue;
+      }
+      // Relative, for the reason endpoint.ts gives: a host named inside a
+      // permanent artefact becomes a dependency that outlives it.
+      const link = this.doc.createElement('a');
+      link.href = `/i/${piece.inscription}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = piece.text;
+      out.push(link);
+    }
+    return out;
   }
 
   private async loadHelp(): Promise<void> {

@@ -53,9 +53,18 @@ describe('reading a player manifest', () => {
   });
 
   it('round-trips what it builds', () => {
-    const text = buildPlayer({ address: ME, name: 'Jim', pronouns: 'he/him' });
+    const text = buildPlayer({ address: ME, name: 'Jim', about: 'plays the London' });
     expect(parsePlayer(text).ok).toBe(true);
-    expect(parsePlayer(text).player?.pronouns).toBe('he/him');
+    expect(parsePlayer(text).player?.about).toBe('plays the London');
+  });
+
+  it('refuses a field the format no longer has', () => {
+    // `pronouns` was removed. An inscription cannot be edited, so a document
+    // carrying it must fail rather than be quietly accepted with a field the
+    // board will never show — the writer would never learn it did nothing.
+    const parsed = parsePlayer(`${PLAYER_HEADER}\naddress: ${ME}\nname: Jim\npronouns: they/them`);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.problems[0].says).toContain('not a field');
   });
 });
 

@@ -29,13 +29,16 @@ describe('reading an inscribed manual', () => {
     const parsed = parseDocs(doc('\n## One\nwrapped\nover lines\n\nsecond\n\n## Two\nmore\n'));
     expect(parsed.ok).toBe(true);
     expect(parsed.docs!.sections.map((s) => s.title)).toEqual(['One', 'Two']);
-    expect(parsed.docs!.sections[0].paragraphs).toEqual(['wrapped over lines', 'second']);
+    expect(parsed.docs!.sections[0].blocks.map((b) => (b as { text: string }).text)).toEqual([
+      'wrapped over lines',
+      'second'
+    ]);
   });
 
   it('keeps text before the first heading', () => {
     const parsed = parseDocs(doc('\nopening words\n\n## One\nbody\n'));
-    expect(parsed.docs!.sections[0].title).toBe(null);
-    expect(parsed.docs!.sections[0].paragraphs).toEqual(['opening words']);
+    expect(parsed.docs!.intro.map((b) => (b as { text: string }).text)).toEqual(['opening words']);
+    expect(parsed.docs!.sections[0].title).toBe('One');
   });
 
   it('offers inscription references as pieces, never as markup', () => {
@@ -59,6 +62,45 @@ describe('reading an inscribed manual', () => {
     const parsed = parseDocs(text);
     expect(parsed.ok, parsed.problem ?? '').toBe(true);
     expect(parsed.docs!.sections.length).toBeGreaterThan(5);
+    // Every heading gets a distinct id, or the index sends two entries to one
+    // place and the manual feels broken exactly where it is most needed.
+    const ids = parsed.docs!.sections.map((x) => x.id);
+    expect(new Set(ids).size, 'two headings share an id').toBe(ids.length);
     expect(Buffer.byteLength(text, 'utf8'), 'one chunk, so one transaction').toBeLessThan(16_384);
+  });
+
+  it('reads the constructs a manual needs to be navigable', () => {
+    const parsed = parseDocs(
+      doc('\n## One\nprose\n\n- a step\n\n$ run this --live\n\nterm :: what it means\n')
+    );
+    expect(parsed.ok).toBe(true);
+    expect(parsed.docs!.sections[0].blocks.map((b) => b.kind)).toEqual([
+      'text',
+      'item',
+      'command',
+      'define'
+    ]);
+  });
+
+  it('nests a sub-heading under its section', () => {
+    const parsed = parseDocs(doc('\n## Top\na\n\n### Under\nb\n'));
+    expect(parsed.docs!.sections.map((x) => [x.level, x.title])).toEqual([
+      [2, 'Top'],
+      [3, 'Under']
+    ]);
+  });
+
+  it('does not read ordinary prose as a definition', () => {
+    // The marker is deliberately unusual, because a colon in a sentence is far
+    // more likely than a glossary line and turning prose into a definition
+    // would silently reformat the manual.
+    const parsed = parseDocs(doc('\n## One\nthe rule is: play a move\n'));
+    expect(parsed.docs!.sections[0].blocks[0].kind).toBe('text');
+  });
+
+  it('gives every heading a distinct id, even when two read alike', () => {
+    const parsed = parseDocs(doc('\n## Fees\na\n\n## Fees\nb\n'));
+    const ids = parsed.docs!.sections.map((x) => x.id);
+    expect(new Set(ids).size).toBe(2);
   });
 });

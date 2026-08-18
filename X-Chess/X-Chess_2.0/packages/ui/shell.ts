@@ -1004,29 +1004,65 @@ export const HTML = `
   <section id="view-profile" class="panel hide">
     <h2>Profile</h2>
     <div class="field">
-      <label for="profile-who">Address</label>
+      <label for="profile-who">Address ${info(
+        'i-profile-who',
+        'Any Stacks address. This reads what the chain says about it and nothing else - ' +
+          'there is no account here to look up, because there are no accounts.'
+      )}</label>
       <input type="text" id="profile-who" placeholder="a Stacks address">
     </div>
     <div class="row"><button class="action" id="profile-load">Show</button></div>
     <div id="profile-body"></div>
 
-    <h2 style="margin-top:18px">Claim a name</h2>
+    <h2 style="margin-top:18px">Claim a name ${info(
+      'i-claim-what',
+      'A short document you inscribe from this wallet, saying what it should be called. ' +
+        'Inscribing costs a signed transaction, so a manifest made BY an address is that ' +
+        'key attesting - which is why a name cannot be bought, sold or given away. It can ' +
+        'only be inscribed by the key it names.'
+    )}</h2>
     <div id="claim-name-why" class="small muted"></div>
+
+    <div class="notice notice--info" id="claim-order">
+      <b>Four things can name an address, and the strongest wins.</b>
+      ${info(
+        'i-name-order',
+        'A BNS name is owned in a registry and can be transferred, so it is the strongest ' +
+          'claim and outranks anything inscribed here - if you own one, this board shows it ' +
+          'whatever your manifest says. Below that: a manifest the address inscribed about ' +
+          'itself, then a name a tournament organiser gave it, then the shortened address, ' +
+          'which is simply true. The board says which of the four it is using.'
+      )}
+    </div>
+
     <div class="field">
-      <label for="claim-name">Name</label>
+      <label for="claim-name">Name ${info(
+        'i-claim-name',
+        'Up to 24 characters, because this appears beside a game rather than on a profile ' +
+          'page, and a name that does not fit a column is one the board has to truncate.'
+      )}</label>
       <input type="text" id="claim-name" maxlength="24" placeholder="what the board should call you">
     </div>
     <div class="field">
-      <label for="claim-pronouns">Pronouns</label>
-      <input type="text" id="claim-pronouns" maxlength="20" placeholder="optional">
-    </div>
-    <div class="field">
-      <label for="claim-about">About</label>
+      <label for="claim-about">About ${info(
+        'i-claim-about',
+        'Optional, one line, 140 characters. Every byte is inscribed once and kept for ever, ' +
+          'so this is a label rather than a biography.'
+      )}</label>
       <input type="text" id="claim-about" maxlength="140" placeholder="optional, one line">
     </div>
     <div class="row"><button class="action" id="claim-build">Build my manifest</button></div>
     <div id="claim-problems" class="notice notice--warn hide"></div>
     <pre id="claim-manifest" class="claim-out hide"></pre>
+    <div class="small muted" id="claim-next">
+      This board cannot inscribe it. ${info(
+        'i-claim-next',
+        'It holds no key and never will, being an inscription itself - a page that collected ' +
+          'one would be wrong for ever. Copy the text above and inscribe it from this wallet ' +
+          'with your own Xtrata tooling. Once it is on chain, this board finds it by reading ' +
+          'what the wallet holds and checks that the same wallet minted it.'
+      )}
+    </div>
   </section>
 
   <footer class="small muted" style="padding:12px 0">

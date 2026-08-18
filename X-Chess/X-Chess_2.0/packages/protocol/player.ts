@@ -27,7 +27,7 @@
 /** The first line, exact, so a scan is a string compare. */
 export const PLAYER_HEADER = 'X-CHESS-PLAYER/1';
 
-export const PLAYER_FIELDS = ['address', 'name', 'pronouns', 'about'] as const;
+export const PLAYER_FIELDS = ['address', 'name', 'about'] as const;
 export type PlayerField = (typeof PLAYER_FIELDS)[number];
 
 /**
@@ -40,7 +40,6 @@ export type PlayerField = (typeof PLAYER_FIELDS)[number];
 export const PLAYER_LIMITS: Record<PlayerField, number> = {
   address: 64,
   name: 24,
-  pronouns: 20,
   about: 140
 };
 
@@ -49,7 +48,6 @@ export const PLAYER_REQUIRED: PlayerField[] = ['address', 'name'];
 export interface Player {
   address: string;
   name: string;
-  pronouns?: string;
   about?: string;
 }
 
@@ -184,7 +182,6 @@ export function nameSourceNote(source: NameSource): string {
  */
 export function buildPlayer(player: Player): string {
   const lines = [PLAYER_HEADER, `address: ${player.address.trim()}`, `name: ${player.name.trim()}`];
-  if (player.pronouns?.trim()) lines.push(`pronouns: ${player.pronouns.trim()}`);
   if (player.about?.trim()) lines.push(`about: ${player.about.trim()}`);
   return `${lines.join('\n')}\n`;
 }
