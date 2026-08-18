@@ -378,7 +378,26 @@ ${SCALE_CSS}
 .tn-controls input.tn-manifest { width: 8.5em; flex: 0 0 auto; }
 /* Its own line, deliberately. It is a sentence, and letting it share a row with
    the controls is what pushes the buttons away from the box they act on. */
-.tn-controls #tournament-fresh { flex: 1 0 100%; margin-top: 2px; }
+/* A group: one question, its controls, and what it produced. */
+.tn-group { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 4px 0 12px; }
+.tn-group__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.tn-group__title { color: var(--gold); font-size: 12px; font-weight: 600;
+                   letter-spacing: .04em; text-transform: uppercase; margin-right: auto; }
+/* Filters and their search box share a line, because they narrow one list and
+   reading them as two separate controls is what made four rows unreadable. */
+.tn-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+.tn-line .tn-list { margin: 0; }
+.tn-line--games { margin-bottom: 10px; }
+/* Wide enough for its own placeholder. At 8.5em these read "entrant name o"
+   and "address or nam", which looks like a rendering fault rather than a box.
+
+   Qualified as `.tn-line input.tn-search`, and that is the THIRD time today
+   this file has needed it. The base rule is input[type='text'] { width: 100% }
+   at (0,1,1); any bare class is (0,1,0) and loses, so the box goes full width
+   and every control meant to sit beside it wraps to its own line. It never
+   looks like a specificity problem - it looks like the flex layout not working.
+   If a width here has no effect, this is why. */
+.tn-line input.tn-search { width: 18em; max-width: 100%; flex: 0 1 auto; }
 .tn-moves { color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 8px; }
 
 /* Whose move it is, in a tournament round. Same word the Explore list uses,
@@ -912,34 +931,48 @@ export const HTML = `
          the number opens a different tournament, Refresh re-reads the one
          already on screen. It belongs beside the line that says how old that
          reading is, which is what prompts anybody to press it. -->
-    <div class="row tn-controls">
-      <button class="action" id="tournament-refresh"
-              title="Read every game again. A tournament in progress changes on chain, not here.">Refresh</button>
-      <span id="tournament-fresh" class="muted small" role="status"></span>
+    <!-- TWO QUESTIONS, ASKED IN ORDER, and the layout should say which is which.
+         Everything above the note answers "which tournament"; everything below
+         it answers "which of its games". They were a flat stack of four
+         near-identical filter-and-search rows, so a reader could not tell that
+         two of them narrowed a list of tournaments and two narrowed a list of
+         games inside one. -->
+    <div class="tn-group">
+      <div class="tn-group__head">
+        <span class="tn-group__title">Choose a tournament</span>
+        <button class="action" id="tournament-refresh"
+                title="Read every game again. A tournament in progress changes on chain, not here.">Refresh</button>
+        <span id="tournament-fresh" class="muted small" role="status"></span>
+      </div>
+      <!-- Filters over the PICKER. Entrant search is free; state comes from
+           what has been opened before. -->
+      <div class="tn-line">
+        <div id="picker-filters" class="tn-list"></div>
+        <input type="text" id="picker-who" class="tn-search"
+               aria-label="Find a tournament by entrant"
+               placeholder="find by entrant name or address">
+        <span id="picker-shown" class="muted small" role="status"></span>
+      </div>
+      <!-- Filled from the director's wallet, so a reader never has to know a
+           number. See ManifestDirectory: holdings finds them, the mint says
+           which the organiser actually made. -->
+      <div id="tournament-list" class="tn-list"></div>
     </div>
-    <!-- Filled from the director's wallet, so a reader never has to know a
-         number. See ManifestDirectory: holdings finds them, the mint says which
-         the organiser actually made. -->
-    <!-- Filters over the PICKER, not over a tournament's games. Entrant search
-         is free; state comes from what has been opened before. -->
-    <div id="picker-filters" class="tn-list"></div>
-    <div class="row tn-controls">
-      <label for="picker-who">Find a tournament</label>
-      <input type="text" id="picker-who" class="tn-manifest" placeholder="entrant name or address">
-      <span id="picker-shown" class="muted small" role="status"></span>
-    </div>
-    <div id="tournament-list" class="tn-list"></div>
-    <!-- Filters over what is already on screen. Nothing here reads the chain:
-         every field they test was computed when the tournament was scored. -->
-    <div id="tournament-filters" class="tn-list"></div>
-    <div class="row tn-controls">
-      <label for="tournament-who">Entrant</label>
-      <input type="text" id="tournament-who" class="tn-manifest" placeholder="address or name">
-      <span id="tournament-shown" class="muted small" role="status"></span>
-    </div>
+
     <div id="tournament-note" class="notice notice--info"></div>
     <div id="tournament-field" class="notice hide"></div>
     <div id="tournament-provenance" class="notice notice--info hide"></div>
+
+    <!-- Below the note, because these narrow the tournament the note just
+         named. Nothing here reads the chain: every field they test was
+         computed when it was scored. -->
+    <div class="tn-line tn-line--games">
+      <div id="tournament-filters" class="tn-list"></div>
+      <input type="text" id="tournament-who" class="tn-search"
+             aria-label="Show only this entrant's games"
+             placeholder="only this entrant">
+      <span id="tournament-shown" class="muted small" role="status"></span>
+    </div>
     <div id="tournament-body"></div>
     <!-- The fallback, and last because it is one: for a tournament this board
          cannot find - inscribed to a wallet it does not watch, or newer than
