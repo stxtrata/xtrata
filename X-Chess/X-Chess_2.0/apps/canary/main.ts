@@ -1086,26 +1086,48 @@ const handlers: Record<string, StepHandler> = {
     const c = requireChain();
     const count = await c.getGameCount();
 
+    // The rules this step opens with, computed first because they are also what
+    // makes a previous run's game recognisable.
+    const rules = normaliseRules({ ...DEFAULT_RULES, white: signer!, black: 'anyone-else' });
+    const want = rulesHash(rules).toLowerCase();
+
     // Already opened one? Adopt it rather than paying the fee twice.
     //
-    // Opening a game costs the full X Chess fee, and a run that was
-    // interrupted after paying it should not have to pay again to carry on.
-    // This is a read, it costs nothing, and it is honest: the game it adopts
-    // is one this account actually opened on this contract.
+    // BY THE RULES HASH, NOT BY WHO OPENED IT, and the difference is the whole
+    // reason this step stalled. `openedBy === signer` adopts any game this
+    // account ever opened, and opening a game does not make you a player in it:
+    // a tournament organiser opens games it is not in, and this very account
+    // opened game 9, whose rules are byte-identical to game 8 and name two
+    // other wallets entirely.
+    //
+    // What that cost was not an error. `submit` would then fire a move into a
+    // game whose rules name somebody else; the contract stores whatever it is
+    // sent, so it confirms, the fee is paid, and replay skips the entry as
+    // landing on an empty square. The step meant to prove one click makes one
+    // entry would have proved it against an entry that never counts — which is
+    // exactly the five-copies-of-e2e4 pattern in game 12.
+    //
+    // A hash is the honest test because it is the identity: it commits to both
+    // players and the rest of the rule set, so matching it means this is a game
+    // THIS STEP opened, with this signer as white, and the move it is about to
+    // make is one the game admits.
     for (let id = count; id >= Math.max(1, count - 50); id--) {
       const row = await c.getGame(id);
-      if (row && row.openedBy === signer) {
+      if (row && String(row.rulesHash ?? '').toLowerCase() === want) {
         state.standardGame = id;
-        ctx.log('warn', `game ${id} was already opened by this account; nothing was sent`);
+        // Set on BOTH paths. It used to be set only when a game was opened, so
+        // a resumed run carried a game id and no rules to go with it.
+        state.standardRules = rules;
+        ctx.log('warn', `game ${id} already carries these rules; nothing was sent`);
         return ok(
-          `game ${id} was already opened by ${signer}.\n\nNOTHING WAS SENT and no fee was paid. ` +
-            `opened at height ${row.openedAt}, ${row.nextSeq} entr${row.nextSeq === 1 ? 'y' : 'ies'}.`,
+          `game ${id} was opened earlier with exactly these rules, so this signer is white ` +
+            `and can move in it.\n\nNOTHING WAS SENT and no fee was paid. opened at height ` +
+            `${row.openedAt}, ${row.nextSeq} entr${row.nextSeq === 1 ? 'y' : 'ies'}.`,
           { standardGame: id, adopted: true }
         );
       }
     }
 
-    const rules = normaliseRules({ ...DEFAULT_RULES, white: signer!, black: 'anyone-else' });
     const result = await c.openGame(rulesHash(rules), false);
     state.standardRules = rules;
     return ok(
