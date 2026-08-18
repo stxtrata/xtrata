@@ -175,19 +175,78 @@ this needs and not a change to it.
 - `tests/legacy/` replays unchanged.
 - An old board meeting a timed game refuses it rather than mis-reading it.
 
-## Open questions
+## Decided
 
-1. **Do flagged games count for ratings?** They should if the game is `ranked`,
-   since `ranked` is committed before a move is played for exactly this reason.
-   Needs deciding, not assuming.
-2. **Can a player flag themselves?** Conceding on time without resigning. Cheap
-   to allow, and it lets an honest player end a game they know they lost.
-3. **Tournament interaction.** A manifest would carry the limit so pairings
-   still verify. Out of scope until Phase 1 is live.
+Answered rather than left open, because the next person to pick this up should
+be arguing with a decision and not rediscovering the question.
+
+### The limit is committed in Phase 1. There is no uncommitted-clock phase.
+
+Phase 1 as first written promised no rules field AND the same countdown on both
+boards. Those cannot both hold. The block anchor is shared; the LIMIT is not.
+With nothing committed, your opponent's board cannot know the game is timed, let
+alone at what tier, so the clock would appear only for whoever chose it — which
+fails on the same ground the plan already uses to reject device clocks: it
+constrains only the player who happens to know about it.
+
+`known-rules.ts` could carry it in a link, but an uncommitted number cannot be
+hash-checked, so two boards could disagree about the deadline and neither would
+be wrong. A clock nobody can verify is not worth the code.
+
+So the phases split on ENDING A GAME rather than on touching the hash:
+
+* **Phase 1** commits the limit (`rules-v2`) and shows an advisory countdown.
+  Nothing new ends a game; the board says "Black is out of time" and the players
+  decide.
+* **Phase 2** adds `flag` to the event set and lets replay end a game on it.
+
+This puts the risk in the right phase. The hash work is the WELL-UNDERSTOOD
+part: `first-mover` set the precedent, "only bump when used" makes it provably
+inert for the 43 existing games, and a byte comparison proves it before anything
+ships. Replay ending games on a claim is the part that can make two boards
+disagree about a result forever, and it deserves its own build.
+
+### Flagged games rate exactly as any other game does.
+
+No new rule. `ranked` is committed before a move is played precisely so this
+question has an answer already, and `checkEligibility` decides the rest.
+
+The edge that looked like it needed a rule does not: flagging somebody who never
+moved produces a game with one mover, which `a-player-never-moved` already
+refuses to rate. That rule exists so a creator cannot name a strong player,
+resign, and hand them a rated win — and it covers flagging for free.
+
+### A player cannot flag themselves.
+
+`resign` already exists (`packages/replay/events.ts`) and does the same thing
+with clearer meaning. Two ways to lose is two paths through replay, two things
+to verify, and one more way for boards to disagree, in exchange for a wording
+preference.
+
+### Tiers display more difference than they enforce.
+
+With grace fixed at 15 minutes, bullet's hard deadline is 16 minutes and blitz's
+is 20. Under ENFORCEMENT they are four minutes apart, whatever the countdown
+says.
+
+That is acceptable — the countdown is real social pressure and the tier names
+are honest about intent — but the board must show BOTH numbers wherever a game
+is timed: the deadline you are playing to, and the point at which you become
+flaggable. A player told "1 minute" who is not flagged for a quarter of an hour
+will otherwise conclude the clock is broken.
+
+### Tournaments are out of scope until Phase 1 is live.
+
+Unchanged. A manifest would carry the limit so pairings still verify.
 
 ## Order of work
 
-Phase 1 against the live board, because it is small, honest about what it
-enforces, and cannot damage anything. Phase 2 gets its own build and its own
-legacy proof, because it touches the three places where a mistake makes two
-boards disagree about a result forever.
+Both phases wait for the board after 2.1.0. This was considered for the 2.1.0
+inscription and deliberately left out: the checkpoint reader, the manual and the
+help panel were finished and proved, and holding a good build back for a feature
+that changes `canonicalRules` would have risked both.
+
+Phase 1 first, and before it is written, the tripwire: a test pinning the rules
+hash of every existing game, byte for byte, so the "only bump when used" claim is
+checked by something other than care. Phase 2 gets its own build and its own
+legacy proof.
