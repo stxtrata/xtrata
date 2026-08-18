@@ -409,8 +409,12 @@ describe('the fee ladder replacing its own transaction', () => {
     // Reading immediately finds a log that has not grown yet and trips the
     // growth guard — a working ladder turned into a stopped tournament, which
     // is the same mistake one layer down.
+    //
+    // First written as a 45-second sleep, which was a guess about indexing lag
+    // and a wrong one: see the polling test below. It waits for the log to
+    // GROW now, which is the thing actually being waited on.
     const block = runner.slice(runner.indexOf("status === 'dropped_replace_by_fee'"));
-    expect(block.slice(0, 800)).toMatch(/setTimeout\(done, 45_000\)/);
+    expect(block.slice(0, 1400)).toMatch(/setTimeout\(done, 15_000\)/);
   });
 
   it('still refuses to play the same move twice', () => {
@@ -451,5 +455,32 @@ describe('saying that a round is over', () => {
     // The summary must read real results rather than restate the schedule.
     expect(runner).toMatch(/const played = await Promise\.all\(/);
     expect(runner).toMatch(/return \{ gameId, white, black, result \}/);
+  });
+});
+
+describe('waiting for the log after a rung was superseded', () => {
+  const runner = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('polls for the log to grow rather than sleeping a fixed guess', () => {
+    // Round 8, game 35: slept 45s, looked once, read 94 where the guard wanted
+    // 95, and stopped a game that was fine. The move HAD landed — the log reads
+    // 95 now. A fixed delay is a guess about indexing lag; polling is an answer.
+    const block = runner.slice(runner.indexOf("status === 'dropped_replace_by_fee'"));
+    expect(block.slice(0, 1400)).toMatch(/while \(Date\.now\(\) < until\)/);
+    expect(block.slice(0, 1400)).toMatch(/readEntries\(gameId\)\)\.length > wasAt/);
+  });
+
+  it('leaves the growth guard alone', () => {
+    // Refusing to play the same move twice is the one thing that must never
+    // soften. What was wrong was asking it before the answer could exist.
+    expect(runner).toMatch(/the log did not grow after a submission/);
+  });
+
+  it('gives up eventually rather than waiting forever', () => {
+    const block = runner.slice(runner.indexOf("status === 'dropped_replace_by_fee'"));
+    expect(block.slice(0, 1400)).toMatch(/4 \* 60_000/);
   });
 });

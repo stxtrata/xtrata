@@ -466,11 +466,25 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
     // to play the same move twice and stops us loudly.
     if (status === 'dropped_replace_by_fee' || status === 'superseded') {
       console.log(`  game ${gameId}: ${chosen.move} was settled by a different rung — re-reading`);
-      // Give the replacement time to be mined and INDEXED before looking. Going
-      // straight round would read a log that has not grown yet and trip the
-      // growth guard, turning a working fee ladder into a stopped tournament —
-      // the same mistake as before, one layer down.
-      await new Promise((done) => setTimeout(done, 45_000));
+      // WAIT FOR THE CONDITION, NOT FOR A DURATION. This slept forty-five
+      // seconds and then looked once, which is a guess about indexing lag
+      // dressed up as a fix. Game 35 of round 8 is what a wrong guess costs:
+      // the move HAD landed, the log read 94 when the guard wanted 95, and the
+      // run stopped on a game that was fine. It reads 95 now.
+      //
+      // The growth guard itself stays exactly as it is — refusing to play the
+      // same move twice is the one thing here that must never soften. What was
+      // wrong is asking it a question before the answer could exist.
+      const wasAt = entries.length;
+      const until = Date.now() + 4 * 60_000;
+      while (Date.now() < until) {
+        await new Promise((done) => setTimeout(done, 15_000));
+        try {
+          if ((await readEntries(gameId)).length > wasAt) break;
+        } catch {
+          // A read that failed says nothing about the log. Ask again.
+        }
+      }
       continue;
     }
 
