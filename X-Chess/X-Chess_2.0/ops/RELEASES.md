@@ -6,6 +6,54 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.1.0 — 2026-08-18
+
+Prepared for inscription, not yet inscribed.
+
+**Why 2.1.0 and not 2.0.0.** 2.0.0 is already on chain as inscription 2988 and
+has been since 9 August. Bumping `2.0.0-dev` to `2.0.0` looked like the obvious
+move and would have put two different permanent artefacts under one version —
+which is the exact thing this ledger exists to prevent, and it was caught only
+because writing the entry landed next to the existing one. The contract and every
+protocol are unchanged since 2988, so this is a minor bump rather than a major.
+
+* **179,090 bytes, 11 chunks**, one `add-chunk-batch` transaction. 0.32 STX
+  at the live fee unit of 100,000 uSTX.
+* `htmlSha256` `90bbace8ada3d634bb18ca18560ae93c79c16ec739262bcf38745f68c6747ee6`
+* Contract `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`.
+
+### Why the version changed at all
+
+`2.0.0-dev` was about to become permanent. The build did NOT read the version
+from `package.json` — it carried its own literal default — so the number in the
+manifest and the number in the artefact were two separate facts that happened to
+agree. Bumping `package.json` alone would have changed nothing anybody could see,
+and the board would have said `dev` for ever. The build now reads `package.json`,
+with `--version` still overriding.
+
+### What is in it since the last canary
+
+* Tournaments are found rather than typed: a group of manifests is the wallet
+  they are sent to. See ADR-0017 and `docs/MANIFESTS.md`.
+* Your own games are found past the end of the newest-25 window, from your own
+  transaction history, and remembered locally.
+* The Explore tab carries a count of games waiting on your move, which updates
+  without the tab being opened and clears when a game ends.
+* Every game says what a move actually costs, because `stx_callContract` has no
+  fee parameter and the wallet's own estimate has been up to fifteen times the
+  price every move here confirms at. When a move of yours is stuck it says the
+  nonce instead, which is the one thing neither wallet can tell you.
+* Provenance distinguishes a tournament nobody has started from one that could
+  not be checked.
+
+### Verified before the build
+
+* 1,379 tests, 17 skipped.
+* The runtime replica suite passes, which is the only thing that catches the
+  four constraints invisible in local dev: one boot rather than two, the proxy
+  rather than the public host, survival of `document.write`, and an unframed
+  page saying up front that it cannot sign.
+
 ---
 
 ## Format

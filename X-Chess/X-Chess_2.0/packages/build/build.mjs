@@ -14,6 +14,7 @@
 // output.
 
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -68,7 +69,23 @@ const ASKED = arg('contract', null);
 const REMEMBERED = ASKED ? null : await rememberedTarget();
 const CONTRACT = ASKED ?? REMEMBERED?.contract ?? PLACEHOLDER;
 const NETWORK = arg('network', null) ?? (ASKED ? 'mainnet' : REMEMBERED?.network) ?? 'mainnet';
-const VERSION = arg('version', '2.0.0-dev');
+/**
+ * What this build calls itself.
+ *
+ * READ FROM package.json, not carried here. It used to default to a literal
+ * '2.0.0-dev', which meant the version in package.json and the version stamped
+ * into the artefact were two separate facts that happened to agree — and the
+ * moment they stopped agreeing, bumping the release number changed nothing that
+ * anybody could see. That was caught while preparing to inscribe: the version
+ * was bumped, the build still said `dev`, and the artefact would have carried
+ * `dev` for ever.
+ *
+ * `--version` still wins, for a build that wants to say something else.
+ */
+const PACKAGE = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+);
+const VERSION = arg('version', PACKAGE.version);
 
 /**
  * When this build happened, to the minute.
