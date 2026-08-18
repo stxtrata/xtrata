@@ -344,6 +344,17 @@ const STARVED_POLL_MS = 30_000;
 const BACKGROUND_POLL_MS = 20_000;
 
 /**
+ * How often to re-read your games that are not on screen.
+ *
+ * The open game is refreshed by the poll and costs nothing extra; these are
+ * whole games, so they are read on their own clock rather than the poll's. A
+ * minute is well inside what anybody notices about a move that took a block to
+ * confirm, and it is bounded by `live()` — usually one or two games, never a
+ * history.
+ */
+const WAITING_RECHECK_MS = 60_000;
+
+/**
  * How long a pending move may be shown on memory alone.
  *
  * Chosen against the block time rather than the poll interval: post-Nakamoto a
@@ -621,6 +632,7 @@ export class ChessApp {
    */
   private readonly waitingOn = new Set<number>();
   private warmedFor: string | null = null;
+  private waitingCheckedAt = 0;
   /** game id -> the manifest that names it. Built from tournaments loaded. */
   private readonly inTournament = new Map<number, { id: number; name: string }>();
   /** address -> the name a loaded tournament gave it. The weakest source. */
@@ -1036,6 +1048,17 @@ export class ChessApp {
         // A poll that throws must not end the polling. The next one may work.
       }
     }
+
+    // The badge, kept true while the page sits open.
+    //
+    // Two halves, because the two cases cost differently. The game ON SCREEN
+    // was just read by the poll above, so its answer is free — and it is the
+    // case that matters most, because the move that should clear the badge is
+    // usually the one you have this moment made. The others need reading, so
+    // they are read rarely.
+    this.noteOpenGame();
+    await this.recheckWaiting();
+
     // Checked AGAIN, after the await. stopPolling() may have run while this
     // tick was reading, and a tick that rescheduled anyway would mean stopping
     // does not stop - the timer would outlive the board that owns it, forever,
@@ -4113,6 +4136,65 @@ export class ChessApp {
     ).filter((row): row is ExploreRow => row !== null);
     this.noteWaiting(built);
     this.drawWaiting();
+  }
+
+  /**
+   * What the open game says about whose turn it is, at no cost.
+   *
+   * The poll has already read this game and replayed it, so the badge can be
+   * kept honest from state that is in hand. Without it, making the last move of
+   * a game left the count sitting at one until something else happened to
+   * rebuild it — the board knew the game was over and the number said otherwise.
+   *
+   * Uses `judgeMove`, which is the same verdict the board uses to decide
+   * whether to enable the squares, so the badge cannot disagree with the board
+   * it sits above.
+   */
+  private noteOpenGame(): void {
+    const id = this.gameId;
+    const state = this.state;
+    if (id === null || !state || !this.address) return;
+
+    const before = this.waitingOn.size;
+    if (state.status === 'over') {
+      this.waitingOn.delete(id);
+      // Over is forever, so this game need never be read again.
+      if (this.rulesConfirmed) this.yours?.markFinished(this.address, id);
+    } else if (judgeMove(this.eligibility(state)).tier === 'yes') {
+      this.waitingOn.add(id);
+      this.yours?.remember(this.address, id);
+    } else {
+      this.waitingOn.delete(id);
+    }
+    if (this.waitingOn.size !== before) this.drawWaiting();
+  }
+
+  /**
+   * Re-read the games that are NOT on screen, occasionally.
+   *
+   * Occasionally rather than every tick because the poll runs every few seconds
+   * and these are whole extra games — the open one is free, these are not. A
+   * minute is far inside the time anybody would notice, and a move made
+   * elsewhere took a block to confirm anyway.
+   *
+   * Only live games, so a long history costs nothing: `finished` has already
+   * removed everything that can never change again.
+   */
+  private async recheckWaiting(): Promise<void> {
+    if (!this.address || !this.yours) return;
+    // A hidden tab does not need a badge it cannot show, and this is spending
+    // somebody's rate limit on a page nobody is looking at.
+    if (this.doc.visibilityState === 'hidden') return;
+    if (this.now() - this.waitingCheckedAt < WAITING_RECHECK_MS) return;
+    this.waitingCheckedAt = this.now();
+
+    const ids = this.yours.live(this.address).filter((id) => id !== this.gameId);
+    if (!ids.length) return;
+    try {
+      await this.readWaiting(ids);
+    } catch {
+      // Keeps whatever the badge had. A failed re-check is not news.
+    }
   }
 
   private drawWaiting(): void {
