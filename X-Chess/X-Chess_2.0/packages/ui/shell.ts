@@ -404,6 +404,10 @@ ${SCALE_CSS}
            border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .tn-pick:hover { border-color: var(--gold); }
 .tn-pick[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+/* Asked for and not yet arrived. Dimmed rather than animated: this sits beside
+   a live tournament and a spinner next to real results reads as the results
+   being provisional. */
+.tn-pick--loading { border-color: var(--gold); color: var(--gold); opacity: .6; }
 .tn-pick .n { color: var(--dim); margin-left: 5px; }
 /* Held but not minted by the organiser. Listed, and not dressed as theirs. */
 .tn-pick--planted { border-style: dashed; }

@@ -699,6 +699,14 @@ export class ChessApp {
   private pickerWho = '';
   private showAllTournaments = false;
   /**
+   * The tournament being read right now, if any.
+   *
+   * Kept apart from `tournament`, which is what is ON SCREEN. Between clicking
+   * and seeing there is half a minute where those are different things, and the
+   * button has to follow the click rather than the arrival.
+   */
+  private tournamentLoading: number | null = null;
+  /**
    * Ids known to be this player's that the window cannot show.
    *
    * Kept apart from `exploreRows` because they are found differently and can
@@ -855,7 +863,10 @@ export class ChessApp {
     on('exploreFind', () => void this.findGame());
     on('tournamentLoad', () => {
       const typed = String((this.el.tournamentId as HTMLInputElement).value ?? '').trim();
-      this.clearTournament(this.found.find((e) => String(e.id) === typed)?.manifest.name);
+      this.clearTournament(
+        Number(typed) || null,
+        this.found.find((e) => String(e.id) === typed)?.manifest.name
+      );
       void this.loadTournamentTab();
     });
     // Same read, said out loud. Refresh and Show do the same work; the two
@@ -2755,8 +2766,9 @@ export class ChessApp {
    * board can be: not blank, not wrong, just answering a question nobody asked
    * any more.
    */
-  private clearTournament(name?: string): void {
+  private clearTournament(id: number | null, name?: string): void {
     this.tournament = null;
+    this.tournamentLoading = id;
     this.tournamentReadAt = 0;
     this.tournamentSeenRaw = '';
     this.tournamentFilter = 'all';
@@ -2965,7 +2977,9 @@ export class ChessApp {
       );
     }
 
-    const showing = this.tournament?.tournamentId ?? null;
+    // What the reader ASKED for, which during a load is not what is on screen.
+    const showing = this.tournamentLoading ?? this.tournament?.tournamentId ?? null;
+    const loading = this.tournamentLoading;
     const { shown, hidden } = this.pickerShows();
 
     // PILLS DO NOT SCALE, and the point at which they stop is low: about six fit
@@ -2997,7 +3011,7 @@ export class ChessApp {
         if (!picker.value) return;
         (this.el.tournamentId as HTMLInputElement).value = picker.value;
         const chosen = this.found.find((e) => String(e.id) === picker.value);
-        this.clearTournament(chosen?.manifest.name);
+        this.clearTournament(Number(picker.value), chosen?.manifest.name);
         void this.loadTournamentTab();
       });
       node.appendChild(picker);
@@ -3007,8 +3021,11 @@ export class ChessApp {
     for (const entry of shown) {
       const button = this.doc.createElement('button');
       button.type = 'button';
-      button.className = `tn-pick${entry.official ? '' : ' tn-pick--planted'}`;
+      button.className =
+        `tn-pick${entry.official ? '' : ' tn-pick--planted'}` +
+        (entry.id === loading ? ' tn-pick--loading' : '');
       button.setAttribute('aria-pressed', String(entry.id === showing));
+      if (entry.id === loading) button.setAttribute('aria-busy', 'true');
       button.textContent = entry.manifest.name;
 
       const number = this.doc.createElement('span');
@@ -3027,7 +3044,7 @@ export class ChessApp {
 
       button.addEventListener('click', () => {
         (this.el.tournamentId as HTMLInputElement).value = String(entry.id);
-        this.clearTournament(entry.manifest.name);
+        this.clearTournament(entry.id, entry.manifest.name);
         void this.loadTournamentTab();
       });
       node.appendChild(button);
@@ -3083,6 +3100,9 @@ export class ChessApp {
       );
       const view = await loadTournament(id, deps);
       this.tournament = view;
+      // Cleared on the unhappy path too, or a manifest that will not parse
+      // leaves its button spinning for the rest of the session.
+      if (!view.ok) this.tournamentLoading = null;
       this.drawTournament();
       if (!view.ok) return false;
 
@@ -3106,6 +3126,7 @@ export class ChessApp {
               // The candidate the Leaderboard cannot guess. See rulesForRanked.
               if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
+      this.tournamentLoading = null;
       this.rememberTournamentState(this.tournament);
       this.tournamentReadAt = this.now();
       this.tournamentSeenRaw = '';
@@ -3117,6 +3138,15 @@ export class ChessApp {
       this.scheduleTournamentPoll();
       return true;
     });
+
+    // AFTER THE GUARD, so it runs on every path. `guard` catches, so a read
+    // that throws never reaches the lines inside — and the button it left
+    // highlighted would stay that way for the rest of the session, pointing at
+    // a tournament that is not on screen.
+    if (this.tournamentLoading !== null) {
+      this.tournamentLoading = null;
+      this.drawTournamentList();
+    }
   }
 
 /**
