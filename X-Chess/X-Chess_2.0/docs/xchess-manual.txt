@@ -1,0 +1,123 @@
+X-CHESS-DOCS/1
+The X Chess manual
+
+This is the long version. The board carries a short one built in, so that it
+still says something when nothing can be read; this is inscribed separately so
+it can be corrected without rebuilding a page that cannot be rebuilt.
+
+## Making a tournament
+
+A tournament is one inscribed document. It names its entrants, and it says which
+game id on the contract is which pairing. That is all it is, and everything else
+the board shows about a tournament is derived from the chain rather than from the
+document.
+
+The order is forced by what a manifest is. Open the games first, because a
+manifest names them by id and ids do not exist until they are opened. Build the
+manifest from what is actually on chain. Inscribe it. Only then play.
+
+Inscribing after the first move is not an error, and the board will read it, but
+it reads as compiled rather than committed. A compiled manifest is a description
+of games that already existed; a committed one is a promise made before anybody
+knew how the games would go. Both are honest and only one is binding.
+
+Opening games does not spoil that order. A game with no submissions has no first
+move, so a manifest inscribed while every game sits empty is still committed.
+
+## Building the manifest
+
+The tooling signs transactions, so it lives in the repository rather than in the
+board. A board holds no keys and never will, being an inscription itself.
+
+Open the games: run the tournament runner with the open command, which computes
+each pairing's rules hash, looks for a game already carrying it, and opens only
+what is missing. It is safe to re-run; it will not open a second copy of a
+pairing that already exists.
+
+Build it: the manifest builder reads every game on the contract and matches
+pairings BY RULES HASH rather than by position in a list. Three games opened at
+once land in whatever order the chain mines them, so a game's number says nothing
+about who is in it. The builder refuses to write a manifest naming a game that
+does not exist, and refuses one whose pairings do not match the chain, because
+either would be a document whose only purpose is to be rejected.
+
+Inscribe it: the inscribe script mints on the Xtrata core with the manifest as
+text, reading the fee unit live rather than trusting a remembered figure.
+
+## Naming the players
+
+An entrant is a name and an address. The name is what the board shows when the
+address has nothing better; a BNS name wins over it, and a player manifest that
+the address inscribed about itself wins over that.
+
+An entrant may also name an entry: the inscription that defines how that player
+chooses. The board links it beside the player, so a reader can open the character
+sheet and see what that competitor was told to do.
+
+An entrant may say whether it is a person or a program. The board uses that to
+warn readers that an all-program tournament does not advance on its own. Saying
+nothing is read as unknown rather than as human, because the first two
+exhibitions said nothing and were played entirely by programs.
+
+## Programming a player
+
+Every player is handed the same engine, inscription #2991. It is deterministic
+and it is not a recommendation: it ranks every legal move with a score, and a
+character reads that list and picks by style. That is the only thing a character
+controls, and it is why two characters handed identical positions play
+differently.
+
+A character sheet is an inscription describing that style in the entry format:
+how it opens, what it will risk, what it avoids. Inscribe it, then name its id as
+the entry for that entrant in the tournament manifest.
+
+The engine exists because the alternative was measured and does not work. Across
+six on-chain games, more thinking effort moved the blunder rate from 29% to 29%,
+competence instructions moved it from 21% to 21%, and a king-mobility hint
+produced no mate in fifty plies where doing nothing mated in twenty-three. The
+engine halved it, 24% to 12%, replicated across three twelve-game runs.
+
+## Fees
+
+A move costs a network fee and nothing the contract charges. Wallets estimate
+that fee from the whole network rather than from this contract, and have quoted
+between eight and fifteen times what moves here actually confirm at.
+
+The board cannot propose a fee. The wallet method it signs through takes six
+parameters and a fee is not one of them, so the number in your wallet is the
+wallet's own and yours to change.
+
+If a move sits unconfirmed, replace it at the same nonce with a higher fee.
+Signing a new one takes the next nonce, which queues behind the stuck move
+instead of replacing it: two fees, and the second cannot confirm until the first
+does. The board shows the nonce of a pending move of yours for exactly this.
+
+## When a game will not finish
+
+The contract has no clock and no resignation by absence. A game nobody has
+touched for a year is, on chain, live and waiting. So a board cannot tell a
+player who walked away from a player who is thinking, and it does not pretend to;
+it says how long it has been quiet and leaves the conclusion to the reader.
+
+A game ends when the chain says so: checkmate, stalemate, a draw by repetition or
+the fifty-move rule, a resignation, or a draw offered and accepted. There is no
+other way, and in particular an organiser cannot declare a result. Results are
+replayed from the log, never taken from a claim, which is what stops a tournament
+being decided by whoever wrote the manifest.
+
+If a program stalls, the fair remedy is for that player to resign or agree a
+draw from its own wallet. That is a real act on chain, permanent, and anybody can
+check it.
+
+## What the board will not do
+
+It will not tell you a game is yours unless the rules that hash to the game's own
+commitment name you.
+
+It will not count a tournament game whose pairing does not match the chain.
+
+It will not report a result it has not replayed.
+
+It will not say a tournament is finished, or crown a winner, until every game has
+a result and every pairing is verified, and it will not break a tie to award a
+place that was shared.

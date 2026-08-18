@@ -15,6 +15,8 @@ import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament } from '../protocol/tournament.js';
+import { parseDocs, splitRefs } from '../protocol/docs.js';
+import type { Docs } from '../protocol/docs.js';
 import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
@@ -59,7 +61,14 @@ import type {
   SponsorshipRow
 } from '../chain/client.js';
 
-export type Tab = 'play' | 'game' | 'explore' | 'leaderboard' | 'tournaments' | 'profile';
+export type Tab =
+  | 'play'
+  | 'game'
+  | 'explore'
+  | 'leaderboard'
+  | 'tournaments'
+  | 'profile'
+  | 'help';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -524,6 +533,7 @@ const IDS = [
   'fee-advice', 'tournament-list', 'tournament-refresh', 'tournament-fresh',
   'tournament-filters', 'tournament-who', 'tournament-shown',
   'picker-filters', 'picker-who', 'picker-shown', 'tournament-field',
+  'tab-help', 'view-help', 'help-body', 'help-note',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -706,6 +716,9 @@ export class ChessApp {
    * button has to follow the click rather than the arrival.
    */
   private tournamentLoading: number | null = null;
+  private docs: ManifestDirectory<Docs> | null = null;
+  private docsFound: Found<Docs>[] = [];
+  private docsAsked = false;
   /**
    * Ids known to be this player's that the window cannot show.
    *
@@ -774,6 +787,18 @@ export class ChessApp {
       // One of possibly several directories: a wallet plus what to look for.
       // A profiles directory is the same call with a different address and
       // `parsePlayer`. See packages/chain/directory.ts.
+      // The manual, found the same way tournaments are, so a correction is a
+      // new inscription rather than a new board.
+      this.docs = new ManifestDirectory<Docs>({
+        endpoint: endpoint as never,
+        reader: this.xtrata,
+        address: TOURNAMENT_DIRECTORY,
+        kind: 'docs',
+        parse: (text) => {
+          const parsed = parseDocs(text);
+          return parsed.ok ? parsed.docs : null;
+        }
+      });
       this.index = new ManifestDirectory<Tournament>({
         endpoint: endpoint as never,
         reader: this.xtrata,
@@ -812,7 +837,9 @@ export class ChessApp {
       });
     };
 
-    for (const tab of ['play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile'] as Tab[]) {
+    for (const tab of [
+      'play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile', 'help'
+    ] as Tab[]) {
       on(camel(`tab-${tab}`), () => this.show(tab));
     }
 
@@ -1507,11 +1534,14 @@ export class ChessApp {
 
   show(tab: Tab): void {
     this.tab = tab;
-    for (const name of ['play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile'] as Tab[]) {
+    for (const name of [
+      'play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile', 'help'
+    ] as Tab[]) {
       this.el[camel(`view-${name}`)].classList.toggle('hide', name !== tab);
       this.el[camel(`tab-${name}`)].setAttribute('aria-selected', String(name === tab));
     }
     if (tab === 'leaderboard') void this.loadLeaderboard();
+    if (tab === 'help') void this.loadHelp();
     // Only on first open. A tournament is a manifest plus a couple of dozen
     // reads, and flicking between tabs should not re-spend that.
     // ONLY THE LIST. Opening the tab used to read a tournament nobody had
@@ -5568,6 +5598,148 @@ export class ChessApp {
       candidates: [fromManifest, ...pairs, knownRules(row.rulesHash)].filter((r): r is Rules => r !== null)
     });
     return found.confirmed ? found.rules : { ...DEFAULT_RULES, ranked: true };
+  }
+
+  /**
+   * The manual: what is built in, then whatever has been inscribed.
+   *
+   * The built-in half is short and never fails, because a manual that only
+   * appears when a lookup succeeds is not one. It says the few things somebody
+   * cannot work out from the board itself, and points at the rest.
+   */
+  private drawHelp(): void {
+    const body = this.el.helpBody;
+    body.replaceChildren();
+
+    const section = (title: string, paragraphs: string[]): void => {
+      const h = this.doc.createElement('h3');
+      h.className = 'help-h';
+      h.textContent = title;
+      body.appendChild(h);
+      for (const text of paragraphs) body.appendChild(this.helpParagraph(text));
+    };
+
+    section('What this is', [
+      'A chess board that is itself an inscription, reading a contract on Stacks. ' +
+        'Every move is a transaction, every position on screen is replayed from the ' +
+        'chain, and nothing is stored on a server because there is no server.',
+      'That is why it says so much about what it is reading: it is deriving what you ' +
+        'see rather than being handed it.'
+    ]);
+
+    section('Playing', [
+      'A move costs a network fee and nothing else. Wallets estimate that from the ' +
+        'whole network and usually suggest several times what moves here need, which ' +
+        'is ' + MOVE_FEE_STX + ' STX. The fee is yours to set.',
+      'If a move sits unconfirmed, raise the fee in your wallet on the SAME nonce ' +
+        'rather than sending it again. A second attempt takes the next nonce, queues ' +
+        'behind the first, and you pay for both.'
+    ]);
+
+    section('Tournaments', [
+      'A tournament is a document inscribed on chain naming its entrants and which ' +
+        'game id is which pairing. The board finds them by reading a wallet the ' +
+        'organiser sends them to, so you never need a number, though you can type ' +
+        'one at the bottom of the Tournaments tab.',
+      'Nothing in a manifest is trusted. Every pairing is checked against the rules ' +
+        'hash its game committed to on chain, and a claim that does not match reads ' +
+        'as unverified and scores nothing.',
+      'A manifest inscribed BEFORE the first move reads as committed; one written ' +
+        'afterwards reads as compiled. Both are honest, and only the first is a ' +
+        'promise rather than a description.'
+    ]);
+
+    section('Running your own', [
+      'The tooling lives in the repository rather than in this page, because it signs ' +
+        'transactions and a board holds no keys. In order: open the games, build the ' +
+        'manifest from what is on chain, inscribe it, then play.',
+      'That order is forced. A manifest names games by id, ids do not exist until ' +
+        'games are opened, and inscribing after the first move makes it a description ' +
+        'instead of a commitment. Opening settles nothing, so it does not spoil it.'
+    ]);
+
+    section('AI players', [
+      'Every player in the exhibitions was a program handed the same inscribed ' +
+        'engine, #2991. A character is a separate inscription describing how that ' +
+        'player chooses among the moves the engine ranks: style, openings, risk.',
+      'A manifest can name one per entrant, and this board links it beside that ' +
+        'player. An all-AI tournament does not advance on its own, because somebody ' +
+        'has to be running the engine, and its games stop when they stop.'
+    ]);
+    this.drawHelpDocs();
+  }
+
+  /** One paragraph, with inscription references offered as links. */
+  private helpParagraph(text: string): HTMLElement {
+    const p = this.doc.createElement('p');
+    p.className = 'help-p';
+    for (const piece of splitRefs(text)) {
+      if (piece.inscription === null) {
+        p.appendChild(this.doc.createTextNode(piece.text));
+        continue;
+      }
+      // Relative, for the reason endpoint.ts gives: a host named inside a
+      // permanent artefact becomes a dependency that outlives it.
+      const link = this.doc.createElement('a');
+      link.href = '/i/' + piece.inscription;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = piece.text;
+      p.appendChild(link);
+    }
+    return p;
+  }
+
+  /** Whatever manual has been inscribed, appended to the built-in one. */
+  private drawHelpDocs(): void {
+    for (const found of this.docsFound) {
+      const h = this.doc.createElement('h3');
+      h.className = 'help-h';
+      h.textContent = found.manifest.title;
+      this.el.helpBody.appendChild(h);
+      for (const part of found.manifest.sections) {
+        if (part.title) {
+          const sub = this.doc.createElement('h4');
+          sub.className = 'help-h4';
+          sub.textContent = part.title;
+          this.el.helpBody.appendChild(sub);
+        }
+        for (const text of part.paragraphs) {
+          this.el.helpBody.appendChild(this.helpParagraph(text));
+        }
+      }
+    }
+  }
+
+  private async loadHelp(): Promise<void> {
+    this.drawHelp();
+    if (this.docsAsked || !this.docs) {
+      this.noteHelp();
+      return;
+    }
+    this.docsAsked = true;
+    try {
+      this.docsFound = await this.docs.list();
+    } catch {
+      // Allowed to try again: a manual missing because the endpoint was busy is
+      // not a manual that does not exist.
+      this.docsAsked = false;
+    }
+    this.drawHelp();
+    this.noteHelp();
+  }
+
+  private noteHelp(): void {
+    this.notice(
+      'helpNote',
+      'info',
+      this.docsFound.length
+        ? 'The first sections are built into this board. The rest is inscribed, and can ' +
+          'be corrected by inscribing a newer one.'
+        : 'This is the short version, built into the board. A fuller manual is inscribed ' +
+          'separately so it can be corrected without rebuilding this page; none has been ' +
+          'found yet in the wallet this board watches.'
+    );
   }
 
   private async loadProfile(): Promise<void> {

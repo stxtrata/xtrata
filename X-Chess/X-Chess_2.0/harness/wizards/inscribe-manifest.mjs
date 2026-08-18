@@ -123,11 +123,19 @@ async function main() {
 
   const bytes = readFileSync(file);
   const text = bytes.toString('utf8');
-  if (!text.startsWith('X-CHESS-TOURNAMENT/1')) {
-    // Checked because an inscription cannot be edited. A file that is not a
-    // manifest is 0.3 STX spent on something the board will never read.
+  // The two documents this script can inscribe, both plain text and both read
+  // by header. Checked because an inscription cannot be edited: a file that is
+  // neither is 0.3 STX spent on something no board will ever read.
+  const KINDS = {
+    'X-CHESS-TOURNAMENT/1': 'tournament manifest',
+    'X-CHESS-DOCS/1': 'manual'
+  };
+  const header = text.split('\n')[0].trim();
+  const kind = KINDS[header];
+  if (!kind) {
     throw new WizardSafetyError(
-      `${file} does not begin with X-CHESS-TOURNAMENT/1, so no board would read it as a tournament.`
+      `${file} begins "${header.slice(0, 40)}", which is neither ` +
+        `${Object.keys(KINDS).join(' nor ')}. No board would read it.`
     );
   }
 
@@ -159,9 +167,14 @@ async function main() {
   // memory as the SentEq failure. A cap is the whole job of this condition.
   const spendCap = feeUnit + feeUnit * (1n + BigInt(Math.ceil(chunks.length / 50)));
 
-  console.log(`\nmanifest  ${file}`);
-  console.log(`name      ${(/"name":\s*"([^"]+)"/.exec(text) ?? [])[1] ?? '?'}`);
-  console.log(`games     ${(text.match(/"id":/g) ?? []).length}`);
+  console.log(`\nfile      ${file}`);
+  console.log(`kind      ${kind}`);
+  console.log(
+    `name      ${(/"name":\s*"([^"]+)"/.exec(text) ?? [])[1] ?? text.split('\n')[1]?.trim() ?? '?'}`
+  );
+  if (kind === 'tournament manifest') {
+    console.log(`games     ${(text.match(/"id":/g) ?? []).length}`);
+  }
   console.log(`sender    ${senderAddress}`);
   console.log(`payload   ${bytes.length} bytes in ${chunks.length} chunk(s)`);
   console.log(`hash      0x${running.toString('hex')}`);
@@ -188,7 +201,11 @@ async function main() {
       Cl.stringAscii('text/plain'),
       Cl.uint(bytes.length),
       Cl.list(chunks.map((c) => Cl.buffer(c))),
-      Cl.stringAscii('data:text/plain,x-chess-tournament-manifest'),
+      Cl.stringAscii(
+        kind === 'manual'
+          ? 'data:text/plain,x-chess-manual'
+          : 'data:text/plain,x-chess-tournament-manifest'
+      ),
       Cl.list(AFTER ? [Cl.uint(GENESIS), Cl.uint(AFTER)] : [Cl.uint(GENESIS)])
     ],
     senderKey,

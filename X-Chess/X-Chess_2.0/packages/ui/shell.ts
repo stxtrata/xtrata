@@ -683,6 +683,7 @@ export const HTML = `
       <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore<span class="tab-count hide" id="explore-waiting"></span></button>
       <button class="tab" id="tab-leaderboard" role="tab" aria-selected="false">Leaderboard</button>
       <button class="tab" id="tab-tournaments" role="tab" aria-selected="false">Tournaments</button>
+      <button class="tab" id="tab-help" role="tab" aria-selected="false">Help</button>
       <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>
     </nav>
     <div class="row">
@@ -988,6 +989,16 @@ export const HTML = `
              maxlength="12" size="12" placeholder="2993">
       <button class="action" id="tournament-load">Show</button>
     </div>
+  </section>
+
+  <section id="view-help" class="panel hide">
+    <h2>How this works</h2>
+    <!-- The essentials are BUILT IN and need no reads, because a manual that
+         only exists when a lookup succeeds is not a manual. The rest is
+         inscribed and found by wallet, so it can be corrected after this board
+         is permanent - see packages/protocol/docs.ts. -->
+    <div id="help-body"></div>
+    <div id="help-note" class="notice notice--info"></div>
   </section>
 
   <section id="view-profile" class="panel hide">
