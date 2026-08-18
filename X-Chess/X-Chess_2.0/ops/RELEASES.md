@@ -10,6 +10,29 @@ that a build which never shipped still leaves a record of why.
 
 Prepared for inscription, not yet inscribed.
 
+**Rebuilt 21:02** after the help panel, the embedded manual and the rating
+checkpoint reader landed. The figures below replace the 11-chunk ones this entry
+first carried; the reasoning about the version number is unchanged.
+
+* **201,457 bytes, 13 chunks.** 0.30 STX protocol + 0.20 STX miner.
+* `htmlSha256` `bcee38aa0d78a716270608bee762b4c615405283d4232d89e140dbcbddbae6c2`
+* xtrata chunk hash `75edb60674e112f97d1eb95caf546436f2eeb57966ee9cc83b8c04c4348bc27e`
+* 1,436 tests passing, 70 files.
+
+**THE BUILD IS NOT BYTE-REPRODUCIBLE**, and this is the entry that has to say
+so. The version line carries a build TIMESTAMP, so two builds of identical
+source differ — the same tree produced `ef408179…` at 20:24 and `bcee38aa…` at
+21:02. That is deliberate, since the timestamp is what tells a bug reporter
+which build they were looking at, but it has a consequence worth stating once:
+the hash above belongs to ONE FILE, not to a commit. Do not rebuild between
+checking it and inscribing, or the thing inscribed is not the thing checked.
+
+### Timed games are deliberately not in this
+
+Planned in `docs/PLAN-timed-games.md` and held back. It changes `canonicalRules`,
+which is the one file where a mistake makes two boards disagree about a finished
+game for ever, and holding a proved build back for it would have risked both.
+
 **Why 2.1.0 and not 2.0.0.** 2.0.0 is already on chain as inscription 2988 and
 has been since 9 August. Bumping `2.0.0-dev` to `2.0.0` looked like the obvious
 move and would have put two different permanent artefacts under one version —
