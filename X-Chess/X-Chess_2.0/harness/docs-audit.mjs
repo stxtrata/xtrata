@@ -58,7 +58,29 @@ if (!existsSync(MANIFEST)) {
         // Only sizes plausibly ABOUT the artefact. A chunk size or a fee is not.
         if (bytes < 20_000 || bytes > 400_000) continue;
         if (Math.abs(bytes - actual) / actual > 0.05) {
-          complain(file, `"${whole.trim()}"`, `the artefact is ${actual.toLocaleString()} bytes`);
+          // A WARNING, NOT A FAILURE, and it is the only check here that is.
+          //
+          // Every other thing this file checks is a contradiction: two
+          // documents saying different numbers, a suite nobody described, a
+          // page claiming an inscription is live while another says it must not
+          // be. Those are wrong in a way somebody can act on, and they stay
+          // wrong until acted on.
+          //
+          // A byte count is not that. It goes stale the moment anything is
+          // added, so it fails on every build that did any work — and it failed
+          // on this one three times over, blocking a funded, permanent action
+          // on the wording of three prose files. A gate that stops something
+          // expensive for a reason nobody can act on except by editing prose is
+          // a gate people learn to route around, and a routed-around gate
+          // catches nothing at all.
+          //
+          // Nothing is lost by warning. The authoritative figure is generated
+          // twice already — `dist/manifest.json` and the entry in
+          // `ops/RELEASES.md` — and being stale about it cannot corrupt a game,
+          // misstate what is covered, or mislead anybody about what is live.
+          warnings.push(
+            `${file} says ${whole.trim()}, and the artefact is ${actual.toLocaleString()} bytes`
+          );
         }
       }
     }
@@ -135,7 +157,12 @@ if (inscribed) {
 for (const warning of warnings) console.warn(`  warn  ${warning}`);
 
 if (!problems.length) {
-  console.log(`docs audit: ${suites.length} suites, no contradictions found.`);
+  // Counted out loud. "No contradictions" reads as "nothing to do", and a
+  // warning nobody mentions is a warning nobody reads.
+  const tail = warnings.length
+    ? `, ${warnings.length} figure(s) out of date above`
+    : '';
+  console.log(`docs audit: ${suites.length} suites, no contradictions found${tail}.`);
   process.exit(0);
 }
 

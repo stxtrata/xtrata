@@ -516,3 +516,32 @@ describe('an indexer that has not caught up is not a lost move', () => {
     expect(guard.slice(0, 900)).toMatch(/4 \* 60_000/);
   });
 });
+
+describe('one game stopping must not kill the other two', () => {
+  const runner = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('settles the round rather than racing it', () => {
+    // Promise.all rejects the moment one game throws, and the others keep
+    // playing into a process already exiting. Round 10: game 40 stopped on a
+    // lagging indexer and took games 41 and 42 with it — forty-nine and fifteen
+    // moves in, both healthy. Three games at once is the nonce rule, not a
+    // transaction; they are independent and should fail independently.
+    expect(runner).toMatch(/const played = await settleAll\(/);
+    expect(runner).not.toMatch(/const played = await Promise\.all\(/);
+  });
+
+  it('names the game and the players that stopped', () => {
+    // A bare rejection knows neither, and "something failed" is not something
+    // anybody can act on — it does not say which game to re-run.
+    expect(runner).toMatch(/return \{ gameId, white, black, failed:/);
+    expect(runner).toMatch(/STOPPED —/);
+  });
+
+  it('still reports the round as complete with the failures in it', () => {
+    const summary = runner.slice(runner.indexOf('round ${round.number} complete'));
+    expect(summary.slice(0, 700)).toMatch(/game\.failed/);
+  });
+});

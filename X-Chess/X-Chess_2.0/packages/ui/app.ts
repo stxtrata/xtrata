@@ -2698,6 +2698,37 @@ export class ChessApp {
         (t.engine ? `, engine inscription ${t.engine}.` : '.')
     );
 
+    // THE DOCUMENTS THEMSELVES, not just their numbers.
+    //
+    // Everything defining a tournament is inscribed — the pairings, the engine
+    // every player was handed — and until now the board printed the numbers as
+    // plain text. A reader had to already know that an inscription can be read,
+    // and where, which makes "checkable by a stranger" true in principle and
+    // false in practice.
+    //
+    // RELATIVE, deliberately. `endpoint.ts` explains why naming a host in a
+    // permanent artefact is a mistake: it makes that host a dependency of
+    // something that outlives it. `/i/<id>` is served by whatever is serving
+    // this board, so under the Xtrata runtime it resolves and nowhere else does
+    // it pretend to. A dead link is a dead link; a baked-in hostname is a
+    // permanent one.
+    const note = this.el.tournamentNote;
+    const read = this.doc.createElement('span');
+    read.className = 'tn-read';
+    read.appendChild(this.doc.createTextNode(' Read: '));
+    const link = (id: number, label: string): void => {
+      if (read.childNodes.length > 1) read.appendChild(this.doc.createTextNode(' · '));
+      const a = this.doc.createElement('a');
+      a.href = `/i/${id}`;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = label;
+      read.appendChild(a);
+    };
+    link(view.tournamentId!, `manifest ${view.tournamentId}`);
+    if (t.engine) link(t.engine, `engine ${t.engine}`);
+    note.appendChild(read);
+
     // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.
     if (view.scored) {
       banner.classList.remove('hide');
@@ -2733,6 +2764,33 @@ export class ChessApp {
           td.textContent = value;
           if (numeric) td.className = 'num';
           tr.appendChild(td);
+        }
+
+        // THE CHARACTER, WHEN THE MANIFEST NAMES ONE.
+        //
+        // `TournamentEntrant.entry` has always been in the format — "inscription
+        // id of the entry that defines the character" — and nothing has ever
+        // written it or shown it. So a tournament's players are six names, and
+        // what those names actually DO is a file on the organiser's machine.
+        //
+        // This is a no-op today, because no manifest carries the field yet. It
+        // is here because the board is about to become permanent and this is the
+        // half that cannot be added afterwards: a future tournament can start
+        // naming character inscriptions the moment it likes, but only a board
+        // that already knows to look will ever show them.
+        const entry = t.entrants.find((e) => e.name === row.name)?.entry;
+        if (typeof entry === 'number' && entry > 0) {
+          const link = this.doc.createElement('a');
+          link.className = 'tn-entry';
+          link.href = `/i/${entry}`;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'character';
+          link.title = `Inscription ${entry}: what this player was told to do`;
+          // Beside the name rather than in a column of its own, so a manifest
+          // without entries does not leave an empty column explaining nothing.
+          tr.firstChild?.appendChild(this.doc.createTextNode(' '));
+          tr.firstChild?.appendChild(link);
         }
         tbody.appendChild(tr);
       }

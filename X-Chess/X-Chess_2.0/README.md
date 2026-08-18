@@ -142,6 +142,9 @@ tests/engine/       the chess edge cases the rules audit turned up
 tests/artifact/     the BUILT html, not the source
 tests/runtime/      the artefact under the Xtrata runtime
 tests/e2e/          cache destruction, and the deployment gating
+tests/bns/          resolving a .btc name, and refusing to guess one
+tests/chess/        the engine every tournament player is handed
+tests/wizards/      the tournament harness: schedules, manifests, forfeits
 ```
 
 ### The ones worth understanding
@@ -187,7 +190,7 @@ npm run build
 Produces:
 
 ```
-dist/xchess.html      141,690 bytes   the board, self-contained
+dist/xchess.html      179,090 bytes   the board, self-contained
 dist/xchess-gates.html   ~98 KB   the deployment and inscription gates
 dist/manifest.json                provenance: hashes, protocol versions
 ```

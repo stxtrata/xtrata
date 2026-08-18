@@ -357,6 +357,13 @@ ${SCALE_CSS}
    this block and was quietly repainting the border back to --line. Checked with
    getComputedStyle rather than by eye: the class was applied and the colour was
    not. Exactly the collision the note at the top of this file describes. */
+/* The inscriptions a tournament is made of, offered rather than described. */
+.tn-entry { font-size: 11px; color: var(--dim); text-decoration: none;
+            border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
+.tn-entry:hover { color: var(--gold); border-color: var(--gold); }
+.tn-read a { color: var(--gold); text-decoration: none; border-bottom: 1px dotted var(--gold); }
+.tn-read a:hover { border-bottom-style: solid; }
+
 /* The list of tournaments found on chain. Buttons rather than links: this
    loads into the tab it is in, and nothing navigates. */
 .tn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }

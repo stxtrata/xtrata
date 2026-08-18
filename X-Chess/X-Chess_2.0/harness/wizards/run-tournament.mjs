@@ -272,6 +272,22 @@ function roundsFromManifest(tournament, agents) {
     .map((number) => ({ number, pairings: byRound.get(number) }));
 }
 
+/**
+ * Run them all, and let each one fail on its own.
+ *
+ * A thin `allSettled` that keeps enough of the pairing to say WHICH game
+ * stopped — a rejection on its own is an error with no game attached, and
+ * "something failed" is not a thing anybody can act on.
+ */
+async function settleAll(promises) {
+  const settled = await Promise.allSettled(promises);
+  return settled.map((outcome) =>
+    outcome.status === 'fulfilled'
+      ? outcome.value
+      : { failed: String(outcome.reason?.message ?? outcome.reason).slice(0, 140) }
+  );
+}
+
 /** Every game on the contract, with the rules that name its players. */
 async function readGames() {
   const count = Number((await readOnly('get-game-count')).value);
@@ -957,7 +973,15 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
 
     // The three games of a round, alongside each other. This is the only
     // parallelism here and it is bounded by the nonce rule rather than by taste.
-    const played = await Promise.all(
+    // SETTLED, NOT ALL. `Promise.all` rejects the moment one game throws, and
+    // the other two keep playing into a process that is already exiting.
+    //
+    // Round 10 is what that costs: game 40 stopped on a lagging indexer, and
+    // games 41 and 42 — forty-nine and fifteen moves in, both entirely healthy
+    // — were killed mid-move by a failure in a game they share nothing with.
+    // Three games at once is the nonce rule, not a transaction; they are
+    // independent and should fail independently.
+    const played = await settleAll(
       round.pairings.map(async (pairing) => {
         const white = agents[pairing.white];
         const black = agents[pairing.black];
@@ -995,10 +1019,16 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
           const already = findByRulesHash(hash, existing);
           gameId = already?.id ?? (await openGame({ white, black, openFee, budget }));
         }
-        const result = await playGame({
-          gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash
-        });
-        return { gameId, white, black, result };
+        try {
+          const result = await playGame({
+            gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash
+          });
+          return { gameId, white, black, result };
+        } catch (error) {
+          // Caught HERE rather than left to settleAll, so the report can name
+          // the game and the players. A bare rejection knows neither.
+          return { gameId, white, black, failed: String(error?.message ?? error).slice(0, 140) };
+        }
       })
     );
 
@@ -1011,6 +1041,15 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
     // to wait.
     console.log(`\n--- round ${round.number} complete ---`);
     for (const game of played) {
+      if (game.failed) {
+        // Named, not swallowed. A game that stopped is a game somebody has to
+        // re-run, and the reason is the only thing that says which.
+        console.log(
+          `  game ${String(game.gameId ?? '?').padEnd(3)} ${(game.white?.name ?? '').padEnd(8)} v ` +
+            `${(game.black?.name ?? '').padEnd(8)} STOPPED — ${game.failed}`
+        );
+        continue;
+      }
       const how = game.result
         ? `${game.result}`
         : 'unfinished — re-run this round, the log is the record';

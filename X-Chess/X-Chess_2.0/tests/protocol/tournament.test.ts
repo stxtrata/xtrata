@@ -49,6 +49,7 @@ const good = {
 const manifest = (body: unknown = good): string =>
   `${TOURNAMENT_HEADER}\n${JSON.stringify(body, null, 2)}`;
 
+
 describe('finding a tournament', () => {
   it('accepts a manifest with the header', () => {
     expect(parseTournament(manifest()).ok).toBe(true);
@@ -444,5 +445,40 @@ describe('only verified games score', () => {
     const live = [{ ...rows[0], id: 9, result: null }];
     expect(verifiedResults(live).has(9)).toBe(true);
     expect(verifiedResults(live).get(9)).toBeNull();
+  });
+});
+
+describe('what a tournament programs, per tournament', () => {
+  // The engine and the characters are both inscribed, and both have to be
+  // selectable by the tournament rather than fixed by the board — otherwise
+  // "these six characters played" rests on a file only the organiser can see.
+
+  it('carries its own engine, so two tournaments can use different ones', () => {
+    const one = parseTournament(manifest({ ...good, engine: 2991 }));
+    const two = parseTournament(manifest({ ...good, engine: 4242 }));
+    expect(one.tournament!.engine).toBe(2991);
+    expect(two.tournament!.engine).toBe(4242);
+  });
+
+  it('lets an entrant name the inscription that defines them', () => {
+    const entrants = good.entrants.map((e, at) =>
+      at === 0 ? { ...e, entry: 2995 } : e
+    );
+    const parsed = parseTournament(manifest({ ...good, entrants }));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.tournament!.entrants[0].entry).toBe(2995);
+    // Optional, so a tournament that does not use characters is still valid.
+    expect(parsed.tournament!.entrants[1].entry).toBeUndefined();
+  });
+
+  it('accepts a manifest written by a later version than this one', () => {
+    // THE PROPERTY THAT CANNOT BE ADDED LATER. This parser is inscribed. If it
+    // refused fields it did not recognise, every future tournament would be
+    // limited to what was imagined on the day the board went on chain.
+    const parsed = parseTournament(
+      manifest({ ...good, prizePool: '10 STX', validator: 2994, somethingNew: { nested: true } })
+    );
+    expect(parsed.ok, parsed.problems.map((p) => `${p.where} ${p.says}`).join('; ')).toBe(true);
+    expect((parsed.tournament as unknown as Record<string, unknown>).prizePool).toBe('10 STX');
   });
 });

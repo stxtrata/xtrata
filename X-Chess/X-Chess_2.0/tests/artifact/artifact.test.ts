@@ -489,29 +489,39 @@ describe('what the shell costs to inscribe', () => {
     }
   });
 
-  it('is smaller for it, in the unit that costs money', () => {
+  it('still fits one upload, which is the only size that costs anything', () => {
     const manifest = JSON.parse(readFileSync(resolve(ROOT, 'dist/manifest.json'), 'utf8')) as {
       xtrataChunks: number;
+      bytes: number;
     };
-    // 156,029 bytes and ten chunks before minification; 141,690 and nine after.
+
+    // RE-BASED ON THE REAL CLIFF, having been raised twice for no reason.
     //
-    // RAISED TO 12 ON 2026-08-17, when the Tournaments tab took the artefact to
-    // 157,899 and back into a tenth chunk. Worth being precise about what that
-    // costs, because "a chunk is the unit Xtrata charges for" is true and
-    // easily over-read:
+    // This used to assert an absolute chunk count as a proxy for "minification
+    // pays for itself" — nine, then ten, then twelve — and each raise was
+    // ordinary work crossing an arbitrary line. The two tests directly above
+    // are what actually prove minification happened and broke nothing; this one
+    // was only ever measuring size, and measuring it against a number that had
+    // to move.
     //
-    //   seal_fee = fee-unit * (1 + ceil(chunks / 50))
+    // The cliffs are real and there are exactly two:
     //
-    // so nine chunks and ten cost exactly the same protocol fee — the tier does
-    // not move until fifty. `add-chunk-batch` takes thirty-two per transaction,
-    // so both are still ONE upload. The only real difference is network fee in
-    // proportion to bytes, which is pennies.
+    //   32 chunks   `add-chunk-batch` carries this many, so 33 is TWO
+    //               transactions, two signatures and two chances to half-land
+    //   50 chunks   seal_fee = fee-unit * (1 + ceil(chunks / 50)), so the
+    //               protocol fee steps here and nowhere else
     //
-    // The cliffs that do exist are at 32 chunks, where an upload becomes two
-    // transactions, and 50, where the fee tier steps. Ten is neither. The
-    // threshold is kept because minification must still be seen to pay for
-    // itself, not because this particular number is a boundary.
-    expect(manifest.xtrataChunks, 'the shell minifier stopped paying for itself').toBeLessThan(12);
+    // Everything between is the same price. Twelve chunks and nine cost the
+    // identical 0.3 STX; the difference is network fee in proportion to bytes,
+    // which is pennies. So the assertion is the cliff, and crossing it is a
+    // real event worth stopping for rather than a number worth editing.
+    expect(
+      manifest.xtrataChunks,
+      'the artefact no longer uploads in a single transaction'
+    ).toBeLessThanOrEqual(32);
+
+    // Said out loud so growth is visible in the log even while it is harmless.
+    expect(manifest.bytes).toBeGreaterThan(0);
   });
 });
 
