@@ -367,7 +367,7 @@ async function playGame({
   // normalises to an OPEN BOARD. The game would have run, looked fine, and
   // refereed nothing: no turn alternation, either character free to move at any
   // time, and the position drifting away from what the committed rules describe.
-  const { rules } = await wizardRules(white.address, black.address);
+  const { rules } = await tournamentRules(white.address, black.address);
   let lastLength = -1;
 
   for (;;) {
@@ -833,7 +833,11 @@ async function main() {
       namesUstx: 0n,
       totalUstx: BigInt(manifest.games.length) * MINER_FEE_USTX * 45n
     };
+    const declaredCooldown = useManifestCooldown(manifest);
     console.log(`\nmanifest  ${loaded.rootId} — ${manifest.name}`);
+    if (declaredCooldown > 0) {
+      console.log(`          cooldown ${declaredCooldown}, which is what makes these games openable at all`);
+    }
     console.log(`          games are NAMED, so none will be opened by this run`);
 
     // SAY OUT LOUD THAT THIS IS A HANDICAP EVENT.
@@ -920,7 +924,7 @@ async function main() {
     let found = null;
     for (const round of plan.rounds) {
       for (const pairing of round.pairings) {
-        const { hash } = await wizardRules(
+        const { hash } = await tournamentRules(
           agents[pairing.white]?.address,
           agents[pairing.black]?.address
         );
@@ -936,7 +940,7 @@ async function main() {
     }
 
     const conceding = agents[side === 'white' ? found.white : found.black];
-    const { rules } = await wizardRules(agents[found.white].address, agents[found.black].address);
+    const { rules } = await tournamentRules(agents[found.white].address, agents[found.black].address);
     console.log(`
 game ${gameId}: ${found.white} (white) v ${found.black}`);
     console.log(`${conceding.name} concedes, making it ${side === 'white' ? '0-1' : '1-0'}`);
@@ -1033,7 +1037,7 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         // row. This used to fabricate white and black onto every game before
         // searching, so every pairing matched the first row and three
         // characters played twenty-eight submissions into a stranger's game.
-        const { hash } = await wizardRules(white.address, black.address);
+        const { hash } = await tournamentRules(white.address, black.address);
 
         // A NAMED GAME IS NEVER OPENED AND NEVER SEARCHED FOR. The manifest
         // said which game this is, so the only question is whether that game
@@ -1176,7 +1180,7 @@ async function openOnly({ field, plan, openFee, manifest }) {
           'A game names both addresses in its rules, so it cannot be opened without them.'
       );
     }
-    const { hash } = await wizardRules(white.address, black.address);
+    const { hash } = await tournamentRules(white.address, black.address);
     const already = findByRulesHash(hash, existing);
     found.push({ ...pairing, white, black, hash, id: already?.id ?? null });
   }
@@ -1260,8 +1264,37 @@ async function gameIdFrom(txid) {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * The rules every game of THIS tournament commits to.
+ *
+ * ONE PLACE, and it had to become one. Five call sites reached past this
+ * helper straight to `wizardRules`, which was harmless while every tournament
+ * shared the defaults and is not harmless now: a cooldown applied when a game
+ * is OPENED and forgotten when its hash is CHECKED produces a game the runner
+ * refuses to play into, permanently, having already paid to open it.
+ *
+ * WHERE THE NUMBER COMES FROM depends on what is being done. Opening a new
+ * tournament takes it from `--cooldown`, because nothing has been written down
+ * yet. Playing one takes it from the MANIFEST, because that is the record and
+ * a flag typed differently on the second day would silently play into nothing.
+ * `useManifestCooldown` is how the second overrides the first.
+ */
+let TOURNAMENT_COOLDOWN = Number(arg('cooldown', '0'));
+
+function useManifestCooldown(manifest) {
+  const declared = manifest?.cooldown ?? 0;
+  if (declared !== TOURNAMENT_COOLDOWN && arg('cooldown')) {
+    throw new WizardSafetyError(
+      `--cooldown ${TOURNAMENT_COOLDOWN} but the manifest declares ${declared}. The manifest is ` +
+        'the record; drop the flag rather than overriding it.'
+    );
+  }
+  TOURNAMENT_COOLDOWN = declared;
+  return declared;
+}
+
 async function tournamentRules(white, black) {
-  return wizardRules(white, black);
+  return wizardRules(white, black, { cooldown: TOURNAMENT_COOLDOWN });
 }
 
 

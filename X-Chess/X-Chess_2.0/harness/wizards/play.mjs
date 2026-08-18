@@ -405,9 +405,9 @@ export async function loadProtocol() {
  * candidate until black has played. Before that the game reads as "rules
  * unconfirmed", which is correct rather than a fault.
  */
-export async function wizardRules(white, black) {
+export async function wizardRules(white, black, { cooldown = 0 } = {}) {
   const { DEFAULT_RULES, normaliseRules, rulesHash } = await loadProtocol();
-  const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
+  const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true, cooldown });
   return { rules, hash: rulesHash(rules) };
 }
 

@@ -630,12 +630,39 @@ describe('rules, without which there is no game', () => {
     expect(play).toContain("'packages', 'protocol', 'canonical.ts'");
   });
 
-  it('names both sides and marks the game ranked', () => {
+  // Real mainnet addresses: the encoder refuses anything that is not a
+  // principal, which is itself the point — a rules hash must never be built
+  // from a name nobody resolved.
+  const WHITE = 'SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2';
+  const BLACK = 'SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN';
+
+  it('names both sides and marks the game ranked', async () => {
+    // ASKED, NOT GREPPED. This matched the exact source literal, so adding an
+    // argument to the call broke it while every property it cares about still
+    // held — the same lesson as "test the property, not the source" elsewhere
+    // in this suite. A rules hash is a commitment; what matters is what comes
+    // back, not how the line is written.
+    const { wizardRules } = await import('../../harness/wizards/play.mjs');
+    const { rules } = await wizardRules(WHITE, BLACK);
+    expect(rules.white, 'the wizards open a game nobody is named in').toBe(WHITE);
+    expect(rules.black).toBe(BLACK);
+    expect(rules.ranked).toBe(true);
+    expect(rules.cooldown, 'default rules, unless a tournament says otherwise').toBe(0);
+
     const play = read('harness/wizards/play.mjs');
-    expect(play, 'the wizards open a game nobody is named in').toMatch(
-      /normaliseRules\(\{ \.\.\.DEFAULT_RULES, white, black, ranked: true \}\)/
-    );
     expect(play, 'the open still sends none for its rules').not.toContain('Cl.none()');
+  });
+
+  it('commits a different hash when a tournament declares a cooldown', async () => {
+    // THE WHOLE REASON THE ARGUMENT EXISTS. A pair in one colour order gets one
+    // ranked game at default rules, ever; exhibitions one and two used all
+    // thirty of theirs. A declared cooldown is what lets a third tournament
+    // open a game between the same two at all.
+    const { wizardRules } = await import('../../harness/wizards/play.mjs');
+    const level = await wizardRules(WHITE, BLACK);
+    const handicapped = await wizardRules(WHITE, BLACK, { cooldown: 1 });
+    expect(handicapped.hash).not.toBe(level.hash);
+    expect(handicapped.rules.cooldown).toBe(1);
   });
 });
 

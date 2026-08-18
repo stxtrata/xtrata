@@ -37,6 +37,16 @@ const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
 
 const arg = (name, fallback = null) => {
   const at = process.argv.indexOf(`--${name}`);
+/**
+ * The cooldown these games committed to, which the manifest must then declare.
+ *
+ * If this is wrong the manifest is wrong about its own games: every hash it
+ * computes to match a pairing misses, and the tournament reads as having no
+ * games at all. Passed explicitly rather than guessed, because guessing zero
+ * is exactly the failure.
+ */
+const COOLDOWN = Number(arg('cooldown', '0'));
+
   return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
 };
 
@@ -156,7 +166,7 @@ async function main() {
     for (const pairing of round.pairings) {
       const white = nameOf[pairing.white];
       const black = nameOf[pairing.black];
-      const { hash } = await wizardRules(byName.get(white), byName.get(black));
+      const { hash } = await wizardRules(byName.get(white), byName.get(black), { cooldown: COOLDOWN });
       const found = findByRulesHash(hash, onChain);
       if (!found) {
         unopened.push(`round ${round.number}: ${white} v ${black}`);
