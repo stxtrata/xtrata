@@ -58,7 +58,7 @@ describe('reading an inscribed manual', () => {
   it('parses the manual this repository ships', () => {
     // The one that will actually be inscribed, so a change that breaks it is
     // caught here rather than after 0.3 STX.
-    const text = readFileSync(resolve(ROOT, 'docs/xchess-manual.txt'), 'utf8');
+    const text = readFileSync(resolve(ROOT, 'docs/manual/xchess-manual.txt'), 'utf8');
     const parsed = parseDocs(text);
     expect(parsed.ok, parsed.problem ?? '').toBe(true);
     expect(parsed.docs!.sections.length).toBeGreaterThan(5);

@@ -60,7 +60,7 @@ Inscribed 2026-08-18 at block 8,795,587, tx
 `3ade6c0f2cf3bcd706dea945d18692d252b53c84ca9be37c427103ba5ec83e28`.
 
 ```
-source        docs/xchess-manual.txt
+source        docs/manual/xchess-manual.txt
 bytes         10,968  (one chunk, one transaction)
 final hash    0xf06feae73fefa2439d7a5c351e87e08eb0027f517e714d51b08e1ff9bb642e6b
 creator       SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S

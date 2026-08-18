@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Build the manual as a self-contained page.
 //
-// SAME SOURCE AS THE TEXT MANUAL. docs/xchess-manual.txt is the content and this
-// is only a renderer, so the two can never drift into saying different things —
-// which is the failure mode of every project that keeps a "web version" beside a
-// "plain version".
+// SAME SOURCE AS THE TEXT MANUAL. xchess-manual.txt beside this file is the
+// content and this is only a renderer, so the two can never drift into saying
+// different things — the failure mode of every project that keeps a "web version"
+// beside a "plain version".
 //
 // Self-contained because it is inscribed: no fonts, no scripts from anywhere, no
 // images. Everything a viewer needs is in the bytes.
@@ -25,7 +25,8 @@ const { parseDocs, splitRefs } = await import(
   `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`
 );
 
-const source = readFileSync(resolve(ROOT, 'docs/xchess-manual.txt'), 'utf8');
+const SOURCE = resolve(HERE, 'xchess-manual.txt');
+const source = readFileSync(SOURCE, 'utf8');
 const parsed = parseDocs(source);
 if (!parsed.ok) {
   console.error(`the manual does not parse: ${parsed.problem}`);
@@ -198,8 +199,11 @@ const html = [
   '</html>'
 ].join('\n');
 
-const out = resolve(ROOT, 'dist/xchess-manual.html');
+// Written BESIDE its source rather than into dist/, because dist is build
+// output that gets cleaned and this is the thing being inscribed. Both halves
+// of the manual live in one folder and are read from there.
+const out = resolve(HERE, 'xchess-manual.html');
 writeFileSync(out, html);
 const bytes = Buffer.byteLength(html, 'utf8');
-console.log(`built dist/xchess-manual.html  ${bytes.toLocaleString()} bytes, ${Math.ceil(bytes / 16384)} chunk(s)`);
-console.log(`${docs.sections.length} sections from docs/xchess-manual.txt`);
+console.log(`built docs/manual/xchess-manual.html  ${bytes.toLocaleString()} bytes, ${Math.ceil(bytes / 16384)} chunk(s)`);
+console.log(`${docs.sections.length} sections from docs/manual/xchess-manual.txt`);

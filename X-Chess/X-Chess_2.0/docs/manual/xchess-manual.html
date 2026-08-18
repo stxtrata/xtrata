@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The X Chess manual</title>
+<style>:root{--bg:#12100e;--panel:#1b1815;--line:#2e2924;--line-2:#453d33;--ink:#e8e2d9;
+--dim:#9a9187;--gold:#d8a24a;--warn:#e0733f;--good:#6fae5f;--light:#b9a98f}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--gold)}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px 80px}
+
+header.top{border-bottom:1px solid var(--line);margin-bottom:28px;
+padding:44px 0 26px;background:
+radial-gradient(60% 120% at 12% 0%,rgba(216,162,74,.10),transparent 60%)}
+header.top h1{margin:0;font-size:34px;letter-spacing:-.4px}
+header.top h1 b{color:var(--gold);font-weight:800}
+header.top .lede{margin:10px 0 0;color:var(--dim);max-width:62ch;font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{border:1px solid var(--line-2);border-radius:999px;padding:4px 11px;
+font-size:12px;color:var(--dim);text-decoration:none}
+.chip:hover{border-color:var(--gold);color:var(--gold)}
+.chip b{color:var(--gold);font-weight:600}
+
+.cols{display:grid;grid-template-columns:230px 1fr;gap:40px;align-items:start}
+nav.toc{position:sticky;top:20px;max-height:calc(100vh - 40px);overflow:auto;
+border-left:2px solid var(--line);padding-left:14px}
+nav.toc h4{margin:0 0 8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+nav.toc ul{list-style:none;margin:0;padding:0}
+nav.toc a{display:block;padding:3px 0;color:var(--dim);text-decoration:none;font-size:13px}
+nav.toc a:hover{color:var(--gold)}
+.toc-3 a{padding-left:12px;font-size:12px;color:#7f776e}
+
+section.s2{margin:34px 0 0;padding-top:22px;border-top:1px solid var(--line)}
+section.s3{margin:22px 0 0}
+h2{font-size:23px;margin:0 0 10px;letter-spacing:-.2px}
+h3{font-size:16px;margin:0 0 8px;color:var(--light)}
+.anchor{margin-left:8px;color:var(--line-2);text-decoration:none;font-weight:400}
+h2:hover .anchor,h3:hover .anchor{color:var(--gold)}
+p{max-width:70ch;margin:9px 0;color:#cfc7bc}
+ul{max-width:70ch;margin:9px 0;padding-left:20px}
+li{margin:4px 0;color:#cfc7bc}
+li::marker{color:var(--gold)}
+.ref{white-space:nowrap}
+
+pre.cmd{max-width:70ch;overflow-x:auto;background:#0d0b09;border:1px solid var(--line-2);
+border-left:3px solid var(--gold);border-radius:5px;padding:11px 13px;margin:12px 0}
+pre.cmd code{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--gold)}
+
+dl.glossary{max-width:70ch;margin:12px 0;display:grid;
+grid-template-columns:minmax(120px,190px) 1fr;gap:1px 18px}
+dl.glossary dt{color:var(--gold);font-weight:600;padding:9px 0;border-top:1px solid var(--line)}
+dl.glossary dd{margin:0;padding:9px 0;color:#cfc7bc;border-top:1px solid var(--line)}
+
+footer{margin-top:52px;padding-top:20px;border-top:1px solid var(--line);
+color:var(--dim);font-size:13px}
+footer a{color:var(--gold)}
+
+@media (max-width:820px){
+.cols{grid-template-columns:1fr;gap:10px}
+nav.toc{position:static;max-height:none;border-left:0;border-top:1px solid var(--line);
+padding:14px 0 0;margin-bottom:8px}
+nav.toc ul{columns:2;column-gap:18px}
+header.top{padding:30px 0 20px}
+header.top h1{font-size:26px}
+}</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+<h1>The <b>X Chess</b> manual</h1>
+<p class="lede">Chess on Bitcoin, via Stacks. Every move is a transaction, every position is replayed from the chain, and this page is itself an inscription.</p>
+<div class="chips">
+<a class="chip" href="#running-your-own-tournament">Run a tournament</a>
+<a class="chip" href="#ai-players">Program a player</a>
+<a class="chip" href="#fees-and-why-your-wallet-is-wrong">Fees</a>
+<a class="chip" href="#glossary">Glossary</a>
+<a class="chip" href="/i/2991" target="_blank" rel="noopener noreferrer">The engine <b>#2991</b></a>
+</div>
+</div></header>
+<div class="wrap"><div class="cols">
+<nav class="toc"><h4>Contents</h4><ul><li class="toc-2"><a href="#what-x-chess-is">What X Chess is</a></li><li class="toc-3"><a href="#what-the-contract-stores-and-what-it-does-not">What the contract stores, and what it does not</a></li><li class="toc-2"><a href="#playing-a-game">Playing a game</a></li><li class="toc-3"><a href="#opening-one">Opening one</a></li><li class="toc-3"><a href="#making-a-move">Making a move</a></li><li class="toc-3"><a href="#fees-and-why-your-wallet-is-wrong">Fees, and why your wallet is wrong</a></li><li class="toc-3"><a href="#when-a-move-will-not-confirm">When a move will not confirm</a></li><li class="toc-3"><a href="#games-that-never-end">Games that never end</a></li><li class="toc-2"><a href="#tournaments">Tournaments</a></li><li class="toc-3"><a href="#what-a-tournament-actually-is">What a tournament actually is</a></li><li class="toc-3"><a href="#committed-and-compiled">Committed and compiled</a></li><li class="toc-3"><a href="#how-the-board-finds-them">How the board finds them</a></li><li class="toc-2"><a href="#running-your-own-tournament">Running your own tournament</a></li><li class="toc-3"><a href="#a-tournament-between-people">A tournament between people</a></li><li class="toc-3"><a href="#the-order-and-why-it-is-forced">The order, and why it is forced</a></li><li class="toc-3"><a href="#opening-the-games">Opening the games</a></li><li class="toc-3"><a href="#building-the-manifest">Building the manifest</a></li><li class="toc-3"><a href="#inscribing-it">Inscribing it</a></li><li class="toc-3"><a href="#naming-the-important-games">Naming the important games</a></li><li class="toc-3"><a href="#telling-the-players">Telling the players</a></li><li class="toc-2"><a href="#adding-ai-players">Adding AI players</a></li><li class="toc-3"><a href="#declaring-which-is-which">Declaring which is which</a></li><li class="toc-3"><a href="#the-engine-every-player-is-handed">The engine every player is handed</a></li><li class="toc-3"><a href="#why-the-engine-exists">Why the engine exists</a></li><li class="toc-3"><a href="#designing-a-character">Designing a character</a></li><li class="toc-2"><a href="#what-the-board-refuses-to-do">What the board refuses to do</a></li><li class="toc-2"><a href="#glossary">Glossary</a></li></ul></nav>
+<main><p>This is the long version. The board carries a short one built in, so it still says something when nothing can be read. This is inscribed separately so it can be corrected without rebuilding a page that cannot be rebuilt.</p><section class="s2"><h2 id="what-x-chess-is">What X Chess is<a class="anchor" href="#what-x-chess-is" aria-label="Link to this section">#</a></h2><p>A chess board that is itself an inscription, reading a contract on Stacks. Every move is a transaction. Every position on screen is replayed from the chain rather than stored anywhere, which is why the board says so much about what it is reading: it is deriving what you see, not being handed it.</p>
+<p>There is no server. Nothing here can be taken down, and nothing here can be edited either, which is the same property read twice.</p></section>
+<section class="s3"><h3 id="what-the-contract-stores-and-what-it-does-not">What the contract stores, and what it does not<a class="anchor" href="#what-the-contract-stores-and-what-it-does-not" aria-label="Link to this section">#</a></h3><p>The contract stores a game's opener, the block it opened at, whether it was offered as ranked, a 32-byte commitment to its rules, and every submission sent to it in order. That is all.</p>
+<p>It does NOT store the players. Their addresses live inside the rules that the commitment hashes, and nowhere else, which is why a game with no submissions cannot be attributed to anybody by reading the chain.</p>
+<p>It does not store results either. A result is replayed from the submissions by whoever is looking, and two boards that disagree about a result disagree about their own code rather than about the chain.</p></section>
+<section class="s2"><h2 id="playing-a-game">Playing a game<a class="anchor" href="#playing-a-game" aria-label="Link to this section">#</a></h2></section>
+<section class="s3"><h3 id="opening-one">Opening one<a class="anchor" href="#opening-one" aria-label="Link to this section">#</a></h3><p>Open a game from the Play tab. You choose who may play each side: a named address, anyone, anyone but you, or whoever moves first. Those choices are hashed into the rules commitment, so they are fixed at the moment the game opens and cannot be revised afterwards.</p>
+<p>A ranked game must name both players by address. That is what makes a rating meaningful, and the board refuses to open a ranked game any other way.</p></section>
+<section class="s3"><h3 id="making-a-move">Making a move<a class="anchor" href="#making-a-move" aria-label="Link to this section">#</a></h3><p>Click the piece, click the destination. The board refuses moves it can prove will not count, and warns about ones it merely doubts, and the warning can always be overruled on a second click.</p>
+<p>A move costs a network fee and nothing the contract charges.</p></section>
+<section class="s3"><h3 id="fees-and-why-your-wallet-is-wrong">Fees, and why your wallet is wrong<a class="anchor" href="#fees-and-why-your-wallet-is-wrong" aria-label="Link to this section">#</a></h3><p>Wallets estimate a fee from the whole network rather than from this contract, and have quoted between eight and fifteen times what moves here actually confirm at. The number to use is on screen in every game.</p>
+<p>The board cannot propose it. The wallet method it signs through takes six parameters and a fee is not one of them, so the figure in your wallet is the wallet's own, and yours to change.</p>
+<ul><li>Xverse: press Edit, then Custom.</li><li>Leather: choose the Custom tab.</li></ul></section>
+<section class="s3"><h3 id="when-a-move-will-not-confirm">When a move will not confirm<a class="anchor" href="#when-a-move-will-not-confirm" aria-label="Link to this section">#</a></h3><p>Replace it at the SAME nonce with a higher fee. The board shows that nonce whenever a move of yours is pending, because it is the one thing neither wallet can tell you: they know your pending transactions, and not which of them is a chess move.</p>
+<p>Signing a new move instead takes the next nonce, which queues behind the stuck one rather than replacing it. Two fees, and the second cannot confirm until the first does.</p>
+<ul><li>Xverse: Speed Up on the Stacks dashboard, or Edit nonce when signing.</li><li>Leather extension: the Activity tab, then increase the fee. Leather desktop</li></ul>
+<p>cannot.</p></section>
+<section class="s3"><h3 id="games-that-never-end">Games that never end<a class="anchor" href="#games-that-never-end" aria-label="Link to this section">#</a></h3><p>The contract has no clock and no resignation by absence. A game nobody has touched for a year is, on chain, live and waiting for a move anybody may still make.</p>
+<p>So a board cannot tell a player who walked away from a player who is thinking, and this one does not pretend to. It says how long a game has been quiet and leaves the conclusion to you.</p>
+<p>A game ends when the chain says so: checkmate, stalemate, a draw by repetition or the fifty-move rule, a resignation, or a draw offered and accepted. There is no other way, and in particular no organiser can declare one.</p></section>
+<section class="s2"><h2 id="tournaments">Tournaments<a class="anchor" href="#tournaments" aria-label="Link to this section">#</a></h2></section>
+<section class="s3"><h3 id="what-a-tournament-actually-is">What a tournament actually is<a class="anchor" href="#what-a-tournament-actually-is" aria-label="Link to this section">#</a></h3><p>One inscribed document naming its entrants and saying which game id is which pairing. Nothing else. Everything the board shows about a tournament is derived from the chain.</p>
+<p>Nothing in it is trusted. Every pairing is checked against the rules hash its game committed to, and a claim that does not match reads as unverified and scores nothing. A manifest that lies fails; it does not mislead.</p></section>
+<section class="s3"><h3 id="committed-and-compiled">Committed and compiled<a class="anchor" href="#committed-and-compiled" aria-label="Link to this section">#</a></h3><p>A manifest inscribed BEFORE the first move of any of its games reads as committed. One written afterwards reads as compiled.</p>
+<p>Both are honest. Only the first is a promise: it was written when nobody knew how the games would go. A compiled manifest is a description of games that already existed, and anybody can write one of those about any games, including games another manifest also claims.</p></section>
+<section class="s3"><h3 id="how-the-board-finds-them">How the board finds them<a class="anchor" href="#how-the-board-finds-them" aria-label="Link to this section">#</a></h3><p>By reading a wallet the organiser sends manifests to, newest first. You never need to know a number, though you can type one at the bottom of the Tournaments tab for a tournament this board does not watch for.</p>
+<p>Holding finds it; creating proves it. Anybody may send an inscription to any wallet, so a document arriving there is a claim. The board reports whether the wallet MINTED it, which a transfer cannot fake, and marks the rest as inscribed by somebody else.</p></section>
+<section class="s2"><h2 id="running-your-own-tournament">Running your own tournament<a class="anchor" href="#running-your-own-tournament" aria-label="Link to this section">#</a></h2><p>Most tournaments are between people, and nothing about that needs an engine, a program or a director sitting at a keyboard. Start here; AI players are an addition to this, not a different thing.</p>
+<p>The tooling signs transactions, so it lives in the repository rather than in the board. A board holds no keys and never will, being an inscription itself.</p></section>
+<section class="s3"><h3 id="a-tournament-between-people">A tournament between people<a class="anchor" href="#a-tournament-between-people" aria-label="Link to this section">#</a></h3><p>An entrant is a name and a Stacks address, and that is the whole requirement. Each player moves from their own wallet, whenever they like, paying their own network fee. Nobody has to be online for the tournament to progress, and there is no server that could stop it.</p>
+<p>Collect the addresses of everybody playing. Decide the format: a round robin plays every pair once, a double round robin plays every pair twice so both have White once. Six entrants is fifteen games as a single round robin, thirty as a double.</p>
+<p>You do not have to run a format to completion. A tournament may be any number of its rounds, and the second exhibition was rounds eight to ten of a double round robin, played long after the first seven.</p></section>
+<section class="s3"><h3 id="the-order-and-why-it-is-forced">The order, and why it is forced<a class="anchor" href="#the-order-and-why-it-is-forced" aria-label="Link to this section">#</a></h3><pre class="cmd"><code>node harness/wizards/run-tournament.mjs open --live</code></pre>
+<pre class="cmd"><code>node harness/wizards/build-manifest.mjs --name &quot;Your Event&quot; --format round-robin</code></pre>
+<pre class="cmd"><code>node harness/wizards/inscribe-manifest.mjs --file harness/wizards/manifest-round-robin.json --live</code></pre>
+<p>Open the games first, because a manifest names them by id and ids do not exist until they are opened. Build the manifest from what is actually on chain. Inscribe it. Then the players play.</p>
+<p>Opening does not spoil the order: a game with no submissions has no first move, so a manifest inscribed while every game sits empty still reads as committed.</p></section>
+<section class="s3"><h3 id="opening-the-games">Opening the games<a class="anchor" href="#opening-the-games" aria-label="Link to this section">#</a></h3><p>The open command computes each pairing's rules hash, looks for a game already carrying it, and opens only what is missing. It is safe to re-run, because it matches on the hash rather than on who opened what, so it will not open a second copy of a pairing that already exists.</p>
+<p>Opening costs the contract's open fee per game and settles nothing else.</p></section>
+<section class="s3"><h3 id="building-the-manifest">Building the manifest<a class="anchor" href="#building-the-manifest" aria-label="Link to this section">#</a></h3><p>The builder reads every game on the contract and matches pairings BY RULES HASH rather than by position in a list. Several games opened at once land in whatever order the chain mines them, so a game's number says nothing about who is in it.</p>
+<p>It refuses to write a manifest naming a game that does not exist, and refuses one whose pairings do not match the chain. Either would be a document whose only purpose is to be rejected.</p>
+<p>Use --from and --rounds to take part of a format.</p></section>
+<section class="s3"><h3 id="inscribing-it">Inscribing it<a class="anchor" href="#inscribing-it" aria-label="Link to this section">#</a></h3><pre class="cmd"><code>node harness/wizards/inscribe-manifest.mjs --file &lt;path&gt; --after &lt;previous id&gt; --live</code></pre>
+<p>The fee unit is read live rather than remembered. --after names an earlier manifest, which lets a reader walk backwards through previous tournaments without being told an address. It cannot be added later, so decide before inscribing.</p>
+<p>Send the finished inscription to the wallet the board reads, or it will only be findable by number.</p></section>
+<section class="s3"><h3 id="naming-the-important-games">Naming the important games<a class="anchor" href="#naming-the-important-games" aria-label="Link to this section">#</a></h3><p>A manifest may say what a game is: Final, Semi-final, Quarter-final, or anything else a tournament calls its stages. The board shows that beside the players, in the game itself, and in the browser tab, so a reader who opens one game knows which it is.</p>
+<p>Most formats do not have a final, and the board will not invent one. A round robin plays every pair against every pair, so its last round is simply the last round. A knockout is different: there the structure means it, and the board works the stages out from the rounds without being told.</p></section>
+<section class="s3"><h3 id="telling-the-players">Telling the players<a class="anchor" href="#telling-the-players" aria-label="Link to this section">#</a></h3><p>Give them the tournament's inscription number, or point them at a board that watches the wallet you sent it to. From there each player finds their own games: the board reads their transaction history, so a game waiting on them is on their screen whether or not anybody told them about it.</p></section>
+<section class="s2"><h2 id="adding-ai-players">Adding AI players<a class="anchor" href="#adding-ai-players" aria-label="Link to this section">#</a></h2><p>Everything above is unchanged. An AI player is an entrant like any other, with an address and a wallet, and a tournament may mix them freely with people.</p>
+<p>The difference is only who decides the moves, and it has one consequence worth being honest about: an AI player does not move by itself. Something has to be running that chooses for it, so a tournament of nothing but programs stops the moment the person running them stops. The board says so when it can tell.</p></section>
+<section class="s3"><h3 id="declaring-which-is-which">Declaring which is which<a class="anchor" href="#declaring-which-is-which" aria-label="Link to this section">#</a></h3><p>Mark an entrant with a kind, so the board can warn readers rather than leaving them to wonder why nothing has moved for a day. An entrant that says nothing is treated as unknown rather than as a person, because the first two exhibitions said nothing and were played entirely by programs.</p></section>
+<section class="s3"><h3 id="the-engine-every-player-is-handed">The engine every player is handed<a class="anchor" href="#the-engine-every-player-is-handed" aria-label="Link to this section">#</a></h3><p>Inscription <a class="ref" href="/i/2991" target="_blank" rel="noopener noreferrer">#2991</a>. It is deterministic, and it is not a recommendation: it ranks every legal move with a score in centipawns from the mover's point of view, best first, and marks any mate.</p>
+<p>A character reads that list and picks by style. That is the only thing a character controls, which is why two characters given identical positions play differently, and why none of them hangs a queen.</p></section>
+<section class="s3"><h3 id="why-the-engine-exists">Why the engine exists<a class="anchor" href="#why-the-engine-exists" aria-label="Link to this section">#</a></h3><p>Measured rather than assumed. Across six on-chain games, more thinking effort moved the blunder rate from 29% to 29%. Competence instructions moved it from 21% to 21%. A king-mobility hint produced no mate in fifty plies where doing nothing mated in twenty-three.</p>
+<p>The engine halved it, 24% to 12%, replicated across three twelve-game runs. It does not make games finish, though: a one-ply control mated more often, 8 to 6.</p></section>
+<section class="s3"><h3 id="designing-a-character">Designing a character<a class="anchor" href="#designing-a-character" aria-label="Link to this section">#</a></h3><p>A character sheet is an inscription describing a style: how it opens, what it will risk, what it avoids, how it treats a won position. Keep it about preferences rather than about chess ability, because the engine already supplies the ability and a character that argues with it plays worse.</p>
+<p>Inscribe the sheet, then name its id as the entry for that entrant in the tournament manifest. The board links it beside that player, so anybody reading the tournament can open the character and see what that competitor was told to do.</p></section>
+<section class="s2"><h2 id="what-the-board-refuses-to-do">What the board refuses to do<a class="anchor" href="#what-the-board-refuses-to-do" aria-label="Link to this section">#</a></h2><ul><li>It will not say a game is yours unless the rules hashing to that game's own</li></ul>
+<p>commitment name you.</p>
+<ul><li>It will not count a tournament game whose pairing does not match the chain.</li><li>It will not report a result it has not replayed itself.</li><li>It will not call a tournament finished, or crown a winner, until every game has</li></ul>
+<p>a result and every pairing is verified.</p>
+<ul><li>It will not break a tie to award a place that was shared.</li><li>It will not treat a rate limit as an answer: a lookup that failed is never</li></ul>
+<p>recorded as a thing that does not exist.</p></section>
+<section class="s2"><h2 id="glossary">Glossary<a class="anchor" href="#glossary" aria-label="Link to this section">#</a></h2><dl class="glossary"><dt id="g-commitment">commitment</dt><dd>The 32-byte hash a game stores instead of its rules. The rules are</dd></dl>
+<p>recovered by proposing candidates and testing them against it.</p>
+<dl class="glossary"><dt id="g-compiled">compiled</dt><dd>A manifest inscribed after play began. A description of games that</dd></dl>
+<p>already existed, rather than a promise made before them.</p>
+<dl class="glossary"><dt id="g-committed">committed</dt><dd>A manifest inscribed before the first move of any of its games.</dd><dt id="g-directory">directory</dt><dd>A wallet that manifests are sent to, so a board can find them. The</dd></dl>
+<p>board knows one address per group and nothing else.</p>
+<dl class="glossary"><dt id="g-entry">entry</dt><dd>The inscription defining how an AI player chooses among ranked moves.</dd><dt id="g-manifest">manifest</dt><dd>An inscribed document naming a tournament's entrants and which game</dd></dl>
+<p>id is which pairing.</p>
+<dl class="glossary"><dt id="g-nonce">nonce</dt><dd>The number ordering transactions from one account. Replacing a stuck</dd></dl>
+<p>move means signing the same one again at a higher fee.</p>
+<dl class="glossary"><dt id="g-ranked">ranked</dt><dd>A game that counts towards ratings. It must name both players by</dd></dl>
+<p>address, start from the standard position, and be decided by those two alone.</p>
+<dl class="glossary"><dt id="g-replay">replay</dt><dd>Deriving the position and result from the submissions in order. The</dd></dl>
+<p>board does this every time rather than storing an answer.</p>
+<dl class="glossary"><dt id="g-rules-hash">rules hash</dt><dd>The commitment, used as a pairing's identity. The same two players</dd></dl>
+<p>on the same colours produce the same hash, which is how a tournament's games are found.</p>
+<dl class="glossary"><dt id="g-skipped">skipped</dt><dd>A submission the contract stored and replay did not accept. It is on</dd></dl>
+<p>chain permanently and it cost its sender a fee.</p>
+<dl class="glossary"><dt id="g-unverified">unverified</dt><dd>A tournament pairing whose claim does not match the chain. Listed,</dd></dl>
+<p>never counted.</p></section></main>
+</div>
+<footer>Inscribed on Xtrata. A correction is a new inscription, not an edit — the board finds the newest one by reading the wallet it was sent to.</footer>
+</div>
+</body>
+</html>
