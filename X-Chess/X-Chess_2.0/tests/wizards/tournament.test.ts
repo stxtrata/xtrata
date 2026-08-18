@@ -484,3 +484,35 @@ describe('waiting for the log after a rung was superseded', () => {
     expect(block.slice(0, 1400)).toMatch(/4 \* 60_000/);
   });
 });
+
+describe('an indexer that has not caught up is not a lost move', () => {
+  const runner = readFileSync(
+    resolve(fileURLToPath(new URL('../..', import.meta.url)), 'harness/wizards/run-tournament.mjs'),
+    'utf8'
+  );
+
+  it('re-reads before deciding the log did not grow', () => {
+    // A short log from a lagging indexer is indistinguishable from a lost move
+    // on ONE read. Game 35 stopped at 94 when the chain held 95; game 40 at 3
+    // when it held 4. Both were fine and both were stopped.
+    const guard = runner.slice(runner.indexOf('ASK AGAIN BEFORE CONCLUDING'));
+    expect(guard.slice(0, 900)).toMatch(/while \(Date\.now\(\) < until && entries\.length <= lastLength\)/);
+  });
+
+  it('puts the waiting next to the question, so every route in is covered', () => {
+    // The first attempt polled only after a superseded rung. Game 40 came
+    // through the ordinary success path and never touched that branch.
+    const guard = runner.indexOf('ASK AGAIN BEFORE CONCLUDING');
+    const throwsAt = runner.indexOf('the log did not grow after a submission');
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard, 'the wait must precede the throw').toBeLessThan(throwsAt);
+  });
+
+  it('still stops when the move really is not there', () => {
+    // The guard is what stands between a confused runner and paying five times
+    // for the same move, as game 12 did. Waiting must not become forgiving.
+    expect(runner).toMatch(/the log did not grow after a submission/);
+    const guard = runner.slice(runner.indexOf('ASK AGAIN BEFORE CONCLUDING'));
+    expect(guard.slice(0, 900)).toMatch(/4 \* 60_000/);
+  });
+});

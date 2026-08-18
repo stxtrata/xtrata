@@ -357,6 +357,17 @@ ${SCALE_CSS}
    this block and was quietly repainting the border back to --line. Checked with
    getComputedStyle rather than by eye: the class was applied and the colour was
    not. Exactly the collision the note at the top of this file describes. */
+/* The list of tournaments found on chain. Buttons rather than links: this
+   loads into the tab it is in, and nothing navigates. */
+.tn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
+.tn-pick { background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+           border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+.tn-pick:hover { border-color: var(--gold); }
+.tn-pick[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
+.tn-pick .n { color: var(--dim); margin-left: 5px; }
+/* Held but not minted by the organiser. Listed, and not dressed as theirs. */
+.tn-pick--planted { border-style: dashed; }
+
 /* The fee note. Quiet by default and legible on purpose: it is present in
    every game, so it has to survive being seen a hundred times without becoming
    either noise or wallpaper. The number is the only loud part. */
@@ -850,6 +861,10 @@ export const HTML = `
       <input type="text" id="tournament-id" inputmode="numeric" placeholder="2993">
     </div>
     <div class="row"><button class="action" id="tournament-load">Show</button></div>
+    <!-- Filled from the director's wallet, so a reader never has to know a
+         number. See TournamentIndex: holdings finds them, the mint says which
+         the organiser actually made. -->
+    <div id="tournament-list" class="tn-list"></div>
     <div id="tournament-note" class="notice notice--info"></div>
     <div id="tournament-provenance" class="notice notice--info hide"></div>
     <div id="tournament-body"></div>

@@ -62,6 +62,25 @@ const arg = (name, fallback = null) => {
   return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
 };
 
+/**
+ * The manifest this one follows, if any: `--after 3001`.
+ *
+ * A CHAIN THAT CAN ONLY BE WALKED ONE WAY, and worth having anyway. Xtrata
+ * exposes `get-dependencies` and `get-parents` and nothing that asks what
+ * depends ON a token, so this cannot be used to find the newest tournament —
+ * that is what the director's wallet is for, see TournamentIndex.
+ *
+ * What it buys is independence from any wallet. Given ONE manifest, a reader
+ * can follow it back through every earlier tournament without being told an
+ * address, and without the organiser still holding anything. Two indexes
+ * pointing opposite ways survive the loss of either.
+ *
+ * It has to be decided before inscribing, because a dependency cannot be added
+ * afterwards. 2993 and 3001 are not chained to each other for exactly that
+ * reason - the idea arrived after they were both permanent.
+ */
+const AFTER = arg('after') ? Number(arg('after')) : null;
+
 function env() {
   const found = {};
   for (const line of readFileSync(join(HERE, '.env.wizards'), 'utf8').split('\n')) {
@@ -148,7 +167,11 @@ async function main() {
   console.log(`hash      0x${running.toString('hex')}`);
   console.log(`fee unit  ${feeUnit} uSTX (read live)`);
   console.log(`spend cap ${spendCap} uSTX + ${TX_FEE} miner fee`);
-  console.log(`parent    Genesis #${GENESIS}`);
+  console.log(`parent    Genesis #${GENESIS}${AFTER ? `, and manifest #${AFTER}` : ''}`);
+  if (!AFTER) {
+    console.log('          (no --after: this manifest names no earlier tournament, so a reader');
+    console.log('           who finds it cannot walk back to the previous one)');
+  }
 
   if (!LIVE) {
     console.log('\nDry run. Nothing was signed. Add --live to inscribe.');
@@ -166,7 +189,7 @@ async function main() {
       Cl.uint(bytes.length),
       Cl.list(chunks.map((c) => Cl.buffer(c))),
       Cl.stringAscii('data:text/plain,x-chess-tournament-manifest'),
-      Cl.list([Cl.uint(GENESIS)])
+      Cl.list(AFTER ? [Cl.uint(GENESIS), Cl.uint(AFTER)] : [Cl.uint(GENESIS)])
     ],
     senderKey,
     network: 'mainnet',

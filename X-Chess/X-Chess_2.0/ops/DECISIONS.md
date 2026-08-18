@@ -1200,3 +1200,90 @@ are large, that is the right side of the trade to be on.
 - Fees move. These constants are a snapshot of one fifteen-minute window, which
   is why the sample is committed as an artefact and the sweep starts at 400 µSTX
   rather than at 2,000 — the old range measured only the spike.
+
+---
+
+## ADR-0017 — A wallet is the directory, because it is the only index that points forward
+
+**Date** 2026-08-18
+**Status** accepted
+
+### Context
+
+The Tournaments tab took an inscription number and defaulted to one. So it could
+only ever show a reader a tournament they already knew the number of, and
+Exhibition Two was invisible to anybody not told "3001".
+
+The board is itself an inscription. There is no later.
+
+### What was checked, and how
+
+The Xtrata core's read-only interface was read from
+`/v2/contracts/interface/…/xtrata-v3-2-3`. It exposes `get-dependencies`,
+`get-parents`, `get-last-token-id`, `get-minted-count` and `get-next-token-id`.
+
+There is no `get-dependents` and no way to ask what depends ON a token.
+
+Two candidate indexes were then tested live against the director address:
+
+| index | call | result |
+| --- | --- | --- |
+| NFT holdings by principal | 1 | `[3001, 3000, … 2992]`, newest first |
+| mint transactions by sender | 1 | the same ten, token ids in the results |
+
+### Options considered
+
+**A chain of manifests, each naming the one before.** Proposed, and it cannot do
+the job alone. Dependencies point backward only, so a chain can be walked from a
+manifest you already have to every earlier one, and never forward to one
+inscribed after this board. The entry point — "what is the newest?" — is exactly
+the half a chain cannot supply.
+
+**Scanning inscription ids downward from `get-last-token-id`.** Correct and
+unbounded. Thousands of reads to find two documents.
+
+**Holdings of a known wallet.** One call, forward-looking, and the pattern
+already exists in `players.ts` for player manifests.
+
+### Decision
+
+A group of manifests is defined by **the wallet they are sent to**. The board
+knows one address per group and nothing else.
+
+This generalises, which is the point: `ManifestDirectory` in
+`packages/chain/directory.ts` is generic over what a manifest is, so a group is a
+wallet plus a parser. Tournaments are one configuration; a profiles wallet, which
+players send their own manifests to, is another. A third kind is configuration
+rather than code.
+
+`kind` is part of the cache key and not decoration. The cache remembers that an
+inscription is NOT of a given kind, and an inscription that is not a tournament
+may perfectly well be a profile — one shared marker would teach each directory to
+skip the other's manifests.
+
+**Holding finds it; creating proves it.** Anybody may send an NFT to any address
+unasked, so a document arriving in a wallet is a claim, not a fact. The directory
+reports `official` from the mint — which a transfer cannot fake — and refuses to
+decide legitimacy, because that question is answered better elsewhere:
+`checkGames` verifies every pairing against the rules hash its game committed to,
+so a fabricated tournament reads `unverified` however it arrived.
+
+The chain is kept as the cheap half, `--after` on `inscribe-manifest.mjs`. It
+buys independence from any wallet: given one manifest, a reader can walk back
+through every earlier tournament without being told an address and without the
+organiser still holding anything. Two indexes pointing opposite ways survive the
+loss of either.
+
+### What it costs
+
+One holdings call per directory per visit, plus a read per candidate on the
+first visit only — an inscription is immutable, so a document that parsed once
+parses the same way forever and is remembered. Repeat visits are one call.
+
+A wallet that goes quiet takes its group with it. That is the price of an index
+that can grow after the board is permanent, and nothing else here has that
+property.
+
+2993 and 3001 are not chained to each other. The idea arrived after both were
+permanent, which is the whole argument for deciding this before inscribing and
+not after.

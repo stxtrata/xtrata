@@ -522,3 +522,10 @@ Check the fixture first. See [When a test fails](#when-a-test-fails).
 **The economics suite takes three minutes**
 It is running 900 random operations and checking five invariants after every
 one. That is the intended cost.
+
+## Manifests
+
+Tournaments and player profiles are inscribed documents, and the board finds
+each group by the wallet they are sent to — one address per group, because a
+wallet is the only index that grows after the board is permanent. See
+[docs/MANIFESTS.md](docs/MANIFESTS.md).

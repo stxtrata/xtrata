@@ -339,7 +339,31 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
   let lastLength = -1;
 
   for (;;) {
-    const entries = await readEntries(gameId);
+    let entries = await readEntries(gameId);
+
+    // ASK AGAIN BEFORE CONCLUDING IT DID NOT. An indexer that has not caught up
+    // returns a short log, and a short log is indistinguishable from a lost move
+    // on a single read. That mistake stopped game 35 at 94 entries when the
+    // chain held 95, and game 40 at 3 when it held 4 — both fine, both stopped.
+    //
+    // The earlier fix polled only after a superseded rung. Game 40 came through
+    // the ordinary success path and never touched that branch, which is how one
+    // more read at the right place would have saved it. So the waiting belongs
+    // HERE, next to the question it answers, and covers every route in.
+    if (lastLength > 0 && entries.length <= lastLength) {
+      const until = Date.now() + 4 * 60_000;
+      while (Date.now() < until && entries.length <= lastLength) {
+        await new Promise((done) => setTimeout(done, 15_000));
+        try {
+          entries = await readEntries(gameId);
+        } catch {
+          // A read that failed says nothing about the log. Ask again.
+        }
+      }
+      if (entries.length > lastLength) {
+        console.log(`  game ${gameId}: the log caught up (${entries.length} entries)`);
+      }
+    }
 
     // THE LOG MUST GROW. Every pass sends exactly one submission and waits for
     // it, so the next read must see more than the last one did. When it does

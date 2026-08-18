@@ -11,6 +11,8 @@ import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
 import { YourGames } from '../chain/yours.js';
 import { XtrataReader } from '../chain/xtrata.js';
+import { ManifestDirectory } from '../chain/directory.js';
+import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
@@ -252,6 +254,21 @@ export const COMPILED_ACCEPTED_BEFORE = 8_787_816;
 const DEFAULT_TOURNAMENT = 2993;
 
 /**
+ * The wallet the board looks in for tournaments.
+ *
+ * A DIRECTORY, NOT AN AUTHORITY. Everything found here is still checked pairing
+ * by pairing against the chain, so this only decides what is worth READING —
+ * and being wrong about that costs a few reads and never a wrong standing.
+ *
+ * It is one address because the alternative is a scan: Xtrata has no way to ask
+ * what depends on a token, so a chain of manifests can be followed backward from
+ * one you have and never forward to one inscribed after this board was. An
+ * address is the only thing that points forward, which is why manifests are sent
+ * here.
+ */
+const TOURNAMENT_DIRECTORY = 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S';
+
+/**
  * What a move on this contract actually costs to get mined, in microSTX.
  *
  * MEASURED, NOT ESTIMATED. It is the bottom rung of the tournament runner's fee
@@ -453,7 +470,7 @@ const IDS = [
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
-  'fee-advice',
+  'fee-advice', 'tournament-list',
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
@@ -614,6 +631,8 @@ export class ChessApp {
   private xtrata: XtrataReader | null = null;
   private players: PlayerNames | null = null;
   private yours: YourGames | null = null;
+  private index: ManifestDirectory<Tournament> | null = null;
+  private found: Found<Tournament>[] = [];
   /**
    * Ids known to be this player's that the window cannot show.
    *
@@ -679,6 +698,19 @@ export class ChessApp {
       });
       this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata });
       this.yours = new YourGames({ endpoint: endpoint as never, contractId: this.chain.contractId });
+      // One of possibly several directories: a wallet plus what to look for.
+      // A profiles directory is the same call with a different address and
+      // `parsePlayer`. See packages/chain/directory.ts.
+      this.index = new ManifestDirectory<Tournament>({
+        endpoint: endpoint as never,
+        reader: this.xtrata,
+        address: TOURNAMENT_DIRECTORY,
+        kind: 'tournament',
+        parse: (text) => {
+          const parsed = parseTournament(text);
+          return parsed.ok ? parsed.tournament : null;
+        }
+      });
     }
     this.wire();
     // After wire(), which is what puts the element in `this.el`.
@@ -1374,7 +1406,12 @@ export class ChessApp {
     if (tab === 'leaderboard') void this.loadLeaderboard();
     // Only on first open. A tournament is a manifest plus a couple of dozen
     // reads, and flicking between tabs should not re-spend that.
-    if (tab === 'tournaments' && !this.tournament) void this.loadTournamentTab();
+    if (tab === 'tournaments' && !this.tournament) {
+      void this.loadTournamentTab();
+      // Alongside, not before: the list is a convenience and must not delay the
+      // tournament itself appearing.
+      void this.loadTournamentList();
+    }
 
     // Rebuild the list when it has gone stale, which OPENING THE TAB is the
     // signal for.
@@ -2470,6 +2507,62 @@ export class ChessApp {
    * provenance needs the height of the earliest MOVE and a game row only says
    * when a game was opened.
    */
+  /**
+   * Ask the chain which tournaments exist, and offer them.
+   *
+   * WITHOUT THIS THE TAB CAN ONLY SHOW YOU WHAT YOU ALREADY KNEW. It took an
+   * inscription number and defaulted to one, so a second tournament was
+   * invisible to anybody not told its number — and this board is itself an
+   * inscription, so "we will add it later" is not available.
+   *
+   * Quiet on failure. The typed field still works, so a directory that cannot
+   * be read costs a convenience rather than the tab.
+   */
+  private async loadTournamentList(): Promise<void> {
+    if (!this.index) return;
+    try {
+      this.found = await this.index.list();
+    } catch {
+      this.found = [];
+    }
+    this.drawTournamentList();
+  }
+
+  private drawTournamentList(): void {
+    const node = this.el.tournamentList;
+    node.replaceChildren();
+    if (!this.found.length) return;
+
+    const showing = this.tournament?.tournamentId ?? null;
+    for (const entry of this.found) {
+      const button = this.doc.createElement('button');
+      button.type = 'button';
+      button.className = `tn-pick${entry.official ? '' : ' tn-pick--planted'}`;
+      button.setAttribute('aria-pressed', String(entry.id === showing));
+      button.textContent = entry.manifest.name;
+
+      const number = this.doc.createElement('span');
+      number.className = 'n';
+      number.textContent = String(entry.id);
+      button.appendChild(number);
+
+      // SAID, NOT ONLY DRAWN. A dashed border is not an explanation, and the
+      // difference here is the one a stranger could exploit: anybody may send
+      // an inscription to any wallet, so being held by the organiser is a
+      // claim and being minted by them is a fact.
+      button.title = entry.official
+        ? `${entry.manifest.games.length} games · inscribed by the tournament organiser`
+        : `${entry.manifest.games.length} games · in the organiser's wallet but inscribed by ` +
+          'somebody else. Every pairing is still checked against the chain.';
+
+      button.addEventListener('click', () => {
+        (this.el.tournamentId as HTMLInputElement).value = String(entry.id);
+        void this.loadTournamentTab();
+      });
+      node.appendChild(button);
+    }
+  }
+
   private async loadTournamentTab(): Promise<void> {
     if (!this.xtrata) {
       // No endpoint means no inscription reader, and a tournament is nothing
@@ -2519,6 +2612,8 @@ export class ChessApp {
               if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
       this.drawTournament();
+      // So the button for what is now on screen reads as selected.
+      this.drawTournamentList();
       return true;
     });
   }
