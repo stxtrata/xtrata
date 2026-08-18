@@ -94,14 +94,21 @@ export function parseDocs(text: unknown): ParsedDocs {
   let blocks = intro;
   let buffer: string[] = [];
 
+  // The item or definition a following line may be a continuation OF. Cleared
+  // by a blank line, by a heading, and by prose — anything that means the last
+  // one is finished. Without it, "was the buffer empty" is the only signal
+  // available and a blank line looks identical to a wrapped line.
+  let open: Block | null = null;
+
   const flush = (): void => {
     const joined = buffer.join(' ').trim();
     if (joined) blocks.push({ kind: 'text', text: joined });
     buffer = [];
   };
 
-  const open = (level: 2 | 3, heading: string): void => {
+  const heading = (level: 2 | 3, heading: string): void => {
     flush();
+    open = null;
     const section: DocSection = { level, title: heading, id: slug(heading), blocks: [] };
     sections.push(section);
     blocks = section.blocks;
@@ -111,25 +118,44 @@ export function parseDocs(text: unknown): ParsedDocs {
     const trimmed = line.trim();
 
     if (trimmed.startsWith('### ')) {
-      open(3, trimmed.slice(4).trim());
+      heading(3, trimmed.slice(4).trim());
       continue;
     }
     if (trimmed.startsWith('## ')) {
-      open(2, trimmed.slice(3).trim());
+      heading(2, trimmed.slice(3).trim());
       continue;
     }
     if (!trimmed) {
       flush();
+      open = null;
       continue;
     }
     if (trimmed.startsWith('$ ')) {
       flush();
+      open = null;
       blocks.push({ kind: 'command', text: trimmed.slice(2).trim() });
       continue;
     }
     if (trimmed.startsWith('- ')) {
       flush();
-      blocks.push({ kind: 'item', text: trimmed.slice(2).trim() });
+      const item: Block = { kind: 'item', text: trimmed.slice(2).trim() };
+      blocks.push(item);
+      open = item;
+      continue;
+    }
+
+    // A LINE THAT CONTINUES THE LAST ONE, rather than starting a paragraph.
+    //
+    // Prose is wrapped at seventy-odd columns, so a definition or a bullet
+    // longer than that spills onto the next line — and treating that spill as a
+    // new paragraph is what broke the glossary: every entry rendered as one row
+    // of the grid followed by a full-width line of orphaned text starting back
+    // at the left margin. It looked like a CSS fault and was a parsing one.
+    //
+    // Only while the previous block is an item or a definition, and only when
+    // no blank line has intervened, which is exactly what a wrapped line is.
+    if (open) {
+      open.text = `${open.text} ${trimmed}`;
       continue;
     }
     // A definition, but only when the separator is surrounded by text. Bare
@@ -138,7 +164,9 @@ export function parseDocs(text: unknown): ParsedDocs {
     const define = /^(.{1,60}?)\s::\s(.+)$/.exec(trimmed);
     if (define) {
       flush();
-      blocks.push({ kind: 'define', term: define[1].trim(), text: define[2].trim() });
+      const entry: Block = { kind: 'define', term: define[1].trim(), text: define[2].trim() };
+      blocks.push(entry);
+      open = entry;
       continue;
     }
     buffer.push(trimmed);

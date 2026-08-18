@@ -104,3 +104,37 @@ describe('reading an inscribed manual', () => {
     expect(new Set(ids).size).toBe(2);
   });
 });
+
+describe('prose that wraps', () => {
+  // The manual is wrapped at about seventy columns, so anything longer than
+  // that continues on the next line. Reading the continuation as a new
+  // paragraph put a full-width orphan under every glossary entry — which looked
+  // like a stylesheet problem and was a parser one.
+
+  it('joins a definition that runs onto the next line', () => {
+    const parsed = parseDocs(doc('\n## G\nterm :: first part\nand the rest of it\n'));
+    const blocks = parsed.docs!.sections[0].blocks;
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'define', text: 'first part and the rest of it' });
+  });
+
+  it('joins a list item that runs onto the next line', () => {
+    const parsed = parseDocs(doc('\n## G\n- one thing\nspilling over\n'));
+    const blocks = parsed.docs!.sections[0].blocks;
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({ kind: 'item', text: 'one thing spilling over' });
+  });
+
+  it('starts a paragraph again after a blank line', () => {
+    const parsed = parseDocs(doc('\n## G\n- one thing\n\nseparate prose\n'));
+    expect(parsed.docs!.sections[0].blocks.map((b) => b.kind)).toEqual(['item', 'text']);
+  });
+
+  it('does not swallow the next item into the last one', () => {
+    const parsed = parseDocs(doc('\n## G\n- one\n- two\n'));
+    expect(parsed.docs!.sections[0].blocks.map((b) => (b as { text: string }).text)).toEqual([
+      'one',
+      'two'
+    ]);
+  });
+});

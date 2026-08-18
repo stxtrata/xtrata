@@ -51,7 +51,19 @@ const XTRATA = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 const [XTRATA_ADDRESS, XTRATA_NAME] = XTRATA.split('.');
 
 const CHUNK = 16_384;
-const TX_FEE = 20_000n;
+
+/**
+ * The miner fee, which is about SIZE and not about the protocol fee.
+ *
+ * A flat 20,000 was fine for every one-chunk document and was rejected outright
+ * for a two-chunk one: FeeTooLow, expected 25,694. Miners price by bytes, and a
+ * chunk is sixteen kilobytes of them, so a constant was always going to fail at
+ * whatever size crossed the line first.
+ *
+ * Free to get wrong in this direction - the node refuses it at broadcast and
+ * nothing is spent - but it costs a round trip and looks like a failure.
+ */
+const txFeeFor = (chunks) => 20_000n + 15_000n * BigInt(Math.max(0, chunks - 1));
 
 const LIVE = process.argv.includes('--live');
 const arg = (name, fallback = null) => {
@@ -136,20 +148,39 @@ async function main() {
 
   const bytes = readFileSync(file);
   const text = bytes.toString('utf8');
-  // The two documents this script can inscribe, both plain text and both read
-  // by header. Checked because an inscription cannot be edited: a file that is
-  // neither is 0.3 STX spent on something no board will ever read.
-  const KINDS = {
-    'X-CHESS-TOURNAMENT/1': 'tournament manifest',
-    'X-CHESS-DOCS/1': 'manual'
-  };
+  // What this script can inscribe, recognised by what the file BEGINS with.
+  // Checked because an inscription cannot be edited: a file that is none of
+  // these is 0.3 STX spent on something nothing will ever read.
+  //
+  // The mime type matters as much as the bytes. Served as text/plain a page
+  // renders as its own source, and there is no correcting that afterwards.
+  const KINDS = [
+    { starts: 'X-CHESS-TOURNAMENT/1', kind: 'tournament manifest', mime: 'text/plain' },
+    { starts: 'X-CHESS-DOCS/1', kind: 'manual', mime: 'text/plain' },
+    { starts: '<!doctype html', kind: 'page', mime: 'text/html' }
+  ];
   const header = text.split('\n')[0].trim();
-  const kind = KINDS[header];
-  if (!kind) {
+  const match = KINDS.find((k) => header.toLowerCase().startsWith(k.starts.toLowerCase()));
+  if (!match) {
     throw new WizardSafetyError(
-      `${file} begins "${header.slice(0, 40)}", which is neither ` +
-        `${Object.keys(KINDS).join(' nor ')}. No board would read it.`
+      `${file} begins "${header.slice(0, 40)}", which is none of ` +
+        `${KINDS.map((k) => k.starts).join(', ')}. Nothing would read it.`
     );
+  }
+  const { kind, mime } = match;
+
+  // A page that reaches for anything off its own bytes is broken the moment the
+  // host it reaches for goes away, and an inscription outlives hosts.
+  if (mime === 'text/html') {
+    const external = [...text.matchAll(/\b(?:src|href)\s*=\s*["'](https?:\/\/[^"']+)/gi)]
+      .map((m) => m[1])
+      .filter((url) => !/^https:\/\/xtrata\.xyz\/i\//.test(url));
+    if (external.length) {
+      throw new WizardSafetyError(
+        `this page loads from ${external.length} external place(s), starting with ` +
+          `${external[0].slice(0, 60)}. An inscription has to carry everything it needs.`
+      );
+    }
   }
 
   // The same incremental chain the contract computes in `process-chunk`:
@@ -181,10 +212,16 @@ async function main() {
   const spendCap = feeUnit + feeUnit * (1n + BigInt(Math.ceil(chunks.length / 50)));
 
   console.log(`\nfile      ${file}`);
-  console.log(`kind      ${kind}`);
-  console.log(
-    `name      ${(/"name":\s*"([^"]+)"/.exec(text) ?? [])[1] ?? text.split('\n')[1]?.trim() ?? '?'}`
-  );
+  console.log(`kind      ${kind}  (served as ${mime})`);
+  // Whatever the document calls itself, by its own convention: a manifest has a
+  // name field, a page has a title, a manual has its second line. Printed
+  // because it is the last human-readable check before something permanent.
+  const called =
+    (/"name":\s*"([^"]+)"/.exec(text) ?? [])[1] ??
+    (/<title[^>]*>([^<]+)<\/title>/i.exec(text) ?? [])[1] ??
+    text.split('\n')[1]?.trim() ??
+    '?';
+  console.log(`name      ${called.trim()}`);
   if (kind === 'tournament manifest') {
     console.log(`games     ${(text.match(/"id":/g) ?? []).length}`);
   }
@@ -192,7 +229,8 @@ async function main() {
   console.log(`payload   ${bytes.length} bytes in ${chunks.length} chunk(s)`);
   console.log(`hash      0x${running.toString('hex')}`);
   console.log(`fee unit  ${feeUnit} uSTX (read live)`);
-  console.log(`spend cap ${spendCap} uSTX + ${TX_FEE} miner fee`);
+  const txFee = txFeeFor(chunks.length);
+  console.log(`spend cap ${spendCap} uSTX + ${txFee} miner fee`);
   console.log(`depends   ${DEPENDS_ON.length ? `#${DEPENDS_ON.join(', #')}` : 'nothing'}`);
   if (!AFTER) {
     console.log('          (no --after, so a reader who finds this cannot walk back to an');
@@ -211,19 +249,15 @@ async function main() {
     functionName: 'mint-single-tx-recursive',
     functionArgs: [
       Cl.buffer(running),
-      Cl.stringAscii('text/plain'),
+      Cl.stringAscii(mime),
       Cl.uint(bytes.length),
       Cl.list(chunks.map((c) => Cl.buffer(c))),
-      Cl.stringAscii(
-        kind === 'manual'
-          ? 'data:text/plain,x-chess-manual'
-          : 'data:text/plain,x-chess-tournament-manifest'
-      ),
+      Cl.stringAscii(`data:text/plain,x-chess-${kind.replace(/\s+/g, '-')}`),
       Cl.list(DEPENDS_ON.map((id) => Cl.uint(id)))
     ],
     senderKey,
     network: 'mainnet',
-    fee: TX_FEE,
+    fee: txFee,
     nonce: await fetchNonce({ address: senderAddress, network: 'mainnet' }),
     postConditions: [Pc.principal(senderAddress).willSendLte(spendCap).ustx()],
     postConditionMode: PostConditionMode.Deny

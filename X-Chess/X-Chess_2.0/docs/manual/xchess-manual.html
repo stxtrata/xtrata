@@ -7,7 +7,6 @@
 <style>:root{--bg:#12100e;--panel:#1b1815;--line:#2e2924;--line-2:#453d33;--ink:#e8e2d9;
 --dim:#9a9187;--gold:#d8a24a;--warn:#e0733f;--good:#6fae5f;--light:#b9a98f}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--gold)}
@@ -77,7 +76,7 @@ header.top h1{font-size:26px}
 <a class="chip" href="#ai-players">Program a player</a>
 <a class="chip" href="#fees-and-why-your-wallet-is-wrong">Fees</a>
 <a class="chip" href="#glossary">Glossary</a>
-<a class="chip" href="/i/2991" target="_blank" rel="noopener noreferrer">The engine <b>#2991</b></a>
+<a class="chip" href="https://xtrata.xyz/i/2991" target="_blank" rel="noopener noreferrer">The engine <b>#2991</b></a>
 </div>
 </div></header>
 <div class="wrap"><div class="cols">
@@ -97,8 +96,7 @@ header.top h1{font-size:26px}
 <ul><li>Xverse: press Edit, then Custom.</li><li>Leather: choose the Custom tab.</li></ul></section>
 <section class="s3"><h3 id="when-a-move-will-not-confirm">When a move will not confirm<a class="anchor" href="#when-a-move-will-not-confirm" aria-label="Link to this section">#</a></h3><p>Replace it at the SAME nonce with a higher fee. The board shows that nonce whenever a move of yours is pending, because it is the one thing neither wallet can tell you: they know your pending transactions, and not which of them is a chess move.</p>
 <p>Signing a new move instead takes the next nonce, which queues behind the stuck one rather than replacing it. Two fees, and the second cannot confirm until the first does.</p>
-<ul><li>Xverse: Speed Up on the Stacks dashboard, or Edit nonce when signing.</li><li>Leather extension: the Activity tab, then increase the fee. Leather desktop</li></ul>
-<p>cannot.</p></section>
+<ul><li>Xverse: Speed Up on the Stacks dashboard, or Edit nonce when signing.</li><li>Leather extension: the Activity tab, then increase the fee. Leather desktop cannot.</li></ul></section>
 <section class="s3"><h3 id="games-that-never-end">Games that never end<a class="anchor" href="#games-that-never-end" aria-label="Link to this section">#</a></h3><p>The contract has no clock and no resignation by absence. A game nobody has touched for a year is, on chain, live and waiting for a move anybody may still make.</p>
 <p>So a board cannot tell a player who walked away from a player who is thinking, and this one does not pretend to. It says how long a game has been quiet and leaves the conclusion to you.</p>
 <p>A game ends when the chain says so: checkmate, stalemate, a draw by repetition or the fifty-move rule, a resignation, or a draw offered and accepted. There is no other way, and in particular no organiser can declare one.</p></section>
@@ -133,40 +131,23 @@ header.top h1{font-size:26px}
 <section class="s2"><h2 id="adding-ai-players">Adding AI players<a class="anchor" href="#adding-ai-players" aria-label="Link to this section">#</a></h2><p>Everything above is unchanged. An AI player is an entrant like any other, with an address and a wallet, and a tournament may mix them freely with people.</p>
 <p>The difference is only who decides the moves, and it has one consequence worth being honest about: an AI player does not move by itself. Something has to be running that chooses for it, so a tournament of nothing but programs stops the moment the person running them stops. The board says so when it can tell.</p></section>
 <section class="s3"><h3 id="declaring-which-is-which">Declaring which is which<a class="anchor" href="#declaring-which-is-which" aria-label="Link to this section">#</a></h3><p>Mark an entrant with a kind, so the board can warn readers rather than leaving them to wonder why nothing has moved for a day. An entrant that says nothing is treated as unknown rather than as a person, because the first two exhibitions said nothing and were played entirely by programs.</p></section>
-<section class="s3"><h3 id="the-engine-every-player-is-handed">The engine every player is handed<a class="anchor" href="#the-engine-every-player-is-handed" aria-label="Link to this section">#</a></h3><p>Inscription <a class="ref" href="/i/2991" target="_blank" rel="noopener noreferrer">#2991</a>. It is deterministic, and it is not a recommendation: it ranks every legal move with a score in centipawns from the mover's point of view, best first, and marks any mate.</p>
+<section class="s3"><h3 id="the-engine-every-player-is-handed">The engine every player is handed<a class="anchor" href="#the-engine-every-player-is-handed" aria-label="Link to this section">#</a></h3><p>Inscription <a class="ref" href="https://xtrata.xyz/i/2991" target="_blank" rel="noopener noreferrer">#2991</a>. It is deterministic, and it is not a recommendation: it ranks every legal move with a score in centipawns from the mover's point of view, best first, and marks any mate.</p>
 <p>A character reads that list and picks by style. That is the only thing a character controls, which is why two characters given identical positions play differently, and why none of them hangs a queen.</p></section>
 <section class="s3"><h3 id="why-the-engine-exists">Why the engine exists<a class="anchor" href="#why-the-engine-exists" aria-label="Link to this section">#</a></h3><p>Measured rather than assumed. Across six on-chain games, more thinking effort moved the blunder rate from 29% to 29%. Competence instructions moved it from 21% to 21%. A king-mobility hint produced no mate in fifty plies where doing nothing mated in twenty-three.</p>
 <p>The engine halved it, 24% to 12%, replicated across three twelve-game runs. It does not make games finish, though: a one-ply control mated more often, 8 to 6.</p></section>
 <section class="s3"><h3 id="designing-a-character">Designing a character<a class="anchor" href="#designing-a-character" aria-label="Link to this section">#</a></h3><p>A character sheet is an inscription describing a style: how it opens, what it will risk, what it avoids, how it treats a won position. Keep it about preferences rather than about chess ability, because the engine already supplies the ability and a character that argues with it plays worse.</p>
 <p>Inscribe the sheet, then name its id as the entry for that entrant in the tournament manifest. The board links it beside that player, so anybody reading the tournament can open the character and see what that competitor was told to do.</p></section>
-<section class="s2"><h2 id="what-the-board-refuses-to-do">What the board refuses to do<a class="anchor" href="#what-the-board-refuses-to-do" aria-label="Link to this section">#</a></h2><ul><li>It will not say a game is yours unless the rules hashing to that game's own</li></ul>
-<p>commitment name you.</p>
-<ul><li>It will not count a tournament game whose pairing does not match the chain.</li><li>It will not report a result it has not replayed itself.</li><li>It will not call a tournament finished, or crown a winner, until every game has</li></ul>
-<p>a result and every pairing is verified.</p>
-<ul><li>It will not break a tie to award a place that was shared.</li><li>It will not treat a rate limit as an answer: a lookup that failed is never</li></ul>
-<p>recorded as a thing that does not exist.</p></section>
-<section class="s2"><h2 id="glossary">Glossary<a class="anchor" href="#glossary" aria-label="Link to this section">#</a></h2><dl class="glossary"><dt id="g-commitment">commitment</dt><dd>The 32-byte hash a game stores instead of its rules. The rules are</dd></dl>
-<p>recovered by proposing candidates and testing them against it.</p>
-<dl class="glossary"><dt id="g-compiled">compiled</dt><dd>A manifest inscribed after play began. A description of games that</dd></dl>
-<p>already existed, rather than a promise made before them.</p>
-<dl class="glossary"><dt id="g-committed">committed</dt><dd>A manifest inscribed before the first move of any of its games.</dd><dt id="g-directory">directory</dt><dd>A wallet that manifests are sent to, so a board can find them. The</dd></dl>
-<p>board knows one address per group and nothing else.</p>
-<dl class="glossary"><dt id="g-entry">entry</dt><dd>The inscription defining how an AI player chooses among ranked moves.</dd><dt id="g-manifest">manifest</dt><dd>An inscribed document naming a tournament's entrants and which game</dd></dl>
-<p>id is which pairing.</p>
-<dl class="glossary"><dt id="g-nonce">nonce</dt><dd>The number ordering transactions from one account. Replacing a stuck</dd></dl>
-<p>move means signing the same one again at a higher fee.</p>
-<dl class="glossary"><dt id="g-ranked">ranked</dt><dd>A game that counts towards ratings. It must name both players by</dd></dl>
-<p>address, start from the standard position, and be decided by those two alone.</p>
-<dl class="glossary"><dt id="g-replay">replay</dt><dd>Deriving the position and result from the submissions in order. The</dd></dl>
-<p>board does this every time rather than storing an answer.</p>
-<dl class="glossary"><dt id="g-rules-hash">rules hash</dt><dd>The commitment, used as a pairing's identity. The same two players</dd></dl>
-<p>on the same colours produce the same hash, which is how a tournament's games are found.</p>
-<dl class="glossary"><dt id="g-skipped">skipped</dt><dd>A submission the contract stored and replay did not accept. It is on</dd></dl>
-<p>chain permanently and it cost its sender a fee.</p>
-<dl class="glossary"><dt id="g-unverified">unverified</dt><dd>A tournament pairing whose claim does not match the chain. Listed,</dd></dl>
-<p>never counted.</p></section></main>
+<section class="s2"><h2 id="what-the-board-refuses-to-do">What the board refuses to do<a class="anchor" href="#what-the-board-refuses-to-do" aria-label="Link to this section">#</a></h2><ul><li>It will not say a game is yours unless the rules hashing to that game's own commitment name you.</li><li>It will not count a tournament game whose pairing does not match the chain.</li><li>It will not report a result it has not replayed itself.</li><li>It will not call a tournament finished, or crown a winner, until every game has a result and every pairing is verified.</li><li>It will not break a tie to award a place that was shared.</li><li>It will not treat a rate limit as an answer: a lookup that failed is never recorded as a thing that does not exist.</li></ul></section>
+<section class="s2"><h2 id="glossary">Glossary<a class="anchor" href="#glossary" aria-label="Link to this section">#</a></h2><dl class="glossary"><dt id="g-commitment">commitment</dt><dd>The 32-byte hash a game stores instead of its rules. The rules are recovered by proposing candidates and testing them against it.</dd><dt id="g-compiled">compiled</dt><dd>A manifest inscribed after play began. A description of games that already existed, rather than a promise made before them.</dd><dt id="g-committed">committed</dt><dd>A manifest inscribed before the first move of any of its games.</dd><dt id="g-directory">directory</dt><dd>A wallet that manifests are sent to, so a board can find them. The board knows one address per group and nothing else.</dd><dt id="g-entry">entry</dt><dd>The inscription defining how an AI player chooses among ranked moves.</dd><dt id="g-manifest">manifest</dt><dd>An inscribed document naming a tournament's entrants and which game id is which pairing.</dd><dt id="g-nonce">nonce</dt><dd>The number ordering transactions from one account. Replacing a stuck move means signing the same one again at a higher fee.</dd><dt id="g-ranked">ranked</dt><dd>A game that counts towards ratings. It must name both players by address, start from the standard position, and be decided by those two alone.</dd><dt id="g-replay">replay</dt><dd>Deriving the position and result from the submissions in order. The board does this every time rather than storing an answer.</dd><dt id="g-rules-hash">rules hash</dt><dd>The commitment, used as a pairing's identity. The same two players on the same colours produce the same hash, which is how a tournament's games are found.</dd><dt id="g-skipped">skipped</dt><dd>A submission the contract stored and replay did not accept. It is on chain permanently and it cost its sender a fee.</dd><dt id="g-unverified">unverified</dt><dd>A tournament pairing whose claim does not match the chain. Listed, never counted.</dd></dl></section></main>
 </div>
 <footer>Inscribed on Xtrata. A correction is a new inscription, not an edit — the board finds the newest one by reading the wallet it was sent to.</footer>
 </div>
+<script>
+document.addEventListener('click',function(e){
+var a=e.target.closest&&e.target.closest('a[href^="#"]');if(!a)return;
+var el=document.getElementById(a.getAttribute('href').slice(1));if(!el)return;
+e.preventDefault();el.scrollIntoView({block:'start'});
+});
+</script>
 </body>
 </html>

@@ -378,6 +378,22 @@ ${SCALE_CSS}
 .tn-controls input.tn-manifest { width: 8.5em; flex: 0 0 auto; }
 /* Its own line, deliberately. It is a sentence, and letting it share a row with
    the controls is what pushes the buttons away from the box they act on. */
+/* The question mark is one character, so it needs a shape rather than a width. */
+.tab--help { font-weight: 700; min-width: 34px; text-align: center; }
+
+/* The manual, filling the tab. Tall because it is a document: a short frame
+   would put a page with its own contents sidebar into a letterbox. */
+.help-frame { width: 100%; height: 78vh; min-height: 460px; display: block;
+              border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+
+/* The way out of the frame, always offered. A browser can refuse to embed and
+   this board cannot see that it did. */
+.help-open { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+             border: 1px solid var(--gold); border-radius: 8px;
+             padding: 12px 14px; margin: 4px 0 14px; }
+.help-open b { color: var(--gold); }
+.help-open .why { color: var(--dim); font-size: 12px; flex: 1 1 22ch; }
+
 /* A group: one question, its controls, and what it produced. */
 .tn-group { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 4px 0 12px; }
 .tn-group__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
@@ -688,8 +704,12 @@ export const HTML = `
       <button class="tab" id="tab-explore" role="tab" aria-selected="false">Explore<span class="tab-count hide" id="explore-waiting"></span></button>
       <button class="tab" id="tab-leaderboard" role="tab" aria-selected="false">Leaderboard</button>
       <button class="tab" id="tab-tournaments" role="tab" aria-selected="false">Tournaments</button>
-      <button class="tab" id="tab-help" role="tab" aria-selected="false">Help</button>
       <button class="tab" id="tab-profile" role="tab" aria-selected="false">Profile</button>
+      <!-- A question mark, and last. It is the tab nobody is looking for until
+           they are, so it should not take a word's worth of the row from the
+           tabs people use constantly. -->
+      <button class="tab tab--help" id="tab-help" role="tab" aria-selected="false"
+              title="How this works" aria-label="Help">?</button>
     </nav>
     <div class="row">
       <!-- The master switch lives up here, not only in the panel, because the

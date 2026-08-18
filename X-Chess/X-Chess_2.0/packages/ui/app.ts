@@ -15,8 +15,6 @@ import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
 import { parseTournament, stageOf } from '../protocol/tournament.js';
-import { parseDocs, splitRefs } from '../protocol/docs.js';
-import type { Block, Docs } from '../protocol/docs.js';
 import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
@@ -337,6 +335,42 @@ type TournamentState = 'planned' | 'running' | 'finished' | 'unknown';
 type PickerFilter = 'all' | 'finished' | 'running' | 'planned' | 'unknown';
 
 const STATE_KEY = 'xchess:tstate:';
+
+/**
+ * Where an inscription can be read.
+ *
+ * ABSOLUTE, and the earlier reasoning for a relative `/i/<id>` was wrong. The
+ * argument was endpoint.ts's: a host named inside a permanent artefact becomes a
+ * dependency that outlives it. That holds for the API this board CANNOT WORK
+ * without, and not for a link a person clicks — if this host disappears the
+ * board still reads the chain and plays games, and only the link 404s.
+ *
+ * What relative actually bought was a link that resolves under one gateway and
+ * nowhere else: not when the file is opened directly, not on a dev server, not
+ * from any other viewer. Tested, and it does not work.
+ *
+ * So it is spelled out. One constant, so a different canonical viewer is one
+ * edit rather than five.
+ */
+const INSCRIPTION_VIEWER = 'https://xtrata.xyz/i/';
+
+/**
+ * The manual, laid out as a page.
+ *
+ * Named here rather than discovered, because it is one document and this is a
+ * link rather than a lookup. A newer manual is found the usual way — by the
+ * wallet — and rendered below; this is the designed version of the same text.
+ *
+ * 3006, and the two before it are why the board LOOKS this one up rather than
+ * trusting the number. 3004's in-page links were all broken by the runtime's
+ * injected base tag; 3005 fixed those and had a glossary where every wrapped
+ * line escaped its column. Neither can be repaired. They stay on chain and are
+ * superseded, which is the only correction an inscription has.
+ *
+ * This constant is the fallback for a board that cannot reach the directory.
+ * The directory is what makes the next correction free.
+ */
+const MANUAL_PAGE = 3006;
 
 /**
  * What a reader can narrow a tournament's games down to.
@@ -716,8 +750,8 @@ export class ChessApp {
    * button has to follow the click rather than the arrival.
    */
   private tournamentLoading: number | null = null;
-  private docs: ManifestDirectory<Docs> | null = null;
-  private docsFound: Found<Docs>[] = [];
+  private docs: ManifestDirectory<{ title: string }> | null = null;
+  private docsFound: Found<{ title: string }>[] = [];
   private docsAsked = false;
   /**
    * Ids known to be this player's that the window cannot show.
@@ -792,14 +826,19 @@ export class ChessApp {
       // `parsePlayer`. See packages/chain/directory.ts.
       // The manual, found the same way tournaments are, so a correction is a
       // new inscription rather than a new board.
-      this.docs = new ManifestDirectory<Docs>({
+      this.docs = new ManifestDirectory<{ title: string }>({
         endpoint: endpoint as never,
         reader: this.xtrata,
         address: TOURNAMENT_DIRECTORY,
-        kind: 'docs',
+        kind: 'manual-page',
+        // RECOGNISED BY WHAT IT IS, so the newest one wins without this board
+        // being rebuilt. The alternative — naming an inscription number here —
+        // would freeze the manual at whatever was true the day this went on
+        // chain, which is the one thing keeping it separate was meant to avoid.
         parse: (text) => {
-          const parsed = parseDocs(text);
-          return parsed.ok ? parsed.docs : null;
+          if (!/^\s*<!doctype html/i.test(text)) return null;
+          const title = /<title[^>]*>([^<]*X Chess manual[^<]*)<\/title>/i.exec(text);
+          return title ? { title: title[1].trim() } : null;
         }
       });
       this.index = new ManifestDirectory<Tournament>({
@@ -3313,12 +3352,8 @@ export class ChessApp {
     // and where, which makes "checkable by a stranger" true in principle and
     // false in practice.
     //
-    // RELATIVE, deliberately. `endpoint.ts` explains why naming a host in a
-    // permanent artefact is a mistake: it makes that host a dependency of
-    // something that outlives it. `/i/<id>` is served by whatever is serving
-    // this board, so under the Xtrata runtime it resolves and nowhere else does
-    // it pretend to. A dead link is a dead link; a baked-in hostname is a
-    // permanent one.
+    // Absolute. See INSCRIPTION_VIEWER: a relative path resolves under one
+    // gateway and nowhere else, including when this page is opened directly.
     const note = this.el.tournamentNote;
     const read = this.doc.createElement('span');
     read.className = 'tn-read';
@@ -3326,7 +3361,7 @@ export class ChessApp {
     const link = (id: number, label: string): void => {
       if (read.childNodes.length > 1) read.appendChild(this.doc.createTextNode(' · '));
       const a = this.doc.createElement('a');
-      a.href = `/i/${id}`;
+      a.href = `${INSCRIPTION_VIEWER}${id}`;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
       a.textContent = label;
@@ -3425,7 +3460,7 @@ export class ChessApp {
         if (typeof entry === 'number' && entry > 0) {
           const link = this.doc.createElement('a');
           link.className = 'tn-entry';
-          link.href = `/i/${entry}`;
+          link.href = `${INSCRIPTION_VIEWER}${entry}`;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
           link.textContent = 'character';
@@ -5638,189 +5673,67 @@ export class ChessApp {
   }
 
   /**
-   * The manual: what is built in, then whatever has been inscribed.
+   * The manual, embedded.
    *
-   * The built-in half is short and never fails, because a manual that only
-   * appears when a lookup succeeds is not one. It says the few things somebody
-   * cannot work out from the board itself, and points at the rest.
+   * IT IS A PAGE, so it is shown as one. It runs to seven thousand pixels and
+   * carries its own contents sidebar, which is why this is a frame filling the
+   * tab rather than a modal: an overlay would put a document with its own
+   * navigation inside a box with different navigation, and give the reader two
+   * scroll positions to keep track of.
+   *
+   * The board used to carry a short copy of this text built in. That is gone —
+   * two manuals is two things to keep true, and the one that was easiest to
+   * update was the one nobody could see.
    */
   private drawHelp(): void {
     const body = this.el.helpBody;
     body.replaceChildren();
 
-    const section = (title: string, paragraphs: string[]): void => {
-      const h = this.doc.createElement('h3');
-      h.className = 'help-h';
-      h.textContent = title;
-      body.appendChild(h);
-      for (const text of paragraphs) body.appendChild(this.helpParagraph(text));
-    };
+    // The newest manual in the directory, else the one this board shipped
+    // knowing about. Found rather than named, so a correction is an
+    // inscription rather than a new board.
+    const found = this.docsFound[0];
+    const id = found?.id ?? MANUAL_PAGE;
 
-    section('What this is', [
-      'A chess board that is itself an inscription, reading a contract on Stacks. ' +
-        'Every move is a transaction, every position on screen is replayed from the ' +
-        'chain, and nothing is stored on a server because there is no server.',
-      'That is why it says so much about what it is reading: it is deriving what you ' +
-        'see rather than being handed it.'
-    ]);
+    // ALWAYS ABOVE THE FRAME, not only when it fails. A frame can be refused by
+    // a browser setting this board cannot see, and a reader looking at an empty
+    // rectangle has no way to know there was ever anything behind it.
+    const bar = this.doc.createElement('div');
+    bar.className = 'help-open';
+    const link = this.doc.createElement('a');
+    link.href = `${INSCRIPTION_VIEWER}${id}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const strong = this.doc.createElement('b');
+    strong.textContent = 'Open the manual in a new tab';
+    link.appendChild(strong);
+    bar.appendChild(link);
 
-    section('Playing', [
-      'A move costs a network fee and nothing else. Wallets estimate that from the ' +
-        'whole network and usually suggest several times what moves here need, which ' +
-        'is ' + MOVE_FEE_STX + ' STX. The fee is yours to set.',
-      'If a move sits unconfirmed, raise the fee in your wallet on the SAME nonce ' +
-        'rather than sending it again. A second attempt takes the next nonce, queues ' +
-        'behind the first, and you pay for both.'
-    ]);
+    const why = this.doc.createElement('span');
+    why.className = 'why';
+    why.textContent =
+      `Inscription ${id}${found ? '' : ', the copy this board shipped with'}. ` +
+      'It is on chain and readable without this page.';
+    bar.appendChild(why);
+    body.appendChild(bar);
 
-    section('Tournaments', [
-      'A tournament is a document inscribed on chain naming its entrants and which ' +
-        'game id is which pairing. The board finds them by reading a wallet the ' +
-        'organiser sends them to, so you never need a number, though you can type ' +
-        'one at the bottom of the Tournaments tab.',
-      'Nothing in a manifest is trusted. Every pairing is checked against the rules ' +
-        'hash its game committed to on chain, and a claim that does not match reads ' +
-        'as unverified and scores nothing.',
-      'A manifest inscribed BEFORE the first move reads as committed; one written ' +
-        'afterwards reads as compiled. Both are honest, and only the first is a ' +
-        'promise rather than a description.'
-    ]);
-
-    section('Running your own', [
-      'The tooling lives in the repository rather than in this page, because it signs ' +
-        'transactions and a board holds no keys. In order: open the games, build the ' +
-        'manifest from what is on chain, inscribe it, then play.',
-      'That order is forced. A manifest names games by id, ids do not exist until ' +
-        'games are opened, and inscribing after the first move makes it a description ' +
-        'instead of a commitment. Opening settles nothing, so it does not spoil it.'
-    ]);
-
-    section('AI players', [
-      'Every player in the exhibitions was a program handed the same inscribed ' +
-        'engine, #2991. A character is a separate inscription describing how that ' +
-        'player chooses among the moves the engine ranks: style, openings, risk.',
-      'A manifest can name one per entrant, and this board links it beside that ' +
-        'player. An all-AI tournament does not advance on its own, because somebody ' +
-        'has to be running the engine, and its games stop when they stop.'
-    ]);
-    this.drawHelpDocs();
-  }
-
-  /** One paragraph, with inscription references offered as links. */
-  private helpParagraph(text: string): HTMLElement {
-    const p = this.doc.createElement('p');
-    p.className = 'help-p';
-    for (const piece of splitRefs(text)) {
-      if (piece.inscription === null) {
-        p.appendChild(this.doc.createTextNode(piece.text));
-        continue;
-      }
-      // Relative, for the reason endpoint.ts gives: a host named inside a
-      // permanent artefact becomes a dependency that outlives it.
-      const link = this.doc.createElement('a');
-      link.href = '/i/' + piece.inscription;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = piece.text;
-      p.appendChild(link);
-    }
-    return p;
-  }
-
-  /**
-   * Whatever manual has been inscribed, with an index for getting into it.
-   *
-   * A manual long enough to be worth inscribing is long enough to be unusable
-   * as one column of prose. The index is BUILT from the headings rather than
-   * written beside them, so it cannot fall out of step with the document it
-   * describes — and it moves the page rather than the address bar, because the
-   * fragment already means something here: `openFromLink` reads it for a game.
-   */
-  private drawHelpDocs(): void {
-    const body = this.el.helpBody;
-
-    for (const found of this.docsFound) {
-      const manual = found.manifest;
-
-      const title = this.doc.createElement('h3');
-      title.className = 'help-h';
-      title.textContent = manual.title;
-      body.appendChild(title);
-
-      for (const block of manual.intro) body.appendChild(this.helpBlock(block));
-
-      if (manual.sections.length > 2) {
-        const index = this.doc.createElement('nav');
-        index.className = 'help-index';
-        index.setAttribute('aria-label', `Contents of ${manual.title}`);
-        for (const section of manual.sections) {
-          const jump = this.doc.createElement('button');
-          jump.type = 'button';
-          jump.className = `help-jump help-jump--${section.level}`;
-          jump.textContent = section.title;
-          jump.addEventListener('click', () => {
-            const target = this.doc.getElementById(`doc-${found.id}-${section.id}`);
-            target?.scrollIntoView({ block: 'start' });
-          });
-          index.appendChild(jump);
-        }
-        body.appendChild(index);
-      }
-
-      for (const section of manual.sections) {
-        const heading = this.doc.createElement(section.level === 2 ? 'h4' : 'h5');
-        heading.className = section.level === 2 ? 'help-h4' : 'help-h5';
-        // Scoped by inscription id, so two manuals cannot collide.
-        heading.id = `doc-${found.id}-${section.id}`;
-        heading.textContent = section.title;
-        body.appendChild(heading);
-        for (const block of section.blocks) body.appendChild(this.helpBlock(block));
-      }
-    }
-  }
-
-  /** One block of an inscribed manual, built as nodes and never as markup. */
-  private helpBlock(block: Block): HTMLElement {
-    if (block.kind === 'command') {
-      const pre = this.doc.createElement('pre');
-      pre.className = 'help-cmd';
-      // textContent, so a manual cannot put anything but text on the page.
-      pre.textContent = block.text;
-      return pre;
-    }
-    if (block.kind === 'define') {
-      const row = this.doc.createElement('p');
-      row.className = 'help-def';
-      const term = this.doc.createElement('b');
-      term.textContent = block.term;
-      row.appendChild(term);
-      row.appendChild(this.doc.createTextNode(' '));
-      for (const node of this.helpPieces(block.text)) row.appendChild(node);
-      return row;
-    }
-    const p = this.helpParagraph(block.text);
-    if (block.kind === 'item') p.className = 'help-p help-item';
-    return p;
-  }
-
-  /** Text with inscription references turned into links. */
-  private helpPieces(text: string): Node[] {
-    const out: Node[] = [];
-    for (const piece of splitRefs(text)) {
-      if (piece.inscription === null) {
-        out.push(this.doc.createTextNode(piece.text));
-        continue;
-      }
-      // Relative, for the reason endpoint.ts gives: a host named inside a
-      // permanent artefact becomes a dependency that outlives it.
-      const link = this.doc.createElement('a');
-      link.href = `/i/${piece.inscription}`;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.textContent = piece.text;
-      out.push(link);
-    }
-    return out;
+    const frame = this.doc.createElement('iframe');
+    frame.className = 'help-frame';
+    frame.src = `${INSCRIPTION_VIEWER}${id}`;
+    frame.title = 'The X Chess manual';
+    // NOT LAZY. Lazy loading defers a frame until it is scrolled near, which is
+    // right for an image far down an article and wrong for the only thing in a
+    // tab: the reader has already asked for it by opening the tab, and a frame
+    // that waits for a scroll it may never get is an empty box. Isolated by
+    // comparison — a plain frame and a sandboxed one both render this page; the
+    // one that did not was the one told to wait.
+    // Enough to render and to run its own contents links, and nothing else. The
+    // manual is found by reading a wallet, and anybody may send an inscription
+    // to a wallet — so it is treated as a stranger's page even though the
+    // directory reports who minted it.
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.setAttribute('referrerpolicy', 'no-referrer');
+    body.appendChild(frame);
   }
 
   private async loadHelp(): Promise<void> {
@@ -5842,15 +5755,16 @@ export class ChessApp {
   }
 
   private noteHelp(): void {
+    const found = this.docsFound[0];
     this.notice(
       'helpNote',
       'info',
-      this.docsFound.length
-        ? 'The first sections are built into this board. The rest is inscribed, and can ' +
-          'be corrected by inscribing a newer one.'
-        : 'This is the short version, built into the board. A fuller manual is inscribed ' +
-          'separately so it can be corrected without rebuilding this page; none has been ' +
-          'found yet in the wallet this board watches.'
+      found
+        ? `Reading inscription ${found.id}, the newest manual in the organiser's wallet` +
+          `${found.official ? '' : ' — inscribed by somebody else, so read it as a stranger would'}.`
+        : `Reading inscription ${MANUAL_PAGE}. No newer manual was found in the wallet this ` +
+          'board watches, which is normal; a correction would appear here without this page ' +
+          'being rebuilt.'
     );
   }
 

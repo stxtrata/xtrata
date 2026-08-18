@@ -39,13 +39,22 @@ const esc = (text) =>
   String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 
-/** Inscription references become links that open where the viewer is served. */
+/**
+ * Where an inscription can be read.
+ *
+ * Absolute, because this page is opened directly as often as it is served: a
+ * relative `/i/<id>` resolves under one gateway and nowhere else, which makes
+ * every link in the manual dead everywhere except one place.
+ */
+const VIEWER = 'https://xtrata.xyz/i/';
+
+/** Inscription references become links to that viewer. */
 const withRefs = (text) =>
   splitRefs(text)
     .map((piece) =>
       piece.inscription === null
         ? esc(piece.text)
-        : `<a class="ref" href="/i/${piece.inscription}" target="_blank" rel="noopener noreferrer">${esc(piece.text)}</a>`
+        : `<a class="ref" href="${VIEWER}${piece.inscription}" target="_blank" rel="noopener noreferrer">${esc(piece.text)}</a>`
     )
     .join('');
 
@@ -103,7 +112,6 @@ const CSS = `
 :root{--bg:#12100e;--panel:#1b1815;--line:#2e2924;--line-2:#453d33;--ink:#e8e2d9;
 --dim:#9a9187;--gold:#d8a24a;--warn:#e0733f;--good:#6fae5f;--light:#b9a98f}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);
 font:15px/1.65 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 a{color:var(--gold)}
@@ -185,7 +193,7 @@ const html = [
   '<a class="chip" href="#ai-players">Program a player</a>',
   '<a class="chip" href="#fees-and-why-your-wallet-is-wrong">Fees</a>',
   '<a class="chip" href="#glossary">Glossary</a>',
-  '<a class="chip" href="/i/2991" target="_blank" rel="noopener noreferrer">The engine <b>#2991</b></a>',
+  `<a class="chip" href="${VIEWER}2991" target="_blank" rel="noopener noreferrer">The engine <b>#2991</b></a>`,
   '</div>',
   '</div></header>',
   '<div class="wrap"><div class="cols">',
@@ -195,6 +203,30 @@ const html = [
   '<footer>Inscribed on Xtrata. A correction is a new inscription, not an edit — ' +
     'the board finds the newest one by reading the wallet it was sent to.</footer>',
   '</div>',
+  // IN-PAGE LINKS CANNOT RELY ON THE URL, and that is not a style preference.
+  //
+  // The Xtrata runtime injects `<base href="null">` into every page it serves.
+  // A bare `#section` is a relative URL, so the browser resolves it against that
+  // base and navigates to /i/null — which answers "Invalid tokenId parameter".
+  // Every contents entry and every heading anchor in the first inscribed copy of
+  // this manual was dead for exactly that reason, and an inscription cannot be
+  // repaired.
+  //
+  // So the hrefs stay, because they say what the link is and keep it reachable
+  // by keyboard, and a handler does the actual moving. Scrolling an element into
+  // view needs no URL at all.
+  '<script>',
+  "document.addEventListener('click',function(e){",
+  "var a=e.target.closest&&e.target.closest('a[href^=\"#\"]');if(!a)return;",
+  "var el=document.getElementById(a.getAttribute('href').slice(1));if(!el)return;",
+  // NOT SMOOTH, and this is the second half of the same bug. Smooth scrolling
+  // is refused outright in some environments rather than falling back to a
+  // jump — measured here: a smooth scrollIntoView moved the page 0 pixels while
+  // an instant one moved it 2,235. Anybody who asks their system for reduced
+  // motion would get a contents list that silently does nothing.
+  "e.preventDefault();el.scrollIntoView({block:'start'});",
+  '});',
+  '</script>',
   '</body>',
   '</html>'
 ].join('\n');
