@@ -58,6 +58,7 @@ function store(): Storage | null {
 
 const norm = (address: string): string => String(address ?? '').trim().toUpperCase();
 const idsKey = (address: string): string => `${PREFIX}${norm(address)}`;
+const doneKey = (address: string): string => `${PREFIX}done:${norm(address)}`;
 const markKey = (address: string): string => `${PREFIX}seen:${norm(address)}`;
 
 export interface YourGamesOptions {
@@ -137,6 +138,51 @@ export class YourGames {
     }
   }
 
+  /**
+   * Games of yours that have ended.
+   *
+   * REMEMBERED BECAUSE A FINISHED GAME CANNOT UNFINISH. That makes it the one
+   * fact here safe to cache forever, and it is what keeps the background check
+   * cheap: a player with sixty games and two live ones pays for two. Without
+   * it, "is anything waiting on me" costs a read of every game ever played,
+   * every time a wallet connects — which is the objection that kept this out of
+   * the page-load path in the first place.
+   *
+   * Wrong only if the store is tampered with, and the cost of that is a game
+   * missing from a count, never a wrong board: the game view reads the chain.
+   */
+  finished(address: string): Set<number> {
+    const local = store();
+    if (!local || !norm(address)) return new Set();
+    try {
+      const raw = local.getItem(doneKey(address));
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed.filter((id): id is number => Number.isSafeInteger(id)) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  /** Record that a game of yours has ended, so it need never be read again. */
+  markFinished(address: string, id: number): void {
+    const local = store();
+    if (!local || !norm(address) || !Number.isSafeInteger(id)) return;
+    const done = this.finished(address);
+    if (done.has(id)) return;
+    done.add(id);
+    try {
+      local.setItem(doneKey(address), JSON.stringify([...done].sort((a, b) => b - a)));
+    } catch {
+      // Then it is read again next time. Slower, never wrong.
+    }
+  }
+
+  /** Games of yours that may still need something from you. */
+  live(address: string): number[] {
+    const done = this.finished(address);
+    return this.known(address).filter((id) => !done.has(id));
+  }
+
   /** Forget everything for one address. Used when a different wallet connects. */
   forget(address: string): void {
     const local = store();
@@ -144,6 +190,7 @@ export class YourGames {
     try {
       local.removeItem(idsKey(address));
       local.removeItem(markKey(address));
+      local.removeItem(doneKey(address));
     } catch {
       // Nothing to do, and nothing depends on it.
     }

@@ -160,6 +160,35 @@ describe('the games an address is in', () => {
     expect(yours.known(ALICE)).toEqual([999, 2]);
   });
 
+  it('stops reading a game once it has ended', async () => {
+    // What makes the background check affordable. A finished game cannot
+    // unfinish, so it is the one thing here safe to cache forever — and it is
+    // the difference between reading two games on connect and reading sixty.
+    const yours = new YourGames({ endpoint: serving([]), contractId: CONTRACT });
+    for (const id of [1, 2, 3]) yours.remember(ALICE, id);
+    yours.markFinished(ALICE, 2);
+    expect(yours.live(ALICE)).toEqual([3, 1]);
+    expect(yours.known(ALICE)).toEqual([3, 2, 1]);
+  });
+
+  it('keeps finished games apart from one wallet to the next', async () => {
+    const BOB = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+    const yours = new YourGames({ endpoint: serving([]), contractId: CONTRACT });
+    yours.remember(ALICE, 1);
+    yours.remember(BOB, 1);
+    yours.markFinished(ALICE, 1);
+    expect(yours.live(ALICE)).toEqual([]);
+    expect(yours.live(BOB)).toEqual([1]);
+  });
+
+  it('forgets that a game finished when the wallet is forgotten', async () => {
+    const yours = new YourGames({ endpoint: serving([]), contractId: CONTRACT });
+    yours.remember(ALICE, 4);
+    yours.markFinished(ALICE, 4);
+    yours.forget(ALICE);
+    expect(yours.finished(ALICE).size).toBe(0);
+  });
+
   it('separates one wallet from another', async () => {
     const BOB = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
     const yours = new YourGames({ endpoint: serving([]), contractId: CONTRACT });

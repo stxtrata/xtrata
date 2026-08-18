@@ -612,6 +612,15 @@ export class ChessApp {
   private yoursOutside: number[] = [];
   /** False once discovery hit its page cap, so the set may be short. */
   private yoursComplete = true;
+  /**
+   * Game ids this board has DERIVED are waiting on the connected player.
+   *
+   * Kept apart from `exploreRows` so the tab count does not depend on the tab
+   * having been opened. Both the background check and the full list write here;
+   * `drawWaiting` reads only this.
+   */
+  private readonly waitingOn = new Set<number>();
+  private warmedFor: string | null = null;
   /** game id -> the manifest that names it. Built from tournaments loaded. */
   private readonly inTournament = new Map<number, { id: number; name: string }>();
   /** address -> the name a loaded tournament gave it. The weakest source. */
@@ -875,6 +884,9 @@ export class ChessApp {
     void this.checkContract();
     this.openFromLink();
     this.startPolling();
+    // A session restored from a previous visit never passed through connect(),
+    // so without this the badge would stay dark until the wallet was clicked.
+    if (this.address) void this.warmWaiting();
   }
 
   /**
@@ -3405,6 +3417,15 @@ export class ChessApp {
     this.drawGame();
     this.exploreLoadedAt = null;
     if (this.tab === 'explore') void this.reloadExplore();
+
+    // A different wallet has a different answer, and keeping the old one would
+    // show one person another person's games.
+    this.waitingOn.clear();
+    this.warmedFor = null;
+    this.drawWaiting();
+    // Not awaited. Nothing on screen waits for it, and it must not delay the
+    // address appearing in the top bar.
+    if (this.address) void this.warmWaiting();
   }
 
   get connectedAddress(): string | null {
@@ -3540,6 +3561,8 @@ export class ChessApp {
       // sort below - which is a stable sort and depends on that.
       const found = built.filter((row): row is ExploreRow => row !== null);
 
+      this.noteWaiting(found);
+
       // REMEMBERED NOW, so it is still findable when it falls off the window.
       // `participant` is set by replay from rules that hash to the game's own
       // commitment, so this records something established rather than guessed —
@@ -3624,6 +3647,7 @@ export class ChessApp {
     ).filter((row): row is ExploreRow => row !== null);
     if (!built.length) return;
 
+    this.noteWaiting(built);
     this.yoursOutside = [...new Set([...this.yoursOutside, ...fresh])].sort((a, b) => b - a);
     this.exploreRows = this.sortForViewer([...this.exploreRows, ...built]);
     this.drawExplore();
@@ -4021,9 +4045,79 @@ export class ChessApp {
    * count a game this browser has never seen, which is the same limit the list
    * has and is stated there rather than implied by a number.
    */
+  /**
+   * Record what these rows say about whose turn it is.
+   *
+   * One writer for the badge, whichever pass built the row, so the number
+   * cannot depend on the route. Removal matters as much as addition: a game
+   * that WAS waiting on you and no longer is must leave the set, or the count
+   * only ever climbs.
+   */
+  private noteWaiting(rows: readonly ExploreRow[]): void {
+    for (const row of rows) {
+      if (row.mine === 'your-move') this.waitingOn.add(row.id);
+      else this.waitingOn.delete(row.id);
+      // A finished game of yours never needs reading again. This is what keeps
+      // the background check below cheap for somebody with a long history.
+      if (row.over && row.participant && this.address) this.yours?.markFinished(this.address, row.id);
+    }
+  }
+
+  /**
+   * Find out what is waiting on you, without being asked to.
+   *
+   * THE BADGE USED TO REQUIRE OPENING THE TAB IT WAS ON. Which is a strange
+   * thing for a notification to ask: you had to go and look at the list to be
+   * told there was a reason to look at the list.
+   *
+   * The reason it was left that way was cost — the list is twenty-five games
+   * and fifty-odd reads, and spending that on connect is what starves a wallet
+   * of its own rate limit right as somebody wants to move. But the badge never
+   * needed the list. It needs YOUR games, which is a different and much smaller
+   * question: `YourGames` holds them locally, `finished` removes the ones that
+   * can never change again, and what is left is usually one or two.
+   *
+   * So this reads your live games and nothing else. A returning player with
+   * sixty games and two in progress pays for two.
+   */
+  private async warmWaiting(): Promise<void> {
+    const who = this.address;
+    if (!who || !this.yours || this.warmedFor === who) return;
+    this.warmedFor = who;
+
+    try {
+      // Local first, so a returning player's badge is right before any request
+      // goes out. Then history, which finds games this browser has never seen.
+      let live = this.yours.live(who);
+      await this.readWaiting(live);
+      const found = await this.yours.discover(who);
+      this.yoursComplete = found.complete;
+      const done = this.yours.finished(who);
+      const extra = found.fresh.filter((id) => !done.has(id) && !live.includes(id));
+      if (extra.length) await this.readWaiting(extra);
+    } catch {
+      // A background check that fails changes nothing on screen. The badge
+      // keeps whatever it had, which for a returning player is still right.
+      this.warmedFor = null;
+    }
+  }
+
+  /** Read these games, derive whose turn it is, and update the badge. */
+  private async readWaiting(ids: readonly number[]): Promise<void> {
+    if (!ids.length) return;
+    const built = (
+      await pool(
+        EXPLORE_READ_WIDTH,
+        [...ids].map((id) => () => this.buildExploreRow(id))
+      )
+    ).filter((row): row is ExploreRow => row !== null);
+    this.noteWaiting(built);
+    this.drawWaiting();
+  }
+
   private drawWaiting(): void {
     const node = this.el.exploreWaiting;
-    const waiting = this.exploreRows.filter((row) => row.mine === 'your-move').length;
+    const waiting = this.waitingOn.size;
     node.textContent = waiting ? String(waiting) : '';
     node.classList.toggle('hide', waiting === 0);
     node.setAttribute(
