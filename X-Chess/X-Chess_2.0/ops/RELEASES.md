@@ -15,8 +15,10 @@ checkpoint reader landed. The figures below replace the 11-chunk ones this entry
 first carried; the reasoning about the version number is unchanged.
 
 * **201,457 bytes, 13 chunks.** 0.30 STX protocol + 0.20 STX miner.
-* `htmlSha256` `bcee38aa0d78a716270608bee762b4c615405283d4232d89e140dbcbddbae6c2`
-* xtrata chunk hash `75edb60674e112f97d1eb95caf546436f2eeb57966ee9cc83b8c04c4348bc27e`
+* `htmlSha256` `73b06d12918a9668d161927ecb93cd5a8c29943539a8c56f4b0cfff52dba6e37`
+* xtrata chunk hash `29216b301a93f78010db5ebc9fb163f089dbf3b8e11e3f10f95cb28e72708113`
+* `MANUAL_PAGE` 3007, inscribed ahead of this build so the fallback names a
+  manual that documents everything the build reads.
 * 1,436 tests passing, 70 files.
 
 **THE BUILD IS NOT BYTE-REPRODUCIBLE**, and this is the entry that has to say

@@ -379,16 +379,19 @@ const INSCRIPTION_VIEWER = 'https://xtrata.xyz/i/';
  * link rather than a lookup. A newer manual is found the usual way — by the
  * wallet — and rendered below; this is the designed version of the same text.
  *
- * 3006, and the two before it are why the board LOOKS this one up rather than
+ * 3007, and the three before it are why the board LOOKS this one up rather than
  * trusting the number. 3004's in-page links were all broken by the runtime's
  * injected base tag; 3005 fixed those and had a glossary where every wrapped
- * line escaped its column. Neither can be repaired. They stay on chain and are
- * superseded, which is the only correction an inscription has.
+ * line escaped its column; 3006 was correct but predates the rating checkpoint,
+ * so it documents a format this board reads and it does not describe. None can
+ * be repaired. They stay on chain and are superseded, which is the only
+ * correction an inscription has — and four of them in a row is the argument for
+ * the directory, not against it.
  *
  * This constant is the fallback for a board that cannot reach the directory.
  * The directory is what makes the next correction free.
  */
-const MANUAL_PAGE = 3006;
+const MANUAL_PAGE = 3007;
 
 /**
  * What a reader can narrow a tournament's games down to.
