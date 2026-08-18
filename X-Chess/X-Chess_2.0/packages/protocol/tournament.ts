@@ -51,7 +51,38 @@ export interface TournamentEntrant {
    * as tournaments between people.
    */
   kind?: 'ai' | 'human';
+  /**
+   * How much deeper than the house engine this seat searches.
+   *
+   * AN OFFSET, NOT A DEPTH, and the difference is not cosmetic. The engine
+   * already scales its own depth by how many pieces are left — 3 in a full
+   * opening, 7 in a bare ending — because a fixed number is either unplayably
+   * slow early or useless late. An absolute depth here would throw that curve
+   * away. This rides it: `depthFor(fen) + depth`.
+   *
+   * THIS RETIRES A RULE THAT WAS TRUE UNTIL NOW. personalities.mjs opens by
+   * saying a personality is a prompt and nothing else — "not a policy, not an
+   * opening book, not a search depth" — because everyone getting the same
+   * engine was what made the comparison fair. A declared ladder is a different
+   * competition: a handicap event rather than a level one. Worth doing, worth
+   * doing on purpose, and not worth discovering later from a field nobody
+   * announced.
+   *
+   * AND IT IS THE ONE CLAIM HERE NOBODY CAN CHECK. Everything else a manifest
+   * says can be recomputed from the chain: a pairing against the game's rules
+   * hash, a result by replay. Depth leaves no trace in the log — characters
+   * deviate from the engine by style, so you cannot infer it from the moves —
+   * so it is a declaration on a document whose header says nothing here is
+   * trusted. A board showing it must show it as DECLARED, never as verified.
+   *
+   * Absent means 0, which is every entrant of exhibitions one and two, so
+   * those manifests keep parsing unchanged.
+   */
+  depth?: number;
 }
+
+/** The most a seat may be handed above the house engine. */
+export const MAX_DEPTH_OFFSET = 2;
 
 export interface TournamentGame {
   /** Game id on the contract. */
@@ -175,6 +206,23 @@ export function parseTournament(text: unknown): ParsedTournament {
     if (!entrant?.name || !entrant?.address) {
       problems.push({ where: 'entrants', says: 'every entrant needs a name and an address' });
       break;
+    }
+    // CHECKED, BECAUSE AN IGNORED HANDICAP IS THE WORST OF BOTH. A manifest is
+    // permanent; a depth the runner silently dropped would sit in the record
+    // claiming a competition that was never run. Same reasoning as the entry
+    // format refusing an unknown field rather than skipping it.
+    if (entrant.depth !== undefined) {
+      const bad =
+        typeof entrant.depth !== 'number' ||
+        !Number.isInteger(entrant.depth) ||
+        entrant.depth < 0 ||
+        entrant.depth > MAX_DEPTH_OFFSET;
+      if (bad) {
+        problems.push({
+          where: `entrant ${entrant.name}`,
+          says: `depth must be a whole number from 0 to ${MAX_DEPTH_OFFSET}, and is ${JSON.stringify(entrant.depth)}`
+        });
+      }
     }
   }
 

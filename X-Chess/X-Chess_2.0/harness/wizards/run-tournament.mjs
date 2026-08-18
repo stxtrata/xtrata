@@ -38,7 +38,7 @@ import {
   scrub
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed } from './personalities.mjs';
-import { anthropicAsker, chooseMove, claudeCodeAsker, rankedNotes } from './chooser.mjs';
+import { anthropicAsker, chooseMove, claudeCodeAsker, depthFor, rankedNotes } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
 import { readLedger, summarise } from './fee-log.mjs';
 import { INSCRIPTION, buildSkill, fetchInscribedSkill, sha256 } from '../skill/build-skill.mjs';
@@ -259,12 +259,25 @@ function roundsFromManifest(tournament, agents) {
     return id;
   };
 
+  // Absent means 0, which is every entrant of exhibitions one and two.
+  const depthOf = (entrantName) =>
+    tournament.entrants.find((e) => e.name === entrantName)?.depth ?? 0;
+
   const byRound = new Map();
   for (const game of tournament.games) {
     const list = byRound.get(game.round) ?? [];
     // `id` is what makes this different from a generated plan: the game is
     // named, so nothing has to be searched for and nothing may be opened.
-    list.push({ white: idFor(game.white), black: idFor(game.black), id: game.id });
+    // THE HANDICAP TRAVELS WITH THE PAIRING, not with the wallet. Depth is a
+    // property of a seat in THIS tournament — the same character may enter the
+    // next one at a different offset, or none — so it is read off the manifest
+    // here and never stored on the agent.
+    list.push({
+      white: idFor(game.white),
+      black: idFor(game.black),
+      id: game.id,
+      depth: { white: depthOf(game.white), black: depthOf(game.black) }
+    });
     byRound.set(game.round, list);
   }
   return [...byRound.keys()]
@@ -316,7 +329,10 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
-async function playGame({ gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash = null }) {
+async function playGame({
+  gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash = null,
+  depth = { white: 0, black: 0 }
+}) {
   // REQUIRED, not defaulted to null. A default here is what let fifteen games
   // be played from an unannotated list without one line of output saying so.
   if (!Position || !rankMoves) {
@@ -436,7 +452,15 @@ async function playGame({ gameId, white, black, replay, ask, budget, Position, r
     // Every legal move still comes back, scored, in engine order. A character
     // chooses among them by style; the list informs and never decides.
     const history = state.accepted.filter((e) => e.kind === 'move').map((e) => e.uci);
-    const annotations = rankedNotes({ rankMoves, Position, fen: state.fen, played: history });
+    //
+    // AN OFFSET ON TOP OF THE PIECE-COUNT CURVE, never a replacement for it.
+    // `depthFor` returns 3 in a full opening and 7 in a bare ending because a
+    // fixed number is unplayably slow at one end and useless at the other; a
+    // declared handicap rides that curve rather than flattening it.
+    const searchDepth = depthFor(state.fen) + (depth[state.turn] ?? 0);
+    const annotations = rankedNotes({
+      rankMoves, Position, fen: state.fen, played: history, depth: searchDepth
+    });
 
     let chosen;
     try {
@@ -811,6 +835,22 @@ async function main() {
     };
     console.log(`\nmanifest  ${loaded.rootId} — ${manifest.name}`);
     console.log(`          games are NAMED, so none will be opened by this run`);
+
+    // SAY OUT LOUD THAT THIS IS A HANDICAP EVENT.
+    //
+    // Every other thing that changes what a run measures announces itself in
+    // this header — which model, which account, which engine — and a declared
+    // search depth changes it more than any of them. It also cannot be checked
+    // afterwards: depth leaves no trace in the log, so if it is not printed
+    // here, the only record that a handicap was applied is the manifest, and
+    // the inscribed board does not show that field.
+    const handicapped = manifest.entrants.filter((e) => (e.depth ?? 0) > 0);
+    if (handicapped.length) {
+      console.log(`          HANDICAP: ${handicapped.length} of ${manifest.entrants.length} seats search deeper`);
+      for (const e of handicapped) {
+        console.log(`          ${e.name.padEnd(10)} +${e.depth} ply above the house engine`);
+      }
+    }
   } else {
     plan = planTournament({
       ids,
@@ -1024,7 +1064,8 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         }
         try {
           const result = await playGame({
-            gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash
+            gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash: hash,
+            depth: pairing.depth ?? { white: 0, black: 0 }
           });
           return { gameId, white, black, result };
         } catch (error) {

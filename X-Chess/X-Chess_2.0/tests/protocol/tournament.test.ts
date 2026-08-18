@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   stageOf,
+  MAX_DEPTH_OFFSET,
   MAX_REVISIONS,
   TOURNAMENT_HEADER,
   addressOf,
@@ -522,5 +523,55 @@ describe('naming a game that is a final', () => {
       })
     ).tournament!;
     expect(stageOf(t, t.games[0])).toBe('Title decider');
+  });
+});
+
+describe('a declared search depth', () => {
+  // Depth is the one thing a manifest claims that CANNOT be recomputed from the
+  // chain. A pairing checks against the game's rules hash and a result checks by
+  // replay; depth leaves no trace in the log, because characters deviate from
+  // the engine by style and you cannot read the setting back off the moves.
+  //
+  // So the only defence is at the door: a depth that is out of range, or not a
+  // number, must fail the manifest rather than be quietly dropped. A dropped
+  // handicap would sit in a permanent record describing a competition nobody ran.
+  const withDepth = (depth: unknown): string =>
+    `${TOURNAMENT_HEADER}\n` +
+    JSON.stringify({
+      name: 'T', format: 'round-robin', contract: 'SP1.core',
+      entrants: [
+        { name: 'A', address: 'SP1', depth },
+        { name: 'B', address: 'SP2' }
+      ],
+      games: [{ id: 1, white: 'A', black: 'B', round: 1 }]
+    });
+
+  it('accepts every offset the house allows', () => {
+    for (let depth = 0; depth <= MAX_DEPTH_OFFSET; depth++) {
+      const parsed = parseTournament(withDepth(depth));
+      expect(parsed.problems, `depth ${depth}`).toEqual([]);
+      expect(parsed.tournament?.entrants[0].depth).toBe(depth);
+    }
+  });
+
+  it('refuses one above the ceiling, and says what the ceiling is', () => {
+    const parsed = parseTournament(withDepth(MAX_DEPTH_OFFSET + 1));
+    expect(parsed.ok).toBe(false);
+    expect(parsed.problems[0].says).toContain(String(MAX_DEPTH_OFFSET));
+    expect(parsed.problems[0].where).toContain('A');
+  });
+
+  it('refuses anything that is not a whole non-negative number', () => {
+    for (const bad of [-1, 1.5, '2', null, true, NaN]) {
+      expect(parseTournament(withDepth(bad)).ok, JSON.stringify(bad)).toBe(false);
+    }
+  });
+
+  it('treats absent as level, so the first two exhibitions still parse', () => {
+    // Neither existing manifest carries the field. If absent were anything but
+    // zero, inscriptions 2993 and 3001 would change meaning retroactively.
+    const parsed = parseTournament(withDepth(undefined));
+    expect(parsed.ok).toBe(true);
+    expect(parsed.tournament?.entrants[0].depth).toBeUndefined();
   });
 });
