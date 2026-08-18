@@ -1316,17 +1316,28 @@ export class ChessApp {
    *     replaced transaction looks exactly like one we cannot see.
    */
   private heldPending(read: PendingRow[] | null, entries: EntryRow[]): PendingRow[] {
+    const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+    // A SUBMISSION IN THE LOG IS NOT PENDING, however the mempool answered.
+    //
+    // This filter used to run only on the path where the mempool was NOT read,
+    // so a fresh read was taken verbatim — and an indexer that still lists a
+    // transaction it has already mined kept the move "pending" for seconds
+    // after it landed. The board then showed the piece on its new square and an
+    // arrow still pointing at it from the old one, which reads as a second move
+    // on its way rather than the one just made.
+    //
+    // The log is the authority and the mempool is a hint about what is coming.
+    // Once the log has it, the hint is spent.
+    const landed = (row: PendingRow): boolean =>
+      entries.some((entry) => same(entry.sender, row.sender) && same(entry.value, row.value));
+
     if (read !== null) {
       this.pendingReadAt = Date.now();
-      return read;
+      return read.filter((row) => !landed(row));
     }
     if (!this.pending.length) return [];
     if (Date.now() - this.pendingReadAt > PENDING_HOLD_MS) return [];
-    const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
-    return this.pending.filter(
-      (row) =>
-        !entries.some((entry) => same(entry.sender, row.sender) && same(entry.value, row.value))
-    );
+    return this.pending.filter((row) => !landed(row));
   }
 
   /**
@@ -1948,7 +1959,12 @@ export class ChessApp {
       this.entries = entries;
       // Nothing to hold on to on a first load, so a failed read shows nothing
       // pending - which is all it can honestly show.
-      this.pending = read ?? [];
+      //
+      // Filtered by the same rule the poll uses, and through the same function
+      // so the two cannot drift. Opening a game moments after a move landed
+      // otherwise drew an arrow from a square the piece had already left,
+      // because the indexer still listed a transaction it had mined.
+      this.pending = this.heldPending(read, entries);
       if (read !== null) this.pendingReadAt = Date.now();
       this.lastReadAt = Date.now();
       return true;

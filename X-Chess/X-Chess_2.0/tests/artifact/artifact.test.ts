@@ -551,3 +551,45 @@ describe('building the same thing twice', () => {
     expect(html, 'the build no longer stamps itself').toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
   });
 });
+
+describe('the stylesheet is inside a template literal', () => {
+  it('contains no backticks inside the CSS or HTML literals', () => {
+    // COST TWICE IN ONE DAY, and the second time it shipped.
+    //
+    // The stylesheet and the markup are each one big template literal. A
+    // backtick inside either ends that string. An ODD number fails loudly at
+    // the next parse. An EVEN number is far worse: the text between them
+    // becomes JavaScript, `tsc --noEmit` passes, `npm run build` passes, and
+    // the artefact ships with a hole where a CSS rule used to be. It was caught
+    // only because a test file happened to be transformed by a stricter parser
+    // than the build's.
+    //
+    // Scoped to the two literals rather than the whole file, because shell.ts
+    // legitimately contains other template literals and ordinary comments —
+    // counting every backtick would fail on code that is perfectly fine.
+    const lines = readFileSync(resolve(ROOT, 'packages/ui/shell.ts'), 'utf8').split('\n');
+    for (const name of ['CSS', 'HTML']) {
+      const opens = lines.findIndex((line) => line.startsWith(`export const ${name} = \``));
+      expect(opens, `${name} literal not found`).toBeGreaterThan(-1);
+      const closes = lines.findIndex((line, at) => at > opens && line.trim() === '`;');
+      expect(closes, `${name} literal never closes`).toBeGreaterThan(opens);
+
+      const inside = lines.slice(opens + 1, closes);
+      const stray = inside.findIndex((line) => line.includes('`'));
+      expect(
+        stray,
+        stray === -1
+          ? ''
+          : `a backtick on line ${opens + 2 + stray} ends the ${name} literal early: ` +
+            inside[stray].trim().slice(0, 70)
+      ).toBe(-1);
+    }
+  });
+
+  it('still carries the rules that were lost when it last happened', () => {
+    // The specific casualties, so a regression names itself.
+    for (const rule of ['tn-search', 'tn-group', 'tn-line']) {
+      expect(html, `${rule} is missing, which is what a stray backtick looks like`).toContain(rule);
+    }
+  });
+});

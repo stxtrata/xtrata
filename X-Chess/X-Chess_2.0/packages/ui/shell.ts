@@ -391,12 +391,17 @@ ${SCALE_CSS}
 /* Wide enough for its own placeholder. At 8.5em these read "entrant name o"
    and "address or nam", which looks like a rendering fault rather than a box.
 
-   Qualified as `.tn-line input.tn-search`, and that is the THIRD time today
-   this file has needed it. The base rule is input[type='text'] { width: 100% }
-   at (0,1,1); any bare class is (0,1,0) and loses, so the box goes full width
-   and every control meant to sit beside it wraps to its own line. It never
-   looks like a specificity problem - it looks like the flex layout not working.
-   If a width here has no effect, this is why. */
+   Qualified by the element, and this file has needed that three times today.
+   The base rule input[type='text'] carries width:100% at (0,1,1); any bare
+   class is (0,1,0) and loses, so the width does nothing, the box fills the
+   panel, and every control meant to sit beside it wraps. It never presents as
+   a specificity problem - it presents as flex layout not working.
+
+   NO BACKTICKS IN THIS FILE. The stylesheet lives inside a template literal, so
+   a backtick ends the string. An ODD number is caught immediately; an EVEN
+   number is worse, because the text between them is parsed as JavaScript, tsc
+   and the build both pass, and the artefact ships with a hole in its CSS. That
+   is what happened while writing this very comment. */
 .tn-line input.tn-search { width: 18em; max-width: 100%; flex: 0 1 auto; }
 .tn-moves { color: var(--dim); font-variant-numeric: tabular-nums; margin-right: 8px; }
 

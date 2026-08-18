@@ -716,3 +716,65 @@ describe('a castle in the mempool', () => {
     app.stopPolling();
   });
 });
+
+describe('a move that has landed is not still on its way', () => {
+  // The arrow and the ghost both come from the pending set, and the piece comes
+  // from the log. When those disagree the board shows a piece on its new square
+  // with a line still pointing at it from the old one — which reads as another
+  // move arriving rather than the one just made.
+
+  it('drops a mempool row the log already has', async () => {
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    const game = await chain.getGameCount();
+    chain.as(ALICE);
+    await chain.submit(game, 'e2e4');
+    chain.mine(1);
+
+    // The indexer still lists the transaction it has already mined, which is
+    // the situation this is about.
+    chain.pending = [
+      { txid: '0xstale', sender: ALICE, value: 'e2e4', receivedAt: Date.now(), fee: 400, nonce: 7 }
+    ];
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: chain as never,
+      document: dom.window.document,
+      connect: async () => ({ address: ALICE }),
+      disconnect: async () => {}
+    });
+    await app.load(game);
+
+    const pending = (app as unknown as { pending: unknown[] }).pending;
+    expect(pending, 'the move is in the log, so nothing is pending').toHaveLength(0);
+
+    const arrows = dom.window.document.getElementById('arrows')!;
+    expect(arrows.querySelectorAll('line'), 'an arrow outlived the move').toHaveLength(0);
+  });
+
+  it('keeps a mempool row the log does not have', async () => {
+    // The other direction, so the filter cannot simply drop everything.
+    const chain = new MockChain({ balances: { [ALICE]: 100_000_000n, [BOB]: 100_000_000n } });
+    chain.as(ALICE);
+    await chain.openGame(rulesHash(RULES), false);
+    const game = await chain.getGameCount();
+    chain.pending = [
+      { txid: '0xreal', sender: ALICE, value: 'e2e4', receivedAt: Date.now(), fee: 400, nonce: 8 }
+    ];
+
+    mountShell(dom.window.document);
+    const app = new ChessApp({
+      chain: chain as never,
+      document: dom.window.document,
+      connect: async () => ({ address: ALICE }),
+      disconnect: async () => {}
+    });
+    await app.load(game);
+
+    expect((app as unknown as { pending: unknown[] }).pending).toHaveLength(1);
+    expect(dom.window.document.getElementById('arrows')!.querySelectorAll('line').length)
+      .toBeGreaterThan(0);
+  });
+});
