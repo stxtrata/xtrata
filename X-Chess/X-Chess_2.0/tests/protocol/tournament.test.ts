@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   stageOf,
   MAX_DEPTH_OFFSET,
+  rulesFor,
   MAX_REVISIONS,
   TOURNAMENT_HEADER,
   addressOf,
@@ -573,5 +574,66 @@ describe('a declared search depth', () => {
     const parsed = parseTournament(withDepth(undefined));
     expect(parsed.ok).toBe(true);
     expect(parsed.tournament?.entrants[0].depth).toBeUndefined();
+  });
+});
+
+describe('a tournament that had to vary its rules to exist', () => {
+  // WHY THIS EXISTS AT ALL. A game's rules hash commits white, black, ranked
+  // and the protocol, and nothing that names a tournament. So one pair in one
+  // colour order gets exactly ONE ranked game with default rules, ever.
+  // Exhibitions one and two used all thirty available to their six players —
+  // 21 + 9 — and a third tournament among the same field could not open a
+  // single game. A cooldown of 1 frees the pairing and costs no gameplay,
+  // being counted in moves in a game where the opponent always moves between
+  // yours.
+  //
+  // The danger is entirely in the reading. A verifier that rebuilds the rules
+  // WITHOUT the cooldown gets a different hash for every game and reports the
+  // whole tournament as "not this pairing" — which is false, and worse than
+  // silence on a board that exists to never repeat an unchecked claim.
+  const white = 'SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2';
+  const black = 'SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN';
+
+  it('hashes differently from the same pairing at rest', () => {
+    // The whole point: this is what makes a second game between them possible.
+    expect(rulesHash(rulesFor({ cooldown: 1 }, white, black)))
+      .not.toBe(rulesHash(rulesFor({ cooldown: 0 }, white, black)));
+  });
+
+  it('reads an undeclared cooldown as zero, so the first two exhibitions hold', () => {
+    expect(rulesFor({}, white, black)).toEqual(rulesFor({ cooldown: 0 }, white, black));
+  });
+
+  it('verifies its games only when the manifest declares the cooldown', () => {
+    const committed = rulesHash(rulesFor({ cooldown: 1 }, white, black));
+    const manifest = (cooldown: number | undefined) => ({
+      name: 'Three', format: 'double-round-robin', contract: 'SP1.core',
+      ...(cooldown === undefined ? {} : { cooldown }),
+      entrants: [{ name: 'Mason', address: white }, { name: 'Wager', address: black }],
+      games: [{ id: 1, white: 'Mason', black: 'Wager', round: 1 }]
+    });
+    const facts = new Map([[1, { rulesHash: committed, result: '1-0' as const, moves: 40 }]]);
+
+    const declared = checkGames(manifest(1), facts);
+    expect(declared[0].verdict, 'declared: the claim checks out').toBe('verified');
+
+    // THE BUG THIS FILE IS HERE TO PREVENT. Same games, same chain, same true
+    // pairing — and a verifier working from the defaults calls it a lie.
+    const guessed = checkGames(manifest(undefined), facts);
+    expect(guessed[0].verdict).toBe('unverified');
+    expect(guessed[0].says).toContain('not this pairing');
+  });
+
+  it('refuses a cooldown that is not a whole number of moves', () => {
+    const bad = (cooldown: unknown) =>
+      parseTournament(`${TOURNAMENT_HEADER}\n` + JSON.stringify({
+        name: 'T', format: 'f', contract: 'SP1.core', cooldown,
+        entrants: [{ name: 'A', address: 'SP1' }, { name: 'B', address: 'SP2' }],
+        games: [{ id: 1, white: 'A', black: 'B', round: 1 }]
+      }));
+    for (const value of [-1, 1.5, '1', null]) {
+      expect(bad(value).ok, JSON.stringify(value)).toBe(false);
+    }
+    expect(bad(1).ok).toBe(true);
   });
 });

@@ -24,7 +24,7 @@
 // rather than repeating the claim.
 
 import { rulesMatchCommitment } from './canonical.js';
-import { DEFAULT_RULES, normaliseRules } from './rules.js';
+import { DEFAULT_RULES, normaliseRules, type Rules } from './rules.js';
 
 /** The first line of a valid manifest. Exact, so a chain sweep is a string compare. */
 export const TOURNAMENT_HEADER = 'X-CHESS-TOURNAMENT/1';
@@ -138,6 +138,33 @@ export interface Tournament {
   name: string;
   format: string;
   contract: string;
+  /**
+   * The cooldown every game in this tournament committed to.
+   *
+   * WHY A TOURNAMENT NEEDS THIS AT ALL, and it is not about cooldowns. A game's
+   * rules hash commits white, black, ranked and the protocol — and nothing that
+   * says which tournament it is. So one pair, in one colour order, can have
+   * exactly ONE ranked game with default rules, ever. Exhibitions one and two
+   * together used all thirty available to their six players; there is no
+   * thirty-first, and a third tournament among the same field cannot open a
+   * single game.
+   *
+   * A cooldown of 1 changes the hash and so frees the pairing. In a two-player
+   * game it can never reject anything — it is counted in MOVES, "wait for one
+   * other to play", and the opponent always has — so it costs no gameplay. It
+   * is a tournament discriminator wearing a rule's clothes, and saying that out
+   * loud here is the price of using it.
+   *
+   * IT MUST BE DECLARED OR NOTHING VERIFIES. A verifier rebuilds the rules from
+   * the pairing and compares to what the chain holds. Rebuilt with the wrong
+   * cooldown, every game in the tournament reports "the rules this game
+   * committed to are not this pairing" — a false accusation, on a board whose
+   * purpose is to never repeat an unchecked claim. So it lives in the manifest,
+   * where a reader finds it before checking anything.
+   *
+   * Absent means 0, which is exhibitions one and two.
+   */
+  cooldown?: number;
   /** Inscription id of the engine every player was handed. */
   engine?: number;
   entrants: TournamentEntrant[];
@@ -192,6 +219,17 @@ export function parseTournament(text: unknown): ParsedTournament {
   for (const field of ['name', 'format', 'contract'] as const) {
     if (typeof t[field] !== 'string' || !t[field]) {
       problems.push({ where: field, says: 'is required' });
+    }
+  }
+  // Same reasoning as depth: a cooldown the verifier dropped would turn every
+  // game in the tournament unverified, and the manifest is permanent.
+  if (t.cooldown !== undefined) {
+    const bad = typeof t.cooldown !== 'number' || !Number.isInteger(t.cooldown) || t.cooldown < 0;
+    if (bad) {
+      problems.push({
+        where: 'cooldown',
+        says: `must be a whole number of moves, and is ${JSON.stringify(t.cooldown)}`
+      });
     }
   }
   if (!Array.isArray(t.entrants) || t.entrants.length < 2) {
@@ -249,6 +287,30 @@ export function parseTournament(text: unknown): ParsedTournament {
 
   const ok = problems.length === 0;
   return { ok, problems, tournament: ok ? (t as Tournament) : null };
+}
+
+/**
+ * The rules a game in this tournament commits to.
+ *
+ * THE ONLY PLACE THIS IS BUILT. It was assembled inline in three places — the
+ * verifier, the replay that derives results, and the board's rule recovery —
+ * each spreading DEFAULT_RULES and each therefore assuming a cooldown of zero.
+ * Three copies of an assumption is three places to forget a tournament that
+ * does not share it, and the failure is silent: replay still works, so results
+ * appear, and only the verdict quietly turns to unverified.
+ */
+export function rulesFor(
+  tournament: Pick<Tournament, 'cooldown'>,
+  white: string | null,
+  black: string | null
+): Rules {
+  return normaliseRules({
+    ...DEFAULT_RULES,
+    white,
+    black,
+    ranked: true,
+    cooldown: tournament.cooldown ?? 0
+  });
 }
 
 /** The address a manifest claims played a colour, or null. */
@@ -695,7 +757,7 @@ export function checkGames(
       };
     }
 
-    const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
+    const rules = rulesFor(tournament, white, black);
     if (!rulesMatchCommitment(rules, seen.rulesHash)) {
       return {
         ...base,

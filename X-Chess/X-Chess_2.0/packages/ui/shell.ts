@@ -443,6 +443,10 @@ ${SCALE_CSS}
 .tn-entry { font-size: 11px; color: var(--dim); text-decoration: none;
             border: 1px solid var(--line); border-radius: 999px; padding: 1px 6px; }
 .tn-entry:hover { color: var(--gold); border-color: var(--gold); }
+/* A declared handicap. Dotted, because every other number on that row was
+   recomputed and this one is taken on the organiser's word. */
+.tn-depth { font-size: 11px; color: var(--dim); border-bottom: 1px dotted var(--dim);
+            cursor: help; }
 .tn-read a { color: var(--gold); text-decoration: none; border-bottom: 1px dotted var(--gold); }
 .tn-read a:hover { border-bottom-style: solid; }
 

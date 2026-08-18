@@ -807,7 +807,21 @@ export class ChessApp {
   /** address -> the name a loaded tournament gave it. The weakest source. */
   private readonly entrantNames = new Map<string, string>();
   /** game id -> the two addresses a loaded manifest says played it. */
-  private readonly manifestPairings = new Map<number, { white: string; black: string }>();
+  private readonly manifestPairings =
+    new Map<number, { white: string; black: string; cooldown: number }>();
+
+  /**
+   * Every cooldown any manifest this board has read declares.
+   *
+   * Candidates are guesses judged by the committed hash, so an extra one costs
+   * a hash and confirms nothing false. What it buys is the games of a
+   * tournament that had to vary its rules to exist at all — see
+   * Tournament.cooldown — which are otherwise unrecoverable from this tab while
+   * the Tournaments tab verifies them perfectly well. That split, the same
+   * games given two verdicts by two tabs, is the exact bug rememberPairings
+   * was written to end.
+   */
+  private readonly knownCooldowns = new Set<number>([0]);
   /** Every address any loaded manifest has named as an entrant. */
   private readonly knownEntrants = new Set<string>();
   private names: Names | null = null;
@@ -3500,6 +3514,29 @@ export class ChessApp {
           );
         }
 
+        // THE HANDICAP, MARKED AS DECLARED.
+        //
+        // Every other thing on this row was recomputed: the points from
+        // replayed games, the verdict from the committed rules hash. Depth
+        // cannot be. It leaves no trace in a game log — characters deviate
+        // from the engine by style, so the setting cannot be read back off the
+        // moves — so it is the one number here that rests on the organiser's
+        // word.
+        //
+        // Shown anyway, because a handicap nobody can see is worse than one
+        // that is merely unproven, and shown with the distinction on its face
+        // rather than in a footnote nobody reads.
+        const depth = t.entrants.find((e) => e.name === row.name)?.depth ?? 0;
+        if (depth > 0) {
+          const mark = this.doc.createElement('span');
+          mark.className = 'tn-depth';
+          mark.textContent = ` +${depth}`;
+          mark.title =
+            `Declared, not verified: this seat searches ${depth} ply deeper than the house ` +
+            'engine. The manifest says so and nothing on chain can confirm it.';
+          tr.firstChild?.appendChild(mark);
+        }
+
         const entry = t.entrants.find((e) => e.name === row.name)?.entry;
         if (typeof entry === 'number' && entry > 0) {
           const link = this.doc.createElement('a');
@@ -5702,11 +5739,14 @@ export class ChessApp {
   /** A manifest's pairings as addresses, for anything that needs a candidate. */
   private rememberPairings(tournament: Tournament): void {
     const addressOfName = new Map(tournament.entrants.map((e) => [e.name, e.address]));
+    this.knownCooldowns.add(tournament.cooldown ?? 0);
     for (const entrant of tournament.entrants) this.knownEntrants.add(entrant.address.toUpperCase());
     for (const game of tournament.games) {
       const white = addressOfName.get(game.white);
       const black = addressOfName.get(game.black);
-      if (white && black) this.manifestPairings.set(game.id, { white, black });
+      if (white && black) {
+        this.manifestPairings.set(game.id, { white, black, cooldown: tournament.cooldown ?? 0 });
+      }
     }
   }
 
@@ -5755,7 +5795,13 @@ export class ChessApp {
     // recovery could not do for itself.
     const claimed = this.manifestPairings.get(row.id);
     const fromManifest = claimed
-      ? normaliseRules({ ...DEFAULT_RULES, white: claimed.white, black: claimed.black, ranked: true })
+      ? normaliseRules({
+          ...DEFAULT_RULES,
+          white: claimed.white,
+          black: claimed.black,
+          ranked: true,
+          cooldown: claimed.cooldown
+        })
       : null;
 
     // AND THE ENTRANTS, FOR THE GAMES NO MANIFEST NAMES.
@@ -5782,7 +5828,11 @@ export class ChessApp {
       for (const white of entrants) {
         for (const black of entrants) {
           if (white === black) continue;
-          pairs.push(normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true }));
+          // At every cooldown a manifest has declared, because a pairing whose
+          // tournament varied its rules hashes to none of the default ones.
+          for (const cooldown of this.knownCooldowns) {
+            pairs.push(normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true, cooldown }));
+          }
         }
       }
     }

@@ -17,9 +17,8 @@
 // behind it, rather than staring at nothing while 1,700 entries are paged.
 
 import { replay } from '../replay/replay.js';
-import { DEFAULT_RULES, normaliseRules } from '../protocol/rules.js';
 import {
-  checkGames, honours, provenance, provenanceNote, resolveTournament, rounds,
+  checkGames, honours, provenance, provenanceNote, resolveTournament, rounds, rulesFor,
   standings, verifiedResults
 } from '../protocol/tournament.js';
 import type { CheckedGame, GameFacts, Provenance, Tournament } from '../protocol/tournament.js';
@@ -160,7 +159,12 @@ export async function scoreTournament(
     // result derived here can never be counted for an unverified game.
     const white = tournament.entrants.find((e) => e.name === game.white)?.address ?? null;
     const black = tournament.entrants.find((e) => e.name === game.black)?.address ?? null;
-    const rules = normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true });
+    // Built from what the MANIFEST declares, not from the defaults. A
+    // tournament that had to vary its rules to open its games at all — see
+    // Tournament.cooldown — replays identically either way, so getting this
+    // wrong would not change a single result. It would only, silently, make
+    // every game in it unverifiable.
+    const rules = rulesFor(tournament, white, black);
     const state = replay(
       entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
       { rules }
