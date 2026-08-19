@@ -136,6 +136,11 @@ const arg = (name, fallback = null) => {
  * It has to be decided before inscribing, because a dependency cannot be added
  * afterwards. 2993 and 3001 are not chained to each other for exactly that
  * reason - the idea arrived after they were both permanent.
+ *
+ * AND IT MUST NOT BE USED ON A TOURNAMENT MANIFEST. See the refusal below.
+ * This paragraph describes a sequence link, and `resolveTournament` reads the
+ * same link as a REVISION. Two features, both documented, mutually
+ * incompatible, and never used together until exhibition three tried it.
  */
 const AFTER = arg('after') ? Number(arg('after')) : null;
 
@@ -259,6 +264,34 @@ async function main() {
     );
   }
   const { kind, mime } = match;
+
+  // A TOURNAMENT MANIFEST MAY NOT DECLARE ANOTHER ONE. Refused rather than
+  // documented, because the mistake is permanent and costs a tournament its
+  // identity.
+  //
+  // `--after` above describes a sequence: this tournament follows that one.
+  // `resolveTournament` reads any dependency that parses as a manifest as an
+  // ANCESTOR, and returns the root of that walk as the tournament id. So a
+  // manifest inscribed with --after does not follow its predecessor, it becomes
+  // a revision OF it, and answers to the older one's id.
+  //
+  // Exhibition three was inscribed at 3015 with --after 3001 and resolved to
+  // 3001 - Exhibition Two's id, with Exhibition Two appearing to have been
+  // revised into a ninety game tournament. Nothing had used --after before, so
+  // the two features had never met.
+  //
+  // A real revision is inscribed by this same route deliberately, so the flag
+  // is not removed. It is refused for the case where it silently means the
+  // opposite of what it says.
+  if (kind === 'tournament manifest' && AFTER !== null && !process.argv.includes('--revises')) {
+    throw new WizardSafetyError(
+      `--after ${AFTER} on a tournament manifest does not mean "follows". resolveTournament ` +
+        `reads a manifest dependency as an ANCESTOR, so this would be inscribed as a REVISION ` +
+        `of ${AFTER} and would answer to ${AFTER}'s id rather than its own.\n\n` +
+        'If that is genuinely what you want, pass --revises as well and say why. Otherwise ' +
+        'inscribe it with no dependency, the way 2993 and 3001 are.'
+    );
+  }
 
   // A CHECKPOINT IS REGENERATED BEFORE IT IS SIGNED, and refused if it differs.
   //

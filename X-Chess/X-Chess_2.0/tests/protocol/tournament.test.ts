@@ -637,3 +637,46 @@ describe('a tournament that had to vary its rules to exist', () => {
     expect(bad(1).ok).toBe(true);
   });
 });
+
+describe('a dependency on another manifest is a REVISION, never a sequence', () => {
+  // THIS COST A TOURNAMENT ITS IDENTITY, briefly, and is worth stating loudly.
+  //
+  // `inscribe-manifest.mjs --after N` is documented as "the manifest this one
+  // follows", so that a reader holding one tournament can walk back through
+  // earlier ones. `resolveTournament` reads any dependency that parses as a
+  // manifest as an ANCESTOR and returns the root of that walk as the tournament
+  // id. Those are different relationships and the format has only one link.
+  //
+  // Exhibition three went up at 3015 declaring 3001, and resolved to 3001 —
+  // Exhibition Two's id, with a finished tournament appearing to have been
+  // revised into a ninety game one. Nothing had ever used --after, so the two
+  // features had never met. It was re-inscribed at 3016 with no dependency.
+  //
+  // The inscriber now refuses the combination. This asserts the behaviour that
+  // makes the refusal necessary, so nobody "fixes" the refusal without first
+  // changing what resolution means.
+  const manifest = (name: string) =>
+    `${TOURNAMENT_HEADER}\n` + JSON.stringify({
+      name, format: 'round-robin', contract: 'SP1.core',
+      entrants: [{ name: 'A', address: 'SP1' }, { name: 'B', address: 'SP2' }],
+      games: [{ id: 1, white: 'A', black: 'B', round: 1 }]
+    });
+
+  const chain = (deps: Record<number, number[]>) => ({
+    text: async (id: number) => (id in deps ? manifest(`T${id}`) : null),
+    dependencies: async (id: number) => deps[id] ?? [],
+    creator: async () => 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S'
+  });
+
+  it('answers to the older manifest, not to itself', async () => {
+    const resolved = await resolveTournament(3015, chain({ 3001: [], 3015: [3001] }));
+    expect(resolved.tournamentId, 'the newer manifest loses its own id').toBe(3001);
+    expect(resolved.lineage).toEqual([3001, 3015]);
+  });
+
+  it('is its own tournament when it declares nothing', async () => {
+    const resolved = await resolveTournament(3016, chain({ 3016: [] }));
+    expect(resolved.tournamentId).toBe(3016);
+    expect(resolved.lineage).toEqual([3016]);
+  });
+});

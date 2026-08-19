@@ -134,15 +134,23 @@ export const ENTRY_INSCRIPTION = Object.freeze({
  * games that were open and empty, verified against the rules each had
  * committed to, and inscribed while every one of them still had zero moves.
  *
- * It declares 3001, so a reader holding any of the three can walk back through
- * the others without being told an address.
+ * IT DECLARES NOTHING, and 3015 is the reason. That inscription is the same
+ * bytes with `--after 3001` on it, and a dependency on another manifest is read
+ * by `resolveTournament` as a REVISION rather than a sequence — so 3015 answers
+ * to 3001, Exhibition Two's id, and makes a finished tournament look as though
+ * it were revised into a ninety game one. 3015 is abandoned. Nothing points at
+ * it and nothing should.
+ *
+ * The walk-back chain the `--after` flag describes cannot be had this way. It
+ * needs a link type the format does not have, which is worth adding and is not
+ * worth guessing at while a tournament waits.
  *
  * It is also the first to carry `entry` ids for its players, `kind` saying
  * they are programs, a declared `depth` per seat, and the `cooldown` of 1
  * without which none of its ninety games could have been opened at all.
  */
 export const EXHIBITION_THREE = Object.freeze({
-  id: 3015,
+  id: 3016,
   board: 3014,
   cooldown: 1,
   url: 'https://xtrata.xyz/x/3015'
