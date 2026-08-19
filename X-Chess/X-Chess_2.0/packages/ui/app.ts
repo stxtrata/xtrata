@@ -3731,17 +3731,23 @@ export class ChessApp {
       return;
     }
 
+    // SAYS IT IS A SECOND DOCUMENT, because the first person to use this
+    // expected the picture to appear in their name manifest and reported its
+    // absence as a bug. Two panels each ending in "your manifest" read as one
+    // thing with two halves, and nothing on screen said otherwise.
     state.textContent =
-      `Previewing inscription ${chosen}. This is stored in this browser only — nothing is ` +
-      'on chain until the manifest below is inscribed.';
+      `Previewing inscription ${chosen}. Stored in this browser only — nothing is on chain ` +
+      'until the manifest below is inscribed, and this is a SEPARATE inscription from your ' +
+      'name. Two documents, because a name and a picture are inscribed and read apart.';
     manifest.textContent = buildPfp(who ?? '', chosen);
     manifest.classList.remove('hide');
     this.text(
       'pfpNext',
-      'This board cannot inscribe it: it holds no key and never will, being an inscription ' +
-        'itself. Copy the text above and inscribe it from this wallet. Once it is on chain, ' +
-        'any board finds it by reading what the wallet holds and checking the same wallet ' +
-        'minted it.'
+      'Inscribe this ON ITS OWN — it does not go inside the name manifest below, and adding ' +
+        'it there would break that document for every board already on chain. This board ' +
+        'cannot inscribe either one: it holds no key and never will, being an inscription ' +
+        'itself. Copy the text above and inscribe it from this wallet. Any board then finds ' +
+        'it by reading what the wallet holds and checking the same wallet minted it.'
     );
   }
 

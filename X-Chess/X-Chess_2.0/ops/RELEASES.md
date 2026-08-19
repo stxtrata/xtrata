@@ -11,9 +11,14 @@ that a build which never shipped still leaves a record of why.
 Profile pictures, phase 1. Built, not yet inscribed. **217,735 bytes, 14 chunks**
 — the first build to cross from 13 chunks to 14.
 
-* `htmlSha256` `8ea651fa02b36f6cdb3be3cbe2adf84efb3330ba90b204c5362a2522aead0592`
-* xtrata chunk hash `334ea1b742810fad37ebaa4eecc57bb1576b0e75605585451ce3132b5600a6fd`
-* build stamp `2.1.4 - 2026-08-19 15:21 - #b40af45a`
+* `htmlSha256` `8c7acc3ab39ecc3e699071397cf61fbca4b3944a97c19337b963e11df0331c88`
+* xtrata chunk hash `7145105b822440f370b55449aea2d46b4d4ba7b60e602c7fc8f8e5dc4fc34941`
+* **218,201 bytes.** Two documents, said out loud: the first person to use this
+  picked an image, built the name manifest, and reported the picture missing
+  from it. It was not missing — it is a second inscription, shown in its own
+  panel directly above. Two panels each ending in "your manifest" read as one
+  thing with two halves, and nothing on screen said otherwise. The heading now
+  says "its own inscription" and both notes say it does not go inside the name.
 * 1,525 tests passing, 77 files. `tsc --noEmit` clean. Docs audit clean.
 
 ### What it adds

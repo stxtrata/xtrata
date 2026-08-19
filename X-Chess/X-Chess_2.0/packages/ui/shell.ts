@@ -1076,13 +1076,15 @@ export const HTML = `
     <div class="row"><button class="action" id="profile-load">Show</button></div>
     <div id="profile-body"></div>
 
-    <h2 style="margin-top:18px">Picture ${info(
+    <h2 style="margin-top:18px">Picture — its own inscription ${info(
       'i-pfp-what',
       'Any picture inscription this wallet HOLDS can be its profile picture. Holding rather ' +
         'than creating, because a picture you bought is the normal case and requiring you to ' +
         'have made it would rule out everything anybody ever collected. The choice itself is ' +
-        'a small manifest you inscribe, which is what makes it yours rather than this ' +
-        'browser\'s.'
+        'a small manifest you inscribe, SEPARATE from the name one below. They are two ' +
+        'documents because a picture field inside a name manifest would make that manifest ' +
+        'unreadable to every board already on chain, which would cost you the name rather ' +
+        'than the picture.'
     )}</h2>
     <div class="pfp-row">
       <div class="pfp-canvas" id="pfp-canvas"></div>
