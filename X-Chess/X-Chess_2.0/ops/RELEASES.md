@@ -10,10 +10,17 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. **231,411 bytes, 15 chunks.**
 
-* `htmlSha256` `18ff838fe144f08f61e2626250e520f6064ab7421f567d2a507764ec90bf3994`
-* xtrata chunk hash `c14bcf5ce321be755912fa8765bfc772817ff00e0ebfdbbfd0ec49195deafa82`
-* build stamp `2.1.5 - 2026-08-19 19:47 - #8b8feb66`
-* 1,561 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+* `htmlSha256` `193a4bd1c35fe98f87242ce491ba59710cc5d2937322db38934c95817e223a33`
+* xtrata chunk hash `676fee30e4a063b5bc31373fcdb059d276823a5bfa287e1606cdb7d8c3de980c`
+* build stamp `2.1.5 - 2026-08-19 20:08 - #588f89fe`
+* 1,564 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+
+**Both copy buttons were doing nothing on the inscription**, and had been since
+each was written. Measured against 3022 in a browser rather than reasoned
+about: `clipboard-write` is `denied` on xtrata.xyz, so `writeText` throws
+whatever the user does, and both buttons fell through to printing the link as
+prose. `execCommand('copy')` goes through the older permission path and works
+on the same page from inside a real click, so it is tried second.
 
 **This entry was opened before `package.json` was bumped**, so the first build
 under it stamped 2.1.4 — the version 3022 already holds — and was one signature

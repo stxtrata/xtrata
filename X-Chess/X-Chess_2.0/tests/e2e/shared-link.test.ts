@@ -292,3 +292,63 @@ describe('a link to a game whose rules need a manifest', () => {
     expect(asked, 'a confirmed game has nothing to gain from a directory read').toBe(0);
   });
 });
+
+describe('copying a link where the modern clipboard is denied', () => {
+  // Measured on inscription 3022 rather than guessed at:
+  //
+  //   navigator.clipboard.writeText  ->  NotAllowedError: Write permission denied
+  //   navigator.permissions.query    ->  clipboard-write: "denied"
+  //
+  // Flat denied, and not for want of a user gesture — userActivation.isActive
+  // was true and it still refused. So both copy buttons fell through to
+  // printing the link as prose, which is why one read as broken.
+
+  it('falls through to the older route when writeText refuses', async () => {
+    const { dom, app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+
+    (dom.window.navigator as unknown as { clipboard: unknown }).clipboard = {
+      writeText: async () => {
+        throw new Error('NotAllowedError');
+      }
+    };
+    let selected = '';
+    (dom.window.document as unknown as { execCommand(c: string): boolean }).execCommand = (c) => {
+      selected = c;
+      return true;
+    };
+
+    const copied = await (app as unknown as {
+      copyText(t: string): Promise<boolean>;
+    }).copyText('https://xtrata.xyz/i/3022?tournament=3016');
+
+    expect(copied, 'the route that actually works on the inscription').toBe(true);
+    expect(selected).toBe('copy');
+  });
+
+  it('leaves no textarea behind either way', async () => {
+    const { dom, app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+    (dom.window.navigator as unknown as { clipboard: unknown }).clipboard = {
+      writeText: async () => {
+        throw new Error('denied');
+      }
+    };
+    (dom.window.document as unknown as { execCommand(): boolean }).execCommand = () => false;
+
+    await (app as unknown as { copyText(t: string): Promise<boolean> }).copyText('x');
+    expect(dom.window.document.querySelectorAll('textarea').length).toBe(0);
+  });
+
+  it('reports failure when neither route is allowed', async () => {
+    const { dom, app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+    (dom.window.navigator as unknown as { clipboard: unknown }).clipboard = undefined;
+    (dom.window.document as unknown as { execCommand(): boolean }).execCommand = () => false;
+
+    expect(
+      await (app as unknown as { copyText(t: string): Promise<boolean> }).copyText('x'),
+      'so the caller can show the link instead of claiming it copied'
+    ).toBe(false);
+  });
+});

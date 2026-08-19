@@ -1956,6 +1956,79 @@ export class ChessApp {
    * runtime puts a session credential on the page URL, and a link built by
    * appending to `location.href` would post it to whoever the link was sent to.
    */
+  /**
+   * Put text on the clipboard, by whichever route this page is allowed.
+   *
+   * THE MODERN API IS DENIED ON THE INSCRIBED PAGE. Measured on 3022 rather
+   * than guessed at:
+   *
+   *   navigator.clipboard.writeText  ->  NotAllowedError: Write permission denied
+   *   navigator.permissions.query    ->  clipboard-write: "denied"
+   *
+   * Flat denied, not a missing user gesture — `userActivation.isActive` was
+   * true and it still refused. So every copy button on this board fell through
+   * to printing the link as text, which is why one of them read as broken: you
+   * pressed it, a line of prose replaced the summary, and nothing was on your
+   * clipboard.
+   *
+   * `execCommand('copy')` goes through the older permission path and RETURNS
+   * TRUE on the same page from inside a real click. It is deprecated and it is
+   * the one that works, which settles it.
+   *
+   * The order is modern first, so a host that permits the good API gets it.
+   * Both need a user gesture and must not be awaited before trying —
+   * `execCommand` is synchronous for exactly that reason, and awaiting the
+   * clipboard promise first would spend the activation on some browsers.
+   */
+  private async copyText(text: string): Promise<boolean> {
+    try {
+      const clipboard = this.doc.defaultView?.navigator?.clipboard;
+      if (clipboard?.writeText) {
+        await clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // Denied, which is the ordinary case on an inscribed page.
+    }
+
+    try {
+      const holder = this.doc.createElement('textarea');
+      holder.value = text;
+      holder.setAttribute('readonly', '');
+      // Off screen rather than hidden. `display:none` and `visibility:hidden`
+      // cannot be selected, and a selection is the whole mechanism.
+      holder.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
+      this.doc.body.appendChild(holder);
+      holder.focus();
+      holder.select();
+      holder.setSelectionRange(0, text.length);
+      const copied = this.doc.execCommand?.('copy') === true;
+      holder.remove();
+      return copied;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Say so on the button itself, briefly.
+   *
+   * NOT IN THE NOTICE, which is where this used to go and where it did not
+   * survive. A tournament's note is rewritten by every redraw — a filter, a
+   * poll, a round finishing — so the confirmation could vanish before it was
+   * read, and did.
+   */
+  private saidOnButton(button: HTMLElement, said: string): void {
+    const was = button.textContent ?? '';
+    if (button.dataset.saying === 'yes') return;
+    button.dataset.saying = 'yes';
+    button.textContent = said;
+    this.doc.defaultView?.setTimeout(() => {
+      button.textContent = was;
+      delete button.dataset.saying;
+    }, 1800);
+  }
+
   private async copyTournamentLink(): Promise<void> {
     const id = this.tournament?.tournamentId ?? null;
     if (id === null) return;
@@ -1963,9 +2036,8 @@ export class ChessApp {
     const absolute = linkForTournament(String(this.doc.location?.href ?? ''), id);
     const called = this.tournament?.tournament?.name ?? `manifest ${id}`;
 
-    try {
-      await (this.doc.defaultView?.navigator?.clipboard?.writeText?.(absolute) ??
-        Promise.reject(new Error('no clipboard')));
+    if (await this.copyText(absolute)) {
+      this.saidOnButton(this.el.tournamentCopy, 'Copied');
       this.notice(
         'tournamentNote',
         'good',
@@ -1973,11 +2045,11 @@ export class ChessApp {
           'checks every pairing against the chain for itself — the link carries the ' +
           'inscription number and nothing it could get wrong.'
       );
-    } catch {
-      // No clipboard, which is ordinary in a sandboxed page. A link nobody can
-      // copy is worse than a link on screen.
-      this.notice('tournamentNote', 'info', `Copy this link: ${absolute}`);
+      return;
     }
+    // Neither route allowed. A link nobody can copy is worse than a link on
+    // screen, and this one goes in an element the redraws do not touch.
+    this.notice('tournamentNote', 'info', `Copy this link: ${absolute}`);
   }
 
   private async copyLink(): Promise<void> {
@@ -1988,9 +2060,8 @@ export class ChessApp {
     const href = String(this.doc.location?.href ?? '');
     const absolute = linkForGame(href, this.gameId, this.rules);
 
-    try {
-      await (this.doc.defaultView?.navigator?.clipboard?.writeText?.(absolute) ??
-        Promise.reject(new Error('no clipboard')));
+    if (await this.copyText(absolute)) {
+      this.saidOnButton(this.el.copyLink, 'Copied');
       this.notice(
         'chainNotice',
         'good',
@@ -1998,11 +2069,9 @@ export class ChessApp {
           'before either of you has moved. The rules are checked against the chain when they ' +
           'arrive, so the link cannot change what the game agreed to.'
       );
-    } catch {
-      // No clipboard, which is ordinary in a sandboxed page. Show it instead,
-      // because a link nobody can copy is worse than a link on screen.
-      this.notice('chainNotice', 'info', `Copy this link for your opponent: ${absolute}`);
+      return;
     }
+    this.notice('chainNotice', 'info', `Copy this link for your opponent: ${absolute}`);
   }
 
 
