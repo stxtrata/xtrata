@@ -3555,7 +3555,13 @@ export class ChessApp {
 
       // Names for everybody, once, before the expensive pass — so the first
       // full paint already reads as people rather than principals.
-      await this.names?.resolveAll(view.tournament?.entrants.map((e) => e.address) ?? []);
+      const field = view.tournament?.entrants.map((e) => e.address) ?? [];
+      await this.names?.resolveAll(field);
+      // AND THE FACES, on the same listing. `Holdings` shares one request per
+      // wallet between the two resolvers, so asking for both costs what asking
+      // for names alone used to. Bounded by the field — ten entrants, not one
+      // per game — and redrawn only if something arrived.
+      if (await (this.pictures?.resolveAll(field) ?? Promise.resolve(false))) this.drawTournament();
       this.notice('tournamentNote', 'info', 'Replaying every game to score it. This is the slow part.');
       // Remembered so Explore can say a game belongs to something. The board
               // can only ever know about tournaments it has loaded — see the
@@ -3632,6 +3638,39 @@ export class ChessApp {
    */
   private pictureUrl(id: number): string {
     return underXtrataRuntime(this.doc) ? `/i/${id}` : `${INSCRIPTION_VIEWER}${id}`;
+  }
+
+  /**
+   * A face beside a name, or nothing.
+   *
+   * NOTHING IS FETCHED HERE. The board never holds the bytes — it points an
+   * `<img>` at the inscription and lets the browser fetch, decode, scale and
+   * cache it. A picture may be 443 KB and this square is twenty-four pixels;
+   * pulling that through the board's own request budget to shrink it would
+   * spend the rate limit the wallet needs on decoration.
+   *
+   * Only for a picture ALREADY RESOLVED. This never starts a lookup, so a list
+   * that has not asked simply shows names — which is what it did before and is
+   * never worse than it was.
+   */
+  private faceFor(address: string): HTMLElement | null {
+    const known = this.pictures?.known(address);
+    if (!known) return null;
+
+    const img = this.doc.createElement('img');
+    img.className = 'pfp';
+    img.src = this.pictureUrl(known.image);
+    img.alt = '';
+    // Decorative, and said so: the name is right beside it and a screen reader
+    // announcing an inscription number twice helps nobody.
+    img.setAttribute('aria-hidden', 'true');
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.title = `Inscription ${known.image}, chosen by manifest ${known.manifest}`;
+    // A picture that will not load leaves the name where it was rather than a
+    // broken square. The wallet may have sold it a minute ago.
+    img.addEventListener('error', () => img.remove());
+    return img;
   }
 
   /**
@@ -4007,6 +4046,9 @@ export class ChessApp {
         const item = this.doc.createElement('div');
         item.className = 'tn-entrant';
 
+        const face = this.faceFor(entrant.address);
+        if (face) item.appendChild(face);
+
         const who = this.doc.createElement('span');
         who.className = 'tn-entrant__name';
         who.textContent = entrant.name;
@@ -4099,13 +4141,22 @@ export class ChessApp {
       for (const [place, row] of view.table.entries()) {
         const tr = this.doc.createElement('tr');
         const crown = crownFor(place);
+        const seat = t.entrants.find((e) => e.name === row.name)?.address ?? '';
         for (const [value, numeric] of [
           [this.tournamentName(t, row.name) + (crown ? ` ${crown}` : ''), false],
           [String(row.points), true], [String(row.played), true],
           [String(row.won), true], [String(row.drawn), true], [String(row.lost), true]
         ] as [string, boolean][]) {
           const td = this.doc.createElement('td');
-          td.textContent = value;
+          // Ahead of the name, so a column of faces lines up and a row without
+          // one is a gap rather than a shunted name.
+          //
+          // Appended as a NODE either side. `textContent =` after appending an
+          // image removes it: assigning it replaces every child, which is the
+          // sort of thing that reads as the picture never having loaded.
+          const face = !numeric && seat ? this.faceFor(seat) : null;
+          if (face) td.appendChild(face);
+          td.appendChild(this.doc.createTextNode(value));
           if (numeric) td.className = 'num';
           tr.appendChild(td);
         }
@@ -5372,6 +5423,19 @@ export class ChessApp {
       const players = found.flatMap((r) => [r.white, r.black]).filter((p): p is string => !!p);
       if (await (this.names?.resolveAll(players) ?? Promise.resolve(false))) this.drawExplore();
 
+      // FACES, FOR WHAT IS ACTUALLY ON SCREEN, and this is the surface where
+      // that distinction earns its keep.
+      //
+      // A page is twenty-five games and up to fifty distinct addresses, and the
+      // list PAGES — somebody walking back through a busy contract would
+      // otherwise trigger a fresh set of lookups per page for squares they may
+      // scroll straight past. So it asks about the rows currently shown, after
+      // they are drawn, and never blocks them.
+      //
+      // Deduplicated because one player appears in several games and the answer
+      // is per player, not per row: a ninety-game tournament is ten faces.
+      void this.paintExploreFaces();
+
       // LAST, because it is the slowest part and the list is useful without it.
       // Everything above is remembered locally and paints with no lookup at all;
       // this is the round trip that finds a game this browser has never seen.
@@ -6119,6 +6183,9 @@ export class ChessApp {
 
     for (const row of found ? [found, ...showing.filter((r) => r.id !== found.id)] : showing) {
       const tr = this.doc.createElement('tr');
+      // So a face arriving later finds its row without the list redrawing.
+      if (row.white) tr.dataset.white = row.white;
+      if (row.black) tr.dataset.black = row.black;
       tr.dataset.game = String(row.id);
       if (found && row.id === found.id) tr.classList.add('found');
       const cell = (node: Node): void => {
@@ -6139,8 +6206,12 @@ export class ChessApp {
       // third-party game the opener is often neither player.
       const players = this.doc.createElement('span');
       if (row.white && row.black) {
+        const wf = this.faceFor(row.white);
+        if (wf) players.appendChild(wf);
         players.appendChild(this.addressNode(row.white));
         players.appendChild(text(' v ', 'muted'));
+        const bf = this.faceFor(row.black);
+        if (bf) players.appendChild(bf);
         players.appendChild(this.addressNode(row.black));
       } else {
         // Three different silences, and they are not interchangeable. "anyone"
@@ -6494,10 +6565,16 @@ export class ChessApp {
             : ' Nothing here is stored; it is recomputed from the chain each time.')
       );
 
+      // A leaderboard is one row per PLAYER, so this is bounded by the field
+      // rather than by the games — fourteen lookups, not eighty-six. Asked
+      // after the table is built so the ratings never wait on a decoration,
+      // and redrawn only if something arrived.
       const body = this.el.leaderboardRows;
       body.replaceChildren();
       for (const row of rows) {
         const tr = this.doc.createElement('tr');
+        // So a face arriving later can find its row without a redraw.
+        tr.dataset.who = row.principal;
         const cells: Array<[string, boolean, string?]> = [
           [String(row.rank), false],
           [row.principal, false],
@@ -6512,16 +6589,88 @@ export class ChessApp {
         ];
         for (const [value, numeric, why] of cells) {
           const td = this.doc.createElement('td');
-          if (value === row.principal) td.appendChild(this.addressNode(row.principal));
-          else td.textContent = value;
+          if (value === row.principal) {
+            const face = this.faceFor(row.principal);
+            if (face) td.appendChild(face);
+            td.appendChild(this.addressNode(row.principal));
+          } else td.textContent = value;
           if (numeric) td.className = 'num';
           if (why) td.title = why;
           tr.appendChild(td);
         }
         body.appendChild(tr);
       }
+
+      // FACES AFTER THE RATINGS, never before. A leaderboard is one row per
+      // PLAYER, so this is bounded by the field rather than by the games —
+      // fourteen lookups against eighty-six replayed games — and `Holdings`
+      // shares the listing with the name resolver, so most of them are already
+      // paid for.
+      //
+      // Not awaited: a rating must never wait on a decoration. The rows are on
+      // screen by now, and each face appends itself to the cell it belongs to
+      // when it arrives.
+      void this.paintFaces(rows.map((r) => r.principal));
       return true;
     });
+  }
+
+  /**
+   * Resolve pictures for a bounded set of addresses, then redraw once.
+   *
+   * ONE REDRAW, not one per face. Resolving serially and repainting each time
+   * would rebuild the table a dozen times over a few seconds, which is visible
+   * and is what makes decoration feel like a fault.
+   */
+  /**
+   * Faces for the Explore rows on screen, patched in rather than redrawn.
+   *
+   * Deliberately not part of the row build. A row is useful the moment it has a
+   * result and a state; a picture is decoration, and making the list wait for
+   * one is the trade the plan for this said not to make.
+   */
+  private async paintExploreFaces(): Promise<void> {
+    if (!this.pictures) return;
+    const rows = this.el.exploreRows.querySelectorAll('tr[data-white], tr[data-black]');
+    const wanted = new Set<string>();
+    for (const tr of rows) {
+      const el = tr as HTMLElement;
+      if (el.dataset.white) wanted.add(el.dataset.white);
+      if (el.dataset.black) wanted.add(el.dataset.black);
+    }
+    if (!wanted.size) return;
+
+    try {
+      if (!(await this.pictures.resolveAll([...wanted]))) return;
+    } catch {
+      // A face that cannot be read costs a face. The row is unaffected.
+      return;
+    }
+    if (this.tab === 'explore') this.drawExplore();
+  }
+
+  private async paintFaces(addresses: readonly string[]): Promise<void> {
+    try {
+      if (!(await (this.pictures?.resolveAll(addresses) ?? Promise.resolve(false)))) return;
+    } catch {
+      // A picture that cannot be read costs a face and never a rating.
+      return;
+    }
+
+    // INSERTED INTO THE ROWS THAT ARE ALREADY THERE, rather than redrawing.
+    //
+    // The obvious version calls `loadLeaderboard` again, and that re-walks
+    // every ranked game — a read per game and a replay of each — to change some
+    // twenty-two pixel squares. That is precisely the "noticeably slower in
+    // exchange for decoration" the plan warned about, and it would have been
+    // invisible in a test and obvious on a contract with a few hundred games.
+    for (const tr of this.el.leaderboardRows.querySelectorAll('tr[data-who]')) {
+      const who = (tr as HTMLElement).dataset.who ?? '';
+      const cell = tr.querySelector('td:nth-child(2)');
+      if (!cell || cell.querySelector('img.pfp')) continue;
+      const face = this.faceFor(who);
+      if (face) cell.insertBefore(face, cell.firstChild);
+    }
   }
 
   /**

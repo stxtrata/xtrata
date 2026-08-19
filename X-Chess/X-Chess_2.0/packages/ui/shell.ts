@@ -470,6 +470,18 @@ ${SCALE_CSS}
 .tn-entrant__name { font-weight: 600; }
 .tn-entrant__addr { margin-left: auto; color: var(--dim); font-size: .85em; }
 
+/* A face beside a name. Fixed square so a row keeps its height whether a
+   picture arrives, fails or was never chosen — a list that reflows as images
+   land reads as broken even when every one of them worked. */
+.pfp {
+  width: 22px; height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  vertical-align: -5px;
+  margin-right: 6px;
+  background: var(--line);
+}
+
 /* The list of tournaments found on chain. Buttons rather than links: this
    loads into the tab it is in, and nothing navigates. */
 .tn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
