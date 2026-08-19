@@ -6,9 +6,35 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
-## 2.1.6 — 2026-08-19
+## 2.1.7 — 2026-08-19
 
 Built, not yet inscribed.
+
+* `htmlSha256` `4fb3e9846559550017c9d6f0902ce89bf00f8d41b10d16e716f63ca6da220098`
+* xtrata chunk hash `390f861999b946a7910195710ba8dcfe07a39eb3123df6a44bc971c08d5e5280`
+* build stamp `2.1.7 - 2026-08-19 22:16 - #de85733f`
+* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
+
+**A move costs one game rather than ninety.** With the loop fixed it
+was stable until a round ended, and then did the same full reload to record
+five results — because a string comparison says something changed and cannot
+say WHAT. The poll reads a row per unfinished game, so it already knows exactly
+which moved; it now re-derives those and takes the rest from memory. No row
+reads at all in a rescore: the poll has done them, and everything else is
+either finished, which cannot change, or was just read and found unmoved. A
+game with nothing remembered falls through to the full path, so a gap in the
+cache can never become a gap in the table.
+
+
+## 2.1.6 — 2026-08-19  ·  **inscription 3024, live on mainnet**
+
+Inscribed as a child of 3023. **232,345 bytes, 15 chunks**, stamp
+`2.1.6 - 2026-08-19 21:43 - #22884569`.
+
+Carries the clipboard fix that missed 3023, and the reload loop below. Does NOT
+carry the targeted rescore, which was built half an hour later under the same
+version and never went up — see 2.1.7. That is exactly the gap somebody
+reported from this inscription: stable, until a round ended.
 
 **A loaded tournament reloaded itself every thirty seconds, for ever.** The
 poll builds a signature of the unfinished games' submission counts and compares
@@ -29,16 +55,6 @@ cannot change.
 * The pairing pass uses a remembered rules hash and reads nothing. A rules hash
   is fixed when a game is opened, so a hash read before is the hash now.
 
-**And a move now costs one game rather than ninety.** With the loop fixed it
-was stable until a round ended, and then did the same full reload to record
-five results — because a string comparison says something changed and cannot
-say WHAT. The poll reads a row per unfinished game, so it already knows exactly
-which moved; it now re-derives those and takes the rest from memory. No row
-reads at all in a rescore: the poll has done them, and everything else is
-either finished, which cannot change, or was just read and found unmoved. A
-game with nothing remembered falls through to the full path, so a gap in the
-cache can never become a gap in the table.
-
 ## 2.1.5 — 2026-08-19  ·  **inscription 3023, live on mainnet**
 
 Inscribed as a child of 3022. **231,411 bytes, 15 chunks**, stamp
@@ -50,10 +66,10 @@ same version number and never went up — see 2.1.6.
 
 ### Originally recorded as **231,411 bytes, 15 chunks.**
 
-* `htmlSha256` `8f5c0d522eebb957925a5bc2346a3de4767753078f462c5a8df1f0bd4691624f`
-* xtrata chunk hash `fbb99561ee17e624ca2830fae7c07fb08ba35b0746edd5670a8bf2ef2da2e79e`
-* build stamp `2.1.6 - 2026-08-19 22:13 - #de85733f`
-* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files.
+* `htmlSha256` `4fb3e9846559550017c9d6f0902ce89bf00f8d41b10d16e716f63ca6da220098`
+* xtrata chunk hash `390f861999b946a7910195710ba8dcfe07a39eb3123df6a44bc971c08d5e5280`
+* build stamp `2.1.7 - 2026-08-19 22:16 - #de85733f`
+* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
 * 1,564 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
 
 **Both copy buttons were doing nothing on the inscription**, and had been since
