@@ -47,6 +47,17 @@ export class PlayerNames {
   // real answer and must not be confused with "not asked yet".
   private readonly cache = new Map<string, string | null>();
   private readonly inFlight = new Map<string, Promise<string | null>>();
+  /**
+   * Which inscription supplied the name, when one did.
+   *
+   * Kept beside the cache rather than folded into it, so `resolve` keeps
+   * returning a name and every caller that only wants one is untouched. It
+   * exists because a person who has just inscribed a manifest needs the board to
+   * say WHICH document it is reading — "your name is Jim Dude" and "your name is
+   * Jim Dude, from inscription 3021" answer different questions, and after
+   * paying a fee it is the second one being asked.
+   */
+  private readonly from = new Map<string, number>();
 
   constructor(options: PlayerNamesOptions) {
     this.endpoint = options.endpoint;
@@ -123,9 +134,33 @@ export class PlayerNames {
       // this address; otherwise it is somebody else's manifest that happens to
       // be held here.
       if (parsed.player!.address.trim().toUpperCase() !== address.trim().toUpperCase()) continue;
-      if (attested(parsed.player, await this.reader.creator(id))) return parsed.player!.name;
+      if (attested(parsed.player, await this.reader.creator(id))) {
+        this.from.set(address, id);
+        return parsed.player!.name;
+      }
     }
     return null;
+  }
+
+  /**
+   * Ask again about this address next time.
+   *
+   * EXISTS BECAUSE OF THE MOMENT AFTER INSCRIBING. A "no" here is cached like
+   * any other answer, and it is the answer somebody has just paid to change —
+   * so without this, checking whether the manifest landed would report the
+   * absence it remembered from before the transaction, for the rest of the
+   * session.
+   */
+  forget(address: string): void {
+    const key = address;
+    this.cache.delete(key);
+    this.inFlight.delete(key);
+    this.from.delete(key);
+  }
+
+  /** The inscription a name came from, if one is known. */
+  manifestFor(address: string): number | null {
+    return this.from.get(address) ?? null;
   }
 
   /** Resolve several, and say whether anything new was learned. */

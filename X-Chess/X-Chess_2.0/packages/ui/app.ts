@@ -617,7 +617,7 @@ const IDS = [
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
-  'profile-who', 'profile-load', 'profile-body',
+  'profile-who', 'profile-load', 'profile-body', 'onchain-check', 'onchain-rows',
   'pfp-canvas', 'pfp-id', 'pfp-check', 'pfp-mine', 'pfp-clear',
   'pfp-problems', 'pfp-grid', 'pfp-state', 'pfp-manifest', 'pfp-next',
   'claim-name-why', 'claim-name', 'claim-about',
@@ -1047,6 +1047,7 @@ export class ChessApp {
     });
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
+    on('onchainCheck', () => void this.checkOnChain());
     on('pfpCheck', () => void this.previewPicture());
     on('pfpMine', () => void this.showHoldings());
     on('pfpClear', () => this.clearPicture());
@@ -3509,7 +3510,7 @@ export class ChessApp {
    *
    * The address is taken from the connected wallet rather than typed, because a
    * manifest naming an address you do not control is refused by `attested` and
-   * would be 0.3 STX spent on nothing.
+   * would be a fee spent on nothing.
    */
   /**
    * Where a picture is fetched from.
@@ -3743,7 +3744,9 @@ export class ChessApp {
     manifest.classList.remove('hide');
     this.text(
       'pfpNext',
-      'Inscribe this ON ITS OWN — it does not go inside the name manifest below, and adding ' +
+      'About 0.03 STX: these manifests are under 120 bytes, so both together are one chunk ' +
+        'each and cost pennies. Inscribe this ON ITS OWN — it does not go inside the name ' +
+        'manifest below, and adding ' +
         'it there would break that document for every board already on chain. This board ' +
         'cannot inscribe either one: it holds no key and never will, being an inscription ' +
         'itself. Copy the text above and inscribe it from this wallet. Any board then finds ' +
@@ -3785,7 +3788,9 @@ export class ChessApp {
     output.classList.remove('hide');
     output.textContent = text;
     why.textContent =
-      `Inscribe this from ${this.address} on Xtrata, as text/plain. It costs about 0.3 STX. ` +
+      `Inscribe this from ${this.address} on Xtrata, as text/plain. About 0.03 STX — ` +
+      'a one-chunk inscription is 11,000 uSTX of protocol fee plus roughly 20,000 of miner ' +
+      'fee, measured off a real mint rather than off `get-fee-unit`, which is not a price. ' +
       'Once it is on chain this board will call you ' + draft.name +
       ' anywhere it currently shows your address — unless you register a BNS name, which wins.';
   }
@@ -6454,6 +6459,96 @@ export class ChessApp {
           'board watches, which is normal; a correction would appear here without this page ' +
           'being rebuilt.'
     );
+  }
+
+  /**
+   * What this address has actually inscribed, named by inscription.
+   *
+   * THE MISSING HALF OF INSCRIBING SOMETHING. Building a manifest is free and
+   * instant; inscribing it costs a fee and a wait, and until now the board gave
+   * no way to ask whether it had landed. The name simply started appearing, or
+   * did not, and there was no telling the difference between "not inscribed",
+   * "inscribed and not found yet" and "inscribed wrongly".
+   *
+   * ASKED FRESH, every time. Both lookups cache, and "this address has nothing"
+   * is exactly the answer somebody has just paid to change — so a check that
+   * used the cache would report the absence it remembered from before the
+   * transaction. `forget` first, then look.
+   *
+   * The rules are not restated here, they are the same ones: newest holding
+   * wins, and it counts only if the address INSCRIBED it. This reports what
+   * those already decided rather than deciding anything itself, which is what
+   * keeps this panel and the rest of the board from disagreeing.
+   */
+  private async checkOnChain(): Promise<void> {
+    const rows = this.el.onchainRows;
+    rows.replaceChildren();
+    const who = this.pictureAddress();
+    if (!who) {
+      rows.textContent = 'Put an address in the box above, or connect a wallet.';
+      return;
+    }
+    if (!this.players || !this.pictures) {
+      rows.textContent = 'No endpoint, so nothing can be read.';
+      return;
+    }
+
+    rows.textContent = `Reading what ${who.slice(0, 8)}… holds…`;
+    this.players.forget(who);
+    this.pictures.forget(who);
+
+    const found = await this.guard('reading what this address inscribed', async () => ({
+      name: await this.players!.resolve(who),
+      nameAt: this.players!.manifestFor(who),
+      picture: await this.pictures!.resolve(who)
+    }));
+    if (found === null) {
+      rows.textContent = 'Could not read that just now. The chain is fine; this page could not see it.';
+      return;
+    }
+
+    rows.replaceChildren();
+    const line = (label: string, said: string, id: number | null): void => {
+      const row = this.doc.createElement('div');
+      row.className = 'row';
+      const key = this.doc.createElement('strong');
+      key.textContent = label;
+      const val = this.doc.createElement('span');
+      val.textContent = said;
+      row.append(key, val);
+      // Linked, so the claim can be read rather than taken. Absolute, for the
+      // reason INSCRIPTION_VIEWER exists.
+      if (id !== null) {
+        const link = this.doc.createElement('a');
+        link.href = `${INSCRIPTION_VIEWER}${id}`;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = `inscription ${id}`;
+        row.append(link);
+      }
+      rows.append(row);
+    };
+
+    line(
+      'Name',
+      found.name ? found.name : 'nothing inscribed from this address yet',
+      found.name ? found.nameAt : null
+    );
+    line(
+      'Picture',
+      found.picture ? `image ${found.picture.image}` : 'nothing inscribed from this address yet',
+      found.picture ? found.picture.manifest : null
+    );
+
+    // SAID EVERY TIME, because a picture that stopped showing is the one case a
+    // person will assume is a bug in the board. It is usually a sale.
+    const note = this.doc.createElement('div');
+    note.className = 'small muted';
+    note.textContent =
+      'Latest wins, and only documents this address inscribed itself count — one somebody ' +
+      'else made about you is ignored however true it looks. A picture also has to still be ' +
+      'held: selling it stops it showing.';
+    rows.append(note);
   }
 
   private async loadProfile(): Promise<void> {

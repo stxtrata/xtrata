@@ -1073,7 +1073,11 @@ export const HTML = `
       )}</label>
       <input type="text" id="profile-who" placeholder="a Stacks address">
     </div>
-    <div class="row"><button class="action" id="profile-load">Show</button></div>
+    <div class="row">
+      <button class="action" id="profile-load">Show</button>
+      <button class="action" id="onchain-check">What has this address inscribed?</button>
+    </div>
+    <div id="onchain-rows" class="small"></div>
     <div id="profile-body"></div>
 
     <h2 style="margin-top:18px">Picture — its own inscription ${info(

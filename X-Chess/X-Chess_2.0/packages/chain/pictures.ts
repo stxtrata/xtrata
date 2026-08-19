@@ -129,6 +129,21 @@ export class PlayerPictures {
   }
 
   /**
+   * Ask again about this address next time.
+   *
+   * EXISTS BECAUSE OF THE MOMENT AFTER INSCRIBING. A "no" here is cached like
+   * any other answer, and it is the answer somebody has just paid to change —
+   * so without this, checking whether the manifest landed would report the
+   * absence it remembered from before the transaction, for the rest of the
+   * session.
+   */
+  forget(address: string): void {
+    const key = String(address ?? '').trim().toUpperCase();
+    this.cache.delete(key);
+    this.inFlight.delete(key);
+  }
+
+  /**
    * The pictures this address could choose from.
    *
    * Judged by `pictureProblem`, so what comes back is exactly what the board
