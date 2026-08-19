@@ -3193,6 +3193,26 @@ export class ChessApp {
     this.el.tournamentProvenance.classList.add('hide');
     this.text('tournamentShown', '');
     this.text('tournamentFresh', '');
+
+    // ALREADY IN HAND, so show it rather than a word.
+    //
+    // The chip that was just pressed was drawn FROM the manifest — the
+    // directory parsed it to know the tournament's name, and it is still in
+    // memory. So everything a manifest declares can be on screen before a
+    // single request goes out: who is in it, how many rounds, which engine,
+    // what the format is. What costs time is the part underneath — a row read
+    // per game and then a replay of each — and that is worth waiting for
+    // against a full page rather than the word "Reading".
+    const known = id === null ? null : (this.found.find((e) => e.id === id)?.manifest ?? null);
+    if (known) {
+      this.tournament = {
+        ok: true, problems: [], tournamentId: id, lineage: [id!], tournament: known,
+        provenance: null, says: '', honoured: true, table: [], rounds: [],
+        scored: false, revision: null
+      };
+      this.drawTournament();
+      return;
+    }
     this.notice('tournamentNote', 'info', name ? `Reading ${name}…` : 'Reading…');
     // So the button that was just pressed reads as selected while it loads.
     this.drawTournamentList();
@@ -3970,6 +3990,60 @@ export class ChessApp {
         'look at a tournament is the slow one — finished games are remembered, so coming ' +
         'back is quick.';
       this.el.tournamentNote.appendChild(wait);
+
+      // THE FIELD, while the results are still coming. A manifest names every
+      // entrant, and a reader waiting on ninety replays would rather read who
+      // is playing than a progress note. Replaced by the rounds when they
+      // arrive, so this is the empty tab filled with true things rather than a
+      // second place results could disagree with.
+      const list = this.doc.createElement('div');
+      list.className = 'tn-entrants';
+      const heading = this.doc.createElement('div');
+      heading.className = 'tn-entrants__head';
+      heading.textContent = `The field — ${t.entrants.length} entrants`;
+      list.appendChild(heading);
+
+      for (const entrant of t.entrants) {
+        const item = this.doc.createElement('div');
+        item.className = 'tn-entrant';
+
+        const who = this.doc.createElement('span');
+        who.className = 'tn-entrant__name';
+        who.textContent = entrant.name;
+        item.appendChild(who);
+
+        if ((entrant.depth ?? 0) > 0) {
+          const pips = this.doc.createElement('span');
+          pips.className = 'tn-depth';
+          pips.textContent = `+${entrant.depth}`;
+          pips.title =
+            `Declared, not verified: this seat searches ${entrant.depth} ply deeper than the ` +
+            'house engine. The manifest says so and nothing on chain can confirm it.';
+          item.appendChild(pips);
+        }
+
+        if (typeof entrant.entry === 'number' && entrant.entry > 0) {
+          const link = this.doc.createElement('a');
+          link.className = 'tn-entry';
+          link.href = `${INSCRIPTION_VIEWER}${entrant.entry}`;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = 'house';
+          link.title = `Inscription ${entrant.entry}: what this player was told to do`;
+          item.appendChild(link);
+        }
+
+        const where = this.doc.createElement('span');
+        where.className = 'tn-entrant__addr';
+        // The NAME is what a manifest calls somebody and the ADDRESS is who
+        // they are. Both, because two tournaments may call one wallet
+        // different things and only one of those is checkable.
+        where.textContent = this.names?.peek(entrant.address) ?? shortPrincipal(entrant.address);
+        item.appendChild(where);
+
+        list.appendChild(item);
+      }
+      this.el.tournamentBody.appendChild(list);
     }
 
     // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.

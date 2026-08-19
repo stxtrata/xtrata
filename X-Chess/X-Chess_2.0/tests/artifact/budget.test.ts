@@ -89,8 +89,8 @@ const CHUNKS = 32;
 //
 // So each row is now roughly 1.5x what it uses — quiet for ordinary work, loud
 // for a package that doubles unexpectedly. The check that makes this safe is
-// the sum: every row at its NEW ceiling totals 268,850 bytes, which is
-// seventeen chunks, still one transaction and still half the real limit.
+// the sum: every row at its ceiling totals 348,850 bytes, which is
+// twenty-two chunks, still one transaction and still inside the real limit.
 //
 // The chunk test above stays the only hard gate, because it is the only one
 // describing a property of the contract rather than a preference of ours.
@@ -110,7 +110,19 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // markup rather than a triangle drawn per arrow - which was tried first and
   // cost 734, and a version with the explanation inside the template literal
   // cost 1,276, because a comment in a template literal is an inscribed byte.
-  { group: 'packages/ui', ceiling: 170_000, measured: 113_602 },
+  //
+  // Moved to 250,000 on 2026-08-19, and this one is a real 51% growth rather
+  // than a row drifting: 113,602 to 171,946 as profile pictures, a paged game
+  // list, deep links for tournaments and players, the tournament preview and a
+  // shared rule-recovery candidate builder all landed. The row did its job —
+  // it stopped just short and made somebody look — and the growth is features
+  // rather than sprawl, so this is the deliberate line.
+  //
+  // The sum is what makes it safe. Every row at its ceiling now totals 348,850
+  // bytes, which is twenty-two chunks: still one `add-chunk-batch` transaction
+  // and still well inside the thirty-two the contract takes. The artefact
+  // itself is fourteen.
+  { group: 'packages/ui', ceiling: 250_000, measured: 171_946 },
   { group: 'packages/chain', ceiling: 33_000, measured: 21_825 },
   // Raised to 18,000 on 2026-08-17, and this one was arithmetic rather than a
   // surprise: step 0 of the Tournaments tab measured it before any UI existed.

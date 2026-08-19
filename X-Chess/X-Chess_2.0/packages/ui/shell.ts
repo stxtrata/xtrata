@@ -454,6 +454,22 @@ ${SCALE_CSS}
    purpose: it is a status line, not a warning, and it goes away by itself. */
 .tn-wait { display: block; margin-top: .45rem; font-size: .85em; opacity: .78; }
 
+/* The field, shown while the results are still being replayed. A plain list on
+   purpose: it is the manifest read out, not a standings table, and dressing it
+   as one would invite a reader to take it for results that had arrived. */
+.tn-entrants { margin-top: 1rem; }
+.tn-entrants__head {
+  font-size: .8em; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--dim); margin-bottom: .5rem;
+}
+.tn-entrant {
+  display: flex; align-items: baseline; gap: .5rem;
+  padding: .3rem 0; border-bottom: 1px solid var(--line);
+}
+.tn-entrant:last-child { border-bottom: 0; }
+.tn-entrant__name { font-weight: 600; }
+.tn-entrant__addr { margin-left: auto; color: var(--dim); font-size: .85em; }
+
 /* The list of tournaments found on chain. Buttons rather than links: this
    loads into the tab it is in, and nothing navigates. */
 .tn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
