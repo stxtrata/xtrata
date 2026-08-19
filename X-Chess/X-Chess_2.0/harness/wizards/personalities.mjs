@@ -51,47 +51,10 @@ const entry = ({ id, name, model = DEFAULT_MODEL, style, prompt }) =>
  * speaking, and it is the same for every entrant, which is what makes the
  * comparison fair. An entrant's inscription is only the character.
  */
-/**
- * What the tournament requires of everybody, as opposed to what an entry asks
- * for. This is the house speaking, so it is identical for every character and
- * an entry cannot alter it.
- *
- * The last paragraph is a COMPETITION RULE, not chess advice, and it is here
- * rather than in anyone's prompt for that reason. Game 17 drew by repetition
- * from a queen, rook, two bishops, knight and five pawns against a queen and
- * two pawns: eighty-nine moves, sixteen of them checks, and 0.267 STX of miner
- * fees to reach a result neither side had to accept. Plumb was playing its
- * entry correctly - it says a draw is acceptable - and that is the point. The
- * problem was not the personality, it was that repeating cost nothing.
- *
- * IT STATES A VERDICT, NOT A TEST, and the first version got that wrong. It read
- * "if you are ahead on material, do not play it", which asks the model to
- * evaluate a condition - and evaluating a condition is something a model does
- * OUT LOUD. Measured: one forfeit in 950 moves, and the reply was
- * "b2b2 isn't in the list, so: b2c1 / Wait, checking material lead rule - I'",
- * a player narrating the check instead of answering with a move.
- *
- * The harness already knows whether you are ahead and which move draws, so it
- * resolves the condition itself and marks the move DO NOT PLAY. Nothing is left
- * to work out, which is the same lesson as everywhere else here: a computed fact
- * lands, an instruction to reason does not.
- *
- * It bites in one place only: you are ahead, and the move draws on the spot.
- * Everything else - how to open, when to sacrifice, whether to trade - is still
- * entirely the character's, which is what the tournament is trying to measure.
- */
-export const HOUSE_RULES = `
-You are playing one side of a chess game. You will be given the position in FEN,
-who is ahead on material, the moves so far, and a list of every legal move
-available to you right now.
-
-Reply with exactly one move from that list, in the same notation, and nothing
-else. No explanation, no commentary, no alternative, no working out. If you find
-yourself writing a sentence, stop and write the move instead.
-
-A move marked DO NOT PLAY is one the tournament has already ruled out for you.
-Choose any other move.
-`.trim();
+// HOUSE_RULES lives in director.mjs now, with the rest of what the harness
+// says rather than what an entrant says. Re-exported because it was imported
+// from here first and moving a name is not worth breaking a caller over.
+export { HOUSE_RULES } from './director.mjs';
 
 export const PERSONALITIES = Object.freeze([
   entry({

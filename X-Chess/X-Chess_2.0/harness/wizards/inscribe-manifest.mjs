@@ -214,6 +214,12 @@ async function main() {
     { starts: 'X-CHESS-ENTRY/1', kind: 'character sheet', mime: 'text/plain' },
     { starts: 'X-CHESS-DOCS/1', kind: 'manual', mime: 'text/plain' },
     { starts: 'X-CHESS-RATINGS/1', kind: 'rating checkpoint', mime: 'text/plain' },
+    // A MODULE, so it is served as JavaScript. The skill inscriptions carry
+    // their marker behind a comment slash because the file has to stay valid
+    // JavaScript while saying what it is, and a reader fetching it wants to
+    // execute it rather than read it.
+    { starts: '// X-CHESS-DIRECTOR/1', kind: 'prompt protocol', mime: 'text/javascript' },
+    { starts: '// X-CHESS-SKILL/1', kind: 'skill module', mime: 'text/javascript' },
     { starts: '<!doctype html', kind: 'page', mime: 'text/html' }
   ];
   const header = text.split('\n')[0].trim();
@@ -377,6 +383,11 @@ async function main() {
   const called =
     (/"name":\s*"([^"]+)"/.exec(text) ?? [])[1] ??
     (/<title[^>]*>([^<]+)<\/title>/i.exec(text) ?? [])[1] ??
+    // A module says what it is on its FIRST line, after the marker — the second
+    // line of one is a bare `//`, which is what this printed before anybody
+    // noticed. It is the last human-readable check before something permanent,
+    // so it has to read like a name.
+    (/^\/\/\s*X-CHESS-[A-Z]+\/\d+\s+(.+)$/.exec(text.split('\n')[0] ?? '') ?? [])[1] ??
     text.split('\n')[1]?.trim() ??
     '?';
   console.log(`name      ${called.trim()}`);
