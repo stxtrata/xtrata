@@ -178,3 +178,54 @@ describe('following a shared link', () => {
     }
   });
 });
+
+describe('links to things that are not games', () => {
+  // `?game=` was the only thing a URL could say, so a tournament or a player
+  // could be shown but never LINKED TO — and a board whose whole claim is that
+  // anybody can check a result made the checking unshareable.
+
+  it('opens the Tournaments tab at a named manifest', async () => {
+    const { dom, app } = await boardAt('https://example.test/?tournament=3016');
+    await tick(60);
+
+    expect((dom.window.document.getElementById('tournament-id') as HTMLInputElement).value)
+      .toBe('3016');
+    expect((app as unknown as { tab: string }).tab).toBe('tournaments');
+  });
+
+  it('opens a Profile at an address', async () => {
+    const { dom, app } = await boardAt(`https://example.test/?player=${ALICE}`);
+    await tick(60);
+
+    expect((dom.window.document.getElementById('profile-who') as HTMLInputElement).value)
+      .toBe(ALICE);
+    expect((app as unknown as { tab: string }).tab).toBe('profile');
+  });
+
+  it('ignores a player link that is not an address', async () => {
+    // A link is a thing strangers hand each other. Putting whatever arrived
+    // straight into a lookup is how a board ends up asking the chain about
+    // somebody's typo — or about a string chosen to see what happens.
+    const { dom, app } = await boardAt('https://example.test/?player=<script>x</script>');
+    await tick(60);
+
+    expect((dom.window.document.getElementById('profile-who') as HTMLInputElement).value).toBe('');
+    expect((app as unknown as { tab: string }).tab).toBe('play');
+  });
+
+  it('ignores a tournament number that is not a number', async () => {
+    const { dom, app } = await boardAt('https://example.test/?tournament=nonsense');
+    await tick(60);
+    expect((dom.window.document.getElementById('tournament-id') as HTMLInputElement).value).toBe('');
+    expect((app as unknown as { tab: string }).tab).toBe('play');
+  });
+
+  it('still prefers a game link when one is present', async () => {
+    // Order matters and is not arbitrary: a game is the most specific thing a
+    // link can name, and the one a player is most likely to have been sent.
+    const { app } = await boardAt('https://example.test/?game=2&tournament=3016');
+    await tick(60);
+    expect((app as unknown as { tab: string }).tab).toBe('game');
+    expect((app as unknown as { gameId: number }).gameId).toBe(2);
+  });
+});

@@ -17,6 +17,7 @@
 // first game was opened, and that comparison is the whole difference between a
 // manifest that committed to its games and one that described them afterwards.
 
+import type { InscriptionMeta } from '../protocol/pfp.js';
 import { deserialize, serializeUint } from './clarity.js';
 import type { ClarityJs } from './clarity.js';
 import { makeEndpoint } from './endpoint.js';
@@ -75,6 +76,7 @@ export class XtrataReader {
   // forever. Caching it is not an optimisation with a staleness risk attached,
   // which is unusual enough here to be worth saying.
   private readonly texts = new Map<number, string | null>();
+  private readonly metas = new Map<number, InscriptionMeta>();
   private readonly heights = new Map<number, number | null>();
 
   constructor(options: XtrataOptions = {}) {
@@ -145,6 +147,76 @@ export class XtrataReader {
     const value = unwrap(await this.read('get-dependencies', [serializeUint(id)]));
     if (!Array.isArray(value)) return [];
     return value.filter((v): v is bigint => typeof v === 'bigint').map(Number);
+  }
+
+  /**
+   * Everything the contract keeps about an inscription, in one read.
+   *
+   * WHY THIS IS ONE CALL AND NOT FOUR. `get-inscription-meta` returns creator,
+   * owner, mime type, size, chunk count and sealed together. A picture needs
+   * three of those to be judged — is it an image, does that wallet hold it, how
+   * big is it — and asking separately would be three round trips for facts the
+   * contract hands over at once.
+   *
+   * It is also what makes a holdings scan affordable. Finding a manifest used to
+   * mean reading the full TEXT of every candidate, which is one chunk read for a
+   * manifest and twenty-eight for a 443 KB image. This says what a candidate IS
+   * before any of it is fetched.
+   *
+   * Null means "could not tell", never an absence — the distinction `PlayerNames`
+   * learned the hard way, where a failed read that reports nothing found is
+   * indistinguishable from a real nothing and gets remembered as one.
+   */
+  async meta(id: number): Promise<InscriptionMeta | null> {
+    // Kept for ever once answered. An id's type, size and creator are fixed at
+    // mint, so this is one of the few things here that cannot go stale. OWNER
+    // IS THE EXCEPTION and is why `owner` below asks again every time.
+    const cached = this.metas.get(id);
+    if (cached !== undefined) return cached;
+
+    const value = unwrap(await this.read('get-inscription-meta', [serializeUint(id)]));
+    if (!value || typeof value !== 'object' || Array.isArray(value) || value instanceof Uint8Array) {
+      return null;
+    }
+    const row = value as Record<string, unknown>;
+    const str = (key: string): string | null => (typeof row[key] === 'string' ? (row[key] as string) : null);
+    const num = (key: string): number | null =>
+      typeof row[key] === 'bigint' ? Number(row[key] as bigint) : null;
+    const meta: InscriptionMeta = {
+      creator: str('creator'),
+      // Read once and cached with the rest, so it answers "who held it when
+      // this was first seen" and NOT "who holds it now". Anything that needs
+      // the second question must call `owner`, which is why that exists.
+      owner: str('owner'),
+      mime: str('mime-type'),
+      size: num('total-size'),
+      chunks: num('total-chunks'),
+      sealed: row.sealed === true
+    };
+    // A response that carried nothing is not remembered as an answer. Same
+    // distinction the holdings lookup draws by throwing: "could not ask" and
+    // "asked, and there is nothing" must never collapse into one another.
+    if (meta.creator === null && meta.mime === null) return null;
+    this.metas.set(id, meta);
+    return meta;
+  }
+
+  /**
+   * Who holds it NOW, deliberately uncached.
+   *
+   * ATTESTATION IS PERMANENT AND HOLDING IS NOT. A manifest signed by the key it
+   * names says what it said for ever, and the NFT it points at can be sold the
+   * next day. So a board that shows a picture on the strength of somebody
+   * holding it has to ask again rather than remember — the alternative is
+   * repeating an unchecked claim about the one part of the screen a person
+   * chose about themselves.
+   *
+   * Split from `meta` for that reason alone: everything there is fixed at mint,
+   * and this is not.
+   */
+  async owner(id: number): Promise<string | null> {
+    const value = unwrap(await this.read('get-owner', [serializeUint(id)]));
+    return typeof value === 'string' ? value : null;
   }
 
   /** Who made it. Same creator across a revision chain is the ownership proof. */

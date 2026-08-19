@@ -6,6 +6,47 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.1.4 — 2026-08-19
+
+Profile pictures, phase 1. Built, not yet inscribed. **217,735 bytes, 14 chunks**
+— the first build to cross from 13 chunks to 14.
+
+* `htmlSha256` `8ea651fa02b36f6cdb3be3cbe2adf84efb3330ba90b204c5362a2522aead0592`
+* xtrata chunk hash `334ea1b742810fad37ebaa4eecc57bb1576b0e75605585451ce3132b5600a6fd`
+* build stamp `2.1.4 - 2026-08-19 15:21 - #b40af45a`
+* 1,525 tests passing, 77 files. `tsc --noEmit` clean. Docs audit clean.
+
+### What it adds
+
+`X-CHESS-PFP/1`: a wallet naming a picture inscription it holds, attested the
+same way a name is — the document's address against the inscription's CREATOR.
+The Profile tab gains a square canvas, a grid of what the wallet holds, and the
+manifest text to inscribe. Nothing is signed here, as with a name claim: this
+board holds no key and never will.
+
+**Why a separate document and not a field on `X-CHESS-PLAYER/1`.** `parsePlayer`
+returns `player: null` when any problem is found, and an unknown label is a
+problem by design. A player manifest carrying `image:` would therefore cost that
+player their NAME on 2988, 3008, 3009 and 3014 — permanently, on artefacts
+nobody can correct. Asserted in `tests/protocol/pfp.test.ts` rather than left as
+a note.
+
+**Holding, not creating**, and only here. A name is checked against the creator
+so it cannot be bought. A picture is checked against the OWNER, because a picture
+you bought is the normal case and requiring you to have made it would rule out
+everything anybody ever collected. Ownership is re-checked when the picture is
+shown, so selling it stops showing it.
+
+`get-inscription-meta` is new in the reader and answers the type, the size and
+the current holder in one call, so nothing is fetched until it is worth fetching.
+
+### Verified live, not just in tests
+
+Against `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X` on localhost: 3002 previews
+as a 2048×2048 webp; 2994 (`text/javascript`) and 3014 (`text/html`) are refused
+by type; 3002 checked against the director is refused as held by somebody else;
+and the picker listed five real holdings across webp, png and jpeg.
+
 ## 2.1.3 — 2026-08-19
 
 Built, not yet inscribed. **206,223 bytes, 13 chunks.**

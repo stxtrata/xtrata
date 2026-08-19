@@ -9,6 +9,8 @@ import type { PendingMove } from './board.js';
 import { buildPlayer, displayName, nameSourceNote, parsePlayer } from '../protocol/player.js';
 import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
+import { PlayerPictures } from '../chain/pictures.js';
+import { buildPfp, pictureProblem } from '../protocol/pfp.js';
 import { YourGames } from '../chain/yours.js';
 import { XtrataReader } from '../chain/xtrata.js';
 import { ManifestDirectory } from '../chain/directory.js';
@@ -57,6 +59,7 @@ import type { RatedGame } from '../ratings/elo-v1.js';
 import { describeContractError } from '../chain/client.js';
 import { describeOutcome, realTxid, watchTx } from '../chain/tx-status.js';
 import type { Endpoint } from '../chain/endpoint.js';
+import { underXtrataRuntime } from '../chain/endpoint.js';
 import type {
   Chain,
   ChainReader,
@@ -615,6 +618,8 @@ const IDS = [
   'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-load', 'profile-body',
+  'pfp-canvas', 'pfp-id', 'pfp-check', 'pfp-mine', 'pfp-clear',
+  'pfp-problems', 'pfp-grid', 'pfp-state', 'pfp-manifest', 'pfp-next',
   'claim-name-why', 'claim-name', 'claim-about',
   'claim-build', 'claim-problems', 'claim-manifest',
   'contract-label', 'endpoint-label'
@@ -770,6 +775,10 @@ export class ChessApp {
   private tournament: TournamentView | null = null;
   private xtrata: XtrataReader | null = null;
   private players: PlayerNames | null = null;
+  private pictures: PlayerPictures | null = null;
+  /** The picture being previewed, before anything is inscribed. */
+  private pictureChoice: number | null = null;
+  private pictureHoldings: Array<{ id: number; mime: string }> = [];
   private yours: YourGames | null = null;
   private index: ManifestDirectory<Tournament> | null = null;
   /** When the tournament on screen was last read from chain. */
@@ -883,6 +892,7 @@ export class ChessApp {
         network: (options.build?.network as 'mainnet' | 'testnet') ?? 'mainnet'
       });
       this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata });
+      this.pictures = new PlayerPictures({ endpoint: endpoint as never, reader: this.xtrata });
       this.yours = new YourGames({ endpoint: endpoint as never, contractId: this.chain.contractId });
       // One of possibly several directories: a wallet plus what to look for.
       // A profiles directory is the same call with a different address and
@@ -1037,6 +1047,9 @@ export class ChessApp {
     });
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
+    on('pfpCheck', () => void this.previewPicture());
+    on('pfpMine', () => void this.showHoldings());
+    on('pfpClear', () => this.clearPicture());
 
     for (const key of [
       'gameKind',
@@ -1156,6 +1169,9 @@ export class ChessApp {
         .join(' · ')
     );
     this.text('contractLabel', build.contract ? `contract ${build.contract}` : '');
+    // Drawn once at boot so the panel says what it is before anybody touches
+    // it, rather than being blank until a button is pressed.
+    this.drawPicture();
 
     const blocked = this.options.signingBlocked?.() ?? null;
     if (blocked) {
@@ -1198,16 +1214,48 @@ export class ChessApp {
     const href = String(this.doc.location?.href ?? '');
     const query = href.includes('?') ? href.slice(href.indexOf('?') + 1).split('#')[0] : '';
     const fragment = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
-    const raw = new URLSearchParams(query).get('game') ?? new URLSearchParams(fragment).get('game');
-    if (raw === null) return;
+    // BOTH, because the Xtrata runtime serves a page whose own URL may already
+    // carry a query, and a shared link is as likely to arrive as a fragment.
+    const asked = (key: string): string | null =>
+      new URLSearchParams(query).get(key) ?? new URLSearchParams(fragment).get(key);
 
-    const game = Number(raw);
-    // A link with a nonsense game number is somebody's typo, not an error to
-    // shout about. The create form is a reasonable place to land.
-    if (!Number.isInteger(game) || game < 1) return;
+    // A whole number, or nothing. A link with a nonsense number in it is
+    // somebody's typo rather than an error to shout about, so every one of
+    // these falls through to the board's ordinary starting place.
+    const whole = (value: string | null): number | null => {
+      if (value === null) return null;
+      const n = Number(value);
+      return Number.isInteger(n) && n >= 1 ? n : null;
+    };
 
-    this.show('game');
-    void this.load(game);
+    const game = whole(asked('game'));
+    if (game !== null) {
+      this.show('game');
+      void this.load(game);
+      return;
+    }
+
+    // A tournament is an inscription number and nothing else, so the link needs
+    // no rules riding along the way `linkForGame` carries them: a manifest names
+    // its own pairings, and the board verifies every one against the chain
+    // before it shows them. The id IS the whole link.
+    const tournament = whole(asked('tournament'));
+    if (tournament !== null) {
+      (this.el.tournamentId as HTMLInputElement).value = String(tournament);
+      this.show('tournaments');
+      void this.loadTournamentTab();
+      return;
+    }
+
+    // An address rather than a number, and checked as one — a link is a thing
+    // strangers hand each other, and putting whatever arrived straight into a
+    // lookup is how a board ends up asking the chain about somebody's typo.
+    const player = String(asked('player') ?? '').trim().toUpperCase();
+    if (/^S[PM][0-9A-HJ-NP-Z]{37,40}$/.test(player)) {
+      (this.el.profileWho as HTMLInputElement).value = player;
+      this.show('profile');
+      void this.loadProfile();
+    }
   }
 
   /**
@@ -3463,6 +3511,240 @@ export class ChessApp {
    * manifest naming an address you do not control is refused by `attested` and
    * would be 0.3 STX spent on nothing.
    */
+  /**
+   * Where a picture is fetched from.
+   *
+   * SAME SHAPE AS `endpointsFor`, and for the same reason. Writing a gateway
+   * host into the artefact makes somebody else's server a permanent dependency
+   * of a permanent page, which `endpoint.ts` refuses at length for API calls and
+   * which is no more acceptable here.
+   *
+   * Under the runtime the page is already being served by that host, so `/i/<id>`
+   * is same-origin and adds no dependency at all. Root-relative rather than bare
+   * relative because the runtime injects `<base href="null">`, which has broken
+   * inscribed pages twice: a root-relative path resolves against the ORIGIN and
+   * survives it, a bare one does not.
+   */
+  private pictureUrl(id: number): string {
+    return underXtrataRuntime(this.doc) ? `/i/${id}` : `${INSCRIPTION_VIEWER}${id}`;
+  }
+
+  /**
+   * The picture chosen but not yet inscribed, remembered per wallet.
+   *
+   * THIS IS NOT A SETTING, and the UI has to keep saying so. Choosing costs
+   * nothing and lasts as long as this browser; the manifest is what makes it
+   * true for anybody else. Keeping the two apart is the whole reason a preview
+   * exists — somebody can try five pictures and inscribe once.
+   */
+  private previewKey(): string | null {
+    const who = this.pictureAddress();
+    return who ? `xchess:pfp:preview:${who}` : null;
+  }
+
+  /**
+   * Whose picture this panel is about.
+   *
+   * The connected wallet when there is one. Otherwise the address typed into the
+   * profile lookup above, which is what makes this usable with no extension at
+   * all — a board being developed against localhost has no wallet, and neither
+   * does somebody reading a page about an address that is not theirs.
+   *
+   * It is not a hole. Nothing here signs, and a manifest naming an address is
+   * inert unless that address INSCRIBED it: `attestedPfp` compares the document
+   * to the inscription's creator, so building one for somebody else produces a
+   * document every reader ignores. The check that matters is at read time and
+   * cannot be reached from here.
+   */
+  private pictureAddress(): string | null {
+    if (this.address) return this.address.trim().toUpperCase();
+    const typed = String((this.el.profileWho as HTMLInputElement)?.value ?? '').trim().toUpperCase();
+    return /^S[A-Z0-9]{20,50}$/.test(typed) ? typed : null;
+  }
+
+  private readPreview(): number | null {
+    const key = this.previewKey();
+    if (!key) return null;
+    try {
+      const raw = (globalThis as { localStorage?: Storage }).localStorage?.getItem(key);
+      const id = Number(raw);
+      return Number.isSafeInteger(id) && id > 0 ? id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private writePreview(id: number | null): void {
+    const key = this.previewKey();
+    if (!key) return;
+    try {
+      const local = (globalThis as { localStorage?: Storage }).localStorage;
+      if (!local) return;
+      if (id === null) local.removeItem(key);
+      else local.setItem(key, String(id));
+    } catch {
+      // A private window. The preview then lasts one visit, which is enough.
+    }
+  }
+
+  /** Check one inscription and, if it can be a picture, show it. */
+  private async previewPicture(): Promise<void> {
+    const raw = String((this.el.pfpId as HTMLInputElement).value ?? '').trim();
+    const id = Number(raw.replace(/^#/, ''));
+    if (!Number.isSafeInteger(id) || id < 1) {
+      this.pictureProblem('That is not an inscription number.');
+      return;
+    }
+    await this.choosePicture(id);
+  }
+
+  /**
+   * Judge one inscription against the wallet, then show it or say why not.
+   *
+   * ASKED OF THE CONTRACT, not of the picture. `meta` gives the type, the size
+   * and the CURRENT holder in one read, so nothing is fetched until it is known
+   * to be worth fetching — which matters when the answer may be half a megabyte.
+   */
+  private async choosePicture(id: number): Promise<void> {
+    const who = this.pictureAddress();
+    if (!who) {
+      this.pictureProblem(
+        'Connect a wallet, or put an address in the box above. A picture belongs to an address.'
+      );
+      return;
+    }
+    if (!this.xtrata) {
+      this.pictureProblem('No endpoint, so the inscription cannot be read.');
+      return;
+    }
+    // WRAPPED, because both halves of this use null and they mean opposite
+    // things. `guard` returns null when the read FAILED; `pictureProblem`
+    // returns null when the picture is FINE. Returned bare, a perfectly good
+    // picture was indistinguishable from a network error and was silently
+    // dropped — the panel simply did nothing, twice, before this was spotted.
+    const said = await this.guard('checking that inscription', async () => ({
+      problem: pictureProblem(await this.xtrata!.meta(id), who)
+    }));
+    if (said === null) return;
+    if (said.problem) {
+      this.pictureProblem(`Inscription ${id}: ${said.problem}`);
+      return;
+    }
+    this.pictureChoice = id;
+    this.writePreview(id);
+    this.el.pfpProblems.classList.add('hide');
+    this.drawPicture();
+  }
+
+  private pictureProblem(says: string): void {
+    const node = this.el.pfpProblems;
+    node.textContent = says;
+    node.classList.remove('hide');
+  }
+
+  /** Everything this wallet holds that this board would agree to show. */
+  private async showHoldings(): Promise<void> {
+    const who = this.pictureAddress();
+    if (!who || !this.pictures) {
+      this.pictureProblem(
+        'Connect a wallet, or put an address in the box above. This lists what it holds.'
+      );
+      return;
+    }
+    const found = await this.guard('reading what this wallet holds', async () =>
+      this.pictures!.holdings(who)
+    );
+    if (found === null) return;
+    this.pictureHoldings = found;
+    this.el.pfpProblems.classList.add('hide');
+    if (!found.length) {
+      this.pictureProblem(
+        'Nothing here can be a picture. It needs to be an image inscription this wallet ' +
+          'holds, within the size limit.'
+      );
+    }
+    this.drawPicture();
+  }
+
+  private clearPicture(): void {
+    this.pictureChoice = null;
+    this.writePreview(null);
+    this.el.pfpProblems.classList.add('hide');
+    this.drawPicture();
+  }
+
+  /**
+   * The canvas, the grid, and the manifest that would make it real.
+   *
+   * The manifest is shown for the same reason a name claim is: this board holds
+   * no key and never will, being an inscription itself. A page that collected
+   * one would be wrong for ever.
+   */
+  private drawPicture(): void {
+    const canvas = this.el.pfpCanvas;
+    canvas.replaceChildren();
+    const chosen = this.pictureChoice ?? this.readPreview();
+    this.pictureChoice = chosen;
+
+    if (chosen === null) {
+      const empty = this.doc.createElement('div');
+      empty.className = 'pfp-empty';
+      empty.textContent = 'no picture';
+      canvas.append(empty);
+    } else {
+      const img = this.doc.createElement('img');
+      img.src = this.pictureUrl(chosen);
+      img.alt = `inscription ${chosen}`;
+      canvas.append(img);
+    }
+
+    const grid = this.el.pfpGrid;
+    grid.replaceChildren();
+    for (const holding of this.pictureHoldings) {
+      const pick = this.doc.createElement('button');
+      pick.className = 'pfp-pick';
+      pick.type = 'button';
+      pick.title = `inscription ${holding.id} — ${holding.mime}`;
+      pick.setAttribute('aria-pressed', String(holding.id === chosen));
+      pick.setAttribute('aria-label', `Use inscription ${holding.id}`);
+      const img = this.doc.createElement('img');
+      img.src = this.pictureUrl(holding.id);
+      img.alt = '';
+      pick.append(img);
+      pick.addEventListener('click', () => void this.choosePicture(holding.id));
+      grid.append(pick);
+    }
+
+    // SAYS WHICH IT IS, every time. A picture on screen that is only in this
+    // browser looks exactly like one the whole world can see, and letting
+    // somebody believe the second when the first is true is the one thing this
+    // panel must not do.
+    const state = this.el.pfpState;
+    const manifest = this.el.pfpManifest;
+    const who = this.pictureAddress();
+    if (chosen === null) {
+      state.textContent = who
+        ? 'Pick one you hold, or type its number.'
+        : 'Connect a wallet, or put an address in the box above, to choose a picture.';
+      manifest.classList.add('hide');
+      this.text('pfpNext', '');
+      return;
+    }
+
+    state.textContent =
+      `Previewing inscription ${chosen}. This is stored in this browser only — nothing is ` +
+      'on chain until the manifest below is inscribed.';
+    manifest.textContent = buildPfp(who ?? '', chosen);
+    manifest.classList.remove('hide');
+    this.text(
+      'pfpNext',
+      'This board cannot inscribe it: it holds no key and never will, being an inscription ' +
+        'itself. Copy the text above and inscribe it from this wallet. Once it is on chain, ' +
+        'any board finds it by reading what the wallet holds and checking the same wallet ' +
+        'minted it.'
+    );
+  }
+
   private buildNameClaim(): void {
     const why = this.el.claimNameWhy;
     const problems = this.el.claimProblems;
@@ -4669,6 +4951,12 @@ export class ChessApp {
    */
   private viewerChanged(): void {
     this.drawWhoami();
+    // A picture belongs to an address, so a different wallet starts again: the
+    // previous holdings are somebody else's and the preview is keyed per wallet.
+    this.pictureHoldings = [];
+    this.pictureChoice = null;
+    this.el.pfpProblems.classList.add('hide');
+    this.drawPicture();
     // The name usually is not known yet at the moment of connecting, so ask and
     // redraw. Never blocking: the address is already on screen and the name is
     // an improvement to it, not a precondition for it.

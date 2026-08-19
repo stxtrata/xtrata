@@ -491,6 +491,35 @@ ${SCALE_CSS}
   font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px;
   white-space: pre; color: var(--ink);
 }
+/* The picture, and the square it lives in.
+   FIXED SQUARE WITH object-fit: cover, so a portrait, a landscape and a
+   thousand-pixel banner all render as the same shape. The alternative is a
+   layout that moves depending on what somebody chose to hold, and a row of
+   names that jumps as pictures arrive. */
+.pfp-canvas {
+  width: 96px; height: 96px; flex: 0 0 96px;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden;
+  background: var(--bg); display: flex; align-items: center; justify-content: center;
+}
+.pfp-canvas img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pfp-canvas .pfp-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 6px; }
+.pfp-row { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0; }
+.pfp-side { flex: 1 1 auto; min-width: 0; }
+/* What the wallet holds, as a grid of squares. Scrolls rather than growing,
+   because a collector with ninety pictures should not push the manifest off
+   the screen. */
+.pfp-grid {
+  display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0;
+  max-height: 220px; overflow-y: auto;
+}
+.pfp-pick {
+  width: 64px; height: 64px; padding: 0; overflow: hidden;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--bg);
+  cursor: pointer;
+}
+.pfp-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pfp-pick:hover, .pfp-pick:focus { border-color: var(--accent); }
+.pfp-pick[aria-pressed='true'] { border-color: var(--accent); border-width: 2px; }
 /* The pairing, which opens the game. Styled as text rather than as a button so
    a round reads as a list and not as a wall of controls, but it IS a button, so
    it is reachable by keyboard and announced as one.
@@ -1046,6 +1075,39 @@ export const HTML = `
     </div>
     <div class="row"><button class="action" id="profile-load">Show</button></div>
     <div id="profile-body"></div>
+
+    <h2 style="margin-top:18px">Picture ${info(
+      'i-pfp-what',
+      'Any picture inscription this wallet HOLDS can be its profile picture. Holding rather ' +
+        'than creating, because a picture you bought is the normal case and requiring you to ' +
+        'have made it would rule out everything anybody ever collected. The choice itself is ' +
+        'a small manifest you inscribe, which is what makes it yours rather than this ' +
+        'browser\'s.'
+    )}</h2>
+    <div class="pfp-row">
+      <div class="pfp-canvas" id="pfp-canvas"></div>
+      <div class="pfp-side">
+        <div class="field">
+          <label for="pfp-id">Inscription ${info(
+            'i-pfp-id',
+            'The number of an inscription you hold. The board asks the contract what it is ' +
+              'before showing anything: the type, the size, and whether this wallet still ' +
+              'holds it are one read.'
+          )}</label>
+          <input type="text" id="pfp-id" class="pfp-id" placeholder="e.g. 3002" inputmode="numeric">
+        </div>
+        <div class="row">
+          <button class="action" id="pfp-check">Preview</button>
+          <button class="action" id="pfp-mine">Show what I hold</button>
+          <button class="action" id="pfp-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+    <div id="pfp-problems" class="notice notice--warn hide"></div>
+    <div id="pfp-grid" class="pfp-grid"></div>
+    <div id="pfp-state" class="small muted"></div>
+    <pre id="pfp-manifest" class="claim-out hide"></pre>
+    <div class="small muted" id="pfp-next"></div>
 
     <h2 style="margin-top:18px">Claim a name ${info(
       'i-claim-what',

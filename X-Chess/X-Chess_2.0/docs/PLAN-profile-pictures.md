@@ -5,8 +5,9 @@ connected address holds, declared through a manifest that address inscribed and
 changed by inscribing another. Optionally, small thumbnails beside names
 wherever a name appears: games, Explore, Leaderboard, Tournaments.
 
-Nothing here is built. This is what it would take, and the four things that
-would go wrong if it were built the obvious way.
+Phase 1 is built. This is what it took, and the four things that would have
+gone wrong if it had been built the obvious way — one of which this document got
+wrong itself, corrected in place below.
 
 ## What already exists
 
@@ -113,19 +114,27 @@ length and for good reasons. The same shape answers it:
    dependency-free, and about twenty-eight reads for a 443 KB image, which is
    why it is last rather than first.
 
-### 4. The holdings scan already reads too much, and this points it at images
+### 4. The scan is already guarded, and the obvious fix would cost
 
-`players.ts:117` fetches the FULL TEXT of up to twelve holdings to find a
-manifest, with no filter on type or size. That is affordable today because most
-holdings are small documents.
+This section said the opposite when the plan was written, and the correction is
+worth keeping rather than quietly replacing.
 
-The people who will use this feature are, by definition, the people who hold
-pictures. A 443 KB webp read as text, twelve times, is the cost this feature
-would silently add to every name lookup.
+The claim was that `players.ts` reads the full text of up to twelve holdings
+blindly, so a wallet holding pictures would have 443 KB fetched as text twelve
+times, and that `get-inscription-meta` should filter the scan first.
 
-**Fix it first, and it pays for itself:** filter with `get-inscription-meta` and
-only read the text of `text/plain` candidates under a size bound. It is the same
-call the picture needs, so the two are one piece of work.
+**The guard already exists.** `XtrataReader.text` reads the chunk COUNT before
+any content and refuses anything over `MAX_CHUNKS = 4`, with the reasoning
+already written next to it: a manifest is a document rather than a payload, and
+reading half a megabyte to discover that is a bad way to find out. So a
+twenty-eight chunk image costs ONE call and is declined.
+
+Putting a `meta` call in front of that would add a round trip per candidate to
+replace a guard that already runs, which is slower for every wallet and faster
+for none. It was implemented, measured against the existing code, and reverted.
+
+`get-inscription-meta` is still essential — but for judging the PICTURE, which
+nothing else can do, rather than for filtering the scan.
 
 ## Two smaller decisions
 
@@ -151,8 +160,8 @@ to somebody who thought they were setting an avatar.
 
 ## Order of work
 
-**Phase 1 — the canvas.** `X-CHESS-PFP/1`, the meta-based scan filter, a picker
-in Profile listing the address's image holdings, and the square thumbnail.
+**Phase 1 — the canvas.** `X-CHESS-PFP/1`, a picker in Profile listing the
+address's image holdings, and the square thumbnail.
 Self-contained, testable, and it makes the scan cheaper rather than dearer.
 
 **Phase 2 — thumbnails beside names.** Only once Phase 1 has shown how the cache
