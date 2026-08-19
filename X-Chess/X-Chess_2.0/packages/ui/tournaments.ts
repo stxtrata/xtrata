@@ -17,6 +17,7 @@
 // behind it, rather than staring at nothing while 1,700 entries are paged.
 
 import { replay } from '../replay/replay.js';
+import { rememberedGame, rememberGame, rulesKeyOf } from '../chain/game-facts.js';
 import {
   checkGames, honours, provenance, provenanceNote, resolveTournament, rounds, rulesFor,
   standings, verifiedResults
@@ -137,6 +138,28 @@ export async function scoreTournament(
       continue;
     }
 
+    // Replayed against the pairing the MANIFEST claims. If that claim is wrong
+    // the rules hash will not match and checkGames refuses it anyway, so a
+    // result derived here can never be counted for an unverified game.
+    const white = tournament.entrants.find((e) => e.name === game.white)?.address ?? null;
+    const black = tournament.entrants.find((e) => e.name === game.black)?.address ?? null;
+    const key = rulesKeyOf(white, black, tournament.cooldown ?? 0);
+
+    // ALREADY WORKED OUT, and checked against the row just read rather than
+    // taken on trust. Entries are append-only and indexed by sequence, so the
+    // same game at the same nextSeq is the same log and replays to the same
+    // answer. The row read still happens on every visit; what a hit skips is the
+    // paging and the replay, which is all of the cost and none of the check.
+    const seen = rememberedGame(game.id);
+    if (seen && seen.nextSeq === row.nextSeq && seen.rulesKey === key && seen.facts.rulesHash === row.rulesHash) {
+      entriesSeen += seen.entries;
+      if (seen.firstHeight !== null && (firstMove === null || seen.firstHeight < firstMove)) {
+        firstMove = seen.firstHeight;
+      }
+      facts.set(game.id, seen.facts);
+      continue;
+    }
+
     const entries = await deps.chain
       .getAllEntries(game.id, row.nextSeq)
       .catch(() => {
@@ -147,18 +170,15 @@ export async function scoreTournament(
     // A short log is a failed read too. `getAllEntries` pages, and a page that
     // does not arrive returns what it has - so a game reporting forty entries
     // and handing back four has not been read, however quietly.
-    if (entries.length < row.nextSeq) readEverything = false;
+    const whole = entries.length >= row.nextSeq;
+    if (!whole) readEverything = false;
+    let firstHere: number | null = null;
     for (const entry of entries) {
-      if (typeof entry.height === 'number' && (firstMove === null || entry.height < firstMove)) {
-        firstMove = entry.height;
+      if (typeof entry.height === 'number' && (firstHere === null || entry.height < firstHere)) {
+        firstHere = entry.height;
       }
     }
-
-    // Replayed against the pairing the MANIFEST claims. If that claim is wrong
-    // the rules hash will not match and checkGames refuses it anyway, so a
-    // result derived here can never be counted for an unverified game.
-    const white = tournament.entrants.find((e) => e.name === game.white)?.address ?? null;
-    const black = tournament.entrants.find((e) => e.name === game.black)?.address ?? null;
+    if (firstHere !== null && (firstMove === null || firstHere < firstMove)) firstMove = firstHere;
     // Built from what the MANIFEST declares, not from the defaults. A
     // tournament that had to vary its rules to open its games at all — see
     // Tournament.cooldown — replays identically either way, so getting this
@@ -169,7 +189,7 @@ export async function scoreTournament(
       entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
       { rules }
     );
-    facts.set(game.id, {
+    const derived: GameFacts = {
       rulesHash: row.rulesHash,
       result: state.result,
       // Accepted, not submitted. See GameFacts.moves.
@@ -182,7 +202,20 @@ export async function scoreTournament(
           ? (state.turn === 'white' ? white : black)
           : null,
       turn: state.status === 'live' && state.result === null ? state.turn : null
-    });
+    };
+    facts.set(game.id, derived);
+
+    // Only a WHOLE read is remembered. A short one is a rate limit wearing a
+    // game's clothes, and caching it would make the outage permanent.
+    if (whole) {
+      rememberGame(game.id, {
+        nextSeq: row.nextSeq,
+        rulesKey: key,
+        facts: derived,
+        firstHeight: firstHere,
+        entries: entries.length
+      });
+    }
   }
 
   const checked = checkGames(tournament, facts);

@@ -4101,9 +4101,7 @@ export class ChessApp {
     this.hidePromotion();
 
     if (this.selected === null) {
-      this.selected = square;
-      this.sound.play('select');
-      this.drawGame();
+      this.pickUp(square, state);
       return;
     }
     if (this.selected === square) {
@@ -4116,9 +4114,7 @@ export class ChessApp {
     if (!reachable.has(square)) {
       // Not an illegal move - the board disables squares that cannot be played,
       // so this is somebody changing their mind about which piece to pick up.
-      this.selected = square;
-      this.sound.play('select');
-      this.drawGame();
+      this.pickUp(square, state);
       return;
     }
 
@@ -4138,6 +4134,61 @@ export class ChessApp {
     }
 
     void this.submit(`${this.selected}${square}`);
+  }
+
+  /**
+   * Pick a square up, and say so when picking it up can lead nowhere.
+   *
+   * THE SILENT REFUSAL. The board disables squares that cannot be played, so
+   * selecting a piece with no legal move and then clicking anywhere else just
+   * selects that instead. No error, no refusal, no submission — from the
+   * player's side, "I tried to move and it did not make any move".
+   *
+   * That is fine when one piece is pinned and thirty other moves exist. It is
+   * not fine IN CHECK, where five moves may be legal out of a normal thirty and
+   * every other piece on the board is inert. Game 8 sat in exactly that
+   * position for forty hours while its player reported the board as broken: the
+   * king was on g8 under Qg3+, five moves answered it, and every other square
+   * they touched did nothing at all.
+   */
+  private pickUp(square: string, state: ReplayState): void {
+    this.selected = square;
+    this.sound.play('select');
+    this.explainSelection(square, state);
+    this.drawGame();
+  }
+
+  /**
+   * Why nothing happened, said in terms of what would.
+   *
+   * Answers "then what" rather than "why not this one". A player who has just
+   * found an immobile piece does not need it named — they need the squares that
+   * still work, which is a list the board already has and they cannot see.
+   *
+   * Only when it is genuinely YOUR move. Picking up pieces on a board you are
+   * watching, or between turns, is browsing rather than a refusal, and a
+   * warning there would be noise on every click.
+   */
+  private explainSelection(square: string, state: ReplayState): void {
+    // Somewhere to go needs no explanation — and clearing the notice here would
+    // wipe a message the player may not have read yet.
+    if (destinationsFrom(state.legalMoves, square).size > 0) return;
+    if (state.status !== 'live' || !this.address) return;
+    if (judgeMove(this.eligibility(state)).tier !== 'yes') return;
+
+    const from = [...new Set(state.legalMoves.map((uci) => uci.slice(0, 2)))].sort();
+    if (!from.length) return;
+    const list = from.join(', ');
+
+    this.notice(
+      'chainNotice',
+      'warn',
+      state.inCheck
+        ? `Your king is in check, so the only legal moves are the ones that answer it — ` +
+          `${from.length} of them, from ${list}. Nothing else can be submitted, ` +
+          `and nothing else you click here will do anything.`
+        : `That piece has no legal move. ${from.length === 1 ? 'One square has' : `${from.length} squares have`} one: ${list}.`
+    );
   }
 
   /**
@@ -4277,6 +4328,40 @@ export class ChessApp {
     // of the reason the wallet is not opening, and the person would be looking
     // at a board that had moved and a wallet that never appeared.
     if (!forced) {
+      // ALREADY IN FLIGHT, asked before anything else because it is the one
+      // refusal the referee cannot make: both submissions are legal when they
+      // are signed, and only the order they land in decides that the second was
+      // wasted.
+      //
+      // Game 8, seq 29 and 30: the same player sent the same move twice, two
+      // blocks apart. The first was accepted; the second arrived when it was no
+      // longer their turn, and was stored and charged for nothing. Twenty
+      // seconds is not impatience — at 0.0004 STX a move can sit in the mempool
+      // far longer than a person will believe a click worked.
+      //
+      // A WARNING AND NOT A BLOCK. Resending at a higher fee is the documented
+      // way out of a move that will not confirm, and this must never stand in
+      // the way of it — so it takes the same escape hatch every soft refusal
+      // here has.
+      const mine = this.pending.filter(
+        (row) => String(row.sender ?? '').toUpperCase() === String(this.address ?? '').toUpperCase()
+      );
+      if (this.address && mine.length) {
+        this.askAnyway(
+          {
+            tier: 'warn',
+            reason: 'already-pending',
+            say:
+              `You already have ${mine.length === 1 ? 'a submission' : `${mine.length} submissions`} ` +
+              `broadcast for this game and not yet in a block${mine[0]?.value ? ` (${mine[0].value})` : ''}. ` +
+              'If that one lands first, this one arrives out of turn: stored, charged, and counting ' +
+              'for nothing. To replace it rather than add to it, resend at the same nonce with a higher fee.'
+          },
+          value
+        );
+        return;
+      }
+
       const verdict = await this.judgeFresh(game, value);
       if (verdict.tier === 'no') {
         this.notice('chainNotice', 'warn', verdict.say);

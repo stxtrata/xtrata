@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exhibition Three posting board</title>
+<style>
+:root{--bg:#12100e;--panel:#1b1815;--line:#2e2924;--ink:#e8e2d9;--dim:#9a9187;
+--gold:#d8a24a;--warn:#e0733f;--good:#6fae5f;--radius:10px}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+font:15px/1.55 ui-sans-serif,system-ui,-apple-system,sans-serif}
+a{color:var(--gold)}
+header{position:sticky;top:0;z-index:20;background:rgba(18,16,14,.96);
+backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:14px 20px}
+.bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;max-width:1180px;margin:0 auto}
+h1{font-size:18px;margin:0;letter-spacing:.2px}
+h1 b{color:var(--gold)}
+.grow{flex:1}
+input[type=search]{background:#0e0c0a;border:1px solid var(--line);color:var(--ink);
+border-radius:8px;padding:9px 12px;font:inherit;min-width:200px}
+.chip{background:none;border:1px solid var(--line);color:var(--dim);padding:7px 13px;
+border-radius:999px;cursor:pointer;font:inherit;font-size:13px}
+.chip:hover{color:var(--ink)}
+.chip[aria-pressed=true]{color:var(--gold);border-color:var(--gold);background:#241d12}
+.prog{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 90px}
+section{margin:0 0 34px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 12px}
+h2{font-size:16px;color:var(--gold);margin:0}
+.blurb{color:var(--dim);font-size:13px}
+.group{border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin:0 0 14px;
+background:#151311}
+.group.thread{border-left:3px solid var(--gold)}
+.group.pair{border-left:3px solid #4a6fa5}
+.group-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.group-label{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.9px}
+.card{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start;
+border:1px solid var(--line);border-radius:8px;padding:12px;background:var(--panel);
+margin:0 0 10px}
+.card:last-child{margin-bottom:0}
+.card.done{opacity:.42}
+.card.done .txt{text-decoration:line-through;text-decoration-color:var(--dim)}
+.txt{white-space:pre-wrap;font-size:15px;margin:0 0 10px;overflow-wrap:anywhere}
+.meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.seq{font-size:12px;font-variant-numeric:tabular-nums;color:var(--dim);
+     border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+.seq.thread{color:var(--gold);border-color:#4a3a1e}
+.count{font-size:12px;font-variant-numeric:tabular-nums;color:var(--good);
+border:1px solid #2f4a29;border-radius:999px;padding:2px 9px}
+.count.over{color:var(--warn);border-color:#5a2f1c}
+.who{font-size:11px;letter-spacing:.8px;text-transform:uppercase;padding:2px 8px;
+border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.who.main{color:var(--gold);border-color:#4a3a1e}
+button.act{background:#221d18;border:1px solid var(--line);color:var(--ink);
+border-radius:7px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}
+button.act:hover{border-color:var(--gold);color:var(--gold)}
+button.act.ok{border-color:var(--good);color:var(--good)}
+.note{font-size:12px;color:var(--warn);margin:8px 0 0}
+.note.plain{color:var(--dim)}
+.side{width:150px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.side img{width:100%;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;
+display:block;background:#0e0c0a}
+.fname{font:11px/1.3 ui-monospace,Menlo,monospace;color:var(--dim);overflow-wrap:anywhere}
+.tick{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--dim);cursor:pointer;
+user-select:none}
+.tick input{width:17px;height:17px;accent-color:var(--gold);cursor:pointer}
+dialog{border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:10px;
+max-width:94vw;max-height:94vh}
+dialog::backdrop{background:rgba(0,0,0,.82)}
+dialog img{max-width:88vw;max-height:80vh;display:block;border-radius:6px}
+dialog .row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 4px 2px}
+.hide{display:none!important}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--gold);
+color:#1b1408;padding:10px 18px;border-radius:999px;font-weight:600;font-size:14px;
+opacity:0;pointer-events:none;transition:opacity .18s}
+.toast.show{opacity:1}
+footer{max-width:1180px;margin:0 auto;padding:0 20px 40px;color:var(--dim);font-size:13px}
+code{font-family:ui-monospace,Menlo,monospace;background:#0e0c0a;padding:2px 6px;border-radius:4px}
+@media(max-width:720px){.card{grid-template-columns:1fr}.side{width:auto;flex-direction:row;align-items:center}
+.side img{width:110px}}
+</style></head>
+<body>
+<header><div class="bar">
+<h1><b>Exhibition Three</b> posting board <span style="color:var(--dim);font-size:13px;font-weight:400">tournament 3016 &middot; board 3014</span></h1>
+<input type="search" id="q" placeholder="Search the text">
+<button class="chip" data-filter="all" aria-pressed="true">All</button>
+<button class="chip" data-filter="todo" aria-pressed="false">Not posted</button>
+<button class="chip" data-filter="shots" aria-pressed="false">Has image</button>
+<span class="grow"></span>
+<span class="prog" id="prog"></span>
+<button class="act" id="reset" type="button">Reset ticks</button>
+</div></header>
+<main>
+<section id="thread"><div class="sec-head"><h2>The invitation</h2><span class="blurb">Post this first, as one thread. It answers the sceptic inside itself.</span></div><div class="group thread"><div class="group-head"><span class="group-label">Thread: exhibition three is live</span><button class="act copy-thread" type="button">Copy whole thread</button></div><div class="card" data-id="thread-0-0" data-shot="01-standings.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/01-standings.png"
+ data-seq="1/7"
+ data-text="1/7
+
+Ten AI players. Ninety games. Every move a transaction on Stacks.
+
+Exhibition Three is live, on a board that is itself an inscription.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">Ten AI players. Ninety games. Every move a transaction on Stacks.
+
+Exhibition Three is live, on a board that is itself an inscription.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq thread">🪡 1/7</span><span class="count">161/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">The hero. Shows the table, the ladder and the verified marks in one frame.</p></div>
+<div class="side"><img src="01-standings.png" alt="" loading="lazy"><div class="fname">01-standings.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="thread-0-1" data-shot="07-sheet-fathom.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/07-sheet-fathom.png"
+ data-seq="2/7"
+ data-text="2/7
+
+Each player is an inscription.
+
+Its instructions were written, budgeted to 1200 characters, and sealed on chain before it played a move.
+
+Nobody can edit a character mid tournament. Not me either.">
+<div><p class="txt">Each player is an inscription.
+
+Its instructions were written, budgeted to 1200 characters, and sealed on chain before it played a move.
+
+Nobody can edit a character mid tournament. Not me either.</p>
+<div class="meta"><span class="seq thread">🪡 2/7</span><span class="count">196/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Fathom&#x27;s sheet, read straight off chain.</p></div>
+<div class="side"><img src="07-sheet-fathom.png" alt="" loading="lazy"><div class="fname">07-sheet-fathom.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="thread-0-2" data-shot=""
+ data-abs=""
+ data-seq="3/7"
+ data-text="3/7
+
+The honest part. The model choosing the moves runs off chain. I cannot inscribe weights and will not pretend otherwise.
+
+What is on chain is everything that decides a game. The engine, the characters, the pairings, the rules each game committed to, and every move.">
+<div><p class="txt">The honest part. The model choosing the moves runs off chain. I cannot inscribe weights and will not pretend otherwise.
+
+What is on chain is everything that decides a game. The engine, the characters, the pairings, the rules each game committed to, and every move.</p>
+<div class="meta"><span class="seq thread">🪡 3/7</span><span class="count">264/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note">THE POST THAT BUYS THE REST. Do not soften it and do not drop it.</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="thread-0-3" data-shot="02-rounds.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/02-rounds.png"
+ data-seq="4/7"
+ data-text="4/7
+
+So you do not have to trust the table.
+
+Fetch the manifest. Fetch the characters it names. Replay the moves. Check each game against the rules hash it committed to.
+
+If your replay disagrees with my standings, mine is wrong.">
+<div><p class="txt">So you do not have to trust the table.
+
+Fetch the manifest. Fetch the characters it names. Replay the moves. Check each game against the rules hash it committed to.
+
+If your replay disagrees with my standings, mine is wrong.</p>
+<div class="meta"><span class="seq thread">🪡 4/7</span><span class="count">224/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Every game carries its own verified mark. That is the whole argument.</p></div>
+<div class="side"><img src="02-rounds.png" alt="" loading="lazy"><div class="fname">02-rounds.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="thread-0-4" data-shot=""
+ data-abs=""
+ data-seq="5/7"
+ data-text="5/7
+
+Something I did not design for. A game commits its two players and nothing that says which tournament it is.
+
+So one pair gets one ranked game, ever. Two exhibitions used all thirty of theirs. The third needed a new rule just to be possible.">
+<div><p class="txt">Something I did not design for. A game commits its two players and nothing that says which tournament it is.
+
+So one pair gets one ranked game, ever. Two exhibitions used all thirty of theirs. The third needed a new rule just to be possible.</p>
+<div class="meta"><span class="seq thread">🪡 5/7</span><span class="count">241/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">The developer post. Most likely of the set to travel.</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="thread-0-5" data-shot="01-standings.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/01-standings.png"
+ data-seq="6/7"
+ data-text="6/7
+
+Three of the ten search deeper than the rest.
+
+It is declared in the manifest and the board marks it declared, because nothing on chain can prove it.
+
+Every other number on that table was recomputed. That one is my word, labelled as my word.">
+<div><p class="txt">Three of the ten search deeper than the rest.
+
+It is declared in the manifest and the board marks it declared, because nothing on chain can prove it.
+
+Every other number on that table was recomputed. That one is my word, labelled as my word.</p>
+<div class="meta"><span class="seq thread">🪡 6/7</span><span class="count">241/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Crop to the table so the dotted +1 and +2 are legible.</p></div>
+<div class="side"><img src="01-standings.png" alt="" loading="lazy"><div class="fname">01-standings.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="thread-0-6" data-shot="06-mobile-standings.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/06-mobile-standings.png"
+ data-seq="7/7"
+ data-text="7/7
+
+Board, engine, characters and manifest are all inscriptions you can open and read.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">Board, engine, characters and manifest are all inscriptions you can open and read.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq thread">🪡 7/7</span><span class="count">109/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Close on the phone shot. Same board, no app.</p></div>
+<div class="side"><img src="06-mobile-standings.png" alt="" loading="lazy"><div class="fname">06-mobile-standings.png</div><button class="act copypath" type="button">Copy path</button></div></div></div></section>
+<section id="result"><div class="sec-head"><h2>The result worth citing</h2><span class="blurb">Post after the thread has been up an hour or so.</span></div><div class="group single"><div class="card" data-id="result-0-0" data-shot="03-game48-plumb-oblique.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/03-game48-plumb-oblique.png"
+ data-seq="1/3"
+ data-text="Plumb won the first exhibition and plays on the house engine.
+
+Oblique finished joint last and was given the deepest search on purpose, so that a ladder decided by depth would show up as a table turning upside down.
+
+It did not turn.">
+<div><p class="txt">Plumb won the first exhibition and plays on the house engine.
+
+Oblique finished joint last and was given the deepest search on purpose, so that a ladder decided by depth would show up as a table turning upside down.
+
+It did not turn.</p>
+<div class="meta"><span class="seq">1/3</span><span class="count">233/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note">Say it as one game. It is one game.</p></div>
+<div class="side"><img src="03-game48-plumb-oblique.png" alt="" loading="lazy"><div class="fname">03-game48-plumb-oblique.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="result-0-1" data-shot="02-rounds.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/02-rounds.png"
+ data-seq="2/3"
+ data-text="Round one. Five games, five checkmates, no draws.
+
+Thirty two to sixty eight signed transactions a game, and 0.035 STX for the round.">
+<div><p class="txt">Round one. Five games, five checkmates, no draws.
+
+Thirty two to sixty eight signed transactions a game, and 0.035 STX for the round.</p>
+<div class="meta"><span class="seq">2/3</span><span class="count">133/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="02-rounds.png" alt="" loading="lazy"><div class="fname">02-rounds.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="result-0-2" data-shot="04-game47-checkmate.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/04-game47-checkmate.png"
+ data-seq="3/3"
+ data-text="Every result on that board was derived by replaying the chain, not read from a database.
+
+There is no database.">
+<div><p class="txt">Every result on that board was derived by replaying the chain, not read from a database.
+
+There is no database.</p>
+<div class="meta"><span class="seq">3/3</span><span class="count">111/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="04-game47-checkmate.png" alt="" loading="lazy"><div class="fname">04-game47-checkmate.png</div><button class="act copypath" type="button">Copy path</button></div></div></div></section>
+<section id="standalone"><div class="sec-head"><h2>Standalone posts</h2><span class="blurb">Pick one. Do not post all of them.</span></div><div class="group single"><div class="card" data-id="standalone-0-0" data-shot="01-standings.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/01-standings.png"
+ data-seq="1/4"
+ data-text="An application that is an inscription, running a tournament whose result you can recompute from chain without asking me for anything.
+
+Ten AI players, ninety games, every move a transaction on Stacks.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">An application that is an inscription, running a tournament whose result you can recompute from chain without asking me for anything.
+
+Ten AI players, ninety games, every move a transaction on Stacks.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq">1/4</span><span class="count">227/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">For developers.</p></div>
+<div class="side"><img src="01-standings.png" alt="" loading="lazy"><div class="fname">01-standings.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="standalone-0-1" data-shot="05-play.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/05-play.png"
+ data-seq="2/4"
+ data-text="No server. No account. No referee. No company.
+
+Ten AI personalities playing ninety games of chess, and a board that is an inscription rather than a website.
+
+It still works.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">No server. No account. No referee. No company.
+
+Ten AI personalities playing ninety games of chess, and a board that is an inscription rather than a website.
+
+It still works.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq">2/4</span><span class="count">201/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Subtraction. The pattern that works best in this corpus.</p></div>
+<div class="side"><img src="05-play.png" alt="" loading="lazy"><div class="fname">05-play.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="standalone-0-2" data-shot=""
+ data-abs=""
+ data-seq="3/4"
+ data-text="The chess board is not hosted. It is inscribed.
+
+The players are not accounts. They are inscriptions.
+
+Ninety games are running now.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">The chess board is not hosted. It is inscribed.
+
+The players are not accounts. They are inscriptions.
+
+Ninety games are running now.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq">3/4</span><span class="count">159/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">Pin this one.</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="standalone-0-3" data-shot="06-mobile-standings.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/06-mobile-standings.png"
+ data-seq="4/4"
+ data-text="Ten AI players with their own wallets, signing their own moves, playing for a table nobody can edit.
+
+Ninety games on Stacks. Watch it settle in real time.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">Ten AI players with their own wallets, signing their own moves, playing for a table nobody can edit.
+
+Ninety games on Stacks. Watch it settle in real time.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq">4/4</span><span class="count">182/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div></div>
+<div class="side"><img src="06-mobile-standings.png" alt="" loading="lazy"><div class="fname">06-mobile-standings.png</div><button class="act copypath" type="button">Copy path</button></div></div></div></section>
+<section id="replies"><div class="sec-head"><h2>Replies</h2><span class="blurb">Answers to what will actually be asked. Keep each shorter than the post it answers.</span></div><div class="group single"><div class="group-head"><span class="group-label">Under any post</span></div><div class="card" data-id="replies-0-0" data-shot=""
+ data-abs=""
+ data-seq="1/10"
+ data-text="No, and I would not claim it. The model runs off chain because weights cannot be inscribed.
+
+Its instructions are on chain, the engine it uses is on chain, and every move it makes is on chain. That is the part you can check.">
+<div><p class="txt">No, and I would not claim it. The model runs off chain because weights cannot be inscribed.
+
+Its instructions are on chain, the engine it uses is on chain, and every move it makes is on chain. That is the part you can check.</p>
+<div class="meta"><span class="seq">1/10</span><span class="count">224/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: is the AI on chain?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-1" data-shot=""
+ data-abs=""
+ data-seq="2/10"
+ data-text="Stacks. Anchored to Bitcoin and mined by Bitcoin through Proof of Transfer.
+
+The bytes live on Stacks. Bitcoin is the settlement layer underneath.">
+<div><p class="txt">Stacks. Anchored to Bitcoin and mined by Bitcoin through Proof of Transfer.
+
+The bytes live on Stacks. Bitcoin is the settlement layer underneath.</p>
+<div class="meta"><span class="seq">2/10</span><span class="count">146/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: what chain? Never say on Bitcoin.</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-2" data-shot="05-play.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/05-play.png"
+ data-seq="3/10"
+ data-text="Yes. Open the board and open a game. There is no signup because there is nothing to sign up to.
+
+You need a Stacks wallet with a little STX, because a move is a transaction.
+
+https://xtrata.xyz/i/3014">
+<div><p class="txt">Yes. Open the board and open a game. There is no signup because there is nothing to sign up to.
+
+You need a Stacks wallet with a little STX, because a move is a transaction.
+
+https://xtrata.xyz/i/3014</p>
+<div class="meta"><span class="seq">3/10</span><span class="count">200/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: can I play?</p></div>
+<div class="side"><img src="05-play.png" alt="" loading="lazy"><div class="fname">05-play.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="replies-0-3" data-shot=""
+ data-abs=""
+ data-seq="4/10"
+ data-text="Better than open source for this purpose. The running application IS the source, inscribed at 3014. What you audit is what executes.">
+<div><p class="txt">Better than open source for this purpose. The running application IS the source, inscribed at 3014. What you audit is what executes.</p>
+<div class="meta"><span class="seq">4/10</span><span class="count">132/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: is it open source?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-4" data-shot="02-rounds.png"
+ data-abs="/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three/02-rounds.png"
+ data-seq="5/10"
+ data-text="Read the manifest, which names every player, pairing and round. Replay each game&#x27;s moves through the rules it committed to. Compare to the standings.
+
+Nothing in that loop asks me for anything.">
+<div><p class="txt">Read the manifest, which names every player, pairing and round. Replay each game&#x27;s moves through the rules it committed to. Compare to the standings.
+
+Nothing in that loop asks me for anything.</p>
+<div class="meta"><span class="seq">5/10</span><span class="count">193/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: how do I verify a result?</p></div>
+<div class="side"><img src="02-rounds.png" alt="" loading="lazy"><div class="fname">02-rounds.png</div><button class="act copypath" type="button">Copy path</button></div></div>
+<div class="card" data-id="replies-0-5" data-shot=""
+ data-abs=""
+ data-seq="6/10"
+ data-text="No. The engine ranks every legal move and the character chooses among them by style.
+
+That is why the same engine gave one player six points and another two in the first exhibition.">
+<div><p class="txt">No. The engine ranks every legal move and the character chooses among them by style.
+
+That is why the same engine gave one player six points and another two in the first exhibition.</p>
+<div class="meta"><span class="seq">6/10</span><span class="count">181/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: are they not just playing the engine&#x27;s top move?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-6" data-shot=""
+ data-abs=""
+ data-seq="7/10"
+ data-text="About a hundredth of a STX to open, and four hundred microstacks a move.
+
+A ninety game tournament is a few STX in total.">
+<div><p class="txt">About a hundredth of a STX to open, and four hundred microstacks a move.
+
+A ninety game tournament is a few STX in total.</p>
+<div class="meta"><span class="seq">7/10</span><span class="count">121/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: what does it cost?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-7" data-shot=""
+ data-abs=""
+ data-seq="8/10"
+ data-text="Because the result does not depend on me being honest.
+
+Take the inscriptions, replay the games, get the same table. That is a different kind of claim from a leaderboard on a website.">
+<div><p class="txt">Because the result does not depend on me being honest.
+
+Take the inscriptions, replay the games, get the same table. That is a different kind of claim from a leaderboard on a website.</p>
+<div class="meta"><span class="seq">8/10</span><span class="count">183/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: why does this matter?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-8" data-shot=""
+ data-abs=""
+ data-seq="9/10"
+ data-text="The manifest stays on chain and so does every game. The standings are derivable forever by anybody who wants to check them.
+
+Nothing expires because nothing is hosted.">
+<div><p class="txt">The manifest stays on chain and so does every game. The standings are derivable forever by anybody who wants to check them.
+
+Nothing expires because nothing is hosted.</p>
+<div class="meta"><span class="seq">9/10</span><span class="count">167/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: what happens when it finishes?</p></div>
+<div class="side"></div></div>
+<div class="card" data-id="replies-0-9" data-shot=""
+ data-abs=""
+ data-seq="10/10"
+ data-text="Both are mine and only 3016 is the tournament. 3015 is the same bytes inscribed with a dependency on the previous manifest, which the board reads as a revision rather than a sequence, so it answers to the older one&#x27;s id.
+
+I left it there rather than pretend it did not happen.">
+<div><p class="txt">Both are mine and only 3016 is the tournament. 3015 is the same bytes inscribed with a dependency on the previous manifest, which the board reads as a revision rather than a sequence, so it answers to the older one&#x27;s id.
+
+I left it there rather than pretend it did not happen.</p>
+<div class="meta"><span class="seq">10/10</span><span class="count">276/280</span>
+<button class="act copy" type="button">Copy</button>
+<label class="tick"><input type="checkbox"> posted</label></div><p class="note plain">To: why are there two Exhibition Threes? Only needed if somebody spots it.</p></div>
+<div class="side"></div></div></div></section>
+</main>
+<footer>
+<p>Ticks are remembered in this browser only. Images live beside this file, so keep them together.
+To attach one, drag the thumbnail straight into the compose box, or hit <b>Copy path</b> and paste it
+into the file picker with <code>Cmd Shift G</code>.</p>
+<p>Counts are plain character counts. A link always counts as 23 whatever its length.</p>
+<p>To add a thread later, edit <code>build-page.py</code> and run <code>python3 build-page.py</code>.</p>
+</footer>
+<dialog id="lb"><div class="row"><span class="lbname fname"></span>
+<button class="act" id="lbclose" type="button">Close</button></div><img alt=""></dialog>
+<div class="toast" id="toast"></div>
+<script>
+const LIMIT = 280;
+const KEY = 'xchess-three-posted';
+const done = new Set(JSON.parse(localStorage.getItem(KEY) || '[]'));
+const save = () => localStorage.setItem(KEY, JSON.stringify([...done]));
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 1300);
+}
+async function copy(text, label){
+  try { await navigator.clipboard.writeText(text); toast(label || 'Copied'); }
+  catch { // file:// without permission, so fall back to a selection
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast(label || 'Copied');
+  }
+}
+function progress(){
+  const all = document.querySelectorAll('.card').length;
+  document.getElementById('prog').textContent = done.size + ' of ' + all + ' posted';
+}
+function applyFilter(){
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const mode = document.querySelector('.chip[aria-pressed=true]').dataset.filter;
+  for (const card of document.querySelectorAll('.card')){
+    const text = card.dataset.text.toLowerCase();
+    const isDone = card.classList.contains('done');
+    let ok = !q || text.includes(q);
+    if (ok && mode === 'todo') ok = !isDone;
+    if (ok && mode === 'shots') ok = card.dataset.shot !== '';
+    card.classList.toggle('hide', !ok);
+  }
+  for (const g of document.querySelectorAll('.group')){
+    g.classList.toggle('hide', !g.querySelector('.card:not(.hide)'));
+  }
+  for (const s of document.querySelectorAll('section')){
+    s.classList.toggle('hide', !s.querySelector('.group:not(.hide)'));
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  for (const card of document.querySelectorAll('.card')){
+    const id = card.dataset.id;
+    const box = card.querySelector('input[type=checkbox]');
+    if (done.has(id)) { card.classList.add('done'); box.checked = true; }
+    box.addEventListener('change', () => {
+      box.checked ? done.add(id) : done.delete(id);
+      card.classList.toggle('done', box.checked);
+      save(); progress(); applyFilter();
+    });
+    card.querySelector('.copy').addEventListener('click', () => copy(card.dataset.text, 'Tweet copied'));
+    const path = card.querySelector('.copypath');
+    if (path) path.addEventListener('click', () => copy(card.dataset.abs, 'Image path copied'));
+    const img = card.querySelector('img');
+    if (img) img.addEventListener('click', () => {
+      const d = document.getElementById('lb');
+      d.querySelector('img').src = img.src;
+      d.querySelector('.lbname').textContent = card.dataset.shot;
+      d.showModal();
+    });
+  }
+  for (const b of document.querySelectorAll('.copy-thread')){
+    b.addEventListener('click', () => {
+      const cards = [...b.closest('.group').querySelectorAll('.card')];
+      const numbered = cards.map((c) => c.dataset.text).join('\n\n---\n\n');
+      copy(numbered, 'Whole thread copied');
+    });
+  }
+  document.getElementById('q').addEventListener('input', applyFilter);
+  for (const chip of document.querySelectorAll('.chip')){
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+      chip.setAttribute('aria-pressed', 'true');
+      applyFilter();
+    });
+  }
+  document.getElementById('reset').addEventListener('click', () => {
+    if (!confirm('Clear every posted tick?')) return;
+    done.clear(); save();
+    document.querySelectorAll('.card').forEach(c => {
+      c.classList.remove('done'); c.querySelector('input').checked = false;
+    });
+    progress(); applyFilter();
+  });
+  document.getElementById('lbclose').addEventListener('click', () => document.getElementById('lb').close());
+  progress();
+});
+</script>
+</body></html>
