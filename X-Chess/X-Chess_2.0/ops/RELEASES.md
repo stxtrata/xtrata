@@ -10,10 +10,24 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `f0480d811f145d6704d7019f9e21e5b87bea9b2b8a5e43db19393405d578da5d`
-* xtrata chunk hash `cf73da87a2d0b45c274be3c06741c2ee42fe69e0b1c7a2f1dfeaa9228426f9ac`
-* build stamp `2.1.7 - 2026-08-19 22:20 UTC - #de85733f`
-* **232,552 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
+* `htmlSha256` `e0d1d4633c33e4086507376bdc734e6c1a0740d943ca7bfe14a134de9816c5cc`
+* xtrata chunk hash `5aa3bb352fad4e75c250cfcc2a85a2170f30544ba7cebce805f8efed463b14dc`
+* build stamp `2.1.7 - 2026-08-19 22:34 UTC - #c2cd381d`
+* **232,674 bytes, 15 chunks.** 1,572 tests, 82 files. `tsc` and docs audit clean.
+
+**The slow half had no bar, because it wrote over its own.** "Replaying every
+game to score it" went in as a bare notice, and the note is where the summary,
+the field and the progress bar live — so the longest wait on the board replaced
+everything explaining it with a sentence saying it would be slow. It sets the
+bar to zero and redraws instead.
+
+**And the table fills in a game at a time.** Progress was emitted at round
+boundaries on the reasoning that ninety redraws would flicker. Wrong about the
+timing: a game is a row read, its entries and a replay, so redraws land a
+second or two apart, which is movement rather than flicker — and a five-game
+round showed nothing at all until all five had finished. Every game now emits,
+the standings grow a row at a time, and drawing is throttled to 220ms so a warm
+load answering ninety games at once does not rebuild the body ninety times.
 
 **The build stamp says UTC now**, because it always was and never said so.
 `toISOString` is UTC by definition, so every stamp on chain — 2988 through 3024

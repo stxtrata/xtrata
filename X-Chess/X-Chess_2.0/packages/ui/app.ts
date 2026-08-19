@@ -515,6 +515,17 @@ const WAITING_RECHECK_MS = 60_000;
 const TOURNAMENT_POLL_MS = 30_000;
 
 /**
+ * How often the tournament body may be rebuilt while it scores.
+ *
+ * Every game emits a partial answer, which is what makes the table fill in
+ * rather than appear. A cold load is a read and a replay per game, so the
+ * redraws land seconds apart on their own; this only bites on a WARM load,
+ * where the cache answers ninety games in a moment and nobody would see
+ * eighty-nine of the rebuilds.
+ */
+const TOURNAMENT_DRAW_MS = 220;
+
+/**
  * How long a pending move may be shown on memory alone.
  *
  * Chosen against the block time rather than the poll interval: post-Nakamoto a
@@ -782,6 +793,9 @@ export class ChessApp {
 
   /** How far a long read has got, for the bar that says so. Null when idle. */
   private progress: { done: number; total: number; what: string } | null = null;
+
+  /** When the tournament body was last rebuilt, so a warm load does not thrash. */
+  private lastTournamentDraw = 0;
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -3726,7 +3740,21 @@ export class ChessApp {
         if (this.tournamentLoading !== null && this.tournamentLoading !== id) return;
         this.progress = { done, total, what: 'games replayed' };
         this.tournament = partial;
-        this.drawTournament();
+
+        // DRAWN AT A RATE SOMEBODY CAN READ. Every game is emitted, and on a
+        // cold load that is a redraw every second or two — exactly the movement
+        // wanted. On a warm one the cache answers ninety games in a moment, and
+        // drawing each would be ninety rebuilds nobody sees. The last is always
+        // drawn, so the finished table is never one frame behind.
+        const now = this.now();
+        if (done >= total || now - this.lastTournamentDraw >= TOURNAMENT_DRAW_MS) {
+          this.lastTournamentDraw = now;
+          this.drawTournament();
+        } else {
+          // The bar still moves. It is two attributes and a width, and it is
+          // the part that says the silence is work rather than a stall.
+          this.tickProgress();
+        }
       },
       onManifest: (tournament: Tournament, rootId: number, lineage: number[]) => {
         if (this.tournamentLoading !== null && this.tournamentLoading !== rootId) return;
@@ -3770,7 +3798,15 @@ export class ChessApp {
       // for names alone used to. Bounded by the field — ten entrants, not one
       // per game — and redrawn only if something arrived.
       if (await (this.pictures?.resolveAll(field) ?? Promise.resolve(false))) this.drawTournament();
-      this.notice('tournamentNote', 'info', 'Replaying every game to score it. This is the slow part.');
+      // NOT A BARE NOTICE. This wrote one sentence over the note, which is
+      // where the summary, the field and the progress bar all live — so the
+      // slowest part of the load replaced everything that explained it with a
+      // line of text saying it would be slow.
+      //
+      // The patience note already says what is happening and the bar already
+      // says how far, so this only has to put the bar at zero and redraw.
+      this.progress = { done: 0, total: view.tournament?.games.length ?? 0, what: 'games replayed' };
+      this.drawTournament();
       // Remembered so Explore can say a game belongs to something. The board
               // can only ever know about tournaments it has loaded — see the
               // column, which says nothing rather than "not in a tournament".
@@ -4237,13 +4273,16 @@ export class ChessApp {
       const bar = this.progressBar();
       if (bar) this.el.tournamentNote.appendChild(bar);
 
-      // THE FIELD, while the results are still coming. A manifest names every
-      // entrant, and a reader waiting on ninety replays would rather read who
-      // is playing than a progress note. Replaced by the rounds when they
-      // arrive, so this is the empty tab filled with true things rather than a
-      // second place results could disagree with.
+      // THE FIELD, until the standings have everybody in them.
+      //
+      // A manifest names every entrant, and a reader waiting on ninety replays
+      // would rather read who is playing than a progress note. But the
+      // standings now grow a row at a time as games are scored, so once they
+      // hold the whole field this is the same ten names printed twice. It
+      // stands in for the table until the table can stand for itself.
       const list = this.doc.createElement('div');
       list.className = 'tn-entrants';
+      const wanted = view.table.length < t.entrants.length;
       const heading = this.doc.createElement('div');
       heading.className = 'tn-entrants__head';
       heading.textContent = `The field — ${t.entrants.length} entrants`;
@@ -4292,7 +4331,7 @@ export class ChessApp {
 
         list.appendChild(item);
       }
-      this.el.tournamentBody.appendChild(list);
+      if (wanted) this.el.tournamentBody.appendChild(list);
     }
 
     // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.

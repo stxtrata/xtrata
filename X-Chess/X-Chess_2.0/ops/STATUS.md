@@ -113,7 +113,7 @@ collapsed in the chooser so a correction is authoritative rather than hidden.
 with a proof its rounding can never be ambiguous, and rating checkpoints that
 must be minted by xtrata.btc and regenerated before they will be inscribed.
 
-**Build and artefact.** One self-contained HTML file, **232,552 bytes — 15 of
+**Build and artefact.** One self-contained HTML file, **232,674 bytes — 15 of
 the 32 Xtrata chunks** that upload in a single transaction. `tests/artifact`
 reads `dist/` rather than source, which is the only way the double-boot class of
 bug is visible at all.

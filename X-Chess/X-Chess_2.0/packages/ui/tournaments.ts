@@ -344,14 +344,21 @@ export async function scoreTournament(
     };
     facts.set(game.id, derived);
 
-    // AT A ROUND BOUNDARY, not per game. Emitting every game would redraw the
-    // table ninety times and read as flicker; a round is the unit the tab is
-    // already organised by, so it appears the way somebody would expect a
-    // tournament to fill in.
-    const after = tournament.games[done];
-    if (deps.onProgress && (!after || after.round !== game.round)) {
-      deps.onProgress(soFar(), done, total);
-    }
+    // EVERY GAME, and the caller decides how often to draw.
+    //
+    // This fired at round boundaries, on the reasoning that ninety redraws
+    // would read as flicker. That was wrong about the timing: a game is a row
+    // read, its entries and a replay, so ninety of them take minutes and a
+    // redraw lands every second or two — which is not flicker, it is the
+    // movement that tells somebody the thing is working.
+    //
+    // It also meant a five-game round showed nothing at all until all five had
+    // finished, which is the longest silence in the whole load.
+    //
+    // Scoring the partial answer is arithmetic on data already in hand, so
+    // emitting it costs nothing. Drawing is the expensive half and belongs to
+    // whoever is drawing.
+    deps.onProgress?.(soFar(), done, total);
 
     // Only a WHOLE read is remembered. A short one is a rate limit wearing a
     // game's clothes, and caching it would make the outage permanent.

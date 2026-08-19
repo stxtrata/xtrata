@@ -152,3 +152,48 @@ describe('rescoring after a game moves', () => {
     }
   });
 });
+
+describe('what a scoring tournament reports as it goes', () => {
+  // The slow half used to write one sentence over the note — which is where the
+  // summary, the field and the progress bar live — so the longest wait on the
+  // board replaced everything explaining it with a line saying it would be
+  // slow. And progress was emitted at round boundaries, so a five-game round
+  // showed nothing at all until all five had finished.
+
+  it('emits a partial answer for every game, not every round', async () => {
+    const seen: Array<[number, number]> = [];
+    await scoreTournament(view(), {
+      ...(chain().deps as unknown as Record<string, unknown>),
+      onProgress: (_v: unknown, done: number, total: number) => seen.push([done, total])
+    } as never);
+
+    expect(seen, 'three games, three emissions').toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3]
+    ]);
+  });
+
+  it('carries a table that grows rather than appearing at the end', async () => {
+    const tables: number[] = [];
+    await scoreTournament(view(), {
+      ...(chain().deps as unknown as Record<string, unknown>),
+      onProgress: (v: { table: unknown[] }) => tables.push(v.table.length)
+    } as never);
+
+    // Never shrinks, and is not empty until the last moment.
+    expect(tables.length).toBe(3);
+    expect(tables[tables.length - 1]).toBeGreaterThanOrEqual(tables[0]);
+  });
+
+  it('marks every partial as unscored', async () => {
+    // The standings in one are real and they are not final, and a reader has
+    // to be able to tell that from a finished tournament.
+    const flags: boolean[] = [];
+    await scoreTournament(view(), {
+      ...(chain().deps as unknown as Record<string, unknown>),
+      onProgress: (v: { scored: boolean }) => flags.push(v.scored)
+    } as never);
+    expect(flags.every((f) => f === false)).toBe(true);
+  });
+});
