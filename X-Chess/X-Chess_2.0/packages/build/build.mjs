@@ -109,13 +109,24 @@ const VERSION = arg('version', PACKAGE.version);
  * `SOURCE_DATE_EPOCH` is the reproducible-builds convention and is understood by
  * other toolchains; `--built` is here for a person who wants to say it plainly.
  * With neither, the clock, which is what an ordinary development build wants.
+ *
+ * AND IT SAYS UTC, because it always was and never said so. `toISOString` is
+ * UTC by definition, so a stamp made in London in summer reads an hour behind
+ * the wall clock of the person who made it — and the first thing anybody
+ * concludes from that is that the build has a wrong clock rather than an
+ * unlabelled one.
+ *
+ * UTC is the right choice and stays: the stamp is baked into a PERMANENT
+ * artefact, and two people building the same source in different places should
+ * get comparable stamps rather than ones that differ by where they sit. What
+ * was missing was four characters saying so.
  */
 const BUILT = (() => {
   const said = arg('built', '');
   if (said) return said;
   const epoch = Number(process.env.SOURCE_DATE_EPOCH);
   const when = Number.isFinite(epoch) && epoch > 0 ? new Date(epoch * 1000) : new Date();
-  return when.toISOString().slice(0, 16).replace('T', ' ');
+  return `${when.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
 })();
 const CANARY = process.argv.includes('--canary');
 const CANARY_NAME = arg('canary-name', 'xchess-core-v1-canary');

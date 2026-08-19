@@ -10,10 +10,17 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `4fb3e9846559550017c9d6f0902ce89bf00f8d41b10d16e716f63ca6da220098`
-* xtrata chunk hash `390f861999b946a7910195710ba8dcfe07a39eb3123df6a44bc971c08d5e5280`
-* build stamp `2.1.7 - 2026-08-19 22:16 - #de85733f`
-* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
+* `htmlSha256` `f0480d811f145d6704d7019f9e21e5b87bea9b2b8a5e43db19393405d578da5d`
+* xtrata chunk hash `cf73da87a2d0b45c274be3c06741c2ee42fe69e0b1c7a2f1dfeaa9228426f9ac`
+* build stamp `2.1.7 - 2026-08-19 22:20 UTC - #de85733f`
+* **232,552 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
+
+**The build stamp says UTC now**, because it always was and never said so.
+`toISOString` is UTC by definition, so every stamp on chain — 2988 through 3024
+— reads an hour behind the London wall clock that made it in summer, and the
+first thing anybody concludes is a wrong clock rather than an unlabelled one.
+UTC stays: the stamp is baked into a permanent artefact, and two people
+building the same source in different places should get comparable stamps.
 
 **A move costs one game rather than ninety.** With the loop fixed it
 was stable until a round ended, and then did the same full reload to record
