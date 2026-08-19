@@ -122,7 +122,24 @@ export const ENTRY_INSCRIPTION = Object.freeze({
     // sheets FIRST, so what is inscribed is exactly what the harness plays —
     // there is no paragraph-break drift to declare.
     Fathom: 3010, Cadence: 3011, Bulwark: 3012, Canon: 3013
-  })
+  }),
+  /**
+   * The prompt protocol: what a director ASKS a model, and what it does with
+   * the reply.
+   *
+   * Inscribed 2026-08-19 and verified the whole way round — fetched back from
+   * chain, executed from those bytes over a data URI, and byte-identical to
+   * harness/wizards/director.mjs. A sheet from 2994 renders into a prompt
+   * through it, which is the only check that means anything: the two are
+   * useless apart.
+   *
+   * THIS IS THE PIECE THAT MADE A GAME REPRODUCIBLE. The engine, the sheets,
+   * the pairings, every move and the referee were already on chain, and with
+   * all of them a stranger still could not reproduce one move — the house
+   * rules, the fence around the character and the rule turning a reply back
+   * into a move lived in a harness on one machine.
+   */
+  director: 3017
 });
 
 /**

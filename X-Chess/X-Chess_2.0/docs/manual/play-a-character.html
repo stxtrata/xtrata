@@ -426,7 +426,7 @@ footer p { max-width: var(--measure); }
 <span class="k">const</span> XTRATA = <span class="s">'https://xtrata.xyz/i/'</span>;
 <span class="k">const</span> SHEET    = <span class="s">2999</span>;   <span class="c">// Plumb. Any number from the board above.</span>
 <span class="k">const</span> PROTOCOL = <span class="s">2994</span>;   <span class="c">// reads a sheet</span>
-<span class="k">const</span> DIRECTOR = <span class="s">0</span>;      <span class="c">// prompt protocol — see the table below</span>
+<span class="k">const</span> DIRECTOR = <span class="s">3017</span>;   <span class="c">// the prompt protocol</span>
 
 <span class="k">const</span> text = <span class="k">async</span> (id) =&gt; (<span class="k">await</span> fetch(XTRATA + id)).text();
 <span class="k">const</span> mod  = <span class="k">async</span> (id) =&gt; <span class="k">import</span>(
@@ -485,7 +485,7 @@ footer p { max-width: var(--measure); }
       <tbody>
         <tr><td class="id"><a href="https://xtrata.xyz/i/2991">2991</a></td><td class="what">The chess engine. Legal moves and evaluation, dependency-free, identical for every player.</td></tr>
         <tr><td class="id"><a href="https://xtrata.xyz/i/2994">2994</a></td><td class="what">The sheet reader. Parses a character and renders the text a model is given.</td></tr>
-        <tr><td class="id">pending</td><td class="what">The prompt protocol: house rules, the fence around a character, the shape of a position, and how a reply becomes a move.</td></tr>
+        <tr><td class="id"><a href="https://xtrata.xyz/i/3017">3017</a></td><td class="what">The prompt protocol: house rules, the fence around a character, the shape of a position, and how a reply becomes a move.</td></tr>
         <tr><td class="id"><a href="https://xtrata.xyz/i/3014">3014</a></td><td class="what">The board. Play, explore, verify, and read the standings.</td></tr>
         <tr><td class="id"><a href="https://xtrata.xyz/i/3016">3016</a></td><td class="what">Exhibition Three: ninety games between all ten characters, committed before a move was played.</td></tr>
         <tr><td class="id">2995&ndash;3000<br>3010&ndash;3013</td><td class="what">The ten characters.</td></tr>
