@@ -473,6 +473,36 @@ ${SCALE_CSS}
 /* A face beside a name. Fixed square so a row keeps its height whether a
    picture arrives, fails or was never chosen — a list that reflows as images
    land reads as broken even when every one of them worked. */
+/* How far a long read has got. It moves because work finished, never on a
+   timer — a stalled read shows a stalled bar, which is the true thing and the
+   one an indeterminate spinner cannot say. */
+.bar {
+  position: relative;
+  height: 18px;
+  margin-top: .5rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--sunk, rgba(0,0,0,.18));
+}
+.bar__fill {
+  height: 100%;
+  background: var(--gold);
+  opacity: .28;
+  transition: width .35s ease;
+}
+@media (prefers-reduced-motion: reduce) { .bar__fill { transition: none; } }
+.bar__said {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  color: var(--dim);
+}
+
 .pfp {
   width: 22px; height: 22px;
   border-radius: 3px;

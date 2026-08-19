@@ -779,6 +779,9 @@ export class ChessApp {
    * that page IS a fixed range and must not drift.
    */
   private exploreTop: number | null = null;
+
+  /** How far a long read has got, for the bar that says so. Null when idle. */
+  private progress: { done: number; total: number; what: string } | null = null;
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -3523,6 +3526,15 @@ export class ChessApp {
       // per game and then a replay of each, which for ninety games is minutes.
       // Holding the first back until the second finished gave a reader a
       // heading over an empty table and no way to tell working from broken.
+      // ROUNDS APPEARING, not a spinner. Everything scored so far is already in
+      // hand, so each of these is a true partial answer rather than an
+      // animation standing in for one.
+      onProgress: (partial: TournamentView, done: number, total: number) => {
+        if (this.tournamentLoading !== null && this.tournamentLoading !== id) return;
+        this.progress = { done, total, what: 'games read' };
+        this.tournament = partial;
+        this.drawTournament();
+      },
       onManifest: (tournament: Tournament, rootId: number, lineage: number[]) => {
         if (this.tournamentLoading !== null && this.tournamentLoading !== rootId) return;
         this.tournament = {
@@ -3586,6 +3598,7 @@ export class ChessApp {
               // The candidate the Leaderboard cannot guess. See rulesForRanked.
               if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
+              this.progress = null;
       this.tournamentLoading = null;
       this.rememberTournamentState(this.tournament);
       this.tournamentReadAt = this.now();
@@ -4029,6 +4042,9 @@ export class ChessApp {
         'look at a tournament is the slow one — finished games are remembered, so coming ' +
         'back is quick.';
       this.el.tournamentNote.appendChild(wait);
+
+      const bar = this.progressBar();
+      if (bar) this.el.tournamentNote.appendChild(bar);
 
       // THE FIELD, while the results are still coming. A manifest names every
       // entrant, and a reader waiting on ninety replays would rather read who
@@ -6442,14 +6458,36 @@ export class ChessApp {
       // walk one button away. See packages/protocol/checkpoint.ts.
       const from = this.verifyEverything ? 0 : await this.checkpointStart(count);
 
+      // SAID BEFORE THE WALK, not after it. Every ranked game is read and
+      // replayed here, three at a time, and on a contract that grows for ever
+      // that is the longest thing the board does. It said nothing at all until
+      // the whole table appeared.
+      const walking = count - from;
+      this.progress = { done: 0, total: walking, what: 'ranked games replayed' };
+      this.drawLeaderboardWait(walking, from);
+
       const judged = await pool(
         LEADERBOARD_READ_WIDTH,
         Array.from({ length: count - from }, (_, at) => async (): Promise<RatedGame | null> => {
           const index = from + at;
           const id = await this.chain.getRankedGame(index);
-          if (id === null) return null;
+          // Counted whatever the outcome, because the bar is about work done
+          // and not about work that succeeded — a read that failed still took
+          // the time, and a bar that skipped it would stall for no visible
+          // reason.
+          const tick = (): void => {
+            if (this.progress) this.progress.done++;
+            this.drawLeaderboardWait(walking, from);
+          };
+          if (id === null) {
+            tick();
+            return null;
+          }
           const row = await this.chain.getGame(id);
-          if (!row) return null;
+          if (!row) {
+            tick();
+            return null;
+          }
 
           const entries = await this.chain.getAllEntries(id, row.nextSeq);
           const recovered = this.rulesForRanked(row, entries);
@@ -6485,9 +6523,11 @@ export class ChessApp {
               ineligible++;
               for (const reason of why) ineligibleWhy.add(describeIneligibility(reason));
             }
+            tick();
             return null;
           }
           const terminal = state.accepted.find((e) => e.seq === state.terminalSequence);
+          tick();
           return {
             game: id,
             white: check.white!,
@@ -6550,6 +6590,7 @@ export class ChessApp {
       // rather than a statement about how much evidence is behind it. It is
       // most of the table early in a tournament, which is exactly when a reader
       // is most likely to be looking.
+      this.progress = null;
       const unsettled = rows.filter((r) => r.provisional).length;
       this.notice(
         'leaderboardNote',
@@ -6647,6 +6688,56 @@ export class ChessApp {
       return;
     }
     if (this.tab === 'explore') this.drawExplore();
+  }
+
+  /**
+   * How far a long read has got, or nothing.
+   *
+   * A BAR THAT MEANS SOMETHING. It moves because games have actually been read
+   * and scored, not on a timer — so a stalled read shows a stalled bar, which
+   * is the true thing and the one an indeterminate spinner cannot say.
+   */
+  /**
+   * What the Leaderboard is doing, while it does it.
+   *
+   * Redrawn on every game rather than on a timer, so the bar stalls when the
+   * reads stall. Cheap: two elements into a node that is replaced anyway.
+   */
+  private drawLeaderboardWait(total: number, from: number): void {
+    if (this.tab !== 'leaderboard') return;
+    this.notice(
+      'leaderboardNote',
+      'info',
+      `Reading and replaying ${total} ranked game${total === 1 ? '' : 's'} from the chain. ` +
+        (from > 0
+          ? 'Everything before the checkpoint is taken from it; this is the part being derived here.'
+          : 'Nothing here is stored, so this is the whole of it — the first look is the slow one.')
+    );
+    const bar = this.progressBar();
+    if (bar) this.el.leaderboardNote.appendChild(bar);
+  }
+
+  private progressBar(): HTMLElement | null {
+    const at = this.progress;
+    if (!at || at.total < 1) return null;
+
+    const wrap = this.doc.createElement('div');
+    wrap.className = 'bar';
+    wrap.setAttribute('role', 'progressbar');
+    wrap.setAttribute('aria-valuemin', '0');
+    wrap.setAttribute('aria-valuemax', String(at.total));
+    wrap.setAttribute('aria-valuenow', String(at.done));
+
+    const fill = this.doc.createElement('div');
+    fill.className = 'bar__fill';
+    fill.style.width = `${Math.round((at.done / at.total) * 100)}%`;
+    wrap.appendChild(fill);
+
+    const said = this.doc.createElement('span');
+    said.className = 'bar__said';
+    said.textContent = `${at.done} of ${at.total} ${at.what}`;
+    wrap.appendChild(said);
+    return wrap;
   }
 
   private async paintFaces(addresses: readonly string[]): Promise<void> {

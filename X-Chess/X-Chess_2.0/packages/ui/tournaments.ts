@@ -49,6 +49,21 @@ export interface TournamentDeps {
    * while the expensive part runs.
    */
   onManifest?: (tournament: Tournament, rootId: number, lineage: number[]) => void;
+  /**
+   * A real partial view, at each round boundary.
+   *
+   * NOT A SPINNER. Everything scored so far is already in hand — the games are
+   * read in manifest order and a manifest is grouped by round, so at a round
+   * boundary there is a complete, honest answer about every game before it.
+   * Scoring that answer is arithmetic on data already fetched, so emitting it
+   * costs nothing and turns minutes of a still page into rounds appearing.
+   *
+   * `scored` is FALSE on every one of these. The view is true about the games
+   * it contains and silent about the rest, and a reader must be able to tell
+   * that apart from a finished tournament — the standings in it are real and
+   * they are not final.
+   */
+  onProgress?: (view: TournamentView, done: number, total: number) => void;
 }
 
 export interface TournamentRow extends CheckedGame {
@@ -161,9 +176,29 @@ export async function scoreTournament(
   let readEverything = true;
   let entriesSeen = 0;
 
+  let done = 0;
+  const total = tournament.games.length;
+  /**
+   * Everything known so far, scored honestly and marked unfinished.
+   *
+   * The games are read in manifest order and a manifest is grouped by round, so
+   * at a boundary this is a complete answer about every game before it and
+   * silent about the rest. `scored: false` is what keeps the two apart.
+   */
+  const soFar = (): TournamentView => {
+    const partial = checkGames(tournament, facts);
+    return {
+      ...view,
+      table: standings(tournament, verifiedResults(partial)),
+      rounds: group(partial, tournament, deps),
+      scored: false
+    };
+  };
+
   for (const game of tournament.games) {
     await deps.pace?.();
     const row = await deps.chain.getGame(game.id).catch(() => null);
+    done++;
     if (!row) {
       readEverything = false;
       continue;
@@ -235,6 +270,15 @@ export async function scoreTournament(
       turn: state.status === 'live' && state.result === null ? state.turn : null
     };
     facts.set(game.id, derived);
+
+    // AT A ROUND BOUNDARY, not per game. Emitting every game would redraw the
+    // table ninety times and read as flicker; a round is the unit the tab is
+    // already organised by, so it appears the way somebody would expect a
+    // tournament to fill in.
+    const after = tournament.games[done];
+    if (deps.onProgress && (!after || after.round !== game.round)) {
+      deps.onProgress(soFar(), done, total);
+    }
 
     // Only a WHOLE read is remembered. A short one is a rate limit wearing a
     // game's clothes, and caching it would make the outage permanent.

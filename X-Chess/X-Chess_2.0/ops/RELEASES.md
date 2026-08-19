@@ -8,12 +8,14 @@ that a build which never shipped still leaves a record of why.
 
 ## 2.1.4 — 2026-08-19
 
-Ready to inscribe. **227,611 bytes, 14 chunks.**
+Ready to inscribe. **229,711 bytes, 15 chunks.**
 
-* `htmlSha256` `aa4d68d4c142179b37e585d1f75fd764574900b8256e479d207c6611d6fdfc96`
-* xtrata chunk hash `07bc502e4923bfcaa3e7f4208002f545861784ebe4c332fddf9e63f076c3688b`
-* build stamp `2.1.4 - 2026-08-19 16:56 - #1ca03366`
-* 1,547 tests passing, 80 files. `tsc --noEmit` clean, docs audit clean.
+* `htmlSha256` `278157865d83bfe86614edcaa3868eb7f32ce0d7372aa8fac65dbdc835e8c7bd`
+* xtrata chunk hash `8c20c61111d55e9119db5452620d7b0da1743d8fe9b2ab5c86bd9f34c5ad6ad3`
+* 1,552 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+* **Fifteen chunks, up from fourteen.** Still one `add-chunk-batch`
+  transaction, which takes thirty-two, so this costs one chunk's protocol fee
+  and nothing structural.
 * Cost, measured on 3014 rather than estimated: **0.236 STX** for 13 chunks, so
   a shade more for 14.
 
@@ -39,6 +41,12 @@ rather than after every build.
 * **A tournament paints before it loads** — the field, the format, the rounds —
   from the manifest already in memory, with no request at all.
 * **The `?` on a rating says what it means**, which is "fewer than ten games".
+* **Long reads say how far they have got.** A tournament emits a real partial
+  view at each round boundary — scored, honest, and marked unfinished — so
+  rounds appear rather than a spinner turning. The Leaderboard says what it is
+  doing before it walks every ranked game rather than after. Both bars move
+  because work finished and never on a timer, so a stalled read looks stalled,
+  which is the one thing an indeterminate spinner cannot say.
 * **The prompt protocol is inscribed at 3017**, so a game is reproducible by a
   stranger end to end.
 
