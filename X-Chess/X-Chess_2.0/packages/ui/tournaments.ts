@@ -64,6 +64,16 @@ export interface TournamentDeps {
    * they are not final.
    */
   onProgress?: (view: TournamentView, done: number, total: number) => void;
+  /**
+   * A game row read, during the first pass.
+   *
+   * Separate from `onProgress` because this pass has no results to show — it is
+   * checking that the chain agrees about who played whom, one row at a time.
+   * There is nothing to render, and that is exactly why it needs to be counted:
+   * for a ninety-game tournament it is ninety reads before the part that has
+   * something to say even begins.
+   */
+  onRead?: (done: number, total: number) => void;
 }
 
 export interface TournamentRow extends CheckedGame {
@@ -127,9 +137,13 @@ export async function loadTournament(id: number, deps: TournamentDeps): Promise<
   deps.onManifest?.(tournament, resolved.tournamentId ?? id, resolved.lineage);
 
   const facts = new Map<number, GameFacts>();
+  let read = 0;
   for (const game of tournament.games) {
     await deps.pace?.();
     const row = await deps.chain.getGame(game.id).catch(() => null);
+    // Counted whatever came back. A read that failed still took the time, and a
+    // count that skipped it would stall for no visible reason.
+    deps.onRead?.(++read, tournament.games.length);
     // A row that cannot be read is left OUT rather than recorded as null, so it
     // reports as `missing` — "we could not check this" and never "this is fine".
     if (row) facts.set(game.id, { rulesHash: row.rulesHash, result: null });

@@ -83,3 +83,41 @@ describe('the bar under a long read', () => {
     expect(second).toBe(first);
   });
 });
+
+describe('the bar moves without rebuilding what surrounds it', () => {
+  // A tournament's note carries a summary, a field list and links to the
+  // documents behind them. Redrawing all of that to advance a bar by one game
+  // rebuilds it ninety times, and the links flicker under a reader's cursor.
+
+  it('updates the bar already on screen', () => {
+    const app = board();
+    const inside = inner(app) as unknown as {
+      progress: { done: number; total: number; what: string } | null;
+      tickProgress(): void;
+    };
+    inside.progress = { done: 0, total: 90, what: 'pairings checked' };
+
+    const host = dom.window.document.getElementById('tournament-note')!;
+    host.appendChild(inner(app).progressBar()!);
+    const before = host.querySelector('.bar');
+
+    inside.progress = { done: 45, total: 90, what: 'pairings checked' };
+    inside.tickProgress();
+
+    const after = host.querySelector('.bar');
+    expect(after, 'the same element, moved').toBe(before);
+    expect(after!.querySelector<HTMLElement>('.bar__fill')!.style.width).toBe('50%');
+    expect(after!.textContent).toContain('45 of 90 pairings checked');
+    expect(after!.getAttribute('aria-valuenow')).toBe('45');
+  });
+
+  it('does nothing when there is no bar to move', () => {
+    const app = board();
+    const inside = inner(app) as unknown as {
+      progress: { done: number; total: number; what: string } | null;
+      tickProgress(): void;
+    };
+    inside.progress = { done: 3, total: 9, what: 'pairings checked' };
+    expect(() => inside.tickProgress()).not.toThrow();
+  });
+});

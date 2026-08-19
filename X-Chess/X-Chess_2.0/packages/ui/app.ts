@@ -3529,14 +3529,25 @@ export class ChessApp {
       // ROUNDS APPEARING, not a spinner. Everything scored so far is already in
       // hand, so each of these is a true partial answer rather than an
       // animation standing in for one.
+      // Counted in place rather than by redrawing. Ninety reads is ninety
+      // redraws of a summary, a field list and a set of links, to move one bar
+      // — so this finds the bar that is already on screen and moves it.
+      onRead: (done: number, total: number) => {
+        if (this.tournamentLoading !== null && this.tournamentLoading !== id) return;
+        this.progress = { done, total, what: 'pairings checked' };
+        this.tickProgress();
+      },
       onProgress: (partial: TournamentView, done: number, total: number) => {
         if (this.tournamentLoading !== null && this.tournamentLoading !== id) return;
-        this.progress = { done, total, what: 'games read' };
+        this.progress = { done, total, what: 'games replayed' };
         this.tournament = partial;
         this.drawTournament();
       },
       onManifest: (tournament: Tournament, rootId: number, lineage: number[]) => {
         if (this.tournamentLoading !== null && this.tournamentLoading !== rootId) return;
+        // At zero, so the bar is on screen before the first read rather than
+        // appearing partway through and reading as a restart.
+        this.progress = { done: 0, total: tournament.games.length, what: 'pairings checked' };
         this.tournament = {
           ok: true, problems: [], tournamentId: rootId, lineage, tournament,
           provenance: null, says: '', honoured: true, table: [], rounds: [],
@@ -4033,9 +4044,10 @@ export class ChessApp {
       const wait = this.doc.createElement('div');
       wait.className = 'tn-wait';
       wait.textContent =
-        `Reading ${t.games.length} games from the chain and replaying each one. The first ` +
-        'look at a tournament is the slow one — finished games are remembered, so coming ' +
-        'back is quick.';
+        `Checking ${t.games.length} pairings against the chain, then replaying every game ` +
+        'to score it. Everything above is read from the manifest and is already true; ' +
+        'this is the part being derived. The first look at a tournament is the slow one — ' +
+        'finished games are remembered, so coming back is quick.';
       this.el.tournamentNote.appendChild(wait);
 
       const bar = this.progressBar();
@@ -6710,6 +6722,27 @@ export class ChessApp {
     );
     const bar = this.progressBar();
     if (bar) this.el.leaderboardNote.appendChild(bar);
+  }
+
+  /**
+   * Move the bar already on screen, without rebuilding anything around it.
+   *
+   * A tournament's note carries a summary, a field list and links to the
+   * documents behind them. Redrawing all of that to advance a bar by one game
+   * would rebuild it ninety times, and the links would flicker for a reader
+   * trying to click one.
+   */
+  private tickProgress(): void {
+    const at = this.progress;
+    if (!at || at.total < 1) return;
+    for (const bar of this.doc.querySelectorAll('.bar')) {
+      const fill = bar.querySelector<HTMLElement>('.bar__fill');
+      const said = bar.querySelector<HTMLElement>('.bar__said');
+      if (fill) fill.style.width = `${Math.round((at.done / at.total) * 100)}%`;
+      if (said) said.textContent = `${at.done} of ${at.total} ${at.what}`;
+      bar.setAttribute('aria-valuenow', String(at.done));
+      bar.setAttribute('aria-valuemax', String(at.total));
+    }
   }
 
   private progressBar(): HTMLElement | null {

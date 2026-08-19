@@ -8,11 +8,11 @@ that a build which never shipped still leaves a record of why.
 
 ## 2.1.4 — 2026-08-19
 
-Ready to inscribe. **229,671 bytes, 15 chunks.**
+Ready to inscribe. **230,427 bytes, 15 chunks.**
 
-* `htmlSha256` `0a3946ad947853605773d4b77acd3cae96db60215859f23cfb4d9690c8e347e2`
-* xtrata chunk hash `2bc311cac43fb4399d0c19741e4e5c29d8eec9c0d3d8d9801eb37fb1a80c4e76`
-* 1,554 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+* `htmlSha256` `a0749a8627e091401d060d4dc42ce224bbf153eda5f688db8de465a4d9f8dc61`
+* xtrata chunk hash `2ae1cb03026fd7e453a9b54413671ed24a7ecf0b4f110a9bddb4683a463d6f84`
+* 1,556 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
 * **Fifteen chunks, up from fourteen.** Still one `add-chunk-batch`
   transaction, which takes thirty-two, so this costs one chunk's protocol fee
   and nothing structural.
