@@ -29,6 +29,16 @@ cannot change.
 * The pairing pass uses a remembered rules hash and reads nothing. A rules hash
   is fixed when a game is opened, so a hash read before is the hash now.
 
+**And a move now costs one game rather than ninety.** With the loop fixed it
+was stable until a round ended, and then did the same full reload to record
+five results — because a string comparison says something changed and cannot
+say WHAT. The poll reads a row per unfinished game, so it already knows exactly
+which moved; it now re-derives those and takes the rest from memory. No row
+reads at all in a rescore: the poll has done them, and everything else is
+either finished, which cannot change, or was just read and found unmoved. A
+game with nothing remembered falls through to the full path, so a gap in the
+cache can never become a gap in the table.
+
 ## 2.1.5 — 2026-08-19  ·  **inscription 3023, live on mainnet**
 
 Inscribed as a child of 3022. **231,411 bytes, 15 chunks**, stamp
@@ -40,10 +50,10 @@ same version number and never went up — see 2.1.6.
 
 ### Originally recorded as **231,411 bytes, 15 chunks.**
 
-* `htmlSha256` `fee88798aed93d1277d26ff4e0d77e7a1a06a68729ca1ad54397d3fa4ef8afe8`
-* xtrata chunk hash `310f6d4abeb955468560464d8e7be3ffb6c7b6bf51b52c5e71e887321a01f2cd`
-* build stamp `2.1.6 - 2026-08-19 21:43 - #22884569`
-* **232,345 bytes, 15 chunks.**
+* `htmlSha256` `8f5c0d522eebb957925a5bc2346a3de4767753078f462c5a8df1f0bd4691624f`
+* xtrata chunk hash `fbb99561ee17e624ca2830fae7c07fb08ba35b0746edd5670a8bf2ef2da2e79e`
+* build stamp `2.1.6 - 2026-08-19 22:13 - #de85733f`
+* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files.
 * 1,564 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
 
 **Both copy buttons were doing nothing on the inscription**, and had been since

@@ -811,7 +811,6 @@ export class ChessApp {
   /** When the tournament on screen was last read from chain. */
   private tournamentReadAt = 0;
   /** The same question asked of submissions, which is what a row can answer. */
-  private tournamentSeenRaw = '';
   private tournamentPoll: ReturnType<typeof setTimeout> | null = null;
   private found: Found<Tournament>[] = [];
   private tournamentFilter: TournamentFilter = 'all';
@@ -3246,21 +3245,26 @@ export class ChessApp {
     this.tournamentPoll = setTimeout(() => void this.pollTournament(), TOURNAMENT_POLL_MS);
   }
 
-  /**
-   * What the unfinished games of a tournament look like right now.
-   *
-   * ONE WRITER, because the baseline and the comparison used to be built in
-   * different places out of different quantities, and a signature that cannot
-   * equal itself is a reload on every poll.
-   */
-  private tournamentSignature(view: TournamentView | null): string {
-    return (view?.rounds ?? [])
-      .flatMap((round) => round.games)
-      .filter((game) => game.result === null)
-      .map((game) => `${game.id}:${game.submissions ?? '?'}`)
-      .join(',');
+  /** What both the full load and a targeted rescore read the chain through. */
+  private tournamentDeps(): Parameters<typeof scoreTournament>[1] {
+    return {
+      chain: this.chain,
+      reader: this.xtrata!,
+      compiledAcceptedBefore: COMPILED_ACCEPTED_BEFORE,
+      bnsFor: (address: string) => this.names?.peek(address) ?? null
+    };
   }
 
+  /**
+   * Ask whether an unfinished game has moved, and update only what has.
+   *
+   * IT KNOWS WHICH ONES. A row per unfinished game, compared against the
+   * submission count already on screen — so the answer is a set of game ids,
+   * not a yes or no. It used to build both sides into a string, compare the
+   * strings, and reload the entire tournament on any difference: ninety
+   * pairings re-checked and ninety games re-replayed to record that five had
+   * finished, with the rows that said so already in hand.
+   */
   private async pollTournament(): Promise<void> {
     const view = this.tournament;
     const live = (view?.rounds ?? [])
@@ -3284,26 +3288,33 @@ export class ChessApp {
         EXPLORE_READ_WIDTH,
         live.map((game) => () => this.chain.getGame(game.id).catch(() => null))
       );
-      // A ROW THAT DID NOT READ IS NOT A ZERO AND NOT A MOVE COUNT.
-      //
-      // This fell back to `moves`, which is what replay ACCEPTED, against a
-      // signature otherwise built from `nextSeq`, which is what the contract
-      // STORED. The two differ for any game with a skipped submission, so one
-      // failed read made the signature differ from itself for ever and the
-      // tournament reloaded on every poll from then on.
-      //
-      // A read that failed says nothing about whether the game moved, so it
-      // carries the last thing known about it.
-      const now = rows
-        .map((row, at) => `${live[at].id}:${row ? row.nextSeq : (live[at].submissions ?? '?')}`)
-        .join(',');
       // Compared against submissions rather than accepted moves, which is the
       // conservative direction: a submission replay will skip still counts as
       // "something happened", so the worst case is one rescore that changes
       // nothing, and never a board that sat still while the game moved.
-      if (now !== this.tournamentSeenRaw) {
-        this.tournamentSeenRaw = now;
-        await this.loadTournamentTab({ again: true });
+      // WHICH GAMES MOVED, which the poll has just worked out and used to
+      // throw away.
+      //
+      // It compared one string against another and, on any difference, reloaded
+      // the entire tournament — so a round ending re-checked ninety pairings
+      // and re-replayed ninety games to record that five had finished. The rows
+      // it needed were already in hand.
+      const moved = new Set<number>();
+      rows.forEach((row, at) => {
+        if (row && row.nextSeq !== live[at].submissions) moved.add(live[at].id);
+      });
+
+      if (moved.size && this.tournament?.ok) {
+        this.progress = { done: 0, total: moved.size, what: 'games replayed' };
+        // Only the games that moved are read and replayed. The rest are taken
+        // from memory and cost nothing: they are either finished, which cannot
+        // change, or were just read and found unmoved.
+        this.tournament = await scoreTournament(this.tournament, this.tournamentDeps(), {
+          only: moved
+        });
+        this.progress = null;
+        this.rememberTournamentState(this.tournament);
+        this.drawTournament();
       }
     } catch {
       // A poll that fails changes nothing on screen and says nothing about it.
@@ -3361,7 +3372,6 @@ export class ChessApp {
     this.tournament = null;
     this.tournamentLoading = id;
     this.tournamentReadAt = 0;
-    this.tournamentSeenRaw = '';
     this.tournamentFilter = 'all';
     this.tournamentWho = '';
     (this.el.tournamentWho as HTMLInputElement).value = '';
@@ -3783,18 +3793,6 @@ export class ChessApp {
       this.tournamentLoading = null;
       this.rememberTournamentState(this.tournament);
       this.tournamentReadAt = this.now();
-      // THE BASELINE, TAKEN FROM WHAT WAS JUST LOADED.
-      //
-      // This cleared the signature, which guaranteed the very next poll found a
-      // difference — anything is different from nothing — and reloaded the
-      // whole tournament. It then cleared it again, so a tournament re-verified
-      // all ninety pairings and re-replayed all ninety games every thirty
-      // seconds for as long as the tab was open, whether or not a single move
-      // had been played.
-      //
-      // Recorded now instead, so the poll fires when something has actually
-      // changed and stays silent when nothing has.
-      this.tournamentSeenRaw = this.tournamentSignature(this.tournament);
       this.drawTournament();
       // So the button for what is now on screen reads as selected.
       this.drawPickerFilters();

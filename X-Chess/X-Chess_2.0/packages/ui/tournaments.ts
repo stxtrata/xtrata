@@ -190,9 +190,30 @@ export async function loadTournament(id: number, deps: TournamentDeps): Promise<
  * cannot be had more cheaply, since a game row records when a game was OPENED
  * and opening settles nothing.
  */
+export interface ScoreOptions {
+  /**
+   * Re-derive only these games and take the rest from memory.
+   *
+   * WHAT A POLL ACTUALLY LEARNED. It reads a row for each unfinished game and
+   * compares the submission counts, so it already knows precisely which games
+   * moved — and reloading the whole tournament to act on that threw the answer
+   * away. A round ending re-checked ninety pairings and re-replayed ninety
+   * games to record that five of them had finished.
+   *
+   * Everything else is either finished, which cannot change, or was just read
+   * and found unmoved. So this costs the entries of the games that moved and
+   * nothing else: no row reads at all, because the poll has already done them.
+   *
+   * A game with nothing remembered falls through to the full path, so this can
+   * never turn a gap in the cache into a gap in the table.
+   */
+  only?: ReadonlySet<number>;
+}
+
 export async function scoreTournament(
   view: TournamentView,
-  deps: TournamentDeps
+  deps: TournamentDeps,
+  options: ScoreOptions = {}
 ): Promise<TournamentView> {
   if (!view.ok || !view.tournament) return view;
   const tournament = view.tournament;
@@ -229,6 +250,22 @@ export async function scoreTournament(
   };
 
   for (const game of tournament.games) {
+    // Not this game's turn to be re-derived, and something is remembered about
+    // it. Nothing is read — not even its row, because whoever asked for a
+    // targeted rescore has just read the rows themselves.
+    if (options.only && !options.only.has(game.id)) {
+      const held = rememberedGame(game.id);
+      if (held) {
+        done++;
+        entriesSeen += held.entries;
+        if (held.firstHeight !== null && (firstMove === null || held.firstHeight < firstMove)) {
+          firstMove = held.firstHeight;
+        }
+        facts.set(game.id, held.facts);
+        continue;
+      }
+    }
+
     await deps.pace?.();
     const row = await deps.chain.getGame(game.id).catch(() => null);
     done++;
