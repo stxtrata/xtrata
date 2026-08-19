@@ -1042,6 +1042,10 @@ export const HTML = `
          computed when it was scored. -->
     <div class="tn-line tn-line--games">
       <div id="tournament-filters" class="tn-list"></div>
+      <!-- Beside the loaded tournament rather than the picker: it copies a link
+           to the one on screen, so it has nothing to say until one is. -->
+      <button class="action hide" id="tournament-copy"
+              title="Copy a link that opens this tournament">Copy link</button>
       <input type="text" id="tournament-who" class="tn-search"
              aria-label="Show only this entrant's games"
              placeholder="only this entrant">

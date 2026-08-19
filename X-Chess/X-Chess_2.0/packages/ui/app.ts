@@ -50,7 +50,9 @@ import {
 import type { Rules } from '../protocol/rules.js';
 import { rulesHash } from '../protocol/canonical.js';
 import { recoverRules } from '../protocol/recover.js';
-import { knownRules, linkForGame, rememberRules, rulesFromLink } from '../protocol/known-rules.js';
+import {
+  knownRules, linkForGame, linkForTournament, rememberRules, rulesFromLink
+} from '../protocol/known-rules.js';
 import { checkEligibility, describeIneligibility } from '../ratings/eligibility.js';
 import { judge, judgeEvent, judgeMove } from './eligibility.js';
 import type { Ctx, Verdict } from './eligibility.js';
@@ -612,7 +614,7 @@ const IDS = [
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
     'explore-newer', 'explore-older',
   'fee-advice', 'tournament-list', 'tournament-refresh', 'tournament-fresh',
-  'tournament-filters', 'tournament-who', 'tournament-shown',
+  'tournament-filters', 'tournament-who', 'tournament-shown', 'tournament-copy',
   'picker-filters', 'picker-who', 'picker-shown', 'tournament-field',
   'tab-help', 'view-help', 'help-body', 'help-note',
   'explore-search', 'explore-find', 'explore-found',
@@ -1033,6 +1035,7 @@ export class ChessApp {
       this.drawGame();
     });
     on('topUp', () => void this.topUp());
+    on('tournamentCopy', () => void this.copyTournamentLink());
     on('exploreRefresh', () => void this.reloadExplore());
     on('exploreOlder', () => void this.pageExplore(-1));
     on('exploreNewer', () => void this.pageExplore(1));
@@ -1928,6 +1931,39 @@ export class ChessApp {
       'Those two do not hash to what this game committed, in either order. Check the addresses - ' +
         'a game commits to the ADDRESS, so a .btc name that has changed hands will not match.'
     );
+  }
+
+  /**
+   * A link that opens the tournament on screen.
+   *
+   * Built from the page's OWN address, like the game one, and for the same
+   * reason: a literal host written into a permanent artefact is a dependency it
+   * can never shed. `shareableBase` also drops `walletBridgeToken` — the
+   * runtime puts a session credential on the page URL, and a link built by
+   * appending to `location.href` would post it to whoever the link was sent to.
+   */
+  private async copyTournamentLink(): Promise<void> {
+    const id = this.tournament?.tournamentId ?? null;
+    if (id === null) return;
+
+    const absolute = linkForTournament(String(this.doc.location?.href ?? ''), id);
+    const called = this.tournament?.tournament?.name ?? `manifest ${id}`;
+
+    try {
+      await (this.doc.defaultView?.navigator?.clipboard?.writeText?.(absolute) ??
+        Promise.reject(new Error('no clipboard')));
+      this.notice(
+        'tournamentNote',
+        'good',
+        `Link copied. It opens ${called} on whatever board the reader is using, which then ` +
+          'checks every pairing against the chain for itself — the link carries the ' +
+          'inscription number and nothing it could get wrong.'
+      );
+    } catch {
+      // No clipboard, which is ordinary in a sandboxed page. A link nobody can
+      // copy is worse than a link on screen.
+      this.notice('tournamentNote', 'info', `Copy this link: ${absolute}`);
+    }
   }
 
   private async copyLink(): Promise<void> {
@@ -3825,6 +3861,14 @@ export class ChessApp {
     this.drawTournamentFilters();
     const banner = this.el.tournamentProvenance;
     banner.classList.add('hide');
+
+    // Shown only for a tournament that READ. A manifest that would not parse
+    // has an id, so a link to it would work — and would send somebody to the
+    // same failure, which is not a thing to offer a button for.
+    this.el.tournamentCopy.classList.toggle(
+      'hide',
+      !(view?.ok && view.tournamentId !== null)
+    );
     if (!view) return;
 
     if (!view.ok) {

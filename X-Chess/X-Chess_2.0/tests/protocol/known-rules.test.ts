@@ -11,14 +11,7 @@
 // on two different games, because explaining the cause is not fixing it.
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import {
-  decode,
-  encode,
-  knownRules,
-  linkForGame,
-  rememberRules,
-  rulesFromLink
-} from '../../packages/protocol/known-rules.js';
+import { decode, encode, knownRules, linkForGame, linkForTournament, rememberRules, rulesFromLink } from '../../packages/protocol/known-rules.js';
 import { recoverRules } from '../../packages/protocol/recover.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
@@ -161,5 +154,44 @@ describe('the link an opponent is sent', () => {
       expect(decode(encode(text))).toBe(text);
     }
     expect(encode(JSON.stringify(NAMED))).not.toMatch(/[+/=]/);
+  });
+});
+
+describe('a link to a tournament', () => {
+  // The id is the whole link. A game link has to carry its rules because a
+  // rules hash cannot be reversed; a manifest names its own pairings and the
+  // reader's board checks every one against the chain, so there is nothing to
+  // carry and nothing a link could get wrong.
+
+  it('keeps the page it was copied from and names the tournament', () => {
+    expect(linkForTournament('https://xtrata.xyz/i/3014', 3016))
+      .toBe('https://xtrata.xyz/i/3014?tournament=3016');
+  });
+
+  it('never carries the wallet bridge token', () => {
+    // THE ONE THAT MATTERS, and it is not ours: the Xtrata runtime puts a
+    // session credential on the page URL. A link built by appending to
+    // location.href would post it to whoever the link was sent to.
+    const copied = linkForTournament(
+      'https://xtrata.xyz/i/3014?walletBridgeToken=secret123&network=mainnet',
+      3016
+    );
+    expect(copied).not.toContain('secret123');
+    expect(copied).toContain('network=mainnet');
+    expect(copied).toContain('tournament=3016');
+  });
+
+  it('does not inherit the last thing the page was pointed at', () => {
+    // Copied while a game link was open. Two destinations in one URL is a link
+    // whose behaviour depends on which parameter the board happens to read first.
+    const copied = linkForTournament('https://xtrata.xyz/i/3014?game=41&rules=abc', 3016);
+    expect(copied).not.toContain('game=');
+    expect(copied).not.toContain('rules=');
+    expect(copied).toBe('https://xtrata.xyz/i/3014?tournament=3016');
+  });
+
+  it('replaces an older tournament rather than appending to it', () => {
+    const copied = linkForTournament('https://xtrata.xyz/i/3014?tournament=2993', 3016);
+    expect(copied).toBe('https://xtrata.xyz/i/3014?tournament=3016');
   });
 });

@@ -137,23 +137,59 @@ export function rulesFromLink(url: string, committed: string | null): Rules | nu
  * the right one here: this artefact is permanent and cannot learn the name of a
  * parameter Xtrata adds next year, so anything unrecognised has to travel.
  */
-export function linkForGame(href: string, game: number, rules: Rules): string {
+/**
+ * What a shared link must never carry, whatever it points at.
+ *
+ * `walletBridgeToken` is the one that matters and it is not ours: the Xtrata
+ * runtime puts it on the page URL, it is a SESSION credential, and a link built
+ * by naively appending to `location.href` would hand it to whoever the link was
+ * sent to. The rest are the parameters this board sets itself, dropped so a
+ * second link does not inherit the first one's destination.
+ */
+const NEVER_SHARED = ['game', 'rules', 'tournament', 'player', 'walletBridgeToken'];
+
+/**
+ * The page's own address, stripped of anything that should not travel.
+ *
+ * Parsed by hand rather than with `URL`, which needs a base and would mean
+ * naming a host in an artefact that must never depend on one.
+ */
+function shareableBase(href: string): { path: string; kept: string[] } {
   const text = String(href ?? '');
   const path = text.split(/[?#]/)[0];
   const query = text.includes('?') ? text.slice(text.indexOf('?') + 1).split('#')[0] : '';
 
-  // Parsed by hand rather than with URL, which needs a base and would mean
-  // naming a host in an artefact that must never depend on one.
   const kept: string[] = [];
   for (const pair of query.split('&')) {
     if (!pair) continue;
-    const name = pair.split('=')[0];
-    if (name === 'game' || name === 'rules' || name === 'walletBridgeToken') continue;
+    if (NEVER_SHARED.includes(pair.split('=')[0])) continue;
     kept.push(pair);
   }
-  kept.push(`game=${game}`, `rules=${encode(JSON.stringify(rules))}`);
+  return { path, kept };
+}
 
-  return path ? `${path}?${kept.join('&')}` : `?${kept.join('&')}`;
+const joined = (path: string, kept: readonly string[]): string =>
+  path ? `${path}?${kept.join('&')}` : `?${kept.join('&')}`;
+
+export function linkForGame(href: string, game: number, rules: Rules): string {
+  const { path, kept } = shareableBase(href);
+  kept.push(`game=${game}`, `rules=${encode(JSON.stringify(rules))}`);
+  return joined(path, kept);
+}
+
+/**
+ * A link to one tournament.
+ *
+ * THE ID IS THE WHOLE LINK, unlike a game's. A game link has to carry its rules
+ * because a rules hash cannot be reversed and the opponent's board would have
+ * nothing to referee with. A manifest names its own pairings and the board
+ * checks every one against the chain before showing them, so there is nothing
+ * to carry and nothing a link could get wrong.
+ */
+export function linkForTournament(href: string, tournament: number): string {
+  const { path, kept } = shareableBase(href);
+  kept.push(`tournament=${tournament}`);
+  return joined(path, kept);
 }
 
 function verify(candidate: Partial<Rules>, committed: string): Rules | null {
