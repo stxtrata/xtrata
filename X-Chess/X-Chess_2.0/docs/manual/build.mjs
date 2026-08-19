@@ -186,7 +186,7 @@ const html = [
   '<body>',
   '<header class="top"><div class="wrap">',
   `<h1>The <b>X Chess</b> manual</h1>`,
-  '<p class="lede">Chess on Bitcoin, via Stacks. Every move is a transaction, every ' +
+  '<p class="lede">Chess on Stacks, anchored to Bitcoin. Every move is a transaction, every ' +
     'position is replayed from the chain, and this page is itself an inscription.</p>',
   '<div class="chips">',
   '<a class="chip" href="#running-your-own-tournament">Run a tournament</a>',
