@@ -313,6 +313,28 @@ export function rulesFor(
   });
 }
 
+/**
+ * Whether one manifest can be a revision of another at all.
+ *
+ * A REVISION CORRECTS A TOURNAMENT, so it has to be about that tournament.
+ * Sharing no games with the thing it declares is not a correction, it is a
+ * different document pointing at the wrong parent, and believing the edge
+ * anyway lets it inherit an identity that was never its own.
+ *
+ * That is not hypothetical. Inscription 3015 is Exhibition Three's manifest
+ * with a dependency on Exhibition Two, added in the belief that the link meant
+ * "follows". It shares none of Exhibition Two's nine games and describes
+ * ninety of its own, and a chooser that trusted the edge showed it in
+ * Exhibition Two's place, as the newer and therefore better manifest.
+ *
+ * One shared game is enough. A revision may add, drop or repair games, so
+ * demanding an exact match would refuse the corrections this is for.
+ */
+export function revisesSameTournament(child: Tournament, parent: Tournament): boolean {
+  const theirs = new Set(parent.games.map((game) => game.id));
+  return child.games.some((game) => theirs.has(game.id));
+}
+
 /** The address a manifest claims played a colour, or null. */
 export function addressOf(tournament: Tournament, name: string): string | null {
   return tournament.entrants.find((e) => e.name === name)?.address ?? null;

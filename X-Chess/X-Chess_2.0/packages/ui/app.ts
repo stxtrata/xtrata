@@ -14,7 +14,12 @@ import { XtrataReader } from '../chain/xtrata.js';
 import { ManifestDirectory } from '../chain/directory.js';
 import type { Found } from '../chain/directory.js';
 import { loadTournament, resultLabel, scoreTournament, verdictLabel } from './tournaments.js';
-import { parseTournament, stageOf } from '../protocol/tournament.js';
+import {
+  MAX_REVISIONS, parseTournament, revisesSameTournament, stageOf
+} from '../protocol/tournament.js';
+
+/** Marks a manifest whose declared parent is not a tournament it belongs to. */
+const BROKEN_PARENT = -1;
 import { checkpointNote, parseCheckpoint, usable } from '../protocol/checkpoint.js';
 import type { Checkpoint } from '../protocol/checkpoint.js';
 import type { CheckedGame } from '../protocol/tournament.js';
@@ -2816,68 +2821,106 @@ export class ChessApp {
    * One chip per tournament, showing the newest correction of it.
    *
    * THIS IS HOW A MISTAKE GETS FIXED. A manifest is permanent, so the only
-   * remedy for a wrong one is to inscribe a better one that declares it, from
-   * the same wallet. `resolveTournament` already walks that chain and already
-   * refuses a link whose creator differs, calling it a fork rather than a
-   * correction. What was missing is that nothing ever walked FORWARD: asking
-   * for a root returned the root's own bytes, so a correction could be made
-   * and would never be seen.
+   * remedy for a wrong one is a better one that declares it, inscribed by the
+   * same wallet. `resolveTournament` already walks that chain. What nothing did
+   * was walk FORWARD: asking for a root returned the root's own bytes, so a
+   * correction could be made and never seen.
    *
-   * The directory lists every manifest the organiser holds, which is exactly
-   * the set a revision can be found in, so forward is a grouping rather than a
-   * search. Newest id wins within a lineage.
+   * TWO GATES, AND THE SECOND IS NOT HERE.
    *
-   * WHAT MAKES IT SAFE, and none of it is new:
-   *   - same creator, or it is a fork and `resolveTournament` says so;
-   *   - a revision only counts if it landed strictly BEFORE the first move,
-   *     which `revisedInTime` decides and the board shows;
-   *   - lineage depth is capped at MAX_REVISIONS.
+   * Creator is checked here, because the directory has already paid for it:
+   * `official` is `mintedHere`, so a manifest that merely ARRIVED in this
+   * wallet cannot supersede one that was made in it. Without that, transferring
+   * an inscription to the organiser would be enough to rewrite their
+   * tournament, which is the fork problem coming through a different door.
    *
-   * So an organiser can fix a typo, and cannot quietly rewrite a tournament
-   * that has started or adopt somebody else's.
+   * The WINDOW is not checked here and must not be: whether a revision landed
+   * before the first move needs the first move, and finding that means reading
+   * every game of every tournament in the list. So this offers the newest
+   * official revision as the chip's target, and `loadTournament` applies
+   * `revisedInTime` once the heights are in hand and says plainly when a
+   * revision arrived too late to count. The cheap check is here, the expensive
+   * one is where the data already is, and neither is skipped.
    *
-   * The alternative, hiding revisions, was the first version of this and it is
-   * worse: it makes a correction invisible instead of authoritative, which is
-   * the opposite of the point.
+   * An earlier version hid revisions instead. That is worse: it makes a
+   * correction invisible rather than authoritative, which is the opposite of
+   * the point.
    */
-  private async collapseRevisions<T extends { id: number }>(found: T[]): Promise<T[]> {
+  private lineageCache: Map<number, number | null> | null = null;
+
+  private async collapseRevisions<T extends { id: number; official: boolean; manifest: Tournament }>(
+    found: T[]
+  ): Promise<T[]> {
     if (!this.xtrata) return found;
 
-    /** Which manifest each one revises, when it revises one at all. */
-    const parentOf = new Map<number, number>();
+    // CACHED ACROSS TAB OPENS. Every entry costs a dependency read and a text
+    // read per dependency, and this runs whenever the list is loaded. The
+    // parent of an inscription cannot change - dependencies are fixed at mint -
+    // so the answer is permanent and re-reading it is pure waste. The tab was
+    // already slow enough on revisits to earn a cache for game facts; that one
+    // keys on games and knows nothing about lineage.
+    const parentOf = (this.lineageCache ??= new Map());
     const known = new Set(found.map((entry) => entry.id));
+
     for (const entry of found) {
+      if (parentOf.has(entry.id)) continue;
+      let parent: number | null = null;
       try {
         for (const dep of await this.xtrata.dependencies(entry.id)) {
           const text = await this.xtrata.text(dep);
-          if (text !== null && parseTournament(text).ok) { parentOf.set(entry.id, dep); break; }
+          if (text === null) continue;
+          const declared = parseTournament(text);
+          if (!declared.ok || !declared.tournament) continue;
+          // THE EDGE IS A CLAIM, NOT A FACT. A manifest that shares no games
+          // with the one it declares is not revising it, and believing the
+          // edge would let it inherit an identity that was never its own -
+          // showing up in the older tournament's place because it is newer.
+          // See revisesSameTournament, and 3015, which is why it exists.
+          if (!revisesSameTournament(entry.manifest, declared.tournament)) {
+            parent = BROKEN_PARENT;
+            break;
+          }
+          parent = dep;
+          break;
         }
       } catch {
-        // A read that failed says nothing about the manifest. Leaving it as a
-        // root shows it, and a tournament too many beats one missing.
+        // A read that failed says nothing about the manifest, and must not be
+        // remembered as "no parent". Left unrecorded so the next load asks
+        // again, and treated as a root for now: a tournament too many in the
+        // chooser beats one missing from it.
+        continue;
       }
+      parentOf.set(entry.id, parent);
     }
 
     const rootOf = (id: number): number => {
       let at = id;
-      for (let step = 0; step < 20; step++) {
+      // The same cap resolveTournament walks under. A cycle cannot happen -
+      // an inscription can only depend on an earlier one - but a bound that
+      // matches the protocol's is cheaper than an argument that it cannot.
+      for (let step = 0; step < MAX_REVISIONS; step++) {
         const parent = parentOf.get(at);
-        if (parent === undefined) return at;
+        if (parent === undefined || parent === null) return at;
         at = parent;
       }
       return at;
     };
 
-    // Newest member of each lineage, which is the correction if there is one.
     const newest = new Map<number, T>();
     for (const entry of found) {
+      // A manifest pointing at a parent it has nothing to do with is
+      // internally inconsistent. Kept off the chooser rather than shown as a
+      // peer or as its parent's replacement, and still openable by number,
+      // because it is a real document and a reader who asks for it has asked.
+      if (parentOf.get(entry.id) === BROKEN_PARENT) continue;
       const root = rootOf(entry.id);
-      // A lineage whose root this wallet does not hold is somebody else's, and
-      // collapsing into it would hide this manifest behind a chip that is not
-      // shown. Left alone.
+      // A lineage whose root this wallet does not hold is somebody else's;
+      // collapsing into it would hide this manifest behind a chip nobody sees.
       if (!known.has(root)) { newest.set(entry.id, entry); continue; }
       const standing = newest.get(root);
-      if (!standing || entry.id > standing.id) newest.set(root, entry);
+      if (!standing) { newest.set(root, entry); continue; }
+      // A revision only outranks what it revises if this wallet MADE it.
+      if (entry.id > standing.id && entry.official) newest.set(root, entry);
     }
     return [...newest.values()].sort((a, b) => b.id - a.id);
   }

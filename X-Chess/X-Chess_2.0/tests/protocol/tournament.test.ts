@@ -25,11 +25,13 @@ import {
   provenanceNote,
   resolveTournament,
   revisedInTime,
+  revisesSameTournament,
   rounds,
   standings,
   verifiedResults
 } from '../../packages/protocol/tournament.js';
 import { rulesHash } from '../../packages/protocol/canonical.js';
+import type { Tournament } from '../../packages/protocol/tournament.js';
 import { DEFAULT_RULES, normaliseRules } from '../../packages/protocol/rules.js';
 import { COMPILED_ACCEPTED_BEFORE } from '../../packages/ui/app.js';
 
@@ -729,5 +731,40 @@ describe('correcting a mistake by reissuing from the same wallet', () => {
     for (let id = 2; id <= MAX_REVISIONS + 5; id++) deps[id] = [id - 1];
     const resolved = await resolveTournament(MAX_REVISIONS + 5, chain(deps, {}));
     expect(resolved.lineage.length).toBeLessThanOrEqual(MAX_REVISIONS + 1);
+  });
+});
+
+describe('a manifest pointing at a parent it has nothing to do with', () => {
+  // 3015 IS THE REASON. It is Exhibition Three's manifest carrying a dependency
+  // on Exhibition Two, added in the belief that the link meant "follows". It
+  // shares none of Exhibition Two's nine games and describes ninety of its own.
+  //
+  // A chooser that trusted the edge treated it as a revision of Exhibition Two
+  // and, being newer and made by the same wallet, showed it IN EXHIBITION TWO'S
+  // PLACE. Hiding the duplicate had looked like the whole job; it was not.
+  const withGames = (ids: number[]): Tournament => ({
+    name: 'T', format: 'f', contract: 'SP1.core',
+    entrants: [{ name: 'A', address: 'SP1' }, { name: 'B', address: 'SP2' }],
+    games: ids.map((id) => ({ id, white: 'A', black: 'B', round: 1 }))
+  });
+
+  it('is not a revision of it', () => {
+    const exhibitionTwo = withGames([34, 35, 36]);
+    const three = withGames([44, 45, 46]);
+    expect(revisesSameTournament(three, exhibitionTwo)).toBe(false);
+  });
+
+  it('accepts a real correction, which shares the games it corrects', () => {
+    const original = withGames([44, 45, 46]);
+    const corrected = withGames([44, 45, 46]);
+    expect(revisesSameTournament(corrected, original)).toBe(true);
+  });
+
+  it('allows a correction to add or drop a game', () => {
+    // A revision that had to match exactly would refuse the corrections this
+    // mechanism exists for: a wrong game id is the likeliest thing to fix.
+    const original = withGames([44, 45, 46]);
+    expect(revisesSameTournament(withGames([44, 45, 46, 47]), original), 'added').toBe(true);
+    expect(revisesSameTournament(withGames([44]), original), 'dropped two').toBe(true);
   });
 });

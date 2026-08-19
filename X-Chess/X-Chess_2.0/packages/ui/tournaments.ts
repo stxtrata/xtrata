@@ -19,7 +19,7 @@
 import { replay } from '../replay/replay.js';
 import { rememberedGame, rememberGame, rulesKeyOf } from '../chain/game-facts.js';
 import {
-  checkGames, honours, provenance, provenanceNote, resolveTournament, rounds, rulesFor,
+  checkGames, honours, provenance, provenanceNote, resolveTournament, revisedInTime, rounds, rulesFor,
   standings, verifiedResults
 } from '../protocol/tournament.js';
 import type { CheckedGame, GameFacts, Provenance, Tournament } from '../protocol/tournament.js';
@@ -57,6 +57,20 @@ export interface TournamentView {
   rounds: Array<{ number: number; games: TournamentRow[] }>;
   /** True once results have been replayed. Until then the table is empty. */
   scored: boolean;
+  /**
+   * Set only when a revision is being viewed rather than a root.
+   *
+   * `inTime` is the revision rule's verdict: true is a correction, false is a
+   * manifest that arrived after play began and does NOT supersede, and null
+   * means the heights were not readable, which is "not checked" and never
+   * "fine".
+   */
+  revision: {
+    id: number;
+    root: number;
+    inTime: boolean | null;
+    says: string;
+  } | null;
 }
 
 const short = (address: string): string =>
@@ -71,7 +85,8 @@ const short = (address: string): string =>
 export async function loadTournament(id: number, deps: TournamentDeps): Promise<TournamentView> {
   const empty: TournamentView = {
     ok: false, problems: [], tournamentId: null, lineage: [], tournament: null,
-    provenance: null, says: '', honoured: true, table: [], rounds: [], scored: false
+    provenance: null, says: '', honoured: true, table: [], rounds: [], scored: false,
+    revision: null
   };
 
   const resolved = await resolveTournament(id, deps.reader);
@@ -227,8 +242,38 @@ export async function scoreTournament(
   );
   const verdict = honours(kind, firstMove, deps.compiledAcceptedBefore, noMovesYet);
 
+  // A REVISION THAT ARRIVED TOO LATE IS NOT A CORRECTION.
+  //
+  // `revisedInTime` was written with the rest of the revision rule and then
+  // never called by anything, which meant a manifest could be reissued halfway
+  // through a tournament and would simply be believed. That is the exact
+  // rewriting-history problem the rule exists to stop, and it survived because
+  // the rule was implemented as a function rather than as a step.
+  //
+  // Only asked when a lineage is being viewed: a root has nothing to be late
+  // for. `revisedInTime` returns null when either height is unknown, which
+  // means NOT CHECKED and never "fine", so it is reported that way.
+  let revision: TournamentView['revision'] = null;
+  if (view.lineage.length > 1) {
+    const viewing = view.lineage[view.lineage.length - 1];
+    const inTime = revisedInTime(await deps.reader.mintedAt(viewing), firstMove);
+    revision = {
+      id: viewing,
+      root: view.lineage[0],
+      inTime,
+      says:
+        inTime === true
+          ? `Revision ${viewing}, inscribed before the first move. This is the corrected manifest.`
+          : inTime === false
+            ? `Revision ${viewing} was inscribed AFTER play began, so it does not supersede ` +
+              `${view.lineage[0]}. Shown because you asked for it, and not counted as the tournament.`
+            : `Revision ${viewing}. Whether it arrived before the first move could not be checked.`
+    };
+  }
+
   return {
     ...view,
+    revision,
     provenance: kind,
     says: verdict.says,
     honoured: verdict.ok,
