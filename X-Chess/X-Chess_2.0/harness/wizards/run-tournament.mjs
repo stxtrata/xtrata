@@ -37,7 +37,9 @@ import {
   looksLikeMainnetAddress,
   scrub
 } from './wizards-core.mjs';
-import { PERSONALITIES, personalityNamed } from './personalities.mjs';
+import { PERSONALITIES, personalityNamed, DEFAULT_MODEL } from './personalities.mjs';
+import { inscribedText, inscribedEntryValidator } from './from-chain.mjs';
+import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
 import { anthropicAsker, chooseMove, claudeCodeAsker, depthFor, rankedNotes } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
 import { readLedger, summarise } from './fee-log.mjs';
@@ -131,6 +133,22 @@ const VIA_CLAUDE_CODE = process.argv.includes('--via-claude-code');
  */
 const MANIFEST = arg('manifest');
 
+/**
+ * Play the characters in the repo rather than the ones on chain.
+ *
+ * THE DEFAULT IS CHAIN, and this is the escape hatch rather than the setting.
+ * A tournament whose prompts come from a file on one machine cannot be
+ * reproduced by anybody: the engine is fetched from an inscription, the
+ * manifest from another, every move is on chain and the contract referees —
+ * and then "these ten characters played" rests on something nobody else can
+ * see. That was the last unreproducible part and this closes it.
+ *
+ * Kept because lab work needs it. A character being TRIED is a file that has
+ * not been inscribed yet and should not be, and `lab.mjs` has no manifest at
+ * all. What it must never be is a silent fallback: see fieldFromManifest.
+ */
+const LOCAL_CHARACTERS = process.argv.includes('--local-characters');
+
 
 /**
  * Play from local source instead of the inscription.
@@ -193,6 +211,84 @@ function readField(vars = env(), borrow = {}) {
 }
 
 const byId = (agents) => Object.fromEntries(agents.map((a) => [a.id, a]));
+
+/**
+ * The field, read from chain: the manifest names the sheets, the sheets are the
+ * characters.
+ *
+ * WHAT THIS CLOSES. Everything else about a tournament here is already
+ * reproducible by a stranger — the engine is fetched and hash-pinned from an
+ * inscription, the pairings from a manifest committed before play, every move
+ * is on chain and the contract referees them. The prompts were the exception,
+ * read from `personalities.mjs` on one machine, so the sentence "these ten
+ * characters played" rested on a file nobody else could see. Now it rests on
+ * inscriptions anybody can fetch.
+ *
+ * PARSED AND RENDERED BY 2994, not by the copy in this repo. Both halves,
+ * deliberately: a runner that parsed from chain and rendered locally would have
+ * moved the drift rather than removed it, since `entryToPrompt` is what decides
+ * what the model is actually told.
+ *
+ * IDENTITY IS THE ADDRESS. `roundsFromManifest` learned this the hard way and
+ * the reasoning is unchanged — a manifest calls somebody "Mason" and this fleet
+ * keys wallets by "mason", and a name lookup dies mid-round. The local file is
+ * still consulted here, but ONLY to find which wallet signs for an address. It
+ * no longer supplies a word of what any character says.
+ *
+ * IT REFUSES RATHER THAN FALLING BACK. A chain read that failed quietly into
+ * the local file would play six of these ten characters differently while
+ * printing that it had read from chain. The difference is smaller than it
+ * sounds and larger than it was described as: the six were written prompt-first
+ * and hard-wrapped, and the entry format joins continuation lines, so their
+ * sheets carry the same WORDS with six to eight newlines collapsed to none. Net
+ * one character, which is how it got recorded, but it is the shape of the text
+ * rather than a typo. A run that stops is a bad afternoon; a run that lies is a
+ * bad record.
+ */
+async function fieldFromManifest(tournament, vars = env(), borrow = {}) {
+  const { module } = await inscribedEntryValidator(ENTRY_INSCRIPTION.validator);
+
+  // Wallets only. Nothing below reads a prompt, a style or a name from it.
+  const wallets = new Map(
+    readField(vars, borrow)
+      .agents.filter((a) => a.address)
+      .map((a) => [a.address.toUpperCase(), a])
+  );
+
+  const agents = [];
+  for (const entrant of tournament.entrants) {
+    if (!entrant.entry) {
+      throw new WizardSafetyError(
+        `${entrant.name} has no entry inscription in this manifest, so there is nothing to ` +
+          'read. Older manifests were written before entries existed; run them with ' +
+          '--local-characters, which says out loud that the prompts came from this disk.'
+      );
+    }
+    const parsed = module.parseEntry(await inscribedText(entrant.entry));
+    if (!parsed.ok) {
+      throw new WizardSafetyError(
+        `inscription ${entrant.entry} (${entrant.name}) does not parse under the validator at ` +
+          `${ENTRY_INSCRIPTION.validator}: ${parsed.problems.map((x) => `${x.where} ${x.says}`).join('; ')}`
+      );
+    }
+    const wallet = wallets.get(String(entrant.address).toUpperCase()) ?? null;
+    agents.push({
+      id: wallet?.id ?? entrant.name.toLowerCase(),
+      name: entrant.name,
+      style: parsed.entry.style,
+      prompt: module.entryToPrompt(parsed.entry),
+      model: MODEL_OVERRIDE ?? DEFAULT_MODEL,
+      entryId: entrant.entry,
+      key: wallet?.key ?? null,
+      address: entrant.address,
+      borrowedFrom: wallet?.borrowedFrom ?? null,
+      // An entrant with no wallet here is still listed, so a dry run shows the
+      // whole field to somebody who has not generated a fleet — same as readField.
+      ready: Boolean(wallet?.key && entrant.address)
+    });
+  }
+  return { agents, ready: agents.every((a) => a.ready), fromChain: true };
+}
 
 /**
  * The manifest, read through the same code the board uses.
@@ -798,8 +894,6 @@ async function fees() {
 
 async function main() {
   const command = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'play';
-  const field = readField();
-  const ids = field.agents.map((a) => a.id);
 
   console.log(`\nX Chess tournament — ${LIVE ? 'LIVE' : 'dry run, nothing is sent'}`);
   console.log(`contract  ${ALLOWED_CONTRACT}`);
@@ -815,10 +909,23 @@ async function main() {
   // is how every tournament so far was run and is why they can only ever be
   // described afterwards.
   let manifest = null;
-  let plan;
+  let loaded = null;
   if (MANIFEST) {
-    const loaded = await loadManifest(MANIFEST);
+    loaded = await loadManifest(MANIFEST);
     manifest = loaded.tournament;
+  }
+
+  // WHERE THE CHARACTERS COME FROM, decided once and announced below.
+  //
+  // The manifest names an entry inscription per seat, so with one in hand there
+  // is no reason to read a prompt off this disk. Without one there is nothing to
+  // read from, which is every dry run and every `lab` session.
+  const field =
+    manifest && !LOCAL_CHARACTERS ? await fieldFromManifest(manifest) : readField();
+  const ids = field.agents.map((a) => a.id);
+
+  let plan;
+  if (manifest) {
     const rounds = roundsFromManifest(manifest, byId(field.agents));
     // The same shape planTournament returns, so the header and the play loop
     // below cannot tell the two apart — which is the point. Nothing about
@@ -867,10 +974,29 @@ async function main() {
 
   console.log(`format    ${plan.format}`);
   console.log(`field     ${ids.join(', ')}`);
+
+  // SAY WHERE THE CHARACTERS CAME FROM, in the same breath as the engine and
+  // the model. A field assembled from chain and a field assembled from this
+  // disk are indistinguishable in the output otherwise, and one of them is
+  // reproducible by a stranger while the other is a claim about a file.
+  if (field.fromChain) {
+    console.log(`entries   read from chain, parsed by ${ENTRY_INSCRIPTION.validator}`);
+    for (const a of field.agents) {
+      console.log(`          ${a.name.padEnd(10)} ${a.entryId}`);
+    }
+  } else {
+    console.log('entries   LOCAL — prompts came from personalities.mjs, not from chain');
+    if (MANIFEST) {
+      console.log('          --local-characters is set, so this run is not reproducible');
+      console.log('          from the record alone. Six of the ten are hard-wrapped here');
+      console.log('          and unwrapped on chain: same words, no line breaks.');
+    }
+  }
+
   console.log(`open fee  ${ustx(openFee)}`);
   console.log(
-    `model     ${MODEL_OVERRIDE ?? PERSONALITIES[0].model}${
-      MODEL_OVERRIDE ? '   (OVERRIDDEN — entries name ' + PERSONALITIES[0].model + ')' : ''
+    `model     ${field.agents[0]?.model ?? DEFAULT_MODEL}${
+      MODEL_OVERRIDE ? '   (OVERRIDDEN — entries name ' + DEFAULT_MODEL + ')' : ''
     }`
   );
   console.log(

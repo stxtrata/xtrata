@@ -28,6 +28,18 @@ const sheet = (id: string): string => readFileSync(join(ENTRIES, `${id}.txt`), '
 /** Written sheet-first. What is inscribed is what plays, exactly. */
 const SHEET_FIRST = ['fathom', 'cadence', 'bulwark', 'canon'];
 
+/** Written prompt-first and transcribed. Their sheets are on chain at 2995-3000. */
+const TRANSCRIBED = PERSONALITIES.map((p) => p.id).filter((id) => !SHEET_FIRST.includes(id));
+
+/**
+ * Hard-wrapped source as the entry format renders it.
+ *
+ * This is the whole of the drift, and asserting it is the point: the runner now
+ * plays what the SHEET says, so anything this does not explain is a word that
+ * changed between the player and the record.
+ */
+const unwrap = (text: string): string => text.replace(/\s*\n\s*/g, ' ').trim();
+
 describe('every character has a sheet that validates', () => {
   for (const character of PERSONALITIES) {
     it(`${character.id} parses, within the entry budget`, () => {
@@ -49,6 +61,39 @@ describe('the sheet-first characters play exactly what is inscribed', () => {
       expect(played).toBe(rendered);
     });
   }
+});
+
+describe('the transcribed six differ from their sheets, and only in wrapping', () => {
+  // NOT a formality now that it decides play. The runner reads prompts from
+  // chain, so from Exhibition Three round 3 these six are played as their
+  // sheets render — and that is a real change to what the model is handed, made
+  // at a round boundary on purpose.
+  //
+  // What must hold is that it is a change of SHAPE and not of WORDS. The local
+  // prompts are hard-wrapped prose; the sheets carry the same text with the
+  // wrapping collapsed, six to eight newlines becoming none. If `unwrap` ever
+  // stops explaining the whole difference, somebody has edited one side.
+  for (const id of TRANSCRIBED) {
+    it(`${id} says the same words with none of the line breaks`, () => {
+      const rendered = entryToPrompt(parseEntry(sheet(id)).entry!);
+      const played = PERSONALITIES.find((p) => p.id === id)!.prompt;
+
+      // It IS a difference. Recorded rather than smoothed over, because a test
+      // that only checked `unwrap` would pass just as happily if they matched.
+      expect(played).not.toBe(rendered);
+      expect(unwrap(played)).toBe(rendered);
+      expect(rendered).not.toContain('\n');
+    });
+  }
+
+  it('leaves the sheet-first four alone, wrapping and all', () => {
+    // The counter-case. These keep their line structure in both, which is what
+    // makes the six above a transcription artefact rather than the format.
+    for (const id of SHEET_FIRST) {
+      const rendered = entryToPrompt(parseEntry(sheet(id)).entry!);
+      expect(rendered).toContain('\n');
+    }
+  });
 });
 
 describe('the field itself', () => {

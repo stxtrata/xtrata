@@ -151,29 +151,29 @@ marked done only when its effect has been READ BACK OFF CHAIN.
 
 ## Open
 
-- **The character prompts are read from a local file.** This is the last thing
-  that makes Exhibition Three unreproducible by a stranger: the engine is
-  fetched from 2991, the manifest from 3016, every move is on chain and the
-  contract referees — but "these ten characters played" rests on
-  `personalities.mjs` on one machine. The runner should build its field from the
-  manifest's `entrants[].entry` ids, parsed with the validator at 2994 rather
-  than the local copy.
+- **Characters are read from chain.** Closed 2026-08-19, at the round 2/3
+  boundary of Exhibition Three. `run-tournament.mjs` builds its field from the
+  manifest's `entrants[].entry` ids, fetching each sheet from the Xtrata core
+  and both parsing AND rendering it with the validator at 2994 — not the copy in
+  this repo, because a runner that parsed from chain and rendered locally would
+  have moved the drift rather than removed it. The header prints each
+  character's inscription id beside the engine's. `--local-characters` is the
+  escape hatch for lab work and says out loud that the run is unreproducible; a
+  failed chain read refuses rather than falling back.
 
-  **Not mid-tournament.** Six of the ten prompts differ from their inscribed
-  sheets by exactly one character, where the entry format joins a paragraph
-  break into a space — verified locally, not assumed:
+  What changed for the six transcribed characters, measured rather than
+  repeated: they were written prompt-first and hard-wrapped, and the entry
+  format joins continuation lines with a space unconditionally, so their sheets
+  carry the same WORDS with six to eight newlines collapsed to none. Net one
+  character. `tests/wizards/entries.test.ts` now asserts that unwrapping
+  explains the whole difference, so a word changing on either side fails.
 
-  ```
-  gambit  388/387   ledger 448/447   mason   480/479
-  wager   460/459   plumb  424/423   oblique 452/451
-  fathom, cadence, bulwark, canon: byte-identical
-  ```
-
-  The four that match were written sheet-first. Switching the source now would
-  change six of ten players between rounds of a running event. Land it behind a
-  flag Exhibition Three does not set, or land it for Exhibition Four, and extend
-  `tests/wizards/entries.test.ts` to prove the other six rather than assuming
-  the difference stays cosmetic.
+  **The sheets cannot be re-inscribed to fix this.** The format has no way to
+  keep a line break inside a field — `parseEntry` joins any indented line with a
+  space and a blank line ends the field — so no sheet can render the original
+  wrapping. And manifest 3016 permanently names 2995–3000, with the revision
+  window shut two rounds ago. Exhibition Four should be written sheet-first, as
+  the four newest already were.
 
 - **The signed wallet matrix.** Nothing has been signed by a real extension and
   there is still no way to RUN the fourteen rows.

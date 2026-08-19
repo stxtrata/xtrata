@@ -45,6 +45,7 @@ import {
 
 import { WizardSafetyError } from './wizards-core.mjs';
 import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
+import { inscribedEntryValidator } from './from-chain.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -196,46 +197,6 @@ async function readFeeUnit() {
   return inner.value;
 }
 
-/**
- * The entry validator, fetched and executed from chain.
- *
- * NOT THE LOCAL COPY, deliberately, and the distinction is the whole point. A
- * sheet is read by whoever fetches 2994, so that is what must accept it. A
- * repo that had drifted ahead of the chain would happily approve a sheet no
- * reader could parse, and the sheet would be permanent before anybody noticed.
- */
-async function fetchInscribedEntryValidator() {
-  const id = ENTRY_INSCRIPTION.validator;
-  const read = async (fn, args) => {
-    const response = await fetch(
-      `https://api.hiro.so/v2/contracts/call-read/${XTRATA_ADDRESS}/${XTRATA_NAME}/${fn}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sender: XTRATA_ADDRESS, arguments: args })
-      }
-    );
-    const body = await response.json();
-    if (!body.okay) throw new WizardSafetyError(`${fn} on ${id} failed: ${JSON.stringify(body).slice(0, 200)}`);
-    return Cl.deserialize(String(body.result));
-  };
-
-  const counted = await read('get-inscription-chunks', [Cl.serialize(Cl.uint(id))]);
-  const chunks = Number(counted?.value?.value ?? counted?.value ?? 1);
-  const parts = [];
-  for (let index = 0; index < chunks; index++) {
-    const piece = await read('get-chunk', [Cl.serialize(Cl.uint(id)), Cl.serialize(Cl.uint(index))]);
-    const raw = piece?.value?.value ?? piece?.value;
-    parts.push(Buffer.from(String(raw).replace(/^0x/, ''), 'hex'));
-  }
-  const bytes = Buffer.concat(parts);
-  const module = await import(`data:text/javascript;base64,${bytes.toString('base64')}`);
-  if (typeof module.parseEntry !== 'function') {
-    throw new WizardSafetyError(`inscription ${id} has no parseEntry, so it is not the entry validator.`);
-  }
-  return { module, bytes };
-}
-
 async function main() {
   const file = arg('file');
   if (!file) throw new WizardSafetyError('--file is required: the manifest to inscribe');
@@ -339,7 +300,7 @@ async function main() {
   // board can display and no tournament can cite, bought permanently.
   if (kind === 'character sheet') {
     console.log(`\nparsing this sheet with the validator at ${ENTRY_INSCRIPTION.validator}...\n`);
-    const { module } = await fetchInscribedEntryValidator();
+    const { module } = await inscribedEntryValidator(ENTRY_INSCRIPTION.validator);
     const parsed = module.parseEntry(text);
     if (!parsed.ok) {
       throw new WizardSafetyError(
