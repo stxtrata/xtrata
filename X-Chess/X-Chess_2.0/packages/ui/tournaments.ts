@@ -35,6 +35,20 @@ export interface TournamentDeps {
   bnsFor?: (address: string) => string | null | undefined;
   /** Paced so a cold load does not spend the whole rate-limit budget at once. */
   pace?: () => Promise<void>;
+  /**
+   * The manifest, the moment it parses and before a single game is read.
+   *
+   * WHAT A READER CAN HAVE IMMEDIATELY. Everything a manifest declares — who is
+   * in it, how many rounds, which engine, what the format is — is in one
+   * document and costs one read. Everything else is twenty row reads and then a
+   * replay of every game, which for ninety games is minutes.
+   *
+   * Holding the first back until the second finished meant a reader clicked a
+   * tournament and got an empty tab, with nothing to say whether it was
+   * working, slow, or broken. This exists so the tab can be full of true things
+   * while the expensive part runs.
+   */
+  onManifest?: (tournament: Tournament, rootId: number, lineage: number[]) => void;
 }
 
 export interface TournamentRow extends CheckedGame {
@@ -94,6 +108,8 @@ export async function loadTournament(id: number, deps: TournamentDeps): Promise<
     return { ...empty, problems: resolved.problems.map((p) => `${p.where}: ${p.says}`) };
   }
   const tournament = resolved.tournament;
+  // Before the row reads below, which is the whole point of the callback.
+  deps.onManifest?.(tournament, resolved.tournamentId ?? id, resolved.lineage);
 
   const facts = new Map<number, GameFacts>();
   for (const game of tournament.games) {

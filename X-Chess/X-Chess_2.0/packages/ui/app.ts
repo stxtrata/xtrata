@@ -57,7 +57,7 @@ import {
 import { checkEligibility, describeIneligibility } from '../ratings/eligibility.js';
 import { judge, judgeEvent, judgeMove } from './eligibility.js';
 import type { Ctx, Verdict } from './eligibility.js';
-import { computeRatings, leaderboard } from '../ratings/elo-v1.js';
+import { computeRatings, leaderboard, PROVISIONAL_GAMES } from '../ratings/elo-v1.js';
 import type { RatedGame } from '../ratings/elo-v1.js';
 import { describeContractError } from '../chain/client.js';
 import { describeOutcome, realTxid, watchTx } from '../chain/tx-status.js';
@@ -3497,7 +3497,21 @@ export class ChessApp {
       chain: this.chain,
       reader: this.xtrata!,
       compiledAcceptedBefore: COMPILED_ACCEPTED_BEFORE,
-      bnsFor: (address: string) => this.names?.peek(address) ?? null
+      bnsFor: (address: string) => this.names?.peek(address) ?? null,
+      // DRAWN THE MOMENT THE MANIFEST PARSES, before a single game is read.
+      // Everything a manifest declares costs one read; everything else is a row
+      // per game and then a replay of each, which for ninety games is minutes.
+      // Holding the first back until the second finished gave a reader a
+      // heading over an empty table and no way to tell working from broken.
+      onManifest: (tournament: Tournament, rootId: number, lineage: number[]) => {
+        if (this.tournamentLoading !== null && this.tournamentLoading !== rootId) return;
+        this.tournament = {
+          ok: true, problems: [], tournamentId: rootId, lineage, tournament,
+          provenance: null, says: '', honoured: true, table: [], rounds: [],
+          scored: false, revision: null
+        };
+        this.drawTournament();
+      }
     };
 
     await this.guard(`reading tournament ${id}`, async () => {
@@ -3892,13 +3906,23 @@ export class ChessApp {
     }
 
     const t = view.tournament!;
+    // EVERYTHING THE MANIFEST ALREADY SAYS, written the same way whether the
+    // expensive pass has run or not. One writer, so a reader watching the tab
+    // fill in never sees the summary change its mind about what it is looking
+    // at — only the parts derived from the chain arriving underneath it.
+    const rounds = t.games.reduce((most, g) => Math.max(most, g.round ?? 0), 0);
+    const laddered = t.entrants.filter((e) => (e.depth ?? 0) > 0).length;
     this.notice(
       'tournamentNote',
       'info',
-      `${t.name} — ${t.format}, ${t.entrants.length} entrants, ${t.games.length} games. ` +
-        `Manifest ${view.tournamentId}` +
+      `${t.name} — ${t.format}. ${t.entrants.length} entrants, ${t.games.length} games` +
+        (rounds > 0 ? `, ${rounds} rounds` : '') +
+        `. Manifest ${view.tournamentId}` +
         (view.lineage.length > 1 ? `, revised ${view.lineage.length - 1} time(s)` : '') +
-        (t.engine ? `, engine inscription ${t.engine}.` : '.')
+        (t.engine ? `, engine ${t.engine}` : '') +
+        (t.cooldown ? `, cooldown ${t.cooldown}` : '') +
+        (laddered ? `. ${laddered} of ${t.entrants.length} seats search deeper` : '') +
+        '.'
     );
 
     this.drawTournamentField(t);
@@ -3929,6 +3953,24 @@ export class ChessApp {
     link(view.tournamentId!, `manifest ${view.tournamentId}`);
     if (t.engine) link(t.engine, `engine ${t.engine}`);
     note.appendChild(read);
+
+    // WHAT IS STILL COMING, and why the table below is empty.
+    //
+    // A manifest is one read; scoring it is a row read per game and then a
+    // replay of every one of them, which for ninety games is minutes. Until
+    // this existed a reader clicked a tournament and got a heading over an
+    // empty table, with nothing to say whether it was working or broken — and
+    // the honest answer, "everything above is read and the rest is being
+    // checked", was already true and simply unsaid.
+    if (!view.scored) {
+      const wait = this.doc.createElement('div');
+      wait.className = 'tn-wait';
+      wait.textContent =
+        `Reading ${t.games.length} games from the chain and replaying each one. The first ` +
+        'look at a tournament is the slow one — finished games are remembered, so coming ' +
+        'back is quick.';
+      this.el.tournamentNote.appendChild(wait);
+    }
 
     // WHICH KIND OF DOCUMENT THIS IS, said before anything derived from it.
     if (view.scored) {
@@ -4045,7 +4087,18 @@ export class ChessApp {
           link.href = `${INSCRIPTION_VIEWER}${entry}`;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
-          link.textContent = 'character';
+          // SET BY THE ENTRY INSCRIPTION EXISTING, which is worth knowing when
+          // reading the label. It never asks whether a seat is a program —
+          // `kind` is a separate field the manifest declares — so a badge is a
+          // statement that this player's instructions are public, and the link
+          // is how you read them.
+          //
+          // "house" reads as a claim about WHO rather than about the document,
+          // and today it is true because every entrant with a sheet is one of
+          // ours. An outside entrant inscribing their own would be labelled the
+          // same and the label would be wrong; the fix then is to gate this on
+          // the creator rather than on the field existing.
+          link.textContent = 'house';
           link.title = `Inscription ${entry}: what this player was told to do`;
           // Beside the name rather than in a column of its own, so a manifest
           // without entries does not leave an empty column explaining nothing.
@@ -5142,6 +5195,10 @@ export class ChessApp {
    * timer is what starved the wallet and stopped a move being broadcast.
    */
   private async loadExplore(): Promise<void> {
+    // Before the rows, because every one of them recovers its own rules and the
+    // manifests are where the candidates come from. Cheap: one directory call
+    // and reads the reader caches for ever.
+    await this.ensureManifestPairings();
     await this.guard('reading the game list', async () => {
       const count = await this.chain.getGameCount();
       this.exploreLoadedAt = count;
@@ -5558,13 +5615,20 @@ export class ChessApp {
               // chain entirely for a game that has not moved since last time.
               ? await this.chain.getAllEntries(id, game.nextSeq)
               : (await this.chain.getPage(id, 0)).filter((e): e is EntryRow => e !== null);
+        // THE SAME CANDIDATES THE LEADERBOARD OFFERS. This passed only
+        // `knownRules`, so a game whose rules no stranger can guess from the
+        // opener and the senders was unrecoverable here however much the board
+        // knew elsewhere — fifteen Exhibition Three rows reading "not yet
+        // known · rules unconfirmed" beside Exhibition Two rows naming both
+        // players, on one screen, because those games declare a cooldown and
+        // nothing on this path had ever heard of it.
         const rules = recoverRules({
           rulesHash: game.rulesHash,
           openedBy: game.openedBy,
           ranked: game.ranked,
           senders: entries.map((e) => e.sender),
           viewer: this.address,
-          candidates: [knownRules(game.rulesHash)].filter((r): r is Rules => r !== null)
+          candidates: this.candidatesFor(game)
         });
         const state = replay(
           entries.map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
@@ -6334,11 +6398,23 @@ export class ChessApp {
         aside.push(`${ineligible} not eligible (${[...ineligibleWhy].join('; ')})`);
       }
 
+      // WHAT THE QUESTION MARK MEANS, said where the question marks are.
+      //
+      // A rating under `PROVISIONAL_GAMES` carried a bare `?` and nothing
+      // anywhere explained it — so the mark read as a fault in the number
+      // rather than a statement about how much evidence is behind it. It is
+      // most of the table early in a tournament, which is exactly when a reader
+      // is most likely to be looking.
+      const unsettled = rows.filter((r) => r.provisional).length;
       this.notice(
         'leaderboardNote',
         'info',
         `Derived from ${rated.length} verified ranked game${rated.length === 1 ? '' : 's'}` +
           (aside.length ? `. Not counted: ${aside.join(', ')}.` : '.') +
+          (unsettled
+            ? ` ${unsettled} rating${unsettled === 1 ? '' : 's'} marked ? are provisional: ` +
+              `fewer than ${PROVISIONAL_GAMES} rated games, so the number will still move a lot.`
+            : '') +
           (seeded && !this.verifyEverything
             ? ` ${checkpointNote(seeded.it, seeded.id)}`
             : ' Nothing here is stored; it is recomputed from the chain each time.')
@@ -6348,20 +6424,24 @@ export class ChessApp {
       body.replaceChildren();
       for (const row of rows) {
         const tr = this.doc.createElement('tr');
-        const cells: [string, boolean][] = [
+        const cells: Array<[string, boolean, string?]> = [
           [String(row.rank), false],
           [row.principal, false],
-          [`${row.rating}${row.provisional ? '?' : ''}`, true],
+          [`${row.rating}${row.provisional ? '?' : ''}`, true, row.provisional
+            ? `Provisional: ${row.games} rated game${row.games === 1 ? '' : 's'}, ` +
+              `fewer than the ${PROVISIONAL_GAMES} this rating needs to settle.`
+            : ''],
           [String(row.games), true],
           [String(row.wins), true],
           [String(row.draws), true],
           [String(row.losses), true]
         ];
-        for (const [value, numeric] of cells) {
+        for (const [value, numeric, why] of cells) {
           const td = this.doc.createElement('td');
           if (value === row.principal) td.appendChild(this.addressNode(row.principal));
           else td.textContent = value;
           if (numeric) td.className = 'num';
+          if (why) td.title = why;
           tr.appendChild(td);
         }
         body.appendChild(tr);
@@ -6425,9 +6505,35 @@ export class ChessApp {
     if (this.manifestPairingsAsked || !this.xtrata) return;
     this.manifestPairingsAsked = true;
     try {
-      const text = await this.xtrata.text(DEFAULT_TOURNAMENT);
-      const parsed = text === null ? null : parseTournament(text);
-      if (parsed?.ok && parsed.tournament) this.rememberPairings(parsed.tournament);
+      // EVERY MANIFEST THE DIRECTORY KNOWS, not one hardcoded id.
+      //
+      // This read 2993 alone, which was Exhibition One and declares no cooldown
+      // — so `knownCooldowns` stayed {0} anywhere the Tournaments tab had not
+      // been opened. Exhibition Three committed its games with `cooldown: 1` to
+      // free pairings that were already used up, and with only 0 to try, no
+      // candidate hashes to what those games committed. Explore showed fifteen
+      // rows reading "rules unconfirmed" and "not yet known" where Exhibition
+      // Two's showed "Plumb v Wager", on the same contract and the same screen.
+      //
+      // The directory is the thing that already knows: one holdings call, and
+      // the manifests behind it are cached by the reader for ever. So the board
+      // learns every cooldown anybody has declared, and a fourth tournament
+      // needs no code.
+      const listed = this.index ? await this.index.list().catch(() => []) : [];
+      const ids = [...new Set([...listed.map((e) => e.id), DEFAULT_TOURNAMENT])];
+      let learned = 0;
+      for (const id of ids) {
+        const text = await this.xtrata.text(id);
+        const parsed = text === null ? null : parseTournament(text);
+        if (parsed?.ok && parsed.tournament) {
+          this.rememberPairings(parsed.tournament);
+          learned++;
+        }
+      }
+      // Nothing read is not "there are no tournaments" — it is a directory that
+      // could not be reached, and the next call should try again rather than
+      // remembering the absence.
+      if (!learned) this.manifestPairingsAsked = false;
     } catch {
       // Asked and could not reach it. Allowed to try again rather than being
       // remembered as "this tournament has no pairings" — the same distinction
@@ -6437,6 +6543,29 @@ export class ChessApp {
   }
 
   private rulesForRanked(row: GameRow, entries: readonly EntryRow[]): Rules {
+    const found = recoverRules({
+      rulesHash: row.rulesHash,
+      openedBy: row.openedBy,
+      ranked: row.ranked,
+      senders: entries.map((e) => e.sender),
+      viewer: this.address,
+      candidates: this.candidatesFor(row)
+    });
+    return found.confirmed ? found.rules : { ...DEFAULT_RULES, ranked: true };
+  }
+
+  /**
+   * The guesses worth testing for one game, in the order worth testing them.
+   *
+   * SHARED BY EVERY TAB THAT RECOVERS RULES, which is the whole point. The
+   * Leaderboard built these and Explore did not, so the same game was named on
+   * one screen and "not yet known · rules unconfirmed" on another — the
+   * two-tabs-two-verdicts split this file has now had three times.
+   *
+   * Nothing here is trusted. Each candidate is a guess and the committed hash
+   * is the judge, so a wrong one costs a hash and confirms nothing.
+   */
+  private candidatesFor(row: GameRow): Rules[] {
     // A MANIFEST SUPPLIES THE CANDIDATE RECOVERY CANNOT GUESS.
     //
     // `recoverRules` searches the opener and whoever has submitted, which fails
@@ -6496,15 +6625,7 @@ export class ChessApp {
       }
     }
 
-    const found = recoverRules({
-      rulesHash: row.rulesHash,
-      openedBy: row.openedBy,
-      ranked: row.ranked,
-      senders: entries.map((e) => e.sender),
-      viewer: this.address,
-      candidates: [fromManifest, ...pairs, knownRules(row.rulesHash)].filter((r): r is Rules => r !== null)
-    });
-    return found.confirmed ? found.rules : { ...DEFAULT_RULES, ranked: true };
+    return [fromManifest, ...pairs, knownRules(row.rulesHash)].filter((r): r is Rules => r !== null);
   }
 
   /**

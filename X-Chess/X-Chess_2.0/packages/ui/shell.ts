@@ -450,6 +450,10 @@ ${SCALE_CSS}
 .tn-read a { color: var(--gold); text-decoration: none; border-bottom: 1px dotted var(--gold); }
 .tn-read a:hover { border-bottom-style: solid; }
 
+/* What is still being read, under the summary that is already true. Quiet on
+   purpose: it is a status line, not a warning, and it goes away by itself. */
+.tn-wait { display: block; margin-top: .45rem; font-size: .85em; opacity: .78; }
+
 /* The list of tournaments found on chain. Buttons rather than links: this
    loads into the tab it is in, and nothing navigates. */
 .tn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 2px; }
