@@ -1,190 +1,199 @@
 # Status
 
-Updated 2026-08-13.
+Updated 2026-08-19.
 
 ## Where this is
 
-Phases A to J complete. There is an application, it builds to a single
-138,685-byte self-contained HTML file, and that artefact has been tested as an artefact -
-including under a reproduction of the Xtrata runtime's injection and
-`document.write` sequence.
+**Launched, and inscribed four times.** X Chess 2.0 went to mainnet as
+inscription 2988 on 2026-08-09 and has carried real games and real money since.
+Three more boards have followed it. Exhibition Three is running now on
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`, ninety games
+across ten characters, with rounds one and two played.
 
-What remains is everything that needs a real wallet, a real endpoint, or a real
-chain: the signed wallet matrix, live reads and writes, the mainnet canary, the
-canary inscription, and the two acceptance tests. See `ops/LAUNCH.md`: 34 of 57
-gate items are closed, and every open one is a reason not to inscribe.
+**The sentence that used to be here caused a mistake.** It said 34 of 57 launch
+gates were closed "and every open one is a reason not to inscribe", which was
+written before 2988 and never revisited. Somebody read it in August, believed
+it, and acted on it. The launch gate governs a PRODUCTION launch on a production
+contract; it has never governed a canary board, and four canary boards exist. If
+you are deciding whether to inscribe, read `ops/RELEASES.md` and the version
+table below — not this paragraph's ancestor.
 
-**It is launched.** Inscription 2988 has been live on mainnet since 2026-08-09,
-with real games and real money on it. What follows describes the tree, not the
-inscription: 2988 was built before most of this and carries none of it.
+## Boards on chain
 
-This file said the opposite for four days, alongside a "Not started" list of nine
-things it called Done sixty lines earlier. `harness/docs-audit.mjs` now refuses
-that particular contradiction mechanically.
+Every one is permanent. A newer board does not replace an older one; readers
+follow whichever link they were given, so an old board being WRONG matters and
+an old board being BEHIND does not.
+
+| version | id | built | hash | what it added |
+|---|---|---|---|---|
+| 2.0.0 | **2988** | 08-09 | — | the first inscription |
+| 2.1.0 | **3008** | 08-18 21:11 | `d19c51f7` | tournaments found by wallet rather than typed; your own games found past the newest-25 window; the waiting-on-you count; the manual embedded from chain |
+| 2.1.1 | **3009** | 08-18 21:32 | `e21c6f1f` | the runtime proxy, which had never once been used |
+| 2.1.2 | **3014** | 08-18 23:10 | `acc7e9b1` | `Tournament.cooldown`, `TournamentEntrant.depth`, one `rulesFor()` |
+| 2.1.3 | not inscribed | 08-19 13:17 | `c7697a3b` | in-check explanation, in-flight warning, tournament cache, collapsed chooser, `revisedInTime` on open |
+
+**2.1.0 → 2.1.1 is the one worth reading.** `underXtrataRuntime()` decided
+whether to use Xtrata's caching proxy by looking for injected support scripts,
+and a served inscription has none — checked directly against the bytes of 3008
+and 2988. So every reader went straight to `api.mainnet.hiro.so` from their own
+address and was rate limited, and a refusal carries no
+`Access-Control-Allow-Origin`, so the browser reported it as CORS. Hundreds of
+"CORS" errors and a board saying it could not reach any endpoint, while the
+proxy answered 200 throughout. It is also why 2988 was slow rather than broken:
+same fault, less data to exhaust the allowance with.
+
+**2.1.2 → 2.1.3** carries five things, checked against 3014's served bytes
+rather than against a changelog. The two that came from a player: picking up a
+piece with no legal move now names the squares that have one (game 8 sat forty
+hours in check with five legal replies and a board that said nothing), and a
+second submission while one is still in the mempool is warned about rather than
+silently charged and skipped.
+
+Other inscriptions: engine **2991**, manifest builder **2992**, exhibition one
+**2993**, entry validator **2994**, character sheets **2995–3000** and
+**3010–3013**, exhibition two **3001**, manual **3003** and **3007**,
+exhibition three **3016**. **3015** is abandoned — nothing points at it, the
+chooser hides it, and it stays on chain because it is a real document.
 
 ## Test counts
 
-Run `npm test`, `npm run test:perft:deep`, and `npm run test:clarity`.
+`npm test` — **1,484 passing, 17 skipped, 74 files.** `npx tsc --noEmit` clean.
 
-`npm run verify` passes end to end. **867 tests, 0 failing.**
+The skips are the heavy perft depths, which `npm run test:perft:deep` enables
+and the release gate requires. They pass: 76/76, roughly 590 million nodes.
 
-`npm run release` REFUSES this build, correctly, on five counts: a placeholder
-contract, a `dev` version string, 0 of 14 wallet matrix rows run, an unsigned
-matrix, and 23 open items in `ops/LAUNCH.md`. Every technical gate inside it
-passes, including deep perft at 762s.
+**The release gate takes about thirteen minutes** and that is not a hang.
+`harness/release.mjs` runs `verify.mjs --deep`, and deep perft alone was
+measured at 762s. Do not pipe it through `tail`, which buffers until the process
+exits and makes a long run look like a dead one.
 
-| suite | tests | state |
-|---|---|---|
-| perft (shallow in `npm test`, deep separately) | 63 / 76 | passing |
-| replay behaviour | 32 | passing |
-| replay fuzz and totality | 15 | passing |
-| canonical rules and readiness | 34 | passing |
-| sha256 against Node's | 6 | passing |
-| Clarity codec against the SDK | 17 | passing |
-| endpoint selection and degrading | 15 | passing |
-| wallet conformance | 32 | passing |
-| post conditions against the SDK | 15 | passing |
-| Elo v1 and determinism | 21 | passing |
-| Clarity core contract | 46 | passing |
-| mock/contract parity | 2 | passing |
-| economic property fuzzing | 4 | passing |
-| zero-STX sponsorship sweep | 8 | passing |
+## What the release gate refuses, and why it is not blocking
 
-The only skips are the heavy perft depths, which `--deep` enables and the release
-gate requires. They pass: 76/76, roughly 590 million nodes.
+`npm run release` refuses this build on two counts, both real and neither about
+the code:
+
+- **22 of 59 items in `ops/LAUNCH.md` are unchecked.**
+- **The wallet matrix is not signed.** Of 14 rows: 4 pass, 3 fail, 15 entries
+  read "not run". Nothing has been signed by a real extension.
+
+Everything technical inside it passes. This gate is the door to a PRODUCTION
+contract and a production inscription, and the canary boards have deliberately
+gone out ahead of it — which is what a canary is for.
 
 ## Done
 
 **Engine.** Dependency-free 0x88, TypeScript. Verified by perft against the six
 canonical positions to depth 6/5, plus five castling-rights positions, plus two
-fixture-free structural checks (mirror symmetry, and agreement between the fast
-pseudo-legal path and the slow path replay actually uses).
+fixture-free structural checks.
 
-**Protocols.** `rules-v1` canonical encoding with ten committed golden vectors
-in `tests/rules/golden-rules-v1.json`. Deliberately not JSON: newline-separated
-ASCII fields, every one validated against a character set that cannot contain
-the separator. `events-v1` control strings (`resgn`, `draw?`, `draw!`), proven
-not to collide with any move. `replay-v1` as a pure total function.
+**Protocols.** `rules-v1` canonical encoding with ten committed golden vectors.
+Deliberately not JSON: newline-separated ASCII fields, each validated against a
+character set that cannot contain the separator. `events-v1` control strings
+proven not to collide with any move. `replay-v1` as a pure total function.
 
-**Core contract.** `xchess-core-v1.clar`, Clarity 4. Append-only log keyed by
-`(game, seq)`. Sponsorship with bootstrap, fixed rebates, a count bound and a
-STX liability bound, top-ups, height-based expiry, and settlement callable by
-anybody. Solvency asserted after every money-touching operation in every test.
+**Core contract.** Append-only log keyed by `(game, seq)`. Sponsorship with
+bootstrap, fixed rebates, a count bound and a STX liability bound, top-ups,
+height-based expiry, settlement callable by anybody. Solvency asserted after
+every money-touching operation in every test.
 
-**The zero-STX scenario, at the contract layer.** A wallet holding exactly zero
-is bootstrapped by the creator's single transaction and plays a full game. This
-is the brief's §78 acceptance test as far as a contract can carry it; the
-remaining half of it is the inscription, which does not exist yet.
-
-**Chain layer.** A hand-rolled Clarity codec matching the SDK byte for byte,
-including 3,000 addresses on both networks. An ordered endpoint list where no
-host is essential, a 404 is an answer, and chain unavailability is reported
-distinctly. An in-memory mock that is proved equal to the contract by a parity
-suite comparing full observable state after every step of a 19-step scenario.
+**Chain layer.** A hand-rolled Clarity codec matching the SDK byte for byte. An
+ordered endpoint list where no host is essential, a 404 is an answer, and
+unavailability is reported distinctly. An in-memory mock proved equal to the
+contract by a parity suite.
 
 **Wallet layer.** Provider discovery, ranking and suppression carrying every
-legacy lesson, checked against fakes that reproduce each documented
-misbehaviour. Post conditions hand-serialised and matched against the SDK,
-including the contract-principal encoding the rebate needs.
+legacy lesson. Post conditions hand-serialised and matched against the SDK.
 
-**Ranked and ratings.** `ranked-v1` eligibility checked entirely from the chain,
-and `elo-v1` with a proof that its rounding can never be ambiguous.
+**Tournaments.** Manifests committed before play, verified pairing by pairing
+against the chain, results derived by replay and never read from a claim.
+Revisions are same-creator, strictly-before-first-move, depth-capped, and
+collapsed in the chooser so a correction is authoritative rather than hidden.
 
-**Application.** Board with click-to-move and promotion, game creation for all
-three kinds, explorer, leaderboard derived entirely from the chain, profile.
-Everything on screen is derived by replay and nothing is stored.
+**Ratings.** `ranked-v1` eligibility checked entirely from the chain, `elo-v1`
+with a proof its rounding can never be ambiguous, and rating checkpoints that
+must be minted by xtrata.btc and regenerated before they will be inscribed.
 
-**Build and artefact.** One self-contained HTML file, 179,090 bytes - 11 of the
-32 Xtrata chunks that upload in a single transaction - with a manifest
-carrying protocol versions and source hashes. `tests/artifact` reads `dist/`
-rather than source, which is the only way the double-boot class of bug is
-visible at all.
+**Build and artefact.** One self-contained HTML file, **206,223 bytes — 13 of
+the 32 Xtrata chunks** that upload in a single transaction. `tests/artifact`
+reads `dist/` rather than source, which is the only way the double-boot class of
+bug is visible at all.
 
-**Xtrata runtime.** An emulator serving the real runtime scripts from xtrata-2.0
-for manual and wallet testing, plus an automated suite that reproduces the four
-injections, the serve-time Hiro rewrite and `document.write` against the built
-artefact.
-
-**Cache.** Only immutable facts are cached, and the cache-destruction test
-proves that deleting every byte reproduces identical verified state, including
-the derived ratings.
-
-**Legacy.** An adapter for the three deployed contracts, and golden fixtures
-proving their games keep the results they had.
-
-**The gates canary.** `dist/xchess-gates.html`, a second self-contained
-artefact that walks an operator through every physically gated step from
-preflight to the permanent inscription: 26 steps across six phases, each one
-marked done only when its effect has been READ BACK OFF CHAIN. Irreversible
-steps require the step's own name to be typed. Redoing a step reopens
-everything downstream of it. The gating is tested like the contract, not like a
-UI.
-
-**Live mainnet reads.** All three legacy contracts are deployed and were read
-end to end, through the real chain layer, codec and address encoding. Their
-games are frozen in `harness/fixtures/legacy-mainnet.json`.
-
-**Harness gates 1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14**, `npm run verify`, and
-`npm run release` with its refusal conditions.
+**The gates canary.** `dist/xchess-gates.html`, 26 steps across six phases, each
+marked done only when its effect has been READ BACK OFF CHAIN.
 
 ## Findings that changed the design
 
-1. **Clarity 6 does not exist; Clarity 4 is current, and it removed
-   `as-contract`.** Verified against mainnet and clarinet. ADR-0001.
-2. **The brief's example sponsorship constants would have stranded every
-   sponsored player after two moves** at the fee legacy X Chess actually
-   confirmed on mainnet. Measured, and replaced. ADR-0004.
-3. **The gameplay/settlement rebate split in §17 cannot be built without
-   teaching the contract which strings are control events**, which §3 forbids.
-   Collapsed to one allowance; the concern it raises is answered by the
-   bootstrap instead. ADR-0005.
-4. **Replay reported a game as live when the rule set's own start position was
-   already terminal** (king and knight against a lone king). Found by a test
-   written while fixing a wrong fixture. Fixed.
+1. **Clarity 6 does not exist; Clarity 4 is current and removed `as-contract`.**
+   ADR-0001.
+2. **The brief's sponsorship constants would have stranded every sponsored
+   player after two moves.** Measured and replaced. ADR-0004.
+3. **The §17 rebate split cannot be built without teaching the contract which
+   strings are control events**, which §3 forbids. ADR-0005.
+4. **Replay reported a game as live when the start position was already
+   terminal.** Fixed.
 5. **A sponsored move needs a post condition covering the rebate the CONTRACT
-   sends.** Under deny mode an uncovered transfer aborts the transaction. The
-   legacy board only ever received, so its call shape would have failed every
-   sponsored move while still charging the network fee. ADR-0006.
-6. **Replay applied `events-v1` to legacy games, changing their results.** A
-   legacy Scholar's Mate with `resgn` at sequence 2 read as 0-1 by resignation
-   instead of 1-0 by checkmate. Opposite winners from identical bytes. Replay
-   now obeys the events protocol a game committed to. ADR-0007.
-7. **Three artefact-only bugs**, none visible in any source file: an escaped
-   closing tag that meant the config script never closed; boot running before
-   `<body>` existed; and a boot guard in module scope, which does nothing if the
-   bundle itself executes twice.
+   sends.** ADR-0006.
+6. **Replay applied `events-v1` to legacy games, changing their results** —
+   opposite winners from identical bytes. ADR-0007.
+7. **Three artefact-only bugs**, none visible in any source file.
+8. **The runtime proxy was never used.** See 2.1.0 → 2.1.1 above. Detection was
+   tested against a page shape no inscription has ever been served in, so it
+   passed while returning false on every real reader.
+9. **A pairing gets one ranked game, ever.** A rules hash commits white, black,
+   ranked and the protocol, and nothing naming the tournament. Exhibitions one
+   and two used all thirty pairings their six players had. Exhibition Three
+   exists because it declares `cooldown: 1`, which changes the hash and frees
+   every pairing while never rejecting a move in a two-player game.
+10. **`--after` on a tournament manifest means REVISION, not sequence.** 3015
+    declared 3001 and resolved to Exhibition Two's id — a finished tournament
+    appearing to have been revised into a ninety-game one. Re-inscribed at 3016.
+    The inscriber now refuses it and `--revises` is the deliberate escape hatch.
 
-## Open after launch
+## Open
 
-Every line here is genuinely open. The list this replaced named nine things as
-"Not started" that this same file calls Done sixty lines above, because it was
-written before launch and never revisited.
+- **The character prompts are read from a local file.** This is the last thing
+  that makes Exhibition Three unreproducible by a stranger: the engine is
+  fetched from 2991, the manifest from 3016, every move is on chain and the
+  contract referees — but "these ten characters played" rests on
+  `personalities.mjs` on one machine. The runner should build its field from the
+  manifest's `entrants[].entry` ids, parsed with the validator at 2994 rather
+  than the local copy.
 
-- The signed wallet matrix. Nothing has been signed by a real extension, and
-  there is still no way to RUN the fourteen rows (master proposal 17).
-- The artefact has never been driven by a real browser (master proposal 18).
-  Every layout and colour claim is arithmetic or jsdom.
-- A production contract, if the canary is not to be it. See the open point in
-  README.md: inscription 2988 cannot be repointed.
-- A post-launch runbook. Nothing written describes operating a permanent thing.
+  **Not mid-tournament.** Six of the ten prompts differ from their inscribed
+  sheets by exactly one character, where the entry format joins a paragraph
+  break into a space — verified locally, not assumed:
+
+  ```
+  gambit  388/387   ledger 448/447   mason   480/479
+  wager   460/459   plumb  424/423   oblique 452/451
+  fathom, cadence, bulwark, canon: byte-identical
+  ```
+
+  The four that match were written sheet-first. Switching the source now would
+  change six of ten players between rounds of a running event. Land it behind a
+  flag Exhibition Three does not set, or land it for Exhibition Four, and extend
+  `tests/wizards/entries.test.ts` to prove the other six rather than assuming
+  the difference stays cosmetic.
+
+- **The signed wallet matrix.** Nothing has been signed by a real extension and
+  there is still no way to RUN the fourteen rows.
+- **The artefact has never been driven by a real browser.** Every layout and
+  colour claim is arithmetic or jsdom.
+- **A production contract**, if the canary is not to be it. 2988 cannot be
+  repointed.
+- **The sequence link between manifests does not exist.** `--after` promised a
+  walk-back chain and delivers a revision edge. A real one needs a second link
+  kind the format does not have. Unstarted.
+- **The one-ply control arm has never completed.** Everything claimed about the
+  engine's effect rests on the on-chain record rather than a controlled
+  comparison. Lab work, and it costs nothing.
+- **A post-launch runbook.** Nothing written describes operating a permanent
+  thing.
 
 ## The risk that matters most
 
 **R1 in `ops/RISKS.md`.** A sponsored move needs a post condition covering the
-rebate the CONTRACT sends, with a contract-principal encoding no previous X Chess
-build ever produced. The bytes match the SDK; that proves the encoding, not that
-a real wallet or the Xtrata bridge accepts it. If they do not, every sponsored
-move aborts while still charging the network fee.
-
-Nothing closes this but a real wallet.
-
-## Next
-
-Everything left needs something real.
-
-1. Live reads against mainnet, and the endpoint-independence run.
-2. The wallet matrix, signed. **Row 4 first**: a sponsored move, with the
-   contract-principal post condition that has never reached a wallet.
-3. Devnet, then a labelled mainnet canary contract.
-4. A canary inscription, and the whole matrix against it.
-5. Only then: the production contract and the production inscription.
+rebate the CONTRACT sends, with a contract-principal encoding no previous build
+ever produced. The bytes match the SDK; that proves the encoding, not that a
+real wallet or the Xtrata bridge accepts it. Nothing closes this but a real
+wallet.
