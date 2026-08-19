@@ -6,13 +6,44 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
-## 2.1.5 — 2026-08-19
+## 2.1.6 — 2026-08-19
 
-Built, not yet inscribed. **231,411 bytes, 15 chunks.**
+Built, not yet inscribed.
 
-* `htmlSha256` `193a4bd1c35fe98f87242ce491ba59710cc5d2937322db38934c95817e223a33`
-* xtrata chunk hash `676fee30e4a063b5bc31373fcdb059d276823a5bfa287e1606cdb7d8c3de980c`
-* build stamp `2.1.5 - 2026-08-19 20:08 - #588f89fe`
+**A loaded tournament reloaded itself every thirty seconds, for ever.** The
+poll builds a signature of the unfinished games' submission counts and compares
+it to the last one — and the last one was CLEARED at the end of every
+successful load. Anything differs from nothing, so the first poll always found
+a change, re-checked all ninety pairings, re-replayed all ninety games, and
+cleared it again. Whether or not a move had been played anywhere.
+
+Two things made it worse. The baseline and the comparison were built in
+different places out of different quantities — `nextSeq` on one side and
+`moves`, which is what replay ACCEPTED, as the fallback on the other — so one
+failed read made the signature differ from itself permanently. And the first
+pass re-read a row per game to learn rules hashes it already knew and which
+cannot change.
+
+* The signature has one writer and is seeded from the load that just finished.
+* A row that did not read carries the last thing known about it, not a zero.
+* The pairing pass uses a remembered rules hash and reads nothing. A rules hash
+  is fixed when a game is opened, so a hash read before is the hash now.
+
+## 2.1.5 — 2026-08-19  ·  **inscription 3023, live on mainnet**
+
+Inscribed as a child of 3022. **231,411 bytes, 15 chunks**, stamp
+`2.1.5 - 2026-08-19 19:47`.
+
+Carries the fix for a shared link to a tournament game showing "anyone". Does
+NOT carry the clipboard fix, which was built twenty minutes later under the
+same version number and never went up — see 2.1.6.
+
+### Originally recorded as **231,411 bytes, 15 chunks.**
+
+* `htmlSha256` `fee88798aed93d1277d26ff4e0d77e7a1a06a68729ca1ad54397d3fa4ef8afe8`
+* xtrata chunk hash `310f6d4abeb955468560464d8e7be3ffb6c7b6bf51b52c5e71e887321a01f2cd`
+* build stamp `2.1.6 - 2026-08-19 21:43 - #22884569`
+* **232,345 bytes, 15 chunks.**
 * 1,564 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
 
 **Both copy buttons were doing nothing on the inscription**, and had been since

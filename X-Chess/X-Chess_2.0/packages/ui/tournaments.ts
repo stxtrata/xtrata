@@ -139,6 +139,25 @@ export async function loadTournament(id: number, deps: TournamentDeps): Promise<
   const facts = new Map<number, GameFacts>();
   let read = 0;
   for (const game of tournament.games) {
+    // ALREADY READ ONCE, AND IT CANNOT HAVE CHANGED.
+    //
+    // This pass exists to check the chain agrees about who played whom, which
+    // it does by comparing the manifest's pairing to the game's RULES HASH. A
+    // rules hash is fixed when the game is opened and there is no operation
+    // that alters it, so a hash this browser read from the chain before is the
+    // same hash it would read again.
+    //
+    // Which makes this the half of a return visit that was pure waste: ninety
+    // reads to learn ninety things that were already known and could not have
+    // moved. The other half — has anybody played since — is asked in the
+    // scoring pass, where the answer actually changes.
+    const known = rememberedGame(game.id);
+    if (known?.facts.rulesHash) {
+      facts.set(game.id, { rulesHash: known.facts.rulesHash, result: null });
+      deps.onRead?.(++read, tournament.games.length);
+      continue;
+    }
+
     await deps.pace?.();
     const row = await deps.chain.getGame(game.id).catch(() => null);
     // Counted whatever came back. A read that failed still took the time, and a
@@ -272,6 +291,9 @@ export async function scoreTournament(
     const derived: GameFacts = {
       rulesHash: row.rulesHash,
       result: state.result,
+      // So the poll can take an exact baseline from a finished load instead of
+      // guessing one and reloading on the difference.
+      submissions: row.nextSeq,
       // Accepted, not submitted. See GameFacts.moves.
       moves: state.accepted.length,
       // Whose move, from the replay that has just run. Null for a finished

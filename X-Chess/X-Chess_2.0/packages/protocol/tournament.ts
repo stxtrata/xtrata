@@ -660,6 +660,16 @@ export interface GameFacts {
   /** Replayed, or null for a game that has not finished. */
   result: '1-0' | '0-1' | '1/2-1/2' | null;
   /**
+   * SUBMISSIONS, which is not `moves` and is why both are here.
+   *
+   * `moves` is what replay accepted; this is what the contract stores, and it
+   * is the number the poll compares to decide whether a game has changed. A
+   * submission replay will skip still means something happened, so watching
+   * this is the conservative direction — the worst case is one rescore that
+   * changes nothing, never a board sitting still while a game moved.
+   */
+  submissions?: number;
+  /**
    * Moves replay ACCEPTED, which is not the number of submissions.
    *
    * A game may be submitted to by anybody, and the contract stores whatever it
@@ -707,6 +717,14 @@ export interface CheckedGame {
   /** Moves replay accepted, when the caller counted them. */
   moves?: number;
   /**
+   * Submissions the contract stored, which is not `moves`.
+   *
+   * Carried so a poll can tell whether a game has moved without re-reading it,
+   * and so the baseline it compares against comes from the same quantity. See
+   * `GameFacts.submissions`.
+   */
+  submissions?: number;
+  /**
    * The address whose move it is, or null when the game is not waiting on one.
    *
    * Derived rather than read: the caller has already replayed the game against
@@ -752,6 +770,7 @@ export function checkGames(
       white: game.white,
       black: game.black,
       moves: seen?.moves,
+      submissions: seen?.submissions,
       toMove: seen?.toMove ?? null,
       turn: seen?.turn ?? null,
       stage: stageOf(tournament, game)

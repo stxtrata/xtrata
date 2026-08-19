@@ -3246,6 +3246,21 @@ export class ChessApp {
     this.tournamentPoll = setTimeout(() => void this.pollTournament(), TOURNAMENT_POLL_MS);
   }
 
+  /**
+   * What the unfinished games of a tournament look like right now.
+   *
+   * ONE WRITER, because the baseline and the comparison used to be built in
+   * different places out of different quantities, and a signature that cannot
+   * equal itself is a reload on every poll.
+   */
+  private tournamentSignature(view: TournamentView | null): string {
+    return (view?.rounds ?? [])
+      .flatMap((round) => round.games)
+      .filter((game) => game.result === null)
+      .map((game) => `${game.id}:${game.submissions ?? '?'}`)
+      .join(',');
+  }
+
   private async pollTournament(): Promise<void> {
     const view = this.tournament;
     const live = (view?.rounds ?? [])
@@ -3269,8 +3284,18 @@ export class ChessApp {
         EXPLORE_READ_WIDTH,
         live.map((game) => () => this.chain.getGame(game.id).catch(() => null))
       );
+      // A ROW THAT DID NOT READ IS NOT A ZERO AND NOT A MOVE COUNT.
+      //
+      // This fell back to `moves`, which is what replay ACCEPTED, against a
+      // signature otherwise built from `nextSeq`, which is what the contract
+      // STORED. The two differ for any game with a skipped submission, so one
+      // failed read made the signature differ from itself for ever and the
+      // tournament reloaded on every poll from then on.
+      //
+      // A read that failed says nothing about whether the game moved, so it
+      // carries the last thing known about it.
       const now = rows
-        .map((row, at) => `${live[at].id}:${row?.nextSeq ?? live[at].moves ?? 0}`)
+        .map((row, at) => `${live[at].id}:${row ? row.nextSeq : (live[at].submissions ?? '?')}`)
         .join(',');
       // Compared against submissions rather than accepted moves, which is the
       // conservative direction: a submission replay will skip still counts as
@@ -3758,7 +3783,18 @@ export class ChessApp {
       this.tournamentLoading = null;
       this.rememberTournamentState(this.tournament);
       this.tournamentReadAt = this.now();
-      this.tournamentSeenRaw = '';
+      // THE BASELINE, TAKEN FROM WHAT WAS JUST LOADED.
+      //
+      // This cleared the signature, which guaranteed the very next poll found a
+      // difference — anything is different from nothing — and reloaded the
+      // whole tournament. It then cleared it again, so a tournament re-verified
+      // all ninety pairings and re-replayed all ninety games every thirty
+      // seconds for as long as the tab was open, whether or not a single move
+      // had been played.
+      //
+      // Recorded now instead, so the poll fires when something has actually
+      // changed and stays silent when nothing has.
+      this.tournamentSeenRaw = this.tournamentSignature(this.tournament);
       this.drawTournament();
       // So the button for what is now on screen reads as selected.
       this.drawPickerFilters();
