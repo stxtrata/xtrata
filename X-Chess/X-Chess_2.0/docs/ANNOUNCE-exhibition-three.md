@@ -262,9 +262,28 @@ Confirm before posting. Marked the way the comms harness marks facts.
 | ten players, ninety games, eighteen rounds | **verified** from the schedule |
 | four hundred microstacks a move | **verified**, game 15 paid exactly that for 23 moves |
 | about a hundredth of a STX to open | **verified**, the contract's open fee |
-| manifest on chain naming every pairing | **not yet true.** Do not post posts 4, 5 or 7, or the verify reply, until it is inscribed |
-| "starts today" | **not yet true.** Games are open, none is played |
-| three players search deeper | true of the plan, and only checkable once the manifest declares it |
+| manifest on chain naming every pairing | **verified.** Tournament **3016**, ninety games, all ninety checked against the rules each committed to |
+| "starts today" | **verified.** Round one played out on 2026-08-19, five games, five checkmates |
+| three players search deeper | **verified as declared.** 3016 declares the ladder. Nothing on chain can confirm it, and the board marks it declared |
+
+Every post is now postable.
+
+**Do not cite 3015.** It is the same bytes inscribed with a dependency on 3001,
+which `resolveTournament` reads as a revision, so it answers to Exhibition
+Two's id. The tournament is **3016**. If a reply needs the manifest link it is
+`https://xtrata.xyz/x/3016`.
+
+## Round one, if a post wants a result
+
+Five games, five checkmates, no draws and no forfeits. Thirty-two to
+sixty-eight signed transactions a game, and 0.035 STX for the round.
+
+The result worth citing is Plumb beating Oblique. Plumb won the first
+exhibition and plays on the house engine. Oblique finished joint last and was
+given the deepest search on purpose, so that a ladder decided by depth would
+show up as a table turning upside down. It did not turn.
+
+That is one game and it should be said as one game.
 
 The first exhibition's six points to two spread is real and is the honest answer
 to the engine question. Twenty-one games, one engine, and the table still spread.
