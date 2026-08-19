@@ -86,6 +86,31 @@ if (!existsSync(HTML) || !existsSync(MANIFEST)) {
     refuse(`the build version is still a development one (${manifest.build})`);
   }
 
+  // ALREADY ON CHAIN UNDER THIS NUMBER.
+  //
+  // The ledger cannot check this for itself: the version lives in package.json
+  // and RELEASES.md is prose. So 2.1.5 was opened as an entry, the work was
+  // done, the build was made — and it stamped 2.1.4, the number 3022 already
+  // holds, because nobody had bumped package.json. One signature away from two
+  // different permanent artefacts under one version, which is the single thing
+  // that ledger exists to prevent and had by then nearly happened three times
+  // in two days.
+  //
+  // Matched against the heading this file writes when an artefact goes live, so
+  // it costs nothing and needs no second list to fall out of date.
+  const ledger = resolve(ROOT, 'ops', 'RELEASES.md');
+  if (manifest.build && existsSync(ledger)) {
+    const escaped = String(manifest.build).replace(/\./g, '\\.');
+    const live = new RegExp(`^## ${escaped}\\b.*inscription (\\d+), live`, 'm')
+      .exec(readFileSync(ledger, 'utf8'));
+    if (live) {
+      refuse(
+        `version ${manifest.build} is already on chain as inscription ${live[1]}. ` +
+          'Bump package.json and rebuild, or this is a second artefact under one number.'
+      );
+    }
+  }
+
   // `add-chunk-batch` takes `(list 32 (buff 16384))`, so 32 chunks - 524,288
   // bytes - go up in ONE transaction. Past that an upload needs a second one,
   // which is a real change to how the artefact ships. Going over is allowed;

@@ -10,9 +10,17 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. **231,411 bytes, 15 chunks.**
 
-* `htmlSha256` `288aa9257581361f751fca794a6f1f450ab74283ec6cd404e13f354329a8f541`
-* xtrata chunk hash `c707708b14f76c3e4ebfeff6973bbd40e67aee6c192634a523b6f2391f48b9d4`
+* `htmlSha256` `18ff838fe144f08f61e2626250e520f6064ab7421f567d2a507764ec90bf3994`
+* xtrata chunk hash `c14bcf5ce321be755912fa8765bfc772817ff00e0ebfdbbfd0ec49195deafa82`
+* build stamp `2.1.5 - 2026-08-19 19:47 - #8b8feb66`
 * 1,561 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+
+**This entry was opened before `package.json` was bumped**, so the first build
+under it stamped 2.1.4 — the version 3022 already holds — and was one signature
+away from putting two different permanent artefacts under one number. Caught
+by being asked to check rather than by anything here. The version lives in
+`package.json` and the ledger cannot see it, which is worth a gate rather than
+a habit.
 
 **A shared link to a tournament game could not name its players.** 3022 shows
 the move list naming Gambit and Cadence while the Players panel says "anyone"
