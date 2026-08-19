@@ -125,6 +125,29 @@ export const ENTRY_INSCRIPTION = Object.freeze({
   })
 });
 
+/**
+ * Exhibition Three: the first manifest that is a commitment.
+ *
+ * INSCRIBED BEFORE A MOVE WAS PLAYED, which neither 2993 nor 3001 managed.
+ * Both went up after their games had started, so `provenance` reads them as
+ * compiled — accurate records, but records. This one was built from ninety
+ * games that were open and empty, verified against the rules each had
+ * committed to, and inscribed while every one of them still had zero moves.
+ *
+ * It declares 3001, so a reader holding any of the three can walk back through
+ * the others without being told an address.
+ *
+ * It is also the first to carry `entry` ids for its players, `kind` saying
+ * they are programs, a declared `depth` per seat, and the `cooldown` of 1
+ * without which none of its ninety games could have been opened at all.
+ */
+export const EXHIBITION_THREE = Object.freeze({
+  id: 3015,
+  board: 3014,
+  cooldown: 1,
+  url: 'https://xtrata.xyz/x/3015'
+});
+
 export const TOURNAMENT_INSCRIPTION = Object.freeze({
   id: 2993,
   sha256: '0041a84a8f46c6c6e31d972ffe1cfd7eb0d3014f89a6da6f9a1d3cdff2f7aa7a',
