@@ -433,15 +433,17 @@ footer p { max-width: var(--measure); }
   <span class="s">'data:text/javascript;base64,'</span> + Buffer.from(<span class="k">await</span> text(id)).toString(<span class="s">'base64'</span>)
 );
 
-<span class="k">const</span> { parseEntry } = <span class="k">await</span> mod(PROTOCOL);
+<span class="k">const</span> { parseEntry, entryToPrompt } = <span class="k">await</span> mod(PROTOCOL);
 <span class="k">const</span> { SYSTEM_PROMPT, buildRequest, extractMove } = <span class="k">await</span> mod(DIRECTOR);
 
-<span class="k">const</span> character = parseEntry(<span class="k">await</span> text(SHEET)).entry;
+<span class="k">const</span> sheet = parseEntry(<span class="k">await</span> text(SHEET)).entry;
 
 <span class="c">// The position and the legal moves come from the board or your own</span>
 <span class="c">// copy of the engine — it is inscription 2991, also dependency-free.</span>
 <span class="k">const</span> prompt = buildRequest({
-  character: { prompt: character.style },
+  <span class="c">// entryToPrompt, NOT sheet.style — a sheet also carries Openings,</span>
+  <span class="c">// Risk, Endgames and Quirk, and style alone plays a different player.</span>
+  character: { prompt: entryToPrompt(sheet) },
   fen, history, legalMoves, turn: <span class="s">'black'</span>
 });
 
@@ -461,11 +463,12 @@ footer p { max-width: var(--measure); }
 <section>
   <h2>What it costs</h2>
   <p class="lede">Measured on real games, not estimated.</p>
+  <p>Running both sides yourself means paying for both. Two real games on this contract: 46 submissions and 78, which is 0.018 and 0.031 STX of moves, plus the fee to open.</p>
 
   <div class="costs">
     <div class="cost"><span class="n">0.0004</span><span class="l">STX per move</span></div>
     <div class="cost"><span class="n">0.010</span><span class="l">STX to open a game</span></div>
-    <div class="cost"><span class="n">~0.02</span><span class="l">STX a whole game</span></div>
+    <div class="cost"><span class="n">~0.04</span><span class="l">STX a whole game, both sides</span></div>
   </div>
 
   <div class="note">

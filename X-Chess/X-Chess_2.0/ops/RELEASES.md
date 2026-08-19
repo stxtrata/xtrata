@@ -8,20 +8,48 @@ that a build which never shipped still leaves a record of why.
 
 ## 2.1.4 — 2026-08-19
 
-Profile pictures, deep links and a paged game list. Built, not yet inscribed.
-**221,526 bytes, 14 chunks** — the first build to cross from 13 chunks to 14.
+Ready to inscribe. **227,611 bytes, 14 chunks.**
 
-* `htmlSha256` `1a78d874e04df3ed821ca6a477fdbbf1e23725b6f0ed31cd73f3dfd8d3c9e7c1`
-* xtrata chunk hash `b9e11fc9625dd917a202539888eda7dcbd3ebe73149bac5501b985e539d19a49`
-* build stamp `2.1.4 - 2026-08-19 15:45 - #8408ccf5`
-* 1,531 tests passing, 78 files. `tsc --noEmit` clean.
+* `htmlSha256` `aa4d68d4c142179b37e585d1f75fd764574900b8256e479d207c6611d6fdfc96`
+* xtrata chunk hash `07bc502e4923bfcaa3e7f4208002f545861784ebe4c332fddf9e63f076c3688b`
+* build stamp `2.1.4 - 2026-08-19 16:56 - #1ca03366`
+* 1,547 tests passing, 80 files. `tsc --noEmit` clean, docs audit clean.
+* Cost, measured on 3014 rather than estimated: **0.236 STX** for 13 chunks, so
+  a shade more for 14.
 
-**This entry carried two different byte counts and neither was current** —
-217,735 in its heading and 218,201 in a bullet, against an artefact of 221,526.
-Written while the work was still moving, which is the failure mode this ledger
-names two entries down: a hash here identifies a FILE, and a file that is still
-being rebuilt does not have one yet. Corrected to the build above, which is the
-one that would be inscribed.
+**A hash here identifies a FILE, not a commit** — the version line carries a
+build timestamp, so any rebuild invalidates the figures above. Do not rebuild
+between checking them and signing. This entry has been corrected twice today
+for exactly that, which is the argument for recording it once the work stops
+rather than after every build.
+
+### What it has that 3014 does not
+
+* **Profile pictures.** `X-CHESS-PFP/1`, a picker in Profile, and faces beside
+  names in Tournaments, the Leaderboard and Explore. The board never holds the
+  bytes: an `<img>` points at the inscription and the browser does the rest.
+* **One holdings listing per wallet.** A name and a picture are found the same
+  way, and each resolver asked separately — three requests for one address.
+* **Deep links** for tournaments and players, with a Copy link button, and a
+  shared rule about what a shared link must never carry.
+* **The game list pages**, with the refresh timer paused while you read.
+* **Explore can name Exhibition Three's players.** It offered no recovery
+  candidates and knew no cooldowns, so fifteen rows read "not yet known · rules
+  unconfirmed" beside Exhibition Two rows naming both players.
+* **A tournament paints before it loads** — the field, the format, the rounds —
+  from the manifest already in memory, with no request at all.
+* **The `?` on a rating says what it means**, which is "fewer than ten games".
+* **The prompt protocol is inscribed at 3017**, so a game is reproducible by a
+  stranger end to end.
+
+### Deliberately not in it
+
+* **Timed games.** Planned in `docs/PLAN-timed-games.md`, with the questions
+  answered. It changes `canonicalRules`, which is the one file where a mistake
+  makes two boards disagree about a finished game for ever.
+* **Playing a house player from the Play tab.** Planned in
+  `docs/PLAN-play-a-house-player.md`. It needs a director watching the chain,
+  which is a change to who runs what rather than to the board.
 
 ### Since that entry was first written
 
