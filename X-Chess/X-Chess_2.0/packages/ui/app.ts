@@ -3588,14 +3588,9 @@ export class ChessApp {
                   stage: stageOf(view.tournament!, game)
                 });
               }
-              // So a game reached from here can name its players. Two
-              // tournaments could name one address differently; the most
-              // recently loaded wins, and the tooltip says the name is an
-              // organiser's rather than the address's own.
-              for (const entrant of view.tournament?.entrants ?? []) {
-                this.entrantNames.set(entrant.address, entrant.name);
-              }
-              // The candidate the Leaderboard cannot guess. See rulesForRanked.
+              // Names and pairings together, in `rememberPairings`, which is
+              // the one writer for both. They were set in two places and only
+              // one of them ran before the Leaderboard walked.
               if (view.tournament) this.rememberPairings(view.tournament);
               this.tournament = await scoreTournament(view, deps);
               this.progress = null;
@@ -6790,7 +6785,28 @@ export class ChessApp {
   private rememberPairings(tournament: Tournament): void {
     const addressOfName = new Map(tournament.entrants.map((e) => [e.name, e.address]));
     this.knownCooldowns.add(tournament.cooldown ?? 0);
-    for (const entrant of tournament.entrants) this.knownEntrants.add(entrant.address.toUpperCase());
+    for (const entrant of tournament.entrants) {
+      this.knownEntrants.add(entrant.address.toUpperCase());
+      // AND THEIR NAMES, which is why the Leaderboard showed principals for
+      // players every other tab called Plumb and Mason.
+      //
+      // This was recorded only after a tournament had been fully loaded — a
+      // manifest read, a row per game and a replay of each — so a reader who
+      // opened the Leaderboard first saw raw addresses for the whole field,
+      // while `xtrata.btc` and `jim.btc` resolved beside them because BNS is a
+      // different lookup that had happened.
+      //
+      // `ensureManifestPairings` already reads every manifest the directory
+      // lists, cheaply and before both the Leaderboard walk and the Explore
+      // list. Recording the names there costs nothing and means they are simply
+      // present.
+      //
+      // Two tournaments may call one address different things; the most
+      // recently read wins, and `displayName` ranks this BELOW a BNS name and
+      // below a self-attested one — an organiser's name for somebody is a claim
+      // about them rather than by them, and the tooltip says so.
+      this.entrantNames.set(entrant.address, entrant.name);
+    }
     for (const game of tournament.games) {
       const white = addressOfName.get(game.white);
       const black = addressOfName.get(game.black);

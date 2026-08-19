@@ -8,11 +8,11 @@ that a build which never shipped still leaves a record of why.
 
 ## 2.1.4 — 2026-08-19
 
-Ready to inscribe. **229,711 bytes, 15 chunks.**
+Ready to inscribe. **229,671 bytes, 15 chunks.**
 
-* `htmlSha256` `278157865d83bfe86614edcaa3868eb7f32ce0d7372aa8fac65dbdc835e8c7bd`
-* xtrata chunk hash `8c20c61111d55e9119db5452620d7b0da1743d8fe9b2ab5c86bd9f34c5ad6ad3`
-* 1,552 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+* `htmlSha256` `0a3946ad947853605773d4b77acd3cae96db60215859f23cfb4d9690c8e347e2`
+* xtrata chunk hash `2bc311cac43fb4399d0c19741e4e5c29d8eec9c0d3d8d9801eb37fb1a80c4e76`
+* 1,554 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
 * **Fifteen chunks, up from fourteen.** Still one `add-chunk-batch`
   transaction, which takes thirty-two, so this costs one chunk's protocol fee
   and nothing structural.
@@ -41,6 +41,11 @@ rather than after every build.
 * **A tournament paints before it loads** — the field, the format, the rounds —
   from the manifest already in memory, with no request at all.
 * **The `?` on a rating says what it means**, which is "fewer than ten games".
+* **The Leaderboard names the field.** Entrant names were recorded only after a
+  full tournament load, so a reader who opened the Leaderboard first got raw
+  principals for everybody while `xtrata.btc` resolved beside them — BNS being
+  a different lookup that had happened. Names are learned wherever pairings
+  are, which is before both the Leaderboard walk and the Explore list.
 * **Long reads say how far they have got.** A tournament emits a real partial
   view at each round boundary — scored, honest, and marked unfinished — so
   rounds appear rather than a spinner turning. The Leaderboard says what it is

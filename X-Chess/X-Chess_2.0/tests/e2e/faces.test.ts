@@ -106,3 +106,51 @@ describe('a face beside a name', () => {
     expect(face(app, ALICE)!.title).toContain('9000');
   });
 });
+
+describe('names on a tab that has not loaded a tournament', () => {
+  // The Leaderboard showed raw principals for the whole field while xtrata.btc
+  // and jim.btc resolved beside them, because BNS is a different lookup that
+  // had happened and the manifest names were recorded only after a full
+  // tournament load — a manifest read, a row per game and a replay of each.
+
+  const FIELD = 'SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX';
+
+  const manifest = {
+    name: 'Exhibition Three',
+    format: 'double-round-robin',
+    contract: 'SP000000000000000000002Q6VF78.xchess',
+    cooldown: 1,
+    entrants: [
+      { name: 'Plumb', address: FIELD },
+      { name: 'Mason', address: BOB }
+    ],
+    games: [{ id: 1, white: 'Plumb', black: 'Mason', round: 1 }]
+  };
+
+  it('learns a name from a manifest without scoring the tournament', () => {
+    const app = board();
+    (app as unknown as { rememberPairings(t: unknown): void }).rememberPairings(manifest);
+
+    const shown = (app as unknown as {
+      nameOf(a: string): { name: string; source: string };
+    }).nameOf(FIELD);
+
+    expect(shown.name).toBe('Plumb');
+    expect(shown.source).toBe('tournament');
+  });
+
+  it('ranks an organiser’s name below the address’s own', () => {
+    // A manifest name is a claim ABOUT somebody; BNS is a claim BY them. The
+    // tooltip says which, and the order has to match that.
+    const app = board();
+    (app as unknown as { rememberPairings(t: unknown): void }).rememberPairings(manifest);
+    (app as unknown as { names: unknown }).names = { peek: () => 'plumb.btc' };
+
+    const shown = (app as unknown as {
+      nameOf(a: string): { name: string; source: string };
+    }).nameOf(FIELD);
+
+    expect(shown.name).toBe('plumb.btc');
+    expect(shown.source).toBe('bns');
+  });
+});
