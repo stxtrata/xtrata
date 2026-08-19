@@ -123,11 +123,16 @@ export class ManifestDirectory<T> {
    * "there are none" must not look the same to a caller, or a rate limit turns
    * into an empty tab that looks authoritative.
    */
-  async list(): Promise<Found<T>[]> {
+  async list(onRead?: (done: number, total: number) => void): Promise<Found<T>[]> {
     const ids = await this.candidates();
     const found: Found<T>[] = [];
 
+    let read = 0;
     for (const id of ids) {
+      // Counted before the work, and whatever the outcome. Most of a wallet's
+      // contents are not the thing being looked for, and a count that only rose
+      // for matches would sit still through a wallet full of character sheets.
+      onRead?.(++read, ids.length);
       const remembered = this.recall(id);
       if (remembered === 'not-this-kind') continue;
 

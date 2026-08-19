@@ -167,3 +167,40 @@ describe('finding tournaments in an organiser’s wallet', () => {
     await expect(index.list()).rejects.toThrow(/429/);
   });
 });
+
+describe('saying how far a listing has got', () => {
+  // Finding tournaments is a holdings call and then a read of everything the
+  // wallet holds, most of which is not a tournament. On a cold board that is
+  // the first thing anybody waits on, and the tab showed nothing at all.
+
+  it('counts every candidate, not just the matches', async () => {
+    // A count that only rose for matches would sit still through a wallet full
+    // of character sheets and then jump — which reads as stalled, then broken.
+    const seen: Array<[number, number]> = [];
+    const index = asTournaments({
+      endpoint: holding([3001, 3000, 2999]),
+      reader: reading({
+        3001: manifest('Two'),
+        3000: 'X-CHESS-ENTRY/1\nname: Oblique',
+        2999: 'X-CHESS-ENTRY/1\nname: Plumb'
+      }),
+      address: DIRECTOR
+    });
+
+    await index.list((done, total) => seen.push([done, total]));
+    expect(seen).toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3]
+    ]);
+  });
+
+  it('still works for a caller that does not want to know', async () => {
+    const index = asTournaments({
+      endpoint: holding([3001]),
+      reader: reading({ 3001: manifest('Two') }),
+      address: DIRECTOR
+    });
+    expect((await index.list()).length).toBe(1);
+  });
+});

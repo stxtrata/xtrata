@@ -2930,10 +2930,49 @@ export class ChessApp {
    */
   private async loadTournamentList(): Promise<void> {
     if (!this.index) return;
+
+    // BEFORE THE CHIPS EXIST, which is the one stretch of this tab that said
+    // nothing at all. Everything else now explains itself — the summary paints
+    // from the manifest, the bar runs through both passes — but all of that
+    // starts once a tournament has been CHOSEN, and choosing needs the list.
+    //
+    // Finding it is a holdings call and then a read of everything in the
+    // wallet, most of which is not a tournament: character sheets, an engine,
+    // an identity. On a cold board that is the first thing a reader waits on
+    // and it looked like an empty tab.
+    if (!this.found.length) {
+      this.notice(
+        'tournamentNote',
+        'info',
+        'Looking for tournaments. They are inscriptions rather than a list on a server, ' +
+          'so this reads what the wallet holds and keeps what it finds — the first look ' +
+          'is the slow one.'
+      );
+      this.progress = { done: 0, total: 1, what: 'inscriptions read' };
+      const bar = this.progressBar();
+      if (bar) this.el.tournamentNote.appendChild(bar);
+    }
+
     try {
-      this.found = await this.collapseRevisions(await this.index.list());
+      this.found = await this.collapseRevisions(
+        await this.index.list((done, total) => {
+          this.progress = { done, total, what: 'inscriptions read' };
+          this.tickProgress();
+        })
+      );
     } catch {
       this.found = [];
+    }
+    this.progress = null;
+
+    // Only when nothing came back. A tournament already on screen has its own
+    // note, and overwriting it with "none found" would be false as well as rude.
+    if (!this.found.length && !this.tournament) {
+      this.notice(
+        'tournamentNote',
+        'info',
+        'No tournaments found in the directory. Open one by inscription number below.'
+      );
     }
     this.drawPickerFilters();
     this.drawTournamentList();
