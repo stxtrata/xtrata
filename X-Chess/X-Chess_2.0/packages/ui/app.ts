@@ -610,6 +610,7 @@ const IDS = [
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
+    'explore-newer', 'explore-older',
   'fee-advice', 'tournament-list', 'tournament-refresh', 'tournament-fresh',
   'tournament-filters', 'tournament-who', 'tournament-shown',
   'picker-filters', 'picker-who', 'picker-shown', 'tournament-field',
@@ -695,6 +696,14 @@ export class ChessApp {
   }
 
   private exploreIsStale(): boolean {
+    // A LIST SOMEBODY IS READING MUST NOT MOVE UNDER THEM. The staleness rule
+    // exists so the newest page keeps up with the chain; applied to page four
+    // it would yank the reader back to the newest every thirty seconds, which
+    // is the same list refusing the thing it was just asked for.
+    //
+    // Refresh still works while paged — it is a request rather than a timer,
+    // and the button says so.
+    if (this.exploreTop !== null) return false;
     if (this.exploreLoadedAt === null) return true;
     return this.now() - this.exploreBuiltAt >= ChessApp.EXPLORE_STALE_MS;
   }
@@ -755,6 +764,18 @@ export class ChessApp {
    */
   private pendingForced: { game: number; value: string } | null = null;
   private exploreRows: ExploreRow[] = [];
+
+  /**
+   * The highest game id on the page being shown, or null for the newest.
+   *
+   * NULL IS NOT ZERO AND NOT A NUMBER. "Show me the newest" has to survive
+   * games being opened while somebody reads, and a page pinned to whatever the
+   * count happened to be when the tab opened would silently stop being the
+   * newest a minute later. So the newest page stores no number at all and works
+   * it out at read time; every other page stores the id it starts at, because
+   * that page IS a fixed range and must not drift.
+   */
+  private exploreTop: number | null = null;
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -1013,6 +1034,8 @@ export class ChessApp {
     });
     on('topUp', () => void this.topUp());
     on('exploreRefresh', () => void this.reloadExplore());
+    on('exploreOlder', () => void this.pageExplore(-1));
+    on('exploreNewer', () => void this.pageExplore(1));
     on('exploreFind', () => void this.findGame());
     on('leaderboardVerify', () => {
       // One way only. Having verified, a reader should not be quietly put back
@@ -4976,7 +4999,10 @@ export class ChessApp {
     }
     this.drawGame();
     this.exploreLoadedAt = null;
-    if (this.tab === 'explore') void this.reloadExplore();
+    // Not while paged away, for the reason in `exploreIsStale`. Your own move
+    // lands on a page you are not looking at, and jumping there to show it is
+    // the board deciding where you should be.
+    if (this.tab === 'explore' && this.exploreTop === null) void this.reloadExplore();
 
     // A different wallet has a different answer, and keeping the old one would
     // show one person another person's games.
@@ -5080,9 +5106,17 @@ export class ChessApp {
 
       // Newest first, and bounded: an unbounded walk on a busy contract would
       // make the first paint arbitrarily slow.
-      const first = Math.max(1, count - (EXPLORE_WINDOW - 1));
+      //
+      // PAGING IS THE SAME READ AT A DIFFERENT OFFSET. The window was always an
+      // id range rather than a query, so an older page costs exactly what this
+      // one does. `exploreTop` is clamped to the live count because games are
+      // opened while somebody reads, and a page pinned past the end would come
+      // back empty rather than at the end.
+      const top = Math.min(this.exploreTop ?? count, count);
+      const first = Math.max(1, top - (EXPLORE_WINDOW - 1));
       const ids: number[] = [];
-      for (let id = count; id >= first; id--) ids.push(id);
+      for (let id = top; id >= first; id--) ids.push(id);
+      const onNewest = this.exploreTop === null || top >= count;
 
       // AND YOUR OWN, WHEREVER THEY ARE.
       //
@@ -5098,9 +5132,17 @@ export class ChessApp {
       // sent. Read exactly like the window ids and replayed exactly the same
       // way, so the turn badge on a game from 2024 is derived from its log
       // rather than from anything remembered about it.
-      this.yoursOutside = this.address
-        ? (this.yours?.known(this.address) ?? []).filter((id) => id < first && id <= count)
-        : [];
+      //
+      // ONLY ON THE NEWEST PAGE. The condition below is "older than this page
+      // starts", which on page one means "fell off the end" and is the whole
+      // point — and on page four means most of the contract, so every one of
+      // your games would be appended to a range that does not contain them. A
+      // reader who has paged has asked for a specific stretch of ids and should
+      // be given that stretch and nothing else.
+      this.yoursOutside =
+        this.address && onNewest
+          ? (this.yours?.known(this.address) ?? []).filter((id) => id < first && id <= count)
+          : [];
       ids.push(...this.yoursOutside);
 
       // A FEW AT A TIME, because the cost here is latency and not bandwidth.
@@ -5297,6 +5339,33 @@ export class ChessApp {
   }
 
   /** Rebuild the list from the chain, discarding any search result with it. */
+  /**
+   * Move a page older or newer.
+   *
+   * A PAGE IS A RANGE OF IDS and nothing else, so this is arithmetic rather
+   * than a cursor: there is no state on the chain to advance and no query to
+   * re-run. Stepping back onto the newest page drops `exploreTop` to null
+   * rather than to the count, which is what lets the newest page keep meaning
+   * "newest" while games are being opened.
+   */
+  private async pageExplore(direction: -1 | 1): Promise<void> {
+    const count = this.exploreTotal ?? 0;
+    if (count < 1) return;
+
+    const top = Math.min(this.exploreTop ?? count, count);
+    const next = top + direction * EXPLORE_WINDOW;
+
+    // Past the newest is the newest, and past the oldest is a page ending at
+    // game 1 rather than an empty one. Neither is an error worth saying.
+    if (next >= count) this.exploreTop = null;
+    else this.exploreTop = Math.max(EXPLORE_WINDOW, next);
+
+    this.exploreFound = null;
+    this.text('exploreFound', '');
+    this.exploreLoadedAt = null;
+    await this.loadExplore();
+  }
+
   private async reloadExplore(): Promise<void> {
     this.exploreLoadedAt = null;
     this.exploreFound = null;
@@ -5791,10 +5860,20 @@ export class ChessApp {
       // Both facts matter: the window is real, so a player's game can fall off
       // it, and the order depends on who is looking.
       const outside = this.yoursOutside.length;
+      // WHICH STRETCH, not just how many. Once the list can be paged, "newest
+      // 25 shown" is wrong on every page but the first, and a reader who has
+      // paged twice has no other way to tell where they are.
+      const paged = this.exploreTop !== null;
+      const top = Math.min(this.exploreTop ?? this.exploreTotal, this.exploreTotal);
+      const low = Math.max(1, top - (EXPLORE_WINDOW - 1));
       this.text(
         'exploreCount',
         `${this.exploreTotal} game${this.exploreTotal === 1 ? '' : 's'} on this contract` +
-          (this.exploreTotal > EXPLORE_WINDOW ? `, newest ${EXPLORE_WINDOW} shown` : '') +
+          (paged
+            ? `, showing ${low}\u2013${top}. Updates are paused while you page; press Refresh.`
+            : this.exploreTotal > EXPLORE_WINDOW
+              ? `, newest ${EXPLORE_WINDOW} shown`
+              : '') +
           // Said because the count above stops being the whole story: the list
           // is no longer "the newest twenty-five" once your own older games are
           // in it, and a reader counting rows would otherwise find more than
@@ -5836,6 +5915,14 @@ export class ChessApp {
           : `${showing.length} of ${this.exploreRows.length} shown.`) + reach
       );
     }
+
+    // Disabled at the ends rather than hidden, so the control does not move
+    // about as somebody pages through.
+    const atNewest = this.exploreTop === null;
+    const atOldest = Math.max(1, Math.min(this.exploreTop ?? this.exploreTotal, this.exploreTotal)
+      - (EXPLORE_WINDOW - 1)) <= 1;
+    (this.el.exploreNewer as HTMLButtonElement).disabled = atNewest;
+    (this.el.exploreOlder as HTMLButtonElement).disabled = atOldest;
 
     for (const row of found ? [found, ...showing.filter((r) => r.id !== found.id)] : showing) {
       const tr = this.doc.createElement('tr');

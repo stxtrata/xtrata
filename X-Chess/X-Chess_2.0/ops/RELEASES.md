@@ -8,12 +8,46 @@ that a build which never shipped still leaves a record of why.
 
 ## 2.1.4 — 2026-08-19
 
-Profile pictures, phase 1. Built, not yet inscribed. **217,735 bytes, 14 chunks**
-— the first build to cross from 13 chunks to 14.
+Profile pictures, deep links and a paged game list. Built, not yet inscribed.
+**221,526 bytes, 14 chunks** — the first build to cross from 13 chunks to 14.
 
-* `htmlSha256` `8c7acc3ab39ecc3e699071397cf61fbca4b3944a97c19337b963e11df0331c88`
-* xtrata chunk hash `7145105b822440f370b55449aea2d46b4d4ba7b60e602c7fc8f8e5dc4fc34941`
-* **218,201 bytes.** Two documents, said out loud: the first person to use this
+* `htmlSha256` `1a78d874e04df3ed821ca6a477fdbbf1e23725b6f0ed31cd73f3dfd8d3c9e7c1`
+* xtrata chunk hash `b9e11fc9625dd917a202539888eda7dcbd3ebe73149bac5501b985e539d19a49`
+* build stamp `2.1.4 - 2026-08-19 15:45 - #8408ccf5`
+* 1,531 tests passing, 78 files. `tsc --noEmit` clean.
+
+**This entry carried two different byte counts and neither was current** —
+217,735 in its heading and 218,201 in a bullet, against an artefact of 221,526.
+Written while the work was still moving, which is the failure mode this ledger
+names two entries down: a hash here identifies a FILE, and a file that is still
+being rebuilt does not have one yet. Corrected to the build above, which is the
+one that would be inscribed.
+
+### Since that entry was first written
+
+* **Deep links for tournaments and players.** `?tournament=<id>` opens the
+  Tournaments tab at that manifest, `?player=<address>` opens a Profile. A
+  tournament link needs nothing but the id, because a manifest names its own
+  pairings and the board checks every one against the chain — unlike a game
+  link, which has to carry its rules. The player value is validated as an
+  address rather than passed through: a link is a thing strangers hand each
+  other.
+* **The game list pages.** Older/Newer over the same twenty-five reads at a
+  different offset, since the window was always an id range rather than a query.
+  Three behaviours decided rather than defaulted, each of them a way for the
+  list to lie quietly: the refresh timer PAUSES while paged, because a list
+  somebody is reading must not move under them; "your games from further back"
+  appears only on the newest page, because its condition is "older than this
+  page starts" and that is most of the contract on page four; and the count line
+  says which stretch of ids is on screen instead of claiming the newest
+  twenty-five everywhere.
+* **What this address has inscribed**, and a manifest cost corrected from 0.3
+  STX to about 0.03 — settled off a real mint transaction rather than off
+  `get-fee-unit`, which returns a number that is not the live price.
+
+### Notes from the original entry
+
+* **Two documents, said out loud:** the first person to use this
   picked an image, built the name manifest, and reported the picture missing
   from it. It was not missing — it is a second inscription, shown in its own
   panel directly above. Two panels each ending in "your manifest" read as one

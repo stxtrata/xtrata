@@ -957,6 +957,12 @@ export const HTML = `
     <h2>Games</h2>
     <div class="row">
       <button class="action" id="explore-refresh">Refresh</button>
+      <!-- Paging. The window has always been an id RANGE rather than a query,
+           so an older page costs exactly what the newest one does: the same
+           twenty-five reads at a different offset. What the buttons change is
+           which range, and nothing about how it is read. -->
+      <button class="action" id="explore-newer" disabled>Newer</button>
+      <button class="action" id="explore-older">Older</button>
       <span id="explore-count" class="muted small"></span>
     </div>
     <!-- Filters. Every one reads a field the row already carries, so none of
