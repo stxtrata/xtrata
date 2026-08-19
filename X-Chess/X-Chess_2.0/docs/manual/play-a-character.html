@@ -1,0 +1,511 @@
+<title>Play a Character</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+
+<style>
+/* ---------------------------------------------------------------
+   Palette taken off the board itself: the two square tints, the
+   ground behind them, and the amber the board already uses to mean
+   "look here". Neutrals are warmed toward the wood rather than grey.
+   --------------------------------------------------------------- */
+:root {
+  --ground:      #f0e8da;
+  --raised:      #f8f3ea;
+  --sunken:      #e5dac6;
+  --edge:        #d3c4a8;
+  --edge-strong: #b8a583;
+
+  --text:        #23190f;
+  --text-soft:   #6b5b45;
+  --text-faint:  #8d7c63;
+
+  --amber:       #a86a10;
+  --amber-bright:#d4912a;
+  --moss:        #4d6344;
+
+  --sq-light:    #d9c9a4;
+  --sq-dark:     #b09a71;
+
+  --shadow: 0 1px 2px rgba(35,25,15,.07), 0 8px 24px -12px rgba(35,25,15,.18);
+
+  --display: 'Fraunces', 'Hoefler Text', Georgia, 'Times New Roman', serif;
+  --body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --measure: 63ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:      #171310;
+    --raised:      #201a15;
+    --sunken:      #100d0a;
+    --edge:        #35291f;
+    --edge-strong: #4c3b2b;
+
+    --text:        #f0e6d6;
+    --text-soft:   #b8a68c;
+    --text-faint:  #8d7c63;
+
+    --amber:       #e0a63f;
+    --amber-bright:#f0bd5e;
+    --moss:        #8fae80;
+
+    --sq-light:    #6d5a3e;
+    --sq-dark:     #4a3c2a;
+
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground:      #171310;
+  --raised:      #201a15;
+  --sunken:      #100d0a;
+  --edge:        #35291f;
+  --edge-strong: #4c3b2b;
+
+  --text:        #f0e6d6;
+  --text-soft:   #b8a68c;
+  --text-faint:  #8d7c63;
+
+  --amber:       #e0a63f;
+  --amber-bright:#f0bd5e;
+  --moss:        #8fae80;
+
+  --sq-light:    #6d5a3e;
+  --sq-dark:     #4a3c2a;
+
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 78rem; margin: 0 auto; padding: 0 1.5rem 6rem; }
+.col { max-width: var(--measure); }
+
+/* --- masthead ------------------------------------------------- */
+
+.top {
+  border-bottom: 1px solid var(--edge);
+  padding: 4.5rem 0 3rem;
+  margin-bottom: 3.5rem;
+}
+.kicker {
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin: 0 0 1.4rem;
+}
+h1 {
+  font-family: var(--display);
+  font-size: clamp(2.6rem, 7vw, 4.6rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -.02em;
+  margin: 0 0 1.2rem;
+  text-wrap: balance;
+}
+.standfirst {
+  font-family: var(--display);
+  font-size: clamp(1.15rem, 2.3vw, 1.45rem);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--text-soft);
+  max-width: 46ch;
+  margin: 0;
+  text-wrap: balance;
+}
+
+/* --- sections ------------------------------------------------- */
+
+section { margin: 0 0 4.5rem; }
+
+h2 {
+  font-family: var(--display);
+  font-size: clamp(1.6rem, 3.4vw, 2.15rem);
+  font-weight: 600;
+  letter-spacing: -.015em;
+  line-height: 1.15;
+  margin: 0 0 .5rem;
+  text-wrap: balance;
+}
+h3 {
+  font-family: var(--body);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .01em;
+  margin: 2rem 0 .4rem;
+}
+.lede { color: var(--text-soft); margin: 0 0 2rem; max-width: var(--measure); }
+p { margin: 0 0 1.1rem; max-width: var(--measure); }
+a { color: var(--amber); text-underline-offset: .18em; text-decoration-thickness: 1px; }
+a:hover { color: var(--amber-bright); }
+a:focus-visible { outline: 2px solid var(--amber-bright); outline-offset: 3px; border-radius: 2px; }
+strong { font-weight: 600; }
+code {
+  font-family: var(--mono);
+  font-size: .875em;
+  background: var(--sunken);
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  padding: .08em .35em;
+}
+
+/* --- the board of characters ---------------------------------- */
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 1px solid var(--edge-strong);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 0 0 1.4rem;
+}
+@media (max-width: 980px) { .board { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 560px) { .board { grid-template-columns: 1fr; } }
+
+.sq {
+  background: var(--sq-light);
+  padding: 1.35rem 1.3rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-height: 12.5rem;
+  border-right: 1px solid rgba(0,0,0,.07);
+  border-bottom: 1px solid rgba(0,0,0,.07);
+}
+.sq.alt { background: var(--sq-dark); }
+
+.sq-name {
+  font-family: var(--display);
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.01em;
+  color: var(--text);
+  margin: 0;
+}
+.sq-style {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.sq-motto {
+  font-family: var(--display);
+  font-size: .98rem;
+  line-height: 1.35;
+  color: var(--text);
+  margin: 0;
+  flex: 1;
+}
+.sq-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  font-family: var(--mono);
+  font-size: .74rem;
+  border-top: 1px solid rgba(0,0,0,.13);
+  padding-top: .55rem;
+}
+.pips { letter-spacing: .12em; color: var(--text-soft); }
+.pips b { color: var(--amber); font-weight: 400; }
+
+/* --- steps ---------------------------------------------------- */
+
+.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; }
+.steps > li {
+  counter-increment: s;
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 0 1.25rem;
+  padding: 1.6rem 0;
+  border-top: 1px solid var(--edge);
+}
+.steps > li::before {
+  content: counter(s);
+  font-family: var(--display);
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--amber);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.steps h3 { margin: 0 0 .45rem; font-size: 1.12rem; }
+.steps p:last-child { margin-bottom: 0; }
+@media (max-width: 560px) {
+  .steps > li { grid-template-columns: 1fr; gap: .3rem; }
+}
+
+/* --- code ----------------------------------------------------- */
+
+.code {
+  background: var(--sunken);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0 0 1.2rem;
+}
+.code pre {
+  font-family: var(--mono);
+  font-size: .82rem;
+  line-height: 1.7;
+  margin: 0;
+  padding: 1.1rem 1.25rem;
+  white-space: pre;
+  color: var(--text);
+}
+.code .c { color: var(--text-faint); font-style: italic; }
+.code .k { color: var(--amber); }
+.code .s { color: var(--moss); }
+
+.note {
+  border-left: 2px solid var(--amber);
+  padding: .1rem 0 .1rem 1.1rem;
+  margin: 0 0 1.4rem;
+  color: var(--text-soft);
+  max-width: var(--measure);
+}
+.note strong { color: var(--text); }
+
+/* --- reference table ------------------------------------------ */
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--edge); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td {
+  text-align: left;
+  padding: .68rem 1rem;
+  border-bottom: 1px solid var(--edge);
+  white-space: nowrap;
+}
+th {
+  font-family: var(--mono);
+  font-size: .7rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-weight: 400;
+  background: var(--sunken);
+}
+tbody tr:last-child td { border-bottom: 0; }
+td.id { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.what { white-space: normal; color: var(--text-soft); }
+
+.costs { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1px; background: var(--edge); border: 1px solid var(--edge); border-radius: 4px; overflow: hidden; margin-bottom: 1.4rem; }
+.cost { background: var(--raised); padding: 1.1rem 1.2rem; }
+.cost .n { font-family: var(--display); font-size: 1.7rem; font-weight: 600; line-height: 1; display: block; margin-bottom: .3rem; font-variant-numeric: tabular-nums; }
+.cost .l { font-family: var(--mono); font-size: .7rem; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
+
+footer {
+  border-top: 1px solid var(--edge);
+  padding-top: 2rem;
+  color: var(--text-faint);
+  font-size: .88rem;
+}
+footer p { max-width: var(--measure); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="kicker">X Chess &middot; on Stacks</p>
+  <h1>Play a character</h1>
+  <p class="standfirst">Ten chess personalities live on Bitcoin as permanent text. Pick one, point your own AI model at it, and play a real game against it.</p>
+</header>
+
+<section>
+  <h2>What this actually is</h2>
+  <p class="lede">Not a chess app with a bot in it.</p>
+  <p>Every character below exists as an <strong>inscription</strong> — a small permanent document on Bitcoin, via Stacks. It describes how that player thinks: what it wants from a position, when it will give up material, how it treats an endgame. Nothing else. It is not code and it holds no secrets.</p>
+  <p>When you play one, <strong>you</strong> supply the intelligence. Your script fetches the character's text, hands it to whichever model you like, and gets a move back. The character is the instructions; the model is the muscle. Two people running the same character on different models will get recognisably the same player making different decisions, which is the interesting part.</p>
+  <p>Every move goes on chain, so the game is a public record that neither side can revise afterwards.</p>
+</section>
+
+<section>
+  <h2>Choose your opponent</h2>
+  <p class="lede">Each name links to its own inscription — the actual text your model will be given, exactly as it is stored.</p>
+</section>
+
+<div class="board">
+
+  <div class="sq"><p class="sq-name">Gambit</p><span class="sq-style">Romantic</span><p class="sq-motto">A quiet position is a lost opportunity.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/2995">sheet 2995</a><span class="pips" title="one ply deeper than the house engine"><b>&#9679;</b>&#9675;</span></div></div>
+
+  <div class="sq alt"><p class="sq-name">Ledger</p><span class="sq-style">Materialist</span><p class="sq-motto">Count everything. Give nothing away.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/2996">sheet 2996</a><span class="pips" title="no extra depth">&#9675;&#9675;</span></div></div>
+
+  <div class="sq"><p class="sq-name">Mason</p><span class="sq-style">Positional</span><p class="sq-motto">The win arrives once enough small things are true.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/2997">sheet 2997</a><span class="pips" title="one ply deeper"><b>&#9679;</b>&#9675;</span></div></div>
+
+  <div class="sq alt"><p class="sq-name">Wager</p><span class="sq-style">Chaotic</span><p class="sq-motto">Reach the position where a mistake is likely.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/2998">sheet 2998</a><span class="pips" title="two ply deeper"><b>&#9679;&#9679;</b></span></div></div>
+
+  <div class="sq"><p class="sq-name">Plumb</p><span class="sq-style">Solid</span><p class="sq-motto">Make no weaknesses.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/2999">sheet 2999</a><span class="pips" title="no extra depth">&#9675;&#9675;</span></div></div>
+
+  <div class="sq alt"><p class="sq-name">Oblique</p><span class="sq-style">Contrarian</span><p class="sq-motto">Rather slightly worse in a position nobody has studied.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/3000">sheet 3000</a><span class="pips" title="two ply deeper"><b>&#9679;&#9679;</b></span></div></div>
+
+  <div class="sq"><p class="sq-name">Fathom</p><span class="sq-style">Simplifier</span><p class="sq-motto">Every trade is a step toward the ending I want.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/3010">sheet 3010</a><span class="pips" title="two ply deeper"><b>&#9679;&#9679;</b></span></div></div>
+
+  <div class="sq alt"><p class="sq-name">Cadence</p><span class="sq-style">Initiative</span><p class="sq-motto">Give them nothing to think about but the threat.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/3011">sheet 3011</a><span class="pips" title="one ply deeper"><b>&#9679;</b>&#9675;</span></div></div>
+
+  <div class="sq"><p class="sq-name">Bulwark</p><span class="sq-style">Counter-attacker</span><p class="sq-motto">Let them come.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/3012">sheet 3012</a><span class="pips" title="no extra depth">&#9675;&#9675;</span></div></div>
+
+  <div class="sq alt"><p class="sq-name">Canon</p><span class="sq-style">Classical</span><p class="sq-motto">The main line is main for a reason.</p><div class="sq-foot"><a href="https://xtrata.xyz/i/3013">sheet 3013</a><span class="pips" title="one ply deeper"><b>&#9679;</b>&#9675;</span></div></div>
+
+</div>
+
+<section class="col">
+  <p style="font-size:.9rem;color:var(--text-faint)">The pips are search depth — how many extra moves ahead that seat looks, on top of what the shared engine already does. It is a handicap the tournament declared out loud, not a measure of strength. Two dots is the maximum anyone may be given.</p>
+  <p style="font-size:.9rem;color:var(--text-faint)">Live records for all ten are on the board's Leaderboard tab: <a href="https://xtrata.xyz/i/3014">xtrata.xyz/i/3014</a>. Ratings move as games finish, which is why they are not printed here.</p>
+</section>
+
+<section>
+  <h2>What you need</h2>
+  <p class="lede">Three things, and you probably have two of them.</p>
+  <p><strong>A Stacks wallet</strong> with a small amount of STX — <a href="https://www.xverse.app/">Xverse</a> or <a href="https://leather.io/">Leather</a>. A whole game costs a few pennies; see the costs below.</p>
+  <p><strong>An AI model you can call.</strong> Anything that takes text and returns text. An API key, a local model, whatever you already use.</p>
+  <p><strong>Node, or any way to run a script.</strong> The example below is about forty lines.</p>
+</section>
+
+<section>
+  <h2>Set up the match</h2>
+  <p class="lede">You play one side by hand on the board. Your script plays the character's side.</p>
+
+  <ol class="steps">
+    <li>
+      <h3>Open the board and connect</h3>
+      <p>Go to <a href="https://xtrata.xyz/i/3014">xtrata.xyz/i/3014</a> and press Connect. The board is itself an inscription — there is no server, and it reads everything from the chain in front of you.</p>
+    </li>
+    <li>
+      <h3>Create a game with two named sides</h3>
+      <p>In the Play tab, set <strong>White</strong> to your own address and leave <strong>Black</strong> as <code>anyone</code>. That is the low-friction setup: your one wallet can play White because it is named, and Black because Black is open.</p>
+      <p>If you would rather the record show two distinct players, make a second wallet and name it as Black instead. Both work; the second is tidier and costs one more account.</p>
+      <p>Leave <strong>ranked</strong> off unless you want the result to touch the public ratings.</p>
+    </li>
+    <li>
+      <h3>Note the game number</h3>
+      <p>Opening the game gives it a number. Your script needs it, and it is also the whole of a shareable link: <code>?game=41</code>.</p>
+    </li>
+    <li>
+      <h3>Point the script at your character</h3>
+      <p>Put the sheet's inscription number in the script below — <code>2999</code> for Plumb, <code>2995</code> for Gambit, and so on from the board above.</p>
+    </li>
+    <li>
+      <h3>Play</h3>
+      <p>Make your move on the board. Run the script; it reads the position, asks your model what the character would play, and submits it. Repeat. Each side pays its own transaction fee as it moves.</p>
+    </li>
+  </ol>
+</section>
+
+<section>
+  <h2>The script</h2>
+  <p class="lede">Everything it needs comes off the chain except your model.</p>
+
+  <div class="note">
+    <p><strong>The prompt protocol is inscribed too.</strong> The house rules, the wording that fences the character off from the instructions, the way a position is described, and the rule that turns a reply back into a move — all of it is one small module on chain. Fetch it and you are asking the model exactly what the tournament asks it. Reimplement it and you are running a different experiment, which is fine, but it is a different one.</p>
+  </div>
+
+<div class="code"><pre><span class="c">// Play one move as a character. Node 20+, no dependencies.</span>
+
+<span class="k">const</span> XTRATA = <span class="s">'https://xtrata.xyz/i/'</span>;
+<span class="k">const</span> SHEET    = <span class="s">2999</span>;   <span class="c">// Plumb. Any number from the board above.</span>
+<span class="k">const</span> PROTOCOL = <span class="s">2994</span>;   <span class="c">// reads a sheet</span>
+<span class="k">const</span> DIRECTOR = <span class="s">0</span>;      <span class="c">// prompt protocol — see the table below</span>
+
+<span class="k">const</span> text = <span class="k">async</span> (id) =&gt; (<span class="k">await</span> fetch(XTRATA + id)).text();
+<span class="k">const</span> mod  = <span class="k">async</span> (id) =&gt; <span class="k">import</span>(
+  <span class="s">'data:text/javascript;base64,'</span> + Buffer.from(<span class="k">await</span> text(id)).toString(<span class="s">'base64'</span>)
+);
+
+<span class="k">const</span> { parseEntry } = <span class="k">await</span> mod(PROTOCOL);
+<span class="k">const</span> { SYSTEM_PROMPT, buildRequest, extractMove } = <span class="k">await</span> mod(DIRECTOR);
+
+<span class="k">const</span> character = parseEntry(<span class="k">await</span> text(SHEET)).entry;
+
+<span class="c">// The position and the legal moves come from the board or your own</span>
+<span class="c">// copy of the engine — it is inscription 2991, also dependency-free.</span>
+<span class="k">const</span> prompt = buildRequest({
+  character: { prompt: character.style },
+  fen, history, legalMoves, turn: <span class="s">'black'</span>
+});
+
+<span class="c">// Your model. Anything that takes two strings and returns one.</span>
+<span class="k">const</span> reply = <span class="k">await</span> yourModel(SYSTEM_PROMPT, prompt);
+<span class="k">const</span> move  = extractMove(reply, legalMoves);   <span class="c">// null if it answered badly</span>
+
+<span class="c">// Then submit `move` to the contract with your wallet, and set the</span>
+<span class="c">// fee to 400 uSTX — see the note on fees below.</span>
+</pre></div>
+
+  <div class="note">
+    <p><strong>If the model answers with a sentence instead of a move</strong>, <code>extractMove</code> returns <code>null</code>. Ask again. The house rules already tell it to reply with one move and nothing else, and most models obey; the ones that narrate tend to do it on the first move of a game and then settle.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What it costs</h2>
+  <p class="lede">Measured on real games, not estimated.</p>
+
+  <div class="costs">
+    <div class="cost"><span class="n">0.0004</span><span class="l">STX per move</span></div>
+    <div class="cost"><span class="n">0.010</span><span class="l">STX to open a game</span></div>
+    <div class="cost"><span class="n">~0.02</span><span class="l">STX a whole game</span></div>
+  </div>
+
+  <div class="note">
+    <p><strong>Your wallet will suggest far more than this.</strong> Wallets estimate from network-wide traffic, not from this contract, and typically propose several times what a move actually needs. Set the fee yourself: in Xverse press <strong>Edit</strong> then <strong>Custom</strong>; in Leather use the <strong>Custom</strong> tab. Enter <code>400</code> uSTX. The board shows the same reminder in every game.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Everything, and where it lives</h2>
+  <p class="lede">Nothing here is hosted. Each number is a permanent document you can fetch, read and run.</p>
+
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Inscription</th><th>What it is</th></tr>
+      </thead>
+      <tbody>
+        <tr><td class="id"><a href="https://xtrata.xyz/i/2991">2991</a></td><td class="what">The chess engine. Legal moves and evaluation, dependency-free, identical for every player.</td></tr>
+        <tr><td class="id"><a href="https://xtrata.xyz/i/2994">2994</a></td><td class="what">The sheet reader. Parses a character and renders the text a model is given.</td></tr>
+        <tr><td class="id">pending</td><td class="what">The prompt protocol: house rules, the fence around a character, the shape of a position, and how a reply becomes a move.</td></tr>
+        <tr><td class="id"><a href="https://xtrata.xyz/i/3014">3014</a></td><td class="what">The board. Play, explore, verify, and read the standings.</td></tr>
+        <tr><td class="id"><a href="https://xtrata.xyz/i/3016">3016</a></td><td class="what">Exhibition Three: ninety games between all ten characters, committed before a move was played.</td></tr>
+        <tr><td class="id">2995&ndash;3000<br>3010&ndash;3013</td><td class="what">The ten characters.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:1.4rem">The contract that referees every game is <code>SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary</code>. It stores moves and enforces the rules; it does not decide anything about who is winning. That comes from replaying the log, which anybody can do.</p>
+</section>
+
+<section>
+  <h2>Write your own character</h2>
+  <p class="lede">The ten are not special. They are ten sheets that happened to get inscribed first.</p>
+  <p>A character is a short text file: a name, a playing style, and optionally how it treats openings, risk, endgames and one quirk. Around twelve hundred characters in total. Fetch <a href="https://xtrata.xyz/i/2994">2994</a>, call <code>blankEntry()</code>, and it hands you the form with the limits written next to each field.</p>
+  <p>Inscribe it and it is permanent — which is the point. A character that can be edited after its games are played describes a player that never existed.</p>
+</section>
+
+<footer>
+  <p>X Chess runs on Stacks and is inscribed with <a href="https://xtrata.xyz">Xtrata</a>. Games are refereed by a contract; results are derived by replaying the log, never taken from anybody's claim.</p>
+  <p>The full manual is at <a href="https://xtrata.xyz/i/3007">xtrata.xyz/i/3007</a>.</p>
+</footer>
+
+</div>
