@@ -10,9 +10,17 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. **206,223 bytes, 13 chunks.**
 
-* `htmlSha256` `f11220aec00fe7c573b10056b2037f4ad1cb43cfe870011de81581bd045e5464`
-* xtrata chunk hash `b344acb8a724cd6d80059462963703553b76069b5c1053a6582108cd260a7dfb`
-* build stamp `2.1.3 - 2026-08-19 13:17 - #c7697a3b`
+* `htmlSha256` `79521871a163957e0c5b65ea09f1238eed083bfbc0ffa22e79238df91246e584`
+* xtrata chunk hash `810062d662cf5f3af130dbd9042fcb7c92fd5dba924a333ee987666052742435`
+* build stamp `2.1.3 - 2026-08-19 14:34 - #c7697a3b`
+* Source hash `#c7697a3b` is UNCHANGED from the 13:17 build this entry first
+  recorded. Nothing in `packages/` has moved since; the file hash differs only
+  because the version line carries a build timestamp, and `dist/` had been
+  rebuilt at 13:37 by something other than the run that wrote this entry. That
+  is exactly the drift this ledger warns about two entries down — a hash here
+  identifies a FILE, not a commit — so it is corrected rather than explained
+  away. The runner now reads characters from chain, but the runner is a harness
+  script and is not part of the board, so there is nothing new in these bytes.
 * 1,484 tests passing, 74 files. `tsc --noEmit` clean.
 * Cost, measured on 3014 rather than estimated: **0.236 STX all in** for 13 chunks.
 
