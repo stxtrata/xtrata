@@ -105,7 +105,7 @@ def build():
                 # ban emoji and the linter enforces it, so a thread marker in
                 # the text would fail its own check. Here it is a label telling
                 # you where you are in a sequence, which is what it is for.
-                seq_label = ("\U0001FAA1 %d/%d" % (pi + 1, total)) if is_thread else ("%d/%d" % (pi + 1, total))
+                seq_label = ("\U0001F9F5 %d/%d" % (pi + 1, total)) if is_thread else ("%d/%d" % (pi + 1, total))
                 # The COPIED text carries the number and never the emoji, so a
                 # thread posts as 1/7 the way threads normally read.
                 copy_text = ("%d/%d\n\n%s" % (pi + 1, total, text)) if is_thread else text

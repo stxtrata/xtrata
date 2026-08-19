@@ -680,3 +680,54 @@ describe('a dependency on another manifest is a REVISION, never a sequence', () 
     expect(resolved.lineage).toEqual([3016]);
   });
 });
+
+describe('correcting a mistake by reissuing from the same wallet', () => {
+  // THE REMEDY FOR A PERMANENT DOCUMENT. A manifest cannot be edited, so the
+  // only fix for a wrong one is a better one that declares it, inscribed by the
+  // same wallet. Three rules already make that safe, and they are asserted here
+  // together because they are only safe together.
+  const ORGANISER = 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S';
+  const STRANGER = 'SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2';
+  const manifest = (name: string) =>
+    `${TOURNAMENT_HEADER}\n` + JSON.stringify({
+      name, format: 'round-robin', contract: 'SP1.core',
+      entrants: [{ name: 'A', address: 'SP1' }, { name: 'B', address: 'SP2' }],
+      games: [{ id: 1, white: 'A', black: 'B', round: 1 }]
+    });
+  const chain = (deps: Record<number, number[]>, creators: Record<number, string>) => ({
+    text: async (id: number) => (id in deps ? manifest(`T${id}`) : null),
+    dependencies: async (id: number) => deps[id] ?? [],
+    creator: async (id: number) => creators[id] ?? ORGANISER
+  });
+
+  it('keeps the tournament id, so a correction does not become a new tournament', async () => {
+    const resolved = await resolveTournament(20, chain({ 10: [], 20: [10] }, {}));
+    expect(resolved.tournamentId, 'the correction answers to the original').toBe(10);
+    expect(resolved.lineage).toEqual([10, 20]);
+    expect(resolved.ok).toBe(true);
+  });
+
+  it('refuses a correction from a different wallet, and says it is a fork', async () => {
+    // Without this, anybody could adopt somebody else's tournament by
+    // inscribing a manifest that declares it.
+    const resolved = await resolveTournament(20, chain({ 10: [], 20: [10] }, { 20: STRANGER }));
+    expect(resolved.ok).toBe(false);
+    expect(resolved.problems[0].says).toContain('fork');
+  });
+
+  it('only counts a correction that landed before the first move', () => {
+    // Strictly before. A revision in the same block as the first move is not
+    // clearly earlier, and the tie must not favour the organiser.
+    expect(revisedInTime(99, 100), 'before the game started').toBe(true);
+    expect(revisedInTime(100, 100), 'same block is not earlier').toBe(false);
+    expect(revisedInTime(101, 100), 'after the first move').toBe(false);
+    expect(revisedInTime(null, 100), 'unknown is never "fine"').toBe(null);
+  });
+
+  it('caps how deep a lineage may go', async () => {
+    const deps: Record<number, number[]> = { 1: [] };
+    for (let id = 2; id <= MAX_REVISIONS + 5; id++) deps[id] = [id - 1];
+    const resolved = await resolveTournament(MAX_REVISIONS + 5, chain(deps, {}));
+    expect(resolved.lineage.length).toBeLessThanOrEqual(MAX_REVISIONS + 1);
+  });
+});

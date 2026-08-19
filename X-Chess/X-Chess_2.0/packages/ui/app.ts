@@ -2804,12 +2804,82 @@ export class ChessApp {
   private async loadTournamentList(): Promise<void> {
     if (!this.index) return;
     try {
-      this.found = await this.index.list();
+      this.found = await this.collapseRevisions(await this.index.list());
     } catch {
       this.found = [];
     }
     this.drawPickerFilters();
     this.drawTournamentList();
+  }
+
+  /**
+   * One chip per tournament, showing the newest correction of it.
+   *
+   * THIS IS HOW A MISTAKE GETS FIXED. A manifest is permanent, so the only
+   * remedy for a wrong one is to inscribe a better one that declares it, from
+   * the same wallet. `resolveTournament` already walks that chain and already
+   * refuses a link whose creator differs, calling it a fork rather than a
+   * correction. What was missing is that nothing ever walked FORWARD: asking
+   * for a root returned the root's own bytes, so a correction could be made
+   * and would never be seen.
+   *
+   * The directory lists every manifest the organiser holds, which is exactly
+   * the set a revision can be found in, so forward is a grouping rather than a
+   * search. Newest id wins within a lineage.
+   *
+   * WHAT MAKES IT SAFE, and none of it is new:
+   *   - same creator, or it is a fork and `resolveTournament` says so;
+   *   - a revision only counts if it landed strictly BEFORE the first move,
+   *     which `revisedInTime` decides and the board shows;
+   *   - lineage depth is capped at MAX_REVISIONS.
+   *
+   * So an organiser can fix a typo, and cannot quietly rewrite a tournament
+   * that has started or adopt somebody else's.
+   *
+   * The alternative, hiding revisions, was the first version of this and it is
+   * worse: it makes a correction invisible instead of authoritative, which is
+   * the opposite of the point.
+   */
+  private async collapseRevisions<T extends { id: number }>(found: T[]): Promise<T[]> {
+    if (!this.xtrata) return found;
+
+    /** Which manifest each one revises, when it revises one at all. */
+    const parentOf = new Map<number, number>();
+    const known = new Set(found.map((entry) => entry.id));
+    for (const entry of found) {
+      try {
+        for (const dep of await this.xtrata.dependencies(entry.id)) {
+          const text = await this.xtrata.text(dep);
+          if (text !== null && parseTournament(text).ok) { parentOf.set(entry.id, dep); break; }
+        }
+      } catch {
+        // A read that failed says nothing about the manifest. Leaving it as a
+        // root shows it, and a tournament too many beats one missing.
+      }
+    }
+
+    const rootOf = (id: number): number => {
+      let at = id;
+      for (let step = 0; step < 20; step++) {
+        const parent = parentOf.get(at);
+        if (parent === undefined) return at;
+        at = parent;
+      }
+      return at;
+    };
+
+    // Newest member of each lineage, which is the correction if there is one.
+    const newest = new Map<number, T>();
+    for (const entry of found) {
+      const root = rootOf(entry.id);
+      // A lineage whose root this wallet does not hold is somebody else's, and
+      // collapsing into it would hide this manifest behind a chip that is not
+      // shown. Left alone.
+      if (!known.has(root)) { newest.set(entry.id, entry); continue; }
+      const standing = newest.get(root);
+      if (!standing || entry.id > standing.id) newest.set(root, entry);
+    }
+    return [...newest.values()].sort((a, b) => b.id - a.id);
   }
 
   /**

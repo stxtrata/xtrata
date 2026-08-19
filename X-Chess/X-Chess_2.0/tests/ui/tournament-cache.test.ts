@@ -73,7 +73,12 @@ function deps(moves: string[] = MATE) {
   const reader = { async mintedAt() { return 90; } };
   return {
     counts,
-    deps: { chain, reader, compiledAcceptedBefore: 0 } as never
+    // `as never` here erased the object's own shape, so a test that reaches
+    // for `deps.chain` to override one method could not compile. Cast to what
+    // the function actually takes instead, which keeps both sides honest.
+    deps: { chain, reader, compiledAcceptedBefore: 0 } as unknown as Parameters<
+      typeof scoreTournament
+    >[1]
   };
 }
 
