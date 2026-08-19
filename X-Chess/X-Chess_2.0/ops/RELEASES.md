@@ -6,6 +6,51 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.1.3 — 2026-08-19
+
+Built, not yet inscribed. **206,223 bytes, 13 chunks.**
+
+* `htmlSha256` `f11220aec00fe7c573b10056b2037f4ad1cb43cfe870011de81581bd045e5464`
+* xtrata chunk hash `b344acb8a724cd6d80059462963703553b76069b5c1053a6582108cd260a7dfb`
+* build stamp `2.1.3 - 2026-08-19 13:17 - #c7697a3b`
+* 1,484 tests passing, 74 files. `tsc --noEmit` clean.
+* Cost, measured on 3014 rather than estimated: **0.236 STX all in** for 13 chunks.
+
+### What it has that 3014 does not
+
+Checked against the served bytes of 3014, not against the changelog:
+
+* **The in-check explanation.** Picking up a piece with no legal move now names
+  the squares that do have one. 3014 has none of this — game 8 sat forty hours
+  with five legal replies and a board that said nothing.
+* **The already-in-flight warning** before a second submission at the same turn.
+* **Finished tournament games are cached**, keyed on game plus `nextSeq`, with
+  the row still read every visit so a hit is checked rather than trusted.
+* **The collapsed chooser** — one chip per tournament, newest revision shown.
+* **`revisedInTime` on the open path**, so a revision that missed its window
+  cannot quietly supersede a valid manifest.
+
+### Why 2.1.3 and not 2.1.2
+
+2.1.2 is permanent on chain as **3014** (`acc7e9b1`, built 2026-08-18 23:10).
+Reusing the number would put two different artefacts under one version, which is
+the mistake this ledger exists to catch and has now caught twice.
+
+## 2.1.2 — 2026-08-18  ·  **inscription 3014, live on mainnet**
+
+Written after the fact, which is itself the note worth keeping: the ledger's own
+rule is that an entry is written when the artefact is BUILT, and 3014 went to
+chain without one. So did **3009** (2.1.1, `e21c6f1f`) before it. A ledger with
+gaps is a ledger nobody can use to answer "what was that reader looking at",
+which is the only question it exists for.
+
+* Build stamp `2.1.2 - 2026-08-18 23:10 - #acc7e9b1`, 13 chunks, 0.236 STX.
+* Carries the tournament work: `Tournament.cooldown`, `TournamentEntrant.depth`,
+  the single `rulesFor()`, and the verifier fix that stopped a declared cooldown
+  reading as "the rules this game committed to are not this pairing".
+* Superseded by 2.1.3 for the five items above. 3014 remains correct for
+  everything it does contain; it is behind, not wrong.
+
 ## 2.1.1 — 2026-08-18
 
 The proxy fix. **Inscribe this, not 3008.**
