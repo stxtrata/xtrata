@@ -2246,6 +2246,10 @@ export class ChessApp {
 
     if (!loaded) return;
     this.adoptRules();
+    // Not awaited. A board that could not identify the rules from what it
+    // already had shows the game either way; this only ever turns "cannot
+    // confirm" into a named pairing, and never the other way round.
+    if (!this.rulesConfirmed) void this.adoptWithManifests();
     // Silently. A game is loaded whole, and every move in it is news only to
     // somebody who has not seen the game before - which is everybody opening
     // it. See `derive`.
@@ -2256,6 +2260,32 @@ export class ChessApp {
 
   private async reload(): Promise<void> {
     if (this.gameId !== null) await this.load(this.gameId);
+  }
+
+  /**
+   * Learn what the manifests say, then decide the rules again.
+   *
+   * `adoptRules` is synchronous and has to stay that way — it runs inside the
+   * draw path. Reading the directory is not, so it happens once here and the
+   * decision is retaken afterwards.
+   *
+   * A game reached by LINK is the case this exists for. Explore and the
+   * Leaderboard both read the manifests before they start, and the Game tab
+   * had no reason to until it turned out to need the same candidates.
+   */
+  private async adoptWithManifests(): Promise<void> {
+    // Guarded here as well as at the call site. A confirmed game has nothing to
+    // gain from a directory read, and this is reachable from more than one
+    // place — the one that is cheap to get wrong later.
+    if (this.rulesConfirmed || this.gameId === null) return;
+
+    const before = this.rulesConfirmed;
+    await this.ensureManifestPairings();
+    if (this.rulesConfirmed || this.gameId === null) return;
+    this.adoptRules();
+    // Only when it changed something. The draw path is not cheap and a link to
+    // a game nothing can identify would otherwise redraw for nothing.
+    if (this.rulesConfirmed !== before) this.drawGame();
   }
 
   /**
@@ -2287,6 +2317,18 @@ export class ChessApp {
       rulesFromLink(String(this.doc.location?.href ?? ''), committed)
     ].filter((rules): rules is Rules => rules !== null);
 
+    // AND EVERYTHING THE MANIFESTS OFFER. This was the third place that
+    // recovers rules and the last one still searching alone.
+    //
+    // Follow a shared link to an Exhibition Three game and the board named
+    // Gambit and Cadence down the move list — sender addresses, which it knows
+    // — while the Players panel said "anyone" and the rules note said fifty
+    // rule sets had been tried. Both halves were true and they contradicted
+    // each other on one screen, because naming a mover needs an address and
+    // naming a SIDE needs the rules, and those games declare a cooldown no
+    // default candidate has.
+    //
+    // `candidatesFor` ends with `knownRules`, so it is not repeated here.
     const found = recoverRules({
       rulesHash: committed,
       openedBy: this.game?.openedBy ?? '',
@@ -2296,7 +2338,7 @@ export class ChessApp {
       // name. Without this, a game between two people opened by one of them is
       // unreadable to BOTH of them until somebody moves.
       viewer: this.address,
-      candidates: offered
+      candidates: [...offered, ...(this.game ? this.candidatesFor(this.game) : [])]
     });
     this.rules = found.rules;
     this.rulesConfirmed = found.confirmed;

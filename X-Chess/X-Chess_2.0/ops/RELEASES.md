@@ -6,9 +6,28 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
-## 2.1.4 — 2026-08-19
+## 2.1.5 — 2026-08-19
 
-Ready to inscribe. **231,069 bytes, 15 chunks.**
+Built, not yet inscribed. **231,411 bytes, 15 chunks.**
+
+* `htmlSha256` `288aa9257581361f751fca794a6f1f450ab74283ec6cd404e13f354329a8f541`
+* xtrata chunk hash `c707708b14f76c3e4ebfeff6973bbd40e67aee6c192634a523b6f2391f48b9d4`
+* 1,561 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+
+**A shared link to a tournament game could not name its players.** 3022 shows
+the move list naming Gambit and Cadence while the Players panel says "anyone"
+and the rules note says fifty rule sets were tried. Both halves are true and
+they contradict each other on one screen: naming a MOVER needs an address,
+which the board has, and naming a SIDE needs the rules, which it did not.
+
+There were three places that recover rules and only two had been given the
+manifest candidates. The Game tab was the third, and it is the one a shared
+link lands on. It now offers the same candidates and reads the directory when
+a game arrives unidentified.
+
+## 2.1.4 — 2026-08-19  ·  **inscription 3022, live on mainnet**
+
+Inscribed as a child of 3002. **231,069 bytes, 15 chunks.**
 
 * `htmlSha256` `c9ea8793b12e591288b87fa78c874634e581ffc8899192df21095c2a672c6b5c`
 * xtrata chunk hash `04949cb708e9e768be673e1953f49053b0298add5f0a6f97f6fc840fbef287f9`

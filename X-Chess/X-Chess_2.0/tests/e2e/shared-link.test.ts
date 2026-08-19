@@ -229,3 +229,66 @@ describe('links to things that are not games', () => {
     expect((app as unknown as { gameId: number }).gameId).toBe(2);
   });
 });
+
+describe('a link to a game whose rules need a manifest', () => {
+  // Followed a link to game 54 and the board named Gambit and Cadence down the
+  // move list while the Players panel said "anyone" and the rules note said
+  // fifty rule sets had been tried. Both halves were true: naming a MOVER needs
+  // an address, which the board had, and naming a SIDE needs the rules, which
+  // it did not — those games declare a cooldown no default candidate carries.
+  //
+  // Explore and the Leaderboard had both been given the manifest candidates.
+  // The Game tab was the third site and the one a shared link lands on.
+
+  it('offers the manifest pairing alongside the link and the cache', async () => {
+    const { app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+
+    const inner = app as unknown as {
+      manifestPairings: Map<number, { white: string; black: string; cooldown: number }>;
+      knownCooldowns: Set<number>;
+      candidatesFor(row: { id: number; rulesHash: string | null }): Array<{ cooldown: number }>;
+    };
+    inner.manifestPairings.set(2, { white: ALICE, black: BOB, cooldown: 1 });
+    inner.knownCooldowns.add(1);
+
+    const offered = inner.candidatesFor({ id: 2, rulesHash: '0xdeadbeef' });
+    expect(offered.length, 'a pairing the search cannot guess').toBeGreaterThan(0);
+    expect(
+      offered.some((r) => r.cooldown === 1),
+      'including the cooldown the tournament declared'
+    ).toBe(true);
+  });
+
+  it('reads the manifests when a game arrives unidentified', async () => {
+    // The candidates are useless if nothing has read a manifest, and a link is
+    // the one route that never had.
+    const { app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+
+    let asked = 0;
+    (app as unknown as { ensureManifestPairings(): Promise<void> }).ensureManifestPairings =
+      async () => {
+        asked++;
+      };
+    (app as unknown as { rulesConfirmed: boolean }).rulesConfirmed = false;
+
+    await (app as unknown as { adoptWithManifests(): Promise<void> }).adoptWithManifests();
+    expect(asked).toBe(1);
+  });
+
+  it('does not go looking when the rules are already confirmed', async () => {
+    const { app } = await boardAt('https://example.test/?game=2');
+    await tick(60);
+
+    let asked = 0;
+    (app as unknown as { ensureManifestPairings(): Promise<void> }).ensureManifestPairings =
+      async () => {
+        asked++;
+      };
+    (app as unknown as { rulesConfirmed: boolean }).rulesConfirmed = true;
+
+    await (app as unknown as { adoptWithManifests(): Promise<void> }).adoptWithManifests();
+    expect(asked, 'a confirmed game has nothing to gain from a directory read').toBe(0);
+  });
+});
