@@ -28,6 +28,7 @@ import { Cl } from '@stacks/transactions';
 
 import { ALLOWED_CONTRACT, WizardSafetyError, addressEnvName, keyEnvName } from './wizards-core.mjs';
 import { PERSONALITIES } from './personalities.mjs';
+import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
 import { doubleRoundRobin, findByRulesHash, roundRobin } from './tournament.mjs';
 import { readOnly, wizardRules } from './play.mjs';
 import { readFileSync } from 'node:fs';
@@ -37,6 +38,9 @@ const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
 
 const arg = (name, fallback = null) => {
   const at = process.argv.indexOf(`--${name}`);
+  return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
+};
+
 /**
  * The cooldown these games committed to, which the manifest must then declare.
  *
@@ -47,8 +51,23 @@ const arg = (name, fallback = null) => {
  */
 const COOLDOWN = Number(arg('cooldown', '0'));
 
-  return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
-};
+/**
+ * How much deeper than the house engine each seat searches.
+ *
+ * LADDERED AGAINST THE FIRST EXHIBITION'S FINISH, not with it. Plumb won that
+ * tournament and stays level; Wager and Oblique took two points each and get
+ * the deepest search. If depth decides chess the table should invert, and if
+ * character decides it Plumb wins again from the bottom of the ladder. Handing
+ * the deepest search to the players who were already strongest would have
+ * measured nothing.
+ *
+ * Absent means level. Nothing here may exceed MAX_DEPTH_OFFSET, and
+ * parseTournament refuses the manifest if it does.
+ */
+const DEPTHS = Object.freeze({
+  Fathom: 2, Oblique: 2, Wager: 2,
+  Cadence: 1, Canon: 1, Mason: 1, Gambit: 1
+});
 
 /** The inscribed engine every player is handed. See TOURNAMENT.md. */
 const ENGINE = Number(arg('engine', '2991'));
@@ -130,9 +149,27 @@ async function main() {
   const format = arg('format', 'round-robin');
   const vars = env();
 
+  // EVERY SEAT CARRIES ITS SHEET AND ITS HANDICAP.
+  //
+  // `entry` has been in the format since it was written — "inscription id of
+  // the entry that defines the character" — and neither existing manifest
+  // carries it, because both were inscribed after their games had started and
+  // were final on arrival. This one is inscribed first, so it can.
+  //
+  // `kind` says these are programs. Absent means unknown rather than human, so
+  // exhibitions one and two are correctly not labelled as games between people.
+  //
+  // `depth` is the only claim here nobody can check. It is declared because a
+  // handicap nobody can see is worse than one that is merely unproven, and the
+  // board marks it declared rather than verified.
   const entrants = PERSONALITIES.map((character) => ({
     name: character.name,
-    address: vars[addressEnvName(character.id)] ?? null
+    address: vars[addressEnvName(character.id)] ?? null,
+    kind: 'ai',
+    ...(ENTRY_INSCRIPTION.sheets[character.name]
+      ? { entry: ENTRY_INSCRIPTION.sheets[character.name] }
+      : {}),
+    ...(DEPTHS[character.name] ? { depth: DEPTHS[character.name] } : {})
   }));
   const missing = entrants.filter((e) => !e.address);
   if (missing.length) {
@@ -191,6 +228,11 @@ async function main() {
     format,
     contract: ALLOWED_CONTRACT,
     engine: ENGINE,
+    // DECLARED, or the manifest is wrong about its own games. It is used above
+    // to FIND each game by hash, and a reader needs it to rebuild the same hash
+    // and verify. Emitting it only in the first half is how a manifest ends up
+    // naming ninety games it then reports as none of its own.
+    ...(COOLDOWN > 0 ? { cooldown: COOLDOWN } : {}),
     entrants,
     games: games.sort((a, b) => a.round - b.round || a.id - b.id)
   };
