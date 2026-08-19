@@ -18,6 +18,7 @@
 
 import { attested, parsePlayer } from '../protocol/player.js';
 import type { Endpoint } from './endpoint.js';
+import { Holdings } from './holdings.js';
 import type { XtrataReader } from './xtrata.js';
 
 /**
@@ -35,13 +36,17 @@ export interface PlayerNamesOptions {
   reader: XtrataReader;
   asset?: string;
   maxScan?: number;
+  /** Shared with the picture resolver, so one address is listed once. */
+  holdings?: Holdings;
 }
 
 export class PlayerNames {
-  private readonly endpoint: Endpoint;
   private readonly reader: XtrataReader;
-  private readonly asset: string;
   private readonly maxScan: number;
+  // The listing moved to `Holdings`, so the endpoint and the asset id are now
+  // its business rather than this class's — they are still ACCEPTED here, so
+  // every existing caller works unchanged, and passed straight through.
+  private readonly index: Holdings;
 
   // null means "asked, and this address has not named itself" — which is a
   // real answer and must not be confused with "not asked yet".
@@ -60,10 +65,13 @@ export class PlayerNames {
   private readonly from = new Map<string, number>();
 
   constructor(options: PlayerNamesOptions) {
-    this.endpoint = options.endpoint;
+    // SHARED WHEN ONE IS GIVEN. A list wanting a name and a face for the same
+    // row would otherwise make the same holdings request twice, moments apart.
+    // Falls back to its own so a caller that only wants names needs no wiring.
+    this.index =
+      options.holdings ??
+      new Holdings({ endpoint: options.endpoint, asset: options.asset, limit: options.maxScan });
     this.reader = options.reader;
-    this.asset =
-      options.asset ?? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3::xtrata-inscription';
     this.maxScan = options.maxScan ?? MAX_SCAN;
   }
 
@@ -104,25 +112,10 @@ export class PlayerNames {
   }
 
   private async look(address: string): Promise<string | null> {
-    const path =
-      `/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(address)}` +
-      `&asset_identifiers=${encodeURIComponent(this.asset)}&limit=${this.maxScan}`;
-    const response = await this.endpoint.request(path);
-    // THROWN, NOT RETURNED, and the difference is the whole point of the cache
-    // above. Returning null here resolves normally, so "could not ask" was
-    // stored as "asked, and this address has no name" — and one rate limit
-    // would have made somebody anonymous for the rest of the session. Same
-    // mistake as reading a 429 on a balance as a balance of zero.
-    if (!response.ok) throw new Error(`holdings lookup: HTTP ${response.status}`);
-
-    const body = (await response.json()) as { results?: Array<{ value?: { hex?: string } }> };
-    const ids: number[] = [];
-    for (const row of body.results ?? []) {
-      // A uint Clarity value: 0x01 then sixteen bytes big-endian.
-      const hex = String(row.value?.hex ?? '').replace(/^0x01/, '');
-      const id = Number.parseInt(hex, 16);
-      if (Number.isSafeInteger(id) && id > 0) ids.push(id);
-    }
+    // Listed by `Holdings`, which shares the request with the picture resolver
+    // and throws rather than returning an empty list on a failed read — the
+    // distinction the cache above depends on. See holdings.ts.
+    const ids = await this.index.list(address);
 
     for (const id of ids.slice(0, this.maxScan)) {
       const text = await this.reader.text(id);

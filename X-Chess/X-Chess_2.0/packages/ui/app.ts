@@ -10,6 +10,7 @@ import { buildPlayer, displayName, nameSourceNote, parsePlayer } from '../protoc
 import { Names } from '../chain/bns.js';
 import { PlayerNames } from '../chain/players.js';
 import { PlayerPictures } from '../chain/pictures.js';
+import { Holdings } from '../chain/holdings.js';
 import { buildPfp, pictureProblem } from '../protocol/pfp.js';
 import { YourGames } from '../chain/yours.js';
 import { XtrataReader } from '../chain/xtrata.js';
@@ -914,8 +915,18 @@ export class ChessApp {
         endpoint: endpoint as never,
         network: (options.build?.network as 'mainnet' | 'testnet') ?? 'mainnet'
       });
-      this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata });
-      this.pictures = new PlayerPictures({ endpoint: endpoint as never, reader: this.xtrata });
+      // ONE LISTING FOR BOTH. A name and a picture are found the same way — walk
+      // what the wallet holds — and each resolver used to ask for that list on
+      // its own account. Invisible while only a Profile panel asked about one
+      // person; fifty avoidable requests once a page of rows wants a name and a
+      // face for every player in it.
+      const holdings = new Holdings({ endpoint: endpoint as never });
+      this.players = new PlayerNames({ endpoint: endpoint as never, reader: this.xtrata, holdings });
+      this.pictures = new PlayerPictures({
+        endpoint: endpoint as never,
+        reader: this.xtrata,
+        holdings
+      });
       this.yours = new YourGames({ endpoint: endpoint as never, contractId: this.chain.contractId });
       // One of possibly several directories: a wallet plus what to look for.
       // A profiles directory is the same call with a different address and

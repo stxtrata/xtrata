@@ -22,6 +22,7 @@
 
 import { attestedPfp, parsePfp, pictureProblem, PFP_HEADER } from '../protocol/pfp.js';
 import type { Endpoint } from './endpoint.js';
+import { Holdings } from './holdings.js';
 import type { XtrataReader } from './xtrata.js';
 
 /** How many holdings to consider before giving up. Same bound as a name. */
@@ -32,6 +33,8 @@ export interface PlayerPicturesOptions {
   reader: XtrataReader;
   asset?: string;
   maxScan?: number;
+  /** Shared with the name resolver, so one address is listed once. */
+  holdings?: Holdings;
 }
 
 export interface Picture {
@@ -42,19 +45,20 @@ export interface Picture {
 }
 
 export class PlayerPictures {
-  private readonly endpoint: Endpoint;
+  // The listing lives in `Holdings` now, so the endpoint and the asset id are
+  // its business. Both are still ACCEPTED by the constructor and passed
+  // through, so no caller changes.
   private readonly reader: XtrataReader;
-  private readonly asset: string;
   private readonly maxScan: number;
+  private readonly index: Holdings;
   private readonly cache = new Map<string, Picture | null>();
   private readonly inFlight = new Map<string, Promise<Picture | null>>();
 
   constructor(options: PlayerPicturesOptions) {
-    this.endpoint = options.endpoint;
+    this.index =
+      options.holdings ??
+      new Holdings({ endpoint: options.endpoint, asset: options.asset, limit: options.maxScan });
     this.reader = options.reader;
-    this.asset =
-      options.asset ??
-      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3::xtrata-inscription';
     this.maxScan = options.maxScan ?? MAX_SCAN;
   }
 
@@ -89,21 +93,11 @@ export class PlayerPictures {
   }
 
   private async look(address: string): Promise<Picture | null> {
-    const path =
-      `/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(address)}` +
-      `&asset_identifiers=${encodeURIComponent(this.asset)}&limit=${this.maxScan}`;
-    const response = await this.endpoint.request(path);
-    // Thrown rather than returned, so a rate limit cannot be remembered as an
-    // answer. See the same line in players.ts.
-    if (!response.ok) throw new Error(`holdings lookup: HTTP ${response.status}`);
-
-    const body = (await response.json()) as { results?: Array<{ value?: { hex?: string } }> };
-    const ids: number[] = [];
-    for (const row of body.results ?? []) {
-      const hex = String(row.value?.hex ?? '').replace(/^0x01/, '');
-      const id = Number.parseInt(hex, 16);
-      if (Number.isSafeInteger(id) && id > 0) ids.push(id);
-    }
+    // Listed by `Holdings`, shared with the name resolver so one address is
+    // asked about once however many things want to know about it. It throws
+    // rather than returning an empty list on a failed read, which is what the
+    // cache above depends on.
+    const ids = await this.index.list(address);
 
     // Newest first, so the first manifest that attests is the current one — the
     // same "latest wins" rule names and tournament revisions already use.
@@ -154,18 +148,13 @@ export class PlayerPictures {
   async holdings(address: string): Promise<Array<{ id: number; mime: string }>> {
     const key = String(address ?? '').trim().toUpperCase();
     if (!key) return [];
-    const path =
-      `/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(key)}` +
-      `&asset_identifiers=${encodeURIComponent(this.asset)}&limit=${this.maxScan}`;
-    const response = await this.endpoint.request(path);
-    if (!response.ok) throw new Error(`holdings lookup: HTTP ${response.status}`);
 
-    const body = (await response.json()) as { results?: Array<{ value?: { hex?: string } }> };
+    // The same list the two resolvers walk. This made a THIRD request for one
+    // wallet before it was shared — the picker, the name and the picture each
+    // asking the API the same question within a second of each other.
+    const ids = await this.index.list(key);
     const out: Array<{ id: number; mime: string }> = [];
-    for (const row of body.results ?? []) {
-      const hex = String(row.value?.hex ?? '').replace(/^0x01/, '');
-      const id = Number.parseInt(hex, 16);
-      if (!Number.isSafeInteger(id) || id < 1) continue;
+    for (const id of ids) {
       const meta = await this.reader.meta(id);
       if (pictureProblem(meta, key)) continue;
       out.push({ id, mime: meta!.mime as string });
