@@ -579,6 +579,12 @@ ${SCALE_CSS}
    NO BACKTICKS IN HERE. This block lives inside a template literal, and naming
    the two modes in backticks the way code would ended the string mid-stylesheet
    and broke the build. There is a test for exactly this. */
+/* Replay controls. Wraps rather than scrolls: five buttons and two selects do
+   not fit a narrow board, and a control that has to be scrolled to is one
+   somebody does not know is there. */
+.rp-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rp-line select { min-width: 0; }
+
 .pcard { padding: 4px 0 12px; }
 .pcard--centre { text-align: center; }
 .pcard--centre .pcard__face { margin: 0 auto 10px; }
@@ -1020,7 +1026,39 @@ export const HTML = `
       </div>
       <div class="panel">
         <h2>Verify</h2>
-        <div id="verify" class="small muted">Every position here is derived from the log.</div>
+        <!-- Replay. Finished games only: a live board must show the position as it
+         stands, and one that could be scrubbed while a move lands is a board
+         showing one thing and claiming another. -->
+    <div id="replay" class="panel hide">
+      <h3>Replay</h3>
+      <div class="row rp-line">
+        <button class="action" id="replay-start" title="First move">&#124;&#9664;</button>
+        <button class="action" id="replay-back" title="Back one move">&#9664;</button>
+        <button class="action" id="replay-play" title="Play">&#9654;</button>
+        <button class="action" id="replay-next" title="Forward one move">&#9654;</button>
+        <button class="action" id="replay-end" title="Last move">&#9654;&#124;</button>
+        <span id="replay-at" class="muted small" role="status"></span>
+      </div>
+      <div class="row rp-line">
+        <label class="small" for="replay-speed">Speed</label>
+        <select id="replay-speed">
+          <option value="1000">1 second a move</option>
+          <option value="3000">3 seconds a move</option>
+          <option value="5000">5 seconds a move</option>
+          <option value="10000">10 seconds a move</option>
+          <option value="ratio">As it happened</option>
+        </select>
+        <select id="replay-times" class="hide">
+          <option value="1">1x, the real thing</option>
+          <option value="10">10x</option>
+          <option value="100">100x</option>
+          <option value="1000">1000x</option>
+          <option value="10000">10000x</option>
+        </select>
+      </div>
+      <div id="replay-said" class="small muted"></div>
+    </div>
+    <div id="verify" class="small muted">Every position here is derived from the log.</div>
         <div class="row"><button class="action" id="verify-game">Re-derive from chain</button></div>
       </div>
       <!-- Sound.

@@ -29,7 +29,7 @@ import type { CheckedGame } from '../protocol/tournament.js';
 import type { Tournament } from '../protocol/tournament.js';
 import type { TournamentView } from './tournaments.js';
 import { pool } from '../chain/pool.js';
-import { BlockTimes, formatClock } from '../chain/block-time.js';
+import { BlockTimes, formatClock, formatDuration } from '../chain/block-time.js';
 import { parseUci } from '../chess/uci.js';
 import { KING, WHITE } from '../chess/board.js';
 import { SHELL } from './shell.js';
@@ -402,6 +402,16 @@ const INSCRIPTION_VIEWER = 'https://xtrata.xyz/i/';
 
 const LAYOUT_KEY = 'xchess:profile-layout';
 
+/**
+ * Seconds a block takes, for turning a height difference into elapsed time.
+ *
+ * MEASURED ON THIS CHAIN rather than taken from a specification: post-Nakamoto
+ * blocks land in eight to twelve seconds, and ten is the middle of what was
+ * actually observed. Only ever used to describe how long a move TOOK, where
+ * being a fifth out changes a "two hour think" into a "two hour think".
+ */
+const BLOCK_SECONDS = 10;
+
 /** A preference, so losing it costs a layout somebody can change back. */
 function readLayout(): 'left' | 'centre' {
   try {
@@ -642,6 +652,8 @@ const IDS = [
   'resign', 'offer-draw', 'accept-draw', 'moves',
   'moves-title', 'toggle-skipped', 'skipped-note',
   'verify', 'verify-game',
+  'replay', 'replay-start', 'replay-back', 'replay-play', 'replay-next', 'replay-end',
+  'replay-at', 'replay-speed', 'replay-times', 'replay-said',
   'sound-toggle', 'sound-master', 'sound-volume', 'sound-background',
   'sound-reset', 'sound-note', 'sound-list', 'sound-more', 'sound-detail', 'sound-sides',
   'explore-refresh', 'explore-count', 'explore-rows', 'explore-filters', 'explore-waiting',
@@ -680,6 +692,22 @@ export class ChessApp {
   private rulesConfirmed = false;
   private rulesTried = 0;
   private state: ReplayState | null = null;
+
+  /**
+   * Which ply the board is showing, or null for the position as it stands.
+   *
+   * ONLY EVER SET ON A FINISHED GAME. A live board must show the current
+   * position: one that could be scrubbed backwards while a move lands is a
+   * board showing one thing and claiming another, and the claim is the whole
+   * product.
+   */
+  private replayPly: number | null = null;
+  private replayTimer: ReturnType<Window['setTimeout']> | null = null;
+  /** Milliseconds a move is held for, or 'ratio' to use the real gaps. */
+  private replaySpeed: number | 'ratio' = 1000;
+  /** How much faster than life, when following the real gaps. */
+  private replayTimes = 1000;
+  private readonly replayCache = new Map<number, ReplayState>();
   private selected: string | null = null;
   private pendingPromotion: { from: string; to: string } | null = null;
   /** The game count the explorer was last built for, or null if never. */
@@ -1134,6 +1162,46 @@ export class ChessApp {
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
     on('onchainCheck', () => void this.checkOnChain({ fresh: true }));
+    on('replayStart', () => { this.replayStop(); this.replayGo(0); });
+    on('replayBack', () => { this.replayStop(); this.replayGo((this.replayPly ?? this.replayLength()) - 1); });
+    on('replayPlay', () => this.replayPlayPause());
+    on('replayNext', () => { this.replayStop(); this.replayGo((this.replayPly ?? this.replayLength()) + 1); });
+    // The end is the LIVE position, not ply N. They are the same board for a
+    // finished game, and only one of them is the thing the rest of the tab is
+    // talking about.
+    on('replayEnd', () => { this.replayStop(); this.replayPly = null; this.drawGame(); });
+
+    const speed = this.el.replaySpeed as HTMLSelectElement;
+    speed.addEventListener('change', () => {
+      this.replaySpeed = speed.value === 'ratio' ? 'ratio' : Number(speed.value);
+      this.drawGame();
+    });
+    const times = this.el.replayTimes as HTMLSelectElement;
+    times.value = '1000';
+    times.addEventListener('change', () => {
+      this.replayTimes = Number(times.value) || 1;
+      this.drawGame();
+    });
+
+    // ARROW KEYS, and only where they can mean this. A board being replayed is
+    // the one place on this page where left and right have an obvious meaning,
+    // and taking them anywhere else would steal them from a text field.
+    this.doc.addEventListener('keydown', (event) => {
+      const key = (event as KeyboardEvent).key;
+      const target = (event as KeyboardEvent).target as HTMLElement | null;
+      const typing = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA'
+        || target?.tagName === 'SELECT';
+      if (typing || this.tab !== 'game' || !this.canReplay()) return;
+      const here = this.replayPly ?? this.replayLength();
+      if (key === 'ArrowLeft') { this.replayStop(); this.replayGo(here - 1); }
+      else if (key === 'ArrowRight') { this.replayStop(); this.replayGo(here + 1); }
+      else if (key === 'Home') { this.replayStop(); this.replayGo(0); }
+      else if (key === 'End') { this.replayStop(); this.replayPly = null; this.drawGame(); }
+      else if (key === ' ') { this.replayPlayPause(); }
+      else return;
+      event.preventDefault();
+    });
+
     on('profileLayout', () => {
       this.profileLayout = this.profileLayout === 'left' ? 'centre' : 'left';
       writeLayout(this.profileLayout);
@@ -1796,6 +1864,10 @@ export class ChessApp {
   // ------------------------------------------------------------------
 
   show(tab: Tab): void {
+    // Leaving the game stops the replay. A board playing itself in a tab nobody
+    // is looking at is spending nothing, but it is also lying about where the
+    // reader left it when they come back.
+    if (tab !== 'game') this.replayStop();
     this.tab = tab;
     for (const name of [
       'play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile', 'help'
@@ -2369,6 +2441,12 @@ export class ChessApp {
     });
 
     if (!loaded) return;
+    // A replay belongs to the game it was started on. Loading another must not
+    // leave a timer stepping through a board that is no longer on screen, and
+    // the cached positions are the previous game's.
+    this.replayStop();
+    this.replayPly = null;
+    this.replayCache.clear();
     this.adoptRules();
     // Not awaited. A board that could not identify the rules from what it
     // already had shows the game either way; this only ever turns "cannot
@@ -2478,6 +2556,181 @@ export class ChessApp {
    * of opening a page. So a fresh derivation is silent and becomes the baseline
    * that everything after it is compared against.
    */
+  /**
+   * The position after `ply` accepted moves.
+   *
+   * REPLAYED, not stored. There is no per-ply position in the log and there
+   * should not be: deriving it here means a replayed board is produced by
+   * exactly the code that produces the live one, so the two cannot disagree.
+   * A hundred-move game replays in well under a millisecond, and the answers
+   * are cached anyway because stepping asks for the same ply repeatedly.
+   *
+   * Nothing here touches the chain. The entries are in memory once the game is
+   * open, so a replay costs no reads and works with the network gone.
+   */
+  /** The move that produced the position on screen, for the from/to highlight. */
+  /**
+   * The replay panel, and what each speed would actually mean for THIS game.
+   *
+   * A MULTIPLIER RATHER THAN A CAP, which was the better idea: capping the long
+   * gaps flattens the thing worth watching. Game 8 ran twenty seconds between
+   * moves during an exchange and forty-six hours when somebody went to bed, and
+   * a ratio keeps that shape while a cap throws it away.
+   *
+   * The cost is that no single multiplier suits every game. That game spans six
+   * days and needs about four thousand times to be watchable; a brisk
+   * tournament game is over in twenty minutes and is fine at ten. So the panel
+   * says what the chosen speed comes to for the game on screen, and the reader
+   * picks by how long they are prepared to watch rather than by a number that
+   * means nothing on its own.
+   */
+  private drawReplay(shown: ReplayState): void {
+    const on = this.canReplay();
+    this.el.replay.classList.toggle('hide', !on);
+    if (!on) return;
+
+    const total = this.replayLength();
+    const at = this.replayPly ?? total;
+    this.text('replayAt', `move ${at} of ${total}`);
+    this.el.replayPlay.textContent = this.replayTimer ? '\u23f8' : '\u25b6';
+    this.el.replayPlay.setAttribute('title', this.replayTimer ? 'Pause' : 'Play');
+    this.el.replayTimes.classList.toggle('hide', this.replaySpeed !== 'ratio');
+
+    // WHAT THE MOVE ON SCREEN COST IN REAL TIME, which is the fact a replay is
+    // for. A forty-six hour think reads as a pause here and as a decision there.
+    const moves = shown.accepted.filter((row) => row.kind === 'move');
+    const said: string[] = [];
+    if (this.replaySpeed === 'ratio') {
+      const spans = this.replaySpans();
+      const whole = spans.reduce((sum, secs) => sum + secs, 0) / this.replayTimes;
+      said.push(`At ${this.replayTimes.toLocaleString()}x this game plays in ${formatDuration(whole)}.`);
+      const gap = at > 1 ? spans[at - 2] : 0;
+      if (gap > 0) said.push(`This move came ${formatDuration(gap)} after the one before it.`);
+    } else {
+      said.push(`${formatDuration((total * this.replaySpeed) / 1000)} at this rate.`);
+    }
+    if (moves.length && at > 0) said.push(`Showing ${moves[moves.length - 1].san}.`);
+    this.text('replaySaid', said.join(' '));
+  }
+
+  /**
+   * How long each move actually took, in milliseconds, from the block heights.
+   *
+   * Derived from the log rather than from a clock. `block-time.ts` turns a
+   * height into a timestamp and is best effort, so this falls back to the
+   * measured block interval when it cannot say — an approximate rhythm being
+   * the point, and an exact one not being available to anybody.
+   */
+  private replaySpans(): number[] {
+    const moves = (this.state?.accepted ?? []).filter((row) => row.kind === 'move');
+    const spans: number[] = [];
+    for (let at = 1; at < moves.length; at++) {
+      const blocks = Math.max(0, (moves[at].height ?? 0) - (moves[at - 1].height ?? 0));
+      spans.push(blocks * BLOCK_SECONDS);
+    }
+    return spans;
+  }
+
+  /** Move to a ply, stopping at either end rather than wrapping. */
+  private replayGo(ply: number): void {
+    const total = this.replayLength();
+    this.replayPly = Math.max(0, Math.min(ply, total));
+    this.drawGame();
+  }
+
+  private replayStop(): void {
+    if (this.replayTimer) this.doc.defaultView?.clearTimeout(this.replayTimer);
+    this.replayTimer = null;
+  }
+
+  /**
+   * Play from where it is, one move at a time.
+   *
+   * Scheduled one move ahead rather than on an interval, because the gap
+   * between moves is not constant in ratio mode and an interval cannot express
+   * that. It also means a pause takes effect on the next move rather than
+   * mid-flight.
+   */
+  private replayTick(): void {
+    const total = this.replayLength();
+    const at = this.replayPly ?? 0;
+    if (at >= total) {
+      this.replayStop();
+      this.drawGame();
+      return;
+    }
+    this.replayGo(at + 1);
+
+    const next = this.replayPly ?? 0;
+    const spans = this.replaySpeed === 'ratio' ? this.replaySpans() : null;
+    const wait = spans
+      ? Math.max(120, ((spans[next - 1] ?? 0) * 1000) / this.replayTimes)
+      : (this.replaySpeed as number);
+    this.replayTimer = this.doc.defaultView?.setTimeout(() => this.replayTick(), wait) ?? null;
+    this.drawGame();
+  }
+
+  private replayPlayPause(): void {
+    if (this.replayTimer) {
+      this.replayStop();
+      this.drawGame();
+      return;
+    }
+    // Pressing play at the end starts again, which is what somebody who has
+    // just watched it to the end and pressed play again means.
+    if ((this.replayPly ?? this.replayLength()) >= this.replayLength()) this.replayPly = 0;
+    this.replayTick();
+  }
+
+  private replayLastMove(shown: ReplayState): { from: string; to: string } | null {
+    const last = [...shown.accepted].reverse().find((row) => row.kind === 'move');
+    return last && last.kind === 'move'
+      ? { from: last.uci.slice(0, 2), to: last.uci.slice(2, 4) }
+      : null;
+  }
+
+  private stateAt(ply: number): ReplayState | null {
+    const live = this.state;
+    if (!live) return null;
+    const held = this.replayCache.get(ply);
+    if (held) return held;
+
+    const moves = live.accepted.filter((row) => row.kind === 'move');
+    if (ply < 0 || ply > moves.length) return null;
+    // Ply zero is the opening position, which is every entry BEFORE the first
+    // accepted move — not an empty log, because a game may open with rejected
+    // submissions and they are part of the record.
+    const upTo = ply === 0 ? -1 : moves[ply - 1].seq;
+    const state = replay(
+      this.entries
+        .filter((entry) => entry.seq <= upTo)
+        .map((e) => ({ mv: e.value, sender: e.sender, seq: e.seq, height: e.height })),
+      { rules: this.rules }
+    );
+    this.replayCache.set(ply, state);
+    return state;
+  }
+
+  /** How many accepted moves this game has, which is the end of the scrub. */
+  private replayLength(): number {
+    return (this.state?.accepted ?? []).filter((row) => row.kind === 'move').length;
+  }
+
+  /** The state the board should DRAW, which is not always the state it holds. */
+  private shownState(): ReplayState | null {
+    return this.replayPly === null ? this.state : (this.stateAt(this.replayPly) ?? this.state);
+  }
+
+  /**
+   * Whether this game may be replayed at all.
+   *
+   * Finished only, and asked of the derived state rather than of a flag: a game
+   * is over when replay says it is, and nothing else is entitled to an opinion.
+   */
+  private canReplay(): boolean {
+    return this.state?.status === 'over' && this.replayLength() > 0;
+  }
+
   private derive(fresh = false): void {
     const before = fresh ? null : this.state;
     this.state = replay(
@@ -2642,24 +2895,35 @@ export class ChessApp {
     this.drawWhyNot(canSubmit, verdict);
     this.drawEventButtons(ctx, canSubmit);
 
+    // WHAT IS DRAWN AND WHAT IS TRUE ARE THE SAME THING UNLESS SOMEBODY IS
+    // REPLAYING, and then they are deliberately not.
+    //
+    // `state` stays the live position throughout, because it is what decides
+    // whether a move may be sent. `shown` is what goes on the board. Keeping
+    // them apart is the whole safety of this: a replayed board is a picture of
+    // the past, and the one thing it must never do is let somebody act on it.
+    const shown = this.shownState() ?? state;
+    const scrubbing = this.replayPly !== null;
+
     renderBoard(this.el.board, {
-      position: state.position,
-      legalMoves: state.legalMoves,
+      position: shown.position,
+      legalMoves: scrubbing ? [] : state.legalMoves,
       flipped: this.flipped,
-      selected: this.selected,
-      lastMove: this.lastMoveSquares(),
+      selected: scrubbing ? null : this.selected,
+      lastMove: scrubbing ? this.replayLastMove(shown) : this.lastMoveSquares(),
       // Only a HARD refusal locks the squares. A warning leaves them live, so a
       // board that has guessed wrong about who may move can always be
       // overruled by the person who actually holds the wallet.
-      readOnly: !canSubmit || locked,
-      pending: this.pendingMoves(),
+      readOnly: scrubbing || !canSubmit || locked,
+      pending: scrubbing ? [] : this.pendingMoves(),
       signing: this.intent?.state === 'signing' ? `${this.intent.from}${this.intent.to}` : null
     }, {
       onSquare: (square) => this.onSquare(square)
     });
 
-    this.drawArrows(state);
+    this.drawArrows(scrubbing ? shown : state);
     this.drawStatus(state);
+    this.drawReplay(shown);
     this.drawRules();
     this.drawMoves(state);
     this.drawPlayers(state);

@@ -10,9 +10,28 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `44fc1dfc59d764e043672f545dc63bf997d363bc8d75c3befb7a2703b1d1f4fd`
-* xtrata chunk hash `ada3865c706e2275874cde55e10ffbdfed83b7a016c096cdc102b03912d083ae`
-* **233,530 bytes, 15 chunks.** 1,577 tests, 83 files. `tsc` and docs audit clean.
+* `htmlSha256` `a03fcb9bdcde7e6a900fec725efb4b25a3b767f8b83e29daaebda649a8c7f97f`
+* xtrata chunk hash `772b016abc1be006ff15b875952e224e7065e7780ee4a7c6aece0851ea7f1b9b`
+* build stamp `2.1.7 - 2026-08-20 10:31 UTC - #a64f93ff`
+* **242,259 bytes, 15 chunks.** 1,585 tests, 84 files. `tsc` and docs audit clean.
+
+**Finished games can be watched.** Step with buttons or arrow keys, play at a
+fixed rate, or follow the real gaps at a multiplier. The position at any ply is
+REPLAYED rather than stored: there is no per-ply position in the log and there
+should not be, because deriving it means a replayed board is produced by exactly
+the code that produces the live one and the two cannot drift apart. Nothing
+touches the chain — the entries are in memory once the game is open.
+
+A multiplier rather than a cap, which was the better idea: capping the long
+gaps flattens the thing worth watching. Game 8 ran twenty seconds between moves
+during an exchange and forty-six hours when somebody went to bed. No single
+multiplier suits every game — that one spans six days and needs about four
+thousand times, a brisk tournament game is fine at ten — so the panel says what
+the chosen speed comes to for the game on screen.
+
+Finished games only, asked of the derived state rather than a flag. A live board
+must show the position as it stands, and one that could be scrubbed while a move
+lands is a board showing one thing and claiming another.
 
 **The Profile tab read nothing on its own.** Connecting resolved a BNS name and
 stopped, so the panel stayed empty and the canvas said "no picture" until two
