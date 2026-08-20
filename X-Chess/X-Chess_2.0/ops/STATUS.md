@@ -35,7 +35,7 @@ an old board being BEHIND does not.
 | 2.1.5 | **3023** | 08-19 19:47 | `8b8feb66` | a shared link to a tournament game names its players |
 | 2.1.6 | **3024** | 08-19 21:43 | `22884569` | the clipboard fix that missed 3023, and a tournament that reloaded itself every thirty seconds |
 | 2.1.7 | **3025** | 08-19 22:20 | `de85733f` | a bar on the scoring walk, standings that fill a row at a time, a move costing one game rather than ninety, `UTC` on the stamp |
-| 2.1.8 | built, not inscribed | 08-20 12:19 | `f91e8346` | tabs switchable while loading, refresh reading only what can change, the Profile as a profile, a kept rating, replay of finished games |
+| 2.1.8 | built, not inscribed | 08-20 17:15 | `f91e8346` | tabs switchable while loading, refresh reading only what can change, the Profile as a profile, a kept rating, replay of finished games |
 
 **2.1.0 → 2.1.1 is the one worth reading.** `underXtrataRuntime()` decided
 whether to use Xtrata's caching proxy by looking for injected support scripts,

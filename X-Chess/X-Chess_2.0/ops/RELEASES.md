@@ -10,18 +10,33 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. To go up as a child of 3025.
 
-* `htmlSha256` `feeb3e4d180646a25b90ca71a4ef7dea22a4ec575dba5d5a68409c8cbef67abd`
-* xtrata chunk hash `c912dd76da1b1aab61c51fee915f80b34e5dc70680203adddaafd986a4e442e5`
-* build stamp `2.1.8 - 2026-08-20 12:19 UTC - #f91e8346`
+* `htmlSha256` `153ae9ec2b9727640f5699bc15714e21f3a1807a3cebaa3163c8016d7e8e2285`
+* xtrata chunk hash `57c6437f96af79390ee268bf8e3749c586b2c93ae8cf1dfb20394f568d257409`
+* build stamp `2.1.8 - 2026-08-20 17:15 UTC - #f91e8346`
 * **245,227 bytes, 15 chunks.** 1,600 tests, 86 files. `tsc` and docs audit clean.
 
 The two page hashes above are of `dist/xchess.html` AS IT STANDS. Rebuilding
 changes them without changing a line of code, because the stamp is inside the
-page: this entry was first written against the 12:01 build and the release gate
-rebuilt at 12:19, which moved both hashes and left the byte count identical.
+page: this entry has been written against the 12:01, 12:19 and 17:15 builds, each
+rebuild moving both hashes and leaving the byte count identical at 245,227.
 `#f91e8346` is the hash of the bundled code and is the stable identifier — it
 survives a rebuild, and it is what to compare when the page hashes disagree.
 Inscribe the file that is there; if it gets rebuilt first, re-read these.
+
+**The release gate refuses this build, and refused every board before it.** Nine
+layers pass — types, contract analysis, serverlessness, the documents, the
+engine and replay and rules and codec and wallet and ratings suites, deep perft
+at about 590 million nodes, contract parity and economics and sponsorship, the
+build, and the artefact under the Xtrata runtime. Two gates are open and have
+been open continuously since before 3022 went up: the wallet matrix has no
+RESULT lines for its fourteen rows, and `ops/LAUNCH.md` has 22 unchecked items.
+
+Both belong to the PRODUCTION launch — a production contract, signed writes
+against a live endpoint, the matrix run against real Xverse and Leather on
+desktop and mobile. Neither is a statement about this board against the canary
+contract, which is what 3022, 3023, 3024 and 3025 all went up as with the same
+two gates open and identical counts. Recorded here so that the refusal is read
+as the standing one rather than as something this build introduced.
 
 **A loading tab froze the whole board.** The shared click helper swallowed every
 click while a long read was running, tabs included — so a tournament reading
