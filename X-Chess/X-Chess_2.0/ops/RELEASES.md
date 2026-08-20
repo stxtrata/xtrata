@@ -6,24 +6,31 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
-## 2.1.8 — 2026-08-20
+## 2.1.8 — 2026-08-20  ·  **inscription 3028, live on mainnet**
 
-Built, not yet inscribed. To go up as a child of 3025.
+Inscribed as a child of 3025.
 
-* `htmlSha256` `153ae9ec2b9727640f5699bc15714e21f3a1807a3cebaa3163c8016d7e8e2285`
-* xtrata chunk hash `57c6437f96af79390ee268bf8e3749c586b2c93ae8cf1dfb20394f568d257409`
-* build stamp `2.1.8 - 2026-08-20 17:15 UTC - #f91e8346`
+* `htmlSha256` `feeb3e4d180646a25b90ca71a4ef7dea22a4ec575dba5d5a68409c8cbef67abd`
+* xtrata chunk hash `c912dd76da1b1aab61c51fee915f80b34e5dc70680203adddaafd986a4e442e5`
+* build stamp `2.1.8 - 2026-08-20 12:19 UTC - #f91e8346`
 * **245,227 bytes, 15 chunks.** 1,600 tests, 86 files. `tsc` and docs audit clean.
 
-The two page hashes above are of `dist/xchess.html` AS IT STANDS. Rebuilding
-changes them without changing a line of code, because the stamp is inside the
-page: this entry has been written against the 12:01, 12:19 and 17:15 builds, each
-rebuild moving both hashes and leaving the byte count identical at 245,227.
-`#f91e8346` is the hash of the bundled code and is the stable identifier — it
-survives a rebuild, and it is what to compare when the page hashes disagree.
-Inscribe the file that is there; if it gets rebuilt first, re-read these.
+Read back raw from 3028 and rehashed, not taken from a build record.
 
-**The release gate refuses this build, and refused every board before it.** Nine
+**The 12:19 build is the one on chain, and a later rebuild was NOT a different
+board.** This entry was written three times — against the 12:01, 12:19 and
+17:15 builds — because the release gate rebuilds and the stamp lives inside the
+page, so every rebuild moved both hashes while the byte count stayed at
+245,227. 3028 went up from the 12:19 build; `dist/` afterwards held the 17:15
+one.
+
+Diffed rather than argued about. Across 245,227 bytes the two files differ in
+**two characters**, both inside the timestamp: `12:19` against `17:15`. Not one
+byte of code, markup or CSS, which is what `#f91e8346` on both already said —
+it is the hash of the bundled code and the only figure here that survives a
+rebuild. So no re-inscription was needed, and 3028 is the whole of 2.1.8.
+
+**The release gate refused this build, as it refused every board before it.** Nine
 layers pass — types, contract analysis, serverlessness, the documents, the
 engine and replay and rules and codec and wallet and ratings suites, deep perft
 at about 590 million nodes, contract parity and economics and sponsorship, the

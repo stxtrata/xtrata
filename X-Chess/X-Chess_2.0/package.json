@@ -1,6 +1,6 @@
 {
   "name": "xchess",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "private": true,
   "type": "module",
   "description": "X Chess 2 \u2014 a permanent, serverless, on-chain chess application",
