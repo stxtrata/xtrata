@@ -400,36 +400,8 @@ const STATE_KEY = 'xchess:tstate:';
  */
 const INSCRIPTION_VIEWER = 'https://xtrata.xyz/i/';
 
-const LAYOUT_KEY = 'xchess:profile-layout';
-
-/**
- * Seconds a block takes, for turning a height difference into elapsed time.
- *
- * MEASURED ON THIS CHAIN rather than taken from a specification: post-Nakamoto
- * blocks land in eight to twelve seconds, and ten is the middle of what was
- * actually observed. Only ever used to describe how long a move TOOK, where
- * being a fifth out changes a "two hour think" into a "two hour think".
- */
 const BLOCK_SECONDS = 10;
 
-/** A preference, so losing it costs a layout somebody can change back. */
-function readLayout(): 'left' | 'centre' {
-  try {
-    return (globalThis as { localStorage?: Storage }).localStorage?.getItem(LAYOUT_KEY) === 'centre'
-      ? 'centre'
-      : 'left';
-  } catch {
-    return 'left';
-  }
-}
-
-function writeLayout(which: 'left' | 'centre'): void {
-  try {
-    (globalThis as { localStorage?: Storage }).localStorage?.setItem(LAYOUT_KEY, which);
-  } catch {
-    // A private window. The default is the common case anyway.
-  }
-}
 
 /**
  * The manual, laid out as a page.
@@ -665,7 +637,7 @@ const IDS = [
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
-  'profile-who', 'profile-load', 'profile-body', 'onchain-check', 'onchain-rows', 'profile-layout',
+  'profile-who', 'profile-body', 'onchain-check', 'onchain-rows', 'pfp-said',
   'pfp-canvas', 'pfp-id', 'pfp-check', 'pfp-mine', 'pfp-clear',
   'pfp-problems', 'pfp-grid', 'pfp-state', 'pfp-manifest', 'pfp-next',
   'claim-name-why', 'claim-name', 'claim-about',
@@ -848,15 +820,6 @@ export class ChessApp {
 
   /** The last computed standings, so Profile can show a row it already has. */
   private ratedRows: LeaderboardRow[] = [];
-
-  /**
-   * Which way the profile card is laid out.
-   *
-   * `left` puts the picture beside the name and `centre` puts it above. Both
-   * were mocked up and this is the one that was chosen; it is remembered per
-   * browser because it is a preference rather than a fact about anybody.
-   */
-  private profileLayout: 'left' | 'centre' = readLayout();
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -1067,6 +1030,13 @@ export class ChessApp {
       this.el[camel(id)] = node;
     }
 
+    /**
+     * A click that must not land while something else is reading.
+     *
+     * `busy` is set by every long read, and this gate is what stops a second
+     * one being started on top of it — two loads of the same tab racing to
+     * write the same elements.
+     */
     const on = (key: string, handler: () => void): void => {
       this.el[key].addEventListener('click', () => {
         if (this.busy) return;
@@ -1074,10 +1044,28 @@ export class ChessApp {
       });
     };
 
+    /**
+     * A click that always lands, whatever else is happening.
+     *
+     * NAVIGATION IS NOT AN ACTION. The gate above was on every button on the
+     * board, tabs included, so a tournament reading ninety games froze the
+     * whole page for minutes: no Profile, no Explore, no Leaderboard, and no
+     * way to tell a busy board from a broken one.
+     *
+     * Switching away is safe because the loads already know where they are.
+     * `drawLeaderboardWait` and `paintExploreFaces` check the current tab
+     * before drawing, and everything else writes into elements that are simply
+     * not on screen — so a load continues, finishes, and is there when somebody
+     * comes back. Nothing is cancelled and nothing is waited for.
+     */
+    const always = (key: string, handler: () => void): void => {
+      this.el[key].addEventListener('click', handler);
+    };
+
     for (const tab of [
       'play', 'game', 'explore', 'leaderboard', 'tournaments', 'profile', 'help'
     ] as Tab[]) {
-      on(camel(`tab-${tab}`), () => this.show(tab));
+      always(camel(`tab-${tab}`), () => this.show(tab));
     }
 
     on('connect', () => void this.connect());
@@ -1146,7 +1134,7 @@ export class ChessApp {
     // exist because "show me 3001" and "show me 3001 AGAIN" are different
     // intentions and a person with a tournament already on screen should not
     // have to wonder whether pressing Show will do anything.
-    on('tournamentRefresh', () => void this.loadTournamentTab({ again: true }));
+    on('tournamentRefresh', () => void this.refreshTournament());
     // Filtering is local, so it can redraw on every keystroke without asking
     // the chain anything.
     this.el.pickerWho.addEventListener('input', () => {
@@ -1160,7 +1148,6 @@ export class ChessApp {
       this.drawTournament();
     });
     on('claimBuild', () => this.buildNameClaim());
-    on('profileLoad', () => void this.loadProfile());
     on('onchainCheck', () => void this.checkOnChain({ fresh: true }));
     on('replayStart', () => { this.replayStop(); this.replayGo(0); });
     on('replayBack', () => { this.replayStop(); this.replayGo((this.replayPly ?? this.replayLength()) - 1); });
@@ -1202,12 +1189,6 @@ export class ChessApp {
       event.preventDefault();
     });
 
-    on('profileLayout', () => {
-      this.profileLayout = this.profileLayout === 'left' ? 'centre' : 'left';
-      writeLayout(this.profileLayout);
-      this.drawLayoutButton();
-      void this.checkOnChain();
-    });
     on('pfpCheck', () => void this.previewPicture());
     on('pfpMine', () => void this.showHoldings());
     on('pfpClear', () => this.clearPicture());
@@ -3565,6 +3546,51 @@ export class ChessApp {
     this.tournamentPoll = setTimeout(() => void this.pollTournament(), TOURNAMENT_POLL_MS);
   }
 
+  /**
+   * Read again what could have changed, and nothing else.
+   *
+   * A FINISHED GAME CANNOT UNFINISH. So refreshing a ninety-game tournament to
+   * see whether five of them have moved never needed to re-check eighty-five
+   * results that are settled, and doing so was most of the wait.
+   *
+   * This is complete as well as cheap: change can only happen in a game that is
+   * still being played, so re-reading exactly those is the whole of what a
+   * refresh could learn. Anything else it did was confirming what it already
+   * knew.
+   *
+   * Falls back to a full load when there is nothing scored to refresh, which is
+   * the first read and the only time the long way round is the short one.
+   */
+  private async refreshTournament(): Promise<void> {
+    const view = this.tournament;
+    if (!view?.ok || !view.scored) {
+      await this.loadTournamentTab({ again: true });
+      return;
+    }
+
+    const live = view.rounds.flatMap((round) => round.games).filter((game) => game.result === null);
+    if (!live.length) {
+      this.notice(
+        'tournamentNote',
+        'good',
+        'Every game in this tournament has a result, and a result cannot change. ' +
+          'There is nothing left to read.'
+      );
+      return;
+    }
+
+    await this.guard(`reading ${live.length} unfinished game${live.length === 1 ? '' : 's'}`, async () => {
+      this.progress = { done: 0, total: live.length, what: 'games replayed' };
+      this.tournament = await scoreTournament(view, this.tournamentDeps(), {
+        only: new Set(live.map((game) => game.id))
+      });
+      this.progress = null;
+      this.rememberTournamentState(this.tournament);
+      this.drawTournament();
+      return true;
+    });
+  }
+
   /** What both the full load and a targeted rescore read the chain through. */
   private tournamentDeps(): Parameters<typeof scoreTournament>[1] {
     return {
@@ -4400,17 +4426,15 @@ export class ChessApp {
     // SAID, because the two look identical and mean opposite things. One is
     // inscribed and one is a choice somebody has not paid for yet, and letting
     // a reader assume the wrong one is how they think they are done.
-    const caption = this.doc.createElement('div');
-    caption.className = 'pfp-said';
-    caption.textContent =
+    this.text('pfpSaid',
       chosen !== null
         ? live && live.image === chosen
           ? `Inscription ${chosen}, and it is the one on chain.`
           : `Inscription ${chosen}, chosen here and NOT inscribed yet.`
         : live
           ? `Inscription ${live.image}, set by your manifest ${live.manifest}.`
-          : '';
-    if (caption.textContent) canvas.append(caption);
+          : ''
+    );
 
     const grid = this.el.pfpGrid;
     grid.replaceChildren();
@@ -7684,19 +7708,7 @@ export class ChessApp {
    * the cache exists so that costs nothing the second time. The button beside
    * it is the one that forgets first, for the moment after inscribing.
    */
-  /**
-   * Name the button by what pressing it does, not by what is on screen.
-   *
-   * A toggle labelled with the current state reads as a status line, and the
-   * reader has to work out that it is a control and that it will do the other
-   * thing. "Centred" on a left-aligned card means press me for centred.
-   */
-  private drawLayoutButton(): void {
-    this.el.profileLayout.textContent = this.profileLayout === 'left' ? 'Centred' : 'Beside';
-  }
-
   private async loadProfileFromChain(): Promise<void> {
-    this.drawLayoutButton();
     const who = this.pictureAddress();
     if (!who || !this.pictures) return;
     try {
@@ -7758,7 +7770,7 @@ export class ChessApp {
     // arranged as a report: the picture in a box elsewhere, the name in one
     // row, the line they wrote about themself nowhere at all.
     const card = this.doc.createElement('div');
-    card.className = `pcard pcard--${this.profileLayout}`;
+    card.className = 'pcard pcard--centre';
 
     const shown = found.picture?.image ?? null;
     if (shown !== null) {
@@ -7822,6 +7834,34 @@ export class ChessApp {
       card.appendChild(stats);
     }
     rows.appendChild(card);
+
+    // ONE ROW, ONCE THERE IS A PROFILE TO BE BELOW.
+    //
+    // These were two labelled rows and a paragraph of caveat, which is a report
+    // about an address rather than a profile of somebody. When the card above
+    // has the picture, the name and the line they wrote, the inscriptions
+    // behind it are provenance: worth being able to check, not worth being the
+    // first thing read. When the card has none of that, they are all there is
+    // and they stay in full.
+    const complete = Boolean(found.picture && found.name);
+    if (complete) {
+      const foot = this.doc.createElement('div');
+      foot.className = 'pcard__from';
+      foot.appendChild(this.doc.createTextNode('Inscribed by this address: '));
+      const link = (id: number, label: string): void => {
+        if (foot.childNodes.length > 1) foot.appendChild(this.doc.createTextNode(' · '));
+        const a = this.doc.createElement('a');
+        a.href = `${INSCRIPTION_VIEWER}${id}`;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        a.textContent = label;
+        foot.appendChild(a);
+      };
+      if (found.nameAt) link(found.nameAt, `name ${found.nameAt}`);
+      if (found.picture) link(found.picture.manifest, `picture ${found.picture.manifest}`);
+      rows.appendChild(foot);
+      return;
+    }
 
     const line = (label: string, said: string, id: number | null): void => {
       const row = this.doc.createElement('div');

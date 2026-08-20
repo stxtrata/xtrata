@@ -10,10 +10,25 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `a03fcb9bdcde7e6a900fec725efb4b25a3b767f8b83e29daaebda649a8c7f97f`
-* xtrata chunk hash `772b016abc1be006ff15b875952e224e7065e7780ee4a7c6aece0851ea7f1b9b`
-* build stamp `2.1.7 - 2026-08-20 10:31 UTC - #a64f93ff`
-* **242,259 bytes, 15 chunks.** 1,585 tests, 84 files. `tsc` and docs audit clean.
+* `htmlSha256` `b05125e93bb1f1e294f6183d3afa54828c020810acba29ce53e1b92a86b4e440`
+* xtrata chunk hash `ee3debe062137224b592b80b1946ed29e21691d14595e0748022482f09dd3118`
+* **242,910 bytes, 15 chunks.** 1,585 tests, 84 files. `tsc` and docs audit clean.
+
+**A loading tab froze the whole board.** The shared click helper swallowed every
+click while a long read was running, tabs included — so a tournament reading
+ninety games locked the page for minutes with no way to tell busy from broken.
+Navigation always lands now. Nothing is cancelled and nothing is waited for: the
+loads already check which tab is showing before drawing, and everything else
+writes into elements that are simply not on screen.
+
+**Refresh reads only what can change.** A finished game cannot unfinish, so
+re-checking eighty-five settled results to see whether five have moved was most
+of the wait and none of the answer.
+
+**The Profile is a profile.** Picture, name, the line the address wrote about
+itself, and the ratings when they exist — with the inscriptions behind it
+collapsed to one provenance row underneath. The Show and check buttons are gone
+because both ran automatically by then.
 
 **Finished games can be watched.** Step with buttons or arrow keys, play at a
 fixed rate, or follow the real gaps at a multiplier. The position at any ply is

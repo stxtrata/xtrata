@@ -58,6 +58,9 @@ function board(): { app: ChessApp; asked: { resolve: number; forget: number } } 
 }
 
 const canvas = (): HTMLElement => dom.window.document.getElementById('pfp-canvas')!;
+// OUTSIDE the canvas, which is a fixed 96px box: the caption went in it and was
+// crammed into a column beside the image, reading as a rendering fault.
+const said = (): string => dom.window.document.getElementById('pfp-said')?.textContent ?? '';
 
 describe('the profile after a wallet connects', () => {
   it('shows the picture the address actually has', async () => {
@@ -67,7 +70,7 @@ describe('the profile after a wallet connects', () => {
     const img = canvas().querySelector('img');
     expect(img, 'the canvas said "no picture" for an inscribed one').not.toBe(null);
     expect(img!.getAttribute('src')).toContain('2986');
-    expect(canvas().textContent).toContain('3026');
+    expect(said()).toContain('3026');
   });
 
   it('says the picture is inscribed rather than merely chosen', () => {
@@ -75,14 +78,14 @@ describe('the profile after a wallet connects', () => {
     // the wrong one thinks they have finished.
     const { app } = board();
     (app as unknown as { drawPicture(): void }).drawPicture();
-    expect(canvas().textContent).toContain('set by your manifest');
+    expect(said()).toContain('set by your manifest');
   });
 
   it('says a local choice is NOT inscribed yet', () => {
     const { app } = board();
     (app as unknown as { pictureChoice: number }).pictureChoice = 3002;
     (app as unknown as { drawPicture(): void }).drawPicture();
-    expect(canvas().textContent).toContain('NOT inscribed yet');
+    expect(said()).toContain('NOT inscribed yet');
   });
 
   it('does not forget what it knows when it looks automatically', async () => {

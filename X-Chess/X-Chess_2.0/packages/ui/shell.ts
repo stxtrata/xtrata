@@ -619,6 +619,14 @@ ${SCALE_CSS}
 .pstat { background: var(--sunk, rgba(0,0,0,.18)); border-radius: 4px; padding: 8px 6px; }
 .pstat__k { display: block; font-size: .68rem; color: var(--dim); }
 .pstat__v { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+
+/* Provenance, under a profile that already says who somebody is. Quiet, because
+   it is there to be checked rather than read. */
+.pcard__from {
+  margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line);
+  font-size: .72rem; color: var(--dim); text-align: center;
+}
+.pcard__from a { color: var(--gold); text-decoration: none; border-bottom: 1px dotted var(--gold); }
 .pfp-row { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0; }
 .pfp-side { flex: 1 1 auto; min-width: 0; }
 /* What the wallet holds, as a grid of squares. Scrolls rather than growing,
@@ -1163,7 +1171,7 @@ export const HTML = `
       <div class="tn-group__head">
         <span class="tn-group__title">Choose a tournament</span>
         <button class="action" id="tournament-refresh"
-                title="Read every game again. A tournament in progress changes on chain, not here.">Refresh</button>
+                title="Read the unfinished games again. A result cannot change, so the settled ones are kept.">Refresh</button>
         <span id="tournament-fresh" class="muted small" role="status"></span>
       </div>
       <!-- Filters over the PICKER. Entrant search is free; state comes from
@@ -1232,10 +1240,12 @@ export const HTML = `
       <input type="text" id="profile-who" placeholder="a Stacks address">
     </div>
     <div class="row">
-      <button class="action" id="profile-load">Show</button>
-      <button class="action" id="onchain-check">What has this address inscribed?</button>
-      <button class="action" id="profile-layout"
-              title="Switch between the picture beside the name and above it">Centred</button>
+      <!-- The Show and check buttons are gone: both ran automatically by the
+           time they were removed, so they asked somebody to press a button for
+           something already on screen. Refresh re-reads, for the moment after
+           inscribing where the remembered answer is the one just paid to
+           change. -->
+      <button class="action" id="onchain-check" title="Read this address again">Refresh</button>
     </div>
     <div id="onchain-rows" class="small"></div>
     <div id="profile-body"></div>
@@ -1251,7 +1261,13 @@ export const HTML = `
         'than the picture.'
     )}</h2>
     <div class="pfp-row">
-      <div class="pfp-canvas" id="pfp-canvas"></div>
+      <div>
+        <div class="pfp-canvas" id="pfp-canvas"></div>
+        <!-- OUTSIDE the canvas. It went in, and the canvas is a fixed 96px flex
+             box, so the caption was crammed into a column beside the image and
+             read as a rendering fault. -->
+        <div class="pfp-said" id="pfp-said"></div>
+      </div>
       <div class="pfp-side">
         <div class="field">
           <label for="pfp-id">Inscription ${info(

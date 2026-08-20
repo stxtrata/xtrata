@@ -94,12 +94,44 @@ export const endpoint = async () => {
     // produced forty-five minutes of "the chain is slow, not stuck" and not one
     // line naming the host that was refusing. A fallback is the single most
     // useful thing this can report and it costs one line.
-    onFallback: (from, to) => console.log(`  (${hostOf(from)} is failing, using ${hostOf(to)})`)
+    onFallback: (from, to) => {
+      console.log(`  (${hostOf(from)} is failing, using ${hostOf(to)})`);
+      noteFallback(from);
+    }
   });
   return ENDPOINT;
 };
 
 const hostOf = (base) => String(base).replace(/^https?:\/\//, '').split('/')[0];
+
+/**
+ * Say when EVERY host has refused recently, which is a different fact.
+ *
+ * One host failing is the ordinary case and the reason failover exists. All of
+ * them failing in rotation is a wider wobble, and it needs saying because the
+ * two look identical line by line: three fallback messages read as the failover
+ * working, and they also read as nothing being up. A round of chess produced
+ * exactly that and the difference was only visible by reading the host names.
+ *
+ * Reported once a minute at most. This is a diagnosis, not a running commentary.
+ */
+const FAILING_WINDOW_MS = 60_000;
+const failing = new Map();
+let saidAllFailing = 0;
+
+function noteFallback(from) {
+  const now = Date.now();
+  failing.set(hostOf(from), now);
+  for (const [host, at] of failing) if (now - at > FAILING_WINDOW_MS) failing.delete(host);
+  if (failing.size >= 3 && now - saidAllFailing > FAILING_WINDOW_MS) {
+    saidAllFailing = now;
+    console.log(
+      `  (every chain host has refused in the last minute: ${[...failing.keys()].join(', ')}. ` +
+        'Reads are still getting through by rotation, but broadcasts land in these windows ' +
+        'and are retried rather than lost.)'
+    );
+  }
+}
 
 /**
  * The host the SDK broadcasts through, which is a different question.
@@ -114,6 +146,67 @@ const hostOf = (base) => String(base).replace(/^https?:\/\//, '').split('/')[0];
  * the reads were: the round that stalled had every move land.
  */
 const PRIMARY = 'https://api.mainnet.hiro.so';
+
+/**
+ * Broadcast, and try again when the answer was unreadable.
+ *
+ * WHY A RETRY IS SAFE HERE AND ROTATING THE HOST IS NOT. The nonce is fixed at
+ * signing, so at most one transaction bearing it can ever be mined — resending
+ * the identical signed bytes cannot double-move, by construction rather than by
+ * care. That is the same property that makes rotating writes dangerous, read
+ * the other way round: pinning the nonce is exactly what makes retrying free.
+ *
+ * AND A DUPLICATE IS THE ANSWER, NOT AN ERROR. "unable to parse node response"
+ * is a proxy returning HTML instead of JSON, so the outcome is genuinely
+ * unknown: the transaction may have been accepted. Asking again is the cheapest
+ * way to find out, and a node saying it already has this transaction is the
+ * confirmation the unreadable response withheld.
+ *
+ * Only the unknown ones are retried. A refusal the node states clearly — bad
+ * nonce, not enough funds — is an answer, and asking again gets the same one.
+ *
+ * Round 8 lost three games to this: 108 moves played, then three broadcasts
+ * landed in a bad minute, got one attempt each, and stopped their games. The
+ * moves had cost nothing, because nothing was sent.
+ */
+const BROADCAST_TRIES = 4;
+
+/** A node that already holds this transaction, however it words it. */
+const alreadyHasIt = (said) =>
+  /ConflictingNonceInMempool|already.*(exists|in.*mempool)|duplicate/i.test(said);
+
+/** An answer that is no answer: the request went out and nothing legible came back. */
+const unreadable = (said) =>
+  /unable to parse|unexpected token|invalid json|fetch failed|ECONNRESET|ETIMEDOUT|502|503|504/i.test(said);
+
+export async function broadcastWithRetry(tx, describe = 'transaction') {
+  let last = null;
+  for (let attempt = 1; attempt <= BROADCAST_TRIES; attempt++) {
+    let result;
+    try {
+      result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
+    } catch (error) {
+      result = { error: String(error?.message ?? error) };
+    }
+    if (!result.error) return result;
+
+    const said = scrub(JSON.stringify(result));
+    // Already there, which means an earlier attempt landed after all. The txid
+    // is computed from the signed bytes, so it is knowable without being told.
+    if (alreadyHasIt(said)) {
+      const txid = typeof tx.txid === 'function' ? tx.txid() : result.txid;
+      console.log(`  (${describe} was already broadcast, treating as sent)`);
+      return { txid };
+    }
+    last = new Error(said);
+    if (!unreadable(said) || attempt === BROADCAST_TRIES) break;
+
+    const waitMs = 2_000 * attempt;
+    console.log(`  (${describe}: node answered unreadably, retrying in ${waitMs / 1000}s)`);
+    await new Promise((done) => setTimeout(done, waitMs));
+  }
+  throw last;
+}
 const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
 
 const arg = (name, fallback = null) => {
@@ -540,8 +633,7 @@ export async function send({
     postConditionMode: PostConditionMode.Deny,
     postConditions
   });
-  const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
-  if (result.error) throw new Error(scrub(JSON.stringify(result)));
+  const result = await broadcastWithRetry(tx, `${wizard.name} in game ${game}`);
 
   // Booked immediately, and only after the broadcast succeeded. The next check
   // then needs no network call, and it is counting the same money the cap does.
@@ -774,7 +866,12 @@ async function sweep(fleet, to) {
       client: CLIENT,
       fee
     });
-    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
+    let result;
+    try {
+      result = await broadcastWithRetry(tx, wizard.name);
+    } catch (error) {
+      result = { error: String(error?.message ?? error) };
+    }
     if (result.error) {
       console.log(`${wizard.name.padEnd(10)} FAILED: ${scrub(JSON.stringify(result))}`);
       process.exitCode = 1;
@@ -870,7 +967,12 @@ async function fund(fleet) {
       fee,
       nonce
     });
-    const result = await broadcastTransaction({ transaction: tx, network: 'mainnet', client: CLIENT });
+    let result;
+    try {
+      result = await broadcastWithRetry(tx, transfer.who);
+    } catch (error) {
+      result = { error: String(error?.message ?? error) };
+    }
     if (result.error) {
       console.log(`  ${transfer.who} FAILED: ${scrub(JSON.stringify(result))}`);
       process.exitCode = 1;

@@ -746,9 +746,13 @@ describe('a rate limit must not end a tournament', () => {
   });
 
   it('debits only after the broadcast succeeded', () => {
-    const broadcast = source.indexOf('const result = await broadcastTransaction');
+    // MATCHED ON THE BROADCAST, not on one spelling of it. This looked for
+    // `const result = await broadcastTransaction` and broke when the call
+    // became a retrying helper — a red on a change that strengthened the very
+    // thing it guards, since the helper is what now decides "succeeded".
+    const broadcast = source.indexOf('await broadcastWithRetry');
     const debit = source.indexOf('debitBalance(wizard.address');
-    expect(broadcast).toBeGreaterThan(-1);
+    expect(broadcast, 'nothing broadcasts at all any more').toBeGreaterThan(-1);
     expect(debit, 'money must not be counted as spent before it is sent').toBeGreaterThan(broadcast);
   });
 
