@@ -1,9 +1,9 @@
 {
   "name": "xchess",
-  "version": "2.1.7",
+  "version": "2.1.8",
   "private": true,
   "type": "module",
-  "description": "X Chess 2 — a permanent, serverless, on-chain chess application",
+  "description": "X Chess 2 \u2014 a permanent, serverless, on-chain chess application",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "check:contract": "clarinet check",

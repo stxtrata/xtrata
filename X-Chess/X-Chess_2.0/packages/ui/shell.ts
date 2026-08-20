@@ -1238,6 +1238,20 @@ export const HTML = `
 
   <section id="view-profile" class="panel hide">
     <h2>Profile</h2>
+    <div id="onchain-rows" class="small"></div>
+    <div id="profile-body"></div>
+
+    <!-- ONE CONTROL, ONCE THERE IS A PROFILE. Everything below is the tooling
+         for MAKING one: an address box, a picture picker and a manifest
+         builder. Left on screen under a finished profile it is the bulk of the
+         page, so the profile reads as a header above a form rather than as a
+         profile. It collapses when the picture and the name have both been
+         found, and this brings it back. -->
+    <div class="row hide" id="profile-edit-row">
+      <button class="ghost" id="profile-edit" title="Change the picture or the name, or look at another address">Edit profile</button>
+    </div>
+
+    <div id="profile-tools">
     <div class="field">
       <label for="profile-who">Address ${info(
         'i-profile-who',
@@ -1254,8 +1268,6 @@ export const HTML = `
            change. -->
       <button class="action" id="onchain-check" title="Read this address again">Refresh</button>
     </div>
-    <div id="onchain-rows" class="small"></div>
-    <div id="profile-body"></div>
 
     <h2 style="margin-top:18px">Picture — its own inscription ${info(
       'i-pfp-what',
@@ -1346,6 +1358,7 @@ export const HTML = `
           'with your own Xtrata tooling. Once it is on chain, this board finds it by reading ' +
           'what the wallet holds and checks that the same wallet minted it.'
       )}
+    </div>
     </div>
   </section>
 

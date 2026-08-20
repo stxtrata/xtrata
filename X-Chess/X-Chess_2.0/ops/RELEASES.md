@@ -6,13 +6,14 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
-## 2.1.7 — 2026-08-19
+## 2.1.8 — 2026-08-20
 
-Built, not yet inscribed.
+Built, not yet inscribed. To go up as a child of 3025.
 
-* `htmlSha256` `addeff0f3cef9c150bb609322bffd1e884a64007f5462525dacce47213068302`
-* xtrata chunk hash `955b1a88c5bbda2dde679b1bc256f55cde00acca1fe7a270512a5853cd1d0209`
-* **244,762 bytes, 15 chunks.** 1,595 tests, 85 files. `tsc` and docs audit clean.
+* `htmlSha256` `e453a6aac28f7570af234cdbf64497872092d49c2c9696cf96840d56a293cdad`
+* xtrata chunk hash `9965054aa101877b7372244f60a3e7538d9ee3e489eb2d230bf083768dbac884`
+* build stamp `2.1.8 - 2026-08-20 12:01 UTC - #f91e8346`
+* **245,227 bytes, 15 chunks.** 1,600 tests, 86 files. `tsc` and docs audit clean.
 
 **A loading tab froze the whole board.** The shared click helper swallowed every
 click while a long read was running, tabs included — so a tournament reading
@@ -29,6 +30,16 @@ of the wait and none of the answer.
 itself, and the ratings when they exist — with the inscriptions behind it
 collapsed to one provenance row underneath. The Show and check buttons are gone
 because both ran automatically by then.
+
+And the tooling that made it collapses too, which was the half that still made
+the tab look like a form. An address box, a picture picker and a manifest
+builder are the bulk of this page and every one is a step somebody has already
+finished once their picture and name are on chain — so a finished profile sat
+as a heading above two sections asking for the picture and name it was already
+showing. One **Edit profile** button brings them back, because changing a
+picture and looking at another address are things people do. It collapses on
+both halves being present, never on one: hiding the picture picker from
+somebody who still needs it is the failure worth avoiding.
 
 **A rating is kept, and can say whether it still holds.** The standings lived in
 memory, so opening Profile before the Leaderboard showed no rating at all and
@@ -70,6 +81,26 @@ The canvas also only ever showed the LOCAL preview, never what the address
 actually has. It shows the inscribed one when nothing is being tried on, and
 says which of the two it is — they look identical and mean opposite things, and
 a reader who assumes the wrong one thinks they have finished.
+
+
+## 2.1.7 — 2026-08-19  ·  **inscription 3025, live on mainnet**
+
+* `htmlSha256` `f0480d811f145d6704d7019f9e21e5b87bea9b2b8a5e43db19393405d578da5d`
+* xtrata chunk hash `cf73da87a2d0b45c274be3c06741c2ee42fe69e0b1c7a2f1dfeaa9228426f9ac`
+* build stamp `2.1.7 - 2026-08-19 22:20 UTC - #de85733f`
+* **232,552 bytes, 15 chunks.** 1,569 tests, 82 files.
+
+Read back off the chain rather than taken from the build that was meant to go
+up, because those had drifted apart. This entry first recorded
+`4fb3e98…` / `390f861…` at 232,548 bytes and stamp `22:16`, from a build made
+four minutes earlier. The code is IDENTICAL — both stamp `#de85733f`, which is
+the hash of the bundled code — and the four bytes are the word `UTC`, added to
+the stamp by the build below it and picked up by a rebuild before inscribing.
+
+Worth spelling out because it is the failure this file exists to prevent: a
+recorded hash that does not match the artefact looks exactly like the wrong
+file went up, and here it means a label was added to a timestamp. The hashes
+above are of the bytes actually inscribed, fetched raw and rehashed.
 
 **The slow half had no bar, because it wrote over its own.** "Replaying every
 game to score it" went in as a bare notice, and the note is where the summary,

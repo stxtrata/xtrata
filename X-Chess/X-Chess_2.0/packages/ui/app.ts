@@ -664,6 +664,7 @@ const IDS = [
   'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
   'profile-who', 'profile-body', 'onchain-check', 'onchain-rows', 'pfp-said',
+  'profile-tools', 'profile-edit-row', 'profile-edit',
   'pfp-canvas', 'pfp-id', 'pfp-check', 'pfp-mine', 'pfp-clear',
   'pfp-problems', 'pfp-grid', 'pfp-state', 'pfp-manifest', 'pfp-next',
   'claim-name-why', 'claim-name', 'claim-about',
@@ -1179,6 +1180,7 @@ export class ChessApp {
     });
     on('claimBuild', () => this.buildNameClaim());
     on('onchainCheck', () => void this.checkOnChain({ fresh: true }));
+    always('profileEdit', () => this.showProfileTools(true));
     on('replayStart', () => { this.replayStop(); this.replayGo(0); });
     on('replayBack', () => { this.replayStop(); this.replayGo((this.replayPly ?? this.replayLength()) - 1); });
     on('replayPlay', () => this.replayPlayPause());
@@ -7892,6 +7894,23 @@ export class ChessApp {
     if (this.tab === 'profile') void this.checkOnChain();
   }
 
+  /**
+   * Show or hide the tooling that makes a profile, under the profile it made.
+   *
+   * The address box, the picture picker and the manifest builder are the bulk
+   * of this tab, and every one of them is a step somebody has already finished
+   * once their picture and name are on chain. Left up, the profile reads as a
+   * heading above a form.
+   *
+   * Hidden rather than removed, and one button brings it back — the reason to
+   * return is changing a picture or looking at another address, which is a
+   * thing people do rather than an edge case.
+   */
+  private showProfileTools(show: boolean): void {
+    this.el.profileTools?.classList.toggle('hide', !show);
+    this.el.profileEditRow?.classList.toggle('hide', show);
+  }
+
   private async checkOnChain(options: { fresh?: boolean } = {}): Promise<void> {
     const rows = this.el.onchainRows;
     rows.replaceChildren();
@@ -8022,6 +8041,10 @@ export class ChessApp {
     // first thing read. When the card has none of that, they are all there is
     // and they stay in full.
     const complete = Boolean(found.picture && found.name);
+    // COLLAPSED ON THE SAME TEST as the provenance row, because they are the
+    // same judgement: there is a profile here, so the things for making one
+    // stop being the page.
+    this.showProfileTools(!complete);
     if (complete) {
       const foot = this.doc.createElement('div');
       foot.className = 'pcard__from';
