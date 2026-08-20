@@ -620,6 +620,13 @@ ${SCALE_CSS}
 .pstat__k { display: block; font-size: .68rem; color: var(--dim); }
 .pstat__v { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 
+/* Where a kept rating came from. Said under the numbers rather than beside
+   them: it qualifies all five, and is not one of them. */
+.pcard__asof {
+  margin: 8px auto 0; max-width: 30rem;
+  font-size: .72rem; line-height: 1.5; color: var(--dim); text-align: center;
+}
+
 /* Provenance, under a profile that already says who somebody is. Quiet, because
    it is there to be checked rather than read. */
 .pcard__from {

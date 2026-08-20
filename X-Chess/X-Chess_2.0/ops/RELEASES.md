@@ -10,9 +10,9 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `b05125e93bb1f1e294f6183d3afa54828c020810acba29ce53e1b92a86b4e440`
-* xtrata chunk hash `ee3debe062137224b592b80b1946ed29e21691d14595e0748022482f09dd3118`
-* **242,910 bytes, 15 chunks.** 1,585 tests, 84 files. `tsc` and docs audit clean.
+* `htmlSha256` `addeff0f3cef9c150bb609322bffd1e884a64007f5462525dacce47213068302`
+* xtrata chunk hash `955b1a88c5bbda2dde679b1bc256f55cde00acca1fe7a270512a5853cd1d0209`
+* **244,762 bytes, 15 chunks.** 1,595 tests, 85 files. `tsc` and docs audit clean.
 
 **A loading tab froze the whole board.** The shared click helper swallowed every
 click while a long read was running, tabs included — so a tournament reading
@@ -29,6 +29,17 @@ of the wait and none of the answer.
 itself, and the ratings when they exist — with the inscriptions behind it
 collapsed to one provenance row underneath. The Show and check buttons are gone
 because both ran automatically by then.
+
+**A rating is kept, and can say whether it still holds.** The standings lived in
+memory, so opening Profile before the Leaderboard showed no rating at all and
+the way to get one was to sit through the walk. They are kept per contract now
+and appear immediately, stamped with what would falsify them: the length of the
+ranked index, and every game still being played with the submission count it
+had. Checking costs that many row reads instead of replaying every ranked game,
+and either confirms the figure as exactly current or says it predates something
+and points at the Leaderboard. A stamp of the count alone would have been the
+obvious one and would confirm stale figures as current, because a game already
+inside the count can finish later and move two ratings.
 
 **Finished games can be watched.** Step with buttons or arrow keys, play at a
 fixed rate, or follow the real gaps at a multiplier. The position at any ply is

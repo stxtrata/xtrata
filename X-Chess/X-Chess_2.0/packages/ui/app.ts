@@ -382,6 +382,32 @@ type PickerFilter = 'all' | 'finished' | 'running' | 'planned' | 'unknown';
 
 const STATE_KEY = 'xchess:tstate:';
 
+/** Where the last computed standings are kept, per contract. */
+const RATING_KEY = 'xchess:ratings:';
+
+/**
+ * The standings as last computed, and enough to tell whether they still hold.
+ *
+ * The walk that produces these is the longest thing the board does, so a reader
+ * who wanted to see their own rating had to sit through every ranked game being
+ * read and replayed - or open the Leaderboard first and know to. Keeping the
+ * answer means the number is on screen immediately.
+ *
+ * NOTHING DERIVED IS CACHED unless it can be checked, so this carries the two
+ * facts that decide whether it is still true. `atCount` is the ranked index
+ * length: a new ranked game appears by extending it. `open` is every game that
+ * was still being played when the walk ran, with the submission count it had -
+ * because a game already counted in `atCount` can finish later, and that
+ * changes ratings without changing the count. A stamp of the count alone would
+ * confirm a stale figure as current, which is worse than not checking.
+ */
+interface RatingCache {
+  contract: string;
+  atCount: number;
+  open: Array<[id: number, nextSeq: number]>;
+  rows: LeaderboardRow[];
+}
+
 /**
  * Where an inscription can be read.
  *
@@ -820,6 +846,10 @@ export class ChessApp {
 
   /** The last computed standings, so Profile can show a row it already has. */
   private ratedRows: LeaderboardRow[] = [];
+  /** What those standings were computed against, or null when computed here. */
+  private ratedStamp: { atCount: number; open: Array<[number, number]> } | null = null;
+  /** Whether the cached standings have been checked against the chain. */
+  private ratedChecked: 'no' | 'checking' | 'current' | 'stale' = 'no';
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -1311,6 +1341,8 @@ export class ChessApp {
         .join(' · ')
     );
     this.text('contractLabel', build.contract ? `contract ${build.contract}` : '');
+    // Before anything is drawn, so a profile opened first has a rating to show.
+    this.loadRatingCache();
     // Drawn once at boot so the panel says what it is before anybody touches
     // it, rather than being blank until a button is pressed.
     this.drawPicture();
@@ -4277,6 +4309,119 @@ export class ChessApp {
     return /^S[A-Z0-9]{20,50}$/.test(typed) ? typed : null;
   }
 
+  /** The key for these standings, which belong to one contract and no other. */
+  private ratingKey(): string {
+    return RATING_KEY + this.chain.contractId;
+  }
+
+  /**
+   * Load the standings computed on a previous visit.
+   *
+   * Read once at start-up rather than at each draw: a profile that has to wait
+   * for storage before it can show a number has given up most of what keeping
+   * the number was for.
+   */
+  private loadRatingCache(): void {
+    try {
+      const raw = (globalThis as { localStorage?: Storage }).localStorage?.getItem(this.ratingKey());
+      if (!raw) return;
+      const cache = JSON.parse(raw) as RatingCache;
+      if (cache?.contract !== this.chain.contractId) return;
+      if (!Array.isArray(cache.rows) || !Array.isArray(cache.open)) return;
+      if (!Number.isSafeInteger(cache.atCount)) return;
+      this.ratedRows = cache.rows;
+      this.ratedStamp = { atCount: cache.atCount, open: cache.open };
+    } catch {
+      // Unreadable or from an older shape. The walk is still there.
+    }
+  }
+
+  /** Keep what the walk just produced, with what would falsify it. */
+  private saveRatingCache(rows: LeaderboardRow[], atCount: number, open: Array<[number, number]>): void {
+    try {
+      const local = (globalThis as { localStorage?: Storage }).localStorage;
+      if (!local) return;
+      const cache: RatingCache = { contract: this.chain.contractId, atCount, open, rows };
+      local.setItem(this.ratingKey(), JSON.stringify(cache));
+    } catch {
+      // Full or private. The standings are on screen either way.
+    }
+  }
+
+  /**
+   * Check whether kept standings still hold, without recomputing them.
+   *
+   * TWO READS' WORTH OF WORK, against a walk that reads and replays every ranked
+   * game. The ranked index is append-only, so its length rising means a new
+   * game exists; and every game that was unfinished at walk time is asked for
+   * its row, which carries the submission count. Unchanged count means no move
+   * has been played, which means it has not finished, which means it cannot have
+   * moved anybody's rating.
+   *
+   * When both hold, the kept figure is not merely recent - it is exactly what
+   * the walk would produce right now, and the profile can say so. When either
+   * fails, this says the figure predates something rather than silently
+   * starting the walk: recomputing is minutes of reads, and doing that
+   * unrequested because somebody opened their profile is the cost this cache
+   * exists to avoid.
+   */
+  private async confirmRatings(): Promise<void> {
+    const stamp = this.ratedStamp;
+    if (!stamp || this.ratedChecked !== 'no') return;
+    this.ratedChecked = 'checking';
+    try {
+      const count = await this.chain.getRankedCount();
+      let moved = count !== stamp.atCount;
+      if (!moved) {
+        for (const [id, seq] of stamp.open) {
+          const row = await this.chain.getGame(id);
+          if (row && row.nextSeq !== seq) {
+            moved = true;
+            break;
+          }
+        }
+      }
+      this.ratedChecked = moved ? 'stale' : 'current';
+    } catch {
+      // A failed check is not a stale rating. Leave it unconfirmed and say so.
+      this.ratedChecked = 'no';
+      return;
+    }
+    this.paintRatingNote();
+  }
+
+  /**
+   * What the kept standings are worth saying about themselves.
+   *
+   * Null when they were computed in this session, because a figure derived here
+   * a moment ago needs no provenance - the caveat belongs to the kept one.
+   */
+  private ratingNoteText(): string | null {
+    if (!this.ratedStamp) return null;
+    if (this.ratedChecked === 'current') {
+      return 'Checked against the chain just now: nothing has changed since this was computed.';
+    }
+    if (this.ratedChecked === 'stale') {
+      return 'Games have been played since this was computed. Open the Leaderboard to bring it up to date.';
+    }
+    return 'Kept from the last time the Leaderboard was walked, and being checked…';
+  }
+
+  /**
+   * Rewrite the one line that changed, rather than the card around it.
+   *
+   * The check finishes after the profile is drawn, and redrawing the card to
+   * report it would clear the picture, the name and the line they wrote, and
+   * put them back - a visible flinch, to deliver a sentence.
+   */
+  private paintRatingNote(): void {
+    const note = this.el.onchainRows?.querySelector('.pcard__asof');
+    const say = this.ratingNoteText();
+    if (!note) return;
+    if (!say) note.remove();
+    else note.textContent = say;
+  }
+
   private readPreview(): number | null {
     const key = this.previewKey();
     if (!key) return null;
@@ -7015,6 +7160,12 @@ export class ChessApp {
     await this.ensureManifestPairings();
     await this.guard('computing ratings', async () => {
       const count = await this.chain.getRankedCount();
+      // WHAT WOULD MAKE THIS ANSWER WRONG. A game still being played can finish
+      // later and move two ratings without the ranked index growing, so the
+      // count alone cannot say whether a kept table still holds. Recorded with
+      // the submission count it had, which is the cheapest thing that changes
+      // when somebody moves.
+      const open: Array<[number, number]> = [];
       let unfinished = 0;
       let unidentified = 0;
       let ineligible = 0;
@@ -7111,7 +7262,10 @@ export class ChessApp {
             // is a state that never occurs.
             const why = check.reasons;
             if (why.some((r) => IDENTITY_REASONS.has(r))) unidentified++;
-            else if (why.length === 1 && why[0] === 'no-result') unfinished++;
+            else if (why.length === 1 && why[0] === 'no-result') {
+              unfinished++;
+              open.push([id, row.nextSeq]);
+            }
             else {
               ineligible++;
               for (const reason of why) ineligibleWhy.add(describeIneligibility(reason));
@@ -7148,6 +7302,17 @@ export class ChessApp {
       // telling a reader to "open the leaderboard" was the board knowing the
       // number and declining to say it.
       this.ratedRows = rows;
+
+      // KEPT ACROSS VISITS TOO. Held in memory only, a reader who opened their
+      // profile before the Leaderboard saw no rating at all, and the way to get
+      // one was to sit through the walk - so the board knew the number, and the
+      // price of being told it was the most expensive thing the board does.
+      //
+      // Computed here, so it needs no checking: the stamp is recorded for the
+      // NEXT visit, and this session shows the figure plainly.
+      this.saveRatingCache(rows, count, open);
+      this.ratedStamp = null;
+      this.ratedChecked = 'no';
 
       // NAMES, WHICH THIS TAB NEVER ASKED FOR. Every row is drawn with
       // `addressNode`, which reads `Names.peek` — a cache lookup and nothing
@@ -7832,6 +7997,19 @@ export class ChessApp {
       stat('Drawn', String(mine.draws));
       stat('Lost', String(mine.losses));
       card.appendChild(stats);
+
+      // WHERE THE NUMBER CAME FROM, when it did not come from here. Standings
+      // kept from a previous visit are a claim about a chain that has moved
+      // since, and a rating presented without that is the board stating an old
+      // figure as a current one.
+      const say = this.ratingNoteText();
+      if (say) {
+        const asof = this.doc.createElement('p');
+        asof.className = 'pcard__asof';
+        asof.textContent = say;
+        card.appendChild(asof);
+        void this.confirmRatings();
+      }
     }
     rows.appendChild(card);
 
