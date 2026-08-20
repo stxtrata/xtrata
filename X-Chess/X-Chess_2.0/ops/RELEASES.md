@@ -180,13 +180,32 @@ Carries the fix for a shared link to a tournament game showing "anyone". Does
 NOT carry the clipboard fix, which was built twenty minutes later under the
 same version number and never went up — see 2.1.6.
 
-### Originally recorded as **231,411 bytes, 15 chunks.**
+### What is actually on chain at 3023
 
-* `htmlSha256` `4fb3e9846559550017c9d6f0902ce89bf00f8d41b10d16e716f63ca6da220098`
-* xtrata chunk hash `390f861999b946a7910195710ba8dcfe07a39eb3123df6a44bc971c08d5e5280`
-* build stamp `2.1.7 - 2026-08-19 22:16 - #de85733f`
-* **232,548 bytes, 15 chunks.** 1,569 tests, 82 files. `tsc` and docs audit clean.
+Read back raw and rehashed on 2026-08-20, not taken from any build record.
+
+* `htmlSha256` `18ff838fe144f08f61e2626250e520f6064ab7421f567d2a507764ec90bf3994`
+* xtrata chunk hash `c14bcf5ce321be755912fa8765bfc772817ff00e0ebfdbbfd0ec49195deafa82`
+* build stamp `2.1.5 - 2026-08-19 19:47 - #8b8feb66`
+* **231,411 bytes, 15 chunks.**
+
+### The rebuild twenty minutes later, which never went up
+
+* `htmlSha256` `193a4bd1c35fe98f87242ce491ba59710cc5d2937322db38934c95817e223a33`
+* xtrata chunk hash `676fee30e4a063b5bc31373fcdb059d276823a5bfa287e1606cdb7d8c3de980c`
+* build stamp `2.1.5 - 2026-08-19 20:08 - #588f89fe`
 * 1,564 tests passing, 81 files. `tsc --noEmit` clean, docs audit clean.
+
+Same version number, carrying the clipboard fix; it shipped as 2.1.6 instead.
+Its byte count was recorded as 231,411 — identical to the inscribed build —
+which cannot now be checked and should not be trusted, because the code hashes
+differ and so did the bytes.
+
+TWO SEPARATE FAULTS were in this entry until 2026-08-20. It carried 2.1.7's
+hashes and byte count, filed here by `40078485`; and beneath that, the figures
+it did claim for itself were the 20:08 rebuild's rather than the inscription's.
+Both are the same mistake the ledger exists to prevent — a build record under
+the wrong artefact — and neither was visible without asking the chain.
 
 **Both copy buttons were doing nothing on the inscription**, and had been since
 each was written. Measured against 3022 in a browser rather than reasoned
@@ -216,6 +235,12 @@ a game arrives unidentified.
 ## 2.1.4 — 2026-08-19  ·  **inscription 3022, live on mainnet**
 
 Inscribed as a child of 3002. **231,069 bytes, 15 chunks.**
+
+Read back raw and rehashed on 2026-08-20:
+
+* `htmlSha256` `c9ea8793b12e591288b87fa78c874634e581ffc8899192df21095c2a672c6b5c`
+* xtrata chunk hash `04949cb708e9e768be673e1953f49053b0298add5f0a6f97f6fc840fbef287f9`
+* build stamp `2.1.4 - 2026-08-19 17:46 - #e91843af`
 
 * `htmlSha256` `c9ea8793b12e591288b87fa78c874634e581ffc8899192df21095c2a672c6b5c`
 * xtrata chunk hash `04949cb708e9e768be673e1953f49053b0298add5f0a6f97f6fc840fbef287f9`

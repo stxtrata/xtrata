@@ -30,7 +30,12 @@ an old board being BEHIND does not.
 | 2.1.0 | **3008** | 08-18 21:11 | `d19c51f7` | tournaments found by wallet rather than typed; your own games found past the newest-25 window; the waiting-on-you count; the manual embedded from chain |
 | 2.1.1 | **3009** | 08-18 21:32 | `e21c6f1f` | the runtime proxy, which had never once been used |
 | 2.1.2 | **3014** | 08-18 23:10 | `acc7e9b1` | `Tournament.cooldown`, `TournamentEntrant.depth`, one `rulesFor()` |
-| 2.1.3 | not inscribed | 08-19 13:17 | `c7697a3b` | in-check explanation, in-flight warning, tournament cache, collapsed chooser, `revisedInTime` on open |
+| 2.1.3 | not inscribed | 08-19 14:34 | `c7697a3b` | in-check explanation, in-flight warning, tournament cache, collapsed chooser, `revisedInTime` on open |
+| 2.1.4 | **3022** | 08-19 17:46 | `e91843af` | profile pictures, held rather than created, as their own manifest |
+| 2.1.5 | **3023** | 08-19 19:47 | `8b8feb66` | a shared link to a tournament game names its players |
+| 2.1.6 | **3024** | 08-19 21:43 | `22884569` | the clipboard fix that missed 3023, and a tournament that reloaded itself every thirty seconds |
+| 2.1.7 | **3025** | 08-19 22:20 | `de85733f` | a bar on the scoring walk, standings that fill a row at a time, a move costing one game rather than ninety, `UTC` on the stamp |
+| 2.1.8 | built, not inscribed | 08-20 12:19 | `f91e8346` | tabs switchable while loading, refresh reading only what can change, the Profile as a profile, a kept rating, replay of finished games |
 
 **2.1.0 → 2.1.1 is the one worth reading.** `underXtrataRuntime()` decided
 whether to use Xtrata's caching proxy by looking for injected support scripts,
@@ -52,12 +57,13 @@ silently charged and skipped.
 Other inscriptions: engine **2991**, manifest builder **2992**, exhibition one
 **2993**, entry validator **2994**, character sheets **2995–3000** and
 **3010–3013**, exhibition two **3001**, manual **3003** and **3007**,
-exhibition three **3016**. **3015** is abandoned — nothing points at it, the
+exhibition three **3016**, the prompt-protocol director **3017**, and Xtrata's
+own picture manifest **3026** and name manifest **3027**. **3015** is abandoned — nothing points at it, the
 chooser hides it, and it stays on chain because it is a real document.
 
 ## Test counts
 
-`npm test` — **1,484 passing, 17 skipped, 74 files.** `npx tsc --noEmit` clean.
+`npm test` — **1,600 passing, 17 skipped, 86 files.** `npx tsc --noEmit` clean.
 
 The skips are the heavy perft depths, which `npm run test:perft:deep` enables
 and the release gate requires. They pass: 76/76, roughly 590 million nodes.
