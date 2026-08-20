@@ -571,13 +571,31 @@ ${SCALE_CSS}
    have finished. */
 .pfp-said { margin-top: 6px; font-size: .72rem; line-height: 1.35; color: var(--dim); }
 
-/* A profile, rather than a list of fields. Centred because the picture is the
-   thing somebody recognises first, and everything under it is about whoever
-   that is. */
-.pcard { text-align: center; padding: 4px 0 12px; }
+/* A profile, rather than a list of fields. Two layouts, both mocked up before
+   either was built: beside puts the picture next to the name and reads as a
+   profile row, centred puts it above and reads as a profile page. Beside is
+   the default and the toggle remembers the choice.
+
+   NO BACKTICKS IN HERE. This block lives inside a template literal, and naming
+   the two modes in backticks the way code would ended the string mid-stylesheet
+   and broke the build. There is a test for exactly this. */
+.pcard { padding: 4px 0 12px; }
+.pcard--centre { text-align: center; }
+.pcard--centre .pcard__face { margin: 0 auto 10px; }
+.pcard--centre .pcard__about { margin-left: auto; margin-right: auto; }
+/* Grid rather than flex, so the stats span the full width underneath both the
+   picture and the text instead of being trapped in the text column. */
+.pcard--left {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0 14px;
+  align-items: start;
+}
+.pcard--left .pcard__face { grid-row: span 3; margin: 0; }
+.pcard--left .pcard__stats { grid-column: 1 / -1; }
 .pcard__face {
   width: 72px; height: 72px; border-radius: 10px; object-fit: cover;
-  display: block; margin: 0 auto 10px; background: var(--line);
+  display: block; background: var(--line);
 }
 .pcard__name { font-size: 1.2rem; font-weight: 600; margin: 0; }
 .pcard__addr {

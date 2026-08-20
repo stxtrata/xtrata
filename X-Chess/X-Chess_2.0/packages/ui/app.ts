@@ -400,6 +400,27 @@ const STATE_KEY = 'xchess:tstate:';
  */
 const INSCRIPTION_VIEWER = 'https://xtrata.xyz/i/';
 
+const LAYOUT_KEY = 'xchess:profile-layout';
+
+/** A preference, so losing it costs a layout somebody can change back. */
+function readLayout(): 'left' | 'centre' {
+  try {
+    return (globalThis as { localStorage?: Storage }).localStorage?.getItem(LAYOUT_KEY) === 'centre'
+      ? 'centre'
+      : 'left';
+  } catch {
+    return 'left';
+  }
+}
+
+function writeLayout(which: 'left' | 'centre'): void {
+  try {
+    (globalThis as { localStorage?: Storage }).localStorage?.setItem(LAYOUT_KEY, which);
+  } catch {
+    // A private window. The default is the common case anyway.
+  }
+}
+
 /**
  * The manual, laid out as a page.
  *
@@ -799,6 +820,15 @@ export class ChessApp {
 
   /** The last computed standings, so Profile can show a row it already has. */
   private ratedRows: LeaderboardRow[] = [];
+
+  /**
+   * Which way the profile card is laid out.
+   *
+   * `left` puts the picture beside the name and `centre` puts it above. Both
+   * were mocked up and this is the one that was chosen; it is remembered per
+   * browser because it is a preference rather than a fact about anybody.
+   */
+  private profileLayout: 'left' | 'centre' = readLayout();
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -1104,6 +1134,12 @@ export class ChessApp {
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
     on('onchainCheck', () => void this.checkOnChain({ fresh: true }));
+    on('profileLayout', () => {
+      this.profileLayout = this.profileLayout === 'left' ? 'centre' : 'left';
+      writeLayout(this.profileLayout);
+      this.drawLayoutButton();
+      void this.checkOnChain();
+    });
     on('pfpCheck', () => void this.previewPicture());
     on('pfpMine', () => void this.showHoldings());
     on('pfpClear', () => this.clearPicture());
@@ -7384,7 +7420,19 @@ export class ChessApp {
    * the cache exists so that costs nothing the second time. The button beside
    * it is the one that forgets first, for the moment after inscribing.
    */
+  /**
+   * Name the button by what pressing it does, not by what is on screen.
+   *
+   * A toggle labelled with the current state reads as a status line, and the
+   * reader has to work out that it is a control and that it will do the other
+   * thing. "Centred" on a left-aligned card means press me for centred.
+   */
+  private drawLayoutButton(): void {
+    this.el.profileLayout.textContent = this.profileLayout === 'left' ? 'Centred' : 'Beside';
+  }
+
   private async loadProfileFromChain(): Promise<void> {
+    this.drawLayoutButton();
     const who = this.pictureAddress();
     if (!who || !this.pictures) return;
     try {
@@ -7446,7 +7494,7 @@ export class ChessApp {
     // arranged as a report: the picture in a box elsewhere, the name in one
     // row, the line they wrote about themself nowhere at all.
     const card = this.doc.createElement('div');
-    card.className = 'pcard';
+    card.className = `pcard pcard--${this.profileLayout}`;
 
     const shown = found.picture?.image ?? null;
     if (shown !== null) {
