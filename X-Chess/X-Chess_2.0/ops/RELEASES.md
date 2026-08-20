@@ -10,10 +10,18 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. To go up as a child of 3025.
 
-* `htmlSha256` `e453a6aac28f7570af234cdbf64497872092d49c2c9696cf96840d56a293cdad`
-* xtrata chunk hash `9965054aa101877b7372244f60a3e7538d9ee3e489eb2d230bf083768dbac884`
-* build stamp `2.1.8 - 2026-08-20 12:01 UTC - #f91e8346`
+* `htmlSha256` `feeb3e4d180646a25b90ca71a4ef7dea22a4ec575dba5d5a68409c8cbef67abd`
+* xtrata chunk hash `c912dd76da1b1aab61c51fee915f80b34e5dc70680203adddaafd986a4e442e5`
+* build stamp `2.1.8 - 2026-08-20 12:19 UTC - #f91e8346`
 * **245,227 bytes, 15 chunks.** 1,600 tests, 86 files. `tsc` and docs audit clean.
+
+The two page hashes above are of `dist/xchess.html` AS IT STANDS. Rebuilding
+changes them without changing a line of code, because the stamp is inside the
+page: this entry was first written against the 12:01 build and the release gate
+rebuilt at 12:19, which moved both hashes and left the byte count identical.
+`#f91e8346` is the hash of the bundled code and is the stable identifier — it
+survives a rebuild, and it is what to compare when the page hashes disagree.
+Inscribe the file that is there; if it gets rebuilt first, re-read these.
 
 **A loading tab froze the whole board.** The shared click helper swallowed every
 click while a long read was running, tabs included — so a tournament reading
