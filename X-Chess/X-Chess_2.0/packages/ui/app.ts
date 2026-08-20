@@ -1100,7 +1100,7 @@ export class ChessApp {
     });
     on('claimBuild', () => this.buildNameClaim());
     on('profileLoad', () => void this.loadProfile());
-    on('onchainCheck', () => void this.checkOnChain());
+    on('onchainCheck', () => void this.checkOnChain({ fresh: true }));
     on('pfpCheck', () => void this.previewPicture());
     on('pfpMine', () => void this.showHoldings());
     on('pfpClear', () => this.clearPicture());
@@ -1766,6 +1766,9 @@ export class ChessApp {
     }
     if (tab === 'leaderboard') void this.loadLeaderboard();
     if (tab === 'help') void this.loadHelp();
+    // For arriving here without having connected since the page opened, and for
+    // a link that lands on somebody else's profile.
+    if (tab === 'profile') void this.loadProfileFromChain();
     // Only on first open. A tournament is a manifest plus a couple of dozen
     // reads, and flicking between tabs should not re-spend that.
     // ONLY THE LIST. Opening the tab used to read a tournament nobody had
@@ -4069,17 +4072,42 @@ export class ChessApp {
     const chosen = this.pictureChoice ?? this.readPreview();
     this.pictureChoice = chosen;
 
-    if (chosen === null) {
+    // WHAT THIS ADDRESS ACTUALLY HAS, when nothing is being tried on.
+    //
+    // This showed the local preview and nothing else, so an address with a
+    // picture inscribed and showing everywhere else on the board read "no
+    // picture" on the one screen that is about its picture. The preview is a
+    // thing being CONSIDERED; the resolved one is a thing that IS.
+    const mine = this.pictureAddress();
+    const live = mine ? (this.pictures?.known(mine) ?? null) : null;
+    const showing = chosen ?? live?.image ?? null;
+
+    if (showing === null) {
       const empty = this.doc.createElement('div');
       empty.className = 'pfp-empty';
       empty.textContent = 'no picture';
       canvas.append(empty);
     } else {
       const img = this.doc.createElement('img');
-      img.src = this.pictureUrl(chosen);
-      img.alt = `inscription ${chosen}`;
+      img.src = this.pictureUrl(showing);
+      img.alt = `inscription ${showing}`;
       canvas.append(img);
     }
+
+    // SAID, because the two look identical and mean opposite things. One is
+    // inscribed and one is a choice somebody has not paid for yet, and letting
+    // a reader assume the wrong one is how they think they are done.
+    const caption = this.doc.createElement('div');
+    caption.className = 'pfp-said';
+    caption.textContent =
+      chosen !== null
+        ? live && live.image === chosen
+          ? `Inscription ${chosen}, and it is the one on chain.`
+          : `Inscription ${chosen}, chosen here and NOT inscribed yet.`
+        : live
+          ? `Inscription ${live.image}, set by your manifest ${live.manifest}.`
+          : '';
+    if (caption.textContent) canvas.append(caption);
 
     const grid = this.el.pfpGrid;
     grid.replaceChildren();
@@ -5476,6 +5504,14 @@ export class ChessApp {
     if (this.address && this.names) {
       void this.names.resolve(this.address).then(() => this.drawWhoami());
     }
+    // AND EVERYTHING THIS ADDRESS HAS INSCRIBED, without being asked.
+    //
+    // Connecting a wallet is the moment somebody expects their own board to
+    // know who they are, and the Profile tab showed an empty panel until two
+    // buttons were pressed — while the picture it could not find was on screen
+    // beside every other name on the board. `Holdings` shares one request
+    // between the name and the picture, so this is one call.
+    void this.loadProfileFromChain();
     this.drawGame();
     this.exploreLoadedAt = null;
     // Not while paged away, for the reason in `exploreIsStale`. Your own move
@@ -7329,7 +7365,36 @@ export class ChessApp {
    * those already decided rather than deciding anything itself, which is what
    * keeps this panel and the rest of the board from disagreeing.
    */
-  private async checkOnChain(): Promise<void> {
+  /**
+   * Read what this address has inscribed, and show it, without being asked.
+   *
+   * ONE CALL, because `Holdings` shares the listing between the name and the
+   * picture resolvers — so knowing both costs what knowing one used to.
+   *
+   * Never `fresh`. This runs on every connect and every visit to the tab, and
+   * the cache exists so that costs nothing the second time. The button beside
+   * it is the one that forgets first, for the moment after inscribing.
+   */
+  private async loadProfileFromChain(): Promise<void> {
+    const who = this.pictureAddress();
+    if (!who || !this.pictures) return;
+    try {
+      await Promise.all([
+        this.pictures.resolve(who),
+        this.players?.resolve(who) ?? Promise.resolve(null)
+      ]);
+    } catch {
+      // A profile that cannot be read is a profile with nothing extra on it,
+      // which is what it looked like a moment ago anyway.
+      return;
+    }
+    if (this.pictureAddress() !== who) return;
+    this.drawPicture();
+    this.drawWhoami();
+    if (this.tab === 'profile') void this.checkOnChain();
+  }
+
+  private async checkOnChain(options: { fresh?: boolean } = {}): Promise<void> {
     const rows = this.el.onchainRows;
     rows.replaceChildren();
     const who = this.pictureAddress();
@@ -7343,8 +7408,15 @@ export class ChessApp {
     }
 
     rows.textContent = `Reading what ${who.slice(0, 8)}… holds…`;
-    this.players.forget(who);
-    this.pictures.forget(who);
+    // FORGOTTEN ONLY WHEN ASKED AGAIN. The button exists for the moment after
+    // inscribing, where the remembered answer is the one somebody has just paid
+    // to change — so it drops it first. The automatic look on connect must not:
+    // it runs on every connect and every visit to this tab, and re-reading a
+    // wallet's holdings each time is the cost this cache was built to avoid.
+    if (options.fresh) {
+      this.players.forget(who);
+      this.pictures.forget(who);
+    }
 
     const found = await this.guard('reading what this address inscribed', async () => ({
       name: await this.players!.resolve(who),

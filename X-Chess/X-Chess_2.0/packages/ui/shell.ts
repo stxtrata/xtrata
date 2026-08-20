@@ -565,6 +565,11 @@ ${SCALE_CSS}
 }
 .pfp-canvas img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pfp-canvas .pfp-empty { font-size: 11px; color: var(--muted); text-align: center; padding: 6px; }
+
+/* Which picture is on screen. The preview and the inscribed one look identical
+   and mean opposite things, and a reader who assumes the wrong one thinks they
+   have finished. */
+.pfp-said { margin-top: 6px; font-size: .72rem; line-height: 1.35; color: var(--dim); }
 .pfp-row { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0; }
 .pfp-side { flex: 1 1 auto; min-width: 0; }
 /* What the wallet holds, as a grid of squares. Scrolls rather than growing,

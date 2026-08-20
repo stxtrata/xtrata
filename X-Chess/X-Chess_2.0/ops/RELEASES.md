@@ -10,10 +10,21 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed.
 
-* `htmlSha256` `e0d1d4633c33e4086507376bdc734e6c1a0740d943ca7bfe14a134de9816c5cc`
-* xtrata chunk hash `5aa3bb352fad4e75c250cfcc2a85a2170f30544ba7cebce805f8efed463b14dc`
-* build stamp `2.1.7 - 2026-08-19 22:34 UTC - #c2cd381d`
-* **232,674 bytes, 15 chunks.** 1,572 tests, 82 files. `tsc` and docs audit clean.
+* `htmlSha256` `44fc1dfc59d764e043672f545dc63bf997d363bc8d75c3befb7a2703b1d1f4fd`
+* xtrata chunk hash `ada3865c706e2275874cde55e10ffbdfed83b7a016c096cdc102b03912d083ae`
+* **233,530 bytes, 15 chunks.** 1,577 tests, 83 files. `tsc` and docs audit clean.
+
+**The Profile tab read nothing on its own.** Connecting resolved a BNS name and
+stopped, so the panel stayed empty and the canvas said "no picture" until two
+buttons were pressed — for an address whose picture was inscribed at 3026 and
+showing beside every other name on the board. It reads on connect and on
+opening the tab now, without forgetting: `Holdings` shares one request between
+the name and the picture, so knowing both costs what knowing one used to.
+
+The canvas also only ever showed the LOCAL preview, never what the address
+actually has. It shows the inscribed one when nothing is being tried on, and
+says which of the two it is — they look identical and mean opposite things, and
+a reader who assumes the wrong one thinks they have finished.
 
 **The slow half had no bar, because it wrote over its own.** "Replaying every
 game to score it" went in as a bare notice, and the note is where the summary,
