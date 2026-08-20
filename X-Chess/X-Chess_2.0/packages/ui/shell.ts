@@ -570,6 +570,31 @@ ${SCALE_CSS}
    and mean opposite things, and a reader who assumes the wrong one thinks they
    have finished. */
 .pfp-said { margin-top: 6px; font-size: .72rem; line-height: 1.35; color: var(--dim); }
+
+/* A profile, rather than a list of fields. Centred because the picture is the
+   thing somebody recognises first, and everything under it is about whoever
+   that is. */
+.pcard { text-align: center; padding: 4px 0 12px; }
+.pcard__face {
+  width: 72px; height: 72px; border-radius: 10px; object-fit: cover;
+  display: block; margin: 0 auto 10px; background: var(--line);
+}
+.pcard__name { font-size: 1.2rem; font-weight: 600; margin: 0; }
+.pcard__addr {
+  font-family: var(--mono); font-size: .72rem; color: var(--dim);
+  margin: 2px 0 0; word-break: break-all;
+}
+/* Bounded to a readable measure even though the field is capped at 140. */
+.pcard__about {
+  margin: 10px auto 0; max-width: 46ch; line-height: 1.5; color: var(--soft);
+}
+.pcard__stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px; margin-top: 14px;
+}
+.pstat { background: var(--sunk, rgba(0,0,0,.18)); border-radius: 4px; padding: 8px 6px; }
+.pstat__k { display: block; font-size: .68rem; color: var(--dim); }
+.pstat__v { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .pfp-row { display: flex; gap: 12px; align-items: flex-start; margin: 8px 0; }
 .pfp-side { flex: 1 1 auto; min-width: 0; }
 /* What the wallet holds, as a grid of squares. Scrolls rather than growing,
@@ -1153,6 +1178,8 @@ export const HTML = `
     <div class="row">
       <button class="action" id="profile-load">Show</button>
       <button class="action" id="onchain-check">What has this address inscribed?</button>
+      <button class="action" id="profile-layout"
+              title="Switch between the picture beside the name and above it">Centred</button>
     </div>
     <div id="onchain-rows" class="small"></div>
     <div id="profile-body"></div>

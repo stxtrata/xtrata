@@ -458,8 +458,13 @@ describe('talking to the chain', () => {
     // Read out of the FETCH, not out of the file: the comment above it names the
     // wrong path in order to warn about it, and a test that matched prose would
     // fail on its own explanation.
+    // MATCHED ON THE PATH, not on how the host is spelled. This looked for
+    // `${API}/v2/contracts/...` and broke the moment the hardcoded host was
+    // replaced by the board's rotating endpoint — a green-to-red on a change
+    // that did not touch the thing under test. The path is the thing under
+    // test.
     const play = read('harness/wizards/play.mjs');
-    const used = [...play.matchAll(/`\$\{API\}(\/v2\/contracts\/[a-z-]+)\//g)].map((m) => m[1]);
+    const used = [...play.matchAll(/(\/v2\/contracts\/[a-z-]+)\/\$\{/g)].map((m) => m[1]);
     expect(used.length, 'the wizards no longer read the contract at all').toBeGreaterThan(0);
     for (const path of used) {
       expect(path, 'the wizards read on a path that 404s').toBe('/v2/contracts/call-read');

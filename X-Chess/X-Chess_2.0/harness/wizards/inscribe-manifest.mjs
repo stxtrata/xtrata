@@ -46,6 +46,7 @@ import {
 import { WizardSafetyError } from './wizards-core.mjs';
 import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
 import { inscribedEntryValidator } from './from-chain.mjs';
+import { endpoint } from './play.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -175,7 +176,12 @@ function env() {
 /** Read the fee unit off the core rather than trusting a remembered number. */
 async function readFeeUnit() {
   const response = await fetch(
-    `https://api.mainnet.hiro.so/v2/contracts/call-read/${XTRATA_ADDRESS}/${XTRATA_NAME}/get-fee-unit`,
+    // The fourth hardcoded host. Less exposed than the others — this is one
+    // read before a deliberate, attended inscription rather than a loop that
+    // has to survive the night — but a fee unit that cannot be read is an
+    // inscription that cannot be priced, and there is no reason for it to be
+    // the one call with no fallback.
+    `${(await endpoint()).base}/v2/contracts/call-read/${XTRATA_ADDRESS}/${XTRATA_NAME}/get-fee-unit`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

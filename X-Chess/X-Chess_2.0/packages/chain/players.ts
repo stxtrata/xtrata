@@ -63,6 +63,11 @@ export class PlayerNames {
    * paying a fee it is the second one being asked.
    */
   private readonly from = new Map<string, number>();
+  // Kept beside the name rather than folded into it, for the same reason `from`
+  // is: `resolve` answers "what is this address called" and returns a string,
+  // and every caller of it wants exactly that. "What does it say about itself"
+  // is a different question asked in one place.
+  private readonly said = new Map<string, string>();
 
   constructor(options: PlayerNamesOptions) {
     // SHARED WHEN ONE IS GIVEN. A list wanting a name and a face for the same
@@ -129,6 +134,7 @@ export class PlayerNames {
       if (parsed.player!.address.trim().toUpperCase() !== address.trim().toUpperCase()) continue;
       if (attested(parsed.player, await this.reader.creator(id))) {
         this.from.set(address, id);
+        if (parsed.player!.about) this.said.set(address, parsed.player!.about);
         return parsed.player!.name;
       }
     }
@@ -149,11 +155,24 @@ export class PlayerNames {
     this.cache.delete(key);
     this.inFlight.delete(key);
     this.from.delete(key);
+    this.said.delete(address);
   }
 
   /** The inscription a name came from, if one is known. */
   manifestFor(address: string): number | null {
     return this.from.get(address) ?? null;
+  }
+
+  /**
+   * The one line an address wrote about itself, or null.
+   *
+   * PARSED SINCE THE FORMAT EXISTED AND NEVER SHOWN. `X-CHESS-PLAYER/1` has
+   * carried `about` from the start, `parsePlayer` validates it against a
+   * 140-character bound, and nothing on the board ever rendered it — so
+   * somebody writing one was paying to inscribe a line no reader could see.
+   */
+  aboutFor(address: string): string | null {
+    return this.said.get(address) ?? null;
   }
 
   /** Resolve several, and say whether anything new was learned. */

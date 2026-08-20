@@ -39,6 +39,7 @@ import {
 } from './wizards-core.mjs';
 import { PERSONALITIES, personalityNamed, DEFAULT_MODEL } from './personalities.mjs';
 import { inscribedText, inscribedEntryValidator } from './from-chain.mjs';
+import { endpoint as chainEndpoint } from './play.mjs';
 import { ENTRY_INSCRIPTION } from '../skill/build-skill.mjs';
 import { anthropicAsker, chooseMove, claudeCodeAsker, depthFor, rankedNotes } from './chooser.mjs';
 import { adjudicate, adjudicationReason } from './adjudicate.mjs';
@@ -315,7 +316,15 @@ async function loadManifest(id) {
   const endpoint = {
     request: async (path, init) => {
       await new Promise((done) => setTimeout(done, 1200));
-      return fetch(`https://api.mainnet.hiro.so${path}`, init);
+      // The same rotating endpoint the rest of the runner reads through. This
+      // was a third hardcoded host, and a manifest that cannot be read stops a
+      // round before a move is played.
+      //
+      // Imported under another name because this local one is the PACING
+      // wrapper around it, and a first attempt at this shadowed the import with
+      // the object being defined — which typechecks, parses, and fails at the
+      // first read with "endpoint is not a function".
+      return (await chainEndpoint()).request(path, init);
     }
   };
   const resolved = await resolveTournament(Number(id), new XtrataReader({ endpoint }));

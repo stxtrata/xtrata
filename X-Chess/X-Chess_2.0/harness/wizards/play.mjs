@@ -57,7 +57,63 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENV_FILE = join(HERE, '.env.wizards');
-const API = 'https://api.mainnet.hiro.so';
+/**
+ * The chain hosts, and how this reaches them.
+ *
+ * THIS WAS ONE HARDCODED HOST WITH NO FAILOVER, while the board it serves has
+ * carried three interchangeable ones with recovery since it was written. The
+ * asymmetry cost a night: seven scattered 503s in a 769-line round log, and
+ * because `api` retried the SAME host five times with backoff — 75 seconds of
+ * asking a dead machine the same question — a handful of intermittent failures
+ * became a 45-minute settle timeout and a stopped round. The moves had landed.
+ * Only the reads failed.
+ *
+ * `makeEndpoint` is the board's, bundled rather than reimplemented, so this
+ * inherits the ordered list, the three sweeps, the 429 handling and the
+ * preference decay that brings the primary back instead of pinning to a
+ * fallback for the afternoon. All of it already tested.
+ *
+ * Bundled once, lazily. The manifest reader already does this, so esbuild is
+ * not a new dependency of the runner.
+ */
+let ENDPOINT = null;
+export const endpoint = async () => {
+  if (ENDPOINT) return ENDPOINT;
+  const { build } = await import('esbuild');
+  const out = await build({
+    entryPoints: [join(HERE, '..', '..', 'packages', 'chain', 'endpoint.ts')],
+    bundle: true, format: 'esm', platform: 'node', write: false, logLevel: 'error'
+  });
+  const { makeEndpoint } = await import(
+    `data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`
+  );
+  ENDPOINT = makeEndpoint({
+    // Headers on every request, whichever host answers.
+    fetch: (url, init) => fetch(url, { ...init, headers: { ...hiroHeaders(), ...(init?.headers ?? {}) } }),
+    // SAID OUT LOUD, because the failure it replaces was invisible. Seven 503s
+    // produced forty-five minutes of "the chain is slow, not stuck" and not one
+    // line naming the host that was refusing. A fallback is the single most
+    // useful thing this can report and it costs one line.
+    onFallback: (from, to) => console.log(`  (${hostOf(from)} is failing, using ${hostOf(to)})`)
+  });
+  return ENDPOINT;
+};
+
+const hostOf = (base) => String(base).replace(/^https?:\/\//, '').split('/')[0];
+
+/**
+ * The host the SDK broadcasts through, which is a different question.
+ *
+ * `makeEndpoint` rotates READS. A broadcast is not a read: it either reaches a
+ * node and is accepted into the mempool or it does not, and a failed one is
+ * visible immediately rather than as a silent stall. Rotating hosts mid-write
+ * would also mean a nonce read from one node and a transaction sent to
+ * another, which is a way to invent a conflict rather than avoid one.
+ *
+ * So writes stay on one host, deliberately, and that is a smaller exposure than
+ * the reads were: the round that stalled had every move land.
+ */
+const PRIMARY = 'https://api.mainnet.hiro.so';
 const [CONTRACT_ADDRESS, CONTRACT_NAME] = ALLOWED_CONTRACT.split('.');
 
 const arg = (name, fallback = null) => {
@@ -143,10 +199,10 @@ const HIRO_KEYS = (() => {
  */
 const CLIENT = HIRO_KEYS.length
   ? {
-      baseUrl: API,
+      baseUrl: PRIMARY,
       fetch: createFetchFn(createApiKeyMiddleware({ apiKey: HIRO_KEYS[0] }))
     }
-  : { baseUrl: API };
+  : { baseUrl: PRIMARY };
 
 /**
  * What a transaction pays the miner.
@@ -188,7 +244,7 @@ const hiroHeaders = (extra = {}) =>
 export const api = async (path, tries = 5) => {
   let last = null;
   for (let attempt = 1; attempt <= tries; attempt++) {
-    const response = await fetch(`${API}${path}`, { headers: hiroHeaders() });
+    const response = await (await endpoint()).request(path);
     if (response.ok) return response.json();
 
     last = new Error(
@@ -322,8 +378,11 @@ export async function readOnly(functionName, args = [], tries = 5) {
   // hazard that makes retrying a write unacceptable.
   let last = null;
   for (let attempt = 1; attempt <= tries; attempt++) {
-    const response = await fetch(
-      `${API}/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
+    // A READ, so it rotates like the others. This was the second hardcoded
+    // host and the one that reads the game log — the exact call `settle` spends
+    // forty-five minutes on when a host is refusing.
+    const response = await (await endpoint()).request(
+      `/v2/contracts/call-read/${CONTRACT_ADDRESS}/${CONTRACT_NAME}/${functionName}`,
       {
         method: 'POST',
         headers: hiroHeaders({ 'Content-Type': 'application/json' }),

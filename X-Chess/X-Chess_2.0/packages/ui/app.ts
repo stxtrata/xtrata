@@ -58,7 +58,7 @@ import { checkEligibility, describeIneligibility } from '../ratings/eligibility.
 import { judge, judgeEvent, judgeMove } from './eligibility.js';
 import type { Ctx, Verdict } from './eligibility.js';
 import { computeRatings, leaderboard, PROVISIONAL_GAMES } from '../ratings/elo-v1.js';
-import type { RatedGame } from '../ratings/elo-v1.js';
+import type { LeaderboardRow, RatedGame } from '../ratings/elo-v1.js';
 import { describeContractError } from '../chain/client.js';
 import { describeOutcome, realTxid, watchTx } from '../chain/tx-status.js';
 import type { Endpoint } from '../chain/endpoint.js';
@@ -632,7 +632,7 @@ const IDS = [
   'explore-search', 'explore-find', 'explore-found',
   'leaderboard-note', 'leaderboard-rows', 'leaderboard-verify',
   'tournament-id', 'tournament-load', 'tournament-note', 'tournament-provenance', 'tournament-body',
-  'profile-who', 'profile-load', 'profile-body', 'onchain-check', 'onchain-rows',
+  'profile-who', 'profile-load', 'profile-body', 'onchain-check', 'onchain-rows', 'profile-layout',
   'pfp-canvas', 'pfp-id', 'pfp-check', 'pfp-mine', 'pfp-clear',
   'pfp-problems', 'pfp-grid', 'pfp-state', 'pfp-manifest', 'pfp-next',
   'claim-name-why', 'claim-name', 'claim-about',
@@ -796,6 +796,9 @@ export class ChessApp {
 
   /** When the tournament body was last rebuilt, so a warm load does not thrash. */
   private lastTournamentDraw = 0;
+
+  /** The last computed standings, so Profile can show a row it already has. */
+  private ratedRows: LeaderboardRow[] = [];
   /** Chain tip as of the last list build. Null when it could not be read. */
   private chainHeight: number | null = null;
   private sponsorshipText: { key: string; message: string } | null = null;
@@ -6815,6 +6818,12 @@ export class ChessApp {
 
       const table = computeRatings(rated);
       const rows = leaderboard(table);
+      // KEPT, so a profile can show somebody their own row without walking
+      // every ranked game again. The walk is the most expensive thing this
+      // board does and it has just finished; throwing the answer away and
+      // telling a reader to "open the leaderboard" was the board knowing the
+      // number and declining to say it.
+      this.ratedRows = rows;
 
       // NAMES, WHICH THIS TAB NEVER ASKED FOR. Every row is drawn with
       // `addressNode`, which reads `Names.peek` — a cache lookup and nothing
@@ -7429,6 +7438,79 @@ export class ChessApp {
     }
 
     rows.replaceChildren();
+
+    // A PROFILE RATHER THAN A LIST OF FIELDS.
+    //
+    // This was three rows of label-and-value, which is what a debug panel looks
+    // like. Everything a person recognises about themself was present and
+    // arranged as a report: the picture in a box elsewhere, the name in one
+    // row, the line they wrote about themself nowhere at all.
+    const card = this.doc.createElement('div');
+    card.className = 'pcard';
+
+    const shown = found.picture?.image ?? null;
+    if (shown !== null) {
+      const img = this.doc.createElement('img');
+      img.className = 'pcard__face';
+      img.src = this.pictureUrl(shown);
+      img.alt = '';
+      img.setAttribute('aria-hidden', 'true');
+      img.addEventListener('error', () => img.remove());
+      card.appendChild(img);
+    }
+
+    const name = this.doc.createElement('p');
+    name.className = 'pcard__name';
+    name.textContent = this.nameOf(who).name;
+    card.appendChild(name);
+
+    const addr = this.doc.createElement('p');
+    addr.className = 'pcard__addr';
+    addr.textContent = who;
+    card.appendChild(addr);
+
+    // THE LINE THEY WROTE ABOUT THEMSELF. `X-CHESS-PLAYER/1` has carried
+    // `about` since the format existed, `parsePlayer` bounds it at 140
+    // characters, and nothing ever rendered it — so anybody who wrote one paid
+    // to inscribe a sentence no reader could see.
+    const said = this.players.aboutFor(who);
+    if (said) {
+      const about = this.doc.createElement('p');
+      about.className = 'pcard__about';
+      about.textContent = said;
+      card.appendChild(about);
+    }
+
+    // STATS ONLY WHEN THEY EXIST, and they exist once the Leaderboard has
+    // walked. Recomputing here would be the most expensive thing the board does,
+    // run again, to fill in four numbers.
+    const mine = this.ratedRows.find(
+      (r) => r.principal.toUpperCase() === who.toUpperCase()
+    );
+    if (mine) {
+      const stats = this.doc.createElement('div');
+      stats.className = 'pcard__stats';
+      const stat = (label: string, value: string): void => {
+        const box = this.doc.createElement('div');
+        box.className = 'pstat';
+        const key = this.doc.createElement('span');
+        key.className = 'pstat__k';
+        key.textContent = label;
+        const val = this.doc.createElement('strong');
+        val.className = 'pstat__v';
+        val.textContent = value;
+        box.append(key, val);
+        stats.appendChild(box);
+      };
+      stat('Rating', `${mine.rating}${mine.provisional ? '?' : ''}`);
+      stat('Games', String(mine.games));
+      stat('Won', String(mine.wins));
+      stat('Drawn', String(mine.draws));
+      stat('Lost', String(mine.losses));
+      card.appendChild(stats);
+    }
+    rows.appendChild(card);
+
     const line = (label: string, said: string, id: number | null): void => {
       const row = this.doc.createElement('div');
       row.className = 'row';
