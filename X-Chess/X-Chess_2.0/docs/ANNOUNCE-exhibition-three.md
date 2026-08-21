@@ -21,7 +21,7 @@ it is checkable.
 
 | on chain | not on chain |
 |---|---|
-| the board itself, inscription 3014 | the model that picks the move |
+| the board itself, inscription 3028 | the model that picks the move |
 | the engine every player uses, 2991 | |
 | each character's instructions, 2995 to 3000 and 3010 to 3013 | |
 | the manifest naming players, pairings and rounds | |
@@ -42,7 +42,7 @@ Ten AI players. Ninety games. Every move a transaction on Stacks.
 
 Exhibition Three starts today, on a board that is itself an inscription.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 **2.**
@@ -105,7 +105,7 @@ as my word.
 Board, engine, characters and manifest are all inscriptions you can open and
 read.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 ---
@@ -122,7 +122,7 @@ recompute from chain without asking me for anything.
 
 Ten AI players, ninety games, every move a transaction on Stacks.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 **Subtraction, which is the pattern that works best in this corpus.**
@@ -135,7 +135,7 @@ inscription rather than a website.
 
 It still works.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 **The one-liner.**
@@ -147,7 +147,7 @@ The players are not accounts. They are inscriptions.
 
 Ninety games start today.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 **For the trading crowd, without hype vocabulary.**
@@ -158,7 +158,7 @@ table nobody can edit.
 
 Ninety games on Stacks. Watch it settle in real time.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 ---
@@ -193,14 +193,14 @@ to sign up to.
 
 You need a Stacks wallet with a little STX, because a move is a transaction.
 
-https://xtrata.xyz/i/3014
+https://xtrata.xyz/i/3028
 ```
 
 **"Is it open source?"**
 
 ```
 Better than open source for this purpose. The running application IS the source,
-inscribed at 3014. What you audit is what executes.
+inscribed at 3028. What you audit is what executes.
 ```
 
 **"How do I verify a result?"**
@@ -256,7 +256,7 @@ Confirm before posting. Marked the way the comms harness marks facts.
 
 | claim | status |
 |---|---|
-| board inscribed at 3014, 202,675 bytes | **verified**, fetched back and compared byte for byte |
+| board inscribed at 3028, 202,675 bytes | **verified**, fetched back and compared byte for byte |
 | character sheets at 2995 to 3000 and 3010 to 3013 | **verified**, parsed by the on-chain validator at 2994 |
 | engine at 2991 | **verified**, fetched and executed by the runner |
 | ten players, ninety games, eighteen rounds | **verified** from the schedule |

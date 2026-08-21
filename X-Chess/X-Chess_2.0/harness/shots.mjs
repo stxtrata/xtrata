@@ -36,7 +36,7 @@ const arg = (name, fallback = null) => {
   return at > -1 && process.argv[at + 1] ? process.argv[at + 1] : fallback;
 };
 const LOCAL = process.argv.includes('--local');
-const BOARD = LOCAL ? 'http://localhost:8899/xchess.html' : 'https://xtrata.xyz/i/3014';
+const BOARD = LOCAL ? 'http://localhost:8899/xchess.html' : 'https://xtrata.xyz/i/3028';
 const ONLY = arg('only');
 
 /** The tournament these shots are of. */

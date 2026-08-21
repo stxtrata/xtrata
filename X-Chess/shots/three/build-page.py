@@ -8,13 +8,13 @@
 import json, html, pathlib
 
 TOURNAMENT = 3016
-BOARD = 3014
+BOARD = 3028
 SHOTS_ABS = "/Users/melophonic/Documents/GitHub/xtrata/X-Chess/shots/three"
 
 CAMPAIGNS = [
  {"id":"thread","title":"The invitation","blurb":"Post this first, as one thread. It answers the sceptic inside itself.","groups":[
    {"kind":"thread","label":"Thread: exhibition three is live","posts":[
-     {"text":"Ten AI players. Ninety games. Every move a transaction on Stacks.\n\nExhibition Three is live, on a board that is itself an inscription.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"Ten AI players. Ninety games. Every move a transaction on Stacks.\n\nExhibition Three is live, on a board that is itself an inscription.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"01-standings.png","note":"The hero. Shows the table, the ladder and the verified marks in one frame."},
      {"text":"Each player is an inscription.\n\nIts instructions were written, budgeted to 1200 characters, and sealed on chain before it played a move.\n\nNobody can edit a character mid tournament. Not me either.",
       "shot":"07-sheet-fathom.png","note":"Fathom's sheet, read straight off chain."},
@@ -26,7 +26,7 @@ CAMPAIGNS = [
       "note":"The developer post. Most likely of the set to travel."},
      {"text":"Three of the ten search deeper than the rest.\n\nIt is declared in the manifest and the board marks it declared, because nothing on chain can prove it.\n\nEvery other number on that table was recomputed. That one is my word, labelled as my word.",
       "shot":"01-standings.png","note":"Crop to the table so the dotted +1 and +2 are legible."},
-     {"text":"Board, engine, characters and manifest are all inscriptions you can open and read.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"Board, engine, characters and manifest are all inscriptions you can open and read.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"06-mobile-standings.png","note":"Close on the phone shot. Same board, no app."}]}]},
 
  {"id":"result","title":"The result worth citing","blurb":"Post after the thread has been up an hour or so.","groups":[
@@ -40,13 +40,13 @@ CAMPAIGNS = [
 
  {"id":"standalone","title":"Standalone posts","blurb":"Pick one. Do not post all of them.","groups":[
    {"kind":"single","posts":[
-     {"text":"An application that is an inscription, running a tournament whose result you can recompute from chain without asking me for anything.\n\nTen AI players, ninety games, every move a transaction on Stacks.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"An application that is an inscription, running a tournament whose result you can recompute from chain without asking me for anything.\n\nTen AI players, ninety games, every move a transaction on Stacks.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"01-standings.png","note":"For developers."},
-     {"text":"No server. No account. No referee. No company.\n\nTen AI personalities playing ninety games of chess, and a board that is an inscription rather than a website.\n\nIt still works.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"No server. No account. No referee. No company.\n\nTen AI personalities playing ninety games of chess, and a board that is an inscription rather than a website.\n\nIt still works.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"05-play.png","note":"Subtraction. The pattern that works best in this corpus."},
-     {"text":"The chess board is not hosted. It is inscribed.\n\nThe players are not accounts. They are inscriptions.\n\nNinety games are running now.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"The chess board is not hosted. It is inscribed.\n\nThe players are not accounts. They are inscriptions.\n\nNinety games are running now.\n\nhttps://xtrata.xyz/i/3028",
       "note":"Pin this one."},
-     {"text":"Ten AI players with their own wallets, signing their own moves, playing for a table nobody can edit.\n\nNinety games on Stacks. Watch it settle in real time.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"Ten AI players with their own wallets, signing their own moves, playing for a table nobody can edit.\n\nNinety games on Stacks. Watch it settle in real time.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"06-mobile-standings.png"}]}]},
 
  {"id":"replies","title":"Replies","blurb":"Answers to what will actually be asked. Keep each shorter than the post it answers.","groups":[
@@ -55,9 +55,9 @@ CAMPAIGNS = [
       "note":"To: is the AI on chain?"},
      {"text":"Stacks. Anchored to Bitcoin and mined by Bitcoin through Proof of Transfer.\n\nThe bytes live on Stacks. Bitcoin is the settlement layer underneath.",
       "note":"To: what chain? Never say on Bitcoin."},
-     {"text":"Yes. Open the board and open a game. There is no signup because there is nothing to sign up to.\n\nYou need a Stacks wallet with a little STX, because a move is a transaction.\n\nhttps://xtrata.xyz/i/3014",
+     {"text":"Yes. Open the board and open a game. There is no signup because there is nothing to sign up to.\n\nYou need a Stacks wallet with a little STX, because a move is a transaction.\n\nhttps://xtrata.xyz/i/3028",
       "shot":"05-play.png","note":"To: can I play?"},
-     {"text":"Better than open source for this purpose. The running application IS the source, inscribed at 3014. What you audit is what executes.",
+     {"text":"Better than open source for this purpose. The running application IS the source, inscribed at 3028. What you audit is what executes.",
       "note":"To: is it open source?"},
      {"text":"Read the manifest, which names every player, pairing and round. Replay each game's moves through the rules it committed to. Compare to the standings.\n\nNothing in that loop asks me for anything.",
       "shot":"02-rounds.png","note":"To: how do I verify a result?"},
