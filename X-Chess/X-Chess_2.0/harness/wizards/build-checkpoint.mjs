@@ -25,10 +25,15 @@ import { fileURLToPath } from 'node:url';
 import { Cl } from '@stacks/transactions';
 
 import { ALLOWED_CONTRACT, WizardSafetyError } from './wizards-core.mjs';
-import { readOnly } from './play.mjs';
+import { readOnly, endpoint as chainEndpoint } from './play.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
+
+/** The wallet whose holdings list the tournaments, as the board reads them. */
+const TOURNAMENT_DIRECTORY = 'SP4ERAJ8SN0J7V3DWZNKBWM7HGWCFV9A3HH62S2S';
+/** Exhibition One, which predates the directory and is always worth reading. */
+const DEFAULT_TOURNAMENT = 2993;
 
 const arg = (name, fallback = null) => {
   const at = process.argv.indexOf(`--${name}`);
@@ -47,16 +52,104 @@ async function load(entry) {
 
 const uint = (n) => Cl.serialize(Cl.uint(n));
 
+/**
+ * Read every tournament manifest the directory knows, for candidate building.
+ *
+ * The same source the board uses: manifests held by the tournament directory,
+ * plus whatever `--manifests` names. Reading them is a handful of calls and
+ * they are cached by the reader, against a walk that makes thousands.
+ *
+ * A manifest that cannot be read is skipped rather than fatal — it costs
+ * candidates for its games and the walk says how many were not counted, which
+ * is visible. Failing the whole build because one document is unreachable
+ * would be worse.
+ */
+async function learnFromManifests({ cands, xtrata, tourney, dir }) {
+  const learned = cands.nothingLearned();
+  const named = String(arg('manifests', '') || '')
+    .split(/[\s,]+/)
+    .map((x) => Number(x))
+    .filter((x) => Number.isSafeInteger(x) && x > 0);
+
+  const paced = {
+    request: async (path, init) => {
+      await new Promise((done) => setTimeout(done, 400));
+      return (await chainEndpoint()).request(path, init);
+    }
+  };
+  const reader = new xtrata.XtrataReader({ endpoint: paced });
+
+  // THE DIRECTORY THE BOARD READS, through the board's own class. Listing a
+  // wallet's manifests is a holdings call and a parse per candidate, and doing
+  // it by hand here would be a second implementation of the thing that decides
+  // which tournaments exist.
+  let ids = named;
+  if (!ids.length) {
+    try {
+      const index = new dir.ManifestDirectory({
+        endpoint: paced,
+        reader,
+        address: TOURNAMENT_DIRECTORY,
+        kind: 'tournament',
+        parse: (text) => {
+          const parsed = tourney.parseTournament(text);
+          return parsed.ok ? parsed.tournament : null;
+        }
+      });
+      ids = (await index.list()).map((found) => found.id);
+    } catch {
+      ids = [];
+    }
+  }
+  ids = [...new Set([...ids, DEFAULT_TOURNAMENT])];
+
+  let read = 0;
+  for (const id of ids) {
+    try {
+      const text = await reader.text(id);
+      const parsed = text === null ? null : tourney.parseTournament(text);
+      if (parsed?.ok && parsed.tournament) {
+        cands.learnFrom(parsed.tournament, learned);
+        read++;
+      }
+    } catch {
+      // Unreadable, or not a tournament. Skipped, and counted below.
+    }
+  }
+  console.log(
+    `manifests ${read} read of ${ids.length} offered — ` +
+      `${learned.pairings.size} pairings, ${learned.entrants.size} entrants, ` +
+      `cooldowns {${[...learned.cooldowns].join(', ')}}`
+  );
+  return learned;
+}
+
+
 async function main() {
-  const [checkpoint, replayMod, eligibility, ratings, recover, rules, canonical] = await Promise.all([
-    load('packages/protocol/checkpoint.ts'),
-    load('packages/replay/replay.ts'),
-    load('packages/ratings/eligibility.ts'),
-    load('packages/ratings/elo-v1.ts'),
-    load('packages/protocol/recover.ts'),
-    load('packages/protocol/rules.ts'),
-    load('packages/protocol/canonical.ts')
-  ]);
+  const [checkpoint, replayMod, eligibility, ratings, recover, rules, canonical, cands, xtrata, tourney, dir] =
+    await Promise.all([
+      load('packages/protocol/checkpoint.ts'),
+      load('packages/replay/replay.ts'),
+      load('packages/ratings/eligibility.ts'),
+      load('packages/ratings/elo-v1.ts'),
+      load('packages/protocol/recover.ts'),
+      load('packages/protocol/rules.ts'),
+      load('packages/protocol/canonical.ts'),
+      load('packages/protocol/candidates.ts'),
+      load('packages/chain/xtrata.ts'),
+      load('packages/protocol/tournament.ts'),
+      load('packages/chain/directory.ts')
+    ]);
+
+  // THE SAME GUESSES THE BOARD OFFERS, from the same code.
+  //
+  // This used to pass `candidates: []`, and `recoverRules` searches only the
+  // opener and whoever has submitted — so a game whose absent side never
+  // appeared on chain could not be confirmed, and an unconfirmed game is not
+  // eligible and is not counted. It counted 33 of 128 ranked games where the
+  // board counts 114, and a checkpoint written from that tells a board to skip
+  // games it could have counted, permanently, in a document nobody replays.
+  const learned = await learnFromManifests({ cands, xtrata, tourney, dir });
 
   const rankedCount = Number((await readOnly('get-ranked-count')).value);
   // NOT THE CURRENT HEIGHT. The first version of this stamped the chain's
@@ -96,7 +189,10 @@ async function main() {
     // own commitment is the judge.
     const found = recover.recoverRules({
       rulesHash, openedBy: row['opened-by'].value, ranked: true,
-      senders: entries.map((x) => x.sender), viewer: null, candidates: []
+      senders: entries.map((x) => x.sender), viewer: null,
+      // No `extra`: that slot is the board's own remembered answer out of local
+      // storage, and this has none to remember anything in.
+      candidates: cands.candidatesFor({ id, rulesHash }, learned, null)
     });
     const useRules = found.confirmed ? found.rules : { ...rules.DEFAULT_RULES, ranked: true };
 

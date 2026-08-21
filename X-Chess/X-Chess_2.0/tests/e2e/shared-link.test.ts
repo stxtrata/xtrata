@@ -244,13 +244,18 @@ describe('a link to a game whose rules need a manifest', () => {
     const { app } = await boardAt('https://example.test/?game=2');
     await tick(60);
 
+    // `learned` is the one object the board and the checkpoint builder both
+    // build candidates out of, so this reaches into it rather than into three
+    // fields that no longer exist separately.
     const inner = app as unknown as {
-      manifestPairings: Map<number, { white: string; black: string; cooldown: number }>;
-      knownCooldowns: Set<number>;
+      learned: {
+        pairings: Map<number, { white: string; black: string; cooldown: number }>;
+        cooldowns: Set<number>;
+      };
       candidatesFor(row: { id: number; rulesHash: string | null }): Array<{ cooldown: number }>;
     };
-    inner.manifestPairings.set(2, { white: ALICE, black: BOB, cooldown: 1 });
-    inner.knownCooldowns.add(1);
+    inner.learned.pairings.set(2, { white: ALICE, black: BOB, cooldown: 1 });
+    inner.learned.cooldowns.add(1);
 
     const offered = inner.candidatesFor({ id: 2, rulesHash: '0xdeadbeef' });
     expect(offered.length, 'a pairing the search cannot guess').toBeGreaterThan(0);

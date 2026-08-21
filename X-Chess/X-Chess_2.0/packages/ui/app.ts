@@ -54,6 +54,9 @@ import { recoverRules } from '../protocol/recover.js';
 import {
   knownRules, linkForGame, linkForTournament, rememberRules, rulesFromLink
 } from '../protocol/known-rules.js';
+import {
+  candidatesFor, learnFrom, nothingLearned
+} from '../protocol/candidates.js';
 import { checkEligibility, describeIneligibility } from '../ratings/eligibility.js';
 import { judge, judgeEvent, judgeMove } from './eligibility.js';
 import type { Ctx, Verdict } from './eligibility.js';
@@ -322,33 +325,10 @@ const MOVE_FEE_STX = (MOVE_FEE_USTX / 1_000_000).toFixed(4);
 
 const EXPLORE_WINDOW = 25;
 
-/**
- * How many entrants may be paired against each other during rules recovery.
- *
- * Quadratic: twelve entrants is 132 ordered pairs, and `recoverRules` caps
- * candidates at 512 before its own search begins. Past this the offer is
- * dropped entirely rather than truncated, because a truncated pair list makes
- * recovery depend on map iteration order — two boards would disagree about
- * whether a game can be confirmed, which is the one property this must not have.
- */
-const MAX_PAIRED_ENTRANTS = 12;
-
-/**
- * How many pair candidates this board may spend of recovery's 512.
- *
- * CONSENSUS-VISIBLE ARITHMETIC, and the reason it is a named constant rather
- * than an emergent property of two loops. Candidates supplied here are checked
- * BEFORE recover's own search and spend the same budget, so an unbounded pair
- * space silently starves the fallback that finds games no manifest names —
- * and a starved search returns unconfirmed, which reads exactly like a game
- * that cannot be recovered at all.
- *
- * Twelve entrants is 132 ordered pairs. One cooldown fits easily; three would
- * be 396, leaving recover's ~200-candidate search 114 and truncating it. 254
- * leaves 256 for that search plus margin, and is enough for twelve entrants at
- * one cooldown or eight at two.
- */
-export const MAX_PAIR_CANDIDATES = 254;
+// Both live with the code that spends them now, so the board and the checkpoint
+// builder cannot bound their pair spaces differently. Re-exported because the
+// arithmetic test imports it from here.
+export { MAX_PAIR_CANDIDATES } from '../protocol/candidates.js';
 
 /**
  * Above this many tournaments, the picker becomes a list rather than buttons.
@@ -932,9 +912,14 @@ export class ChessApp {
   >();
   /** address -> the name a loaded tournament gave it. The weakest source. */
   private readonly entrantNames = new Map<string, string>();
-  /** game id -> the two addresses a loaded manifest says played it. */
-  private readonly manifestPairings =
-    new Map<number, { white: string; black: string; cooldown: number }>();
+  /**
+   * Everything read from manifests that rule recovery is built out of.
+   *
+   * One object rather than three fields, because it is passed whole to
+   * `candidatesFor` — which the checkpoint builder also calls, so the two
+   * cannot drift into counting different numbers of games.
+   */
+  private readonly learned = nothingLearned();
 
   /**
    * Every cooldown any manifest this board has read declares.
@@ -947,9 +932,7 @@ export class ChessApp {
    * games given two verdicts by two tabs, is the exact bug rememberPairings
    * was written to end.
    */
-  private readonly knownCooldowns = new Set<number>([0]);
   /** Every address any loaded manifest has named as an entrant. */
-  private readonly knownEntrants = new Set<string>();
   private names: Names | null = null;
   private times: BlockTimes | null = null;
   private poll: ReturnType<typeof setTimeout> | null = null;
@@ -7575,10 +7558,12 @@ export class ChessApp {
    */
   /** A manifest's pairings as addresses, for anything that needs a candidate. */
   private rememberPairings(tournament: Tournament): void {
-    const addressOfName = new Map(tournament.entrants.map((e) => [e.name, e.address]));
-    this.knownCooldowns.add(tournament.cooldown ?? 0);
+    // THE HALF THE CHECKPOINT BUILDER ALSO NEEDS. Pairings, entrants and
+    // cooldowns are what a candidate list is made of, so they are learned by
+    // shared code and the two callers cannot drift into counting differently.
+    learnFrom(tournament, this.learned);
+
     for (const entrant of tournament.entrants) {
-      this.knownEntrants.add(entrant.address.toUpperCase());
       // AND THEIR NAMES, which is why the Leaderboard showed principals for
       // players every other tab called Plumb and Mason.
       //
@@ -7598,13 +7583,6 @@ export class ChessApp {
       // below a self-attested one — an organiser's name for somebody is a claim
       // about them rather than by them, and the tooltip says so.
       this.entrantNames.set(entrant.address, entrant.name);
-    }
-    for (const game of tournament.games) {
-      const white = addressOfName.get(game.white);
-      const black = addressOfName.get(game.black);
-      if (white && black) {
-        this.manifestPairings.set(game.id, { white, black, cooldown: tournament.cooldown ?? 0 });
-      }
     }
   }
 
@@ -7688,66 +7666,11 @@ export class ChessApp {
    * is the judge, so a wrong one costs a hash and confirms nothing.
    */
   private candidatesFor(row: GameRow): Rules[] {
-    // A MANIFEST SUPPLIES THE CANDIDATE RECOVERY CANNOT GUESS.
-    //
-    // `recoverRules` searches the opener and whoever has submitted, which fails
-    // whenever neither is a player or the log is short — and that is why the
-    // Leaderboard reported "5 candidates failing verification" while the
-    // Tournaments tab verified all twenty-one of the same games. The tab was not
-    // doing something cleverer; it had a candidate to test.
-    //
-    // This is NOT trusting the manifest. A candidate is proposed and the rules
-    // hash either reproduces it or it does not, exactly as before. All the
-    // manifest does is supply a guess worth checking, which is the one thing
-    // recovery could not do for itself.
-    const claimed = this.manifestPairings.get(row.id);
-    const fromManifest = claimed
-      ? normaliseRules({
-          ...DEFAULT_RULES,
-          white: claimed.white,
-          black: claimed.black,
-          ranked: true,
-          cooldown: claimed.cooldown
-        })
-      : null;
-
-    // AND THE ENTRANTS, FOR THE GAMES NO MANIFEST NAMES.
-    //
-    // The five games still failing were round one, played before there was a
-    // manifest, so the exact pairing above finds nothing for them. What they
-    // have in common is a player who never submitted — a forfeit, an abort —
-    // and recovery builds its pair space from whoever HAS submitted, so the
-    // absent side is missing from the search entirely. The game is
-    // unrecoverable not because the answer is unknowable but because the one
-    // address that would settle it never appeared on chain.
-    //
-    // A manifest names those addresses. Trying every ordered pair of known
-    // entrants offers the missing side back to a search that could not reach
-    // it. Thirty pairs for six entrants, all local hashing, no reads.
-    //
-    // Still not trust. Every pair is a guess and the committed hash is the
-    // judge, so offering a wrong pair costs one hash and confirms nothing.
-    const pairs: Rules[] = [];
-    const entrants = [...this.knownEntrants];
-    // Bounded because it is quadratic and `recoverRules` has a hard candidate
-    // cap it would otherwise eat before reaching its own search.
-    if (entrants.length <= MAX_PAIRED_ENTRANTS) {
-      // THIS GAME'S OWN COOLDOWN FIRST, then the others. If the budget runs
-      // out it should run out on the least likely guesses, not on the one the
-      // manifest actually declared for the tournament this game is in.
-      const ordered = [...new Set([claimed?.cooldown ?? 0, ...this.knownCooldowns])];
-      outer: for (const cooldown of ordered) {
-        for (const white of entrants) {
-          for (const black of entrants) {
-            if (white === black) continue;
-            if (pairs.length >= MAX_PAIR_CANDIDATES) break outer;
-            pairs.push(normaliseRules({ ...DEFAULT_RULES, white, black, ranked: true, cooldown }));
-          }
-        }
-      }
-    }
-
-    return [fromManifest, ...pairs, knownRules(row.rulesHash)].filter((r): r is Rules => r !== null);
+    // ONE IMPLEMENTATION, SHARED WITH THE CHECKPOINT BUILDER. It used to live
+    // here, and the builder had none at all — so it counted 33 of 128 ranked
+    // games where this counts 114, and the checkpoint it wrote would have told
+    // a board to skip games it could have counted.
+    return candidatesFor(row, this.learned, knownRules(row.rulesHash));
   }
 
   /**
