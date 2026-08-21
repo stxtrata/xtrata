@@ -91,3 +91,32 @@ That is everything from my side. Happy to sign as soon as you are ready.
 
 Thanks,
 Jim
+
+---
+
+# Follow-up reply to Andrea, 17 August 2026
+
+They agreed all three asks. Kickoff restored at $1,000, wallets defined as resolved
+ownership, at-risk definition accepted as written.
+
+Note the trigger moved: the kickoff is now "upon contract execution" rather than
+"upon blueprint approval". Signing speed is payment speed, so the reply's job is to
+remove every reason for delay.
+
+---
+
+Hi Andrea,
+
+That all works, thank you. Agreed on both definitions and on the schedule as you have
+set it out.
+
+I am ready to sign as soon as you send the contract, today if that is possible, and
+happy to be onboarded to the new tracker at the same time.
+
+One small thing while we are here. What asset is the grant paid in, and roughly how long
+after contract execution does the kickoff usually land? Only so I can plan around it.
+
+Thanks for sorting out the kickoff, and for explaining where the difference came from.
+Looking forward to getting started.
+
+Jim

@@ -1,0 +1,861 @@
+X-CHESS-RATINGS/1
+{
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "rankedIndex": 129,
+  "block": 8815318,
+  "table": [
+    {
+      "who": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "rating": 1374,
+      "games": 28,
+      "won": 19,
+      "drawn": 6,
+      "lost": 3
+    },
+    {
+      "who": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "rating": 1332,
+      "games": 18,
+      "won": 14,
+      "drawn": 2,
+      "lost": 2
+    },
+    {
+      "who": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "rating": 1317,
+      "games": 18,
+      "won": 14,
+      "drawn": 1,
+      "lost": 3
+    },
+    {
+      "who": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "rating": 1313,
+      "games": 28,
+      "won": 16,
+      "drawn": 10,
+      "lost": 2
+    },
+    {
+      "who": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "rating": 1260,
+      "games": 28,
+      "won": 15,
+      "drawn": 4,
+      "lost": 9
+    },
+    {
+      "who": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "rating": 1236,
+      "games": 18,
+      "won": 10,
+      "drawn": 1,
+      "lost": 7
+    },
+    {
+      "who": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "rating": 1216,
+      "games": 1,
+      "won": 1,
+      "drawn": 0,
+      "lost": 0
+    },
+    {
+      "who": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "rating": 1201,
+      "games": 2,
+      "won": 1,
+      "drawn": 0,
+      "lost": 1
+    },
+    {
+      "who": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "rating": 1199,
+      "games": 2,
+      "won": 1,
+      "drawn": 0,
+      "lost": 1
+    },
+    {
+      "who": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+      "rating": 1184,
+      "games": 1,
+      "won": 0,
+      "drawn": 0,
+      "lost": 1
+    },
+    {
+      "who": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "rating": 1103,
+      "games": 18,
+      "won": 4,
+      "drawn": 2,
+      "lost": 12
+    },
+    {
+      "who": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "rating": 1066,
+      "games": 28,
+      "won": 6,
+      "drawn": 3,
+      "lost": 19
+    },
+    {
+      "who": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "rating": 1032,
+      "games": 28,
+      "won": 2,
+      "drawn": 6,
+      "lost": 20
+    },
+    {
+      "who": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "rating": 967,
+      "games": 28,
+      "won": 1,
+      "drawn": 3,
+      "lost": 24
+    }
+  ],
+  "games": [
+    {
+      "id": 6,
+      "white": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "black": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+      "result": "1-0"
+    },
+    {
+      "id": 11,
+      "white": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "black": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "result": "0-1"
+    },
+    {
+      "id": 12,
+      "white": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "black": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "result": "1-0"
+    },
+    {
+      "id": 13,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "0-1"
+    },
+    {
+      "id": 14,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 15,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 16,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 17,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 18,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "0-1"
+    },
+    {
+      "id": 19,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 20,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 21,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 22,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 23,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 24,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 25,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 26,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 27,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 28,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "0-1"
+    },
+    {
+      "id": 29,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1-0"
+    },
+    {
+      "id": 30,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 31,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 32,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "1-0"
+    },
+    {
+      "id": 33,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 34,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "0-1"
+    },
+    {
+      "id": 35,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 36,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 37,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 38,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 39,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 40,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 41,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 42,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 44,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 45,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "0-1"
+    },
+    {
+      "id": 46,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 47,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 48,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 49,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 50,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 51,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1-0"
+    },
+    {
+      "id": 52,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 53,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 54,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "0-1"
+    },
+    {
+      "id": 55,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 56,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 57,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 58,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 59,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 60,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 61,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "1-0"
+    },
+    {
+      "id": 62,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 63,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1-0"
+    },
+    {
+      "id": 64,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 65,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 66,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 67,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 68,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1-0"
+    },
+    {
+      "id": 69,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 70,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 71,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 72,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 73,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "1-0"
+    },
+    {
+      "id": 74,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 75,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 76,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 77,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "1-0"
+    },
+    {
+      "id": 78,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "0-1"
+    },
+    {
+      "id": 79,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 80,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 81,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1-0"
+    },
+    {
+      "id": 82,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 83,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 84,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 85,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 86,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "0-1"
+    },
+    {
+      "id": 87,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 88,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 89,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 90,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1-0"
+    },
+    {
+      "id": 91,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 92,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 93,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 94,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "0-1"
+    },
+    {
+      "id": 95,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 96,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "1-0"
+    },
+    {
+      "id": 97,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 98,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 99,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 100,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "1-0"
+    },
+    {
+      "id": 101,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 102,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 103,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 104,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 105,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 106,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 107,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 108,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 109,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 110,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 111,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "0-1"
+    },
+    {
+      "id": 112,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "1-0"
+    },
+    {
+      "id": 113,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 114,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 115,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 116,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 117,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 118,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 119,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "0-1"
+    },
+    {
+      "id": 120,
+      "white": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "1/2-1/2"
+    },
+    {
+      "id": 121,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    },
+    {
+      "id": 122,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "result": "0-1"
+    },
+    {
+      "id": 123,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 124,
+      "white": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 125,
+      "white": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "black": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "result": "0-1"
+    },
+    {
+      "id": 126,
+      "white": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "black": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "result": "0-1"
+    },
+    {
+      "id": 127,
+      "white": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "black": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "result": "0-1"
+    },
+    {
+      "id": 128,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "result": "1-0"
+    },
+    {
+      "id": 129,
+      "white": "SP290YBDWN08X61HRZ3GAEA0YES001DJ6YX51HYKN",
+      "black": "SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB",
+      "result": "1-0"
+    },
+    {
+      "id": 130,
+      "white": "SPHF4CZBN3F9EH08BWJGZ9HECNFZHGW2ZRVT7G6P",
+      "black": "SP1AZT4GMWSX8EHM321YVHD8QVR0C6X2767TCN0W2",
+      "result": "0-1"
+    },
+    {
+      "id": 131,
+      "white": "SP1RY4PXSBTZ1BSVAD0N0K94WAHVBBC8WJJJY612N",
+      "black": "SPD7PCGZJNMSV5VQA8E2BSEBR744N7ZXFYB91ZCN",
+      "result": "1-0"
+    },
+    {
+      "id": 132,
+      "white": "SP3GHD7TYY0VJCRTN2BZJZ0CEFHX9M9WMH4ASCW13",
+      "black": "SP1T7TGSAFZA0JMYZP4C65QS1BYRQ03DS9E9YYHRX",
+      "result": "0-1"
+    },
+    {
+      "id": 133,
+      "white": "SP3PK4MSPRSJA8RVGF0ZHHC2SF89DQNVWAA90RZ2T",
+      "black": "SP1NVDYFG0R14PGVQ09DXTRA7EAJ389MDS04RPRSM",
+      "result": "1-0"
+    }
+  ],
+  "note": "Chain the next checkpoint to this inscription with --after. Regenerate with harness/wizards/build-checkpoint.mjs and compare bytes before inscribing."
+}

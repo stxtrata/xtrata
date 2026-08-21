@@ -10,10 +10,10 @@ that a build which never shipped still leaves a record of why.
 
 Built, not yet inscribed. To go up as a child of 3028.
 
-* `htmlSha256` `3f4ad0e91ab0f89450dccb9efcba485cc376c113c6e491d7059a83a2be9318dc`
-* xtrata chunk hash `0a57d36b9b23fc713ac13d0c612fa2cdd53e8ec066e0a1a02556479c0582d813`
-* build stamp `2.1.9 - 2026-08-21 16:24 UTC - #11bd7383`
-* **245,225 bytes, 15 chunks.** 1,618 tests, 87 files. `tsc` and docs audit clean.
+* `htmlSha256` `92af7967942fce818e8471032a31f52ad384c0a3c1c1c039d36a1e10d2173b9a`
+* xtrata chunk hash `19c9a303508cbc5b82fb868cbdf9ce9e39ebf540656489c7a80415c8e154cac2`
+* build stamp `2.1.9 - 2026-08-21 21:44 UTC - #936aba6a`
+* **245,304 bytes, 15 chunks.** 1,630 tests, 88 files. `tsc` and docs audit clean.
 
 **One file, and the reason it matters is that the leaderboard is unusable
 without it.** 128 ranked games are read and replayed from every reader's
@@ -52,20 +52,36 @@ properly, which is the property worth having while this one is not yet up.
 Nothing else changed. The harness gained a human seat on the same day and none
 of it is in this artefact, because the harness is never inscribed.
 
-**This artefact alone does not fix the leaderboard.** It makes a correct
-checkpoint READABLE; no correct checkpoint exists yet. The first walk under the
-fixed writer counted 33 games where the board counts 114, because
-`build-checkpoint.mjs` passes `candidates: []` to `recoverRules` while the board
-passes `candidatesFor(row)` — manifest pairings, entrant pairs against known
-cooldowns, known rules. Without candidates most games' rules cannot be
-confirmed, so 95 of 128 were written off as not counted.
+**A second fault, found the same way and also fixed.** The first walk under the
+corrected writer counted 33 games where the board counts 114, because
+`build-checkpoint.mjs` passed `candidates: []` to `recoverRules` while the board
+passes the manifest pairing, every ordered pair of known entrants and every
+declared cooldown. Without candidates a game whose absent side never appeared
+on chain cannot be confirmed, and an unconfirmed game is not counted: 95 of 128
+written off. Inscribing that would have seeded a board with a third of the
+history and told it to skip the rest, permanently.
 
-Inscribing that would have seeded a board with 33 games and told it to skip
-replaying the first 128, dropping about 81 games of rating history into a
-document that is believed rather than replayed. The builder needs the board's
-recovery before any checkpoint is worth inscribing. See the note in
-`docs/PLAN-play-a-house-player.md` for the shape of the day; this one is not
-shelved, it is next.
+Rule recovery is one implementation now — `packages/protocol/candidates.ts` —
+which the board delegates to and the builder calls with the same learnings,
+read through the board's own `ManifestDirectory` rather than a second idea of
+which tournaments exist. `MAX_PAIRED_ENTRANTS` and `MAX_PAIR_CANDIDATES` moved
+with it, so the two callers cannot bound their pair spaces differently and
+confirm different games from the same chain.
+
+**The first checkpoint is built** and kept at `ops/checkpoint-129.json`: 129
+ranked indices consumed, 123 games counted, through block 8,815,318, 23,709
+bytes in 2 chunks. Its table carries the same fourteen players in the same
+order as the live board, where the broken walk carried ten and a different
+picture.
+
+`sha256 8f411fb17bdd302298a1d5a0dede36ac49f20aca89cfac142754c20f227e320a`,
+xtrata chunk hash
+`99d492b369e9b4f0af551ce7dfbdbb0a16beb803c4bc712e71d3d1bddd8cadd4`.
+
+It must be minted BY `xtrata.btc` — a checkpoint that merely arrived at that
+wallet is refused, because this is the one document the board believes without
+replaying it. 3028 refuses it on the old equality check and walks all 129, so
+inscribing it cannot hurt a board already up.
 
 
 ## 2.1.8 — 2026-08-20  ·  **inscription 3028, live on mainnet**
