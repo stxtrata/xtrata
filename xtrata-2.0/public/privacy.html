@@ -1,0 +1,189 @@
+<!doctype html>
+<!--
+  DRAFT — written from what the code actually does (functions/log.ts,
+  functions/lib/telemetry-ingest.ts, functions/migrations/009_telemetry.sql,
+  010_dataing_sessions.sql, 008_radio_verdicts.sql). Every retention figure and
+  every claim about what is stored is traceable to one of those.
+
+  Two things to settle before this is linked from the Dataing partner console:
+    1. privacy@xtrata.xyz must actually deliver somewhere.
+    2. It is worth a lawyer's eye if Dataing sign-in ships to real users — this
+       covers UK/EU expectations in substance but is not legal advice.
+
+  If the code changes, this page changes with it. A privacy policy that has
+  drifted from the schema is worse than none.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy — Xtrata</title>
+<meta name="description" content="What Xtrata collects, why, how long it is kept, and what can and cannot be deleted." />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<style>
+  :root{color-scheme:dark;--bg:#07090f;--panel:#101623;--line:#243044;--ink:#e6edf6;--mut:#8b9bb4;
+    --acc:#3ea6ff;--warn:#ffb454;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--ink);font:17px/1.65 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:radial-gradient(1100px 620px at 50% -14%,rgba(94,233,255,.08),transparent),var(--bg)}
+  header{display:flex;align-items:center;gap:12px;padding:16px 24px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.4px}.logo b{color:var(--acc)}
+  main{max-width:44rem;margin:0 auto;padding:40px 24px 80px}
+  h1{font-size:1.9rem;line-height:1.2;margin:0 0 .4rem}
+  .stamp{color:var(--mut);font-family:var(--mono);font-size:.8rem;margin:0 0 2rem}
+  h2{font-size:1.15rem;margin:2.4rem 0 .6rem;padding-top:1.4rem;border-top:1px solid var(--line)}
+  h3{font-size:.95rem;margin:1.5rem 0 .4rem;color:var(--acc)}
+  p,li{color:var(--mut)}
+  li{margin:.3rem 0}
+  strong{color:var(--ink);font-weight:600}
+  code{font-family:var(--mono);font-size:.85em;color:var(--ink)}
+  a{color:var(--acc)}
+  .callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);
+    border-radius:10px;padding:1rem 1.2rem;margin:1.4rem 0}
+  .callout p:last-child{margin-bottom:0}
+  footer{border-top:1px solid var(--line);margin-top:3rem;padding-top:1.2rem;color:var(--mut);font-size:.9rem}
+</style>
+</head>
+<body>
+<header><span class="logo"><b>Xtrata</b></span></header>
+<main>
+
+<h1>Privacy</h1>
+<p class="stamp">Version 1.0 · Last updated 20 August 2026</p>
+
+<p>Xtrata is a data layer for Bitcoin Layer&nbsp;2 (Stacks) and the website at
+<code>xtrata.xyz</code> that reads and writes it. This page says what we collect, why,
+how long we keep it, and — importantly — what can and cannot be deleted.</p>
+
+<p><strong>You do not need an account to use Xtrata.</strong> Most of the site works with no
+identifier at all: no sign-up, no email, no profile.</p>
+
+<h2>The part to read first: permanence</h2>
+
+<div class="callout">
+<p><strong>Anything inscribed on-chain is permanent, public, and cannot be deleted by us or
+by anyone else.</strong> That is the point of the technology, and it is not reversible.</p>
+<p>Before you inscribe, assume the content and the address that paid for it are readable by
+anyone, forever. No deletion request can undo an inscription. If you would not want something
+public in ten years, do not inscribe it.</p>
+</div>
+
+<p>Nothing described in the rest of this page is inscribed on-chain. Diagnostics, sessions and
+anything read from a connected account stay in our ordinary databases, are deletable, and are
+deleted on the schedules below.</p>
+
+<h2>What the website collects</h2>
+
+<h3>Your wallet</h3>
+<p>When you connect a Stacks wallet, your public address is used in your browser to show your
+holdings and to build transactions you approve yourself. <strong>Private keys and seed phrases
+never reach our servers.</strong> We cannot see them, and we cannot move your assets.</p>
+
+<h3>Diagnostics</h3>
+<p>We record what goes wrong on the site so it can be fixed. Each event holds a random session
+id, the page path, which step failed, an error code and scrubbed message, a coarse browser /
+operating system / device type, and the country your request came from.</p>
+<p>If a wallet is connected we store a <strong>salted hash</strong> of the address —
+<code>sha256(secret&nbsp;salt + address)</code> — so failures can be followed across a single
+journey. The salt is a server secret, which means the stored value cannot be reversed back to
+your address or brute-forced. No raw or partial address is kept.</p>
+<p><strong>Retention:</strong> routine events are deleted after <strong>90 days</strong>, error
+records after <strong>180 days</strong>. This happens automatically.</p>
+
+<h3>Xtrata Radio</h3>
+<p>When a track will not play, the player reports the contract and token id and the reason. That
+record contains <strong>no identifier of any kind</strong> — it describes the track, not the
+listener — and exists so nobody else has to hit the same broken track.</p>
+<p>Likes are stored in your own browser and are never sent to us.</p>
+
+<h3>Creator tools</h3>
+<p>If you publish a collection, we store the Stacks address that created it, the collection
+metadata you enter, and any preview assets you upload. These are kept while the collection exists
+and are removed when you delete it.</p>
+
+<h2>Signing in with Dataing</h2>
+
+<p>This applies only if you choose to connect a Dataing account. It is entirely optional, and
+every other part of Xtrata works without it.</p>
+
+<h3>What we ask for</h3>
+<ul>
+  <li><strong>Sign-in and basic profile</strong> — to know a session belongs to you.</li>
+  <li><strong>Wallet status</strong> — whether you already have an active Dataing wallet, so we
+      know whether to offer you anything that needs one.</li>
+  <li><strong>Monetization preference</strong> — your own choice about how apps may monetise for
+      you, so we can respect it.</li>
+</ul>
+<p>We use these to build you a radio station from music already inscribed on-chain. That is the
+whole purpose.</p>
+
+<h3>Where the access token lives</h3>
+<p>A Dataing token is a credential to somebody's dating profile, so it is treated as one.
+<strong>The token is never given to your browser.</strong> The exchange happens on our server, the
+token is stored server-side, and your browser receives only a random session id in a cookie that
+JavaScript cannot read. The token is never written into a page, a URL, an analytics event, or a
+log line.</p>
+<p><strong>Retention:</strong> the session expires when the token does — typically within an hour —
+and the stored row is deleted.</p>
+
+<h3>What we never do</h3>
+<ul>
+  <li>We never inscribe anything from Dataing on-chain — not your profile, not your preferences,
+      and never anything about who you matched or spoke with.</li>
+  <li>We never store your matches, messages, or photos.</li>
+  <li>We never sell your data, and we never share it for advertising.</li>
+  <li>We cannot write to your Dataing profile. The connection is read-only.</li>
+</ul>
+
+<h3>Disconnecting</h3>
+<p>Signing out of Xtrata ends the session and deletes the stored token. You can also revoke
+Xtrata's access from inside Dataing at any time, which stops it regardless of anything we do.</p>
+
+<h2>Who else is involved</h2>
+<ul>
+  <li><strong>Hiro</strong> — reading data off-chain-to-browser means your browser talks to a
+      public Stacks node (<code>api.mainnet.hiro.so</code>) directly. Your IP address is visible to
+      them, as it would be to any website you visit. Nothing about you is added to those requests.</li>
+  <li><strong>Cloudflare</strong> — hosts the site and its databases, and keeps standard,
+      short-lived request logs.</li>
+</ul>
+<p>There are no advertising trackers, no analytics SDKs, and no third-party scripts collecting
+behaviour on this site.</p>
+
+<h2>Cookies</h2>
+<p>Only functional ones. Nothing for advertising or cross-site tracking:</p>
+<ul>
+  <li><code>xt_dataing_state</code> and <code>xt_dataing_verifier</code> — protect the sign-in
+      handshake from tampering. Deleted the moment sign-in finishes; expire in 10 minutes regardless.</li>
+  <li><code>xt_dataing_session</code> — your opaque session id, if you connected Dataing.</li>
+</ul>
+
+<h2>Your rights, and their honest limits</h2>
+<p>You can ask us what we hold about you, ask for it to be corrected, ask for it to be deleted, or
+object to how it is used. Write to
+<a href="mailto:privacy@xtrata.xyz">privacy@xtrata.xyz</a> and we will answer within 30 days.</p>
+<p>Two limits we would rather state plainly than have you discover:</p>
+<ul>
+  <li><strong>On-chain data cannot be deleted.</strong> Not by request, not by court order, not by
+      us. See the top of this page.</li>
+  <li><strong>Salted diagnostic hashes cannot be searched by address</strong>, because they are not
+      reversible. That is a deliberate privacy property, but it means we usually cannot single out
+      "your" diagnostic rows. They delete themselves on the schedule above.</li>
+</ul>
+<p>If you are in the UK or EU and are unhappy with our answer, you may complain to your national
+data protection authority.</p>
+
+<h2>Children</h2>
+<p>Xtrata is not directed at children and is not intended for anyone under 18.</p>
+
+<h2>Changes</h2>
+<p>If this policy changes materially, the version and date above change and the new version is
+published here before it takes effect.</p>
+
+<footer>
+<p>Questions: <a href="mailto:privacy@xtrata.xyz">privacy@xtrata.xyz</a> · <a href="/">xtrata.xyz</a></p>
+</footer>
+
+</main>
+</body>
+</html>

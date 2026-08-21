@@ -1,0 +1,261 @@
+# XTRATA / AUDIONALS — X SEARCH TERMS
+#
+# One query per line. Paste straight into X search.
+# ALWAYS click the Latest tab, or add &f=live to the URL. This matters more than
+# the query: X defaults to Top, which is engagement ranked and buries anything
+# from the last hour.
+#
+# [D] = run daily, high volume, pair with within_time:1d
+# [W] = run weekly, low volume, no time filter or you will see nothing
+#
+# Sections are ordered by reply value, best first. A search that finds someone
+# with the problem beats a search that finds someone discussing the category.
+
+
+# =====================================================================
+# A. SOMEONE HAS THE PROBLEM YOU FIXED
+# Highest value. You can answer with evidence, not a pitch.
+# =====================================================================
+
+# [D]
+("IPFS" OR "pinata" OR "arweave" OR "nft.storage") (broken OR dead OR "not loading" OR unpinned OR "gone") NFT
+# [D]
+NFT ("metadata is gone" OR "image is gone" OR "link is dead" OR "shows 404" OR "grey box" OR "gray box")
+# [W]
+("shut down" OR "shutting down" OR "sunsetting" OR "servers are down") (NFT OR collection OR marketplace) art
+# [W]
+("lost my" OR "lost all") (NFT OR "the art" OR "the music") (gone OR dead OR offline)
+# [W]
+("still paying" OR "renewal" OR "subscription") (pinning OR "to host" OR "keep my NFT")
+# [D]
+("centralised" OR "centralized") (NFT OR metadata OR "token uri") (risk OR problem OR dependency)
+
+
+# =====================================================================
+# B. SOMEONE IS ASKING FOR WHAT YOU BUILT
+# Highest conversion of all. They are looking, right now.
+# =====================================================================
+
+# [D]
+("anyone know" OR "looking for" OR "best way to" OR "how do I") (store OR host OR inscribe) (on-chain OR onchain OR "on chain")
+# [D]
+("recommend" OR "suggestions") (permanent OR immutable OR "fully on-chain") (storage OR hosting)
+# [W]
+("is there a way to" OR "can you actually") (put OR store) (music OR audio OR "a song") (on-chain OR onchain OR bitcoin)
+# [W]
+("looking for" OR "need") developer (Stacks OR ordinals OR inscriptions)
+
+
+# =====================================================================
+# C. CATEGORY CONVERSATIONS
+# =====================================================================
+
+# [D]
+"fully on-chain" -"fully on-chain gaming"
+# [D]
+"recursive inscriptions" OR "recursive inscription"
+# [D]
+ordinals (permanence OR storage OR "off-chain" OR immutable OR "data layer")
+# [W]
+("on-chain data" OR "onchain data") (bitcoin OR stacks OR layer OR permanent)
+# [W]
+("digital permanence" OR "permanent web" OR "immutable storage") -advert
+
+
+# =====================================================================
+# D. AUDIONALS — YOUR OWN VOCABULARY
+# Low volume, but anyone using these words is deep in your exact niche.
+# Reply to every single one.
+# =====================================================================
+
+# [W]
+Audionals OR Audional
+# [W]
+"Audional Sequencer" OR "Ordinal Based 1"
+# [W]
+OB1 (bitcoin OR ordinals OR sample OR audio OR music)
+# [W]
+BVST OR "Bitcoin VST"
+# [W]
+("Proof of Session" OR "proof of free") (bitcoin OR on-chain OR onchain)
+
+
+# =====================================================================
+# E. ON-CHAIN MUSIC AND THE MUSIC INDUSTRY
+# Wider audience than crypto. Many are not crypto people at all.
+# =====================================================================
+
+# [D]
+"on-chain music" OR "onchain music" OR "music on Bitcoin" OR "on-chain audio"
+# [D]
+("music NFT" OR "music nfts") (royalt OR splits OR ownership OR rights)
+# [W]
+("streaming royalties" OR "Spotify payout" OR "per stream") (artists OR producers) (broken OR unfair OR pennies)
+# [W]
+(producers OR "sample pack" OR stems OR DAW) (on-chain OR onchain OR blockchain OR bitcoin)
+# [W]
+("who owns" OR "ownership of") (the master OR masters OR "my music") (blockchain OR on-chain OR onchain)
+
+
+# =====================================================================
+# F. BUILDER CHATTER WHERE YOU HAVE DONE THE WORK
+# You have shipped these. You can answer with specifics.
+# =====================================================================
+
+# [D]
+("passkey wallet" OR "seedless wallet" OR "embedded wallet" OR "WebAuthn PRF") crypto
+# [D]
+("gasless" OR "sponsored transaction" OR "sponsored transactions" OR "pays the gas") (Stacks OR Bitcoin)
+# [D]
+(sBTC OR "Stacks") (building OR shipped OR launched OR "just deployed") -airdrop -giveaway -price
+# [W]
+(Clarity OR "Clarity contract") (Stacks OR bitcoin) -"clarity of thought"
+# [W]
+("account abstraction" OR "smart wallet") (bitcoin OR stacks OR "no seed phrase")
+
+
+# =====================================================================
+# G. AI AGENTS ON-CHAIN
+# You run Agent 27 and publish an agent skill. Few people can say that.
+# =====================================================================
+
+# [W]
+("AI agent" OR "autonomous agent") (wallet OR "on-chain" OR onchain OR bitcoin) -trading -bot
+# [W]
+(AIBTC OR "agent skill" OR "agent skills") (bitcoin OR stacks OR on-chain)
+# [W]
+(agents OR agent) (inscribe OR inscribing OR "mint their own")
+
+
+# =====================================================================
+# H. LINK ROT AND PRESERVATION
+# Not crypto. Archivists, artists, writers. Your emotional pitch lands here.
+# =====================================================================
+
+# [W]
+("link rot" OR "dead links" OR "the internet forgets" OR "digital decay")
+# [W]
+("archive.org" OR "wayback") (gone OR lost OR "no longer") (art OR music OR site)
+# [W]
+("preserve" OR "preservation") (digital art OR "net art" OR "generative art") (forever OR permanent)
+
+
+# =====================================================================
+# I. OBJECTIONS WORTH CORRECTING
+# People stating something you can disprove with a number. Be gracious.
+# =====================================================================
+
+# [W]
+("too expensive" OR "costs too much" OR "cannot afford") (on-chain OR onchain) (storage OR "to store")
+# [W]
+("you can't put" OR "you cannot put" OR "impossible to put") (music OR audio OR apps OR video) (on-chain OR onchain OR "on bitcoin")
+# [W]
+("nobody actually" OR "no one actually") ("stores" OR "puts") (data OR art OR music) on-chain
+
+
+# =====================================================================
+# J. ECOSYSTEM AND NEIGHBOURS
+# Adjacent projects. Where your users already are.
+# =====================================================================
+
+# [D]
+(Stacks OR sBTC) (ordinals OR inscriptions OR NFT) -price -airdrop
+# [W]
+(Sordinals OR "Stacks ordinals") -price
+# [W]
+(bitmap OR runes OR "BRC-20") (recursive OR inscription OR "on-chain")
+# [W]
+(Gamma.io OR gamma) (Stacks OR ordinals) -gamma-ray
+
+
+# =====================================================================
+# K. LIVE SPACES AND STREAMS
+# =====================================================================
+
+# [D]
+filter:spaces (Stacks OR ordinals OR "on-chain music" OR bitcoin art)
+# [D]
+("Space" OR "Spaces") (Stacks OR ordinals OR sBTC OR "web3 music" OR inscriptions) (today OR tonight OR "going live" OR "joining us" OR "starting now")
+# [W]
+url:i/spaces (bitcoin OR music OR inscriptions OR stacks)
+# [W]
+card_name:audiospace (bitcoin OR ordinals OR music)
+# [W]
+filter:native_video (ordinals OR Stacks OR "on-chain music")
+# [W]
+("AMA" OR "fireside" OR "panel") (ordinals OR Stacks OR "on-chain") (today OR tomorrow OR this week)
+
+
+# =====================================================================
+# OPERATORS — RELIABLE
+# =====================================================================
+# within_time:1d            last 24 hours. Also 2h, 6h, 7d
+# since:2026-08-10          from this date, YYYY-MM-DD, inclusive
+# until:2026-08-17          before this date, exclusive
+# min_faves:5               only posts with some traction
+# min_replies:2             posts that started a conversation
+# min_retweets:3
+# -filter:replies           top-level posts only
+# filter:replies            ONLY replies, good for finding live threads
+# -filter:links             discussion rather than promo
+# filter:media              has an image or video
+# filter:quote              quote tweets, often where the argument is
+# -filter:nativeretweets    drop RTs
+# lang:en
+# from:someone / to:someone / @someone
+# list:1234567890           search inside one of your Lists. Very powerful.
+# filter:follows            only people you follow
+# -from:jimdotbtc           exclude yourself
+# "exact phrase"            quotes force the exact wording
+# (a OR b) c                parentheses group, space means AND
+# -word                     exclude
+
+# =====================================================================
+# OPERATORS — UNRELIABLE, VERIFY BEFORE TRUSTING
+# =====================================================================
+# filter:spaces             works intermittently
+# url:i/spaces              works intermittently
+# card_name:audiospace      undocumented, may return nothing
+# filter:verified           meaning changed after the Blue relaunch
+
+
+# =====================================================================
+# RECIPES
+# =====================================================================
+# Daily sweep, broad terms, only what is fresh and has traction:
+# ("fully on-chain" OR "recursive inscriptions") -filter:replies min_faves:3 within_time:1d lang:en
+#
+# Find live arguments to join rather than announcements:
+# ("on-chain music") filter:replies min_replies:2 within_time:2d
+#
+# Watch one curated ecosystem list without the wider firehose:
+# list:YOUR_LIST_ID (inscription OR permanence OR "on-chain") within_time:1d
+#
+# Catch a conference week:
+# (Stacks OR ordinals) ("this week" OR "day one" OR keynote) since:2026-09-01 until:2026-09-08
+
+
+# =====================================================================
+# SEARCH OPTIONS WORTH SETTING UP ONCE
+# =====================================================================
+# Save each daily query as a bookmark with &f=live already on it, so you never
+# land on the Top tab by accident.
+# X Pro (TweetDeck) lets you pin a saved search as a live column. The daily [D]
+# queries are what belong there. The [W] ones are a Friday job, not a column.
+# Build a List of the 100 accounts that matter and use list:ID. It removes the
+# firehose without removing the ecosystem.
+
+
+# =====================================================================
+# BEFORE YOU REPLY
+# =====================================================================
+# Section A finds people who just lost work they cared about. Arriving with a
+# product is vulture behaviour and reads that way. Say what happened and why,
+# offer the explanation, and only mention Xtrata if they ask what you do.
+#
+# The strongest reply you have is not a claim, it is a link somebody can run
+# themselves: the reconstruction spec rebuilds any inscription with no
+# permission from you. Reach for that before reaching for the pitch.
+#
+# The comms linter rejects hype vocabulary, em dashes and semicolons. Replies
+# drafted from these searches should pass the same bar.

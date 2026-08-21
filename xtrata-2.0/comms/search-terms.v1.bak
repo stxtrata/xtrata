@@ -1,0 +1,57 @@
+XTRATA / AUDIONALS — X SEARCH TERMS
+One query per line. Paste straight into X search.
+Always click the Latest tab, or add &f=live to the URL.
+
+--- 1. SOMEONE HAS THE PROBLEM YOU FIXED (highest value) ---
+
+("IPFS" OR "pinata" OR "arweave") (broken OR dead OR "not loading" OR unpinned) NFT
+NFT ("metadata is gone" OR "image is gone" OR "link is dead" OR "404")
+("shut down" OR "rugged" OR "servers are down") (NFT OR collection) art
+
+--- 2. CATEGORY CONVERSATIONS ---
+
+"fully on-chain" -"fully on-chain gaming"
+"recursive inscriptions"
+"on-chain music" OR "music on Bitcoin" OR "on-chain audio"
+ordinals (permanence OR storage OR "off-chain" OR immutable)
+
+--- 3. BUILDER CHATTER WHERE YOU HAVE DONE THE WORK ---
+
+("passkey wallet" OR "seedless wallet" OR "embedded wallet") crypto
+("gasless" OR "sponsored transaction" OR "pays the gas") (Stacks OR Bitcoin)
+(sBTC OR "Stacks") (building OR shipped OR launch) -airdrop -giveaway
+
+--- 4. AUDIONALS NARROW TERMS (low volume, always worth a reply) ---
+
+BVST OR "Bitcoin VST"
+Audionals
+
+--- 5. LIVE SPACES AND STREAMS ---
+
+filter:spaces (Stacks OR ordinals OR "on-chain music")
+("Space" OR "Spaces") (Stacks OR ordinals OR sBTC OR "web3 music") (today OR tonight OR "going live" OR "joining us")
+url:i/spaces (bitcoin OR music OR inscriptions)
+filter:native_video (ordinals OR Stacks OR "on-chain music")
+
+--- FILTERS TO ADD TO ANY LINE ABOVE ---
+
+within_time:1d          last 24 hours
+within_time:2h          last 2 hours
+since:2026-08-10 until:2026-08-17    date range, YYYY-MM-DD
+min_faves:5             only posts with some traction
+-filter:replies         top-level posts only
+-filter:links           discussion rather than promo
+lang:en
+
+--- EXAMPLE WITH FILTERS APPLIED ---
+
+("fully on-chain" OR "recursive inscriptions") -filter:replies min_faves:3 within_time:1d lang:en
+
+--- NOTES ---
+
+X operator support is inconsistent and changes without notice.
+filter:spaces and url: have both been unreliable at times. Try each once and
+keep the ones that behave.
+
+Sorting matters more than the query. X defaults to Top, which is engagement
+ranked and buries anything from the last hour. Latest is the tab you want.

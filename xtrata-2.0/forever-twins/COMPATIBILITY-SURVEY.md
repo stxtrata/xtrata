@@ -221,3 +221,224 @@ number is the entire argument for the project and it is currently unmeasured.
   rather than any collection API.
 - **"Unreachable" means unreachable today, through four IPFS gateways.** It is not
   proof the art is gone forever, and it is not proof it will be there tomorrow.
+
+---
+
+## 7. Correction to the fragility test, verified 17 August 2026
+
+"Can the art be fetched" is the wrong test, and the earlier "2 of 19 unreachable" figure
+understates the problem rather than overstating it.
+
+### What was measured
+
+Mutant Monkeys, 4,639 items, 220,928 STX lifetime volume, 952 owners.
+
+| Source | Result |
+|---|---|
+| The contract's own pointer, an Oracle Cloud ORDS route | 404 on every id tested |
+| Gamma's private gateway, `stxnft.mypinata.cloud` | 200 |
+| `ipfs.io` | 504 after 28s |
+| `dweb.link` | 504 after 28s |
+| `4everland.io` | 504 after 30s |
+| Control: a widely pinned CID on `ipfs.io` | 200 in 0.18s |
+
+The control is what makes this conclusive. Public gateways were working and fast for
+content genuinely on the network, and timed out on this collection's CID.
+
+Crash Punks v1 shows the same shape from a different angle: its Gaia hub bucket returns
+530 while `gaia.blockstack.org` itself returns 301, so the service is up and the bucket
+is gone.
+
+### Why this matters more than "unreachable"
+
+There are three states, not two, and the middle one is the dangerous one because it is
+invisible:
+
+1. **Healthy.** The contract's pointer resolves, or the CID is retrievable from public
+   IPFS.
+2. **Silently dependent.** The pointer is dead, but a marketplace serves the art from its
+   own commercial pinning account. Everything looks fine on the marketplace. Nothing
+   looks wrong to a holder. The art has exactly one custodian, and it is neither the
+   project nor the holders. **Mutant Monkeys is in this state today.**
+3. **Gone.** No pointer, no cache.
+
+A naive fetch test sees a rendering marketplace and records state 2 as healthy. That is
+why the count of at-risk collections is almost certainly higher than 2 of 19.
+
+### The test the harvester should implement
+
+For each token, record all four independently rather than collapsing to a boolean:
+
+- Does the contract's `get-token-uri` target resolve? Test the host root too, so a bad
+  day is distinguishable from a dead bucket.
+- If the target is IPFS, does the CID resolve on at least two public gateways, with a
+  known-good control CID in the same run to prove the gateways are healthy?
+- Does it resolve on any marketplace-operated gateway?
+- Time to first byte, since a 28-second success is a different kind of alive from a
+  0.18-second one.
+
+A collection where only the marketplace gateway answers is the headline finding, not a
+footnote. It is also the most persuasive possible argument for Forever Twins, because
+the holder cannot see the risk from anywhere in the normal experience.
+
+### Consequence for public claims
+
+Do not say "the art is gone" for a state-2 collection. It is not gone, it is dependent.
+The accurate line is that the artwork is retrievable from exactly one commercial cache
+and the contract's own pointer is dead. That survives being checked, which "gone" would
+not, because anyone can open the marketplace and see pictures.
+
+---
+
+## 8. Bitcoin Monkeys, the parent collection, checked 17 August 2026
+
+`SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys`
+2,500 items, 694 owners, 985,610 STX lifetime volume.
+
+**Verdict: healthy on data availability. Do not describe it as at risk in the link-rot
+sense.**
+
+### What the contract points at
+
+`get-token-uri` builds the URI from an on-chain data var plus a lookup contract:
+
+```clarity
+(ok (some (concat (concat (var-get ipfs-root)
+  (unwrap-panic (contract-call? .conversion lookup token-id))) ".json")))
+```
+
+`ipfs-root`, read live via `/v2/data_var/`, is:
+
+```
+ipfs://QmXPHzFbdFuoyw7AY7BVgr9nbimyjuzyerQyD6uJaoUgdz/bitcoin_monkeys_
+```
+
+### Availability
+
+| Source | Result |
+|---|---|
+| `ipfs.io`, bare directory CID | **200 in 1.8s** |
+| `stxnft.mypinata.cloud` | 200 in 4.9s |
+| `dweb.link`, bare CID | 504 |
+| Control CID on `ipfs.io` | 200 in 0.07s |
+
+The content is genuinely on the public IPFS network. One healthy public gateway is
+sufficient proof of availability, and gateway-to-gateway variance is normal.
+
+### Two methodology mistakes this caught
+
+**1. A blank marketplace page is not evidence.** The old `stacks.gamma.io` interface
+rendered no item images for this collection, and its avatar was an empty square. The
+current `gamma.io` interface renders every item perfectly. A screenshot of a failing UI
+says nothing about the art.
+
+**2. Test the bare CID before concluding.** The first test appended a guessed filename,
+`bitcoin_monkeys_1.json`, and got 504 from every gateway. The real filename comes from
+the `.conversion` contract lookup, not the raw token id. The bare directory CID returned
+200 in under two seconds. **A 504 on a wrong path looks identical to a 504 on missing
+content.** Always resolve the CID itself first, then the path within it.
+
+### The real finding here, which is a different risk
+
+`metadata-frozen` reads `0x04`, which is `false`. **The metadata is not frozen.** The
+contract owner can repoint `ipfs-root` at any time, changing what all 2,500 tokens
+resolve to in a single transaction.
+
+So the art is durable but the pointer is mutable. That is a distinct failure mode from
+link rot and it is not visible to holders either. It belongs in the fragility measurement
+as its own column.
+
+### The narrative worth keeping
+
+Same creator, same deployer address, same era, two collections:
+
+- **Bitcoin Monkeys**, 986K STX volume: art on public IPFS, retrievable, healthy.
+- **Mutant Monkeys**, 221K STX volume, minted by burning a Bitcoin Monkeys SERUM: pointer
+  returns 404, and the art is not on any public IPFS node tested. It exists in one
+  commercial pinning account.
+
+Nobody was negligent. One collection was set up in a way that survived and one was not,
+by the same team. That is entropy across a portfolio rather than carelessness, and it is
+a better argument for Forever Twins than any single dead link.
+
+### Note for collection selection
+
+This deployer also holds `wasteland-apes-nft` and `byzantion-bitcoin-bulls`, two of the
+candidate collections in `COLLECTION-SIZING.md`. Given Bitcoin Monkeys is on healthy
+public IPFS, check both before describing either as at risk. They may be cheap to
+preserve and perfectly healthy, which is a fine reason to preserve them but not an
+at-risk story.
+
+---
+
+## 9. CORRECTION, and the rule that supersedes sections 7 and 8
+
+**Sections 7 and 8 overstated the case. All four collections tested have artwork that is
+retrievable from public IPFS. The only genuine defect found is Mutant Monkeys' dead
+contract pointer.**
+
+### The asymmetry that caused the error
+
+The same CID, `QmWAYP9LJD15mgrnapfpJhBArG6T3J4XKTM77tzqggvP7w`, on five public gateways:
+
+| Gateway | Result |
+|---|---|
+| `ipfs.io` | 504, four separate attempts |
+| `dweb.link` | 504 |
+| `4everland.io` | 504 |
+| `w3s.link` | 504 |
+| **`gateway.ipfs.io`** | **200 in 1.4s** |
+
+Downloaded and verified: 1,306,539 bytes, PNG, 2000 x 2000, genuine image data.
+
+**A 200 proves the content exists. A 504 proves nothing.** A gateway timeout means that
+gateway could not locate the content among its peers inside its own timeout. It is a
+statement about the gateway, not about the network. Four gateways failing and one
+succeeding is not a marginal case, it is the normal condition of IPFS.
+
+This is the reverse of how the earlier sections read the evidence, and it is the reverse
+of how most people would read it.
+
+### Corrected status of all four collections
+
+| Collection | Contract points at | Pointer resolves | On public IPFS | Metadata frozen |
+|---|---|---|---|---|
+| Bitcoin Monkeys | `ipfs://QmXPHz…` | yes | **yes**, ipfs.io 1.0s | no |
+| Bitcoin Bulls OG | `ipfs://bafybeih…` | yes | **yes**, dweb.link 0.3s | no freeze mechanism exists |
+| Wasteland Apes | `ipfs://Qmf1gSo…` | yes | **yes**, w3s.link 3.9s | no |
+| Mutant Monkeys | `https://…oraclecloudapps.com/…` | **no, 404** | **yes**, gateway.ipfs.io 1.4s | no |
+
+Every live value above was read from the chain via `/v2/data_var/`, not from source
+defaults, which differ. Mutant Monkeys' source default is `ipfs://placeholder/` while its
+live value is the Oracle Cloud URL.
+
+### What is still true, and it is the only claim worth making
+
+Mutant Monkeys' contract points at a URL that returns 404 for every token id tested, and
+`metadata-frozen` is false so it was never sealed. **A holder with only their token and
+the contract has no route to their own artwork.** The art exists on IPFS, but nothing on
+chain says so. The recovery path is knowledge held by a marketplace.
+
+That is a real and demonstrable failure of the on-chain record. It is not "the art is
+gone" and it is not "one custodian".
+
+### Rules for the harvester, superseding section 7
+
+1. **Never conclude unavailability from gateway failures.** Try at least six public
+   gateways including `gateway.ipfs.io`, which succeeded where four others failed. Record
+   which gateway answered.
+2. **Treat any single 200 as proof of availability** and stop testing.
+3. **Report "not retrieved by N gateways", never "unavailable".** The honest output is a
+   retrieval difficulty score, not a binary.
+4. **A control CID per run is necessary but not sufficient.** The control proved the
+   gateways were healthy, and they still returned false negatives for real content.
+5. **The genuinely checkable failure is the pointer, not the payload.** Does
+   `get-token-uri` resolve, yes or no. That is deterministic, fast, and cannot produce a
+   false negative the way IPFS retrieval can. Lead the fragility measurement with it.
+
+### Consequence for the "2 of 19 unreachable" figure
+
+That number came from single-gateway testing and should not be used. The likely truth is
+that far less art is unreachable than it suggested, and the real story is pointer rot
+rather than data loss. Re-run the whole survey under the rules above before publishing
+anything.

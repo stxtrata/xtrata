@@ -1,0 +1,457 @@
+
+
+=== 15:35:00 — ("IPFS" OR "pinata" OR "arweave") (broken OR dead OR "not loading" OR unpinned) NFT ===
+
+To view keyboard shortcuts, press question mark
+View keyboard shortcuts
+
+
+("IPFS" OR "pinata" OR "arweave") (broken OR dead OR "not loading" OR unpinned) NFT
+Top
+Latest
+People
+Media
+Lists
+
+See new posts
+Search timeline
+Citizen Chain
+@CitizenChain_
+·
+May 19
+Citizen Chain - STEAL THIS NFT
+Permissionless preservation for the culturally exhausted.
+For the phunks, bulls, bears, builders, collectors, lurkers, artists, and weirdos who lived through the cycles.
+We remember 2017.
+
+We were...
+DropsMarket
+@DropsMarket
+·
+May 16
+DROPS is live: an NFT exchange built for XRPL EVM
+The XRP Ledger has carried NFTs (XLS-20) for years. Clean, fast, elegant — and intentionally simple. They sit in a wallet. They transfer. That's the design.
+But NFTs in 2026 are doing more than...
+InfinityBlocks
+@_InfinityBlocks
+·
+May 15
+How Much Does It Cost to Build a Web3 MVP in 2026? (Real Numbers, No Sales Talk)
+Every founder asks the same question on the first call. "How much will this cost?" And almost every founder asks it badly.
+Not because they're not smart. Because the question itself is broken. "How...
+ᴳᴿᴱᴱᴺᶜᴿᴼˢˢ
+@greencrosslive
+·
+May 12
+NOGATE_KEEPERS.EXE - (I/III)
+Part I of III: The Diagnosis and the Path
+A dissertation on why copyright is incompatible with decentralization, why NFT platforms are warehouses dressed up as cathedrals, and why the artist who...
+lemma
+@lemma_hq
+·
+May 10
+V4 Hook Summer Is Coming
+Open the timeline right now and you'll see it everywhere: @Uniswap V4 Hooks. The narrative has gone from "interesting Ethereum sidebar" to top-of-feed in under three weeks. People are calling it Hook...
+King Autist
+@King_Autist
+·
+May 10
+Why @findurnemo’s Light Protocol is quietly building the most sovereign NFTs in existence. 
+Most NFT projects are just fancy receipts pointing to IPFS or AWS.
+@findurnemo's @bankrmon (and the entire multi-phase vision) is different.  
+The hex string IS the image. Raw pixel data. No pointers....
+Niall Cottrell
+@niall_cottrell
+·
+May 10
+🔔🚨 Attention NFT Issuers 🚨🔔
+
+Did you release an NFT collection using 
+@XRPLMarketPlace
+? 🤔
+
+We currently have a script running extracting the NFT IDs &amp; IPFS URLs of some of these collections so we can pin these files to IPFS ensuring the NFTs do NOT become broken! 🔐✅
+
+IF you
+Show more
+Quote
+Xmart
+@XRPLMarketPlace
+·
+Mar 19
+xMart Marketplace – Service Sunset Notice
+
+After careful consideration, we have made the difficult decision to wind down the xMart marketplace.
+
+Following an internal team dispute, the platform has effectively been inactive and, over time, usage has declined significantly. xMart
+HairyLabs
+@HairyLabs
+·
+May 9
+Add some extra bits, search resolves #NFT collections, added approved collection, admin page to approve or REKT collections, safe buying for approved NFT collection, apply to add to safe collection, all integrated into /explorer page,  offer, buy if listed on hairylabs market,
+Show more
+Slayphin ✏️
+@slayphindotweb3
+·
+May 8
+🦄 A Complete Introduction to 
+@unipegv4
+, the NFT 2.0 x DeFi 3.0 project.
+
+$uPEG is a project where buying a token on Uniswap creates a living, one-of-a-kind digital unicorn — and selling it destroys it forever.
+
+That's not a metaphor. That's literally what happens. And once you
+Show more
+Quote
+Slayphin ✏️
+@slayphindotweb3
+·
+May 6
+A quick tutorial on how to properly buy @unipegv4 on their official marketplace:
+
+1. Go to https://p2peg.app/collections/unipeg
+2. Select your unicorn of choice (I suggest sorting by highest age score as provenance is key)
+3. Click "Buy now"
+
+Happy collecting.
+
+🦄
+this one dev
+@thisonedevv
+·
+May 8
+Unipeg. The EVM Art Renaissance
+The Standard That Quietly Collapsed
+There's a version of on-chain digital culture that never fully arrived.
+CryptoPunks were radical in 2017, not because they were images. They were the first objects...
+Extenscience
+@extenscience
+·
+May 6
+Extenscience: The Decentralized Platform Turning Your Health Data Into Verifiable Scientific Assets
+Longevity science has a fundamental problem. The most valuable health data in the world biomarkers, genetic profiles, wearable metrics, and metabolic records sits locked inside private biotech...
+ifxscript🧸▣
+@ifxscript
+·
+May 5
+Just discovered 
+@cartyisme
+'s The Florentines and the pedigree behind it makes it even more interesting
+
+1,401 Renaissance masters. 8-bit Gameboy aesthetic. 100% onchain on ETH.But first, who is cartyisme? 
+Carty Sewill is a traditional artist turned NFT creator who works
+Show more
+Etheism
+@Etheism_
+·
+May 5
+The Forgotten Etheist Manifesto
+What if the image wasn't attached to the token — but was the token?
+ 
+Every NFT project you've encountered stores its art somewhere else. A server. IPFS. Arweave. The token points to the image. The...
+Jean-Michel Pailhon 🧢
+@jmpailhon
+·
+May 4
+Digital Art Market on Blockchains - April 2026
+Grail Capital's Monthly Newsletter 
+📊 Market Overview: The Paradox of April
+April delivered one of the most paradoxical months in NFT history. Blue-chip floor prices surged - and the global NFT...
+Jolie Bae
+@mthuy030198
+·
+May 4
+❓ How most NFTs used to work:
+When you buy an NFT, the smart contract on the blockchain only records:
+“The image for this NFT is at this IPFS link” (a storage system outside the blockchain).
+The actual images, metadata (traits, rarity, etc.) are stored off-chain on servers or
+Show more
+Quote
+skrumpeys ( 💫 )
+@skrumpeys
+·
+May 4
+Skrumpeys 迁移至 EVMFS
+The first NFT on Monad to migrate off IPFS and into the chain itself.
+Skrumpeys are now (slightly more) on-chain.
+Every byte of art, every line of metadata for all 3333 Skrumpeys, used to sit on IPFS...
+Search filters
+People
+From anyone
+People you follow
+Location
+Anywhere
+Near you
+Advanced search
+Live on X
+Today’s News
+AI Video Captures Bitcoin Hodlers' Joyful Morning Routine
+2 hours ago · Other · 1,000 posts
+Michael Saylor's 'Strategy, Amplified' Video Draws Online Buzz
+3 days ago · Other · 7,096 posts
+CFTC Pushes Crypto Clarity with or Without Congress
+22 hours ago · News · 39.9K posts
+Trending now
+What’s happening
+1,500 live matches
+Football’s back on Sky Sports
+Promoted by Sky Sports
+Trending
+XRP Army
+Trending in United Kingdom
+Golden Axe
+Trending in United Kingdom
+#ENGvPAK
+Show more
+Who to follow
+Tasie
+@Papi_snr
+Clint Kruse
+@KruseCalifornia
+Alex Miller
+@alexlmiller
+Show more
+Terms
+ ·
+Privacy
+ ·
+Cookies
+ ·
+Accessibility
+ ·
+Ads Info
+ ·
+
+More
+© 2026 X Corp.
+
+
+=== ("IPFS" OR "pinata" OR "arweave") (broken OR dead OR "not loading" OR unpinned) NFT  @  15:42:40 ===
+
+To view keyboard shortcuts, press question mark
+View keyboard shortcuts
+("IPFS" OR "pinata" OR "arweave") (broken OR dead OR "not loading" OR unpinned) NFT
+Top
+Latest
+People
+Media
+Lists
+See new posts
+Search timeline
+King David base.eth
+@d_brightster
+·
+Jul 1
+Web3 is not dead you just don’t know more than airdrop farming. 
+List of what you can do in web3 to stack funds.
+1.Token trading
+2.NFT flipping
+3.Long-term token investing
+4.Airdrop farming
+5.Yield farming
+6.Liquidity provision
+7.Staking tokens
+8.Validator operation
+Show more
+Joshua__web3
+@Joshua__web3
+·
+Jun 30
+VOICE (Opinion Arc)  June 2026 Recap: Momentum in the Opinion Economy
+Building the Opinion Economy, One Hot Take at a Time
+June was a watershed month for VOICE as the platform accelerated its mission to become the opinion layer of the internet, empowering creators and...
+Ash2Cash
+@Crypto_0x00
+·
+Jun 23
+至暗时刻的 $UPEG：一场关于 Uniswap V4 的信仰实验
+"在所有人都恐慌离场的时候，建设者在做什么？"
+前言：从天堂到地狱
+2026 年 5 月初，uPEG 的价格突破 3400，市值创造3400万的历史高点。OpenSea CMO Adam Hollander 在推特上公开买入，Uniswap 团队成员 niko...
+figure8_spark
+@figure8_spark
+·
+Jun 21
+Replying to 
+@Izakaya_Global
+🕵️ Case Solved
+Final Answer: Non-Fungible Tokens (NFTs)
+I was supposed to be filling out corporate spreadsheets at my day job, but instead, I’ve spent the last 48 hours pacing around my room like a classic noir detective, staring at a digital crime scene. The mystery? A world
+Show more
+Better life
+@zecbetter
+·
+Jun 19
+LOVE FOR PEACE
+It cannot be bought with money. Each NFT is minted by permanently burning 100 LOVE — sent to the dead address, removed from circulation forever.
+LOVE is a commemorative token launched in the early days of the Russia–Ukraine war to support fundraising for Ukraine,
+Show more
+SV 🇸🇻
+@thecryptosv
+·
+Jun 17
+We've been whitelisting some of the most active NFT collections on Cronos, but a few collections have broken metadata URIs or IPFS links configured in their contracts.
+If you notice missing images, metadata issues, or anything that doesn't look right on Mintpad, let us know.
+Show more
+Quote
+Mintpad
+@mintpadX
+·
+Jun 17
+Mintpad is now live 🚀
+🌐 http://mintpad.app
+Built from the ground up with scalability in mind, a clean and intuitive experience, and full optimization for both web and mobile.
+No unnecessary complexity. No distractions.
+Just a fast NFT marketplace focused on what
+Chikai
+@lifeofc
+·
+Jun 16
+One thing nice about using Claude Code is that I can ask it, what the hell did I do this past week?
+...and it gives me an answer!
+Two major projects I'm working on, http://provena.art (digital art preservation project) and my cinematic AI workflow.
+Plus I have 4 short
+Show more
+bankrbot
+@bankrbot
+·
+Jun 11
+Replying to 
+@ArctiCAmele
+ and 
+@Joshua_WD
+i'm not affiliated with the crawlrr team — this is an independent on-chain audit of the $CRAWL token contract plus what i can verify from public sources. i won't speculate on unverifiable roadmap items or tier structures.
+contract architecture
+CRAWL lives at
+Show more
+WOLF Crypto
+@WOLF_Crypto_X
+·
+Jun 11
+🔥 NBA TOP SHOT JUST FUTURE-PROOFED ITS ENTIRE CATALOG
+@nbatopshot
+ has moved every Moment to the InterPlanetary File System (IPFS), a decentralized storage network.
+💡 Why this matters:
+• Most Web3 companies store media (videos, art, NFT metadata) on centralized servers
+ •
+Show more
+Quote
+NBA Top Shot
+@NBATopShot
+·
+Jun 9
+Every Moment Video Is Now Independently Verifiable on NBA Top Shot
+🏆 NBA Top Shot is now the only sports collectible any owner can independently authenticate end to end with nothing except an internet connection.
+Every Moment on the platform is now preserved on a...
+UC 🟦(opinion arc) 🗣️
+@uc1web3
+·
+Jun 10
+Crypto market is down portfolio is red project ruging it's community's, Airdrop looks dead ☠️ 
+NFT market still finding its feet, Infofi dead and buried, prediction market all over CT where your money is at risk, where do we go from here??
+VOICE the first OpinionFi layer on
+Show more
+Quote
+VOICE (opinion arc)
+@voicehavefun
+·
+Jun 8
+introducing Pinata Contest 🪅
+$1,000 USDT + OG/WL spots. 2 weeks
+http://voice.fun/socialcamp
+complete tasks → earn punches → SMASH → grab your prize
+Adiix 🐳
+@Adityapunk01
+·
+Jun 9
+Blockchain can compute tokens can transfer. But can Web3 remember?
+Not until now and that gap has been silently breaking everything.
+Every AI agent, every DeFi protocol, every NFT marketplace 
+ They all depend on one thing nobody built properly:
+ A memory layer that's the
+Show more
+WhySoSerious
+@0xwhysoseriouss
+·
+Jun 3
+Pattern Retrieval: When a Neural Network Remembers an ASCII Character
+I've been following a lot of generative NFT projects lately. Most shuffle traits, render an image, and store it on IPFS. Done.
+Pattern Retrieval is not that.
+It is a live simulation running inside...
+Zoma
+@babygirl_anniee
+·
+Jun 2
+Adamilenich’s Approach to Generative Art
+There is a moment, somewhere in the middle of every Pattern Retrieval token, when noise becomes a letter. Not gradually. Not smoothly. In lurches, pass by pass, the static reorganizing, something...
+Ben
+@ben__crypto23
+·
+Jun 2
+Replying to 
+@Basman_Studios
+Fair point. in fact, I thought about it a lot before launching it.
+However, I think a few things are different — specifically in regard to the Pump. fun comparison. 
+1. The buyer psychology is different. 
+NFT floor speculation exists but the "100x in a week" psychology that
+Show more
+Lumera Protocol
+@lumera
+·
+Jun 2
+Replying to 
+@lumera
+IPFS is the default. It works until it doesn't. When a project goes inactive and stops pinning, the files disappear. Any metadata stored off-chain goes with it. A permanent digital asset becomes a broken link. This is the storage problem every NFT ecosystem is sitting on.
+grace
+@graceb_art
+·
+May 31
+colorglyphs on-chain storage follow-up 
+@balon_art
+@opensea
+@raster_art
+colorglyphs (0x60F3680350F65Beb2752788cB48aBFCE84a4759E) is fully on-chain, verified via ethereum RPC.
+tokenURI() returns a data:text/plain;charset=utf-8,… URI directly from the contract.  no IPFS, no API,
+Show more
+People
+From anyone
+People you follow
+Location
+Anywhere
+Near you
+AI Video Captures Bitcoin Hodlers' Joyful Morning Routine
+2 hours ago · Other · 1,024 posts
+Michael Saylor's 'Strategy, Amplified' Video Draws Online Buzz
+3 days ago · Other · 7,120 posts
+CFTC Pushes Crypto Clarity with or Without Congress
+22 hours ago · News · 40K posts
+Trending now
+1,500 live matches
+Football’s back on Sky Sports
+Promoted by Sky Sports
+Trending in United Kingdom
+Golden Axe
+Trending in United Kingdom
+miele
+Trending in United Kingdom
+Associated Newspapers
+Show more
+Who to follow
+norbertredkie
+@NRedkie
+Alex Miller
+@alexlmiller
+John Carter
+@martianwyrdlord
+Show more
+Terms
+ ·
+Privacy
+ ·
+Cookies
+ ·
+Accessibility
+ ·
+Ads Info
+ ·
+© 2026 X Corp.

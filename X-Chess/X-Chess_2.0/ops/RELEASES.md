@@ -6,6 +6,68 @@ to work out what somebody was looking at when they reported a problem.
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.1.9 — 2026-08-20
+
+Built, not yet inscribed. To go up as a child of 3028.
+
+* `htmlSha256` `3f4ad0e91ab0f89450dccb9efcba485cc376c113c6e491d7059a83a2be9318dc`
+* xtrata chunk hash `0a57d36b9b23fc713ac13d0c612fa2cdd53e8ec066e0a1a02556479c0582d813`
+* build stamp `2.1.9 - 2026-08-21 16:24 UTC - #11bd7383`
+* **245,225 bytes, 15 chunks.** 1,618 tests, 87 files. `tsc` and docs audit clean.
+
+**One file, and the reason it matters is that the leaderboard is unusable
+without it.** 128 ranked games are read and replayed from every reader's
+browser, from their own IP, against the public endpoint — which now refuses
+part way through and says so on screen. The wallet shares that allowance, so a
+move can fail to broadcast while it lasts. The walk grows for the life of the
+contract: it was 38 ranked games when "nothing derived is cached" was written.
+
+The fix for that is a rating checkpoint, and the reader for one shipped long
+ago. No checkpoint has ever been inscribed, and building the first one showed
+why it could not have been.
+
+`rankedIndex` is a position in the ranked INDEX — a reader resumes there —
+and the writer set it to the games it could COUNT. A ranked index holds games
+no rating counts: still being played, ineligible, or with a player nothing on
+chain can identify. Four of the first ten on this contract. So a walk over 128
+indices counting 117 wrote 117, and a reader resumed at 117 having already been
+seeded with everything through 127; every countable game between was counted
+twice.
+
+`parseCheckpoint` then enforced `games.length === rankedIndex`, which refused
+the honest document and accepted the renumbered one. Checked against the real
+parser rather than reasoned about: consumed 128 / listed 117 is rejected,
+claims 117 / lists 117 is accepted.
+
+The count is a bound now, not an equality. Listing more games than indices
+consumed is still impossible and still refused, and `buildCheckpoint` throws on
+a `rankedIndex` under the games it lists — so the direction that resumes
+mid-walk fails while it can still be fixed, rather than on chain.
+
+**3028 and every board before it stay correct.** They refuse a corrected
+checkpoint on the equality check and fall back to the full walk: slower, never
+wrong. No inscribed board can be made to double count by a checkpoint written
+properly, which is the property worth having while this one is not yet up.
+
+Nothing else changed. The harness gained a human seat on the same day and none
+of it is in this artefact, because the harness is never inscribed.
+
+**This artefact alone does not fix the leaderboard.** It makes a correct
+checkpoint READABLE; no correct checkpoint exists yet. The first walk under the
+fixed writer counted 33 games where the board counts 114, because
+`build-checkpoint.mjs` passes `candidates: []` to `recoverRules` while the board
+passes `candidatesFor(row)` — manifest pairings, entrant pairs against known
+cooldowns, known rules. Without candidates most games' rules cannot be
+confirmed, so 95 of 128 were written off as not counted.
+
+Inscribing that would have seeded a board with 33 games and told it to skip
+replaying the first 128, dropping about 81 games of rating history into a
+document that is believed rather than replayed. The builder needs the board's
+recovery before any checkpoint is worth inscribing. See the note in
+`docs/PLAN-play-a-house-player.md` for the shape of the day; this one is not
+shelved, it is next.
+
+
 ## 2.1.8 — 2026-08-20  ·  **inscription 3028, live on mainnet**
 
 Inscribed as a child of 3025.

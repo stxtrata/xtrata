@@ -36,6 +36,7 @@ an old board being BEHIND does not.
 | 2.1.6 | **3024** | 08-19 21:43 | `22884569` | the clipboard fix that missed 3023, and a tournament that reloaded itself every thirty seconds |
 | 2.1.7 | **3025** | 08-19 22:20 | `de85733f` | a bar on the scoring walk, standings that fill a row at a time, a move costing one game rather than ninety, `UTC` on the stamp |
 | 2.1.8 | **3028** | 08-20 12:19 | `f91e8346` | tabs switchable while loading, refresh reading only what can change, the Profile as a profile, a kept rating, replay of finished games |
+| 2.1.9 | built, not inscribed | 08-21 16:24 | `11bd7383` | a rating checkpoint can describe an honest walk, so the leaderboard need not replay 128 games in every browser |
 
 **2.1.0 → 2.1.1 is the one worth reading.** `underXtrataRuntime()` decided
 whether to use Xtrata's caching proxy by looking for injected support scripts,
@@ -119,7 +120,7 @@ collapsed in the chooser so a correction is authoritative rather than hidden.
 with a proof its rounding can never be ambiguous, and rating checkpoints that
 must be minted by xtrata.btc and regenerated before they will be inscribed.
 
-**Build and artefact.** One self-contained HTML file, **245,227 bytes — 15 of
+**Build and artefact.** One self-contained HTML file, **245,225 bytes — 15 of
 the 32 Xtrata chunks** that upload in a single transaction. `tests/artifact`
 reads `dist/` rather than source, which is the only way the double-boot class of
 bug is visible at all.
