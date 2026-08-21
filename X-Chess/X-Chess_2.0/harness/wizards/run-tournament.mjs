@@ -246,6 +246,58 @@ const byId = (agents) => Object.fromEntries(agents.map((a) => [a.id, a]));
  * rather than a typo. A run that stops is a bad afternoon; a run that lies is a
  * bad record.
  */
+/**
+ * Turn `--white-human SP…` into a seat, or refuse.
+ *
+ * AN ADDRESS AND NOT A NAME. The board resolves `.btc` for you; this does not,
+ * and the difference is deliberate. The seat is committed to whatever is passed
+ * here at the moment the game opens and cannot be corrected afterwards, so a
+ * BNS lookup that answered with the wrong address — or answered at all for a
+ * name that has since moved — would put somebody else in the game permanently.
+ * Refusing costs one copy and paste.
+ */
+function seatForPerson(side, address, name = null) {
+  if (!address) return null;
+  if (!/^S[A-Z0-9]{20,50}$/.test(String(address).toUpperCase())) {
+    throw new WizardSafetyError(
+      `--${side}-human wants a Stacks address and got "${address}". The seat is committed ` +
+        'to it on chain when the game opens, and a wrong one cannot be corrected afterwards.'
+    );
+  }
+  return personSeat({
+    name: name || (side === 'white' ? 'White' : 'Black'),
+    address: String(address).toUpperCase(),
+    kind: 'human'
+  });
+}
+
+/**
+ * The field entry for a seat a person plays.
+ *
+ * Built from the manifest alone and deliberately blind to the fleet: it takes
+ * no wallets argument, so there is no path by which a key on disk becomes a key
+ * this runner could sign that seat with. A manifest saying a person plays here
+ * outranks a key that happens to be lying around, and the cheapest way to
+ * guarantee that is to make the key unreachable rather than to remember not to
+ * use it.
+ */
+function personSeat(entrant) {
+  return {
+    id: String(entrant.name).toLowerCase(),
+    name: entrant.name,
+    style: null,
+    prompt: null,
+    model: null,
+    entryId: null,
+    key: null,
+    address: entrant.address,
+    borrowedFrom: null,
+    human: true,
+    // READY MEANS "this seat can be played", not "this runner plays it".
+    ready: Boolean(entrant.address)
+  };
+}
+
 async function fieldFromManifest(tournament, vars = env(), borrow = {}) {
   const { module } = await inscribedEntryValidator(ENTRY_INSCRIPTION.validator);
 
@@ -258,6 +310,20 @@ async function fieldFromManifest(tournament, vars = env(), borrow = {}) {
 
   const agents = [];
   for (const entrant of tournament.entrants) {
+    // A SEAT A PERSON PLAYS.
+    //
+    // `kind: 'human'` has been in the manifest format since it was written and
+    // nothing has ever read it. It means somebody signs this side themself, so
+    // there is no character inscription to fetch and no key for the fleet to
+    // hold — and, more to the point, this runner must never move for it.
+    //
+    // Both of the refusals below are correct for a character and wrong for a
+    // person: a human has no entry to parse, and a fleet that held their key
+    // would be a fleet that could play their side for them.
+    if (entrant.kind === 'human') {
+      agents.push(personSeat(entrant));
+      continue;
+    }
     if (!entrant.entry) {
       throw new WizardSafetyError(
         `${entrant.name} has no entry inscription in this manifest, so there is nothing to ` +
@@ -283,6 +349,7 @@ async function fieldFromManifest(tournament, vars = env(), borrow = {}) {
       key: wallet?.key ?? null,
       address: entrant.address,
       borrowedFrom: wallet?.borrowedFrom ?? null,
+      human: false,
       // An entrant with no wallet here is still listed, so a dry run shows the
       // whole field to somebody who has not generated a fleet — same as readField.
       ready: Boolean(wallet?.key && entrant.address)
@@ -434,6 +501,74 @@ async function readGames() {
  * Reading first every time is what makes this resumable at any point - the
  * position is never carried in a variable across a failure.
  */
+/**
+ * How often to ask whether the person has moved, and how long to keep asking.
+ *
+ * Thirty seconds because a person is not a program: polling harder does not
+ * make them move sooner, and the rate limit is shared with every read this
+ * runner makes for every other game in the round.
+ */
+const HUMAN_POLL_MS = 30_000;
+const HUMAN_SAY_EVERY_MS = 10 * 60_000;
+
+/**
+ * Wait for the person on the other side to play.
+ *
+ * THE RUNNER SENDS NOTHING ON THIS PASS, which breaks the invariant the loop
+ * below is built on — every pass submits exactly one move, so a log that has
+ * not grown means something is wrong. Here a log that has not grown means
+ * somebody is thinking, and the two must not be confused: that guard exists
+ * because game 12 played e2e4 five times and was charged for all five.
+ *
+ * So the waiting happens HERE, inside the pass, and the loop only continues
+ * once the log has actually grown. The guard at the top then sees growth and
+ * is satisfied without being weakened for the games that still need it.
+ *
+ * Returns true when the log grew, false when the cap ran out. A cap rather
+ * than forever because an abandoned game should end as a stopped runner with a
+ * reason, not as a process nobody remembers starting.
+ */
+async function waitForPerson({
+  gameId, mover, since,
+  // Seams, so the waiting can be tested in milliseconds rather than hours.
+  // Defaulted to the real thing, so production takes exactly the path above.
+  read = readEntries, poll = HUMAN_POLL_MS, capMinutes = null
+}) {
+  const cap = capMinutes ?? Number(arg('human-timeout-minutes', '1440'));
+  const until = Date.now() + cap * 60_000;
+  let lastSaid = Date.now();
+  console.log(
+    `  game ${gameId}: waiting for ${mover.name} — a person plays this seat, ` +
+      `up to ${cap} minutes`
+  );
+  while (Date.now() < until) {
+    await new Promise((done) => setTimeout(done, poll));
+    let entries = null;
+    try {
+      entries = await read(gameId);
+    } catch {
+      // A read that failed says nothing about whether they moved. Ask again.
+      continue;
+    }
+    if (entries.length > since) {
+      console.log(`  game ${gameId}: ${mover.name} moved`);
+      return true;
+    }
+    // SAID OCCASIONALLY, because a silent terminal and a hung runner look the
+    // same, and this one is designed to be silent for hours.
+    if (Date.now() - lastSaid >= HUMAN_SAY_EVERY_MS) {
+      const left = Math.round((until - Date.now()) / 60_000);
+      console.log(`  game ${gameId}: still waiting for ${mover.name} (${left} minutes left)`);
+      lastSaid = Date.now();
+    }
+  }
+  console.log(
+    `  game ${gameId}: gave up waiting for ${mover.name} after ${capMinutes} minutes. ` +
+      'The game is untouched and resumes if this is run again.'
+  );
+  return false;
+}
+
 async function playGame({
   gameId, white, black, replay, ask, budget, Position, rankMoves, expectHash = null,
   depth = { white: 0, black: 0 }
@@ -442,6 +577,15 @@ async function playGame({
   // be played from an unannotated list without one line of output saying so.
   if (!Position || !rankMoves) {
     throw new WizardSafetyError('playGame needs the engine and the search to rank moves');
+  }
+  // NOTHING TO PLAY. Two people can play each other through the board; this
+  // runner would sit between them reading the chain and never submitting, which
+  // looks exactly like a runner that is working.
+  if (white.human && black.human) {
+    throw new WizardSafetyError(
+      `game ${gameId} names people on both sides, so this runner has no seat in it. ` +
+        'Play it from the board.'
+    );
   }
   // NEVER SUBMIT INTO A GAME WITHOUT CHECKING IT IS OURS.
   //
@@ -537,6 +681,14 @@ async function playGame({
     // White at move 55, and White was losing by move 68. Left unconnected until
     // the rule is one the evidence supports.
     const mover = state.turn === 'white' ? white : black;
+
+    // THE ONE PASS THAT SENDS NOTHING. Everything below chooses a move and
+    // submits it; for a seat somebody else signs, doing any of it would be
+    // playing their side for them.
+    if (mover.human) {
+      if (!(await waitForPerson({ gameId, mover, since: entries.length }))) return null;
+      continue;
+    }
 
     // WHAT EACH MOVE COSTS, worked out here rather than in the model's head.
     //
@@ -787,26 +939,48 @@ async function readEntries(gameId) {
  *
  *   node harness/wizards/run-tournament.mjs game --white gambit --black ledger \
  *     --white-wallet wizard-1 --black-wallet wizard-2 --live
+ *
+ * OR AGAINST A PERSON, which needs no manifest and so no inscription:
+ *
+ *   node harness/wizards/run-tournament.mjs game --white plumb \
+ *     --black-human SP3JNSE... --black-name Jim --live
+ *
+ * The person's seat is committed to their address when the game is opened, so
+ * only they can play it, and this runner answers whenever it is the character's
+ * turn. It waits rather than moving on their behalf; see `waitForPerson`.
  */
 async function oneGame({ openFee }) {
-  const white = personalityNamed(arg('white', 'gambit')).id;
-  const black = personalityNamed(arg('black', 'ledger')).id;
-  if (white === black) {
+  // A SEAT NAMED BY ADDRESS RATHER THAN BY CHARACTER.
+  const asPerson = (side) =>
+    seatForPerson(side, arg(`${side}-human`), arg(`${side}-name`));
+  const personWhite = asPerson('white');
+  const personBlack = asPerson('black');
+  if (personWhite && personBlack) {
+    throw new WizardSafetyError(
+      'both seats are people, so this runner has nothing to play. Two people play each ' +
+        'other from the board, with no harness in the middle.'
+    );
+  }
+
+  const white = personWhite ? null : personalityNamed(arg('white', 'gambit')).id;
+  const black = personBlack ? null : personalityNamed(arg('black', 'ledger')).id;
+  if (white && black && white === black) {
     throw new WizardSafetyError('a character cannot play itself; --white and --black must differ.');
   }
 
   const borrow = {};
-  if (arg('white-wallet')) borrow[white] = arg('white-wallet');
-  if (arg('black-wallet')) borrow[black] = arg('black-wallet');
+  if (white && arg('white-wallet')) borrow[white] = arg('white-wallet');
+  if (black && arg('black-wallet')) borrow[black] = arg('black-wallet');
 
   const agents = byId(readField(env(), borrow).agents);
-  const w = agents[white];
-  const b = agents[black];
+  const w = personWhite ?? agents[white];
+  const b = personBlack ?? agents[black];
 
   console.log(`one game: ${w.name} (white) v ${b.name} (black)`);
   for (const agent of [w, b]) {
     const where = agent.borrowedFrom ? `  [wallet borrowed from ${agent.borrowedFrom}]` : '';
-    console.log(`  ${agent.name.padEnd(9)} ${agent.address ?? 'NO WALLET'}${where}`);
+    const who = agent.human ? '  [a person plays this seat]' : where;
+    console.log(`  ${agent.name.padEnd(9)} ${agent.address ?? 'NO WALLET'}${who}`);
   }
   const cost = openFee + MINER_FEE_USTX * 46n;
   console.log(`  costs about ${ustx(cost)} for a 45 move game\n`);
@@ -814,8 +988,10 @@ async function oneGame({ openFee }) {
   if (!LIVE) {
     console.log('Dry run. Nothing was signed and nothing was sent. Add --live to play it.');
     if (!w.ready || !b.ready) {
-      console.log('\nBoth characters need a wallet before --live. Either generate one each, or');
+      console.log('\nEvery character needs a wallet before --live. Either generate one each, or');
       console.log('lend them existing ones with --white-wallet and --black-wallet.');
+      console.log('A seat given with --white-human or --black-human needs none: the person');
+      console.log('signs it themself, and this runner never moves for it.');
     }
     return;
   }
@@ -991,7 +1167,12 @@ async function main() {
   if (field.fromChain) {
     console.log(`entries   read from chain, parsed by ${ENTRY_INSCRIPTION.validator}`);
     for (const a of field.agents) {
-      console.log(`          ${a.name.padEnd(10)} ${a.entryId}`);
+      // A person has no entry inscription, and printing `null` under a column
+      // headed "entries" reads as a failed read rather than as the one seat
+      // this runner is deliberately not playing.
+      console.log(
+        `          ${a.name.padEnd(10)} ${a.human ? 'a person plays this seat' : a.entryId}`
+      );
     }
   } else {
     console.log('entries   LOCAL — prompts came from personalities.mjs, not from chain');
@@ -1004,7 +1185,7 @@ async function main() {
 
   console.log(`open fee  ${ustx(openFee)}`);
   console.log(
-    `model     ${field.agents[0]?.model ?? DEFAULT_MODEL}${
+    `model     ${field.agents.find((a) => !a.human)?.model ?? DEFAULT_MODEL}${
       MODEL_OVERRIDE ? '   (OVERRIDDEN — entries name ' + DEFAULT_MODEL + ')' : ''
     }`
   );
@@ -1182,7 +1363,28 @@ game ${gameId}: ${found.white} (white) v ${found.black}`);
         // submission costs a fee and a permanent entry in a stranger's log.
         let gameId;
         if (pairing.id !== undefined) {
-          const row = (await readGames()).find((g) => g.id === pairing.id);
+          // READ THE ONE GAME THE MANIFEST NAMES. This used to sweep the whole
+          // contract — one get-game per id, once per pairing, with the pairings
+          // running concurrently — so the cost grew with the contract rather
+          // than with the round: 215 reads a round at 43 games, 665 at 133.
+          // That is what rate limited the later rounds, and backing off cannot
+          // fix a load that rises every round.
+          let raw;
+          try {
+            raw = (await readOnly('get-game', [Cl.serialize(Cl.uint(pairing.id))])).value?.value;
+          } catch (err) {
+            // A READ THAT FAILED IS NOT A GAME THAT IS ABSENT. Reporting a rate
+            // limit as a missing game sends the reader hunting for a setup
+            // problem that does not exist.
+            throw new WizardSafetyError(
+              `could not read game ${pairing.id} from the contract: ${err?.message ?? err}. ` +
+                'That is a failed read, not a missing game — the tournament is intact and ' +
+                'resumes from the chain once the node is answering.'
+            );
+          }
+          const row = raw
+            ? { id: pairing.id, rulesHash: raw['rules-hash']?.value?.value ?? null }
+            : null;
           if (!row) {
             throw new WizardSafetyError(
               `the manifest names game ${pairing.id} and it is not on this contract. ` +
@@ -1556,4 +1758,4 @@ if (Boolean(process.argv[1]) && pathToFileURL(process.argv[1]).href === import.m
   });
 }
 
-export { readField, readGames, readEntries, settleAll };
+export { readField, readGames, readEntries, settleAll, personSeat, waitForPerson, seatForPerson };

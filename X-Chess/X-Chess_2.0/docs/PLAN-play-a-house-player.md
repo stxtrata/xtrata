@@ -2,12 +2,53 @@
 
 A person picks Plumb, presses one button, and plays a game of chess against it.
 
-Nothing here is built. This is what it would take, the one question that decides
-the shape of it, and the three things that would go wrong if it were built the
-obvious way.
+**Part of this is now built — see "What is built" below.** A person can take a
+seat in a game the runner plays, with no board change and no inscription. What
+is still not built is the part that makes it a FEATURE rather than a command:
+nobody is watching the chain for challenges, so somebody has to run the harness
+for the house side.
 
-Shelved deliberately: the current board is finished and the work below changes
-who runs what, which is a bigger thing than it looks.
+The rest of this document is the original plan, kept because the question it
+turns on has not changed.
+
+## What is built (2026-08-20)
+
+`kind: 'human'` has been in the manifest format since it was written and nothing
+read it. The runner now does, and it means: no character inscription to fetch,
+no key expected on this seat, and — the point — this runner never moves for it.
+
+Two ways in. A tournament manifest can name a person as an entrant, or a single
+game can be set up with no manifest at all:
+
+```
+node harness/wizards/run-tournament.mjs game \
+  --white plumb --black-human SP3JNSE… --black-name Jim --live
+```
+
+That opens a game committing Black to your address, so only you can play it,
+and answers as Plumb whenever it is White's turn. Between your moves it waits:
+`waitForPerson` polls every thirty seconds for up to a day, says so occasionally
+so a silent terminal is not mistaken for a hung one, and gives up cleanly rather
+than running for ever. The game is untouched by giving up and resumes if the
+command is run again.
+
+Three things it deliberately refuses:
+
+* **Both seats human.** The runner would sit between two people reading the
+  chain and never submitting, which looks exactly like a runner that is working.
+* **A `.btc` name.** The board resolves BNS; this does not. The seat is
+  committed at the moment the game opens and cannot be corrected, so a lookup
+  answering with a stale address would put a stranger in the game permanently.
+* **A key on a human seat.** `personSeat` takes the entrant alone and is never
+  handed the fleet, so there is no argument by which a key on disk could become
+  a key this runner signs that seat with. The manifest outranks the keyring.
+
+What this does NOT change: somebody still has to run the command, and that
+somebody needs the house player's wallet. It is a way to play Plumb, not a
+service that answers challenges. Everything below is still what it would take to
+make it one.
+
+## The original plan
 
 ## The question that decides everything
 
