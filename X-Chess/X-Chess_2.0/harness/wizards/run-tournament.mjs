@@ -256,6 +256,11 @@ const byId = (agents) => Object.fromEntries(agents.map((a) => [a.id, a]));
  * name that has since moved — would put somebody else in the game permanently.
  * Refusing costs one copy and paste.
  */
+/**
+ * @param {string} side
+ * @param {string | null | undefined} address
+ * @param {string | null} [name]
+ */
 function seatForPerson(side, address, name = null) {
   if (!address) return null;
   if (!/^S[A-Z0-9]{20,50}$/.test(String(address).toUpperCase())) {
@@ -527,6 +532,11 @@ const HUMAN_SAY_EVERY_MS = 10 * 60_000;
  * Returns true when the log grew, false when the cap ran out. A cap rather
  * than forever because an abandoned game should end as a stopped runner with a
  * reason, not as a process nobody remembers starting.
+ */
+/**
+ * @param {{ gameId: number, mover: { name: string }, since: number,
+ *           read?: (id: number) => Promise<unknown[]>, poll?: number,
+ *           capMinutes?: number | null }} options
  */
 async function waitForPerson({
   gameId, mover, since,

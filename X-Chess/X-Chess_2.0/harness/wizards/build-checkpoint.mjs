@@ -135,6 +135,11 @@ async function main() {
   const text = checkpoint.buildCheckpoint({
     contract: ALLOWED_CONTRACT,
     block: height,
+    // THE INDICES CONSUMED, which is every ranked game walked — including the
+    // ones no rating could count. This used to be inferred from `games.length`
+    // and so renumbered itself down to the countable ones, telling a reader to
+    // resume in the middle of the walk it had just done.
+    rankedIndex: rankedCount,
     // `at` is the walk's own bookkeeping and does not belong in the document.
     games: games.map(({ id, white, black, result }) => ({ id, white, black, result })),
     table,

@@ -125,11 +125,21 @@ export function parseCheckpoint(text: unknown): ParsedCheckpoint {
     }
   }
 
-  // THE COUNT IS THE ONE ARITHMETIC CLAIM WORTH CHECKING FOR FREE. A checkpoint
-  // saying it consumed forty games while listing thirty is either truncated or
-  // describing a walk it did not do, and either way the table cannot follow
-  // from the list.
-  if (Array.isArray(c.games) && Number.isInteger(c.rankedIndex) && c.games.length !== c.rankedIndex) {
+  // THE COUNT IS THE ONE ARITHMETIC CLAIM WORTH CHECKING FOR FREE — but the
+  // claim is a bound, not an equality, and demanding equality was WRONG.
+  //
+  // A ranked index contains games that no rating can count: still being played,
+  // ineligible, or with a player nothing on chain can identify. The walk
+  // consumes those indices and lists no game for them, so an honest checkpoint
+  // over 128 indices lists rather fewer than 128 games. Requiring equality
+  // refused every honest document and accepted exactly one dishonest one — the
+  // walk that renumbers `rankedIndex` down to the games it counted, which then
+  // tells a reader to resume in the MIDDLE of what it already consumed. Every
+  // countable game after that point is seeded and replayed, and counted twice.
+  //
+  // Listing MORE games than indices consumed is still impossible, and still
+  // means the document is describing a walk it did not do.
+  if (Array.isArray(c.games) && Number.isInteger(c.rankedIndex) && c.games.length > (c.rankedIndex as number)) {
     problems.push(
       `says it consumed ${c.rankedIndex} ranked games and lists ${c.games.length}`
     );
@@ -195,10 +205,24 @@ export function checkpointNote(checkpoint: Checkpoint, id: number): string {
 export function buildCheckpoint(input: {
   contract: string;
   block: number;
+  /**
+   * How many ranked INDICES the walk consumed — not how many games it counted.
+   *
+   * These are not the same number and treating them as one was wrong in a way
+   * that produced a well-formed, reproducible, WRONG document. See the note on
+   * `rankedIndex` above and the count check in `parseCheckpoint`.
+   */
+  rankedIndex: number;
   games: readonly CheckpointGame[];
   table: readonly CheckpointRow[];
   note?: string;
 }): string {
+  if (!Number.isInteger(input.rankedIndex) || input.rankedIndex < input.games.length) {
+    throw new Error(
+      `rankedIndex must be the ranked indices consumed (at least ${input.games.length}, ` +
+        `the games listed), and got ${input.rankedIndex}`
+    );
+  }
   const games = input.games.map((game) => ({
     id: game.id,
     white: game.white,
@@ -223,7 +247,7 @@ export function buildCheckpoint(input: {
 
   const body = {
     contract: input.contract,
-    rankedIndex: games.length,
+    rankedIndex: input.rankedIndex,
     block: input.block,
     table,
     games,
