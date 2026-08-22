@@ -30,6 +30,7 @@ import { Cl, Pc, PostConditionMode } from '@stacks/transactions';
 import {
   ALLOWED_CONTRACT,
   DEFAULT_SPEND_CAP_USTX,
+  EXPECTED_FEE_USTX,
   MINER_FEE_USTX,
   WizardSafetyError,
   addressEnvName,
@@ -992,8 +993,13 @@ async function oneGame({ openFee }) {
     const who = agent.human ? '  [a person plays this seat]' : where;
     console.log(`  ${agent.name.padEnd(9)} ${agent.address ?? 'NO WALLET'}${who}`);
   }
-  const cost = openFee + MINER_FEE_USTX * 46n;
-  console.log(`  costs about ${ustx(cost)} for a 45 move game\n`);
+  // BOTH NUMBERS, LABELLED. The ceiling alone read as the price and is about
+  // seven times it: every rung replaces the one below rather than adding to it,
+  // and 98% of moves never leave the bottom.
+  const worst = openFee + MINER_FEE_USTX * 46n;
+  const usual = openFee + EXPECTED_FEE_USTX * 46n;
+  console.log(`  about ${ustx(usual)} for a 45 move game, at most ${ustx(worst)}`);
+  console.log(`  (moves start at ${ustx(EXPECTED_FEE_USTX)} and only climb if one sits unmined)\n`);
 
   if (!LIVE) {
     console.log('Dry run. Nothing was signed and nothing was sent. Add --live to play it.');
@@ -1207,8 +1213,16 @@ async function main() {
     }`
   );
   console.log(
-    `schedule  ${plan.plannedRounds} rounds, ${plan.plannedGames} games, ` +
-      `${ustx(plan.chainUstx)} of chess\n`
+    `schedule  ${plan.plannedRounds} rounds, ${plan.plannedGames} games\n` +
+      `cost      about ${ustx(
+        (plan.chainUstx * EXPECTED_FEE_USTX) / MINER_FEE_USTX
+      )} of chess, at most ${ustx(plan.chainUstx)}\n` +
+      // THE CAP IS THE CEILING AND MUST STAY THE CEILING. `plan.chainUstx` is
+      // what the spend cap is checked against, so it is quoted unchanged; the
+      // first figure is the same plan priced at the rung moves actually land
+      // on. Scaled rather than recomputed, so there is one arithmetic and the
+      // two lines cannot disagree about how many moves there are.
+      `          (a plan is capped at the worst case; moves start at ${ustx(EXPECTED_FEE_USTX)})\n`
   );
 
   if (command === 'game') {

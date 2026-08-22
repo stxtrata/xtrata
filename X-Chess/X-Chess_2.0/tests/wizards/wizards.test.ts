@@ -19,6 +19,7 @@ import {
   BALANCE_FLOOR_USTX,
   DEFAULT_SPEND_CAP_USTX,
   FEE_LADDER,
+  EXPECTED_FEE_USTX,
   MINER_FEE_USTX,
   DIRECTOR,
   KEY_SHAPED,
@@ -796,6 +797,18 @@ describe('what a move offers a miner', () => {
     // whole way costs exactly what every move cost before.
     expect(FEE_LADDER[FEE_LADDER.length - 1]).toBe(3_000n);
     expect(MINER_FEE_USTX, 'the plan quotes something other than the worst case').toBe(3_000n);
+  });
+
+  it('has a figure for what a move is expected to cost, distinct from the cap', () => {
+    // The ceiling alone was being printed as though it were the price, and it
+    // is about seven times it: a one-game run quoted 0.148 STX where the real
+    // answer is nearer 0.028, because rungs REPLACE each other and 98% of moves
+    // never leave the bottom one. A reader cannot tell a bound from a price
+    // unless the output says which it is.
+    expect(EXPECTED_FEE_USTX).toBe(FEE_LADDER[0]);
+    expect(EXPECTED_FEE_USTX).toBe(400n);
+    expect(EXPECTED_FEE_USTX, 'a price that equalled the cap would say nothing')
+      .toBeLessThan(MINER_FEE_USTX);
   });
 
   it('prices a plan at the worst case, never the hoped-for one', () => {

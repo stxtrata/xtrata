@@ -137,6 +137,22 @@ export const FEE_BUMP_AFTER_MS = 45_000;
 /** The rung a plan quotes and a spend cap is checked against: the worst case. */
 export const MINER_FEE_USTX = FEE_LADDER[FEE_LADDER.length - 1];
 
+/**
+ * What a move is actually expected to cost: the bottom rung.
+ *
+ * FOR SAYING, NEVER FOR CAPPING. A spend cap checked against this would be a
+ * cap on the good case only, which is the fault the fixed fee was introduced to
+ * fix — see the plan test that pins `totalUstx` to the worst case.
+ *
+ * It exists because quoting only the ceiling was misleading in the direction
+ * that costs trust: a one-game run against a house player printed "costs about
+ * 0.148000 STX" when 98% of moves land on this rung and the whole of round 5
+ * cost 0.0496 STX. A reader has no way to tell a bound from a price unless the
+ * output says which it is, and the same confusion over `get-fee-unit` has
+ * already sent somebody looking for money that was never going to be spent.
+ */
+export const EXPECTED_FEE_USTX = FEE_LADDER[0];
+
 /** Per run, across every wizard. The float is small; this is smaller. */
 export const DEFAULT_SPEND_CAP_USTX = 3_000_000n;
 
