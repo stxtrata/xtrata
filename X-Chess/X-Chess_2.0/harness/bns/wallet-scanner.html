@@ -1,0 +1,3548 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet scanner</title>
+<!--
+  What every wallet holds, before and after moving any of it.
+
+  THIS PAGE NEVER SEES A SEED, A PHRASE, OR A PRIVATE KEY. It takes addresses
+  and reads public chain data about them. There is no field to type a phrase
+  into and no code here that could use one. That is not squeamishness: a browser
+  page is the worst place a seed can be, and the rescue that DOES need one runs
+  in a terminal, from a file at mode 600, on one machine.
+
+  Two jobs:
+
+    1. INVENTORY. Step through a list of addresses and list what each holds -
+       STX, BNS names, other NFTs, fungible tokens.
+    2. COMPARE. Save the result, run the rescue, load the saved file back, and
+       the page diffs it. "Everything moved" is a claim; a diff is evidence.
+
+  Self-contained on purpose. One file, no CDN, no build step, no dependency that
+  can rot. Open it from disk.
+-->
+<style>
+  :root {
+    --bg: #f6f5f2; --ink: #1b1a17; --muted: #6b675f; --line: #d9d5cc;
+    --panel: #fffefb; --accent: #8a6a2f; --good: #2f6a3f; --bad: #8a2f2f;
+    --warn: #8a5a2f; --code: #efece5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+      --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+      --warn: #d8a76a; --code: #232119;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+    --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+    --warn: #d8a76a; --code: #232119;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; }
+  /* The results table is the one thing allowed to use the whole window. Capping
+     it at the prose width is what made it scroll sideways in the first place. */
+  #results { max-width: none; margin-left: calc((100% - 96vw) / 2); width: 96vw; }
+  @media (max-width: 1180px) { #results { margin-left: 0; width: 100%; } }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.1rem; margin-bottom: 1rem;
+  }
+  .never {
+    border-left: 3px solid var(--accent); background: var(--code);
+    padding: .75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1.5rem;
+  }
+  .never strong { color: var(--accent); }
+  label { display: block; font-weight: 600; margin-bottom: .35rem; font-size: .9rem; }
+  .hint { color: var(--muted); font-size: .85rem; margin: .3rem 0 0; }
+  textarea, input[type="text"], input[type="password"] {
+    width: 100%; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: .6rem .7rem;
+  }
+  textarea { min-height: 8.5rem; resize: vertical; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-top: .9rem; }
+  button {
+    font: inherit; font-weight: 600; padding: .55rem 1rem; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; min-height: 2.5rem;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .bar { height: 5px; background: var(--code); border-radius: 3px; overflow: hidden; margin-top: .9rem; }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .status { font-size: .88rem; color: var(--muted); margin-top: .5rem; min-height: 1.4em; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* A zero is a fact and should not shout as loudly as a balance. */
+  td.zero { color: var(--muted); }
+  td.addr { cursor: help; white-space: nowrap; }
+  /* Numbers are narrow and fixed; the columns that vary get what is left. */
+  th.num, td.num { width: 1%; white-space: nowrap; }
+  .more { margin-top: .35rem; }
+  td.src { font-size: .8rem; line-height: 1.3; white-space: nowrap; cursor: help; }
+  /* An address no seed reaches is the one the rescue cannot touch, so it is
+     marked rather than merely left blank. */
+  td.src.none { color: var(--warn); font-style: italic; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
+  .tag {
+    display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
+    font-size: .78rem; margin: .1rem .2rem .1rem 0; font-family: ui-monospace, Menlo, monospace;
+  }
+  /* A tag carrying a number behind it says so, or nobody hovers. */
+  .tag[title] { cursor: help; border-bottom: 1px dotted var(--muted); }
+  /* Closed it is one line; open it names every contract. No script involved. */
+  .nfts > summary {
+    cursor: pointer; font-size: .8rem; padding: .05rem .4rem; border-radius: 4px;
+    background: var(--code); display: inline-block; list-style: none;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .nfts > summary::-webkit-details-marker { display: none; }
+  .nfts > summary::before { content: '▸ '; color: var(--muted); }
+  .nfts[open] > summary::before { content: '▾ '; }
+  .nfts > ul { margin: .4rem 0 .2rem; padding-left: 1rem; list-style: none; }
+  .nfts > ul > li { margin-bottom: .35rem; font-size: .8rem; line-height: 1.35; }
+  .nfts .count { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .nfts .who {
+    color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+  }
+  .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .totals { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: .8rem; }
+  .totals div { font-size: .85rem; color: var(--muted); }
+  .totals b { display: block; font-size: 1.3rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wallet scanner</h1>
+  <p class="sub">Every address a recovery phrase reaches, and what each one holds.</p>
+
+  <div class="never">
+    <strong>This page derives addresses. It cannot spend from them.</strong>
+    Your phrase is used in this tab and nowhere else: it is never sent anywhere,
+    never written to storage, never put in the URL, and it is wiped from the
+    field when the scan ends. Only the derived <em>addresses</em> — which are
+    public — are sent to the block explorers. There is no signing code in this
+    file at all, so it cannot move anything even if it wanted to.
+    <br><br>
+    <strong>Read this before you paste anything.</strong> A page asking for a
+    recovery phrase is the oldest theft on the internet, and being told it is
+    safe is exactly what a fake would say. Open this file from your own disk,
+    not from a link somebody sent you. Check the URL bar says
+    <span class="mono">file://</span>. If you want to be certain, search this
+    file for <span class="mono">fetch(</span> — every one goes to a block
+    explorer with an address, and none carries a key.
+    <br><br>
+    <strong>Prefer not to?</strong> Then don't. Run
+    <span class="mono">harness/bns/addresses.mjs</span> in a terminal, paste the
+    addresses it prints into <span class="mono">inventory.html</span>, and this
+    page has nothing you need.
+  </div>
+
+  <div class="panel">
+    <label for="secret">Recovery phrase, or a single private key</label>
+    <textarea id="secret" spellcheck="false" autocomplete="off" autocapitalize="off"
+      style="min-height:4.5rem"
+      placeholder="twelve or twenty-four lowercase words, separated by spaces&#10;&#10;or one private key: 64 hex characters"></textarea>
+    <p class="hint">
+      A phrase is scanned account by account until it finds
+      <span id="gap-label">20</span> empty ones in a row — the standard gap
+      limit — so a wallet with a used account at number 63 is still found. A
+      single private key is one keypair with no tree beneath it, so there is
+      nothing to scan and it checks that one account.
+    </p>
+    <div class="row">
+      <button id="scan" class="primary" type="button">Scan</button>
+      <button id="stop-scan" type="button" disabled>Stop</button>
+      <button id="forget" type="button">Forget the phrase</button>
+      <label class="hint" style="display:flex;align-items:center;gap:.4rem;font-weight:400">
+        <input type="checkbox" id="keep-empty"> keep empty accounts in the list
+      </label>
+    </div>
+    <p class="status" id="scan-status">Nothing entered.</p>
+  </div>
+
+  <div class="panel">
+    <label for="addresses">Addresses, one per line</label>
+    <textarea id="addresses" spellcheck="false"
+      placeholder="SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7&#10;SP3XCSEFE1F63CP3BEYNK1B1CTQ3HV5CWGCE7WB4P&#10;&#10;Paste the owner column from check-names.mjs, or the addresses from a rescue dry run."></textarea>
+    <p class="hint">
+      Anything that is not an <span class="mono">SP…</span> / <span class="mono">SM…</span>
+      principal is ignored, so you can paste a whole table and let it pick the addresses out.
+      <strong>Hover a token</strong> for its amount and full contract;
+      <strong>click "N more"</strong> on tokens or NFTs to expand the rest.
+      The address is shortened — hover it for the full principal, and the saved
+      snapshot always keeps it in full.
+      Both are kept off screen so four hundred rows stay scannable.
+      sBTC, xBTC, aeUSDC and USDC get their own columns and are matched on the
+      exact contract, never the symbol — several tokens on Stacks claim the
+      <span class="mono">sBTC</span> symbol and are not it.
+    </p>
+
+    <label for="apikey" style="margin-top:1rem">Hiro API key (optional)</label>
+    <input id="apikey" type="password" autocomplete="off" spellcheck="false" placeholder="blank is fine for a few wallets">
+    <p class="hint">
+      Kept in this tab only — never stored, never sent anywhere but api.hiro.so.
+      Without one you get roughly fifty requests a minute shared with everything
+      else on your connection, which is enough for a handful of wallets and not
+      for sixty. Each wallet costs two requests, plus one per BNS name.
+    </p>
+
+    <div class="row">
+      <button id="run" class="primary" type="button">Take inventory</button>
+      <button id="stop" type="button" disabled>Stop</button>
+      <button id="save" type="button" disabled>Save snapshot</button>
+      <button id="retry" type="button" hidden>Retry failed</button>
+      <button id="resume" type="button" hidden>Resume from snapshot</button>
+      <button id="load" type="button">Load snapshot to compare</button>
+      <input id="file" type="file" accept="application/json" hidden>
+    </div>
+    <div class="bar"><i id="progress"></i></div>
+    <p class="status" id="status">Ready.</p>
+  </div>
+
+  <div id="totals" class="panel" hidden>
+    <div class="totals" style="align-items:flex-start">
+      <div>wallets<b id="t-wallets">0</b></div>
+      <div>STX<b id="t-stx">0</b></div>
+      <div id="t-headline-wrap"></div>
+      <div id="t-btc"></div>
+      <div id="t-sources"></div>
+      <div>BNS names<b id="t-bns">0</b></div>
+      <div>other NFTs<b id="t-nft">0</b></div>
+      <div>token types<b id="t-ft">0</b></div>
+    </div>
+  </div>
+
+  <p class="status warn" id="t-stale" style="display:none"></p>
+
+  <div id="diff-panel" class="panel" hidden>
+    <h2 style="margin-top:0">Against the saved snapshot</h2>
+    <div id="diff"></div>
+  </div>
+
+  <div id="results" class="scroll"></div>
+  <!-- Filled by `addresses.mjs --canary`. Absent means no Bitcoin column, which
+       is the right default: without the pairing this page cannot know which
+       bc1 address belongs to which principal, and guessing one would be worse
+       than omitting it. -->
+  <script type="application/json" id="btc-pairs">{}</script>
+  <!-- Which seed reached each address, also filled by `--canary`. An address
+       that is NOT in here was found some other way - a name owner the seeds
+       cannot derive - and saying so is the point rather than a gap. -->
+  <script type="application/json" id="address-sources">{}</script>
+</main>
+
+<script>"use strict";var XKEY=(()=>{var Fi=Object.create;var Nt=Object.defineProperty;var Di=Object.getOwnPropertyDescriptor;var ji=Object.getOwnPropertyNames;var Ni=Object.getPrototypeOf,Mi=Object.prototype.hasOwnProperty;var ie=(t,e)=>()=>(e||t((e={exports:{}}).exports,e),e.exports),$i=(t,e)=>{for(var r in e)Nt(t,r,{get:e[r],enumerable:!0})},to=(t,e,r,n)=>{if(e&&typeof e=="object"||typeof e=="function")for(let o of ji(e))!Mi.call(t,o)&&o!==r&&Nt(t,o,{get:()=>e[o],enumerable:!(n=Di(e,o))||n.enumerable});return t};var Ki=(t,e,r)=>(r=t!=null?Fi(Ni(t)):{},to(e||!t||!t.__esModule?Nt(r,"default",{value:t,enumerable:!0}):r,t)),qi=t=>to(Nt({},"__esModule",{value:!0}),t);var ri=ie(mr=>{"use strict";Object.defineProperty(mr,"__esModule",{value:!0});mr.crypto=void 0;mr.crypto={node:void 0,web:typeof self=="object"&&"crypto"in self?self.crypto:void 0}});var Xe=ie(C=>{"use strict";Object.defineProperty(C,"__esModule",{value:!0});C.randomBytes=C.wrapConstructorWithOpts=C.wrapConstructor=C.checkOpts=C.Hash=C.concatBytes=C.toBytes=C.utf8ToBytes=C.asyncLoop=C.nextTick=C.hexToBytes=C.bytesToHex=C.isLE=C.rotr=C.createView=C.u32=C.u8=void 0;var Er=ri(),Ha=t=>new Uint8Array(t.buffer,t.byteOffset,t.byteLength);C.u8=Ha;var La=t=>new Uint32Array(t.buffer,t.byteOffset,Math.floor(t.byteLength/4));C.u32=La;var Ua=t=>new DataView(t.buffer,t.byteOffset,t.byteLength);C.createView=Ua;var Oa=(t,e)=>t<<32-e|t>>>e;C.rotr=Oa;C.isLE=new Uint8Array(new Uint32Array([287454020]).buffer)[0]===68;if(!C.isLE)throw new Error("Non little-endian hardware is not supported");var Ca=Array.from({length:256},(t,e)=>e.toString(16).padStart(2,"0"));function Ia(t){if(!(t instanceof Uint8Array))throw new Error("Uint8Array expected");let e="";for(let r=0;r<t.length;r++)e+=Ca[t[r]];return e}C.bytesToHex=Ia;function Ra(t){if(typeof t!="string")throw new TypeError("hexToBytes: expected string, got "+typeof t);if(t.length%2)throw new Error("hexToBytes: received invalid unpadded hex");let e=new Uint8Array(t.length/2);for(let r=0;r<e.length;r++){let n=r*2,o=t.slice(n,n+2),s=Number.parseInt(o,16);if(Number.isNaN(s)||s<0)throw new Error("Invalid byte sequence");e[r]=s}return e}C.hexToBytes=Ra;var Fa=async()=>{};C.nextTick=Fa;async function Da(t,e,r){let n=Date.now();for(let o=0;o<t;o++){r(o);let s=Date.now()-n;s>=0&&s<e||(await(0,C.nextTick)(),n+=s)}}C.asyncLoop=Da;function ni(t){if(typeof t!="string")throw new TypeError(`utf8ToBytes expected string, got ${typeof t}`);return new TextEncoder().encode(t)}C.utf8ToBytes=ni;function qn(t){if(typeof t=="string"&&(t=ni(t)),!(t instanceof Uint8Array))throw new TypeError(`Expected input type is Uint8Array (got ${typeof t})`);return t}C.toBytes=qn;function ja(...t){if(!t.every(n=>n instanceof Uint8Array))throw new Error("Uint8Array list expected");if(t.length===1)return t[0];let e=t.reduce((n,o)=>n+o.length,0),r=new Uint8Array(e);for(let n=0,o=0;n<t.length;n++){let s=t[n];r.set(s,o),o+=s.length}return r}C.concatBytes=ja;var Kn=class{clone(){return this._cloneInto()}};C.Hash=Kn;var Na=t=>Object.prototype.toString.call(t)==="[object Object]"&&t.constructor===Object;function Ma(t,e){if(e!==void 0&&(typeof e!="object"||!Na(e)))throw new TypeError("Options should be object or undefined");return Object.assign(t,e)}C.checkOpts=Ma;function $a(t){let e=n=>t().update(qn(n)).digest(),r=t();return e.outputLen=r.outputLen,e.blockLen=r.blockLen,e.create=()=>t(),e}C.wrapConstructor=$a;function Ka(t){let e=(n,o)=>t(o).update(qn(n)).digest(),r=t({});return e.outputLen=r.outputLen,e.blockLen=r.blockLen,e.create=n=>t(n),e}C.wrapConstructorWithOpts=Ka;function qa(t=32){if(Er.crypto.web)return Er.crypto.web.getRandomValues(new Uint8Array(t));if(Er.crypto.node)return new Uint8Array(Er.crypto.node.randomBytes(t).buffer);throw new Error("The environment doesn't have randomBytes function")}C.randomBytes=qa});var zn=ie(Y=>{"use strict";Object.defineProperty(Y,"__esModule",{value:!0});Y.c32decode=Y.c32normalize=Y.c32encode=Y.c32=void 0;var za=Xe();Y.c32="0123456789ABCDEFGHJKMNPQRSTVWXYZ";var Rt="0123456789abcdef";function Pa(t,e){if(!t.match(/^[0-9a-fA-F]*$/))throw new Error("Not a hex-encoded string");t.length%2!==0&&(t=`0${t}`),t=t.toLowerCase();let r=[],n=0;for(let c=t.length-1;c>=0;c--)if(n<4){let a=Rt.indexOf(t[c])>>n,d=0;c!==0&&(d=Rt.indexOf(t[c-1]));let l=1+n,f=d%(1<<l)<<5-l,h=Y.c32[a+f];n=l,r.unshift(h)}else n=0;let o=0;for(let c=0;c<r.length&&r[c]==="0";c++)o++;r=r.slice(o);let s=new TextDecoder().decode((0,za.hexToBytes)(t)).match(/^\u0000*/),i=s?s[0].length:0;for(let c=0;c<i;c++)r.unshift(Y.c32[0]);if(e){let c=e-r.length;for(let a=0;a<c;a++)r.unshift(Y.c32[0])}return r.join("")}Y.c32encode=Pa;function oi(t){return t.toUpperCase().replace(/O/g,"0").replace(/L|I/g,"1")}Y.c32normalize=oi;function Wa(t,e){if(t=oi(t),!t.match(`^[${Y.c32}]*<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wallet scanner</title>
+<!--
+  What every wallet holds, before and after moving any of it.
+
+  THIS PAGE NEVER SEES A SEED, A PHRASE, OR A PRIVATE KEY. It takes addresses
+  and reads public chain data about them. There is no field to type a phrase
+  into and no code here that could use one. That is not squeamishness: a browser
+  page is the worst place a seed can be, and the rescue that DOES need one runs
+  in a terminal, from a file at mode 600, on one machine.
+
+  Two jobs:
+
+    1. INVENTORY. Step through a list of addresses and list what each holds -
+       STX, BNS names, other NFTs, fungible tokens.
+    2. COMPARE. Save the result, run the rescue, load the saved file back, and
+       the page diffs it. "Everything moved" is a claim; a diff is evidence.
+
+  Self-contained on purpose. One file, no CDN, no build step, no dependency that
+  can rot. Open it from disk.
+-->
+<style>
+  :root {
+    --bg: #f6f5f2; --ink: #1b1a17; --muted: #6b675f; --line: #d9d5cc;
+    --panel: #fffefb; --accent: #8a6a2f; --good: #2f6a3f; --bad: #8a2f2f;
+    --warn: #8a5a2f; --code: #efece5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+      --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+      --warn: #d8a76a; --code: #232119;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171613; --ink: #ece8df; --muted: #979186; --line: #33302a;
+    --panel: #1e1d19; --accent: #d8ae5c; --good: #7cc08c; --bad: #e08a8a;
+    --warn: #d8a76a; --code: #232119;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 1100px; margin: 0 auto; }
+  /* The results table is the one thing allowed to use the whole window. Capping
+     it at the prose width is what made it scroll sideways in the first place. */
+  #results { max-width: none; margin-left: calc((100% - 96vw) / 2); width: 96vw; }
+  @media (max-width: 1180px) { #results { margin-left: 0; width: 100%; } }
+  h1 { font-size: 1.5rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
+  h2 { font-size: 1.05rem; margin: 2rem 0 .5rem; }
+  .sub { color: var(--muted); margin: 0 0 1.5rem; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 1rem 1.1rem; margin-bottom: 1rem;
+  }
+  .never {
+    border-left: 3px solid var(--accent); background: var(--code);
+    padding: .75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1.5rem;
+  }
+  .never strong { color: var(--accent); }
+  label { display: block; font-weight: 600; margin-bottom: .35rem; font-size: .9rem; }
+  .hint { color: var(--muted); font-size: .85rem; margin: .3rem 0 0; }
+  textarea, input[type="text"], input[type="password"] {
+    width: 100%; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 7px; padding: .6rem .7rem;
+  }
+  textarea { min-height: 8.5rem; resize: vertical; }
+  .row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; margin-top: .9rem; }
+  button {
+    font: inherit; font-weight: 600; padding: .55rem 1rem; border-radius: 7px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; min-height: 2.5rem;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  .bar { height: 5px; background: var(--code); border-radius: 3px; overflow: hidden; margin-top: .9rem; }
+  .bar > i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .status { font-size: .88rem; color: var(--muted); margin-top: .5rem; min-height: 1.4em; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .6rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  /* A zero is a fact and should not shout as loudly as a balance. */
+  td.zero { color: var(--muted); }
+  td.addr { cursor: help; white-space: nowrap; }
+  /* Numbers are narrow and fixed; the columns that vary get what is left. */
+  th.num, td.num { width: 1%; white-space: nowrap; }
+  .more { margin-top: .35rem; }
+  td.src { font-size: .8rem; line-height: 1.3; white-space: nowrap; cursor: help; }
+  /* An address no seed reaches is the one the rescue cannot touch, so it is
+     marked rather than merely left blank. */
+  td.src.none { color: var(--warn); font-style: italic; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: .85em; }
+  .tag {
+    display: inline-block; padding: .05rem .4rem; border-radius: 4px; background: var(--code);
+    font-size: .78rem; margin: .1rem .2rem .1rem 0; font-family: ui-monospace, Menlo, monospace;
+  }
+  /* A tag carrying a number behind it says so, or nobody hovers. */
+  .tag[title] { cursor: help; border-bottom: 1px dotted var(--muted); }
+  /* Closed it is one line; open it names every contract. No script involved. */
+  .nfts > summary {
+    cursor: pointer; font-size: .8rem; padding: .05rem .4rem; border-radius: 4px;
+    background: var(--code); display: inline-block; list-style: none;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .nfts > summary::-webkit-details-marker { display: none; }
+  .nfts > summary::before { content: '▸ '; color: var(--muted); }
+  .nfts[open] > summary::before { content: '▾ '; }
+  .nfts > ul { margin: .4rem 0 .2rem; padding-left: 1rem; list-style: none; }
+  .nfts > ul > li { margin-bottom: .35rem; font-size: .8rem; line-height: 1.35; }
+  .nfts .count { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .nfts .who {
+    color: var(--muted); font-family: ui-monospace, Menlo, monospace; font-size: .72rem;
+  }
+  .good { color: var(--good); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  .totals { display: flex; gap: 2rem; flex-wrap: wrap; margin-top: .8rem; }
+  .totals div { font-size: .85rem; color: var(--muted); }
+  .totals b { display: block; font-size: 1.3rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Wallet scanner</h1>
+  <p class="sub">Every address a recovery phrase reaches, and what each one holds.</p>
+
+  <div class="never">
+    <strong>This page derives addresses. It cannot spend from them.</strong>
+    Your phrase is used in this tab and nowhere else: it is never sent anywhere,
+    never written to storage, never put in the URL, and it is wiped from the
+    field when the scan ends. Only the derived <em>addresses</em> — which are
+    public — are sent to the block explorers. There is no signing code in this
+    file at all, so it cannot move anything even if it wanted to.
+    <br><br>
+    <strong>Read this before you paste anything.</strong> A page asking for a
+    recovery phrase is the oldest theft on the internet, and being told it is
+    safe is exactly what a fake would say. Open this file from your own disk,
+    not from a link somebody sent you. Check the URL bar says
+    <span class="mono">file://</span>. If you want to be certain, search this
+    file for <span class="mono">fetch(</span> — every one goes to a block
+    explorer with an address, and none carries a key.
+    <br><br>
+    <strong>Prefer not to?</strong> Then don't. Run
+    <span class="mono">harness/bns/addresses.mjs</span> in a terminal, paste the
+    addresses it prints into <span class="mono">inventory.html</span>, and this
+    page has nothing you need.
+  </div>
+
+  <div class="panel">
+    <label for="secret">Recovery phrase, or a single private key</label>
+    <textarea id="secret" spellcheck="false" autocomplete="off" autocapitalize="off"
+      style="min-height:4.5rem"
+      placeholder="twelve or twenty-four lowercase words, separated by spaces&#10;&#10;or one private key: 64 hex characters"></textarea>
+    <p class="hint">
+      A phrase is scanned account by account until it finds
+      <span id="gap-label">20</span> empty ones in a row — the standard gap
+      limit — so a wallet with a used account at number 63 is still found. A
+      single private key is one keypair with no tree beneath it, so there is
+      nothing to scan and it checks that one account.
+    </p>
+    <div class="row">
+      <button id="scan" class="primary" type="button">Scan</button>
+      <button id="stop-scan" type="button" disabled>Stop</button>
+      <button id="forget" type="button">Forget the phrase</button>
+      <label class="hint" style="display:flex;align-items:center;gap:.4rem;font-weight:400">
+        <input type="checkbox" id="keep-empty"> keep empty accounts in the list
+      </label>
+    </div>
+    <p class="status" id="scan-status">Nothing entered.</p>
+  </div>
+
+  <div class="panel">
+    <label for="addresses">Addresses, one per line</label>
+    <textarea id="addresses" spellcheck="false"
+      placeholder="SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7&#10;SP3XCSEFE1F63CP3BEYNK1B1CTQ3HV5CWGCE7WB4P&#10;&#10;Paste the owner column from check-names.mjs, or the addresses from a rescue dry run."></textarea>
+    <p class="hint">
+      Anything that is not an <span class="mono">SP…</span> / <span class="mono">SM…</span>
+      principal is ignored, so you can paste a whole table and let it pick the addresses out.
+      <strong>Hover a token</strong> for its amount and full contract;
+      <strong>click "N more"</strong> on tokens or NFTs to expand the rest.
+      The address is shortened — hover it for the full principal, and the saved
+      snapshot always keeps it in full.
+      Both are kept off screen so four hundred rows stay scannable.
+      sBTC, xBTC, aeUSDC and USDC get their own columns and are matched on the
+      exact contract, never the symbol — several tokens on Stacks claim the
+      <span class="mono">sBTC</span> symbol and are not it.
+    </p>
+
+    <label for="apikey" style="margin-top:1rem">Hiro API key (optional)</label>
+    <input id="apikey" type="password" autocomplete="off" spellcheck="false" placeholder="blank is fine for a few wallets">
+    <p class="hint">
+      Kept in this tab only — never stored, never sent anywhere but api.hiro.so.
+      Without one you get roughly fifty requests a minute shared with everything
+      else on your connection, which is enough for a handful of wallets and not
+      for sixty. Each wallet costs two requests, plus one per BNS name.
+    </p>
+
+    <div class="row">
+      <button id="run" class="primary" type="button">Take inventory</button>
+      <button id="stop" type="button" disabled>Stop</button>
+      <button id="save" type="button" disabled>Save snapshot</button>
+      <button id="retry" type="button" hidden>Retry failed</button>
+      <button id="resume" type="button" hidden>Resume from snapshot</button>
+      <button id="load" type="button">Load snapshot to compare</button>
+      <input id="file" type="file" accept="application/json" hidden>
+    </div>
+    <div class="bar"><i id="progress"></i></div>
+    <p class="status" id="status">Ready.</p>
+  </div>
+
+  <div id="totals" class="panel" hidden>
+    <div class="totals" style="align-items:flex-start">
+      <div>wallets<b id="t-wallets">0</b></div>
+      <div>STX<b id="t-stx">0</b></div>
+      <div id="t-headline-wrap"></div>
+      <div id="t-btc"></div>
+      <div id="t-sources"></div>
+      <div>BNS names<b id="t-bns">0</b></div>
+      <div>other NFTs<b id="t-nft">0</b></div>
+      <div>token types<b id="t-ft">0</b></div>
+    </div>
+  </div>
+
+  <p class="status warn" id="t-stale" style="display:none"></p>
+
+  <div id="diff-panel" class="panel" hidden>
+    <h2 style="margin-top:0">Against the saved snapshot</h2>
+    <div id="diff"></div>
+  </div>
+
+  <div id="results" class="scroll"></div>
+  <!-- Filled by `addresses.mjs --canary`. Absent means no Bitcoin column, which
+       is the right default: without the pairing this page cannot know which
+       bc1 address belongs to which principal, and guessing one would be worse
+       than omitting it. -->
+  <script type="application/json" id="btc-pairs">{}</script>
+  <!-- Which seed reached each address, also filled by `--canary`. An address
+       that is NOT in here was found some other way - a name owner the seeds
+       cannot derive - and saying so is the point rather than a gap. -->
+  <script type="application/json" id="address-sources">{}</script>
+</main>
+
+))throw new Error("Not a c32-encoded string");let r=t.match(`^${Y.c32[0]}*`),n=r?r[0].length:0,o=[],s=0,i=0;for(let d=t.length-1;d>=0;d--){i===4&&(o.unshift(Rt[s]),i=0,s=0);let f=(Y.c32.indexOf(t[d])<<i)+s,h=Rt[f%16];if(i+=1,s=f>>4,s>1<<i)throw new Error("Panic error in decoding.");o.unshift(h)}o.unshift(Rt[s]),o.length%2===1&&o.unshift("0");let c=0;for(let d=0;d<o.length&&o[d]==="0";d++)c++;o=o.slice(c-c%2);let a=o.join("");for(let d=0;d<n;d++)a=`00${a}`;if(e){let d=e*2-a.length;for(let l=0;l<d;l+=2)a=`00${a}`}return a}Y.c32decode=Wa});var fi=ie(X=>{"use strict";Object.defineProperty(X,"__esModule",{value:!0});X.output=X.exists=X.hash=X.bytes=X.bool=X.number=void 0;function Br(t){if(!Number.isSafeInteger(t)||t<0)throw new Error(`Wrong positive integer: ${t}`)}X.number=Br;function si(t){if(typeof t!="boolean")throw new Error(`Expected boolean, not ${t}`)}X.bool=si;function Pn(t,...e){if(!(t instanceof Uint8Array))throw new TypeError("Expected Uint8Array");if(e.length>0&&!e.includes(t.length))throw new TypeError(`Expected Uint8Array of length ${e}, not of length=${t.length}`)}X.bytes=Pn;function ii(t){if(typeof t!="function"||typeof t.create!="function")throw new Error("Hash should be wrapped by utils.wrapConstructor");Br(t.outputLen),Br(t.blockLen)}X.hash=ii;function ci(t,e=!0){if(t.destroyed)throw new Error("Hash instance has been destroyed");if(e&&t.finished)throw new Error("Hash#digest() has already been called")}X.exists=ci;function ai(t,e){Pn(t);let r=e.outputLen;if(t.length<r)throw new Error(`digestInto() expects output buffer of length at least ${r}`)}X.output=ai;var Ga={number:Br,bool:si,bytes:Pn,hash:ii,exists:ci,output:ai};X.default=Ga});var di=ie(vr=>{"use strict";Object.defineProperty(vr,"__esModule",{value:!0});vr.SHA2=void 0;var Wn=fi(),Ft=Xe();function Za(t,e,r,n){if(typeof t.setBigUint64=="function")return t.setBigUint64(e,r,n);let o=BigInt(32),s=BigInt(4294967295),i=Number(r>>o&s),c=Number(r&s),a=n?4:0,d=n?0:4;t.setUint32(e+a,i,n),t.setUint32(e+d,c,n)}var Gn=class extends Ft.Hash{constructor(e,r,n,o){super(),this.blockLen=e,this.outputLen=r,this.padOffset=n,this.isLE=o,this.finished=!1,this.length=0,this.pos=0,this.destroyed=!1,this.buffer=new Uint8Array(e),this.view=(0,Ft.createView)(this.buffer)}update(e){Wn.default.exists(this);let{view:r,buffer:n,blockLen:o}=this;e=(0,Ft.toBytes)(e);let s=e.length;for(let i=0;i<s;){let c=Math.min(o-this.pos,s-i);if(c===o){let a=(0,Ft.createView)(e);for(;o<=s-i;i+=o)this.process(a,i);continue}n.set(e.subarray(i,i+c),this.pos),this.pos+=c,i+=c,this.pos===o&&(this.process(r,0),this.pos=0)}return this.length+=e.length,this.roundClean(),this}digestInto(e){Wn.default.exists(this),Wn.default.output(e,this),this.finished=!0;let{buffer:r,view:n,blockLen:o,isLE:s}=this,{pos:i}=this;r[i++]=128,this.buffer.subarray(i).fill(0),this.padOffset>o-i&&(this.process(n,0),i=0);for(let f=i;f<o;f++)r[f]=0;Za(n,o-8,BigInt(this.length*8),s),this.process(n,0);let c=(0,Ft.createView)(e),a=this.outputLen;if(a%4)throw new Error("_sha2: outputLen should be aligned to 32bit");let d=a/4,l=this.get();if(d>l.length)throw new Error("_sha2: outputLen bigger than state");for(let f=0;f<d;f++)c.setUint32(4*f,l[f],s)}digest(){let{buffer:e,outputLen:r}=this;this.digestInto(e);let n=e.slice(0,r);return this.destroy(),n}_cloneInto(e){e||(e=new this.constructor),e.set(...this.get());let{blockLen:r,buffer:n,length:o,finished:s,destroyed:i,pos:c}=this;return e.length=o,e.pos=c,e.finished=s,e.destroyed=i,o%r&&e.buffer.set(n),e}};vr.SHA2=Gn});var Vn=ie(lt=>{"use strict";Object.defineProperty(lt,"__esModule",{value:!0});lt.sha224=lt.sha256=void 0;var Va=di(),se=Xe(),Ya=(t,e,r)=>t&e^~t&r,Xa=(t,e,r)=>t&e^t&r^e&r,Ja=new Uint32Array([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),Ke=new Uint32Array([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]),qe=new Uint32Array(64),Ar=class extends Va.SHA2{constructor(){super(64,32,8,!1),this.A=Ke[0]|0,this.B=Ke[1]|0,this.C=Ke[2]|0,this.D=Ke[3]|0,this.E=Ke[4]|0,this.F=Ke[5]|0,this.G=Ke[6]|0,this.H=Ke[7]|0}get(){let{A:e,B:r,C:n,D:o,E:s,F:i,G:c,H:a}=this;return[e,r,n,o,s,i,c,a]}set(e,r,n,o,s,i,c,a){this.A=e|0,this.B=r|0,this.C=n|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=a|0}process(e,r){for(let f=0;f<16;f++,r+=4)qe[f]=e.getUint32(r,!1);for(let f=16;f<64;f++){let h=qe[f-15],u=qe[f-2],p=(0,se.rotr)(h,7)^(0,se.rotr)(h,18)^h>>>3,b=(0,se.rotr)(u,17)^(0,se.rotr)(u,19)^u>>>10;qe[f]=b+qe[f-7]+p+qe[f-16]|0}let{A:n,B:o,C:s,D:i,E:c,F:a,G:d,H:l}=this;for(let f=0;f<64;f++){let h=(0,se.rotr)(c,6)^(0,se.rotr)(c,11)^(0,se.rotr)(c,25),u=l+h+Ya(c,a,d)+Ja[f]+qe[f]|0,b=((0,se.rotr)(n,2)^(0,se.rotr)(n,13)^(0,se.rotr)(n,22))+Xa(n,o,s)|0;l=d,d=a,a=c,c=i+u|0,i=s,s=o,o=n,n=u+b|0}n=n+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,a=a+this.F|0,d=d+this.G|0,l=l+this.H|0,this.set(n,o,s,i,c,a,d,l)}roundClean(){qe.fill(0)}destroy(){this.set(0,0,0,0,0,0,0,0),this.buffer.fill(0)}},Zn=class extends Ar{constructor(){super(),this.A=-1056596264,this.B=914150663,this.C=812702999,this.D=-150054599,this.E=-4191439,this.F=1750603025,this.G=1694076839,this.H=-1090891868,this.outputLen=28}};lt.sha256=(0,se.wrapConstructor)(()=>new Ar);lt.sha224=(0,se.wrapConstructor)(()=>new Zn)});var Yn=ie(ht=>{"use strict";Object.defineProperty(ht,"__esModule",{value:!0});ht.c32checkDecode=ht.c32checkEncode=void 0;var ui=Vn(),li=Xe(),Dt=zn();function hi(t){let e=(0,ui.sha256)((0,ui.sha256)((0,li.hexToBytes)(t)));return(0,li.bytesToHex)(e.slice(0,4))}function Qa(t,e){if(t<0||t>=32)throw new Error("Invalid version (must be between 0 and 31)");if(!e.match(/^[0-9a-fA-F]*$/))throw new Error("Invalid data (not a hex string)");e=e.toLowerCase(),e.length%2!==0&&(e=`0${e}`);let r=t.toString(16);r.length===1&&(r=`0${r}`);let n=hi(`${r}${e}`),o=(0,Dt.c32encode)(`${e}${n}`);return`${Dt.c32[t]}${o}`}ht.c32checkEncode=Qa;function e0(t){t=(0,Dt.c32normalize)(t);let e=(0,Dt.c32decode)(t.slice(1)),r=t[0],n=Dt.c32.indexOf(r),o=e.slice(-8),s=n.toString(16);if(s.length===1&&(s=`0${s}`),hi(`${s}${e.substring(0,e.length-8)}`)!==o)throw new Error("Invalid c32check string: checksum mismatch");return[n,e.substring(0,e.length-8)]}ht.c32checkDecode=e0});var bi=ie((sd,pi)=>{"use strict";function t0(t){if(t.length>=255)throw new TypeError("Alphabet too long");for(var e=new Uint8Array(256),r=0;r<e.length;r++)e[r]=255;for(var n=0;n<t.length;n++){var o=t.charAt(n),s=o.charCodeAt(0);if(e[s]!==255)throw new TypeError(o+" is ambiguous");e[s]=n}var i=t.length,c=t.charAt(0),a=Math.log(i)/Math.log(256),d=Math.log(256)/Math.log(i);function l(u){if(u instanceof Uint8Array||(ArrayBuffer.isView(u)?u=new Uint8Array(u.buffer,u.byteOffset,u.byteLength):Array.isArray(u)&&(u=Uint8Array.from(u))),!(u instanceof Uint8Array))throw new TypeError("Expected Uint8Array");if(u.length===0)return"";for(var p=0,b=0,y=0,E=u.length;y!==E&&u[y]===0;)y++,p++;for(var A=(E-y)*d+1>>>0,g=new Uint8Array(A);y!==E;){for(var _=u[y],S=0,F=A-1;(_!==0||S<b)&&F!==-1;F--,S++)_+=256*g[F]>>>0,g[F]=_%i>>>0,_=_/i>>>0;if(_!==0)throw new Error("Non-zero carry");b=S,y++}for(var j=A-b;j!==A&&g[j]===0;)j++;for(var R=c.repeat(p);j<A;++j)R+=t.charAt(g[j]);return R}function f(u){if(typeof u!="string")throw new TypeError("Expected String");if(u.length===0)return new Uint8Array;for(var p=0,b=0,y=0;u[p]===c;)b++,p++;for(var E=(u.length-p)*a+1>>>0,A=new Uint8Array(E);u[p];){var g=u.charCodeAt(p);if(g>255)return;var _=e[g];if(_===255)return;for(var S=0,F=E-1;(_!==0||S<y)&&F!==-1;F--,S++)_+=i*A[F]>>>0,A[F]=_%256>>>0,_=_/256>>>0;if(_!==0)throw new Error("Non-zero carry");y=S,p++}for(var j=E-y;j!==E&&A[j]===0;)j++;for(var R=new Uint8Array(b+(E-j)),$=b;j!==E;)R[$++]=A[j++];return R}function h(u){var p=f(u);if(p)return p;throw new Error("Non-base"+i+" character")}return{encode:l,decodeUnsafe:f,decode:h}}pi.exports=t0});var wi=ie(pt=>{"use strict";Object.defineProperty(pt,"__esModule",{value:!0});pt.decode=pt.encode=void 0;var kr=Vn(),xi=Xe(),yi=bi(),gi="123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";function r0(t,e="00"){let r=typeof t=="string"?(0,xi.hexToBytes)(t):t,n=typeof e=="string"?(0,xi.hexToBytes)(e):t;if(!(r instanceof Uint8Array)||!(n instanceof Uint8Array))throw new TypeError("Argument must be of type Uint8Array or string");let o=(0,kr.sha256)((0,kr.sha256)(new Uint8Array([...n,...r])));return yi(gi).encode([...n,...r,...o.slice(0,4)])}pt.encode=r0;function n0(t){let e=yi(gi).decode(t),r=e.slice(0,1),n=e.slice(1,-4),o=(0,kr.sha256)((0,kr.sha256)(new Uint8Array([...r,...n])));return e.slice(-4).forEach((s,i)=>{if(s!==o[i])throw new Error("Invalid checksum")}),{prefix:r,data:n}}pt.decode=n0});var ki=ie(W=>{"use strict";Object.defineProperty(W,"__esModule",{value:!0});W.c32ToB58=W.b58ToC32=W.c32addressDecode=W.c32address=W.versions=void 0;var Ei=Yn(),Bi=wi(),mi=Xe();W.versions={mainnet:{p2pkh:22,p2sh:20},testnet:{p2pkh:26,p2sh:21}};var bt={};bt[0]=W.versions.mainnet.p2pkh;bt[5]=W.versions.mainnet.p2sh;bt[111]=W.versions.testnet.p2pkh;bt[196]=W.versions.testnet.p2sh;var xt={};xt[W.versions.mainnet.p2pkh]=0;xt[W.versions.mainnet.p2sh]=5;xt[W.versions.testnet.p2pkh]=111;xt[W.versions.testnet.p2sh]=196;function vi(t,e){if(!e.match(/^[0-9a-fA-F]{40}$/))throw new Error("Invalid argument: not a hash160 hex string");return`S${(0,Ei.c32checkEncode)(t,e)}`}W.c32address=vi;function Ai(t){if(t.length<=5)throw new Error("Invalid c32 address: invalid length");if(t[0]!="S")throw new Error('Invalid c32 address: must start with "S"');return(0,Ei.c32checkDecode)(t.slice(1))}W.c32addressDecode=Ai;function o0(t,e=-1){let r=Bi.decode(t),n=(0,mi.bytesToHex)(r.data),o=parseInt((0,mi.bytesToHex)(r.prefix),16),s;return e<0?(s=o,bt[o]!==void 0&&(s=bt[o])):s=e,vi(s,n)}W.b58ToC32=o0;function s0(t,e=-1){let r=Ai(t),n=r[0],o=r[1],s;e<0?(s=n,xt[n]!==void 0&&(s=xt[n])):s=e;let i=s.toString(16);return i.length===1&&(i=`0${i}`),Bi.encode(o,i)}W.c32ToB58=s0});var Ti=ie(z=>{"use strict";Object.defineProperty(z,"__esModule",{value:!0});z.b58ToC32=z.c32ToB58=z.versions=z.c32normalize=z.c32addressDecode=z.c32address=z.c32checkDecode=z.c32checkEncode=z.c32decode=z.c32encode=void 0;var Xn=zn();Object.defineProperty(z,"c32encode",{enumerable:!0,get:function(){return Xn.c32encode}});Object.defineProperty(z,"c32decode",{enumerable:!0,get:function(){return Xn.c32decode}});Object.defineProperty(z,"c32normalize",{enumerable:!0,get:function(){return Xn.c32normalize}});var Si=Yn();Object.defineProperty(z,"c32checkEncode",{enumerable:!0,get:function(){return Si.c32checkEncode}});Object.defineProperty(z,"c32checkDecode",{enumerable:!0,get:function(){return Si.c32checkDecode}});var jt=ki();Object.defineProperty(z,"c32address",{enumerable:!0,get:function(){return jt.c32address}});Object.defineProperty(z,"c32addressDecode",{enumerable:!0,get:function(){return jt.c32addressDecode}});Object.defineProperty(z,"c32ToB58",{enumerable:!0,get:function(){return jt.c32ToB58}});Object.defineProperty(z,"b58ToC32",{enumerable:!0,get:function(){return jt.b58ToC32}});Object.defineProperty(z,"versions",{enumerable:!0,get:function(){return jt.versions}})});var u0={};$i(u0,{BTC_PATH:()=>Ui,STACKS_PATHS:()=>Li,accountsFrom:()=>d0,btcAddress:()=>Qn,isPhrase:()=>f0,isRawKey:()=>Oi,stacksAddress:()=>Jn});function ro(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"&&"BYTES_PER_ELEMENT"in t&&t.BYTES_PER_ELEMENT===1}var Tr=t=>t?`"${t}" `:"";function ke(t,e=""){if(typeof t!="number")throw new TypeError(Tr(e)+"expected number, got "+typeof t);if(!Number.isSafeInteger(t)||t<0)throw new RangeError(Tr(e)+"expected integer >= 0, got "+t);return t}function Se(t,e,r=""){if(ro(t)&&(e===void 0||t.length===e))return t;e!==void 0&&ke(e,"length");let n=ro(t),o=e!==void 0?` of length ${e}`:"",s=n?`length=${t.length}`:`type=${typeof t}`,i=Tr(r)+"expected Uint8Array"+o+", got "+s;throw n?new RangeError(i):new TypeError(i)}function Mt(t){if(typeof t!="function"||typeof t.create!="function")throw new TypeError("expected hash wrapped by utils.createHasher");if(ke(t.outputLen),ke(t.blockLen),t.outputLen<1||t.blockLen<1)throw new Error("hash blockLen / outputLen must be >= 1")}var no=(t,e)=>{if(t===null||typeof t!="object"||Array.isArray(t))throw new TypeError((e==="object"?"":`"${e}" `)+"expected object, got type="+typeof t)};function Qe(t,e=!0){if(t.destroyed)throw new Error("hash was destroyed");if(e&&t.finished)throw new Error("digest() was already called")}function $t(t,e){Se(t,void 0,"output");let r=e.outputLen;if(!(t.length>=r))throw new RangeError('"output" expected length >= '+r)}function we(...t){for(let e=0;e<t.length;e++)t[e].fill(0)}function et(t){return new DataView(t.buffer,t.byteOffset,t.byteLength)}function ce(t,e){return t<<32-e|t>>>e}function zi(t){if(typeof t!="string")throw new TypeError("string expected");return new Uint8Array(new TextEncoder().encode(t))}function _r(t,e=""){return typeof t=="string"?zi(t):Se(t,void 0,e)}function Hr(t,e,r="opts"){return no(t,"defaults"),e!==void 0&&no(e,r),Object.assign(t,e)}function Lr(t,e={}){if(typeof t!="function")throw new TypeError('"hashCons" expected function, got type='+typeof t);e=Hr({},e,"info");let r=(o,s)=>t(s).update(o).digest(),n=t(void 0);return r.outputLen=n.outputLen,r.blockLen=n.blockLen,r.canXOF=n.canXOF,r.create=o=>t(o),Object.assign(r,e),Object.freeze(r)}var Ur=t=>({oid:Uint8Array.from([6,9,96,134,72,1,101,3,4,2,t])});var Kt=class{oHash;iHash;blockLen;outputLen;canXOF=!1;finished=!1;destroyed=!1;constructor(e,r){if(Mt(e),Se(r,void 0,"key"),this.iHash=e.create(),typeof this.iHash.update!="function")throw new Error("expected Hash instance");this.blockLen=this.iHash.blockLen,this.outputLen=this.iHash.outputLen;let n=this.blockLen,o=new Uint8Array(n);o.set(r.length>n?e.create().update(r).digest():r);for(let s=0;s<o.length;s++)o[s]^=54;this.iHash.update(o),this.oHash=e.create();for(let s=0;s<o.length;s++)o[s]^=106;this.oHash.update(o),we(o)}update(e){return Qe(this),this.iHash.update(e),this}digestInto(e){Qe(this),$t(e,this),this.finished=!0;let r=e.subarray(0,this.outputLen);this.iHash.digestInto(r),this.oHash.update(r),this.oHash.digestInto(r),this.destroy()}digest(){let e=new Uint8Array(this.oHash.outputLen);return this.digestInto(e),e}_cloneInto(e){e||=Object.create(Object.getPrototypeOf(this),{});let{oHash:r,iHash:n,finished:o,destroyed:s,blockLen:i,outputLen:c,canXOF:a}=this;return e=e,e.finished=o,e.destroyed=s,e.blockLen=i,e.outputLen=c,e.canXOF=a,e.oHash=r._cloneInto(e.oHash),e.iHash=n._cloneInto(e.iHash),e}clone(){return this._cloneInto()}destroy(){this.destroyed=!0,this.oHash.destroy(),this.iHash.destroy()}},oo=(()=>{let t=((e,r,n)=>new Kt(e,r).update(n).digest());return t.create=(e,r)=>new Kt(e,r),t})();function Pi(t,e,r,n){Mt(t);let o=Hr({dkLen:32,asyncTick:10},n),{c:s,dkLen:i,asyncTick:c}=o;if(ke(s,"c"),ke(i,"dkLen"),ke(c,"asyncTick"),s<1)throw new Error('"c" (iterations) must be >= 1');if(i<1)throw new Error('"dkLen" must be >= 1');if(i>(2**32-1)*t.outputLen)throw new Error("derived key too long");let a=_r(e,"password"),d=_r(r,"salt"),l=new Uint8Array(i),{iHash:f,oHash:h,outputLen:u}=oo.create(t,a),p=new Uint8Array(u),b=Wi(f,h,d,p);return{c:s,dkLen:i,asyncTick:c,DK:l,outputLen:u,eng:b}}function Wi(t,e,r,n){let o=new Uint8Array(4),s=et(o),i=t._cloneInto().update(r),c=e._cloneInto(),a=t._cloneInto,d=e._cloneInto;return{u1:(l,f)=>{s.setInt32(0,l,!1),i._cloneInto(c).update(o).digestInto(n),e._cloneInto(c).update(n).digestInto(n),f.set(n.subarray(0,f.length))},rounds:(l,f)=>{for(let h=1;h<l;h++){a.call(t,c).update(n).digestInto(n),d.call(e,c).update(n).digestInto(n);for(let u=0;u<f.length;u++)f[u]^=n[u]}},output:l=>(t.destroy(),e.destroy(),i.destroy(),c.destroy(),we(n),l)}}function so(t,e,r,n){let{c:o,dkLen:s,DK:i,outputLen:c,eng:a}=Pi(t,e,r,n);for(let d=1,l=0;l<s;d++,l+=c){let f=i.subarray(l,l+c);a.u1(d,f),a.rounds(o,f)}return a.output(i)}var qt=BigInt(4294967295),io=BigInt(32);function Gi(t,e=!1){return e?{h:Number(t&qt),l:Number(t>>io&qt)}:{h:Number(t>>io&qt)|0,l:Number(t&qt)|0}}function co(t,e=!1){let r=t.length,n=new Uint32Array(r),o=new Uint32Array(r);for(let s=0;s<r;s++){let{h:i,l:c}=Gi(t[s],e);[n[s],o[s]]=[i,c]}return[n,o]}var Zi=t=>t/2**32|0,Vi=t=>t>>>0;function ao(t,e,r,n){let o=Zi(r),s=Vi(r);t.setUint32(e,n?s:o,n),t.setUint32(e+4,n?o:s,n)}var Or=(t,e,r)=>t>>>r,Cr=(t,e,r)=>t<<32-r|e>>>r,ze=(t,e,r)=>t>>>r|e<<32-r,Pe=(t,e,r)=>t<<32-r|e>>>r,wt=(t,e,r)=>t<<64-r|e>>>r-32,mt=(t,e,r)=>t>>>r-32|e<<64-r;function he(t,e,r,n){let o=(e>>>0)+(n>>>0);return{h:t+r+(o/2**32|0)|0,l:o|0}}var fo=(t,e,r)=>(t>>>0)+(e>>>0)+(r>>>0),uo=(t,e,r,n)=>e+r+n+(t/2**32|0)|0,lo=(t,e,r,n)=>(t>>>0)+(e>>>0)+(r>>>0)+(n>>>0),ho=(t,e,r,n,o)=>e+r+n+o+(t/2**32|0)|0,po=(t,e,r,n,o)=>(t>>>0)+(e>>>0)+(r>>>0)+(n>>>0)+(o>>>0),bo=(t,e,r,n,o,s)=>e+r+n+o+s+(t/2**32|0)|0;function xo(t,e,r){return t&e^~t&r}function yo(t,e,r){return t&e^t&r^e&r}var Et=class{blockLen;outputLen;canXOF=!1;padOffset;isLE;buffer;view;finished=!1;length=0;pos=0;destroyed=!1;constructor(e,r,n,o){this.blockLen=e,this.outputLen=r,this.padOffset=n,this.isLE=o,this.buffer=new Uint8Array(e),this.view=et(this.buffer)}update(e){Qe(this),Se(e);let{view:r,buffer:n,blockLen:o}=this,s=e.length,i=!1;for(let c=0;c<s;){let a=Math.min(o-this.pos,s-c);if(a===o){let d=et(e);for(;o<=s-c;c+=o)this.process(d,c);i=!0;continue}n.set(c===0&&a===s?e:e.subarray(c,c+a),this.pos),this.pos+=a,c+=a,this.pos===o&&(this.process(r,0),this.pos=0,i=!0)}return this.length+=e.length,i&&this.roundClean(),this}digestInto(e){Qe(this),$t(e,this),this.finished=!0;let{buffer:r,view:n,blockLen:o,isLE:s}=this,{pos:i}=this;r[i++]=128,r.fill(0,i),this.padOffset>o-i&&(this.process(n,0),r.fill(0)),ao(n,o-8,this.length*8,s),this.process(n,0),this.roundClean();let c=e===r?n:et(e),a=this.outputLen,d=a/4,l=this.get();if(a%4||d>l.length)throw new Error("invalid outputLen");for(let f=0;f<d;f++)c.setUint32(4*f,l[f],s)}digest(){let{buffer:e,outputLen:r}=this;this.digestInto(e);let n=e.slice(0,r);return this.destroy(),n}_cloneIntoMeta(e){let{buffer:r,length:n,finished:o,destroyed:s,pos:i}=this;return e.destroyed=s,e.finished=o,e.length=n,e.pos=i,i&&e.buffer.set(r),e}clone(){return this._cloneInto()}},go=Uint32Array.from([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]);var wo=Uint32Array.from([1779033703,4089235720,3144134277,2227873595,1013904242,4271175723,2773480762,1595750129,1359893119,2917565137,2600822924,725511199,528734635,4215389547,1541459225,327033209]);var Xi=Uint32Array.from([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),Te=new Uint32Array(64),Ir=class extends Et{A=0;B=0;C=0;D=0;E=0;F=0;G=0;H=0;constructor(e,r){super(64,e,8,!1),this.A=r[0]|0,this.B=r[1]|0,this.C=r[2]|0,this.D=r[3]|0,this.E=r[4]|0,this.F=r[5]|0,this.G=r[6]|0,this.H=r[7]|0}get(){let{A:e,B:r,C:n,D:o,E:s,F:i,G:c,H:a}=this;return[e,r,n,o,s,i,c,a]}set(e,r,n,o,s,i,c,a){this.A=e|0,this.B=r|0,this.C=n|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=a|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let f=0;f<16;f++,r+=4)Te[f]=e.getUint32(r,!1);for(let f=16;f<64;f++){let h=Te[f-15],u=Te[f-2],p=ce(h,7)^ce(h,18)^h>>>3,b=ce(u,17)^ce(u,19)^u>>>10;Te[f]=b+Te[f-7]+p+Te[f-16]|0}let{A:n,B:o,C:s,D:i,E:c,F:a,G:d,H:l}=this;for(let f=0;f<64;f++){let h=ce(c,6)^ce(c,11)^ce(c,25),u=l+h+xo(c,a,d)+Xi[f]+Te[f]|0,b=(ce(n,2)^ce(n,13)^ce(n,22))+yo(n,o,s)|0;l=d,d=a,a=c,c=i+u|0,i=s,s=o,o=n,n=u+b|0}n=n+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,a=a+this.F|0,d=d+this.G|0,l=l+this.H|0,this.set(n,o,s,i,c,a,d,l)}roundClean(){we(Te)}destroy(){this.destroyed=!0,this.set(0,0,0,0,0,0,0,0),we(this.buffer)}},Rr=class extends Ir{constructor(){super(32,go)}};var mo=co(["0x428a2f98d728ae22","0x7137449123ef65cd","0xb5c0fbcfec4d3b2f","0xe9b5dba58189dbbc","0x3956c25bf348b538","0x59f111f1b605d019","0x923f82a4af194f9b","0xab1c5ed5da6d8118","0xd807aa98a3030242","0x12835b0145706fbe","0x243185be4ee4b28c","0x550c7dc3d5ffb4e2","0x72be5d74f27b896f","0x80deb1fe3b1696b1","0x9bdc06a725c71235","0xc19bf174cf692694","0xe49b69c19ef14ad2","0xefbe4786384f25e3","0x0fc19dc68b8cd5b5","0x240ca1cc77ac9c65","0x2de92c6f592b0275","0x4a7484aa6ea6e483","0x5cb0a9dcbd41fbd4","0x76f988da831153b5","0x983e5152ee66dfab","0xa831c66d2db43210","0xb00327c898fb213f","0xbf597fc7beef0ee4","0xc6e00bf33da88fc2","0xd5a79147930aa725","0x06ca6351e003826f","0x142929670a0e6e70","0x27b70a8546d22ffc","0x2e1b21385c26c926","0x4d2c6dfc5ac42aed","0x53380d139d95b3df","0x650a73548baf63de","0x766a0abb3c77b2a8","0x81c2c92e47edaee6","0x92722c851482353b","0xa2bfe8a14cf10364","0xa81a664bbc423001","0xc24b8b70d0f89791","0xc76c51a30654be30","0xd192e819d6ef5218","0xd69906245565a910","0xf40e35855771202a","0x106aa07032bbd1b8","0x19a4c116b8d2d0c8","0x1e376c085141ab53","0x2748774cdf8eeb99","0x34b0bcb5e19b48a8","0x391c0cb3c5c95a63","0x4ed8aa4ae3418acb","0x5b9cca4f7763e373","0x682e6ff3d6b2b8a3","0x748f82ee5defb2fc","0x78a5636f43172f60","0x84c87814a1f0ab72","0x8cc702081a6439ec","0x90befffa23631e28","0xa4506cebde82bde9","0xbef9a3f7b2c67915","0xc67178f2e372532b","0xca273eceea26619c","0xd186b8c721c0c207","0xeada7dd6cde0eb1e","0xf57d4f7fee6ed178","0x06f067aa72176fba","0x0a637dc5a2c898a6","0x113f9804bef90dae","0x1b710b35131c471b","0x28db77f523047d84","0x32caab7b40c72493","0x3c9ebe0a15c9bebc","0x431d67c49c100d4c","0x4cc5d4becb3e42b6","0x597f299cfc657e2a","0x5fcb6fab3ad6faec","0x6c44198c4a475817"].map(t=>BigInt(t))),Ji=mo[0],Qi=mo[1],_e=new Uint32Array(80),He=new Uint32Array(80),Fr=class extends Et{Ah=0;Al=0;Bh=0;Bl=0;Ch=0;Cl=0;Dh=0;Dl=0;Eh=0;El=0;Fh=0;Fl=0;Gh=0;Gl=0;Hh=0;Hl=0;constructor(e,r){super(128,e,16,!1),this.Ah=r[0]|0,this.Al=r[1]|0,this.Bh=r[2]|0,this.Bl=r[3]|0,this.Ch=r[4]|0,this.Cl=r[5]|0,this.Dh=r[6]|0,this.Dl=r[7]|0,this.Eh=r[8]|0,this.El=r[9]|0,this.Fh=r[10]|0,this.Fl=r[11]|0,this.Gh=r[12]|0,this.Gl=r[13]|0,this.Hh=r[14]|0,this.Hl=r[15]|0}get(){let{Ah:e,Al:r,Bh:n,Bl:o,Ch:s,Cl:i,Dh:c,Dl:a,Eh:d,El:l,Fh:f,Fl:h,Gh:u,Gl:p,Hh:b,Hl:y}=this;return[e,r,n,o,s,i,c,a,d,l,f,h,u,p,b,y]}set(e,r,n,o,s,i,c,a,d,l,f,h,u,p,b,y){this.Ah=e|0,this.Al=r|0,this.Bh=n|0,this.Bl=o|0,this.Ch=s|0,this.Cl=i|0,this.Dh=c|0,this.Dl=a|0,this.Eh=d|0,this.El=l|0,this.Fh=f|0,this.Fl=h|0,this.Gh=u|0,this.Gl=p|0,this.Hh=b|0,this.Hl=y|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let g=0;g<16;g++,r+=4)_e[g]=e.getUint32(r),He[g]=e.getUint32(r+=4);for(let g=16;g<80;g++){let _=_e[g-15]|0,S=He[g-15]|0,F=ze(_,S,1)^ze(_,S,8)^Or(_,S,7),j=Pe(_,S,1)^Pe(_,S,8)^Cr(_,S,7),R=_e[g-2]|0,$=He[g-2]|0,K=ze(R,$,19)^wt(R,$,61)^Or(R,$,6),Q=Pe(R,$,19)^mt(R,$,61)^Cr(R,$,6),L=lo(j,Q,He[g-7],He[g-16]),ee=ho(L,F,K,_e[g-7],_e[g-16]);_e[g]=ee|0,He[g]=L|0}let{Ah:n,Al:o,Bh:s,Bl:i,Ch:c,Cl:a,Dh:d,Dl:l,Eh:f,El:h,Fh:u,Fl:p,Gh:b,Gl:y,Hh:E,Hl:A}=this;for(let g=0;g<80;g++){let _=ze(f,h,14)^ze(f,h,18)^wt(f,h,41),S=Pe(f,h,14)^Pe(f,h,18)^mt(f,h,41),F=f&u^~f&b,j=h&p^~h&y,R=po(A,S,j,Qi[g],He[g]),$=bo(R,E,_,F,Ji[g],_e[g]),K=R|0,Q=ze(n,o,28)^wt(n,o,34)^wt(n,o,39),L=Pe(n,o,28)^mt(n,o,34)^mt(n,o,39),ee=n&s^n&c^s&c,te=o&i^o&a^i&a;E=b|0,A=y|0,b=u|0,y=p|0,u=f|0,p=h|0,{h:f,l:h}=he(d|0,l|0,$|0,K|0),d=c|0,l=a|0,c=s|0,a=i|0,s=n|0,i=o|0;let I=fo(K,L,te);n=uo(I,$,Q,ee),o=I|0}({h:n,l:o}=he(this.Ah|0,this.Al|0,n|0,o|0)),{h:s,l:i}=he(this.Bh|0,this.Bl|0,s|0,i|0),{h:c,l:a}=he(this.Ch|0,this.Cl|0,c|0,a|0),{h:d,l}=he(this.Dh|0,this.Dl|0,d|0,l|0),{h:f,l:h}=he(this.Eh|0,this.El|0,f|0,h|0),{h:u,l:p}=he(this.Fh|0,this.Fl|0,u|0,p|0),{h:b,l:y}=he(this.Gh|0,this.Gl|0,b|0,y|0),{h:E,l:A}=he(this.Hh|0,this.Hl|0,E|0,A|0),this.set(n,o,s,i,c,a,d,l,f,h,u,p,b,y,E,A)}roundClean(){we(_e,He)}destroy(){this.destroyed=!0,we(this.buffer),this.set(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)}},Dr=class extends Fr{constructor(){super(64,wo)}};var Eo=Lr(()=>new Rr,Ur(1));var Bo=Lr(()=>new Dr,Ur(3));function vo(t){if(typeof t!="string")throw new TypeError("invalid mnemonic type: "+typeof t);return t.normalize("NFKD")}function Ao(t){let e=vo(t),r=e.split(" ");if(![12,15,18,21,24].includes(r.length))throw new Error("Invalid mnemonic");return{nfkd:e,words:r}}function ec(t){if(Se(t),![16,20,24,28,32].includes(t.length))throw new RangeError("invalid entropy length")}var tc=t=>{let e=8-t.length/4;return Eo(t)[0]>>e<<e};function rc(t){if(!Array.isArray(t)||t.length!==2048||typeof t[0]!="string")throw new TypeError("Wordlist: expected array of 2048 strings");t.forEach(e=>{if(typeof e!="string")throw new TypeError("wordlist: non-string element: "+e)})}function nc(t,e){rc(e);let r=t.length/3*4,n=new Uint8Array(r+1),o=0,s=0,i=0;for(let a of t){let d=e.indexOf(a);if(d===-1)throw new Error("Unknown word: "+a);for(o=o<<11|d,s+=11;s>=8;)s-=8,n[i++]=o>>>s&255;o&=(1<<s)-1}s>0&&(n[i]=o<<8-s);let c=n.subarray(0,r);if(n[r]!==tc(c))throw new Error("Invalid checksum");return Uint8Array.from(c)}function oc(t,e){let{words:r}=Ao(t),n=nc(r,e);return ec(n),n}function jr(t,e){try{oc(t,e)}catch{return!1}return!0}var sc=t=>{if(typeof t!="string")throw new TypeError("invalid passphrase type: "+typeof t);return vo("mnemonic"+t)};function ko(t,e=""){return so(Bo,Ao(t).nfkd,sc(e),{c:2048,dkLen:64})}var Nr=Object.freeze(`abandon
+ability
+able
+about
+above
+absent
+absorb
+abstract
+absurd
+abuse
+access
+accident
+account
+accuse
+achieve
+acid
+acoustic
+acquire
+across
+act
+action
+actor
+actress
+actual
+adapt
+add
+addict
+address
+adjust
+admit
+adult
+advance
+advice
+aerobic
+affair
+afford
+afraid
+again
+age
+agent
+agree
+ahead
+aim
+air
+airport
+aisle
+alarm
+album
+alcohol
+alert
+alien
+all
+alley
+allow
+almost
+alone
+alpha
+already
+also
+alter
+always
+amateur
+amazing
+among
+amount
+amused
+analyst
+anchor
+ancient
+anger
+angle
+angry
+animal
+ankle
+announce
+annual
+another
+answer
+antenna
+antique
+anxiety
+any
+apart
+apology
+appear
+apple
+approve
+april
+arch
+arctic
+area
+arena
+argue
+arm
+armed
+armor
+army
+around
+arrange
+arrest
+arrive
+arrow
+art
+artefact
+artist
+artwork
+ask
+aspect
+assault
+asset
+assist
+assume
+asthma
+athlete
+atom
+attack
+attend
+attitude
+attract
+auction
+audit
+august
+aunt
+author
+auto
+autumn
+average
+avocado
+avoid
+awake
+aware
+away
+awesome
+awful
+awkward
+axis
+baby
+bachelor
+bacon
+badge
+bag
+balance
+balcony
+ball
+bamboo
+banana
+banner
+bar
+barely
+bargain
+barrel
+base
+basic
+basket
+battle
+beach
+bean
+beauty
+because
+become
+beef
+before
+begin
+behave
+behind
+believe
+below
+belt
+bench
+benefit
+best
+betray
+better
+between
+beyond
+bicycle
+bid
+bike
+bind
+biology
+bird
+birth
+bitter
+black
+blade
+blame
+blanket
+blast
+bleak
+bless
+blind
+blood
+blossom
+blouse
+blue
+blur
+blush
+board
+boat
+body
+boil
+bomb
+bone
+bonus
+book
+boost
+border
+boring
+borrow
+boss
+bottom
+bounce
+box
+boy
+bracket
+brain
+brand
+brass
+brave
+bread
+breeze
+brick
+bridge
+brief
+bright
+bring
+brisk
+broccoli
+broken
+bronze
+broom
+brother
+brown
+brush
+bubble
+buddy
+budget
+buffalo
+build
+bulb
+bulk
+bullet
+bundle
+bunker
+burden
+burger
+burst
+bus
+business
+busy
+butter
+buyer
+buzz
+cabbage
+cabin
+cable
+cactus
+cage
+cake
+call
+calm
+camera
+camp
+can
+canal
+cancel
+candy
+cannon
+canoe
+canvas
+canyon
+capable
+capital
+captain
+car
+carbon
+card
+cargo
+carpet
+carry
+cart
+case
+cash
+casino
+castle
+casual
+cat
+catalog
+catch
+category
+cattle
+caught
+cause
+caution
+cave
+ceiling
+celery
+cement
+census
+century
+cereal
+certain
+chair
+chalk
+champion
+change
+chaos
+chapter
+charge
+chase
+chat
+cheap
+check
+cheese
+chef
+cherry
+chest
+chicken
+chief
+child
+chimney
+choice
+choose
+chronic
+chuckle
+chunk
+churn
+cigar
+cinnamon
+circle
+citizen
+city
+civil
+claim
+clap
+clarify
+claw
+clay
+clean
+clerk
+clever
+click
+client
+cliff
+climb
+clinic
+clip
+clock
+clog
+close
+cloth
+cloud
+clown
+club
+clump
+cluster
+clutch
+coach
+coast
+coconut
+code
+coffee
+coil
+coin
+collect
+color
+column
+combine
+come
+comfort
+comic
+common
+company
+concert
+conduct
+confirm
+congress
+connect
+consider
+control
+convince
+cook
+cool
+copper
+copy
+coral
+core
+corn
+correct
+cost
+cotton
+couch
+country
+couple
+course
+cousin
+cover
+coyote
+crack
+cradle
+craft
+cram
+crane
+crash
+crater
+crawl
+crazy
+cream
+credit
+creek
+crew
+cricket
+crime
+crisp
+critic
+crop
+cross
+crouch
+crowd
+crucial
+cruel
+cruise
+crumble
+crunch
+crush
+cry
+crystal
+cube
+culture
+cup
+cupboard
+curious
+current
+curtain
+curve
+cushion
+custom
+cute
+cycle
+dad
+damage
+damp
+dance
+danger
+daring
+dash
+daughter
+dawn
+day
+deal
+debate
+debris
+decade
+december
+decide
+decline
+decorate
+decrease
+deer
+defense
+define
+defy
+degree
+delay
+deliver
+demand
+demise
+denial
+dentist
+deny
+depart
+depend
+deposit
+depth
+deputy
+derive
+describe
+desert
+design
+desk
+despair
+destroy
+detail
+detect
+develop
+device
+devote
+diagram
+dial
+diamond
+diary
+dice
+diesel
+diet
+differ
+digital
+dignity
+dilemma
+dinner
+dinosaur
+direct
+dirt
+disagree
+discover
+disease
+dish
+dismiss
+disorder
+display
+distance
+divert
+divide
+divorce
+dizzy
+doctor
+document
+dog
+doll
+dolphin
+domain
+donate
+donkey
+donor
+door
+dose
+double
+dove
+draft
+dragon
+drama
+drastic
+draw
+dream
+dress
+drift
+drill
+drink
+drip
+drive
+drop
+drum
+dry
+duck
+dumb
+dune
+during
+dust
+dutch
+duty
+dwarf
+dynamic
+eager
+eagle
+early
+earn
+earth
+easily
+east
+easy
+echo
+ecology
+economy
+edge
+edit
+educate
+effort
+egg
+eight
+either
+elbow
+elder
+electric
+elegant
+element
+elephant
+elevator
+elite
+else
+embark
+embody
+embrace
+emerge
+emotion
+employ
+empower
+empty
+enable
+enact
+end
+endless
+endorse
+enemy
+energy
+enforce
+engage
+engine
+enhance
+enjoy
+enlist
+enough
+enrich
+enroll
+ensure
+enter
+entire
+entry
+envelope
+episode
+equal
+equip
+era
+erase
+erode
+erosion
+error
+erupt
+escape
+essay
+essence
+estate
+eternal
+ethics
+evidence
+evil
+evoke
+evolve
+exact
+example
+excess
+exchange
+excite
+exclude
+excuse
+execute
+exercise
+exhaust
+exhibit
+exile
+exist
+exit
+exotic
+expand
+expect
+expire
+explain
+expose
+express
+extend
+extra
+eye
+eyebrow
+fabric
+face
+faculty
+fade
+faint
+faith
+fall
+false
+fame
+family
+famous
+fan
+fancy
+fantasy
+farm
+fashion
+fat
+fatal
+father
+fatigue
+fault
+favorite
+feature
+february
+federal
+fee
+feed
+feel
+female
+fence
+festival
+fetch
+fever
+few
+fiber
+fiction
+field
+figure
+file
+film
+filter
+final
+find
+fine
+finger
+finish
+fire
+firm
+first
+fiscal
+fish
+fit
+fitness
+fix
+flag
+flame
+flash
+flat
+flavor
+flee
+flight
+flip
+float
+flock
+floor
+flower
+fluid
+flush
+fly
+foam
+focus
+fog
+foil
+fold
+follow
+food
+foot
+force
+forest
+forget
+fork
+fortune
+forum
+forward
+fossil
+foster
+found
+fox
+fragile
+frame
+frequent
+fresh
+friend
+fringe
+frog
+front
+frost
+frown
+frozen
+fruit
+fuel
+fun
+funny
+furnace
+fury
+future
+gadget
+gain
+galaxy
+gallery
+game
+gap
+garage
+garbage
+garden
+garlic
+garment
+gas
+gasp
+gate
+gather
+gauge
+gaze
+general
+genius
+genre
+gentle
+genuine
+gesture
+ghost
+giant
+gift
+giggle
+ginger
+giraffe
+girl
+give
+glad
+glance
+glare
+glass
+glide
+glimpse
+globe
+gloom
+glory
+glove
+glow
+glue
+goat
+goddess
+gold
+good
+goose
+gorilla
+gospel
+gossip
+govern
+gown
+grab
+grace
+grain
+grant
+grape
+grass
+gravity
+great
+green
+grid
+grief
+grit
+grocery
+group
+grow
+grunt
+guard
+guess
+guide
+guilt
+guitar
+gun
+gym
+habit
+hair
+half
+hammer
+hamster
+hand
+happy
+harbor
+hard
+harsh
+harvest
+hat
+have
+hawk
+hazard
+head
+health
+heart
+heavy
+hedgehog
+height
+hello
+helmet
+help
+hen
+hero
+hidden
+high
+hill
+hint
+hip
+hire
+history
+hobby
+hockey
+hold
+hole
+holiday
+hollow
+home
+honey
+hood
+hope
+horn
+horror
+horse
+hospital
+host
+hotel
+hour
+hover
+hub
+huge
+human
+humble
+humor
+hundred
+hungry
+hunt
+hurdle
+hurry
+hurt
+husband
+hybrid
+ice
+icon
+idea
+identify
+idle
+ignore
+ill
+illegal
+illness
+image
+imitate
+immense
+immune
+impact
+impose
+improve
+impulse
+inch
+include
+income
+increase
+index
+indicate
+indoor
+industry
+infant
+inflict
+inform
+inhale
+inherit
+initial
+inject
+injury
+inmate
+inner
+innocent
+input
+inquiry
+insane
+insect
+inside
+inspire
+install
+intact
+interest
+into
+invest
+invite
+involve
+iron
+island
+isolate
+issue
+item
+ivory
+jacket
+jaguar
+jar
+jazz
+jealous
+jeans
+jelly
+jewel
+job
+join
+joke
+journey
+joy
+judge
+juice
+jump
+jungle
+junior
+junk
+just
+kangaroo
+keen
+keep
+ketchup
+key
+kick
+kid
+kidney
+kind
+kingdom
+kiss
+kit
+kitchen
+kite
+kitten
+kiwi
+knee
+knife
+knock
+know
+lab
+label
+labor
+ladder
+lady
+lake
+lamp
+language
+laptop
+large
+later
+latin
+laugh
+laundry
+lava
+law
+lawn
+lawsuit
+layer
+lazy
+leader
+leaf
+learn
+leave
+lecture
+left
+leg
+legal
+legend
+leisure
+lemon
+lend
+length
+lens
+leopard
+lesson
+letter
+level
+liar
+liberty
+library
+license
+life
+lift
+light
+like
+limb
+limit
+link
+lion
+liquid
+list
+little
+live
+lizard
+load
+loan
+lobster
+local
+lock
+logic
+lonely
+long
+loop
+lottery
+loud
+lounge
+love
+loyal
+lucky
+luggage
+lumber
+lunar
+lunch
+luxury
+lyrics
+machine
+mad
+magic
+magnet
+maid
+mail
+main
+major
+make
+mammal
+man
+manage
+mandate
+mango
+mansion
+manual
+maple
+marble
+march
+margin
+marine
+market
+marriage
+mask
+mass
+master
+match
+material
+math
+matrix
+matter
+maximum
+maze
+meadow
+mean
+measure
+meat
+mechanic
+medal
+media
+melody
+melt
+member
+memory
+mention
+menu
+mercy
+merge
+merit
+merry
+mesh
+message
+metal
+method
+middle
+midnight
+milk
+million
+mimic
+mind
+minimum
+minor
+minute
+miracle
+mirror
+misery
+miss
+mistake
+mix
+mixed
+mixture
+mobile
+model
+modify
+mom
+moment
+monitor
+monkey
+monster
+month
+moon
+moral
+more
+morning
+mosquito
+mother
+motion
+motor
+mountain
+mouse
+move
+movie
+much
+muffin
+mule
+multiply
+muscle
+museum
+mushroom
+music
+must
+mutual
+myself
+mystery
+myth
+naive
+name
+napkin
+narrow
+nasty
+nation
+nature
+near
+neck
+need
+negative
+neglect
+neither
+nephew
+nerve
+nest
+net
+network
+neutral
+never
+news
+next
+nice
+night
+noble
+noise
+nominee
+noodle
+normal
+north
+nose
+notable
+note
+nothing
+notice
+novel
+now
+nuclear
+number
+nurse
+nut
+oak
+obey
+object
+oblige
+obscure
+observe
+obtain
+obvious
+occur
+ocean
+october
+odor
+off
+offer
+office
+often
+oil
+okay
+old
+olive
+olympic
+omit
+once
+one
+onion
+online
+only
+open
+opera
+opinion
+oppose
+option
+orange
+orbit
+orchard
+order
+ordinary
+organ
+orient
+original
+orphan
+ostrich
+other
+outdoor
+outer
+output
+outside
+oval
+oven
+over
+own
+owner
+oxygen
+oyster
+ozone
+pact
+paddle
+page
+pair
+palace
+palm
+panda
+panel
+panic
+panther
+paper
+parade
+parent
+park
+parrot
+party
+pass
+patch
+path
+patient
+patrol
+pattern
+pause
+pave
+payment
+peace
+peanut
+pear
+peasant
+pelican
+pen
+penalty
+pencil
+people
+pepper
+perfect
+permit
+person
+pet
+phone
+photo
+phrase
+physical
+piano
+picnic
+picture
+piece
+pig
+pigeon
+pill
+pilot
+pink
+pioneer
+pipe
+pistol
+pitch
+pizza
+place
+planet
+plastic
+plate
+play
+please
+pledge
+pluck
+plug
+plunge
+poem
+poet
+point
+polar
+pole
+police
+pond
+pony
+pool
+popular
+portion
+position
+possible
+post
+potato
+pottery
+poverty
+powder
+power
+practice
+praise
+predict
+prefer
+prepare
+present
+pretty
+prevent
+price
+pride
+primary
+print
+priority
+prison
+private
+prize
+problem
+process
+produce
+profit
+program
+project
+promote
+proof
+property
+prosper
+protect
+proud
+provide
+public
+pudding
+pull
+pulp
+pulse
+pumpkin
+punch
+pupil
+puppy
+purchase
+purity
+purpose
+purse
+push
+put
+puzzle
+pyramid
+quality
+quantum
+quarter
+question
+quick
+quit
+quiz
+quote
+rabbit
+raccoon
+race
+rack
+radar
+radio
+rail
+rain
+raise
+rally
+ramp
+ranch
+random
+range
+rapid
+rare
+rate
+rather
+raven
+raw
+razor
+ready
+real
+reason
+rebel
+rebuild
+recall
+receive
+recipe
+record
+recycle
+reduce
+reflect
+reform
+refuse
+region
+regret
+regular
+reject
+relax
+release
+relief
+rely
+remain
+remember
+remind
+remove
+render
+renew
+rent
+reopen
+repair
+repeat
+replace
+report
+require
+rescue
+resemble
+resist
+resource
+response
+result
+retire
+retreat
+return
+reunion
+reveal
+review
+reward
+rhythm
+rib
+ribbon
+rice
+rich
+ride
+ridge
+rifle
+right
+rigid
+ring
+riot
+ripple
+risk
+ritual
+rival
+river
+road
+roast
+robot
+robust
+rocket
+romance
+roof
+rookie
+room
+rose
+rotate
+rough
+round
+route
+royal
+rubber
+rude
+rug
+rule
+run
+runway
+rural
+sad
+saddle
+sadness
+safe
+sail
+salad
+salmon
+salon
+salt
+salute
+same
+sample
+sand
+satisfy
+satoshi
+sauce
+sausage
+save
+say
+scale
+scan
+scare
+scatter
+scene
+scheme
+school
+science
+scissors
+scorpion
+scout
+scrap
+screen
+script
+scrub
+sea
+search
+season
+seat
+second
+secret
+section
+security
+seed
+seek
+segment
+select
+sell
+seminar
+senior
+sense
+sentence
+series
+service
+session
+settle
+setup
+seven
+shadow
+shaft
+shallow
+share
+shed
+shell
+sheriff
+shield
+shift
+shine
+ship
+shiver
+shock
+shoe
+shoot
+shop
+short
+shoulder
+shove
+shrimp
+shrug
+shuffle
+shy
+sibling
+sick
+side
+siege
+sight
+sign
+silent
+silk
+silly
+silver
+similar
+simple
+since
+sing
+siren
+sister
+situate
+six
+size
+skate
+sketch
+ski
+skill
+skin
+skirt
+skull
+slab
+slam
+sleep
+slender
+slice
+slide
+slight
+slim
+slogan
+slot
+slow
+slush
+small
+smart
+smile
+smoke
+smooth
+snack
+snake
+snap
+sniff
+snow
+soap
+soccer
+social
+sock
+soda
+soft
+solar
+soldier
+solid
+solution
+solve
+someone
+song
+soon
+sorry
+sort
+soul
+sound
+soup
+source
+south
+space
+spare
+spatial
+spawn
+speak
+special
+speed
+spell
+spend
+sphere
+spice
+spider
+spike
+spin
+spirit
+split
+spoil
+sponsor
+spoon
+sport
+spot
+spray
+spread
+spring
+spy
+square
+squeeze
+squirrel
+stable
+stadium
+staff
+stage
+stairs
+stamp
+stand
+start
+state
+stay
+steak
+steel
+stem
+step
+stereo
+stick
+still
+sting
+stock
+stomach
+stone
+stool
+story
+stove
+strategy
+street
+strike
+strong
+struggle
+student
+stuff
+stumble
+style
+subject
+submit
+subway
+success
+such
+sudden
+suffer
+sugar
+suggest
+suit
+summer
+sun
+sunny
+sunset
+super
+supply
+supreme
+sure
+surface
+surge
+surprise
+surround
+survey
+suspect
+sustain
+swallow
+swamp
+swap
+swarm
+swear
+sweet
+swift
+swim
+swing
+switch
+sword
+symbol
+symptom
+syrup
+system
+table
+tackle
+tag
+tail
+talent
+talk
+tank
+tape
+target
+task
+taste
+tattoo
+taxi
+teach
+team
+tell
+ten
+tenant
+tennis
+tent
+term
+test
+text
+thank
+that
+theme
+then
+theory
+there
+they
+thing
+this
+thought
+three
+thrive
+throw
+thumb
+thunder
+ticket
+tide
+tiger
+tilt
+timber
+time
+tiny
+tip
+tired
+tissue
+title
+toast
+tobacco
+today
+toddler
+toe
+together
+toilet
+token
+tomato
+tomorrow
+tone
+tongue
+tonight
+tool
+tooth
+top
+topic
+topple
+torch
+tornado
+tortoise
+toss
+total
+tourist
+toward
+tower
+town
+toy
+track
+trade
+traffic
+tragic
+train
+transfer
+trap
+trash
+travel
+tray
+treat
+tree
+trend
+trial
+tribe
+trick
+trigger
+trim
+trip
+trophy
+trouble
+truck
+true
+truly
+trumpet
+trust
+truth
+try
+tube
+tuition
+tumble
+tuna
+tunnel
+turkey
+turn
+turtle
+twelve
+twenty
+twice
+twin
+twist
+two
+type
+typical
+ugly
+umbrella
+unable
+unaware
+uncle
+uncover
+under
+undo
+unfair
+unfold
+unhappy
+uniform
+unique
+unit
+universe
+unknown
+unlock
+until
+unusual
+unveil
+update
+upgrade
+uphold
+upon
+upper
+upset
+urban
+urge
+usage
+use
+used
+useful
+useless
+usual
+utility
+vacant
+vacuum
+vague
+valid
+valley
+valve
+van
+vanish
+vapor
+various
+vast
+vault
+vehicle
+velvet
+vendor
+venture
+venue
+verb
+verify
+version
+very
+vessel
+veteran
+viable
+vibrant
+vicious
+victory
+video
+view
+village
+vintage
+violin
+virtual
+virus
+visa
+visit
+visual
+vital
+vivid
+vocal
+voice
+void
+volcano
+volume
+vote
+voyage
+wage
+wagon
+wait
+walk
+wall
+walnut
+want
+warfare
+warm
+warrior
+wash
+wasp
+waste
+water
+wave
+way
+wealth
+weapon
+wear
+weasel
+weather
+web
+wedding
+weekend
+weird
+welcome
+west
+wet
+whale
+what
+wheat
+wheel
+when
+where
+whip
+whisper
+wide
+width
+wife
+wild
+will
+win
+window
+wine
+wing
+wink
+winner
+winter
+wire
+wisdom
+wise
+wish
+witness
+wolf
+woman
+wonder
+wood
+wool
+word
+work
+world
+worry
+worth
+wrap
+wreck
+wrestle
+wrist
+write
+wrong
+yard
+year
+yellow
+you
+young
+youth
+zebra
+zero
+zone
+zoo`.split(`
+`));var ic=t=>t/2**32|0,cc=t=>t>>>0;function So(t,e,r,n){let o=ic(r),s=cc(r);t.setUint32(e,n?s:o,n),t.setUint32(e+4,n?o:s,n)}function zt(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"&&"BYTES_PER_ELEMENT"in t&&t.BYTES_PER_ELEMENT===1}var Mr=t=>t?`"${t}" `:"";function me(t,e=""){if(typeof t!="number")throw new TypeError(Mr(e)+"expected number, got "+typeof t);if(!Number.isSafeInteger(t)||t<0)throw new RangeError(Mr(e)+"expected integer >= 0, got "+t);return t}function pe(t,e,r=""){if(zt(t)&&(e===void 0||t.length===e))return t;e!==void 0&&me(e,"length");let n=zt(t),o=e!==void 0?` of length ${e}`:"",s=n?`length=${t.length}`:`type=${typeof t}`,i=Mr(r)+"expected Uint8Array"+o+", got "+s;throw n?new RangeError(i):new TypeError(i)}function Pt(t){if(typeof t!="function"||typeof t.create!="function")throw new TypeError("expected hash wrapped by utils.createHasher");if(me(t.outputLen),me(t.blockLen),t.outputLen<1||t.blockLen<1)throw new Error("hash blockLen / outputLen must be >= 1")}var To=(t,e)=>{if(t===null||typeof t!="object"||Array.isArray(t))throw new TypeError((e==="object"?"":`"${e}" `)+"expected object, got type="+typeof t)};function tt(t,e=!0){if(t.destroyed)throw new Error("hash was destroyed");if(e&&t.finished)throw new Error("digest() was already called")}function Wt(t,e){pe(t,void 0,"output");let r=e.outputLen;if(!(t.length>=r))throw new RangeError('"output" expected length >= '+r)}function Bt(...t){for(let e=0;e<t.length;e++)t[e].fill(0)}function Gt(t){return new DataView(t.buffer,t.byteOffset,t.byteLength)}function ae(t,e){return t<<32-e|t>>>e}var Ho=typeof Uint8Array.from([]).toHex=="function"&&typeof Uint8Array.fromHex=="function",ac=Array.from({length:256},(t,e)=>e.toString(16).padStart(2,"0"));function Zt(t){if(pe(t),Ho)return t.toHex();let e="";for(let r=0;r<t.length;r++)e+=ac[t[r]];return e}function _o(t){return t>=48&&t<=57?t-48:t>=65&&t<=70?t-55:t>=97&&t<=102?t-87:void 0}function $r(t){if(typeof t!="string")throw new TypeError("hex string expected, got "+typeof t);if(Ho)try{return Uint8Array.fromHex(t)}catch(o){throw o instanceof SyntaxError?new RangeError(o.message):o}let e=t.length,r=e/2;if(e%2)throw new RangeError("hex string expected, got unpadded hex of length "+e);let n=new Uint8Array(r);for(let o=0,s=0;o<r;o++,s+=2){let i=_o(t.charCodeAt(s)),c=_o(t.charCodeAt(s+1));if(i===void 0||c===void 0){let a=t[s]+t[s+1];throw new RangeError('hex string expected, got non-hex character "'+a+'" at index '+s)}n[o]=i*16+c}return n}function Lo(...t){let e=0;for(let n=0;n<t.length;n++){let o=t[n];pe(o),e+=o.length}let r=new Uint8Array(e);for(let n=0,o=0;n<t.length;n++){let s=t[n];r.set(s,o),o+=s.length}return r}function fc(t,e,r="opts"){return To(t,"defaults"),e!==void 0&&To(e,r),Object.assign(t,e)}function Uo(t,e={}){if(typeof t!="function")throw new TypeError('"hashCons" expected function, got type='+typeof t);e=fc({},e,"info");let r=(o,s)=>t(s).update(o).digest(),n=t(void 0);return r.outputLen=n.outputLen,r.blockLen=n.blockLen,r.canXOF=n.canXOF,r.create=o=>t(o),Object.assign(r,e),Object.freeze(r)}function Oo(t=32){me(t,"bytesLength");let e=typeof globalThis=="object"?globalThis.crypto:null;if(typeof e?.getRandomValues!="function")throw new Error("crypto.getRandomValues must be defined");if(t>65536)throw new RangeError(`"bytesLength" expected <= 65536, got ${t}`);return e.getRandomValues(new Uint8Array(t))}var Co=t=>({oid:Uint8Array.from([6,9,96,134,72,1,101,3,4,2,t])});function Io(t,e,r){return t&e^~t&r}function Ro(t,e,r){return t&e^t&r^e&r}var Vt=class{blockLen;outputLen;canXOF=!1;padOffset;isLE;buffer;view;finished=!1;length=0;pos=0;destroyed=!1;constructor(e,r,n,o){this.blockLen=e,this.outputLen=r,this.padOffset=n,this.isLE=o,this.buffer=new Uint8Array(e),this.view=Gt(this.buffer)}update(e){tt(this),pe(e);let{view:r,buffer:n,blockLen:o}=this,s=e.length,i=!1;for(let c=0;c<s;){let a=Math.min(o-this.pos,s-c);if(a===o){let d=Gt(e);for(;o<=s-c;c+=o)this.process(d,c);i=!0;continue}n.set(c===0&&a===s?e:e.subarray(c,c+a),this.pos),this.pos+=a,c+=a,this.pos===o&&(this.process(r,0),this.pos=0,i=!0)}return this.length+=e.length,i&&this.roundClean(),this}digestInto(e){tt(this),Wt(e,this),this.finished=!0;let{buffer:r,view:n,blockLen:o,isLE:s}=this,{pos:i}=this;r[i++]=128,r.fill(0,i),this.padOffset>o-i&&(this.process(n,0),r.fill(0)),So(n,o-8,this.length*8,s),this.process(n,0),this.roundClean();let c=e===r?n:Gt(e),a=this.outputLen,d=a/4,l=this.get();if(a%4||d>l.length)throw new Error("invalid outputLen");for(let f=0;f<d;f++)c.setUint32(4*f,l[f],s)}digest(){let{buffer:e,outputLen:r}=this;this.digestInto(e);let n=e.slice(0,r);return this.destroy(),n}_cloneIntoMeta(e){let{buffer:r,length:n,finished:o,destroyed:s,pos:i}=this;return e.destroyed=s,e.finished=o,e.length=n,e.pos=i,i&&e.buffer.set(r),e}clone(){return this._cloneInto()}},Fo=Uint32Array.from([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]);var dc=Uint32Array.from([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),Le=new Uint32Array(64),Kr=class extends Vt{A=0;B=0;C=0;D=0;E=0;F=0;G=0;H=0;constructor(e,r){super(64,e,8,!1),this.A=r[0]|0,this.B=r[1]|0,this.C=r[2]|0,this.D=r[3]|0,this.E=r[4]|0,this.F=r[5]|0,this.G=r[6]|0,this.H=r[7]|0}get(){let{A:e,B:r,C:n,D:o,E:s,F:i,G:c,H:a}=this;return[e,r,n,o,s,i,c,a]}set(e,r,n,o,s,i,c,a){this.A=e|0,this.B=r|0,this.C=n|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=a|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let f=0;f<16;f++,r+=4)Le[f]=e.getUint32(r,!1);for(let f=16;f<64;f++){let h=Le[f-15],u=Le[f-2],p=ae(h,7)^ae(h,18)^h>>>3,b=ae(u,17)^ae(u,19)^u>>>10;Le[f]=b+Le[f-7]+p+Le[f-16]|0}let{A:n,B:o,C:s,D:i,E:c,F:a,G:d,H:l}=this;for(let f=0;f<64;f++){let h=ae(c,6)^ae(c,11)^ae(c,25),u=l+h+Io(c,a,d)+dc[f]+Le[f]|0,b=(ae(n,2)^ae(n,13)^ae(n,22))+Ro(n,o,s)|0;l=d,d=a,a=c,c=i+u|0,i=s,s=o,o=n,n=u+b|0}n=n+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,a=a+this.F|0,d=d+this.G|0,l=l+this.H|0,this.set(n,o,s,i,c,a,d,l)}roundClean(){Bt(Le)}destroy(){this.destroyed=!0,this.set(0,0,0,0,0,0,0,0),Bt(this.buffer)}},qr=class extends Kr{constructor(){super(32,Fo)}};var Do=Uo(()=>new qr,Co(1));function Xt(t,e,r=()=>{}){if(!Array.isArray(t))throw new TypeError(`"${e}" expected array, got type=${typeof t}`);for(let n=0;n<t.length;n++)r(t[n],`${e}[${n}]`);return t}var G=(t,e,r)=>pe(t,e,r),zr=me;function No(t,e=""){if(typeof t!="string"){let r=e&&`"${e}" `;throw new TypeError(r+"expected string, got type="+typeof t)}return t}function Ue(t,e="object"){if(t===null||typeof t!="object"||Array.isArray(t))throw new TypeError(e==="object"?"expected valid options object":`"${e}" expected object, got type=${typeof t}`);return t}function We(t,e){if(typeof t!="function")throw new TypeError(`"${e}" is invalid: expected function, got ${typeof t}`);return t}var Pr=Zt,Ee=(...t)=>Lo(...t),Jt=t=>$r(t),rt=zt,Qt=t=>Oo(t),Yt=BigInt(0),jo=BigInt(1),uc=t=>t?`"${t}" `:"";function be(t,e=""){if(typeof t!="boolean")throw new TypeError(uc(e)+"expected boolean, got type="+typeof t);return t}function er(t){if(typeof t=="bigint"){if(!Oe(t))throw new RangeError("positive bigint expected, got "+t)}else zr(t);return t}function nt(t,e=""){if(typeof t!="number"){let r=e&&`"${e}" `;throw new TypeError(r+"expected number, got type="+typeof t)}if(!Number.isSafeInteger(t)){let r=e&&`"${e}" `;throw new RangeError(r+"expected safe integer, got "+t)}}function vt(t){let e=er(t).toString(16);return e.length&1?"0"+e:e}function Mo(t){if(typeof t!="string")throw new TypeError("hex string expected, got "+typeof t);return t===""?Yt:BigInt("0x"+t)}function xe(t){return Mo(Zt(t))}function Wr(t){return Mo(Zt(lc(pe(t)).reverse()))}function tr(t,e){if(me(e),e===0)throw new Error("zero output length is invalid");t=er(t);let r=e*2,n=t.toString(16);if(n.length>r)throw new RangeError("number is too large");return $r(n.padStart(r,"0"))}function Gr(t,e){return tr(t,e).reverse()}function lc(t){return Uint8Array.from(G(t))}function Oe(t){return typeof t=="bigint"&&Yt<=t}function Zr(t,e,r){return Oe(t)&&Oe(e)&&Oe(r)&&e<=t&&t<r}function Vr(t,e,r,n){if(!Zr(e,r,n))throw new RangeError("expected valid "+t+": "+r+" <= n < "+n+", got "+e)}function ot(t){if(t<Yt)throw new Error("expected non-negative bigint, got "+t);return t===Yt?0:t.toString(2).length}var At=t=>(nt(t,"n"),(jo<<BigInt(t))-jo);function $o(t,e,r){if(me(t,"hashLen"),me(e,"qByteLen"),typeof r!="function")throw new TypeError("hmacFn must be a function");let n=y=>new Uint8Array(y),o=Uint8Array.of(),s=Uint8Array.of(0),i=Uint8Array.of(1),c=1e3,a=n(t),d=n(t),l=0,f=()=>{a.fill(1),d.fill(0),l=0},h=(...y)=>r(d,Ee(a,...y)),u=(y=o)=>{d=h(s,y),a=h(),y.length!==0&&(d=h(i,y),a=h())},p=()=>{if(l++>=c)throw new Error("drbg: tried max amount of iterations");let y=0,E=[];for(;y<e;){a=h();let A=a.slice();E.push(A),y+=a.length}return Ee(...E)};return(y,E)=>{f(),u(y);let A;for(;(A=E(p()))===void 0;)u();return f(),A}}function Ce(t,e={},r={},n="object"){Ue(t,n),Ue(e,"fields"),Ue(r,"optFields");function o(i,c,a){let d=n==="object"?`param "${String(i)}"`:`"${n}.${String(i)}"`,l=t[i];if(!Object.hasOwn(t,i)&&(a?l!==void 0:c!=="function"))throw new TypeError(`${d} is invalid: expected own property`);if(a&&l===void 0)return;let f=typeof l;if(f!==c||l===null)throw new TypeError(`${d} is invalid: expected ${c}, got ${f}`)}let s=(i,c)=>Object.entries(i).forEach(([a,d])=>o(a,d,c));s(e,!1),s(r,!0)}var Z=BigInt(0),N=BigInt(1),Ie=BigInt(2),Po=BigInt(3),Yr=BigInt(4),Wo=BigInt(5),hc=BigInt(7),Go=BigInt(8),pc=BigInt(9),bc=BigInt(15),Zo=BigInt(16),xc=BigInt("0x10000000000000000");function re(t,e){if(e<=Z)throw new Error("mod: expected positive modulus, got "+e);let r=t%e;return r>=Z?r:e+r}function Vo(t,e,r){if(r<=N)throw new Error("pow: expected modulus > 1, got "+r);if(typeof e!="bigint")throw new TypeError("invalid exponent: expected bigint, got "+typeof e);if(e<Z)throw new Error("invalid exponent, negatives unsupported");if(e===Z)return N;if(e===N)return t;let n=t%r;if(n<Z&&(n+=r),e<xc){let c=N;for(;e>Z;)e&N&&(c=c*n%r),n=n*n%r,e>>=N;return c}let o=[];for(;e>Z;)o.push(Number(e&bc)),e>>=Yr;let s=new Array(16);s[0]=N,s[1]=n;for(let c=2;c<16;c++)s[c]=s[c-1]*n%r;let i=s[o[o.length-1]];for(let c=o.length-2;c>=0;c--){i=i*i%r,i=i*i%r,i=i*i%r,i=i*i%r;let a=o[c];a!==0&&(i=i*s[a]%r)}return i}function ne(t,e,r){if(r<=N)throw new Error("pow2: expected modulus > 1, got "+r);if(e<Z)throw new Error("pow2: expected non-negative exponent, got "+e);let n=t;for(;e-- >Z;)n*=n,n%=r;return n}function Ko(t,e){if(t===Z)throw new Error("invert: expected non-zero number");if(e<=N)throw new Error("invert: expected modulus > 1, got "+e);let r=re(t,e),n=e,o=Z,s=N;for(;r!==Z;){let c=n/r,a=n-r*c,d=o-s*c;n=r,r=a,o=s,s=d}if(n!==N)throw new Error("invert: does not exist");return re(o,e)}function Yo(t,e){if(e<=N)throw new Error("invertCt: expected prime modulus > 1, got "+e);let r=re(t,e);if(r===Z)throw new Error("invertCt: expected non-zero number");let n=Vo(r,e-Ie,e);if(re(r*n,e)!==N)throw new Error("invertCt: does not exist");return n}function Xr(t,e,r){let n=t;if(!n.eql(n.sqr(e),r))throw new Error("Cannot find square root")}function Jr(t,e){if((t&N)===Z)throw new Error(e+": expected odd modulus, got "+t)}function Xo(t,e){let r=t,n=(r.ORDER+N)/Yr,o=r.pow(e,n);return Xr(r,o,e),o}function yc(t,e){let r=t,n=(r.ORDER-Wo)/Go,o=r.mul(e,Ie),s=r.pow(o,n),i=r.mul(e,s),c=r.mul(r.mul(i,Ie),s),a=r.mul(i,r.sub(c,r.ONE));return Xr(r,a,e),a}function gc(t){let e=it(t),r=Jo(t),n=r(e,e.neg(e.ONE)),o=r(e,n),s=r(e,e.neg(n)),i=(t+hc)/Zo;return((c,a)=>{let d=c,l=d.pow(a,i),f=d.mul(l,n),h=d.mul(l,o),u=d.mul(l,s),p=d.eql(d.sqr(f),a),b=d.eql(d.sqr(h),a);l=d.cmov(l,f,p),f=d.cmov(u,h,b);let y=d.eql(d.sqr(f),a),E=d.cmov(l,f,y);return Xr(d,E,a),E})}function Jo(t){if(t<Po)throw new Error("sqrt is not defined for small field");Jr(t,"tonelliShanks");let e=t-N,r=0;for(;e%Ie===Z;)e/=Ie,r++;let n=Ie,o=it(t);for(;qo(o,n)===1;)if(n++>1e3)throw new Error("Cannot find square root: probably non-prime P");if(r===1)return Xo;let s=o.pow(n,e),i=(e+N)/Ie;return function(a,d){let l=a;if(l.is0(d))return d;if(qo(l,d)!==1)throw new Error("Cannot find square root");let f=r,h=l.mul(l.ONE,s),u=l.pow(d,e),p=l.pow(d,i);for(;!l.eql(u,l.ONE);){if(l.is0(u))throw new Error("Cannot find square root: probably non-prime P");let b=1,y=l.sqr(u);for(;!l.eql(y,l.ONE);)if(b++,y=l.sqr(y),b===f)throw new Error("Cannot find square root");let E=N<<BigInt(f-b-1),A=l.pow(h,E);f=b,h=l.sqr(A),u=l.mul(u,h),p=l.mul(p,A)}return p}}function wc(t){return Jr(t,"Fp.sqrt"),t%Yr===Po?Xo:t%Go===Wo?yc:t%Zo===pc?gc(t):Jo(t)}var mc=["create","isValid","is0","neg","inv","sqrt","sqr","eql","add","sub","mul","pow","div","addN","subN","mulN","sqrN"];function st(t){if(Ue(t,"field"),typeof t.ORDER!="bigint")throw new TypeError('param "ORDER" is invalid: expected bigint, got '+typeof t.ORDER);nt(t.BYTES,"BYTES"),nt(t.BITS,"BITS");for(let e of mc)We(t[e],"field."+e);if(t.BYTES<1||t.BITS<1)throw new Error("invalid field: expected BYTES/BITS > 0");if(t.ORDER<=N)throw new Error("invalid field: expected ORDER > 1, got "+t.ORDER);return t}function Qr(t,e,r=!1){st(t),Xt(e,"nums"),be(r,"passZero");let n=t,o=new Array(e.length).fill(r?n.ZERO:void 0),s=e.reduce((c,a,d)=>n.is0(a)?c:(o[d]=c,n.mul(c,a)),n.ONE),i=n.inv(s);return e.reduceRight((c,a,d)=>n.is0(a)?c:(o[d]=n.mul(c,o[d]),n.mul(c,a)),i),o}function qo(t,e){st(t);let r=t;Jr(r.ORDER,"FpLegendre");let n=(r.ORDER-N)/Ie,o=r.pow(e,n),s=r.eql(o,r.ONE),i=r.eql(o,r.ZERO),c=r.eql(o,r.neg(r.ONE));if(!s&&!i&&!c)throw new Error("invalid Legendre symbol result");return s?1:i?0:-1}function Ec(t,e){if(e!==void 0&&zr(e),t<=Z)throw new Error("invalid n length: expected positive n, got "+t);if(e!==void 0&&e<1)throw new Error("invalid n length: expected positive bit length, got "+e);let r=ot(t);if(e!==void 0&&e<r)throw new Error(`invalid n length: expected nBitLength (${e}) >= bitLen(n) (${r})`);let n=e!==void 0?e:r,o=Math.ceil(n/8);return{nBitLength:n,nByteLength:o}}var zo=new WeakMap,rr=class{ORDER;BITS;BYTES;isLE;ZERO=Z;ONE=N;_lengths;_mod;constructor(e,r={}){if(e<=N)throw new Error("invalid field: expected ORDER > 1, got "+e);let n;this.isLE=!1,r!=null&&typeof r=="object"&&(typeof r.BITS=="number"&&(n=r.BITS),typeof r.sqrt=="function"&&Object.defineProperty(this,"sqrt",{value:r.sqrt,enumerable:!0}),typeof r.isLE=="boolean"&&(this.isLE=r.isLE),r.allowedLengths&&(this._lengths=Object.freeze(r.allowedLengths.slice())),typeof r.modFromBytes=="boolean"&&(this._mod=r.modFromBytes));let{nBitLength:o,nByteLength:s}=Ec(e,n);if(s>2048)throw new Error("invalid field: expected ORDER of <= 2048 bytes");this.ORDER=e,this.BITS=o,this.BYTES=s,Object.freeze(this)}create(e){return re(e,this.ORDER)}isValid(e){if(typeof e!="bigint")throw new TypeError("invalid field element: expected bigint, got "+typeof e);return Z<=e&&e<this.ORDER}is0(e){return e===Z}isValidNot0(e){return!this.is0(e)&&this.isValid(e)}isOdd(e){return(e&N)===N}neg(e){return re(-e,this.ORDER)}eql(e,r){return e===r}sqr(e){return re(e*e,this.ORDER)}add(e,r){return re(e+r,this.ORDER)}sub(e,r){return re(e-r,this.ORDER)}mul(e,r){return re(e*r,this.ORDER)}pow(e,r){return Vo(e,r,this.ORDER)}div(e,r){return re(e*Ko(r,this.ORDER),this.ORDER)}sqrN(e){return e*e}addN(e,r){return e+r}subN(e,r){return e-r}mulN(e,r){return e*r}inv(e){return Ko(e,this.ORDER)}sqrt(e){let r=zo.get(this);return r||zo.set(this,r=wc(this.ORDER)),r(this,e)}toBytes(e){return this.isLE?Gr(e,this.BYTES):tr(e,this.BYTES)}fromBytes(e,r=!1){G(e);let{_lengths:n,BYTES:o,isLE:s,ORDER:i,_mod:c}=this;if(n){if(e.length<1||!n.includes(e.length)||e.length>o)throw new Error("Field.fromBytes: expected "+n+" bytes, got "+e.length);let d=new Uint8Array(o);d.set(e,s?0:d.length-e.length),e=d}if(e.length!==o)throw new Error("Field.fromBytes: expected "+o+" bytes, got "+e.length);let a=s?Wr(e):xe(e);if(c&&(a=re(a,i)),!r&&!this.isValid(a))throw new Error("invalid field element: outside of range 0..ORDER");return a}invertBatch(e){return Qr(this,e,!0)}cmov(e,r,n){return be(n,"condition"),n?r:e}};function it(t,e={}){return Object.freeze(rr.prototype),new rr(t,e)}function Qo(t){if(typeof t!="bigint")throw new Error("field order must be bigint");if(t<=N)throw new Error("field order must be greater than 1");let e=ot(t-N);return Math.ceil(e/8)}function nr(t){let e=Qo(t);return e+Math.ceil(e/2)}function or(t,e,r=!1){G(t);let n=t.length,o=Qo(e),s=Math.max(nr(e),16);if(n<s||n>1024)throw new Error("expected "+s+"-1024 bytes of input, got "+n);let i=r?Wr(t):xe(t),c=re(i,e-N)+N;return r?Gr(c,o):tr(c,o)}var rn=BigInt(0),kt=BigInt(1),Bc=BigInt(4),en=16,es=128,vc=5,ts=2**31;function ct(t){let e=t;if(typeof e!="function")throw new TypeError('"Point" expected constructor, got type='+typeof t);We(e.fromAffine,"Point.fromAffine"),We(e.fromBytes,"Point.fromBytes"),We(e.fromHex,"Point.fromHex"),Ue(e.BASE,"Point.BASE"),Ue(e.ZERO,"Point.ZERO"),st(e.Fp),st(e.Fn)}function ns(t,e){ct(t),os(e,t);let r=Qr(t.Fp,e.map(n=>n.Z));return e.map((n,o)=>t.fromAffine(n.toAffine(r[o])))}function Ac(t,e,r=1){if(!Number.isSafeInteger(t)||t<r||t>e)throw new Error("invalid window size, expected ["+r+".."+e+"], got W="+t)}function kc(t,e){let r=t*(4*e+128);if(r>ts)throw new Error("invalid window size: table would need ~"+Math.ceil(r/2**20)+" MiB, max "+ts/2**20+" MiB")}function nn(t,e){if(t!==void 0){We(t,"randomBytes");try{let r=t(e);if(!rt(r)||r.length!==e)return}catch{return}return t}}function os(t,e){Xt(t,"points"),t.forEach((r,n)=>{if(!(r instanceof e))throw new Error("invalid point at index "+n)})}function Sc(t,e,r){if(!Array.isArray(t))throw new Error("array of scalars expected");t.forEach((n,o)=>{if(!(r===void 0?e.isValid(n):Oe(n)&&n<r))throw new Error("invalid scalar at index "+o)})}var ss=new WeakMap;function tn(t){return ss.get(t)||1}function Tc(t,e){let r=t.double(),n=[t];for(let o=1;o<e;o++)n.push(n[o-1].add(r));return n}function _c(t,e){let r=2**e,n=r/2,o=BigInt(r-1),s=[];for(;t>rn;){let i=0;t&kt&&(i=Number(t&o),i>=n&&(i-=r),t-=BigInt(i)),s.push(i),t>>=kt}return s}function Hc(t,e,r){let n=2**e,o=n/2,s=BigInt(n-1),i=BigInt(e),c=[];for(let a=0;a<r;a++){let d=Number(t&s);t>>=i,d>o&&(d-=n,t+=kt),c.push(d)}if(t!==rn)throw new Error("invalid wnaf");return c}function Lc(t,e,r){let n=0;for(let s of r)n=Math.max(n,s.length);let o=t;for(let s=n-1;s>=0;s--){s!==n-1&&(o=o.double());for(let i=0;i<r.length;i++){let c=r[i][s];if(c){let a=e[i][Math.abs(c)-1>>1];o=o.add(c<0?a.negate():a)}}}return o}var sr=class{Point;BASE;ZERO;randomBytes;wnafPrecomputes=new WeakMap;baseCanBeBlinded;bits;constructor(e,r){ct(e),this.randomBytes=nn(r,en),this.Point=e,this.BASE=e.BASE,this.ZERO=e.ZERO,this.bits=e.Fn.BITS}buildWnafTable(e,r,n){let o=Math.ceil(n/r)+1,s=2**(r-1),i=[],c=e;for(let a=0;a<o;a++){let d=c;for(let l=0;l<s;l++)i.push(d),d=d.add(c);c=i[i.length-1].double()}return{W:r,bits:n,windows:o,comp:i}}wnafCachedCT(e,r){let{W:n,windows:o,comp:s}=e,i=2**(n-1),c=Hc(r,n,o),a=this.ZERO,d=this.BASE;for(let l=0;l<o;l++){let f=c[l],h=l*i,u=Math.abs(f)-1,p=s[h];for(let y=1;y<i;y++)p=y===u?s[h+y]:p;let b=p.negate();f===0?d=d.add(s[h]):a=a.add(f<0?b:p)}return{p:a,f:d}}getWnafPrecomputes(e,r,n,o){let s=this.wnafPrecomputes.get(r),i=s?.find(c=>c.W===e&&c.bits===n);return i||(i=this.buildWnafTable(r,e,n),typeof o=="function"&&(i={...i,comp:o(i.comp)}),s||(s=[],this.wnafPrecomputes.set(r,s)),s.push(i)),i}assertPoint(e){if(!(e instanceof this.Point))throw new TypeError('"point" expected Point instance, got type='+typeof e)}validateMulInput(e,r){if(this.assertPoint(e),!Zr(r,kt,this.Point.Fn.ORDER))throw new Error("invalid scalar")}runCT(e,r,n,o){let s=tn(e);return s===1?this.fixedWindowCT(e,r,n):this.wnafCachedCT(this.getWnafPrecomputes(s,e,n,o),r)}mulCT(e,r,n){return this.validateMulInput(e,r),this.runCT(e,r,this.bits,n)}mulCTBlinded(e,r,n){if(this.validateMulInput(e,r),this.randomBytes===void 0)throw new Error("randomBytes is required for scalar blinding");let o=this.Point.Fn.BITS+es,s=this.randomBytes(en);if(!rt(s)||s.length!==en)throw new Error("randomBytes returned invalid byte array");s[0]=s[0]&63|128;let i=r+xe(s)*this.Point.Fn.ORDER;return this.runCT(e,i,o,n)}fixedWindowCT(e,r,n){let o=vc,s=1<<o,i=At(o),c=new Array(s);c[0]=this.ZERO;for(let l=1;l<s;l++)c[l]=c[l-1].add(e);let a=Math.ceil(n/o),d=this.ZERO;for(let l=a-1;l>=0;l--){if(l!==a-1)for(let u=0;u<o;u++)d=d.double();let f=Number(r>>BigInt(l*o)&i),h=c[0];for(let u=1;u<s;u++)h=u===f?c[u]:h;d=d.add(h)}return{p:d,f:d}}shouldBlind(e,r){return this.randomBytes===void 0?!1:r===kt?!0:e!==this.BASE?!1:(this.baseCanBeBlinded===void 0&&(this.baseCanBeBlinded=this.mulUnsafe(this.BASE,this.Point.Fn.ORDER).is0()),this.baseCanBeBlinded)}mulSecret(e,r,n,o){return this.shouldBlind(e,n)?this.mulCTBlinded(e,r,o):this.mulCT(e,r,o)}mulUnsafe(e,r,n){if(this.assertPoint(e),!Oe(r))throw new Error("invalid scalar");let o=tn(e);if(o===1||r>=this.Point.Fn.ORDER)return ir(this.Point,[e],[r],!0);let s=this.getWnafPrecomputes(o,e,this.bits,n);return this.wnafCachedCT(s,r).p}setWindowSize(e,r){this.assertPoint(e),Ac(r,this.bits);let n=Math.ceil((this.bits+es)/r)+1;kc(n*2**(r-1),this.Point.Fp.BYTES),ss.set(e,r),this.wnafPrecomputes.delete(e)}hasWindowSize(e){return tn(e)!==1}};function ir(t,e,r,n=!1){if(ct(t),os(e,t),be(n,"allowOversized"),Sc(r,t.Fn,n?t.Fn.ORDER**Bc:void 0),e.length!==r.length)throw new Error("arrays of points and scalars must have equal length");let o=e.map(i=>Tc(i,4)),s=r.map(i=>_c(i,4));return Lc(t.ZERO,o,s)}function rs(t,e,r){if(e){if(e.ORDER!==t)throw new Error("Field.ORDER must match order: Fp == p, Fn == n");return st(e),e}else return it(t,{isLE:r})}function is(t,e,r={},n){if(t!=="weierstrass"&&t!=="edwards")throw new Error('expected curve type "weierstrass" or "edwards"');if(n===void 0&&(n=t==="edwards"),!e||typeof e!="object")throw new Error(`expected valid ${t} CURVE object`);Ce(r);for(let a of["p","n","h"]){let d=e[a];if(!(Oe(d)&&d!==rn))throw new Error(`CURVE.${a} must be positive bigint`)}let o=rs(e.p,r.Fp,n),s=rs(e.n,r.Fn,n),c=["Gx","Gy","a",t==="weierstrass"?"b":"d"];for(let a of c)if(!o.isValid(e[a]))throw new Error(`CURVE.${a} must be valid field element of CURVE.Fp`);return e=Object.freeze(Object.assign({},e)),{CURVE:e,Fp:o,Fn:s}}function cs(t,e){return function(n){let o=t(n);return{secretKey:o,publicKey:e(o)}}}var cr=class{oHash;iHash;blockLen;outputLen;canXOF=!1;finished=!1;destroyed=!1;constructor(e,r){if(Pt(e),pe(r,void 0,"key"),this.iHash=e.create(),typeof this.iHash.update!="function")throw new Error("expected Hash instance");this.blockLen=this.iHash.blockLen,this.outputLen=this.iHash.outputLen;let n=this.blockLen,o=new Uint8Array(n);o.set(r.length>n?e.create().update(r).digest():r);for(let s=0;s<o.length;s++)o[s]^=54;this.iHash.update(o),this.oHash=e.create();for(let s=0;s<o.length;s++)o[s]^=106;this.oHash.update(o),Bt(o)}update(e){return tt(this),this.iHash.update(e),this}digestInto(e){tt(this),Wt(e,this),this.finished=!0;let r=e.subarray(0,this.outputLen);this.iHash.digestInto(r),this.oHash.update(r),this.oHash.digestInto(r),this.destroy()}digest(){let e=new Uint8Array(this.oHash.outputLen);return this.digestInto(e),e}_cloneInto(e){e||=Object.create(Object.getPrototypeOf(this),{});let{oHash:r,iHash:n,finished:o,destroyed:s,blockLen:i,outputLen:c,canXOF:a}=this;return e=e,e.finished=o,e.destroyed=s,e.blockLen=i,e.outputLen=c,e.canXOF=a,e.oHash=r._cloneInto(e.oHash),e.iHash=n._cloneInto(e.iHash),e}clone(){return this._cloneInto()}destroy(){this.destroyed=!0,this.oHash.destroy(),this.iHash.destroy()}},as=(()=>{let t=((e,r,n)=>new cr(e,r).update(n).digest());return t.create=(e,r)=>new cr(e,r),t})();var Uc=BigInt(0),on=class extends Error{constructor(e=""){super(e)}},Be={Err:on,_tlv:{encode:(t,e)=>{let{Err:r}=Be;if(nt(t,"tag"),t<0||t>255)throw new r("tlv.encode: wrong tag");if(No(e,"data"),e.length&1)throw new r("tlv.encode: unpadded data");let n=e.length/2,o=vt(n);if(o.length/2&128)throw new r("tlv.encode: long form length too big");let s=n>127?vt(o.length/2|128):"";return vt(t)+s+o+e},decode(t,e){let{Err:r}=Be;e=G(e,void 0,"DER data");let n=0;if(t<0||t>255)throw new r("tlv.decode: wrong tag");if(e.length<2||e[n++]!==t)throw new r("tlv.decode: wrong tlv");let o=e[n++],s=!!(o&128),i=0;if(!s)i=o;else{let a=o&127;if(!a)throw new r("tlv.decode(long): indefinite length not supported");if(a>4)throw new r("tlv.decode(long): byte length is too big");let d=e.subarray(n,n+a);if(d.length!==a)throw new r("tlv.decode: length bytes not complete");if(d[0]===0)throw new r("tlv.decode(long): zero leftmost byte");for(let l of d)i=i<<8|l;if(n+=a,i<128)throw new r("tlv.decode(long): not minimal encoding")}let c=e.subarray(n,n+i);if(c.length!==i)throw new r("tlv.decode: wrong value length");return{v:c,l:e.subarray(n+i)}}},_int:{encode(t){let{Err:e}=Be;if(er(t),t<Uc)throw new e("integer: negative integers are not allowed");let r=vt(t);if(Number.parseInt(r[0],16)&8&&(r="00"+r),r.length&1)throw new e("unexpected DER parsing assertion: unpadded hex");return r},decode(t){let{Err:e}=Be;if(t.length<1)throw new e("invalid signature integer: empty");if(t[0]&128)throw new e("invalid signature integer: negative");if(t.length>1&&t[0]===0&&!(t[1]&128))throw new e("invalid signature integer: unnecessary leading zero");return xe(t)}},toSig(t){let{Err:e,_int:r,_tlv:n}=Be,o=G(t,void 0,"signature"),{v:s,l:i}=n.decode(48,o);if(i.length)throw new e("invalid signature: left bytes after parsing");let{v:c,l:a}=n.decode(2,s),{v:d,l}=n.decode(2,a);if(l.length)throw new e("invalid signature: left bytes after parsing");return{r:r.decode(c),s:r.decode(d)}},hexFromSig(t){let{_tlv:e,_int:r}=Be;Ce(t,{r:"bigint",s:"bigint"},{},"sig");let n=e.encode(2,r.encode(t.r)),o=e.encode(2,r.encode(t.s)),s=n+o;return e.encode(48,s)}},sn=(Object.freeze(Be._tlv),Object.freeze(Be._int),Object.freeze(Be));var fs=(t,e)=>(t+(t>=0?e:-e)/ds)/e;function Oc(t,e,r){Vr("scalar",t,ve,r);let[[n,o],[s,i]]=e,c=fs(i*t,r),a=fs(-o*t,r),d=t-c*n-a*s,l=-c*o-a*i,f=d<ve,h=l<ve;f&&(d=-d),h&&(l=-l);let u=At(Math.ceil(ot(r)/2))+Ge;if(d<ve||d>=u||l<ve||l>=u)throw new Error("splitScalar (endomorphism): failed for k");return{k1neg:f,k1:d,k2neg:h,k2:l}}function fn(t){if(!["compact","recovered","der"].includes(t))throw new Error('Signature format must be "compact", "recovered", or "der"');return t}function cn(t,e){Ce(t);let r={};for(let n of Object.keys(e))r[n]=t[n]===void 0?e[n]:t[n];return be(r.lowS,"lowS"),be(r.prehash,"prehash"),r.format!==void 0&&fn(r.format),r}var ve=BigInt(0),Ge=BigInt(1),ds=BigInt(2),an=BigInt(3),Cc=BigInt(4);function us(t,e={}){let r=is("weierstrass",t,e),n=r.Fp,o=r.Fn,s=r.CURVE,{h:i,n:c}=s;Ce(e,{},{allowInfinityPoint:"boolean",clearCofactor:"function",isTorsionFree:"function",fromBytes:"function",toBytes:"function",endo:"object",randomBytes:"function"});let{endo:a,allowInfinityPoint:d}=e,l=e.randomBytes===void 0?Qt:e.randomBytes;if(a&&(!n.is0(s.a)||typeof a.beta!="bigint"||!Array.isArray(a.basises)))throw new Error('invalid endo: expected "beta": bigint and "basises": array');let f=hs(n,o);function h(){if(!n.isOdd)throw new Error("compression is not supported: Field does not have .isOdd()")}function u(I,w,v){if(d&&w.is0())return Uint8Array.of(0);let{x:T,y:U}=w.toAffine(),m=n.toBytes(T);if(be(v,"isCompressed"),v){h();let x=!n.isOdd(U);return Ee(ls(x),m)}else return Ee(Uint8Array.of(4),m,n.toBytes(U))}function p(I){G(I,void 0,"Point");let{publicKey:w,publicKeyUncompressed:v}=f,T=I.length,U=I[0],m=I.subarray(1);if(d&&T===1&&U===0)return{x:n.ZERO,y:n.ZERO};if(T===w&&(U===2||U===3)){let x=n.fromBytes(m);if(!n.isValid(x))throw new Error("bad point: is not on curve, wrong x");let B=g(x),k;try{k=n.sqrt(B)}catch(M){let D=M instanceof Error?": "+M.message:"";throw new Error("bad point: is not on curve, sqrt error"+D)}h();let O=n.isOdd(k);return(U&1)===1!==O&&(k=n.neg(k)),{x,y:k}}else if(T===v&&U===4){let x=n.BYTES,B=n.fromBytes(m.subarray(0,x)),k=n.fromBytes(m.subarray(x,x*2));if(!_(B,k))throw new Error("bad point: is not on curve");return{x:B,y:k}}else throw new Error(`bad point: got length ${T}, expected compressed=${w} or uncompressed=${v}`)}let b=e.toBytes===void 0?u:e.toBytes,y=e.fromBytes===void 0?p:e.fromBytes,E=n.mul(s.b,an),A=n.is0(s.a)?I=>n.ZERO:I=>n.mul(s.a,I);function g(I){let w=n.sqr(I),v=n.mul(w,I);return n.add(n.add(v,n.mul(I,s.a)),s.b)}function _(I,w){let v=n.sqr(w),T=g(I);return n.eql(v,T)}if(!_(s.Gx,s.Gy))throw new Error("bad curve params: generator point");let S=n.mul(n.pow(s.a,an),Cc),F=n.mul(n.sqr(s.b),BigInt(27));if(n.is0(n.add(S,F)))throw new Error("bad curve params: a or b");function j(I,w,v=!1){if(!n.isValid(w)||v&&n.is0(w))throw new Error(`bad point coordinate ${I}`);return w}function R(I){if(!(I instanceof L))throw new Error("Weierstrass Point expected")}function $(I){if(!a||!a.basises)throw new Error("no endo");return Oc(I,a.basises,o.ORDER)}function K(I,w,v,T){if(!o.isValid(T))throw new RangeError("invalid scalar: out of range");if(a){let{k1neg:U,k1:m,k2neg:x,k2:B}=$(T),k=new L(n.mul(v.X,a.beta),v.Y,v.Z);I.push(U?v.negate():v,x?k.negate():k),w.push(m,B)}else I.push(v),w.push(T)}let Q=new WeakSet;class L{static BASE=new L(s.Gx,s.Gy,n.ONE);static ZERO=new L(n.ZERO,n.ONE,n.ZERO);static Fp=n;static Fn=o;X;Y;Z;constructor(w,v,T){this.X=j("x",w),this.Y=j("y",v,!0),this.Z=j("z",T),Object.freeze(this)}static CURVE(){return s}static fromAffine(w){let{x:v,y:T}=w||{};if(!w||!n.isValid(v)||!n.isValid(T))throw new Error("invalid affine point");if(w instanceof L)throw new Error("projective point not allowed");return n.is0(v)&&n.is0(T)?L.ZERO:new L(v,T,n.ONE)}static fromBytes(w){let v=L.fromAffine(y(G(w,void 0,"point")));return v.assertValidity(),v}static fromHex(w){return L.fromBytes(Jt(w))}get x(){return this.toAffine().x}get y(){return this.toAffine().y}precompute(w=6,v=!0){return te.setWindowSize(this,w),v||this.multiply(an),this}assertValidity(){let w=this;if(w.is0()){if(e.allowInfinityPoint&&n.is0(w.X)&&n.eql(w.Y,n.ONE)&&n.is0(w.Z))return;throw new Error("bad point: ZERO")}if(Q.has(w))return;let{x:v,y:T}=w.toAffine();if(!n.isValid(v)||!n.isValid(T))throw new Error("bad point: x or y not field elements");if(!_(v,T))throw new Error("bad point: equation left != right");if(!w.isTorsionFree())throw new Error("bad point: not in prime-order subgroup");Q.add(w)}hasEvenY(){let{y:w}=this.toAffine();if(!n.isOdd)throw new Error("Field doesn't support isOdd");return!n.isOdd(w)}equals(w){R(w);let{X:v,Y:T,Z:U}=this,{X:m,Y:x,Z:B}=w,k=n.eql(n.mul(v,B),n.mul(m,U)),O=n.eql(n.mul(T,B),n.mul(x,U));return k&&O}negate(){return new L(this.X,n.neg(this.Y),this.Z)}double(){let{X:w,Y:v,Z:T}=this,U=n.ZERO,m=n.ZERO,x=n.ZERO,B=n.mul(w,w),k=n.mul(v,v),O=n.mul(T,T),H=n.mul(w,v);return H=n.add(H,H),x=n.mul(w,T),x=n.add(x,x),U=A(x),m=n.mul(E,O),m=n.add(U,m),U=n.sub(k,m),m=n.add(k,m),m=n.mul(U,m),U=n.mul(H,U),x=n.mul(E,x),O=A(O),H=n.sub(B,O),H=A(H),H=n.add(H,x),x=n.add(B,B),B=n.add(x,B),B=n.add(B,O),B=n.mul(B,H),m=n.add(m,B),O=n.mul(v,T),O=n.add(O,O),B=n.mul(O,H),U=n.sub(U,B),x=n.mul(O,k),x=n.add(x,x),x=n.add(x,x),new L(U,m,x)}add(w){R(w);let{X:v,Y:T,Z:U}=this,{X:m,Y:x,Z:B}=w,k=n.ZERO,O=n.ZERO,H=n.ZERO,M=n.mul(v,m),D=n.mul(T,x),P=n.mul(U,B),J=n.add(v,T),q=n.add(m,x);J=n.mul(J,q),q=n.add(M,D),J=n.sub(J,q),q=n.add(v,U);let V=n.add(m,B);return q=n.mul(q,V),V=n.add(M,P),q=n.sub(q,V),V=n.add(T,U),k=n.add(x,B),V=n.mul(V,k),k=n.add(D,P),V=n.sub(V,k),H=A(q),k=n.mul(E,P),H=n.add(k,H),k=n.sub(D,H),H=n.add(D,H),O=n.mul(k,H),D=n.add(M,M),D=n.add(D,M),P=A(P),q=n.mul(E,q),D=n.add(D,P),P=n.sub(M,P),P=A(P),q=n.add(q,P),M=n.mul(D,q),O=n.add(O,M),M=n.mul(V,q),k=n.mul(J,k),k=n.sub(k,M),M=n.mul(J,D),H=n.mul(V,H),H=n.add(H,M),new L(k,O,H)}subtract(w){return R(w),this.add(w.negate())}is0(){return this.equals(L.ZERO)}multiply(w){if(!o.isValidNot0(w))throw new RangeError("invalid scalar: out of range");let{p:v,f:T}=te.mulSecret(this,w,i,ee);return ee([v,T])[0]}multiplyUnsafe(w){let v=this,T=w;if(!o.isValid(T))throw new RangeError("invalid scalar: out of range");if(T===ve||v.is0())return L.ZERO;if(T===Ge)return v;if(te.hasWindowSize(this))return te.mulUnsafe(v,T,ee);let U=[],m=[];return K(U,m,v,T),ir(L,U,m)}mulAddUnsafe(w,v,T){R(v);let U=[],m=[];return K(U,m,this,w),K(U,m,v,T),ir(L,U,m)}toAffine(w){let v=this,T=w;if(T!=null&&!n.isValid(T))throw new RangeError('"invertedZ" expected valid field element');let{X:U,Y:m,Z:x}=v;if(n.eql(x,n.ONE))return{x:U,y:m};let B=v.is0();T==null&&(T=B?n.ONE:n.inv(x));let k=n.mul(U,T),O=n.mul(m,T),H=n.mul(x,T);if(B)return{x:n.ZERO,y:n.ZERO};if(!n.eql(H,n.ONE))throw new Error("invZ was invalid");return{x:k,y:O}}isTorsionFree(){let{isTorsionFree:w}=e;return i===Ge?!0:w?w(L,this):te.mulUnsafe(this,c).is0()}clearCofactor(){let{clearCofactor:w}=e;return i===Ge?this:w?w(L,this):this.multiplyUnsafe(i)}isSmallOrder(){return i===Ge?this.is0():this.clearCofactor().is0()}toBytes(w=!0){return be(w,"isCompressed"),this.assertValidity(),b(L,this,w)}toHex(w=!0){return Pr(this.toBytes(w))}toString(){return`<Point ${this.is0()?"ZERO":this.toHex()}>`}}let ee=I=>ns(L,I),te=new sr(L,l);return te.bits>=6&&L.BASE.precompute(6),Object.freeze(L.prototype),Object.freeze(L),L}function ls(t){return Uint8Array.of(t?2:3)}function hs(t,e){return{secretKey:e.BYTES,publicKey:1+t.BYTES,publicKeyUncompressed:1+2*t.BYTES,publicKeyHasPrefix:!0,signature:2*e.BYTES}}function Ic(t,e={}){ct(t);let{Fn:r}=t,n=e.randomBytes===void 0?Qt:e.randomBytes,o=Object.assign(hs(t.Fp,r),{seed:Math.max(nr(r.ORDER),16)});function s(u){try{let p=r.fromBytes(u);return r.isValidNot0(p)}catch{return!1}}function i(u,p){let{publicKey:b,publicKeyUncompressed:y}=o;try{let E=u.length;return p===!0&&E!==b||p===!1&&E!==y?!1:!!t.fromBytes(u)}catch{return!1}}function c(u){return u=u===void 0?n(o.seed):u,or(G(u,o.seed,"seed"),r.ORDER)}function a(u,p=!0){return t.BASE.multiply(r.fromBytes(u)).toBytes(p)}function d(u){let{secretKey:p,publicKey:b,publicKeyUncompressed:y}=o,E=r._lengths;if(!rt(u))return;let A=G(u,void 0,"key").length,g=A===b||A===y,_=A===p||!!E?.includes(A);if(!(g&&_))return g}function l(u,p,b=!0){if(d(u)===!0)throw new Error("first arg must be private key");if(d(p)===!1)throw new Error("second arg must be public key");let y=r.fromBytes(u);return t.fromBytes(p).multiply(y).toBytes(b)}let f={isValidSecretKey:s,isValidPublicKey:i,randomSecretKey:c},h=cs(c,a);return Object.freeze(f),Object.freeze(o),Object.freeze({getPublicKey:a,getSharedSecret:l,keygen:h,Point:t,utils:f,lengths:o})}function ps(t,e,r={}){ct(t);let n=e;Pt(n),Ce(r,{},{hmac:"function",lowS:"boolean",randomBytes:"function",bits2int:"function",bits2int_modN:"function"});let o=Object.assign({},r),s=o.randomBytes===void 0?Qt:o.randomBytes,i=o.hmac===void 0?(m,x)=>as(n,m,x):o.hmac,{Fp:c,Fn:a}=t,{ORDER:d,BITS:l}=a,f=nr(d),h=nn(s,f),{keygen:u,getPublicKey:p,getSharedSecret:b,utils:y,lengths:E}=Ic(t,o),A={prehash:!0,lowS:typeof o.lowS=="boolean"?o.lowS:!0,format:"compact",extraEntropy:!1},g=d*ds+Ge<c.ORDER;function _(m){let x=d>>Ge;return m>x}function S(m,x){if(!a.isValidNot0(x))throw new Error(`invalid signature ${m}: out of range 1..Point.Fn.ORDER`);return x}function F(){if(!c.isOdd)throw new Error("Field doesn't support isOdd")}function j(m,x,B){return F(),(m===B?0:2)|Number(c.isOdd(x))}function R(){if(g)throw new Error('"recovered" sig type is not supported for cofactor >2 curves')}function $(m,x){fn(x);let B=E.signature,k=x==="compact"?B:x==="recovered"?B+1:void 0;return G(m,k)}class K{r;s;recovery;constructor(x,B,k){if(this.r=S("r",x),this.s=S("s",B),k!=null){if(R(),![0,1,2,3].includes(k))throw new Error("invalid recovery id");this.recovery=k}Object.freeze(this)}static fromBytes(x,B=A.format){$(x,B);let k;if(B==="der"){let{r:D,s:P}=sn.toSig(G(x));return new K(D,P)}B==="recovered"&&(k=x[0],B="compact",x=x.subarray(1));let O=E.signature/2,H=x.subarray(0,O),M=x.subarray(O,O*2);return new K(a.fromBytes(H),a.fromBytes(M),k)}static fromHex(x,B){return this.fromBytes(Jt(x),B)}assertRecovery(){let{recovery:x}=this;if(x==null)throw new Error("invalid recovery id: must be present");return x}addRecoveryBit(x){return new K(this.r,this.s,x)}recoverPublicKey(x){let{r:B,s:k}=this,O=this.assertRecovery(),H=O===2||O===3?B+d:B;if(!c.isValid(H))throw new Error("invalid recovery id: sig.r+curve.n != R.x");let M=c.toBytes(H),D=t.fromBytes(Ee(ls((O&1)===0),M)),P=a.inv(H),J=L(G(x,void 0,"msgHash")),q=a.create(-J*P),V=a.create(k*P),ue=t.BASE.mulAddUnsafe(q,D,V);if(ue.is0())throw new Error("invalid recovery: point at infinify");return ue.assertValidity(),ue}hasHighS(){return _(this.s)}toBytes(x=A.format){if(fn(x),x==="der")return Jt(sn.hexFromSig(this));let{r:B,s:k}=this,O=a.toBytes(B),H=a.toBytes(k);return x==="recovered"?(R(),Ee(Uint8Array.of(this.assertRecovery()),O,H)):Ee(O,H)}toHex(x){return Pr(this.toBytes(x))}}Object.freeze(K.prototype),Object.freeze(K);let Q=o.bits2int===void 0?function(x){if(x.length>8192)throw new Error("input is too large");let B=xe(x),k=x.length*8-l;return k>0?B>>BigInt(k):B}:o.bits2int,L=o.bits2int_modN===void 0?function(x){return a.create(Q(x))}:o.bits2int_modN,ee=At(l);function te(m){return Vr("num < 2^"+l,m,ve,ee),a.toBytes(m)}function I(m,x){return G(m,void 0,"message"),x?G(n(m),void 0,"prehashed message"):m}function w(m,x,B){let{lowS:k,prehash:O,extraEntropy:H}=cn(B,A);m=I(m,O);let M=L(m),D=a.fromBytes(x);if(!a.isValidNot0(D))throw new Error("invalid private key");let P=[te(D),te(M)];if(H!=null&&H!==!1){let ue=H===!0?s(E.secretKey):H;P.push(G(ue,void 0,"extraEntropy"))}let J=Ee(...P),q=M;function V(ue){let Je=Q(ue);if(!a.isValidNot0(Je))return;let yt=t.BASE.multiply(Je).toAffine(),Ae=a.create(yt.x);if(Ae===ve)return;let le;if(h!==void 0){let gt=xe(or(h(f),d)),Ci=a.inv(a.mul(gt,Je)),Ii=a.mul(gt,q),Ri=a.mul(gt,D);le=a.create(Ci*a.create(Ii+Ri*Ae))}else{let gt=Yo(Je,d);le=a.create(gt*a.create(q+Ae*D))}if(le===ve)return;let Sr=j(yt.x,yt.y,Ae),eo=le;return k&&_(le)&&(eo=a.neg(le),Sr^=1),new K(Ae,eo,g?void 0:Sr)}return{seed:J,k2sig:V}}function v(m,x,B={}){let{seed:k,k2sig:O}=w(m,x,B);return $o(n.outputLen,a.BYTES,i)(k,O).toBytes(B.format)}function T(m,x,B,k={}){let{lowS:O,prehash:H,format:M}=cn(k,A);if(B=G(B,void 0,"publicKey"),x=I(x,H),!rt(m)){let D=m instanceof K?", use sig.toBytes()":"";throw new Error("verify expects Uint8Array signature"+D)}$(m,M);try{let D=K.fromBytes(m,M),P=t.fromBytes(B);if(O&&D.hasHighS())return!1;let{r:J,s:q}=D,V=L(x),ue=a.inv(q),Je=a.create(V*ue),yt=a.create(J*ue),Ae=t.BASE.mulAddUnsafe(Je,P,yt);if(Ae.is0())return!1;let le=Ae.toAffine();return!(a.create(le.x)!==J||M==="recovered"&&D.recovery!==j(le.x,le.y,J))}catch{return!1}}function U(m,x,B={}){let{prehash:k}=cn(B,A);return x=I(x,k),K.fromBytes(m,"recovered").recoverPublicKey(x).toBytes()}return Object.freeze({keygen:u,getPublicKey:p,getSharedSecret:b,utils:y,lengths:E,Point:t,sign:v,verify:T,recoverPublicKey:U,Signature:K,hash:n})}var un={p:BigInt("0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f"),n:BigInt("0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"),h:BigInt(1),a:BigInt(0),b:BigInt(7),Gx:BigInt("0x79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"),Gy:BigInt("0x483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8")},Rc={beta:BigInt("0x7ae96a2b657c07106e64479eac3434e99cf0497512f58995c1396c28719501ee"),basises:[[BigInt("0x3086d221a7d46bcde86c90e49284eb15"),-BigInt("0xe4437ed6010e88286f547fa90abfe4c3")],[BigInt("0x114ca50f7a8e2f3f657c1108d9d44cfd8"),BigInt("0x3086d221a7d46bcde86c90e49284eb15")]]};var bs=BigInt(2);function Fc(t){let e=un.p,r=BigInt(3),n=BigInt(6),o=BigInt(11),s=BigInt(22),i=BigInt(23),c=BigInt(44),a=BigInt(88),d=t*t*t%e,l=d*d*t%e,f=ne(l,r,e)*l%e,h=ne(f,r,e)*l%e,u=ne(h,bs,e)*d%e,p=ne(u,o,e)*u%e,b=ne(p,s,e)*p%e,y=ne(b,c,e)*b%e,E=ne(y,a,e)*y%e,A=ne(E,c,e)*b%e,g=ne(A,r,e)*l%e,_=ne(g,i,e)*p%e,S=ne(_,n,e)*d%e,F=ne(S,bs,e);if(!dn.eql(dn.sqr(F),t))throw new Error("Cannot find square root");return F}var dn=it(un.p,{sqrt:Fc}),Dc=us(un,{Fp:dn,endo:Rc}),Re=ps(Dc,Do);function xs(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"&&"BYTES_PER_ELEMENT"in t&&t.BYTES_PER_ELEMENT===1}var ln=t=>t?`"${t}" `:"";function hn(t,e=""){if(typeof t!="number")throw new TypeError(ln(e)+"expected number, got "+typeof t);if(!Number.isSafeInteger(t)||t<0)throw new RangeError(ln(e)+"expected integer >= 0, got "+t);return t}function oe(t,e,r=""){if(xs(t)&&(e===void 0||t.length===e))return t;e!==void 0&&hn(e,"length");let n=xs(t),o=e!==void 0?` of length ${e}`:"",s=n?`length=${t.length}`:`type=${typeof t}`,i=ln(r)+"expected Uint8Array"+o+", got "+s;throw n?new RangeError(i):new TypeError(i)}function gs(t){if(typeof t!="function"||typeof t.create!="function")throw new TypeError("expected hash wrapped by utils.createHasher");if(hn(t.outputLen),hn(t.blockLen),t.outputLen<1||t.blockLen<1)throw new Error("hash blockLen / outputLen must be >= 1")}var ys=(t,e)=>{if(t===null||typeof t!="object"||Array.isArray(t))throw new TypeError((e==="object"?"":`"${e}" `)+"expected object, got type="+typeof t)};function at(t,e=!0){if(t.destroyed)throw new Error("hash was destroyed");if(e&&t.finished)throw new Error("digest() was already called")}function ar(t,e){oe(t,void 0,"output");let r=e.outputLen;if(!(t.length>=r))throw new RangeError('"output" expected length >= '+r)}function ye(...t){for(let e=0;e<t.length;e++)t[e].fill(0)}function Fe(t){return new DataView(t.buffer,t.byteOffset,t.byteLength)}function fe(t,e){return t<<32-e|t>>>e}function St(t,e){return t<<e|t>>>32-e>>>0}function Tt(...t){let e=0;for(let n=0;n<t.length;n++){let o=t[n];oe(o),e+=o.length}let r=new Uint8Array(e);for(let n=0,o=0;n<t.length;n++){let s=t[n];r.set(s,o),o+=s.length}return r}function jc(t,e,r="opts"){return ys(t,"defaults"),e!==void 0&&ys(e,r),Object.assign(t,e)}function _t(t,e={}){if(typeof t!="function")throw new TypeError('"hashCons" expected function, got type='+typeof t);e=jc({},e,"info");let r=(o,s)=>t(s).update(o).digest(),n=t(void 0);return r.outputLen=n.outputLen,r.blockLen=n.blockLen,r.canXOF=n.canXOF,r.create=o=>t(o),Object.assign(r,e),Object.freeze(r)}var pn=t=>({oid:Uint8Array.from([6,9,96,134,72,1,101,3,4,2,t])});var fr=class{oHash;iHash;blockLen;outputLen;canXOF=!1;finished=!1;destroyed=!1;constructor(e,r){if(gs(e),oe(r,void 0,"key"),this.iHash=e.create(),typeof this.iHash.update!="function")throw new Error("expected Hash instance");this.blockLen=this.iHash.blockLen,this.outputLen=this.iHash.outputLen;let n=this.blockLen,o=new Uint8Array(n);o.set(r.length>n?e.create().update(r).digest():r);for(let s=0;s<o.length;s++)o[s]^=54;this.iHash.update(o),this.oHash=e.create();for(let s=0;s<o.length;s++)o[s]^=106;this.oHash.update(o),ye(o)}update(e){return at(this),this.iHash.update(e),this}digestInto(e){at(this),ar(e,this),this.finished=!0;let r=e.subarray(0,this.outputLen);this.iHash.digestInto(r),this.oHash.update(r),this.oHash.digestInto(r),this.destroy()}digest(){let e=new Uint8Array(this.oHash.outputLen);return this.digestInto(e),e}_cloneInto(e){e||=Object.create(Object.getPrototypeOf(this),{});let{oHash:r,iHash:n,finished:o,destroyed:s,blockLen:i,outputLen:c,canXOF:a}=this;return e=e,e.finished=o,e.destroyed=s,e.blockLen=i,e.outputLen=c,e.canXOF=a,e.oHash=r._cloneInto(e.oHash),e.iHash=n._cloneInto(e.iHash),e}clone(){return this._cloneInto()}destroy(){this.destroyed=!0,this.oHash.destroy(),this.iHash.destroy()}},bn=(()=>{let t=((e,r,n)=>new fr(e,r).update(n).digest());return t.create=(e,r)=>new fr(e,r),t})();var dr=BigInt(4294967295),ws=BigInt(32);function Nc(t,e=!1){return e?{h:Number(t&dr),l:Number(t>>ws&dr)}:{h:Number(t>>ws&dr)|0,l:Number(t&dr)|0}}function ms(t,e=!1){let r=t.length,n=new Uint32Array(r),o=new Uint32Array(r);for(let s=0;s<r;s++){let{h:i,l:c}=Nc(t[s],e);[n[s],o[s]]=[i,c]}return[n,o]}var Mc=t=>t/2**32|0,$c=t=>t>>>0;function Es(t,e,r,n){let o=Mc(r),s=$c(r);t.setUint32(e,n?s:o,n),t.setUint32(e+4,n?o:s,n)}var xn=(t,e,r)=>t>>>r,yn=(t,e,r)=>t<<32-r|e>>>r,Ze=(t,e,r)=>t>>>r|e<<32-r,Ve=(t,e,r)=>t<<32-r|e>>>r,Ht=(t,e,r)=>t<<64-r|e>>>r-32,Lt=(t,e,r)=>t>>>r-32|e<<64-r;function ge(t,e,r,n){let o=(e>>>0)+(n>>>0);return{h:t+r+(o/2**32|0)|0,l:o|0}}var Bs=(t,e,r)=>(t>>>0)+(e>>>0)+(r>>>0),vs=(t,e,r,n)=>e+r+n+(t/2**32|0)|0,As=(t,e,r,n)=>(t>>>0)+(e>>>0)+(r>>>0)+(n>>>0),ks=(t,e,r,n,o)=>e+r+n+o+(t/2**32|0)|0,Ss=(t,e,r,n,o)=>(t>>>0)+(e>>>0)+(r>>>0)+(n>>>0)+(o>>>0),Ts=(t,e,r,n,o,s)=>e+r+n+o+s+(t/2**32|0)|0;function gn(t,e,r){return t&e^~t&r}function wn(t,e,r){return t&e^t&r^e&r}var Ye=class{blockLen;outputLen;canXOF=!1;padOffset;isLE;buffer;view;finished=!1;length=0;pos=0;destroyed=!1;constructor(e,r,n,o){this.blockLen=e,this.outputLen=r,this.padOffset=n,this.isLE=o,this.buffer=new Uint8Array(e),this.view=Fe(this.buffer)}update(e){at(this),oe(e);let{view:r,buffer:n,blockLen:o}=this,s=e.length,i=!1;for(let c=0;c<s;){let a=Math.min(o-this.pos,s-c);if(a===o){let d=Fe(e);for(;o<=s-c;c+=o)this.process(d,c);i=!0;continue}n.set(c===0&&a===s?e:e.subarray(c,c+a),this.pos),this.pos+=a,c+=a,this.pos===o&&(this.process(r,0),this.pos=0,i=!0)}return this.length+=e.length,i&&this.roundClean(),this}digestInto(e){at(this),ar(e,this),this.finished=!0;let{buffer:r,view:n,blockLen:o,isLE:s}=this,{pos:i}=this;r[i++]=128,r.fill(0,i),this.padOffset>o-i&&(this.process(n,0),r.fill(0)),Es(n,o-8,this.length*8,s),this.process(n,0),this.roundClean();let c=e===r?n:Fe(e),a=this.outputLen,d=a/4,l=this.get();if(a%4||d>l.length)throw new Error("invalid outputLen");for(let f=0;f<d;f++)c.setUint32(4*f,l[f],s)}digest(){let{buffer:e,outputLen:r}=this;this.digestInto(e);let n=e.slice(0,r);return this.destroy(),n}_cloneIntoMeta(e){let{buffer:r,length:n,finished:o,destroyed:s,pos:i}=this;return e.destroyed=s,e.finished=o,e.length=n,e.pos=i,i&&e.buffer.set(r),e}clone(){return this._cloneInto()}},_s=Uint32Array.from([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]);var Hs=Uint32Array.from([1779033703,4089235720,3144134277,2227873595,1013904242,4271175723,2773480762,1595750129,1359893119,2917565137,2600822924,725511199,528734635,4215389547,1541459225,327033209]);var qc=Uint8Array.from([7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8]),Us=Uint8Array.from(new Array(16).fill(0).map((t,e)=>e)),zc=Us.map(t=>(9*t+5)%16),Os=(()=>{let r=[[Us],[zc]];for(let n=0;n<4;n++)for(let o of r)o.push(o[n].map(s=>qc[s]));return r})(),Cs=Os[0],Is=Os[1],Rs=[[11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8],[12,13,11,15,6,9,9,7,12,15,11,13,7,8,7,7],[13,15,14,11,7,7,6,8,13,14,13,12,5,5,6,9],[14,11,12,14,8,6,5,5,15,12,15,14,9,9,8,6],[15,12,13,13,9,5,8,6,14,11,12,11,8,6,5,5]].map(t=>Uint8Array.from(t)),Pc=Cs.map((t,e)=>t.map(r=>Rs[e][r])),Wc=Is.map((t,e)=>t.map(r=>Rs[e][r])),Gc=Uint32Array.from([0,1518500249,1859775393,2400959708,2840853838]),Zc=Uint32Array.from([1352829926,1548603684,1836072691,2053994217,0]);function Ls(t,e,r,n){return t===0?e^r^n:t===1?e&r|~e&n:t===2?(e|~r)^n:t===3?e&n|r&~n:e^(r|~n)}var ur=new Uint32Array(16),mn=class extends Ye{h0=1732584193;h1=-271733879;h2=-1732584194;h3=271733878;h4=-1009589776;constructor(){super(64,20,8,!0)}get(){let{h0:e,h1:r,h2:n,h3:o,h4:s}=this;return[e,r,n,o,s]}set(e,r,n,o,s){this.h0=e|0,this.h1=r|0,this.h2=n|0,this.h3=o|0,this.h4=s|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let u=0;u<16;u++,r+=4)ur[u]=e.getUint32(r,!0);let n=this.h0|0,o=n,s=this.h1|0,i=s,c=this.h2|0,a=c,d=this.h3|0,l=d,f=this.h4|0,h=f;for(let u=0;u<5;u++){let p=4-u,b=Gc[u],y=Zc[u],E=Cs[u],A=Is[u],g=Pc[u],_=Wc[u];for(let S=0;S<16;S++){let F=St(n+Ls(u,s,c,d)+ur[E[S]]+b,g[S])+f|0;n=f,f=d,d=St(c,10)|0,c=s,s=F}for(let S=0;S<16;S++){let F=St(o+Ls(p,i,a,l)+ur[A[S]]+y,_[S])+h|0;o=h,h=l,l=St(a,10)|0,a=i,i=F}}this.set(this.h1+c+l|0,this.h2+d+h|0,this.h3+f+o|0,this.h4+n+i|0,this.h0+s+a|0)}roundClean(){ye(ur)}destroy(){this.destroyed=!0,ye(this.buffer),this.set(0,0,0,0,0)}},Fs=_t(()=>new mn);var Vc=Uint32Array.from([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),De=new Uint32Array(64),En=class extends Ye{A=0;B=0;C=0;D=0;E=0;F=0;G=0;H=0;constructor(e,r){super(64,e,8,!1),this.A=r[0]|0,this.B=r[1]|0,this.C=r[2]|0,this.D=r[3]|0,this.E=r[4]|0,this.F=r[5]|0,this.G=r[6]|0,this.H=r[7]|0}get(){let{A:e,B:r,C:n,D:o,E:s,F:i,G:c,H:a}=this;return[e,r,n,o,s,i,c,a]}set(e,r,n,o,s,i,c,a){this.A=e|0,this.B=r|0,this.C=n|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=a|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let f=0;f<16;f++,r+=4)De[f]=e.getUint32(r,!1);for(let f=16;f<64;f++){let h=De[f-15],u=De[f-2],p=fe(h,7)^fe(h,18)^h>>>3,b=fe(u,17)^fe(u,19)^u>>>10;De[f]=b+De[f-7]+p+De[f-16]|0}let{A:n,B:o,C:s,D:i,E:c,F:a,G:d,H:l}=this;for(let f=0;f<64;f++){let h=fe(c,6)^fe(c,11)^fe(c,25),u=l+h+gn(c,a,d)+Vc[f]+De[f]|0,b=(fe(n,2)^fe(n,13)^fe(n,22))+wn(n,o,s)|0;l=d,d=a,a=c,c=i+u|0,i=s,s=o,o=n,n=u+b|0}n=n+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,a=a+this.F|0,d=d+this.G|0,l=l+this.H|0,this.set(n,o,s,i,c,a,d,l)}roundClean(){ye(De)}destroy(){this.destroyed=!0,this.set(0,0,0,0,0,0,0,0),ye(this.buffer)}},Bn=class extends En{constructor(){super(32,_s)}};var Ds=ms(["0x428a2f98d728ae22","0x7137449123ef65cd","0xb5c0fbcfec4d3b2f","0xe9b5dba58189dbbc","0x3956c25bf348b538","0x59f111f1b605d019","0x923f82a4af194f9b","0xab1c5ed5da6d8118","0xd807aa98a3030242","0x12835b0145706fbe","0x243185be4ee4b28c","0x550c7dc3d5ffb4e2","0x72be5d74f27b896f","0x80deb1fe3b1696b1","0x9bdc06a725c71235","0xc19bf174cf692694","0xe49b69c19ef14ad2","0xefbe4786384f25e3","0x0fc19dc68b8cd5b5","0x240ca1cc77ac9c65","0x2de92c6f592b0275","0x4a7484aa6ea6e483","0x5cb0a9dcbd41fbd4","0x76f988da831153b5","0x983e5152ee66dfab","0xa831c66d2db43210","0xb00327c898fb213f","0xbf597fc7beef0ee4","0xc6e00bf33da88fc2","0xd5a79147930aa725","0x06ca6351e003826f","0x142929670a0e6e70","0x27b70a8546d22ffc","0x2e1b21385c26c926","0x4d2c6dfc5ac42aed","0x53380d139d95b3df","0x650a73548baf63de","0x766a0abb3c77b2a8","0x81c2c92e47edaee6","0x92722c851482353b","0xa2bfe8a14cf10364","0xa81a664bbc423001","0xc24b8b70d0f89791","0xc76c51a30654be30","0xd192e819d6ef5218","0xd69906245565a910","0xf40e35855771202a","0x106aa07032bbd1b8","0x19a4c116b8d2d0c8","0x1e376c085141ab53","0x2748774cdf8eeb99","0x34b0bcb5e19b48a8","0x391c0cb3c5c95a63","0x4ed8aa4ae3418acb","0x5b9cca4f7763e373","0x682e6ff3d6b2b8a3","0x748f82ee5defb2fc","0x78a5636f43172f60","0x84c87814a1f0ab72","0x8cc702081a6439ec","0x90befffa23631e28","0xa4506cebde82bde9","0xbef9a3f7b2c67915","0xc67178f2e372532b","0xca273eceea26619c","0xd186b8c721c0c207","0xeada7dd6cde0eb1e","0xf57d4f7fee6ed178","0x06f067aa72176fba","0x0a637dc5a2c898a6","0x113f9804bef90dae","0x1b710b35131c471b","0x28db77f523047d84","0x32caab7b40c72493","0x3c9ebe0a15c9bebc","0x431d67c49c100d4c","0x4cc5d4becb3e42b6","0x597f299cfc657e2a","0x5fcb6fab3ad6faec","0x6c44198c4a475817"].map(t=>BigInt(t))),Yc=Ds[0],Xc=Ds[1],je=new Uint32Array(80),Ne=new Uint32Array(80),vn=class extends Ye{Ah=0;Al=0;Bh=0;Bl=0;Ch=0;Cl=0;Dh=0;Dl=0;Eh=0;El=0;Fh=0;Fl=0;Gh=0;Gl=0;Hh=0;Hl=0;constructor(e,r){super(128,e,16,!1),this.Ah=r[0]|0,this.Al=r[1]|0,this.Bh=r[2]|0,this.Bl=r[3]|0,this.Ch=r[4]|0,this.Cl=r[5]|0,this.Dh=r[6]|0,this.Dl=r[7]|0,this.Eh=r[8]|0,this.El=r[9]|0,this.Fh=r[10]|0,this.Fl=r[11]|0,this.Gh=r[12]|0,this.Gl=r[13]|0,this.Hh=r[14]|0,this.Hl=r[15]|0}get(){let{Ah:e,Al:r,Bh:n,Bl:o,Ch:s,Cl:i,Dh:c,Dl:a,Eh:d,El:l,Fh:f,Fl:h,Gh:u,Gl:p,Hh:b,Hl:y}=this;return[e,r,n,o,s,i,c,a,d,l,f,h,u,p,b,y]}set(e,r,n,o,s,i,c,a,d,l,f,h,u,p,b,y){this.Ah=e|0,this.Al=r|0,this.Bh=n|0,this.Bl=o|0,this.Ch=s|0,this.Cl=i|0,this.Dh=c|0,this.Dl=a|0,this.Eh=d|0,this.El=l|0,this.Fh=f|0,this.Fl=h|0,this.Gh=u|0,this.Gl=p|0,this.Hh=b|0,this.Hl=y|0}_cloneInto(e){return(e||=new this.constructor).set(...this.get()),this._cloneIntoMeta(e)}process(e,r){for(let g=0;g<16;g++,r+=4)je[g]=e.getUint32(r),Ne[g]=e.getUint32(r+=4);for(let g=16;g<80;g++){let _=je[g-15]|0,S=Ne[g-15]|0,F=Ze(_,S,1)^Ze(_,S,8)^xn(_,S,7),j=Ve(_,S,1)^Ve(_,S,8)^yn(_,S,7),R=je[g-2]|0,$=Ne[g-2]|0,K=Ze(R,$,19)^Ht(R,$,61)^xn(R,$,6),Q=Ve(R,$,19)^Lt(R,$,61)^yn(R,$,6),L=As(j,Q,Ne[g-7],Ne[g-16]),ee=ks(L,F,K,je[g-7],je[g-16]);je[g]=ee|0,Ne[g]=L|0}let{Ah:n,Al:o,Bh:s,Bl:i,Ch:c,Cl:a,Dh:d,Dl:l,Eh:f,El:h,Fh:u,Fl:p,Gh:b,Gl:y,Hh:E,Hl:A}=this;for(let g=0;g<80;g++){let _=Ze(f,h,14)^Ze(f,h,18)^Ht(f,h,41),S=Ve(f,h,14)^Ve(f,h,18)^Lt(f,h,41),F=f&u^~f&b,j=h&p^~h&y,R=Ss(A,S,j,Xc[g],Ne[g]),$=Ts(R,E,_,F,Yc[g],je[g]),K=R|0,Q=Ze(n,o,28)^Ht(n,o,34)^Ht(n,o,39),L=Ve(n,o,28)^Lt(n,o,34)^Lt(n,o,39),ee=n&s^n&c^s&c,te=o&i^o&a^i&a;E=b|0,A=y|0,b=u|0,y=p|0,u=f|0,p=h|0,{h:f,l:h}=ge(d|0,l|0,$|0,K|0),d=c|0,l=a|0,c=s|0,a=i|0,s=n|0,i=o|0;let I=Bs(K,L,te);n=vs(I,$,Q,ee),o=I|0}({h:n,l:o}=ge(this.Ah|0,this.Al|0,n|0,o|0)),{h:s,l:i}=ge(this.Bh|0,this.Bl|0,s|0,i|0),{h:c,l:a}=ge(this.Ch|0,this.Cl|0,c|0,a|0),{h:d,l}=ge(this.Dh|0,this.Dl|0,d|0,l|0),{h:f,l:h}=ge(this.Eh|0,this.El|0,f|0,h|0),{h:u,l:p}=ge(this.Fh|0,this.Fl|0,u|0,p|0),{h:b,l:y}=ge(this.Gh|0,this.Gl|0,b|0,y|0),{h:E,l:A}=ge(this.Hh|0,this.Hl|0,E|0,A|0),this.set(n,o,s,i,c,a,d,l,f,h,u,p,b,y,E,A)}roundClean(){ye(je,Ne)}destroy(){this.destroyed=!0,ye(this.buffer),this.set(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)}},An=class extends vn{constructor(){super(64,Hs)}};var kn=_t(()=>new Bn,pn(1));var Sn=_t(()=>new An,pn(3));var Ps=t=>Object.freeze(t());function Ws(t){return t instanceof Uint8Array||ArrayBuffer.isView(t)&&t.constructor.name==="Uint8Array"&&"BYTES_PER_ELEMENT"in t&&t.BYTES_PER_ELEMENT===1}function ft(t){if(!Ws(t))throw new TypeError("Uint8Array expected")}function Jc(t,e){return Array.isArray(e)?e.length===0?!0:t?e.every(r=>typeof r=="string"):e.every(r=>Number.isSafeInteger(r)):!1}function Ln(t){if(typeof t!="function")throw new TypeError("function expected");return!0}function _n(t,e){if(typeof e!="string")throw new TypeError(`${t}: string expected`);return!0}function lr(t,e="number"){if(typeof t!="number")throw new TypeError(`${e}: expected number, got ${typeof t}`);if(!Number.isSafeInteger(t))throw new RangeError(`${e}: expected safe integer, got ${t}`)}function js(t,e){if(!Jc(!1,e))throw new TypeError(`${t}: array of numbers expected`)}function Gs(...t){let e=s=>s,r=(s,i)=>c=>s(i(c)),n=t.map(s=>s.encode).reduceRight(r,e),o=t.map(s=>s.decode).reduce(r,e);return{encode:n,decode:o}}var Qc=(()=>{let t=[];for(let e=0;e<40;e++)t.push(2**e);return t})();function Ns(t,e=t.length){let r=new Array(e);for(let n=0;n<e;n++)r[n]=t[n];return r}var Ms=(()=>{try{let t=new TextDecoder;return t.decode(Uint8Array.of(65,48,43,127))==="A0+\x7F"?t:void 0}catch{return}})(),Tn=8192;function ea(t){let e=t.length;if(Ms!==void 0&&e>=12)return Ms.decode(t);if(e<=Tn)return String.fromCharCode.apply(null,t);let r="";for(let n=0;n<e;n+=Tn)r+=String.fromCharCode.apply(null,t.subarray(n,n+Tn));return r}function ta(t){if(lr(t),t<=0||t>8)throw new RangeError("radix2: bits should be in (0..8]");let e=Qc[t]-1;return{encode:r=>{ft(r);let n=r.length,o=new Uint8Array(Math.ceil(n*8/t)),s=0,i=0,c=0;for(let a=0;a<n;)for(a+2<n?(s=s<<24|r[a]<<16|r[a+1]<<8|r[a+2],i+=24,a+=3):(s=(s<<8|r[a])&65535,i+=8,a++);i-=t,o[c++]=s>>i&e,!(i<t););return i>0&&(o[c]=s<<t-i&e),o},decode:r=>{let n=r.length,o=new Uint8Array(Math.floor(n*t/8)),s=0,i=0,c=0;for(let a=0;a<n;a++)for(s=(s<<t|r[a])&65535,i+=t;i>=8;i-=8)o[c++]=s>>i-8&255;if(s=s<<8-i&255,i>=t)throw new Error("Excess padding");if(s>0)throw new Error(`Non-zero padding: ${s}`);return o}}}function Zs(t,e){let r=t.length;if(r>128)throw new Error("alphabet: max 128 letters");let n=new Uint8Array(r),o=new Int8Array(128).fill(-1);for(let s=0;s<r;s++){let i=t.charCodeAt(s);if(t.codePointAt(s)!==i||i>127)throw new Error("alphabet: single-char ASCII letters only");n[s]=i,o[i]=s}if(e!==void 0)for(let s of Object.keys(e)){let i=s.charCodeAt(0),c=o[e[s].charCodeAt(0)];if(s.length!==1||i>127||c===void 0||c===-1)throw new Error(`alphabet: invalid alias ${s}`);o[i]=c}return{encode:s=>{let i=new Uint8Array(s.length);for(let c=0;c<s.length;c++){let a=s[c],d=n[a];if(d===void 0)throw new Error(`alphabet.encode: invalid digit ${a}`);i[c]=d}return ea(i)},decode:s=>{_n("decode",s);let i=s.length,c=new Uint8Array(i);for(let a=0;a<i;a++){let d=s.charCodeAt(a),l=d<128?o[d]:-1;if(l===-1)throw new Error(`Unknown letter "${s[a]}". Allowed: ${t}`);c[a]=l}return c}}}function $s(t){return Ln(t),function(...e){try{return t.apply(null,e)}catch{}}}function ra(t,e){if(lr(t),t<=0)throw new RangeError(`checksum length must be positive: ${t}`);Ln(e);let r=e;return{encode(n){ft(n);let o=r(n).slice(0,t),s=new Uint8Array(n.length+t);return s.set(n),s.set(o,n.length),s},decode(n){ft(n);let o=n.slice(0,-t),s=n.slice(-t),i=r(o).slice(0,t);for(let c=0;c<t;c++)if(i[c]!==s[c])throw new Error("Invalid checksum");return o}}}var Ks=656356768,na={encode:t=>{ft(t);let e=t.length;if(e===0)return new Uint8Array(0);let r=0;for(;r<e-1&&t[r]===0;)r++;let n=Math.ceil(e/2),o=new Uint16Array(n),s=e&1;s&&(o[0]=t[0]);for(let h=s,u=s;h<e;h+=2,u++)o[u]=t[h]<<8|t[h+1];let i=[],c=0;for(;c<n;){let h=0;for(let u=c;u<n;u++){let p=h*65536+o[u],b=Math.floor(p/Ks);h=p-b*Ks,o[u]=b,b===0&&u===c&&c++}i.push(h)}let a=i.length-1,d=a*5;for(let h=i[a];d++,!(h<58);h=Math.floor(h/58));let l=new Uint8Array(r+d),f=l.length-1;for(let h=0;h<a;h++){let u=i[h];for(let p=0;p<5;p++)l[f--]=u%58,u=Math.floor(u/58)}for(let h=i[a];f>=r;h=Math.floor(h/58))l[f--]=h%58;return l},decode:t=>{ft(t);let e=t.length;if(e===0)return new Uint8Array(0);if(e>=65536)throw new Error("invalid length");let r=0;for(;r<e-1&&t[r]===0;)r++;let n=new Uint16Array(Math.ceil(e*6/16)+1),o=0,s=0,i=e%5||5;for(;s<e;){let l=0,f=1;for(let u=s+i;s<u;s++){let p=t[s];if(p>=58)throw new Error(`invalid integer: ${p}`);l=l*58+p,f*=58}i=5;let h=l;for(let u=0;u<o;u++){let p=n[u]*f+h;h=Math.floor(p/65536),n[u]=p-h*65536}for(;h>0;h=Math.floor(h/65536))n[o++]=h%65536}let c=o===0?1:o*2-(n[o-1]<256?1:0),a=new Uint8Array(r+c),d=a.length-1;for(let l=0;l<o;l++){let f=n[l];a[d--]=f&255,d>=r&&(a[d--]=f>>8)}return a}},oa=t=>Gs(na,Zs(t)),sa=Ps(()=>oa("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"));var Vs=t=>{Ln(t);let e=t;return Gs(ra(4,r=>e(e(r))),sa)};var Hn=Zs("qpzry9x8gf2tvdw0s3jn54khce6mua7l");function ia(t){let e=t.length,r=new Uint8Array(e);for(let n=0;n<e;n++){let o=t[n];if(o<0||o>=32)throw new Error(`alphabet.encode: invalid digit ${o}`);r[n]=o}return r}var qs=[996825010,642813549,513874426,1027748829,705979059];function Ut(t){let e=t>>25,r=(t&33554431)<<5;for(let n=0;n<qs.length;n++)(e>>n&1)===1&&(r^=qs[n]);return r}function zs(t,e,r=1){let n=t.length,o=1;for(let i=0;i<n;i++){let c=t.charCodeAt(i);if(c<33||c>126)throw new Error(`Invalid prefix (${t})`);o=Ut(o)^c>>5}o=Ut(o);for(let i=0;i<n;i++)o=Ut(o)^t.charCodeAt(i)&31;for(let i of e)o=Ut(o)^i;for(let i=0;i<6;i++)o=Ut(o);o^=r;let s=new Uint8Array(6);for(let i=0;i<6;i++)s[i]=o>>>5*(5-i)&31;return Hn.encode(s)}function ca(t){let e=t==="bech32"?1:734539939,r=ta(5),n=f=>{ft(f);let h=f.length,u=new Array(Math.ceil(h*8/5)),p=0,b=0,y=0;for(let E=0;E<h;E++)for(p=p<<8|f[E],b+=8;b>=5;b-=5)u[y++]=p>>b-5&31;return b>0&&(u[y]=p<<5-b&31),u},o=f=>{js("radix2.decode",f);let h=f.length,u=new Uint8Array(h);for(let p=0;p<h;p++){let b=f[p];if(b<0||b>=32)throw new Error(`convertRadix2: invalid word=${b}`);u[p]=b}return r.decode(u)},s=$s(o);function i(f,h,u=90){_n("bech32.encode prefix",f),u!==!1&&lr(u,"limit"),Ws(h)&&(h=Ns(h)),js("bech32.encode",h);let p=f.length;if(p===0)throw new TypeError(`Invalid prefix length ${p}`);let b=p+7+h.length;if(u!==!1&&b>u)throw new TypeError(`Length ${b} exceeds limit ${u}`);let y=f.toLowerCase(),E=zs(y,h,e);return`${y}1${Hn.encode(ia(h))}${E}`}function c(f,h=90){_n("bech32.decode input",f),h!==!1&&lr(h,"limit");let u=f.length;if(u<8||h!==!1&&u>h)throw new TypeError(`invalid string length ${u}, expected (8..${h})`);let p=f.toLowerCase();if(f!==p&&f!==f.toUpperCase())throw new Error("mixed-case string not allowed");let b=p.lastIndexOf("1");if(b===0||b===-1)throw new Error('invalid separator "1"');let y=p.slice(0,b),E=p.slice(b+1);if(E.length<6)throw new Error("invalid data length");let A=Hn.decode(E),g=Ns(A,A.length-6),_=zs(y,g,e);if(!E.endsWith(_))throw new Error(`Invalid checksum in ${f}`);return{prefix:y,words:g}}let a=$s(c);function d(f){let{prefix:h,words:u}=c(f,!1);return{prefix:h,words:u,bytes:o(u)}}function l(f,h){return i(f,n(h))}return{encode:i,decode:c,encodeFromBytes:l,decodeToBytes:d,decodeUnsafe:a,fromWords:o,fromWordsUnsafe:s,toWords:n}}var Un=Ps(()=>ca("bech32"));var Ct=Re.Point,Ot=Ct.Fn,On=Vs(kn),aa=Uint8Array.from("Bitcoin seed".split(""),t=>t.charCodeAt(0)),Cn={private:76066276,public:76067358},In=2147483648,fa=t=>Fs(kn(t)),da=t=>Fe(t).getUint32(0,!1),dt=(t,e="number")=>{if(typeof t!="number")throw new TypeError(`"${e}" expected number, got type=${typeof t}`);if(!Number.isSafeInteger(t)||t<0||t>2**32-1)throw new RangeError(`"${e}" expected integer in range 0..2**32-1, got ${t}`);let r=new Uint8Array(4);return Fe(r).setUint32(0,t,!1),r},Rn=(t,e="versions")=>{if(!(typeof t=="object"&&t!==null))throw new Error("versions must be an object");return dt(t.private,`${e}.private`),dt(t.public,`${e}.public`),t},hr=class t{get fingerprint(){if(!this.pubHash)throw new Error("No publicKey set!");return da(this.pubHash)}get identifier(){return this.pubHash}get pubKeyHash(){return this.pubHash}get privateKey(){return this._privateKey||null}get publicKey(){return this._publicKey||null}get privateExtendedKey(){let e=this._privateKey;if(!e)throw new Error("No private key");return On.encode(this.serialize(this.versions.private,Tt(Uint8Array.of(0),e)))}get publicExtendedKey(){if(!this._publicKey)throw new Error("No public key");return On.encode(this.serialize(this.versions.public,this._publicKey))}static fromMasterSeed(e,r=Cn){if(oe(e),r=Rn(r),8*e.length<128||8*e.length>512)throw new RangeError("HDKey: seed length must be between 128 and 512 bits; 256 bits is advised, got "+e.length);let n=bn(Sn,aa,e),o=n.slice(0,32),s=n.slice(32);return new t({versions:r,chainCode:s,privateKey:o})}static fromExtendedKey(e,r=Cn){r=Rn(r);let n=On.decode(e),o=Fe(n),s=o.getUint32(0,!1),i={versions:r,depth:n[4],parentFingerprint:o.getUint32(5,!1),index:o.getUint32(9,!1),chainCode:n.slice(13,45)},c=n.slice(45),a=c[0]===0;if(s!==r[a?"private":"public"])throw new Error("Version mismatch");return a?new t({...i,privateKey:c.slice(1)}):new t({...i,publicKey:c})}static fromJSON(e){return t.fromExtendedKey(e.xpriv)}versions;depth=0;index=0;chainCode=null;parentFingerprint=0;_privateKey;_publicKey;pubHash;constructor(e){if(!e||typeof e!="object")throw new Error("HDKey.constructor must not be called directly");if(this.versions=e.versions?Rn(e.versions):Cn,this.depth=e.depth||0,this.chainCode=e.chainCode?Uint8Array.from(e.chainCode):null,this.index=e.index||0,this.parentFingerprint=e.parentFingerprint||0,!this.depth&&(this.parentFingerprint||this.index))throw new Error("HDKey: zero depth with non-zero index/parent fingerprint");if(this.depth>255)throw new Error("HDKey: depth exceeds the serializable value 255");if(e.publicKey&&e.privateKey)throw new Error("HDKey: publicKey and privateKey at same time.");if(e.privateKey){if(!Re.utils.isValidSecretKey(e.privateKey))throw new Error("Invalid private key");this._privateKey=Uint8Array.from(e.privateKey),this._publicKey=Re.getPublicKey(this._privateKey,!0)}else if(e.publicKey)this._publicKey=Ct.fromBytes(e.publicKey).toBytes(!0);else throw new Error("HDKey: no public or private key provided");this.pubHash=fa(this._publicKey)}derive(e){if(!/^[mM]'?/.test(e))throw new Error('Path must start with "m" or "M"');if(/^[mM]'?$/.test(e))return this;let r=e.replace(/^[mM]'?\//,"").split("/"),n=this;for(let o of r){let s=/^(\d+)('?)$/.exec(o),i=s&&s[1];if(!s||s.length!==3||typeof i!="string")throw new Error("invalid child index: "+o);let c=+i;if(!Number.isSafeInteger(c)||c>=In)throw new Error("Invalid index");s[2]==="'"&&(c+=In),n=n.deriveChild(c)}return n}deriveChild(e,r){if(!this._publicKey||!this.chainCode)throw new Error("No publicKey or chainCode set");let n=dt(e,"index");if(e>=In){let a=this._privateKey;if(!a)throw new Error("Could not derive hardened child key");n=Tt(Uint8Array.of(0),a,n)}else n=Tt(this._publicKey,n);let o=r||bn(Sn,this.chainCode,n);oe(o,64);let s=o.slice(0,32),i=o.slice(32),c={versions:this.versions,chainCode:i,depth:this.depth+1,parentFingerprint:this.fingerprint,index:e};if(c.depth>255)throw new Error("HDKey: depth exceeds the serializable value 255");try{let a=Ot.fromBytes(s);if(this._privateKey){let d=Ot.create(Ot.fromBytes(this._privateKey)+a);if(!Ot.isValidNot0(d))throw new Error("The tweak was out of range or the resulted private key is invalid");c.privateKey=Ot.toBytes(d)}else{let d=Ct.fromBytes(this._publicKey),l=a===0n?d:d.add(Ct.BASE.multiply(a));if(l.equals(Ct.ZERO))throw new Error("The tweak was equal to negative P, which made the result key invalid");c.publicKey=l.toBytes(!0)}return new t(c)}catch{return this.deriveChild(e+1)}}sign(e){if(!this._privateKey)throw new Error("No privateKey set!");return oe(e,32),Re.sign(e,this._privateKey,{prehash:!1})}verify(e,r){if(oe(e,32),oe(r,64),!this._publicKey)throw new Error("No publicKey set!");return Re.verify(r,e,this._publicKey,{prehash:!1})}wipePrivateData(){return this._privateKey&&(this._privateKey.fill(0),this._privateKey=void 0),this}toJSON(){return{xpriv:this.privateExtendedKey,xpub:this.publicExtendedKey}}serialize(e,r){if(!this.chainCode)throw new Error("No chainCode set");return oe(r,33),Tt(dt(e,"version"),new Uint8Array([this.depth]),dt(this.parentFingerprint,"parentFingerprint"),dt(this.index,"index"),this.chainCode,r)}};function Fn(t){if(!Number.isSafeInteger(t)||t<0)throw new Error(`Wrong positive integer: ${t}`)}function ua(t){if(typeof t!="boolean")throw new Error(`Expected boolean, not ${t}`)}function Ys(t,...e){if(!(t instanceof Uint8Array))throw new TypeError("Expected Uint8Array");if(e.length>0&&!e.includes(t.length))throw new TypeError(`Expected Uint8Array of length ${e}, not of length=${t.length}`)}function la(t){if(typeof t!="function"||typeof t.create!="function")throw new Error("Hash should be wrapped by utils.wrapConstructor");Fn(t.outputLen),Fn(t.blockLen)}function ha(t,e=!0){if(t.destroyed)throw new Error("Hash instance has been destroyed");if(e&&t.finished)throw new Error("Hash#digest() has already been called")}function pa(t,e){Ys(t);let r=e.outputLen;if(t.length<r)throw new Error(`digestInto() expects output buffer of length at least ${r}`)}var ba={number:Fn,bool:ua,bytes:Ys,hash:la,exists:ha,output:pa},pr=ba;var xa={node:void 0,web:typeof self=="object"&&"crypto"in self?self.crypto:void 0};var xr=t=>new DataView(t.buffer,t.byteOffset,t.byteLength),de=(t,e)=>t<<32-e|t>>>e,ya=new Uint8Array(new Uint32Array([287454020]).buffer)[0]===68;if(!ya)throw new Error("Non little-endian hardware is not supported");var Mf=Array.from({length:256},(t,e)=>e.toString(16).padStart(2,"0"));function ga(t){if(typeof t!="string")throw new TypeError(`utf8ToBytes expected string, got ${typeof t}`);return new TextEncoder().encode(t)}function Dn(t){if(typeof t=="string"&&(t=ga(t)),!(t instanceof Uint8Array))throw new TypeError(`Expected input type is Uint8Array (got ${typeof t})`);return t}var br=class{clone(){return this._cloneInto()}};function It(t){let e=n=>t().update(Dn(n)).digest(),r=t();return e.outputLen=r.outputLen,e.blockLen=r.blockLen,e.create=()=>t(),e}function wa(t,e,r,n){if(typeof t.setBigUint64=="function")return t.setBigUint64(e,r,n);let o=BigInt(32),s=BigInt(4294967295),i=Number(r>>o&s),c=Number(r&s),a=n?4:0,d=n?0:4;t.setUint32(e+a,i,n),t.setUint32(e+d,c,n)}var ut=class extends br{constructor(e,r,n,o){super(),this.blockLen=e,this.outputLen=r,this.padOffset=n,this.isLE=o,this.finished=!1,this.length=0,this.pos=0,this.destroyed=!1,this.buffer=new Uint8Array(e),this.view=xr(this.buffer)}update(e){pr.exists(this);let{view:r,buffer:n,blockLen:o}=this;e=Dn(e);let s=e.length;for(let i=0;i<s;){let c=Math.min(o-this.pos,s-i);if(c===o){let a=xr(e);for(;o<=s-i;i+=o)this.process(a,i);continue}n.set(e.subarray(i,i+c),this.pos),this.pos+=c,i+=c,this.pos===o&&(this.process(r,0),this.pos=0)}return this.length+=e.length,this.roundClean(),this}digestInto(e){pr.exists(this),pr.output(e,this),this.finished=!0;let{buffer:r,view:n,blockLen:o,isLE:s}=this,{pos:i}=this;r[i++]=128,this.buffer.subarray(i).fill(0),this.padOffset>o-i&&(this.process(n,0),i=0);for(let f=i;f<o;f++)r[f]=0;wa(n,o-8,BigInt(this.length*8),s),this.process(n,0);let c=xr(e),a=this.outputLen;if(a%4)throw new Error("_sha2: outputLen should be aligned to 32bit");let d=a/4,l=this.get();if(d>l.length)throw new Error("_sha2: outputLen bigger than state");for(let f=0;f<d;f++)c.setUint32(4*f,l[f],s)}digest(){let{buffer:e,outputLen:r}=this;this.digestInto(e);let n=e.slice(0,r);return this.destroy(),n}_cloneInto(e){e||(e=new this.constructor),e.set(...this.get());let{blockLen:r,buffer:n,length:o,finished:s,destroyed:i,pos:c}=this;return e.length=o,e.pos=c,e.finished=s,e.destroyed=i,o%r&&e.buffer.set(n),e}};var ma=new Uint8Array([7,4,13,1,10,6,15,3,12,0,9,5,2,14,11,8]),Js=Uint8Array.from({length:16},(t,e)=>e),Ea=Js.map(t=>(9*t+5)%16),Nn=[Js],Mn=[Ea];for(let t=0;t<4;t++)for(let e of[Nn,Mn])e.push(e[t].map(r=>ma[r]));var Qs=[[11,14,15,12,5,8,7,9,11,13,14,15,6,7,9,8],[12,13,11,15,6,9,9,7,12,15,11,13,7,8,7,7],[13,15,14,11,7,7,6,8,13,14,13,12,5,5,6,9],[14,11,12,14,8,6,5,5,15,12,15,14,9,9,8,6],[15,12,13,13,9,5,8,6,14,11,12,11,8,6,5,5]].map(t=>new Uint8Array(t)),Ba=Nn.map((t,e)=>t.map(r=>Qs[e][r])),va=Mn.map((t,e)=>t.map(r=>Qs[e][r])),Aa=new Uint32Array([0,1518500249,1859775393,2400959708,2840853838]),ka=new Uint32Array([1352829926,1548603684,1836072691,2053994217,0]),yr=(t,e)=>t<<e|t>>>32-e;function Xs(t,e,r,n){return t===0?e^r^n:t===1?e&r|~e&n:t===2?(e|~r)^n:t===3?e&n|r&~n:e^(r|~n)}var gr=new Uint32Array(16),jn=class extends ut{constructor(){super(64,20,8,!0),this.h0=1732584193,this.h1=-271733879,this.h2=-1732584194,this.h3=271733878,this.h4=-1009589776}get(){let{h0:e,h1:r,h2:n,h3:o,h4:s}=this;return[e,r,n,o,s]}set(e,r,n,o,s){this.h0=e|0,this.h1=r|0,this.h2=n|0,this.h3=o|0,this.h4=s|0}process(e,r){for(let u=0;u<16;u++,r+=4)gr[u]=e.getUint32(r,!0);let n=this.h0|0,o=n,s=this.h1|0,i=s,c=this.h2|0,a=c,d=this.h3|0,l=d,f=this.h4|0,h=f;for(let u=0;u<5;u++){let p=4-u,b=Aa[u],y=ka[u],E=Nn[u],A=Mn[u],g=Ba[u],_=va[u];for(let S=0;S<16;S++){let F=yr(n+Xs(u,s,c,d)+gr[E[S]]+b,g[S])+f|0;n=f,f=d,d=yr(c,10)|0,c=s,s=F}for(let S=0;S<16;S++){let F=yr(o+Xs(p,i,a,l)+gr[A[S]]+y,_[S])+h|0;o=h,h=l,l=yr(a,10)|0,a=i,i=F}}this.set(this.h1+c+l|0,this.h2+d+h|0,this.h3+f+o|0,this.h4+n+i|0,this.h0+s+a|0)}roundClean(){gr.fill(0)}destroy(){this.destroyed=!0,this.buffer.fill(0),this.set(0,0,0,0,0)}},ei=It(()=>new jn);var Sa=(t,e,r)=>t&e^~t&r,Ta=(t,e,r)=>t&e^t&r^e&r,_a=new Uint32Array([1116352408,1899447441,3049323471,3921009573,961987163,1508970993,2453635748,2870763221,3624381080,310598401,607225278,1426881987,1925078388,2162078206,2614888103,3248222580,3835390401,4022224774,264347078,604807628,770255983,1249150122,1555081692,1996064986,2554220882,2821834349,2952996808,3210313671,3336571891,3584528711,113926993,338241895,666307205,773529912,1294757372,1396182291,1695183700,1986661051,2177026350,2456956037,2730485921,2820302411,3259730800,3345764771,3516065817,3600352804,4094571909,275423344,430227734,506948616,659060556,883997877,958139571,1322822218,1537002063,1747873779,1955562222,2024104815,2227730452,2361852424,2428436474,2756734187,3204031479,3329325298]),Me=new Uint32Array([1779033703,3144134277,1013904242,2773480762,1359893119,2600822924,528734635,1541459225]),$e=new Uint32Array(64),wr=class extends ut{constructor(){super(64,32,8,!1),this.A=Me[0]|0,this.B=Me[1]|0,this.C=Me[2]|0,this.D=Me[3]|0,this.E=Me[4]|0,this.F=Me[5]|0,this.G=Me[6]|0,this.H=Me[7]|0}get(){let{A:e,B:r,C:n,D:o,E:s,F:i,G:c,H:a}=this;return[e,r,n,o,s,i,c,a]}set(e,r,n,o,s,i,c,a){this.A=e|0,this.B=r|0,this.C=n|0,this.D=o|0,this.E=s|0,this.F=i|0,this.G=c|0,this.H=a|0}process(e,r){for(let f=0;f<16;f++,r+=4)$e[f]=e.getUint32(r,!1);for(let f=16;f<64;f++){let h=$e[f-15],u=$e[f-2],p=de(h,7)^de(h,18)^h>>>3,b=de(u,17)^de(u,19)^u>>>10;$e[f]=b+$e[f-7]+p+$e[f-16]|0}let{A:n,B:o,C:s,D:i,E:c,F:a,G:d,H:l}=this;for(let f=0;f<64;f++){let h=de(c,6)^de(c,11)^de(c,25),u=l+h+Sa(c,a,d)+_a[f]+$e[f]|0,b=(de(n,2)^de(n,13)^de(n,22))+Ta(n,o,s)|0;l=d,d=a,a=c,c=i+u|0,i=s,s=o,o=n,n=u+b|0}n=n+this.A|0,o=o+this.B|0,s=s+this.C|0,i=i+this.D|0,c=c+this.E|0,a=a+this.F|0,d=d+this.G|0,l=l+this.H|0,this.set(n,o,s,i,c,a,d,l)}roundClean(){$e.fill(0)}destroy(){this.set(0,0,0,0,0,0,0,0),this.buffer.fill(0)}},$n=class extends wr{constructor(){super(),this.A=-1056596264,this.B=914150663,this.C=812702999,this.D=-150054599,this.E=-4191439,this.F=1750603025,this.G=1694076839,this.H=-1090891868,this.outputLen=28}},ti=It(()=>new wr),Yf=It(()=>new $n);var _i=Ki(Ti(),1),i0=22,Hi=t=>ei(ti(t)),c0=t=>Array.from(t,e=>e.toString(16).padStart(2,"0")).join(""),a0=t=>Uint8Array.from(t.match(/.{2}/g)??[],e=>parseInt(e,16));function Jn(t){return(0,_i.c32address)(i0,c0(Hi(t)))}function Qn(t){return Un.encode("bc",[0,...Un.toWords(Hi(t))])}var Li=[{name:"leather",path:t=>`m/44'/5757'/0'/0/${t}`,label:t=>`Account ${t+1}`},{name:"hardened",path:t=>`m/44'/5757'/${t}'/0/0`,label:t=>`hardened ${t}`}],Ui=t=>`m/84'/0'/${t}'/0/0`;function f0(t){return jr(String(t).trim().replace(/\s+/g," "),Nr)}function Oi(t){return/^[0-9a-fA-F]{64}(01)?$/.test(String(t).trim())}function d0(t,e,r){let n=String(t).trim().replace(/\s+/g," ");if(Oi(n)){if(e>0)return[];let i=n.slice(0,64),c=Re.getPublicKey(a0(i),!0);return[{index:0,convention:"raw key",account:"the key itself",path:"(no derivation)",stacks:Jn(c),btc:Qn(c)}]}if(!jr(n,Nr))throw new Error("That is not a valid recovery phrase or private key. A phrase is 12 or 24 lowercase words; a key is 64 hex characters. Nothing has been derived.");let o=hr.fromMasterSeed(ko(n)),s=[];for(let i of Li)for(let c=e;c<e+r;c++){let a=o.derive(i.path(c));if(!a.privateKey)continue;let d=Jn(a.publicKey),l=null;if(i.name==="leather"){let f=o.derive(Ui(c));f.publicKey&&(l=Qn(f.publicKey))}s.push({index:c,convention:i.name,account:i.label(c),path:i.path(c),stacks:d,btc:l})}return s}return qi(u0);})();
+/*! Bundled license information:
+
+@noble/hashes/utils.js:
+@noble/hashes/esm/utils.js:
+  (*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) *)
+
+@scure/bip39/index.js:
+  (*! scure-bip39 - MIT License (c) 2022 Patricio Palladino, Paul Miller (paulmillr.com) *)
+
+@noble/curves/utils.js:
+@noble/curves/abstract/modular.js:
+@noble/curves/abstract/curve.js:
+@noble/curves/abstract/der.js:
+@noble/curves/abstract/weierstrass.js:
+@noble/curves/secp256k1.js:
+  (*! noble-curves - MIT License (c) 2022 Paul Miller (paulmillr.com) *)
+
+@scure/base/index.js:
+  (*! scure-base - MIT License (c) 2022 Paul Miller (paulmillr.com) *)
+
+@scure/bip32/index.js:
+  (*! scure-bip32 - MIT License (c) 2022 Patricio Palladino, Paul Miller (paulmillr.com) *)
+*/
+</script>
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+
+  /**
+   * How many empty accounts in a row before a scan stops.
+   *
+   * Twenty is the BIP44 gap limit and every wallet uses it, which is what makes
+   * it the right number here: a scan that stopped at the first empty account
+   * would miss a wallet whose owner made accounts 1 and 40, and one that never
+   * stopped would run forever on a phrase with nothing on it.
+   */
+  const GAP_LIMIT = 20;
+
+  /** Derived in batches, so a long scan shows progress instead of freezing. */
+  const BATCH = 5;
+
+  let scanning = false;
+
+  /** Anything at all, on either chain. An account with only dust still counts. */
+  function populated(row) {
+    return Boolean(
+      (row.stx ?? 0) > 0 ||
+        row.bns?.length ||
+        row.nfts?.length ||
+        row.fts?.length ||
+        (row.btc && !row.btc.error && BigInt(row.btc.sats ?? 0) > 0n)
+    );
+  }
+
+  $('scan').addEventListener('click', async () => {
+    const secret = $('secret').value.trim().replace(/\s+/g, ' ');
+    if (!secret) { $('scan-status').textContent = 'Enter a phrase or a key first.'; return; }
+
+    let found = [];
+    const pairs = {};
+    const sources = {};
+    let gap = 0;
+    let index = 0;
+    scanning = true;
+    $('scan').disabled = true;
+    $('stop-scan').disabled = false;
+
+    try {
+      // Validated BEFORE anything is scanned, so a typo is a sentence rather
+      // than a hundred empty accounts and a shrug.
+      XKEY.accountsFrom(secret, 0, 1);
+
+      while (scanning && gap < GAP_LIMIT) {
+        const batch = XKEY.accountsFrom(secret, index, BATCH);
+        if (!batch.length) break;
+        for (const account of batch) {
+          if (account.btc) pairs[account.stacks] = account.btc;
+          sources[account.stacks] = { seed: 'this phrase', account: account.account };
+          found.push(account);
+        }
+        // Only the Leather line paces the gap. The hardened shape is a
+        // secondary search and its emptiness says nothing about where to stop.
+        const leather = batch.filter((a) => a.convention === 'leather');
+        const active = await Promise.all(
+          leather.map((a) => window.__probe(a.stacks, pairs[a.stacks]))
+        );
+        for (const row of active) gap = populated(row) ? 0 : gap + 1;
+        index += BATCH;
+        $('scan-status').textContent =
+          `Scanned ${index} account(s); ${gap} empty in a row (stops at ${GAP_LIMIT}).`;
+        if (batch.length < BATCH * 2) break; // a raw key: one account, no tree
+      }
+
+      const keepEmpty = $('keep-empty').checked;
+      const rows = await window.__inventoryAll(
+        found.map((a) => a.stacks),
+        pairs,
+        sources
+      );
+      const shown = keepEmpty ? rows : rows.filter(populated);
+      $('addresses').value = shown.map((r) => r.address).join('\n');
+      $('scan-status').textContent =
+        `Done. ${found.length} address(es) derived, ${rows.filter(populated).length} with something on them` +
+        (keepEmpty ? '.' : ', empty ones hidden.');
+
+      // WIPED. The scan is over and the phrase has no further use, so it stops
+      // existing rather than sitting in a field behind a page somebody walks
+      // away from.
+      $('secret').value = '';
+    } catch (error) {
+      $('scan-status').textContent = String(error?.message ?? error);
+      $('scan-status').className = 'status bad';
+    } finally {
+      scanning = false;
+      $('scan').disabled = false;
+      $('stop-scan').disabled = true;
+    }
+  });
+
+  $('stop-scan').addEventListener('click', () => {
+    scanning = false;
+    $('scan-status').textContent = 'Stopping after this batch…';
+  });
+
+  $('forget').addEventListener('click', () => {
+    $('secret').value = '';
+    $('scan-status').textContent = 'Cleared.';
+  });
+
+  $('gap-label').textContent = String(GAP_LIMIT);
+})();
+</script>
+
+<script>
+(() => {
+  'use strict';
+
+  const API = 'https://api.mainnet.hiro.so';
+  const BNS_V2 = 'SP2QEZ06AGJ3RKJPBV14SY1V5BBFNAW33D96YPGZF.BNS-V2';
+  const BNS_ASSET = BNS_V2 + '::BNS-V2';
+  const [BNS_ADDR, BNS_NAME] = BNS_V2.split('.');
+
+  const $ = (id) => document.getElementById(id);
+  /** Attribute-safe. A token name is contract-authored and may contain anything. */
+  const esc = (text) =>
+    String(text).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const PRINCIPAL = /\bS[PM][0-9A-HJKMNP-TV-Z]{20,}\b/g;
+
+  let stopped = false;
+  let current = null;   // the inventory just taken
+  let baseline = null;  // a snapshot loaded from disk
+
+  /**
+   * How long to wait before a retry pass, in ms.
+   *
+   * Longer than the in-request backoff on purpose. `Failed to fetch` is the
+   * browser refusing or a connection dying rather than a server saying no, and
+   * that clears on a fresh connection rather than on a fast retry - so the
+   * second pass is a genuinely separate attempt, not another rung of the same
+   * ladder.
+   */
+  const RETRY_PAUSE_MS = 3000;
+
+  /**
+   * Bumped when a row gains a field the renderer reads.
+   *
+   * A snapshot is a file that outlives the code that wrote it, and resuming
+   * from one mixes old rows with new. Stamping it means a stale one is
+   * SAID rather than inferred from a column reading "undefined".
+   */
+  const SNAPSHOT_FORMAT = 2;
+
+  /**
+   * Token metadata, cached by contract for the life of the tab.
+   *
+   * A balance without decimals is a number nobody can read: the same holding is
+   * "1000000" or "1.0" depending on a field the balances endpoint does not
+   * return. Fetched once per CONTRACT rather than once per wallet - eighty-seven
+   * token types across four hundred wallets is eighty-seven requests, not
+   * thousands - and best effort throughout, because a token whose metadata is
+   * missing should still show its raw balance rather than vanishing.
+   */
+  const ftMeta = new Map();
+
+  /**
+   * The tokens that get their own column, BY EXACT CONTRACT.
+   *
+   * NEVER BY SYMBOL, and the reason is not theoretical. Searching Hiro's token
+   * index for "sBTC" returns thirty-two results including several "Mock sBTC"
+   * and one called *buttcoin* that simply claims the symbol. A symbol is a
+   * string a contract asserts about itself and anybody may assert any string, so
+   * a column headed sBTC that matched on it would eventually show somebody's
+   * scam token as a Bitcoin balance.
+   *
+   * Every entry below was verified on chain: the contract is deployed, and the
+   * decimals and symbol were read from the contract itself rather than an index
+   * describing it.
+   */
+  const HEADLINE = Object.freeze([
+    { label: 'sBTC', contract: 'SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.sbtc-token', decimals: 8 },
+    { label: 'xBTC', contract: 'SP3DX3H4FEYZJZ586MFBS25ZW3HZDMEW92260R2PR.Wrapped-Bitcoin', decimals: 8 },
+    { label: 'aeUSDC', contract: 'SP31MH65V85NDTM30FJBKP4JNC39HR1ZX3CRW9Z97.token-aeusdc', decimals: 6 },
+    { label: 'USDC', contract: 'SP2DBFGMT7SATSJPCCA38SDDPBNNQ86QWADJ3E6WT.usdc', decimals: 6 }
+  ]);
+  const HEADLINE_CONTRACTS = new Set(HEADLINE.map((t) => t.contract));
+
+  /**
+   * Stacks principal -> the Bitcoin address Leather pairs with it.
+   *
+   * Supplied by the generator, because this page cannot derive it: the pairing
+   * comes from a seed, and this page never sees one. No pairing means no Bitcoin
+   * column, which is the honest default.
+   */
+  const BTC_PAIRS = (() => {
+    try { return JSON.parse($('btc-pairs')?.textContent || '{}'); } catch { return {}; }
+  })();
+  // Always true in the scanner: the pairing arrives after load, so a column
+  // decided at load time would never appear.
+  const HAS_BTC = true;
+
+  /**
+   * Stacks principal -> { seed, account }, from the labels in the seed file.
+   *
+   * The labels are yours: whatever sits before the colon on each line of
+   * `.seed`. They exist because a multi-seed report without them says "twelve
+   * unreachable", which is a fact nobody can act on, while "unreachable, and the
+   * OG-Hiro seed was not loaded" says what to fetch next.
+   *
+   * AN ADDRESS MISSING FROM THIS MAP IS THE INTERESTING CASE. It got into the
+   * list some other way - a name owner no seed derives - so the column says so
+   * rather than leaving a blank, and that column doubles as "can the rescue
+   * touch this wallet at all".
+   */
+  const SOURCES = (() => {
+    try { return JSON.parse($('address-sources')?.textContent || '{}'); } catch { return {}; }
+  })();
+  const HAS_SOURCES = true;
+
+  /**
+   * Bitcoin balance, from an Esplora API.
+   *
+   * NOT HIRO, and not for want of trying: their Ordinals, Runes and BRC-20 APIs
+   * all answer 410 Gone - deprecated - and the Stacks balances endpoint rejects
+   * a bech32 address outright. So this is a second host, added deliberately,
+   * with a fallback to a second implementation of the same API.
+   *
+   * Both send `access-control-allow-origin: *`, so a file:// page can call them.
+   */
+  const BTC_HOSTS = ['https://mempool.space/api', 'https://blockstream.info/api'];
+
+  async function btcBalance(address) {
+    let last = null;
+    for (const host of BTC_HOSTS) {
+      try {
+        const response = await fetch(`${host}/address/${address}`);
+        if (!response.ok) { last = `HTTP ${response.status}`; continue; }
+        const body = await response.json();
+        const confirmed =
+          BigInt(body.chain_stats.funded_txo_sum) - BigInt(body.chain_stats.spent_txo_sum);
+        const pending =
+          BigInt(body.mempool_stats.funded_txo_sum) - BigInt(body.mempool_stats.spent_txo_sum);
+        return {
+          // A STRING, not a BigInt. Anything stored on a row ends up in
+          // JSON.stringify when the snapshot is saved, and a BigInt makes that
+          // THROW - which is exactly how the Save button stopped working the
+          // moment Bitcoin balances arrived. A row must be serialisable by
+          // construction, not by luck.
+          sats: (confirmed + pending).toString(),
+          txCount: body.chain_stats.tx_count + body.mempool_stats.tx_count,
+          utxos: body.chain_stats.funded_txo_count - body.chain_stats.spent_txo_count
+        };
+      } catch (error) {
+        last = error.message;
+      }
+    }
+    return { error: last ?? 'unreachable' };
+  }
+
+  /** Sats, shown as sats. A number in BTC hides the ones that matter. */
+  const sats = (n) => `${n.toLocaleString('en-US')}`;
+
+  async function metaFor(assetId) {
+    const contract = assetId.split('::')[0];
+    if (ftMeta.has(contract)) return ftMeta.get(contract);
+    let meta = null;
+    try {
+      // THE CONTRACT, not the metadata endpoint. `/metadata/v1/ft/...` answers
+      // 200 with a name, a symbol and a total supply and NO decimals field at
+      // all for plenty of real tokens - so a run built on it silently formatted
+      // every balance as though it had none. SIP-010 defines `get-decimals` on
+      // the token itself, which is the authority rather than an index of it.
+      const [address, name] = contract.split('.');
+      const response = await fetch(
+        `${API}/v2/contracts/call-read/${address}/${name}/get-decimals`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers() },
+          body: JSON.stringify({ sender: address, arguments: [] })
+        }
+      );
+      if (response.ok) {
+        const body = await response.json();
+        // (ok uN) serialises as 0x07 01 <16 bytes big-endian>.
+        const hex = String(body.result ?? '').replace(/^0x/, '');
+        if (body.okay && hex.startsWith('0701')) {
+          meta = { decimals: parseInt(hex.slice(4, 36), 16) };
+        }
+      }
+    } catch {
+      // Best effort throughout. A raw number beats no number, and a token whose
+      // contract will not answer should still show what it holds.
+    }
+    ftMeta.set(contract, meta);
+    return meta;
+  }
+
+  /** A balance, in whatever units the token actually uses. */
+  function formatAmount(raw, meta) {
+    if (raw === undefined || raw === null || raw === '') return 'amount not recorded';
+    const decimals = meta?.decimals ?? 0;
+    if (!decimals) return `${BigInt(raw).toLocaleString('en-US')} (raw)`;
+    const negative = BigInt(raw) < 0n;
+    const digits = (negative ? -BigInt(raw) : BigInt(raw)).toString().padStart(decimals + 1, '0');
+    const whole = digits.slice(0, -decimals);
+    const part = digits.slice(-decimals).replace(/0+$/, '');
+    return `${negative ? '-' : ''}${BigInt(whole).toLocaleString('en-US')}${part ? '.' + part : ''}`;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  const headers = () => {
+    const key = $('apikey').value.trim();
+    // Both spellings, because the proxy in this project sends both and it costs
+    // nothing to match it. Hiro lists X-Api-Key AND X-Hiro-Api-Key in its
+    // Access-Control-Allow-Headers, so neither breaks the preflight.
+    return key ? { 'x-api-key': key, 'x-hiro-api-key': key } : {};
+  };
+
+  /**
+   * Retried with backoff, and a failure is reported as a FAILURE.
+   *
+   * The one thing this page must never do is render a rate limit as an empty
+   * wallet. "You own nothing here" and "nobody answered" look identical in a
+   * table and mean opposite things, so a read that could not be made is marked
+   * rather than counted as zero.
+   */
+  async function get(path, tries = 6) {
+    let last = 'no attempt made';
+    for (let attempt = 0; attempt < tries; attempt++) {
+      if (stopped) throw new Error('stopped');
+      try {
+        const response = await fetch(API + path, { headers: headers() });
+        if (response.ok) return await response.json();
+        if (response.status === 404) return null;
+        // Kept, not collapsed. A 429 and a 502 and a blocked request all used to
+        // arrive in the table as the single word "unread", which meant the one
+        // question worth asking - WHY - could not be answered from the screen.
+        last = `HTTP ${response.status}`;
+        if (response.status !== 429 && response.status !== 502 && response.status !== 503) {
+          throw new Error(`${last} on ${path.split('?')[0]}`);
+        }
+      } catch (error) {
+        // A fetch that rejects rather than answering is a different animal from
+        // one that answered badly: it is CORS, a dropped connection, or the
+        // browser refusing. TypeError is what fetch throws for all three, and
+        // the message is the only clue there is.
+        last = error.name === 'TypeError' ? `blocked or dropped (${error.message})` : error.message;
+        if (attempt === tries - 1) throw new Error(last);
+      }
+      await new Promise((done) => setTimeout(done, 600 * 2 ** attempt));
+    }
+    throw new Error(`${last} after ${tries} attempts`);
+  }
+
+  /** Clarity buff / uint arguments, hand-encoded. Bare hex, no 0x prefix. */
+  const uintArg = (n) => '01' + BigInt(n).toString(16).padStart(32, '0');
+
+  async function readOnly(fn, args) {
+    const response = await fetch(`${API}/v2/contracts/call-read/${BNS_ADDR}/${BNS_NAME}/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers() },
+      body: JSON.stringify({ sender: BNS_ADDR, arguments: args })
+    });
+    if (!response.ok) return null;
+    const body = await response.json();
+    return body.okay ? body.result : null;
+  }
+
+  /**
+   * A BNS token id back into a readable name.
+   *
+   * `get-bns-from-id` returns a tuple of two buffers. Decoding the serialised
+   * form by hand beats shipping a Clarity deserialiser in a page that has no
+   * build step: find the two length-prefixed buffers and read them as ASCII.
+   */
+  async function nameOfToken(id) {
+    const hex = await readOnly('get-bns-from-id', [uintArg(id)]);
+    if (!hex) return null;
+    const bytes = hex.replace(/^0x/, '');
+    const found = [];
+    // 0x02 then a 4-byte length then the bytes. Scan for that shape.
+    for (let at = 0; at + 10 <= bytes.length; ) {
+      if (bytes.slice(at, at + 2) !== '02') { at += 2; continue; }
+      const length = parseInt(bytes.slice(at + 2, at + 10), 16);
+      if (!Number.isFinite(length) || length === 0 || length > 48) { at += 2; continue; }
+      const body = bytes.slice(at + 10, at + 10 + length * 2);
+      if (body.length < length * 2) { at += 2; continue; }
+      let text = '';
+      for (let i = 0; i < body.length; i += 2) text += String.fromCharCode(parseInt(body.slice(i, i + 2), 16));
+      if (/^[\x20-\x7e]+$/.test(text)) { found.push(text); at += 10 + length * 2; } else { at += 2; }
+    }
+    if (found.length >= 2) return `${found[0]}.${found[1]}`;
+    return found[0] ?? null;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  async function inventory(address) {
+    const row = { address, stx: null, bns: [], nfts: [], fts: [], error: null };
+    try {
+      const balances = await get(`/extended/v1/address/${address}/balances`);
+      row.stx = balances ? Number(balances.stx.balance) / 1e6 : 0;
+      row.fts = Object.entries(balances?.fungible_tokens ?? {})
+        .filter(([, v]) => BigInt(v.balance) > 0n)
+        .map(([id, v]) => ({ id, balance: v.balance }));
+      // The headline tokens come out of the shared list and into their own
+      // columns. Matched on the CONTRACT half of the asset identifier, so a
+      // token claiming the symbol cannot land in the wrong column.
+      row.headline = {};
+      // The RAW balance too, kept alongside the display string. A total cannot
+      // be built by parsing formatted numbers back - "1,234.5" and "1234.5" and
+      // "0 (raw)" are three different parsing problems - so the number that gets
+      // summed is the one the chain returned.
+      row.headlineRaw = {};
+      for (const token of HEADLINE) {
+        const held = row.fts.find((f) => f.id.split('::')[0] === token.contract);
+        row.headline[token.label] = held
+          ? formatAmount(held.balance, { decimals: token.decimals })
+          : null;
+        row.headlineRaw[token.label] = held ? String(held.balance) : null;
+      }
+      row.fts = row.fts.filter((f) => !HEADLINE_CONTRACTS.has(f.id.split('::')[0]));
+
+      // Decimals for everything left, so the hover shows a number rather than a
+      // digit soup. Cached per contract, so this costs nothing after the first
+      // wallet holding it.
+      for (const ft of row.fts) {
+        const meta = await metaFor(ft.id);
+        ft.amount = formatAmount(ft.balance, meta);
+        ft.decimals = meta?.decimals ?? null;
+      }
+
+      const holdings = await get(
+        `/extended/v1/tokens/nft/holdings?principal=${address}&limit=200`
+      );
+      for (const item of holdings?.results ?? []) {
+        const asset = item.asset_identifier ?? '';
+        const idMatch = /u(\d+)/.exec(item.value?.repr ?? '');
+        const id = idMatch ? Number(idMatch[1]) : null;
+        if (asset === BNS_ASSET && id !== null) {
+          row.bns.push({ id, name: await nameOfToken(id) });
+        } else {
+          row.nfts.push({ asset, id });
+        }
+      }
+    } catch (error) {
+      // Marked, never silently zeroed, and marked with WHAT WENT WRONG. See
+      // `get`. Also to the console, because a long run scrolls and the console
+      // keeps every one of them.
+      row.error = String(error.message ?? error);
+      console.error(`[inventory] ${address}: ${row.error}`);
+    }
+
+    // Bitcoin last and separately: a different host, and a failure there must
+    // not mark the whole Stacks row unread.
+    const btcAddress = BTC_PAIRS[address];
+    if (btcAddress) {
+      row.btcAddress = btcAddress;
+      row.btc = await btcBalance(btcAddress);
+    }
+    return row;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  /**
+   * The Bitcoin cell, with the warning that belongs on it.
+   *
+   * A busy address is very likely an ORDINALS address, and on one of those a
+   * "balance" is not spendable money - it is inscriptions sitting in UTXOs, and
+   * sweeping it destroys them. The tooltip says so wherever the transaction
+   * count suggests it, because a number labelled "balance" invites exactly the
+   * action that loses the thing.
+   */
+  function btcCell(row) {
+    // DERIVED, not trusted. A row carried over from a snapshot has no
+    // `btcAddress` - the same failure that printed "undefined" for token
+    // amounts - so the pairing is looked up here and the cell says whether the
+    // balance was actually fetched.
+    const paired = row.btcAddress ?? BTC_PAIRS[row.address] ?? null;
+    if (!paired) return '<td class="num zero">—</td>';
+    if (!row.btc) {
+      return (
+        `<td class="num zero" title="${esc(paired)}\n\nNot read in this run. ` +
+        `Resume or retry to fetch it.">not read</td>`
+      );
+    }
+    if (row.btc?.error) {
+      return `<td class="num bad" title="${esc(row.btc.error)}">unread</td>`;
+    }
+    const value = BigInt(row.btc?.sats ?? 0);
+    const busy = (row.btc?.txCount ?? 0) > 20;
+    const note =
+      `${paired}\n${row.btc?.utxos ?? 0} UTXO(s), ${row.btc?.txCount ?? 0} tx` +
+      (busy
+        ? '\n\nWARNING: heavily used, so this is very likely an ordinals address.' +
+          '\nA balance here may BE inscriptions sitting in UTXOs. Sweeping it' +
+          '\nspends them, and they do not come back. Check before moving anything.'
+        : '');
+    return (
+      `<td class="num${value === 0n ? ' zero' : ''}${busy ? ' warn' : ''}" ` +
+      `title="${esc(note)}">${value === 0n ? '—' : sats(value)}${busy ? ' ⚠' : ''}</td>`
+    );
+  }
+
+  /**
+   * Which seed this address came from, or that none did.
+   *
+   * Derived from the injected map rather than stored on the row, so a snapshot
+   * taken before this column existed still fills it in.
+   */
+  function sourceCell(address) {
+    const from = SOURCES[address];
+    if (!from) {
+      return (
+        '<td class="src none" title="No loaded seed derives this address. It is here ' +
+        'because it holds one of your names.\n\nThe rescue cannot move it: only the ' +
+        'owner can sign, and that key is on a seed not in the file.">not derived</td>'
+      );
+    }
+    return (
+      `<td class="src" title="${esc(`${from.seed}\n${from.account}`)}">` +
+      `${esc(from.seed)}<br><span class="who">${esc(from.account)}</span></td>`
+    );
+  }
+
+  function render(rows) {
+    const wrap = $('results');
+    wrap.innerHTML = '';
+    const table = document.createElement('table');
+    table.innerHTML =
+      '<thead><tr><th>address</th>' +
+      (HAS_SOURCES ? '<th>from</th>' : '') +
+      '<th class="num">STX</th>' +
+      HEADLINE.map((t) => `<th class="num">${t.label}</th>`).join('') +
+      (HAS_BTC ? '<th class="num">BTC (sats)</th>' : '') +
+      '<th>BNS names</th><th>other NFTs</th><th>tokens</th></tr></thead>';
+    const body = document.createElement('tbody');
+
+    for (const row of rows) {
+      const tr = document.createElement('tr');
+      const names = row.bns.map((b) => `<span class="tag">${b.name ?? '#' + b.id}</span>`).join('');
+      // Everything detailed lives in a title rather than on screen. The table
+      // has to stay scannable across four hundred rows, and a wallet holding
+      // eighty tokens would otherwise be a page of its own.
+      const byContract = new Map();
+      for (const nft of row.nfts) {
+        byContract.set(nft.asset, (byContract.get(nft.asset) ?? 0) + 1);
+      }
+      // A DETAILS ELEMENT, not a tooltip and not a column.
+      //
+      // One wallet here holds 53 NFTs across 9 contracts. On screen that is a
+      // page; in a title attribute it is a nine-line hover you cannot select,
+      // cannot scroll and cannot read on a phone. Closed it costs one line, open
+      // it names every contract with its count, and it needs no script - so it
+      // survives whatever else changes here.
+      const nfts = row.nfts.length
+        ? `<details class="nfts"><summary>${row.nfts.length} from ${byContract.size} contract(s)</summary>` +
+          `<ul>${[...byContract]
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+            .map(([asset, n]) => {
+              const [contract, token] = asset.split('::');
+              return (
+                `<li><b>${esc(token ?? asset)}</b> <span class="count">(${n})</span>` +
+                `<br><span class="who">${esc(contract)}</span></li>`
+              );
+            })
+            .join('')}</ul></details>`
+        : '<span style="color:var(--muted)">—</span>';
+      const tokenTag = (f) => {
+              // DERIVED AT RENDER TIME, never trusted from the row.
+              //
+              // A row carried over from a snapshot was written by whatever
+              // version took it, and an older one has no `amount` field at all -
+              // so this printed the string "undefined" as a balance, for the
+              // same token that showed 40,000 one row below. A number nobody can
+              // rely on is worse than a raw one, and a snapshot is a file that
+              // outlives the code that wrote it.
+        const amount =
+          f.amount ?? formatAmount(f.balance, ftMeta.get(f.id.split('::')[0]) ?? null);
+        return `<span class="tag tag--hover" title="${esc(
+          `${amount}\n${f.id}`
+        )}">${esc(f.id.split('::').pop())}</span>`;
+      };
+
+      // A few on screen, the rest one click away. One wallet here holds
+      // eighty-seven token types, which as a wall of tags is a screenful for a
+      // single row and pushes every other column out of view.
+      const TOKENS_SHOWN = 4;
+      const fts = !row.fts.length
+        ? '<span style="color:var(--muted)">—</span>'
+        : row.fts.length <= TOKENS_SHOWN
+          ? row.fts.map(tokenTag).join('')
+          : row.fts.slice(0, TOKENS_SHOWN).map(tokenTag).join('') +
+            `<details class="nfts"><summary>${row.fts.length - TOKENS_SHOWN} more</summary>` +
+            `<div class="more">${row.fts.slice(TOKENS_SHOWN).map(tokenTag).join('')}</div>` +
+            '</details>';
+      // A failed row spans the remaining columns with its reason rather than
+      // showing three empty dashes that look like an answer.
+      // ABBREVIATED, with the whole thing on hover and in the saved snapshot.
+      // A 41 character principal in every row forced the table sideways and
+      // pushed the columns that carry the answers off the edge - so the one
+      // value nobody reads character by character is the one that gets short.
+      tr.innerHTML =
+        `<td class="mono addr" title="${esc(row.address)}">${esc(
+          `${row.address.slice(0, 6)}…${row.address.slice(-5)}`
+        )}</td>` +
+        (HAS_SOURCES ? sourceCell(row.address) : '') +
+        `<td class="num${row.error ? ' bad' : ''}">${row.error ? 'unread' : row.stx.toFixed(6)}</td>` +
+        (row.error
+          ? `<td colspan="${HEADLINE.length + (HAS_BTC ? 4 : 3)}" class="bad" style="font-size:.82rem">${row.error
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;')}</td>`
+          : HEADLINE.map((t) => {
+              const held = row.headline?.[t.label];
+              return `<td class="num${held ? '' : ' zero'}">${held ?? '—'}</td>`;
+            }).join('') +
+            (HAS_BTC ? btcCell(row) : '') +
+            `<td>${names || '<span style="color:var(--muted)">—</span>'}</td>` +
+            `<td>${nfts}</td><td>${fts}</td>`);
+      body.appendChild(tr);
+    }
+    table.appendChild(body);
+    wrap.appendChild(table);
+
+    const unread = rows.filter((r) => r.error);
+    if (unread.length) {
+      const note = document.createElement('p');
+      note.className = 'status bad';
+      note.textContent =
+        `${unread.length} wallet(s) could not be read and are NOT counted as empty. ` +
+        'The reason is on each row, and every one is also in the browser console.';
+      wrap.appendChild(note);
+    }
+
+    $('totals').hidden = false;
+    $('t-wallets').textContent = rows.length;
+    $('t-stx').textContent = rows.reduce((s, r) => s + (r.stx ?? 0), 0).toFixed(6);
+    // A headline token with nothing in it anywhere is not worth a total, but the
+    // COLUMN stays: an empty column is an answer, and a missing one is a
+    // question about whether it was ever checked.
+    if (HAS_SOURCES) {
+      const bySeed = new Map();
+      let orphans = 0;
+      for (const row of rows) {
+        const from = SOURCES[row.address];
+        if (!from) { orphans++; continue; }
+        bySeed.set(from.seed, (bySeed.get(from.seed) ?? 0) + 1);
+      }
+      $('t-sources').innerHTML =
+        [...bySeed]
+          .map(([seed, n]) => `<div style="margin-right:2rem">${esc(seed)}<b>${n}</b></div>`)
+          .join('') +
+        (orphans ? `<div style="margin-right:2rem">no seed<b class="warn">${orphans}</b></div>` : '');
+      $('t-sources').style.display = 'flex';
+    }
+    // A TOTAL, not a holder count. Summed from the raw balances, and it says
+    // when it is partial: a row carried over from a snapshot written before
+    // headlineRaw existed contributes nothing, and a total quietly missing a
+    // wallet is worse than one that admits it.
+    let stale = 0;
+    for (const row of rows) if (row.headline && !row.headlineRaw) stale++;
+
+    $('t-headline-wrap').innerHTML = HEADLINE.map((t) => {
+      let sum = 0n;
+      let holders = 0;
+      for (const row of rows) {
+        const raw = row.headlineRaw?.[t.label];
+        if (!raw) continue;
+        sum += BigInt(raw);
+        holders++;
+      }
+      if (!holders) return '';
+      const shown = formatAmount(sum.toString(), { decimals: t.decimals });
+      return (
+        `<div style="margin-right:2rem" title="${esc(`${holders} wallet(s) hold ${t.label}`)}">` +
+        `${t.label}<b>${shown}</b></div>`
+      );
+    }).join('');
+
+    // Bitcoin, in sats, across every paired address that was actually read.
+    if (HAS_BTC) {
+      let sats = 0n;
+      let read = 0;
+      let unread = 0;
+      for (const row of rows) {
+        if (row.btc?.error) { unread++; continue; }
+        if (row.btc?.sats === undefined) continue;
+        sats += BigInt(row.btc.sats);
+        read++;
+      }
+      $('t-btc').innerHTML = read
+        ? `<div title="${esc(
+            `${read} address(es) read${unread ? `, ${unread} unread and NOT counted` : ''}` +
+              `\n${(Number(sats) / 1e8).toFixed(8)} BTC`
+          )}">BTC (sats)<b${unread ? ' class="warn"' : ''}>${sats.toLocaleString('en-US')}${
+            unread ? ' *' : ''
+          }</b></div>`
+        : '';
+    }
+
+    if (stale) {
+      $('t-stale').textContent =
+        `* ${stale} wallet(s) came from a snapshot predating these totals and are not counted. ` +
+        'A fresh run includes them.';
+      $('t-stale').style.display = 'block';
+    } else {
+      $('t-stale').style.display = 'none';
+    }
+    $('t-bns').textContent = rows.reduce((s, r) => s + r.bns.length, 0);
+    $('t-nft').textContent = rows.reduce((s, r) => s + r.nfts.length, 0);
+    $('t-ft').textContent = new Set(rows.flatMap((r) => r.fts.map((f) => f.id))).size;
+  }
+
+  /**
+   * What moved, and what did not.
+   *
+   * The whole reason to take an inventory twice. "The rescue worked" is a claim;
+   * a wallet that still holds a name it was supposed to have moved is evidence,
+   * and it is the only way to notice one transaction of a hundred and twenty
+   * having quietly failed.
+   */
+  function renderDiff(before, after) {
+    const byAddress = new Map(after.rows.map((r) => [r.address, r]));
+    const lines = [];
+    let stillHolding = 0;
+
+    for (const was of before.rows) {
+      const now = byAddress.get(was.address);
+      if (!now) continue;
+      if (now.error) {
+        lines.push(`<tr><td class="mono">${was.address}</td><td class="bad">unread now — not proof of anything</td></tr>`);
+        continue;
+      }
+      const namesBefore = was.bns.length, namesAfter = now.bns.length;
+      const stxMoved = (was.stx ?? 0) - (now.stx ?? 0);
+      if (namesAfter > 0 || (now.stx ?? 0) > 0.01) {
+        stillHolding++;
+        lines.push(
+          `<tr><td class="mono">${was.address}</td><td class="warn">still holds ` +
+          `${namesAfter} name(s) and ${(now.stx ?? 0).toFixed(6)} STX</td></tr>`
+        );
+      } else if (namesBefore > 0 || stxMoved > 0) {
+        lines.push(
+          `<tr><td class="mono">${was.address}</td><td class="good">emptied — ` +
+          `${namesBefore} name(s) and ${stxMoved.toFixed(6)} STX moved</td></tr>`
+        );
+      }
+    }
+
+    $('diff-panel').hidden = false;
+    $('diff').innerHTML =
+      `<p class="status">${stillHolding === 0
+        ? '<span class="good">Every wallet in the snapshot is empty.</span>'
+        : `<span class="warn">${stillHolding} wallet(s) still hold something.</span>`}</p>` +
+      `<div class="scroll"><table><tbody>${lines.join('')}</tbody></table></div>`;
+  }
+
+  /* --------------------------------------------------------------- */
+
+  /**
+   * Read a list of addresses into `rows`, replacing any row already there.
+   *
+   * Takes the rows it is updating rather than starting fresh, which is what
+   * makes a retry pass possible: a failed wallet is re-read and its row
+   * REPLACED, so the successes from the first pass are never re-fetched and
+   * never lost.
+   */
+  async function pass(addresses, rows, label) {
+    for (let at = 0; at < addresses.length; at++) {
+      if (stopped) break;
+      $('status').textContent = `${label} ${at + 1} of ${addresses.length} — ${addresses[at]}`;
+      $('progress').style.width = `${(at / addresses.length) * 100}%`;
+      const row = await inventory(addresses[at]);
+      const existing = rows.findIndex((r) => r.address === row.address);
+      if (existing === -1) rows.push(row);
+      else rows[existing] = row;
+      render(rows);
+    }
+    $('progress').style.width = '100%';
+    return rows;
+  }
+
+  /** Enable or hide the retry button according to what actually failed. */
+  function offerRetry(rows) {
+    const failed = rows.filter((r) => r.error);
+    $('retry').hidden = failed.length === 0;
+    $('retry').textContent = `Retry ${failed.length} failed`;
+    return failed;
+  }
+
+  function busy(on) {
+    $('run').disabled = on;
+    $('retry').disabled = on;
+    $('stop').disabled = !on;
+    $('save').disabled = on || !current;
+  }
+
+  $('run').addEventListener('click', async () => {
+    const addresses = [...new Set($('addresses').value.match(PRINCIPAL) ?? [])];
+    if (!addresses.length) { $('status').textContent = 'No addresses found in that.'; return; }
+
+    stopped = false;
+    busy(true);
+    const rows = await pass(addresses, [], 'Reading');
+
+    // ONE AUTOMATIC SECOND PASS, then it is offered rather than repeated.
+    //
+    // A `Failed to fetch` is usually transient and clears on a fresh
+    // connection, so retrying once without being asked saves the common case.
+    // Retrying forever would turn a genuinely unreachable address into an
+    // infinite loop that looks like progress, which is why it stops at one and
+    // hands the decision back.
+    const failed = rows.filter((r) => r.error);
+    if (failed.length && !stopped) {
+      $('status').textContent =
+        `${failed.length} failed. Waiting ${RETRY_PAUSE_MS / 1000}s, then trying those again…`;
+      await new Promise((done) => setTimeout(done, RETRY_PAUSE_MS));
+      if (!stopped) await pass(failed.map((r) => r.address), rows, 'Retrying');
+    }
+
+    current = { format: SNAPSHOT_FORMAT, takenAt: new Date().toISOString(), rows };
+    const left = offerRetry(rows);
+    $('status').textContent = stopped
+      ? `Stopped. ${rows.length} of ${addresses.length} read.`
+      : left.length
+        ? `Done, but ${left.length} wallet(s) still unread. Retry them, or run again later.`
+        : `Done. ${rows.length} wallet(s), all read.`;
+    busy(false);
+    if (baseline) renderDiff(baseline, current);
+  });
+
+  $('retry').addEventListener('click', async () => {
+    if (!current) return;
+    const failed = current.rows.filter((r) => r.error);
+    if (!failed.length) { $('retry').hidden = true; return; }
+
+    stopped = false;
+    busy(true);
+    await pass(failed.map((r) => r.address), current.rows, 'Retrying');
+    current.takenAt = new Date().toISOString();
+    const left = offerRetry(current.rows);
+    $('status').textContent = left.length
+      ? `${left.length} wallet(s) still unread. These may need a different network or a later run.`
+      : 'Done. Every wallet read.';
+    busy(false);
+    if (baseline) renderDiff(baseline, current);
+  });
+
+  $('stop').addEventListener('click', () => { stopped = true; $('status').textContent = 'Stopping…'; });
+
+  $('save').addEventListener('click', () => {
+    if (!current) {
+      $('status').textContent = 'Nothing to save yet — take an inventory first.';
+      return;
+    }
+    try {
+      // A replacer as well as the fix at source, because the next person to put
+      // a BigInt on a row should not silently break saving for a third time.
+      const json = JSON.stringify(
+        current,
+        (key, value) => (typeof value === 'bigint' ? value.toString() : value),
+        2
+      );
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `inventory-${current.takenAt.slice(0, 19).replace(/[:T]/g, '-')}.json`;
+      // IN THE DOCUMENT, and revoked LATER. A detached anchor does not reliably
+      // trigger a download in every browser, and revoking the object URL in the
+      // same tick races the download that was just asked for.
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }, 30_000);
+      $('status').textContent = `Saved ${current.rows.length} wallet(s) to ${a.download}.`;
+    } catch (error) {
+      // Never silent. The failure that prompted this was an exception nobody
+      // saw, on a button that simply appeared to do nothing.
+      const message = String(error?.message ?? error);
+      console.error('[inventory] save failed:', error);
+      $('status').textContent = `Could not save the snapshot: ${message}`;
+      $('status').className = 'status bad';
+    }
+  });
+
+  /**
+   * Carry on from a snapshot instead of reading it all again.
+   *
+   * Four hundred wallets is an eight hundred request run, and a run that dies
+   * near the end used to mean starting from zero. A snapshot already holds every
+   * answer it got, so resuming reads only what is NOT already there: the
+   * addresses in the box that the snapshot never covered, plus the ones it
+   * covered and failed on. Successful rows are carried straight across.
+   */
+  $('resume').addEventListener('click', async () => {
+    if (!baseline) return;
+    const addresses = [...new Set($('addresses').value.match(PRINCIPAL) ?? [])];
+    const done = new Map(baseline.rows.filter((r) => !r.error).map((r) => [r.address, r]));
+    const todo = addresses.filter((a) => !done.has(a));
+
+    // Everything the snapshot got, kept as-is. This is the whole point: those
+    // rows are answers, and re-fetching them would spend the budget that made
+    // the run fail in the first place.
+    const rows = addresses.filter((a) => done.has(a)).map((a) => done.get(a));
+    render(rows);
+
+    if (!todo.length) {
+      current = { takenAt: new Date().toISOString(), rows };
+      $('status').textContent = `Nothing to resume — the snapshot already covers all ${rows.length}.`;
+      offerRetry(rows);
+      $('save').disabled = false;
+      return;
+    }
+
+    stopped = false;
+    busy(true);
+    $('status').textContent = `Resuming: ${rows.length} carried over, ${todo.length} to read.`;
+    await pass(todo, rows, 'Reading');
+    current = { takenAt: new Date().toISOString(), rows };
+    const left = offerRetry(rows);
+    $('status').textContent = left.length
+      ? `Resumed. ${rows.length} wallet(s), ${left.length} still unread.`
+      : `Resumed. ${rows.length} wallet(s), all read.`;
+    busy(false);
+  });
+
+  // Two hooks for the scanner above: probe one address, and inventory a list.
+  // Exposed rather than duplicated, so the scanner and the table agree about
+  // what "what this wallet holds" means.
+  window.__probe = async (address, btc) => {
+    if (btc) BTC_PAIRS[address] = btc;
+    return inventory(address);
+  };
+  window.__inventoryAll = async (addresses, pairs, sources) => {
+    Object.assign(BTC_PAIRS, pairs);
+    Object.assign(SOURCES, sources);
+    const rows = [];
+    await pass(addresses, rows, 'Reading');
+    current = { format: SNAPSHOT_FORMAT, takenAt: new Date().toISOString(), rows };
+    offerRetry(rows);
+    $('save').disabled = false;
+    return rows;
+  };
+
+  $('load').addEventListener('click', () => $('file').click());
+  $('file').addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      baseline = JSON.parse(await file.text());
+      if (!Array.isArray(baseline?.rows)) throw new Error('no rows');
+      const good = baseline.rows.filter((r) => !r.error).length;
+      const stale = (baseline.format ?? 1) < SNAPSHOT_FORMAT;
+      $('resume').hidden = false;
+      $('resume').textContent = `Resume from snapshot (${good} already read)`;
+      $('status').textContent =
+        `Snapshot loaded: ${baseline.rows.length} wallet(s) from ${baseline.takenAt}, ` +
+        `${good} read successfully. RESUME to carry those over and read only the rest, ` +
+        'or take a fresh inventory and it will be compared against this one.' +
+        (stale
+          ? ' NOTE: this snapshot predates token amounts, so carried-over rows show ' +
+            'raw balances rather than decimal-adjusted ones. A fresh run fixes that; ' +
+            'nothing about it is wrong, only less precise.'
+          : '');
+      // Prefill, so comparing does not need the addresses pasted twice.
+      if (!$('addresses').value.trim()) {
+        $('addresses').value = baseline.rows.map((r) => r.address).join('\n');
+      }
+      if (current) renderDiff(baseline, current);
+    } catch {
+      $('status').textContent = 'That file is not an inventory snapshot.';
+    }
+  });
+})();
+</script>
+</body>
+</html>
