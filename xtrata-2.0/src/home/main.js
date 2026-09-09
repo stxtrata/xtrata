@@ -202,6 +202,7 @@
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
+    import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
@@ -9902,6 +9903,20 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       wallet: walletAdapter,
       review: reviewPublicWalletRequest,
       transfer: showStxTransfer,
+      gameSave: (method, params, session, label, guard) => runGameSave(method, params, {
+        client: state.client, contract: { ...state.contract }, session, label,
+        guard: () => { guard(); if (getContractId(state.contract) !== 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3') throw new Error('The viewer contract changed.'); },
+        review: reviewPublicWalletRequest,
+        submit: (options) => new Promise((resolve, reject) => {
+          const timer = setTimeout(() => reject(Object.assign(new Error('No wallet response. Check save confirmation before retrying.'), {code:-32002})), 90000);
+          const finish = (fn, value) => { clearTimeout(timer); fn(value); };
+          try { showContractCall({ contractAddress: options.contract.address, contractName: options.contract.contractName,
+            functionName: options.functionName, functionArgs: options.functionArgs,
+            network: session.network, stxAddress: session.address,
+            postConditionMode: PostConditionMode.Deny, postConditions: options.postConditions,
+            onFinish: (value) => finish(resolve, value), onCancel: () => finish(reject, Object.assign(new Error('Save publication cancelled.'), {code:4001})), onError: (error) => finish(reject, error) }); } catch (error) { finish(reject, error); }
+        })
+      }),
       isBusy: () => state.busy,
       pendingChanged: setBusy,
       sessionChanged: (session) => {

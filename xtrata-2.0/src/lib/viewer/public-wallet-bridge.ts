@@ -1,3 +1,4 @@
+import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -13,13 +14,20 @@ type Payment = {
   network: 'mainnet' | 'testnet';
 };
 export type WalletReview =
-  { kind: 'connect'; label: string } | ({ kind: 'transfer'; label: string } & Payment);
+  SaveReview | { kind: 'connect'; label: string } | ({ kind: 'transfer'; label: string } & Payment);
 type Options = {
   host: Window;
   wallet: WalletAdapter;
   review: (request: WalletReview) => Promise<boolean>;
   transfer: (request: WalletStxTransferOptions) => void;
   sessionChanged: (session: WalletSession) => void;
+  gameSave?: (
+    method: string,
+    params: unknown,
+    session: WalletSession,
+    label: string,
+    guard: () => void
+  ) => Promise<unknown>;
   isBusy?: () => boolean;
   pendingChanged?: (pending: boolean) => void;
 };
@@ -191,7 +199,11 @@ export function installPublicWalletBridge(options: Options) {
           network: session.network
         };
       }
-      if (!connects.has(method) && !transfers.has(method))
+      if (
+        !connects.has(method) &&
+        !transfers.has(method) &&
+        !(GAME_SAVE_METHODS.has(method) && options.gameSave)
+      )
         throw failure(
           'This public viewer supports wallet connection and native STX payments only.',
           -32601
@@ -219,6 +231,17 @@ export function installPublicWalletBridge(options: Options) {
         }
         if (!grant!.authorized)
           throw failure('Connect this preview before requesting a payment.', 4100);
+        if (GAME_SAVE_METHODS.has(method) && options.gameSave) {
+          const initial = checkedSession(options.wallet.getSession());
+          const guard = () => {
+            if (!alive()) throw failure('The preview changed. Reconnect and review again.', 4001);
+            checkedSession(options.wallet.getSession(), {
+              address: initial.address,
+              network: initial.network
+            } as Payment);
+          };
+          return await options.gameSave(method, p.params, initial, entry.label, guard);
+        }
         const payment = parsePublicPayment(p.params, options.wallet.getSession());
         const initial = checkedSession(options.wallet.getSession(), payment);
         if (
@@ -311,13 +334,17 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
     title.textContent =
       request.kind === 'connect'
         ? 'Connect this preview to your wallet?'
-        : 'Review preview payment';
+        : request.kind === 'save'
+          ? 'Publish this game checkpoint?'
+          : 'Review preview payment';
     const text = document.createElement('p');
     text.style.whiteSpace = 'pre-line';
     text.textContent =
       request.kind === 'connect'
         ? `${request.label}\nShare your selected wallet address with this preview. Payments still require a separate approval.`
-        : `${request.label}\nNetwork: ${request.network}\nFrom: ${request.address}\nTo: ${request.recipient}\nAmount: ${stx(request.amount)} STX\nRequested fee: ${request.fee ? `${stx(request.fee)} STX` : 'wallet estimate'}\nMemo: ${request.memo || '(none)'}\n\nCheck the wallet’s final amount and fee before signing.`;
+        : request.kind === 'save'
+          ? `${request.label}\nFrom: ${request.address}\nNetwork: mainnet\nSave: ${request.bytes.toLocaleString()} bytes\nProtocol fee: ${stx(request.protocolFee)} STX, plus the wallet’s network fee\nContract: ${request.contract}\n\nYour progress, journal and linked notes will be public and permanent. The save will reference Timeloop Detective #3040. Check the wallet’s final fee before signing.`
+          : `${request.label}\nNetwork: ${request.network}\nFrom: ${request.address}\nTo: ${request.recipient}\nAmount: ${stx(request.amount)} STX\nRequested fee: ${request.fee ? `${stx(request.fee)} STX` : 'wallet estimate'}\nMemo: ${request.memo || '(none)'}\n\nCheck the wallet’s final amount and fee before signing.`;
     const cancel = document.createElement('button');
     cancel.textContent = 'Cancel';
     const approve = document.createElement('button');
@@ -342,7 +369,18 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
       event.preventDefault();
       finish(false);
     });
-    dialog.append(title, text, cancel, approve);
+    dialog.append(title, text);
+    if (request.kind === 'save') {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = 'Review save JSON';
+      const pre = document.createElement('pre');
+      pre.textContent = request.json;
+      pre.style.cssText = 'white-space:pre-wrap;max-height:180px;overflow:auto;font-size:12px';
+      details.append(summary, pre);
+      dialog.append(details);
+    }
+    dialog.append(cancel, approve);
     document.body.append(dialog);
     dialog.showModal();
     cancel.focus();

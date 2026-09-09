@@ -21,7 +21,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup() {
+function setup(gameSave?: any) {
   const wallet = {
     getSession: vi.fn(() => ({ ...session })),
     connect: vi.fn(async () => ({ ...session })),
@@ -34,6 +34,7 @@ function setup() {
   const pendingChanged = vi.fn();
   const bridge = installPublicWalletBridge({
     host: window,
+    gameSave,
     wallet,
     review,
     transfer,
@@ -315,5 +316,26 @@ describe('native payment validation', () => {
     expect(() => parsePublicPayment({ ...payment, recipient: 'bad' }, session)).toThrow();
     expect(() => parsePublicPayment({ ...payment, memo: 'é'.repeat(18) }, session)).toThrow();
     expect(() => parsePublicPayment({ ...payment, network: 'unknown' }, session)).toThrow();
+  });
+});
+
+describe('scoped game-save bridge', () => {
+  it('requires a connected, authorized preview and rechecks account before save submission', async () => {
+    let latestGuard: (() => void) | undefined;
+    const gameSave = vi.fn(async (_method, _params, _session, _label, guard) => {
+      latestGuard = guard;
+      guard();
+      return { status: 'submitted' };
+    });
+    const h = setup(gameSave),
+      f = await h.frame();
+    expect(await f.request('xtrata_saveGame', {})).toMatchObject({ ok: false });
+    expect(gameSave).not.toHaveBeenCalled();
+    await f.request('stx_requestAccounts');
+    expect(await f.request('xtrata_saveGame', {})).toMatchObject({ ok: true });
+    expect(gameSave.mock.calls[0][0]).toBe('xtrata_saveGame');
+    h.wallet.getSession.mockReturnValue({ ...session, address: recipient });
+    expect(() => latestGuard!()).toThrow(/changed/);
+    expect(h.pendingChanged.mock.calls.at(-1)).toEqual([false]);
   });
 });
