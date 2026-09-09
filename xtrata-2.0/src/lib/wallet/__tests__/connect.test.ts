@@ -994,3 +994,29 @@ describe('wallet connect helpers', () => {
     expect(result.txRaw).toMatch(/^[0-9a-f]+$/i);
   });
 });
+
+
+describe('explicit STX transfer network fees', () => {
+  it('carries the requested 0.003 STX separately from a 1 STX recipient payment', () => {
+    expect(__testing.buildStxTransferParams({
+      recipient: ADDRESS, amount: '1000000', fee: '3000', memo: 'TD:WEDNESDAY:1', network: 'mainnet', stxAddress: ADDRESS
+    })).toMatchObject({ recipient: ADDRESS, amount: '1000000', fee: '3000', memo: 'TD:WEDNESDAY:1' });
+  });
+});
+
+
+describe('Xverse explicit transfer fee forwarding', () => {
+  it('keeps 3000 microSTX on the modern RPC fallback route', async () => {
+    const provider = { request: vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      expect(method).toBe('stx_transferStx');
+      expect(params).toEqual({ recipient: ADDRESS, amount: '1000000', fee: '3000', memo: 'TD:WEDNESDAY:1' });
+      return { status: 'success', result: { txid: '0xfee' } };
+    }) };
+    window.localStorage.setItem('STX_PROVIDER', 'XverseProviders.StacksProvider');
+    (window as typeof window & { XverseProviders?: unknown }).XverseProviders = { BitcoinProvider: provider };
+    __testing.rememberXverseAccount(ADDRESS);
+    await expect(__testing.requestStxTransfer(provider as never, {
+      recipient: ADDRESS, amount: '1000000', fee: '3000', memo: 'TD:WEDNESDAY:1', network: 'mainnet', stxAddress: ADDRESS
+    })).resolves.toMatchObject({ txId: '0xfee' });
+  });
+});
