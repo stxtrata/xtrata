@@ -132,6 +132,19 @@ describe('in-game checkpoint publication', () => {
 });
 
 describe('wallet checkpoint library',()=>{
+  it('loads large owned manual backups in bounded batches without raising the publication limit',async()=>{
+    const {p,meta}=setup();
+    const large=JSON.stringify({...JSON.parse(json),save:{...JSON.parse(json).save,commands:Array.from({length:20000},()=>({type:'settings',motion:false}))}});
+    expect(new TextEncoder().encode(large).length).toBeGreaterThan(GAME_SAVE_LIMIT);
+    expect(()=>parseGameSave(large,address)).toThrow();
+    const parsed=parseGameSave(large,address,false);
+    Object.assign(meta,{totalSize:BigInt(parsed.bytes.length),totalChunks:BigInt(parsed.chunks.length),finalHash:parsed.hash});
+    const getChunkBatch=vi.fn(async(_id:bigint,ids:bigint[])=>ids.map(i=>parsed.chunks[Number(i)]));
+    expect(await runGameSave('xtrata_loadGameSave',{...args,tokenId:'99'},{...p,client:{...p.client,getChunkBatch}})).toMatchObject({json:large,owner:address});
+    expect(getChunkBatch).toHaveBeenCalledTimes(Math.ceil(parsed.chunks.length/4));
+    getChunkBatch.mockResolvedValue([]);
+    await expect(runGameSave('xtrata_loadGameSave',{...args,tokenId:'99'},{...p,client:{...p.client,getChunkBatch}})).rejects.toThrow(/Incomplete/);
+  });
   it('returns only owned, self-published checkpoints and paginates holdings',async()=>{
     const {p,meta}=setup();
     p.client.getInscriptionMeta.mockImplementation(async(id:any)=>({...meta,creator:id===98n?'other':address,mimeType:id===97n?'text/html':'application/json'}));

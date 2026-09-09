@@ -15,6 +15,7 @@ import { loadWalletHoldingsPage, type WalletHoldingsPage } from './wallet-index'
 
 export const GAME_SAVE_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 export const GAME_SAVE_LIMIT = 32 * 16384;
+export const GAME_SAVE_LOAD_LIMIT = 4_000_000;
 export const GAME_SAVE_METHODS = new Set([
   'xtrata_saveGame',
   'xtrata_checkGameSave',
@@ -34,12 +35,13 @@ export type SaveReview = {
 const error = (message: string, code = -32602) => Object.assign(new Error(message), { code });
 const hex = (b: Uint8Array) => Array.from(b, (v) => v.toString(16).padStart(2, '0')).join('');
 export function parseGameSave(json: unknown, address: string, requireWallet = true) {
-  if (typeof json !== 'string' || json.length > GAME_SAVE_LIMIT)
+  const limit = requireWallet ? GAME_SAVE_LIMIT : GAME_SAVE_LOAD_LIMIT;
+  if (typeof json !== 'string' || json.length > limit)
     throw error(
       'This save is too large for in-game publication. Download the JSON and use Xtrata’s inscription screen.'
     );
   const bytes = new TextEncoder().encode(json);
-  if (!bytes.length || bytes.length > GAME_SAVE_LIMIT)
+  if (!bytes.length || bytes.length > limit)
     throw error('This save exceeds the in-game publication limit. Download the JSON instead.');
   let data: any;
   try {
@@ -71,7 +73,7 @@ export type SavePorts = {
   client: Pick<
     XtrataClient,
     'quoteSingleTxFee' | 'getIdByHash' | 'getInscriptionMeta' | 'getOwner' | 'getChunk' | 'isPaused'
-  >;
+  > & Partial<Pick<XtrataClient,'getChunkBatch'>>;
   contract: ContractConfig;
   session: WalletSession;
   label: string;
@@ -100,7 +102,7 @@ export async function runGameSave(method: string, params: unknown, p: SavePorts)
       meta.creator !== address ||
       meta.mimeType !== 'application/json' ||
       meta.totalSize <= 0n ||
-      meta.totalSize > BigInt(GAME_SAVE_LIMIT) ||
+      meta.totalSize > BigInt(GAME_SAVE_LOAD_LIMIT) ||
       meta.totalChunks !== BigInt(Math.ceil(Number(meta.totalSize) / 16384)) ||
       (expected && hex(meta.finalHash) !== expected)
     )
@@ -151,14 +153,24 @@ export async function runGameSave(method: string, params: unknown, p: SavePorts)
     const id = BigInt(input.tokenId),
       meta = await verifyMeta(id),
       chunks: Uint8Array[] = [];
-    for (let i = 0; i < Number(meta.totalChunks); i++) {
-      const part = await p.client.getChunk(id, BigInt(i), address);
+    const count = Number(meta.totalChunks);
+    // A manually inscribed backup can exceed the single-transaction upload
+    // limit. Reconstruct it in bounded contract batch reads, never 245 serial
+    // RPC calls, while retaining exact chunk length/hash checks.
+    for (let start = 0; start < count;) {
+      const indexes = Array.from({length:Math.min(p.client.getChunkBatch?4:1,count-start)},(_,n)=>BigInt(start+n));
+      const parts = p.client.getChunkBatch && indexes.length>1
+        ? await p.client.getChunkBatch(id,indexes,address)
+        : [await p.client.getChunk(id,indexes[0],address)];
       p.guard();
-      const expected =
-        i === Number(meta.totalChunks) - 1 ? Number(meta.totalSize) - i * 16384 : 16384;
-      if (!part || part.length !== expected)
-        throw error('Incomplete save bytes. Try loading again.');
-      chunks.push(part);
+      if(parts.length!==indexes.length)throw error('Incomplete save bytes. Try loading again.');
+      for(let n=0;n<parts.length;n++){
+        const i=start+n,part=parts[n];
+        const expected = i===count-1 ? Number(meta.totalSize)-i*16384 : 16384;
+        if (!part || part.length !== expected)throw error('Incomplete save bytes. Try loading again.');
+        chunks.push(part);
+      }
+      start+=indexes.length;
     }
     if (hex(computeExpectedHash(chunks)) !== hex(meta.finalHash))
       throw error('Save integrity check failed.');

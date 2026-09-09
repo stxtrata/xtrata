@@ -36,8 +36,10 @@ No smart contracts, contract configuration, café payment recipients, mint prici
 general inscription flow, grid layout, wallet selection, or unrelated apps are
 changed. Discovery reuses the existing wallet holdings reader. Save publication
 remains pinned to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`,
-using `mint-single-tx-recursive`, a 512 KiB maximum and original game dependency
+using `mint-single-tx-recursive`, a 512 KiB publication maximum and original game dependency
 #3040. The new artifact retains case/save schema version 1.3.5 compatibility.
+Owned manual backups up to 4,000,000 bytes load through four-chunk batch reads,
+with the same integrity and ownership checks.
 Existing v1.3.6 direct saves remain usable; its immutable UI is not rewritten.
 
 Only viewer source, targeted tests and these text notes belong in this commit.
@@ -82,7 +84,8 @@ a claim to have tested a personal Xverse/Leather extension signing dialog.
 ## Validation
 
 - Viewer/wallet/client regression suite: 265 tests passed.
-- Final save/bridge focused suite: 42 tests passed.
+- Final save/bridge focused suite: 43 tests passed, including a backup larger than
+  the publication limit and incomplete batch rejection.
 - Host production build, including prebuild/postbuild: passed.
 - Game suite: 124 tests passed, including historical selection, wallet changes,
   ownership failures, uncertain submissions, no second payment, JSON byte
