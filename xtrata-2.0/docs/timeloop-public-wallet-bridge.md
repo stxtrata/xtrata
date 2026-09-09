@@ -2,6 +2,36 @@
 
 9 September 2026. Follow-up to the selective Timeloop staging integration.
 
+## Testing wallet policy
+
+The user explicitly requires **wizard accounts only for all wallet tests**.
+Never use personal, deployer, sponsor or other hot wallets for testing, even
+when they are already installed or unlocked in a browser. Root `AGENTS.md`
+records this standing rule. The public browser simulator uses the Archivist
+identity and the Skeptic for the account-change case; it has no signing keys.
+
+The offline wizard check below passed against the local provisioned Archivist
+configuration. It cross-checked the configured key/address, constructed and
+deserialized the cafe and save-memo transaction payloads, and verified that
+all signature bytes remained zero. No transaction was signed or broadcast,
+and no wizard key was exposed to a browser or output.
+
+```sh
+node scripts/wizard/timeloop-payment-dry.mjs /absolute/path/to/.env.wizards
+```
+
+This is transaction construction, not a live receipt or extension test.
+Real wizard broadcasts remain subject to explicit spend authorization and
+the wizard safety limits. Never raise those limits to make a test pass.
+
+Cloudflare reported a successful deployment of production-code commit
+`a34bec80240cf287d5dcbd7aacda072f7655d87c` at
+<https://80cedd2b.xtrata.pages.dev>. The deployed homepage was opened and its
+installed Xverse chooser observed. A personal-wallet connection attempt was
+stopped when the user clarified the wallet policy; the test tab was closed,
+and no payment was signed or sent. Do not count that as a passed wizard-wallet
+or payment test. Subsequent real-wallet testing must use a wizard harness.
+
 ## What now works
 
 The public homepage can answer the existing v1.3.4 game's immediate-parent
@@ -97,8 +127,8 @@ remains local/ignored. No external API keys or signing keys are required.
 ## Remaining release steps
 
 Pushing `main-staging` is not proof that a hosting deployment succeeded.
-Confirm the deployed staging revision, then connect with the intended real
-wallet and first review/cancel a payment, checking the amount, recipient,
+Confirm the deployed staging revision, then use a provisioned wizard-only
+wallet harness and first review/cancel a payment, checking the amount, recipient,
 memo and final fee. Real wallet versions, Safari/iPhone and hosted sandbox
 behavior remain unverified by these Chromium simulations.
 

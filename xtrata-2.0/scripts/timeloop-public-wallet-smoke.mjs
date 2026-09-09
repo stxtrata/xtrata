@@ -10,7 +10,9 @@ import { chromium } from 'playwright';
 if (!process.argv[2])
   throw Error('Usage: node scripts/timeloop-public-wallet-smoke.mjs /path/to/production-game.html');
 const gameBytes = await readFile(resolve(process.argv[2]));
-const payer = 'SP000000000000000000002Q6VF78';
+// Public Wizard-1 (Archivist) identity; this runner uses no key and cannot sign.
+const payer = 'SP1MDNJ5G13C9S3GN4V5AZPN7H68H4ZG9VKG251KM';
+const alternateWizard = 'SP22CWG8M640KD093CHHHMWF5M1RFC015XDARQM8V';
 const recipient = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const txId = '0x' + 'a'.repeat(64);
 const host = `<!doctype html><html><head><meta charset="utf-8"><title>Local simulated wallet — no broadcast</title>
@@ -118,7 +120,7 @@ try {
   await review.waitFor();
   await page.evaluate((value) => {
     window.mock.address = value;
-  }, recipient);
+  }, alternateWizard);
   await review.getByRole('button', { name: 'Continue to wallet' }).click();
   await game.getByText('Wallet account or network changed.', { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.mock.transfers.length), 1);
