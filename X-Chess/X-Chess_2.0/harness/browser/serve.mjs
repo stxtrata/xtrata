@@ -7,7 +7,7 @@ import {createHash} from 'node:crypto';
 import {build} from 'esbuild';
 import {uintCV, someCV, noneCV, tupleCV, trueCV, standardPrincipalCV, serializeCV} from '@stacks/transactions';
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const artifact = await readFile(resolve(root, 'dist/xchess.html'), 'utf8');
+const artifact = await readFile(resolve(root, process.env.XCHESS_TEST_ARTIFACT || 'dist/xchess.html'), 'utf8');
 const sha256 = createHash('sha256').update(artifact).digest('hex');
 const bundle = await build({entryPoints:[resolve(root, 'harness/browser/smoke.ts')], bundle:true, write:false, format:'iife', platform:'browser'});
 const address = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
@@ -21,7 +21,7 @@ const server = createServer(async (req,res) => {
     if (url.pathname === '/report' && req.method === 'POST') {
       let data=''; for await (const chunk of req) data+=chunk;
       lastReport = {...JSON.parse(data), artifactSha256:sha256, testedAt:new Date().toISOString()};
-      await writeFile(resolve(root, 'dist/browser-report.json'), JSON.stringify(lastReport,null,2)+'\n');
+      await writeFile(resolve(root, process.env.XCHESS_TEST_REPORT_DIR || 'dist', 'browser-report.json'), JSON.stringify(lastReport,null,2)+'\n');
       return send('ok','text/plain');
     }
     if (url.pathname === '/report') return send(JSON.stringify(lastReport), 'application/json');

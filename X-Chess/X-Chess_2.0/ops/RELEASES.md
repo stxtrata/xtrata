@@ -1,19 +1,26 @@
 # Releases
 
-## 2.3.1 — peer candidate, not deployed or inscribed
+## 2.3.1 — inscribed as 3037, 2026-09-09
+
+Post-inscription testing: all 14 wizard transactions succeeded, including two
+legacy games, peer registry deployment/create/join, and winner-published result
+**3038**. Sealed bytes and live viewer verification passed. See the
+[acceptance report](../reviews/3037/REPORT.md) for costs, coverage, deployed registry
+address and unresolved UI issues. Real wallet-extension signing remains untested.
+The following paragraph records the original pre-inscription build validation.
 
 Signed peer moves, manual transport, encrypted recovery and independently
 verifiable public archives replace the superseded referee service proposal.
 The standalone HTML is **311,553 bytes / 20 Xtrata chunks**. SHA-256:
 `d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7`.
 
-The peer registry is undeployed. Existing core protocol hashes are unchanged.
+The peer registry was undeployed at build time. Existing core protocol hashes are unchanged.
 See [instructions](PEER-2.3.1.md) and `releases/2.3.1/VALIDATION.json`.
 Packaged source reproduces the exact HTML. Validation includes 1,743 passing
 regression tests (17 deliberate skips), 68 simnet tests, 187 final focused tests,
 a frozen public signature vector, 44 captured-runtime browser checks and 13
 peer browser checks. These overlap; they are not an additive unique test count.
-Real wallet/deployment/inscription read-back checks remain open.
+At build time, real wallet/deployment/inscription read-back checks remained open.
 
 
 Every canary and every release candidate, with enough detail to reproduce it or

@@ -3,8 +3,8 @@
 import {readFileSync,writeFileSync,existsSync,mkdirSync,renameSync} from 'node:fs';
 import {createHash,createCipheriv,createDecipheriv,randomBytes} from 'node:crypto';
 import assert from 'node:assert/strict';
-import {Cl,Pc,PostConditionMode,ClarityVersion,makeContractCall,makeSmartContractDeploy,getAddressFromPrivateKey} from '@stacks/transactions';
-import {endpoint,api,balanceOf,nextNonce} from '../../harness/wizards/play.mjs';
+import {Cl,Pc,PostConditionMode,ClarityVersion,deserializeTransaction,makeContractCall,makeContractDeploy,getAddressFromPrivateKey} from '@stacks/transactions';
+import {endpoint,api,balanceOf,nextNonce,broadcastWithRetry} from '../../harness/wizards/play.mjs';
 import {readFleet,RESERVED_ADDRESSES,scrub} from '../../harness/wizards/wizards-core.mjs';
 import * as m from './modules.mjs';
 const DIR='reviews/3037',FILE=DIR+'/live-state.json',LIMIT=1_000_000n,LIVE=process.argv.includes('--live');
@@ -24,18 +24,18 @@ async function wait(row){
 }
 const allowed=new Map([[CORE,new Set(['open-game','open-sponsored-game','submit'])],[REGISTRY,new Set(['create-peer-game','join-peer-game'])],[XTRATA,new Set(['mint-single-tx-recursive'])]]);
 async function send(label,w,contract,fn,args,cost=0n,pcs=[],deploy=false){
- let row=state.transactions.find(t=>t.label===label);if(row)return wait(row);
+ let row=state.transactions.find(t=>t.label===label);if(row){if(row.status==='prepared'){assert(LIVE);const tx=deserializeTransaction(readFileSync(DIR+'/signed-transactions/'+row.txid+'.hex','utf8'));assert.equal(tx.txid(),row.txid);await broadcastWithRetry(tx,label);row.status='pending';save();}return wait(row);}
  assert(LIVE,'Use --live only after checking the dry plan');assert(allowed.get(contract)?.has(fn)||(deploy&&contract===REGISTRY&&w===patron&&fn==='deploy'));
  const fee=deploy?30000n:contract===XTRATA?20000n:3000n;
  const spent=state.transactions.reduce((n,t)=>n+BigInt(t.maxCostUstx),0n);assert(spent+cost+fee<=LIMIT,'Session spend cap would be exceeded');assert(await balanceOf(w.address,{maxAgeMs:0})-cost-fee>=200000n,'Wizard balance floor');
  const nonce=await nextNonce(w.address),common={senderKey:w.key,network:'mainnet',fee,nonce,postConditionMode:PostConditionMode.Deny,postConditions:pcs};
- const tx=deploy?await makeSmartContractDeploy({...common,contractName:'xchess-peer-v1',codeBody:readFileSync('contracts/xchess-peer-v1.clar','utf8'),clarityVersion:ClarityVersion.Clarity4}):await makeContractCall({...common,contractAddress:contract.split('.')[0],contractName:contract.split('.')[1],functionName:fn,functionArgs:args});
+ const tx=deploy?await makeContractDeploy({...common,contractName:'xchess-peer-v1',codeBody:readFileSync('contracts/xchess-peer-v1.clar','utf8'),clarityVersion:ClarityVersion.Clarity4}):await makeContractCall({...common,contractAddress:contract.split('.')[0],contractName:contract.split('.')[1],functionName:fn,functionArgs:args,validateWithAbi:false});
  row={label,contract,function:fn,sender:w.address,nonce:String(nonce),txid:tx.txid(),maxCostUstx:String(cost+fee),status:'prepared'};state.transactions.push(row);save();mkdirSync(DIR+'/signed-transactions',{recursive:true});writeFileSync(DIR+'/signed-transactions/'+row.txid+'.hex',tx.serialize());
  console.log('Broadcast',label,row.txid,'max',row.maxCostUstx,'uSTX');
- const response=await ep.request('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:tx.serializeBytes()});const result=await response.json();if(!response.ok){row.broadcastError=result;save();throw Error('Broadcast refused for '+label+': '+JSON.stringify(result));}
+ await broadcastWithRetry(tx,label);
  row.status='pending';save();return wait(row);
 }
-function resultNumber(tx){const result=m.decode(tx.tx_result.hex);assert(result.ok);return Number(result.value);}
+function resultNumber(tx){const result=m.decode(tx.tx_result.hex);assert(result.ok);const value=typeof result.value==='bigint'?result.value:result.value?.['token-id'];assert(typeof value==='bigint','Unexpected transaction result');return Number(value);}
 function checked(name,data){if(!state.checks.some(x=>x.name===name))state.checks.push({name,passed:true,...data});save();console.log('PASS',name,data?stringify(data):'');}
 const openFee=await ro(CORE,'get-open-fee'),price=await ro(CORE,'get-sponsor-price'),fu=await ro(XTRATA,'get-fee-unit');const feeUnit=fu.ok?fu.value:fu;
 state.plan={core:CORE,registry:REGISTRY,xtrata:XTRATA,openFeeUstx:String(openFee),sponsorPriceUstx:String(price.total),inscriptionProtocolFeeUstx:String(feeUnit*3n),maxSessionUstx:String(LIMIT),newGames:'standard + one-player sponsorship + named peer game; all unranked',wizardAddresses:[white.address,black.address,patron.address]};save();
@@ -48,7 +48,7 @@ try{
   if(sponsor)pcs.push(Pc.principal(CORE).willSendLte(price.bootstrap).ustx());
   const tx=await send(kind+'-open',white,CORE,sponsor?'open-sponsored-game':'open-game',[Cl.some(Cl.bufferFromHex(rh)),Cl.bool(false),...(sponsor?[Cl.standardPrincipal(black.address)]:[])],cost,pcs);
   const id=resultNumber(tx);state[kind+'Game']=id;save();
-  if(sponsor){const sr=await ro(CORE,'get-sponsorship',[Cl.uint(id),Cl.standardPrincipal(black.address)]);assert.equal(sr['rebates-left'],45n);checked('Mainnet sponsorship bootstrap and reserve created',{game:id,bootstrapUstx:String(price.bootstrap),reservedUstx:String(sr.reserved)});}
+  if(sponsor){const sr=await ro(CORE,'get-sponsorship',[Cl.uint(id),Cl.standardPrincipal(black.address)]);const used=state.transactions.filter(t=>t.label.startsWith('sponsored-move-')&&t.sender===black.address&&t.status==='success').length;assert.equal(sr['rebates-left'],45n-BigInt(used));checked('Mainnet sponsorship bootstrap and reserve created',{game:id,bootstrapUstx:String(price.bootstrap),reservedUstx:String(sr.reserved)});}
   for(const [index,value] of ['f2f3','e7e5','g2g4','d8h4'].entries()){
    const actor=index%2===0?white:black,pc=sponsor&&actor===black?[Pc.principal(CORE).willSendLte(2000n).ustx()]:[];
    await send(kind+'-move-'+(index+1),actor,CORE,'submit',[Cl.uint(id),Cl.stringAscii(value)],0n,pc);
@@ -63,15 +63,15 @@ try{
  if(existsSync(keyFile)){const e=JSON.parse(readFileSync(keyFile,'utf8')),d=createDecipheriv('aes-256-gcm',encryptionKey,Buffer.from(e.iv,'hex'));d.setAuthTag(Buffer.from(e.tag,'hex'));const decoded=JSON.parse(Buffer.concat([d.update(Buffer.from(e.cipher,'hex')),d.final()]).toString());keys={};for(const side of ['white','black'])keys[side]={public:decoded[side].public,secret:await crypto.subtle.importKey('jwk',decoded[side].jwk,{name:'ECDSA',namedCurve:'P-256'},true,['sign'])};}
  else {keys={white:await m.generateKey(),black:await m.generateKey()};const decoded={};for(const side of ['white','black'])decoded[side]={public:keys[side].public,jwk:await crypto.subtle.exportKey('jwk',keys[side].secret)};const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',encryptionKey,iv);const cipher=Buffer.concat([c.update(JSON.stringify(decoded)),c.final()]);writeFileSync(keyFile,JSON.stringify({iv:iv.toString('hex'),tag:c.getAuthTag().toString('hex'),cipher:cipher.toString('hex')}),{mode:0o600});}
  if(!state.peerDescriptor){state.peerDescriptor=m.descriptor();save();}
- const created=await send('peer-create',white,REGISTRY,'create-peer-game',m.createArgs(black.address,true,keys.white.public,state.peerDescriptor).map(Cl.deserialize));const gameId=resultNumber(created);state.peerGame=gameId;save();
+ const created=await send('peer-create',white,REGISTRY,'create-peer-game',m.createArgs(black.address,true,keys.white.public,state.peerDescriptor).map(x=>Cl.deserialize(x)));const gameId=resultNumber(created);state.peerGame=gameId;save();
  const registry=new m.PeerRegistry(REGISTRY,'mainnet',ep.base),invitation=await registry.game(gameId);assert.equal(invitation.creatorKey,keys.white.public);
- await send('peer-join',black,REGISTRY,'join-peer-game',m.joinArgs(invitation,keys.black.public).map(Cl.deserialize));
+ await send('peer-join',black,REGISTRY,'join-peer-game',m.joinArgs(invitation,keys.black.public).map(x=>Cl.deserialize(x)));
  let opening;for(let i=0;i<100;i++){try{opening=await registry.confirmed(gameId);break;}catch(e){if(!String(e.message).includes('confirmations'))throw e;await pause(5000);}}assert(opening,'Waiting for registry confirmations');checked('Named player keys and full joined descriptor confirmed on mainnet',{registry:REGISTRY,game:gameId});
  let game=m.emptyGame(opening);for(const value of ['f2f3','e7e5','g2g4','d8h4']){const actor=m.actorTurn((await m.replay(game)).position),payload=await m.makeMove(game,actor,value);game.line.moves.push(await m.sign(payload,keys[actor].secret));await m.replay(game);}
- const archive=await m.archive(game);assert.equal((await m.verifyArchive(archive,opening)).summary.result,'0-1');const bytes=Buffer.from(m.canonical(archive)+'\n');writeFileSync(DIR+'/registered-peer-result.json',bytes);checked('Registered off-chain signed Fool’s Mate verifies against the live opening',{bytes:bytes.length,historyRoot:archive.final.root,fileSha256:createHash('sha256').update(bytes).digest('hex'),moves:4});
+ const archive=existsSync(DIR+'/registered-peer-result.json')?JSON.parse(readFileSync(DIR+'/registered-peer-result.json','utf8')):await m.archive(game);assert.equal((await m.verifyArchive(archive,opening)).summary.result,'0-1');const bytes=Buffer.from(m.canonical(archive)+'\n');writeFileSync(DIR+'/registered-peer-result.json',bytes);checked('Registered off-chain signed Fool’s Mate verifies against the live opening',{bytes:bytes.length,historyRoot:archive.final.root,fileSha256:createHash('sha256').update(bytes).digest('hex'),moves:4});
  assert(bytes.length<=16384,'Test archive must stay one chunk');const rolling=createHash('sha256').update(Buffer.concat([Buffer.alloc(32),bytes])).digest();
  const minted=await send('peer-result-inscription',black,XTRATA,'mint-single-tx-recursive',[Cl.buffer(rolling),Cl.stringAscii('application/json'),Cl.uint(bytes.length),Cl.list([Cl.buffer(bytes)]),Cl.stringAscii('data:text/plain,xchess-peer-v1-3037-acceptance-test'),Cl.list([Cl.uint(3037)])],feeUnit*3n,[Pc.principal(black.address).willSendLte(feeUnit*3n).ustx()]);
  const inscriptionId=resultNumber(minted);state.resultInscription=inscriptionId;save();
  const reader=new m.XtrataReader({endpoint:ep});const sealedText=await reader.text(inscriptionId);assert.equal(sealedText,bytes.toString());await m.verifyArchive(JSON.parse(sealedText),opening);checked('Sealed on-chain result bytes match and independently verify',{inscription:inscriptionId,sha256:createHash('sha256').update(sealedText).digest('hex')});
- state.endBalances={};for(const w of [white,black,patron])state.endBalances[w.address]=String(await balanceOf(w.address,{maxAgeMs:0}));state.completedAt=new Date().toISOString();state.success=true;save();console.log('COMPLETE',stringify({standardGame:state.standardGame,sponsoredGame:state.sponsoredGame,registry:REGISTRY,peerGame:gameId,resultInscription:inscriptionId,maxBookedUstx:state.transactions.reduce((n,t)=>n+BigInt(t.maxCostUstx),0n)}));
+ state.endBalances={};for(const w of [white,black,patron])state.endBalances[w.address]=String(await balanceOf(w.address,{maxAgeMs:0}));state.completedAt=new Date().toISOString();state.success=true;if(state.lastError){state.recoveredHarnessError=state.lastError;delete state.lastError;}save();console.log('COMPLETE',stringify({standardGame:state.standardGame,sponsoredGame:state.sponsoredGame,registry:REGISTRY,peerGame:gameId,resultInscription:inscriptionId,maxBookedUstx:state.transactions.reduce((n,t)=>n+BigInt(t.maxCostUstx),0n)}));
 }catch(e){state.lastError=scrub(e instanceof Error?e.message:String(e));save();console.error(state.lastError);process.exitCode=1;}

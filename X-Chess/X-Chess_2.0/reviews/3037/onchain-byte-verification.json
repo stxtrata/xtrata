@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "inscription": 3037,
+  "sha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+  "bytes": 311553,
+  "method": "All 20 chunks read directly using the on-chain contract read functions",
+  "at": "2026-09-09T11:14:19.310Z"
+}

@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {build} from 'esbuild';
 import {uintCV,serializeCV} from '@stacks/transactions';
-const artifact=await readFile('dist/xchess.html','utf8');
+const artifact=await readFile(process.env.XCHESS_TEST_ARTIFACT || 'dist/xchess.html','utf8');
 const js=(await build({entryPoints:['harness/peer/driver.ts'],bundle:true,write:false,platform:'browser',format:'iife'})).outputFiles[0].text;
 const queues=new Map(),pending=new Map();let sequence=0;
 createServer(async(req,res)=>{

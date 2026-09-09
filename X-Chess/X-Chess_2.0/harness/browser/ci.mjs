@@ -1,9 +1,10 @@
 // CI adapter for the same self-running page used interactively in a real browser.
+import {createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import {mkdtemp, rm, readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-const expectedHash = JSON.parse(await readFile('dist/manifest.json', 'utf8')).htmlSha256;
+const expectedHash = process.env.XCHESS_TEST_ARTIFACT ? createHash('sha256').update(await readFile(process.env.XCHESS_TEST_ARTIFACT)).digest('hex') : JSON.parse(await readFile('dist/manifest.json', 'utf8')).htmlSha256;
 const startedAt = Date.now();
 const profile = await mkdtemp(join(tmpdir(), 'xchess-browser-'));
 const server = spawn(process.execPath,['harness/browser/serve.mjs'],{stdio:'inherit'});

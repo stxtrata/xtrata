@@ -1,0 +1,10 @@
+{
+  "fileSha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f",
+  "status": "finished",
+  "root": "b2c43fa18d464012a0d96fd6e9532373aaabb7311b15d2447c5bb81c4166a816",
+  "fen": "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
+  "result": "0-1",
+  "termination": "checkmate",
+  "opening": "Signatures and replay valid; on-chain opening has not been checked",
+  "guarantee": "Authenticates this signed line; does not establish absence of other branches"
+}

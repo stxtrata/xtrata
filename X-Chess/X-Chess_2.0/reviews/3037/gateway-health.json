@@ -1,0 +1,22 @@
+{
+  "at": "2026-09-09T11:11:58.883Z",
+  "rows": [
+    {
+      "base": "https://xtrata.xyz/hiro/mainnet",
+      "status": 200,
+      "ms": 1133,
+      "tip": 8950035
+    },
+    {
+      "base": "https://api.mainnet.hiro.so",
+      "status": 200,
+      "ms": 64,
+      "tip": 8950035
+    },
+    {
+      "base": "https://stacks-node-api.mainnet.stacks.co",
+      "ms": 94,
+      "error": "fetch failed"
+    }
+  ]
+}

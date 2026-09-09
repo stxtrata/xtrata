@@ -1,0 +1,177 @@
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > spends about two reads a game, and says so out loud
+      25 games -> 51 reads
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > does not grow with the size of the contract, only with the window
+      25 games -> 51 reads, 100 games -> 51 reads
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > reads the window concurrently, because latency is the cost and not bandwidth
+      peak reads in flight: 3
+
+ ✓ tests/e2e/shared-link.test.ts (25 tests) 3956ms
+     ✓ round-trips: a board booted at the produced link opens the game  613ms
+     ✓ ignores a nonsense game number instead of shouting about it  403ms
+ ✓ tests/e2e/pending-move.test.ts (28 tests) 4333ms
+     ✓ highlights the piece as soon as it is picked up  599ms
+     ✓ says it is broadcast once it is signed  348ms
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs the second time > skips the entries for every game that has not moved
+      cold 51 reads -> warm 26 reads
+
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > reads it three at a time rather than one after another
+      peak reads in flight: 3
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs the second time > reads the new entries, and only those, when a game has moved
+      one game moved -> 1 entry page(s) read
+
+ ✓ tests/e2e/explore-scale.test.ts (8 tests) 6140ms
+     ✓ spends about two reads a game, and says so out loud  1114ms
+     ✓ does not grow with the size of the contract, only with the window  1162ms
+     ✓ reads the window concurrently, because latency is the cost and not bandwidth  562ms
+     ✓ does not read the whole window at once either  531ms
+     ✓ keeps the newest game first, which concurrency is free to have broken  533ms
+     ✓ skips the entries for every game that has not moved  1095ms
+     ✓ reads the new entries, and only those, when a game has moved  1134ms
+ ✓ tests/e2e/request-budget.test.ts (29 tests) 6270ms
+     ✓ spends at most two reads per poll  798ms
+     ✓ reads it again after a submission, which is what spends one  327ms
+     ✓ finds a game outside the window with exactly one lookup  413ms
+     ✓ rebuilds a stale list when you open the tab, and not before  784ms
+     ✓ costs nothing to filter, however many times  315ms
+ ✓ tests/e2e/explore-paging.test.ts (6 tests) 7587ms
+     ✓ starts on the newest page with Newer disabled  1005ms
+     ✓ shows the previous stretch of ids, and says which  934ms
+     ✓ pauses the refresh timer while paged away  928ms
+     ✓ returns to the newest as null rather than as a number  1330ms
+     ✓ stops at the oldest rather than running off the end  2497ms
+     ✓ does not append your older games to a page that is not the newest  882ms
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > costs one read a game on a second visit, not three
+      9 ranked games: cold 28 reads -> warm 10
+
+ ✓ tests/e2e/replay-game.test.ts (8 tests) 1257ms
+ ✓ tests/e2e/sound.test.ts (14 tests) 1844ms
+ ✓ tests/e2e/promotion.test.ts (10 tests) 3990ms
+     ✓ opens when a pawn reaches the last rank, and names the move it is about  867ms
+     ✓ submits the piece that was chosen  317ms
+     ✓ does not fire a stale move after the player picks up another piece  331ms
+     ✓ does not fire a stale move when the pawn is put back down  323ms
+     ✓ has a Cancel that puts the board back  362ms
+     ✓ closes on Escape, and Escape keeps working after other keys  410ms
+     ✓ is announced as a dialog and focuses the first choice  559ms
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > grows with the ranked games, which is the thing still to decide
+      4 ranked -> 13 reads, 12 ranked -> 37 reads
+
+ ✓ tests/e2e/rating-cache.test.ts (11 tests) 1275ms
+     ✓ writes them where the next visit can find them  379ms
+ ✓ tests/e2e/leaderboard-scale.test.ts (7 tests) 4979ms
+     ✓ reads it three at a time rather than one after another  697ms
+     ✓ still produces the table, which concurrency is free to have broken  508ms
+     ✓ costs one read a game on a second visit, not three  1017ms
+     ✓ recomputes every rating even when nothing was fetched  1412ms
+     ✓ grows with the ranked games, which is the thing still to decide  1081ms
+ ✓ tests/runtime/xtrata-runtime.test.ts (13 tests) 1812ms
+     ✓ survives document.write and renders a board  438ms
+ ✓ tests/artifact/artifact.test.ts (37 tests) 1551ms
+     ✓ renders a board  723ms
+ ✓ tests/artifact/gates-artifact.test.ts (15 tests) 1573ms
+     ✓ renders every step  753ms
+ ✓ tests/e2e/canary-inputs.test.ts (9 tests) 909ms
+     ✓ reaches the handler that needs it  417ms
+ ✓ tests/runtime/direct-inscription.test.ts (3 tests) 627ms
+     ✓ boots at inscription 3034 and reads through the proxy  387ms
+ ✓ tests/chain/rate-limit.test.ts (7 tests) 1812ms
+     ✓ still calls a real outage unavailable  1807ms
+ ✓ tests/e2e/silent-refusal.test.ts (5 tests) 781ms
+     ✓ says which squares can answer a check  415ms
+ ✓ tests/e2e/loading-progress.test.ts (7 tests) 711ms
+     ✓ shows nothing when nothing is running  356ms
+ ✓ tests/peer/store.test.ts (12 tests) 940ms
+ ✓ tests/e2e/explore.test.ts (45 tests) 13682ms
+     ✓ says which game is waiting for you  858ms
+     ✓ does not claim a game is yours when the turn belongs to somebody else  442ms
+     ✓ puts what you can act on first  311ms
+     ✓ offers the filters, and starts on All  325ms
+     ✓ goes back to everything, and says so again  302ms
+     ✓ says a game already on screen is already on screen, and reads nothing  431ms
+     ✓ says plainly when there is no such game  636ms
+     ✓ refuses to pretend it can search by player  344ms
+     ✓ puts the list back when the box is cleared  423ms
+     ✓ finds the games you are in  366ms
+     ✓ stops offering your own game as an open seat  374ms
+     ✓ answers for nobody again on disconnect  587ms
+     ✓ matches a game by address even when the row displays a name  609ms
+     ✓ costs nothing until somebody presses it  421ms
+     ✓ finds the game whose moves are being paid for  454ms
+     ✓ says what it could not ask, rather than calling it unsponsored  593ms
+     ✓ asks once, however many times it is pressed  705ms
+     ✓ asks only about the sides a game actually names  465ms
+ ✓ tests/e2e/waiting-badge.test.ts (6 tests) 945ms
+     ✓ clears itself when the game ends, without the list being rebuilt  471ms
+ ✓ tests/e2e/faces.test.ts (7 tests) 873ms
+     ✓ points at the inscription and never holds the bytes  436ms
+ ✓ tests/ui/sound-panel.test.ts (41 tests) 869ms
+ ✓ tests/e2e/tournament-poll.test.ts (8 tests) 773ms
+     ✓ reads every game the first time  456ms
+ ✓ tests/artifact/contrast.test.ts (12 tests) 482ms
+ ✓ tests/e2e/profile-auto.test.ts (5 tests) 624ms
+     ✓ shows the picture the address actually has  382ms
+ ✓ tests/peer/protocol.test.ts (33 tests) 612ms
+ ✓ tests/ui/board-colour.test.ts (11 tests) 409ms
+ ✓ tests/legacy/live-games.test.ts (7 tests) 189ms
+ ✓ tests/ui/sounds.test.ts (41 tests) 238ms
+ ✓ tests/ui/board-coordinates.test.ts (6 tests) 310ms
+ ✓ tests/e2e/profile-collapse.test.ts (5 tests) 723ms
+     ✓ collapses the tooling that made it  491ms
+ ✓ tests/rankings/elo.test.ts (21 tests) 101ms
+ ✓ tests/artifact/budget.test.ts (3 tests) 162ms
+ ✓ tests/ui/game-presets.test.ts (3 tests) 273ms
+ ✓ tests/peer/transport.test.ts (12 tests) 95ms
+ ✓ tests/wizards/game-plans.test.ts (13 tests) 74ms
+ ✓ tests/wallet/connect.test.ts (16 tests) 9ms
+ ✓ tests/wallet/conformance.test.ts (40 tests) 158ms
+ ✓ tests/ui/board-keyboard.test.ts (1 test) 133ms
+ ✓ tests/chain/read-resilience.test.ts (11 tests) 59ms
+ ✓ tests/chain/yours.test.ts (13 tests) 13ms
+ ✓ tests/e2e/cache-recovery.test.ts (15 tests) 147ms
+ ✓ tests/artifact/sounds.test.ts (6 tests) 73ms
+ ✓ tests/chain/tx-status.test.ts (11 tests) 30ms
+ ✓ tests/ui/tournament-cache.test.ts (4 tests) 51ms
+ ✓ tests/wallet/postconditions.test.ts (20 tests) 22ms
+ ✓ tests/e2e/submission-gate.test.ts (25 tests) 34ms
+ ✓ tests/chain/xtrata.test.ts (11 tests) 29ms
+ ✓ tests/e2e/cache-destruction.test.ts (6 tests) 48ms
+ ✓ tests/legacy/legacy.test.ts (12 tests) 53ms
+ ✓ tests/chain/players.test.ts (9 tests) 44ms
+ ✓ tests/wallet/outflows.test.ts (11 tests) 15ms
+ ✓ tests/artifact/wallet-matrix.test.ts (22 tests) 6ms
+ ✓ tests/chain/pictures.test.ts (10 tests) 7ms
+ ✓ tests/e2e/inscribe-track.test.ts (9 tests) 15ms
+ ✓ tests/chain/price-cache.test.ts (5 tests) 7ms
+ ✓ tests/artifact/xtrata-hash.test.ts (5 tests) 7ms
+ ✓ tests/chain/holdings.test.ts (7 tests) 8ms
+ ✓ tests/chain/directory.test.ts (7 tests) 7ms
+ ✓ tests/artifact/pieces.test.ts (8 tests) 8ms
+ ✓ tests/e2e/gates.test.ts (29 tests) 12ms
+ ✓ tests/runtime/captured-runtime.test.ts (1 test) 4ms
+ ✓ tests/artifact/manual-page.test.ts (5 tests) 4ms
+ ✓ tests/rankings/checkpoint-walk.test.ts (2 tests) 2ms
+ ↓ tests/legacy/fetch-canary.test.ts (1 test | 1 skipped)
+ ↓ tests/legacy/fetch-live.test.ts (2 tests | 2 skipped)
+ ✓ tests/peer/vector.test.ts (1 test) 13ms
+ ✓ tests/chain/endpoint.test.ts (34 tests) 18510ms
+     ✓ reports chain unavailability distinctly when every base is down  3621ms
+     ✓ tries every base before giving up  1827ms
+     ✓ does not fall away from an explicit override even when it fails  1805ms
+     ✓ does not mistake a plain 503 for a rate limit  1821ms
+     ✓ sweeps every base, and retries the sweep a bounded number of times  1828ms
+     ✓ still calls a real outage an outage, when the budget was healthy  1813ms
+     ✓ calls it an outage when nothing has ever reported a budget  1821ms
+     ✓ never silences a page that is merely offline  3615ms
+
+ Test Files  67 passed | 2 skipped (69)
+      Tests  889 passed | 3 skipped (892)
+   Start at  12:06:49
+   Duration  20.18s (transform 3.82s, setup 0ms, import 30.60s, tests 93.31s, environment 7ms)
+
+JSON report written to /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0/reviews/3037/regression-tests.json

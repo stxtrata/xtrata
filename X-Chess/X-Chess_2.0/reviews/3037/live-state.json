@@ -1,0 +1,660 @@
+{
+  "inscription": 3037,
+  "createdAt": "2026-09-09T11:05:53.078Z",
+  "limitUstx": "1000000",
+  "transactions": [
+    {
+      "label": "standard-open",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "open-game",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "35",
+      "txid": "11924115f2dfb178ee646bb0e42e38fb1ba832703273f0bb72db8226cff740b0",
+      "maxCostUstx": "13000",
+      "status": "success",
+      "blockHeight": 8950021,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000088",
+        "repr": "(ok u136)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "stx_asset",
+          "tx_id": "0x11924115f2dfb178ee646bb0e42e38fb1ba832703273f0bb72db8226cff740b0",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+            "recipient": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "amount": "10000"
+          }
+        },
+        {
+          "event_index": 1,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x11924115f2dfb178ee646bb0e42e38fb1ba832703273f0bb72db8226cff740b0",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000007056576656e740d0000000b67616d652d6f70656e65640366656501000000000000000000000000000027100467616d650100000000000000000000000000000088066865696768740100000000000000000000000000889105096f70656e65642d627905164edb577497874d0f4669f023b12832d30632d4fa0672616e6b6564040a72756c65732d686173680a0200000020b5316d1bcbee49da803bf3140d4118bdd97999b1c365704abbbe59bd6669ae02",
+              "repr": "(tuple (event \"game-opened\") (fee u10000) (game u136) (height u8950021) (opened-by 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (ranked false) (rules-hash (some 0xb5316d1bcbee49da803bf3140d4118bdd97999b1c365704abbbe59bd6669ae02)))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "standard-move-1",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "36",
+      "txid": "9330da4d6d517805891d687ff0fc4f7cef244832b1caab562631c662703384d5",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950023,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000000",
+        "repr": "(ok u0)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x9330da4d6d517805891d687ff0fc4f7cef244832b1caab562631c662703384d5",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000880668656967687401000000000000000000000000008891070673656e64657205164edb577497874d0f4669f023b12832d30632d4fa0373657101000000000000000000000000000000000576616c75650d0000000466326633",
+              "repr": "(tuple (event \"entry-submitted\") (game u136) (height u8950023) (sender 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (seq u0) (value \"f2f3\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "standard-move-2",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "28",
+      "txid": "35816a598f2ee513110d4ea5ed42d48e71d9d4f215a65990253fc1e843fb388f",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950025,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000001",
+        "repr": "(ok u1)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x35816a598f2ee513110d4ea5ed42d48e71d9d4f215a65990253fc1e843fb388f",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000880668656967687401000000000000000000000000008891090673656e64657205168c6419cdc3a35c2ebc373ea224369bd4fd2239ed0373657101000000000000000000000000000000010576616c75650d0000000465376535",
+              "repr": "(tuple (event \"entry-submitted\") (game u136) (height u8950025) (sender 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S) (seq u1) (value \"e7e5\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "standard-move-3",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "37",
+      "txid": "d7ecbe1e51e794b9384612349c84edbcd12f0650b406b875665d2e3b7a860fc6",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950027,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000002",
+        "repr": "(ok u2)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xd7ecbe1e51e794b9384612349c84edbcd12f0650b406b875665d2e3b7a860fc6",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d65010000000000000000000000000000008806686569676874010000000000000000000000000088910b0673656e64657205164edb577497874d0f4669f023b12832d30632d4fa0373657101000000000000000000000000000000020576616c75650d0000000467326734",
+              "repr": "(tuple (event \"entry-submitted\") (game u136) (height u8950027) (sender 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (seq u2) (value \"g2g4\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "standard-move-4",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "29",
+      "txid": "df54664e5ddb8d82ef8dd8fbe79a449c1d7503bff60a475f94817d2afa1a2567",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950029,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000003",
+        "repr": "(ok u3)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xdf54664e5ddb8d82ef8dd8fbe79a449c1d7503bff60a475f94817d2afa1a2567",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d65010000000000000000000000000000008806686569676874010000000000000000000000000088910d0673656e64657205168c6419cdc3a35c2ebc373ea224369bd4fd2239ed0373657101000000000000000000000000000000030576616c75650d0000000464386834",
+              "repr": "(tuple (event \"entry-submitted\") (game u136) (height u8950029) (sender 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S) (seq u3) (value \"d8h4\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "sponsored-open",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "open-sponsored-game",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "38",
+      "txid": "b03f3b38df1ca612701ff10a83e0c1c8ac0633f25af9f80dfcb17a697d70eeb9",
+      "maxCostUstx": "403000",
+      "status": "success",
+      "blockHeight": 8950031,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000089",
+        "repr": "(ok u137)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "stx_asset",
+          "tx_id": "0xb03f3b38df1ca612701ff10a83e0c1c8ac0633f25af9f80dfcb17a697d70eeb9",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+            "recipient": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "amount": "400000"
+          }
+        },
+        {
+          "event_index": 1,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xb03f3b38df1ca612701ff10a83e0c1c8ac0633f25af9f80dfcb17a697d70eeb9",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000007056576656e740d0000000b67616d652d6f70656e65640366656501000000000000000000000000000027100467616d65010000000000000000000000000000008906686569676874010000000000000000000000000088910f096f70656e65642d627905164edb577497874d0f4669f023b12832d30632d4fa0672616e6b6564040a72756c65732d686173680a0200000020b5316d1bcbee49da803bf3140d4118bdd97999b1c365704abbbe59bd6669ae02",
+              "repr": "(tuple (event \"game-opened\") (fee u10000) (game u137) (height u8950031) (opened-by 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (ranked false) (rules-hash (some 0xb5316d1bcbee49da803bf3140d4118bdd97999b1c365704abbbe59bd6669ae02)))"
+            }
+          }
+        },
+        {
+          "event_index": 2,
+          "event_type": "stx_asset",
+          "tx_id": "0xb03f3b38df1ca612701ff10a83e0c1c8ac0633f25af9f80dfcb17a697d70eeb9",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "recipient": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+            "amount": "250000"
+          }
+        },
+        {
+          "event_index": 3,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xb03f3b38df1ca612701ff10a83e0c1c8ac0633f25af9f80dfcb17a697d70eeb9",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c0000000909626f6f747374726170010000000000000000000000000003d090056576656e740d0000001273706f6e736f72736869702d66756e64656406657870697279010000000000000000000000000088a1ef0966756e6465642d627905164edb577497874d0f4669f023b12832d30632d4fa0467616d6501000000000000000000000000000000890672656261746501000000000000000000000000000007d00772656261746573010000000000000000000000000000002d0872657365727665640100000000000000000000000000015f900377686f05168c6419cdc3a35c2ebc373ea224369bd4fd2239ed",
+              "repr": "(tuple (bootstrap u250000) (event \"sponsorship-funded\") (expiry u8954351) (funded-by 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (game u137) (rebate u2000) (rebates u45) (reserved u90000) (who 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "sponsored-move-1",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "39",
+      "txid": "cbc961c0eddad499c5cef508ddd3cdca247158786aa38af6a4f4ed6ac0295a4c",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950033,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000000",
+        "repr": "(ok u0)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xcbc961c0eddad499c5cef508ddd3cdca247158786aa38af6a4f4ed6ac0295a4c",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000890668656967687401000000000000000000000000008891110673656e64657205164edb577497874d0f4669f023b12832d30632d4fa0373657101000000000000000000000000000000000576616c75650d0000000466326633",
+              "repr": "(tuple (event \"entry-submitted\") (game u137) (height u8950033) (sender 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (seq u0) (value \"f2f3\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "sponsored-move-2",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "30",
+      "txid": "419bb572240afa547b3fb42e3467ad091d9968338578ae765eaf4f05dafa7e1c",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950035,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000001",
+        "repr": "(ok u1)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x419bb572240afa547b3fb42e3467ad091d9968338578ae765eaf4f05dafa7e1c",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000890668656967687401000000000000000000000000008891130673656e64657205168c6419cdc3a35c2ebc373ea224369bd4fd2239ed0373657101000000000000000000000000000000010576616c75650d0000000465376535",
+              "repr": "(tuple (event \"entry-submitted\") (game u137) (height u8950035) (sender 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S) (seq u1) (value \"e7e5\"))"
+            }
+          }
+        },
+        {
+          "event_index": 1,
+          "event_type": "stx_asset",
+          "tx_id": "0x419bb572240afa547b3fb42e3467ad091d9968338578ae765eaf4f05dafa7e1c",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "recipient": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+            "amount": "2000"
+          }
+        },
+        {
+          "event_index": 2,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x419bb572240afa547b3fb42e3467ad091d9968338578ae765eaf4f05dafa7e1c",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c0000000506616d6f756e7401000000000000000000000000000007d0056576656e740d0000000b7265626174652d706169640467616d6501000000000000000000000000000000890c726562617465732d6c656674010000000000000000000000000000002c0377686f05168c6419cdc3a35c2ebc373ea224369bd4fd2239ed",
+              "repr": "(tuple (amount u2000) (event \"rebate-paid\") (game u137) (rebates-left u44) (who 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "sponsored-move-3",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "40",
+      "txid": "0bb765a73ef4f79431e9ceea789bed9e67673db8b030474f928054e264b54e69",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950037,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000002",
+        "repr": "(ok u2)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x0bb765a73ef4f79431e9ceea789bed9e67673db8b030474f928054e264b54e69",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000890668656967687401000000000000000000000000008891150673656e64657205164edb577497874d0f4669f023b12832d30632d4fa0373657101000000000000000000000000000000020576616c75650d0000000467326734",
+              "repr": "(tuple (event \"entry-submitted\") (game u137) (height u8950037) (sender 'SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT) (seq u2) (value \"g2g4\"))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "sponsored-move-4",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+      "function": "submit",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "31",
+      "txid": "b5262065c7be906f096e2f4315c01f2648ea1c6b806cfc69e9d0aef4935e75a0",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950039,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000003",
+        "repr": "(ok u3)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xb5262065c7be906f096e2f4315c01f2648ea1c6b806cfc69e9d0aef4935e75a0",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000006056576656e740d0000000f656e7472792d7375626d69747465640467616d6501000000000000000000000000000000890668656967687401000000000000000000000000008891170673656e64657205168c6419cdc3a35c2ebc373ea224369bd4fd2239ed0373657101000000000000000000000000000000030576616c75650d0000000464386834",
+              "repr": "(tuple (event \"entry-submitted\") (game u137) (height u8950039) (sender 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S) (seq u3) (value \"d8h4\"))"
+            }
+          }
+        },
+        {
+          "event_index": 1,
+          "event_type": "stx_asset",
+          "tx_id": "0xb5262065c7be906f096e2f4315c01f2648ea1c6b806cfc69e9d0aef4935e75a0",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "recipient": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+            "amount": "2000"
+          }
+        },
+        {
+          "event_index": 2,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xb5262065c7be906f096e2f4315c01f2648ea1c6b806cfc69e9d0aef4935e75a0",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c0000000506616d6f756e7401000000000000000000000000000007d0056576656e740d0000000b7265626174652d706169640467616d6501000000000000000000000000000000890c726562617465732d6c656674010000000000000000000000000000002b0377686f05168c6419cdc3a35c2ebc373ea224369bd4fd2239ed",
+              "repr": "(tuple (amount u2000) (event \"rebate-paid\") (game u137) (rebates-left u43) (who 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "peer-registry-deploy",
+      "contract": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+      "function": "deploy",
+      "sender": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH",
+      "nonce": "0",
+      "txid": "b48d0dc67604c0065d99d6b1ece65142dd574d21a95047cc408f352436156148",
+      "maxCostUstx": "30000",
+      "status": "success",
+      "blockHeight": 8950041,
+      "feeUstx": "30000",
+      "result": {
+        "hex": "0x0703",
+        "repr": "(ok true)"
+      },
+      "events": []
+    },
+    {
+      "label": "peer-create",
+      "contract": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+      "function": "create-peer-game",
+      "sender": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "nonce": "41",
+      "txid": "63d56dfac986ebf342485cb03fa30c4b87a1fc89864956d527ff30c01553eba8",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950043,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000001",
+        "repr": "(ok u1)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x63d56dfac986ebf342485cb03fa30c4b87a1fc89864956d527ff30c01553eba8",
+          "contract_log": {
+            "contract_id": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000002056576656e740d0000000c706565722d637265617465640467616d650100000000000000000000000000000001",
+              "repr": "(tuple (event \"peer-created\") (game u1))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "peer-join",
+      "contract": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+      "function": "join-peer-game",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "32",
+      "txid": "fdf4d13765edf72dadf063a2367a6062fa054e352d3de9b593f79adb25cdbcd9",
+      "maxCostUstx": "3000",
+      "status": "success",
+      "blockHeight": 8950045,
+      "feeUstx": "3000",
+      "result": {
+        "hex": "0x070100000000000000000000000000000001",
+        "repr": "(ok u1)"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "smart_contract_log",
+          "tx_id": "0xfdf4d13765edf72dadf063a2367a6062fa054e352d3de9b593f79adb25cdbcd9",
+          "contract_log": {
+            "contract_id": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c00000002056576656e740d0000000b706565722d6a6f696e65640467616d650100000000000000000000000000000001",
+              "repr": "(tuple (event \"peer-joined\") (game u1))"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "label": "peer-result-inscription",
+      "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+      "function": "mint-single-tx-recursive",
+      "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "nonce": "33",
+      "txid": "28457a3b733c1ed1b38a4ba94937d0026249a6d377e51aca84016d705f43c056",
+      "maxCostUstx": "320000",
+      "status": "success",
+      "blockHeight": 8950050,
+      "feeUstx": "20000",
+      "result": {
+        "hex": "0x070c0000000207657869737465640408746f6b656e2d69640100000000000000000000000000000bde",
+        "repr": "(ok (tuple (existed false) (token-id u3038)))"
+      },
+      "events": [
+        {
+          "event_index": 0,
+          "event_type": "stx_asset",
+          "tx_id": "0x28457a3b733c1ed1b38a4ba94937d0026249a6d377e51aca84016d705f43c056",
+          "asset": {
+            "asset_event_type": "transfer",
+            "sender": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+            "recipient": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "amount": "11000"
+          }
+        },
+        {
+          "event_index": 1,
+          "event_type": "non_fungible_token_asset",
+          "tx_id": "0x28457a3b733c1ed1b38a4ba94937d0026249a6d377e51aca84016d705f43c056",
+          "asset": {
+            "asset_event_type": "mint",
+            "asset_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3::xtrata-inscription",
+            "sender": "",
+            "recipient": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+            "value": {
+              "hex": "0x0100000000000000000000000000000bde",
+              "repr": "u3038"
+            }
+          }
+        },
+        {
+          "event_index": 2,
+          "event_type": "smart_contract_log",
+          "tx_id": "0x28457a3b733c1ed1b38a4ba94937d0026249a6d377e51aca84016d705f43c056",
+          "contract_log": {
+            "contract_id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+            "topic": "print",
+            "value": {
+              "hex": "0x0c0000000a0a6368756e6b2d73697a6501000000000000000000000000000040000c646570656e64656e636965730b000000010100000000000000000000000000000bdd056576656e740d00000012696e736372697074696f6e2d7365616c65640a66696e616c2d686173680200000020c0b3ad1b7a2c429d5592bcc5d21ee0eaf1415bf83fdf66a0e8134939977d0025056f776e657205168c6419cdc3a35c2ebc373ea224369bd4fd2239ed07706172656e74730b0000000008746f6b656e2d69640100000000000000000000000000000bde09746f6b656e2d7572690d00000033646174613a746578742f706c61696e2c7863686573732d706565722d76312d333033372d616363657074616e63652d746573740c746f74616c2d6368756e6b7301000000000000000000000000000000010a746f74616c2d73697a650100000000000000000000000000000c71",
+              "repr": "(tuple (chunk-size u16384) (dependencies (list u3037)) (event \"inscription-sealed\") (final-hash 0xc0b3ad1b7a2c429d5592bcc5d21ee0eaf1415bf83fdf66a0e8134939977d0025) (owner 'SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S) (parents (list)) (token-id u3038) (token-uri \"data:text/plain,xchess-peer-v1-3037-acceptance-test\") (total-chunks u1) (total-size u3185))"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "Mainnet standard game replays to checkmate",
+      "passed": true,
+      "game": 136,
+      "moves": 4
+    },
+    {
+      "name": "Mainnet sponsorship bootstrap and reserve created",
+      "passed": true,
+      "game": 137,
+      "bootstrapUstx": "250000",
+      "reservedUstx": "90000"
+    },
+    {
+      "name": "Mainnet sponsored game replays to checkmate",
+      "passed": true,
+      "game": 137,
+      "moves": 4
+    },
+    {
+      "name": "Two sponsored moves received contract rebates",
+      "passed": true,
+      "remainingRebates": 43,
+      "reservedUstx": "86000"
+    },
+    {
+      "name": "Deployed peer registry source matches the reviewed immutable contract",
+      "passed": true
+    },
+    {
+      "name": "Named player keys and full joined descriptor confirmed on mainnet",
+      "passed": true,
+      "registry": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+      "game": 1
+    },
+    {
+      "name": "Registered off-chain signed Fool’s Mate verifies against the live opening",
+      "passed": true,
+      "bytes": 3185,
+      "historyRoot": "b2c43fa18d464012a0d96fd6e9532373aaabb7311b15d2447c5bb81c4166a816",
+      "fileSha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f",
+      "moves": 4
+    },
+    {
+      "name": "Sealed on-chain result bytes match and independently verify",
+      "passed": true,
+      "inscription": 3038,
+      "sha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f"
+    }
+  ],
+  "plan": {
+    "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+    "registry": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+    "xtrata": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "openFeeUstx": "10000",
+    "sponsorPriceUstx": "390000",
+    "inscriptionProtocolFeeUstx": "300000",
+    "maxSessionUstx": "1000000",
+    "newGames": "standard + one-player sponsorship + named peer game; all unranked",
+    "wizardAddresses": [
+      "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+      "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+      "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH"
+    ]
+  },
+  "startBalances": {
+    "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT": "2000000",
+    "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S": "2000000",
+    "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH": "2000000"
+  },
+  "legacyRules": {
+    "replayProtocol": "replay-v1",
+    "eventsProtocol": "events-v1",
+    "white": "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT",
+    "black": "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S",
+    "allow": [],
+    "cooldown": 0,
+    "noConsecutive": false,
+    "ranked": false,
+    "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+  },
+  "standardGame": 136,
+  "sponsoredGame": 137,
+  "peerRegistry": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+  "peerDescriptor": {
+    "protocol": "xchess-peer-v1",
+    "engine": "xchess-engine-v1:2ce32043537e211ff09dec435ae8c9eec89d21e6e71a082fc4ed0a929668bd33",
+    "rules": "xchess-automatic-draw-v1",
+    "algorithm": "P256-SHA256-raw-v1",
+    "nonce": "07edf1f5b4a7e75cc1aea4baa375269f164a2032c80c340a9e3739fd6ffcf537",
+    "initialFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "clock": {
+      "baseMs": 0,
+      "incrementMs": 0
+    }
+  },
+  "peerGame": 1,
+  "resultInscription": 3038,
+  "endBalances": {
+    "SP17DPNVMJY3MT3T6D7R27C986B9GCCPMZ92T7VYT": "1569000",
+    "SP26686EDREHNRBNW6WZA491PKFAFT8HSXP269W7S": "2208000",
+    "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH": "1970000"
+  },
+  "completedAt": "2026-09-09T11:25:56.524Z",
+  "success": true,
+  "recoveredHarnessError": "every endpoint is rate limiting this address (tried 1). The chain is fine. This page has asked too many times in the last minute.",
+  "cost": {
+    "netFleetDecreaseUstx": "253000",
+    "networkFeesUstx": "86000",
+    "remainingSponsorshipReserveUstx": "86000",
+    "nonrefundableUstx": "167000"
+  }
+}

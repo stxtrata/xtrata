@@ -1,0 +1,48 @@
+{
+  "testedAt": "2026-09-09T11:25:56.524Z",
+  "appInscription": 3037,
+  "mainnetRoundTripPassed": true,
+  "transactions": 14,
+  "standardGame": 136,
+  "sponsoredGame": 137,
+  "peerRegistry": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+  "peerGame": 1,
+  "resultInscription": 3038,
+  "cost": {
+    "netFleetDecreaseUstx": "253000",
+    "networkFeesUstx": "86000",
+    "remainingSponsorshipReserveUstx": "86000",
+    "nonrefundableUstx": "167000"
+  },
+  "automated": {
+    "regression": {
+      "passed": 889,
+      "skipped": 3
+    },
+    "rules": {
+      "passed": 489,
+      "skipped": 14
+    },
+    "contracts": 68,
+    "runtimeBrowser": 44,
+    "peerBrowser": 13,
+    "typecheck": true,
+    "countsMayOverlap": true
+  },
+  "liveArchiveViewer": {
+    "openingVerified": true,
+    "result": "0-1",
+    "termination": "checkmate",
+    "bytes": 3185,
+    "sha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f"
+  },
+  "unresolved": [
+    "Initial leaderboard failure can hide its suggested retry button",
+    "Stale player labels until refresh",
+    "Older-page UI did not advance during endpoint trouble",
+    "Registry/manual text predates deployment and peer mode",
+    "Tournament running summary disagrees with completed game list",
+    "Full ranking rebuild interrupted by endpoint failures"
+  ],
+  "releaseHtmlUnchanged": true
+}

@@ -1,4 +1,13 @@
-# X Chess 2.3.1 — signed peer play candidate
+# X Chess 2.3.1 — signed peer play
+
+**Post-inscription update, 2026-09-09:** the user inscribed the app as **3037**.
+Authorized wizard testing then deployed the exact registry at
+`SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1` on mainnet.
+Registered game 1 finished and its winner published archive **3038**; sealed-byte
+read-back and live verification passed. Enter that address in the existing
+registry field. See [test report and remaining issues](../reviews/3037/REPORT.md).
+The undeployed/deployment-approval statements below describe the earlier build
+stage and are superseded by this update for this deployed registry.
 
 This candidate replaces the earlier referee-service design. Nothing has been
 deployed or inscribed as part of this implementation. The separate 2.2.0 release

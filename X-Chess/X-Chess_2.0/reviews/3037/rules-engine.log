@@ -1,0 +1,47 @@
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+ ✓ tests/protocol/sha256.test.ts (5 tests) 85ms
+ ✓ tests/chess/skill.test.ts (19 tests) 181ms
+ ✓ tests/engine/rules-audit.test.ts (64 tests) 177ms
+ ✓ tests/rules/recover.test.ts (22 tests) 36ms
+ ✓ tests/replay/replay.test.ts (32 tests) 60ms
+ ✓ tests/rules/canonical.test.ts (39 tests) 19ms
+ ✓ tests/protocol/known-rules.test.ts (15 tests) 17ms
+ ✓ tests/rules/first-mover.test.ts (18 tests) 17ms
+ ✓ tests/protocol/pfp.test.ts (13 tests) 4ms
+ ✓ tests/protocol/clarity.test.ts (18 tests) 1106ms
+     ✓ agrees with the SDK over three thousand arbitrary hashes, on both networks  1016ms
+ ✓ tests/protocol/docs.test.ts (15 tests) 13ms
+ ✓ tests/protocol/checkpoint.test.ts (11 tests) 6ms
+ ✓ tests/protocol/tournament.test.ts (70 tests) 51ms
+ ✓ tests/protocol/player.test.ts (17 tests) 10ms
+ ✓ tests/protocol/entry.test.ts (19 tests) 7ms
+ ✓ tests/protocol/adopting-a-game.test.ts (8 tests) 13ms
+ ✓ tests/protocol/candidates.test.ts (12 tests) 4ms
+ ✓ tests/chess/search.test.ts (12 tests) 1509ms
+     ✓ prefers a faster mate to a slower one  448ms
+     ✓ gives the same answer whether or not the state has been searched before  464ms
+ ↓ tests/rules/generate-golden.test.ts (1 test | 1 skipped)
+ ✓ tests/protocol/recover.test.ts (2 tests) 4ms
+ ✓ tests/perft/perft.test.ts (76 tests | 13 skipped) 4281ms
+       ✓ depth 4 has 197,281 nodes  595ms
+     ✓ kiwipete agrees between the fast and slow paths  733ms
+     ✓ position 5 agrees between the fast and slow paths  400ms
+     ✓ position 6 agrees between the fast and slow paths  549ms
+ ✓ tests/fuzz/replay-fuzz.test.ts (15 tests) 111630ms
+     ✓ never throws on generated logs  16980ms
+     ✓ never throws on a log at the contract ceiling  3633ms
+     ✓ gives the same answer twice for the same bytes  8971ms
+     ✓ never accepts anything after the game is over  17942ms
+     ✓ reaches the same position with the rejected entries removed  12801ms
+     ✓ accounts for every submission exactly once  12313ms
+     ✓ gives a live game legal moves and a finished one none  19427ms
+     ✓ only ever ends a game on an accepted entry, or before it started  19539ms
+
+ Test Files  21 passed | 1 skipped (22)
+      Tests  489 passed | 14 skipped (503)
+   Start at  12:09:16
+   Duration  112.20s (transform 2.02s, setup 0ms, import 3.04s, tests 119.23s, environment 1ms)
+
+JSON report written to /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0/reviews/3037/rules-engine.json

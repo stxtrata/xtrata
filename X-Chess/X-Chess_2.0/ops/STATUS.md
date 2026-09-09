@@ -2,11 +2,14 @@
 
 Updated 2026-09-09.
 
-The active candidate is **2.3.1**, adding signed peer play without a mandatory
-service. See [peer instructions and limitations](PEER-2.3.1.md). It is not deployed
-or inscribed. The 2.2.0 evidence below is preserved as historical context.
+The active version is **2.3.1**, inscribed as **3037**, adding signed peer play
+without a mandatory service. Post-inscription wizard testing completed two legacy
+mainnet games and registered peer game 1, whose winner published result **3038**.
+All 14 transactions succeeded; read-back and live archive verification passed.
+See [test evidence, registry address and remaining UI issues](../reviews/3037/REPORT.md)
+and [peer instructions and limitations](PEER-2.3.1.md).
 
-The latest reviewed working inscription is **3034**, version **2.1.9**. The
+The previous reviewed working inscription was **3034**, version **2.1.9**. The
 **2.2.0 candidate** implements the review's 15 improvements while preserving the
 existing mainnet canary contract and versioned chess protocols. It is built for
 review; it has not been inscribed. See [candidate evidence](CANDIDATE-2.2.0.md).
@@ -23,6 +26,7 @@ an old board being BEHIND does not.
 
 | version | id | built | hash | what it added |
 |---|---|---|---|---|
+| 2.3.1 | **3037** | 09-09 10:30 UTC | `c75b37bd` | signed peer play; exact chain bytes verified; winner-published test result 3038 |
 | 2.1.9 | **3034** | 08-21 21:44 UTC | `936aba6a` | latest working inscription verified from its served bytes on 2026-09-07 |
 | 2.0.0 | **2988** | 08-09 | — | the first inscription |
 | 2.1.0 | **3008** | 08-18 21:11 | `d19c51f7` | tournaments found by wallet rather than typed; your own games found past the newest-25 window; the waiting-on-you count; the manual embedded from chain |
