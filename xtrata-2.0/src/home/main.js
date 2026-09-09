@@ -51,6 +51,7 @@
     import { initXtrataRadio } from '/src/home/radio.js';
     import {
       getSelectedWalletProviderId,
+      showStxTransfer,
       showContractCall,
       showSponsoredContractCall
     } from '/src/lib/wallet/connect.ts';
@@ -201,6 +202,7 @@
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
+    import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
       mergeDependencySources,
@@ -3661,6 +3663,9 @@
               : getObjectUrl();
         }
         target.append(frame);
+        if (!isPdf && options.interactiveHtml) {
+          publicWalletBridge.register(frame, options.walletLabel ?? 'Prepared local preview');
+        }
         return;
       }
 
@@ -6136,6 +6141,7 @@
             : url;
         }
         dom.fullscreenStage.append(frame);
+        if (!isPdf) publicWalletBridge.register(frame, `Inscription #${token.id.toString()}`);
         return;
       }
 
@@ -6434,6 +6440,7 @@
         frame.allow = INSCRIPTION_FRAME_ALLOW;
         frame.src = url;
         dom.fullscreenStage.append(frame);
+        publicWalletBridge.register(frame, 'Prepared local preview');
         return;
       }
 
@@ -7842,6 +7849,7 @@
         truthfulImageSizing: true,
         htmlDoc,
         interactiveHtml: true,
+        walletLabel: `Inscription #${token.id.toString()}`,
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
@@ -9888,6 +9896,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateControls();
       }
     };
+
+    const publicWalletBridge = installPublicWalletBridge({
+      host: window,
+      wallet: walletAdapter,
+      review: reviewPublicWalletRequest,
+      transfer: showStxTransfer,
+      isBusy: () => state.busy,
+      pendingChanged: setBusy,
+      sessionChanged: (session) => {
+        // Connecting from a game must not reload the grid or replace its iframe.
+        state.walletSession = session;
+        refreshConnectedWalletMatureMode();
+        updateWalletStatus();
+        updateControls();
+      }
+    });
 
     const setExplorerModeFromRequest = () => {
       const request = getExplorerRequest();
