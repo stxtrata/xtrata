@@ -11,13 +11,15 @@ import type { XtrataClient } from '../contract/client';
 import type { ContractConfig } from '../contract/config';
 import { getContractId } from '../contract/config';
 import type { WalletSession } from '../wallet/types';
+import { loadWalletHoldingsPage, type WalletHoldingsPage } from './wallet-index';
 
 export const GAME_SAVE_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 export const GAME_SAVE_LIMIT = 32 * 16384;
 export const GAME_SAVE_METHODS = new Set([
   'xtrata_saveGame',
   'xtrata_checkGameSave',
-  'xtrata_loadGameSave'
+  'xtrata_loadGameSave',
+  'xtrata_listGameSaves'
 ]);
 export type SaveReview = {
   kind: 'save';
@@ -68,7 +70,7 @@ export function parseGameSave(json: unknown, address: string, requireWallet = tr
 export type SavePorts = {
   client: Pick<
     XtrataClient,
-    'quoteSingleTxFee' | 'getIdByHash' | 'getInscriptionMeta' | 'getChunk' | 'isPaused'
+    'quoteSingleTxFee' | 'getIdByHash' | 'getInscriptionMeta' | 'getOwner' | 'getChunk' | 'isPaused'
   >;
   contract: ContractConfig;
   session: WalletSession;
@@ -76,6 +78,7 @@ export type SavePorts = {
   guard: () => void;
   review: (r: SaveReview) => Promise<boolean>;
   submit: (options: any) => Promise<any>;
+  holdingsPage?: (pageIndex: number) => Promise<WalletHoldingsPage>;
 };
 /** Narrow JSON-only publisher. No caller-selected contracts, methods, spend caps or recipients. */
 export async function runGameSave(method: string, params: unknown, p: SavePorts) {
@@ -102,8 +105,42 @@ export async function runGameSave(method: string, params: unknown, p: SavePorts)
       (expected && hex(meta.finalHash) !== expected)
     )
       throw error('This is not a confirmed JSON save published by the connected wallet.');
+    if (await p.client.getOwner(id, address) !== address)
+      throw error('This save is no longer owned by the connected wallet.');
+    p.guard();
     return meta;
   };
+  if (method === 'xtrata_listGameSaves') {
+    const cursor = input.cursor ?? 0;
+    if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > 100000)
+      throw error('Invalid checkpoint history page.');
+    const pageSize = 10;
+    const page = await (p.holdingsPage
+      ? p.holdingsPage(cursor)
+      : loadWalletHoldingsPage({network:'mainnet',walletAddress:address,
+          contractIds:[GAME_SAVE_CONTRACT],pageIndex:cursor,pageSize}));
+    p.guard();
+    const saves: {tokenId:string;bytes:number;createdAt:string|null;hash:string}[] = [];
+    // Holdings are candidates only. Validate creator, live NFT ownership,
+    // schema and every content byte before offering an entry to the player.
+    for (const id of [...new Set(page.tokenIds)].slice(0,pageSize)) {
+      try {
+        const loaded = await runGameSave('xtrata_loadGameSave', {...input,tokenId:id.toString()}, p);
+        const data = JSON.parse(loaded.json!);
+        const date = typeof data.createdAt === 'string' && Number.isFinite(Date.parse(data.createdAt))
+          ? new Date(data.createdAt).toISOString() : null;
+        saves.push({tokenId:id.toString(),bytes:new TextEncoder().encode(loaded.json).length,
+          createdAt:date,hash:loaded.hash!});
+      } catch (e) {
+        p.guard();
+        // Non-save assets are expected; network failures must remain visible.
+        if ((e as any)?.code !== -32602) throw e;
+      }
+    }
+    saves.sort((a,b)=>BigInt(a.tokenId)>BigInt(b.tokenId)?-1:1);
+    return {status:'listed',contract:GAME_SAVE_CONTRACT,address,saves,
+      nextCursor:(cursor+1)*pageSize<page.total?cursor+1:null,scanned:page.tokenIds.length};
+  }
   if (method === 'xtrata_loadGameSave') {
     if (
       typeof input.tokenId !== 'string' ||
@@ -131,14 +168,23 @@ export async function runGameSave(method: string, params: unknown, p: SavePorts)
       bytes.set(c, offset);
       offset += c.length;
     }
-    const json = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    let json: string;
+    try { json = new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+    catch { throw error('Invalid checkpoint UTF-8 encoding.'); }
     parseGameSave(json, address, false);
+    // Ownership can change while chunks are loading. Do not restore a
+    // transferred checkpoint using a stale holdings/metadata response.
+    if (await p.client.getOwner(id, address) !== address)
+      throw error('This save is no longer owned by the connected wallet.');
+    p.guard();
     return {
       status: 'confirmed',
       contract: GAME_SAVE_CONTRACT,
       tokenId: id.toString(),
       hash: hex(meta.finalHash),
-      json
+      json,
+      owner: address,
+      creator: address
     };
   }
   if (method === 'xtrata_checkGameSave') {

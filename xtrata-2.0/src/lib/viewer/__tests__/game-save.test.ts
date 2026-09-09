@@ -40,7 +40,8 @@ function setup() {
       submit: vi.fn(async (_options: any) => ({ txId: txid })),
       client: {
         getIdByHash: vi.fn(async () => null as bigint | null),
-        getInscriptionMeta: vi.fn(async () => meta),
+        getInscriptionMeta: vi.fn(async (_id: bigint) => meta),
+        getOwner: vi.fn(async (_id: bigint) => address as string|null),
         quoteSingleTxFee: vi.fn(async () => 11000n),
         isPaused: vi.fn(async () => false),
         getChunk: vi.fn(async () => data.bytes)
@@ -127,6 +128,31 @@ describe('in-game checkpoint publication', () => {
     await expect(runGameSave('xtrata_loadGameSave', { ...args, tokenId: '99' }, p)).rejects.toThrow(
       /confirmed/
     );
+  });
+});
+
+describe('wallet checkpoint library',()=>{
+  it('returns only owned, self-published checkpoints and paginates holdings',async()=>{
+    const {p,meta}=setup();
+    p.client.getInscriptionMeta.mockImplementation(async(id:any)=>({...meta,creator:id===98n?'other':address,mimeType:id===97n?'text/html':'application/json'}));
+    p.client.getOwner.mockImplementation(async(id:any)=>id===96n?'other':address);
+    const holdingsPage=vi.fn(async()=>({tokenIds:[99n,98n,97n,96n],total:11,sourceBase:'test'}));
+    const result=await runGameSave('xtrata_listGameSaves',{...args,cursor:0},{...p,holdingsPage});
+    expect(result).toMatchObject({status:'listed',address,nextCursor:1,saves:[{tokenId:'99',hash:data.hashHex}]});
+    expect(p.submit).not.toHaveBeenCalled();expect(p.review).not.toHaveBeenCalled();
+    await expect(runGameSave('xtrata_listGameSaves',{...args,cursor:-1},{...p,holdingsPage})).rejects.toThrow(/page/);
+  });
+  it('fails closed on transfer during loading, changed wallet, and unavailable history',async()=>{
+    const {p}=setup();
+    p.client.getOwner.mockResolvedValueOnce(address).mockResolvedValueOnce('other');
+    await expect(runGameSave('xtrata_loadGameSave',{...args,tokenId:'99'},p)).rejects.toThrow(/owned/);
+    await expect(runGameSave('xtrata_listGameSaves',args,{...p,holdingsPage:async()=>{throw Error('Service unavailable')}})).rejects.toThrow(/unavailable/);
+    p.guard.mockImplementation(()=>{throw Error('Wallet changed')});
+    await expect(runGameSave('xtrata_listGameSaves',args,p)).rejects.toThrow(/changed/);
+  });
+  it('does not turn a failed chain read into an empty list',async()=>{
+    const {p}=setup();p.client.getInscriptionMeta.mockRejectedValue(Error('Network unavailable'));
+    await expect(runGameSave('xtrata_listGameSaves',args,{...p,holdingsPage:async()=>({tokenIds:[99n],total:1,sourceBase:'test'})})).rejects.toThrow(/Network/);
   });
 });
 

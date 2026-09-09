@@ -65,6 +65,8 @@ export function parsePublicPayment(params: unknown, session: WalletSession): Pay
   const recipient = String(p.recipient ?? p.to ?? '').trim();
   if (!validateStacksAddress(recipient))
     throw failure('A valid STX recipient address is required.');
+  if (recipient === session.address)
+    throw failure('Stacks cannot transfer STX to the sending address. Choose a different recipient or keep the save reference without a memo payment.');
   const rawAmount = p.amount ?? p.amountUstx ?? p.microstx;
   if (typeof rawAmount === 'number' && !Number.isSafeInteger(rawAmount))
     throw failure('Invalid STX amount.');

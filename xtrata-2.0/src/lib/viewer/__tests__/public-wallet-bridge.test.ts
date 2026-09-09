@@ -178,7 +178,7 @@ describe('public preview wallet bridge', () => {
     const f = await h.frame();
     await f.request('stx_requestAccounts');
     expect(
-      await f.request('stx_transferStx', { recipient: address, amount: '1', memo: 'TD1:abc:1' })
+      await f.request('stx_transferStx', { recipient, amount: '1', memo: 'TD1:abc:1' })
     ).toMatchObject({ ok: true });
     expect(h.transfer.mock.calls[0][0]).toMatchObject({
       amount: '1',
@@ -313,6 +313,7 @@ describe('native payment validation', () => {
     expect(parsePublicPayment({ ...payment, fee }, session).fee).toBeUndefined();
   });
   it('validates recipient, UTF-8 memo length and explicit network', () => {
+    expect(() => parsePublicPayment({...payment,recipient:address},session)).toThrow(/sending address/);
     expect(() => parsePublicPayment({ ...payment, recipient: 'bad' }, session)).toThrow();
     expect(() => parsePublicPayment({ ...payment, memo: 'é'.repeat(18) }, session)).toThrow();
     expect(() => parsePublicPayment({ ...payment, network: 'unknown' }, session)).toThrow();
