@@ -1,5 +1,11 @@
 # Timeloop Detective: selective staging integration
 
+Follow-up: the public-viewer blocker recorded below has now been addressed
+on staging by the implementation documented in
+[Timeloop public wallet bridge](timeloop-public-wallet-bridge.md). The
+original review below records why that additional work was necessary.
+Real-wallet and hosted-deployment checks are still separate release steps.
+
 ## Scope and provenance
 
 Prepared on 9 September 2026 from `origin/main-staging` at
