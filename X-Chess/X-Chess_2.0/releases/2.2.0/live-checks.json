@@ -1,0 +1,98 @@
+{
+  "artifactSha256": "23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6",
+  "network": "mainnet",
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "transport": "local framed runtime using captured production scripts and Xtrata production proxy, with normal public endpoint fallbacks",
+  "fullVerification": {
+    "passed": true,
+    "rankedEntriesRead": 130,
+    "ratedGames": 124,
+    "totalPlayerGames": 248,
+    "unfinished": 2,
+    "unidentified": 3,
+    "ineligible": 1,
+    "rows": [
+      {
+        "displayName": "Mason",
+        "rating": 1374,
+        "games": 28
+      },
+      {
+        "displayName": "Fathom",
+        "rating": 1332,
+        "games": 18
+      },
+      {
+        "displayName": "Plumb",
+        "rating": 1323,
+        "games": 29
+      },
+      {
+        "displayName": "Canon",
+        "rating": 1317,
+        "games": 18
+      },
+      {
+        "displayName": "Ledger",
+        "rating": 1260,
+        "games": 28
+      },
+      {
+        "displayName": "Bulwark",
+        "rating": 1236,
+        "games": 18
+      },
+      {
+        "displayName": "xtrata.btc",
+        "rating": 1216,
+        "games": 1
+      },
+      {
+        "displayName": "SP17…2T7VYT",
+        "rating": 1201,
+        "games": 2
+      },
+      {
+        "displayName": "SP26…269W7S",
+        "rating": 1199,
+        "games": 2
+      },
+      {
+        "displayName": "jim.btc",
+        "rating": 1174,
+        "games": 2
+      },
+      {
+        "displayName": "Cadence",
+        "rating": 1103,
+        "games": 18
+      },
+      {
+        "displayName": "Gambit",
+        "rating": 1066,
+        "games": 28
+      },
+      {
+        "displayName": "Oblique",
+        "rating": 1032,
+        "games": 28
+      },
+      {
+        "displayName": "Wager",
+        "rating": 967,
+        "games": 28
+      }
+    ]
+  },
+  "game47": {
+    "loaded": true,
+    "result": "0-1",
+    "acceptedMoves": 32,
+    "flippedReplayFirstMove": "f2f4",
+    "squares": 64,
+    "enabledSquaresDuringReplay": 0,
+    "keyboardFocusRetained": true
+  },
+  "earlierAttempts": "Standalone Hiro and production-proxy attempts encountered shared API limits. Added burst spacing, adaptive public-fallback spacing, failed-batch stop and clear failure status. Final full walk passed after immutable caches warmed.",
+  "wallet": "stub; no signing or broadcast"
+}

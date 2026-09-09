@@ -1,0 +1,1 @@
+Superseded local referee-service experiment. Excluded from X Chess 2.3.1. No service version was deployed and no contract was broadcast. A private, unpublished Sites project was reserved before the peer-only requirement; it is not a dependency of the candidate. The peer handoff is authoritative for the current implementation.

@@ -1,0 +1,278 @@
+{
+  "sha256": "874eb5902048f609ca1c8259a0bee8a1f02a1ccd50862955ba30a97c125984b4",
+  "encoding": "SHA256 of compact JSON sorted object keys; ordered files from packages, apps, contracts",
+  "files": [
+    {
+      "path": "packages/build/build.mjs",
+      "sha256": "40a53766ca5f07c232c8f502e9639d792348429565adb62160e27ae92fc754ff"
+    },
+    {
+      "path": "packages/chain/block-time.ts",
+      "sha256": "ccab11bdd1da23955e4bbe905fc3bb5bb1e9b966e0165cb63afd9965dd0e9427"
+    },
+    {
+      "path": "packages/chain/bns.ts",
+      "sha256": "abf2f505b434d0b916416d110695fe4ba54b18bde0ecdb4874599fcdd7a1156f"
+    },
+    {
+      "path": "packages/chain/clarity.ts",
+      "sha256": "037a59e75683ef58fc9ef9fd7e93643ccc81a3d56f0d786f0ca90590d66b625b"
+    },
+    {
+      "path": "packages/chain/client.ts",
+      "sha256": "891a061206377df72d50db185c39ba1aaea6fc0531d43878205d17abebed4075"
+    },
+    {
+      "path": "packages/chain/directory.ts",
+      "sha256": "8921bc420bccd46a1a277c963ffd517217502375e91eecaa5229ea970c428b39"
+    },
+    {
+      "path": "packages/chain/endpoint.ts",
+      "sha256": "9efc32dd46066b1b98d86ef66dedc8a1622ffc6f56b5ff15401e972a0430a79b"
+    },
+    {
+      "path": "packages/chain/game-facts.ts",
+      "sha256": "833cc6e7cdc5048cebfe919430e78e461185123f6344427c471f495daffe0250"
+    },
+    {
+      "path": "packages/chain/holdings.ts",
+      "sha256": "49d7d7a96bb0e3469c13db84697ec09d3f8307ca877e9f10f08435c04fab8d8d"
+    },
+    {
+      "path": "packages/chain/legacy.ts",
+      "sha256": "3b0497722eb1942983f1e91d3d19f213f49932a53f2d36e99c20e1dc5aadbc9a"
+    },
+    {
+      "path": "packages/chain/mock.ts",
+      "sha256": "f721c9a7cde0ca2b43aaa4799682a2800b05c76e1730330c56bf65a942897f16"
+    },
+    {
+      "path": "packages/chain/pictures.ts",
+      "sha256": "e296b0caf68e1e01b766871cc7bb860ce5bc19fa99823ddb3d33e0b06e27174a"
+    },
+    {
+      "path": "packages/chain/players.ts",
+      "sha256": "581172f26aa88ef4e5fc09590e5acddceafc402426f898407032e226be011175"
+    },
+    {
+      "path": "packages/chain/pool.ts",
+      "sha256": "a494ae6b6b53b31ee97334223f85f1ca4ff129c1678c7f7bbfc6a1d34be4609c"
+    },
+    {
+      "path": "packages/chain/read-transport.ts",
+      "sha256": "b91cfef34b4a6a8376ec45ff3e48be7f5a1eeba5d36b16e3488499c297d9fb3f"
+    },
+    {
+      "path": "packages/chain/tx-status.ts",
+      "sha256": "91a7b5d26d98e98961c1f0c3397b2818e18fe7528a7eeb62835abcf6ecaa7a86"
+    },
+    {
+      "path": "packages/chain/xtrata.ts",
+      "sha256": "957aa6dccbf03c19a10ded1c3afffb2102612ac6d551a2bac270edb7922da829"
+    },
+    {
+      "path": "packages/chain/yours.ts",
+      "sha256": "37590b9b8693f61c62403f5bb858f6d7c22755951e8d13fbea9295d13ad9f7db"
+    },
+    {
+      "path": "packages/chess/board.ts",
+      "sha256": "a4495c85f533a526c5294925aea29b3fe3578c66caefc3614b0d614f3f0d6a63"
+    },
+    {
+      "path": "packages/chess/engine.ts",
+      "sha256": "4d3b75f96989b5034ed4e86dbf5473d66ea512a7be72804734fed9f11128058b"
+    },
+    {
+      "path": "packages/chess/fen.ts",
+      "sha256": "7ea8e14600da9e4345ae7067908ad02c11204f4128d9b65dfa81eb8871ef0860"
+    },
+    {
+      "path": "packages/chess/moves.ts",
+      "sha256": "443d913b0332bf0866f7d608856ebea9acc54b33dd2c0fff43fa9bc8199d2371"
+    },
+    {
+      "path": "packages/chess/search.ts",
+      "sha256": "a9e542ab380d01b078a4979fdf72a8141b848fd2ebef8a9041237c8ff8ea4bf7"
+    },
+    {
+      "path": "packages/chess/uci.ts",
+      "sha256": "6826bb511f52cf4762d858f10fef70a77ef60b6732ff6a13a4692cc7151a08f4"
+    },
+    {
+      "path": "packages/protocol/candidates.ts",
+      "sha256": "b9e79abc869e6fd91694c3b744fc88a49db673b61845f31d587d4dd52059243d"
+    },
+    {
+      "path": "packages/protocol/canonical.ts",
+      "sha256": "eeb6632332bc2c920c3cdf9f8c66b8d832b1e103992fb77f95100875e134f434"
+    },
+    {
+      "path": "packages/protocol/checkpoint.ts",
+      "sha256": "87dba705973dce23042896524f7029e98d783fef8cc0c88833cccd9168ddf9b1"
+    },
+    {
+      "path": "packages/protocol/docs.ts",
+      "sha256": "85bc275f79f2d1072a856295ef58e8b36762002b9ba2f305b9eb12d90a27b413"
+    },
+    {
+      "path": "packages/protocol/entry.ts",
+      "sha256": "072a15ae421b7fb93bede4ab8059ec1101b4b99268025a1a653af4ebcb036d5a"
+    },
+    {
+      "path": "packages/protocol/known-rules.ts",
+      "sha256": "a73bbd1cf8081c2d80ea5c4b588c1ddd5224fdcf1de22e5710463f26ec97bc6b"
+    },
+    {
+      "path": "packages/protocol/manifest-builder.ts",
+      "sha256": "74471c2fecd2068d0fb50b2c3843cd5556385704c11cefb14387b62bb3cc815d"
+    },
+    {
+      "path": "packages/protocol/pfp.ts",
+      "sha256": "5defd903ae5e6f97178802719db71fd5050bd0ed0fc5db1a3b8df49a904fde71"
+    },
+    {
+      "path": "packages/protocol/player.ts",
+      "sha256": "456c7903e36cd029510c97087d405b786c6787c98b21dfbd9f171ec0803eb3c0"
+    },
+    {
+      "path": "packages/protocol/recover.ts",
+      "sha256": "6be82e6f05ce604b36b4f95bdfd2be6320815bda64a789cdbd67f472cea46df6"
+    },
+    {
+      "path": "packages/protocol/rules.ts",
+      "sha256": "0d8435cf929971202f9fc8019f5f29b623478a91c2582c215974a513b495e591"
+    },
+    {
+      "path": "packages/protocol/sha256.ts",
+      "sha256": "607cf2894b39c43149b3aea44ead630ca76e553c6e381ea9fc711e9adc93161f"
+    },
+    {
+      "path": "packages/protocol/tournament.ts",
+      "sha256": "311b0cbb3946c874c1a23ed5bcf9b15b25a6ce8ce932ba320e4be9206496e319"
+    },
+    {
+      "path": "packages/protocol/versions.ts",
+      "sha256": "e7b183ad12e4f6dc074d66f8073aa4993ffa7c8fd49e1374ba3e969ce88e3bac"
+    },
+    {
+      "path": "packages/ratings/eligibility.ts",
+      "sha256": "45cb80a1142e312dfd31fdc8f88822474e65e8a4dde1b4d75ec43a85c470a466"
+    },
+    {
+      "path": "packages/ratings/elo-v1.ts",
+      "sha256": "870dd72d3797a803ce62950f60824f81103cfebce1894407a5f87aabbb42552d"
+    },
+    {
+      "path": "packages/replay/events.ts",
+      "sha256": "916319cf1aff1aaf49bde64e01d4497712de0617db0e43c1ce3d41ff27f1bf06"
+    },
+    {
+      "path": "packages/replay/replay.ts",
+      "sha256": "30404093ddc8ed66457728cf504989aa21c113f9bb0e1da0f910b412c4c8ef25"
+    },
+    {
+      "path": "packages/replay/result.ts",
+      "sha256": "6ef259a6ebfc479b2c016e7de083cc6e8496406c0ca05c894127fb49878697b4"
+    },
+    {
+      "path": "packages/storage/verified-cache.ts",
+      "sha256": "5e6e4919ba0a5824639d992e768de2b56781a026f5a8e261cb479c64cecd68d8"
+    },
+    {
+      "path": "packages/ui/TOURNAMENTS-TAB.md",
+      "sha256": "fc16d67835a5787e501f0c562332134ed2df8a33beb385990d2e6c3deb7b8185"
+    },
+    {
+      "path": "packages/ui/app.ts",
+      "sha256": "8f8683f700dda3b4613bd492a58f0dbabb83a384cd79c43c599d61d544461bc5"
+    },
+    {
+      "path": "packages/ui/audio.ts",
+      "sha256": "76043ccb02b0ea4b15cb288f51247152e3ce710731ecdb931d35adc378870563"
+    },
+    {
+      "path": "packages/ui/board-keyboard.ts",
+      "sha256": "7de60feb174d2249f54cf84c11e43d522dfa0c291a8eb1732ae67b971f81e197"
+    },
+    {
+      "path": "packages/ui/board.ts",
+      "sha256": "83fb0edb8b16a25dd10b2e687d0bdf0c0035f245e59f6453fc7cff19b6e3c9be"
+    },
+    {
+      "path": "packages/ui/boot.ts",
+      "sha256": "ec33cfc67f8b1b3df84c956b35f1197ab409f40ed8eee9309f1dbc956409b87c"
+    },
+    {
+      "path": "packages/ui/canary.ts",
+      "sha256": "062915045092550c9845046df3dd5acb9436fefa96380711cc7443f33083459c"
+    },
+    {
+      "path": "packages/ui/eligibility.ts",
+      "sha256": "36da1dd1091563e34d4f5e76557f9850b340dbb5fe58266a96759446d3dc728f"
+    },
+    {
+      "path": "packages/ui/fee-advice.ts",
+      "sha256": "7902e8f36f35eb88fecf96f47cbc7c54f6efe376f6d7fbe86999dadd94d97ef8"
+    },
+    {
+      "path": "packages/ui/game-presets.ts",
+      "sha256": "3dc30ca8bf075ab20a62e030fd3f91acebf2b07c26f3bc051402ae6a774161d4"
+    },
+    {
+      "path": "packages/ui/gates.ts",
+      "sha256": "f0a201651d5adbf7600fa69953ba8a0289389c5bb784088125cfe07733f12a88"
+    },
+    {
+      "path": "packages/ui/pieces.ts",
+      "sha256": "23f1f3707e49d9cb09ead57e3b120f1e863555bfa40e5ef2886f25f9f207f70b"
+    },
+    {
+      "path": "packages/ui/rating-state.ts",
+      "sha256": "ae51bd39be27df3a67fde023ff9d21e894d1f7f33215fa6f5ff835125688f6f5"
+    },
+    {
+      "path": "packages/ui/shell.ts",
+      "sha256": "44451be36190f924e9872f9b40ff28a48cee3338015929983a59f5bbd9d1eeac"
+    },
+    {
+      "path": "packages/ui/sound-panel.ts",
+      "sha256": "196c5a36187ed652a6ed3d5f3c2f7067182a053031be751848026febd12a1e06"
+    },
+    {
+      "path": "packages/ui/sounds.ts",
+      "sha256": "402ab97faf16cffefe1f22cc2e49526f23d46269bca1f95a7f214b65acb1b4f1"
+    },
+    {
+      "path": "packages/ui/tournaments.ts",
+      "sha256": "fb60ed4e1d98a728dab3bf56fe116e85f4ea82c62915e61bf5bea7a345cd7b4b"
+    },
+    {
+      "path": "packages/wallet/connect.ts",
+      "sha256": "2d029b44e68fec06d5d9d16b118a81fb9d3b15a01446f22d513ac336ee61f841"
+    },
+    {
+      "path": "packages/wallet/postconditions.ts",
+      "sha256": "15607d98a88592b96ede8af512f31e64b4a96b62ac2bf274daa1fa70cbc26b2f"
+    },
+    {
+      "path": "packages/wallet/providers.ts",
+      "sha256": "666372f0fcaec00454796235450749a96a4c6c3900aa27607fd0140743bc9297"
+    },
+    {
+      "path": "packages/wallet/requests.ts",
+      "sha256": "d6f77f12cfbe09c11949603c8c08385dad572ee3dd6c433baea3edbb0c99945b"
+    },
+    {
+      "path": "apps/canary/main.ts",
+      "sha256": "337d95a96f8eaea470b913164e9bcc893ca81e79fc451f7b36a4fd9f51e0cbd4"
+    },
+    {
+      "path": "apps/chess/main.ts",
+      "sha256": "e31b38dadbafc9ec02d8da9c367ad1f4d8dee417c44d53d75f40859d1ed97529"
+    },
+    {
+      "path": "contracts/xchess-core-v1.clar",
+      "sha256": "8048e4be63d665c4ac4b94afc6c74187d185f822cedd60fb24d5ece7567b3c9f"
+    }
+  ]
+}

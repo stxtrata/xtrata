@@ -1,0 +1,15 @@
+
+> xchess@2.2.0 test:clarity
+> vitest run -c vitest.clarinet.config.ts
+
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+The Vitest environment clarinet defines the "transformMode". This options was deprecated in Vitest 4 and will be removed in the next major version. Please, use "viteEnvironment" instead.
+Updated deployment plan file
+
+ Test Files  4 passed (4)
+      Tests  62 passed (62)
+   Start at  22:19:18
+   Duration  286.69s (transform 270ms, setup 104ms, import 279ms, tests 284.91s, environment 817ms)
+

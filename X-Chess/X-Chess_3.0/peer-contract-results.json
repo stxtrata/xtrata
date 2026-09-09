@@ -1,0 +1,46 @@
+[
+  {
+    "name": "on-chain creation binds opponent, key and clock rules",
+    "passed": true
+  },
+  {
+    "name": "only invited opponent can join",
+    "passed": true
+  },
+  {
+    "name": "duplicate player key rejected",
+    "passed": true
+  },
+  {
+    "name": "invited opponent registers immutable key",
+    "passed": true
+  },
+  {
+    "name": "either player can record without opponent permission",
+    "passed": true
+  },
+  {
+    "name": "bad first pointer does not block later pointers",
+    "passed": true
+  },
+  {
+    "name": "outsider cannot add discovery pointers",
+    "passed": true
+  },
+  {
+    "name": "incorrect archive hash length rejected",
+    "passed": true
+  },
+  {
+    "name": "unsupported rules and invalid clocks rejected",
+    "passed": true
+  },
+  {
+    "name": "self game and malformed key rejected",
+    "passed": true
+  },
+  {
+    "name": "unjoined game cannot publish and expired invitation cannot join",
+    "passed": true
+  }
+]

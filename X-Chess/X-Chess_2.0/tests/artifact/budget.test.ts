@@ -122,8 +122,11 @@ const BUDGETS: Array<{ group: string; ceiling: number; measured: number }> = [
   // bytes, which is twenty-two chunks: still one `add-chunk-batch` transaction
   // and still well inside the thirty-two the contract takes. The artefact
   // itself is fourteen.
+  // 2.3.1: peer protocol, durable journal, WebRTC, archives and optional UI.
+  { group: 'packages/peer', ceiling: 90_000, measured: 65_000 },
   { group: 'packages/ui', ceiling: 250_000, measured: 171_946 },
-  { group: 'packages/chain', ceiling: 33_000, measured: 21_825 },
+  // 2.2.0: bounded reads, shared scheduling and namespaced cache recovery.
+  { group: 'packages/chain', ceiling: 43_000, measured: 34_312 },
   // Raised to 18,000 on 2026-08-17, and this one was arithmetic rather than a
   // surprise: step 0 of the Tournaments tab measured it before any UI existed.
   //

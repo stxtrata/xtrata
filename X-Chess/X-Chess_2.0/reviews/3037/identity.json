@@ -1,0 +1,7 @@
+{
+  "inscription": 3037,
+  "originalSha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+  "servedSha256": "1d4b695e5a1a49c183046d665cbbfac747e06fe675d510df0b32c9df00322822",
+  "servedBytes": 311561,
+  "matchesExpectedRuntimeTransform": true
+}

@@ -294,3 +294,10 @@ describe('disconnecting a wallet', () => {
     expect(granted.length).toBe(3);
   });
 });
+
+it.each([true, false])('stops every retry after user cancellation (bridged=%s)', async bridged => {
+  const refusal = Object.assign(new Error('User rejected connection'), {code: 4001});
+  const {call, asked} = recorder(() => refusal);
+  await expect(connectWallet({call, bridged: () => bridged, providerCount: () => 2})).rejects.toBe(refusal);
+  expect(asked).toHaveLength(1);
+});

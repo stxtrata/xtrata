@@ -1,0 +1,166 @@
+{
+  "source": "/Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_3.0/dist/v3-expanded.html",
+  "sha256": "45d1f8ce414ddf42630acbcfba1be3947f52967690b56565f5aa9174d10744df",
+  "bytes": 567196,
+  "chunks": 35,
+  "passed": 39,
+  "failed": 0,
+  "results": [
+    {
+      "name": "UI: boots one 64-square board without errors",
+      "passed": true
+    },
+    {
+      "name": "UI: no network requests during practice boot",
+      "passed": true
+    },
+    {
+      "name": "UI: a1 is dark and h1 is light",
+      "passed": true
+    },
+    {
+      "name": "UI: board has one tab stop (v2.2 keyboard parity)",
+      "passed": true
+    },
+    {
+      "name": "UI: Home moves focus to start of row",
+      "passed": true
+    },
+    {
+      "name": "UI: flip reverses board",
+      "passed": true
+    },
+    {
+      "name": "UI: legal move preview then commit updates board",
+      "passed": true
+    },
+    {
+      "name": "UI: replay refuses new moves",
+      "passed": true
+    },
+    {
+      "name": "UI: duplicate boot remains single board",
+      "passed": true
+    },
+    {
+      "name": "UI: default New game can create local practice without a wallet",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: start",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: kiwipete",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: en passant endgame",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: promotions/pins",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 5",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 6",
+      "passed": true
+    },
+    {
+      "name": "Replay: Fool’s mate and reject after termination",
+      "passed": true
+    },
+    {
+      "name": "Replay: en passant",
+      "passed": true
+    },
+    {
+      "name": "Replay: castle kingside",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to q",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to r",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to b",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to n",
+      "passed": true
+    },
+    {
+      "name": "Replay: threefold repetition",
+      "passed": true
+    },
+    {
+      "name": "Replay: 100 halfmoves",
+      "passed": true
+    },
+    {
+      "name": "Replay: two knights versus king remains playable",
+      "passed": true
+    },
+    {
+      "name": "Replay: unbound control cannot claim seat",
+      "passed": true
+    },
+    {
+      "name": "Replay: incomplete evidence rejected",
+      "passed": true
+    },
+    {
+      "name": "Evidence: export/import preserves replay",
+      "passed": true
+    },
+    {
+      "name": "Compatibility: V3 reader never reinterprets V2 protocol",
+      "passed": true
+    },
+    {
+      "name": "Compatibility: unqualified links stay outside V3 reader",
+      "passed": true
+    },
+    {
+      "name": "Wallet: cancellation makes one request only",
+      "passed": true
+    },
+    {
+      "name": "Wallet: detects Xverse BitcoinProvider (v2.2 supported shape)",
+      "passed": true
+    },
+    {
+      "name": "Wallet: accepts correct-network address",
+      "passed": true
+    },
+    {
+      "name": "Wallet: rejects wrong-network address",
+      "passed": true
+    },
+    {
+      "name": "Protocol: unsupported extension semantics are not replayed",
+      "passed": true
+    },
+    {
+      "name": "UI: blocked local and session storage do not crash boot",
+      "passed": true
+    },
+    {
+      "name": "Artifact: fits existing 32-chunk budget",
+      "passed": true
+    },
+    {
+      "name": "Artifact: no external script or stylesheet dependencies",
+      "passed": true
+    }
+  ]
+}

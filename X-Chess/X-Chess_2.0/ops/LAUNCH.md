@@ -1,14 +1,16 @@
 # Launch checklist
 
-Nothing here is a formality. Every unchecked line is a reason not to inscribe.
+The peer 2.3.1 candidate has separate instructions in [PEER-2.3.1.md](PEER-2.3.1.md); its new registry is undeployed.
+
+This is the production launch checklist. Unchecked production and personal-wallet gates remain open; the frontend canary candidate has separate technical evidence in CANDIDATE-2.2.0.md.
 
 An inscription is permanent and a deployed contract is immutable. There is no
 patch, no rollback and no "we will fix that next week".
 
 **Status: LAUNCHED 2026-08-09**, as Xtrata inscription 2988. Updated 2026-08-13.
 
-The gates below that are still unchecked are the ones a SECOND inscription
-should close, not reasons the first should not have happened. Read them that way.
+The latest reviewed working board is 3034. A new frontend inscription does not
+close unchecked contract or real-wallet gates by itself.
 
 ---
 
@@ -51,7 +53,7 @@ should close, not reasons the first should not have happened. Read them that way
 
 ## Gate 4 — The artefact
 
-- [x] build produces a single self-contained HTML file (245,304 bytes)
+- [x] build produces a single self-contained HTML file (approximately 311 KB for the 2.3.1 candidate)
 - [x] exactly one unescaped `</script>` in the output
 - [x] `dist/manifest.json` with reproducible provenance
 - [x] `tests/artifact` reads `dist/`, not source

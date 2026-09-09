@@ -1,0 +1,116 @@
+{
+  "artifact": {
+    "version": "3.0.0-local",
+    "htmlSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893",
+    "bytes": 381715,
+    "chunks": 24,
+    "rollingHash": "b24bbbfc0cf62d126480699792062f8ad6e6476e1659ddfa682ae618f2ceb012",
+    "v2Sha256": "23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6",
+    "v3ExpandedSha256": "45d1f8ce414ddf42630acbcfba1be3947f52967690b56565f5aa9174d10744df",
+    "contract": "xchess-core-v3",
+    "deployment": "local only",
+    "contractSha256": "8a5d52d1b6b8029b796144a154c4625715c294fba81dde2848894ced15bb2d64",
+    "sourceSha256": {
+      "src/imported-app.js": "3a7b7a5a83de496bcc5a9769654d9077dc565542a261cf5c510d4bc50de507cc",
+      "src/shell.html": "76e357ed17c9e1f7448dd6754d1c5ad908a65dd6f20de05b1fc45d0ada6d7a5a",
+      "src/v2-wallet.ts": "50a9e51ed6fecfba04f4e2f660bb11b7a21f90850048f1bf9c1ad3f2f8f77f5c",
+      "src/loader.js": "8a91645451c577d9465664d5fa2f74c3105b76430418ff1846c3b495b428585b",
+      "local-config.json": "507a5e0fa61bab385d79344cdb8846905575f2d520a61b20c4c6487e7b466d58",
+      "build.mjs": "c6aa5ab93af604c127c1600790eb154a7e4c79430d819b49e3f44bb0fc6753a0"
+    },
+    "compression": "gzip; browser DecompressionStream"
+  },
+  "testedAt": "2026-09-09T10:12:38.045496+00:00",
+  "originalV3": {
+    "sha256": "65fdc65051c02aea38ce404421631d4eb7e604dcf2ba02cb97000f23d29f5f16",
+    "bytes": 549959,
+    "passed": 30,
+    "failed": 8
+  },
+  "validation": {
+    "v2Standard": {
+      "passed": 1686,
+      "skipped": 17,
+      "failed": 0,
+      "note": "Prior baseline run; byte-pinned V2 application unchanged. Browser compatibility rerun for current artifact."
+    },
+    "app": {
+      "passed": 39,
+      "failed": 0
+    },
+    "contract": {
+      "passed": 23,
+      "failed": 0
+    },
+    "journey": {
+      "passed": 5,
+      "failed": 0
+    },
+    "browser-v2": {
+      "passed": 36,
+      "failed": 0,
+      "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893"
+    },
+    "browser-v3": {
+      "passed": 44,
+      "failed": 0,
+      "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893"
+    },
+    "clarinet": {
+      "passed": true,
+      "warnings": 22,
+      "contracts": 2
+    },
+    "peer-protocol": {
+      "passed": 21,
+      "failed": 0
+    },
+    "peer-contract": {
+      "passed": 11,
+      "failed": 0
+    },
+    "peer-browser": {
+      "passed": 14,
+      "failed": 0,
+      "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893"
+    },
+    "peerTypecheck": {
+      "passed": true,
+      "target": "es2022",
+      "libraries": [
+        "es2022",
+        "dom",
+        "dom.iterable"
+      ]
+    }
+  },
+  "scope": [
+    "All V2 functions retained in dedicated V2 view with byte-pinned 2.2.0 application",
+    "V3 targeted UI and transport fixes; actual frontend-to-Clarinet simnet journey",
+    "New editable local contract with descriptors, extension fields and fixed sponsorship accounting",
+    "Peer-play view, local registry, signed history verification, manual WebRTC pairing, durable keys/history, file fallback and completed record preparation"
+  ],
+  "notPerformed": [
+    "Public-network deployment or inscription",
+    "Real extension/mobile signing or public-network transaction",
+    "Redesign of every V2 feature into the new arena",
+    "Support for browsers without DecompressionStream",
+    "Remote-device NAT or TURN interoperability testing",
+    "Precise trusted clock adjudication or abandonment challenges",
+    "Public peer-registry deployment and sealed-inscription retrieval"
+  ],
+  "peerArtifact": {
+    "protocol": "xchess-peer-v1",
+    "deployment": "local only",
+    "peerHtmlSha256": "82ca78e4618e888b08bceeebe301968c1dcd9432d5ade98b3f6af313e5c19ef2",
+    "contractSha256": "9b6386346d60919d919d497faaa96849b568fdcd95fb5d04f8d7198e28bd11ec",
+    "rules": "standard-v2-engine-snapshot-1",
+    "engineSourceSha256": {
+      "board": "a4495c85f533a526c5294925aea29b3fe3578c66caefc3614b0d614f3f0d6a63",
+      "engine": "4d3b75f96989b5034ed4e86dbf5473d66ea512a7be72804734fed9f11128058b",
+      "fen": "7ea8e14600da9e4345ae7067908ad02c11204f4128d9b65dfa81eb8871ef0860",
+      "moves": "443d913b0332bf0866f7d608856ebea9acc54b33dd2c0fff43fa9bc8199d2371",
+      "uci": "6826bb511f52cf4762d858f10fef70a77ef60b6732ff6a13a4692cc7151a08f4"
+    }
+  }
+}

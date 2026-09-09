@@ -1,0 +1,34 @@
+name: X Chess inscription candidate
+on:
+  pull_request:
+    paths: ['X-Chess/X-Chess_2.0/**', '.github/workflows/xchess-candidate.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: X-Chess/X-Chess_2.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.10.0'
+          cache: npm
+          cache-dependency-path: X-Chess/X-Chess_2.0/package-lock.json
+      - run: npm ci
+      - name: Install the reviewed Clarinet version
+        run: |
+          curl -fsSL https://github.com/stx-labs/clarinet/releases/download/v3.12.0/clarinet-linux-x64-glibc.tar.gz -o /tmp/clarinet.tar.gz
+          echo 'abd7757283d20941a50a391bbc6a0c3b4320e0d03cdd4717882376a87158ba53  /tmp/clarinet.tar.gz' | sha256sum --check
+          tar -xzf /tmp/clarinet.tar.gz -C /tmp
+          sudo install /tmp/clarinet /usr/local/bin/clarinet
+      - run: npm run verify:candidate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xchess-inscription-candidate
+          path: X-Chess/X-Chess_2.0/dist/

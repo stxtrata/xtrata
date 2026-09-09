@@ -1,14 +1,37 @@
 # Releases
 
+## 2.3.1 — peer candidate, not deployed or inscribed
+
+Signed peer moves, manual transport, encrypted recovery and independently
+verifiable public archives replace the superseded referee service proposal.
+The standalone HTML is **311,553 bytes / 20 Xtrata chunks**. SHA-256:
+`d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7`.
+
+The peer registry is undeployed. Existing core protocol hashes are unchanged.
+See [instructions](PEER-2.3.1.md) and `releases/2.3.1/VALIDATION.json`.
+Packaged source reproduces the exact HTML. Validation includes 1,743 passing
+regression tests (17 deliberate skips), 68 simnet tests, 187 final focused tests,
+a frozen public signature vector, 44 captured-runtime browser checks and 13
+peer browser checks. These overlap; they are not an additive unique test count.
+Real wallet/deployment/inscription read-back checks remain open.
+
+
 Every canary and every release candidate, with enough detail to reproduce it or
 to work out what somebody was looking at when they reported a problem.
 
 An entry is written when the artefact is BUILT, not when it is inscribed, so
 that a build which never shipped still leaves a record of why.
 
+## 2.2.0 — 2026-09-07 — candidate, not inscribed
+
+Implements all 15 items from the [3034 review](INSCRIPTION-3034-REVIEW.md).
+The complete implementation and verification record is [CANDIDATE-2.2.0.md](CANDIDATE-2.2.0.md).
+The build target is unchanged. A new inscription ID must come from the new URL;
+3034 is provenance, not a value to hardcode into the candidate.
+
 ## 2.1.9 — 2026-08-20
 
-Built, not yet inscribed. To go up as a child of 3028.
+Confirmed working as inscription **3034** on 2026-09-07. The exact source rebuild matches the served bytes after the documented Xtrata rewrites.
 
 * `htmlSha256` `92af7967942fce818e8471032a31f52ad384c0a3c1c1c039d36a1e10d2173b9a`
 * xtrata chunk hash `19c9a303508cbc5b82fb868cbdf9ce9e39ebf540656489c7a80415c8e154cac2`

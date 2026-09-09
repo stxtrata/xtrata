@@ -1,22 +1,19 @@
 # Status
 
-Updated 2026-08-19.
+Updated 2026-09-09.
 
-## Where this is
+The active candidate is **2.3.1**, adding signed peer play without a mandatory
+service. See [peer instructions and limitations](PEER-2.3.1.md). It is not deployed
+or inscribed. The 2.2.0 evidence below is preserved as historical context.
 
-**Launched, and inscribed four times.** X Chess 2.0 went to mainnet as
-inscription 2988 on 2026-08-09 and has carried real games and real money since.
-Three more boards have followed it. Exhibition Three is running now on
-`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`, ninety games
-across ten characters, with rounds one and two played.
+The latest reviewed working inscription is **3034**, version **2.1.9**. The
+**2.2.0 candidate** implements the review's 15 improvements while preserving the
+existing mainnet canary contract and versioned chess protocols. It is built for
+review; it has not been inscribed. See [candidate evidence](CANDIDATE-2.2.0.md).
 
-**The sentence that used to be here caused a mistake.** It said 34 of 57 launch
-gates were closed "and every open one is a reason not to inscribe", which was
-written before 2988 and never revisited. Somebody read it in August, believed
-it, and acted on it. The launch gate governs a PRODUCTION launch on a production
-contract; it has never governed a canary board, and four canary boards exist. If
-you are deciding whether to inscribe, read `ops/RELEASES.md` and the version
-table below — not this paragraph's ancestor.
+Exhibition Three was observed complete in the 3034 review: 90 games finished.
+The remaining production launch gates and real extension/mobile wallet coverage
+are separate from a frontend canary update. They are not marked complete by stub tests.
 
 ## Boards on chain
 
@@ -26,6 +23,7 @@ an old board being BEHIND does not.
 
 | version | id | built | hash | what it added |
 |---|---|---|---|---|
+| 2.1.9 | **3034** | 08-21 21:44 UTC | `936aba6a` | latest working inscription verified from its served bytes on 2026-09-07 |
 | 2.0.0 | **2988** | 08-09 | — | the first inscription |
 | 2.1.0 | **3008** | 08-18 21:11 | `d19c51f7` | tournaments found by wallet rather than typed; your own games found past the newest-25 window; the waiting-on-you count; the manual embedded from chain |
 | 2.1.1 | **3009** | 08-18 21:32 | `e21c6f1f` | the runtime proxy, which had never once been used |
@@ -62,19 +60,13 @@ exhibition three **3016**, the prompt-protocol director **3017**, and Xtrata's
 own picture manifest **3026** and name manifest **3027**. **3015** is abandoned — nothing points at it, the
 chooser hides it, and it stays on chain because it is a real document.
 
-## Test counts
+## Current test evidence
 
-`npm test` — **1,630 passing, 17 skipped, 88 files.** `npx tsc --noEmit` clean.
+The generated reports and exact candidate hashes are linked in
+[CANDIDATE-2.2.0.md](CANDIDATE-2.2.0.md). Counts come from the executed suites;
+historical figures elsewhere in this file describe earlier releases.
 
-The skips are the heavy perft depths, which `npm run test:perft:deep` enables
-and the release gate requires. They pass: 76/76, roughly 590 million nodes.
-
-**The release gate takes about thirteen minutes** and that is not a hang.
-`harness/release.mjs` runs `verify.mjs --deep`, and deep perft alone was
-measured at 762s. Do not pipe it through `tail`, which buffers until the process
-exits and makes a long run look like a dead one.
-
-## What the release gate refuses, and why it is not blocking
+## Historical launch-gate notes (2026-08-19)
 
 `npm run release` refuses this build on two counts, both real and neither about
 the code:
@@ -120,7 +112,7 @@ collapsed in the chooser so a correction is authoritative rather than hidden.
 with a proof its rounding can never be ambiguous, and rating checkpoints that
 must be minted by xtrata.btc and regenerated before they will be inscribed.
 
-**Build and artefact.** One self-contained HTML file, **245,304 bytes — 15 of
+**Build and artefact.** One self-contained HTML file, **approximately 312 KB — 20 of
 the 32 Xtrata chunks** that upload in a single transaction. `tests/artifact`
 reads `dist/` rather than source, which is the only way the double-boot class of
 bug is visible at all.

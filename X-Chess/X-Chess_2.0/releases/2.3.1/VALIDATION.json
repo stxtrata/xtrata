@@ -1,0 +1,54 @@
+{
+  "version": "2.3.1",
+  "artifactSha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+  "bytes": 311553,
+  "xtrataChunks": 20,
+  "packagedAt": "2026-09-09T10:42:23.722Z",
+  "reports": {
+    "tests.json": {
+      "sha256": "78c791ec5c263e320d8a5658da049df5c4a7b3b4adb53f38cc87ab66c5507b38",
+      "passed": 1743,
+      "skipped": 17
+    },
+    "final-artifact-tests.json": {
+      "sha256": "321b557bce4111ab9489abe2f19efebd32f3756c691a1453bed73af5a5d9ebfa",
+      "passed": 187,
+      "skipped": 0
+    },
+    "contracts.json": {
+      "sha256": "f928cc7f6d9ac584630c1ca49f11e77547dc98da6eb9371d6c2eea62c02a71f1",
+      "passed": 68,
+      "skipped": 0
+    },
+    "vector-test.json": {
+      "sha256": "58a4e4122f82da585128409a79759f3d3f75531d9fe8721fe9bb12099b863e88",
+      "passed": 1,
+      "skipped": 0
+    },
+    "browser-report.json": {
+      "sha256": "b60ebf2c2029d09f776e5d4f1197ed50f8c009b7c955ea665aa71f075f0f05c2",
+      "passed": 44,
+      "skipped": 0
+    },
+    "peer-browser-report.json": {
+      "sha256": "458659b590701a4692c18036cfa565daa75d0887a9d5f4059243bc07d6e2cb30",
+      "passed": 13,
+      "skipped": 0
+    }
+  },
+  "sourceRebuild": {
+    "passed": true,
+    "artifactSha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+    "method": "Rebuilt the packaged source twice from a fresh temporary directory using matching installed lockfile build tools."
+  },
+  "notes": [
+    "Full regression passed with 17 deliberate skips (13 deep perft, three live-network tests and one vector generator).",
+    "After the full run, only peer button styling changed; final focused tests and both browser reports validate the exact packaged HTML.",
+    "Contract suite uses actual frontend create/join ABI in simnet; no live transaction, registry deployment or inscription was performed.",
+    "Native WebRTC ran in separate Chrome profiles with manual signed offer/answer and no ICE services; local fixture HTTP commands coordinate tests, not application move transport.",
+    "Wallet automation uses stubs and captured Xtrata scripts. Real wallet signing, production viewer networking and sealed inscription read-back remain manual/deployment checks.",
+    "Offline example is a frozen public browser-generated vector, independently checked by the bundled Node verifier. It has no verified Stacks identity.",
+    "12 Clarinet analysis warnings remain; both contracts check successfully. No peer timeout adjudication, hosted referee, rating or payout integration exists."
+  ],
+  "manualVisualCheck": "Final desktop Quick Play inspected in Chrome through browser UI; native browser tests additionally assert mobile board tracks fit and keyboard focus works."
+}

@@ -1,0 +1,223 @@
+PASS UI: boots one 64-square board without errors
+PASS UI: no network requests during practice boot
+FAIL UI: a1 is dark and h1 is light The expression evaluated to a falsy value:
+
+  assert.ok(d.querySelector('[data-square="a1"]').classList.contains('dark'))
+
+FAIL UI: board has one tab stop (v2.2 keyboard parity) Expected values to be strictly equal:
+
+64 !== 1
+
+FAIL UI: Home moves focus to start of row Expected values to be strictly equal:
+
+'d4' !== 'a4'
+
+PASS UI: flip reverses board
+PASS UI: legal move preview then commit updates board
+PASS UI: replay refuses new moves
+PASS UI: duplicate boot remains single board
+FAIL UI: default New game can create local practice without a wallet New game dialog remains open
+PASS Engine perft depth 3: start
+PASS Engine perft depth 3: kiwipete
+PASS Engine perft depth 3: en passant endgame
+PASS Engine perft depth 3: promotions/pins
+PASS Engine perft depth 3: position 5
+PASS Engine perft depth 3: position 6
+PASS Replay: Fool’s mate and reject after termination
+PASS Replay: en passant
+PASS Replay: castle kingside
+PASS Replay: promotion to q
+PASS Replay: promotion to r
+PASS Replay: promotion to b
+PASS Replay: promotion to n
+PASS Replay: threefold repetition
+PASS Replay: 100 halfmoves
+PASS Replay: two knights versus king remains playable
+PASS Replay: unbound control cannot claim seat
+PASS Replay: incomplete evidence rejected
+PASS Evidence: export/import preserves replay
+FAIL Compatibility: accepts v2.2 contract protocol response unsupported-contract-protocol
+FAIL Compatibility: accepts legacy #game=47 shared link invalid-identity
+PASS Wallet: cancellation makes one request only
+FAIL Wallet: detects Xverse BitcoinProvider (v2.2 supported shape) Expected values to be strictly equal:
+
+0 !== 1
+
+PASS Wallet: accepts correct-network address
+PASS Wallet: rejects wrong-network address
+PASS UI: blocked session storage does not crash boot
+FAIL Artifact: fits existing 32-chunk budget The expression evaluated to a falsy value:
+
+  assert.ok(Math.ceil(Buffer.byteLength(html)/16384)<=32)
+
+PASS Artifact: no external script or stylesheet dependencies
+{
+  "source": "/Users/melophonic/Downloads/x-chess-3.0.html",
+  "sha256": "65fdc65051c02aea38ce404421631d4eb7e604dcf2ba02cb97000f23d29f5f16",
+  "bytes": 549959,
+  "chunks": 34,
+  "passed": 30,
+  "failed": 8,
+  "results": [
+    {
+      "name": "UI: boots one 64-square board without errors",
+      "passed": true
+    },
+    {
+      "name": "UI: no network requests during practice boot",
+      "passed": true
+    },
+    {
+      "name": "UI: a1 is dark and h1 is light",
+      "passed": false,
+      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(d.querySelector('[data-square=\"a1\"]').classList.contains('dark'))\n"
+    },
+    {
+      "name": "UI: board has one tab stop (v2.2 keyboard parity)",
+      "passed": false,
+      "error": "Expected values to be strictly equal:\n\n64 !== 1\n"
+    },
+    {
+      "name": "UI: Home moves focus to start of row",
+      "passed": false,
+      "error": "Expected values to be strictly equal:\n\n'd4' !== 'a4'\n"
+    },
+    {
+      "name": "UI: flip reverses board",
+      "passed": true
+    },
+    {
+      "name": "UI: legal move preview then commit updates board",
+      "passed": true
+    },
+    {
+      "name": "UI: replay refuses new moves",
+      "passed": true
+    },
+    {
+      "name": "UI: duplicate boot remains single board",
+      "passed": true
+    },
+    {
+      "name": "UI: default New game can create local practice without a wallet",
+      "passed": false,
+      "error": "New game dialog remains open"
+    },
+    {
+      "name": "Engine perft depth 3: start",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: kiwipete",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: en passant endgame",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: promotions/pins",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 5",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 6",
+      "passed": true
+    },
+    {
+      "name": "Replay: Fool’s mate and reject after termination",
+      "passed": true
+    },
+    {
+      "name": "Replay: en passant",
+      "passed": true
+    },
+    {
+      "name": "Replay: castle kingside",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to q",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to r",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to b",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to n",
+      "passed": true
+    },
+    {
+      "name": "Replay: threefold repetition",
+      "passed": true
+    },
+    {
+      "name": "Replay: 100 halfmoves",
+      "passed": true
+    },
+    {
+      "name": "Replay: two knights versus king remains playable",
+      "passed": true
+    },
+    {
+      "name": "Replay: unbound control cannot claim seat",
+      "passed": true
+    },
+    {
+      "name": "Replay: incomplete evidence rejected",
+      "passed": true
+    },
+    {
+      "name": "Evidence: export/import preserves replay",
+      "passed": true
+    },
+    {
+      "name": "Compatibility: accepts v2.2 contract protocol response",
+      "passed": false,
+      "error": "unsupported-contract-protocol"
+    },
+    {
+      "name": "Compatibility: accepts legacy #game=47 shared link",
+      "passed": false,
+      "error": "invalid-identity"
+    },
+    {
+      "name": "Wallet: cancellation makes one request only",
+      "passed": true
+    },
+    {
+      "name": "Wallet: detects Xverse BitcoinProvider (v2.2 supported shape)",
+      "passed": false,
+      "error": "Expected values to be strictly equal:\n\n0 !== 1\n"
+    },
+    {
+      "name": "Wallet: accepts correct-network address",
+      "passed": true
+    },
+    {
+      "name": "Wallet: rejects wrong-network address",
+      "passed": true
+    },
+    {
+      "name": "UI: blocked session storage does not crash boot",
+      "passed": true
+    },
+    {
+      "name": "Artifact: fits existing 32-chunk budget",
+      "passed": false,
+      "error": "The expression evaluated to a falsy value:\n\n  assert.ok(Math.ceil(Buffer.byteLength(html)/16384)<=32)\n"
+    },
+    {
+      "name": "Artifact: no external script or stylesheet dependencies",
+      "passed": true
+    }
+  ]
+}

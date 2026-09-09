@@ -3,7 +3,10 @@
 Known technical, economic and runtime risks, with status and mitigation. A risk
 leaves this list when it is closed by evidence, not by confidence.
 
-Updated 2026-08-08.
+Updated 2026-09-07. The 2.2.0 candidate closes the reproduced rating duplication
+and cancellation defects in automated tests and adds real-browser coverage using
+captured production runtime bytes. See CANDIDATE-2.2.0.md for exact evidence.
+The historical matrix below does not describe complete present-day wallet coverage.
 
 ---
 
@@ -39,9 +42,9 @@ pays its bootstrap to the OPPONENT and the model only asked what came back to
 the caller. Transaction `0x16033c85...` returned `(ok u3)` and was discarded by
 `abort_by_post_condition`, costing 0.1 STX. Fixed; see ADR-0008.
 
-**Still open:** a sponsored SUBMIT, where the contract pays a rebate back to
-the caller, has still never reached a wallet. That is the original R1 and it is
-row 4 of the matrix.
+**Still open:** complete sponsored-submit coverage across the wallet matrix.
+The earlier claim that no sponsored submit had ever reached a wallet contradicted
+the mainnet evidence above; the gap is coverage across providers and platforms.
 
 *Mitigation so far.* The encoding matches `@stacks/transactions` byte for byte,
 and a real wallet has now accepted a contract-principal condition in a
@@ -54,21 +57,22 @@ contract pays out, which is the check whose absence caused the abort.
 *What closes it.* Row 4 of `harness/wallets/MATRIX.md`, on both wallets, on
 desktop and mobile, framed. Then a mainnet canary sponsored move.
 
-### R2 — Nothing has been signed by a real wallet at all
+### R2 — Real-wallet coverage is incomplete
 **Severity** critical. **Status** open.
 
-Everything up to `provider.request` is exercised against fakes. No request has
-reached a real extension.
+Automated conformance tests exercise `provider.request` with fakes. Historical
+mainnet signing evidence exists under R1; it does not close every extension/mobile
+row. No new real-wallet signing was performed for the 2.2.0 candidate.
 
 *What closes it.* The full wallet matrix, then the mainnet canary.
 
-### R3 — The runtime emulator has only ever run under jsdom
+### R3 — Runtime compatibility and wallet coverage
 **Severity** medium. **Status** open, narrowed.
 
-The injection sequence, `document.write`, the serve-time rewrite and the bridge
-refusal are reproduced against the built artefact and pass. What has not
-happened is a real browser driving `harness/runtime/serve.mjs --framed` with a
-real extension behind the bridge.
+The candidate is exercised in a real Chromium browser with the captured production
+runtime, direct and framed loading, bridge cancellation, mobile layout and native
+IndexedDB. These are now reproducible browser regressions. Real extension signing
+behind the bridge remains a separate manual check.
 
 *What closes it.* The wallet matrix, run through the runtime harness.
 

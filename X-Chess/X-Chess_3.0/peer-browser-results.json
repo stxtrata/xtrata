@@ -1,0 +1,65 @@
+{
+  "results": [
+    {
+      "name": "IndexedDB retains a non-exportable signing key across Store instances",
+      "passed": true
+    },
+    {
+      "name": "Web Locks serialize competing browser writers",
+      "passed": true
+    },
+    {
+      "name": "real WebRTC offer/answer connects without STUN or signaling service locally",
+      "passed": true
+    },
+    {
+      "name": "real WebRTC transports a chunked record larger than a single message",
+      "passed": true
+    },
+    {
+      "name": "peer UI starts with 64 squares and a dark a1",
+      "passed": true
+    },
+    {
+      "name": "peer board has one tab stop and keyboard navigation",
+      "passed": true
+    },
+    {
+      "name": "UI creates and joins a game through real Clarity calls in simnet",
+      "passed": true
+    },
+    {
+      "name": "UI copies manual invitation/answer and establishes a peer connection",
+      "passed": true
+    },
+    {
+      "name": "automatically signed moves reach the other browser and update its board",
+      "passed": true
+    },
+    {
+      "name": "winner prepares checkmate after loser disconnects without final signature",
+      "passed": true
+    },
+    {
+      "name": "winner registers inscription reference through simnet without loser approval",
+      "passed": true
+    },
+    {
+      "name": "signed-file fallback imports completed history into the disconnected peer",
+      "passed": true
+    },
+    {
+      "name": "reload recovers the registered key and complete history from durable storage",
+      "passed": true
+    },
+    {
+      "name": "shipped single-file loader opens the new peer view",
+      "passed": true
+    }
+  ],
+  "passed": 14,
+  "failed": 0,
+  "limitations": "Real WebRTC tested locally; simnet and simulated wallets; no remote NAT traversal or public chain broadcast.",
+  "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893",
+  "testedAt": "2026-09-09T10:12:38.045496+00:00"
+}

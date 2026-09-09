@@ -1,0 +1,112 @@
+{
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "name": "connect with V2 wallet policy",
+      "passed": true
+    },
+    {
+      "name": "open new community game, quote, sign and authoritative recovery",
+      "passed": true
+    },
+    {
+      "name": "preview, sign and confirm e2e4 against the same contract",
+      "passed": true
+    },
+    {
+      "name": "clean-page recovery reconstructs committed rules and move",
+      "passed": true
+    },
+    {
+      "name": "no frontend exceptions during full journey",
+      "passed": true
+    }
+  ],
+  "calls": [
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "sign",
+      "fn": "open-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "sign",
+      "fn": "submit"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    }
+  ]
+}

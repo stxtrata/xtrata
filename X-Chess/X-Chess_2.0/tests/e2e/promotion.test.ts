@@ -210,10 +210,11 @@ describe('the promotion picker', () => {
     expect((await chain.getAllEntries(1)).length).toBe(0);
   });
 
-  it('is announced as a group, since it takes the board over', async () => {
+  it('is announced as a dialog and focuses the first choice', async () => {
     const { doc } = await board();
     await offerPromotion(doc);
-    expect(picker(doc).getAttribute('role')).toBe('group');
+    expect(picker(doc).getAttribute('role')).toBe('dialog');
+    expect(doc.activeElement).toBe(picker(doc).querySelector('button'));
     expect(picker(doc).getAttribute('aria-label')).toContain('promotion');
   });
 });
@@ -233,3 +234,20 @@ describe('the promotion picker', () => {
 // that was cheap to write passed whether the guard existed or not, which is
 // worse than no test. Left for a fixture that can fail a read on demand.
 // ---------------------------------------------------------------------------
+
+it('cycles promotion focus and restores the board on cancellation', async () => {
+  const {doc}=await board();await offerPromotion(doc);
+  const buttons=[...picker(doc).querySelectorAll<HTMLButtonElement>('button')];
+  buttons[0].dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true}));
+  expect(doc.activeElement).toBe(buttons[buttons.length-1]);
+  buttons[buttons.length-1].click();
+  expect(doc.activeElement).toBe(doc.getElementById('board'));
+  expect(picker(doc).classList.contains('hide')).toBe(true);
+});
+it('does not steal Space from a focused promotion button for replay shortcuts', async () => {
+  const {doc}=await board();await offerPromotion(doc);
+  const event=new dom.window.KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true});
+  picker(doc).querySelector('button')!.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);
+  expect(picker(doc).classList.contains('hide')).toBe(false);
+});

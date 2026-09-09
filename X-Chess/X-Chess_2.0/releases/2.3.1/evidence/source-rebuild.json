@@ -1,0 +1,5 @@
+{
+  "passed": true,
+  "artifactSha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+  "method": "Rebuilt the packaged source twice from a fresh temporary directory using matching installed lockfile build tools."
+}

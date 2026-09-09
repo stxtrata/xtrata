@@ -1,0 +1,16 @@
+{
+  "name":"xchess-v3-local",
+  "version":"3.0.0",
+  "private":true,
+  "type":"module",
+  "scripts":{
+    "build":"node build.mjs",
+    "check:contract":"clarinet check",
+    "test:contract":"node tests/contract.mjs",
+    "test:app":"node tests/app.mjs",
+    "test:journey":"node tests/journey.mjs",
+    "test:peer":"node tests/peer.mjs && node tests/peer-contract.mjs",
+    "test":"node tests/contract.mjs && node tests/app.mjs && node tests/journey.mjs && npm run test:peer",
+    "test:browser:serve":"node tests/browser-server.mjs"
+  }
+}

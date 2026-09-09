@@ -1,0 +1,5 @@
+
+> xchess@2.2.0 test
+> vitest run --maxWorkers=2 --reporter=json --outputFile=../reviews/v3.0/v22-current-results.json
+
+JSON report written to /Users/melophonic/Documents/GitHub/xtrata/X-Chess/reviews/v3.0/v22-current-results.json

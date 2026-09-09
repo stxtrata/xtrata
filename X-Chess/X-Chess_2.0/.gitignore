@@ -41,3 +41,6 @@ harness/wizards/.fee-log.jsonl
 # a commit that way.
 /.*-scratch.mjs
 /.*-samples.jsonl
+
+# Encrypted local wizard test recovery; never part of a public archive.
+reviews/3037/private-*

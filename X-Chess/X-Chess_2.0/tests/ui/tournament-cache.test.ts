@@ -58,7 +58,7 @@ function deps(moves: string[] = MATE) {
     contractId: 'SP000000000000000000002Q6VF78.xchess',
     async getGame() {
       counts.rows++;
-      return { id: 1, nextSeq: moves.length, openedAt: 100, openedBy: WHITE, ranked: true, rulesHash: '0xabc' };
+      return { id: 1, nextSeq: moves.length, openedAt: 100, openedBy: WHITE, ranked: true, rulesHash: 'ab'.repeat(32) };
     },
     async getAllEntries() {
       counts.entries++;

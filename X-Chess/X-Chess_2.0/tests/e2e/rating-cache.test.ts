@@ -210,3 +210,9 @@ describe('checking whether a kept rating still holds', () => {
     expect(inner(app).ratingNoteText()).toBeNull();
   });
 });
+
+it('invalidates the unversioned cache that may contain doubled ratings', () => {
+  const {app} = board({rankedCount: 12, seqs: {}});
+  store.set(`xchess:ratings:${CONTRACT}`, JSON.stringify({contract: CONTRACT, atCount: 12, open: [], rows: [ROW]}));
+  inner(app).loadRatingCache(); expect(inner(app).ratedRows).toEqual([]);
+});

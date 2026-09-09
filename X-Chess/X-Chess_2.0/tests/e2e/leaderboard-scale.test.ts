@@ -193,3 +193,29 @@ describe('what the leaderboard costs', () => {
     );
   });
 });
+
+it('full verification after a seeded visit counts each real game once', async () => {
+  const {chain} = await contractWith(2);
+  mountShell(dom.window.document);
+  const app = new ChessApp({chain, document: dom.window.document, build: {network: 'devnet', contract: chain.contractId}});
+  type Internal = {checkpoint: unknown; checkpointStart: (count: number) => Promise<number>; verifyEverything: boolean; ratedRows: Array<{games: number}>};
+  const state = app as unknown as Internal;
+  state.checkpoint = {id: 999, it: {rankedIndex: 1, block: 1, games: [{id: 1, white: ALICE, black: BOB, result: '0-1'}]}};
+  state.checkpointStart = async () => 1;
+  await app.loadLeaderboard();
+  expect(state.ratedRows.map(r => r.games)).toEqual([2, 2]);
+  state.verifyEverything = true;
+  await app.loadLeaderboard();
+  expect(state.ratedRows.map(r => r.games)).toEqual([2, 2]);
+});
+it('ends failed verification progress without replacing the previous table', async () => {
+  const {chain}=await contractWith(2);mountShell(dom.window.document);
+  const app=new ChessApp({chain,document:dom.window.document,build:{network:'devnet',contract:chain.contractId}});
+  await app.loadLeaderboard();
+  const before=dom.window.document.getElementById('leaderboard-rows')!.textContent;
+  chain.getRankedGame=async()=>{throw Object.assign(Error('rate limited'),{code:'RATE_LIMITED'});};
+  await app.loadLeaderboard();
+  expect(dom.window.document.getElementById('leaderboard-note')!.textContent).toContain('Verification stopped');
+  expect(dom.window.document.querySelector('#leaderboard-note [role=progressbar]')).toBeNull();
+  expect(dom.window.document.getElementById('leaderboard-rows')!.textContent).toBe(before);
+});

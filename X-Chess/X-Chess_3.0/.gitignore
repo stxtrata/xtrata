@@ -1,0 +1,3 @@
+.cache/
+*.log
+deployments/default.simnet-plan.yaml

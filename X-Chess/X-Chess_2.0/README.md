@@ -2,14 +2,14 @@
 
 Chess on Stacks, where the board itself is a permanent Xtrata inscription.
 
-Every game is on chain, every move is a transaction, and the position, the
+In the original on-chain mode, every move is a transaction, and the position, the
 result and every rating are **derived by replaying the log** rather than stored.
 There is no X Chess server: no API, no database, no signing service, no
 indexer, no leaderboard. If every machine anybody involved has ever operated
 disappeared tomorrow, the application would keep working.
 
-**Live on mainnet as Xtrata inscription 2988.** Open
-<https://xtrata.xyz/i/2988> and play. See
+**Latest reviewed working board: [inscription 3034](https://xtrata.xyz/i/3034), version 2.1.9.**
+The active candidate is **2.3.1**, adding optional signed peer play and public archives. See [peer instructions](ops/PEER-2.3.1.md). The separate [2.2.0 candidate evidence](ops/CANDIDATE-2.2.0.md) is historical. See
 [Where this actually stands](#where-this-actually-stands).
 
 ---
@@ -47,7 +47,7 @@ To convince yourself it works rather than just looks like it:
 npm test
 ```
 
-That is about two minutes and 867 tests. Nothing in it touches the
+The standard suite takes a few minutes; the generated verification report records its actual count. Nothing in it touches the
 network, a wallet, or any money.
 
 ---
@@ -125,6 +125,7 @@ case a failure needs interpreting.
 ### Where the tests are
 
 ```
+tests/peer/         signed peer protocol, forks, storage/recovery and transport
 tests/perft/        move generation, against published node counts
 tests/replay/       replay's behaviour, stated as things a reader may rely on
 tests/fuzz/         replay under hostile input: totality and determinism
@@ -190,7 +191,7 @@ npm run build
 Produces:
 
 ```
-dist/xchess.html      245,304 bytes   the board, self-contained
+dist/xchess.html      approximately 311 KB   the 2.3.1 board, self-contained
 dist/xchess-gates.html   ~98 KB   the deployment and inscription gates
 dist/manifest.json                provenance: hashes, protocol versions
 ```
@@ -436,14 +437,15 @@ game, position, result and rating without this repository existing.
 
 **Live on mainnet. Real games, real moves, real money.**
 
-The application is Xtrata inscription **2988**, version 2.0.0, built
-2026-08-09, build hash `c2861564`, and inscription 2988 is 123,062 bytes. Served at
-<https://xtrata.xyz/i/2988> and reconstructed from the chain on every load.
+The latest working inscription reviewed on 2026-09-07 is **3034**, version **2.1.9**,
+built 2026-08-21 21:44 UTC, code hash `936aba6a`. The original 2988 remains permanent.
+The **2.2.0 candidate is not yet inscribed**. Its exact bytes, hashes and test evidence
+are linked in [the candidate record](ops/CANDIDATE-2.2.0.md).
 
 It talks to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary`
 on mainnet.
 
-### Live state, read from the contract on 2026-08-17
+### Historical state, read from the contract on 2026-08-17
 
 | Reading | Value |
 | --- | --- |
@@ -532,3 +534,27 @@ Tournaments and player profiles are inscribed documents, and the board finds
 each group by the wallet they are sent to — one address per group, because a
 wallet is the only index that grows after the board is permanent. See
 [docs/MANIFESTS.md](docs/MANIFESTS.md).
+
+## Reproducible next inscription
+
+`npm run build:candidate` builds twice using the explicit network, contract, version
+and UTC stamp in `harness/candidate.json`. It refuses protocol or contract drift
+from 3034 and checks identical artifact hashes and the 32-chunk ceiling.
+`npm run verify:candidate` also runs types, contract analysis, serverlessness,
+documentation, the full suite, deep perft, Clarity economics and the real-browser suite.
+The CI workflow archives `dist/` with machine-readable evidence. Nothing signs or publishes.
+
+`npm run serve:browser-tests` serves the same deterministic browser checks at
+`http://127.0.0.1:4342`. Opening that page runs the tests and writes
+`dist/browser-report.json`. It uses native IndexedDB, the exact built HTML, the
+captured production runtime, and fake chain/wallet responses. The CI adapter
+needs `google-chrome` or `CHROME_BIN`. The full personal-wallet matrix remains separate.
+
+The runtime harness defaults to the production scripts captured on 2026-09-07,
+with their source URLs and SHA-256 hashes in `harness/runtime/captured/2026-09-07/manifest.json`.
+Use `--runtime-dir <directory>` explicitly to compare another runtime revision.
+
+For live reads through the same hosted proxy used by inscriptions, run
+`npm run serve:runtime:framed -- --wallet=stub --production-proxy`. This mode
+forwards no personal Hiro API keys. A standalone Hiro test can still encounter
+shared endpoint limits; the candidate stops failed walks without replacing ratings.

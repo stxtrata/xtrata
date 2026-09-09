@@ -1,0 +1,33 @@
+
+> xchess@2.2.0 build:candidate
+> node harness/candidate.mjs
+
+built dist/xchess-gates.html  170,117 bytes
+  version        2.2.0 - 2026-09-07 21:20 UTC - #4c77aa5f
+  contract name  xchess-core-v1-canary
+  contract sha   8048e4be63d665c4ac4b94afc6c74187d185f822cedd60fb24d5ece7567b3c9f
+  clarity        4
+built dist/xchess.html  254,748 bytes
+  sha256    23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6  (shasum -a 256)
+  xtrata    516ba635e5d70439c8543aa37454156e142225f6c9590168e4f4f9f2814aa7c1  (16 chunks, what Inscribe shows)
+  budget    16/32 chunks in one upload transaction, 269,540 bytes to spare
+  contract  SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary (mainnet)
+  version   2.2.0 - 2026-09-07 21:20 UTC - #f9b2817e
+
+  The page shows "2.2.0 - 2026-09-07 21:20 UTC - #f9b2817e" at the top.
+  If it does not, you are looking at an older build. Hard-reload it.
+built dist/xchess-gates.html  170,117 bytes
+  version        2.2.0 - 2026-09-07 21:20 UTC - #4c77aa5f
+  contract name  xchess-core-v1-canary
+  contract sha   8048e4be63d665c4ac4b94afc6c74187d185f822cedd60fb24d5ece7567b3c9f
+  clarity        4
+built dist/xchess.html  254,748 bytes
+  sha256    23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6  (shasum -a 256)
+  xtrata    516ba635e5d70439c8543aa37454156e142225f6c9590168e4f4f9f2814aa7c1  (16 chunks, what Inscribe shows)
+  budget    16/32 chunks in one upload transaction, 269,540 bytes to spare
+  contract  SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary (mainnet)
+  version   2.2.0 - 2026-09-07 21:20 UTC - #f9b2817e
+
+  The page shows "2.2.0 - 2026-09-07 21:20 UTC - #f9b2817e" at the top.
+  If it does not, you are looking at an older build. Hard-reload it.
+Candidate ready for review: 23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6

@@ -761,3 +761,26 @@ describe('what one spectator costs, per minute', () => {
     expect(mempoolReads, 'the ghost went unwatched while a move was in flight').toBe(4);
   });
 });
+
+it('completes the load notice and ignores a late response for another game', async () => {
+  const {chain} = counted(); const app = await watching(chain, ALICE);
+  chain.as(ALICE); await chain.openGame(rulesHash(RULES), false);
+  const original = chain.getGame.bind(chain);
+  let release!: () => void;
+  chain.getGame = async id => {if(id===1)await new Promise<void>(resolve=>{release=resolve;});return original(id);};
+  const slow=app.load(1); await app.load(2); release(); await slow;
+  expect(dom.window.document.getElementById('chain-notice')!.textContent).toContain('Game 2 loaded');
+  expect((app as unknown as {gameId:number}).gameId).toBe(2);
+  app.stopPolling();
+});
+
+it('does not let a late failed load overwrite a newer wallet notice', async () => {
+  const {chain} = counted(); const app=await watching(chain,ALICE);
+  let reject!: (error: Error) => void;
+  chain.getGame=async ()=>new Promise((_,fail)=>{reject=fail;});
+  const slow=app.load(1);
+  (app as unknown as {notice(key:string,kind:string,text:string):void}).notice('chainNotice','info','Wallet operation completed');
+  reject(Error('old request failed'));await slow;
+  expect(dom.window.document.getElementById('chain-notice')!.textContent).toBe('Wallet operation completed');
+  app.stopPolling();
+});

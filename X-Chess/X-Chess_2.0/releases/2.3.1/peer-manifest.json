@@ -1,0 +1,17 @@
+{
+  "artifactSha256": "d20d86835aa73e8b157f48df1c7c49405e210fc988d39a733b9a19a26e1ad1d7",
+  "protocol": "xchess-peer-v1",
+  "engine": "xchess-engine-v1:2ce32043537e211ff09dec435ae8c9eec89d21e6e71a082fc4ed0a929668bd33",
+  "registryDeployed": false,
+  "mandatoryService": null,
+  "peerSources": {
+    "contracts/xchess-peer-v1.clar": "47f574a391ec8c39795a0277dfd9d9b0e9761f6ddff44935f604fe441fb87b77",
+    "packages/peer/crypto.ts": "1bc87a251a26e0fc7fed31bd8e89f61f9d24b4b3f2aa8c3f1fdf9407b089d96f",
+    "packages/peer/protocol.ts": "8e155c41034c334c0acffdc0d458a1f614bc6b64e6398707a0ed5a7172782967",
+    "packages/peer/store.ts": "6ef162593dd61889987807b3aefc02ac3c35acf081607e28770a6d67c3096c4f",
+    "packages/peer/transport.ts": "8c656386f3c133213227adff2c6ce50d74e26e42b064bf4cbf6ea9fb1807f193",
+    "packages/peer/registry.ts": "1abbc7e1da4555161a1bd23d26563673aa2f40eb4059f1dc5fbced6592c9f5c3",
+    "packages/peer/ui.ts": "8a476dd226d8c1a402cca63dd79afd354dd75b4c3835fc79220037dae864606f"
+  },
+  "offlineVerifierSha256": "29a49a65ad14b50dbfbd20e4829925cabc72c9d495f5dc218e3f8755ec584639"
+}

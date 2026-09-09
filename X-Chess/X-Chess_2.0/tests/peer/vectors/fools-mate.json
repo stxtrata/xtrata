@@ -1,0 +1,94 @@
+{
+  "branches": [],
+  "final": {
+    "fen": "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3",
+    "result": "0-1",
+    "root": "6712eba509a0c3c34674e2eb3407312b6d58892ca2cebaff6e72fd07c49fc7b9",
+    "status": "finished",
+    "termination": "checkmate"
+  },
+  "format": "xchess-peer-archive-v1",
+  "line": {
+    "moves": [
+      {
+        "payload": {
+          "actor": "white",
+          "kind": "move",
+          "match": "7ef024af6bebbc92f15e907d5cb06b8500793d3538ff36e7017e5016575b2147",
+          "previousHash": "d01810d7a568cdc5aa5387c338aa3bac44c11cd33cc4a2bdb1001084c861c56e",
+          "protocol": "xchess-peer-v1",
+          "resultingPositionHash": "4a39925b15fb49641df678407fe1e6da5f9e5fcc263b1fd49a88d7fc198e5d24",
+          "sequence": 1,
+          "value": "f2f3"
+        },
+        "signature": "c11bbf8fb4e320d8d904c26307f9c3931bf29dc58408ca0a4f730ed7c1f0174780560bcd077bdaba23006a7923a2e5ff22015180734410206d9cfe86596f6661"
+      },
+      {
+        "payload": {
+          "actor": "black",
+          "kind": "move",
+          "match": "7ef024af6bebbc92f15e907d5cb06b8500793d3538ff36e7017e5016575b2147",
+          "previousHash": "b2429a9958b5a64b4f1247fd758c452acbca30969c8b2945ba8712f2339cd6ac",
+          "protocol": "xchess-peer-v1",
+          "resultingPositionHash": "338b875f8b691ccbd9bf35f51e072287a6f1c2cadc5a243f72743d670ce39717",
+          "sequence": 2,
+          "value": "e7e5"
+        },
+        "signature": "dbcd8b30005c8fa26bc73f695b934b572d270a5a769f825d0e0f2bbc676757c03aecb4013738ab286e5f1ccc9b5ca0effbdc3ca3a27801c334b90ba3393d9488"
+      },
+      {
+        "payload": {
+          "actor": "white",
+          "kind": "move",
+          "match": "7ef024af6bebbc92f15e907d5cb06b8500793d3538ff36e7017e5016575b2147",
+          "previousHash": "b47185c2bd91593a6a9a244df1acb86599de1819138de1e16381be17ab9970cf",
+          "protocol": "xchess-peer-v1",
+          "resultingPositionHash": "41257ea84f356cb3afe5ddfe066f25598ae7b9088ec7f847f58b94cc7011d6a9",
+          "sequence": 3,
+          "value": "g2g4"
+        },
+        "signature": "4d8451de71d8fe3868581d7d5628b3f118cec971e82e555a858b53a750f45d98ee46ad1a9526bf456159051281ac7a8590bf52aad266f3d327a901b661624e9b"
+      },
+      {
+        "payload": {
+          "actor": "black",
+          "kind": "move",
+          "match": "7ef024af6bebbc92f15e907d5cb06b8500793d3538ff36e7017e5016575b2147",
+          "previousHash": "698c1dcb5e6c8eeae725393689045c13a56c869d8f14cef606af1d092caf3335",
+          "protocol": "xchess-peer-v1",
+          "resultingPositionHash": "38e0022b334eadcd01358a8939dd3f315b65fa2a431c0e6fc874d7233fd95527",
+          "sequence": 4,
+          "value": "d8h4"
+        },
+        "signature": "7c40aa32196a9792b9c5b36e513583e645608b7a863984124cca81cff9682e37b9cfe5ff43a706f144af1ad565b39d13554ca2e6f3f70d158ffdfe78e7ec375d"
+      }
+    ],
+    "resignations": []
+  },
+  "opening": {
+    "black": {
+      "address": "Demo black",
+      "key": "045ffecd4afe2b10f1582b008b7dc8da32b5f03673ecc3c76395ecdd953597f28ab4f0a5936855b1000e0f92a602eb258cc20deacbed23a425663c22e15daa34db"
+    },
+    "descriptor": {
+      "algorithm": "P256-SHA256-raw-v1",
+      "clock": {
+        "baseMs": 0,
+        "incrementMs": 0
+      },
+      "engine": "xchess-engine-v1:2ce32043537e211ff09dec435ae8c9eec89d21e6e71a082fc4ed0a929668bd33",
+      "initialFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "nonce": "73e7f98b3e03288609ba7a6d3a1d4c56de0bbc3daf47924437b0b305954b7d27",
+      "protocol": "xchess-peer-v1",
+      "rules": "xchess-automatic-draw-v1"
+    },
+    "game": 1,
+    "kind": "demo",
+    "network": "local",
+    "registry": "local-demo",
+    "white": {
+      "address": "Demo white",
+      "key": "045b29ae12fc367ea7196c383bb4cd99a0dc3b6df8fe4d3cee9c567ee5ab0e61b2cf359202a49263869b97be9dee724ac2f11e4b6459ec2a24661e59c6a45fc83d"
+    }
+  }
+}

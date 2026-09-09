@@ -22,7 +22,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const HTML_PATH = resolve(ROOT, 'dist/xchess.html');
-const RUNTIME_DIR = resolve(ROOT, '..', '..', 'xtrata-2.0', 'public', 'runtime');
+const RUNTIME_DIR = resolve(ROOT, 'harness/runtime/captured/2026-09-07');
 
 let artifact = '';
 
@@ -167,7 +167,7 @@ describe('the real runtime scripts', () => {
           'The runtime emulator needs them; this suite exercises the injection shape only.'
       );
     }
-    expect(typeof present).toBe('boolean');
+    expect(present, 'the captured runtime is part of the test inputs').toBe(true);
   });
 });
 

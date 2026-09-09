@@ -1,0 +1,172 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "IndexedDB: 100 writes commit in one transaction",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: 100 reads in one transaction",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: all values round-trip",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: deletion is recoverable",
+      "passed": true
+    },
+    {
+      "name": "direct/false: one board",
+      "passed": true
+    },
+    {
+      "name": "direct/false: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "direct/false: one connection request",
+      "passed": true,
+      "detail": "[\"wallet_connect\"]"
+    },
+    {
+      "name": "direct/false: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "direct: friend draft requires opponent",
+      "passed": true
+    },
+    {
+      "name": "direct: first two preset validates",
+      "passed": true
+    },
+    {
+      "name": "direct: loaded 64 squares",
+      "passed": true
+    },
+    {
+      "name": "direct: flip preserves keyboard square",
+      "passed": true
+    },
+    {
+      "name": "direct: historical fee qualified",
+      "passed": true
+    },
+    {
+      "name": "direct: mobile board fits",
+      "passed": true
+    },
+    {
+      "name": "direct/false: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "direct/true: one board",
+      "passed": true
+    },
+    {
+      "name": "direct/true: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "direct/true: one connection request",
+      "passed": true,
+      "detail": "[\"wallet_connect\"]"
+    },
+    {
+      "name": "direct/true: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "direct/true: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "framed/false: one board",
+      "passed": true
+    },
+    {
+      "name": "framed/false: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "framed/false: one connection request",
+      "passed": true,
+      "detail": "[\"stx_getAddresses\"]"
+    },
+    {
+      "name": "framed/false: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "framed: friend draft requires opponent",
+      "passed": true
+    },
+    {
+      "name": "framed: first two preset validates",
+      "passed": true
+    },
+    {
+      "name": "framed: loaded 64 squares",
+      "passed": true
+    },
+    {
+      "name": "framed: flip preserves keyboard square",
+      "passed": true
+    },
+    {
+      "name": "framed: historical fee qualified",
+      "passed": true
+    },
+    {
+      "name": "framed: mobile board fits",
+      "passed": true
+    },
+    {
+      "name": "framed/false: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "framed/true: one board",
+      "passed": true
+    },
+    {
+      "name": "framed/true: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "framed/true: one connection request",
+      "passed": true,
+      "detail": "[\"stx_getAddresses\"]"
+    },
+    {
+      "name": "framed/true: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "framed/true: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    }
+  ],
+  "metrics": {
+    "individualWriteMs": 1544.2999999998137,
+    "individualWriteTransactions": 100,
+    "batchWriteMs": 9.100000000093132,
+    "batchWriteTransactions": 1,
+    "batchReadMs": 5.899999999906868,
+    "batchReadTransactions": 1
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893",
+  "testedAt": "2026-09-09T10:11:49.270Z"
+}

@@ -1,0 +1,80 @@
+{
+  "testedAt": "2026-09-09T11:01:36.546Z",
+  "readings": {
+    "xchess-core-v1-canary/get-open-fee": {
+      "type": "uint",
+      "value": "10000"
+    },
+    "xchess-core-v1-canary/get-sponsor-price": {
+      "type": "tuple",
+      "value": {
+        "bootstrap": {
+          "type": "uint",
+          "value": "250000"
+        },
+        "liability": {
+          "type": "uint",
+          "value": "90000"
+        },
+        "margin": {
+          "type": "uint",
+          "value": "50000"
+        },
+        "total": {
+          "type": "uint",
+          "value": "390000"
+        }
+      }
+    },
+    "xchess-core-v1-canary/get-game-count": {
+      "type": "uint",
+      "value": "135"
+    },
+    "xtrata-v3-2-3/get-fee-unit": {
+      "type": "ok",
+      "value": {
+        "type": "uint",
+        "value": "100000"
+      }
+    },
+    "xtrata-v3-2-3/get-inscription-meta": {
+      "type": "some",
+      "value": {
+        "type": "tuple",
+        "value": {
+          "creator": {
+            "type": "address",
+            "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          "final-hash": {
+            "type": "buffer",
+            "value": "03391db5accf54748ab6c1e54de3ad9a82f42794b7d42b63d71cbb8b72c6fc48"
+          },
+          "mime-type": {
+            "type": "ascii",
+            "value": "text/html"
+          },
+          "owner": {
+            "type": "address",
+            "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          "sealed": {
+            "type": "true"
+          },
+          "total-chunks": {
+            "type": "uint",
+            "value": "20"
+          },
+          "total-size": {
+            "type": "uint",
+            "value": "311553"
+          }
+        }
+      }
+    }
+  },
+  "registry": {
+    "contract": "SPARQA0T0GWJZADHRMGNVTJ51D014V8P7XPDSTNH.xchess-peer-v1",
+    "status": 404
+  }
+}

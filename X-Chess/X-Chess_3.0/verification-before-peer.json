@@ -1,0 +1,74 @@
+{
+  "artifact": {
+    "version": "3.0.0-local",
+    "htmlSha256": "f264eb82f564ca772bd7ad2f38731857a72094c2e8ca7f14d2a681bf41480ac9",
+    "bytes": 352829,
+    "chunks": 22,
+    "rollingHash": "a0e3856c71f2e4d30f2959a8d664ccc6473b973427615a908a5819a65023eaeb",
+    "v2Sha256": "23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6",
+    "v3ExpandedSha256": "45d1f8ce414ddf42630acbcfba1be3947f52967690b56565f5aa9174d10744df",
+    "contract": "xchess-core-v3",
+    "deployment": "local only",
+    "contractSha256": "8a5d52d1b6b8029b796144a154c4625715c294fba81dde2848894ced15bb2d64",
+    "sourceSha256": {
+      "src/imported-app.js": "3a7b7a5a83de496bcc5a9769654d9077dc565542a261cf5c510d4bc50de507cc",
+      "src/shell.html": "76e357ed17c9e1f7448dd6754d1c5ad908a65dd6f20de05b1fc45d0ada6d7a5a",
+      "src/v2-wallet.ts": "50a9e51ed6fecfba04f4e2f660bb11b7a21f90850048f1bf9c1ad3f2f8f77f5c",
+      "src/loader.js": "b9d15ad8113278e2a684d74d8c328aeee745627dae7c00d08859002b8c922b68",
+      "local-config.json": "507a5e0fa61bab385d79344cdb8846905575f2d520a61b20c4c6487e7b466d58",
+      "build.mjs": "421a57fbb7e8a53f28c531e0204fa8cb76ae0cb2ac8a2ef6a121e460a0db3033"
+    },
+    "compression": "gzip; browser DecompressionStream"
+  },
+  "testedAt": "2026-09-09T09:43:47.617934+00:00",
+  "originalV3": {
+    "sha256": "65fdc65051c02aea38ce404421631d4eb7e604dcf2ba02cb97000f23d29f5f16",
+    "bytes": 549959,
+    "passed": 30,
+    "failed": 8
+  },
+  "validation": {
+    "v2Standard": {
+      "passed": 1686,
+      "skipped": 17,
+      "failed": 0
+    },
+    "app": {
+      "passed": 39,
+      "failed": 0
+    },
+    "contract": {
+      "passed": 23,
+      "failed": 0
+    },
+    "journey": {
+      "passed": 5,
+      "failed": 0
+    },
+    "browser-v2": {
+      "passed": 36,
+      "failed": 0,
+      "artifactSha256": "f264eb82f564ca772bd7ad2f38731857a72094c2e8ca7f14d2a681bf41480ac9"
+    },
+    "browser-v3": {
+      "passed": 44,
+      "failed": 0,
+      "artifactSha256": "f264eb82f564ca772bd7ad2f38731857a72094c2e8ca7f14d2a681bf41480ac9"
+    },
+    "clarinet": {
+      "passed": true,
+      "warnings": 19
+    }
+  },
+  "scope": [
+    "All V2 functions retained in dedicated V2 view with byte-pinned 2.2.0 application",
+    "V3 targeted UI and transport fixes; actual frontend-to-Clarinet simnet journey",
+    "New editable local contract with descriptors, extension fields and fixed sponsorship accounting"
+  ],
+  "notPerformed": [
+    "Public-network deployment or inscription",
+    "Real extension/mobile signing or public-network transaction",
+    "Redesign of every V2 feature into the new arena",
+    "Support for browsers without DecompressionStream"
+  ]
+}

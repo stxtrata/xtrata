@@ -1,0 +1,5 @@
+{
+  "network": "devnet",
+  "contract": "STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ.xchess-core-v3",
+  "endpoint": "http://localhost:3999"
+}

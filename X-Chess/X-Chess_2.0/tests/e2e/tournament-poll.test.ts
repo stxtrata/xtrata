@@ -84,7 +84,7 @@ function chain(longer: number | null = null) {
         async getGame(id: number) {
           counts.rows++;
           return { id, nextSeq: lengthOf(id), openedAt: 100, openedBy: WHITE,
-                   ranked: true, rulesHash: `0xhash${id}` };
+                   ranked: true, rulesHash: id.toString(16).padStart(64, '0') };
         },
         async getAllEntries(id: number) {
           counts.entries++;

@@ -1,0 +1,13 @@
+
+> xchess@2.1.9 test:perft:deep
+> PERFT_DEEP=1 vitest run tests/perft
+
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+
+ Test Files  1 passed (1)
+      Tests  76 passed (76)
+   Start at  22:08:24
+   Duration  1012.28s (transform 117ms, setup 0ms, import 178ms, tests 1011.77s, environment 0ms)
+

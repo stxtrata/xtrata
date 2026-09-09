@@ -91,12 +91,12 @@ if (!existsSync(MANIFEST)) {
 // The number of tests, which the suite itself knows.
 // ---------------------------------------------------------------------------
 
-const COUNT = /\*?\*?(\d{2,5})\*?\*?\s+tests\b/gi;
+const COUNT = /(?<![\d,])\*?\*?(\d[\d,]{1,6})\*?\*?\s+tests\b/gi;
 const claimedCounts = [];
 for (const file of ['ops/STATUS.md', 'README.md']) {
   if (!existsSync(resolve(ROOT, file))) continue;
   for (const [whole, figure] of read(file).matchAll(COUNT)) {
-    claimedCounts.push({ file, whole, value: Number(figure) });
+    claimedCounts.push({ file, whole, value: Number(figure.replaceAll(',', '')) });
   }
 }
 if (claimedCounts.length) {

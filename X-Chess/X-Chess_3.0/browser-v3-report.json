@@ -1,0 +1,184 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "direct/false: document replacement reboot",
+      "passed": true
+    },
+    {
+      "name": "direct/false: 64 squares",
+      "passed": true
+    },
+    {
+      "name": "direct/false: correct a1 colour",
+      "passed": true
+    },
+    {
+      "name": "direct/false: mobile fits",
+      "passed": true
+    },
+    {
+      "name": "direct/false: one board tab stop",
+      "passed": true
+    },
+    {
+      "name": "direct/false: Home navigation",
+      "passed": true
+    },
+    {
+      "name": "direct/false: fresh practice works",
+      "passed": true
+    },
+    {
+      "name": "direct/false: move applied",
+      "passed": true
+    },
+    {
+      "name": "direct/false: replay read only",
+      "passed": true
+    },
+    {
+      "name": "direct/false: exactly one wallet request",
+      "passed": true
+    },
+    {
+      "name": "direct/false: no exceptions",
+      "passed": true
+    },
+    {
+      "name": "direct/true: document replacement reboot",
+      "passed": true
+    },
+    {
+      "name": "direct/true: 64 squares",
+      "passed": true
+    },
+    {
+      "name": "direct/true: correct a1 colour",
+      "passed": true
+    },
+    {
+      "name": "direct/true: mobile fits",
+      "passed": true
+    },
+    {
+      "name": "direct/true: one board tab stop",
+      "passed": true
+    },
+    {
+      "name": "direct/true: Home navigation",
+      "passed": true
+    },
+    {
+      "name": "direct/true: fresh practice works",
+      "passed": true
+    },
+    {
+      "name": "direct/true: move applied",
+      "passed": true
+    },
+    {
+      "name": "direct/true: replay read only",
+      "passed": true
+    },
+    {
+      "name": "direct/true: exactly one wallet request",
+      "passed": true
+    },
+    {
+      "name": "direct/true: no exceptions",
+      "passed": true
+    },
+    {
+      "name": "framed/false: document replacement reboot",
+      "passed": true
+    },
+    {
+      "name": "framed/false: 64 squares",
+      "passed": true
+    },
+    {
+      "name": "framed/false: correct a1 colour",
+      "passed": true
+    },
+    {
+      "name": "framed/false: mobile fits",
+      "passed": true
+    },
+    {
+      "name": "framed/false: one board tab stop",
+      "passed": true
+    },
+    {
+      "name": "framed/false: Home navigation",
+      "passed": true
+    },
+    {
+      "name": "framed/false: fresh practice works",
+      "passed": true
+    },
+    {
+      "name": "framed/false: move applied",
+      "passed": true
+    },
+    {
+      "name": "framed/false: replay read only",
+      "passed": true
+    },
+    {
+      "name": "framed/false: exactly one wallet request",
+      "passed": true
+    },
+    {
+      "name": "framed/false: no exceptions",
+      "passed": true
+    },
+    {
+      "name": "framed/true: document replacement reboot",
+      "passed": true
+    },
+    {
+      "name": "framed/true: 64 squares",
+      "passed": true
+    },
+    {
+      "name": "framed/true: correct a1 colour",
+      "passed": true
+    },
+    {
+      "name": "framed/true: mobile fits",
+      "passed": true
+    },
+    {
+      "name": "framed/true: one board tab stop",
+      "passed": true
+    },
+    {
+      "name": "framed/true: Home navigation",
+      "passed": true
+    },
+    {
+      "name": "framed/true: fresh practice works",
+      "passed": true
+    },
+    {
+      "name": "framed/true: move applied",
+      "passed": true
+    },
+    {
+      "name": "framed/true: replay read only",
+      "passed": true
+    },
+    {
+      "name": "framed/true: exactly one wallet request",
+      "passed": true
+    },
+    {
+      "name": "framed/true: no exceptions",
+      "passed": true
+    }
+  ],
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+  "artifactSha256": "3441f57113021e5727ae5572fd840f54b58772fcb5e771a2f3f0fe751e583893",
+  "testedAt": "2026-09-09T10:11:35.746Z"
+}

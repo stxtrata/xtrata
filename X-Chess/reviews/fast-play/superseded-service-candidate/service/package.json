@@ -1,0 +1,8 @@
+{
+  "name": "xchess-quick-play-service",
+  "version": "2.3.1",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs", "db:generate": "drizzle-kit generate" },
+  "devDependencies": { "esbuild": "0.25.12", "drizzle-orm": "0.45.2", "drizzle-kit": "0.31.9" }
+}

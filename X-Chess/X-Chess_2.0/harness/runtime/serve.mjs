@@ -3,7 +3,7 @@
 //
 // There is no Xtrata testnet, so this is the only place the inscribed board can
 // be exercised before it is permanent. It is therefore built to be FAITHFUL
-// rather than convenient: it uses the REAL runtime scripts from xtrata-2.0,
+// rather than convenient: it uses captured production runtime scripts by default,
 // reproduces the same injections in the same order, the same
 // document.open/write/close, and the same serve-time Hiro rewrite, and proxies
 // /hiro/<network> so the rewrite's target actually exists.
@@ -28,8 +28,10 @@ import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-const RUNTIME_DIR = resolve(ROOT, '..', '..', 'xtrata-2.0', 'public', 'runtime');
+const runtimeArg = process.argv.indexOf('--runtime-dir');
+const RUNTIME_DIR = runtimeArg < 0 ? resolve(ROOT, 'harness/runtime/captured/2026-09-07') : resolve(process.argv[runtimeArg + 1]);
 const PORT = Number(process.env.PORT || 4331);
+const PRODUCTION_PROXY = process.argv.includes('--production-proxy');
 
 /**
  * Proxy cache, and how long an answer is reused.
@@ -386,7 +388,7 @@ const server = createServer(async (request, response) => {
     if (path === `/i/${BOARD_ID}`) {
       // HTML, so it is rewritten on the way out, exactly as the worker does.
       const html = await readFile(resolve(ROOT, ARTIFACT), 'utf8');
-      return send(response, 200, rewriteHiroBases(html), TYPES['.html']);
+      return send(response, 200, rewriteHiroBases(html).replace('<head>', '<head><base href="null">'), TYPES['.html']);
     }
 
     // Any other inscription: fetched from the live site. Recursion is a real
@@ -416,8 +418,7 @@ const server = createServer(async (request, response) => {
           response,
           500,
           `Could not read ${name} from ${RUNTIME_DIR}.\n` +
-            'This harness reads the real runtime scripts rather than copies, so it needs\n' +
-            'xtrata-2.0 checked out beside the xtrata repository root.'
+            'Restore the captured runtime or pass an explicit --runtime-dir.'
         );
       }
     }
@@ -438,6 +439,7 @@ const server = createServer(async (request, response) => {
     if (path.startsWith('/hiro/')) {
       const [, , network, ...rest] = path.split('/');
       const upstream =
+        PRODUCTION_PROXY ? `https://xtrata.xyz/hiro/${network}` :
         network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so';
       const target = `${upstream}/${rest.join('/')}${url.search}`;
       const body = request.method === 'POST' ? await readBody(request) : undefined;
@@ -453,7 +455,7 @@ const server = createServer(async (request, response) => {
         return send(response, hit.status, hit.text, hit.type);
       }
 
-      const apiKey = HIRO_KEYS.length ? HIRO_KEYS[hiroKeyIndex % HIRO_KEYS.length] : null;
+      const apiKey = !PRODUCTION_PROXY && HIRO_KEYS.length ? HIRO_KEYS[hiroKeyIndex % HIRO_KEYS.length] : null;
       const headers = {
         'Content-Type': request.headers['content-type'] || 'application/json'
       };
@@ -467,6 +469,10 @@ const server = createServer(async (request, response) => {
       const text = await upstreamResponse.text();
       const type = upstreamResponse.headers.get('content-type') || TYPES['.json'];
       const left = upstreamResponse.headers.get('x-ratelimit-remaining-minute');
+      for (const name of ['retry-after', 'x-ratelimit-remaining-minute', 'ratelimit-remaining']) {
+        const value = upstreamResponse.headers.get(name);
+        if (value !== null) response.setHeader(name, value);
+      }
       console.log(
         `  proxy ${request.method} ${path} -> ${upstreamResponse.status}` +
           (left ? ` (${left} left this minute)` : '') +
@@ -528,7 +534,7 @@ server.listen(PORT, () => {
   console.log(`  runtime   real scripts from ${RUNTIME_DIR}`);
   console.log(
     `  proxy     /hiro/<network> -> the public API, ` +
-      (HIRO_KEYS.length
+      (PRODUCTION_PROXY ? 'Xtrata production proxy; personal keys are not forwarded' : HIRO_KEYS.length
         ? `${HIRO_KEYS.length} Hiro key${HIRO_KEYS.length > 1 ? 's' : ''} attached AT THE PROXY`
         : 'anonymous (about fifty requests a minute, shared with your wallet)') +
       '\n'

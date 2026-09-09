@@ -1,0 +1,86 @@
+[
+  {
+    "name": "winner publishes checkmate without a loser final acknowledgement",
+    "passed": true
+  },
+  {
+    "name": "every unfinished prefix refuses completed publication",
+    "passed": true
+  },
+  {
+    "name": "move tampering fails signature verification",
+    "passed": true
+  },
+  {
+    "name": "forged key cannot sign a player move",
+    "passed": true
+  },
+  {
+    "name": "validly signed illegal move rejected",
+    "passed": true
+  },
+  {
+    "name": "validly signed false board rejected",
+    "passed": true
+  },
+  {
+    "name": "other game, network, rules, registry and player keys cannot substitute",
+    "passed": true
+  },
+  {
+    "name": "upload cannot redefine its own on-chain opening",
+    "passed": true
+  },
+  {
+    "name": "reordered and missing moves rejected",
+    "passed": true
+  },
+  {
+    "name": "events after a terminal position rejected",
+    "passed": true
+  },
+  {
+    "name": "signed resignation is sufficient",
+    "passed": true
+  },
+  {
+    "name": "draw requires an opponent offer and acceptance",
+    "passed": true
+  },
+  {
+    "name": "draw offer expires when recipient replies with a move",
+    "passed": true
+  },
+  {
+    "name": "automatic repetition draw preserves full position history",
+    "passed": true
+  },
+  {
+    "name": "clock-expiry and disconnect claims cannot invent results",
+    "passed": true
+  },
+  {
+    "name": "unknown timestamp fields rejected",
+    "passed": true
+  },
+  {
+    "name": "duplicate and stale prefix imports do not roll back history",
+    "passed": true
+  },
+  {
+    "name": "conflicting valid signed branches are not silently selected",
+    "passed": true
+  },
+  {
+    "name": "signature randomness does not change the history root",
+    "passed": true
+  },
+  {
+    "name": "transpositions have the same board but different history hashes",
+    "passed": true
+  },
+  {
+    "name": "oversized and malformed archives rejected",
+    "passed": true
+  }
+]

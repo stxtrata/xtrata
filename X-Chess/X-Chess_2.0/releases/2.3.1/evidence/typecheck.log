@@ -1,0 +1,4 @@
+
+> xchess@2.3.1 typecheck
+> tsc --noEmit
+

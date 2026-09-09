@@ -1,0 +1,60 @@
+{
+  "status": "tested-candidate-not-inscribed",
+  "version": "2.2.0",
+  "recordedAt": "2026-09-07T21:51:03.180341+00:00",
+  "artifactSha256": "23774fd3f961b0d801d84555100b0b7e5facc3a43c4ed8e79b0b779c92ad88b6",
+  "sourceFingerprint": "874eb5902048f609ca1c8259a0bee8a1f02a1ccd50862955ba30a97c125984b4",
+  "checks": {
+    "typecheck": "passed",
+    "serverlessAudit": "passed",
+    "documentationAudit": "passed",
+    "contractAnalysis": {
+      "passed": true,
+      "contracts": 1,
+      "existingWarnings": 10
+    },
+    "standardSuite": {
+      "passed": 1686,
+      "failed": 0,
+      "skipped": 17,
+      "passingFiles": 96,
+      "skippedFiles": 3
+    },
+    "deepPerft": {
+      "passed": 76,
+      "failed": 0,
+      "seconds": 1012.28,
+      "scope": "unchanged engine; all canonical deep depths enabled"
+    },
+    "contractSuite": {
+      "passed": 62,
+      "failed": 0,
+      "files": 4,
+      "seconds": 286.69
+    },
+    "realBrowser": {
+      "passed": 36,
+      "failed": 0,
+      "engine": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36"
+    },
+    "repeatBuild": "byte-for-byte identical",
+    "protocolSourcePins": "same replay, rules, rating and contract hashes as 3034",
+    "xtrataRollingHash": "independently recomputed from 16384-byte chunks",
+    "liveFullVerification": "130 ranked entries read; 124 games rated; 248 total player-games"
+  },
+  "defaultSkipExplanation": "Deep perft covers the default skipped heavy depths. Optional historical inscription retrieval and golden-vector regeneration remain skipped.",
+  "limits": [
+    "No real extension/mobile signing performed for this candidate.",
+    "No inscription or broadcast performed.",
+    "Hosted CI workflow added but not dispatched in this session.",
+    "Shared public API throttling remains possible. Cold walks may need a retry; failed walks preserve previous ratings."
+  ],
+  "sizeComparison": {
+    "previousInscription": 3034,
+    "previousBytes": 245304,
+    "candidateBytes": 254748,
+    "increaseBytes": 9444,
+    "chunks": 16,
+    "maximumBatchChunks": 32
+  }
+}
