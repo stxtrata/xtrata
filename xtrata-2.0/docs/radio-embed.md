@@ -1,5 +1,7 @@
 # Embedding Xtrata Radio
 
+For listeners, see [How to listen to Xtrata Radio](radio-listener-guide.md). The web guide is available at `/radio/guide.html` after deployment.
+
 Open `/radio/share.html` for live previews and copyable snippets using the current host.
 
 ```html
