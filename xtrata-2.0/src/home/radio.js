@@ -40,7 +40,7 @@ const saveState = (state) => {
   try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* noop */ }
 };
 
-export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
+export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = true } = {}) => {
   if (!tokenIds.length || typeof document === 'undefined') {
     return null;
   }
@@ -1447,7 +1447,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null } = {}) => {
     applyVolume();
     renderKnob();
   }
-  if (saved && saved.on && saved.tokenId) {
+  if (resumePlayback && saved && saved.on && saved.tokenId) {
     const resume = async () => {
       const track = await resolveTrack(String(saved.tokenId));
       if (!track) return;

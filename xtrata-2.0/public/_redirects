@@ -1,4 +1,6 @@
 /homepage / 302
+/radio/embed /radio/embed.html 200
+/radio/share /radio/share.html 200
 /homepage/ / 302
 /homepage.html / 302
 /homepage-registry-ledger-v1 / 302
