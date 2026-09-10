@@ -1463,7 +1463,8 @@ const requestStxTransfer = async (provider: StacksProvider, options: WalletStxTr
     {
       recipient: options.recipient,
       amount: normalizeBigIntLike(options.amount) ?? '0',
-      ...(options.memo ? { memo: options.memo } : {})
+      ...(options.memo ? { memo: options.memo } : {}),
+      ...(options.fee !== undefined ? { fee: normalizeBigIntLike(options.fee) } : {})
     },
     options.stxAddress
   );
