@@ -69,7 +69,7 @@ is not supported by the current contracts.
 
 ## Training sequence
 
-1. Load [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/XTRATA_AGENT_SKILL.md).
+1. Load [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/XTRATA_AGENT_SKILL.md).
 2. Load the focused skill docs:
    - [`skill-inscribe.md`](skill-inscribe.md)
    - [`skill-batch-mint.md`](skill-batch-mint.md)
@@ -148,10 +148,10 @@ is not supported by the current contracts.
 
 ## Companion references
 
-- [`docs/ai-skills/README.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/docs/ai-skills/README.md)
+- [`docs/ai-skills/README.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/docs/ai-skills/README.md)
 - [`skill-inscribe.md`](skill-inscribe.md)
 - [`skill-batch-mint.md`](skill-batch-mint.md)
-- [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/XTRATA_AGENT_SKILL.md)
-- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
-- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
-- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+- [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/XTRATA_AGENT_SKILL.md)
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-query-example.js)

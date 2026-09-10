@@ -344,6 +344,8 @@ type RuntimeWalletContractCallRequest = {
 };
 
 type RuntimeWalletStxTransferRequest = {
+  fee?: string;
+  sender?: string;
   recipient: string;
   amount: string;
   memo: string;
@@ -668,6 +670,8 @@ const parseRuntimeStxTransferRequest = (
     recipient,
     amount,
     memo,
+    fee: parseRuntimeFee(record.fee),
+    sender: typeof record.address === 'string' ? record.address.trim() : undefined,
     network: normalizeRuntimeNetwork(record.network, fallbackNetwork)
   };
 };
@@ -1295,10 +1299,24 @@ export default function App() {
             fallbackNetwork
           );
 
+          let session = walletAdapter.getSession();
+          if (!session.isConnected) {
+            session = await walletAdapter.connect();
+            setWalletSession(session);
+          }
+          if (!session.isConnected || !session.address) {
+            throw createRuntimeWalletBridgeError('Wallet transaction was cancelled by the user.', 4001);
+          }
+          if ((session.network && session.network !== request.network) ||
+              (request.sender && request.sender !== session.address)) {
+            throw createRuntimeWalletBridgeError('Wallet account or network changed. Review the transfer again.', -32602);
+          }
           return await new Promise((resolve, reject) => {
             showStxTransfer(
               {
                 recipient: request.recipient,
+                stxAddress: session.address!,
+                fee: request.fee,
                 amount: request.amount,
                 memo: request.memo,
                 network: request.network,
@@ -1314,7 +1332,8 @@ export default function App() {
                       'Wallet transaction was cancelled by the user.',
                       4001
                     )
-                  )
+                  ),
+                onError: (error) => reject(error)
               }
             );
           });

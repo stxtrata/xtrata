@@ -51,6 +51,7 @@
     import { initXtrataRadio } from '/src/home/radio.js';
     import {
       getSelectedWalletProviderId,
+      showStxTransfer,
       showContractCall,
       showSponsoredContractCall
     } from '/src/lib/wallet/connect.ts';
@@ -201,6 +202,7 @@
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
+    import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
       mergeDependencySources,
@@ -245,6 +247,91 @@
     } from '/src/lib/telemetry/index.ts';
 
     installGlobalTelemetry();
+
+    /**
+     * Make in-page anchors actually land on their target.
+     *
+     * The homepage is ~15,400px tall and most of it is rendered by this script,
+     * so a hash that arrives WITH the document points at markup the browser has
+     * not laid out yet. It gives up and leaves you at the top. That is why the
+     * Developers tab appeared to "just go back to the homepage": the URL really
+     * did become /#docs, the scroll simply never happened.
+     *
+     * Two halves, because there are two ways to arrive:
+     *  - clicking while already here — handled without a reload, so the target
+     *    is scrolled to at a moment when it demonstrably exists;
+     *  - arriving from another page — retried until the target appears.
+     */
+    const scrollToHashTarget = (behavior = 'auto') => {
+      const id = decodeURIComponent((window.location.hash || '').replace(/^#/, ''));
+      if (!id) return false;
+      const target = document.getElementById(id);
+      if (!target) return false;
+      target.scrollIntoView({ behavior, block: 'start' });
+      return true;
+    };
+
+    // Same-page jump: no reload, so no race with rendering.
+    document.addEventListener('click', (event) => {
+      const link = event.target?.closest?.('a[href*="#"]');
+      if (!link || link.target === '_blank' || event.defaultPrevented) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+      let url;
+      try { url = new URL(link.getAttribute('href') ?? '', window.location.href); } catch { return; }
+      if (url.origin !== window.location.origin || url.pathname !== window.location.pathname) return;
+      const id = decodeURIComponent(url.hash.replace(/^#/, ''));
+      const target = id && document.getElementById(id);
+      // No target on THIS page means it is a real navigation; leave it alone.
+      if (!target) return;
+      event.preventDefault();
+      window.history.pushState(null, '', url.hash);
+      // Instant, not smooth, for two reasons. The docs section is ~15,300px
+      // down, and animating that distance is a long disorienting ride rather
+      // than a helpful transition. It is also the more robust choice: smooth
+      // scrolling is silently a no-op in some embedded browsers, which is
+      // exactly the "the URL changed but nothing moved" symptom being fixed.
+      target.scrollIntoView({ block: 'start' });
+    });
+
+    // Arriving with a hash, e.g. clicking Developers from /market.
+    //
+    // "Retry until the element exists" looks like the right condition and is
+    // not: #docs is static markup in index.html, so it exists at parse time.
+    // The scroll lands correctly and is then invalidated as this script renders
+    // the ~15,000px of page around it. What has to settle is the LAYOUT, not the
+    // element.
+    //
+    // So re-apply over a short window instead, and stop the instant the reader
+    // takes over — nothing is worse than a page that keeps yanking itself back
+    // while someone is trying to scroll.
+    const settleHashScroll = (windowMs = 2500) => {
+      if (!window.location.hash) return;
+      let userTookOver = false;
+      const release = () => { userTookOver = true; };
+      for (const evt of ['wheel', 'touchstart', 'keydown']) {
+        window.addEventListener(evt, release, { once: true, passive: true });
+      }
+      const settleUntil = Date.now() + windowMs;
+      const settle = () => {
+        if (userTookOver) return;
+        scrollToHashTarget();
+        if (Date.now() < settleUntil) window.setTimeout(settle, 150);
+      };
+      settle();
+    };
+
+    if (window.location.hash) {
+      if (document.readyState === 'complete') settleHashScroll();
+      else window.addEventListener('load', () => settleHashScroll(), { once: true });
+    }
+
+    // Defensive: a hash can arrive through the history API rather than a page
+    // load, and then neither `load` nor `hashchange` fires. Not proven necessary
+    // here — the case that prompted it turned out to be the embedded preview
+    // browser doing a client-side navigation that a real browser does not — but
+    // it is a line of code, and back/forward onto a hashed URL is real.
+    window.addEventListener('popstate', () => settleHashScroll(1200));
+    window.addEventListener('hashchange', () => scrollToHashTarget());
 
     /**
      * Permissions delegated to an iframe showing ONE inscription the user chose to open.
@@ -3576,6 +3663,9 @@
               : getObjectUrl();
         }
         target.append(frame);
+        if (!isPdf && options.interactiveHtml) {
+          publicWalletBridge.register(frame, options.walletLabel ?? 'Prepared local preview');
+        }
         return;
       }
 
@@ -6051,6 +6141,7 @@
             : url;
         }
         dom.fullscreenStage.append(frame);
+        if (!isPdf) publicWalletBridge.register(frame, `Inscription #${token.id.toString()}`);
         return;
       }
 
@@ -6349,6 +6440,7 @@
         frame.allow = INSCRIPTION_FRAME_ALLOW;
         frame.src = url;
         dom.fullscreenStage.append(frame);
+        publicWalletBridge.register(frame, 'Prepared local preview');
         return;
       }
 
@@ -7757,6 +7849,7 @@
         truthfulImageSizing: true,
         htmlDoc,
         interactiveHtml: true,
+        walletLabel: `Inscription #${token.id.toString()}`,
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
@@ -9803,6 +9896,22 @@ const openCuratedGallery = async (galleryId, options = {}) => {
         updateControls();
       }
     };
+
+    const publicWalletBridge = installPublicWalletBridge({
+      host: window,
+      wallet: walletAdapter,
+      review: reviewPublicWalletRequest,
+      transfer: showStxTransfer,
+      isBusy: () => state.busy,
+      pendingChanged: setBusy,
+      sessionChanged: (session) => {
+        // Connecting from a game must not reload the grid or replace its iframe.
+        state.walletSession = session;
+        refreshConnectedWalletMatureMode();
+        updateWalletStatus();
+        updateControls();
+      }
+    });
 
     const setExplorerModeFromRequest = () => {
       const request = getExplorerRequest();

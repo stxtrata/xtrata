@@ -1122,7 +1122,7 @@ repopulates parent edges for rows that predate the edge table. `limit` is capped
 at 100; paginate via `nextFromTokenId` until `complete`. When the
 `INDEX_ADMIN_TOKEN` env var is set, the backfill requires a matching
 `x-admin-token` header (else `401`); normal sync/refresh is never gated. Full
-runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/docs/inscription-relationship-index.md).
+runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/docs/inscription-relationship-index.md).
 
 ## Security Notes
 - Never log private keys or seed phrases.
@@ -1134,8 +1134,8 @@ runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/
 
 ## Companion Scripts
 This repository includes runnable references:
-- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
-- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
-- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-query-example.js)
 
 These scripts require minimal config (key, network, inputs) and implement this skill file's flow directly.
