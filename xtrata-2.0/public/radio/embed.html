@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" data-radio-embed="true">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Xtrata Radio player</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;background:transparent;font:14px system-ui,sans-serif;color:#f4f7f7}body{padding:4px}.player{height:132px;padding:18px;border:1px solid #324344;border-radius:16px;background:#10191b;display:flex;align-items:center;gap:16px}button{cursor:pointer;border:1px solid #496264;background:#203234;color:inherit;border-radius:50%;width:44px;height:44px;flex-shrink:0;font:18px system-ui}button:focus-visible,a:focus-visible{outline:3px solid #93f4de;outline-offset:3px}button:disabled{opacity:.5}.copy{min-width:0;flex:1}.brand{color:#93f4de;font-size:11px;letter-spacing:2px;text-decoration:none}.title{margin:8px 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:650}.status{font-size:12px;color:#a8bbbd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.controls{display:flex;gap:6px}.controls button{width:32px;height:32px;font-size:15px}.xtrata-radio{display:none!important}body.minimal .player{height:64px;padding:8px 12px;gap:12px}body.minimal .title{margin:0;font-size:13px}body.minimal .brand{letter-spacing:0;font-size:11px}body.minimal .status{display:none}body.minimal .controls{display:none}@media(max-width:340px){.player{gap:10px;padding:12px}.controls{display:none}}
+</style>
+<body>
+<main class="player" aria-label="Xtrata Radio">
+  <button id="play" aria-label="Play radio">▶</button>
+  <div class="copy"><a class="brand" href="/radio" target="_blank" rel="noopener">XTRATA RADIO ↗</a><div class="title" id="title">Music from the chain</div><div class="status" id="status" role="status">Press play to tune in</div></div>
+  <div class="controls"><button id="quieter" aria-label="Lower volume">−</button><button id="louder" aria-label="Raise volume">+</button><button id="next" aria-label="Next song">›</button></div>
+</main>
+<script src="/radio/embed.js" defer></script>
+</body>
+</html>
