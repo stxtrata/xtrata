@@ -31,3 +31,20 @@ The existing standalone engine is rebuilt with `npm run build:radio`. Its
 `resumePlayback` option defaults to true for existing pages and is false for embeds.
 This implements a simple hosted embed, not the proposed partner accounts,
 analytics or direct-chain reconstruction product in `RADIO-EMBED-PLAN.md`.
+
+## Hosting and routing
+
+Cloudflare Pages serves `radio/share.html`, `radio/embed.html` and
+`radio/guide.html` at their extensionless URLs automatically. Do not add
+`/radio/share /radio/share.html 200` or the equivalent embed rewrite: Pages
+canonicalises the rewritten HTML path back to the same URL, producing a
+self-redirect loop. Existing `.html` links remain supported by Pages.
+
+Validate a Pages preview or deployment with:
+
+```sh
+node scripts/radio-route-smoke.mjs https://your-preview.pages.dev
+```
+
+The check follows a bounded number of redirects and verifies the actual share,
+embed and guide page content, including minimal-mode query preservation.
