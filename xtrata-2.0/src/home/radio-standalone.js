@@ -9,5 +9,6 @@ import { CURATED_GALLERIES } from './config.js';
 
 initXtrataRadio({
   tokenIds: CURATED_GALLERIES.find((gallery) => gallery.id === 'jim-music')?.tokenIds ?? [],
-  stationName: 'XTRATA FM'
+  stationName: 'XTRATA FM',
+  resumePlayback: document.documentElement.dataset.radioEmbed !== 'true'
 });
