@@ -1,0 +1,153 @@
+{
+  "name": "06-demo-direct-offer-answer",
+  "started": 1788977584361,
+  "finished": 1788977589926,
+  "frames": [
+    {
+      "file": "000000.png",
+      "at": 1788977584363,
+      "seconds": 0.002,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000001.png",
+      "at": 1788977584725,
+      "seconds": 0.364,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000002.png",
+      "at": 1788977584972,
+      "seconds": 0.611,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000003.png",
+      "at": 1788977585265,
+      "seconds": 0.904,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000004.png",
+      "at": 1788977585502,
+      "seconds": 1.141,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000005.png",
+      "at": 1788977585735,
+      "seconds": 1.374,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000006.png",
+      "at": 1788977585971,
+      "seconds": 1.61,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000007.png",
+      "at": 1788977586194,
+      "seconds": 1.833,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000008.png",
+      "at": 1788977586429,
+      "seconds": 2.068,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000009.png",
+      "at": 1788977586674,
+      "seconds": 2.313,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000010.png",
+      "at": 1788977586960,
+      "seconds": 2.599,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000011.png",
+      "at": 1788977587216,
+      "seconds": 2.855,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000012.png",
+      "at": 1788977587461,
+      "seconds": 3.1,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000013.png",
+      "at": 1788977587712,
+      "seconds": 3.351,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000014.png",
+      "at": 1788977587956,
+      "seconds": 3.595,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000015.png",
+      "at": 1788977588188,
+      "seconds": 3.827,
+      "tab": "2004482636"
+    },
+    {
+      "file": "000016.png",
+      "at": 1788977588426,
+      "seconds": 4.065,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000017.png",
+      "at": 1788977588684,
+      "seconds": 4.323,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000018.png",
+      "at": 1788977588969,
+      "seconds": 4.608,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000019.png",
+      "at": 1788977589206,
+      "seconds": 4.845,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000020.png",
+      "at": 1788977589448,
+      "seconds": 5.087,
+      "tab": "2004482633"
+    },
+    {
+      "file": "000021.png",
+      "at": 1788977589684,
+      "seconds": 5.323,
+      "tab": "2004482633"
+    }
+  ],
+  "events": [
+    {
+      "seconds": 0.444,
+      "note": "White creates the signed temporary connection offer. Redact the connection-description text before publishing this footage."
+    },
+    {
+      "seconds": 2.117,
+      "note": "Black answers the pasted offer and returns the temporary answer."
+    },
+    {
+      "seconds": 4.057,
+      "note": "Both histories match; direct play is now ready. Clocks are advisory local estimates."
+    }
+  ]
+}

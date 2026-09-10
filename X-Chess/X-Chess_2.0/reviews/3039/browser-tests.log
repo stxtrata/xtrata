@@ -1,0 +1,2 @@
+Browser regression: http://127.0.0.1:4342 (artifact 18249bf9727533dbb46ca4286b2bcea59cd5ff7c56bc3471e613cf8dcee50f83)
+Browser: 44 checks passed on Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36

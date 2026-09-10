@@ -1,0 +1,30 @@
+{
+  "product": "X Chess",
+  "build": "2.3.2",
+  "builtFrom": "apps/chess/main.ts",
+  "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+  "network": "mainnet",
+  "built": "2026-09-09 11:42 UTC",
+  "codeHash": "c475f35f",
+  "exact": true,
+  "rulesProtocol": "rules-v1",
+  "replayProtocol": "replay-v1",
+  "eventsProtocol": "events-v1",
+  "rankedProtocol": "ranked-v1",
+  "ratingProtocol": "elo-v1",
+  "coreFormat": "xchess-core-v1",
+  "replayHash": "30404093ddc8ed66457728cf504989aa21c113f9bb0e1da0f910b412c4c8ef25",
+  "rulesHash": "eeb6632332bc2c920c3cdf9f8c66b8d832b1e103992fb77f95100875e134f434",
+  "ratingHash": "870dd72d3797a803ce62950f60824f81103cfebce1894407a5f87aabbb42552d",
+  "contractHash": "8048e4be63d665c4ac4b94afc6c74187d185f822cedd60fb24d5ece7567b3c9f",
+  "htmlSha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+  "xtrataChainHash": "afcea630c9bc21b8302e87e0b9f0e2dfe3baab425a0e48868e8b60fa8e0ba0b5",
+  "xtrataChunkBytes": 16384,
+  "xtrataChunks": 20,
+  "bytes": 314711,
+  "canary": {
+    "bytes": 170117,
+    "sha256": "c40cff2776f7e34f9a7db4acb8f894a324217374079768369a57eab4d6a09098",
+    "contractName": "xchess-core-v1-canary"
+  }
+}

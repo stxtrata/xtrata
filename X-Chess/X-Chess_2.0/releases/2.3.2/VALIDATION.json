@@ -1,0 +1,44 @@
+{
+  "version": "2.3.2",
+  "artifactSha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+  "bytes": 314711,
+  "xtrataChunks": 20,
+  "packagedAt": "2026-09-09T11:47:59.153Z",
+  "reports": {
+    "tests.json": {
+      "sha256": "f6e9eb130482f3e5123679511b8e742197b8b8417d4a0dd9efede4b87cf0d127",
+      "passed": 1751,
+      "skipped": 17
+    },
+    "final-artifact-tests.json": {
+      "sha256": "058d090e4c9c22a54318a677ad195d9a9794f79be5b382f7177ba1ffb3af9b1f",
+      "passed": 198,
+      "skipped": 0
+    },
+    "contracts.json": {
+      "sha256": "eac3dfac9c22fbecf6196a4ce680e36d6773f487a2b424f6598bfa0508cc415b",
+      "passed": 68,
+      "skipped": 0
+    },
+    "browser-report.json": {
+      "sha256": "acec8a2a821ab0380648960eb7f874efab3109faa88c5313152ccd447b7a0c3b",
+      "passed": 44,
+      "skipped": 0
+    },
+    "peer-browser-report.json": {
+      "sha256": "af51ae4b84b7fb79f32cd73342a45c56b80f769fd835dd6e160b76f42ccd109f",
+      "passed": 13,
+      "skipped": 0
+    }
+  },
+  "sourceRebuild": true,
+  "protocolsUnchangedFrom": "2.3.1",
+  "notes": [
+    "Suite counts overlap. Three live tests and the vector generator are skipped; optional deep perft is not required for unchanged engine code.",
+    "44 captured-runtime browser checks and 13 native peer checks use the exact release HTML.",
+    "10 targeted display/recovery tests include delayed and failed reads.",
+    "No new mainnet transactions were needed. Real wallet-extension signing and final sealed-byte read-back remain post-inscription checks.",
+    "Clarinet check passed with 12 existing warnings.",
+    "A manual file-URL browser inspection was blocked by browser policy; automated Chrome runtime and peer browser suites completed successfully."
+  ]
+}

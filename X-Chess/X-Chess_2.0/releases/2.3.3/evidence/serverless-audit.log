@@ -1,0 +1,8 @@
+
+> xchess@2.3.3 audit:serverless
+> node harness/serverless-audit.mjs
+
+serverlessness audit: read 80 files under packages, apps, contracts, dist
+
+no server dependencies found.
+all 7 canaries matched, so the patterns are live.

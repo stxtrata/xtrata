@@ -2,7 +2,24 @@
 
 Updated 2026-09-09.
 
-The active version is **2.3.1**, inscribed as **3037**, adding signed peer play
+The latest inscribed board is **2.3.3**, inscription **3042**. All 20 sealed
+chunks match the released HTML exactly. Post-inscription verification passed
+44 runtime and 16 peer browser checks. Live legacy replay, the registered game 2
+opening and the published #3038 archive were also checked. No STX was spent in
+this verification round. See [post-inscription evidence and limits](../reviews/3042/REPORT.md)
+and [changes and recovery steps](PEER-2.3.3.md). Actual iPhone Xverse testing
+remains outstanding; desktop mobile-size checks do not certify that device.
+
+The previous board is **2.3.2**, inscribed as **3039**.
+It fixes rule-recovery displays, leaderboard retries, explorer paging feedback,
+tournament summaries and registry/help guidance. See
+[changes and inscription instructions](PEER-2.3.2.md) and
+[release validation](../releases/2.3.2/VALIDATION.json). Its sealed bytes match the
+release exactly; post-inscription runtime/peer browser checks and #3038 archive
+compatibility passed. See [live test findings](../reviews/3039/REPORT.md), including
+the remaining initial explorer count-label issue and endpoint limitations.
+
+The previous version is **2.3.1**, inscribed as **3037**, adding signed peer play
 without a mandatory service. Post-inscription wizard testing completed two legacy
 mainnet games and registered peer game 1, whose winner published result **3038**.
 All 14 transactions succeeded; read-back and live archive verification passed.
@@ -26,6 +43,8 @@ an old board being BEHIND does not.
 
 | version | id | built | hash | what it added |
 |---|---|---|---|---|
+| 2.3.3 | **3042** | 09-09 12:33 UTC | `7402490c` | explicit peer transport, synchronized clocks, signed-history receipts and embedded SVG pawns; sealed bytes verified |
+| 2.3.2 | **3039** | 09-09 11:42 UTC | `c475f35f` | display and read-recovery fixes; peer handoff/iOS pawn issues reported afterwards |
 | 2.3.1 | **3037** | 09-09 10:30 UTC | `c75b37bd` | signed peer play; exact chain bytes verified; winner-published test result 3038 |
 | 2.1.9 | **3034** | 08-21 21:44 UTC | `936aba6a` | latest working inscription verified from its served bytes on 2026-09-07 |
 | 2.0.0 | **2988** | 08-09 | — | the first inscription |

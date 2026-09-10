@@ -1,0 +1,5 @@
+
+> xchess@2.3.3 audit:docs
+> node harness/docs-audit.mjs
+
+docs audit: 21 suites, no contradictions found.

@@ -1,0 +1,204 @@
+{
+  "passed": true,
+  "results": [
+    {
+      "name": "IndexedDB: 100 writes commit in one transaction",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: 100 reads in one transaction",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: all values round-trip",
+      "passed": true
+    },
+    {
+      "name": "IndexedDB: deletion is recoverable",
+      "passed": true
+    },
+    {
+      "name": "direct/false: one board",
+      "passed": true
+    },
+    {
+      "name": "direct/false: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "direct/false: one connection request",
+      "passed": true,
+      "detail": "[\"wallet_connect\"]"
+    },
+    {
+      "name": "direct/false: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "direct: friend draft requires opponent",
+      "passed": true
+    },
+    {
+      "name": "direct: first two preset validates",
+      "passed": true
+    },
+    {
+      "name": "direct: loaded 64 squares",
+      "passed": true
+    },
+    {
+      "name": "direct: flip preserves keyboard square",
+      "passed": true
+    },
+    {
+      "name": "direct: historical fee qualified",
+      "passed": true
+    },
+    {
+      "name": "direct: mobile board fits",
+      "passed": true
+    },
+    {
+      "name": "direct/false: peer mode opens in captured runtime",
+      "passed": true
+    },
+    {
+      "name": "direct/false: peer wallet outcome",
+      "passed": true
+    },
+    {
+      "name": "direct/false: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "direct/true: one board",
+      "passed": true
+    },
+    {
+      "name": "direct/true: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "direct/true: one connection request",
+      "passed": true,
+      "detail": "[\"wallet_connect\"]"
+    },
+    {
+      "name": "direct/true: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "direct/true: peer mode opens in captured runtime",
+      "passed": true
+    },
+    {
+      "name": "direct/true: peer wallet outcome",
+      "passed": true
+    },
+    {
+      "name": "direct/true: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "framed/false: one board",
+      "passed": true
+    },
+    {
+      "name": "framed/false: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "framed/false: one connection request",
+      "passed": true,
+      "detail": "[\"stx_getAddresses\"]"
+    },
+    {
+      "name": "framed/false: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "framed: friend draft requires opponent",
+      "passed": true
+    },
+    {
+      "name": "framed: first two preset validates",
+      "passed": true
+    },
+    {
+      "name": "framed: loaded 64 squares",
+      "passed": true
+    },
+    {
+      "name": "framed: flip preserves keyboard square",
+      "passed": true
+    },
+    {
+      "name": "framed: historical fee qualified",
+      "passed": true
+    },
+    {
+      "name": "framed: mobile board fits",
+      "passed": true
+    },
+    {
+      "name": "framed/false: peer mode opens in captured runtime",
+      "passed": true
+    },
+    {
+      "name": "framed/false: peer wallet outcome",
+      "passed": true
+    },
+    {
+      "name": "framed/false: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "framed/true: one board",
+      "passed": true
+    },
+    {
+      "name": "framed/true: no horizontal overflow at 390px",
+      "passed": true,
+      "detail": "390"
+    },
+    {
+      "name": "framed/true: one connection request",
+      "passed": true,
+      "detail": "[\"stx_getAddresses\"]"
+    },
+    {
+      "name": "framed/true: correct connection outcome",
+      "passed": true
+    },
+    {
+      "name": "framed/true: peer mode opens in captured runtime",
+      "passed": true
+    },
+    {
+      "name": "framed/true: peer wallet outcome",
+      "passed": true
+    },
+    {
+      "name": "framed/true: no uncaught errors",
+      "passed": true,
+      "detail": "[]"
+    }
+  ],
+  "metrics": {
+    "individualWriteMs": 125.10000000149012,
+    "individualWriteTransactions": 100,
+    "batchWriteMs": 11.799999998882413,
+    "batchWriteTransactions": 1,
+    "batchReadMs": 7.400000000372529,
+    "batchReadTransactions": 1
+  },
+  "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36",
+  "artifactSha256": "0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0",
+  "testedAt": "2026-09-09T12:35:00.643Z"
+}

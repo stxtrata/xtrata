@@ -1,0 +1,72 @@
+{
+  "passed": true,
+  "artifactSha256": "0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0",
+  "testedAt": "2026-09-09T12:39:13.969Z",
+  "environment": "Native headless Chrome, separate user-data-dir profiles; 390px iframe viewport (avoids desktop Chrome minimum window width); test-only HTTP command coordination; application moves use WebRTC or explicit manual import",
+  "results": [
+    {
+      "name": "Independent browser profiles create separate keys and join a demo",
+      "passed": true
+    },
+    {
+      "name": "Joined game has an explicit transport choice and no running clock before connection",
+      "passed": true
+    },
+    {
+      "name": "Empty and truncated handoff inputs give actionable messages",
+      "passed": true
+    },
+    {
+      "name": "Real ordered WebRTC data channel with signed manual signaling and no ICE service",
+      "passed": true
+    },
+    {
+      "name": "Fresh signed connection descriptions reconnect and synchronize saved history",
+      "passed": true
+    },
+    {
+      "name": "Signed moves synchronize through native WebRTC",
+      "passed": true
+    },
+    {
+      "name": "Winner records checkmate after loser closes, with no acknowledgment or final consent",
+      "passed": true
+    },
+    {
+      "name": "Fresh keyless browser verifies and replays a complete public archive with external requests blocked",
+      "passed": true
+    },
+    {
+      "name": "Encrypted native IndexedDB recovery restores private game key in a fresh browser",
+      "passed": true
+    },
+    {
+      "name": "Reload resumes the durable completed game",
+      "passed": true
+    },
+    {
+      "name": "Pending setup transaction restores after reload without rebroadcast",
+      "passed": true
+    },
+    {
+      "name": "Complete manual signed-message game when WebRTC is unavailable",
+      "passed": true
+    },
+    {
+      "name": "Duplicate manual transcript import is idempotent",
+      "passed": true
+    },
+    {
+      "name": "Tampered browser import preserves accepted signed history",
+      "passed": true
+    },
+    {
+      "name": "Embedded SVG pawns have the correct white/black fills at mobile board size",
+      "passed": true
+    },
+    {
+      "name": "Mobile viewport, keyboard grid, zero unhandled errors and zero external fetches in all three profiles",
+      "passed": true
+    }
+  ]
+}

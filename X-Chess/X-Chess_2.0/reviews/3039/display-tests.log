@@ -1,0 +1,39 @@
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > reads it three at a time rather than one after another
+      peak reads in flight: 3
+
+ ✓ tests/e2e/tournament-poll.test.ts (8 tests) 2957ms
+     ✓ reads every game the first time  1438ms
+     ✓ still produces the whole table, not just the game that moved  741ms
+ ✓ tests/e2e/display-232.test.ts (10 tests) 3487ms
+   ✓ exposes initial leaderboard failure retry, shares overlapping walks and clears recovered error  2423ms
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > costs one read a game on a second visit, not three
+      9 ranked games: cold 28 reads -> warm 10
+
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > grows with the ranked games, which is the thing still to decide
+      4 ranked -> 13 reads, 12 ranked -> 37 reads
+
+ ✓ tests/e2e/leaderboard-scale.test.ts (7 tests) 8991ms
+     ✓ reads it three at a time rather than one after another  2700ms
+     ✓ still produces the table, which concurrency is free to have broken  603ms
+     ✓ costs one read a game on a second visit, not three  1084ms
+     ✓ recomputes every rating even when nothing was fetched  1108ms
+     ✓ grows with the ranked games, which is the thing still to decide  1178ms
+   ✓ full verification after a seeded visit counts each real game once  1703ms
+   ✓ ends failed verification progress without replacing the previous table  562ms
+ ✓ tests/e2e/explore-paging.test.ts (6 tests) 11379ms
+     ✓ starts on the newest page with Newer disabled  2279ms
+     ✓ shows the previous stretch of ids, and says which  1242ms
+     ✓ pauses the refresh timer while paged away  938ms
+     ✓ returns to the newest as null rather than as a number  1460ms
+     ✓ stops at the oldest rather than running off the end  4221ms
+     ✓ does not append your older games to a page that is not the newest  1175ms
+
+ Test Files  4 passed (4)
+      Tests  31 passed (31)
+   Start at  12:56:47
+   Duration  13.80s (transform 2.84s, setup 0ms, import 8.93s, tests 26.81s, environment 0ms)
+
+JSON report written to /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0/reviews/3039/display-tests.json

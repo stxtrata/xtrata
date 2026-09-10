@@ -1,0 +1,9 @@
+{
+  "captured": "2026-09-07",
+  "source": "https://xtrata.xyz/runtime/",
+  "files": {
+    "module-bootstrap.js": "e2fb4fe2a123a815de3406eb7ba16d1477950210fe49a09cfca9c01181871e66",
+    "url-support.js": "c45510d605c6e5151f0d2ced1be9166e9244e7ed37e85f21954c2041c7d2c927",
+    "wallet-shim.js": "5a2629c88dbb843dbab8b06b38dd8b9d9fe97df0ed25b52c9aa3c7e45063a5ac"
+  }
+}

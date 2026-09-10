@@ -1,0 +1,44 @@
+{
+  "version": "2.3.3",
+  "artifactSha256": "0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0",
+  "bytes": 319980,
+  "xtrataChunks": 20,
+  "packagedAt": "2026-09-09T12:39:54.475Z",
+  "reports": {
+    "tests.json": {
+      "sha256": "36ead9ca73069405bd57b8151ea8653f9d0e434a7c29c246a1b1a4d541e3ec6d",
+      "passed": 1763,
+      "skipped": 17
+    },
+    "final-artifact-tests.json": {
+      "sha256": "52c741e382118301125ce02198774f27571c4a2ced6637403cd072de35c156e9",
+      "passed": 190,
+      "skipped": 0
+    },
+    "contracts.json": {
+      "sha256": "5fa92c8099d83143b8d363643b2f084ee0665bb855eebc239caf7ff212c6e0bb",
+      "passed": 68,
+      "skipped": 0
+    },
+    "browser-report.json": {
+      "sha256": "cd40c431e523bc87893a9e358206cc15e86d53cf2a47287b7f78c1c789cdc5af",
+      "passed": 44,
+      "skipped": 0
+    },
+    "peer-browser-report.json": {
+      "sha256": "617a851e12c4eed3f13edc2473bc74ed8ab79d7bc45854e11c7a4101887042a9",
+      "passed": 16,
+      "skipped": 0
+    }
+  },
+  "sourceRebuild": true,
+  "protocolsUnchangedFrom": "2.3.1",
+  "notes": [
+    "Suite counts overlap. Three live tests and the vector generator are skipped; optional deep perft is not required for unchanged engine code.",
+    "44 captured-runtime browser checks and 16 native peer checks use the exact release HTML.",
+    "Nine peer UI regressions cover registered readiness, manual e4/e5 handoff, saved-game recovery, input errors, clocks and disconnected winner publication; the prior ten display regressions also run.",
+    "No new mainnet transactions were needed. Real wallet-extension signing and final sealed-byte read-back remain post-inscription checks.",
+    "Clarinet check passed with 12 existing warnings.",
+    "Native tests use desktop Chrome, not actual iOS Xverse. Real phone rendering and two-device handoff still need a device check."
+  ]
+}

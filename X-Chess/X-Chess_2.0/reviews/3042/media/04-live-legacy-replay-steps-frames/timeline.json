@@ -1,0 +1,99 @@
+{
+  "name": "04-live-legacy-replay-steps",
+  "started": 1788977404083,
+  "finished": 1788977412036,
+  "frames": [
+    {
+      "file": "000000.png",
+      "at": 1788977404083,
+      "seconds": 0
+    },
+    {
+      "file": "000001.png",
+      "at": 1788977404798,
+      "seconds": 0.715
+    },
+    {
+      "file": "000002.png",
+      "at": 1788977405384,
+      "seconds": 1.301
+    },
+    {
+      "file": "000003.png",
+      "at": 1788977405936,
+      "seconds": 1.853
+    },
+    {
+      "file": "000004.png",
+      "at": 1788977406484,
+      "seconds": 2.401
+    },
+    {
+      "file": "000005.png",
+      "at": 1788977407029,
+      "seconds": 2.946
+    },
+    {
+      "file": "000006.png",
+      "at": 1788977407563,
+      "seconds": 3.48
+    },
+    {
+      "file": "000007.png",
+      "at": 1788977408117,
+      "seconds": 4.034
+    },
+    {
+      "file": "000008.png",
+      "at": 1788977408670,
+      "seconds": 4.587
+    },
+    {
+      "file": "000009.png",
+      "at": 1788977409231,
+      "seconds": 5.148
+    },
+    {
+      "file": "000010.png",
+      "at": 1788977409795,
+      "seconds": 5.712
+    },
+    {
+      "file": "000011.png",
+      "at": 1788977410351,
+      "seconds": 6.268
+    },
+    {
+      "file": "000012.png",
+      "at": 1788977410892,
+      "seconds": 6.809
+    },
+    {
+      "file": "000013.png",
+      "at": 1788977411475,
+      "seconds": 7.392
+    }
+  ],
+  "events": [
+    {
+      "seconds": 0.519,
+      "note": "Initial board: move 0 of 4."
+    },
+    {
+      "seconds": 2.01,
+      "note": "Replay move 1 of 4."
+    },
+    {
+      "seconds": 3.492,
+      "note": "Replay move 2 of 4."
+    },
+    {
+      "seconds": 4.993,
+      "note": "Replay move 3 of 4."
+    },
+    {
+      "seconds": 6.479,
+      "note": "Replay move 4 of 4."
+    }
+  ]
+}

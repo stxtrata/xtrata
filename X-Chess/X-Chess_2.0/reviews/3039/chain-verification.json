@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "inscription": 3039,
+  "at": "2026-09-09T11:58:38.087Z",
+  "meta": {
+    "creator": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "owner": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "mime": "text/html",
+    "size": 314711,
+    "chunks": 20,
+    "sealed": true
+  },
+  "sha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+  "method": "All on-chain chunks read directly; exact original HTML equality",
+  "existingArchive": {
+    "inscription": 3038,
+    "sha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f",
+    "registeredOpeningVerified": true,
+    "result": "0-1"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "name": "01-live-quick-play-guidance",
+  "started": 1788977177308,
+  "finished": 1788977231752,
+  "frames": [
+    {
+      "file": "000000.png",
+      "at": 1788977177308,
+      "seconds": 0
+    },
+    {
+      "file": "000001.png",
+      "at": 1788977178087,
+      "seconds": 0.779
+    },
+    {
+      "file": "000002.png",
+      "at": 1788977178632,
+      "seconds": 1.324
+    },
+    {
+      "file": "000003.png",
+      "at": 1788977179191,
+      "seconds": 1.883
+    },
+    {
+      "file": "000004.png",
+      "at": 1788977179746,
+      "seconds": 2.438
+    },
+    {
+      "file": "000005.png",
+      "at": 1788977180281,
+      "seconds": 2.973
+    }
+  ],
+  "events": [
+    {
+      "seconds": 0,
+      "note": "Live #3042: Quick Play separates registration from transport; no private game loaded."
+    },
+    {
+      "seconds": 3.534,
+      "error": "Error: node_repl exec context not found"
+    },
+    {
+      "seconds": 28.11,
+      "note": "Default mainnet registry and two setup transactions; do not press Create or Join in this demonstration."
+    },
+    {
+      "seconds": 54.444,
+      "note": "Direct offer/answer and manual exchange instructions; no managed service is required."
+    }
+  ]
+}

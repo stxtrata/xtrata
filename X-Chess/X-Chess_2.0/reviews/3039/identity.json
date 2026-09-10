@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "inscription": 3039,
+  "originalSha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+  "servedSha256": "18249bf9727533dbb46ca4286b2bcea59cd5ff7c56bc3471e613cf8dcee50f83",
+  "servedBytes": 314719,
+  "matchesExpectedRuntimeTransform": true
+}

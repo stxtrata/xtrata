@@ -1,0 +1,30 @@
+{
+  "name": "03-live-legacy-game-137",
+  "started": 1788977330135,
+  "finished": 1788977375744,
+  "frames": [
+    {
+      "file": "000000.png",
+      "at": 1788977330135,
+      "seconds": 0
+    }
+  ],
+  "events": [
+    {
+      "seconds": 0.715,
+      "error": "Error: node_repl exec context not found"
+    },
+    {
+      "seconds": 44.396,
+      "note": "Existing mainnet sponsored game 137: committed rules recovered, four accepted moves, Black checkmate."
+    },
+    {
+      "seconds": 44.807,
+      "note": "Replay reset to the initial board."
+    },
+    {
+      "seconds": 45.609,
+      "note": "Replay returns to move 4 of 4; board can be flipped. No new moves were submitted."
+    }
+  ]
+}

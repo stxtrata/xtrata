@@ -1,0 +1,271 @@
+
+ RUN  v4.1.10 /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0
+
+ ✓ tests/perft/perft.test.ts (76 tests | 13 skipped) 6243ms
+       ✓ depth 4 has 197,281 nodes  818ms
+       ✓ depth 3 has 97,862 nodes  619ms
+       ✓ depth 3 has 89,890 nodes  390ms
+     ✓ kiwipete mirrors to the same node count  340ms
+     ✓ kiwipete agrees between the fast and slow paths  914ms
+     ✓ position 5 agrees between the fast and slow paths  468ms
+     ✓ position 6 agrees between the fast and slow paths  650ms
+ ✓ tests/e2e/explore-paging.test.ts (6 tests) 6867ms
+     ✓ starts on the newest page with Newer disabled  645ms
+     ✓ shows the previous stretch of ids, and says which  870ms
+     ✓ pauses the refresh timer while paged away  858ms
+     ✓ returns to the newest as null rather than as a number  1268ms
+     ✓ stops at the oldest rather than running off the end  2346ms
+     ✓ does not append your older games to a page that is not the newest  879ms
+ ✓ tests/e2e/explore.test.ts (45 tests) 11984ms
+     ✓ says which game is waiting for you  752ms
+     ✓ does not claim a game is yours when the turn belongs to somebody else  354ms
+     ✓ says the list is bounded and sorted, because both are true  302ms
+     ✓ narrows to the game waiting on you  300ms
+     ✓ says a game already on screen is already on screen, and reads nothing  338ms
+     ✓ says plainly when there is no such game  355ms
+     ✓ refuses to pretend it can search by player  329ms
+     ✓ puts the list back when the box is cleared  425ms
+     ✓ finds the games you are in  356ms
+     ✓ stops offering your own game as an open seat  357ms
+     ✓ answers for nobody again on disconnect  508ms
+     ✓ matches a game by address even when the row displays a name  368ms
+     ✓ costs nothing until somebody presses it  319ms
+     ✓ finds the game whose moves are being paid for  436ms
+     ✓ says what it could not ask, rather than calling it unsponsored  436ms
+     ✓ asks once, however many times it is pressed  643ms
+     ✓ asks only about the sides a game actually names  435ms
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > reads it three at a time rather than one after another
+      peak reads in flight: 3
+
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > costs one read a game on a second visit, not three
+      9 ranked games: cold 28 reads -> warm 10
+
+stdout | tests/e2e/leaderboard-scale.test.ts > what the leaderboard costs > grows with the ranked games, which is the thing still to decide
+      4 ranked -> 13 reads, 12 ranked -> 37 reads
+
+ ✓ tests/e2e/leaderboard-scale.test.ts (7 tests) 4455ms
+     ✓ reads it three at a time rather than one after another  712ms
+     ✓ still produces the table, which concurrency is free to have broken  505ms
+     ✓ costs one read a game on a second visit, not three  1002ms
+     ✓ recomputes every rating even when nothing was fetched  1173ms
+     ✓ grows with the ranked games, which is the thing still to decide  978ms
+ ✓ tests/e2e/request-budget.test.ts (29 tests) 5016ms
+     ✓ spends at most two reads per poll  323ms
+     ✓ is refused before the wallet opens, and says why  333ms
+     ✓ finds a game outside the window with exactly one lookup  396ms
+     ✓ rebuilds a stale list when you open the tab, and not before  468ms
+ ✓ tests/chain/endpoint.test.ts (34 tests) 18858ms
+     ✓ reports chain unavailability distinctly when every base is down  3628ms
+     ✓ tries every base before giving up  1818ms
+     ✓ does not fall away from an explicit override even when it fails  1803ms
+     ✓ does not mistake a plain 503 for a rate limit  1808ms
+     ✓ sweeps every base, and retries the sweep a bounded number of times  1811ms
+     ✓ still calls a real outage an outage, when the budget was healthy  1813ms
+     ✓ calls it an outage when nothing has ever reported a budget  1815ms
+     ✓ never silences a page that is merely offline  3615ms
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > spends about two reads a game, and says so out loud
+      25 games -> 51 reads
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > does not grow with the size of the contract, only with the window
+      25 games -> 51 reads, 100 games -> 51 reads
+
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs > reads the window concurrently, because latency is the cost and not bandwidth
+      peak reads in flight: 3
+
+ ✓ tests/e2e/promotion.test.ts (10 tests) 3075ms
+     ✓ opens when a pawn reaches the last rank, and names the move it is about  480ms
+     ✓ submits the piece that was chosen  304ms
+     ✓ does not fire a stale move after the player picks up another piece  350ms
+     ✓ does not fire a stale move when the pawn is put back down  335ms
+     ✓ has a Cancel that puts the board back  336ms
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs the second time > skips the entries for every game that has not moved
+      cold 51 reads -> warm 26 reads
+
+ ✓ tests/e2e/pending-move.test.ts (28 tests) 3466ms
+     ✓ highlights the piece as soon as it is picked up  418ms
+stdout | tests/e2e/explore-scale.test.ts > what the game list costs the second time > reads the new entries, and only those, when a game has moved
+      one game moved -> 1 entry page(s) read
+
+ ✓ tests/e2e/explore-scale.test.ts (8 tests) 5362ms
+     ✓ spends about two reads a game, and says so out loud  702ms
+     ✓ does not grow with the size of the contract, only with the window  1078ms
+     ✓ reads the window concurrently, because latency is the cost and not bandwidth  511ms
+     ✓ does not read the whole window at once either  526ms
+     ✓ keeps the newest game first, which concurrency is free to have broken  533ms
+     ✓ skips the entries for every game that has not moved  998ms
+     ✓ reads the new entries, and only those, when a game has moved  1003ms
+ ✓ tests/e2e/tournament-poll.test.ts (8 tests) 1493ms
+     ✓ reads every game the first time  960ms
+ ✓ tests/e2e/display-232.test.ts (10 tests) 2463ms
+   ✓ exposes initial leaderboard failure retry, shares overlapping walks and clears recovered error  560ms
+   ✓ keeps page and cursor on failed pagination, blocks double clicks, and retries the same range  487ms
+   ✓ awaits the same in-flight manifest read for all consumers  302ms
+ ✓ tests/e2e/shared-link.test.ts (25 tests) 4656ms
+     ✓ round-trips: a board booted at the produced link opens the game  532ms
+     ✓ ignores a nonsense game number instead of shouting about it  539ms
+     ✓ ignores a player link that is not an address  317ms
+     ✓ offers the manifest pairing alongside the link and the cache  306ms
+     ✓ reports failure when neither route is allowed  328ms
+ ✓ tests/chess/search.test.ts (12 tests) 2107ms
+     ✓ mates from the ending that ran a hundred moves without one  460ms
+     ✓ does not walk into stalemate when it is winning  546ms
+     ✓ gives the same answer whether or not the state has been searched before  490ms
+ ✓ tests/wizards/chooser.test.ts (68 tests) 1478ms
+     ✓ sharpens the ranking that went flat  842ms
+ ✓ tests/e2e/sound.test.ts (14 tests) 1825ms
+     ✓ says nothing at all for the game it just opened  542ms
+ ✓ tests/chain/rate-limit.test.ts (7 tests) 1824ms
+     ✓ still calls a real outage unavailable  1809ms
+ ✓ tests/runtime/xtrata-runtime.test.ts (13 tests) 2312ms
+     ✓ survives document.write and renders a board  1011ms
+ ✓ tests/artifact/gates-artifact.test.ts (15 tests) 1741ms
+     ✓ renders every step  567ms
+ ✓ tests/artifact/artifact.test.ts (37 tests) 1761ms
+     ✓ renders a board  682ms
+ ✓ tests/protocol/clarity.test.ts (18 tests) 1206ms
+     ✓ agrees with the SDK over three thousand arbitrary hashes, on both networks  1174ms
+ ✓ tests/e2e/rating-cache.test.ts (11 tests) 1450ms
+     ✓ writes them where the next visit can find them  593ms
+ ✓ tests/e2e/replay-game.test.ts (8 tests) 1532ms
+     ✓ is offered for a game that is over  740ms
+ ✓ tests/peer/ui.test.ts (9 tests) 4008ms
+   ✓ registered players cannot move before choosing transport; clocks remain paused  769ms
+   ✓ manual e4 transfer enables Black only after verified import, then transfers e5 back  690ms
+   ✓ empty and truncated inputs give actionable errors without changing saved moves  341ms
+   ✓ direct readiness requires matching history, and disconnect pauses clocks without hiding manual fallback  437ms
+   ✓ a restored pre-fix local e4 is preserved and can be sent to the waiting phone  415ms
+   ✓ loading the joined registry preserves a pre-existing local move and explains the connection step  359ms
+   ✓ manual fallback permits the winning last move after loser disconnects, without a receipt  532ms
+ ✓ tests/e2e/waiting-badge.test.ts (6 tests) 815ms
+     ✓ clears itself when the game ends, without the list being rebuilt  453ms
+ ✓ tests/peer/store.test.ts (12 tests) 900ms
+ ✓ tests/e2e/canary-inputs.test.ts (9 tests) 2236ms
+     ✓ reaches the handler that needs it  1117ms
+ ✓ tests/ui/sound-panel.test.ts (41 tests) 1392ms
+ ✓ tests/e2e/faces.test.ts (7 tests) 1371ms
+     ✓ points at the inscription and never holds the bytes  752ms
+ ✓ tests/bns/rescue.test.ts (56 tests) 987ms
+ ✓ tests/e2e/profile-collapse.test.ts (5 tests) 1381ms
+     ✓ collapses the tooling that made it  600ms
+ ✓ tests/e2e/silent-refusal.test.ts (5 tests) 2616ms
+     ✓ says which squares can answer a check  904ms
+     ✓ stays quiet when the piece has somewhere to go  376ms
+     ✓ stays quiet when it is not your move  516ms
+     ✓ warns rather than sending it  355ms
+     ✓ lets it through when the pending move is somebody else’s  459ms
+ ✓ tests/e2e/loading-progress.test.ts (7 tests) 1047ms
+     ✓ shows nothing when nothing is running  642ms
+ ✓ tests/runtime/direct-inscription.test.ts (3 tests) 871ms
+     ✓ boots at inscription 3034 and reads through the proxy  600ms
+ ✓ tests/peer/protocol.test.ts (33 tests) 398ms
+ ✓ tests/e2e/profile-auto.test.ts (5 tests) 647ms
+     ✓ shows the picture the address actually has  423ms
+ ✓ tests/artifact/contrast.test.ts (12 tests) 511ms
+ ✓ tests/wizards/wizards.test.ts (81 tests) 295ms
+ ✓ tests/ui/board-colour.test.ts (11 tests) 429ms
+ ✓ tests/ui/game-presets.test.ts (3 tests) 232ms
+ ✓ tests/ui/board-coordinates.test.ts (6 tests) 306ms
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > returns once the log grows
+  game 7: waiting for Jim — a person plays this seat, up to 1 minutes
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > returns once the log grows
+  game 7: Jim moved
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > gives up when the cap runs out, rather than never returning
+  game 7: waiting for Jim — a person plays this seat, up to 0.002 minutes
+
+ ✓ tests/chess/skill.test.ts (19 tests) 92ms
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > gives up when the cap runs out, rather than never returning
+  game 7: gave up waiting for Jim after 0.002 minutes. The game is untouched and resumes if this is run again.
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > keeps waiting through a failed read
+  game 7: waiting for Jim — a person plays this seat, up to 1 minutes
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > keeps waiting through a failed read
+  game 7: Jim moved
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > does not treat a log that shrank as a move
+  game 7: waiting for Jim — a person plays this seat, up to 0.002 minutes
+
+stdout | tests/wizards/human-seat.test.ts > waiting for a person to move > does not treat a log that shrank as a move
+  game 7: gave up waiting for Jim after 0.002 minutes. The game is untouched and resumes if this is run again.
+
+ ✓ tests/wizards/human-seat.test.ts (14 tests) 263ms
+ ✓ tests/legacy/live-games.test.ts (7 tests) 187ms
+ ✓ tests/artifact/budget.test.ts (3 tests) 206ms
+ ✓ tests/ui/sounds.test.ts (41 tests) 332ms
+ ✓ tests/wallet/conformance.test.ts (40 tests) 143ms
+ ✓ tests/protocol/sha256.test.ts (5 tests) 86ms
+ ✓ tests/engine/rules-audit.test.ts (64 tests) 101ms
+ ✓ tests/e2e/cache-recovery.test.ts (15 tests) 127ms
+ ✓ tests/rankings/elo.test.ts (21 tests) 77ms
+ ✓ tests/rules/recover.test.ts (22 tests) 45ms
+ ✓ tests/ui/board-keyboard.test.ts (1 test) 140ms
+ ✓ tests/peer/transport.test.ts (12 tests) 67ms
+ ✓ tests/wizards/game-plans.test.ts (13 tests) 85ms
+ ✓ tests/artifact/sounds.test.ts (6 tests) 94ms
+ ✓ tests/protocol/tournament.test.ts (70 tests) 52ms
+ ✓ tests/chain/read-resilience.test.ts (11 tests) 45ms
+ ✓ tests/replay/replay.test.ts (32 tests) 53ms
+ ✓ tests/wizards/tournament.test.ts (59 tests) 53ms
+ ✓ tests/legacy/legacy.test.ts (12 tests) 65ms
+ ✓ tests/ui/tournament-cache.test.ts (4 tests) 35ms
+ ✓ tests/chain/players.test.ts (9 tests) 24ms
+ ✓ tests/e2e/cache-destruction.test.ts (6 tests) 38ms
+ ✓ tests/rules/canonical.test.ts (39 tests) 18ms
+ ✓ tests/e2e/submission-gate.test.ts (25 tests) 36ms
+ ✓ tests/wizards/forfeit.test.ts (10 tests) 12ms
+ ✓ tests/protocol/known-rules.test.ts (15 tests) 24ms
+ ✓ tests/chain/tx-status.test.ts (11 tests) 34ms
+ ✓ tests/chain/xtrata.test.ts (11 tests) 27ms
+ ✓ tests/rules/first-mover.test.ts (18 tests) 23ms
+ ✓ tests/wallet/postconditions.test.ts (20 tests) 24ms
+ ✓ tests/bns/scanner.test.ts (10 tests) 12ms
+ ✓ tests/wizards/naming.test.ts (22 tests) 11ms
+ ✓ tests/e2e/inscribe-track.test.ts (9 tests) 5ms
+ ✓ tests/wallet/outflows.test.ts (11 tests) 15ms
+ ✓ tests/chain/yours.test.ts (13 tests) 11ms
+ ✓ tests/peer/vector.test.ts (1 test) 32ms
+ ✓ tests/wizards/entries.test.ts (22 tests) 11ms
+ ✓ tests/e2e/gates.test.ts (29 tests) 12ms
+ ✓ tests/wizards/adjudicate.test.ts (13 tests) 12ms
+ ✓ tests/protocol/pfp.test.ts (13 tests) 5ms
+ ✓ tests/protocol/docs.test.ts (15 tests) 9ms
+ ✓ tests/wallet/connect.test.ts (16 tests) 11ms
+ ✓ tests/chain/holdings.test.ts (7 tests) 7ms
+ ✓ tests/artifact/pieces.test.ts (8 tests) 7ms
+ ✓ tests/artifact/xtrata-hash.test.ts (5 tests) 5ms
+ ✓ tests/chain/pictures.test.ts (10 tests) 7ms
+ ✓ tests/chain/directory.test.ts (7 tests) 11ms
+ ✓ tests/chain/price-cache.test.ts (5 tests) 8ms
+ ✓ tests/wizards/director.test.ts (6 tests) 7ms
+ ✓ tests/artifact/wallet-matrix.test.ts (22 tests) 13ms
+ ✓ tests/protocol/checkpoint.test.ts (11 tests) 8ms
+ ✓ tests/protocol/player.test.ts (17 tests) 4ms
+ ✓ tests/protocol/entry.test.ts (19 tests) 6ms
+ ✓ tests/protocol/adopting-a-game.test.ts (8 tests) 7ms
+ ✓ tests/runtime/captured-runtime.test.ts (1 test) 4ms
+ ✓ tests/protocol/candidates.test.ts (12 tests) 5ms
+ ✓ tests/artifact/manual-page.test.ts (5 tests) 5ms
+ ✓ tests/wizards/fee-log.test.ts (5 tests) 3ms
+ ✓ tests/protocol/recover.test.ts (2 tests) 2ms
+ ✓ tests/rankings/checkpoint-walk.test.ts (2 tests) 6ms
+ ↓ tests/legacy/fetch-canary.test.ts (1 test | 1 skipped)
+ ↓ tests/legacy/fetch-live.test.ts (2 tests | 2 skipped)
+ ↓ tests/rules/generate-golden.test.ts (1 test | 1 skipped)
+ ✓ tests/fuzz/replay-fuzz.test.ts (15 tests) 127907ms
+     ✓ never throws on generated logs  18858ms
+     ✓ never throws on a log at the contract ceiling  3940ms
+     ✓ gives the same answer twice for the same bytes  20695ms
+     ✓ never accepts anything after the game is over  24878ms
+     ✓ reaches the same position with the rejected entries removed  11814ms
+     ✓ accounts for every submission exactly once  11146ms
+     ✓ gives a live game legal moves and a finished one none  18379ms
+     ✓ only ever ends a game on an accepted entry, or before it started  18166ms
+
+ Test Files  102 passed | 3 skipped (105)
+      Tests  1763 passed | 17 skipped (1780)
+   Start at  13:34:00
+   Duration  128.61s (transform 3.92s, setup 0ms, import 40.62s, tests 242.39s, environment 11ms)
+
+JSON report written to /Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_2.0/dist/tests.json

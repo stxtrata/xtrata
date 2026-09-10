@@ -1,0 +1,27 @@
+{
+  "name": "02-live-resume-registered-game-2",
+  "started": 1788977231756,
+  "finished": 1788977301234,
+  "frames": [
+    {
+      "file": "000000.png",
+      "at": 1788977231756,
+      "seconds": 0
+    },
+    {
+      "file": "000001.png",
+      "at": 1788977232349,
+      "seconds": 0.593
+    }
+  ],
+  "events": [
+    {
+      "seconds": 1.24,
+      "error": "Error: node_repl exec context not found"
+    },
+    {
+      "seconds": 67.22,
+      "note": "Game 2 registration verified. This browser has no matching private game key: Replay viewer, starting position, clocks paused. This is not a recovery of the owner’s off-chain e4."
+    }
+  ]
+}

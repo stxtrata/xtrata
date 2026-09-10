@@ -1,0 +1,83 @@
+{
+  "testedAt": "2026-09-09T12:01:14.518Z",
+  "inscription": 3039,
+  "version": "2.3.2",
+  "identity": {
+    "passed": true,
+    "inscription": 3039,
+    "originalSha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+    "servedSha256": "18249bf9727533dbb46ca4286b2bcea59cd5ff7c56bc3471e613cf8dcee50f83",
+    "servedBytes": 314719,
+    "matchesExpectedRuntimeTransform": true
+  },
+  "chain": {
+    "passed": true,
+    "inscription": 3039,
+    "at": "2026-09-09T11:58:38.087Z",
+    "meta": {
+      "creator": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "owner": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+      "mime": "text/html",
+      "size": 314711,
+      "chunks": 20,
+      "sealed": true
+    },
+    "sha256": "6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3",
+    "method": "All on-chain chunks read directly; exact original HTML equality",
+    "existingArchive": {
+      "inscription": 3038,
+      "sha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f",
+      "registeredOpeningVerified": true,
+      "result": "0-1"
+    }
+  },
+  "tests": {
+    "display": 31,
+    "runtimeBrowser": 44,
+    "peerBrowser": 13
+  },
+  "newTransactions": 0,
+  "stxSpent": "0",
+  "limitations": [
+    "Real wallet-extension signing not exercised",
+    "Live endpoints intermittently rate limited or unavailable",
+    "Initial explorer failure displays 0 games before the count is known",
+    "Game 47 named-rule recovery remains unresolved in the live browser"
+  ],
+  "live": {
+    "legacyGame47": {
+      "result": "0-1",
+      "accepted": 32,
+      "namedRuleRecoveryOnFirstVisit": "Unresolved, including after later Refresh; fallback rules explicitly unconfirmed"
+    },
+    "explorer": {
+      "count": 137,
+      "newestRows": 25,
+      "olderRange": [
+        88,
+        112
+      ],
+      "recoveryNoticeCleared": true
+    },
+    "peerArchive": {
+      "id": 3038,
+      "openingVerifiedInLiveUI": true,
+      "checkmateVerified": true,
+      "hashesMatch": true
+    },
+    "helpUpdated": true,
+    "tournament": {
+      "id": 2993,
+      "finishedGames": 21,
+      "stillPlaying": 0,
+      "freshnessAndPickerAgree": true
+    },
+    "leaderboard": {
+      "players": 14,
+      "verifiedRankedGames": 123,
+      "unidentifiedGames": 1,
+      "checkpoint": 3035,
+      "fullFromScratch": false
+    }
+  }
+}

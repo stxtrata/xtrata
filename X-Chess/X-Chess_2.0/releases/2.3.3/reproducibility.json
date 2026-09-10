@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "artifactSha256": "0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0",
+  "config": {
+    "version": "2.3.3",
+    "network": "mainnet",
+    "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xchess-core-v1-canary",
+    "built": "2026-09-09 12:33 UTC"
+  },
+  "protocolsUnchangedFrom": 3034,
+  "protocols": {
+    "replayHash": "30404093ddc8ed66457728cf504989aa21c113f9bb0e1da0f910b412c4c8ef25",
+    "rulesHash": "eeb6632332bc2c920c3cdf9f8c66b8d832b1e103992fb77f95100875e134f434",
+    "ratingHash": "870dd72d3797a803ce62950f60824f81103cfebce1894407a5f87aabbb42552d",
+    "contractHash": "8048e4be63d665c4ac4b94afc6c74187d185f822cedd60fb24d5ece7567b3c9f"
+  }
+}

@@ -1,0 +1,14 @@
+Peer browser fixture http://127.0.0.1:4343/app?side=white
+PASS Independent browser profiles create separate keys and join a demo
+PASS Real ordered WebRTC data channel with signed manual signaling and no ICE service
+PASS Fresh signed connection descriptions reconnect and synchronize saved history
+PASS Signed moves synchronize through native WebRTC
+PASS Winner records checkmate after loser closes, with no acknowledgment or final consent
+PASS Fresh keyless browser verifies and replays a complete public archive with external requests blocked
+PASS Encrypted native IndexedDB recovery restores private game key in a fresh browser
+PASS Reload resumes the durable completed game
+PASS Pending setup transaction restores after reload without rebroadcast
+PASS Complete manual signed-message game when WebRTC is unavailable
+PASS Duplicate manual transcript import is idempotent
+PASS Tampered browser import preserves accepted signed history
+PASS Mobile viewport, keyboard grid, zero unhandled errors and zero external fetches in all three profiles

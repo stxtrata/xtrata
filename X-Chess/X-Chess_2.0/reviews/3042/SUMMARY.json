@@ -1,0 +1,36 @@
+{
+  "inscription": 3042,
+  "version": "2.3.3",
+  "sealedBytesMatch": true,
+  "sha256": "0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0",
+  "runtimeChecks": {
+    "passed": 44,
+    "total": 44
+  },
+  "peerChecks": {
+    "passed": 16,
+    "total": 16
+  },
+  "existingArchive": {
+    "inscription": 3038,
+    "sha256": "ef37a120bd4cefc26bdfa39bd8f534f9acf0bb6eefb9404544b57d6b2ff60c5f",
+    "registeredOpeningVerified": true,
+    "result": "0-1"
+  },
+  "transactionsSubmitted": 0,
+  "stxSpent": 0,
+  "actualIPhoneXverseTested": false,
+  "tutorialRoot": "media/xchess-tutorials/3042-r1",
+  "limitations": "See REPORT.md; passing exercised paths does not certify every wallet, device or network.",
+  "tutorials": {
+    "chapters": 6,
+    "secondsPerChapter": 120,
+    "videoVariants": 18,
+    "audioStems": 12,
+    "captionCues": 163,
+    "zipPackages": 7,
+    "zipIntegrityAndFileHashesPassed": true,
+    "completePack": "media/xchess-tutorials/3042-r1/packs/xchess-3042-complete-presenter-series.zip",
+    "mediaLocalOnly": true
+  }
+}

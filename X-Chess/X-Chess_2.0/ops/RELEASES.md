@@ -1,5 +1,49 @@
 # Releases
 
+## 2.3.3 — inscribed as 3042, 2026-09-09
+
+Makes the peer connection/manual handoff explicit above the board, requires a
+synchronized channel or a manual choice before moving, and pauses advisory clocks
+until synchronized. Receivers return saved signed history as a receipt. Manual
+fallback preserves winner publication after disconnection. Embedded SVG pawns
+replace the iOS emoji-prone board glyph; input errors and recovery guidance are
+clearer. Existing saved games and proof/contract formats are unchanged.
+See [changes and game 2 recovery steps](PEER-2.3.3.md) and
+[release validation](../releases/2.3.3/VALIDATION.json). Actual iPhone Xverse
+validation remains a device check. The user inscribed this release as **3042**.
+All 20 on-chain chunks match its 319,980 bytes exactly (SHA-256
+`0fe8c2b1515f6e80c234d84ef2f244c6e781d182181323a0e2d38c844ce104d0`).
+The served artifact passed 44 runtime and 16 peer browser checks. Live legacy
+game 137, registered opening 2 and existing result archive #3038 were verified.
+No new transaction was submitted during these checks. See
+[post-inscription report](../reviews/3042/REPORT.md).
+
+## 2.3.2 — inscribed as 3039
+
+Post-inscription read-back reconstructed all 20 chunks exactly. The served bytes
+passed 44 runtime and 13 peer browser checks; 31 targeted display tests passed.
+Live #3039 verified the registered opening and full signed result archive #3038.
+See [post-inscription report](../reviews/3039/REPORT.md) for live recovery/paging
+observations, the initial unknown-count display issue and test limits. No STX
+was spent in this verification round.
+
+Player panels and move eligibility now refresh together after verified rule
+recovery. Failed leaderboard loads expose retry; interrupted verification retains
+completed replays while checking fresh rows. Explorer paging preserves its old
+page/cursor on failure and reports loading/retry. Tournament summaries refresh
+with scored results, and Quick Play includes the deployed mainnet registry and
+current guidance. See [full change explanation](PEER-2.3.2.md).
+
+Standalone HTML: **314,711 bytes / 20 chunks**. SHA-256:
+`6bbebca61cc412ebfcde80575a90e0192513f66160d470c609dbf98d105316c3`.
+The packaged source rebuilds it exactly. Validation: 1,751 regression tests
+passed (17 deliberate skips), 198 final focused checks, 68 contract checks,
+44 runtime browser checks and 13 native peer browser checks. Counts overlap.
+Typecheck, docs/serverlessness audits and Clarity analysis passed; 12 existing
+Clarity warnings remain. The existing #3038 public archive verifies with the new
+verifier. No new mainnet transaction was sent. Real wallet-extension signing and
+sealed-byte read-back for this new version remain post-inscription checks.
+
 ## 2.3.1 — inscribed as 3037, 2026-09-09
 
 Post-inscription testing: all 14 wizard transactions succeeded, including two
