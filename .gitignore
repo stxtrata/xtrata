@@ -37,3 +37,6 @@ xtrata-1.0/artifacts/
 
 # Local/generated recursive app prototypes
 xtrata-1.0/recursive-apps/
+
+# Local media assets, scripts and notes
+/media/
