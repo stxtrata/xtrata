@@ -1,0 +1,118 @@
+{ event: "game-opened", fee: u1000000, game: u1, height: u3, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x0c73303480286b107599f600e3c36107f91c008a8356c8feb4b5d5e4794c1d46) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u2, height: u4, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x0c73303480286b107599f600e3c36107f91c008a8356c8feb4b5d5e4794c1d46) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u3, height: u8, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: none } (xchess-core-v3:468)
+{ event: "entry-submitted", game: u3, height: u9, sender: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ bootstrap: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, count: u10, event: "sponsorship-changed", margin: u0, rebate: u20 } (xchess-core-v3:855)
+{ blocks: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, event: "expiry-changed" } (xchess-core-v3:873)
+{ bootstrap: u100, event: "sponsorship-funded", expiry: u113, funded-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, game: u1, rebate: u20, rebates: u10, reserved: u200, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:538)
+{ bootstrap: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, count: u10, event: "sponsorship-changed", margin: u0, rebate: u10 } (xchess-core-v3:855)
+{ added: u200, by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-topped-up", game: u1, rebates-added: u10, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:624)
+{ event: "entry-submitted", game: u1, height: u17, sender: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ amount: u20, event: "rebate-paid", game: u1, rebates-left: u19, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:676)
+{ event: "entry-submitted", game: u1, height: u128, sender: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ, seq: u1, value: "junk" } (xchess-core-v3:716)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u1, released: u380, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:757)
+{ event: "game-opened", fee: u1000000, game: u4, height: u131, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "entry-submitted", game: u4, height: u132, sender: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ event: "game-opened", fee: u1000000, game: u5, height: u133, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u6, height: u134, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u6, height: u137, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u5, released: u260, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:757)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u5, released: u200, who: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA } (xchess-core-v3:757)
+{
+  "passed": 23,
+  "failed": 0,
+  "results": [
+    {
+      "name": "described opening stores permanent bytes and matching commitment",
+      "passed": true
+    },
+    {
+      "name": "identical descriptors allocate distinct game IDs",
+      "passed": true
+    },
+    {
+      "name": "stale opening quote rejects atomically",
+      "passed": true
+    },
+    {
+      "name": "empty rules rejected",
+      "passed": true
+    },
+    {
+      "name": "zero options version rejected",
+      "passed": true
+    },
+    {
+      "name": "V2-format opening and submission ABI retained",
+      "passed": true
+    },
+    {
+      "name": "configure small immutable funding terms",
+      "passed": true
+    },
+    {
+      "name": "stale sponsorship quote rejects",
+      "passed": true
+    },
+    {
+      "name": "third-party sponsorship reserves exactly its liability",
+      "passed": true
+    },
+    {
+      "name": "duplicate sponsorship rejected",
+      "passed": true
+    },
+    {
+      "name": "top-up uses original rebate when global rebate decreases",
+      "passed": true
+    },
+    {
+      "name": "submission pays original rebate and reconciles reserve",
+      "passed": true
+    },
+    {
+      "name": "expiry stops rebates without stopping submissions",
+      "passed": true
+    },
+    {
+      "name": "permissionless settlement releases exactly remaining reserve",
+      "passed": true
+    },
+    {
+      "name": "second settlement rejected",
+      "passed": true
+    },
+    {
+      "name": "descriptor immutable after moves, sponsorship and settlement",
+      "passed": true
+    },
+    {
+      "name": "V3 open ABI and 32-entry page match frontend",
+      "passed": true
+    },
+    {
+      "name": "V3 opening with two funding beneficiaries reconciles exactly",
+      "passed": true
+    },
+    {
+      "name": "V3 duplicate beneficiary rolls back game and reserve",
+      "passed": true
+    },
+    {
+      "name": "V3 top-up binds immutable rebate and count",
+      "passed": true
+    },
+    {
+      "name": "V3 oversized bootstrap rolls back atomically",
+      "passed": true
+    },
+    {
+      "name": "V3 expired quote is zero and expired top-up rejected",
+      "passed": true
+    },
+    {
+      "name": "V3 settlement releases reserves independently",
+      "passed": true
+    }
+  ]
+}

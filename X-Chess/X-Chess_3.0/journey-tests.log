@@ -1,0 +1,120 @@
+Updated deployment plan file
+PASS connect with V2 wallet policy
+{ event: "game-opened", fee: u1000000, game: u1, height: u3, opened-by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, ranked: false, rules-hash: (some 0xc5ed1debfa809fef81102db4e47044b689bf5a1fb9485fd1c1739c8edbe4aab2) } (xchess-core-v3:468)
+PASS open new community game, quote, sign and authoritative recovery
+{ event: "entry-submitted", game: u1, height: u4, sender: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+PASS preview, sign and confirm e2e4 against the same contract
+PASS clean-page recovery reconstructs committed rules and move
+PASS no frontend exceptions during full journey
+{
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "name": "connect with V2 wallet policy",
+      "passed": true
+    },
+    {
+      "name": "open new community game, quote, sign and authoritative recovery",
+      "passed": true
+    },
+    {
+      "name": "preview, sign and confirm e2e4 against the same contract",
+      "passed": true
+    },
+    {
+      "name": "clean-page recovery reconstructs committed rules and move",
+      "passed": true
+    },
+    {
+      "name": "no frontend exceptions during full journey",
+      "passed": true
+    }
+  ],
+  "calls": [
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "sign",
+      "fn": "open-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "sign",
+      "fn": "submit"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    }
+  ]
+}

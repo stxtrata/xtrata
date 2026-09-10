@@ -1,0 +1,64 @@
+id: 0
+name: Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`
+network: simnet
+genesis:
+  wallets:
+  - name: deployer
+    address: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
+    balance: '100000000000000'
+    sbtc-balance: '1000000000'
+  - name: wallet_1
+    address: ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA
+    balance: '100000000000000'
+    sbtc-balance: '1000000000'
+  - name: wallet_2
+    address: ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ
+    balance: '100000000000000'
+    sbtc-balance: '1000000000'
+  - name: wallet_3
+    address: ST38Z90Q6R9XPPT0BZB2A5G60ZXJAZW6QZM5G1PTK
+    balance: '100000000000000'
+    sbtc-balance: '1000000000'
+  - name: wallet_4
+    address: ST2XTK2PKTSSSG8K5NW32ANH44PCY2BCPXKJETQ1N
+    balance: '100000000000000'
+    sbtc-balance: '1000000000'
+  - name: wallet_5
+    address: ST2MAFB1WS1ZPFJVQHC7J1Y98ZX652A9AVGN8VSEV
+    balance: '5000'
+    sbtc-balance: '1000000000'
+  - name: wallet_6
+    address: ST3D7Q1MC79QPJB6EPNKPAF5ADEJGBP9K0NN2FERR
+    balance: '0'
+    sbtc-balance: '1000000000'
+  contracts:
+  - genesis
+  - lockup
+  - bns
+  - cost-voting
+  - costs
+  - pox
+  - costs-2
+  - pox-2
+  - costs-3
+  - pox-3
+  - pox-4
+  - signers
+  - signers-voting
+  - costs-4
+  - pox-5
+plan:
+  batches:
+  - id: 0
+    transactions:
+    - transaction-type: emulated-contract-publish
+      contract-name: xchess-core-v3
+      emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
+      path: contracts/xchess-core-v3.clar
+      clarity-version: 4
+    - transaction-type: emulated-contract-publish
+      contract-name: xchess-peer-v1
+      emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
+      path: contracts/xchess-peer-v1.clar
+      clarity-version: 4
+    epoch: '4.0'

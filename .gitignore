@@ -40,3 +40,6 @@ xtrata-1.0/recursive-apps/
 
 # Local media assets, scripts and notes
 /media/
+
+# Local wizard credentials (all directories)
+.env.wizards

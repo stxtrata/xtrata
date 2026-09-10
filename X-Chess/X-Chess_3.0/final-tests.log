@@ -1,0 +1,446 @@
+
+> xchess-v3-local@3.0.0 test
+> node tests/contract.mjs && node tests/app.mjs && node tests/journey.mjs
+
+{ event: "game-opened", fee: u1000000, game: u1, height: u3, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x0c73303480286b107599f600e3c36107f91c008a8356c8feb4b5d5e4794c1d46) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u2, height: u4, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x0c73303480286b107599f600e3c36107f91c008a8356c8feb4b5d5e4794c1d46) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u3, height: u8, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: none } (xchess-core-v3:468)
+{ event: "entry-submitted", game: u3, height: u9, sender: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ bootstrap: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, count: u10, event: "sponsorship-changed", margin: u0, rebate: u20 } (xchess-core-v3:855)
+{ blocks: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, event: "expiry-changed" } (xchess-core-v3:873)
+{ bootstrap: u100, event: "sponsorship-funded", expiry: u113, funded-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, game: u1, rebate: u20, rebates: u10, reserved: u200, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:538)
+{ bootstrap: u100, by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, count: u10, event: "sponsorship-changed", margin: u0, rebate: u10 } (xchess-core-v3:855)
+{ added: u200, by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-topped-up", game: u1, rebates-added: u10, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:624)
+{ event: "entry-submitted", game: u1, height: u17, sender: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ amount: u20, event: "rebate-paid", game: u1, rebates-left: u19, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:676)
+{ event: "entry-submitted", game: u1, height: u128, sender: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ, seq: u1, value: "junk" } (xchess-core-v3:716)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u1, released: u380, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:757)
+{ event: "game-opened", fee: u1000000, game: u4, height: u131, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "entry-submitted", game: u4, height: u132, sender: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+{ event: "game-opened", fee: u1000000, game: u5, height: u133, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u6, height: u134, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ event: "game-opened", fee: u1000000, game: u6, height: u137, opened-by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, ranked: false, rules-hash: (some 0x5d210fea3e5c0ab1df6efafebcc909aebcae5a9690c8f86724a2c90af0692888) } (xchess-core-v3:468)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u5, released: u260, who: 'ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ } (xchess-core-v3:757)
+{ by: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA, event: "sponsorship-settled", game: u5, released: u200, who: 'ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA } (xchess-core-v3:757)
+{
+  "passed": 23,
+  "failed": 0,
+  "results": [
+    {
+      "name": "described opening stores permanent bytes and matching commitment",
+      "passed": true
+    },
+    {
+      "name": "identical descriptors allocate distinct game IDs",
+      "passed": true
+    },
+    {
+      "name": "stale opening quote rejects atomically",
+      "passed": true
+    },
+    {
+      "name": "empty rules rejected",
+      "passed": true
+    },
+    {
+      "name": "zero options version rejected",
+      "passed": true
+    },
+    {
+      "name": "V2-format opening and submission ABI retained",
+      "passed": true
+    },
+    {
+      "name": "configure small immutable funding terms",
+      "passed": true
+    },
+    {
+      "name": "stale sponsorship quote rejects",
+      "passed": true
+    },
+    {
+      "name": "third-party sponsorship reserves exactly its liability",
+      "passed": true
+    },
+    {
+      "name": "duplicate sponsorship rejected",
+      "passed": true
+    },
+    {
+      "name": "top-up uses original rebate when global rebate decreases",
+      "passed": true
+    },
+    {
+      "name": "submission pays original rebate and reconciles reserve",
+      "passed": true
+    },
+    {
+      "name": "expiry stops rebates without stopping submissions",
+      "passed": true
+    },
+    {
+      "name": "permissionless settlement releases exactly remaining reserve",
+      "passed": true
+    },
+    {
+      "name": "second settlement rejected",
+      "passed": true
+    },
+    {
+      "name": "descriptor immutable after moves, sponsorship and settlement",
+      "passed": true
+    },
+    {
+      "name": "V3 open ABI and 32-entry page match frontend",
+      "passed": true
+    },
+    {
+      "name": "V3 opening with two funding beneficiaries reconciles exactly",
+      "passed": true
+    },
+    {
+      "name": "V3 duplicate beneficiary rolls back game and reserve",
+      "passed": true
+    },
+    {
+      "name": "V3 top-up binds immutable rebate and count",
+      "passed": true
+    },
+    {
+      "name": "V3 oversized bootstrap rolls back atomically",
+      "passed": true
+    },
+    {
+      "name": "V3 expired quote is zero and expired top-up rejected",
+      "passed": true
+    },
+    {
+      "name": "V3 settlement releases reserves independently",
+      "passed": true
+    }
+  ]
+}
+PASS UI: boots one 64-square board without errors
+PASS UI: no network requests during practice boot
+PASS UI: a1 is dark and h1 is light
+PASS UI: board has one tab stop (v2.2 keyboard parity)
+PASS UI: Home moves focus to start of row
+PASS UI: flip reverses board
+PASS UI: legal move preview then commit updates board
+PASS UI: replay refuses new moves
+PASS UI: duplicate boot remains single board
+PASS UI: default New game can create local practice without a wallet
+PASS Engine perft depth 3: start
+PASS Engine perft depth 3: kiwipete
+PASS Engine perft depth 3: en passant endgame
+PASS Engine perft depth 3: promotions/pins
+PASS Engine perft depth 3: position 5
+PASS Engine perft depth 3: position 6
+PASS Replay: Fool’s mate and reject after termination
+PASS Replay: en passant
+PASS Replay: castle kingside
+PASS Replay: promotion to q
+PASS Replay: promotion to r
+PASS Replay: promotion to b
+PASS Replay: promotion to n
+PASS Replay: threefold repetition
+PASS Replay: 100 halfmoves
+PASS Replay: two knights versus king remains playable
+PASS Replay: unbound control cannot claim seat
+PASS Replay: incomplete evidence rejected
+PASS Evidence: export/import preserves replay
+PASS Compatibility: V3 reader never reinterprets V2 protocol
+PASS Compatibility: unqualified links stay outside V3 reader
+PASS Wallet: cancellation makes one request only
+PASS Wallet: detects Xverse BitcoinProvider (v2.2 supported shape)
+PASS Wallet: accepts correct-network address
+PASS Wallet: rejects wrong-network address
+PASS Protocol: unsupported extension semantics are not replayed
+PASS UI: blocked local and session storage do not crash boot
+PASS Artifact: fits existing 32-chunk budget
+PASS Artifact: no external script or stylesheet dependencies
+{
+  "source": "/Users/melophonic/Documents/GitHub/xtrata/X-Chess/X-Chess_3.0/dist/v3-expanded.html",
+  "sha256": "45d1f8ce414ddf42630acbcfba1be3947f52967690b56565f5aa9174d10744df",
+  "bytes": 567196,
+  "chunks": 35,
+  "passed": 39,
+  "failed": 0,
+  "results": [
+    {
+      "name": "UI: boots one 64-square board without errors",
+      "passed": true
+    },
+    {
+      "name": "UI: no network requests during practice boot",
+      "passed": true
+    },
+    {
+      "name": "UI: a1 is dark and h1 is light",
+      "passed": true
+    },
+    {
+      "name": "UI: board has one tab stop (v2.2 keyboard parity)",
+      "passed": true
+    },
+    {
+      "name": "UI: Home moves focus to start of row",
+      "passed": true
+    },
+    {
+      "name": "UI: flip reverses board",
+      "passed": true
+    },
+    {
+      "name": "UI: legal move preview then commit updates board",
+      "passed": true
+    },
+    {
+      "name": "UI: replay refuses new moves",
+      "passed": true
+    },
+    {
+      "name": "UI: duplicate boot remains single board",
+      "passed": true
+    },
+    {
+      "name": "UI: default New game can create local practice without a wallet",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: start",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: kiwipete",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: en passant endgame",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: promotions/pins",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 5",
+      "passed": true
+    },
+    {
+      "name": "Engine perft depth 3: position 6",
+      "passed": true
+    },
+    {
+      "name": "Replay: Fool’s mate and reject after termination",
+      "passed": true
+    },
+    {
+      "name": "Replay: en passant",
+      "passed": true
+    },
+    {
+      "name": "Replay: castle kingside",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to q",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to r",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to b",
+      "passed": true
+    },
+    {
+      "name": "Replay: promotion to n",
+      "passed": true
+    },
+    {
+      "name": "Replay: threefold repetition",
+      "passed": true
+    },
+    {
+      "name": "Replay: 100 halfmoves",
+      "passed": true
+    },
+    {
+      "name": "Replay: two knights versus king remains playable",
+      "passed": true
+    },
+    {
+      "name": "Replay: unbound control cannot claim seat",
+      "passed": true
+    },
+    {
+      "name": "Replay: incomplete evidence rejected",
+      "passed": true
+    },
+    {
+      "name": "Evidence: export/import preserves replay",
+      "passed": true
+    },
+    {
+      "name": "Compatibility: V3 reader never reinterprets V2 protocol",
+      "passed": true
+    },
+    {
+      "name": "Compatibility: unqualified links stay outside V3 reader",
+      "passed": true
+    },
+    {
+      "name": "Wallet: cancellation makes one request only",
+      "passed": true
+    },
+    {
+      "name": "Wallet: detects Xverse BitcoinProvider (v2.2 supported shape)",
+      "passed": true
+    },
+    {
+      "name": "Wallet: accepts correct-network address",
+      "passed": true
+    },
+    {
+      "name": "Wallet: rejects wrong-network address",
+      "passed": true
+    },
+    {
+      "name": "Protocol: unsupported extension semantics are not replayed",
+      "passed": true
+    },
+    {
+      "name": "UI: blocked local and session storage do not crash boot",
+      "passed": true
+    },
+    {
+      "name": "Artifact: fits existing 32-chunk budget",
+      "passed": true
+    },
+    {
+      "name": "Artifact: no external script or stylesheet dependencies",
+      "passed": true
+    }
+  ]
+}
+PASS connect with V2 wallet policy
+{ event: "game-opened", fee: u1000000, game: u1, height: u3, opened-by: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, ranked: false, rules-hash: (some 0xc5ed1debfa809fef81102db4e47044b689bf5a1fb9485fd1c1739c8edbe4aab2) } (xchess-core-v3:468)
+PASS open new community game, quote, sign and authoritative recovery
+{ event: "entry-submitted", game: u1, height: u4, sender: 'STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ, seq: u0, value: "e2e4" } (xchess-core-v3:716)
+PASS preview, sign and confirm e2e4 against the same contract
+PASS clean-page recovery reconstructs committed rules and move
+PASS no frontend exceptions during full journey
+{
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "name": "connect with V2 wallet policy",
+      "passed": true
+    },
+    {
+      "name": "open new community game, quote, sign and authoritative recovery",
+      "passed": true
+    },
+    {
+      "name": "preview, sign and confirm e2e4 against the same contract",
+      "passed": true
+    },
+    {
+      "name": "clean-page recovery reconstructs committed rules and move",
+      "passed": true
+    },
+    {
+      "name": "no frontend exceptions during full journey",
+      "passed": true
+    }
+  ],
+  "calls": [
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "sign",
+      "fn": "open-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "quote-rebate"
+    },
+    {
+      "type": "sign",
+      "fn": "submit"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    },
+    {
+      "type": "read",
+      "fn": "get-protocol-v3"
+    },
+    {
+      "type": "read",
+      "fn": "get-v3-game"
+    },
+    {
+      "type": "read",
+      "fn": "get-count"
+    },
+    {
+      "type": "read",
+      "fn": "get-entries-page"
+    }
+  ]
+}

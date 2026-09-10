@@ -1,0 +1,100 @@
+# Jim's .btc names. One per line.
+#
+# Gitignored, like `.seed`. A complete inventory of one person's holdings tied
+# to one name is worth keeping to yourself even though every entry is public on
+# chain individually — and this list is nobody's business but yours.
+#
+# A trailing `.btc` is stripped, case is ignored, and em/en dashes are folded to
+# hyphens, because BNS labels cannot contain them and a list typed on a phone
+# will have them. So the original spellings below are kept as you wrote them.
+#
+#   node harness/bns/check-names.mjs harness/bns/names.txt
+#   node harness/bns/rescue.mjs --names harness/bns/names.txt
+#
+# Checked 2026-08-15: 62 of these are registered and live, all renewing between
+# 1135 and 1138 days out. Two exceptions are noted at the bottom.
+
+Jim
+TheDude
+64x64
+Shelter-dao
+Hash-one
+Brighton
+Drwho
+Beyourownbank
+Myriad
+Jimdude
+Doctorwho
+superhiroes
+superhiros
+stacksound
+Sqyzy
+Xwhyz
+PUNX
+Cicada
+Soundhound
+—___—
+_-__-_
+-----------.btc
+Melophonic
+__-__
+__—__
+-_-__-_-
+Cockwomble
+Pillock
+Bumhole
+Chickmagnet
+Bamboozle
+Slag
+Fuckwit
+Shitbag
+Tosspot
+Thundercunt
+Idj
+Fucktrumpet
+Knobjockey
+Fuckshitstack
+Cluster-fuck
+Cumbubble
+Mememe
+Shithouse
+Fucknugget
+Cunts
+Facefuck
+Saulgoodman
+Antidisestablishmentarianism
+Hedgehogs——why-cant-they-share
+What-the-fuck
+Hundred-little-reasons
+prck
+Mthrfckr
+Fartknocker
+Spaz
+An0nym0us
+Lets-fucking-go
+Hckr
+Audionals
+0o_x_o0
+numberwangking
+numberwangkingdom
+cumstain
+
+# ---------------------------------------------------------------------------
+# TWO THAT NEED YOUR EYES
+# ---------------------------------------------------------------------------
+#
+# `Hedgehogs——why-cant-they-share` is the only entry that is NOT in the
+# registry. It folds to `hedgehogs--why-cant-they-share`, two hyphens, which
+# does not exist. If the real name has one hyphen there, or a different word,
+# correct the line above — a name that is merely mistyped here would otherwise
+# be reported as lost, and worse, would be left behind by the rescue.
+#
+# `__—__` and `__-__` are separate lines above but fold to the SAME label,
+# `__-__`, so they count as one name. If they are genuinely two different names,
+# one of them is spelled differently from how it is written here.
+#
+# The five punctuation-only names — `—___—`, `_-__-_`, `-----------`, `__-__`,
+# `-_-__-_-` — all resolved to something real, but they are the entries most
+# likely to have been mangled by a keyboard between your wallet and this file.
+# Worth eyeballing the owner addresses in the check-names output against what
+# your wallet shows before you rely on them.

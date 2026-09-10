@@ -1,0 +1,255 @@
+A new deployment plan was computed and differs from the default deployment plan currently saved on disk:
++ ---
+  id: 0
+- name: Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`
++ name: "Simulated deployment, used as a default for `clarinet console`, `clarinet test` and `clarinet check`"
+  network: simnet
+  genesis:
+    wallets:
+-   - name: deployer
+-     address: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
+-     balance: '100000000000000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_1
+-     address: ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA
+-     balance: '100000000000000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_2
+-     address: ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ
+-     balance: '100000000000000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_3
+-     address: ST38Z90Q6R9XPPT0BZB2A5G60ZXJAZW6QZM5G1PTK
+-     balance: '100000000000000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_4
+-     address: ST2XTK2PKTSSSG8K5NW32ANH44PCY2BCPXKJETQ1N
+-     balance: '100000000000000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_5
+-     address: ST2MAFB1WS1ZPFJVQHC7J1Y98ZX652A9AVGN8VSEV
+-     balance: '5000'
+-     sbtc-balance: '1000000000'
+-   - name: wallet_6
+-     address: ST3D7Q1MC79QPJB6EPNKPAF5ADEJGBP9K0NN2FERR
+-     balance: '0'
+-     sbtc-balance: '1000000000'
++     - name: deployer
++       address: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
++       balance: "100000000000000"
++       sbtc-balance: "1000000000"
++     - name: wallet_1
++       address: ST10D4BBG66ZXWWBNB1MXTYGWKFTN8AHZS93YH1ZA
++       balance: "100000000000000"
++       sbtc-balance: "1000000000"
++     - name: wallet_2
++       address: ST2R3P5Q2AN0Q6GD8XJPTZ926V8N51CKCHBP2SKHZ
++       balance: "100000000000000"
++       sbtc-balance: "1000000000"
++     - name: wallet_3
++       address: ST38Z90Q6R9XPPT0BZB2A5G60ZXJAZW6QZM5G1PTK
++       balance: "100000000000000"
++       sbtc-balance: "1000000000"
++     - name: wallet_4
++       address: ST2XTK2PKTSSSG8K5NW32ANH44PCY2BCPXKJETQ1N
++       balance: "100000000000000"
++       sbtc-balance: "1000000000"
++     - name: wallet_5
++       address: ST2MAFB1WS1ZPFJVQHC7J1Y98ZX652A9AVGN8VSEV
++       balance: "5000"
++       sbtc-balance: "1000000000"
++     - name: wallet_6
++       address: ST3D7Q1MC79QPJB6EPNKPAF5ADEJGBP9K0NN2FERR
++       balance: "0"
++       sbtc-balance: "1000000000"
+    contracts:
+-   - genesis
+-   - lockup
+-   - bns
+-   - cost-voting
+-   - costs
+-   - pox
+-   - costs-2
+-   - pox-2
+-   - costs-3
+-   - pox-3
+-   - pox-4
+-   - signers
+-   - signers-voting
+-   - costs-4
+-   - pox-5
++     - genesis
++     - lockup
++     - bns
++     - cost-voting
++     - costs
++     - pox
++     - costs-2
++     - pox-2
++     - costs-3
++     - pox-3
++     - pox-4
++     - signers
++     - signers-voting
++     - costs-4
+  plan:
+    batches:
+-   - id: 0
+-     transactions:
+-     - transaction-type: emulated-contract-publish
+-       contract-name: xchess-core-v3
+-       emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
+-       path: contracts/xchess-core-v3.clar
+-       clarity-version: 4
+-     epoch: '4.0'
++     - id: 0
++       transactions:
++         - emulated-contract-publish:
++             contract-name: xchess-core-v3
++             emulated-sender: STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ
++             path: contracts/xchess-core-v3.clar
++             clarity-version: 4
++       epoch: "3.3"
+Overwrite? [Y/n]
+note: using deployments/default.simnet-plan.yaml
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:146:20
+    (try! (collect (+ expected-open-fee (fold custom-funding-cost sponsors u0))))
+                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note:: source of untrusted input here
+    (sponsors (list 2 {beneficiary: principal, bootstrap: uint, rebate: uint, count: uint, expiry: uint})))
+     ^~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:159:34
+    (map-set Sponsorships {game: game, who: who} (merge row
+                                 ^~~~
+note:: source of untrusted input here
+(define-public (top-up (game uint) (who principal) (count uint) (expected-rebate uint))
+                        ^~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:159:45
+    (map-set Sponsorships {game: game, who: who} (merge row
+                                            ^~~
+note:: source of untrusted input here
+(define-public (top-up (game uint) (who principal) (count uint) (expected-rebate uint))
+                                    ^~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:182:25
+    (let ((id (register (some (descriptor-hash rules options-version options match-ref)) ranked)))
+                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+     ^~~~~~~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+                           ^~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:183:31
+      (map-insert Descriptors id {
+                              ^~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+     ^~~~~~~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+                           ^~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:185:18
+        options: options, match-ref: match-ref })
+                 ^~~~~~~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+     ^~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:185:38
+        options: options, match-ref: match-ref })
+                                     ^~~~~~~~~
+note:: source of untrusted input here
+    (options (buff 1024)) (match-ref (string-ascii 128))
+                           ^~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:204:22
+    (try! (fund game who))
+                     ^~~
+note:: source of untrusted input here
+    (game uint) (who principal) (expected-bootstrap uint)
+                 ^~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:490:19
+    (ok (register rules-hash ranked))
+                  ^~~~~~~~~~
+note:: source of untrusted input here
+(define-public (open-game (rules-hash (optional (buff 32))) (ranked bool))
+                           ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:570:25
+    (let ((id (register rules-hash ranked)))
+                        ^~~~~~~~~~
+note:: source of untrusted input here
+    (rules-hash (optional (buff 32)))
+     ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:571:19
+      (try! (fund id opponent))
+                  ^~
+note:: source of untrusted input here
+    (rules-hash (optional (buff 32)))
+     ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:588:25
+    (let ((id (register rules-hash ranked)))
+                        ^~~~~~~~~~
+note:: source of untrusted input here
+    (rules-hash (optional (buff 32)))
+     ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:589:19
+      (try! (fund id white))
+                  ^~
+note:: source of untrusted input here
+    (rules-hash (optional (buff 32)))
+     ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:590:19
+      (try! (fund id black))
+                  ^~
+note:: source of untrusted input here
+    (rules-hash (optional (buff 32)))
+     ^~~~~~~~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:731:25
+    (try! (maybe-rebate game tx-sender))
+                        ^~~~
+note:: source of untrusted input here
+(define-public (submit (game uint) (value (string-ascii 5)))
+                        ^~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:751:37
+      (map-set Sponsorships { game: game, who: who }
+                                    ^~~~
+note:: source of untrusted input here
+(define-public (settle-sponsorship (game uint) (who principal))
+                                    ^~~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:751:48
+      (map-set Sponsorships { game: game, who: who }
+                                               ^~~
+note:: source of untrusted input here
+(define-public (settle-sponsorship (game uint) (who principal))
+                                                ^~~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:819:27
+    (try! (pay-out amount to))
+                          ^~
+note:: source of untrusted input here
+(define-public (withdraw (amount uint) (to principal))
+                                        ^~
+warning: use of potentially unchecked data
+--> contracts/xchess-core-v3.clar:872:28
+    (var-set expiry-blocks blocks)
+                           ^~~~~~
+note:: source of untrusted input here
+(define-public (set-expiry-blocks (blocks uint))
+                                   ^~~~~~
+! 19 warnings detected
+✔ 1 contract checked
