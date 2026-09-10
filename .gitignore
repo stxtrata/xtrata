@@ -40,3 +40,6 @@ xtrata-1.0/recursive-apps/
 
 # Local media assets, scripts and notes
 /media/
+
+# X-Chess is maintained locally
+/X-Chess/
