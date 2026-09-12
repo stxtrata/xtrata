@@ -242,7 +242,8 @@
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="HTML_Template.js?v=6"></script>
-<script src="audio-processing.js?v=1"></script>
+<script src="music-diagnostics.js?v=1"></script>
+<script src="audio-processing.js?v=2"></script>
 <script src="music-build.js?v=1"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="agent-one.js?v=2026-07-28.7"></script>
@@ -296,7 +297,7 @@ async function api(path, opts){
   const A=xa(); const m=(opts&&opts.method)||'GET';
   let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
   if(path==='/api/health') return A.health();
-  if(path==='/api/estimate') return A.estimate(body);
+  if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate(body);window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
   if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
@@ -538,7 +539,7 @@ function updateGo(){
   if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
   if(musicJobActive()){ b.disabled=true; b.textContent='Inscription in progress'; return; }
-  if(building){ b.disabled=true; b.textContent='Building player…'; return; }
+  if(building){ b.disabled=true; b.textContent='Preparing audio…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
   if(OVERSIZE){ b.disabled=true; b.textContent='Too long for one inscription'; return; }
@@ -967,8 +968,10 @@ async function sbQuote(){
   const ready=SB.items.filter(it=>it.status==='ready');
   if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
   try{
+    window.XtrataMusicDiagnostics?.log('quote','Calculating costs for '+ready.length+' prepared tracks.');
     const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt() });
     if(run!==SB.quoteRun) return;
+    window.XtrataMusicDiagnostics?.log('quote-ready','Batch quote received.');
     SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
     try{
       const req=BigInt(est.requiredUstx);

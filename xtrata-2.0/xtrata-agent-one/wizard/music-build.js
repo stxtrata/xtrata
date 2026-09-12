@@ -51,7 +51,27 @@
     const o = { ...overrides };
     o.format ||= document.querySelector('#musicFormat')?.value || 'details';
     o.quality ||= document.querySelector('#musicQuality')?.value || 'original';
-    const work = serial.then(() => buildOutput(file, onStatus, o));
+    const diagnostic = (phase, message) => {
+      if (window.XtrataMusicDiagnostics) window.XtrataMusicDiagnostics.log(phase, message);
+    };
+    diagnostic(
+      'queued',
+      (file.size / 1048576).toFixed(2) + ' MiB audio; ' + o.format + '; ' + o.quality + '.'
+    );
+    const work = serial.then(async () => {
+      diagnostic('prepare', 'Starting audio preparation.');
+      try {
+        const result = await buildOutput(file, onStatus, o);
+        diagnostic(
+          'prepared',
+          'Output ready: ' + result.playerFile.size + ' bytes (' + result.playerFile.type + ').'
+        );
+        return result;
+      } catch (error) {
+        diagnostic('error', 'Preparation failed; see the error below the action button.');
+        throw error;
+      }
+    });
     serial = work.catch(() => {});
     return work;
   }

@@ -73,6 +73,8 @@ try {
     .setInputFiles({ name: 'untagged-tone.wav', mimeType: 'audio/wav', buffer: buf });
   await p.waitForFunction(() => !building && !!PLAYER, {}, { timeout: 180000 });
   console.log('Original WAV prepared');
+  assert.equal(await p.locator('#musicPrepProgress').getAttribute('value'), '100');
+  assert((await p.locator('#musicDiagnosticLog').textContent()).includes('engine-ready'));
   assert.equal(await p.evaluate(() => PLAYER.size), buf.length);
   assert.equal(await p.evaluate(() => META.artist), '');
   const bytes = await p.evaluate(async () =>
@@ -97,21 +99,30 @@ try {
     return !a.paused;
   });
   assert(playable);
-  console.log('Player bounds',await frame.evaluate(()=>{const e=document.querySelector('.player');const r=e.getBoundingClientRect();return {width:r.width,height:r.height,body:document.body.getBoundingClientRect().height};}));
+  console.log(
+    'Player bounds',
+    await frame.evaluate(() => {
+      const e = document.querySelector('.player');
+      const r = e.getBoundingClientRect();
+      return {
+        width: r.width,
+        height: r.height,
+        body: document.body.getBoundingClientRect().height
+      };
+    })
+  );
   await p.locator('#previewFrame').scrollIntoViewIfNeeded();
-  await p.locator('#previewFrame').screenshot({path:'/tmp/xtrata-music-qa/player.png'});
+  await p.locator('#previewFrame').screenshot({ path: '/tmp/xtrata-music-qa/player.png' });
   console.log('Optimised player plays');
   await mkdir('/tmp/xtrata-music-qa', { recursive: true });
   await p.screenshot({ path: '/tmp/xtrata-music-qa/real-audio-desktop.png', fullPage: true });
   await p.locator('#musicQuality').selectOption('original');
   await p.waitForFunction(() => !building && META?.quality === 'original', {}, { timeout: 180000 });
-  await p
-    .locator('#picker')
-    .setInputFiles({
-      name: 'corrupt.wav',
-      mimeType: 'audio/wav',
-      buffer: Buffer.from('not audio')
-    });
+  await p.locator('#picker').setInputFiles({
+    name: 'corrupt.wav',
+    mimeType: 'audio/wav',
+    buffer: Buffer.from('not audio')
+  });
   await p.waitForFunction(() => !building, {}, { timeout: 180000 });
   assert(await p.locator('#go').isDisabled());
   assert.equal(await p.evaluate(() => PLAYER), null);

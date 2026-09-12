@@ -94,3 +94,18 @@ existing wallet limits and spending authorisation still apply.
 
 Rollback: revert the music release commits and redeploy. Preserve existing funded
 job state; do not clear agent storage or wallet recovery material.
+
+## Preparation progress update
+
+Added a visible preparation panel with elapsed time, an indeterminate engine-load
+bar, measured conversion percentage when FFmpeg supplies duration/time, and a
+completed state after quoting. A collapsible, copyable log records engine loading,
+file size, processing, output packaging and quoting. Only parsed timing/phase data
+is logged; raw encoder output, filenames, metadata, audio and wallet data are not.
+Engine loading reports a heartbeat every ten seconds and fails retryably after
+120 seconds; conversion is not cut off by that engine-load timeout.
+
+Validation includes timeout/retry cleanup, honest progress states, the existing
+browser workflow smoke and a generated 35.8 MiB WAV conversion (5.9 MiB output).
+The user's recording eventually completed; the progress update makes long work
+visible rather than claiming the recording was invalid or the encoder was stuck.

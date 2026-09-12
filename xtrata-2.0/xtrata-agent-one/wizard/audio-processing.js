@@ -9,6 +9,70 @@
     typeof SharedArrayBuffer !== 'undefined';
   const CORE_MT = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js';
   const CORE_ST = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js';
+  const report = (phase, message, percent = null) => {
+    if (typeof window.dispatchEvent === 'function' && typeof CustomEvent !== 'undefined')
+      window.dispatchEvent(
+        new CustomEvent('xtrata:audio-diagnostic', { detail: { phase, message, percent } })
+      );
+  };
+  async function loadEngine(f, core, onStatus) {
+    const started = Date.now();
+    let expired = false,
+      timer;
+    report(
+      'engine-load',
+      'Loading ' +
+        (core === CORE_MT ? 'multi-threaded' : 'single-threaded') +
+        ' engine from jsDelivr; download and WebAssembly initialisation may take time.'
+    );
+    const heartbeat = setInterval(() => {
+      const seconds = Math.round((Date.now() - started) / 1000);
+      const message =
+        'Audio engine is still loading (' +
+        seconds +
+        's). Waiting for download / WebAssembly initialisation.';
+      report('engine-wait', message);
+      onStatus?.(message);
+    }, 10000);
+    try {
+      const loading = f.load().then(() => {
+        if (expired) {
+          try {
+            f.exit();
+          } catch {}
+        }
+      });
+      await Promise.race([
+        loading,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            expired = true;
+            try {
+              f.exit();
+            } catch {}
+            reject(
+              new Error(
+                'Audio engine did not load within 120 seconds. Check your connection or content blocker, then drop the file again to retry.'
+              )
+            );
+          }, 120000);
+        })
+      ]);
+      report(
+        'engine-ready',
+        'Audio engine ready after ' + ((Date.now() - started) / 1000).toFixed(1) + 's.'
+      );
+    } catch (error) {
+      report(
+        'engine-error',
+        expired ? 'Engine load timed out after 120s.' : 'Engine download or initialisation failed.'
+      );
+      throw error;
+    } finally {
+      clearTimeout(timer);
+      clearInterval(heartbeat);
+    }
+  }
   let _ff = null,
     _loading = null;
   async function ffPersistent(onStatus) {
@@ -20,7 +84,7 @@
       if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg.wasm not loaded');
       onStatus && onStatus('Loading the audio engine…');
       const f = FF.createFFmpeg({ log: false, corePath: CORE_MT });
-      await f.load();
+      await loadEngine(f, CORE_MT, onStatus);
       _ff = f;
       return f;
     })();
@@ -38,7 +102,7 @@
     if (!FF || !FF.createFFmpeg) throw new Error('ffmpeg.wasm not loaded');
     onStatus && onStatus('Loading the audio engine…');
     const f = FF.createFFmpeg({ log: false, corePath: CORE_ST, mainName: 'main' });
-    await f.load();
+    await loadEngine(f, CORE_ST, onStatus);
     return f;
   }
   /**
@@ -50,15 +114,72 @@
    */
   async function runOnce(file, inName, args, outputs, onStatus) {
     const iso = isolated();
+    const stage = args.includes('cover.jpg')
+      ? 'artwork extraction'
+      : args.includes('out.weba')
+        ? 'Opus conversion'
+        : 'original audio validation';
+    report('stage', 'Starting ' + stage + '.');
     const f = iso ? await ffPersistent(onStatus) : await ffFresh(onStatus);
     const clean = (n) => {
       try {
         f.FS('unlink', n);
       } catch (_e) {}
     };
+    const seconds = (value) => value.split(':').reduce((total, n) => total * 60 + Number(n), 0);
+    let duration = 0;
+    let lastProgress = 0,
+      lastSignal = Date.now(),
+      heartbeat;
+    if (f.setLogger)
+      f.setLogger(({ message }) => {
+        const text = String(message || '');
+        const durationMatch = text.match(/Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/);
+        if (durationMatch) duration = seconds(durationMatch[1]);
+        const match = text.match(/time=\s*(\d+:\d+:\d+(?:\.\d+)?)/);
+        if (match) {
+          lastSignal = Date.now();
+          if (Date.now() - lastProgress > 2000) {
+            lastProgress = Date.now();
+            const message = stage + ': processed ' + match[1] + ' of audio';
+            report(
+              'progress',
+              message,
+              stage === 'Opus conversion' && duration > 0
+                ? Math.min(99, Math.floor((seconds(match[1]) / duration) * 100))
+                : null
+            );
+            onStatus?.(message);
+          }
+        }
+      });
     try {
+      report(
+        'input',
+        'Reading ' + (file.size / 1048576).toFixed(2) + ' MiB into the audio engine.'
+      );
       f.FS('writeFile', inName, await fetchFile(file));
+      report('processing', 'Running ' + stage + '.');
+      onStatus?.('Running ' + stage + '…');
+      const started = Date.now();
+      heartbeat = setInterval(
+        () =>
+          report(
+            'processing-wait',
+            stage +
+              ' running for ' +
+              Math.round((Date.now() - started) / 1000) +
+              's; last encoder progress ' +
+              Math.round((Date.now() - lastSignal) / 1000) +
+              's ago.'
+          ),
+        10000
+      );
       await f.run(...args);
+      report(
+        'processing-done',
+        stage + ' command finished in ' + ((Date.now() - started) / 1000).toFixed(1) + 's.'
+      );
       const out = {};
       for (const name of outputs) {
         try {
@@ -68,8 +189,21 @@
           out[name] = null;
         }
       }
+      report(
+        'output',
+        Object.entries(out)
+          .map(([name, data]) => name + ': ' + (data ? data.length + ' bytes' : 'not present'))
+          .join('; ')
+      );
       return out;
+    } catch (error) {
+      report(
+        'processing-error',
+        stage + ' failed; see the preparation error below the action button.'
+      );
+      throw error;
     } finally {
+      clearInterval(heartbeat);
       if (iso) {
         [inName, ...outputs].forEach(clean);
       } else {
@@ -182,7 +316,10 @@
 
   async function extract(file, onStatus, quality = 'optimised') {
     const cached = extracts.get(file);
-    if (cached && cached[quality]) return cached[quality];
+    if (cached && cached[quality]) {
+      report('cache', 'Reusing prepared audio for this file (' + quality + ').');
+      return cached[quality];
+    }
     const inName =
       'in-' + Date.now() + '.' + ((file.name.match(/\.([a-z0-9]+)$/i) || [])[1] || 'mp3');
 
@@ -246,8 +383,11 @@
         coverB64 = b64(cb);
         coverMime = 'image/jpeg';
       }
-    } catch (_e) {}
+    } catch (_e) {
+      report('artwork-optional', 'No extractable cover artwork; continuing without artwork.');
+    }
 
+    report('packaging', 'Preparing audio bytes for the selected output.');
     const result = {
       audioB64: b64(weba),
       audioBytes: weba,

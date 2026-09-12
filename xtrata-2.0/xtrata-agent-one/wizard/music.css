@@ -193,3 +193,62 @@ header {
     transition: none !important;
   }
 }
+
+#musicPreparation {
+  margin: 18px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+}
+.music-prep-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.music-prep-heading strong {
+  color: var(--acc);
+}
+#musicPrepElapsed {
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+#musicPrepMessage {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+#musicPrepProgress {
+  width: 100%;
+  height: 12px;
+  accent-color: var(--acc);
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+  display: block;
+}
+#musicPrepProgress::-webkit-progress-bar {
+  background: #354039;
+}
+#musicPrepProgress::-webkit-progress-value {
+  background: var(--acc);
+  transition: width 0.3s;
+}
+#musicPrepProgress:indeterminate {
+  background: linear-gradient(90deg, #354039 25%, #c5ed96 50%, #354039 75%);
+  background-size: 200% 100%;
+  animation: musicPreparationPulse 1.8s linear infinite;
+}
+#musicPrepProgress:indeterminate::-webkit-progress-bar {
+  background: transparent;
+}
+#musicPrepAdvice {
+  font-size: 12px;
+  margin-bottom: 0;
+}
+@keyframes musicPreparationPulse {
+  to {
+    background-position: -200% 0;
+  }
+}
