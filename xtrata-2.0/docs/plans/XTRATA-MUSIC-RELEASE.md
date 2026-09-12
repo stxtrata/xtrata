@@ -201,3 +201,6 @@ batch transitions, and existing draft/quote/payment simulations).
 Added optional Economy funding and a mobile-friendly Speed up review with explicit additional payment, total approval and service fee. A separate durable policy record preserves pending transaction identity and fee limits across reloads; top-ups activate only after matching canonical confirmation. Standard remains the default. See [Music Economy and speed-up](MUSIC-ECONOMY-SPEED-UP.md) for design, recovery boundaries and validation. Agent build `2026-09-12.1`; 297 focused tests, build and targeted lint pass. No real payments or inscriptions were used for verification.
 
 Deployed verification passed for commit `06fc43fa6`: editor, mobile speed-up, payment-state reload, live read-only Economy/Standard quotes and real FFmpeg/audio playback. Corrected the audio smoke's hidden-format selector and added explicit funding-quote coverage. All wallet payments in UI tests remain simulated.
+
+
+Original audio copy: hide the lossy-optimisation reminder when “Keep original file” is selected. The reminder returns for every Opus preset and follows restored draft settings through the existing format-help refresh.

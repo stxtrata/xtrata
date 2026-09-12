@@ -115,6 +115,7 @@ function musicFormatHelp() {
   if (window.musicAppearance) window.musicAppearance.visibility();
   const format = $('#musicFormat').value,
     quality = $('#musicQuality').value;
+  $('#musicLossyWarning').hidden = quality === 'original';
   document.querySelectorAll('input[name=musicReleaseFormat]').forEach((input) => {
     input.checked = input.value === format;
   });

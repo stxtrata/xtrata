@@ -119,7 +119,7 @@
       <label>Audio quality<select id="musicQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label>
     </div>
     <p class="muted" id="formatHelp">A playable release with optional details. Your original audio is preserved inside the player.</p>
-    <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription. Optimisation is lossy; keep your original master.</p>
+    <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription.<span id="musicLossyWarning"> Optimisation is lossy; keep your original master.</span></p>
     <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.oga,.opus,.aiff,.aif" multiple hidden />
     <div id="drop" class="drop" role="button" tabindex="0" aria-label="Choose audio files">
       <div class="drop-main">Drop your music here</div>
@@ -1230,7 +1230,7 @@ function sbDone(job){
 }
 </script>
 <script src="music-appearance.js?v=2"></script>
-<script src="music-editor.js?v=6"></script>
+<script src="music-editor.js?v=7"></script>
 <script src="music-artwork.js?v=1"></script>
 <script src="music-artwork-editor.js?v=1"></script>
 </body>
