@@ -90,7 +90,7 @@
     <div class="music-steps" aria-label="Creation steps">1 · Upload <span>2 · Prepare & preview</span> <span>3 · Review & inscribe</span></div>
     <div class="music-options">
       <label>Release format<select id="musicFormat"><option value="audio">Audio only</option><option value="details" selected>Song with details</option><option value="artwork">Song with artwork</option></select></label>
-      <label>Audio quality<select id="musicQuality"><option value="original" selected>Keep original file</option><option value="optimised">Optimise · Opus 96 kbps VBR</option></select></label>
+      <label>Audio quality<select id="musicQuality"><option value="original" selected>Keep original file</option><option value="optimised">Optimise · Opus 96 kbps VBR</option><option value="compact">Smallest audio · Opus 48 kbps VBR</option></select></label>
     </div>
     <p class="muted" id="formatHelp">A playable release with optional details. Your original audio is preserved inside the player.</p>
     <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription. Optimisation is lossy; keep your original master.</p>
@@ -381,7 +381,7 @@ async function pickFile(f){
     $('#qName').textContent=r.format==='audio'?f.name:(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     const mib=(n)=>(n/1048576).toFixed(2);
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
-    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
+    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → '+r.audioLabel+' '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show';
     prefillEdits(r);
@@ -939,6 +939,7 @@ function sbRow(it,i){
       +(it.status==='ready'?btn('sbToggle',(it.show?'▾ hide':'▸ preview'),'Preview this player'):'')
       +(it.status==='ready'?btn('musicEditTrack','Edit','Edit this track'):'')
       +(it.status==='ready'?btn('sbArt','🖼','Change this player’s artwork'):'')
+      +(it.info?.hasCover?btn('musicOptimiseTrackArt','Shrink art','Optimise existing artwork'):'')
       +btn('sbRemove','✕','Remove from batch')
     +'</div>'
     +((it.status==='ready'&&it.show)?(it.info?.format==='audio'?'<audio controls src="'+sbPreviewUrl(it)+'" style="width:100%;margin-top:12px"></audio>':'<iframe src="'+sbPreviewUrl(it)+'" title="preview" loading="lazy" sandbox="allow-scripts" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#10120f;display:block;margin-top:10px"></iframe>'):'')
@@ -1096,6 +1097,8 @@ function sbDone(job){
   const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
 }
 </script>
-<script src="music-editor.js?v=1"></script>
+<script src="music-editor.js?v=2"></script>
+<script src="music-artwork.js?v=1"></script>
+<script src="music-artwork-editor.js?v=1"></script>
 </body>
 </html>

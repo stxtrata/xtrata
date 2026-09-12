@@ -109,3 +109,29 @@ Validation includes timeout/retry cleanup, honest progress states, the existing
 browser workflow smoke and a generated 35.8 MiB WAV conversion (5.9 MiB output).
 The user's recording eventually completed; the progress update makes long work
 visible rather than claiming the recording was invalid or the encoder was stuck.
+
+## Audio bitrate and artwork size controls
+
+The music route now offers original, 96 kbps Opus VBR, and 48 kbps Opus VBR
+for both single-track and per-track batch edits. The shared encoder explicitly
+passes the selected bitrate to FFmpeg and caches 48/96 results separately; legacy
+callers retain their 96 kbps default. Bitrate changes are lossy and must be auditioned.
+
+The new artwork helper/editor provides opt-in comparison, original preservation,
+resizing without upscaling, and actual byte savings before applying. Presets use
+longest edges of 512 px (100 KB target), 256 px (30 KB), 128 px (12 KB) or 1024 px
+(200 KB), plus keep-original. It chooses smaller WebP/JPEG candidates, retains
+transparency, and warns above 1024 px / 250 KB, with a stronger warning above 1 MiB.
+Targets are product guidance, not universal artwork standards or guaranteed sizes.
+The default recommendation for this player is 512 × 512 and 50–100 KB or less.
+Embedded player covers and batch uploads share these controls. Existing artwork
+inside an original audio file remains byte-preserved; separate player-art reduction
+does not strip it. Browser preparation accepts still PNG/JPEG/WebP up to 20 MiB;
+images above 40 megapixels require prior local resizing.
+
+Validation: 13 focused unit/regression checks; real 48-vs-96 kbps encoding and
+playback; browser comparison of a 2048 × 1024 cover reduced to 256 × 128; transparency
+and no-upscaling checks; batch resize preserving artist credits and per-track 48 kbps
+MIME. Workflow tests use simulated payments only. Test media stays outside Git.
+
+WebP transparency/format background: https://developers.google.com/speed/webp

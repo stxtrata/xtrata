@@ -120,7 +120,9 @@ function musicFormatHelp() {
     ' ' +
     (quality === 'original'
       ? 'Original audio bytes are preserved.'
-      : 'Audio is converted to Opus at 96 kbps VBR.');
+      : quality === 'compact'
+        ? 'Audio is converted to Opus at 48 kbps VBR. Smaller files, with a greater loss of detail — audition before inscribing.'
+        : 'Audio is converted to Opus at 96 kbps VBR.');
   $('#editWrap').style.display = FILE && format !== 'audio' && !SB.active ? 'block' : 'none';
   $('#eCoverBtn').closest('.efield').style.display = format === 'artwork' ? 'block' : 'none';
 }
@@ -202,7 +204,7 @@ window.musicEditTrack = (i) => {
   editor.innerHTML =
     '<h2>Edit track ' +
     (i + 1) +
-    '</h2><div class="music-options"><label>Release format<select id="trackFormat"><option value="audio">Audio only</option><option value="details">Song with details</option><option value="artwork">Song with artwork</option></select></label><label>Audio quality<select id="trackQuality"><option value="original">Keep original</option><option value="optimised">Optimise · Opus</option></select></label></div><div id="trackFields" class="metadata-grid"></div><div class="music-toolbar"><button class="btn" id="saveTrack">Apply track changes</button><button class="btn ghost" id="shareTrack">Apply artist, album and artwork to all tracks</button><button class="btn ghost" id="closeTrack">Close</button></div>';
+    '</h2><div class="music-options"><label>Release format<select id="trackFormat"><option value="audio">Audio only</option><option value="details">Song with details</option><option value="artwork">Song with artwork</option></select></label><label>Audio quality<select id="trackQuality"><option value="original">Keep original</option><option value="optimised">Opus · 96 kbps VBR</option><option value="compact">Opus · 48 kbps VBR (smaller)</option></select></label></div><div id="trackFields" class="metadata-grid"></div><div class="music-toolbar"><button class="btn" id="saveTrack">Apply track changes</button><button class="btn ghost" id="shareTrack">Apply artist, album and artwork to all tracks</button><button class="btn ghost" id="closeTrack">Close</button></div>';
   const values = { ...it.info, ...it.overrides };
   $('#trackFormat').value = values.format || $('#musicFormat').value;
   $('#trackQuality').value = values.quality || $('#musicQuality').value;

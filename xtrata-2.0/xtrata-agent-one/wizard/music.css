@@ -252,3 +252,47 @@ header {
     background-position: -200% 0;
   }
 }
+#musicArtworkDialog {
+  width: min(760px, calc(100% - 24px));
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 24px;
+}
+#musicArtworkDialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+}
+#musicArtworkDialog p {
+  font-size: 13px;
+}
+.artwork-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+.artwork-comparison figure {
+  margin: 0;
+  min-width: 0;
+}
+.artwork-comparison img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: repeating-conic-gradient(#27322a 0% 25%, #17201a 0% 50%) 50%/20px 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.artwork-comparison figcaption {
+  font-size: 12px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+#artworkWarning,
+.artwork-warning {
+  color: var(--warn);
+  font-size: 13px;
+}

@@ -270,7 +270,7 @@
   }
 
   // The opus tool's Music (High Quality) → .weba command (+ Audional/Xtrata tags).
-  const OPUS_ARGS = (inName) => [
+  const OPUS_ARGS = (inName, bitrate = 96) => [
     '-i',
     inName,
     '-map',
@@ -297,7 +297,7 @@
     '-c:a',
     'libopus',
     '-b:a',
-    '96k',
+    bitrate + 'k',
     '-vbr',
     '1',
     '-compression_level',
@@ -315,6 +315,9 @@
   const extracts = new WeakMap();
 
   async function extract(file, onStatus, quality = 'optimised') {
+    if (!['original', 'optimised', 'compact'].includes(quality))
+      throw new Error('Unsupported audio quality');
+    const bitrate = quality === 'compact' ? 48 : 96;
     const cached = extracts.get(file);
     if (cached && cached[quality]) {
       report('cache', 'Reusing prepared audio for this file (' + quality + ').');
@@ -330,7 +333,9 @@
     // title/artist/lyrics via -map_metadata 0 (see OPUS_ARGS).
     onStatus &&
       onStatus(
-        quality === 'original' ? 'Checking original audio…' : 'Optimising to Opus (96 kbps VBR)…'
+        quality === 'original'
+          ? 'Checking original audio…'
+          : 'Optimising to Opus (' + bitrate + ' kbps VBR)…'
       );
     const args =
       quality === 'original'
@@ -350,7 +355,7 @@
             'ffmetadata',
             'meta.txt'
           ]
-        : [...OPUS_ARGS(inName), '-map_metadata', '0', '-f', 'ffmetadata', 'meta.txt'];
+        : [...OPUS_ARGS(inName, bitrate), '-map_metadata', '0', '-f', 'ffmetadata', 'meta.txt'];
     const enc = await runOnce(file, inName, args, ['out.weba', 'meta.txt', 'check.pcm'], onStatus);
     if (quality === 'original' && !enc['check.pcm']?.length)
       throw new Error('This file does not contain decodable audio. Choose a valid recording.');

@@ -89,6 +89,11 @@ try {
     { timeout: 180000 }
   );
   assert((await p.evaluate(() => PLAYER.size)) < buf.length);
+  const size96 = await p.evaluate(() => PLAYER.size);
+  await p.locator('#musicQuality').selectOption('compact');
+  await p.waitForFunction(() => !building && META?.quality === 'compact', {}, { timeout: 180000 });
+  assert.equal(await p.evaluate(() => META.audioLabel), 'Opus 48 kbps VBR');
+  assert((await p.evaluate(() => PLAYER.size)) < size96);
   await p.locator('#musicFormat').selectOption('details');
   await p.waitForFunction(() => !building && META?.format === 'details', {}, { timeout: 180000 });
   const frame = p.frames().find((f) => f !== p.mainFrame());
@@ -135,7 +140,7 @@ try {
         checks: [
           'real FFmpeg original WAV byte equality',
           'untagged metadata',
-          'real Opus conversion',
+          'real 96 and 48 kbps Opus conversion with smaller 48 kbps output',
           'embedded audio playback',
           'original package rebuild',
           'corrupt audio rejection',

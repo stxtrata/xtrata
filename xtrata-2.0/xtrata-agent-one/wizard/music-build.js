@@ -78,7 +78,7 @@
   async function buildOutput(file, onStatus, o) {
     if (
       !['audio', 'details', 'artwork'].includes(o.format) ||
-      !['original', 'optimised'].includes(o.quality)
+      !['original', 'optimised', 'compact'].includes(o.quality)
     )
       throw new Error('Choose a valid release format and audio quality.');
     if (!file.size) throw new Error('This audio file is empty.');
@@ -93,7 +93,26 @@
     const coverB64 =
       o.format === 'artwork' ? (o.coverB64 !== undefined ? o.coverB64 : ex.coverB64) : null;
     const coverMime = coverB64 ? o.coverMime || ex.coverMime || 'image/jpeg' : null;
-    const audioLabel = o.quality === 'original' ? 'Original audio' : 'Opus 96 kbps VBR';
+    const audioLabel =
+      o.quality === 'original'
+        ? 'Original audio'
+        : o.quality === 'compact'
+          ? 'Opus 48 kbps VBR'
+          : 'Opus 96 kbps VBR';
+    let artworkInfo = null;
+    if (coverB64 && window.XtrataMusicArtwork) {
+      try {
+        artworkInfo = await window.XtrataMusicArtwork.inspect(
+          window.XtrataMusicArtwork.fromBase64(coverB64, coverMime)
+        );
+      } catch {
+        artworkInfo = {
+          warnings: [
+            'Artwork could not be inspected. Use the artwork editor to check or replace it.'
+          ]
+        };
+      }
+    }
     let playerFile, html;
     if (o.format === 'audio') {
       playerFile =
@@ -153,6 +172,7 @@
       html,
       coverB64,
       coverMime,
+      artworkInfo,
       hasCover: !!coverB64,
       hasLyrics: o.format !== 'audio' && !!metadata.lyrics,
       audioLabel,

@@ -104,6 +104,29 @@ try {
     mimeType: 'audio/wav',
     buffer: Buffer.from('exact fixture audio')
   };
+  assert(
+    await page.evaluate(async () => {
+      const c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 32;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = 'red';
+      ctx.fillRect(0, 0, 20, 20);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+      const out = await window.XtrataMusicArtwork.optimise(
+        new File([blob], 'alpha.png', { type: 'image/png' }),
+        'small'
+      );
+      const bitmap = await createImageBitmap(out.file);
+      const check = document.createElement('canvas');
+      check.width = 64;
+      check.height = 32;
+      const x = check.getContext('2d');
+      x.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      return out.width === 64 && out.height === 32 && x.getImageData(63, 31, 1, 1).data[3] === 0;
+    })
+  );
   await page.locator('#picker').setInputFiles(file);
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   assert.equal(await page.locator('#eArtist').inputValue(), '');
@@ -113,19 +136,31 @@ try {
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   await page.locator('#musicFormat').selectOption('artwork');
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
-  await page
-    .locator('#eCoverPick')
-    .setInputFiles({
-      name: 'art.png',
-      mimeType: 'image/png',
-      buffer: Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
-        'base64'
-      )
-    });
-  await page.waitForFunction(() => EDITS_DIRTY);
-  await page.locator('#applyEdits').click();
-  await page.waitForFunction(() => !document.querySelector('#go').disabled);
+  const cover = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 2048;
+    c.height = 1024;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#245c42';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.fillStyle = 'white';
+    ctx.font = '120px sans-serif';
+    ctx.fillText('Music artwork', 120, 400);
+    return c.toDataURL('image/png').split(',')[1];
+  });
+  await page.locator('#eCoverPick').setInputFiles({
+    name: 'cover.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(cover, 'base64')
+  });
+  await page.waitForFunction(() => !document.querySelector('#artworkApply').disabled);
+  assert((await page.locator('#artworkWarning').innerText()).includes('High resolution'));
+  await page.locator('#artworkPreset').selectOption('small');
+  await page.waitForFunction(() => !document.querySelector('#artworkApply').disabled);
+  assert((await page.locator('#artworkResult').innerText()).includes('256 × 128'));
+  await page.screenshot({ path: '/tmp/music-artwork-review.png' });
+  await page.locator('#artworkApply').click();
+  await page.waitForFunction(() => META.hasCover && !document.querySelector('#go').disabled);
   assert(await page.evaluate(() => META.hasCover));
   await page.locator('#musicRemoveArt').click();
   await page.locator('#applyEdits').click();
@@ -146,6 +181,11 @@ try {
   await page.waitForFunction(() => !building);
   assert(await page.locator('#go').isDisabled());
   await page.evaluate(() => (window.failQuote = false));
+  await page.locator('#musicQuality').selectOption('original');
+  await page.waitForFunction(() => !document.querySelector('#go').disabled);
+  await page.locator('#musicQuality').selectOption('compact');
+  await page.waitForFunction(() => !document.querySelector('#go').disabled);
+  assert.equal(await page.evaluate(() => META.audioLabel), 'Opus 48 kbps VBR');
   await page.locator('#musicQuality').selectOption('original');
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   await page.locator('#musicFormat').selectOption('audio');
@@ -180,12 +220,28 @@ try {
     'Batch artist',
     'Batch artist'
   ]);
+  await page.locator('.sbrow button[title="Change this player’s artwork"]').first().click();
+  await page.locator('#sbArtPick').setInputFiles({
+    name: 'cover.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(cover, 'base64')
+  });
+  await page.waitForFunction(() => !document.querySelector('#artworkApply').disabled);
+  await page.locator('#artworkPreset').selectOption('tiny');
+  await page.waitForFunction(() => !document.querySelector('#artworkApply').disabled);
+  await page.locator('#artworkApply').click();
+  await page.waitForFunction(
+    () => SB.items[0].info.hasCover && !document.querySelector('#sbGo').disabled
+  );
+  assert.equal(await page.evaluate(() => SB.items[0].info.artist), 'Batch artist');
+  assert.equal(await page.evaluate(() => SB.items[0].info.artworkInfo.width), 128);
   await page.locator('.sbrow button[title="Edit this track"]').first().click();
+  await page.locator('#trackQuality').selectOption('compact');
   await page.locator('#trackFormat').selectOption('audio');
   await page.locator('#saveTrack').click();
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);
   assert.deepEqual(await page.evaluate(() => SB.items.map((i) => i.player.type)), [
-    'audio/wav',
+    'audio/webm; codecs=opus',
     'text/html'
   ]);
   await page.setViewportSize({ width: 1280, height: 950 });
@@ -205,7 +261,9 @@ try {
         checks: [
           'neutral branding',
           'untagged audio',
-          'art add/remove',
+          'art add/remove, resize comparison and high-resolution warning',
+          'transparent artwork preserved without upscaling',
+          'batch artwork resize and per-track 48 kbps output',
           'dirty quote gate',
           'quote failure',
           'draft restore',

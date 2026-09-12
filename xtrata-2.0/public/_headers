@@ -48,3 +48,8 @@
 
 /wizard/music-diagnostics.js
   Cache-Control: no-cache
+
+/wizard/music-artwork.js
+  Cache-Control: no-cache
+/wizard/music-artwork-editor.js
+  Cache-Control: no-cache

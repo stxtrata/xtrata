@@ -50,3 +50,46 @@ it('reports engine wait, times out, and allows a fresh retry without recording f
   expect(JSON.stringify(events)).not.toContain('private');
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('passes 48 kbps to FFmpeg and caches each bitrate independently', async () => {
+  const commands: string[][] = [];
+  const window: any = {
+    FFmpeg: {
+      createFFmpeg: () => ({
+        load: async () => {},
+        exit: () => {},
+        FS: (op: string, name: string) =>
+          op === 'readFile'
+            ? name === 'out.weba'
+              ? new Uint8Array([1, 2, 3])
+              : name === 'meta.txt'
+                ? new TextEncoder().encode(';FFMETADATA1')
+                : null
+            : undefined,
+        run: async (...args: string[]) => {
+          commands.push(args);
+        }
+      })
+    }
+  };
+  vm.runInNewContext(code, {
+    window,
+    Date,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    TextDecoder,
+    Uint8Array,
+    btoa: (s: string) => Buffer.from(s, 'binary').toString('base64')
+  });
+  const f = new File(['audio'], 'song.wav');
+  const a = window.XtrataAudioProcessing;
+  await a.extract(f, () => {}, 'compact');
+  await a.extract(f, () => {}, 'compact');
+  expect(commands).toHaveLength(2);
+  expect(commands[0][commands[0].indexOf('-b:a') + 1]).toBe('48k');
+  await a.extract(f, () => {}, 'optimised');
+  expect(commands).toHaveLength(4);
+  expect(commands[2][commands[2].indexOf('-b:a') + 1]).toBe('96k');
+});
