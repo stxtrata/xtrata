@@ -325,7 +325,9 @@ async function api(path, opts){
 }
 
 // ---- wallet (window.XtrataWallet from agent-one.js) ----
-function xw(){ return window.XtrataWallet || null; }
+// Only an isolated automation harness installs this adapter. Never fall back to
+// an extension when the harness is present (including a disconnected wizard).
+function xw(){ return window.XtrataWizardFunding || window.XtrataWallet || null; }
 // BNS: show the .btc name; address hidden until the pill is clicked (reveal + copy; click again = name).
 let WALLET_NAME=null, WALLET_REVEAL=false;
 const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
@@ -358,9 +360,20 @@ async function connectWallet(){ const w=xw();
 async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
-async function payWallet(addr, ustx){ const w=xw();
+async function payWallet(addr, ustx, files){ const w=xw();
   if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
-  await w.pay({ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') }); }
+  const payment={ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
+  if(window.XtrataWizardFunding){
+    if(!JOB || JOB.depositAddress!==addr || JOB.expectedFunder!==WALLET) throw new Error('Wizard funding identity does not match this job');
+    const hashes=await Promise.all(files.map(async file=>{
+      const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+      return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+    }));
+    // Explicit public fields only: never pass a job object or deposit key out.
+    return w.pay({...payment, jobId:JOB.jobId, expectedFunder:JOB.expectedFunder,
+      user:JOB.user, playerHashes:hashes});
+  }
+  return w.pay(payment); }
 
 // ---- health ----
 (async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet'; SERVER.parentWindowMs=h.parentWindowMs||900000; SERVER.deployer=h.deployer||null;
@@ -619,6 +632,7 @@ $('#go').onclick=async()=>{
     PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
     const deps=depsList(), parents=parentList();
+    if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
     if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
     const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:'text/html', deps, parents, fastTrack:true, origin:'suno', receipt:wantReceipt(),
@@ -628,9 +642,9 @@ $('#go').onclick=async()=>{
     JOB=job;
     if(SERVER.mock){ setProg('MOCK — simulating inscription…', ['pay']); }
     else {
-      setProg('Opening your wallet to pay '+stx(job.requiredUstx)+'…', []);
-      try{ await payWallet(job.depositAddress, job.requiredUstx); }
-      catch(e){ $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
+      setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
+      try{ await payWallet(job.depositAddress, job.requiredUstx, [payload.file]); }
+      catch(e){ if(window.XtrataWizardFunding){ $('#hint').textContent=e.message; setProg('Wizard funding stopped — check the local funding plan or payment journal', []); updateGo(); return; } $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
       setProg('Waiting for payment to land…', []);
     }
     startPoll();
@@ -1156,6 +1170,7 @@ $('#sbGo').onclick=async()=>{
   try{
     const items=ready.map(it=>({ file:it.player, uri:'xtrata:song/'+((it.info&&it.info.title)?slug(it.info.title):slug(it.file.name)), mime:'text/html' }));
     const deps=depsList(), parents=parentList();
+    if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))) throw new Error('Dependencies must be token-id uints.');
     if(!parents.every(d=>/^\d+$/.test(d))) throw new Error('Parent must be a token-id uint.');
     // Job-level deps/parents apply to every item in the batch.
@@ -1167,9 +1182,9 @@ $('#sbGo').onclick=async()=>{
     JOB=job;
     if(SERVER.mock){ setProg('MOCK — simulating batch inscription…',['pay']); }
     else{
-      setProg('Opening your wallet to pay '+stx(job.requiredUstx)+'…', []);
-      try{ await payWallet(job.depositAddress, job.requiredUstx); }
-      catch(e){ $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
+      setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
+      try{ await payWallet(job.depositAddress, job.requiredUstx, items.map(it=>it.file)); }
+      catch(e){ if(window.XtrataWizardFunding){ $('#sbHint').textContent=e.message; setProg('Wizard funding stopped — check the local funding plan or payment journal', []); sbUpdateGo(); return; } $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
       setProg('Waiting for payment to land…', []);
     }
     startPoll();
