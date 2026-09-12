@@ -1,0 +1,5 @@
+import http from 'node:http';import {readFile} from 'node:fs/promises';
+const port=Number(process.env.CANARY_PORT||4180);
+if(!Number.isInteger(port)||port<1024||port>65535)throw Error('CANARY_PORT must be an integer from 1024 to 65535.');
+const files={'/':'index.html','/index.html':'index.html','/app.js':'app.js','/style.css':'style.css'};
+http.createServer(async(req,res)=>{const file=files[req.url];res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");if(!file||req.method!=='GET'){res.writeHead(404);return res.end();}try{res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(await readFile(new URL('canary/'+file,import.meta.url)));}catch{res.writeHead(503);res.end('Build the canary first.');}}).listen(port,'127.0.0.1',()=>console.log(`Passkey canary: http://127.0.0.1:${port}`));

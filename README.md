@@ -75,6 +75,10 @@ All resolve from on-chain data.
 
 What’s in this repo
 
+Standalone collaboration tools:
+
+- [Experimental passkey compatibility canary](tools/passkey-canary/README.md) — local software checks and disposable-device testing with DEorganized. Includes setup, pinned fixtures and known limitations.
+
 This repository contains:
 	•	the Xtrata smart contracts
 	•	a single-page web app for minting, viewing, and managing inscriptions
@@ -174,4 +178,3 @@ If Bitcoin is the settlement layer, and Stacks is the execution layer,
 Xtrata is the memory layer.
 
 ⸻
-

@@ -1,0 +1,77 @@
+# WebAuthn PRF support matrix (living doc)
+
+Seeded from the initial PRF diagnosis (V4, 2026-07-14); completed during later
+hardening. A passkey wallet needs **byte-identical PRF output across all of a
+user's synced devices** — that is the axis that matters here, not just "does PRF
+run."
+
+> **Verified-by-hand results** live in the companion
+> [`prf-verification-checklist.md`](./prf-verification-checklist.md). This file records
+> capability per spec and provider docs; that file records what has actually been
+> confirmed end-to-end on real devices.
+
+## Browser engine — does `getClientExtensionResults().prf.results` return bytes?
+
+| Engine | PRF | Since |
+|---|---|---|
+| Chrome / Edge desktop | ✅ | 116 (Aug 2023) |
+| Safari desktop (macOS) | ✅ | 18.0 (Sep 2024) |
+| Chrome on Android | ✅ | 116 |
+| Safari iOS/iPadOS | ✅ (reliable cross-device **18.4+**) | 18.0; floor 18.4 |
+| Firefox desktop | ✅ | 139 (May 2025) |
+| Firefox Android / Android WebView | ❌ | — |
+
+## Provider — PRF **and** byte-identical across synced devices?
+
+| Provider | PRF | Synced-consistent | Notes |
+|---|---|---|---|
+| **iCloud Keychain** | ✅ | ✅ | iOS/iPadOS 18.4+, macOS 15.4+. The 18.0–18.3 hybrid-vs-local mismatch is fixed in 18.4. |
+| **Google Password Manager** | ✅ | ✅ | On by default; broadest and most reliable. |
+| **Windows Hello** | ✅ | ❌ | Device-bound (TPM). Would be a single-device wallet — **`createPasskey()` rejects it before deriving**; the `get()` path applies no gate today ([#13](https://github.com/DeOrganized/stacks-passkey-wallet/issues/13), [`get-vs-create-ambiguity.md`](./get-vs-create-ambiguity.md#checking-backup-eligibility-on-the-get-path)). |
+| **Hardware keys** | ✅ (fw ≥5.2) | ❌ | Device-bound. |
+| **Hybrid / caBLE (QR)** | ✅ | follows phone's provider | |
+
+## Launch support (this library)
+
+| Tier | Target |
+|---|---|
+| Supported | iCloud Keychain (iOS/iPadOS 18.4+, macOS 15.4+); Google Password Manager (Chrome/Edge 116+, incl. Windows & Android) |
+| Rejected at `createPasskey()` | Windows Hello, hardware keys — device-bound; no `get()`-path gate today (#13) |
+| Unsupported | Firefox Android, Android WebView, cross-vendor hybrid |
+
+The **iOS 18.4 floor is a conservative user-agent check in code**
+(`assertPlatformSupportsPrf`), not a capability probe — user agents it does not
+recognize pass through to WebAuthn's own typed errors. Windows *users* are
+supported via Google Password Manager; the host calls `providerGuidance()`
+during create to steer them there (see [`integration.md`](./integration.md)).
+
+## Failure surface (for feature detection)
+
+Unsupported PRF is signalled non-uniformly:
+
+| Situation | `getClientExtensionResults()` |
+|---|---|
+| Browser ignored the extension | `prf` absent → `PrfUnsupportedError("prf-not-processed")` |
+| Authenticator can't PRF at create | `{ prf: { enabled: false } }` → `PrfUnsupportedError("prf-not-enabled")` |
+| `get()` returned no bytes | `{ prf: {} }` → `PrfUnsupportedError("no-prf-results")` |
+
+Ground truth is a real `get()` returning `prf.results.first` of 32 bytes.
+
+## Implementation gotchas (carried into the library)
+
+- **Salt is hashed by the browser:** `actualSalt = SHA-256("WebAuthn PRF" ‖ 0x00 ‖ inputSalt)`.
+- **HKDF the PRF output** before BIP-39 (don't use PRF bytes directly).
+- **Dedicated `get()`** for bytes; don't rely on create-time results.
+- **UV consistency:** create and get must use identical `userVerification` (CTAP2
+  keeps separate UV/non-UV PRFs). Enforced + tested.
+- **UV is not biometric-specific:** a knowledge-factor screen lock (PIN/pattern)
+  satisfies `userVerification: "required"` — confirmed on GPM/Android with no
+  biometric enrolled. Users who cannot or do not enrol a biometric are not excluded
+  from a passkey wallet. Evidence in
+  [`prf-verification-checklist.md`](./prf-verification-checklist.md).
+
+## Sources
+
+W3C WebAuthn L3 · MDN WebAuthn extensions · WebKit Safari 18.0 notes · Chrome 116
+notes · Apple Developer Forums 764730/774112 · Chrome-for-Devs GPM · Yubico PRF
+guides. See the M1 diagnosis report for the full citation set.

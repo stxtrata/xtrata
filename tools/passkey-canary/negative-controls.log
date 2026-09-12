@@ -1,0 +1,11 @@
+Negative controls, against vector: all-zero
+
+  [OK] 1. one flipped PRF byte → different mnemonic
+  [OK] 2. different PRF salt → different universe
+  [OK] 3. different HKDF info → different entropy
+  [OK] 4. testnet at mainnet coin type 0' → NOT the frozen testnet address — wrong-path address tb1qjyexgupjwsfy3uuxec724salu4ax24pe3za3vd
+  [OK] 5. corrupted expected address → verifier reports FAIL — 2 assertion failure(s) raised
+
+=================================
+RESULT: ALL 5 CONTROLS BEHAVED CORRECTLY
+=================================
