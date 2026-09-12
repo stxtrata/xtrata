@@ -69,7 +69,7 @@ try {
     buf.writeInt16LE(Math.round(3000 * Math.sin((2 * Math.PI * 440 * i) / 44100)), 44 + i * 2);
   assert.equal(await p.locator('#musicQuality').inputValue(), 'optimised');
   await p.locator('#musicQuality').selectOption('original');
-  await p.locator('#musicFormat').selectOption('audio');
+  await p.locator('input[name=musicReleaseFormat][value=audio]').check();
   await p
     .locator('#picker')
     .setInputFiles({ name: 'untagged-tone.wav', mimeType: 'audio/wav', buffer: buf });
@@ -105,7 +105,7 @@ try {
   await p.waitForFunction(() => !building && META?.quality === 'compact', {}, { timeout: 180000 });
   assert.equal(await p.evaluate(() => META.audioLabel), 'Opus 48 kbps VBR');
   assert((await p.evaluate(() => PLAYER.size)) < size96);
-  await p.locator('#musicFormat').selectOption('details');
+  await p.locator('input[name=musicReleaseFormat][value=details]').check();
   await p.waitForFunction(() => !building && META?.format === 'details', {}, { timeout: 180000 });
   await p.locator('#musicStyleControls [data-option="timeline"]').selectOption('waveform');
   await p.waitForFunction(

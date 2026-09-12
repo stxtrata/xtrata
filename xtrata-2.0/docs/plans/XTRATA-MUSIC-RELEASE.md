@@ -178,3 +178,19 @@ and details/lyrics dialogs. Editor smoke covers styles, palette/type/framing,
 draft restoration, per-track batch overrides, artwork optimisation and simulated
 payments. Real-audio smoke covers 48/96/128/160 kbps encoding, waveform generation,
 playback and corrupt-file rejection. No personal wallets or real payments are used.
+
+
+## Visual release selection — 2026-09-12
+
+The top-level format dropdown is now three persistent icon-and-text radio cards:
+Audio only, Audio + metadata, and Audio + metadata + artwork. All remain in one
+row at phone widths, with a checked indicator and keyboard focus. Selection uses
+the existing output/requote flow, so changes invalidate the prior quote and reuse
+prepared audio. Cards lock during preparation and funded jobs. Audio-only hides
+the player/metadata editor; metadata adds the player/details; artwork also exposes
+cover and crop controls. The selected card follows restored drafts. Batch format
+changes update all tracks, hiding appearance when the entire batch is audio-only.
+
+Validation: production build, focused music tests, targeted script lint, and the
+browser smoke (card switching, conditional controls, mobile alignment, single and
+batch transitions, and existing draft/quote/payment simulations).

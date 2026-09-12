@@ -46,7 +46,7 @@ function showMusicPreview(r) {
 }
 function musicBusy(busy) {
   for (const el of document.querySelectorAll(
-    '#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    'input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = busy || !!musicJobActive();
 }
@@ -55,7 +55,7 @@ function musicUnlockJob() {
 }
 function musicLockJob() {
   for (const el of document.querySelectorAll(
-    '#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    'input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = true;
   updateGo();
@@ -115,6 +115,18 @@ function musicFormatHelp() {
   if (window.musicAppearance) window.musicAppearance.visibility();
   const format = $('#musicFormat').value,
     quality = $('#musicQuality').value;
+  document.querySelectorAll('input[name=musicReleaseFormat]').forEach((input) => {
+    input.checked = input.value === format;
+  });
+  document
+    .querySelectorAll(
+      '#musicStyleControls [data-option="artFit"],#musicStyleControls [data-option="position"]'
+    )
+    .forEach((input) => {
+      input.closest('label').hidden = format !== 'artwork' && !SB.active;
+    });
+  $('#editToggle').textContent =
+    format === 'artwork' ? 'Edit artwork, metadata and lyrics' : 'Edit metadata and lyrics';
   $('#formatHelp').textContent =
     format === 'audio'
       ? 'Only the audio file is inscribed. Existing tags and embedded artwork remain inside original files; no additional metadata or player is added.'
@@ -135,6 +147,13 @@ function musicFormatHelp() {
   $('#editWrap').style.display = FILE && format !== 'audio' && !SB.active ? 'block' : 'none';
   $('#eCoverBtn').closest('.efield').style.display = format === 'artwork' ? 'block' : 'none';
 }
+document.querySelectorAll('input[name=musicReleaseFormat]').forEach((input) => {
+  input.addEventListener('change', () => {
+    if (!input.checked || building || SB.busy || musicJobActive()) return;
+    $('#musicFormat').value = input.value;
+    $('#musicFormat').dispatchEvent(new Event('change'));
+  });
+});
 for (const id of ['#musicFormat', '#musicQuality'])
   $(id).onchange = () => {
     if (musicJobActive()) return;
@@ -150,6 +169,7 @@ for (const id of ['#musicFormat', '#musicQuality'])
         };
         it.status = 'queued';
       }
+      musicFormatHelp();
       sbProcess();
     } else if (FILE) {
       markEditsDirty();
@@ -382,6 +402,7 @@ $('#restoreMusicDraft').onclick = async () => {
     window.musicAppearance.set(d.appearance || d.items[0]?.overrides?.appearance);
     $('#musicFormat').value = d.format;
     $('#musicQuality').value = d.quality;
+    musicFormatHelp();
     if (d.items.length === 1) {
       sbResetUI();
       await pickFile(d.items[0].file);

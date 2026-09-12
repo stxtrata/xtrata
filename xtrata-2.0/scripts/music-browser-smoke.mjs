@@ -96,6 +96,13 @@ try {
     })
   );
   await page.goto(base + '/music/');
+  assert.equal(await page.locator('.music-format-card').count(), 3);
+  assert(await page.locator('input[name=musicReleaseFormat][value=details]').isChecked());
+  await page.locator('input[name=musicReleaseFormat][value=audio]').check();
+  assert(await page.locator('#musicAppearancePanel').isHidden());
+  await page.locator('input[name=musicReleaseFormat][value=details]').check();
+  assert(await page.locator('#musicAppearancePanel').isVisible());
+  assert(await page.locator('#musicStyleControls [data-option=artFit]').isHidden());
   assert.equal(await page.locator('#musicQuality').inputValue(), 'optimised');
   await page.locator('#musicQuality').selectOption('original');
   await page.waitForSelector('#saveMusicDraft');
@@ -136,7 +143,7 @@ try {
   assert(await page.locator('#go').isDisabled());
   await page.locator('#applyEdits').click();
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
-  await page.locator('#musicFormat').selectOption('artwork');
+  await page.locator('input[name=musicReleaseFormat][value=artwork]').check();
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   const cover = await page.evaluate(() => {
     const c = document.createElement('canvas');
@@ -164,6 +171,8 @@ try {
   await page.locator('#artworkApply').click();
   await page.waitForFunction(() => META.hasCover && !document.querySelector('#go').disabled);
   assert(await page.evaluate(() => META.hasCover));
+  assert(await page.locator('#eCoverBtn').isVisible());
+  assert(await page.locator('#musicStyleControls [data-option=artFit]').isVisible());
   await page.locator('#musicRemoveArt').click();
   await page.locator('#applyEdits').click();
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
@@ -218,12 +227,27 @@ try {
   assert.equal(await page.evaluate(() => META.audioLabel), 'Opus 48 kbps VBR');
   await page.locator('#musicQuality').selectOption('original');
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
-  await page.locator('#musicFormat').selectOption('audio');
+  await page.locator('input[name=musicReleaseFormat][value=audio]').check();
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   assert.equal(await page.evaluate(() => PLAYER.text()), 'exact fixture audio');
   assert.equal(await page.evaluate(() => PLAYER.type), 'audio/wav');
   assert(await page.locator('#musicAppearancePanel').isHidden());
   await page.setViewportSize({ width: 390, height: 844 });
+  const cards = await page.locator('.music-format-card').evaluateAll((nodes) =>
+    nodes.map((el) => ({
+      top: el.getBoundingClientRect().top,
+      left: el.getBoundingClientRect().left,
+      right: el.getBoundingClientRect().right
+    }))
+  );
+  assert(
+    cards.every(
+      (card) => Math.abs(card.top - cards[0].top) < 2 && card.left >= 0 && card.right <= 390
+    )
+  );
+  await page
+    .locator('.music-format-picker')
+    .screenshot({ path: '/tmp/music-format-cards-mobile.png' });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await mkdir('/tmp/xtrata-music-qa', { recursive: true });
   await page.screenshot({ path: '/tmp/xtrata-music-qa/mobile.png', fullPage: true });
@@ -242,6 +266,13 @@ try {
   await page.waitForSelector('#saveMusicDraft');
   await page.locator('#picker').setInputFiles([file, { ...file, name: 'second.wav' }]);
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);
+  await page.locator('input[name=musicReleaseFormat][value=audio]').check();
+  await page.waitForFunction(() => !SB.busy && !document.querySelector('#sbGo').disabled);
+  assert(await page.locator('#musicAppearancePanel').isHidden());
+  assert(await page.evaluate(() => SB.items.every((item) => item.info.format === 'audio')));
+  await page.locator('input[name=musicReleaseFormat][value=details]').check();
+  await page.waitForFunction(() => !SB.busy && !document.querySelector('#sbGo').disabled);
+  assert(await page.locator('#musicAppearancePanel').isVisible());
   await page.locator('#musicStyleControls [data-style="studio"]').click();
   await page.locator('#musicStyleApplyAll').click();
   await page.waitForFunction(() => !SB.busy && !document.querySelector('#sbGo').disabled);
@@ -303,6 +334,7 @@ try {
         base,
         checks: [
           'neutral branding',
+          'three visible format cards with responsive editor sections',
           'all player styles, palettes, typography, framing, preview sizes and draft restoration',
           'batch appearance application with independent per-track styles',
           'untagged audio',

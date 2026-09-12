@@ -203,7 +203,13 @@
         })
     );
     const visibility = () => {
-      section.hidden = document.querySelector('#musicFormat').value === 'audio' && !SB.active;
+      const format = document.querySelector('#musicFormat').value;
+      const hasPlayers =
+        SB.active &&
+        SB.items.some(
+          (item) => (item.overrides?.format || item.info?.format || format) !== 'audio'
+        );
+      section.hidden = format === 'audio' && !hasPlayers;
       document.querySelector('#musicStyleApplyAll').hidden = !SB.active;
     };
     new MutationObserver(visibility).observe(document.querySelector('#musicBatch'), {
