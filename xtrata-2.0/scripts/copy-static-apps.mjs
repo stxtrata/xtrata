@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
 
 const staticApps = [
+  { source: 'music', target: 'dist/music' },
   {
     source: 'opus-file-generator',
     target: 'dist/opus-file-generator'

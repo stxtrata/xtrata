@@ -1,9 +1,11 @@
 <!doctype html>
 <html lang="en">
 <head>
+<base href="/wizard/" />
+<meta name="description" content="Inscribe your music with optional artwork, lyrics and credits. Preserve your original recording or prepare a smaller playable release with Xtrata Music." />
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SUNO More — do more with your Suno music · Xtrata Inscription Wizard</title>
+<title>Xtrata Music — inscribe your music</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
 <style>
@@ -24,8 +26,8 @@
   main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 18px 64px}
   .card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
   h1{margin:0 0 6px;font-size:22px}
-  .suno-logo{margin:2px 0 14px;line-height:0;text-align:center}
-  .suno-logo img{display:inline-block;width:auto;height:auto;max-width:300px;max-height:188px;border-radius:14px;border:1px solid rgba(255,255,255,.06);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  .music-logo{margin:2px 0 14px;line-height:0;text-align:center}
+  .music-logo img{display:inline-block;width:auto;height:auto;max-width:300px;max-height:188px;border-radius:14px;border:1px solid rgba(255,255,255,.06);box-shadow:0 8px 30px rgba(0,0,0,.4)}
   .lead{color:var(--mut);font-size:13.5px;margin:0 0 20px}
   .tag{display:inline-block;background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:14px}
   .drop{border:1.6px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;transition:.15s;cursor:pointer}
@@ -67,11 +69,12 @@
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
+<link rel="stylesheet" href="music.css?v=4" />
 </head>
 <body>
 <header>
   <img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;flex:none" />
-  <div class="logo"><b>XTRATA</b> <i>Inscription Wizard</i> · SUNO More</div>
+  <a class="logo" href="/" style="text-decoration:none"><b>XTRATA</b> <i>Music</i></a>
   <div class="spacer"></div>
   <span id="health" class="pill">connecting…</span>
   <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
@@ -80,31 +83,68 @@
 
 <main>
   <div class="card">
-    <span class="tag">⚡ one payment → full player on-chain</span>
-    <h1 class="suno-logo"><img src="/suno-more/assets/suno-more-logo.webp" alt="SUNO More — one song, infinite possibilities" /></h1>
-    <p class="lead">You made the song — now do more with it. Drop any audio and pay once: your browser optimises it to Opus, pulls in whatever cover art, title, artist &amp; lyrics the file already carries, and builds a self-contained player. A Suno export arrives with all of that embedded and goes straight through; anything else just asks you for the missing pieces first. The agent inscribes the master and returns the token + receipt to your wallet, change refunded.</p>
-    <p class="lead" style="font-size:13.5px;opacity:.85">🔑 <b>Self-custody, start to finish.</b> Your song stays on your machine until you pay, and your deposit goes to a one-shot wallet <b>your own browser creates and controls</b> — never to us. It is emptied and its key destroyed the moment your inscription and change are back with you.</p>
-
+    <span class="tag">Built using Xtrata Protocol</span>
+    <h1 class="music-title">Xtrata Music</h1>
+    <p class="music-subtitle">Your music. Preserved on-chain.</p>
+    <p class="lead">For songs, instrumentals, live recordings, demos and finished releases. Start with your audio. Add as much or as little artwork, lyrics and credits as you like.</p>
+    <fieldset class="music-format-picker" aria-describedby="formatHelp">
+      <legend>Choose what to inscribe</legend>
+      <div class="music-format-cards">
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="audio" />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 34V12l20-4v22M20 19l20-4"/><ellipse cx="14" cy="35" rx="6" ry="5"/><ellipse cx="34" cy="31" rx="6" ry="5"/></svg></span>
+          <strong>Audio only</strong>
+          <small>Just your recording</small>
+          <span class="music-format-description">Preserve or optimise the audio file.</span>
+        </label>
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="details" checked />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="5" width="32" height="38" rx="4"/><path d="M25 24V13l8-2v10M15 32h18M15 37h12"/><ellipse cx="21" cy="25" rx="4" ry="3"/></svg></span>
+          <strong>Audio + metadata</strong>
+          <small>Your song and its story</small>
+          <span class="music-format-description">A player with credits, details and lyrics.</span>
+        </label>
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="artwork" />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="36" height="38" rx="4"/><path d="M6 30l11-12 8 8 6-6 11 10M14 35h20M14 39h13"/><circle cx="32" cy="13" r="3"/></svg></span>
+          <strong>Audio + metadata + artwork</strong>
+          <small>The complete presentation</small>
+          <span class="music-format-description">Add a cover to your player, credits and lyrics.</span>
+        </label>
+      </div>
+    </fieldset>
+    <select id="musicFormat" class="music-format-value" hidden aria-hidden="true" tabindex="-1"><option value="audio">Audio only</option><option value="details" selected>Audio + metadata</option><option value="artwork">Audio + metadata + artwork</option></select>
+    <div class="music-steps" aria-label="Creation steps">1 · Choose a format <span>2 · Prepare & preview</span> <span>3 · Review & inscribe</span></div>
+    <div class="music-options music-audio-options">
+      <label>Audio quality<select id="musicQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label>
+    </div>
+    <p class="muted" id="formatHelp">A playable release with optional details. Your original audio is preserved inside the player.</p>
+    <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription.<span id="musicLossyWarning"> Optimisation is lossy; keep your original master.</span></p>
     <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.oga,.opus,.aiff,.aif" multiple hidden />
-    <div id="drop" class="drop">
+    <div id="drop" class="drop" role="button" tabindex="0" aria-label="Choose audio files">
       <div class="drop-main">Drop your music here</div>
-      <div class="drop-sub">or <u>browse</u> — one song, or several for a batch (embedded cover art + title)</div>
+      <div class="drop-sub">or <u>browse</u> — one song or several tracks · metadata and artwork are optional</div>
     </div>
 
+    <div class="music-fee-choice">
+      <label for="musicFeeMode">Processing budget</label>
+      <select id="musicFeeMode"><option value="standard">Standard · more room for network fees</option><option value="economy">Economy · lower initial budget</option></select>
+      <p id="musicFeeHelp" class="muted">More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.</p>
+    </div>
     <div id="quote" class="quote">
       <div class="kv"><span>Track</span><span id="qName">—</span></div>
-      <div class="kv"><span>Player</span><span id="qPlayer">—</span></div>
+      <div class="kv"><span>Inscription output</span><span id="qPlayer">—</span></div>
       <div class="kv tot"><span>Pay once</span><span id="qPay">—</span></div>
-      <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished player's exact size. Over-collected for fees; unused remainder refunded on delivery.</div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished output's exact size. Over-collected for fees; unused remainder refunded on delivery.</div>
     </div>
 
     <div id="preview" style="display:none;margin-top:16px">
       <div class="muted" style="font-size:12px;margin-bottom:8px">▶ Preview — play it before you inscribe:</div>
-      <iframe id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
+      <iframe sandbox="allow-scripts" id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
     </div>
 
     <!-- BATCH mode: several tracks → one payment, N players, one receipt (fast isolated core). -->
-    <div id="sunoBatch" style="display:none;margin-top:16px">
+    <div id="musicBatch" style="display:none;margin-top:16px">
       <div id="sbHead" class="muted" style="font-size:12.5px;margin-bottom:10px"></div>
       <div id="sbList"></div>
       <div id="sbDropped" class="muted" style="font-size:11.5px;margin-top:2px"></div>
@@ -155,7 +195,7 @@
     <div id="receiptWrap" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
       <label class="checkline" style="display:flex;align-items:flex-start;gap:9px;cursor:pointer">
         <input type="checkbox" id="receiptToggle" />
-        <span style="font-size:12.5px">Also inscribe an on-chain receipt <span class="muted">— a second permanent token recording what you paid (~0.1 STX extra). A readable receipt is saved either way, so this is off unless you want the on-chain copy.</span></span>
+        <span style="font-size:12.5px">Also inscribe an on-chain receipt <span class="muted">— a second permanent token recording what you paid (included in the quote when selected). A readable receipt is saved either way, so this is off unless you want the on-chain copy.</span></span>
       </label>
     </div>
     <div id="relWrap" style="display:none;margin-top:12px">
@@ -185,6 +225,7 @@
       </div>
     </div>
 
+    <p class="muted">Review before you inscribe: the selected files and details become public and permanent. Credits and rights information are supplied by you. Confirm that you have permission to publish this material.</p>
     <button id="go" class="btn" disabled>Drop a track to begin</button>
     <div id="hint" class="hint"></div>
 
@@ -213,6 +254,27 @@
         <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
         <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
       </div>
+      <section id="musicSpeed" class="music-speed" hidden aria-labelledby="musicSpeedTitle">
+        <h3 id="musicSpeedTitle">Economy processing</h3>
+        <p id="musicSpeedStatus"></p><p id="musicSpeedExpiry" class="muted"></p>
+        <button id="musicSpeedOpen" class="btn ghost" type="button">Speed up</button>
+        <div id="musicSpeedReview" hidden>
+          <div class="kv"><span>Funds currently in the job</span><strong id="musicSpeedBalance"></strong></div>
+          <div class="kv"><span>Additional payment</span><strong id="musicSpeedExtra"></strong></div>
+          <div class="kv"><span>New total approved funding</span><strong id="musicSpeedTotal"></strong></div>
+          <div class="kv"><span>Service fee included in total</span><strong id="musicSpeedService"></strong></div>
+          <p class="muted">Wallet transfer fees are additional. Unused job funds return on delivery. This quote is valid for two minutes.</p>
+          <button id="musicSpeedApprove" class="btn" type="button">Confirm faster processing</button>
+          <button id="musicSpeedKeep" class="btn ghost" type="button">Keep waiting</button>
+        </div>
+        <div id="musicTopUpRecovery" hidden>
+          <label for="musicTopUpTx">Check your wallet activity, then paste the additional payment's transaction ID</label>
+          <input id="musicTopUpTx" type="text" autocomplete="off" spellcheck="false" />
+          <button id="musicTopUpCheck" class="btn ghost" type="button">Check payment</button>
+        </div>
+        <p id="musicTopUpTxStatus" class="muted"></p>
+        <p id="musicSpeedError" class="err" role="alert"></p>
+      </section>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
         <div class="muted" style="font-size:11px;margin-top:5px">Stops at the next safe point. Anything already uploaded stays on-chain unsealed and costs nothing more; the rest of your deposit comes straight back.</div>
@@ -226,32 +288,23 @@
 <footer>Runs entirely in your browser · need the full controls? Open the <a href="./" target="_blank" rel="noopener">Inscription Wizard</a>.</footer>
 
 <script>
-  // Backendless config. ?mock=1 runs the whole flow offline (no chain).
   (function(){ var qs=new URLSearchParams(location.search);
     var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="HTML_Template.js?v=6"></script>
-<script src="audio-processing.js?v=1"></script>
-<script src="suno-build.js?v=8"></script>
+<script src="music-player.js?v=1"></script>
+<script src="music-diagnostics.js?v=1"></script>
+<script src="audio-processing.js?v=3"></script>
+<script src="music-build.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="agent-one.js?v=2026-09-12.1"></script>
 <script>
+let musicSubmitting=false;
+function musicJobActive(){return musicSubmitting||(typeof JOB!=='undefined'&&JOB&&!['DONE','COMPLETE','COMPLETE_WITH_SKIPS','COMPLETED','REFUNDED','CANCELLED','FAILED'].includes(JOB.status));}
 const SERVER = { mock:false, net:'mainnet' };
-// Batch state, declared HERE rather than beside its helpers further down. routeDrop and
-// updateGo both read it during page load, and a `const` used before its declaration line
-// is in the temporal dead zone — where `typeof SB !== 'undefined'` does NOT save you: it
-// throws ReferenceError rather than returning 'undefined'. That is exactly what broke
-// this page on load and on the first dropped file.
 const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
-// VERSION HANDSHAKE: this page requires AT LEAST the agent bundle build below. The site's deploy
-// pipeline rebuilds agent-one.js from src/agent-one/*.ts — if that source hasn't been updated, the
-// stale agent is detected here and live inscriptions are blocked (a stale agent burns real miner
-// fees on refund loops). Builds are date-stamped (YYYY-MM-DD.N) so a string compare orders them;
-// a NEWER deployed bundle must pass — requiring an exact match wrongly locked the page out
-// whenever the agent shipped ahead of the page.
-const XAO_MIN_AGENT_BUILD='2026-07-28.7';
+const XAO_MIN_AGENT_BUILD='2026-09-12.1';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -266,35 +319,16 @@ const $ = (s)=>document.querySelector(s);
 const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
 const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
-// SUNO takes ANY audio. A Suno export already carries cover art, title and artist and
-// goes straight through; every other file is built the same way and simply asks for the
-// missing pieces before it can be inscribed.
-const DROP_HTML='<div class="drop-main">Drop your music here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch. MP3, WAV, FLAC, M4A, OGG. Suno exports bring their own artwork; anything else, you add it here.</div>';
-// TWO different limits, on two different files.
-//
-// 1. The SOURCE you drop in. Bounded only by what the in-browser encoder can chew
-//    through, because this file never goes on-chain — it is transcoded to Opus first.
-//    WAV is uncompressed at roughly 10 MiB per minute, so 128 MiB is about a
-//    12-minute lossless master.
+const DROP_HTML='<div class="drop-main">Drop your music here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch. MP3, WAV, FLAC, M4A, OGG. Artwork and metadata are optional for every recording.</div>';
 const AUDIO_MAX_MB=128;
-// 2. The PLAYER that actually gets inscribed. This one is the contract's own hard cap:
-//    xtrata-v3-2-3 defines MAX-TOTAL-CHUNKS u2048 * CHUNK-SIZE u16384 = 33,554,432
-//    bytes, and refuses anything larger. Opus at 96k VBR plus the base64 embedding
-//    runs near 1 MiB per minute, so this is roughly a 33-minute track — nowhere near
-//    it for a song, but reachable for a long mix, and worth catching HERE rather than
-//    at seal time when the deposit has already been spent.
 const CHAIN_MAX_BYTES=33554432;
 const CHAIN_MAX_MB=CHAIN_MAX_BYTES/1048576;
-// Matches MAX_BATCH_ITEMS in agent-core: the receipt's dependency list is capped at 50
-// by the contract, and parents plus the identity link need the remaining headroom.
 const BATCH_MAX=40;
 const MP3_MAX_MB=AUDIO_MAX_MB;   // legacy name, still referenced in a few messages
-// Any audio the in-browser encoder can read. A Suno export already carries artwork,
-// title and artist and sails through; everything else is built the same way and simply
-// asks for what is missing before it can be inscribed.
 const AUDIO_EXT=['mp3','wav','flac','m4a','aac','ogg','oga','opus','weba','webm','aiff','aif','wma'];
 function validateAudio(f){
   if(!f) return 'No file selected.';
+  if(!f.size) return 'This file is empty. Choose an audio recording.';
   const ext=((f.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'').toLowerCase();
   const looksAudio = AUDIO_EXT.includes(ext) || (f.type||'').toLowerCase().startsWith('audio/');
   if(!looksAudio) return 'That does not look like an audio file. Drop an MP3, WAV, FLAC, M4A or OGG — anything else belongs in the <a href="./" target="_blank" rel="noopener" style="color:var(--acc2)">main wizard</a>.';
@@ -302,8 +336,7 @@ function validateAudio(f){
   if(mb>AUDIO_MAX_MB) return 'Audio is capped at '+AUDIO_MAX_MB+' MiB here (the encode runs in your browser) — yours is '+mb.toFixed(1)+' MiB.';
   return null;
 }
-const validateSuno=validateAudio;   // old name, same check
-// Block + redirect: reset the page and offer the modular main wizard.
+const validateMusic=validateAudio;   // old name, same check
 function rejectToWizard(msg){
   FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
@@ -312,12 +345,11 @@ function rejectToWizard(msg){
   building=false; $('#go').disabled=true; $('#go').textContent='Drop a track to begin';
 }
 function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
-// Backendless data layer: former /api/* → window.XtrataAgent.
 async function api(path, opts){
   const A=xa(); const m=(opts&&opts.method)||'GET';
   let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
   if(path==='/api/health') return A.health();
-  if(path==='/api/estimate') return A.estimate(body);
+  if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate({...body,feeMode:musicFeeMode()});window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
   if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
@@ -325,11 +357,7 @@ async function api(path, opts){
   throw new Error('no route: '+path);
 }
 
-// ---- wallet (window.XtrataWallet from agent-one.js) ----
-// Only an isolated automation harness installs this adapter. Never fall back to
-// an extension when the harness is present (including a disconnected wizard).
 function xw(){ return window.XtrataWizardFunding || window.XtrataWallet || null; }
-// BNS: show the .btc name; address hidden until the pill is clicked (reveal + copy; click again = name).
 let WALLET_NAME=null, WALLET_REVEAL=false;
 const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
 async function bnsLookup(addr){ try{
@@ -347,12 +375,6 @@ async function walletPillClick(){ if(!WALLET) return;
 function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; const b=$('#connectBtn');
   if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
   else { b.textContent='Connect wallet'; renderWalletPill(); }
-  // Whether the parent is "yours" depends on which wallet is connected.
-  // DEFERRED on purpose: setWallet runs during initial script evaluation (the
-  // reconnect probe at the bottom of this file), and checkParent touches consts
-  // declared further down — a temporal dead zone. checkParent is also async, so the
-  // ReferenceError surfaced as an unhandled rejection that a plain try/catch here
-  // could never see. A timeout of 0 runs it once the whole script has evaluated.
   try{ setTimeout(()=>{ Promise.resolve(checkParent()).catch(()=>{}); }, 0); }catch(_e){}
   updateGo(); }
 async function connectWallet(){ const w=xw();
@@ -361,76 +383,65 @@ async function connectWallet(){ const w=xw();
 async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
-async function payWallet(addr, ustx, files){ const w=xw();
+async function payWallet(addr, ustx, files, trackResult=false){ const w=xw();
   if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
-  const payment={ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
+  const payment={ trackResult, recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
   if(window.XtrataWizardFunding){
     if(!JOB || JOB.depositAddress!==addr || JOB.expectedFunder!==WALLET) throw new Error('Wizard funding identity does not match this job');
     const hashes=await Promise.all(files.map(async file=>{
       const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
       return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
     }));
-    // Explicit public fields only: never pass a job object or deposit key out.
     return w.pay({...payment, jobId:JOB.jobId, expectedFunder:JOB.expectedFunder,
       user:JOB.user, playerHashes:hashes});
   }
   return w.pay(payment); }
 
-// ---- health ----
 (async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet'; SERVER.parentWindowMs=h.parentWindowMs||900000; SERVER.deployer=h.deployer||null;
   $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net+' · agent '+(window.XAO_AGENT_BUILD||'pre-v');
   checkAgentBuild();
 }catch(e){ $('#health').textContent='agent not loaded'; $('#health').style.color='var(--bad)'; } updateGo(); })();
 (function(){ try{ const w=xw(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
 
-// ---- file pick / drop → build the player in-browser, then quote on its exact size ----
 const drop=$('#drop'), picker=$('#picker');
 drop.onclick=()=>picker.click();
-// One file → the single-song fast track (unchanged). Several → batch mode. A single file
-// dropped while a batch is open is added to that batch.
-function routeDrop(fs){ fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!SB.active) pickFile(fs[0]); else enterSunoBatch(fs); }
+function routeDrop(fs){ if(building||SB.busy||musicJobActive()) return; fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!SB.active) pickFile(fs[0]); else enterMusicBatch(fs); }
 picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; };
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
 ['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
 drop.addEventListener('drop',e=>{ routeDrop(Array.from((e.dataTransfer&&e.dataTransfer.files)||[])); });
 
 async function pickFile(f){
-  const verr=validateSuno(f);
+  const verr=validateMusic(f);
+  clearEditsDirty();
   if(verr){ rejectToWizard(verr); return; }
   FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
   $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none';
   drop.classList.add('has');
   drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
-  building=true; updateGo();
+  building=true; musicBusy(true); updateGo();
   try{
-    // GATE: a Suno export must carry embedded cover art + title + artist. Probe before the heavy encode.
     $('#hint').innerHTML='<span class="spin"></span>Checking your track…';
-    const p=await window.XtrataSuno.probe(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
-    // ANY MP3 is welcome. A Suno export arrives with artwork, title and artist already
-    // embedded and sails through; anything else is built just the same and simply asks
-    // for the missing pieces before it can be inscribed. Sending someone to another
-    // page to type a title was a heavier bounce than the problem deserved.
+
     NEEDS = [];
-    if(!p.hasCover) NEEDS.push('artwork'); if(!p.hasTitle) NEEDS.push('a title'); if(!p.hasArtist) NEEDS.push('an artist');
+
     $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
-    const r=await window.XtrataSuno.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
+    const r=await window.XtrataMusic.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
-    if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
-    $('#qName').textContent=(r.title||f.name)+(r.artist?(' — '+r.artist):'');
+    showMusicPreview(r);
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
+    $('#qName').textContent=r.format==='audio'?f.name:(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     const mib=(n)=>(n/1048576).toFixed(2);
-    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
-    // Conversion transparency: source → Opus (Music HQ 96k VBR) → base64-in-player.
-    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → Opus 96k VBR '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → '+r.audioLabel+' '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
     $('#quote').className='quote show';
     prefillEdits(r);
     refreshNeeds(r);
   }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
-  building=false; updateGo();
+  building=false; musicBusy(false); updateGo();
 }
 
-// ---- optional edit panel (fast track untouched; expands on demand) ----
 let COVER_OVERRIDE; // undefined = keep extracted art; {b64,mime} = replacement
 function prefillEdits(r){
   COVER_OVERRIDE=undefined;
@@ -461,8 +472,6 @@ $('#eCoverPick').onchange=()=>{
     $('#editHint').innerHTML='<span style="color:var(--warn)">New artwork staged — press <b>Apply changes</b> to put it in the player.</span>'; };
   rd.readAsDataURL(f);
 };
-// Any keystroke in the panel counts, including the ones that do not change the player's
-// size — a missing lyric sheet is as invisible on-chain as a missing title.
 ['#eTitle','#eArtist','#eAlbum','#eLyrics','#eBpm','#eNote','#eLicense','#eDescription']
   .forEach(sel=>{ const el=$(sel); if(el) el.addEventListener('input',markEditsDirty); });
 
@@ -474,37 +483,27 @@ function collectEdits(){
   return o;
 }
 $('#applyEdits').onclick=async()=>{
-  if(!FILE||building) return;
-  building=true; updateGo(); $('#editHint').innerHTML='<span class="spin"></span>Rebuilding player…';
+  if(!FILE||building||musicJobActive()) return;
+  EST=null; building=true; musicBusy(true); updateGo(); $('#editHint').innerHTML='<span class="spin"></span>Rebuilding player…';
   try{
-    // Cached extraction in suno-build.js → no re-encode; this is near-instant.
-    const r=await window.XtrataSuno.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
+    const r=await window.XtrataMusic.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
     PLAYER=r.playerFile; META=r;
-    if(r.html){ $('#previewFrame').srcdoc=r.html; $('#preview').style.display='block'; }
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
+    showMusicPreview(r);
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
     const mib=(n)=>(n/1048576).toFixed(2);
-    $('#qName').textContent=(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
-    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · Opus'+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    $('#qName').textContent=r.format==='audio'?FILE.name:(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
     $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
-    clearEditsDirty();
+    refreshNeeds(r); clearEditsDirty();
     $('#editHint').innerHTML='<span class="ok">✓ Preview updated — quote refreshed on the new exact size.</span>';
   }catch(e){ $('#editHint').innerHTML='<span class="err">Rebuild failed: '+esc(e.message)+'</span>'; }
-  building=false; updateGo();
+  building=false; musicBusy(false); updateGo();
 };
 
-// ---- relationships: one parent (ownership, escrowed) + free dependencies ----
-// One parent only: SUNO players are always staged (>512 KiB), and the staged seal
-// path supports a single parent — the agent rejects more, so don't offer more.
-// Off by default, matching the main wizard. SUNO used to omit `receipt` entirely,
-// which the agent defaults to true — so every song quietly bought a receipt token.
 const wantReceipt=()=>!!($('#receiptToggle')&&$('#receiptToggle').checked);
 const parentId=()=>String($('#sParent').value||'').trim();
 const parentList=()=>parentId()?[parentId()]:[];
 const depsList=()=>String($('#sDeps').value||'').split(',').map(s=>s.trim()).filter(Boolean);
-// 'none' | 'checking' | 'ok' | 'bad' | 'unverified'. Only 'checking' and 'bad' hold
-// the button: when the check itself is unavailable we let the job through, because
-// the agent validates the parent before taking payment and escrow refunds anything
-// it cannot use. Blocking on an absent check would make the page unusable.
 let PARENT_OK='none';
 $('#relToggle').onclick=()=>{ const p=$('#relPanel'); const open=p.style.display==='none';
   p.style.display=open?'block':'none';
@@ -519,8 +518,6 @@ async function checkParent(){
   const A=window.XtrataAgent;
   if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
   PARENT_OK='checking'; box.innerHTML='<span class="muted"><span class="spin"></span>#'+esc(id)+' — checking the current owner…</span>'; updateGo();
-  // ownerOfChecked, not ownerOf: ownerOf answers null for BOTH "no such token" and
-  // "the read failed", so a flaky API used to tell people their token id was wrong.
   let owner=null, ok=true;
   try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
   if(run!==parentCheckRun) return;                       // the field changed mid-flight
@@ -532,10 +529,8 @@ async function checkParent(){
   updateGo();
 }
 if($('#receiptToggle')) $('#receiptToggle').addEventListener('change',()=>{ quoteRefresh(); });
-$('#sParent').addEventListener('input',()=>{ if(parentCheckTimer)clearTimeout(parentCheckTimer); parentCheckTimer=setTimeout(()=>{ checkParent(); quoteRefresh(); },500); });
+$('#sParent').addEventListener('input',()=>{ EST=null; SB.EST=null; ++musicQuoteRun; ++SB.quoteRun; updateGo(); if(parentCheckTimer)clearTimeout(parentCheckTimer); parentCheckTimer=setTimeout(()=>{ checkParent(); quoteRefresh(); },500); });
 $('#sDeps').addEventListener('input',()=>{ /* deps are free and unowned — nothing to check or requote */ });
-// Why the inscribe button is held, in the same spirit as the Create page's
-// getParentBlockingMessage(): never start a job that escrow will bounce.
 function parentBlockingMessage(){
   const id=parentId();
   if(!id) return null;
@@ -544,25 +539,25 @@ function parentBlockingMessage(){
   if(PARENT_OK==='checking') return 'Checking the parent inscription…';
   return null;
 }
-// Re-quote after a parent change: each escrowed parent reserves a return-transfer fee.
+let musicQuoteRun=0;
 async function quoteRefresh(){
   if(SB.active){ sbQuote(); return; }
-  if(!PLAYER) return;
+  if(!PLAYER||building||EDITS_DIRTY||musicJobActive()) return;
+  const run=++musicQuoteRun, output=PLAYER;
+  EST=null; $('#qPay').textContent='Refreshing quote…'; updateGo();
   try{
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
-    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
-  }catch(_e){}
+    const estimate=await api('/api/estimate',{method:'POST',body:{bytes:output.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()}});
+    if(run!==musicQuoteRun||PLAYER!==output||EDITS_DIRTY) return;
+    EST=estimate; $('#qPay').textContent=stx(EST.requiredUstx);
+  }catch(e){if(run===musicQuoteRun){EST=null;$('#qPay').textContent='Quote unavailable — change the option to retry';}}
   updateGo();
 }
 
-// What this track still needs before it can be inscribed. Empty for a Suno export.
 let NEEDS=[];
 let OVERSIZE=false;   // the built player exceeds what the contract can hold
-// Edits typed or artwork staged since the last rebuild. The player is built ONCE and
-// inscribed as-is, so anything not applied is simply absent from what goes on-chain —
-// and that is invisible unless we say so. A warning, not a block: it is their call.
 let EDITS_DIRTY=false;
 function markEditsDirty(){
+  EST=null; $('#qPay').textContent='Apply changes to refresh quote';
   if(EDITS_DIRTY) return;
   EDITS_DIRTY=true;
   const h=$('#editHint');
@@ -570,14 +565,9 @@ function markEditsDirty(){
   updateGo();
 }
 function clearEditsDirty(){ EDITS_DIRTY=false; updateGo(); }
-// "artwork, a title and an artist" — not "and ... and ...".
 const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
-// Re-derived from the BUILT player, not from the original probe: once artwork or a
-// title is supplied and the player rebuilt, the requirement is genuinely gone.
 function refreshNeeds(r){
   NEEDS=[];
-  // The contract will refuse an oversize inscription outright, so catch it before a
-  // deposit is quoted rather than after it has been spent.
   if(PLAYER&&PLAYER.size>CHAIN_MAX_BYTES){
     $('#hint').innerHTML='<span class="err">This player is '+(PLAYER.size/1048576).toFixed(1)
       +' MiB once encoded, and the contract cannot hold more than '+CHAIN_MAX_MB
@@ -585,9 +575,9 @@ function refreshNeeds(r){
     OVERSIZE=true; updateGo(); return;
   }
   OVERSIZE=false;
-  if(!(r&&(r.hasCover||r.coverB64))) NEEDS.push('artwork');
-  if(!(r&&r.title)) NEEDS.push('a title');
-  if(!(r&&r.artist)) NEEDS.push('an artist');
+
+
+
   const hint=$('#hint');
   if(NEEDS.length){
     $('#editWrap').style.display='block';
@@ -600,11 +590,14 @@ function refreshNeeds(r){
 function updateGo(){
   if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
   const b=$('#go');
-  if(building){ b.disabled=true; b.textContent='Building player…'; return; }
+  if(musicJobActive()){ b.disabled=true; b.textContent='Inscription in progress'; return; }
+  if(building){ b.disabled=true; b.textContent='Preparing audio…'; return; }
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
   if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
   if(OVERSIZE){ b.disabled=true; b.textContent='Too long for one inscription'; return; }
   if(NEEDS.length){ b.disabled=true; b.textContent='Add '+listOf(NEEDS)+' to continue'; return; }
+  if(EDITS_DIRTY){ b.disabled=true; b.textContent='Apply changes to refresh your preview and quote'; return; }
+  if(!EST){ b.disabled=true; b.textContent='A current quote is required'; return; }
   if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
   const pb=parentBlockingMessage();
   if(pb){ b.disabled=true; b.textContent=pb; return; }
@@ -613,13 +606,9 @@ function updateGo(){
     + (EST? stx(EST.requiredUstx) : '');
 }
 
-// ---- one combined action: create job (player File) + pay, then track ----
 $('#go').onclick=async()=>{
-  if(!PLAYER) return;
+  if(!PLAYER||building||EDITS_DIRTY||!EST||OVERSIZE||musicJobActive()) return;
   if(!SERVER.mock && !WALLET){ connectWallet(); return; }
-  // Ask, do not refuse. The player was built before these edits, so they are genuinely
-  // absent from what would be inscribed — but plenty of people will have typed
-  // something they do not care about, and this is permanent either way.
   if(EDITS_DIRTY){
     const sure=await confirmDanger({
       title:'Inscribe without your latest edits?',
@@ -636,11 +625,13 @@ $('#go').onclick=async()=>{
     if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
     if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
-    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:'text/html', deps, parents, fastTrack:true, origin:'suno', receipt:wantReceipt(),
-      sunoPlayer: META ? { ok:true, title:META.title||'', artist:META.artist||'', hasCover:!!META.hasCover, playerBytes:PLAYER.size } : null,
+    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:PLAYER.type, deps, parents, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(),
+
       user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    musicSubmitting=true; musicLockJob();
     const { job }=await api('/api/jobs',{method:'POST',body:payload});
-    JOB=job;
+    musicSubmitting=false;
+    JOB=job; musicLockJob();
     if(SERVER.mock){ setProg('MOCK — simulating inscription…', ['pay']); }
     else {
       setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
@@ -649,25 +640,22 @@ $('#go').onclick=async()=>{
       setProg('Waiting for payment to land…', []);
     }
     startPoll();
-  }catch(e){ $('#prog').className='prog'; $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; b.disabled=false; }
+  }catch(e){ musicSubmitting=false; musicUnlockJob(); $('#prog').className='prog'; $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; b.disabled=false; }
 };
 
 const PHASE={
-  // Declaring a parent turns one payment into two sends. Without this entry the job
-  // parks here showing a stale "waiting for payment" line and auto-cancels 15 minutes
-  // later with no explanation.
   AWAITING_PARENT:{msg:'Deposit received ✓ — now send the parent inscription to the deposit wallet.',on:['pay'],pct:12},
   FUNDED:{msg:'Payment confirmed — starting…',on:['pay'],pct:18},
   INSCRIBING:{msg:'Inscribing your player on-chain…',on:['pay','inscribe'],pct:30},
   INSCRIBED:{msg:'Inscribed ✓ — minting your receipt…',on:['pay','inscribe'],pct:85},
   DELIVERING:{msg:'Delivering your tokens + refunding every unused µSTX of your deposit…',on:['pay','inscribe','deliver'],pct:92} };
 const TIPS=[
-  'Stacks blocks confirm in seconds since the Nakamoto upgrade — but a full inscription is several transactions (upload → seal → deliver → refund), so allow 2–10 minutes end-to-end.',
+  'An inscription takes several transactions. Completion time depends on file size, network conditions and confirmations.',
   'Keep this tab open until you see ✓ — the agent runs in your browser. If the tab closes, it resumes (or refunds) when you reopen the page.',
   'Large files upload in 32-chunk batches. Each batch is confirmed on-chain before the next, so a hiccup never re-inscribes a batch — it picks up exactly where it left off.',
   'Your deposit sits in a one-shot wallet. Anything unused comes back to you automatically as change.',
   'If network fees spike mid-job, the agent pauses and waits for them to settle instead of overpaying — the status line will say so.',
-  'The final step mints an on-chain HTML receipt and sends both tokens to your wallet.',
+  'A readable receipt is saved for every job. A separate on-chain receipt is optional.',
 ];
 let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;
 const BAR={pct:0,floor:0,ceil:0,at:0,indet:false};
@@ -678,7 +666,6 @@ function setBar(pct){ const b=$('#bar'); if(!b) return;
   if(f>BAR.floor||f<BAR.floor-8) BAR.at=Date.now();   // new phase (or reset) -> restart the in-band creep clock
   BAR.floor=f; BAR.ceil=Math.min(100, f>=100?100:f+(f<85?10:6));
   if(BAR.pct<f) BAR.pct=f; }
-// steady creep so a slow confirmation never looks frozen; eases toward a crept target within the phase band
 setInterval(()=>{ const b=$('#bar'); if(!b||BAR.indet) return; const el=b.firstElementChild; if(!el) return;
   const span=Math.max(0,BAR.ceil-BAR.floor); const t=Math.min(1,(Date.now()-BAR.at)/40000);
   let target=BAR.floor+span*(1-Math.pow(1-t,2))*0.9; if(BAR.ceil>=100) target=100;
@@ -694,9 +681,7 @@ function setProg(msg, done, pct){ $('#prog').className='prog show'; $('#progMsg'
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+((done||[]).includes(s.dataset.s)?' done':''); }); }
 function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
   let msg=p.msg, pct=p.pct;
-  // Auto-resume visibility: a transient hiccup parks the job and it resumes on its own — say so.
   if(job&&job.retryCount&&/resuming where/.test(job.progress||'')){ msg='Recovered from a network hiccup — resuming automatically (attempt '+job.retryCount+'/4)…'; }
-  // Chunk-level progress from the agent (staged uploads): "uploading · X/Y chunks"
   const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
   if(st==='INSCRIBING'&&m){ const a=+m[1], b=+m[2]||1; pct=30+Math.round(52*a/b); msg='Uploading on-chain · '+a+' / '+b+' chunks ('+Math.round(100*a/b)+'%)'; }
   else if(st==='INSCRIBING'&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
@@ -704,19 +689,11 @@ function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
   $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
   document.querySelectorAll('.step').forEach(s=>{ s.className='step'+(p.on.includes(s.dataset.s)?' done':''); }); }
 
-// ---- parent escrow: the second send, and where the job waits for it ----
 const ESCROW_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'];
 let PARENT_MSG=null, PARENT_OWNER={};
-// Arrival is one-way before the gate: a parent at the deposit wallet only leaves
-// when the job returns it at the very end, long after this checklist matters. So
-// once we have SEEN it there, latch it green — otherwise one unanswered lookup
-// makes the light flicker off and on, and the user cannot tell what is true.
 let PARENT_ARRIVED={};
 function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=true; }
-// Re-checked, not cached forever. The first version resolved once and never looked
-// again, so a parent that had since moved to the deposit wallet was still described
-// as sitting in your wallet — complete with a Send button for a send already made.
 const PARENT_OWNER_AT={};
 async function noteParentOwner(id){
   if(PARENT_OWNER_AT[id] && Date.now()-PARENT_OWNER_AT[id] < 15000) return;   // at most one lookup per 15 s
@@ -729,13 +706,9 @@ function renderEscrow(job, status){
   if(!parents.length||!ESCROW_STATES.includes(job.status)){ hideEscrow(); return; }
   const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=false;
   const ps=(status&&status.parents)||{held:[],missing:parents,unexpected:[]};
-  // Once nothing is missing, the "transfer submitted — it will show as arrived once
-  // confirmed" note is stale and directly contradicts the row above it.
   if(!(ps.missing||[]).length) PARENT_MSG=null;
   const paid=(status&&status.funded)||!!job.depositReceivedUstx;
   const rows=parents.map((p)=>{
-    // Past the gate the parent is definitionally held — the contract would not have
-    // let the mint start otherwise. Never ask for it again once we are inscribing.
     const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
     if(pastGate||(ps.held||[]).map(String).includes(p)) PARENT_ARRIVED[p]=true;
     const held=!!PARENT_ARRIVED[p];
@@ -761,9 +734,6 @@ function renderEscrow(job, status){
     +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
     +'</div>';
 }
-// "ADDRESS.name" for the Xtrata core, in the order we can most trust it:
-// parentInfo() reports the deployer the job actually used, health is the same
-// agent's own config, and the literal is the mainnet deployer as a last resort.
 async function sendParentCoreId(){
   try{
     const A=window.XtrataAgent;
@@ -772,8 +742,6 @@ async function sendParentCoreId(){
   if(SERVER.deployer&&JOB&&JOB.core) return SERVER.deployer+'.'+JOB.core;
   return 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.'+((JOB&&JOB.core)||'xtrata-v3-2-3');
 }
-// Recipient is HARD-CODED to this job's deposit wallet — the parent can never be
-// sent somewhere it cannot be recovered from.
 async function sendParentNow(pid){
   const w=xw();
   if(!w||!w.sendInscription){ PARENT_MSG={err:1,text:'This wallet bundle cannot send inscriptions — transfer #'+esc(pid)+' to the deposit address manually.'}; return; }
@@ -781,9 +749,6 @@ async function sendParentNow(pid){
   if(!JOB){ return; }
   PARENT_MSG={text:'Waiting for wallet confirmation…'};
   try{
-    // job.core is the contract NAME only ("xtrata-v3-2-3"). The fully-qualified
-    // "ADDRESS.name" comes from parentInfo() — splitting job.core handed the name
-    // in as the address, which the wallet rejected as an invalid c32 address.
     const core=(await sendParentCoreId()).split('.');
     if(!/^S[PTMN][0-9A-HJKMNP-Z]{37,41}$/.test(core[0]||'')) throw new Error('could not resolve the Xtrata contract address for this transfer');
     const r=await w.sendInscription({ contractAddress:core[0], contractName:core[1]||'xtrata-v3-2-3',
@@ -794,18 +759,11 @@ async function sendParentNow(pid){
 }
 window.sendParentNow=sendParentNow;
 
-// The keep-open banner and the leave guard both live in the shared panel
-// (src/agent-one/ui-panels.ts), so the wizard gets the identical behaviour.
 let JOB_LIVE=false;
 function renderKeepOpen(job, st){
   JOB_LIVE = window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') }).live;
 }
-// --- finish without me -------------------------------------------------------
-// The deposit key never leaves this browser EXCEPT here, so the agreement is
-// explicit, per job, and spells out what changes rather than burying it.
 const HANDOFF_CONSENT='i-agree-xtrata-may-finish-this-job';
-// Only qualify the custody promise where the handoff is genuinely on offer —
-// an unexplained caveat is worse than none.
 function handoffOffered(){ try{ const A=window.XtrataAgent; return !!(A&&A.handoffAvailable&&A.handoffAvailable()); }catch{ return false; } }
 function renderHandoff(job){
   const row=$('#handoffRow'); if(!row) return;
@@ -843,16 +801,7 @@ $('#handoffBtn').onclick=async()=>{
   }
 };
 
-// The main wizard has had this guard for a while; SUNO did not. It can only trigger
-// the browser's own generic "Leave site?" prompt — the wording and buttons are not
-// ours to control — so the banner above is what actually does the explaining.
 
-// Suppression-proof confirmation for destructive actions. Resolves false on
-// cancel, on Escape, and on backdrop click — so an unanswered question NEVER
-// cancels a running job. window.confirm cannot promise that: a browser may
-// suppress it outright, and a suppressed dialog is indistinguishable from a click.
-// confirmDanger lives in the shared bundle (src/agent-one/ui-panels.ts) so a fix
-// to it reaches both wizards at once. It injects its own styles.
 const confirmDanger = (o)=>window.XtrataUI.confirmDanger(o);
 
 $('#cancelJobBtn').onclick=async()=>{
@@ -871,33 +820,111 @@ $('#cancelJobBtn').onclick=async()=>{
   }catch(e){ b.disabled=false; b.textContent='Stop this job & refund me';
     $('#hint').innerHTML='<span class="err">Could not cancel: '+esc((e&&e.message)||String(e))+'</span>'; }
 };
+function musicFeeMode(){ return $('#musicFeeMode').value; }
+$('#musicFeeMode').onchange=()=>{
+  if(musicJobActive()) return;
+  $('#musicFeeHelp').textContent=musicFeeMode()==='economy'
+    ? 'Lower initial mining budget. Targets about 1 STX per MB of transaction data, plus protocol, service and delivery costs. Timing is not guaranteed. Keep this tab open; you can review a speed-up at any time. Uploads can expire if left unfinished.'
+    : 'More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.';
+  quoteRefresh();
+};
+let musicSpeedBusy=false, musicSpeedQuote=null;
+function renderMusicFees(job,status){
+  const s=status?.musicFees, box=$('#musicSpeed');
+  box.hidden=!s||!['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(job.status);
+  if(box.hidden) return;
+  const u=s.upgrade, paying=u?.state==='payment';
+  const elapsed=Math.max(0,Math.floor((Date.now()-(s.lastConfirmedAt||Date.now()))/1000));
+  $('#musicSpeedTitle').textContent=paying?'Confirming additional payment':s.mode==='economy'?(elapsed>=120?'Still waiting for lower fees':'Economy processing'):'Standard fee budget active';
+  $('#musicSpeedStatus').textContent=paying
+    ? 'Your job is retained while this payment is checked. You will not be asked to pay again. Delivery waits for this check.'
+    : (elapsed>=60?Math.floor(elapsed/60)+' min since the last confirmed step. ':'')+'Confirmed upload progress is reused. A higher fee can improve priority; it cannot guarantee a finish time.';
+  $('#musicSpeedExpiry').textContent=s.expiryUnknown?'Upload expiry could not be verified; new transactions are paused.':s.expiryBlocks!=null?'Upload expiry: '+Math.max(0,s.expiryBlocks)+' Stacks blocks remaining. '+(s.expiryBlocks<=720?'Time is running short; review the job now.':'Successful chunk uploads refresh this window.'):'';
+  $('#musicSpeedOpen').hidden=paying||s.mode!=='economy'||!['FUNDED','INSCRIBING','FEE_WAITING'].includes(job.status);
+  $('#musicSpeedOpen').disabled=musicSpeedBusy;
+  $('#musicTopUpRecovery').hidden=!paying||!!u.txid;
+  $('#musicTopUpTxStatus').textContent=paying&&u.txid?'Payment transaction recorded — checking on-chain confirmation.':'';
+  if(u?.error) $('#musicSpeedError').textContent=u.error;
+  if(paying){ musicSpeedQuote=u; $('#musicSpeedReview').hidden=true; }
+  if(s.mode==='standard') $('#musicSpeedReview').hidden=true;
+}
+$('#musicSpeedOpen').onclick=async()=>{
+  if(musicSpeedBusy||!JOB) return; musicSpeedBusy=true; $('#musicSpeedOpen').disabled=true;
+  $('#musicSpeedError').textContent='';
+  try{
+    musicSpeedQuote=await xa().quoteMusicSpeedUp(JOB.jobId);
+    const q=musicSpeedQuote;
+    $('#musicSpeedBalance').textContent=stx(q.balance);
+    $('#musicSpeedExtra').textContent=stx(q.additional);
+    $('#musicSpeedTotal').textContent=stx(q.total);
+    $('#musicSpeedService').textContent=stx(q.service);
+    $('#musicSpeedApprove').textContent=BigInt(q.additional)>0n?'Add '+stx(q.additional)+' and speed up':'Confirm faster processing';
+    $('#musicSpeedReview').hidden=false;
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicSpeedOpen').disabled=false;}
+};
+$('#musicSpeedKeep').onclick=()=>{ $('#musicSpeedReview').hidden=true; $('#musicSpeedStatus').textContent='Continuing within your existing budget. You can review Speed up again whenever you choose.'; };
+$('#musicSpeedApprove').onclick=async()=>{
+  if(musicSpeedBusy||!musicSpeedQuote||!JOB) return;
+  musicSpeedBusy=true; $('#musicSpeedApprove').disabled=true; $('#musicSpeedError').textContent='';
+  const id=JOB.jobId, quoteId=musicSpeedQuote.id;
+  try{
+    if(window.XtrataWizardFunding) throw new Error('Automated wizard funding does not support top-ups. Use the normal connected-wallet flow.');
+    if(!WALLET||WALLET!==musicSpeedQuote.sender) throw new Error('Connect the original paying wallet to approve this speed-up.');
+    const q=await xa().approveMusicSpeedUp(id,quoteId);
+    $('#musicSpeedReview').hidden=true;
+    if(q.state==='payment'){
+      await refresh();
+      try{
+        const result=await payWallet(JOB.depositAddress,q.additional,[],true);
+        const txid=typeof result==='string'?result:(result?.txId||result?.txid||result?.tx_id);
+        if(!txid) throw new Error('Wallet response did not include a transaction ID. Check wallet activity and enter it below.');
+        await xa().recordMusicTopUp(id,quoteId,txid);
+      }catch(e){
+        if(e?.code===4001||e?.code==='USER_CANCELLED') await xa().dismissMusicTopUp(id,quoteId);
+        else $('#musicSpeedError').textContent='Payment outcome needs checking. '+e.message;
+      }
+    }
+    await refresh();
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{ musicSpeedBusy=false;$('#musicSpeedApprove').disabled=false; }
+};
+$('#musicTopUpCheck').onclick=async()=>{
+  if(musicSpeedBusy||!JOB||!musicSpeedQuote) return;
+  musicSpeedBusy=true; $('#musicTopUpCheck').disabled=true;
+  try{ await xa().recordMusicTopUp(JOB.jobId,musicSpeedQuote.id,$('#musicTopUpTx').value.trim()); await refresh(); }
+  catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicTopUpCheck').disabled=false;}
+};
+
 function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,2000); refresh(); }
 async function refresh(){
   if(!JOB) return;
   try{ const {job,status}=await api('/api/jobs/'+JOB.jobId);
+    JOB=job;
     const funded=status&&status.funded, pending=status&&status.pending, st=job.status;
+    if(!musicJobActive()) musicUnlockJob();
     if(st==='AWAITING_DEPOSIT'){
       setProg(funded?'Payment confirmed — starting…':(pending?'Payment seen — confirming (usually under 30 s)…':'Waiting for payment to land…'),
         funded?['pay']:[], funded?18:(pending?10:4)); }
     else if(PHASE[st]){ setPhase(st, job); }
-    // The status only flips off AWAITING_PARENT on the agent's next ~20 s poll, so for
-    // that window the header kept asking for a parent the checklist already showed as
-    // arrived. Say what is actually true while we wait for the gate to re-run.
     if(st==='AWAITING_PARENT' && status && status.parents && !(status.parents.missing||[]).length){
       setProg('Parent inscription received ✓ — starting the inscription…', ['pay','parent'], 16);
     }
+    renderMusicFees(job, status);
+    if(st==='FEE_WAITING'){ const remaining=Number(status?.musicFees?.remainingWeight), total=Number(job.minerReserve); const pct=Number.isFinite(remaining)&&total>0?18+66*Math.max(0,Math.min(1,1-remaining/total)):18; setProg(job.progress||'Waiting within your approved fee budget…',['pay','inscribe'],pct); }
     renderEscrow(job, status);
-    // Cancellable right up until something is minted.
-    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
+    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','FEE_WAITING','EXPIRED'].includes(st)&&!status?.musicFees?.pending&&status?.musicFees?.upgrade?.state!=='payment'&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
     $('#cancelRow').style.display=canCancel?'block':'none';
     renderKeepOpen(job, st);
     renderHandoff(job);
+    if(job.feePolicy==='music-v1') $('#handoffRow').style.display='none';
     if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
     else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
     else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="err">'+esc(job.error||'Something went wrong')+(st==='NEEDS_RECOVERY'?' — your funds are safe on the job’s one-shot wallet.':' — funds returned.')+'</span>'
-        +(st==='NEEDS_RECOVERY'?' <a href="#" onclick="sunoRecover(\''+esc(job.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>':''); $('#go').disabled=false; }
+        +(st==='NEEDS_RECOVERY'?' <a href="#" onclick="musicRecover(\''+esc(job.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>':''); $('#go').disabled=false; }
   }catch{ /* transient — keep polling */ }
 }
 function showJobLog(id){ try{ const A=window.XtrataAgent; const lines=(A&&A.getJobLog&&A.getJobLog(id))||[];
@@ -908,43 +935,32 @@ window.showJobLog=showJobLog;
 function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const bl=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(bl),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
 window.viewReceipt=viewReceipt;
 
-// ---- resume path: reattach to a live/stranded job from a previous visit ----
-// A closed or frozen tab mid-run used to leave this page blank while the burner
-// held funds. On load: reattach a live fast-track job straight to the progress
-// card (the engine resumes from the on-chain chunk index), or surface a
-// NEEDS_RECOVERY job with a one-click recover that sweeps funds home.
-function sunoRecover(id){ (async()=>{ try{
+function musicRecover(id){ (async()=>{ try{
   const A=xa(); await A.recoverJob(id);
   JOB={jobId:id}; $('#go').disabled=true;
   setProg('Recovering assets and sweeping unused funds back to your wallet…', []);
   startPoll();
 }catch(e){ $('#hint').innerHTML='<span class="err">'+esc((e&&e.message)||String(e))+'</span>'; } })(); }
-window.sunoRecover=sunoRecover;
+window.musicRecover=musicRecover;
 (async()=>{ try{
   for(let i=0;i<25&&!window.XtrataAgent;i++) await new Promise(r=>setTimeout(r,200));   // bundle is deferred
   const A=window.XtrataAgent; if(!A||JOB) return;
-  const jobs=await A.listJobs();
-  const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status));
+  const jobs=(await A.listJobs()).filter(j=>j.origin==='music');
+  const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(j.status));
   if(live){ JOB=live; $('#go').disabled=true;
     setProg('Picking up where you left off — nothing already uploaded is redone. You can stop and take a refund at any point below.', ['pay']);
     startPoll(); return; }
-  // A job that is funded but still waiting for its parent is stranded in exactly
-  // the same way — the burner holds real STX. Reattach it so the escrow checklist
-  // comes back (send the parent, or watch the automatic refund land).
   const parentWait=(jobs||[]).find(j=>j.status==='AWAITING_PARENT');
   if(parentWait){ JOB=parentWait; $('#go').disabled=true;
     setProg('Deposit received ✓ — this job is still waiting for its parent inscription.', ['pay']);
     startPoll(); return; }
   const rec=(jobs||[]).find(j=>j.status==='NEEDS_RECOVERY');
   if(rec){ $('#hint').innerHTML='<span class="err">↻ A previous run stopped ('+esc(rec.progress||rec.error||'interrupted')+') — your funds are safe on its one-shot wallet.</span> '
-    +'<a href="#" onclick="sunoRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>'; return; }
+    +'<a href="#" onclick="musicRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>'; return; }
   const wait=(jobs||[]).find(j=>j.status==='AWAITING_DEPOSIT');
   if(wait){ $('#hint').innerHTML='<span class="muted">↻ An unpaid job from a previous session is still open — <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a> to resume or cancel it.</span>'; }
-  // Anything left unfinished on the OTHER wizard is invisible here otherwise, and if it
-  // was funded its one-shot wallet is still holding the deposit.
   if(window.XtrataUI) window.XtrataUI.unfinishedBanner({ skipJobId: JOB&&JOB.jobId });
 }catch(e){} })();
-// Frozen-tab catch-up: background tabs throttle timers; on return, refresh at once.
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&JOB){ refresh(); if(!poll) startPoll(); } });
 window.addEventListener('focus',()=>{ if(JOB){ refresh(); if(!poll) startPoll(); } });
 
@@ -952,7 +968,6 @@ function done(job){
   $('#prog').className='prog';
   const tok=job.tokenId, net=(job.net||SERVER.net);
   const player=(net==='mainnet'&&tok)?('https://xtrata.xyz/inscription/'+tok):null;
-  // Final settlement: explain what came back and show the true price paid — in STX and, above all, dollars.
   const R=job.receipt||{};
   const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(EST&&EST.stxUsd?Number(EST.stxUsd):null);
   const usd=u=>usdRate!=null?('$'+(Number(u)/1e6*usdRate).toFixed(2)):null;
@@ -981,16 +996,10 @@ function done(job){
   const ag=$('#again'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); resetAll(); };
   $('#go').disabled=false; $('#go').textContent='Inscribe my track';
 }
-function resetAll(){ FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
+function resetAll(){ musicUnlockJob(); FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
   picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none'; $('#hint').textContent=''; updateGo(); }
 
-// =================== BATCH: several tracks → one payment, N players ===================
-// Reuses the isolated page's FAST multi-threaded ffmpeg core (via XtrataSuno.build) and the
-// agent's batch job API (A.estimateBatch + A.createJob({items})). Songs are probed + built
-// SEQUENTIALLY (the shared core runs one command at a time). Songs with no embedded cover art
-// are auto-dropped (this page's promise is "embedded artwork"); the rest each get a preview and
-// an optional artwork swap, then inscribe together for one payment + one receipt.
 let sbArtTarget=-1;
 const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
 const sbMib=(n)=>(n/1048576).toFixed(2);
@@ -998,21 +1007,18 @@ const sbCostLabel=(ustx)=>stx(ustx)+(SB.stxUsd!=null?(' · ~$'+(Number(ustx)/1e6
 function sbEnterUI(){ SB.active=true;
   $('#quote').className='quote'; $('#preview').style.display='none'; $('#editWrap').style.display='none';
   $('#go').style.display='none'; $('#hint').textContent=''; $('#result').className='result'; $('#prog').className='prog';
-  $('#sunoBatch').style.display='block'; }
-function sbResetUI(){ SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} } });
+  $('#musicBatch').style.display='block'; }
+function sbResetUI(){ musicUnlockJob(); FILE=null;PLAYER=null;META=null;EST=null;EDITS_DIRTY=false; SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} } });
   SB.items=[]; SB.dropped=[]; SB.active=false; SB.busy=false; SB.EST=null; SB.droppedNote=''; JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
-  $('#sunoBatch').style.display='none'; $('#go').style.display='';
+  $('#musicBatch').style.display='none'; $('#go').style.display='';
   drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
   $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none'; hideEscrow(); updateGo(); }
-function enterSunoBatch(files){
+function enterMusicBatch(files){
   const key=f=>f.name+'|'+f.size; const have=new Set(SB.items.map(it=>key(it.file)));
   let bad=0, added=0, overflow=0;
-  // 40 is the ceiling: the receipt lists every minted token as a dependency and the
-  // contract caps those at 50, leaving headroom for parents and the identity link.
-  // Silently dropping the 41st was worse than refusing it — files simply vanished.
   for(const f of files){
     if(SB.items.length>=BATCH_MAX){ overflow++; continue; }
-    if(validateAudio(f)){ bad++; continue; }
+    if(validateAudio(f)){ bad++; SB.dropped.push(f.name+': '+validateAudio(f).replace(/<[^>]*>/g,'')); continue; }
     if(have.has(key(f))) continue; have.add(key(f));
     SB.items.push({ file:f, status:'queued', player:null, info:null, previewUrl:null, show:false, err:null }); added++; }
   if(!SB.items.length){ rejectToWizard('None of those look like audio files under '+AUDIO_MAX_MB+' MiB. MP3, WAV, FLAC, M4A and OGG all work here.'); return; }
@@ -1020,34 +1026,31 @@ function enterSunoBatch(files){
   const notes=[];
   if(bad) notes.push(bad+' file'+(bad>1?'s':'')+' skipped — not audio, or over '+AUDIO_MAX_MB+' MiB.');
   if(overflow) notes.push(overflow+' more did not fit — '+BATCH_MAX+' songs is the maximum per batch. Inscribe these, then start another.');
-  SB.droppedNote = notes.join(' ');
+  SB.droppedNote = notes.concat(SB.dropped).join(' ');
   drop.classList.add('has');
   drop.innerHTML='<div class="fname">🎵 Batch · '+SB.items.length+' song'+(SB.items.length>1?'s':'')+'</div><div class="fmeta">drop more tracks to add · click to browse</div>';
   sbRender(); sbProcess();
 }
 let sbEngineWarned=false;
 async function sbProcess(){
-  if(SB.busy) return; SB.busy=true;
+  if(SB.busy) return; SB.busy=true; musicBusy(true);
   try{
-    if(!window.XtrataSuno||!window.buildXtrataAudioPlayerHtml){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
+    if(!window.XtrataMusic||!window.XtrataMusicPlayer){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
     for(;;){
       const it=SB.items.find(x=>x.status==='queued');
       if(!it) break;
       it.status='probing'; sbRender();
       try{
-        await window.XtrataSuno.probe(it.file,()=>{});
-        // No longer dropped for missing artwork. Every row already has an artwork
-        // button and a details editor — removing the song told people to fix it
-        // somewhere else while deleting the row that could have fixed it here.
+
         it.status='building'; sbRender();
-        const r=await window.XtrataSuno.build(it.file,()=>{});
+        const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides||{});
         if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
-        it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null;
+        it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null;
         it.needs=sbNeeds(r);
       }catch(e){ it.status='error'; it.err=(e&&e.message)||String(e); }
       sbRender(); sbQuote();
     }
-  } finally { SB.busy=false; sbRender(); sbQuote(); }
+  } finally { SB.busy=false; musicBusy(false); musicFormatHelp(); sbRender(); await sbQuote(); }
 }
 function sbPreviewUrl(it){ if(!it.player) return ''; if(!it.previewUrl){ try{ it.previewUrl=URL.createObjectURL(it.player); }catch(_e){ it.previewUrl=''; } } return it.previewUrl; }
 function sbRow(it,i){
@@ -1055,7 +1058,7 @@ function sbRow(it,i){
   const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : '';
   let status;
   if(it.status==='ready'&&it.needs&&it.needs.length) status='<span style="color:var(--warn)">needs '+esc(listOf(it.needs))+' — use 🖼 to add artwork</span>';
-  else if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · Opus'+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
+  else if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · '+esc(it.info.audioLabel)+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
   else if(it.status==='building') status='<span style="color:var(--acc2)"><span class="spin"></span>building player…</span>';
   else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>reading the track…</span>';
   else if(it.status==='error') status='<span class="err">✗ '+esc(it.err||'failed')+'</span> <a href="#" onclick="sbRetry('+i+');return false" style="margin-left:4px">retry</a>';
@@ -1066,10 +1069,12 @@ function sbRow(it,i){
       +'<img alt="" src="'+artSrc+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none"/>'
       +'<div style="flex:1;min-width:0"><div class="fname" style="font-size:14px;word-break:break-word">'+title+'</div><div class="fmeta">'+status+'</div></div>'
       +(it.status==='ready'?btn('sbToggle',(it.show?'▾ hide':'▸ preview'),'Preview this player'):'')
-      +btn('sbArt','🖼','Change this player’s artwork')
+      +(it.status==='ready'?btn('musicEditTrack','Edit','Edit this track'):'')
+      +(it.status==='ready'?btn('sbArt','🖼','Change this player’s artwork'):'')
+      +(it.info?.hasCover?btn('musicOptimiseTrackArt','Shrink art','Optimise existing artwork'):'')
       +btn('sbRemove','✕','Remove from batch')
     +'</div>'
-    +((it.status==='ready'&&it.show)?('<iframe src="'+sbPreviewUrl(it)+'" title="preview" loading="lazy" sandbox="allow-scripts allow-same-origin allow-popups" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#10120f;display:block;margin-top:10px"></iframe>'):'')
+    +((it.status==='ready'&&it.show)?(it.info?.format==='audio'?'<audio controls src="'+sbPreviewUrl(it)+'" style="width:100%;margin-top:12px"></audio>':'<iframe src="'+sbPreviewUrl(it)+'" title="preview" loading="lazy" sandbox="allow-scripts" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#10120f;display:block;margin-top:10px"></iframe>'):'')
     +'</div>';
 }
 function sbRender(){
@@ -1091,15 +1096,16 @@ function sbRender(){
   sbUpdateGo();
 }
 async function sbQuote(){
+  SB.EST=null; sbUpdateGo();
   const run=++SB.quoteRun; const A=window.XtrataAgent;
   const ready=SB.items.filter(it=>it.status==='ready');
   if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
   try{
-    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt() });
+    window.XtrataMusicDiagnostics?.log('quote','Calculating costs for '+ready.length+' prepared tracks.');
+    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt(),feeMode:musicFeeMode() });
     if(run!==SB.quoteRun) return;
+    window.XtrataMusicDiagnostics?.log('quote-ready','Batch quote received.');
     SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
-    // Split the single batch payment across songs in proportion to each one's on-chain
-    // footprint (protocol fee + miner reserve), so the per-song costs sum EXACTLY to the total.
     try{
       const req=BigInt(est.requiredUstx);
       const direct=(est.items||[]).map(x=>BigInt(x.protocolFee||'0')+BigInt(x.minerReserve||'0'));
@@ -1118,23 +1124,22 @@ async function sbQuote(){
     sbRender();
   }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; SB.stxUsd=null; sbUpdateGo(); } }
 }
-// What a built player still lacks. Same rule as the single flow.
 function sbNeeds(r){
   const n=[];
-  // Each batch item is a SEPARATE inscription, so each player must fit the contract
-  // ceiling on its own — a batch does not pool the allowance.
   if(r&&r.playerFile&&r.playerFile.size>CHAIN_MAX_BYTES) n.push('a shorter edit (over '+CHAIN_MAX_MB+' MiB inscribed)');
-  if(!(r&&(r.hasCover||r.coverB64))) n.push('artwork');
-  if(!(r&&r.title)) n.push('a title');
-  if(!(r&&r.artist)) n.push('an artist');
+
+
+
   return n;
 }
 function sbUpdateGo(){
   const b=$('#sbGo'); if(!b) return;
+  if(musicJobActive()){ b.disabled=true; b.textContent='Inscription in progress'; return; }
   const ready=SB.items.filter(it=>it.status==='ready').length;
   const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
   if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
-  if(busy){ b.disabled=true; b.textContent='Building players…'; return; }
+  if(busy){ b.disabled=true; b.textContent='Building releases…'; return; }
+  if(SB.items.some(it=>it.status==='error')){ b.disabled=true; b.textContent='Retry or remove failed tracks'; return; }
   if(!ready){ b.disabled=true; b.textContent='No players ready'; return; }
   const incomplete=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length);
   if(incomplete.length){ b.disabled=true; b.textContent=incomplete.length+' song'+(incomplete.length>1?'s':'')+' still need artwork or details'; return; }
@@ -1144,10 +1149,10 @@ function sbUpdateGo(){
   b.disabled=!SB.EST; b.textContent = SB.EST? ('Inscribe '+ready+' player'+(ready>1?'s':'')+'  ·  pay '+stx(SB.EST.requiredUstx)) : ('Inscribe '+ready+' player'+(ready>1?'s':''));
 }
 window.sbToggle=(i)=>{ const it=SB.items[i]; if(it){ it.show=!it.show; sbRender(); } };
-window.sbRemove=(i)=>{ const it=SB.items[i]; if(!it) return; if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} }
+window.sbRemove=(i)=>{ if(SB.busy||musicJobActive())return; const it=SB.items[i]; if(!it) return; if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} }
   SB.items.splice(i,1); if(!SB.items.length){ sbResetUI(); return; } sbRender(); sbQuote(); };
-window.sbRetry=(i)=>{ const it=SB.items[i]; if(it){ it.status='queued'; it.err=null; sbRender(); sbProcess(); } };
-window.sbArt=(i)=>{ sbArtTarget=i; $('#sbArtPick').click(); };
+window.sbRetry=(i)=>{ if(SB.busy||musicJobActive())return; const it=SB.items[i]; if(it){ it.status='queued'; it.err=null; sbRender(); sbProcess(); } };
+window.sbArt=(i)=>{ if(SB.busy||musicJobActive())return; sbArtTarget=i; $('#sbArtPick').click(); };
 $('#sbArtPick').onchange=async()=>{
   const f=$('#sbArtPick').files[0]; $('#sbArtPick').value=''; const it=SB.items[sbArtTarget]; if(!f||!it) return;
   if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ $('#sbHint').innerHTML='<span class="err">Artwork must be PNG, JPEG or WebP.</span>'; return; }
@@ -1156,31 +1161,33 @@ $('#sbArtPick').onchange=async()=>{
   try{
     let cover=f; try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(f,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
     const b64=await sbReadB64(cover);
-    const r=await window.XtrataSuno.build(it.file,()=>{},{ coverB64:b64, coverMime:cover.type||'image/png' });
+    it.overrides={...it.overrides,format:'artwork',coverB64:b64,coverMime:cover.type||'image/png'};
+    const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides);
     if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
-    it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null; it.show=true;
+    it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null; it.show=true;
     it.needs=sbNeeds(r);
     $('#sbHint').innerHTML='<span class="ok">✓ Artwork updated — preview refreshed.</span>';
   }catch(e){ it.status=prev==='ready'?'ready':'error'; it.err=(e&&e.message)||String(e); $('#sbHint').innerHTML='<span class="err">Artwork rebuild failed: '+esc(it.err)+'</span>'; }
   sbRender(); sbQuote();
 };
 $('#sbGo').onclick=async()=>{
-  const ready=SB.items.filter(it=>it.status==='ready'); if(!ready.length) return;
+  const ready=SB.items.filter(it=>it.status==='ready'); if(!document.querySelector('#trackEditor').hidden||!ready.length||!SB.EST||SB.busy||musicJobActive()||SB.items.some(it=>it.status!=='ready'||it.needs?.length)) return;
   if(!SERVER.mock&&!WALLET){ connectWallet(); return; }
   const b=$('#sbGo'); b.disabled=true; $('#sbHint').textContent='';
   try{
-    const items=ready.map(it=>({ file:it.player, uri:'xtrata:song/'+((it.info&&it.info.title)?slug(it.info.title):slug(it.file.name)), mime:'text/html' }));
+    const items=ready.map(it=>({ file:it.player, uri:'xtrata:song/'+((it.info&&it.info.title)?slug(it.info.title):slug(it.file.name)), mime:it.player.type }));
     const deps=depsList(), parents=parentList();
     if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))) throw new Error('Dependencies must be token-id uints.');
     if(!parents.every(d=>/^\d+$/.test(d))) throw new Error('Parent must be a token-id uint.');
-    // Job-level deps/parents apply to every item in the batch.
     if(deps.length) items.forEach(it=>{ it.deps=deps; });
-    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'suno', receipt:wantReceipt(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
     PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
+    musicSubmitting=true; musicLockJob();
     const { job }=await api('/api/jobs',{method:'POST',body:payload});
-    JOB=job;
+    musicSubmitting=false;
+    JOB=job; musicLockJob();
     if(SERVER.mock){ setProg('MOCK — simulating batch inscription…',['pay']); }
     else{
       setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
@@ -1189,10 +1196,10 @@ $('#sbGo').onclick=async()=>{
       setProg('Waiting for payment to land…', []);
     }
     startPoll();
-  }catch(e){ $('#prog').className='prog'; $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; sbUpdateGo(); }
+  }catch(e){ musicSubmitting=false; musicUnlockJob(); $('#prog').className='prog'; $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; sbUpdateGo(); }
 };
 function sbDone(job){
-  $('#prog').className='prog'; $('#sunoBatch').style.display='none';
+  $('#prog').className='prog'; $('#musicBatch').style.display='none';
   const items=job.items||[]; const okItems=items.filter(i=>i.tokenId); const net=job.net||SERVER.net;
   const R=job.receipt||{};
   const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(SB.EST&&SB.EST.stxUsd?Number(SB.EST.stxUsd):null);
@@ -1222,6 +1229,9 @@ function sbDone(job){
   const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
 }
 </script>
-<script src="/xtrata-radio.js" defer></script>
+<script src="music-appearance.js?v=2"></script>
+<script src="music-editor.js?v=7"></script>
+<script src="music-artwork.js?v=1"></script>
+<script src="music-artwork-editor.js?v=1"></script>
 </body>
 </html>

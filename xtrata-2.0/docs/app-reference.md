@@ -70,6 +70,19 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/components/TokenCardMedia.tsx` renders grid cell media (image/audio/video/html/text) and handles per-token loading.
 - `src/components/TokenContentPreview.tsx` renders the large preview, resolves content, and exposes preview actions.
 
+## Xtrata Music
+
+- `music/index.html` is the independent `/music/` inscription page: optional metadata/artwork, original or optimised audio, single and mixed-output batch jobs, quotes and recovery.
+- `xtrata-agent-one/wizard/music-player.js` owns the independent versioned Music player, validated appearance settings, self-contained HTML generation and creation-time waveform peaks. Legacy wizard templates remain separate.
+- `xtrata-agent-one/wizard/music-appearance.js` owns Classic/Sleeve/Studio cards, appearance controls and preview sizing, reused by the single and per-track editors. `scripts/music-player-smoke.mjs` verifies exported player layouts and keyboard playback with local generated audio.
+- `xtrata-agent-one/wizard/music-editor.js` adds per-track editing, draft-only IndexedDB storage, preview and quote invalidation. It never stores wallet keys.
+- `xtrata-agent-one/wizard/music-build.js` defines the neutral output contract and versioned `xtrata-music` metadata record. Raw audio uses its real MIME type; packaged releases use `text/html`.
+- `xtrata-agent-one/wizard/audio-processing.js` owns shared FFmpeg extraction and File-identity caching. Both the legacy `suno-build.js` adapter and the neutral builder consume it; preserve the script ordering in both wizard entry points.
+- `src/agent-one/music-fees.ts` defines the opt-in Economy budget, durable non-secret control record, transaction accounting and top-up verification. `agent-core.ts` integrates fee waits, saved nonces, exact-transaction retries and confirmed speed-ups; legacy Standard jobs retain their existing fee policy.
+- `docs/plans/MUSIC-ECONOMY-SPEED-UP.md` records payment invariants and rollout limits. `scripts/music-speed-smoke.mjs` checks mobile review, wallet cancellation, pending-payment reloads and zero-payment upgrades with simulated wallets.
+- The page uses the existing agent core with `origin: 'music'`, and the existing init/upload/seal, delivery and recovery machinery. `/music/` intentionally uses the single-threaded encoder so wallet popups retain the standard browser context.
+- `docs/plans/XTRATA-MUSIC-RELEASE.md` records scope, verification and promotion notes. `scripts/music-browser-smoke.mjs` exercises simulated payment workflows; `scripts/music-audio-smoke.mjs` tests real local audio preparation without payments.
+
 ## Artist manager portal
 
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.

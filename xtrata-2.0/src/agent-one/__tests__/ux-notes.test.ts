@@ -136,6 +136,12 @@ describe('what the receipt actually renders', () => {
     expect(html).toContain('0.056');
   });
 
+  it('brands neutral music receipts independently', async () => {
+    const html = await render('music');
+    expect(html).toContain('<title>Xtrata Music — Receipt job-1</title>');
+    expect(html).not.toContain('SUNO');
+  });
+
   it('says SUNO More when the job came from there', async () => {
     const html = await render('suno');
     expect(html).toContain('<title>Xtrata SUNO More — Receipt job-1</title>');
