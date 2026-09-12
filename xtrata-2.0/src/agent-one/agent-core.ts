@@ -21,8 +21,9 @@ import {
   estimateTransaction, estimateTransactionByteLength,
   uintCV, standardPrincipalCV, bufferCV, stringAsciiCV, listCV,
   makeStandardSTXPostCondition, FungibleConditionCode, PostConditionMode, AnchorMode,
-  cvToJSON, getAddressFromPrivateKey, TransactionVersion,
+  cvToJSON, cvToHex, hexToCV, getAddressFromPrivateKey, TransactionVersion,
 } from '@stacks/transactions';
+import { MusicFeeWait, MusicFeeRecovery, type MusicFeeState, readMusicFees, writeMusicFees, musicWeight, musicTransactionCap, confirmedMusicTransaction, speedUpAmounts, verifyMusicTopUp } from './music-fees';
 import { StacksMainnet } from '@stacks/network';
 
 const cfg: any = (window as any).XAO_CONFIG || {};
@@ -199,6 +200,7 @@ async function quoteLowFee(opts: any) {
   return makeContractCall(opts);
 }
 async function send(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, onFeeWait?: (m: string) => void, logId: string | null = null, feeCeiling: bigint | null = null) {
+  if (logId && readMusicFees(logId)) return sendMusic(key, from, fn, args, spendCap, logId);
   const post = spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [];
   const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args, senderKey: key, network, postConditionMode: PostConditionMode.Deny, postConditions: post, anchorMode: AnchorMode.Any };
   try { opts.nonce = await safeNonce(from, logId); } catch {}
@@ -551,7 +553,7 @@ async function restoreBytes(id: string): Promise<boolean> {
 }
 
 // ---------- verbose agent log: console [xao] lines + persisted job.log (cap 200, survives reload) ----------
-export const AGENT_BUILD = '2026-07-28.7';
+export const AGENT_BUILD = '2026-09-12.1';
 function xaoLog(id: string | null, msg: string) {
   try { console.info(`[xao ${new Date().toISOString().slice(11, 19)}]${id ? ' ' + id + ' ·' : ''} ${msg}`); } catch {}
   if (!id) return;
@@ -644,7 +646,7 @@ async function estimate(opts: any) {
   // bounded by MINT_CAP. This REPLACES a flat MINT_CAP reserve that charged every
   // small inscription for 2 STX of mining — a 64 KiB file reserved 2 STX to spend
   // about 0.15. Tightening that is most of what "run a tight ship" means here.
-  const minerReserve = minerBudget(bytes, q.single, minerTxs);
+  const minerReserve = opts.feeMode === 'economy' ? musicWeight(Number(bytes), q.single, Number(minerTxs)) : minerBudget(bytes, q.single, minerTxs);
   // On-chain receipt is optional: when off, its protocol+miner cost is left out of
   // the deposit (the HTML receipt is still generated locally at delivery time).
   const rq = await quoteFee(RECEIPT_EST, 1);                 // quoteFee handles MOCK internally
@@ -658,7 +660,7 @@ async function estimate(opts: any) {
   const required = ((requiredExact + 9999n) / 10000n) * 10000n;            // round deposit UP to 0.01 STX
   const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;
   const stxUsd = await stxUsdPrice();
-  return { bytes: Number(bytes), chunks, single: q.single, batches: q.batches,
+  return { feeMode: opts.feeMode === 'economy' ? 'economy' : 'standard', bytes: Number(bytes), chunks, single: q.single, batches: q.batches,
     protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString(),
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
     deliveryReserve: DELIVERY_RESERVE.toString(), parentCount: Number(parentCount), parentReserve: parentReserve.toString(), marginUstx: String(marginUstx),
@@ -676,7 +678,7 @@ async function estimateBatch(opts: any) {
     const chunks = Math.ceil(Number(bytes) / CHUNK) || 1;
     const q = await quoteFee(Number(bytes), chunks);
     const minerTxs = q.single ? 1n : BigInt(q.batches + 2);
-    const minerReserve = minerBudget(bytes, q.single, minerTxs);
+    const minerReserve = opts.feeMode === 'economy' ? musicWeight(Number(bytes), q.single, Number(minerTxs)) : minerBudget(bytes, q.single, minerTxs);
     items.push({ bytes: Number(bytes), chunks, single: q.single, batches: q.batches, protocolFee: q.protocolFee.toString(), minerReserve: minerReserve.toString() });
     sumProtocol += q.protocolFee; sumMiner += minerReserve;
   }
@@ -691,7 +693,7 @@ async function estimateBatch(opts: any) {
   const required = (((baseCosts + feeExact) + 9999n) / 10000n) * 10000n;
   const agentFeeUstx = (pct > 0n && pct < 100n) ? (required * pct) / 100n : 0n;
   const stxUsd = await stxUsdPrice();
-  return { items, count: itemsBytes.length, sumProtocol: sumProtocol.toString(), sumMiner: sumMiner.toString(),
+  return { feeMode: opts.feeMode === 'economy' ? 'economy' : 'standard', items, count: itemsBytes.length, sumProtocol: sumProtocol.toString(), sumMiner: sumMiner.toString(),
     receiptProtocol: receiptProtocol.toString(), receiptMiner: receiptMiner.toString(),
     parentCount: Number(parentCount), parentReserve: parentReserve.toString(), deliveryReserve: deliveryReserve.toString(),
     marginUstx: String(marginUstx), agentFeePct: Number(pct), agentFeeUstx: agentFeeUstx.toString(),
@@ -1278,8 +1280,244 @@ async function sweepStxTo(key: string, fromAddr: string, to: string, tries = 5):
 async function inscribeReceipt(key: string, from: string, html: string, uri: string, deps: string[]) { const data = enc.encode(html); const q = await quoteFee(data.length, chunkBytes(data).length); const tokenId = await mintSingle(key, from, data, 'text/html', uri, deps, q.protocolFee); return { tokenId }; }
 
 // ---------- estimate→create→inscribe→deliver→refund (mirror core) ----------
+// Opt-in Music policy: isolated from legacy Standard jobs and their fee defaults.
+function receivedForJob(job: any): bigint {
+  return BigInt(job.depositReceivedUstx || job.requiredUstx) + BigInt(readMusicFees(job.jobId)?.extraReceived || 0);
+}
+function musicProtected(job: any, s: MusicFeeState) {
+  return BigInt(job.protocolFee) - BigInt(s.protocolSpent) + BigInt(s.service)
+    + BigInt(job.receiptProtocol || 0) + BigInt(job.receiptMiner || 0)
+    + BigInt((job.parents || []).length) * PARENT_RETURN_FEE
+    + DELIVERY_RESERVE + BigInt(Math.max(0, (job.items?.length || 1) - 1)) * ITEM_DELIVERY_FEE + REFUND_TX_FEE;
+}
+function initialiseMusicFees(job: any, est: any) {
+  if (est.feeMode !== 'economy') return;
+  if (!(navigator as any).locks?.request) throw new Error('Economy requires a browser with secure job locking. Choose Standard in this browser.');
+  job.feePolicy = 'music-v1';
+  writeMusicFees(job.jobId, { version: 1, mode: 'economy', networkBudget: job.minerReserve,
+    spent: '0', protocolSpent: '0', remainingWeight: job.minerReserve, approvedTotal: job.requiredUstx,
+    extraReceived: '0', service: job.agentFeeExpectedUstx, lastConfirmedAt: Date.now(), waitSince: 0 });
+}
+async function checkMusicExpiry(job: any) {
+  const s = readMusicFees(job.jobId); if (!s) return;
+  const targets = (job.items || [job]).filter((it: any) => it.uploadHash && !it.tokenId);
+  if (!targets.length) return;
+  try {
+    const r = await hfetch('/v2/info'); if (!r.ok) throw new Error('chain height unavailable');
+    const info: any = await r.json(); const height = Number(info.stacks_tip_height);
+    if (!Number.isSafeInteger(height)) throw new Error('chain height unavailable');
+    let remaining = 4320;
+    for (const it of targets) {
+      const st: any = await ro('get-upload-state', [bufferCV(fromHex(it.uploadHash)), standardPrincipalCV(job.depositAddress)]);
+      const uploadKey = cvToHex(bufferCV(fromHex(it.uploadHash)));
+      if (s.sealedUploads?.includes(uploadKey)) continue;
+      if (!st?.value) {
+        if (s.startedUploads?.includes(uploadKey)) throw new MusicFeeRecovery('Previously started upload is no longer available on-chain. Recover the remaining funds; it will not be restarted automatically.');
+        continue;
+      }
+      const touched = Number(st?.value?.value?.['last-touched']?.value);
+      if (!Number.isSafeInteger(touched)) throw new Error('upload expiry unavailable');
+      remaining = Math.min(remaining, touched + 4320 - height);
+    }
+    const fresh = readMusicFees(job.jobId)!; fresh.expiryBlocks = remaining; fresh.expiryUnknown = false; writeMusicFees(job.jobId, fresh);
+    if (remaining <= 0) throw new MusicFeeWait('This upload has reached its on-chain expiry. Stop and recover the remaining funds; increasing fees cannot restore expired chunks.');
+  } catch (e) {
+    if (e instanceof MusicFeeWait || e instanceof MusicFeeRecovery) throw e;
+    const fresh = readMusicFees(job.jobId)!; fresh.expiryUnknown = true; writeMusicFees(job.jobId, fresh);
+    throw new MusicFeeWait('Cannot verify the upload expiry right now. Progress is paused while the chain is checked.');
+  }
+}
+async function musicPaymentCheck(id: string) {
+  let s = readMusicFees(id); const u = s?.upgrade;
+  if (!s || u?.state !== 'payment' || !u.txid) return;
+  const r = await hfetch(`/extended/v1/tx/${u.txid}`); if (!r.ok) return;
+  const tx: any = await r.json();
+  if (String(tx.tx_id || '').replace(/^0x/, '').toLowerCase() !== u.txid) return;
+  if (tx.canonical === true && tx.is_unanchored !== true && String(tx.tx_status).startsWith('abort')) {
+    const fresh = readMusicFees(id)!; if (fresh.upgrade?.id !== u.id || fresh.upgrade.state !== 'payment') return;
+    fresh.upgrade.state = 'failed'; fresh.upgrade.error = 'Additional transfer failed on-chain; Economy remains active. Review Speed up for a new quote.'; writeMusicFees(id, fresh); return;
+  }
+  try { if (!verifyMusicTopUp(tx, readJob(id), u)) return; } catch (e) {
+    const fresh = readMusicFees(id)!; if (fresh.upgrade?.id !== u.id || fresh.upgrade.state !== 'payment') return;
+    fresh.upgrade.error = errMsg(e); delete fresh.upgrade.txid; writeMusicFees(id, fresh); return;
+  }
+  s = readMusicFees(id)!;
+  if (s.upgrade?.id !== u.id || s.upgrade.state !== 'payment') return;
+  s.extraReceived = (BigInt(s.extraReceived) + BigInt(u.additional)).toString();
+  s.mode = 'standard'; s.networkBudget = u.networkBudget; s.approvedTotal = u.total; s.service = u.service;
+  s.upgrade.state = 'confirmed'; s.waitSince = 0; writeMusicFees(id, s);
+  xaoLog(id, 'Speed-up payment verified on-chain; approved higher fee budget is now active.');
+}
+async function musicFundingGate(id: string) {
+  await musicPaymentCheck(id);
+  if (readMusicFees(id)?.upgrade?.state === 'payment') throw new MusicFeeWait('Additional payment is being confirmed. Your job and its funds are retained.');
+}
+function musicWeightFor(fn: string, args: any[]) {
+  if (fn.startsWith('mint-single')) return BigInt(args[2].value) + PERTX_MINER;
+  if (fn === 'add-chunk-batch') return args[1].list.reduce((n: bigint, c: any) => n + BigInt(c.buffer.length), PERTX_MINER);
+  return PERTX_MINER;
+}
+async function sendMusic(key: string, from: string, fn: string, args: any[], spendCap: bigint | null, id: string) {
+  let s = readMusicFees(id)!;
+  // A reload first settles the exact original nonce, even if the on-chain upload
+  // index has moved on. Saved arguments contain only public transaction data.
+  if (s.pending) {
+    const same = s.pending.fn === fn && JSON.stringify(s.pending.args) === JSON.stringify(args.map(cvToHex));
+    const result = await settleMusicPending(key, from, id);
+    if (same) return result;
+  }
+  await musicFundingGate(id);
+  assertNotCancelled(id);
+  await checkMusicExpiry(readJob(id));
+  s = readMusicFees(id)!;
+  const suggestedNonce = await safeNonce(from, id);
+  if (suggestedNonce == null && s.nextNonce == null) throw new MusicFeeWait('Cannot verify the next transaction nonce. Waiting for the chain API.');
+  const nonce = BigInt(suggestedNonce ?? s.nextNonce!);
+  const nextNonce = s.nextNonce != null && BigInt(s.nextNonce) > nonce ? BigInt(s.nextNonce) : nonce;
+  const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: fn, functionArgs: args,
+    senderKey: key, network, nonce: nextNonce, fee: 1n, anchorMode: AnchorMode.Any,
+    postConditionMode: PostConditionMode.Deny, postConditions: spendCap != null ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, spendCap)] : [] };
+  const draft = await makeContractCall(opts);
+  if (BigInt(spendCap || 0n) > BigInt(readJob(id).protocolFee) - BigInt(s.protocolSpent)) throw new MusicFeeWait('Protocol fees have changed. The existing approval cannot cover this transaction; review or recover the job.');
+  const weight = musicWeightFor(fn, args);
+  const cap = musicTransactionCap(s, weight, estimateTransactionByteLength(draft));
+  const bal = await balance(from);
+  if (cap <= 0n || bal < cap + musicProtected(readJob(id), s)) throw new MusicFeeWait('The remaining budget needs a review before another transaction can be sent. Choose Speed up to review funding.');
+  // Economy submits the serialized-byte floor; a rejected floor never authorises a bump.
+  let fee = cap;
+  if (s.mode === 'standard') {
+    const quoted: any = await quoteLowFee({ ...opts, fee: undefined });
+    fee = BigInt(quoted.auth.spendingCondition.fee);
+    if (fee > cap) throw new MusicFeeWait('Network fees exceed your approved budget. Waiting for lower fees.');
+  }
+  const tx = await makeContractCall({ ...opts, fee });
+  const txid = tx.txid();
+  s = readMusicFees(id)!;
+  if (s.upgrade?.state === 'payment') throw new MusicFeeWait('Additional payment is being confirmed.');
+  assertNotCancelled(id);
+  s.pending = { fn, args: args.map(cvToHex), nonce: String(tx.auth.spendingCondition.nonce), fee: String(fee),
+    weight: String(weight), protocol: String(spendCap || 0n), ids: [txid], fees: { [txid]: String(fee) }, since: Date.now() };
+  s.waitSince ||= Date.now(); writeMusicFees(id, s); // persist BEFORE broadcast, including ambiguous network outcomes
+  const res: any = await broadcastTransaction(tx, network);
+  if (res?.error) {
+    // A definitive node rejection did not consume the nonce or mining budget.
+    const fresh = readMusicFees(id)!; delete fresh.pending; writeMusicFees(id, fresh);
+    throw new MusicFeeWait(`${fn}: ${res.reason || res.error}. Waiting within your approved fee limit.`);
+  }
+  xaoLog(id, `${fn}: broadcast ${txid}; ${fee} µSTX; ${s.mode} budget. Waiting for confirmation.`);
+  return settleMusicPending(key, from, id);
+}
+async function settleMusicPending(key: string, from: string, id: string): Promise<any> {
+  let s = readMusicFees(id)!; const p = s.pending; if (!p) return null;
+  let allMissing = true;
+  for (const txid of p.ids) {
+    const r = await hfetch(`/extended/v1/tx/${txid}`);
+    if (r.status === 404) continue;
+    allMissing = false; if (!r.ok) continue;
+    const d: any = await r.json();
+    if (d.tx_status === 'success' && d.canonical === true && d.is_unanchored !== true && d.microblock_canonical !== false) {
+      s = readMusicFees(id)!;
+      confirmedMusicTransaction(s, txid); writeMusicFees(id, s);
+      xaoLog(id, `${p.fn}: confirmed; mining spend ${s.spent} µSTX.`);
+      return { txid, d };
+    }
+    if (d.canonical === true && d.is_unanchored !== true && String(d.tx_status).startsWith('abort')) {
+      s = readMusicFees(id)!; s.pending!.protocol = '0'; confirmedMusicTransaction(s, txid); writeMusicFees(id, s);
+      throw new MusicFeeRecovery('A transaction aborted. Review the job log and recover; no automatic retry will spend more funds.');
+    }
+  }
+  await musicPaymentCheck(id);
+  await checkMusicExpiry(readJob(id));
+  s = readMusicFees(id)!;
+  if (allMissing && s.mode === 'economy' && s.upgrade?.state !== 'payment' && Date.now() - p.since >= 60000) {
+    // Retrying the identical signed transaction repairs a lost broadcast response
+    // without increasing fees, changing its nonce or risking a second inscription.
+    const tx = await makeContractCall({ contractAddress: CORE[0], contractName: CORE[1], functionName: p.fn,
+      functionArgs: p.args.map(hexToCV), senderKey: key, network, nonce: BigInt(p.nonce), fee: BigInt(p.fee),
+      anchorMode: AnchorMode.Any, postConditionMode: PostConditionMode.Deny,
+      postConditions: BigInt(p.protocol) > 0n ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, BigInt(p.protocol))] : [] });
+    if (!p.ids.includes(tx.txid())) throw new MusicFeeRecovery('Saved transaction identity could not be reconstructed. Review recovery before continuing.');
+    const fresh = readMusicFees(id)!;
+    if (fresh.upgrade?.state !== 'payment') {
+      fresh.pending!.since = Date.now(); writeMusicFees(id, fresh);
+      await broadcastTransaction(tx, network);
+      xaoLog(id, 'Re-submitted the identical saved transaction after a missing broadcast; nonce and fee unchanged.');
+    }
+  }
+  // A requested upgrade changes this live ceiling. Replacement always keeps the
+  // original arguments and nonce; all signed candidate IDs remain in the journal.
+  if (s.mode === 'standard' && s.upgrade?.state !== 'payment' && Date.now() - p.since >= RBF_AFTER_MS && p.ids.length < 5) {
+    const args = p.args.map(hexToCV);
+    const opts: any = { contractAddress: CORE[0], contractName: CORE[1], functionName: p.fn, functionArgs: args,
+      senderKey: key, network, nonce: BigInt(p.nonce), fee: 1n, anchorMode: AnchorMode.Any,
+      postConditionMode: PostConditionMode.Deny, postConditions: BigInt(p.protocol) > 0n ? [makeStandardSTXPostCondition(from, FungibleConditionCode.LessEqual, BigInt(p.protocol))] : [] };
+    const draft = await makeContractCall(opts);
+    const cap = musicTransactionCap(s, BigInt(p.weight), estimateTransactionByteLength(draft));
+    const next = BigInt(p.fee) * 2n < cap ? BigInt(p.fee) * 2n : cap;
+    if (next > BigInt(p.fee) && await balance(from) >= next + musicProtected(readJob(id), s)) {
+      const tx = await makeContractCall({ ...opts, fee: next }); const txid = tx.txid();
+      s = readMusicFees(id)!; s.pending!.ids.push(txid); s.pending!.fees[txid] = String(next);
+      s.pending!.fee = String(next); s.pending!.since = Date.now(); writeMusicFees(id, s);
+      const res: any = await broadcastTransaction(tx, network);
+      xaoLog(id, res?.error ? 'Replacement rejected; watching every original transaction.' : `Speed-up replacement sent at ${next} µSTX using nonce ${p.nonce}.`);
+    }
+  }
+  throw new MusicFeeWait('Waiting for transaction confirmation. You can keep waiting or review Speed up.');
+}
+async function quoteMusicSpeedUp(id: string) {
+  await musicPaymentCheck(id);
+  const job = readJob(id); const s = readMusicFees(id);
+  if (!s || !['INSCRIBING', 'FUNDED', 'FEE_WAITING'].includes(job.status) || job.cancelRequested) throw new Error('This job is no longer available for a speed-up');
+  if (s.upgrade?.state === 'payment') return s.upgrade;
+  if (s.mode !== 'economy') throw new Error('Standard fee budget is already active');
+  await checkMusicExpiry(job);
+  const inputs = job.items || [job];
+  const standard = inputs.reduce((n: bigint, it: any) => n + minerBudget(it.bytes, it.single, BigInt(it.single ? 1 : it.batches + 2)), 0n);
+  const bal = await balance(job.depositAddress);
+  const amounts = speedUpAmounts(s, standard, bal, musicProtected(job, s), BigInt(job.agentFeePct));
+  // A new quote invalidates any older unapproved review. An in-flight payment is never replaced.
+  const fresh = readMusicFees(id)!; if (fresh.upgrade?.state === 'payment') return fresh.upgrade;
+  if (fresh.mode !== 'economy') throw new Error('Standard fee budget is already active');
+  fresh.upgrade = { ...amounts, id: crypto.randomUUID(), state: 'review', expires: Date.now() + 120000,
+    balance: String(bal), sender: job.funder || job.expectedFunder || job.user };
+  writeMusicFees(id, fresh); return fresh.upgrade;
+}
+async function approveMusicSpeedUp(id: string, quoteId: string) {
+  return (navigator as any).locks.request(`xao-music-funding:${id}`, async () => {
+    const job = readJob(id); const s = readMusicFees(id)!; const u = s?.upgrade;
+    if (!u || u.id !== quoteId || u.state !== 'review' || u.expires < Date.now() || job.cancelRequested || !['INSCRIBING', 'FUNDED', 'FEE_WAITING'].includes(job.status)) throw new Error('This quote has changed. Review a fresh speed-up price.');
+    if (BigInt(u.additional) > 0n) {
+      const r = await hfetch(`/extended/v1/address/${u.sender}/nonces`); if (!r.ok) throw new Error('Could not verify the paying wallet nonce');
+      const data: any = await r.json();
+      if (!Number.isSafeInteger(data.last_executed_tx_nonce)) throw new Error('Could not verify the paying wallet nonce');
+      u.minNonce = data.last_executed_tx_nonce + 1;
+      const infoResponse = await hfetch('/v2/info'); if (!infoResponse.ok) throw new Error('Could not verify the current chain height');
+      const info: any = await infoResponse.json();
+      if (!Number.isSafeInteger(info.stacks_tip_height)) throw new Error('Could not verify the current chain height');
+      u.minBlockHeight = info.stacks_tip_height + 1;
+      const latest = readMusicFees(id)!; const current = readJob(id);
+      if (u.expires < Date.now() || latest.upgrade?.id !== quoteId || latest.upgrade.state !== 'review' || current.cancelRequested || !['INSCRIBING', 'FUNDED', 'FEE_WAITING'].includes(current.status)) throw new Error('Job progressed; request a fresh speed-up quote');
+      Object.assign(s, latest); s.upgrade = u;
+    }
+    if (BigInt(u.additional) === 0n) {
+      s.mode = 'standard'; s.networkBudget = u.networkBudget; s.approvedTotal = u.total; s.service = u.service; u.state = 'confirmed';
+    } else u.state = 'payment';
+    writeMusicFees(id, s); return u;
+  });
+}
+async function recordMusicTopUp(id: string, quoteId: string, txid: string) {
+  const s = readMusicFees(id)!; const u = s?.upgrade;
+  if (!u || u.id !== quoteId || u.state !== 'payment') throw new Error('No matching payment request');
+  if (!/^(0x)?[0-9a-f]{64}$/i.test(txid)) throw new Error('Enter the transaction ID shown in your wallet activity');
+  const normal = txid.replace(/^0x/, '').toLowerCase();
+  if (u.txid && u.txid !== normal) throw new Error('A payment transaction is already being watched');
+  u.txid = normal; writeMusicFees(id, s); await musicPaymentCheck(id);
+}
+
 async function createJob(opts: any) {
   const { file, uri, mime = 'application/octet-stream', deps = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard', sunoPlayer = null } = opts;
+  if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
+  if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
   if (!file || !uri) throw new Error('file, uri required');
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
   // PARENT LINKING (escrow): validate declared parents up-front, before payment is requested.
@@ -1299,7 +1537,7 @@ async function createJob(opts: any) {
       if (!owner) throw new Error(`Parent token #${pid} does not exist on ${CORE_NAME} — check the token id. No job was created.`);
     }
   }
-  const est = await estimate({ bytes: data.length, marginUstx, agentFeePct, parentCount: parentIds.length, receipt });
+  const est = await estimate({ bytes: data.length, marginUstx, agentFeePct, parentCount: parentIds.length, receipt, feeMode: opts.feeMode });
   // Ask for durable storage BEFORE a key exists to lose. The deposit key and the
   // file both live in browser storage that a browser may evict without asking; this
   // is the difference between "probably survives" and "survives".
@@ -1315,6 +1553,7 @@ async function createJob(opts: any) {
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin, sunoPlayer,
   };
+  initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
 }
 /**
@@ -1327,6 +1566,8 @@ async function createJob(opts: any) {
  */
 async function createBatchJob(opts: any) {
   const { items = [], parents = [], user, recipient = null, expectedFunder = null, marginUstx = '0', fastTrack = false, strict = false, agentFeePct = AGENT_FEE_PCT, receipt = true, origin = 'wizard' } = opts;
+  if (opts.feeMode === 'economy' && !(navigator as any).locks?.request) throw new Error('Economy requires secure browser job locking; use Standard.');
+  if (opts.feeMode === 'economy' && (origin !== 'music' || CORE_NAME !== 'xtrata-v3-2-3')) throw new Error('Economy is currently supported only by Music on xtrata-v3-2-3');
   if (!Array.isArray(items) || !items.length) throw new Error('items required');
   if (items.length > MAX_BATCH_ITEMS) throw new Error(`batch too large: ${items.length} items (max ${MAX_BATCH_ITEMS})`);
   if (!fastTrack && !user) throw new Error('delivery address (user) required unless fastTrack');
@@ -1360,7 +1601,7 @@ async function createBatchJob(opts: any) {
   const allParents = [...new Set([...sharedParents, ...built.flatMap((b) => b.parents)])];
   if (allParents.length > 45) throw new Error('too many distinct parents for one batch (max 45)');
   if (!MOCK) for (const pid of allParents) { const owner = await ownerOf(pid); if (!owner) throw new Error(`Parent token #${pid} does not exist on ${CORE_NAME} — no job was created.`); }
-  const est = await estimateBatch({ itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, agentFeePct, receipt });
+  const est = await estimateBatch({ itemsBytes: built.map((b) => b.bytes), parentCount: allParents.length, marginUstx, agentFeePct, receipt, feeMode: opts.feeMode });
   for (let i = 0; i < built.length; i += 1) Object.assign(built[i], {
     chunks: est.items[i].chunks, single: est.items[i].single, batches: est.items[i].batches,
     protocolFee: est.items[i].protocolFee, minerReserve: est.items[i].minerReserve,
@@ -1388,10 +1629,13 @@ async function createBatchJob(opts: any) {
     margin: String(marginUstx), requiredUstx: est.requiredUstx, depositAddress: w.address, ephemeralMnemonic: w.mnemonic,
     status: 'AWAITING_DEPOSIT', createdAt: new Date().toISOString(), storageDurability: durability, origin,
   };
+  initialiseMusicFees(job, est);
   writeJob(job); return publicJob(job);
 }
 
 async function statusJob(job: any) {
+  if (readMusicFees(job.jobId)) await musicPaymentCheck(job.jobId);
+  const musicFees = readMusicFees(job.jobId);
   const bal = await balOf(job);
   const funded = bal >= BigInt(job.requiredUstx);
   // "Payment seen" (mempool) — UI signal only; money decisions still gate on the confirmed balance.
@@ -1421,7 +1665,7 @@ async function statusJob(job: any) {
     try { parents = await parentsStatus(job); } catch {}
   }
   const batch = job.items ? { current: (job.batchProgress || {}).current || 0, total: job.items.length, items: job.items.map((i: any) => ({ idx: i.idx, uri: i.uri, status: i.status, tokenId: i.tokenId || null, error: i.error || null })) } : null;
-  return { jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null };
+  return { musicFees, jobId: job.jobId, status: job.status, depositAddress: job.depositAddress, requiredUstx: job.requiredUstx, balanceUstx: bal.toString(), funded, pending, parents, batch, tokenId: job.tokenId || null };
 }
 
 // ---------- batch mint loop (browser mirror of svc runBatchItems) ----------
@@ -1462,6 +1706,7 @@ async function runBatchItems(job: any) {
       item.status = 'INSCRIBED'; item.error = null; minted += 1;
       prog(`batch ${i + 1}/${job.items.length} · inscribed → #${item.tokenId}`);
     } catch (e) {
+      if (e instanceof MusicFeeWait || e instanceof MusicFeeRecovery) { writeJob(job); throw e; }
       const msg = errMsg(e);
       if (!ITEM_FATAL.test(msg)) { item.status = 'PENDING'; writeJob(job); throw e; }   // transient → resume at this item
       item.status = 'FAILED'; item.error = msg; failed += 1;
@@ -1498,6 +1743,7 @@ async function runInscribe(job: any) {
     if (!reads) throw new Error(`could not read the deposit balance (${errMsg(lastErr)}) — nothing was spent, retrying`);
     if (bal < BigInt(job.requiredUstx)) throw new Error(`not funded: need ${job.requiredUstx}, have ${bal}`);
     job.depositReceivedUstx = bal.toString();
+    writeJob(job); // single-transaction Economy waits must also remember funding before broadcast
   }
   // PARENT GATE: the mint/seal aborts (ERR-NOT-AUTHORIZED) unless the deposit wallet owns every
   // declared parent, and a mid-mint abort still burns miner fees. Verify BEFORE spending.
@@ -1666,9 +1912,12 @@ async function deliverBatch(job: any, received: bigint, agentFee: bigint, stxUsd
 
 async function deliver(job: any) {
   if (!job.tokenId) throw new Error('no tokenId yet — run the inscribe step first');
+  const managed = readMusicFees(job.jobId);
+  if (managed) await musicFundingGate(job.jobId);
+  const funding = readMusicFees(job.jobId);
   const pct = BigInt(job.agentFeePct ?? AGENT_FEE_PCT);
-  const received = BigInt(job.depositReceivedUstx || job.requiredUstx);
-  const agentFee = pct > 0n ? (received * pct) / 100n : 0n;
+  const received = receivedForJob(job);
+  const agentFee = funding ? BigInt(funding.service) : (pct > 0n ? (received * pct) / 100n : 0n);
   const stxUsd = await stxUsdPrice();
   if (job.items) return deliverBatch(job, received, agentFee, stxUsd);
   const prog = (m: string) => { job.progress = m; job.progressAt = new Date().toISOString(); writeJob(job); xaoLog(job.jobId, m); };
@@ -1741,12 +1990,15 @@ async function deliver(job: any) {
   job.status = 'COMPLETE'; writeJob(job); idbDeleteBytes(job.jobId); return { receipt };
 }
 async function refundAndClose(job: any, reasonIn = 'cancelled') {
+  const control = readMusicFees(job.jobId);
+  if (control?.pending || control?.upgrade?.state === 'payment') throw new MusicFeeWait('Pending transaction or payment must be resolved before funds can be returned.');
+  if (control) { job.status = 'RECOVERING'; writeJob(job); }
   const reason = job.items
     ? `${reasonIn} · batch: ${job.items.filter((i: any) => i.tokenId).length}/${job.items.length} items inscribed — all inscriptions and funds returned`
     : reasonIn;
   if (job.mock) {
     const rid = String(Math.floor(1000 + Math.random() * 9000));
-    const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: BigInt(job.depositReceivedUstx || job.requiredUstx), receiptTokenId: rid, outcome: 'refunded', note: reason });
+    const d = receiptData(job, { received: receivedForJob(job), agentFee: 0n, change: receivedForJob(job), receiptTokenId: rid, outcome: 'refunded', note: reason });
     job.receiptHtml = buildReceiptHtml(d); job.status = 'CANCELLED'; job.cancelReason = reason; job.cancelledAt = new Date().toISOString(); job.receiptTokenId = rid; delete job.ephemeralMnemonic; writeJob(job);
     return { cancelled: true, mock: true };
   }
@@ -1789,7 +2041,7 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
       const b0 = await balance(dep.address);
       const need = BigInt(job.receiptProtocol || '110000') + 80000n + REFUND_TX_FEE;
       if (b0 > need + 50000n) {
-        const d = receiptData(job, { received: BigInt(job.depositReceivedUstx || job.requiredUstx), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
+        const d = receiptData(job, { received: receivedForJob(job), agentFee: 0n, change: b0 - need, receiptTokenId: null, recipient: returnTo, outcome: 'refunded', note: reason });
         const r = await inscribeReceipt(dep.key, dep.address, buildReceiptHtml(d), `xtrata:receipt/${job.jobId}`, job.tokenId ? [String(job.tokenId)] : []);
         if (r.tokenId) { try { await sendNftRetry(dep.key, dep.address, r.tokenId, returnTo); } catch {} job.receiptTokenId = r.tokenId; out.receiptTokenId = r.tokenId; job.receiptHtml = buildReceiptHtml(d); }
       }
@@ -1844,7 +2096,12 @@ async function refundAndClose(job: any, reasonIn = 'cancelled') {
 }
 // Fast-track auto-pilot (mirror autoRunJob): detect funder → railroad → inscribe → deliver.
 async function autoRun(job: any) {
-  const funder = job.mock ? 'SP_MOCK_SENDER' : await detectFunder(job.depositAddress);
+  if (readMusicFees(job.jobId)) {
+    const state = readMusicFees(job.jobId)!;
+    if (state.pending) { const dep = deriveFrom(job.ephemeralMnemonic); await settleMusicPending(dep.key, dep.address, job.jobId); }
+    await musicFundingGate(job.jobId);
+  }
+  const funder = job.funder || (job.mock ? 'SP_MOCK_SENDER' : await detectFunder(job.depositAddress));
   if (!funder) throw new Error('could not determine the paying address');
   job.funder = funder; writeJob(job);
   if (job.fastTrack && job.expectedFunder && !addrEq(funder, job.expectedFunder)) {
@@ -1945,11 +2202,18 @@ const MAX_RETRIES = 4;
 function background(id: string, fn: () => Promise<any>) {
   PROCESSING.add(id);
   void syncWakeLock();
-  Promise.resolve().then(fn).then(() => {
+  const managed = readMusicFees(id);
+  const run = () => managed ? (navigator as any).locks.request(`xao-music-job:${id}`, { ifAvailable: true }, (lock: any) => lock ? fn() : undefined) : fn();
+  Promise.resolve().then(run).then(() => {
     try { const j = readJob(id); if (j.retryCount && (j.status === 'COMPLETE' || j.status === 'COMPLETE_WITH_SKIPS')) { delete j.retryCount; writeJob(j); } } catch {}
     PROCESSING.delete(id);
   }).catch(async (e) => {
     const msg = errMsg(e);
+    if (e instanceof MusicFeeRecovery) { const j = readJob(id); j.status = 'NEEDS_RECOVERY'; j.keepKey = true; j.error = msg; j.progress = msg; writeJob(j); PROCESSING.delete(id); return; }
+    if (e instanceof MusicFeeWait || readMusicFees(id)?.pending || readMusicFees(id)?.upgrade?.state === 'payment') {
+      const j = readJob(id); j.status = 'FEE_WAITING'; j.progress = msg; j.progressAt = new Date().toISOString(); writeJob(j);
+      PROCESSING.delete(id); return;
+    }
     // A cancel is not an error: no retry, no NEEDS_RECOVERY, straight to the refund.
     if (e instanceof JobCancelled || isCancelRequested(id)) {
       xaoLog(id, 'cancelled by request — returning everything to the payer');
@@ -1986,6 +2250,10 @@ async function watchTick() {
   void syncWakeLock();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
+    if (readMusicFees(j.jobId) && ['FEE_WAITING', 'INSCRIBING'].includes(j.status)) {
+      if (Date.now() - (Date.parse(j.progressAt || '') || 0) < 20000) continue;
+      background(j.jobId, () => autoRun(readJob(j.jobId))); continue;
+    }
     // A cancel requested while the tab was closed. Honour it before any resume
     // logic below, or the watcher would happily restart the job we were asked to stop.
     if (j.cancelRequested && !['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(j.status)) {
@@ -2059,10 +2327,11 @@ async function reapTick() {
   const now = Date.now();
   for (const j of listJobsRaw()) {
     if (PROCESSING.has(j.jobId)) continue;
+    if (readMusicFees(j.jobId) && j.depositReceivedUstx) continue;
     // NEEDS_FUNDS is paused ON PURPOSE and waiting for the user to top the wallet up.
     // Reaping it would refund and wipe the key — the exact outcome that state exists
     // to prevent — and strand chunks that are already paid for.
-    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED', 'NEEDS_FUNDS'].includes(j.status)) continue;
+    if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED', 'NEEDS_RECOVERY', 'EXPIRED', 'NEEDS_FUNDS', 'FEE_WAITING'].includes(j.status)) continue;
     const last = Date.parse(j.progressAt || j.createdAt || '') || 0;
     // Payments can take many minutes to confirm — give AWAITING_DEPOSIT 12× the normal window.
     const win = j.status === 'AWAITING_DEPOSIT' ? WINDOW_MS * 12 : WINDOW_MS;
@@ -2088,6 +2357,8 @@ async function reapTick() {
     for (const pid of (job.parents || [])) out.push({ id: String(pid), owner: MOCK ? job.depositAddress : await ownerOf(String(pid)) });
     return { parents: out, depositAddress: job.depositAddress, core: `${CORE[0]}.${CORE[1]}` };
   },
+  quoteMusicSpeedUp, approveMusicSpeedUp, recordMusicTopUp,
+  dismissMusicTopUp: async (id: string, quoteId: string) => { const s = readMusicFees(id)!; if (s?.upgrade?.id !== quoteId || s.upgrade.state !== 'payment' || s.upgrade.txid) throw new Error('This payment must be verified before continuing'); delete s.upgrade; writeMusicFees(id, s); },
   estimate: async (opts: any) => estimate({ ...opts, bytes: opts.bytes != null ? opts.bytes : (opts.file ? (opts.file as File).size : 0) }),
   createJob: async (opts: any) => (Array.isArray(opts?.items) && opts.items.length ? createBatchJob(opts) : createJob(opts)),
   estimateBatch: async (opts: any) => estimateBatch({ ...opts, itemsBytes: opts.itemsBytes ?? (opts.items || []).map((it: any) => (it.file ? (it.file as File).size : it.bytes || 0)) }),
@@ -2106,6 +2377,8 @@ async function reapTick() {
    */
   cancelJob: async (id: string) => {
     const job = readJob(id);
+    const fees = readMusicFees(id);
+    if (fees?.pending || fees?.upgrade?.state === 'payment') return { error: 'Wait for the pending transaction or additional payment to resolve before stopping.' };
     if (['COMPLETE', 'COMPLETE_WITH_SKIPS', 'CANCELLED'].includes(job.status)) return { error: `job is already ${job.status}` };
     if (job.tokenId || (job.items || []).some((i: any) => i.tokenId)) {
       return { error: 'this job has already minted an inscription — use recovery, which returns the token and the remaining STX' };
@@ -2135,6 +2408,8 @@ async function reapTick() {
   // Is this job safe to throw away, and if not, why not? Drives the confirm dialog so
   // the user is told what would be lost rather than just refused.
   discardCheck: async (id: string) => {
+    const control = readMusicFees(id);
+    if (control?.pending || control?.upgrade?.state === 'payment') return { safe: false, unknown: true, reasons: ['Pending transaction or payment must be resolved first'], heldNfts: [], partial: [] };
     const job = readJob(id);
     if (!job.ephemeralMnemonic) return { safe: true, reasons: [], leftoverUstx: '0', heldNfts: [], partial: [] };
     const dep = deriveFrom(job.ephemeralMnemonic);
@@ -2167,6 +2442,8 @@ async function reapTick() {
   // empty of both STX and inscriptions — the point of the confirm dialog is to abandon
   // half-finished UPLOAD work, never to abandon assets.
   discardJob: async (id: string, consent: string) => {
+    const control = readMusicFees(id);
+    if (control?.pending || control?.upgrade?.state === 'payment') throw new Error('Pending transaction or payment must be resolved first');
     if (consent !== DISCARD_CONSENT) throw new Error('discarding a job requires explicit confirmation');
     const job = readJob(id);
     if (job.ephemeralMnemonic) {
@@ -2325,6 +2602,7 @@ const HANDOFF_ENDPOINT: string = cfg.handoffEndpoint || '';
 const HANDOFF_CONSENT = 'i-agree-xtrata-may-finish-this-job';
 
 async function handoffJob(id: string, consent: string) {
+  if (readMusicFees(id)) throw new Error('Economy jobs must remain in this browser; server handoff does not support the approved fee policy.');
   if (!HANDOFF_ENDPOINT) throw new Error('finishing without you is not enabled on this deployment');
   if (consent !== HANDOFF_CONSENT) throw new Error('handoff requires explicit consent');
   const job = readJob(id);
@@ -2402,4 +2680,4 @@ export { deriveFrom, newWallet, balance, quoteFee, mintSingle, stagedInscribe, g
 // meaningful when exercised against a degraded API rather than asserted on in source.
 export { detectFunder, parentsStatus, heldInscriptions, waitTx, safeNonce, statusJob, autoRun, returnStrays, unsealedUploadFor };
 // Exported so the branding can be verified by RENDERING a receipt, not by reading the template.
-export { buildReceiptHtml, buildBatchReceiptHtml, brandFor };
+export { buildReceiptHtml, buildBatchReceiptHtml, brandFor, receivedForJob };

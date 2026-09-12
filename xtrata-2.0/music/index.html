@@ -69,7 +69,7 @@
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
-<link rel="stylesheet" href="music.css?v=3" />
+<link rel="stylesheet" href="music.css?v=4" />
 </head>
 <body>
 <header>
@@ -126,6 +126,11 @@
       <div class="drop-sub">or <u>browse</u> — one song or several tracks · metadata and artwork are optional</div>
     </div>
 
+    <div class="music-fee-choice">
+      <label for="musicFeeMode">Processing budget</label>
+      <select id="musicFeeMode"><option value="standard">Standard · more room for network fees</option><option value="economy">Economy · lower initial budget</option></select>
+      <p id="musicFeeHelp" class="muted">More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.</p>
+    </div>
     <div id="quote" class="quote">
       <div class="kv"><span>Track</span><span id="qName">—</span></div>
       <div class="kv"><span>Inscription output</span><span id="qPlayer">—</span></div>
@@ -249,6 +254,27 @@
         <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
         <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
       </div>
+      <section id="musicSpeed" class="music-speed" hidden aria-labelledby="musicSpeedTitle">
+        <h3 id="musicSpeedTitle">Economy processing</h3>
+        <p id="musicSpeedStatus"></p><p id="musicSpeedExpiry" class="muted"></p>
+        <button id="musicSpeedOpen" class="btn ghost" type="button">Speed up</button>
+        <div id="musicSpeedReview" hidden>
+          <div class="kv"><span>Funds currently in the job</span><strong id="musicSpeedBalance"></strong></div>
+          <div class="kv"><span>Additional payment</span><strong id="musicSpeedExtra"></strong></div>
+          <div class="kv"><span>New total approved funding</span><strong id="musicSpeedTotal"></strong></div>
+          <div class="kv"><span>Service fee included in total</span><strong id="musicSpeedService"></strong></div>
+          <p class="muted">Wallet transfer fees are additional. Unused job funds return on delivery. This quote is valid for two minutes.</p>
+          <button id="musicSpeedApprove" class="btn" type="button">Confirm faster processing</button>
+          <button id="musicSpeedKeep" class="btn ghost" type="button">Keep waiting</button>
+        </div>
+        <div id="musicTopUpRecovery" hidden>
+          <label for="musicTopUpTx">Check your wallet activity, then paste the additional payment's transaction ID</label>
+          <input id="musicTopUpTx" type="text" autocomplete="off" spellcheck="false" />
+          <button id="musicTopUpCheck" class="btn ghost" type="button">Check payment</button>
+        </div>
+        <p id="musicTopUpTxStatus" class="muted"></p>
+        <p id="musicSpeedError" class="err" role="alert"></p>
+      </section>
       <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
         <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
         <div class="muted" style="font-size:11px;margin-top:5px">Stops at the next safe point. Anything already uploaded stays on-chain unsealed and costs nothing more; the rest of your deposit comes straight back.</div>
@@ -272,13 +298,13 @@
 <script src="audio-processing.js?v=3"></script>
 <script src="music-build.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
-<script src="agent-one.js?v=2026-07-28.7"></script>
+<script src="agent-one.js?v=2026-09-12.1"></script>
 <script>
 let musicSubmitting=false;
 function musicJobActive(){return musicSubmitting||(typeof JOB!=='undefined'&&JOB&&!['DONE','COMPLETE','COMPLETE_WITH_SKIPS','COMPLETED','REFUNDED','CANCELLED','FAILED'].includes(JOB.status));}
 const SERVER = { mock:false, net:'mainnet' };
 const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
-const XAO_MIN_AGENT_BUILD='2026-07-28.7';
+const XAO_MIN_AGENT_BUILD='2026-09-12.1';
 let AGENT_STALE=false;
 function checkAgentBuild(){
   const b=window.XAO_AGENT_BUILD||null;
@@ -323,7 +349,7 @@ async function api(path, opts){
   const A=xa(); const m=(opts&&opts.method)||'GET';
   let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
   if(path==='/api/health') return A.health();
-  if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate(body);window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
+  if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate({...body,feeMode:musicFeeMode()});window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
   if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
   let mm;
   if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
@@ -357,9 +383,9 @@ async function connectWallet(){ const w=xw();
 async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
 $('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
 $('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
-async function payWallet(addr, ustx, files){ const w=xw();
+async function payWallet(addr, ustx, files, trackResult=false){ const w=xw();
   if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
-  const payment={ recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
+  const payment={ trackResult, recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
   if(window.XtrataWizardFunding){
     if(!JOB || JOB.depositAddress!==addr || JOB.expectedFunder!==WALLET) throw new Error('Wizard funding identity does not match this job');
     const hashes=await Promise.all(files.map(async file=>{
@@ -403,7 +429,7 @@ async function pickFile(f){
     const r=await window.XtrataMusic.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
     PLAYER=r.playerFile; META=r;
     showMusicPreview(r);
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
     $('#qName').textContent=r.format==='audio'?f.name:(r.title||f.name)+(r.artist?(' — '+r.artist):'');
     const mib=(n)=>(n/1048576).toFixed(2);
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
@@ -463,7 +489,7 @@ $('#applyEdits').onclick=async()=>{
     const r=await window.XtrataMusic.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
     PLAYER=r.playerFile; META=r;
     showMusicPreview(r);
-    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt()})});
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
     const mib=(n)=>(n/1048576).toFixed(2);
     $('#qName').textContent=r.format==='audio'?FILE.name:(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
     $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
@@ -520,7 +546,7 @@ async function quoteRefresh(){
   const run=++musicQuoteRun, output=PLAYER;
   EST=null; $('#qPay').textContent='Refreshing quote…'; updateGo();
   try{
-    const estimate=await api('/api/estimate',{method:'POST',body:{bytes:output.size,parentCount:parentList().length,receipt:wantReceipt()}});
+    const estimate=await api('/api/estimate',{method:'POST',body:{bytes:output.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()}});
     if(run!==musicQuoteRun||PLAYER!==output||EDITS_DIRTY) return;
     EST=estimate; $('#qPay').textContent=stx(EST.requiredUstx);
   }catch(e){if(run===musicQuoteRun){EST=null;$('#qPay').textContent='Quote unavailable — change the option to retry';}}
@@ -599,7 +625,7 @@ $('#go').onclick=async()=>{
     if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
     if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
     if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
-    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:PLAYER.type, deps, parents, fastTrack:true, origin:'music', receipt:wantReceipt(),
+    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:PLAYER.type, deps, parents, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(),
 
       user:WALLET||undefined, expectedFunder:WALLET||undefined };
     musicSubmitting=true; musicLockJob();
@@ -794,6 +820,83 @@ $('#cancelJobBtn').onclick=async()=>{
   }catch(e){ b.disabled=false; b.textContent='Stop this job & refund me';
     $('#hint').innerHTML='<span class="err">Could not cancel: '+esc((e&&e.message)||String(e))+'</span>'; }
 };
+function musicFeeMode(){ return $('#musicFeeMode').value; }
+$('#musicFeeMode').onchange=()=>{
+  if(musicJobActive()) return;
+  $('#musicFeeHelp').textContent=musicFeeMode()==='economy'
+    ? 'Lower initial mining budget. Targets about 1 STX per MB of transaction data, plus protocol, service and delivery costs. Timing is not guaranteed. Keep this tab open; you can review a speed-up at any time. Uploads can expire if left unfinished.'
+    : 'More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.';
+  quoteRefresh();
+};
+let musicSpeedBusy=false, musicSpeedQuote=null;
+function renderMusicFees(job,status){
+  const s=status?.musicFees, box=$('#musicSpeed');
+  box.hidden=!s||!['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(job.status);
+  if(box.hidden) return;
+  const u=s.upgrade, paying=u?.state==='payment';
+  const elapsed=Math.max(0,Math.floor((Date.now()-(s.lastConfirmedAt||Date.now()))/1000));
+  $('#musicSpeedTitle').textContent=paying?'Confirming additional payment':s.mode==='economy'?(elapsed>=120?'Still waiting for lower fees':'Economy processing'):'Standard fee budget active';
+  $('#musicSpeedStatus').textContent=paying
+    ? 'Your job is retained while this payment is checked. You will not be asked to pay again. Delivery waits for this check.'
+    : (elapsed>=60?Math.floor(elapsed/60)+' min since the last confirmed step. ':'')+'Confirmed upload progress is reused. A higher fee can improve priority; it cannot guarantee a finish time.';
+  $('#musicSpeedExpiry').textContent=s.expiryUnknown?'Upload expiry could not be verified; new transactions are paused.':s.expiryBlocks!=null?'Upload expiry: '+Math.max(0,s.expiryBlocks)+' Stacks blocks remaining. '+(s.expiryBlocks<=720?'Time is running short; review the job now.':'Successful chunk uploads refresh this window.'):'';
+  $('#musicSpeedOpen').hidden=paying||s.mode!=='economy'||!['FUNDED','INSCRIBING','FEE_WAITING'].includes(job.status);
+  $('#musicSpeedOpen').disabled=musicSpeedBusy;
+  $('#musicTopUpRecovery').hidden=!paying||!!u.txid;
+  $('#musicTopUpTxStatus').textContent=paying&&u.txid?'Payment transaction recorded — checking on-chain confirmation.':'';
+  if(u?.error) $('#musicSpeedError').textContent=u.error;
+  if(paying){ musicSpeedQuote=u; $('#musicSpeedReview').hidden=true; }
+  if(s.mode==='standard') $('#musicSpeedReview').hidden=true;
+}
+$('#musicSpeedOpen').onclick=async()=>{
+  if(musicSpeedBusy||!JOB) return; musicSpeedBusy=true; $('#musicSpeedOpen').disabled=true;
+  $('#musicSpeedError').textContent='';
+  try{
+    musicSpeedQuote=await xa().quoteMusicSpeedUp(JOB.jobId);
+    const q=musicSpeedQuote;
+    $('#musicSpeedBalance').textContent=stx(q.balance);
+    $('#musicSpeedExtra').textContent=stx(q.additional);
+    $('#musicSpeedTotal').textContent=stx(q.total);
+    $('#musicSpeedService').textContent=stx(q.service);
+    $('#musicSpeedApprove').textContent=BigInt(q.additional)>0n?'Add '+stx(q.additional)+' and speed up':'Confirm faster processing';
+    $('#musicSpeedReview').hidden=false;
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicSpeedOpen').disabled=false;}
+};
+$('#musicSpeedKeep').onclick=()=>{ $('#musicSpeedReview').hidden=true; $('#musicSpeedStatus').textContent='Continuing within your existing budget. You can review Speed up again whenever you choose.'; };
+$('#musicSpeedApprove').onclick=async()=>{
+  if(musicSpeedBusy||!musicSpeedQuote||!JOB) return;
+  musicSpeedBusy=true; $('#musicSpeedApprove').disabled=true; $('#musicSpeedError').textContent='';
+  const id=JOB.jobId, quoteId=musicSpeedQuote.id;
+  try{
+    if(window.XtrataWizardFunding) throw new Error('Automated wizard funding does not support top-ups. Use the normal connected-wallet flow.');
+    if(!WALLET||WALLET!==musicSpeedQuote.sender) throw new Error('Connect the original paying wallet to approve this speed-up.');
+    const q=await xa().approveMusicSpeedUp(id,quoteId);
+    $('#musicSpeedReview').hidden=true;
+    if(q.state==='payment'){
+      await refresh();
+      try{
+        const result=await payWallet(JOB.depositAddress,q.additional,[],true);
+        const txid=typeof result==='string'?result:(result?.txId||result?.txid||result?.tx_id);
+        if(!txid) throw new Error('Wallet response did not include a transaction ID. Check wallet activity and enter it below.');
+        await xa().recordMusicTopUp(id,quoteId,txid);
+      }catch(e){
+        if(e?.code===4001||e?.code==='USER_CANCELLED') await xa().dismissMusicTopUp(id,quoteId);
+        else $('#musicSpeedError').textContent='Payment outcome needs checking. '+e.message;
+      }
+    }
+    await refresh();
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{ musicSpeedBusy=false;$('#musicSpeedApprove').disabled=false; }
+};
+$('#musicTopUpCheck').onclick=async()=>{
+  if(musicSpeedBusy||!JOB||!musicSpeedQuote) return;
+  musicSpeedBusy=true; $('#musicTopUpCheck').disabled=true;
+  try{ await xa().recordMusicTopUp(JOB.jobId,musicSpeedQuote.id,$('#musicTopUpTx').value.trim()); await refresh(); }
+  catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicTopUpCheck').disabled=false;}
+};
+
 function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,2000); refresh(); }
 async function refresh(){
   if(!JOB) return;
@@ -808,11 +911,14 @@ async function refresh(){
     if(st==='AWAITING_PARENT' && status && status.parents && !(status.parents.missing||[]).length){
       setProg('Parent inscription received ✓ — starting the inscription…', ['pay','parent'], 16);
     }
+    renderMusicFees(job, status);
+    if(st==='FEE_WAITING'){ const remaining=Number(status?.musicFees?.remainingWeight), total=Number(job.minerReserve); const pct=Number.isFinite(remaining)&&total>0?18+66*Math.max(0,Math.min(1,1-remaining/total)):18; setProg(job.progress||'Waiting within your approved fee budget…',['pay','inscribe'],pct); }
     renderEscrow(job, status);
-    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','EXPIRED'].includes(st)&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
+    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','FEE_WAITING','EXPIRED'].includes(st)&&!status?.musicFees?.pending&&status?.musicFees?.upgrade?.state!=='payment'&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
     $('#cancelRow').style.display=canCancel?'block':'none';
     renderKeepOpen(job, st);
     renderHandoff(job);
+    if(job.feePolicy==='music-v1') $('#handoffRow').style.display='none';
     if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
     else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
       $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
@@ -840,7 +946,7 @@ window.musicRecover=musicRecover;
   for(let i=0;i<25&&!window.XtrataAgent;i++) await new Promise(r=>setTimeout(r,200));   // bundle is deferred
   const A=window.XtrataAgent; if(!A||JOB) return;
   const jobs=(await A.listJobs()).filter(j=>j.origin==='music');
-  const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','INSCRIBED','DELIVERING'].includes(j.status));
+  const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(j.status));
   if(live){ JOB=live; $('#go').disabled=true;
     setProg('Picking up where you left off — nothing already uploaded is redone. You can stop and take a refund at any point below.', ['pay']);
     startPoll(); return; }
@@ -996,7 +1102,7 @@ async function sbQuote(){
   if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
   try{
     window.XtrataMusicDiagnostics?.log('quote','Calculating costs for '+ready.length+' prepared tracks.');
-    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt() });
+    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt(),feeMode:musicFeeMode() });
     if(run!==SB.quoteRun) return;
     window.XtrataMusicDiagnostics?.log('quote-ready','Batch quote received.');
     SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
@@ -1075,7 +1181,7 @@ $('#sbGo').onclick=async()=>{
     if(!deps.every(d=>/^\d+$/.test(d))) throw new Error('Dependencies must be token-id uints.');
     if(!parents.every(d=>/^\d+$/.test(d))) throw new Error('Parent must be a token-id uint.');
     if(deps.length) items.forEach(it=>{ it.deps=deps; });
-    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'music', receipt:wantReceipt(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
     PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
     setProg('Creating your one-shot deposit…', []);
     musicSubmitting=true; musicLockJob();
@@ -1124,7 +1230,7 @@ function sbDone(job){
 }
 </script>
 <script src="music-appearance.js?v=2"></script>
-<script src="music-editor.js?v=5"></script>
+<script src="music-editor.js?v=6"></script>
 <script src="music-artwork.js?v=1"></script>
 <script src="music-artwork-editor.js?v=1"></script>
 </body>

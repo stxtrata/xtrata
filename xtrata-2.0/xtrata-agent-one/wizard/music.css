@@ -657,3 +657,5 @@ main {
     display: none;
   }
 }
+
+.music-fee-choice{margin:20px 0;padding:18px;border:1px solid var(--line);border-radius:12px}.music-fee-choice label{display:block;font-weight:700;margin-bottom:8px}.music-fee-choice select{width:100%}.music-fee-choice p{margin-bottom:0;font-size:13px;line-height:1.5}.music-speed{margin-top:18px;padding:18px;border:1px solid var(--accent,#91ab70);border-radius:12px;text-align:left}.music-speed h3{margin:0 0 8px}.music-speed p{font-size:13px;line-height:1.5}.music-speed .kv{gap:16px;flex-wrap:wrap}.music-speed input{width:100%;box-sizing:border-box}.music-speed [hidden],.music-speed[hidden]{display:none!important}

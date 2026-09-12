@@ -65,6 +65,7 @@ try {
       createJob: async (p) => {
         window.payloads.push({
           origin: p.origin,
+          feeMode: p.feeMode,
           mime: p.mime,
           bytes: p.file ? await p.file.text() : null,
           items: p.items?.map((i) => ({ mime: i.mime, size: i.file.size }))
@@ -251,12 +252,15 @@ try {
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await mkdir('/tmp/xtrata-music-qa', { recursive: true });
   await page.screenshot({ path: '/tmp/xtrata-music-qa/mobile.png', fullPage: true });
+  await page.locator('#musicFeeMode').selectOption('economy');
+  await page.waitForFunction(() => !document.querySelector('#go').disabled);
   await page.locator('#go').click();
   await page.waitForFunction(() =>
     document.querySelector('#hint').textContent.includes('SIMULATION')
   );
   assert.deepEqual(await page.evaluate(() => payloads[0]), {
     origin: 'music',
+    feeMode: 'economy',
     mime: 'audio/wav',
     bytes: 'exact fixture audio',
     items: undefined

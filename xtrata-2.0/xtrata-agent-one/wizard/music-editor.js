@@ -46,7 +46,7 @@ function showMusicPreview(r) {
 }
 function musicBusy(busy) {
   for (const el of document.querySelectorAll(
-    'input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = busy || !!musicJobActive();
 }
@@ -55,7 +55,7 @@ function musicUnlockJob() {
 }
 function musicLockJob() {
   for (const el of document.querySelectorAll(
-    'input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicFeeMode,input[name=musicReleaseFormat],#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = true;
   updateGo();

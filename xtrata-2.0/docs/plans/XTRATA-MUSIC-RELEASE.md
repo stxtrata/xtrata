@@ -194,3 +194,8 @@ changes update all tracks, hiding appearance when the entire batch is audio-only
 Validation: production build, focused music tests, targeted script lint, and the
 browser smoke (card switching, conditional controls, mobile alignment, single and
 batch transitions, and existing draft/quote/payment simulations).
+
+
+## Economy and speed-up — 2026-09-12
+
+Added optional Economy funding and a mobile-friendly Speed up review with explicit additional payment, total approval and service fee. A separate durable policy record preserves pending transaction identity and fee limits across reloads; top-ups activate only after matching canonical confirmation. Standard remains the default. See [Music Economy and speed-up](MUSIC-ECONOMY-SPEED-UP.md) for design, recovery boundaries and validation. Agent build `2026-09-12.1`; 297 focused tests, build and targeted lint pass. No real payments or inscriptions were used for verification.
