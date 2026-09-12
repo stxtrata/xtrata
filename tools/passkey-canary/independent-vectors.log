@@ -1,0 +1,60 @@
+Independent verification of 4 frozen vectors
+File: <original-validation-workspace>/upstream/test/vectors/derivation.vectors.json
+Imports from src/ or the published package: none.
+
+HKDF: SHA-256, info "stacks-passkey-wallet/bip39-entropy/v1", salt = utf8(PRF salt), 32 bytes
+  [PASS] params hash is SHA-256
+  [PASS] params entropy is 32 bytes
+  [PASS] params salt source is utf8(PRF salt)
+
+=== vector: all-zero ===
+  [PASS] all-zero PRF input is 32 bytes
+  [PASS] all-zero Stacks path
+  [PASS] all-zero Bitcoin path
+  [PASS] all-zero Bitcoin testnet path
+  [PASS] all-zero mnemonic (HKDF → BIP-39)
+  [PASS] all-zero mnemonic is 24 words
+  [PASS] all-zero Stacks address (@stacks/wallet-sdk)
+  [PASS] all-zero Stacks address (stated path)
+  [PASS] all-zero Bitcoin address (bitcoinjs-lib)
+  [PASS] all-zero Bitcoin testnet address (bitcoinjs-lib)
+
+=== vector: all-ff ===
+  [PASS] all-ff PRF input is 32 bytes
+  [PASS] all-ff Stacks path
+  [PASS] all-ff Bitcoin path
+  [PASS] all-ff Bitcoin testnet path
+  [PASS] all-ff mnemonic (HKDF → BIP-39)
+  [PASS] all-ff mnemonic is 24 words
+  [PASS] all-ff Stacks address (@stacks/wallet-sdk)
+  [PASS] all-ff Stacks address (stated path)
+  [PASS] all-ff Bitcoin address (bitcoinjs-lib)
+  [PASS] all-ff Bitcoin testnet address (bitcoinjs-lib)
+
+=== vector: counter-0..31 ===
+  [PASS] counter-0..31 PRF input is 32 bytes
+  [PASS] counter-0..31 Stacks path
+  [PASS] counter-0..31 Bitcoin path
+  [PASS] counter-0..31 Bitcoin testnet path
+  [PASS] counter-0..31 mnemonic (HKDF → BIP-39)
+  [PASS] counter-0..31 mnemonic is 24 words
+  [PASS] counter-0..31 Stacks address (@stacks/wallet-sdk)
+  [PASS] counter-0..31 Stacks address (stated path)
+  [PASS] counter-0..31 Bitcoin address (bitcoinjs-lib)
+  [PASS] counter-0..31 Bitcoin testnet address (bitcoinjs-lib)
+
+=== vector: sha256-tagged ===
+  [PASS] sha256-tagged PRF input is 32 bytes
+  [PASS] sha256-tagged Stacks path
+  [PASS] sha256-tagged Bitcoin path
+  [PASS] sha256-tagged Bitcoin testnet path
+  [PASS] sha256-tagged mnemonic (HKDF → BIP-39)
+  [PASS] sha256-tagged mnemonic is 24 words
+  [PASS] sha256-tagged Stacks address (@stacks/wallet-sdk)
+  [PASS] sha256-tagged Stacks address (stated path)
+  [PASS] sha256-tagged Bitcoin address (bitcoinjs-lib)
+  [PASS] sha256-tagged Bitcoin testnet address (bitcoinjs-lib)
+
+=================================
+RESULT: ALL ASSERTIONS PASS
+=================================

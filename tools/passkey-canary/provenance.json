@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-09-12T20:02:19.618Z",
+  "upstreamCommit": "1e85e68ab95fcb6e0965b99a19b2f68271854540",
+  "upstreamVersion": "0.4.0",
+  "xtrataCommit": "edc785580637d002a5406463fd780160a74cdffb",
+  "xtrataSeedSha256": "8afb98a014b947efa73506a70c82d3a5aa5eb8bfcac64212d55a56181d9123bd",
+  "xtrataBundleSha256": "b217ae010fbf63f513d4cc02e8a905600f5470a2eca4525e8c89919992e77b65",
+  "vectorSha256": "2821395dcbe04ca1c92e2ea9a954214808a6deeea1a3c8e6d6c67816b8511ab4",
+  "dependencies": {
+    "xtrataTransactions": "6.17.0",
+    "xtrataBip32": "1.1.3",
+    "xtrataBip39": "1.1.0",
+    "upstreamTransactions": "7.5.0"
+  }
+}
