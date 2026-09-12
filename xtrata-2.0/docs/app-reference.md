@@ -73,6 +73,8 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 ## Xtrata Music
 
 - `music/index.html` is the independent `/music/` inscription page: optional metadata/artwork, original or optimised audio, single and mixed-output batch jobs, quotes and recovery.
+- `xtrata-agent-one/wizard/music-player.js` owns the independent versioned Music player, validated appearance settings, self-contained HTML generation and creation-time waveform peaks. Legacy wizard templates remain separate.
+- `xtrata-agent-one/wizard/music-appearance.js` owns Classic/Sleeve/Studio cards, appearance controls and preview sizing, reused by the single and per-track editors. `scripts/music-player-smoke.mjs` verifies exported player layouts and keyboard playback with local generated audio.
 - `xtrata-agent-one/wizard/music-editor.js` adds per-track editing, draft-only IndexedDB storage, preview and quote invalidation. It never stores wallet keys.
 - `xtrata-agent-one/wizard/music-build.js` defines the neutral output contract and versioned `xtrata-music` metadata record. Raw audio uses its real MIME type; packaged releases use `text/html`.
 - `xtrata-agent-one/wizard/audio-processing.js` owns shared FFmpeg extraction and File-identity caching. Both the legacy `suno-build.js` adapter and the neutral builder consume it; preserve the script ordering in both wizard entry points.

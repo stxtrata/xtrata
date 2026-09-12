@@ -41,16 +41,16 @@
   const mimeFor = (f) =>
     MIME[f.name.split('.').pop().toLowerCase()] ||
     (f.type.startsWith('audio/') ? f.type : 'application/octet-stream');
-  const escape = (s) =>
-    String(s).replace(
-      /[&<>"']/g,
-      (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
-    );
   let serial = Promise.resolve();
   function build(file, onStatus, overrides = {}) {
     const o = { ...overrides };
     o.format ||= document.querySelector('#musicFormat')?.value || 'details';
     o.quality ||= document.querySelector('#musicQuality')?.value || 'optimised';
+    o.appearance = window.XtrataMusicPlayer.normalize(
+      o.appearance || window.musicAppearance?.get()
+    );
+    if (o.artFit)
+      o.appearance = window.XtrataMusicPlayer.normalize({ ...o.appearance, artFit: o.artFit });
     const diagnostic = (phase, message) => {
       if (window.XtrataMusicDiagnostics) window.XtrataMusicDiagnostics.log(phase, message);
     };
@@ -96,7 +96,9 @@
     const audioLabel =
       o.quality === 'original'
         ? 'Original audio'
-        : 'Opus ' + ({ compact: 48, optimised: 96, high: 128, premium: 160 })[o.quality] + ' kbps VBR';
+        : 'Opus ' +
+          { compact: 48, optimised: 96, high: 128, premium: 160 }[o.quality] +
+          ' kbps VBR';
     let artworkInfo = null;
     if (coverB64 && window.XtrataMusicArtwork) {
       try {
@@ -119,40 +121,20 @@
           : new File([ex.audioBytes], metadata.title + '.weba', { type: audioMime });
       html = null;
     } else {
-      html = window.buildXtrataAudioPlayerHtml({
-        mode: 'embedded',
+      metadata.appearance = o.appearance;
+      metadata.template = window.XtrataMusicPlayer.VERSION;
+      if (o.appearance.timeline === 'waveform' && onStatus) onStatus('Preparing the waveform…');
+      const peaks =
+        o.appearance.timeline === 'waveform' ? await window.XtrataMusicPlayer.preparePeaks(ex) : [];
+      html = window.XtrataMusicPlayer.build({
         audioMimeType: audioMime,
         audioBase64: ex.audioB64,
-        artFit: o.artFit || 'cover',
-        imageBase64: coverB64 || undefined,
-        imageMimeType: coverMime || undefined,
-        metadata
+        imageBase64: coverB64,
+        imageMimeType: coverMime,
+        metadata,
+        appearance: o.appearance,
+        peaks
       });
-      // Include the complete versioned record, including credits not understood by older players.
-      const json = JSON.stringify(metadata)
-        .replace(/</g, '\\u003c')
-        .replace(/>/g, '\\u003e')
-        .replace(/&/g, '\\u0026');
-      const credits = FIELDS.filter(
-        (k) =>
-          !['title', 'artist', 'album', 'lyrics', 'description', 'license', 'bpm', 'note'].includes(
-            k
-          ) && metadata[k]
-      )
-        .map(
-          (k) =>
-            '<div><dt>' +
-            escape(k.replace(/([A-Z])/g, ' $1')) +
-            '</dt><dd>' +
-            escape(metadata[k]) +
-            '</dd></div>'
-        )
-        .join('');
-      html = html.replace(
-        '</head>',
-        '<script type="application/json" id="xtrata-music-metadata">' + json + '</script></head>'
-      );
-      if (credits) html = html.replace('</dl>', credits + '</dl>');
       playerFile = new File(
         [html],
         window.XtrataAudioProcessing.slug(metadata.title) + '.music.html',
@@ -166,6 +148,7 @@
     return {
       ...metadata,
       metadata,
+      appearance: o.appearance,
       playerFile,
       html,
       coverB64,

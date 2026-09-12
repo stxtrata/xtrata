@@ -69,7 +69,7 @@
   .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
   footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
 </style>
-<link rel="stylesheet" href="music.css?v=1" />
+<link rel="stylesheet" href="music.css?v=2" />
 </head>
 <body>
 <header>
@@ -241,10 +241,10 @@
     window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
-<script src="HTML_Template.js?v=6"></script>
+<script src="music-player.js?v=1"></script>
 <script src="music-diagnostics.js?v=1"></script>
 <script src="audio-processing.js?v=3"></script>
-<script src="music-build.js?v=2"></script>
+<script src="music-build.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="agent-one.js?v=2026-07-28.7"></script>
 <script>
@@ -903,7 +903,7 @@ let sbEngineWarned=false;
 async function sbProcess(){
   if(SB.busy) return; SB.busy=true; musicBusy(true);
   try{
-    if(!window.XtrataMusic||!window.buildXtrataAudioPlayerHtml){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
+    if(!window.XtrataMusic||!window.XtrataMusicPlayer){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
     for(;;){
       const it=SB.items.find(x=>x.status==='queued');
       if(!it) break;
@@ -913,7 +913,7 @@ async function sbProcess(){
         it.status='building'; sbRender();
         const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides||{});
         if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
-        it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null;
+        it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null;
         it.needs=sbNeeds(r);
       }catch(e){ it.status='error'; it.err=(e&&e.message)||String(e); }
       sbRender(); sbQuote();
@@ -1032,7 +1032,7 @@ $('#sbArtPick').onchange=async()=>{
     it.overrides={...it.overrides,format:'artwork',coverB64:b64,coverMime:cover.type||'image/png'};
     const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides);
     if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
-    it.player=r.playerFile; it.info=r; it.status='ready'; it.err=null; it.show=true;
+    it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null; it.show=true;
     it.needs=sbNeeds(r);
     $('#sbHint').innerHTML='<span class="ok">✓ Artwork updated — preview refreshed.</span>';
   }catch(e){ it.status=prev==='ready'?'ready':'error'; it.err=(e&&e.message)||String(e); $('#sbHint').innerHTML='<span class="err">Artwork rebuild failed: '+esc(it.err)+'</span>'; }
@@ -1097,7 +1097,8 @@ function sbDone(job){
   const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
 }
 </script>
-<script src="music-editor.js?v=3"></script>
+<script src="music-appearance.js?v=1"></script>
+<script src="music-editor.js?v=4"></script>
 <script src="music-artwork.js?v=1"></script>
 <script src="music-artwork-editor.js?v=1"></script>
 </body>

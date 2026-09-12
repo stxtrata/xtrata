@@ -168,6 +168,26 @@ try {
   await page.locator('#applyEdits').click();
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   assert(!(await page.evaluate(() => META.hasCover)));
+  for (const style of ['sleeve', 'studio', 'classic']) {
+    await page.locator('#musicStyleControls [data-style="' + style + '"]').click();
+    await page.waitForFunction(
+      (s) => !building && META.appearance.style === s && !document.querySelector('#go').disabled,
+      style
+    );
+    assert((await page.evaluate(() => PLAYER.text())).includes('data-style="' + style + '"'));
+  }
+  await page.locator('#musicStyleControls [data-option="palette"]').selectOption('paper');
+  await page.waitForFunction(() => !building && META.appearance.palette === 'paper');
+  await page.locator('#musicStyleControls [data-option="font"]').selectOption('serif');
+  await page.waitForFunction(() => !building && META.appearance.font === 'serif');
+  await page.locator('#musicStyleControls [data-option="artFit"]').selectOption('cover');
+  await page.waitForFunction(() => !building && META.appearance.artFit === 'cover');
+  await page.locator('[data-preview-width="280px"]').click();
+  assert((await page.locator('#previewFrame').boundingBox()).width <= 281);
+  await page.locator('[data-preview-width="100%"]').click();
+  await page
+    .locator('#musicAppearancePanel')
+    .screenshot({ path: '/tmp/music-appearance-editor.png' });
   await page.locator('#saveMusicDraft').click();
   await page.waitForFunction(() =>
     document.querySelector('#draftStatus').textContent.includes('saved locally')
@@ -178,6 +198,14 @@ try {
     document.querySelector('#draftStatus').textContent.includes('restored')
   );
   assert.equal(await page.locator('#eArtist').inputValue(), 'Session musician');
+  assert.deepEqual(
+    await page.evaluate(() => [
+      META.appearance.palette,
+      META.appearance.font,
+      META.appearance.artFit
+    ]),
+    ['paper', 'serif', 'cover']
+  );
   await page.evaluate(() => (window.failQuote = true));
   await page.locator('#musicQuality').selectOption('optimised');
   await page.waitForFunction(() => !building);
@@ -194,6 +222,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#go').disabled);
   assert.equal(await page.evaluate(() => PLAYER.text()), 'exact fixture audio');
   assert.equal(await page.evaluate(() => PLAYER.type), 'audio/wav');
+  assert(await page.locator('#musicAppearancePanel').isHidden());
   await page.setViewportSize({ width: 390, height: 844 });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await mkdir('/tmp/xtrata-music-qa', { recursive: true });
@@ -213,11 +242,23 @@ try {
   await page.waitForSelector('#saveMusicDraft');
   await page.locator('#picker').setInputFiles([file, { ...file, name: 'second.wav' }]);
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);
+  await page.locator('#musicStyleControls [data-style="studio"]').click();
+  await page.locator('#musicStyleApplyAll').click();
+  await page.waitForFunction(() => !SB.busy && !document.querySelector('#sbGo').disabled);
+  assert.deepEqual(await page.evaluate(() => SB.items.map((i) => i.info.appearance.style)), [
+    'studio',
+    'studio'
+  ]);
   await page.locator('.sbrow button[title="Edit this track"]').first().click();
   assert(await page.locator('#sbGo').isDisabled());
+  await page.locator('#trackEditor [data-style="sleeve"]').click();
   await page.locator('#track-artist').fill('Batch artist');
   await page.locator('#shareTrack').click();
   await page.waitForFunction(() => !document.querySelector('#sbGo').disabled);
+  assert.deepEqual(await page.evaluate(() => SB.items.map((i) => i.info.appearance.style)), [
+    'sleeve',
+    'studio'
+  ]);
   assert.deepEqual(await page.evaluate(() => SB.items.map((i) => i.info.artist)), [
     'Batch artist',
     'Batch artist'
@@ -262,6 +303,8 @@ try {
         base,
         checks: [
           'neutral branding',
+          'all player styles, palettes, typography, framing, preview sizes and draft restoration',
+          'batch appearance application with independent per-track styles',
           'untagged audio',
           'art add/remove, resize comparison and high-resolution warning',
           'transparent artwork preserved without upscaling',

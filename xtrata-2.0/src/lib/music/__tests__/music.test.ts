@@ -16,10 +16,9 @@ function setup() {
         opusBytes: q === 'optimised' ? 3 : null
       }),
       slug: () => 'track'
-    },
-    buildXtrataAudioPlayerHtml: (c: any) =>
-      '<html><head></head><body><dl></dl>' + JSON.stringify(c) + '</body></html>'
+    }
   };
+  vm.runInNewContext(source('xtrata-agent-one/wizard/music-player.js'), { window });
   vm.runInNewContext(source('xtrata-agent-one/wizard/music-build.js'), {
     window,
     File,

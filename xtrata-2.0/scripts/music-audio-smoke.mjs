@@ -92,9 +92,12 @@ try {
   );
   assert((await p.evaluate(() => PLAYER.size)) < buf.length);
   const size96 = await p.evaluate(() => PLAYER.size);
-  for (const [quality, bitrate] of [['high', 128], ['premium', 160]]) {
+  for (const [quality, bitrate] of [
+    ['high', 128],
+    ['premium', 160]
+  ]) {
     await p.locator('#musicQuality').selectOption(quality);
-    await p.waitForFunction(q => !building && META?.quality === q, quality, { timeout: 180000 });
+    await p.waitForFunction((q) => !building && META?.quality === q, quality, { timeout: 180000 });
     assert.equal(await p.evaluate(() => META.audioLabel), `Opus ${bitrate} kbps VBR`);
     assert((await p.evaluate(() => PLAYER.size)) > size96);
   }
@@ -104,7 +107,16 @@ try {
   assert((await p.evaluate(() => PLAYER.size)) < size96);
   await p.locator('#musicFormat').selectOption('details');
   await p.waitForFunction(() => !building && META?.format === 'details', {}, { timeout: 180000 });
+  await p.locator('#musicStyleControls [data-option="timeline"]').selectOption('waveform');
+  await p.waitForFunction(
+    () => !building && META.appearance.timeline === 'waveform',
+    {},
+    { timeout: 30000 }
+  );
   const frame = p.frames().find((f) => f !== p.mainFrame());
+  await frame.waitForSelector('#timeline svg');
+  assert((await frame.locator('#timeline rect').count()) > 0);
+
   await frame.waitForSelector('audio', { state: 'attached' });
   const playable = await frame.evaluate(async () => {
     let a = document.querySelector('audio');
@@ -149,7 +161,7 @@ try {
           'real FFmpeg original WAV byte equality',
           'untagged metadata',
           'real 48, 96, 128 and 160 kbps Opus conversion with smaller 48 kbps output',
-          'embedded audio playback',
+          'embedded audio playback and precomputed real waveform',
           'original package rebuild',
           'corrupt audio rejection',
           'no page errors'

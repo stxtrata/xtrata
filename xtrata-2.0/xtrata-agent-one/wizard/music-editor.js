@@ -22,6 +22,8 @@ function showMusicPreview(r) {
     musicPreviewUrl = null;
   }
   const frame = $('#previewFrame');
+  const previewSizes = document.querySelector('.music-preview-sizes');
+  if (previewSizes) previewSizes.hidden = !r.html;
   let raw = $('#musicRawPreview');
   if (!raw) {
     raw = document.createElement('div');
@@ -44,7 +46,7 @@ function showMusicPreview(r) {
 }
 function musicBusy(busy) {
   for (const el of document.querySelectorAll(
-    '#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = busy || !!musicJobActive();
 }
@@ -53,7 +55,7 @@ function musicUnlockJob() {
 }
 function musicLockJob() {
   for (const el of document.querySelectorAll(
-    '#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
+    '#musicAppearancePanel input,#musicAppearancePanel select,#musicAppearancePanel button,#picker,#musicFormat,#musicQuality,#editPanel input,#editPanel textarea,#editPanel select,#editPanel button,#trackEditor input,#trackEditor select,#trackEditor button'
   ))
     el.disabled = true;
   updateGo();
@@ -64,11 +66,12 @@ $('#drop').addEventListener('keydown', (e) => {
     if (!building && !SB.busy && !musicJobActive()) picker.click();
   }
 });
+window.musicAppearance = window.XtrataMusicAppearance.init();
 const oldCollect = collectEdits;
 collectEdits = function () {
   const o = oldCollect();
   for (const key of Object.keys(musicExtraFields)) o[key] = $('#music-' + key).value;
-  o.artFit = $('#musicArtFit').value;
+  o.appearance = window.musicAppearance.get();
   return o;
 };
 const extra = document.createElement('div');
@@ -90,17 +93,18 @@ $('#moreMetaPanel').append(extra);
 const artOptions = document.createElement('div');
 artOptions.className = 'music-toolbar';
 artOptions.innerHTML =
-  '<button type="button" class="btn ghost" id="musicRemoveArt">Remove artwork</button><label>Artwork fit<select id="musicArtFit"><option value="cover">Fill square</option><option value="contain">Show whole image</option></select></label>';
+  '<button type="button" class="btn ghost" id="musicRemoveArt">Remove artwork</button>';
 $('#eCoverBtn').parentElement.parentElement.append(artOptions);
 $('#musicRemoveArt').onclick = () => {
   COVER_OVERRIDE = { b64: null, mime: null };
   $('#eCoverThumb').removeAttribute('src');
   markEditsDirty();
 };
-$('#musicArtFit').onchange = markEditsDirty;
+
 const oldPrefill = prefillEdits;
 prefillEdits = function (r) {
   oldPrefill(r);
+  window.musicAppearance.set(r.appearance);
   for (const key of Object.keys(musicExtraFields)) $('#music-' + key).value = r[key] || '';
   for (const key of ['bpm', 'note', 'license', 'description'])
     $('#e' + key[0].toUpperCase() + key.slice(1)).value = r[key] || '';
@@ -108,6 +112,7 @@ prefillEdits = function (r) {
   musicFormatHelp();
 };
 function musicFormatHelp() {
+  if (window.musicAppearance) window.musicAppearance.visibility();
   const format = $('#musicFormat').value,
     quality = $('#musicQuality').value;
   $('#formatHelp').textContent =
@@ -224,6 +229,46 @@ window.musicEditTrack = (i) => {
     g.append(l, input);
     $('#trackFields').append(g);
   }
+  const styleHost = document.createElement('div');
+  $('#trackFields').before(styleHost);
+  const preview = document.createElement('iframe');
+  preview.className = 'music-track-preview';
+  preview.title = 'Track style preview';
+  preview.setAttribute('sandbox', 'allow-scripts');
+  styleHost.after(preview);
+  const previewNote = document.createElement('p');
+  previewNote.className = 'muted';
+  preview.after(previewNote);
+  let previewRun = 0;
+  const trackAppearance = window.XtrataMusicAppearance.mount(
+    styleHost,
+    values.appearance,
+    async () => {
+      const run = ++previewRun;
+      previewNote.textContent = 'Updating preview…';
+      try {
+        const r = await window.XtrataMusic.build(it.file, () => {}, {
+          ...it.overrides,
+          ...gather(),
+          format: $('#trackFormat').value,
+          quality: $('#trackQuality').value,
+          appearance: trackAppearance.get(),
+          artFit: undefined
+        });
+        if (run !== previewRun || editor.hidden) return;
+        preview.hidden = !r.html;
+        preview.srcdoc = r.html || '';
+        previewNote.textContent = r.html
+          ? 'Style preview · Apply track changes to save and refresh the quote.'
+          : 'Audio only has no inscribed player style.';
+      } catch (error) {
+        if (run === previewRun) previewNote.textContent = error.message;
+      }
+    }
+  );
+  preview.hidden = !it.info?.html;
+  preview.srcdoc = it.info?.html || '';
+  previewNote.textContent = 'Apply track changes to save the appearance and refresh the quote.';
   const gather = () =>
     Object.fromEntries(window.XtrataMusic.FIELDS.map((k) => [k, $('#track-' + k).value]));
   const save = async (shared) => {
@@ -231,7 +276,9 @@ window.musicEditTrack = (i) => {
     const edits = {
       ...gather(),
       format: $('#trackFormat').value,
-      quality: $('#trackQuality').value
+      quality: $('#trackQuality').value,
+      appearance: trackAppearance.get(),
+      artFit: undefined
     };
     it.overrides = { ...it.overrides, ...edits };
     it.status = 'queued';
@@ -247,6 +294,8 @@ window.musicEditTrack = (i) => {
         };
         row.status = 'queued';
       }
+    ++previewRun;
+    preview.srcdoc = '';
     editor.hidden = true;
     SB.EST = null;
     ++SB.quoteRun;
@@ -255,6 +304,8 @@ window.musicEditTrack = (i) => {
   $('#saveTrack').onclick = () => save(false);
   $('#shareTrack').onclick = () => save(true);
   $('#closeTrack').onclick = () => {
+    ++previewRun;
+    preview.srcdoc = '';
     editor.hidden = true;
     sbUpdateGo();
   };
@@ -307,7 +358,13 @@ $('#saveMusicDraft').onclick = async () => {
       : [{ file: FILE, overrides: collectEdits() }];
     await draftAccess('readwrite', (s) =>
       s.put(
-        { version: 1, format: $('#musicFormat').value, quality: $('#musicQuality').value, items },
+        {
+          version: 1,
+          appearance: window.musicAppearance.get(),
+          format: $('#musicFormat').value,
+          quality: $('#musicQuality').value,
+          items
+        },
         'current'
       )
     );
@@ -322,6 +379,7 @@ $('#restoreMusicDraft').onclick = async () => {
       throw new Error('Finish the current operation first.');
     const d = await draftAccess('readonly', (s) => s.get('current'));
     if (!d) throw new Error('No saved draft on this device.');
+    window.musicAppearance.set(d.appearance || d.items[0]?.overrides?.appearance);
     $('#musicFormat').value = d.format;
     $('#musicQuality').value = d.quality;
     if (d.items.length === 1) {
@@ -342,7 +400,7 @@ $('#restoreMusicDraft').onclick = async () => {
       for (const k of Object.keys(musicExtraFields)) $('#music-' + k).value = o[k] || '';
       COVER_OVERRIDE =
         o.coverB64 !== undefined ? { b64: o.coverB64, mime: o.coverMime } : undefined;
-      $('#musicArtFit').value = o.artFit || 'cover';
+      window.musicAppearance.set(o.appearance || { artFit: o.artFit || 'contain' });
       markEditsDirty();
       await $('#applyEdits').onclick();
     } else {

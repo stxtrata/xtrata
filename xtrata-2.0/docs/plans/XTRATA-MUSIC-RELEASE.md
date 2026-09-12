@@ -139,3 +139,42 @@ WebP transparency/format background: https://developers.google.com/speed/webp
 ### Full Opus quality range
 
 Added 128 and 160 kbps VBR alongside 48 and 96 for single releases and per-track batch edits. New sessions default to 96 kbps; original audio and saved draft choices remain available. Encoding caches stay separate for each quality. Verified exact encoder bitrate arguments, local browser flows, and real encoding at all four rates.
+
+
+## Player styles and appearance studio — 2026-09-12
+
+The Music route now loads its own `xtrata-music-player-v1` module. Classic, Sleeve
+and Studio share an embedded player engine with visible play/pause, seek, timing
+and status, plus optional details and lyrics dialogs. Existing legacy templates
+and previously inscribed files are unchanged.
+
+Creators can choose four palettes, a custom accent, three system font families,
+whole-image/fill framing, crop position, square/soft corners, progress/waveform,
+no-art presentation, and album/details/lyrics visibility. Presentation controls do
+not delete the underlying metadata. The appearance and template version are stored
+with the file. Custom colours use contrasting black or white play-button text;
+other text retains the palette's fixed foreground/background pairs.
+
+The widened desktop editor places the working preview beside appearance controls;
+mobile stacks them. Preview size choices include phone and 280 px viewer. Single
+changes rebuild from cached audio and invalidate/requote exact output bytes.
+Batch defaults have an explicit apply-to-all action; saved per-track overrides stay
+independent. Drafts persist appearance, and raw audio bypasses player generation.
+Closing a track editor unloads its temporary player.
+
+Waveform peaks are calculated once during creation and cached against prepared
+audio, then embedded as bounded SVG bars. There is no listener-side audio decoding
+for waveform generation and no runtime network dependency. A decode failure or
+12-second waveform timeout falls back to a plain seek bar. The optional waveform
+adds markup; the default progress player omits it. System fonts avoid font payloads.
+A small test fixture's default player is guarded to stay below 24 KB excluding
+substantial audio/art; final quotes always use actual complete output bytes.
+
+Validation: focused unit/regression tests cover input escaping, appearance
+validation, raw-byte preservation, generated-script parsing and legacy-template
+compatibility. The player smoke covers Classic/Sleeve/Studio with and without art
+at 160/200/280/390/492/760 px, visible errors, real local WAV playback, keyboard seek/pause,
+and details/lyrics dialogs. Editor smoke covers styles, palette/type/framing,
+draft restoration, per-track batch overrides, artwork optimisation and simulated
+payments. Real-audio smoke covers 48/96/128/160 kbps encoding, waveform generation,
+playback and corrupt-file rejection. No personal wallets or real payments are used.
