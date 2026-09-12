@@ -24,3 +24,10 @@ Standard remains the default. Economy is offered only by Music for v3.2.3 in bro
 While a wallet outcome is uncertain, a saved transaction ID can restore verification; a second payment button is withheld. Delivery and key disposal wait for unresolved payments. Canonical on-chain success is verified through the configured chain API; this cannot eliminate underlying chain reorg or API trust risks. The legacy delivery/recovery subsystem remains in use. Economy jobs cannot be handed off to the server, which does not yet understand this policy record.
 
 Deployment target: `main-music-updates`. Promotion to `main` remains a separate review.
+
+
+## Deployed verification
+
+Cloudflare deployed implementation commit `06fc43fa6` successfully to the Music preview. Both deployed editor and speed-up browser smokes pass. The real deployed bundle identifies as `2026-09-12.1`; read-only quotes for a 1 MiB test payload returned 1.89 STX Economy versus 2.83 STX Standard with identical protocol fees (a point-in-time check, not a guaranteed price). Real FFmpeg smoke passed original-byte preservation, 48/96/128/160 kbps conversions, embedded playback, waveform preparation and corrupt-audio rejection with no page errors.
+
+The audio smoke selector was corrected to wait for the internal format field to be attached rather than visible: the earlier three-card UI intentionally hides that field. It now explicitly verifies live Economy/Standard quotes. Generated media and screenshots remain local.

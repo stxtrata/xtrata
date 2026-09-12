@@ -49,7 +49,18 @@ try {
     };
   });
   await p.goto(base + '/music/' + (live ? '' : '?mock=1'));
-  await p.waitForSelector('#musicFormat');
+  await p.waitForSelector('#musicFormat', { state: 'attached' });
+  await p.waitForFunction(() => !!window.XtrataAgent?.estimate);
+  const quotes = await p.evaluate(async () => {
+    const standard = await window.XtrataAgent.estimate({ bytes: 1048576, receipt: false });
+    const economy = await window.XtrataAgent.estimate({ bytes: 1048576, receipt: false, feeMode: 'economy' });
+    return { build: window.XtrataAgent.build, standard, economy };
+  });
+  assert.equal(quotes.economy.feeMode, 'economy');
+  assert(BigInt(quotes.economy.requiredUstx) < BigInt(quotes.standard.requiredUstx));
+  assert.equal(quotes.economy.protocolFee, quotes.standard.protocolFee);
+  console.log('Read-only funding quotes', JSON.stringify({ build: quotes.build, economy: quotes.economy.requiredUstx, standard: quotes.standard.requiredUstx }));
+  await p.locator('#musicFeeMode').selectOption('economy');
   // Real PCM WAV, two seconds. Generated only in memory, never committed.
   const n = 44100 * 2,
     buf = Buffer.alloc(44 + n * 2);
@@ -158,7 +169,8 @@ try {
         passed: true,
         base,
         checks: [
-          'real FFmpeg original WAV byte equality',
+          'read-only Economy and Standard funding quotes',
+      'real FFmpeg original WAV byte equality',
           'untagged metadata',
           'real 48, 96, 128 and 160 kbps Opus conversion with smaller 48 kbps output',
           'embedded audio playback and precomputed real waveform',
