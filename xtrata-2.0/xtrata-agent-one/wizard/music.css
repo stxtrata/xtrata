@@ -1,0 +1,195 @@
+:root {
+  --bg: #101211;
+  --panel: #191d1b;
+  --panel2: #121613;
+  --line: #354039;
+  --ink: #f4f1e8;
+  --mut: #adb8ae;
+  --acc: #c5ed96;
+  --acc2: #bad89b;
+  scrollbar-gutter: stable;
+}
+body {
+  background:
+    radial-gradient(900px 450px at 70% 0, rgba(170, 206, 130, 0.09), transparent), var(--bg);
+}
+main {
+  width: min(900px, 100%);
+  max-width: 900px;
+  padding: 32px 20px;
+  margin: auto;
+}
+.card {
+  padding: 32px;
+}
+.music-title {
+  font-size: clamp(36px, 6vw, 58px);
+  letter-spacing: -0.045em;
+  margin: 18px 0 4px;
+  line-height: 1.1;
+}
+.music-subtitle {
+  font-size: 22px;
+  margin: 0 0 16px;
+}
+.lead {
+  max-width: 670px;
+}
+.tag {
+  color: var(--acc);
+}
+.music-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  color: var(--acc);
+  font-size: 12px;
+  padding: 20px 0;
+}
+.music-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.music-options label {
+  font-size: 13px;
+  font-weight: 600;
+}
+select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--panel2);
+  color: var(--ink);
+  font: inherit;
+}
+.music-options + p {
+  font-size: 13px;
+}
+.btn {
+  background: var(--acc);
+  color: #14200d;
+  box-shadow: none;
+}
+.btn.ghost {
+  color: var(--ink);
+  background: transparent;
+}
+.btn:disabled {
+  opacity: 0.5;
+}
+.drop {
+  border-color: #647653;
+}
+.drop:focus-visible,
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 4px;
+}
+#preview {
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+#preview audio {
+  width: 100%;
+}
+#health {
+  font-size: 10px;
+}
+header {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.logo {
+  white-space: nowrap;
+}
+.kv {
+  gap: 18px;
+}
+.kv > span:last-child {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.music-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+.music-toolbar .btn {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+#trackEditor {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 16px 0;
+  background: var(--panel2);
+}
+.metadata-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.music-faq {
+  border-top: 1px solid var(--line);
+  margin-top: 24px;
+  padding-top: 14px;
+}
+.music-faq details {
+  margin: 12px 0;
+}
+.music-faq summary {
+  cursor: pointer;
+}
+.music-faq p {
+  font-size: 13px;
+  color: var(--mut);
+}
+@media (max-width: 600px) {
+  main {
+    padding: 16px 10px;
+  }
+  .card {
+    padding: 20px 14px;
+  }
+  .music-options,
+  .metadata-grid {
+    grid-template-columns: 1fr;
+  }
+  .music-steps {
+    gap: 10px;
+    font-size: 11px;
+  }
+  header {
+    padding: 12px;
+  }
+  .sbrow > div {
+    flex-wrap: wrap;
+  }
+  .sbrow .btn {
+    min-height: 40px;
+  }
+  #health {
+    display: none;
+  }
+  .efield input,
+  .efield textarea,
+  select {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

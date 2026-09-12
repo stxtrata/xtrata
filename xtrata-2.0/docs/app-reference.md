@@ -70,6 +70,15 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/components/TokenCardMedia.tsx` renders grid cell media (image/audio/video/html/text) and handles per-token loading.
 - `src/components/TokenContentPreview.tsx` renders the large preview, resolves content, and exposes preview actions.
 
+## Xtrata Music
+
+- `music/index.html` is the independent `/music/` inscription page: optional metadata/artwork, original or optimised audio, single and mixed-output batch jobs, quotes and recovery.
+- `xtrata-agent-one/wizard/music-editor.js` adds per-track editing, draft-only IndexedDB storage, preview and quote invalidation. It never stores wallet keys.
+- `xtrata-agent-one/wizard/music-build.js` defines the neutral output contract and versioned `xtrata-music` metadata record. Raw audio uses its real MIME type; packaged releases use `text/html`.
+- `xtrata-agent-one/wizard/audio-processing.js` owns shared FFmpeg extraction and File-identity caching. Both the legacy `suno-build.js` adapter and the neutral builder consume it; preserve the script ordering in both wizard entry points.
+- The page uses the existing agent core with `origin: 'music'`, and the existing init/upload/seal, delivery and recovery machinery. `/music/` intentionally uses the single-threaded encoder so wallet popups retain the standard browser context.
+- `docs/plans/XTRATA-MUSIC-RELEASE.md` records scope, verification and promotion notes. `scripts/music-browser-smoke.mjs` exercises simulated payment workflows; `scripts/music-audio-smoke.mjs` tests real local audio preparation without payments.
+
 ## Artist manager portal
 
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.

@@ -707,6 +707,7 @@ async function estimateBatch(opts: any) {
 const ORIGIN_BRAND: Record<string, string> = {
   wizard: 'Inscription Wizard',
   suno: 'SUNO More',
+  music: 'Music',
 };
 const brandFor = (origin: any) => ORIGIN_BRAND[String(origin || 'wizard')] || ORIGIN_BRAND.wizard;
 

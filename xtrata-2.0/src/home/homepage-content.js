@@ -1,5 +1,10 @@
 export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
   Object.freeze({
+    id: 'xtrata-music', status: 'live', eyebrow: 'For every musician',
+    title: 'Xtrata Music', description: 'Preserve a recording with optional artwork, lyrics and credits.',
+    artwork: '/favicons/xtrata-apple-touch-icon.png', href: '/music/', cta: 'Inscribe your music', tone: 'suno'
+  }),
+  Object.freeze({
     id: 'forever-twins',
     status: 'live',
     eyebrow: 'On-chain legacy',

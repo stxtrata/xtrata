@@ -34,3 +34,14 @@
   Cache-Control: no-cache
 /wizard/optimize-image.js
   Cache-Control: no-cache
+
+/wizard/audio-processing.js
+  Cache-Control: no-cache
+/wizard/music-build.js
+  Cache-Control: no-cache
+/wizard/music-editor.js
+  Cache-Control: no-cache
+/wizard/music.css
+  Cache-Control: no-cache
+/music/*
+  Cache-Control: no-cache
