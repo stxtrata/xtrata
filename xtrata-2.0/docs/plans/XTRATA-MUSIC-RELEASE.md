@@ -24,7 +24,8 @@ New generated test media and screenshots remain in `/tmp`, outside Git.
 ## Verification
 
 - Production build: passes.
-- Targeted music, homepage and agent regression suite: 291 tests pass.
+- Targeted music, homepage and agent regression suite: 291 tests pass; the
+  prior funding adapter adds 15 passing tests (306 total).
 - Existing SUNO More browser funding isolation test: passes (simulated only).
 - New browser smoke: optional fields; artwork add/remove; dirty and failed quotes;
   draft restore; original bytes/MIME; mobile width; single and batch simulated
@@ -48,6 +49,29 @@ Both new browser scripts accept a preview origin as their final argument. Browse
 smoke intercepts the agent and extraction to simulate payment deterministically;
 audio smoke loads deployed code and the real encoder, reads quotes, and never connects
 or funds a wallet. Each launches a new Chrome profile with no user extensions.
+
+## Deployed preview verification
+
+Cloudflare check succeeded for implementation commit `2f7afdeca`.
+Immutable deployment: `https://df5a152f.xtrata.pages.dev/music/`.
+Branch alias: `https://main-music-updates.xtrata.pages.dev/music/`.
+
+Both browser smoke scripts passed against the deployed branch alias. Browser
+fetches verified that the page and all four new shared/editor/style assets match
+the committed bytes, return HTTP 200 with correct MIME types, and use `no-cache`.
+A live read-only quote returned the protocol, network reserve and required funding
+fields. Actual payment, signing, broadcast and mainnet inscription were not run.
+The neutral no-artwork player was visually inspected at square dimensions and its
+embedded audio played successfully. Screenshots remain local in
+`/tmp/xtrata-music-qa/`.
+
+A direct Python HTTP request received 403, while the normal fresh-browser route
+and same-origin browser fetches succeeded; deployed browser checks are the
+verification evidence. This did not require changing site access controls.
+
+The branch includes the prior disposable-wallet funding adapter plus the music
+implementation and these release notes. It is ahead of `main` without missing
+upstream commits at review preparation time.
 
 ## Promotion scope and limits
 
