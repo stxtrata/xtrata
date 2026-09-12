@@ -315,9 +315,9 @@
   const extracts = new WeakMap();
 
   async function extract(file, onStatus, quality = 'optimised') {
-    if (!['original', 'optimised', 'compact'].includes(quality))
+    if (!['original', 'optimised', 'compact', 'high', 'premium'].includes(quality))
       throw new Error('Unsupported audio quality');
-    const bitrate = quality === 'compact' ? 48 : 96;
+    const bitrate = ({ compact: 48, optimised: 96, high: 128, premium: 160 })[quality];
     const cached = extracts.get(file);
     if (cached && cached[quality]) {
       report('cache', 'Reusing prepared audio for this file (' + quality + ').');

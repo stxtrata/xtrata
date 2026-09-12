@@ -90,7 +90,7 @@
     <div class="music-steps" aria-label="Creation steps">1 · Upload <span>2 · Prepare & preview</span> <span>3 · Review & inscribe</span></div>
     <div class="music-options">
       <label>Release format<select id="musicFormat"><option value="audio">Audio only</option><option value="details" selected>Song with details</option><option value="artwork">Song with artwork</option></select></label>
-      <label>Audio quality<select id="musicQuality"><option value="original" selected>Keep original file</option><option value="optimised">Optimise · Opus 96 kbps VBR</option><option value="compact">Smallest audio · Opus 48 kbps VBR</option></select></label>
+      <label>Audio quality<select id="musicQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label>
     </div>
     <p class="muted" id="formatHelp">A playable release with optional details. Your original audio is preserved inside the player.</p>
     <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription. Optimisation is lossy; keep your original master.</p>
@@ -243,8 +243,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script src="HTML_Template.js?v=6"></script>
 <script src="music-diagnostics.js?v=1"></script>
-<script src="audio-processing.js?v=2"></script>
-<script src="music-build.js?v=1"></script>
+<script src="audio-processing.js?v=3"></script>
+<script src="music-build.js?v=2"></script>
 <script src="optimize-image.js?v=1"></script>
 <script src="agent-one.js?v=2026-07-28.7"></script>
 <script>
@@ -1097,7 +1097,7 @@ function sbDone(job){
   const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
 }
 </script>
-<script src="music-editor.js?v=2"></script>
+<script src="music-editor.js?v=3"></script>
 <script src="music-artwork.js?v=1"></script>
 <script src="music-artwork-editor.js?v=1"></script>
 </body>

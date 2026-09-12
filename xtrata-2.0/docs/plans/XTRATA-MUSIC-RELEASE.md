@@ -135,3 +135,7 @@ and no-upscaling checks; batch resize preserving artist credits and per-track 48
 MIME. Workflow tests use simulated payments only. Test media stays outside Git.
 
 WebP transparency/format background: https://developers.google.com/speed/webp
+
+### Full Opus quality range
+
+Added 128 and 160 kbps VBR alongside 48 and 96 for single releases and per-track batch edits. New sessions default to 96 kbps; original audio and saved draft choices remain available. Encoding caches stay separate for each quality. Verified exact encoder bitrate arguments, local browser flows, and real encoding at all four rates.

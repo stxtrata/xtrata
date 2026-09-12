@@ -1,4 +1,4 @@
-/* global building, PLAYER, META, EDITS_DIRTY, SB, payloads, extensionCalls */
+/* global building, PLAYER, META, SB, payloads, extensionCalls */
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import { strict as assert } from 'node:assert';
@@ -96,6 +96,8 @@ try {
     })
   );
   await page.goto(base + '/music/');
+  assert.equal(await page.locator('#musicQuality').inputValue(), 'optimised');
+  await page.locator('#musicQuality').selectOption('original');
   await page.waitForSelector('#saveMusicDraft');
   assert.equal(await page.title(), 'Xtrata Music — inscribe your music');
   assert(!/suno/i.test(await page.locator('body').innerText()));

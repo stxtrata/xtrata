@@ -51,7 +51,7 @@ it('reports engine wait, times out, and allows a fresh retry without recording f
   expect(vi.getTimerCount()).toBe(0);
 });
 
-it('passes 48 kbps to FFmpeg and caches each bitrate independently', async () => {
+it('passes all four bitrates to FFmpeg and caches each bitrate independently', async () => {
   const commands: string[][] = [];
   const window: any = {
     FFmpeg: {
@@ -92,4 +92,11 @@ it('passes 48 kbps to FFmpeg and caches each bitrate independently', async () =>
   await a.extract(f, () => {}, 'optimised');
   expect(commands).toHaveLength(4);
   expect(commands[2][commands[2].indexOf('-b:a') + 1]).toBe('96k');
+  for (const [quality, bitrate] of [['high', '128k'], ['premium', '160k']]) {
+    const count = commands.length;
+    await a.extract(f, () => {}, quality);
+    await a.extract(f, () => {}, quality);
+    expect(commands).toHaveLength(count + 2);
+    expect(commands[count][commands[count].indexOf('-b:a') + 1]).toBe(bitrate);
+  }
 });

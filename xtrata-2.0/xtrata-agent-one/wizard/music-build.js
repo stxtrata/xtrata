@@ -50,7 +50,7 @@
   function build(file, onStatus, overrides = {}) {
     const o = { ...overrides };
     o.format ||= document.querySelector('#musicFormat')?.value || 'details';
-    o.quality ||= document.querySelector('#musicQuality')?.value || 'original';
+    o.quality ||= document.querySelector('#musicQuality')?.value || 'optimised';
     const diagnostic = (phase, message) => {
       if (window.XtrataMusicDiagnostics) window.XtrataMusicDiagnostics.log(phase, message);
     };
@@ -78,7 +78,7 @@
   async function buildOutput(file, onStatus, o) {
     if (
       !['audio', 'details', 'artwork'].includes(o.format) ||
-      !['original', 'optimised', 'compact'].includes(o.quality)
+      !['original', 'optimised', 'compact', 'high', 'premium'].includes(o.quality)
     )
       throw new Error('Choose a valid release format and audio quality.');
     if (!file.size) throw new Error('This audio file is empty.');
@@ -96,9 +96,7 @@
     const audioLabel =
       o.quality === 'original'
         ? 'Original audio'
-        : o.quality === 'compact'
-          ? 'Opus 48 kbps VBR'
-          : 'Opus 96 kbps VBR';
+        : 'Opus ' + ({ compact: 48, optimised: 96, high: 128, premium: 160 })[o.quality] + ' kbps VBR';
     let artworkInfo = null;
     if (coverB64 && window.XtrataMusicArtwork) {
       try {

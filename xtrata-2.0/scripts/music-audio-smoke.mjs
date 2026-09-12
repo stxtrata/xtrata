@@ -67,6 +67,8 @@ try {
   buf.writeUInt32LE(n * 2, 40);
   for (let i = 0; i < n; i++)
     buf.writeInt16LE(Math.round(3000 * Math.sin((2 * Math.PI * 440 * i) / 44100)), 44 + i * 2);
+  assert.equal(await p.locator('#musicQuality').inputValue(), 'optimised');
+  await p.locator('#musicQuality').selectOption('original');
   await p.locator('#musicFormat').selectOption('audio');
   await p
     .locator('#picker')
@@ -90,6 +92,12 @@ try {
   );
   assert((await p.evaluate(() => PLAYER.size)) < buf.length);
   const size96 = await p.evaluate(() => PLAYER.size);
+  for (const [quality, bitrate] of [['high', 128], ['premium', 160]]) {
+    await p.locator('#musicQuality').selectOption(quality);
+    await p.waitForFunction(q => !building && META?.quality === q, quality, { timeout: 180000 });
+    assert.equal(await p.evaluate(() => META.audioLabel), `Opus ${bitrate} kbps VBR`);
+    assert((await p.evaluate(() => PLAYER.size)) > size96);
+  }
   await p.locator('#musicQuality').selectOption('compact');
   await p.waitForFunction(() => !building && META?.quality === 'compact', {}, { timeout: 180000 });
   assert.equal(await p.evaluate(() => META.audioLabel), 'Opus 48 kbps VBR');
@@ -140,7 +148,7 @@ try {
         checks: [
           'real FFmpeg original WAV byte equality',
           'untagged metadata',
-          'real 96 and 48 kbps Opus conversion with smaller 48 kbps output',
+          'real 48, 96, 128 and 160 kbps Opus conversion with smaller 48 kbps output',
           'embedded audio playback',
           'original package rebuild',
           'corrupt audio rejection',
