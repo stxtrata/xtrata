@@ -644,7 +644,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
+    likesStatus: chainState?.snapshot().status || 'disconnected', band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
     relatives: relatives.slice()

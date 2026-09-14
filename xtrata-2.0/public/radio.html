@@ -230,7 +230,9 @@
     Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band)});
     $('presetBtn').textContent='PRESET: '+(s.preset==='music'?'MUSIC':'ALL');
     var list=$('likesList');list.innerHTML='';
-    $('likesHint').style.display=s.likes.length?'none':'';
+    var likesStatus=s.likesStatus||'disconnected';
+    $('likesHint').style.display=likesStatus==='ready'&&s.likes.length?'none':'';
+    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes where available; retrying automatically.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet.';
     s.likes.forEach(function(l){
       var row=document.createElement('div');row.className='lrow';
       row.innerHTML='<span class="lt" title="Play now">'+esc(l.title)+'</span><span class="la">'+esc(l.artist||('#'+l.tokenId))+'</span><button title="Remove">✕</button>';
