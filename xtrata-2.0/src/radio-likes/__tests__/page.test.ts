@@ -76,3 +76,28 @@ it('retains a favourite when its import transaction fails',async()=>{
  await import('../page');await vi.waitFor(()=>expect(localStorage.getItem(key)).toBeNull());
  expect(localStorage.getItem('xtrata.radio.likes')).toBe(saved);
 });
+it('opens the selected song review directly with its confirmed unlike state, without sending',async()=>{
+ history.replaceState(null,'','/?id=2&action=review');
+ mocks.session={isConnected:true,address:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',network:'mainnet'};
+ try{
+  await import('../page');await vi.waitFor(()=>expect((document.getElementById('review') as HTMLDialogElement).open).toBe(true));
+  expect(document.querySelectorAll('#songs tr')).toHaveLength(1);
+  expect(document.getElementById('choices')?.textContent).toContain('Unlike #2');
+  expect(document.querySelector('#songs')?.textContent).toContain('5');expect(mocks.send).not.toHaveBeenCalled();
+ }finally{history.replaceState(null,'','/');}
+});
+it('keeps the direct song selection through wallet connection',async()=>{
+ history.replaceState(null,'','/?id=1&action=review');
+ try{
+  await import('../page');await vi.waitFor(()=>expect(document.querySelectorAll('#songs tr')).toHaveLength(1));
+  expect((document.getElementById('review') as HTMLDialogElement).open).toBe(false);
+  button('connect').click();await vi.waitFor(()=>expect((document.getElementById('review') as HTMLDialogElement).open).toBe(true));
+  expect(document.getElementById('choices')?.textContent).toContain('Like #1');expect(mocks.send).not.toHaveBeenCalled();
+ }finally{history.replaceState(null,'','/');}
+});
+it('retries a failed state read and displays the recovered global count',async()=>{
+ const original=globalThis.fetch;let failed=false;
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>{if(new URL(input,'https://test').searchParams.has('ids')&&!failed){failed=true;throw Error('temporary');}return original(input);}));
+ await import('../page');await vi.waitFor(()=>expect(document.getElementById('status')?.textContent).toContain('Confirmed on-chain likes'));
+ expect(document.querySelector('#songs')?.textContent).toContain('5');
+});

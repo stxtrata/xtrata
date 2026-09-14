@@ -90,3 +90,11 @@ The automatic local-favourites popup has been removed. The radio now offers impo
 A single like or unlike now requests exactly 200 microSTX (0.0002 STX). Review and the persistent wallet reminder display a prominent fee card instructing users to choose Custom, enter 0.0002 STX, and change a higher fee or cancel. The wallet can override a requested fee; this is not an enforceable wallet fee cap. Confirmation speed is not guaranteed, and users are advised to cancel/try later if that fee is not accepted. Batch requests remain separately sized and do not inherit the single-song fee.
 
 Validation: 12 targeted page/helper tests passed, including exact single-state fee requests, batch isolation and the persistent reminder. The on-chain bundle built successfully. No live signing or transaction was performed.
+
+## Direct heart flow and endorsement refresh
+
+A radio heart click with a selected song now opens `/radio/endorse?id=…&action=review`, bypassing the intermediate radio dialog. This mode shows only that song and automatically opens its fee review after the connected wallet’s confirmed state is available. A confirmed like selects Unlike; otherwise it selects Like. Connecting preserves the selection. Review never sends a transaction; Continue to wallet remains the explicit signing trigger. The all-song/import page remains available by link, and import controls are hidden in single-song mode.
+
+Endorsement reads retry a failed batch once and preserve successful batches. Pending transaction status is checked before reading song states, so confirmation is followed by fresh counts. Visible pages refresh every 30 seconds except during review, loading or wallet approval. Missing batches are explicitly reported; unavailable is never treated as zero or an actionable false like. Wallet storage changes invalidate the review and reload state.
+
+Validation: 12 targeted page/radio UI tests passed, including direct unlike selection, selection preserved through connect and transient state-read recovery. Both bundles and radio JavaScript lint passed. No live signing was performed.

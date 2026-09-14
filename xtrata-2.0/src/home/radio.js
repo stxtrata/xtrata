@@ -700,7 +700,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     if (!likesDialog.open) likesDialog.showModal();
   };
   const toggleLike = () => {
-    openOnchainLikes(nowPlaying?.tokenId);
+    if (nowPlaying?.tokenId != null) window.open('/radio/endorse?id=' + encodeURIComponent(nowPlaying.tokenId) + '&action=review', '_blank', 'noopener');
+    else openOnchainLikes();
     return nowPlaying ? isLiked(nowPlaying.tokenId) : false;
   };
   const classifyRelative = (mime) => {

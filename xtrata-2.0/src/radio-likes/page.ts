@@ -8,6 +8,9 @@ let config:any,tracks:any[]=[],states=new Map<number,{liked:boolean;total:string
 const pendingMemory=new Map<string,string>();
 let statesWallet:string|undefined;
 let reviewWallet='',reviewChanges:LikeChange[]=[];
+const selectedId=new URL(location.href).searchParams.get('id');
+const directReview=new URL(location.href).searchParams.get('action')==='review'&&selectedId!==null;
+let reviewedWallet:string|undefined;
 const status=(message:string)=>{el('status').textContent=message;};
 const logStart=Date.now(),logLines:string[]=[];
 const diagnostic=(stage:string,details:Record<string,string|number|boolean>={})=>{
@@ -38,14 +41,15 @@ function render(){
  let saved:unknown=[];try{saved=JSON.parse(localStorage.getItem('xtrata.radio.likes')||'[]');}catch{ /* no import available */ }
  const localCount=Array.isArray(saved)?new Set(saved.map(row=>String(row?.tokenId))).size:0;
  const remaining=connected&&!loading?importCandidates(saved,new Set(tracks.map(t=>t.id)),new Set([...states].filter(([,s])=>s.liked).map(([id])=>id))).length:localCount;
- el('import-offer').textContent=localCount ? remaining ? `You have ${remaining} saved favourites to review for on-chain import. ${connected?'Use the import button below.':'Connect your wallet to check which ones still need importing.'} Nothing is published automatically.` : 'All eligible saved favourites are already liked by this wallet on-chain.' : '';
+ el('import-offer').textContent=!directReview&&localCount ? remaining ? `You have ${remaining} saved favourites to review for on-chain import. ${connected?'Use the import button below.':'Connect your wallet to check which ones still need importing.'} Nothing is published automatically.` : 'All eligible saved favourites are already liked by this wallet on-chain.' : '';
  el('wallet').textContent=connected?`Wallet: ${session.address}`:'';
  el<HTMLButtonElement>('disconnect').disabled=!session.isConnected||busy;
  el<HTMLButtonElement>('connect').disabled=busy;
- el<HTMLButtonElement>('import').disabled=!config?.enabled||!connected||busy||loading||waiting;
+ el<HTMLButtonElement>('import').hidden=Boolean(directReview);
+ el<HTMLButtonElement>('import').disabled=Boolean(directReview)||!config?.enabled||!connected||busy||loading||waiting;
  el('pending').replaceChildren();if(waiting){const a=document.createElement('a');a.href='https://explorer.hiro.so/txid/'+pending()+'?chain=mainnet';a.target='_blank';a.rel='noopener';a.textContent='Transaction pending — view on explorer. Use Refresh to check confirmation.';el('pending').append(a);}
  const selected=new URL(location.href).searchParams.get('id');
- el('songs').replaceChildren();for(const track of [...tracks].sort((a,b)=>Number(String(b.id)===selected)-Number(String(a.id)===selected))){
+ el('songs').replaceChildren();for(const track of tracks.filter(t=>!directReview||String(t.id)===selectedId).sort((a,b)=>Number(String(b.id)===selected)-Number(String(a.id)===selected))){
   const row=document.createElement('tr'),title=document.createElement('td'),count=document.createElement('td'),action=document.createElement('td'),button=document.createElement('button');
   title.textContent=`#${track.id} · ${track.title}`;const state=states.get(track.id);count.textContent=state?.total??'—';
   button.textContent=state?.liked?'Unlike on-chain':'Like on-chain';button.disabled=!connected||!state||!config?.enabled||busy||loading||waiting;
@@ -78,29 +82,49 @@ function review(changes:LikeChange[]){
  diagnostic('REVIEW_OPEN',{count:changes.length});
  reviewWallet=wallet.getSession().address||'';reviewChanges=changes;el('choices').replaceChildren();
  for(const change of changes){const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=true;box.dataset.id=String(change.id);label.append(box,document.createTextNode(`${change.liked?'Like':'Unlike'} #${change.id} · ${tracks.find(t=>t.id===change.id)?.title||''}`));el('choices').append(label,document.createElement('br'));}
- el('review-note').textContent='Up to 25 songs per transaction. Already confirmed likes are skipped on import and removed from this browser’s saved favourites. Closing or cancelling this review sends nothing.';
+ el('review-note').textContent=changes.length===1?'Review this song and fee, then continue to your wallet. Cancelling sends nothing.':'Up to 25 songs per transaction. Already confirmed likes are skipped on import. Cancelling sends nothing.';
  el('fee-reminder').textContent='';
  void updateFeeSuggestion();
  el<HTMLDialogElement>('review').showModal();
 }
 async function refresh(){
  diagnostic('REFRESH_START');
- const run=++generation;loading=true;states.clear();render();
+ const run=++generation;loading=true;states.clear();statesWallet=undefined;render();
  try {
   const nextConfig=await api();if(run!==generation)return;config=nextConfig;diagnostic('CONFIG_READ',{enabled:Boolean(config.enabled)});
   if(!config.enabled){status('On-chain likes are not activated on this site yet. Your previous favourites remain saved in this browser; imports and new likes will become available after activation.');return;}
   const session=wallet.getSession(),address=session.network==='mainnet'?session.address:undefined;
   const result=await fetch('/radio/counts?range=all',{cache:'no-store'});if(!result.ok)throw Error('Song catalogue unavailable.');const catalogue=await result.json();if(run!==generation)return;tracks=catalogue.tracks;
-  const next=new Map();for(let i=0;i<tracks.length;i+=25){const data=await api({ids:tracks.slice(i,i+25).map(t=>t.id).join(','),...(address?{wallet:address}:{})});if(run!==generation)return;if(data.contract!==config.contract)throw Error('Contract configuration changed. Refresh before continuing.');for(const r of data.rows)next.set(r.id,r);}
-  if(run!==generation)return;states=next;statesWallet=address;diagnostic('STATES_READY',{tracks:tracks.length,connected:Boolean(address)});status('Confirmed on-chain likes. Saved browser favourites are not included.');
-  const txid=pending();if(txid&&address){const tx=await api({txid,wallet:address});if(run!==generation)return;if(tx.status==='confirmed'||tx.status==='failed'){pendingMemory.delete(pendingKey());try{localStorage.removeItem(pendingKey());}catch{ /* memory fallback */ }status(tx.status==='confirmed'?'Transaction confirmed. Refresh if the latest count has not appeared yet.':'Transaction failed; it did not change your on-chain likes. A network fee may still have been paid.');}}
+  // Resolve the transaction first, then fetch its resulting on-chain state.
+  const txid=pending();let transactionStatus='';
+  if(txid&&address){try{const tx=await api({txid,wallet:address});if(run!==generation)return;
+   if(tx.status==='confirmed'||tx.status==='failed'){pendingMemory.delete(pendingKey());try{localStorage.removeItem(pendingKey());}catch{ /* memory fallback */ }transactionStatus=tx.status;}
+  }catch{diagnostic('TRANSACTION_STATUS_UNAVAILABLE');}}
+  const next=new Map<number,{liked:boolean;total:string}>();let failed=0;
+  const requested=tracks.filter(t=>!directReview||String(t.id)===selectedId);
+  for(let i=0;i<requested.length;i+=25){
+   const params={ids:requested.slice(i,i+25).map(t=>t.id).join(','),...(address?{wallet:address}:{})};
+   try{
+    let data;try{data=await api(params);}catch{data=await api(params);}
+    if(run!==generation||address!==(wallet.getSession().network==='mainnet'?wallet.getSession().address:undefined))return;
+    if(data.contract!==config.contract)throw Error('Contract configuration changed.');
+    for(const r of data.rows)next.set(r.id,r);
+    states=new Map(next);statesWallet=address;render();
+   }catch{failed++;diagnostic('STATE_BATCH_UNAVAILABLE',{batch:i/25});}
+  }
+  if(run!==generation)return;states=next;statesWallet=address;
+  diagnostic('STATES_READY',{tracks:next.size,connected:Boolean(address),failedBatches:failed});
+  status(failed?'Some on-chain likes could not be read. Available totals are shown; Refresh retries missing songs.':transactionStatus==='confirmed'?'Transaction confirmed. On-chain likes refreshed.':transactionStatus==='failed'?'Transaction failed; your like state was not changed.':'Confirmed on-chain likes across all wallets. Your button reflects the connected wallet.');
   // Also reconciles imports completed before this browser version was deployed.
   if(run===generation&&address===wallet.getSession().address&&wallet.getSession().isConnected&&!pending()){
    const removed=removeConfirmedLocalLikes([...states].filter(([,state])=>state.liked===true).map(([id])=>id));
    if(removed)diagnostic('LOCAL_FAVOURITES_CLEANED',{removed});
   }
  }catch(e){if(run===generation)status(e instanceof Error?e.message:'Unable to refresh.');}
- finally{if(run===generation){loading=false;render();}}
+ finally{if(run===generation){loading=false;render();
+   const session=wallet.getSession(),id=Number(selectedId),state=states.get(id);
+   if(directReview&&!busy&&!pending()&&session.isConnected&&session.address===statesWallet&&state&&reviewedWallet!==session.address){reviewedWallet=session.address;review([{id,liked:!state.liked}]);}
+  }}
 }
 el('connect').onclick=async()=>{diagnostic('CONNECT_CLICK');try{await wallet.connect();diagnostic('CONNECT_RETURNED',{connected:wallet.getSession().isConnected,network:wallet.getSession().network||'unknown'});await refresh();}catch(e){diagnostic('CONNECT_FAILED');status(String(e));}};
 el('disconnect').onclick=async()=>{await wallet.disconnect();await refresh();};
@@ -130,4 +154,6 @@ el('approve').onclick=async()=>{
   status('Submitted. Your totals will change after confirmation. Use Refresh to check progress.');
  }catch(e){diagnostic('APPROVAL_FAILED');status(e instanceof Error?e.message:'Wallet request failed.');}finally{if(waitingTimer)clearInterval(waitingTimer);diagnostic('WALLET_FLOW_SETTLED');busy=false;render();}
 };
+window.addEventListener('storage',event=>{if(!busy&&(event.key===null||event.key==='xtrata.v15.1.wallet.session')){el<HTMLDialogElement>('review').close();void refresh();}});
+window.setInterval(()=>{if(!document.hidden&&!busy&&!loading&&!el<HTMLDialogElement>('review').open)void refresh();},30000);
 void refresh();
