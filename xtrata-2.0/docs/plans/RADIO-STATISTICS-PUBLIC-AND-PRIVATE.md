@@ -143,3 +143,7 @@ TypeScript, changed JavaScript lint and radio bundle build pass.
 Lazy-loaded 44px square covers appear beside titles and in song details. The cache extracts raster data images or HTTPS artwork links from JSON metadata and HTML image tags without executing scripts. Missing or broken artwork leaves a music-note placeholder. Images use no-referrer requests. Embedded covers are limited to 700,000 characters and served separately through `/radio/artwork?id=…`; remote artwork loads from its host.
 
 Apply `014_radio_artwork.sql` before deployment. It adds the cover cache and schedules existing HTML entries for gradual enrichment again (two per counts refresh), without changing listening or like totals.
+
+Thumbnail recovery: stable catalogue assets revalidate and use an artwork release query string. Metadata enrichment invokes the inscription runtime directly, avoiding same-zone HTTP routing. Previously failed entries retry after the existing 24-hour cooldown; an operator may reset their checked_at to zero to retry sooner.
+
+Validation: 44 targeted radio/runtime tests pass and the counts Worker bundles successfully. A standalone strict TypeScript check reaches pre-existing errors in `functions/lib/hiro-keys.ts` and `functions/runtime/{cache,content}.ts`; no new metadata-module diagnostics were reported. Live artwork recovery was checked against inscription 2756.
