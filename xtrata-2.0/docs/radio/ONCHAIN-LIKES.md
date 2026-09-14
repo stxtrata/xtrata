@@ -74,3 +74,9 @@ Validation: 14 targeted tests passed, including pending-to-confirmed cleanup, fa
 The catalogue reads the contract’s global `total` for each song, independently of the listener’s `liked` flag. During diagnosis the live API returned total 2 for songs 2883 and 2885, while the earlier screenshot displayed unavailable values. Previously any one failed batch discarded every total. `radio-chain-totals.ts` now retries configuration and each failed batch once, preserves successful batches, and returns ready/partial/unavailable/disabled status. The catalogue requests fresh data and explicitly explains missing totals with a Refresh instruction. Unavailable remains null, never a fabricated zero.
 
 Validation: 13 targeted catalogue/chain-total tests passed, covering cross-wallet totals, transient failures, partial results and unavailable configuration. Catalogue JavaScript ESLint passed. No signing or wallet access was performed.
+
+## Album display
+
+The radio now passes album metadata to its standalone song information, and the catalogue shows Album immediately beside Song. The column is sortable, searchable and included in song details. Migration 016 adds the cached album field; existing HTML metadata is rechecked in bounded background batches on catalogue requests after deployment. Album names can therefore populate gradually. No album is fabricated when metadata omits it.
+
+Migration 016 was applied successfully to the production `xtrata-manage` database on 2026-09-14. The UI/enrichment code still requires deployment.

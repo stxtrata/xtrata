@@ -44,6 +44,7 @@ function likesSetup(){
  db.exec(readFileSync(new URL('../../migrations/013_radio_metadata_likes.sql',import.meta.url),'utf8'));
  db.exec(readFileSync(new URL('../../migrations/014_radio_artwork.sql',import.meta.url),'utf8'));
  db.exec(readFileSync(new URL('../../migrations/015_radio_song_classification.sql',import.meta.url),'utf8'));
+ db.exec(readFileSync(new URL('../../migrations/016_radio_album.sql',import.meta.url),'utf8'));
  env.TELEMETRY_SALT='test-only-salt';
  env.DB.batch=async(statements:any[])=>{db.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());db.exec('COMMIT');return results;}catch(e){db.exec('ROLLBACK');throw e;}};
 }
@@ -61,10 +62,10 @@ describe('current likes and inscription metadata',()=>{
  });
  it('reads artist from immutable HTML once and reuses cached metadata',async()=>{
   likesSetup();db.exec("UPDATE inscription_index SET mime='text/html' WHERE token_id=1");db.exec("INSERT INTO radio_metadata(token_id,title,artist,status,checked_at) VALUES(1,'Cached','Artist','ready',0)");
-  const fetcher=vi.fn(async()=>new Response('<source src="data:audio/mpeg;base64,YQ=="><title>Real song</title><script type="application/json">{"artist":"Real artist"}</script>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetcher);
+  const fetcher=vi.fn(async()=>new Response('<source src="data:audio/mpeg;base64,YQ=="><title>Real song</title><script type="application/json">{"artist":"Real artist","album":"Real album"}</script>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetcher);
   await refreshRadioMetadata(env);await refreshRadioMetadata(env);
   expect(fetcher).toHaveBeenCalledTimes(1);expect(fetcher.mock.calls[0][0]).toBe('https://xtrata.xyz/inscription/1');
-  const d=await(await get()).json();expect(d.tracks[0].title).toBe('Real song');expect(d.tracks[0].artist).toBe('Real artist');
+  const d=await(await get()).json();expect(d.tracks[0].title).toBe('Real song');expect(d.tracks[0].artist).toBe('Real artist');expect(d.tracks[0].album).toBe('Real album');
  });
 });
 
@@ -86,4 +87,9 @@ describe('song-only catalogue',()=>{
   db.exec('UPDATE radio_metadata SET is_song=NULL WHERE token_id=3');
   expect((await(await get()).json()).tracks.map((r:any)=>r.id)).toEqual([1]);
  });
+});
+
+it('reports inline album names without requiring cached HTML metadata',async()=>{
+ db.prepare('UPDATE inscription_index SET token_uri=? WHERE token_id=1').run('data:application/json,'+encodeURIComponent(JSON.stringify({name:'Track',album:{name:'Album title'}})));
+ const data=await(await get()).json();expect(data.tracks[0].album).toBe('Album title');expect(data.tracks[1].album).toBe('');
 });
