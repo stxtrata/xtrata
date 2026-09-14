@@ -1,3 +1,4 @@
+import {removeConfirmedLocalLikes} from '../lib/radio/local-like-cleanup';
 import {createStacksWalletAdapter} from '../lib/wallet/adapter';
 import {showContractCall,type WalletCallProgress} from '../lib/wallet/connect';
 import {buildLikeCall,likeFeeSuggestion,importCandidates,type LikeChange} from '../lib/radio/onchain-likes';
@@ -70,7 +71,7 @@ function review(changes:LikeChange[]){
  diagnostic('REVIEW_OPEN',{count:changes.length});
  reviewWallet=wallet.getSession().address||'';reviewChanges=changes;el('choices').replaceChildren();
  for(const change of changes){const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=true;box.dataset.id=String(change.id);label.append(box,document.createTextNode(`${change.liked?'Like':'Unlike'} #${change.id} · ${tracks.find(t=>t.id===change.id)?.title||''}`));el('choices').append(label,document.createElement('br'));}
- el('review-note').textContent='Up to 25 songs per transaction. Already confirmed likes are skipped on import. Closing or cancelling this review sends nothing.';
+ el('review-note').textContent='Up to 25 songs per transaction. Already confirmed likes are skipped on import and removed from this browser’s saved favourites. Closing or cancelling this review sends nothing.';
  el('fee-reminder').textContent='';
  void updateFeeSuggestion();
  el<HTMLDialogElement>('review').showModal();
@@ -86,6 +87,11 @@ async function refresh(){
   const next=new Map();for(let i=0;i<tracks.length;i+=25){const data=await api({ids:tracks.slice(i,i+25).map(t=>t.id).join(','),...(address?{wallet:address}:{})});if(run!==generation)return;if(data.contract!==config.contract)throw Error('Contract configuration changed. Refresh before continuing.');for(const r of data.rows)next.set(r.id,r);}
   if(run!==generation)return;states=next;statesWallet=address;diagnostic('STATES_READY',{tracks:tracks.length,connected:Boolean(address)});status('Confirmed on-chain likes. Saved browser favourites are not included.');
   const txid=pending();if(txid&&address){const tx=await api({txid,wallet:address});if(run!==generation)return;if(tx.status==='confirmed'||tx.status==='failed'){pendingMemory.delete(pendingKey());try{localStorage.removeItem(pendingKey());}catch{ /* memory fallback */ }status(tx.status==='confirmed'?'Transaction confirmed. Refresh if the latest count has not appeared yet.':'Transaction failed; it did not change your on-chain likes. A network fee may still have been paid.');}}
+  // Also reconciles imports completed before this browser version was deployed.
+  if(run===generation&&address===wallet.getSession().address&&wallet.getSession().isConnected&&!pending()){
+   const removed=removeConfirmedLocalLikes([...states].filter(([,state])=>state.liked===true).map(([id])=>id));
+   if(removed)diagnostic('LOCAL_FAVOURITES_CLEANED',{removed});
+  }
  }catch(e){if(run===generation)status(e instanceof Error?e.message:'Unable to refresh.');}
  finally{if(run===generation){loading=false;render();}}
 }

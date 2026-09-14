@@ -49,3 +49,30 @@ it('shows a fee suggestion before approval and updates it when the selection cha
  expect(document.getElementById('fee-suggestion')?.textContent).toBe('Select at least one song.');
  expect(mocks.send).not.toHaveBeenCalled();
 });
+it('keeps local favourites while an import is pending, then removes only confirmed likes',async()=>{
+ mocks.session={isConnected:true,address:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',network:'mainnet'};
+ localStorage.setItem('xtrata.radio.likes',JSON.stringify([{tokenId:'1'},{tokenId:'2'},{tokenId:'3'}]));
+ const key=`xtrata.radio.chain.pending:${config.contract}:${mocks.session.address}`;
+ localStorage.setItem(key,'0x'+'b'.repeat(64));
+ const original=globalThis.fetch;let confirmed=false;
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>new URL(input,'https://test').searchParams.has('txid')?new Response(JSON.stringify({status:confirmed?'confirmed':'pending'})):original(input)));
+ await import('../page');await vi.waitFor(()=>expect(document.getElementById('pending')?.textContent).toContain('pending'));
+ expect(JSON.parse(localStorage.getItem('xtrata.radio.likes')!)).toHaveLength(3);
+ confirmed=true;button('refresh').click();await vi.waitFor(()=>expect(localStorage.getItem(key)).toBeNull());
+ expect(JSON.parse(localStorage.getItem('xtrata.radio.likes')!)).toEqual([{tokenId:'1'},{tokenId:'3'}]);
+});
+it('reconciles older confirmed imports on load without publishing anything',async()=>{
+ mocks.session={isConnected:true,address:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',network:'mainnet'};
+ localStorage.setItem('xtrata.radio.likes',JSON.stringify([{tokenId:'2'}]));
+ await import('../page');await vi.waitFor(()=>expect(localStorage.getItem('xtrata.radio.likes')).toBeNull());
+ expect(document.getElementById('import-offer')?.textContent).toBe('');expect(mocks.send).not.toHaveBeenCalled();
+});
+it('retains a favourite when its import transaction fails',async()=>{
+ mocks.session={isConnected:true,address:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',network:'mainnet'};
+ const saved=JSON.stringify([{tokenId:'1'}]);localStorage.setItem('xtrata.radio.likes',saved);
+ const key=`xtrata.radio.chain.pending:${config.contract}:${mocks.session.address}`;localStorage.setItem(key,'0x'+'c'.repeat(64));
+ const original=globalThis.fetch;
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>new URL(input,'https://test').searchParams.has('txid')?new Response(JSON.stringify({status:'failed'})):original(input)));
+ await import('../page');await vi.waitFor(()=>expect(localStorage.getItem(key)).toBeNull());
+ expect(localStorage.getItem('xtrata.radio.likes')).toBe(saved);
+});
