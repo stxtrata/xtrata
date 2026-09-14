@@ -657,14 +657,44 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // triggered them (button, media keys, OS controls, stall, ended).
   ['play', 'pause', 'playing', 'ended'].forEach((ev) => player.addEventListener(ev, emit));
   const isLiked = (id) => Boolean(chainState?.snapshot().likes.some(l => l.tokenId === String(id)));
+  const likesDialog = document.createElement('dialog');
+  likesDialog.className = 'xtrata-radio-likes-dialog';
+  document.body.append(likesDialog);
   const openOnchainLikes = (id) => {
-    const url = '/radio/endorse' + (id != null ? '?id=' + encodeURIComponent(id) : '');
-    window.open(url, '_blank', 'noopener');
+    likesDialog.replaceChildren();
+    const heading = document.createElement('h2');
+    heading.textContent = 'Your radio likes';
+    const note = document.createElement('p');
+    note.textContent = 'The heart lights after your on-chain like is confirmed. Connect your wallet and review the network fee on the next page. Xtrata charges no platform fee.';
+    const action = document.createElement('a');
+    action.href = '/radio/endorse' + (id != null ? '?id=' + encodeURIComponent(id) : '');
+    action.target = '_blank'; action.rel = 'noopener';
+    action.textContent = id != null ? (isLiked(id) ? 'Review unlike for song #' : 'Like song #') + id + ' on-chain ↗' : 'Connect wallet / choose a song to like ↗';
+    likesDialog.append(heading, note, action);
+    const saved = loadLikes();
+    if (Array.isArray(saved) && saved.length) {
+      const offer = document.createElement('p');
+      offer.textContent = 'Your previous favourites are still saved in this browser. You can review and import them as on-chain likes, up to 25 per transaction.';
+      const list = document.createElement('ul');
+      for (const item of saved) {
+        if (!item || item.tokenId == null) continue;
+        const row = document.createElement('li');
+        row.textContent = (item.title || 'Song #' + item.tokenId) + (item.artist ? ' — ' + item.artist : '');
+        list.append(row);
+      }
+      const link = document.createElement('a');
+      link.href = '/radio/endorse?import=1'; link.target = '_blank'; link.rel = 'noopener';
+      link.textContent = 'Review and import saved favourites ↗';
+      likesDialog.append(offer, list, link);
+    }
+    const close = document.createElement('button');
+    close.textContent = 'Back to radio'; close.onclick = () => likesDialog.close();
+    likesDialog.append(close);
+    if (!likesDialog.open) likesDialog.showModal();
   };
   const toggleLike = () => {
-    if (!nowPlaying) return false;
-    openOnchainLikes(nowPlaying.tokenId);
-    return isLiked(nowPlaying.tokenId);
+    openOnchainLikes(nowPlaying?.tokenId);
+    return nowPlaying ? isLiked(nowPlaying.tokenId) : false;
   };
   const classifyRelative = (mime) => {
     const m = String(mime || '').toLowerCase();
@@ -1756,7 +1786,17 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshChainLikes(true); });
   window.setInterval(() => { if (!document.hidden) refreshChainLikes(); }, 15000);
   refreshChainLikes();
-  chainLike?.addEventListener('click', event => event.stopPropagation());
+  chainLike?.addEventListener('click', event => {
+    event.preventDefault(); event.stopPropagation(); openOnchainLikes(nowPlaying?.tokenId);
+  });
+  // One explicit migration offer per browser session; never delete the saved list.
+  try {
+    const saved = loadLikes();
+    if (Array.isArray(saved) && saved.length && !sessionStorage.getItem('xtrata.radio.import-offered.v1')) {
+      openOnchainLikes();
+      sessionStorage.setItem('xtrata.radio.import-offered.v1', '1');
+    }
+  } catch { /* Storage/dialog restrictions must not prevent playback. */ }
   const statsLink = root.querySelector('.xtrata-radio__stats');
   statsLink?.addEventListener('click', event => event.stopPropagation());
   let statsRows = null;
