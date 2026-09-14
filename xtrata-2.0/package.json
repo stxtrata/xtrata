@@ -73,7 +73,9 @@
     "test": "npm run test:contracts && npm run test:app && npm run test:clarinet",
     "build:radio": "vite build -c vite.radio.config.ts",
     "check:v3.2.4": "clarinet check --manifest-path v3.2.4/Clarinet.toml",
-    "test:v3.2.4": "npm run check:v3.2.4 && node tests/xtrata-v3.2.4.migration.test.mjs"
+    "test:v3.2.4": "npm run check:v3.2.4 && node tests/xtrata-v3.2.4.migration.test.mjs",
+    "wizards:suno": "node scripts/wizard/suno-harness.mjs",
+    "wizards:suno:test:browser": "XTRATA_BROWSER_TESTS=1 vitest run scripts/wizard/__tests__/suno-browser.test.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

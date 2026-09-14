@@ -1,3 +1,5 @@
+import CollectionInventoryPanel from './components/CollectionInventoryPanel';
+import StorageCleanupPanel from './components/StorageCleanupPanel';
 import {
   useCallback,
   useEffect,
@@ -1120,6 +1122,7 @@ export default function CollectionManagerApp() {
               </div>
             </div>
             <div className="panel__body">
+              <CollectionInventoryPanel key={`${activeCollectionId}:${journeyRefreshKey}`} collectionId={activeCollectionId} />
               <CollectionSettingsPanel
                 mode="guided"
                 activeCollectionId={activeCollectionId}
@@ -1163,6 +1166,8 @@ export default function CollectionManagerApp() {
             />
           </div>
         </section>
+
+        {activeCollectionId && <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} />}
 
         {!showAdvancedPanels && (
           <div className="manage-advanced-teaser">

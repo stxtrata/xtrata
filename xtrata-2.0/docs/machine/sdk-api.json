@@ -625,6 +625,11 @@
             "signature": "export const MAX_UPLOAD_BATCH_SIZE"
           },
           {
+            "name": "FEE_BATCH_SIZE",
+            "kind": "const",
+            "signature": "export const FEE_BATCH_SIZE"
+          },
+          {
             "name": "MAX_SMALL_MINT_CHUNKS",
             "kind": "const",
             "signature": "export const MAX_SMALL_MINT_CHUNKS"
@@ -685,6 +690,26 @@
             "signature": "export const DEFAULT_FEE_UNIT_MICROSTX"
           },
           {
+            "name": "FeeUnits",
+            "kind": "type",
+            "signature": "export type FeeUnits"
+          },
+          {
+            "name": "OBSERVED_FEE_UNITS_MICROSTX",
+            "kind": "const",
+            "signature": "export const OBSERVED_FEE_UNITS_MICROSTX: FeeUnits"
+          },
+          {
+            "name": "OBSERVED_UPLOAD_CHUNK_FEE_UNIT_MICROSTX",
+            "kind": "const",
+            "signature": "export const OBSERVED_UPLOAD_CHUNK_FEE_UNIT_MICROSTX"
+          },
+          {
+            "name": "OBSERVED_SINGLE_TX_FEE_UNIT_MICROSTX",
+            "kind": "const",
+            "signature": "export const OBSERVED_SINGLE_TX_FEE_UNIT_MICROSTX"
+          },
+          {
             "name": "FeeSchedule",
             "kind": "type",
             "signature": "export type FeeSchedule"
@@ -700,14 +725,49 @@
             "signature": "export type BatchFeeEstimate"
           },
           {
+            "name": "FeeUnitOverrides",
+            "kind": "type",
+            "signature": "export type FeeUnitOverrides"
+          },
+          {
+            "name": "resolveFeeUnits",
+            "kind": "const",
+            "signature": "export const resolveFeeUnits"
+          },
+          {
             "name": "getFeeSchedule",
             "kind": "const",
             "signature": "export const getFeeSchedule"
           },
           {
+            "name": "firstBatchChunks",
+            "kind": "const",
+            "signature": "export const firstBatchChunks"
+          },
+          {
+            "name": "additionalBatches",
+            "kind": "const",
+            "signature": "export const additionalBatches"
+          },
+          {
+            "name": "sealFeeForChunks",
+            "kind": "const",
+            "signature": "export const sealFeeForChunks"
+          },
+          {
+            "name": "singleTxFeeForChunks",
+            "kind": "const",
+            "signature": "export const singleTxFeeForChunks"
+          },
+          {
             "name": "estimateContractFees",
             "kind": "const",
             "signature": "export const estimateContractFees"
+          },
+          {
+            "name": "estimateSingleTxContractFee",
+            "kind": "const",
+            "signature": "export const estimateSingleTxContractFee"
           },
           {
             "name": "estimateBatchContractFees",
@@ -735,9 +795,19 @@
             "signature": "export const resolveSealSpendCapMicroStx"
           },
           {
+            "name": "SINGLE_TX_SPEND_CAP_SAFETY_MULTIPLIER",
+            "kind": "const",
+            "signature": "export const SINGLE_TX_SPEND_CAP_SAFETY_MULTIPLIER"
+          },
+          {
             "name": "resolveSmallMintSingleTxSpendCapMicroStx",
             "kind": "const",
             "signature": "export const resolveSmallMintSingleTxSpendCapMicroStx"
+          },
+          {
+            "name": "resolveHelperSmallMintSpendCapMicroStx",
+            "kind": "const",
+            "signature": "export const resolveHelperSmallMintSpendCapMicroStx"
           },
           {
             "name": "resolveBatchSealSpendCapMicroStx",
@@ -763,6 +833,11 @@
             "name": "buildSmallMintSingleTxStxPostConditions",
             "kind": "const",
             "signature": "export const buildSmallMintSingleTxStxPostConditions"
+          },
+          {
+            "name": "buildHelperSmallMintStxPostConditions",
+            "kind": "const",
+            "signature": "export const buildHelperSmallMintStxPostConditions"
           },
           {
             "name": "buildBatchSealStxPostConditions",
@@ -1072,6 +1147,11 @@
           }
         ],
         "deploy": [
+          {
+            "name": "ArtistDeployRegistryEntry",
+            "kind": "type",
+            "signature": "export type ArtistDeployRegistryEntry"
+          },
           {
             "name": "ArtistMintType",
             "kind": "type",
@@ -1625,6 +1705,16 @@
             "name": "ReconstructInscriptionOptions",
             "kind": "type",
             "signature": "export type ReconstructInscriptionOptions"
+          },
+          {
+            "name": "MAX_READ_LENGTH",
+            "kind": "const",
+            "signature": "export const MAX_READ_LENGTH"
+          },
+          {
+            "name": "MAX_READ_BATCH_SIZE",
+            "kind": "const",
+            "signature": "export const MAX_READ_BATCH_SIZE"
           },
           {
             "name": "ReconstructXtrataInscriptionOptions",

@@ -1,3 +1,5 @@
+import { storageEnabled } from '../../lib/collection-storage/common';
+import { createUploadIntent, putVerifiedUpload, boundedBody } from '../../lib/collection-storage/uploads';
 import { badRequest, jsonResponse, serverError } from '../../lib/utils';
 import { getCollectionDeployReadiness } from '../../lib/collection-deploy';
 import {
@@ -171,6 +173,17 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
           availableBindingKeys(requestEnv) || 'none'
         }. Capability snapshot: ${summarizeCapabilities(capabilities)}. Request ID: ${requestId}`
       );
+    }
+
+    if (storageEnabled(env)) {
+      if (request.method === 'GET') return jsonResponse(await createUploadIntent(env, collectionId));
+      if (request.method === 'PUT') {
+        const key = new URL(request.url).searchParams.get('key') ?? '';
+        const bytes = await boundedBody(request);
+        return jsonResponse(await putVerifiedUpload(env, collectionId, key, bytes,
+          request.headers.get('content-type') || 'application/octet-stream'));
+      }
+      return jsonResponse({ error: 'Method not allowed' }, 405);
     }
 
     if (request.method === 'PUT') {

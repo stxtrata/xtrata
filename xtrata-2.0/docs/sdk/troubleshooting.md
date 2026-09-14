@@ -91,3 +91,12 @@ npm run sdk:typecheck
 npm run sdk:test
 npm run sdk:docs:validate
 ```
+
+### Collection v1.5
+
+- `u123`: register the verified file hash in the collection inventory.
+- `u124`: another buyer holds this hash reservation; do not create another upload.
+- `u122`: the hash is already sealed. Reuse the existing inscription through the
+  appropriate ownership/sale flow; do not infer that this collection minted it.
+- Missing granular fee reads block v1.5 minting. Refresh after fixing the network;
+  never substitute the aggregate fee or the core-native single-tx quote.

@@ -1162,7 +1162,7 @@ repopulates parent edges for rows that predate the edge table. `limit` is capped
 at 100; paginate via `nextFromTokenId` until `complete`. When the
 `INDEX_ADMIN_TOKEN` env var is set, the backfill requires a matching
 `x-admin-token` header (else `401`); normal sync/refresh is never gated. Full
-runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/docs/inscription-relationship-index.md).
+runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/docs/inscription-relationship-index.md).
 
 ## Security Notes
 - Never log private keys or seed phrases.
@@ -1174,9 +1174,9 @@ runbook: [`docs/inscription-relationship-index.md`](https://github.com/stxtrata/
 
 ## Companion Scripts
 This repository includes runnable references:
-- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
-- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
-- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-query-example.js)
 
 These scripts require minimal config (key, network, inputs) and implement this skill file's flow directly.
 
@@ -1286,10 +1286,10 @@ pagination, and troubleshooting:
 
 ## Canonical GitHub References
 
-- [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/XTRATA_AGENT_SKILL.md)
-- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-mint-example.js)
-- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-transfer-example.js)
-- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/OPTIMISATIONS/xtrata-1.0/scripts/xtrata-query-example.js)
+- [`XTRATA_AGENT_SKILL.md`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/XTRATA_AGENT_SKILL.md)
+- [`scripts/xtrata-mint-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-mint-example.js)
+- [`scripts/xtrata-transfer-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-transfer-example.js)
+- [`scripts/xtrata-query-example.js`](https://github.com/stxtrata/xtrata/blob/main/xtrata-1.0/scripts/xtrata-query-example.js)
 
 ---
 
@@ -2717,6 +2717,29 @@ These workflow plans are designed so integrators can call `openContractCall` dir
 Validation note:
 - Workflow planners fail fast with `SdkValidationError` when critical inputs are malformed (missing sender, invalid hash length, oversized URI, zero/negative spend values, network mismatches).
 
+## Quoting a v1.5 collection mint on core v3.2.3
+
+```ts
+import { readCollectionV15FeeUnits, quoteCollectionV15Mint } from '@xtrata/sdk';
+
+// Supply a read-only adapter that returns the decoded uint (bigint).
+// Unavailable or invalid reads must throw or return null.
+const units = await readCollectionV15FeeUnits(readCoreUint);
+const quote = quoteCollectionV15Mint(units, 33, 1_000_000n);
+// quote.begin: begin cap; quote.upload: zero;
+// quote.seal: reserved collection price + protocol seal fee;
+// quote.total: price + begin + seal, also used by the helper's <=30-chunk route.
+```
+
+Register the verified hashes with `set-registered-token-uri-batch` before opening
+minting. Re-read fees before each payable step. For resumed mints, use the price
+stored in `get-reservation`, not the current phase price. Keep wallet transactions
+in deny mode with sender STX caps. Confirm a collection receipt using
+`get-token-mint-context`; a core hash lookup alone is not proof of a collection
+sale. No write, wallet signing, or deployment occurs when calling these quote
+helpers. Existing SDK workflow defaults are historical; v1.5 clients must use the
+explicit granular quote path above instead of legacy aggregate fee estimates.
+
 ---
 
 
@@ -3008,6 +3031,22 @@ Validation source:
   3. `npm run sdk:pack:smoke`
   4. `npm run sdk:examples:smoke`
 
+## Collection helper v1.5 (source candidate)
+
+The manager's new standard collection template targets core v3.2.3. No deployed
+helper address is implied. Existing v1.4 collections and default SDK target
+selection remain unchanged. Select v3.2.3 explicitly with
+`resolveArtistDeployCoreTarget(network, registry, '3.2.3')`; absence of a matching
+network returns null. `buildArtistDeployContractSource` retargets both the v1.5
+core pin and its static duplicate-hash lookup.
+
+v1.5 requires registered inventory and rejects already sealed hashes. Upload ABI:
+32 chunks; client upload policy and helper atomic route: at most 30 chunks. Core
+fee buckets are 32 chunks. Upload transfers zero STX; chunk/batch fees are paid at
+seal. The helper atomic route pays staged begin + seal fees, not the core-native
+single-transaction fee. Read all four units using `readCollectionV15FeeUnits` and
+quote with `quoteCollectionV15Mint`. These helpers have no observed-fee fallback.
+
 ---
 
 
@@ -3107,6 +3146,15 @@ npm run sdk:test
 npm run sdk:docs:validate
 ```
 
+### Collection v1.5
+
+- `u123`: register the verified file hash in the collection inventory.
+- `u124`: another buyer holds this hash reservation; do not create another upload.
+- `u122`: the hash is already sealed. Reuse the existing inscription through the
+  appropriate ownership/sale flow; do not infer that this collection minted it.
+- Missing granular fee reads block v1.5 minting. Refresh after fixing the network;
+  never substitute the aggregate fee or the core-native single-tx quote.
+
 ---
 
 
@@ -3196,17 +3244,24 @@ without using `xtrata.xyz` as a trust anchor.
 
 Current public mainnet target:
 
-`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`
 
 Fallback source chain for historical and migrated content:
 
-1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
-2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
+1. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-1`
+2. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0`
+3. `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v1-1-1`
 
-`xtrata-v3.0.0` exists in contract sources and SDK capability detection, but it
-is not the public default until the contract registry and public docs explicitly
-promote it. `xtrata-v3.1.1` exists as a comparison contract source and still
-requires SDK/app capability updates before promotion.
+Verified against mainnet on 2026-07-27: `xtrata-v3-2-3` is live, and every
+read-only call listed below answers on it. Earlier v3 sources (`xtrata-v3.0.0`,
+`xtrata-v3.1.0`, `xtrata-v3.1.1`, `xtrata-v3.2.0` through `xtrata-v3.2.2`) exist
+in this repository as contract history and comparison sources. They are not
+reconstruction targets.
+
+Reconstruction never depends on this list being current: a reconstructor is
+given a contract ID and reads it directly. The list records which contracts hold
+public content, not which contracts the library is capable of reading — the
+library is version-agnostic and works against anything exposing the calls below.
 
 ## Required Public Inputs
 
@@ -3458,9 +3513,22 @@ Current packaging mode:
 - Tarball smoke validation is available via `npm run sdk:pack:smoke` from repo root.
 - Example tarball smoke validation is available via `npm run sdk:examples:tarball:smoke` from repo root.
 
-Mint workflow planners cap first-party upload calls at 30 chunks per
-`add-chunk-batch` / `mint-add-chunk-batch`, while retaining the deployed
-contract ABI constant of 50 for protocol fee math and list compatibility.
+Three different batch sizes are in play, and conflating them is a money bug:
+
+- **30** (`MAX_UPLOAD_BATCH_SIZE`) — chunks this SDK sends per
+  `add-chunk-batch` / `mint-add-chunk-batch`. A client-side cap, safely under
+  the contract's limit.
+- **32** (`FEE_BATCH_SIZE`) — the deployed contract's `MAX-UPLOAD-BATCH-SIZE`,
+  the batch size it CHARGES for. This is the divisor for protocol fee math.
+  Verified against mainnet source for `xtrata-v3-2-3` (line 75, asserted at
+  line 1067).
+- **50** (`MAX_BATCH_SIZE`) — the length of the index lists the contract types
+  as `(list 50 uint)`, e.g. `purge-expired-chunk-batch`. Correct for those
+  lists and for read batching. **Never** correct for fee math.
+
+This file previously stated the deployed ABI constant was 50 and directed its
+use for protocol fee math. It is 32. Six fee sites followed that premise and
+capped seal post-conditions below the fee the contract charges.
 
 Quick start:
 

@@ -70,6 +70,19 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/components/TokenCardMedia.tsx` renders grid cell media (image/audio/video/html/text) and handles per-token loading.
 - `src/components/TokenContentPreview.tsx` renders the large preview, resolves content, and exposes preview actions.
 
+## Xtrata Music
+
+- `music/index.html` is the independent `/music/` inscription page: optional metadata/artwork, original or optimised audio, single and mixed-output batch jobs, quotes and recovery.
+- `xtrata-agent-one/wizard/music-player.js` owns the independent versioned Music player, validated appearance settings, self-contained HTML generation and creation-time waveform peaks. Legacy wizard templates remain separate.
+- `xtrata-agent-one/wizard/music-appearance.js` owns Classic/Sleeve/Studio cards, appearance controls and preview sizing, reused by the single and per-track editors. `scripts/music-player-smoke.mjs` verifies exported player layouts and keyboard playback with local generated audio.
+- `xtrata-agent-one/wizard/music-editor.js` adds per-track editing, draft-only IndexedDB storage, preview and quote invalidation. It never stores wallet keys.
+- `xtrata-agent-one/wizard/music-build.js` defines the neutral output contract and versioned `xtrata-music` metadata record. Raw audio uses its real MIME type; packaged releases use `text/html`.
+- `xtrata-agent-one/wizard/audio-processing.js` owns shared FFmpeg extraction and File-identity caching. Both the legacy `suno-build.js` adapter and the neutral builder consume it; preserve the script ordering in both wizard entry points.
+- `src/agent-one/music-fees.ts` defines the opt-in Economy budget, durable non-secret control record, transaction accounting and top-up verification. `agent-core.ts` integrates fee waits, saved nonces, exact-transaction retries and confirmed speed-ups; legacy Standard jobs retain their existing fee policy.
+- `docs/plans/MUSIC-ECONOMY-SPEED-UP.md` records payment invariants and rollout limits. `scripts/music-speed-smoke.mjs` checks mobile review, wallet cancellation, pending-payment reloads and zero-payment upgrades with simulated wallets.
+- The page uses the existing agent core with `origin: 'music'`, and the existing init/upload/seal, delivery and recovery machinery. `/music/` intentionally uses the single-threaded encoder so wallet popups retain the standard browser context.
+- `docs/plans/XTRATA-MUSIC-RELEASE.md` records scope, verification and promotion notes. `scripts/music-browser-smoke.mjs` exercises simulated payment workflows; `scripts/music-audio-smoke.mjs` tests real local audio preparation without payments.
+
 ## Artist manager portal
 
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.
@@ -99,6 +112,7 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `src/lib/contract/fungible-assets.ts` maps known SIP-010 token contracts used by first-party commerce and vault flows to the asset metadata needed for wallet post-conditions.
 - `src/lib/commerce/registry.ts`, `src/lib/commerce/contract.ts`, `src/lib/commerce/client.ts`, `src/lib/commerce/parsers.ts`, and `src/lib/commerce/types.ts` provide registry loading, contract-id parsing, transaction builders, and read-only helpers for `xtrata-commerce`.
 - `src/lib/vault/registry.ts`, `src/lib/vault/contract.ts`, `src/lib/vault/client.ts`, `src/lib/vault/parsers.ts`, and `src/lib/vault/types.ts` provide registry loading, contract-id parsing, transaction builders, and read-only helpers for `xtrata-vault`.
+- `contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar` is the undeployed v3.2.3 collection candidate. `scripts/contract-variants.mjs` generates its pinned mainnet copy. `docs/plans/COLLECTION-MINT-V1.5-AND-STORAGE.md` records helper policy, the staging cleanup design, core chunk-purge limitations and remaining integration; existing app/SDK defaults remain v1.4.
 - `contracts/live/xtrata-drops-v1.1.clar` is deployed on mainnet as `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1`. It adds immutable multi-batch campaign policy, permanent creator/operator separation, sequential campaign editions, and claimant-bound BNS attestations while preserving the v1.0 legacy drop and relayer read surface.
 - `src/deploy-console.ts`, `web/deploy-console.html`, and `src/lib/deploy/drops-v1-1.ts` provide the guarded Drops v1.1 mainnet deployment card, sponsor/BNS-attestor setup buttons, source checks, and copyable local audit log. `scripts/mainnet-deploy-contract.mjs xtrata-drops-v1-1` is the CLI fallback.
 - `src/lib/deploy/proof-of-free-v1.ts` and the `proof-of-free-v1` card in `src/deploy-console.ts` provide the Living Synth v3 engine-first deployment gate. The card verifies the sealed `text/javascript` Xtrata inscription against the pinned candidate SHA-256, generates the dedicated Clarity source byte-identically with the CLI release generator, preflights/downloads/deploys it, configures sponsor and BNS attestor, creates strict inactive campaign `0`, and verifies the immutable config plus empty campaign on-chain.
@@ -360,3 +374,38 @@ Notes: examples must prove end-to-end integration with minimal custom code.
 16) SDK hardening and release readiness.
 Files: `docs/sdk/test-gates.md`, `docs/sdk/changelog.md`, `docs/sdk/release-notes-template.md`, `packages/xtrata-sdk/**`, `packages/xtrata-reconstruction/**`, `examples/**`, `.github/workflows/ci.yml`, `.github/workflows/sdk-release.yml`.
 Notes: every phase must add tests and pass defined release gates before progressing.
+
+## Radio listening analytics (opt-in, September 2026)
+
+The website and hosted embeds use `src/lib/radio/play-counter.ts` to observe
+playback independently of audio delivery. `functions/radio/plays.ts` accepts
+bounded cumulative observations into D1 after migration 011 and explicit
+`RADIO_COUNTER_ENABLED=1` activation. `/radio/stats.html` uses the existing debug
+sign-in to show partial, qualified, completed and repeat plays over selected
+periods. These are browser-reported analytics, not verified people or votes.
+Rules, privacy choices, limitations, deployment settings and testing notes are in
+[Radio play counter](plans/RADIO-PLAY-COUNTER.md).
+
+## Collection storage automation (opt-in, September 2026)
+
+`COLLECTION_STORAGE_V2=1` enables verified immutable uploads and tracked manifests
+following migration 010. The collection storage worker can automatically verify
+sealed content twice, wait through a grace period, verify a separate recovery
+copy, and remove staging bytes. Recovery previews preserve existing asset URLs.
+Exceptions appear in the Storage cleanup panel; normal files need no approval.
+Core chunks and recovery copies are never purged. Deployment bindings, writer
+locking, recovery retention requirements and validation notes are documented in
+[Collection storage automation](plans/COLLECTION-STORAGE-AUTOMATION.md).
+
+
+## Collection v1.5 manager and public mint integration
+
+New standard manager deployments use v1.5 with the exact v3.2.3 target for the
+wallet network. `CollectionInventoryPanel` provides guided hash registration.
+`packages/xtrata-sdk/src/collection-v15.ts` supplies strict granular fee reads and
+bigint staged quotes; `CollectionMintLivePage` rechecks fees before payable steps
+and validates collection receipts. SDK deployment target selection is explicit;
+legacy generic workflow defaults remain unchanged. See
+[implementation and activation notes](plans/COLLECTION-V1.5-CLIENT-INTEGRATION.md).
+
+- X-Chess 2.6.0 manual deployment uses the X-Chess card in `src/deploy-console.ts`, pinned checks in `src/lib/deploy/xchess.ts`, and exact source `contracts/live/xchess-browser-house-v2.clar` (source inscription #3048). It repeats preflight at wallet opening and verifies deployed source bytes afterward. Engine #3049 is a per-match board term. See `docs/notes/xchess-2.6.0-manual-deployment.md`.

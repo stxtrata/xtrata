@@ -18,3 +18,5 @@ export * from './workflows.js';
 export * from './backup-migration.js';
 export * from './sponsor.js';
 export * from './payments.js';
+
+export * from "./collection-v15.js";

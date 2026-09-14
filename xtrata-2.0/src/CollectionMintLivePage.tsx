@@ -1,3 +1,4 @@
+import { isCollectionV15, readCollectionV15FeeUnits, quoteCollectionV15Mint, type CollectionV15FeeUnits } from '../packages/xtrata-sdk/src/collection-v15';
 import { startJourney, event } from './lib/telemetry/client';
 import { classify } from './lib/telemetry/classify';
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
@@ -158,6 +159,7 @@ type ContractStatus = {
   finalized: boolean | null;
   mintPrice: bigint | null;
   coreFeeUnitMicroStx: bigint | null;
+  v15Fees: CollectionV15FeeUnits | null;
   activePhaseId: bigint | null;
   activePhaseMintPrice: bigint | null;
   maxSupply: bigint | null;
@@ -170,6 +172,7 @@ type TxPayload = {
 };
 
 type MintProgress = {
+  reservedMintPrice: bigint | null;
   hasReservation: boolean;
   uploadState: UploadState | null;
   tokenId: bigint | null;
@@ -1114,6 +1117,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     } satisfies CollectionContractTarget;
   }, [metadata]);
 
+  const usesV15 = isCollectionV15(templateVersion);
+
   const coreClient = useMemo(
     () =>
       createXtrataClient({
@@ -1433,6 +1438,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (!collectionContract) {
       return 'Collection contract details are missing.';
     }
+    if (usesV15 && !contractStatus?.v15Fees) return 'Verified core fee information is unavailable. Refresh collection status before minting.';
     if (contractStatus?.paused) {
       return 'Minting is currently paused.';
     }
@@ -1450,7 +1456,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     }
     return null;
   }, [
-    collectionContract,
+    collectionContract, usesV15, contractStatus?.v15Fees,
     contractStatus?.finalized,
     contractStatus?.paused,
     contractStatus?.reservedCount,
@@ -1497,6 +1503,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (normalized.includes('(err u122)') || normalized.includes('contract error u122')) {
       return 'This asset hash is already sealed on-chain (u122). Refresh collection status and continue with the next item.';
     }
+    if (normalized.includes('u123')) return 'This file is not registered in the collection inventory. The collection owner must register it before minting.';
+    if (normalized.includes('u124')) return 'This file is reserved by another buyer. Choose another item or wait for the reservation to be released.';
     if (normalized.includes('post-condition check failure')) {
       return 'Wallet safety checks blocked this transaction. This usually means payout settings or mint price changed. Refresh status and retry.';
     }
@@ -1506,15 +1514,22 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     return raw;
   }, []);
 
+  const v15Quote = useCallback((chunks: number) => {
+    const units = contractStatus?.v15Fees;
+    const price = contractStatus?.activePhaseMintPrice ?? contractStatus?.mintPrice;
+    if (!units || price == null || chunks < 1) return null;
+    return quoteCollectionV15Mint(units, chunks, price);
+  }, [contractStatus]);
+
   const useMintPriceSealCap =
-    collectionMintPaymentModel === 'seal' &&
+    !usesV15 && collectionMintPaymentModel === 'seal' &&
     contractStatus?.activePhaseMintPrice === null &&
     collectionMintPricingConfig.mode === 'price-includes-seal-fee' &&
     collectionMintPricingConfig.onChainMintPriceMicroStx !== null &&
     collectionMintPricingConfig.onChainMintPriceMicroStx === (contractStatus?.mintPrice ?? null) &&
     collectionMintPricingConfig.mintPriceMicroStx !== null;
   const useMintPriceTotalCap =
-    collectionMintPaymentModel === 'seal' &&
+    !usesV15 && collectionMintPaymentModel === 'seal' &&
     contractStatus?.activePhaseMintPrice === null &&
     collectionMintPricingConfig.mode === 'price-includes-total-fees' &&
     collectionMintPricingConfig.onChainMintPriceMicroStx !== null &&
@@ -1541,6 +1556,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
   const resolveMintBeginPostConditions = useCallback(
     (sender: string) => {
+      if (usesV15) return buildMintBeginStxPostConditions({ sender, mintPrice: v15Quote(1)?.begin ?? null });
       const beginSpendCap = resolveCollectionBeginSpendCapMicroStx({
         mintPrice: contractStatus?.mintPrice ?? null,
         activePhaseMintPrice: contractStatus?.activePhaseMintPrice ?? null,
@@ -1556,6 +1572,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       });
     },
     [
+      usesV15, v15Quote,
       chargeMintPriceAtBegin,
       contractStatus?.activePhaseMintPrice,
       contractStatus?.coreFeeUnitMicroStx,
@@ -1565,6 +1582,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
   const resolveSealPostConditions = useCallback(
     (sender: string, totalChunks: number) => {
+      if (usesV15) return buildMintBeginStxPostConditions({ sender, mintPrice: v15Quote(totalChunks)?.seal ?? null });
       if (collectionMintPaymentModel === 'begin') {
         // Temporary legacy compatibility (v1.1): mint price already paid at begin.
         return buildSealStxPostConditions({
@@ -1602,6 +1620,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       });
     },
     [
+      usesV15, v15Quote,
       collectionMintPaymentModel,
       collectionMintPricingConfig.mintPriceMicroStx,
       collectionMintPricingConfig.mode,
@@ -1637,6 +1656,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
   const resolveSmallSingleTxSpendCap = useCallback(
     (totalChunks: number) => {
+      if (usesV15) return v15Quote(totalChunks)?.total ?? null;
       const sealSpendCapOverride = resolveSingleTxSealSpendCapOverride();
       if (sealSpendCapOverride === null) {
         return null;
@@ -1651,6 +1671,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       });
     },
     [
+      usesV15, v15Quote,
       chargeMintPriceAtBegin,
       collectionMintPricingConfig.mintPriceMicroStx,
       contractStatus?.activePhaseMintPrice,
@@ -1664,6 +1685,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
   const resolveSmallSingleTxPostConditions = useCallback(
     (sender: string, totalChunks: number) => {
+      if (usesV15) return buildMintBeginStxPostConditions({ sender, mintPrice: v15Quote(totalChunks)?.total ?? null });
       const sealSpendCapOverride = resolveSingleTxSealSpendCapOverride();
       if (sealSpendCapOverride === null) {
         return null;
@@ -1679,6 +1701,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       });
     },
     [
+      usesV15, v15Quote,
       chargeMintPriceAtBegin,
       collectionMintPricingConfig.mintPriceMicroStx,
       contractStatus?.activePhaseMintPrice,
@@ -1862,6 +1885,18 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             readOnly('get-reserved-count')
           ]);
         const coreFeeUnitMicroStx = await coreClient.getFeeUnit(senderAddress).catch(() => null);
+        let v15Fees: CollectionV15FeeUnits | null = null;
+        if (usesV15) {
+          const locked = await readOnly('get-locked-core-contract');
+          if (String(cvToValue(locked)) !== getContractId(coreContract) ||
+              coreContract.contractName !== 'xtrata-v3-2-3' || coreContract.network !== collectionContract.network)
+            throw new Error('Collection v1.5 must be pinned to the configured v3.2.3 core on this network.');
+          v15Fees = await readCollectionV15FeeUnits(async functionName => parseUintCv(unwrapReadOnly(await callReadOnlyFunction({
+            contractAddress: coreContract.address, contractName: coreContract.contractName,
+            functionName, functionArgs: [], senderAddress, network
+          }))));
+        }
+
         const activePhaseCv = await readOnly('get-active-phase');
         const activePhaseId = parseUintCv(activePhaseCv);
         let activePhaseMintPrice: bigint | null = null;
@@ -1891,6 +1926,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           finalized: Boolean(cvToValue(finalizedCv)),
           mintPrice: parseUintCv(mintPriceCv),
           coreFeeUnitMicroStx,
+          v15Fees,
           activePhaseId,
           activePhaseMintPrice,
           maxSupply: parseUintCv(maxSupplyCv),
@@ -1903,6 +1939,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         return nextStatus;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
+        if (usesV15) setContractStatus(null);
         setStatusMessage(`Unable to refresh contract status: ${message}`);
         return null;
       } finally {
@@ -1911,8 +1948,22 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }
       }
     },
-    [collectionContract, coreClient, walletSession.address]
+    [collectionContract, coreClient, coreContract, usesV15, walletSession.address]
   );
+
+  const readCollectionMintOwner = useCallback(async (tokenId: bigint, senderAddress: string) => {
+    if (!collectionContract) throw new Error('Collection contract is missing.');
+    const value = unwrapReadOnly(await callReadOnlyFunction({
+      contractAddress: collectionContract.address, contractName: collectionContract.contractName,
+      functionName: 'get-token-mint-context', functionArgs: [uintCV(tokenId)], senderAddress,
+      network: toStacksNetwork(collectionContract.network)
+    }));
+    if (value.type === ClarityType.OptionalNone) return null;
+    if (value.type !== ClarityType.OptionalSome || value.value.type !== ClarityType.Tuple)
+      throw new Error('Collection mint receipt is invalid.');
+    const owner = value.value.data.owner;
+    return owner ? String(cvToValue(owner)) : null;
+  }, [collectionContract]);
 
   const syncCollectionTokenNumbers = useCallback(
     async (options?: { forceFull?: boolean; mintedCount?: bigint | null }) => {
@@ -2024,6 +2075,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }
         try {
           const tokenId = await coreClient.getIdByHash(hashBytes, senderAddress);
+          if (tokenId !== null && usesV15 && !await readCollectionMintOwner(tokenId, senderAddress)) return null;
           return tokenId === null ? null : tokenId.toString();
         } catch {
           return null;
@@ -2093,7 +2145,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   }, [
     canonicalHashHexByAssetId,
     contractStatus?.mintedCount,
-    coreClient,
+    coreClient, usesV15, readCollectionMintOwner,
     coreContract.address,
     fetchAssetBytes,
     mintableAssets,
@@ -2162,10 +2214,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       const senderAddress = session.address;
       const network = toStacksNetwork(collectionContract.network);
       const [tokenId, uploadStateResult, reservationCv] = await Promise.all([
-        coreClient.getIdByHash(expectedHashBytes, senderAddress).catch(() => null),
+        coreClient.getIdByHash(expectedHashBytes, senderAddress).catch(error => { if (usesV15) throw error; return null; }),
         coreClient
           .getUploadState(expectedHashBytes, senderAddress, senderAddress)
-          .catch(() => null),
+          .catch(error => { if (usesV15) throw error; return null; }),
         callReadOnlyFunction({
           contractAddress: collectionContract.address,
           contractName: collectionContract.contractName,
@@ -2173,17 +2225,24 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           functionArgs: [principalCV(senderAddress), bufferCV(expectedHashBytes)],
           senderAddress,
           network
-        }).catch(() => null)
+        }).catch(error => { if (usesV15) throw error; return null; })
       ]);
+      if (usesV15 && tokenId !== null) {
+        const owner = await readCollectionMintOwner(tokenId, senderAddress);
+        if (owner !== senderAddress) throw new Error('This hash already exists on-chain, but it is not a mint by this wallet through this collection. No duplicate will be minted.');
+      }
       const reservationValue = reservationCv ? unwrapReadOnly(reservationCv) : null;
       const hasReservation = reservationValue?.type === ClarityType.OptionalSome;
+      const reservedMintPrice = reservationValue?.type === ClarityType.OptionalSome && reservationValue.value.type === ClarityType.Tuple
+        ? parseUintCv(reservationValue.value.data['mint-price']) : null;
       return {
         tokenId,
         uploadState: uploadStateResult,
+        reservedMintPrice,
         hasReservation
       };
     },
-    [collectionContract, coreClient]
+    [collectionContract, coreClient, usesV15, readCollectionMintOwner]
   );
 
   const checkReservationForHash = useCallback(
@@ -2372,6 +2431,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         normalizeHashHex(canonicalHashHexByAssetId[asset.asset_id]) ??
         normalizeHashHex(asset.expected_hash ?? '');
       const tokenUri = DEFAULT_TOKEN_URI;
+      const freshV15Quote = async (chunks: number, reservedPrice?: bigint) => {
+        const latest = await loadContractStatus({ silent: true });
+        const price = reservedPrice ?? latest?.activePhaseMintPrice ?? latest?.mintPrice;
+        if (!latest?.v15Fees || price == null) throw new Error('Verified core fees and collection price are unavailable.');
+        return quoteCollectionV15Mint(latest.v15Fees, chunks, price);
+      };
       try {
         const rawBytes = await fetchAssetBytes(asset.asset_id);
         const chunks = chunkBytes(rawBytes);
@@ -2404,6 +2469,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }
 
         const expectedHashBytes = computedHash;
+        if (usesV15) {
+          if (!collectionContract || !contractStatus?.v15Fees) throw new Error('Refresh verified collection status before minting.');
+          const registered = unwrapReadOnly(await callReadOnlyFunction({
+            contractAddress: collectionContract.address, contractName: collectionContract.contractName,
+            functionName: 'get-registered-token-uri', functionArgs: [bufferCV(expectedHashBytes)], senderAddress,
+            network: toStacksNetwork(collectionContract.network)
+          }));
+          if (registered.type !== ClarityType.OptionalSome) throw new Error('This asset is not registered in the collection inventory (u123).');
+        }
+
         const coreContractId = `${coreContract.address}.${coreContract.contractName}`;
         let progress = await getMintProgress(expectedHashBytes, session);
         if (progress.tokenId !== null) {
@@ -2431,7 +2506,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             `Small-file single-tx route active (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks).`
           );
 
-          const singleTxSpendCap = resolveSmallSingleTxSpendCap(chunks.length);
+          const singleTxSpendCap = usesV15 ? (await freshV15Quote(chunks.length)).total : resolveSmallSingleTxSpendCap(chunks.length);
           if (singleTxSpendCap === null) {
             throw new Error(
               'Single-tx safety cap is unavailable. Refresh on-chain status, then retry.'
@@ -2447,7 +2522,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   : `Single-tx safety cap <= ${toMicroStxLabel(singleTxSpendCap)} (mint price + begin anti-spam + seal protocol fee).`
           );
 
-          const singleTxPostConditions = resolveSmallSingleTxPostConditions(
+          const singleTxPostConditions = usesV15 ? buildMintBeginStxPostConditions({ sender: senderAddress, mintPrice: singleTxSpendCap }) : resolveSmallSingleTxPostConditions(
             senderAddress,
             chunks.length
           );
@@ -2496,7 +2571,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
 
         const needsBegin = !progress.hasReservation || progress.uploadState === null;
         if (needsBegin) {
-          const beginSpendCap = resolveCollectionBeginSpendCapMicroStx({
+          const beginSpendCap = usesV15 ? (await freshV15Quote(chunks.length)).begin : resolveCollectionBeginSpendCapMicroStx({
             mintPrice: contractStatus?.mintPrice ?? null,
             activePhaseMintPrice: contractStatus?.activePhaseMintPrice ?? null,
             protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
@@ -2509,7 +2584,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 : `Begin safety cap <= ${toMicroStxLabel(beginSpendCap)} (protocol anti-spam fee only).`
             );
           }
-          const beginPostConditions = resolveMintBeginPostConditions(senderAddress);
+          const beginPostConditions = usesV15 ? buildMintBeginStxPostConditions({ sender: senderAddress, mintPrice: beginSpendCap }) : resolveMintBeginPostConditions(senderAddress);
           if (!beginPostConditions) {
             throw new Error(
               'Mint pricing data is unavailable for wallet safety checks. Refresh status, then retry.'
@@ -2641,11 +2716,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }
 
         activeStage = 'seal';
-        const sealPostConditions = resolveSealPostConditions(senderAddress, chunks.length);
+        if (usesV15 && progress.reservedMintPrice == null) throw new Error('The reserved mint price could not be verified.');
+        const v15Seal = usesV15 ? (await freshV15Quote(chunks.length, progress.reservedMintPrice!)).seal : null;
+        const sealPostConditions = usesV15 ? buildMintBeginStxPostConditions({ sender: senderAddress, mintPrice: v15Seal }) : resolveSealPostConditions(senderAddress, chunks.length);
         if (!sealPostConditions) {
           throw new Error('Seal fee safety cap is unavailable. Refresh contract status and retry.');
         }
-        const sealSpendCap =
+        const sealSpendCap = usesV15 ? v15Seal :
           collectionMintPaymentModel === 'begin'
             ? resolveSealSpendCapMicroStx({
                 protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
@@ -2751,7 +2828,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       templateVersion,
       useMintPriceTotalCap,
       useMintPriceSealCap,
-      waitForMintProgress
+      waitForMintProgress, usesV15, loadContractStatus, collectionContract, contractStatus?.v15Fees
     ]
   );
 
@@ -3301,13 +3378,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   });
   const mintPriceToneClass = `collection-live-page__hero-price-card--${mintPriceTone}`;
   const heroStatusLabel = soldOut ? 'Sold out' : freeMint ? 'Free mint' : null;
-  const mintBeginSpendCap = resolveCollectionBeginSpendCapMicroStx({
+  const mintBeginSpendCap = usesV15 ? v15Quote(1)?.begin ?? null : resolveCollectionBeginSpendCapMicroStx({
     mintPrice: contractStatus?.mintPrice ?? null,
     activePhaseMintPrice: contractStatus?.activePhaseMintPrice ?? null,
     protocolFeeMicroStx: contractStatus?.coreFeeUnitMicroStx ?? null,
     chargeMintPriceAtBegin
   });
-  const protocolFeeUnitLabel = toMicroStxLabel(contractStatus?.coreFeeUnitMicroStx ?? null);
+  const protocolFeeUnitLabel = toMicroStxLabel(usesV15 ? contractStatus?.v15Fees?.begin ?? null : contractStatus?.coreFeeUnitMicroStx ?? null);
   const fallbackMaxChunkCount = largestMintableAsset?.totalChunks ?? null;
   const fallbackMaxBytes = largestMintableAsset?.totalBytes ?? null;
   const collectionMaxChunkCount = deployPricingLock?.maxChunks ?? fallbackMaxChunkCount;
@@ -3329,17 +3406,17 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     collectionMaxChunkCount === null || collectionMaxChunkCount <= 0
       ? null
       : 1 + Math.ceil(collectionMaxChunkCount / FEE_BATCH_SIZE);
-  const minimumProtocolFeeTotal =
+  const minimumProtocolFeeTotal = usesV15 && contractStatus?.v15Fees ? quoteCollectionV15Mint(contractStatus.v15Fees, 1, 0n).total :
     contractStatus?.coreFeeUnitMicroStx && contractStatus.coreFeeUnitMicroStx > 0n
       ? contractStatus.coreFeeUnitMicroStx * 3n
       : null;
-  const estimatedMaxProtocolFeeTotal =
+  const estimatedMaxProtocolFeeTotal = usesV15 && contractStatus?.v15Fees && collectionMaxChunkCount ? quoteCollectionV15Mint(contractStatus.v15Fees, collectionMaxChunkCount, 0n).total :
     contractStatus?.coreFeeUnitMicroStx &&
     contractStatus.coreFeeUnitMicroStx > 0n &&
     estimatedSealFeeUnits !== null
       ? contractStatus.coreFeeUnitMicroStx * BigInt(1 + estimatedSealFeeUnits)
       : null;
-  const sealMinProtocolFee =
+  const sealMinProtocolFee = usesV15 && contractStatus?.v15Fees ? quoteCollectionV15Mint(contractStatus.v15Fees, 1, 0n).sealProtocol :
     contractStatus?.coreFeeUnitMicroStx && contractStatus.coreFeeUnitMicroStx > 0n
       ? contractStatus.coreFeeUnitMicroStx * 2n
       : null;
@@ -3614,7 +3691,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   Minimum protocol fee is{' '}
                   {minimumProtocolFeeTotal ? toMicroStxLabel(minimumProtocolFeeTotal) : 'unknown'}
                   {sealMinProtocolFee
-                    ? ` (begin ${protocolFeeUnitLabel} + seal ${toMicroStxLabel(sealMinProtocolFee)} for <=50 chunks).`
+                    ? ` (begin ${protocolFeeUnitLabel} + seal ${toMicroStxLabel(sealMinProtocolFee)} for ${usesV15 ? 'one chunk' : '<=50 chunks'}).`
                     : '.'}
                 </p>
                 {estimatedMaxProtocolFeeTotal !== null && collectionMaxChunkCount !== null && (
@@ -4057,7 +4134,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 <span className="meta-value">{finalizedLabel}</span>
               </div>
               <div>
-                <span className="meta-label">Protocol fee unit</span>
+                <span className="meta-label">{usesV15 ? 'Protocol begin fee' : 'Protocol fee unit'}</span>
                 <span className="meta-value">{protocolFeeUnitLabel}</span>
               </div>
               <div>
@@ -4069,6 +4146,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 <span className="meta-value">
                   {mintBeginSpendCap === null
                     ? 'Loading protected spend cap...'
+                    : usesV15 ? `Deny mode caps use fresh core fees: begin ${protocolFeeUnitLabel}; upload 0 STX; seal includes the reserved mint price plus the granular protocol seal fee. The helper atomic route includes begin and seal.`
                     : collectionMintPaymentModel === 'begin'
                       ? `Deny mode caps: begin anti-spam <= ${toMicroStxLabel(
                           mintBeginSpendCap

@@ -37,7 +37,7 @@ import {
 import { useManageWallet } from '../ManageWalletContext';
 import { parseDeployPricingLockSnapshot } from '../../lib/deploy/pricing-lock';
 import InfoTooltip from './InfoTooltip';
-import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar?raw';
+import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar?raw';
 import preinscribedTemplateSource from '../../../contracts/clarinet/contracts/xtrata-preinscribed-collection-sale-v1.0.clar?raw';
 
 type CollectionDraft = {
@@ -172,7 +172,7 @@ const compactClaritySourceForDeploy = (source: string) => {
   return result.length > 0 ? result : source;
 };
 
-type DeployTemplateMode = 'standard-v1.4';
+type DeployTemplateMode = 'standard-v1.5';
 
 type ContractNameAvailability = {
   exists: boolean;
@@ -377,7 +377,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const [deployPending, setDeployPending] = useState(false);
   const [draftPending, setDraftPending] = useState(false);
   const [selectedDraftLoading, setSelectedDraftLoading] = useState(false);
-  const deployTemplateMode: DeployTemplateMode = 'standard-v1.4';
+  const deployTemplateMode: DeployTemplateMode = 'standard-v1.5';
   const [deployAttemptId, setDeployAttemptId] = useState<string | null>(null);
   const [deployDebugLog, setDeployDebugLog] = useState<string[]>([]);
   const reviewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -397,14 +397,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     return new URLSearchParams(window.location.search).get('debug') === '1.4';
   }, []);
   const selectedStandardTemplateSource = standardTemplateSource;
-  const fallbackCoreTarget = useMemo(
-    () => resolveArtistDeployCoreTarget('mainnet'),
-    []
-  );
   const activeNetwork = walletSession.network ?? 'mainnet';
   const coreTarget = useMemo(
-    () => resolveArtistDeployCoreTarget(activeNetwork) ?? fallbackCoreTarget,
-    [activeNetwork, fallbackCoreTarget]
+    () => resolveArtistDeployCoreTarget(activeNetwork, undefined, mintType === 'standard' ? '3.2.3' : 'legacy'),
+    [activeNetwork, mintType]
   );
   const lockedMarketplaceAddress = coreTarget?.address ?? '';
   const effectiveMarketplaceAddress = canEditMarketplaceRecipient
@@ -909,7 +905,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         },
         coreContractId:
           coreTarget?.contractId ??
-          'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0',
+          '',
         operatorAddress:
           coreTarget?.address ?? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X'
       }),
@@ -931,7 +927,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     if (mintType === 'pre-inscribed') {
       return 'xtrata-preinscribed-collection-sale-v1.0';
     }
-    return 'xtrata-collection-mint-v1.4';
+    return 'xtrata-collection-mint-v1.5';
   }, [mintType]);
   const deploySourceByteLength = useMemo(
     () => new TextEncoder().encode(deployBuild.source).byteLength,
@@ -1073,7 +1069,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const details = {
       debugVersion: DEPLOY_DEBUG_VERSION,
       clarityVersion: DEPLOY_CLARITY_VERSION,
-      defaultDeployTemplateMode: 'standard-v1.4',
+      defaultDeployTemplateMode: 'standard-v1.5',
       sourceCompactionMode: DEPLOY_SOURCE_COMPACTION_MODE,
       debug14Enabled
     };
@@ -1123,7 +1119,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     }
 
     const networkCoreTarget =
-      resolveArtistDeployCoreTarget(activeNetwork) ?? fallbackCoreTarget;
+      resolveArtistDeployCoreTarget(activeNetwork, undefined, mintType === 'standard' ? '3.2.3' : 'legacy');
     if (!networkCoreTarget) {
       appendDeployDebug('Draft create blocked: missing core target for network', {
         attemptId,
@@ -1166,7 +1162,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.4';
+        : 'xtrata-collection-mint-v1.5';
 
     const draftMetadata = {
       mintType,
@@ -1310,7 +1306,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       return;
     }
 
-    const networkCoreTarget = resolveArtistDeployCoreTarget(session.network);
+    const networkCoreTarget = resolveArtistDeployCoreTarget(session.network, undefined, mintType === 'standard' ? '3.2.3' : 'legacy');
     if (!networkCoreTarget) {
       appendDeployDebug('Deploy blocked: missing core target for network', {
         attemptId,
@@ -1355,7 +1351,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.4';
+        : 'xtrata-collection-mint-v1.5';
     const sourceTemplateLabel = templateVersion;
     let sourceBeforeCompaction = refreshBuild.source;
 

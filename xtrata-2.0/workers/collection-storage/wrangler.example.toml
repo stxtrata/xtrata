@@ -1,0 +1,30 @@
+# Copy to an ignored local config and replace bindings with isolated resources
+# for testing. Do not point a preview worker at production D1/R2.
+name = "xtrata-collection-storage"
+main = "index.ts"
+compatibility_date = "2026-09-14"
+[triggers]
+crons = ["*/5 * * * *"]
+[vars]
+COLLECTION_STORAGE_V2 = "1"
+COLLECTION_CLEANUP_MODE = "auto-quarantine"
+COLLECTION_CLEANUP_GRACE_MS = "86400000"
+COLLECTION_CLEANUP_ORPHAN_GRACE_MS = "604800000"
+COLLECTION_CLEANUP_CONFIRMATIONS = "6"
+# Set only after every writer uses verified immutable uploads. This is a
+# deployment prerequisite, not a per-file human approval step.
+COLLECTION_CLEANUP_WRITERS_LOCKED = "0"
+[[d1_databases]]
+binding = "DB"
+database_name = "REPLACE_WITH_ISOLATED_DATABASE"
+database_id = "REPLACE_WITH_DATABASE_ID"
+migrations_dir = "../../functions/migrations"
+[[r2_buckets]]
+binding = "COLLECTION_ASSETS"
+bucket_name = "REPLACE_WITH_STAGING_BUCKET"
+[[r2_buckets]]
+binding = "COLLECTION_RECOVERY"
+bucket_name = "REPLACE_WITH_SEPARATE_PRIVATE_RECOVERY_BUCKET"
+# Secrets: COLLECTION_CLEANUP_SCAN_TOKEN (>=32 random characters), HIRO_API_KEY.
+# Pages additionally needs COLLECTION_CLEANUP_ADMIN_TOKEN for the review UI.
+# Recovery bucket must have NO expiry lifecycle rule; do not expose an r2.dev URL.

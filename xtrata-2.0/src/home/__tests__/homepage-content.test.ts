@@ -50,6 +50,7 @@ describe('homepage content configuration', () => {
     expect(hrefs.every((href) => href.startsWith('/') || href.startsWith('https://'))).toBe(true);
     expect(HOMEPAGE_OBJECTS.some((item) => item.preview.src?.includes('/i/'))).toBe(true);
     expect(HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.id)).toEqual([
+      'xtrata-music',
       'forever-twins',
       'suno-more'
     ]);

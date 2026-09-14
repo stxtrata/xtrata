@@ -6,6 +6,14 @@ const ROOT = process.cwd();
 
 const VARIANT_SETS = [
   {
+    id: 'xtrata-collection-mint-v1.5',
+    syncMode: 'pinned-core',
+    variants: [
+      { name: 'clarinet', file: 'contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar', core: '.xtrata-v3-2-3' },
+      { name: 'mainnet-candidate', file: 'contracts/live/xtrata-collection-mint-v1.5.clar', core: "'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3" }
+    ]
+  },
+  {
     id: 'xtrata-v1.1.0',
     variants: [
       {
@@ -390,6 +398,23 @@ const main = async () => {
   for (const set of VARIANT_SETS) {
     const setResults = [];
     const syncMode = set.syncMode ?? 'traits';
+
+    if (syncMode === 'pinned-core') {
+      const source = await fs.readFile(path.join(ROOT, set.variants[0].file), 'utf8');
+      for (const variant of set.variants) {
+        const expected = source.replaceAll(set.variants[0].core, variant.core);
+        const absolute = path.join(ROOT, variant.file);
+        let actual = null;
+        try { actual = await fs.readFile(absolute, 'utf8'); } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+        const changed = actual !== expected;
+        if (changed && fix) await fs.writeFile(absolute, expected, 'utf8');
+        results.push({ file: variant.file, changed });
+        rows.push(`- ${set.id}/${variant.name}: ${variant.file} [${changed ? (fix ? 'updated' : 'mismatch') : 'ok'}]`);
+      }
+      continue;
+    }
 
     if (syncMode === 'plain') {
       for (const variant of set.variants) {

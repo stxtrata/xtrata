@@ -54,6 +54,10 @@ export class FakeChain {
   broadcasts: bigint[] = [];
   /** tx id → status returned by the tx endpoint. */
   txStatus = new Map<string, string>();
+  realTxIds = false;
+  lastSignedId: string | null = null;
+  txDetails = new Map<string, any>();
+  stacksHeight = 1000;
   private feeIdx = 0;
   private txSeq = 0;
 
@@ -106,6 +110,7 @@ export class FakeChain {
     const json = (body: unknown, status = 200) =>
       new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
+    if (url.endsWith('/v2/info')) return json({ stacks_tip_height: this.stacksHeight });
     // --- balances (v2) ---
     let m = /\/extended\/v2\/addresses\/([^/]+)\/balances\/stx/.exec(url);
     if (m) return json({ balance: String(this.balances.get(m[1]) ?? 0n) });
@@ -173,8 +178,9 @@ export class FakeChain {
       }
       if (url.endsWith('/get-upload-state')) {
         const n = this.lastUploadKey ? this.uploads.get(this.lastUploadKey) : undefined;
-        return json({ okay: true, result: n == null ? NONE_HEX : uploadStateHex(n) });
+        return json({ okay: true, result: n == null ? '0x09' : uploadStateHex(n) });
       }
+      if (url.endsWith('/get-id-by-hash')) return json({ okay: true, result: '0x09' });
       if (url.endsWith('/quote-inscription-fee')) {
         // (ok (some {total-fee, upload-batches, begin-fee, seal-fee})) — the protocol
         // fee, which is separate from the miner fee this suite is mostly about.
@@ -226,7 +232,7 @@ export class FakeChain {
       if (fee <= this.minAcceptedFee) {
         return json({ error: 'transaction rejected', reason: 'FeeTooLow', reason_data: { expected: String(this.minAcceptedFee + 1n) } }, 400);
       }
-      const txid = `0x${(++this.txSeq).toString(16).padStart(64, '0')}`;
+      const txid = this.realTxIds && this.lastSignedId ? `0x${this.lastSignedId}` : `0x${(++this.txSeq).toString(16).padStart(64, '0')}`;
       this.txStatus.set(txid, fee >= this.minFeeToConfirm ? 'success' : 'pending');
       if (fee >= this.minFeeToConfirm) {
         // A confirmed replacement supersedes every earlier tx for the same nonce.
@@ -246,7 +252,7 @@ export class FakeChain {
     // Hiro returns the txid WITHOUT a 0x prefix from /v2/transactions but accepts
     // either form on lookup, so normalise both ends here.
     m = /\/extended\/v1\/tx\/(?:0x)?([0-9a-f]+)/.exec(url);
-    if (m) { const id = `0x${m[1]}`; return json({ tx_status: this.txStatus.get(id) ?? 'pending', tx_id: id }); }
+    if (m) { const id = `0x${m[1]}`; return json(this.txDetails.get(id) || { tx_status: this.txStatus.get(id) ?? 'pending', tx_id: id, canonical: true, is_unanchored: false }); }
 
     if (url.includes('/v2/accounts/')) return json({ balance: '0x0', nonce: 1 });
 
@@ -296,11 +302,11 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
   someOwnerHexImpl = (addr: string) =>
     stacks.cvToHex(stacks.responseOkCV(stacks.someCV(stacks.standardPrincipalCV(addr))));
   NONE_HEX = stacks.cvToHex(stacks.responseOkCV(stacks.noneCV()));
-  // (ok {current-index: uN}) — NOT wrapped in an optional, same as
-  // quote-inscription-fee; the agent walks .value.value['current-index'].
+  // Upload state is an optional tuple; model the deployed ABI exactly.
   uploadStateHexImpl = (currentIndex: number) =>
-    stacks.cvToHex(stacks.responseOkCV(stacks.tupleCV({
-      'current-index': stacks.uintCV(currentIndex)
+    stacks.cvToHex(stacks.someCV(stacks.tupleCV({
+      'current-index': stacks.uintCV(currentIndex),
+      'last-touched': stacks.uintCV(1000)
     })));
   quoteHexImpl = (totalFee: number, batches: number) =>
     // (ok {…}) — the contract does NOT wrap this in an optional, and the agent walks
@@ -366,6 +372,7 @@ export async function loadAgent(chain: FakeChain, opts: { core?: string } = {}) 
         try {
           const raw = init.body instanceof Uint8Array ? init.body : new Uint8Array(init.body);
           const tx: any = stacks.deserializeTransaction(raw);
+          chain.lastSignedId = tx.txid();
           chain.lastBroadcastFee = BigInt(tx.auth.spendingCondition.fee.toString());
           chain.lastBroadcastNonce = BigInt(tx.auth.spendingCondition.nonce.toString());
           // Token transfers carry a recipient; remember it so a test can assert where

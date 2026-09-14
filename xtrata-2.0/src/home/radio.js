@@ -6,6 +6,7 @@
 // extracted and played, so the station works across formats.
 
 import radioCss from './radio.css?inline';
+import { attachPlayCounter } from '../lib/radio/play-counter';
 
 const STORAGE_KEY = 'xtrata.radio.v1';
 
@@ -114,6 +115,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   // --- audio plumbing ---------------------------------------------------
   const player = new Audio();
+  const playCounter = attachPlayCounter(player, document.documentElement.dataset.radioEmbed === 'true' ? 'embed' : 'radio');
   player.preload = 'auto';
   player.volume = 0.8; // knob default 8/10
 
@@ -1281,6 +1283,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         await new Promise((resolve) => setTimeout(resolve, (tuningSeconds - elapsed) * 1000));
       }
       if (token !== tuneToken || !on) { endTune(); return; }
+      playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
       if (player.src !== track.src) {
         player.src = track.src;
       }
@@ -1457,6 +1460,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       root.classList.add('is-on');
       applyVolume();
       renderKnob();
+      playCounter.select(PLAYABLE_CONTRACT, Number(saved.tokenId));
       player.src = track.src;
       const begin = () => {
         try { if (Number(saved.position) > 1 && player.currentTime < 1) player.currentTime = Number(saved.position); } catch { /* noop */ }

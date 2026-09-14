@@ -1,11 +1,19 @@
 import { validateStacksAddress } from '@stacks/transactions';
 import { getContractId } from './config.js';
-import type { NetworkType, SdkContractRegistryEntry } from './types.js';
+import type { NetworkType } from './types.js';
 import {
   normalizeDependencyIds,
   parseDependencyInput,
   validateDependencyIds
 } from './mint.js';
+
+/** Deployment registry input; does not opt the legacy mint planner into new core versions. */
+export type ArtistDeployRegistryEntry = {
+  address: string;
+  contractName: string;
+  network: NetworkType;
+  protocolVersion?: string;
+};
 
 export type ArtistMintType = 'standard' | 'pre-inscribed';
 
@@ -66,7 +74,7 @@ const SYMBOL_PATTERN = /^[A-Z0-9-]{1,16}$/;
 const CONTRACT_ID_PATTERN = /^[A-Z0-9]+\.[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 
-const isCoreEntry = (entry: SdkContractRegistryEntry) =>
+const isCoreEntry = (entry: ArtistDeployRegistryEntry) =>
   entry.protocolVersion === '2.1.0' ||
   entry.protocolVersion === '2.1.1' ||
   entry.protocolVersion === '3.0.0' ||
@@ -163,17 +171,20 @@ export const deriveArtistContractName = (params: {
 
 export const resolveArtistDeployCoreTarget = (
   network: NetworkType,
-  registry: readonly SdkContractRegistryEntry[]
+  registry: readonly ArtistDeployRegistryEntry[],
+  coreVersion: 'legacy' | '3.2.3' = 'legacy'
 ): ArtistDeployCoreTarget | null => {
   const candidate = registry.find(
-    (entry) => entry.network === network && isCoreEntry(entry)
+    (entry) => entry.network === network && (coreVersion === '3.2.3'
+      ? entry.protocolVersion === '3.2.3' && entry.contractName === 'xtrata-v3-2-3'
+      : isCoreEntry(entry))
   );
   if (!candidate) {
     return null;
   }
   return {
     address: candidate.address,
-    contractId: getContractId(candidate),
+    contractId: getContractId({ address: candidate.address, contractName: candidate.contractName }),
     network: candidate.network
   };
 };
@@ -291,11 +302,30 @@ export const buildArtistDeployContractSource = (params: {
   }
 
   let source = templateSource;
+  if (mintType === 'standard' && templateSource.includes('ERR-UNREGISTERED-HASH')) {
+    if (!params.coreContractId.endsWith('.xtrata-v3-2-3')) {
+      errors.push('Collection v1.5 requires core v3.2.3.');
+    }
+    for (const [role, paidBps] of [['artist', 9500], ['marketplace', 250], ['operator', 250]] as const) {
+      source = replaceLine({ source, marker: `${role}-bps`,
+        pattern: new RegExp(`^\\(define-data-var ${role}-bps uint u\\d+\\)$`, 'm'),
+        replacement: `(define-data-var ${role}-bps uint u${resolved.mintPriceMicroStx === 0n ? 0 : paidBps})`, errors });
+    }
+    // The duplicate guard is a static Clarity call and must follow the pin.
+    source = replaceLine({
+      source,
+      marker: 'v1.5 duplicate hash guard',
+      pattern: /\(contract-call\? (?:\.[a-zA-Z0-9-]+|'[A-Z0-9]+\.[a-zA-Z0-9-]+) get-id-by-hash hash\)/,
+      replacement: `(contract-call? '${params.coreContractId} get-id-by-hash hash)`,
+      errors
+    });
+  }
+
 
   source = replaceLine({
     source,
     marker: 'ALLOWED-XTRATA-CONTRACT',
-    pattern: /^\(define-constant ALLOWED-XTRATA-CONTRACT '.*\)$/m,
+    pattern: /^\(define-constant ALLOWED-XTRATA-CONTRACT [^)]+\)$/m,
     replacement: `(define-constant ALLOWED-XTRATA-CONTRACT '${params.coreContractId})`,
     errors
   });
@@ -349,7 +379,7 @@ export const buildArtistDeployContractSource = (params: {
   source = replaceLine({
     source,
     marker: 'artist-recipient',
-    pattern: /^\(define-data-var artist-recipient principal '.*\)$/m,
+    pattern: /^\(define-data-var artist-recipient principal [^)]+\)$/m,
     replacement: `(define-data-var artist-recipient principal '${resolved.artistAddress})`,
     errors
   });
@@ -357,7 +387,7 @@ export const buildArtistDeployContractSource = (params: {
   source = replaceLine({
     source,
     marker: 'marketplace-recipient',
-    pattern: /^\(define-data-var marketplace-recipient principal '.*\)$/m,
+    pattern: /^\(define-data-var marketplace-recipient principal [^)]+\)$/m,
     replacement: `(define-data-var marketplace-recipient principal '${resolved.marketplaceAddress})`,
     errors
   });
@@ -365,7 +395,7 @@ export const buildArtistDeployContractSource = (params: {
   source = replaceLine({
     source,
     marker: 'operator-recipient',
-    pattern: /^\(define-data-var operator-recipient principal '.*\)$/m,
+    pattern: /^\(define-data-var operator-recipient principal [^)]+\)$/m,
     replacement: `(define-data-var operator-recipient principal '${resolved.operatorAddress})`,
     errors
   });

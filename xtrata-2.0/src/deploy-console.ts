@@ -87,6 +87,9 @@ import dropsV11Source from '../contracts/live/xtrata-drops-v1.1.clar?raw';
 import livingSynthGatewaySource from '../contracts/live/xtrata-v3-2-3-gateway.clar?raw';
 import livingSynthRegistrySource from '../contracts/live/proof-of-free-living-synth-v1.clar?raw';
 
+import xchessHelperSource from '../contracts/live/xchess-browser-house-v2.clar?raw';
+import {XCHESS_HELPER_NAME, XCHESS_HELPER_SOURCE, inspectXChessSource} from './lib/deploy/xchess';
+
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
 
@@ -96,6 +99,7 @@ type Deployable = {
   /** contract source bundled at build time */
   code: string;
   notes: string;
+  xchess?: boolean;
   sponsoredMarket?: boolean;
   dropsV11?: boolean;
   proofOfFree?: boolean;
@@ -104,6 +108,13 @@ type Deployable = {
 };
 
 const DEPLOYABLE: Deployable[] = [
+  {
+    name: XCHESS_HELPER_NAME,
+    source: XCHESS_HELPER_SOURCE,
+    code: xchessHelperSource,
+    xchess: true,
+    notes: 'X-Chess 2.6.0 deterministic house matches: authenticated batches, separate sponsor reserves and recoverable execution authority. Exact source archived as #3048; engine #3049. No owner setup or relayer configuration is needed.'
+  },
   {
     name: LIVING_SYNTH_GATEWAY_NAME,
     source: 'contracts/live/xtrata-v3-2-3-gateway.clar',
@@ -331,6 +342,8 @@ const sha256Hex = async (text: string) => {
 
 const runPreflight = async (entry: Deployable, code: string): Promise<PreflightResult> => {
   const problems: string[] = [];
+  const sha256 = await sha256Hex(code);
+  if (entry.xchess) problems.push(...inspectXChessSource(code, sha256));
   const active = stripComments(code);
   if (active.includes('.mock-')) {
     problems.push('active code references a .mock- principal (clarinet stand-in)');
@@ -385,6 +398,15 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     chainStatus = classifyContractInterfaceResponse(response.ok, response.status);
     if (chainStatus === 'deployed') {
       alreadyDeployed = true;
+      if (entry.xchess) {
+        const deployed = await fetch(`${HIRO_API}/v2/contracts/source/${EXPECTED_DEPLOYER}/${entry.name}?proof=0`);
+        if (!deployed.ok) problems.push(`Cannot verify deployed X-Chess source: HTTP ${deployed.status}`);
+        else {
+          const body = await deployed.json();
+          if (typeof body.source !== 'string') problems.push('Deployed X-Chess source is unavailable');
+          else problems.push(...inspectXChessSource(body.source, await sha256Hex(body.source)));
+        }
+      }
     } else if (chainStatus === 'unknown') {
       problems.push(`Hiro contract-name check returned HTTP ${response.status}`);
     }
@@ -395,7 +417,7 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
   return {
     ok: problems.length === 0,
     problems,
-    sha256: await sha256Hex(code),
+    sha256,
     bytes: new TextEncoder().encode(code).length,
     alreadyDeployed,
     chainStatus
@@ -457,9 +479,9 @@ const cliCommand = (entry: Deployable) =>
   `XTRATA_MAINNET_MNEMONIC="..." node scripts/mainnet-deploy-contract.mjs ${entry.name} --broadcast`;
 
 // Contracts here are Clarity 4, matching what wallets publish — safe to sign.
-const deployContract = (name: string) => {
+const deployContract = async (name: string) => {
   const stateEntry = states.get(name)!;
-  if (!stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
+  if (stateEntry.busy || !stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
     return;
   if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
     stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
@@ -469,6 +491,22 @@ const deployContract = (name: string) => {
   }
   stateEntry.busy = true;
   stateEntry.error = null;
+  if (stateEntry.entry.xchess) {
+    render();
+    try {
+      stateEntry.preflight = await runPreflight(stateEntry.entry, stateEntry.source);
+      if (!stateEntry.preflight.ok || stateEntry.preflight.alreadyDeployed)
+        throw new Error(stateEntry.preflight.problems.join('; ') || 'Contract is already deployed; its source has been verified.');
+      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER)
+        throw new Error('Signer changed during preflight. Reconnect the deployer before signing.');
+    } catch (error) {
+      stateEntry.busy = false;
+      stateEntry.error = error instanceof Error ? error.message : String(error);
+      addLog(stateEntry, 'deploy', 'error', stateEntry.error);
+      render();
+      return;
+    }
+  }
   addLog(
     stateEntry,
     'deploy',
@@ -1730,12 +1768,14 @@ const render = () => {
   for (const stateEntry of states.values()) {
     const { entry, preflight, txId, error, busy, logs } = stateEntry;
     if (entry.livingSynthRole) continue;
-    const card = el('div', { className: entry.dropsV11 ? 'card featured' : 'card' });
+    const card = el('div', { className: entry.dropsV11 || entry.xchess ? 'card featured' : 'card', ...(entry.xchess ? {id:'xchess-deployment'} : {}) });
     card.append(
       el(
         'h2',
         {},
-        entry.proofOfFree
+        entry.xchess
+          ? 'X-Chess 2.6.0 — browser house helper'
+          : entry.proofOfFree
           ? 'Proof of Free v1 — Living Synth v3 controller'
           : entry.dropsV11
           ? 'Drops v1.1 — campaign deployment'
@@ -1743,6 +1783,12 @@ const render = () => {
       ),
       el('p', {}, entry.notes)
     );
+
+    if (entry.xchess) {
+      card.append(el('p', {}, 'Inscribing the .clar file stores source; this wallet deployment makes it callable. Engine ID 3049 and your new board ID are entered in the board when creating a match, not inserted into this contract.'));
+      if (preflight?.ok && preflight.alreadyDeployed)
+        card.append(el('p', {className:'ok'}, 'Deployed source verified byte-for-byte. Copy the Contract id below into Browser house matches → Deployed browser-house helper contract. No admin transaction is required.'));
+    }
 
     if (entry.proofOfFree) {
       const engineInput = el('input', {
@@ -1895,15 +1941,17 @@ const render = () => {
         el(
           'p',
           {},
-          entry.proofOfFree
+          entry.xchess
+            ? 'Exact tested Clarity 4 source. The wallet must show xchess-browser-house-v2 on mainnet. Review its network fee before signing; the console requests the existing 0.49 STX fee default. No game deposits are made by deployment.'
+            : entry.proofOfFree
             ? 'Contract is generated from the audited Drops v1.1 base and the verified engine binding. Download the generated source before signing so it is retained in the release evidence bundle.'
             : 'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
         ),
-        ...(entry.proofOfFree ? [] : [el('pre', {}, cliCommand(entry))]),
+        ...(entry.proofOfFree || entry.xchess ? [] : [el('pre', {}, cliCommand(entry))]),
         el(
           'p',
           {},
-          'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
+          entry.xchess ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
         )
       );
     }

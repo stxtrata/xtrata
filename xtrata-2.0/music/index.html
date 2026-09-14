@@ -1,0 +1,1237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<base href="/wizard/" />
+<meta name="description" content="Inscribe your music with optional artwork, lyrics and credits. Preserve your original recording or prepare a smaller playable release with Xtrata Music." />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Xtrata Music — inscribe your music</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="/favicons/xtrata-apple-touch-icon.png" />
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121723; --panel2:#0e131d; --line:#243044;
+    --ink:#e6edf6; --mut:#8b9bb4; --acc:#3ea6ff; --acc2:#7c5cff; --ok:#3ddc97; --warn:#ffb454; --bad:#ff6b6b;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(1000px 520px at 50% -10%,rgba(124,92,255,.16),transparent),var(--bg);
+    color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+  .logo{font-weight:800;letter-spacing:.5px}
+  .logo b{color:var(--acc)} .logo i{color:var(--acc2);font-style:normal}
+  .pill{padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--mut);font-size:12px}
+  .pill.live{color:var(--ok);border-color:#1f5a45} .pill.mock{color:var(--warn);border-color:#5a4620}
+  .spacer{margin-left:auto}
+  main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:32px 18px 64px}
+  .card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
+  h1{margin:0 0 6px;font-size:22px}
+  .music-logo{margin:2px 0 14px;line-height:0;text-align:center}
+  .music-logo img{display:inline-block;width:auto;height:auto;max-width:300px;max-height:188px;border-radius:14px;border:1px solid rgba(255,255,255,.06);box-shadow:0 8px 30px rgba(0,0,0,.4)}
+  .lead{color:var(--mut);font-size:13.5px;margin:0 0 20px}
+  .tag{display:inline-block;background:#10203a;border:1px solid #234a6e;color:var(--acc);border-radius:999px;padding:2px 10px;font-size:11px;font-weight:700;margin-bottom:14px}
+  .drop{border:1.6px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;transition:.15s;cursor:pointer}
+  .drop.drag{border-color:var(--acc2);background:#140f24}
+  .drop.has{border-style:solid;border-color:#2a3650;background:var(--panel2);text-align:left}
+  .drop-main{font-weight:700} .drop-sub{color:var(--mut);font-size:12.5px;margin-top:6px}
+  .fname{font-weight:700;word-break:break-all} .fmeta{color:var(--mut);font-family:var(--mono);font-size:12px;margin-top:4px}
+  .quote{margin:18px 0 0;background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;display:none}
+  .quote.show{display:block}
+  .kv{display:flex;justify-content:space-between;padding:5px 0;font-size:13px}
+  .kv span:first-child{color:var(--mut)} .kv span:last-child{font-family:var(--mono)}
+  .kv.tot span:last-child{color:var(--acc);font-weight:800;font-size:16px}
+  .btn{width:100%;margin-top:18px;background:linear-gradient(180deg,#8b6cff,#6f4cf0);border:0;color:#fff;
+    padding:15px 16px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-size:13px;padding:10px 14px;width:auto;margin:0}
+  .hint{color:var(--mut);font-size:12px;text-align:center;margin-top:10px;min-height:16px}
+  .err{color:var(--bad)} .ok{color:var(--ok)}
+  .prog{margin-top:18px;display:none;background:#0e1726;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .prog.show{display:block}
+  .spin{display:inline-block;width:13px;height:13px;border:2px solid var(--line);border-top-color:var(--acc2);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .steps{display:flex;gap:6px;margin-top:12px;font-size:11px;color:var(--mut);flex-wrap:wrap}
+  .step{padding:2px 8px;border:1px solid var(--line);border-radius:999px}
+  .step.on{color:var(--acc2);border-color:#3a2f7a} .step.done{color:var(--ok);border-color:#1f5a45}
+  .bar{height:6px;border-radius:999px;background:#1a2438;margin-top:12px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .9s ease}
+  .bar.indet i{width:28%;animation:xslide 1.6s ease-in-out infinite}
+  @keyframes xslide{0%{margin-left:-28%}100%{margin-left:100%}}
+  .tip{margin-top:9px;font-size:11px;color:var(--mut);min-height:14px;transition:opacity .4s}
+  .elapsed{float:right;color:var(--mut);font-size:11px;font-variant-numeric:tabular-nums}
+  .result{margin-top:16px;display:none} .result.show{display:block}
+  .result a.btn{display:block;text-align:center;text-decoration:none;background:linear-gradient(180deg,#37cf8e,#23b277)}
+  .muted{color:var(--mut)} a{color:var(--acc)}
+  .efield{margin-bottom:10px;min-width:0}
+  .efield label{display:block;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+  .efield input,.efield textarea{width:100%;background:#0b0e14;border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px 10px;font:inherit;font-size:13.5px}
+  .efield textarea{resize:vertical;font-size:13px;line-height:1.5}
+  .efield input:focus,.efield textarea:focus{outline:none;border-color:var(--acc2)}
+  footer{padding:14px 22px;color:var(--mut);font-size:12px;text-align:center}
+</style>
+<link rel="stylesheet" href="music.css?v=4" />
+</head>
+<body>
+<header>
+  <img src="favicon.svg" alt="Xtrata" style="width:28px;height:28px;border-radius:7px;flex:none" />
+  <a class="logo" href="/" style="text-decoration:none"><b>XTRATA</b> <i>Music</i></a>
+  <div class="spacer"></div>
+  <span id="health" class="pill">connecting…</span>
+  <span id="walletAddr" class="pill" style="display:none;cursor:pointer;color:var(--ok);border-color:#1f5a45" title="connected wallet — click to show & copy the address"></span>
+  <button class="btn ghost" id="connectBtn">Connect wallet</button>
+</header>
+
+<main>
+  <div class="card">
+    <span class="tag">Built using Xtrata Protocol</span>
+    <h1 class="music-title">Xtrata Music</h1>
+    <p class="music-subtitle">Your music. Preserved on-chain.</p>
+    <p class="lead">For songs, instrumentals, live recordings, demos and finished releases. Start with your audio. Add as much or as little artwork, lyrics and credits as you like.</p>
+    <fieldset class="music-format-picker" aria-describedby="formatHelp">
+      <legend>Choose what to inscribe</legend>
+      <div class="music-format-cards">
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="audio" />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 34V12l20-4v22M20 19l20-4"/><ellipse cx="14" cy="35" rx="6" ry="5"/><ellipse cx="34" cy="31" rx="6" ry="5"/></svg></span>
+          <strong>Audio only</strong>
+          <small>Just your recording</small>
+          <span class="music-format-description">Preserve or optimise the audio file.</span>
+        </label>
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="details" checked />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="5" width="32" height="38" rx="4"/><path d="M25 24V13l8-2v10M15 32h18M15 37h12"/><ellipse cx="21" cy="25" rx="4" ry="3"/></svg></span>
+          <strong>Audio + metadata</strong>
+          <small>Your song and its story</small>
+          <span class="music-format-description">A player with credits, details and lyrics.</span>
+        </label>
+        <label class="music-format-card">
+          <input type="radio" name="musicReleaseFormat" value="artwork" />
+          <span class="music-format-icon" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="5" width="36" height="38" rx="4"/><path d="M6 30l11-12 8 8 6-6 11 10M14 35h20M14 39h13"/><circle cx="32" cy="13" r="3"/></svg></span>
+          <strong>Audio + metadata + artwork</strong>
+          <small>The complete presentation</small>
+          <span class="music-format-description">Add a cover to your player, credits and lyrics.</span>
+        </label>
+      </div>
+    </fieldset>
+    <select id="musicFormat" class="music-format-value" hidden aria-hidden="true" tabindex="-1"><option value="audio">Audio only</option><option value="details" selected>Audio + metadata</option><option value="artwork">Audio + metadata + artwork</option></select>
+    <div class="music-steps" aria-label="Creation steps">1 · Choose a format <span>2 · Prepare & preview</span> <span>3 · Review & inscribe</span></div>
+    <div class="music-options music-audio-options">
+      <label>Audio quality<select id="musicQuality"><option value="original">Keep original file</option><option value="compact">Smallest · Opus 48 kbps VBR</option><option value="optimised" selected>Balanced · Opus 96 kbps VBR (default)</option><option value="high">High quality · Opus 128 kbps VBR</option><option value="premium">Extra quality · Opus 160 kbps VBR</option></select></label>
+    </div>
+    <p class="muted" id="formatHelp">A playable release with optional details. Your original audio is preserved inside the player.</p>
+    <p class="muted">Files are prepared on this device. Preview the finished output before funding an inscription.<span id="musicLossyWarning"> Optimisation is lossy; keep your original master.</span></p>
+    <input id="picker" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.aac,.ogg,.oga,.opus,.aiff,.aif" multiple hidden />
+    <div id="drop" class="drop" role="button" tabindex="0" aria-label="Choose audio files">
+      <div class="drop-main">Drop your music here</div>
+      <div class="drop-sub">or <u>browse</u> — one song or several tracks · metadata and artwork are optional</div>
+    </div>
+
+    <div class="music-fee-choice">
+      <label for="musicFeeMode">Processing budget</label>
+      <select id="musicFeeMode"><option value="standard">Standard · more room for network fees</option><option value="economy">Economy · lower initial budget</option></select>
+      <p id="musicFeeHelp" class="muted">More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.</p>
+    </div>
+    <div id="quote" class="quote">
+      <div class="kv"><span>Track</span><span id="qName">—</span></div>
+      <div class="kv"><span>Inscription output</span><span id="qPlayer">—</span></div>
+      <div class="kv tot"><span>Pay once</span><span id="qPay">—</span></div>
+      <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished output's exact size. Over-collected for fees; unused remainder refunded on delivery.</div>
+    </div>
+
+    <div id="preview" style="display:none;margin-top:16px">
+      <div class="muted" style="font-size:12px;margin-bottom:8px">▶ Preview — play it before you inscribe:</div>
+      <iframe sandbox="allow-scripts" id="previewFrame" title="Player preview" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:12px;background:#10120f;display:block"></iframe>
+    </div>
+
+    <!-- BATCH mode: several tracks → one payment, N players, one receipt (fast isolated core). -->
+    <div id="musicBatch" style="display:none;margin-top:16px">
+      <div id="sbHead" class="muted" style="font-size:12.5px;margin-bottom:10px"></div>
+      <div id="sbList"></div>
+      <div id="sbDropped" class="muted" style="font-size:11.5px;margin-top:2px"></div>
+      <input id="sbArtPick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+      <div id="sbQuoteBox" class="quote" style="margin-top:14px">
+        <div class="kv"><span>Players ready</span><span id="sbCount">—</span></div>
+        <div class="kv tot"><span>Pay once — every player, one receipt</span><span id="sbPay">—</span></div>
+        <div class="muted" style="font-size:11px;margin-top:6px">Quoted on the finished players' exact sizes. Over-collected for fees; unused remainder refunded on delivery.</div>
+      </div>
+      <button id="sbGo" class="btn" disabled>Inscribe players</button>
+      <div id="sbHint" class="hint"></div>
+    </div>
+
+    <!-- Optional edit panel: fast track stays untouched; this expands only on demand. -->
+    <div id="editWrap" style="display:none;margin-top:12px">
+      <button id="editToggle" class="btn ghost" type="button" style="width:100%;text-align:center">✎ Edit details — artwork · title · artist</button>
+      <div id="editPanel" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
+        <div class="efield"><label for="eTitle">Song title</label><input id="eTitle" type="text" maxlength="120" /></div>
+        <div class="efield"><label for="eArtist">Artist</label><input id="eArtist" type="text" maxlength="120" /></div>
+        <div class="efield">
+          <label>Artwork</label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <img id="eCoverThumb" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f" />
+            <button id="eCoverBtn" class="btn ghost" type="button" style="flex:1">Change artwork…</button>
+            <input id="eCoverPick" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+          </div>
+          <div class="muted" style="font-size:11px;margin-top:4px">PNG / JPEG / WebP · embedded in the player, so smaller files inscribe cheaper.</div>
+        </div>
+        <button id="moreMetaToggle" class="btn ghost" type="button" style="width:100%;text-align:center;margin-top:4px">More metadata ▾</button>
+        <div id="moreMetaPanel" style="display:none;margin-top:8px">
+          <div class="efield"><label for="eAlbum">Album</label><input id="eAlbum" type="text" maxlength="120" /></div>
+          <div style="display:flex;gap:10px">
+            <div class="efield" style="flex:1"><label for="eBpm">BPM</label><input id="eBpm" type="text" inputmode="numeric" maxlength="6" /></div>
+            <div class="efield" style="flex:2"><label for="eNote">Note</label><input id="eNote" type="text" maxlength="120" /></div>
+          </div>
+          <div class="efield"><label for="eLicense">License</label><input id="eLicense" type="text" maxlength="160" placeholder="e.g. All rights reserved · CC BY-NC 4.0" /></div>
+          <div class="efield"><label for="eDescription">Description</label><input id="eDescription" type="text" maxlength="300" /></div>
+          <div class="efield"><label for="eLyrics">Lyrics</label><textarea id="eLyrics" rows="6"></textarea></div>
+        </div>
+        <button id="applyEdits" class="btn" type="button" style="margin-top:12px;font-size:13px;padding:11px 14px">Apply changes → rebuild preview</button>
+        <div id="editHint" class="muted" style="font-size:11px;margin-top:6px;text-align:center"></div>
+      </div>
+    </div>
+
+    <!-- Relationships. Parent is an OWNERSHIP link and changes the payment flow into
+         two sends (STX + the parent itself), so it gets its own disclosure rather
+         than sitting among the song metadata. -->
+    <div id="receiptWrap" style="display:none;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px">
+      <label class="checkline" style="display:flex;align-items:flex-start;gap:9px;cursor:pointer">
+        <input type="checkbox" id="receiptToggle" />
+        <span style="font-size:12.5px">Also inscribe an on-chain receipt <span class="muted">— a second permanent token recording what you paid (included in the quote when selected). A readable receipt is saved either way, so this is off unless you want the on-chain copy.</span></span>
+      </label>
+    </div>
+    <div id="relWrap" style="display:none;margin-top:12px">
+      <button id="relToggle" class="btn ghost" type="button" style="width:100%;text-align:center">🔗 Relationships — parent &amp; dependencies ▾</button>
+      <div id="relPanel" style="display:none;margin-top:10px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px 16px">
+        <div class="efield">
+          <label for="sParent">Parent inscription <span class="muted" style="text-transform:none;letter-spacing:0">· optional</span></label>
+          <input id="sParent" type="text" inputmode="numeric" placeholder="token id you own — e.g. 134" />
+          <div class="muted" style="font-size:11px;margin-top:5px">
+            An <b>ownership</b> link: this song becomes a child of that inscription. You send the parent to
+            the deposit wallet along with your payment; parent, song and change all come back to you.
+            <b>One parent per song</b> — players are large, and large inscriptions seal with a single parent.
+          </div>
+          <div id="sParentCheck" style="margin-top:8px;font-size:12.5px"></div>
+        </div>
+        <div class="efield" style="margin-bottom:0">
+          <label for="sDeps">Dependencies <span class="muted" style="text-transform:none;letter-spacing:0">· optional</span></label>
+          <input id="sDeps" type="text" placeholder="134, 90" />
+          <div class="muted" style="font-size:11px;margin-top:5px">
+            A <b>reference</b> link — you do not need to own these, and anything can reference anything.
+            Free: dependencies add nothing to your quote.
+          </div>
+        </div>
+        <div id="sRelBatchNote" class="muted" style="font-size:11px;margin-top:10px;display:none">
+          In a batch these apply to <b>every</b> song — one parent, escrowed once, linked to all of them.
+        </div>
+      </div>
+    </div>
+
+    <p class="muted">Review before you inscribe: the selected files and details become public and permanent. Credits and rights information are supplied by you. Confirm that you have permission to publish this material.</p>
+    <button id="go" class="btn" disabled>Drop a track to begin</button>
+    <div id="hint" class="hint"></div>
+
+    <div id="prog" class="prog">
+      <div><span class="spin"></span><span id="progMsg">Starting…</span><span class="elapsed" id="elapsed"></span></div>
+      <div class="bar indet" id="bar"><i></i></div>
+      <div class="tip" id="tip"></div>
+      <div class="steps">
+        <span class="step" data-s="pay">Payment</span>
+        <span class="step" data-s="parent" hidden>Parent</span>
+        <span class="step" data-s="inscribe">Inscribe</span>
+        <span class="step" data-s="deliver">Deliver</span>
+      </div>
+      <!-- Escrow checklist — only for jobs that declared a parent. Two sends, any
+           order; parent, song and change all come back. -->
+      <div id="escrow" style="display:none;margin-top:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:12.5px"></div>
+      <!-- Always on screen while a job is live. The keep-open message used to be one
+           of the rotating tips, which is easy to miss and gone a second later. -->
+      <!-- keep-open banner: rendered by the shared panel (src/agent-one/ui-panels.ts) -->
+      <div id="keepOpenSlot"></div>
+      <!-- Finish without me. Hidden entirely unless a handoff endpoint is configured,
+           so a half-deployed feature is never offered. Lived inside the old keep-open
+           box; it is a sibling of the slot now that the banner renders itself. -->
+      <div id="handoffRow" style="display:none;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)">
+        <button id="handoffBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:5px 11px;font-size:12px">Finish this without me →</button>
+        <div class="muted" style="font-size:11px;margin-top:5px">Hands this one job to Xtrata's server so it completes while you close the tab. You will be asked to agree first.</div>
+        <div id="handoffState" class="ok" style="font-size:11.5px;margin-top:6px;display:none"></div>
+      </div>
+      <section id="musicSpeed" class="music-speed" hidden aria-labelledby="musicSpeedTitle">
+        <h3 id="musicSpeedTitle">Economy processing</h3>
+        <p id="musicSpeedStatus"></p><p id="musicSpeedExpiry" class="muted"></p>
+        <button id="musicSpeedOpen" class="btn ghost" type="button">Speed up</button>
+        <div id="musicSpeedReview" hidden>
+          <div class="kv"><span>Funds currently in the job</span><strong id="musicSpeedBalance"></strong></div>
+          <div class="kv"><span>Additional payment</span><strong id="musicSpeedExtra"></strong></div>
+          <div class="kv"><span>New total approved funding</span><strong id="musicSpeedTotal"></strong></div>
+          <div class="kv"><span>Service fee included in total</span><strong id="musicSpeedService"></strong></div>
+          <p class="muted">Wallet transfer fees are additional. Unused job funds return on delivery. This quote is valid for two minutes.</p>
+          <button id="musicSpeedApprove" class="btn" type="button">Confirm faster processing</button>
+          <button id="musicSpeedKeep" class="btn ghost" type="button">Keep waiting</button>
+        </div>
+        <div id="musicTopUpRecovery" hidden>
+          <label for="musicTopUpTx">Check your wallet activity, then paste the additional payment's transaction ID</label>
+          <input id="musicTopUpTx" type="text" autocomplete="off" spellcheck="false" />
+          <button id="musicTopUpCheck" class="btn ghost" type="button">Check payment</button>
+        </div>
+        <p id="musicTopUpTxStatus" class="muted"></p>
+        <p id="musicSpeedError" class="err" role="alert"></p>
+      </section>
+      <div id="cancelRow" style="display:none;margin-top:12px;text-align:center">
+        <button id="cancelJobBtn" class="btn ghost" type="button" style="width:auto;margin:0;padding:6px 12px;font-size:12px">Stop this job &amp; refund me</button>
+        <div class="muted" style="font-size:11px;margin-top:5px">Stops at the next safe point. Anything already uploaded stays on-chain unsealed and costs nothing more; the rest of your deposit comes straight back.</div>
+      </div>
+    </div>
+
+    <div id="result" class="result"></div>
+  </div>
+</main>
+
+<footer>Runs entirely in your browser · need the full controls? Open the <a href="./" target="_blank" rel="noopener">Inscription Wizard</a>.</footer>
+
+<script>
+  (function(){ var qs=new URLSearchParams(location.search);
+    var d={ hiro:'/hiro/mainnet', agentFeeAddress:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', windowMs:300000, mock: qs.get('mock')==='1' };
+    window.XAO_CONFIG = Object.assign(d, window.XAO_CONFIG||{}); })();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script src="music-player.js?v=1"></script>
+<script src="music-diagnostics.js?v=1"></script>
+<script src="audio-processing.js?v=3"></script>
+<script src="music-build.js?v=3"></script>
+<script src="optimize-image.js?v=1"></script>
+<script src="agent-one.js?v=2026-09-12.1"></script>
+<script>
+let musicSubmitting=false;
+function musicJobActive(){return musicSubmitting||(typeof JOB!=='undefined'&&JOB&&!['DONE','COMPLETE','COMPLETE_WITH_SKIPS','COMPLETED','REFUNDED','CANCELLED','FAILED'].includes(JOB.status));}
+const SERVER = { mock:false, net:'mainnet' };
+const SB={ items:[], dropped:[], active:false, busy:false, quoteRun:0, EST:null, stxUsd:null, droppedNote:'' };
+const XAO_MIN_AGENT_BUILD='2026-09-12.1';
+let AGENT_STALE=false;
+function checkAgentBuild(){
+  const b=window.XAO_AGENT_BUILD||null;
+  if(b&&b>=XAO_MIN_AGENT_BUILD) return;
+  AGENT_STALE=true;
+  $('#hint').innerHTML='<span class="err">⚠ Outdated agent bundle deployed (build '+esc(b||'pre-versioning')+', page needs '+XAO_MIN_AGENT_BUILD+' or newer). Live inscriptions are disabled — the deployed agent-one.js is missing the fee-spike + auto-resume fixes. Rebuild/redeploy it, then reload.</span>';
+  console.error('[xao] agent bundle build too old:',b,'minimum',XAO_MIN_AGENT_BUILD);
+}
+let WALLET=null, FILE=null, PLAYER=null, META=null, EST=null, JOB=null, poll=null, building=false;
+
+const $ = (s)=>document.querySelector(s);
+const stx = (u)=>(Number(u)/1e6).toFixed(6).replace(/0+$/,'').replace(/\.$/,'')+' STX';
+const esc = (s)=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+function slug(s){ return String(s||'').toLowerCase().replace(/\.[^.]+$/,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'track'; }
+const DROP_HTML='<div class="drop-main">Drop your music here</div><div class="drop-sub">or <u>browse</u> — one song, or several for a batch. MP3, WAV, FLAC, M4A, OGG. Artwork and metadata are optional for every recording.</div>';
+const AUDIO_MAX_MB=128;
+const CHAIN_MAX_BYTES=33554432;
+const CHAIN_MAX_MB=CHAIN_MAX_BYTES/1048576;
+const BATCH_MAX=40;
+const MP3_MAX_MB=AUDIO_MAX_MB;   // legacy name, still referenced in a few messages
+const AUDIO_EXT=['mp3','wav','flac','m4a','aac','ogg','oga','opus','weba','webm','aiff','aif','wma'];
+function validateAudio(f){
+  if(!f) return 'No file selected.';
+  if(!f.size) return 'This file is empty. Choose an audio recording.';
+  const ext=((f.name.match(/\.([a-z0-9]+)$/i)||[])[1]||'').toLowerCase();
+  const looksAudio = AUDIO_EXT.includes(ext) || (f.type||'').toLowerCase().startsWith('audio/');
+  if(!looksAudio) return 'That does not look like an audio file. Drop an MP3, WAV, FLAC, M4A or OGG — anything else belongs in the <a href="./" target="_blank" rel="noopener" style="color:var(--acc2)">main wizard</a>.';
+  const mb=f.size/1048576;
+  if(mb>AUDIO_MAX_MB) return 'Audio is capped at '+AUDIO_MAX_MB+' MiB here (the encode runs in your browser) — yours is '+mb.toFixed(1)+' MiB.';
+  return null;
+}
+const validateMusic=validateAudio;   // old name, same check
+function rejectToWizard(msg){
+  FILE=null;PLAYER=null;META=null;EST=null; if(poll){clearInterval(poll);poll=null;}
+  drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#result').className='result'; $('#editWrap').style.display='none'; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none';
+  $('#hint').innerHTML='<span class="err">'+msg+'</span><br><a class="btn ghost" href="./" target="_blank" rel="noopener" style="display:inline-block;width:auto;margin-top:10px">Build it in the main wizard →</a>';
+  building=false; $('#go').disabled=true; $('#go').textContent='Drop a track to begin';
+}
+function xa(){ const A=window.XtrataAgent; if(!A) throw new Error('Agent bundle not loaded (agent-one.js).'); return A; }
+async function api(path, opts){
+  const A=xa(); const m=(opts&&opts.method)||'GET';
+  let body={}; if(opts&&opts.body){ body = (typeof opts.body==='string') ? JSON.parse(opts.body) : opts.body; }
+  if(path==='/api/health') return A.health();
+  if(path==='/api/estimate'){window.XtrataMusicDiagnostics?.log('quote','Requesting quote for '+body.bytes+' bytes.');try{const result=await A.estimate({...body,feeMode:musicFeeMode()});window.XtrataMusicDiagnostics?.log('quote-ready','Quote received.');return result;}catch(e){window.XtrataMusicDiagnostics?.log('quote-error','Quote request failed; no payment was requested.');throw e;}}
+  if(path==='/api/jobs' && m==='POST') return { job: await A.createJob(body) };
+  let mm;
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)\/cancel$/))) { if(!A.cancelJob) throw new Error('this agent bundle has no cancel — redeploy agent-one.js'); return A.cancelJob(mm[1]); }
+  if((mm=path.match(/^\/api\/jobs\/([^/]+)$/))) return A.getJob(mm[1]);
+  throw new Error('no route: '+path);
+}
+
+function xw(){ return window.XtrataWizardFunding || window.XtrataWallet || null; }
+let WALLET_NAME=null, WALLET_REVEAL=false;
+const shortAddr=a=>a.slice(0,5)+'…'+a.slice(-4);
+async function bnsLookup(addr){ try{
+  const base=(window.XAO_CONFIG&&window.XAO_CONFIG.hiro)?window.XAO_CONFIG.hiro.replace(/\/(mainnet|testnet)\/?$/,''):'https://api.hiro.so';
+  const r=await fetch(base+'/v1/addresses/stacks/'+addr); if(!r.ok) return null;
+  const d=await r.json(); return (d&&d.names&&d.names[0])||null; }catch{ return null; } }
+function renderWalletPill(){ const el=$('#walletAddr'); if(!WALLET){ el.style.display='none'; return; }
+  el.style.display='';
+  if(WALLET_NAME&&!WALLET_REVEAL){ el.textContent='● '+WALLET_NAME; el.title='connected as '+WALLET_NAME+' — click to show & copy the address'; }
+  else { el.textContent='● '+shortAddr(WALLET); el.title=WALLET+(WALLET_NAME?' — click to show '+WALLET_NAME:' — click to copy'); } }
+async function walletPillClick(){ if(!WALLET) return;
+  WALLET_REVEAL=!WALLET_NAME||!WALLET_REVEAL;
+  renderWalletPill();
+  if(WALLET_REVEAL){ try{ await navigator.clipboard.writeText(WALLET); $('#walletAddr').textContent='✓ copied'; setTimeout(renderWalletPill,900); }catch{} } }
+function setWallet(a){ WALLET=a||null; WALLET_NAME=null; WALLET_REVEAL=false; const b=$('#connectBtn');
+  if(WALLET){ b.textContent='Disconnect'; renderWalletPill(); bnsLookup(WALLET).then(n=>{ if(n&&WALLET===a){ WALLET_NAME=n; renderWalletPill(); } }); }
+  else { b.textContent='Connect wallet'; renderWalletPill(); }
+  try{ setTimeout(()=>{ Promise.resolve(checkParent()).catch(()=>{}); }, 0); }catch(_e){}
+  updateGo(); }
+async function connectWallet(){ const w=xw();
+  if(!w||!w.connect){ alert('Wallet bundle not loaded. Open this from the Xtrata site so agent-one.js (wallet) is present.'); return; }
+  try{ const a=await w.connect(); a?setWallet(a):alert('Connected, but no Stacks address returned.'); }catch(e){ alert('Connect failed:\n'+((e&&e.message)||e)); } }
+async function disconnectWallet(){ try{ const w=xw(); if(w&&w.disconnect) await w.disconnect(); }catch{} setWallet(null); }
+$('#connectBtn').onclick=()=>{ WALLET?disconnectWallet():connectWallet(); };
+$('#walletAddr').onclick=walletPillClick;   // disconnect lives on the button; the pill reveals/copies
+async function payWallet(addr, ustx, files, trackResult=false){ const w=xw();
+  if(!w||!w.pay) throw new Error('wallet cannot pay — open inside the Xtrata site');
+  const payment={ trackResult, recipient:addr, amount:String(ustx), network:(SERVER.net==='testnet'?'testnet':'mainnet') };
+  if(window.XtrataWizardFunding){
+    if(!JOB || JOB.depositAddress!==addr || JOB.expectedFunder!==WALLET) throw new Error('Wizard funding identity does not match this job');
+    const hashes=await Promise.all(files.map(async file=>{
+      const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+      return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+    }));
+    return w.pay({...payment, jobId:JOB.jobId, expectedFunder:JOB.expectedFunder,
+      user:JOB.user, playerHashes:hashes});
+  }
+  return w.pay(payment); }
+
+(async()=>{ try{ const h=await api('/api/health'); SERVER.mock=!!h.mock; SERVER.net=h.net||'mainnet'; SERVER.parentWindowMs=h.parentWindowMs||900000; SERVER.deployer=h.deployer||null;
+  $('#health').className='pill '+(h.mock?'mock':'live'); $('#health').textContent=(h.mock?'MOCK':'LIVE')+' · '+SERVER.net+' · agent '+(window.XAO_AGENT_BUILD||'pre-v');
+  checkAgentBuild();
+}catch(e){ $('#health').textContent='agent not loaded'; $('#health').style.color='var(--bad)'; } updateGo(); })();
+(function(){ try{ const w=xw(); const a=w&&w.getAddress&&w.getAddress(); if(a) setWallet(a); }catch{} })();
+
+const drop=$('#drop'), picker=$('#picker');
+drop.onclick=()=>picker.click();
+function routeDrop(fs){ if(building||SB.busy||musicJobActive()) return; fs=(fs||[]).filter(Boolean); if(!fs.length) return; if(fs.length===1&&!SB.active) pickFile(fs[0]); else enterMusicBatch(fs); }
+picker.onchange=()=>{ routeDrop(Array.from(picker.files||[])); picker.value=''; };
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('drag');}));
+['dragleave','dragend','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('drag');}));
+drop.addEventListener('drop',e=>{ routeDrop(Array.from((e.dataTransfer&&e.dataTransfer.files)||[])); });
+
+async function pickFile(f){
+  const verr=validateMusic(f);
+  clearEditsDirty();
+  if(verr){ rejectToWizard(verr); return; }
+  FILE=f; PLAYER=null; META=null; EST=null; JOB=null; if(poll){clearInterval(poll);poll=null;}
+  $('#result').className='result'; $('#prog').className='prog'; $('#quote').className='quote'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none';
+  drop.classList.add('has');
+  drop.innerHTML='<div class="fname">🎵 '+esc(f.name)+'</div><div class="fmeta">'+(f.size/1048576).toFixed(2)+' MiB · click to choose a different file</div>';
+  building=true; musicBusy(true); updateGo();
+  try{
+    $('#hint').innerHTML='<span class="spin"></span>Checking your track…';
+
+    NEEDS = [];
+
+    $('#hint').innerHTML='<span class="spin"></span>Building your player in-browser…';
+    const r=await window.XtrataMusic.build(f, (msg)=>{ $('#hint').innerHTML='<span class="spin"></span>'+esc(msg); });
+    PLAYER=r.playerFile; META=r;
+    showMusicPreview(r);
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
+    $('#qName').textContent=r.format==='audio'?f.name:(r.title||f.name)+(r.artist?(' — '+r.artist):'');
+    const mib=(n)=>(n/1048576).toFixed(2);
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    if(r.opusBytes&&r.sourceBytes){ $('#qPlayer').title='MP3 '+mib(r.sourceBytes)+' MiB → '+r.audioLabel+' '+mib(r.opusBytes)+' MiB (−'+Math.round((1-r.opusBytes/r.sourceBytes)*100)+'%) → +⅓ base64 embedding'; }
+    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
+    $('#quote').className='quote show';
+    prefillEdits(r);
+    refreshNeeds(r);
+  }catch(e){ $('#hint').innerHTML='<span class="err">Could not build the player: '+esc(e.message)+'</span>'; }
+  building=false; musicBusy(false); updateGo();
+}
+
+let COVER_OVERRIDE; // undefined = keep extracted art; {b64,mime} = replacement
+function prefillEdits(r){
+  COVER_OVERRIDE=undefined;
+  $('#eTitle').value=r.title||''; $('#eArtist').value=r.artist||'';
+  $('#eAlbum').value=r.album||''; $('#eLyrics').value=r.lyrics||'';
+  $('#eBpm').value=''; $('#eNote').value=''; $('#eLicense').value=''; $('#eDescription').value='';
+  $('#eCoverThumb').src=r.coverB64?('data:'+(r.coverMime||'image/jpeg')+';base64,'+r.coverB64):'';
+  $('#editHint').textContent='';
+  $('#editWrap').style.display='block'; $('#editPanel').style.display='none'; $('#moreMetaPanel').style.display='none';
+  $('#relWrap').style.display='block'; $('#sRelBatchNote').style.display='none'; $('#receiptWrap').style.display='block';
+  $('#editToggle').textContent='✎ Edit details — artwork · title · artist';
+  $('#moreMetaToggle').textContent='More metadata ▾';
+}
+$('#editToggle').onclick=()=>{ const p=$('#editPanel'); const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  $('#editToggle').textContent=open?'✎ Edit details ▴':'✎ Edit details — artwork · title · artist'; };
+$('#moreMetaToggle').onclick=()=>{ const p=$('#moreMetaPanel'); const open=p.style.display==='none';
+  p.style.display=open?'block':'none'; $('#moreMetaToggle').textContent=open?'Less metadata ▴':'More metadata ▾'; };
+$('#eCoverBtn').onclick=()=>$('#eCoverPick').click();
+$('#eCoverPick').onchange=()=>{
+  const f=$('#eCoverPick').files[0]; if(!f) return;
+  if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ $('#editHint').innerHTML='<span class="err">Artwork must be PNG, JPEG or WebP.</span>'; return; }
+  if(f.size>4*1048576){ $('#editHint').innerHTML='<span class="err">Artwork over 4 MiB would bloat the inscription — please use a smaller image.</span>'; return; }
+  const rd=new FileReader();
+  rd.onload=()=>{ const s=String(rd.result); const b64=s.slice(s.indexOf(',')+1);
+    COVER_OVERRIDE={ b64, mime:f.type };
+    $('#eCoverThumb').src=s; markEditsDirty();
+    $('#editHint').innerHTML='<span style="color:var(--warn)">New artwork staged — press <b>Apply changes</b> to put it in the player.</span>'; };
+  rd.readAsDataURL(f);
+};
+['#eTitle','#eArtist','#eAlbum','#eLyrics','#eBpm','#eNote','#eLicense','#eDescription']
+  .forEach(sel=>{ const el=$(sel); if(el) el.addEventListener('input',markEditsDirty); });
+
+function collectEdits(){
+  const v=(id)=>$(id).value;
+  const o={ title:v('#eTitle'), artist:v('#eArtist'), album:v('#eAlbum'), lyrics:v('#eLyrics'),
+    bpm:v('#eBpm'), note:v('#eNote'), license:v('#eLicense'), description:v('#eDescription') };
+  if(COVER_OVERRIDE){ o.coverB64=COVER_OVERRIDE.b64; o.coverMime=COVER_OVERRIDE.mime; }
+  return o;
+}
+$('#applyEdits').onclick=async()=>{
+  if(!FILE||building||musicJobActive()) return;
+  EST=null; building=true; musicBusy(true); updateGo(); $('#editHint').innerHTML='<span class="spin"></span>Rebuilding player…';
+  try{
+    const r=await window.XtrataMusic.build(FILE,(m)=>{ $('#editHint').innerHTML='<span class="spin"></span>'+esc(m); },collectEdits());
+    PLAYER=r.playerFile; META=r;
+    showMusicPreview(r);
+    EST=await api('/api/estimate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({bytes:PLAYER.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()})});
+    const mib=(n)=>(n/1048576).toFixed(2);
+    $('#qName').textContent=r.format==='audio'?FILE.name:(r.title||FILE.name)+(r.artist?(' — '+r.artist):'');
+    $('#qPlayer').textContent=mib(PLAYER.size)+' MiB · '+r.audioLabel+(r.hasCover?' + cover':'')+(r.hasLyrics?' + lyrics':'');
+    $('#qPay').textContent=stx(EST.requiredUstx)+(EST.stxUsd?(' · ~$'+(Number(EST.requiredUstx)/1e6*EST.stxUsd).toFixed(2)):'');
+    refreshNeeds(r); clearEditsDirty();
+    $('#editHint').innerHTML='<span class="ok">✓ Preview updated — quote refreshed on the new exact size.</span>';
+  }catch(e){ $('#editHint').innerHTML='<span class="err">Rebuild failed: '+esc(e.message)+'</span>'; }
+  building=false; musicBusy(false); updateGo();
+};
+
+const wantReceipt=()=>!!($('#receiptToggle')&&$('#receiptToggle').checked);
+const parentId=()=>String($('#sParent').value||'').trim();
+const parentList=()=>parentId()?[parentId()]:[];
+const depsList=()=>String($('#sDeps').value||'').split(',').map(s=>s.trim()).filter(Boolean);
+let PARENT_OK='none';
+$('#relToggle').onclick=()=>{ const p=$('#relPanel'); const open=p.style.display==='none';
+  p.style.display=open?'block':'none';
+  $('#relToggle').textContent=open?'🔗 Relationships ▴':'🔗 Relationships — parent & dependencies ▾'; };
+let parentCheckRun=0, parentCheckTimer=null;
+async function checkParent(){
+  const box=$('#sParentCheck'); if(!box) return;
+  const id=parentId(); const run=++parentCheckRun;
+  if(!id){ box.innerHTML=''; PARENT_OK='none'; updateGo(); return; }
+  if(!/^\d+$/.test(id)){ box.innerHTML='<span class="err">A parent must be a numeric token id.</span>'; PARENT_OK='bad'; updateGo(); return; }
+  if(SERVER.mock){ box.innerHTML='<span class="muted">MOCK mode — ownership not checked.</span>'; PARENT_OK='unverified'; updateGo(); return; }
+  const A=window.XtrataAgent;
+  if(!A||!A.ownerOfChecked){ box.innerHTML='<span class="muted">Ownership check unavailable here — the agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
+  PARENT_OK='checking'; box.innerHTML='<span class="muted"><span class="spin"></span>#'+esc(id)+' — checking the current owner…</span>'; updateGo();
+  let owner=null, ok=true;
+  try{ const r=await A.ownerOfChecked(id); ok=r.ok; owner=r.owner; }catch{ ok=false; }
+  if(run!==parentCheckRun) return;                       // the field changed mid-flight
+  if(!ok){ box.innerHTML='<span class="muted">#'+esc(id)+' — could not check the owner right now. The agent re-checks the parent before taking any payment.</span>'; PARENT_OK='unverified'; updateGo(); return; }
+  if(owner&&WALLET&&owner===WALLET){ box.innerHTML='<span class="ok">✓ #'+esc(id)+' — in your connected wallet</span>'; PARENT_OK='ok'; }
+  else if(!owner){ box.innerHTML='<span class="err">✗ #'+esc(id)+' — no owner found. Check the token id.</span>'; PARENT_OK='bad'; }
+  else if(!WALLET){ box.innerHTML='<span style="color:var(--warn)">#'+esc(id)+' — held by '+esc(shortAddr(owner))+'. Connect that wallet to confirm it is yours.</span>'; PARENT_OK='bad'; }
+  else { box.innerHTML='<span class="err">✗ #'+esc(id)+' — held by '+esc(shortAddr(owner))+', not your connected wallet. Escrow would auto-refund.</span>'; PARENT_OK='bad'; }
+  updateGo();
+}
+if($('#receiptToggle')) $('#receiptToggle').addEventListener('change',()=>{ quoteRefresh(); });
+$('#sParent').addEventListener('input',()=>{ EST=null; SB.EST=null; ++musicQuoteRun; ++SB.quoteRun; updateGo(); if(parentCheckTimer)clearTimeout(parentCheckTimer); parentCheckTimer=setTimeout(()=>{ checkParent(); quoteRefresh(); },500); });
+$('#sDeps').addEventListener('input',()=>{ /* deps are free and unowned — nothing to check or requote */ });
+function parentBlockingMessage(){
+  const id=parentId();
+  if(!id) return null;
+  if(!/^\d+$/.test(id)) return 'Parent must be a numeric token id';
+  if(PARENT_OK==='bad') return 'Parent is not in your connected wallet';
+  if(PARENT_OK==='checking') return 'Checking the parent inscription…';
+  return null;
+}
+let musicQuoteRun=0;
+async function quoteRefresh(){
+  if(SB.active){ sbQuote(); return; }
+  if(!PLAYER||building||EDITS_DIRTY||musicJobActive()) return;
+  const run=++musicQuoteRun, output=PLAYER;
+  EST=null; $('#qPay').textContent='Refreshing quote…'; updateGo();
+  try{
+    const estimate=await api('/api/estimate',{method:'POST',body:{bytes:output.size,parentCount:parentList().length,receipt:wantReceipt(),feeMode:musicFeeMode()}});
+    if(run!==musicQuoteRun||PLAYER!==output||EDITS_DIRTY) return;
+    EST=estimate; $('#qPay').textContent=stx(EST.requiredUstx);
+  }catch(e){if(run===musicQuoteRun){EST=null;$('#qPay').textContent='Quote unavailable — change the option to retry';}}
+  updateGo();
+}
+
+let NEEDS=[];
+let OVERSIZE=false;   // the built player exceeds what the contract can hold
+let EDITS_DIRTY=false;
+function markEditsDirty(){
+  EST=null; $('#qPay').textContent='Apply changes to refresh quote';
+  if(EDITS_DIRTY) return;
+  EDITS_DIRTY=true;
+  const h=$('#editHint');
+  if(h) h.innerHTML='<span style="color:var(--warn)">Not applied yet — press <b>Apply changes</b> to put these in the player.</span>';
+  updateGo();
+}
+function clearEditsDirty(){ EDITS_DIRTY=false; updateGo(); }
+const listOf=(a)=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1];
+function refreshNeeds(r){
+  NEEDS=[];
+  if(PLAYER&&PLAYER.size>CHAIN_MAX_BYTES){
+    $('#hint').innerHTML='<span class="err">This player is '+(PLAYER.size/1048576).toFixed(1)
+      +' MiB once encoded, and the contract cannot hold more than '+CHAIN_MAX_MB
+      +' MiB in one inscription. That is roughly 33 minutes of audio — try a shorter track, or split it.</span>';
+    OVERSIZE=true; updateGo(); return;
+  }
+  OVERSIZE=false;
+
+
+
+  const hint=$('#hint');
+  if(NEEDS.length){
+    $('#editWrap').style.display='block';
+    $('#editPanel').style.display='block';          // open it — that is where the fix is
+    hint.innerHTML='<span style="color:var(--warn)">Almost there — this track still needs '
+      +esc(listOf(NEEDS))+'. Add '+(NEEDS.length>1?'them':'it')+' below, then Apply changes.</span>';
+  } else { hint.textContent=''; }
+  updateGo();
+}
+function updateGo(){
+  if(SB.active){ sbUpdateGo(); return; }   // batch mode drives its own button
+  const b=$('#go');
+  if(musicJobActive()){ b.disabled=true; b.textContent='Inscription in progress'; return; }
+  if(building){ b.disabled=true; b.textContent='Preparing audio…'; return; }
+  if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
+  if(!FILE||!PLAYER){ b.disabled=true; b.textContent='Drop a track to begin'; return; }
+  if(OVERSIZE){ b.disabled=true; b.textContent='Too long for one inscription'; return; }
+  if(NEEDS.length){ b.disabled=true; b.textContent='Add '+listOf(NEEDS)+' to continue'; return; }
+  if(EDITS_DIRTY){ b.disabled=true; b.textContent='Apply changes to refresh your preview and quote'; return; }
+  if(!EST){ b.disabled=true; b.textContent='A current quote is required'; return; }
+  if(!SERVER.mock && !WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
+  const pb=parentBlockingMessage();
+  if(pb){ b.disabled=true; b.textContent=pb; return; }
+  b.disabled=false;
+  b.textContent = (EDITS_DIRTY?'Inscribe without your latest edits  ·  pay ':'Inscribe my track'+(EST?'  ·  pay ':''))
+    + (EST? stx(EST.requiredUstx) : '');
+}
+
+$('#go').onclick=async()=>{
+  if(!PLAYER||building||EDITS_DIRTY||!EST||OVERSIZE||musicJobActive()) return;
+  if(!SERVER.mock && !WALLET){ connectWallet(); return; }
+  if(EDITS_DIRTY){
+    const sure=await confirmDanger({
+      title:'Inscribe without your latest edits?',
+      body:'You changed artwork or details but have not pressed "Apply changes", so the player about to be inscribed is the version from before those edits. Inscriptions are permanent — applying takes a second and rebuilds the preview so you can see exactly what goes on-chain.',
+      confirmLabel:'Inscribe as it is', cancelLabel:'Let me apply them'
+    });
+    if(!sure){ $('#editPanel').style.display='block'; $('#applyEdits').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  }
+  const b=$('#go'); b.disabled=true; $('#hint').textContent='';
+  try{
+    PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
+    setProg('Creating your one-shot deposit…', []);
+    const deps=depsList(), parents=parentList();
+    if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
+    if(!deps.every(d=>/^\d+$/.test(d))){ throw new Error('Dependencies must be token-id uints.'); }
+    if(!parents.every(d=>/^\d+$/.test(d))){ throw new Error('Parent must be a token-id uint.'); }
+    const payload={ file:PLAYER, uri:'xtrata:audio/'+(META&&META.title?slug(META.title):slug(FILE.name)), mime:PLAYER.type, deps, parents, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(),
+
+      user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    musicSubmitting=true; musicLockJob();
+    const { job }=await api('/api/jobs',{method:'POST',body:payload});
+    musicSubmitting=false;
+    JOB=job; musicLockJob();
+    if(SERVER.mock){ setProg('MOCK — simulating inscription…', ['pay']); }
+    else {
+      setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
+      try{ await payWallet(job.depositAddress, job.requiredUstx, [payload.file]); }
+      catch(e){ if(window.XtrataWizardFunding){ $('#hint').textContent=e.message; setProg('Wizard funding stopped — check the local funding plan or payment journal', []); updateGo(); return; } $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
+      setProg('Waiting for payment to land…', []);
+    }
+    startPoll();
+  }catch(e){ musicSubmitting=false; musicUnlockJob(); $('#prog').className='prog'; $('#hint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; b.disabled=false; }
+};
+
+const PHASE={
+  AWAITING_PARENT:{msg:'Deposit received ✓ — now send the parent inscription to the deposit wallet.',on:['pay'],pct:12},
+  FUNDED:{msg:'Payment confirmed — starting…',on:['pay'],pct:18},
+  INSCRIBING:{msg:'Inscribing your player on-chain…',on:['pay','inscribe'],pct:30},
+  INSCRIBED:{msg:'Inscribed ✓ — minting your receipt…',on:['pay','inscribe'],pct:85},
+  DELIVERING:{msg:'Delivering your tokens + refunding every unused µSTX of your deposit…',on:['pay','inscribe','deliver'],pct:92} };
+const TIPS=[
+  'An inscription takes several transactions. Completion time depends on file size, network conditions and confirmations.',
+  'Keep this tab open until you see ✓ — the agent runs in your browser. If the tab closes, it resumes (or refunds) when you reopen the page.',
+  'Large files upload in 32-chunk batches. Each batch is confirmed on-chain before the next, so a hiccup never re-inscribes a batch — it picks up exactly where it left off.',
+  'Your deposit sits in a one-shot wallet. Anything unused comes back to you automatically as change.',
+  'If network fees spike mid-job, the agent pauses and waits for them to settle instead of overpaying — the status line will say so.',
+  'A readable receipt is saved for every job. A separate on-chain receipt is optional.',
+];
+let tipIdx=0, tipTimer=null, progT0=null, elapsedTimer=null;
+const BAR={pct:0,floor:0,ceil:0,at:0,indet:false};
+function setBar(pct){ const b=$('#bar'); if(!b) return;
+  if(pct==null){ BAR.indet=true; b.className='bar indet'; b.firstElementChild.style.width='28%'; return; }
+  BAR.indet=false; b.className='bar';
+  const f=Math.max(2,Math.min(100,pct));
+  if(f>BAR.floor||f<BAR.floor-8) BAR.at=Date.now();   // new phase (or reset) -> restart the in-band creep clock
+  BAR.floor=f; BAR.ceil=Math.min(100, f>=100?100:f+(f<85?10:6));
+  if(BAR.pct<f) BAR.pct=f; }
+setInterval(()=>{ const b=$('#bar'); if(!b||BAR.indet) return; const el=b.firstElementChild; if(!el) return;
+  const span=Math.max(0,BAR.ceil-BAR.floor); const t=Math.min(1,(Date.now()-BAR.at)/40000);
+  let target=BAR.floor+span*(1-Math.pow(1-t,2))*0.9; if(BAR.ceil>=100) target=100;
+  BAR.pct+=(Math.max(target,BAR.floor)-BAR.pct)*0.15;
+  if(BAR.pct>99.6&&BAR.ceil>=100) BAR.pct=100;
+  el.style.width=BAR.pct.toFixed(1)+'%'; },80);
+function startWaitExtras(){
+  if(!tipTimer){ const rot=()=>{ const t=$('#tip'); t.style.opacity=0; setTimeout(()=>{ t.textContent=TIPS[tipIdx++%TIPS.length]; t.style.opacity=1; },400); }; rot(); tipTimer=setInterval(rot,9000); }
+  if(!elapsedTimer){ progT0=progT0||Date.now(); elapsedTimer=setInterval(()=>{ const s=((Date.now()-progT0)/1000)|0; $('#elapsed').textContent=(s>=60?((s/60)|0)+'m ':'')+ (s%60)+'s'; },1000); }
+}
+function stopWaitExtras(){ if(tipTimer){clearInterval(tipTimer);tipTimer=null;} if(elapsedTimer){clearInterval(elapsedTimer);elapsedTimer=null;} progT0=null; $('#elapsed').textContent=''; $('#tip').textContent=''; }
+function setProg(msg, done, pct){ $('#prog').className='prog show'; $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
+  document.querySelectorAll('.step').forEach(s=>{ s.className='step'+((done||[]).includes(s.dataset.s)?' done':''); }); }
+function setPhase(st, job){ const p=PHASE[st]; if(!p) return;
+  let msg=p.msg, pct=p.pct;
+  if(job&&job.retryCount&&/resuming where/.test(job.progress||'')){ msg='Recovered from a network hiccup — resuming automatically (attempt '+job.retryCount+'/4)…'; }
+  const m=/(\d+)\s*\/\s*(\d+)\s*chunks/.exec((job&&job.progress)||'');
+  if(st==='INSCRIBING'&&m){ const a=+m[1], b=+m[2]||1; pct=30+Math.round(52*a/b); msg='Uploading on-chain · '+a+' / '+b+' chunks ('+Math.round(100*a/b)+'%)'; }
+  else if(st==='INSCRIBING'&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
+  else if((st==='DELIVERING'||st==='INSCRIBED')&&job&&job.progress){ msg=job.progress.charAt(0).toUpperCase()+job.progress.slice(1); }
+  $('#progMsg').textContent=msg; setBar(pct); startWaitExtras();
+  document.querySelectorAll('.step').forEach(s=>{ s.className='step'+(p.on.includes(s.dataset.s)?' done':''); }); }
+
+const ESCROW_STATES=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING'];
+let PARENT_MSG=null, PARENT_OWNER={};
+let PARENT_ARRIVED={};
+function hideEscrow(){ const e=$('#escrow'); if(e){ e.style.display='none'; e.innerHTML=''; }
+  const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=true; }
+const PARENT_OWNER_AT={};
+async function noteParentOwner(id){
+  if(PARENT_OWNER_AT[id] && Date.now()-PARENT_OWNER_AT[id] < 15000) return;   // at most one lookup per 15 s
+  PARENT_OWNER_AT[id]=Date.now();
+  try{ const A=window.XtrataAgent; if(A&&A.ownerOf) PARENT_OWNER[id]=await A.ownerOf(id); }catch{ /* keep the last known owner */ }
+}
+function renderEscrow(job, status){
+  const box=$('#escrow'); if(!box) return;
+  const parents=(job.parents||[]).map(String);
+  if(!parents.length||!ESCROW_STATES.includes(job.status)){ hideEscrow(); return; }
+  const chip=document.querySelector('.step[data-s="parent"]'); if(chip) chip.hidden=false;
+  const ps=(status&&status.parents)||{held:[],missing:parents,unexpected:[]};
+  if(!(ps.missing||[]).length) PARENT_MSG=null;
+  const paid=(status&&status.funded)||!!job.depositReceivedUstx;
+  const rows=parents.map((p)=>{
+    const pastGate=['INSCRIBING','INSCRIBED','DELIVERING','COMPLETE','COMPLETE_WITH_SKIPS'].includes(job.status);
+    if(pastGate||(ps.held||[]).map(String).includes(p)) PARENT_ARRIVED[p]=true;
+    const held=!!PARENT_ARRIVED[p];
+    const owner=PARENT_OWNER[p];
+    if(!held) void noteParentOwner(p);
+    let right;
+    if(held) right='<span class="ok">✓ arrived at the deposit wallet</span>';
+    else if(owner&&owner===job.depositAddress) right='<span class="ok">✓ arrived at the deposit wallet</span>';
+    else if(owner&&WALLET&&owner===WALLET) right='<span class="ok">✓ in your wallet</span> <button class="btn ghost" style="width:auto;margin:0 0 0 8px;padding:4px 10px;font-size:11.5px" onclick="sendParentNow(\''+esc(p)+'\')">Send #'+esc(p)+' now</button>';
+    else if(owner) right='<span style="color:var(--warn)">held by '+esc(shortAddr(owner))+' — send #'+esc(p)+' to the deposit address from that wallet</span>';
+    else right='<span class="muted">checking the current owner…</span>';
+    return '<div class="kv"><span>2 · Parent inscription #'+esc(p)+'</span><span>'+right+'</span></div>';
+  }).join('');
+  box.style.display='block';
+  box.innerHTML='<div style="font-weight:700;margin-bottom:6px">Escrow checklist <span class="muted" style="font-weight:400">— two sends, any order; parent, song and change all come back to you</span></div>'
+    +'<div class="kv"><span>Deposit address</span><span class="mono" style="word-break:break-all">'+esc(job.depositAddress)+'</span></div>'
+    +'<div class="muted" style="font-size:11px;margin:2px 0 8px">🔑 Your browser created this wallet and holds the only key — Xtrata cannot spend from it'+(handoffOffered()?', unless you hand this job over below':'')+'. Emptied and destroyed when your inscription and change come back.</div>'
+    +'<div class="kv"><span>1 · STX deposit ('+stx(job.requiredUstx)+')</span><span>'+(paid?'<span class="ok">✓ arrived</span>':(status&&status.pending?'<span style="color:var(--warn)">⏳ seen — confirming…</span>':'<span class="muted">awaiting</span>'))+'</span></div>'
+    +rows
+    +(PARENT_MSG?('<div style="margin-top:6px;'+(PARENT_MSG.err?'color:var(--bad)':'color:var(--ok)')+'">'+PARENT_MSG.text+'</div>'):'')
+    +((ps.unexpected&&ps.unexpected.length)?('<div style="margin-top:6px;color:var(--mut);font-size:12px">Inscription #'+ps.unexpected.map(esc).join(', #')+' arrived but is not a declared parent of this job. It will be sent back to whoever sent it — <strong>your job carries on as normal</strong>.</div>'):'')
+    +'<div class="muted" style="font-size:11px;margin-top:6px">The parent is only borrowed for the mint.'
+    +((job.status==='AWAITING_PARENT'&&job.fundedAt&&SERVER.parentWindowMs)?(' If it has not arrived by '+new Date(Date.parse(job.fundedAt)+SERVER.parentWindowMs).toLocaleTimeString()+', the job cancels itself and returns your deposit.'):'')
+    +'</div>';
+}
+async function sendParentCoreId(){
+  try{
+    const A=window.XtrataAgent;
+    if(A&&A.parentInfo&&JOB){ const r=await A.parentInfo(JOB.jobId); if(r&&r.core&&r.core.includes('.')) return String(r.core); }
+  }catch(_e){}
+  if(SERVER.deployer&&JOB&&JOB.core) return SERVER.deployer+'.'+JOB.core;
+  return 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.'+((JOB&&JOB.core)||'xtrata-v3-2-3');
+}
+async function sendParentNow(pid){
+  const w=xw();
+  if(!w||!w.sendInscription){ PARENT_MSG={err:1,text:'This wallet bundle cannot send inscriptions — transfer #'+esc(pid)+' to the deposit address manually.'}; return; }
+  if(!WALLET){ connectWallet(); return; }
+  if(!JOB){ return; }
+  PARENT_MSG={text:'Waiting for wallet confirmation…'};
+  try{
+    const core=(await sendParentCoreId()).split('.');
+    if(!/^S[PTMN][0-9A-HJKMNP-Z]{37,41}$/.test(core[0]||'')) throw new Error('could not resolve the Xtrata contract address for this transfer');
+    const r=await w.sendInscription({ contractAddress:core[0], contractName:core[1]||'xtrata-v3-2-3',
+      tokenId:pid, sender:WALLET, recipient:JOB.depositAddress, network:SERVER.net||'mainnet' });
+    PARENT_MSG={text:'✓ Parent #'+esc(pid)+' transfer submitted'+(r&&r.txId?(' · '+esc(String(r.txId).slice(0,10))+'…'):'')+' — it will show as arrived once confirmed.'};
+    delete PARENT_OWNER[pid];
+  }catch(e){ PARENT_MSG={err:1,text:'Parent send did not go through: '+esc((e&&e.message)||String(e))+' — retry, or send #'+esc(pid)+' to the deposit address yourself.'}; }
+}
+window.sendParentNow=sendParentNow;
+
+let JOB_LIVE=false;
+function renderKeepOpen(job, st){
+  JOB_LIVE = window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') }).live;
+}
+const HANDOFF_CONSENT='i-agree-xtrata-may-finish-this-job';
+function handoffOffered(){ try{ const A=window.XtrataAgent; return !!(A&&A.handoffAvailable&&A.handoffAvailable()); }catch{ return false; } }
+function renderHandoff(job){
+  const row=$('#handoffRow'); if(!row) return;
+  const A=window.XtrataAgent;
+  const enabled=!!(A&&A.handoffAvailable&&A.handoffAvailable());
+  row.style.display=(enabled&&JOB_LIVE)?'block':'none';
+  const st=$('#handoffState');
+  if(job&&job.handedOffAt){
+    st.style.display='block';
+    st.textContent='✓ Handed to the server at '+new Date(job.handedOffAt).toLocaleTimeString()+' — you can close this tab. It will still finish here if you stay.';
+    $('#handoffBtn').disabled=true;
+  } else { st.style.display='none'; $('#handoffBtn').disabled=false; }
+}
+$('#handoffBtn').onclick=async()=>{
+  if(!JOB) return;
+  const ok=confirm(
+    'Let Xtrata finish this job without you?\n\n'+
+    'Right now the wallet holding your deposit can only be spent by this browser tab — nobody else, including Xtrata, can touch it.\n\n'+
+    'If you agree, the key for THIS ONE JOB is sent to Xtrata\'s server so it can finish the inscription while you close the tab. It affects only this job and only until it completes; the wallet is emptied and the key destroyed at the end. Your own wallet is never involved.\n\n'+
+    'Your inscription and change still go back to the same wallet either way.\n\n'+
+    'Agree and hand this job over?');
+  if(!ok) return;
+  const b=$('#handoffBtn'); b.disabled=true; b.textContent='Handing over…';
+  try{
+    const r=await window.XtrataAgent.handoffJob(JOB.jobId, HANDOFF_CONSENT);
+    $('#handoffState').style.display='block';
+    $('#handoffState').textContent = r&&r.alreadyHandedOff
+      ? '✓ Already handed over — you can close this tab.'
+      : '✓ Handed over — you can close this tab. It will still finish here if you stay.';
+  }catch(e){
+    b.disabled=false; b.textContent='Finish this without me →';
+    $('#handoffState').style.display='block';
+    $('#handoffState').className='err';
+    $('#handoffState').textContent='Could not hand it over: '+esc((e&&e.message)||String(e))+'. Nothing changed — this tab is still in charge.';
+  }
+};
+
+
+const confirmDanger = (o)=>window.XtrataUI.confirmDanger(o);
+
+$('#cancelJobBtn').onclick=async()=>{
+  if(!JOB) return;
+  const sure = await confirmDanger({
+    title:'Stop this job and return everything?',
+    body:'Any upload in progress halts at the next safe point. Chunks already on-chain stay there unsealed — nothing is minted and they cost nothing more — and the whole remaining deposit is sent back to the wallet that paid. Keep this tab open until you see "Cancelled".',
+    confirmLabel:'Stop and refund me', cancelLabel:'Keep going'
+  });
+  if(!sure) return;
+  const b=$('#cancelJobBtn'); b.disabled=true; b.textContent='Cancelling…';
+  try{ const r=await api('/api/jobs/'+JOB.jobId+'/cancel',{method:'POST'});
+    if(r&&r.error) throw new Error(r.error);
+    $('#hint').innerHTML='<span class="muted">Cancelling — returning your deposit. Keep this tab open until it confirms.</span>';
+    if(!poll) startPoll();
+  }catch(e){ b.disabled=false; b.textContent='Stop this job & refund me';
+    $('#hint').innerHTML='<span class="err">Could not cancel: '+esc((e&&e.message)||String(e))+'</span>'; }
+};
+function musicFeeMode(){ return $('#musicFeeMode').value; }
+$('#musicFeeMode').onchange=()=>{
+  if(musicJobActive()) return;
+  $('#musicFeeHelp').textContent=musicFeeMode()==='economy'
+    ? 'Lower initial mining budget. Targets about 1 STX per MB of transaction data, plus protocol, service and delivery costs. Timing is not guaranteed. Keep this tab open; you can review a speed-up at any time. Uploads can expire if left unfinished.'
+    : 'More room for changing network fees, with automatic fee increases within the funded reserve. Unused funds return on delivery.';
+  quoteRefresh();
+};
+let musicSpeedBusy=false, musicSpeedQuote=null;
+function renderMusicFees(job,status){
+  const s=status?.musicFees, box=$('#musicSpeed');
+  box.hidden=!s||!['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(job.status);
+  if(box.hidden) return;
+  const u=s.upgrade, paying=u?.state==='payment';
+  const elapsed=Math.max(0,Math.floor((Date.now()-(s.lastConfirmedAt||Date.now()))/1000));
+  $('#musicSpeedTitle').textContent=paying?'Confirming additional payment':s.mode==='economy'?(elapsed>=120?'Still waiting for lower fees':'Economy processing'):'Standard fee budget active';
+  $('#musicSpeedStatus').textContent=paying
+    ? 'Your job is retained while this payment is checked. You will not be asked to pay again. Delivery waits for this check.'
+    : (elapsed>=60?Math.floor(elapsed/60)+' min since the last confirmed step. ':'')+'Confirmed upload progress is reused. A higher fee can improve priority; it cannot guarantee a finish time.';
+  $('#musicSpeedExpiry').textContent=s.expiryUnknown?'Upload expiry could not be verified; new transactions are paused.':s.expiryBlocks!=null?'Upload expiry: '+Math.max(0,s.expiryBlocks)+' Stacks blocks remaining. '+(s.expiryBlocks<=720?'Time is running short; review the job now.':'Successful chunk uploads refresh this window.'):'';
+  $('#musicSpeedOpen').hidden=paying||s.mode!=='economy'||!['FUNDED','INSCRIBING','FEE_WAITING'].includes(job.status);
+  $('#musicSpeedOpen').disabled=musicSpeedBusy;
+  $('#musicTopUpRecovery').hidden=!paying||!!u.txid;
+  $('#musicTopUpTxStatus').textContent=paying&&u.txid?'Payment transaction recorded — checking on-chain confirmation.':'';
+  if(u?.error) $('#musicSpeedError').textContent=u.error;
+  if(paying){ musicSpeedQuote=u; $('#musicSpeedReview').hidden=true; }
+  if(s.mode==='standard') $('#musicSpeedReview').hidden=true;
+}
+$('#musicSpeedOpen').onclick=async()=>{
+  if(musicSpeedBusy||!JOB) return; musicSpeedBusy=true; $('#musicSpeedOpen').disabled=true;
+  $('#musicSpeedError').textContent='';
+  try{
+    musicSpeedQuote=await xa().quoteMusicSpeedUp(JOB.jobId);
+    const q=musicSpeedQuote;
+    $('#musicSpeedBalance').textContent=stx(q.balance);
+    $('#musicSpeedExtra').textContent=stx(q.additional);
+    $('#musicSpeedTotal').textContent=stx(q.total);
+    $('#musicSpeedService').textContent=stx(q.service);
+    $('#musicSpeedApprove').textContent=BigInt(q.additional)>0n?'Add '+stx(q.additional)+' and speed up':'Confirm faster processing';
+    $('#musicSpeedReview').hidden=false;
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicSpeedOpen').disabled=false;}
+};
+$('#musicSpeedKeep').onclick=()=>{ $('#musicSpeedReview').hidden=true; $('#musicSpeedStatus').textContent='Continuing within your existing budget. You can review Speed up again whenever you choose.'; };
+$('#musicSpeedApprove').onclick=async()=>{
+  if(musicSpeedBusy||!musicSpeedQuote||!JOB) return;
+  musicSpeedBusy=true; $('#musicSpeedApprove').disabled=true; $('#musicSpeedError').textContent='';
+  const id=JOB.jobId, quoteId=musicSpeedQuote.id;
+  try{
+    if(window.XtrataWizardFunding) throw new Error('Automated wizard funding does not support top-ups. Use the normal connected-wallet flow.');
+    if(!WALLET||WALLET!==musicSpeedQuote.sender) throw new Error('Connect the original paying wallet to approve this speed-up.');
+    const q=await xa().approveMusicSpeedUp(id,quoteId);
+    $('#musicSpeedReview').hidden=true;
+    if(q.state==='payment'){
+      await refresh();
+      try{
+        const result=await payWallet(JOB.depositAddress,q.additional,[],true);
+        const txid=typeof result==='string'?result:(result?.txId||result?.txid||result?.tx_id);
+        if(!txid) throw new Error('Wallet response did not include a transaction ID. Check wallet activity and enter it below.');
+        await xa().recordMusicTopUp(id,quoteId,txid);
+      }catch(e){
+        if(e?.code===4001||e?.code==='USER_CANCELLED') await xa().dismissMusicTopUp(id,quoteId);
+        else $('#musicSpeedError').textContent='Payment outcome needs checking. '+e.message;
+      }
+    }
+    await refresh();
+  }catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{ musicSpeedBusy=false;$('#musicSpeedApprove').disabled=false; }
+};
+$('#musicTopUpCheck').onclick=async()=>{
+  if(musicSpeedBusy||!JOB||!musicSpeedQuote) return;
+  musicSpeedBusy=true; $('#musicTopUpCheck').disabled=true;
+  try{ await xa().recordMusicTopUp(JOB.jobId,musicSpeedQuote.id,$('#musicTopUpTx').value.trim()); await refresh(); }
+  catch(e){ $('#musicSpeedError').textContent=e.message; }
+  finally{musicSpeedBusy=false;$('#musicTopUpCheck').disabled=false;}
+};
+
+function startPoll(){ if(poll) clearInterval(poll); poll=setInterval(refresh,2000); refresh(); }
+async function refresh(){
+  if(!JOB) return;
+  try{ const {job,status}=await api('/api/jobs/'+JOB.jobId);
+    JOB=job;
+    const funded=status&&status.funded, pending=status&&status.pending, st=job.status;
+    if(!musicJobActive()) musicUnlockJob();
+    if(st==='AWAITING_DEPOSIT'){
+      setProg(funded?'Payment confirmed — starting…':(pending?'Payment seen — confirming (usually under 30 s)…':'Waiting for payment to land…'),
+        funded?['pay']:[], funded?18:(pending?10:4)); }
+    else if(PHASE[st]){ setPhase(st, job); }
+    if(st==='AWAITING_PARENT' && status && status.parents && !(status.parents.missing||[]).length){
+      setProg('Parent inscription received ✓ — starting the inscription…', ['pay','parent'], 16);
+    }
+    renderMusicFees(job, status);
+    if(st==='FEE_WAITING'){ const remaining=Number(status?.musicFees?.remainingWeight), total=Number(job.minerReserve); const pct=Number.isFinite(remaining)&&total>0?18+66*Math.max(0,Math.min(1,1-remaining/total)):18; setProg(job.progress||'Waiting within your approved fee budget…',['pay','inscribe'],pct); }
+    renderEscrow(job, status);
+    const canCancel=['AWAITING_DEPOSIT','AWAITING_PARENT','FUNDED','INSCRIBING','FEE_WAITING','EXPIRED'].includes(st)&&!status?.musicFees?.pending&&status?.musicFees?.upgrade?.state!=='payment'&&!job.tokenId&&!(job.items||[]).some(i=>i.tokenId);
+    $('#cancelRow').style.display=canCancel?'block':'none';
+    renderKeepOpen(job, st);
+    renderHandoff(job);
+    if(job.feePolicy==='music-v1') $('#handoffRow').style.display='none';
+    if(st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS'){ clearInterval(poll); poll=null; setBar(100); setTimeout(()=>{ stopWaitExtras(); (job.items?sbDone:done)(job); },600); }
+    else if(st==='CANCELLED'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
+      $('#hint').innerHTML='<span class="muted">↩︎ Cancelled — funds returned'+(job.cancelReason?(' ('+esc(job.cancelReason)+')'):'')+'. <a href="#" onclick="showJobLog(\''+esc(job.jobId)+'\');return false">View agent log</a></span>'; $('#go').disabled=false; }
+    else if(st==='ERROR'||st==='NEEDS_RECOVERY'){ clearInterval(poll); poll=null; stopWaitExtras(); $('#prog').className='prog';
+      $('#hint').innerHTML='<span class="err">'+esc(job.error||'Something went wrong')+(st==='NEEDS_RECOVERY'?' — your funds are safe on the job’s one-shot wallet.':' — funds returned.')+'</span>'
+        +(st==='NEEDS_RECOVERY'?' <a href="#" onclick="musicRecover(\''+esc(job.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>':''); $('#go').disabled=false; }
+  }catch{ /* transient — keep polling */ }
+}
+function showJobLog(id){ try{ const A=window.XtrataAgent; const lines=(A&&A.getJobLog&&A.getJobLog(id))||[];
+  const w=window.open('','_blank'); const body=lines.length?lines.map(esc).join('\n'):'(no log entries — this job predates verbose logging)';
+  if(w){ w.document.open(); w.document.write('<pre style="background:#0b0e14;color:#8ea0bd;padding:20px;font:12px/1.6 monospace;white-space:pre-wrap">'+body+'</pre>'); w.document.close(); }
+}catch(e){ alert('Could not open log: '+((e&&e.message)||e)); } }
+window.showJobLog=showJobLog;
+function viewReceipt(id){ try{ const A=window.XtrataAgent; const html=A&&A.getReceiptHtml&&A.getReceiptHtml(id); if(!html){ alert('Receipt not generated yet.'); return; } const w=window.open('','_blank'); if(w){ w.document.open(); w.document.write(html); w.document.close(); } else { const bl=new Blob([html],{type:'text/html'}); window.open(URL.createObjectURL(bl),'_blank'); } }catch(e){ alert('Could not open receipt: '+((e&&e.message)||e)); } }
+window.viewReceipt=viewReceipt;
+
+function musicRecover(id){ (async()=>{ try{
+  const A=xa(); await A.recoverJob(id);
+  JOB={jobId:id}; $('#go').disabled=true;
+  setProg('Recovering assets and sweeping unused funds back to your wallet…', []);
+  startPoll();
+}catch(e){ $('#hint').innerHTML='<span class="err">'+esc((e&&e.message)||String(e))+'</span>'; } })(); }
+window.musicRecover=musicRecover;
+(async()=>{ try{
+  for(let i=0;i<25&&!window.XtrataAgent;i++) await new Promise(r=>setTimeout(r,200));   // bundle is deferred
+  const A=window.XtrataAgent; if(!A||JOB) return;
+  const jobs=(await A.listJobs()).filter(j=>j.origin==='music');
+  const live=(jobs||[]).find(j=>j.fastTrack&&['FUNDED','INSCRIBING','FEE_WAITING','INSCRIBED','DELIVERING'].includes(j.status));
+  if(live){ JOB=live; $('#go').disabled=true;
+    setProg('Picking up where you left off — nothing already uploaded is redone. You can stop and take a refund at any point below.', ['pay']);
+    startPoll(); return; }
+  const parentWait=(jobs||[]).find(j=>j.status==='AWAITING_PARENT');
+  if(parentWait){ JOB=parentWait; $('#go').disabled=true;
+    setProg('Deposit received ✓ — this job is still waiting for its parent inscription.', ['pay']);
+    startPoll(); return; }
+  const rec=(jobs||[]).find(j=>j.status==='NEEDS_RECOVERY');
+  if(rec){ $('#hint').innerHTML='<span class="err">↻ A previous run stopped ('+esc(rec.progress||rec.error||'interrupted')+') — your funds are safe on its one-shot wallet.</span> '
+    +'<a href="#" onclick="musicRecover(\''+esc(rec.jobId)+'\');return false">Recover now</a> · <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a>'; return; }
+  const wait=(jobs||[]).find(j=>j.status==='AWAITING_DEPOSIT');
+  if(wait){ $('#hint').innerHTML='<span class="muted">↻ An unpaid job from a previous session is still open — <a href="/wizard/" target="_blank" rel="noopener">open wizard History</a> to resume or cancel it.</span>'; }
+  if(window.XtrataUI) window.XtrataUI.unfinishedBanner({ skipJobId: JOB&&JOB.jobId });
+}catch(e){} })();
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&JOB){ refresh(); if(!poll) startPoll(); } });
+window.addEventListener('focus',()=>{ if(JOB){ refresh(); if(!poll) startPoll(); } });
+
+function done(job){
+  $('#prog').className='prog';
+  const tok=job.tokenId, net=(job.net||SERVER.net);
+  const player=(net==='mainnet'&&tok)?('https://xtrata.xyz/inscription/'+tok):null;
+  const R=job.receipt||{};
+  const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(EST&&EST.stxUsd?Number(EST.stxUsd):null);
+  const usd=u=>usdRate!=null?('$'+(Number(u)/1e6*usdRate).toFixed(2)):null;
+  const both=u=>stx(u)+(usd(u)?(' · '+usd(u)):'');
+  const paidU=R.totalPaid!=null?R.totalPaid:(R.depositReceived!=null&&job.refundedUstx!=null?String(BigInt(R.depositReceived)-BigInt(job.refundedUstx||'0')):null);
+  const settle=
+    '<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'+
+      (R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')+
+      (job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded to you</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')+
+      '<div class="muted" style="font-size:11px;margin:4px 0 8px">The deposit is over-collected to guarantee fees; everything not spent on the inscription, receipt, network fees and the wizard fee comes straight back to your wallet.</div>'+
+      (paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Final price to immortalise this song</span>'+
+        '<span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+
+        (usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')+
+      '<div class="muted" style="font-size:11px;margin-top:8px">On-chain forever — no renewals, no hosting, no further cost. Full breakdown on your receipt.</div>'+
+    '</div>';
+  $('#result').className='result show';
+  $('#result').innerHTML =
+    '<div class="ok" style="font-weight:800;font-size:16px;margin-bottom:6px">✓ Inscribed'+(META&&META.title?(' — '+esc(META.title)):'')+(META&&META.artist?(' · '+esc(META.artist)):'')+'</div>'+
+    '<div class="kv"><span>Player token</span><span class="ok">#'+esc(tok||'—')+'</span></div>'+
+    (job.receiptTokenId?'<div class="kv"><span>Receipt token</span><span class="ok">#'+esc(job.receiptTokenId)+'</span></div>':'')+
+    ((META&&(META.hasCover||META.hasLyrics))?('<div class="kv"><span>Includes</span><span>Opus'+(META.hasCover?' + cover':'')+(META.hasLyrics?' + lyrics':'')+'</span></div>'):'')+
+    settle+
+    (player?('<a class="btn" href="'+player+'" target="_blank" rel="noopener">▶ Open your player</a>'):'')+
+    '<button class="btn ghost" style="display:block;width:100%;text-align:center;margin-top:8px" onclick="viewReceipt(\''+esc(job.jobId)+'\')">View receipt</button>'+
+    '<div class="hint" style="margin-top:12px"><a href="#" id="again">Inscribe another track</a></div>';
+  const ag=$('#again'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); resetAll(); };
+  $('#go').disabled=false; $('#go').textContent='Inscribe my track';
+}
+function resetAll(){ musicUnlockJob(); FILE=null;PLAYER=null;META=null;EST=null;JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
+  picker.value=''; drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#quote').className='quote'; $('#prog').className='prog'; $('#result').className='result'; $('#preview').style.display='none'; $('#previewFrame').removeAttribute('srcdoc'); $('#editWrap').style.display='none'; $('#hint').textContent=''; updateGo(); }
+
+let sbArtTarget=-1;
+const sbReadB64=(file)=>new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]||null); r.onerror=()=>rej(r.error); r.readAsDataURL(file); });
+const sbMib=(n)=>(n/1048576).toFixed(2);
+const sbCostLabel=(ustx)=>stx(ustx)+(SB.stxUsd!=null?(' · ~$'+(Number(ustx)/1e6*Number(SB.stxUsd)).toFixed(2)):'');
+function sbEnterUI(){ SB.active=true;
+  $('#quote').className='quote'; $('#preview').style.display='none'; $('#editWrap').style.display='none';
+  $('#go').style.display='none'; $('#hint').textContent=''; $('#result').className='result'; $('#prog').className='prog';
+  $('#musicBatch').style.display='block'; }
+function sbResetUI(){ musicUnlockJob(); FILE=null;PLAYER=null;META=null;EST=null;EDITS_DIRTY=false; SB.items.forEach(it=>{ if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} } });
+  SB.items=[]; SB.dropped=[]; SB.active=false; SB.busy=false; SB.EST=null; SB.droppedNote=''; JOB=null; if(poll){clearInterval(poll);poll=null;} stopWaitExtras();
+  $('#musicBatch').style.display='none'; $('#go').style.display='';
+  drop.classList.remove('has'); drop.innerHTML=DROP_HTML;
+  $('#prog').className='prog'; $('#result').className='result'; $('#sbHint').textContent=''; $('#relWrap').style.display='none'; $('#receiptWrap').style.display='none'; hideEscrow(); updateGo(); }
+function enterMusicBatch(files){
+  const key=f=>f.name+'|'+f.size; const have=new Set(SB.items.map(it=>key(it.file)));
+  let bad=0, added=0, overflow=0;
+  for(const f of files){
+    if(SB.items.length>=BATCH_MAX){ overflow++; continue; }
+    if(validateAudio(f)){ bad++; SB.dropped.push(f.name+': '+validateAudio(f).replace(/<[^>]*>/g,'')); continue; }
+    if(have.has(key(f))) continue; have.add(key(f));
+    SB.items.push({ file:f, status:'queued', player:null, info:null, previewUrl:null, show:false, err:null }); added++; }
+  if(!SB.items.length){ rejectToWizard('None of those look like audio files under '+AUDIO_MAX_MB+' MiB. MP3, WAV, FLAC, M4A and OGG all work here.'); return; }
+  sbEnterUI();
+  const notes=[];
+  if(bad) notes.push(bad+' file'+(bad>1?'s':'')+' skipped — not audio, or over '+AUDIO_MAX_MB+' MiB.');
+  if(overflow) notes.push(overflow+' more did not fit — '+BATCH_MAX+' songs is the maximum per batch. Inscribe these, then start another.');
+  SB.droppedNote = notes.concat(SB.dropped).join(' ');
+  drop.classList.add('has');
+  drop.innerHTML='<div class="fname">🎵 Batch · '+SB.items.length+' song'+(SB.items.length>1?'s':'')+'</div><div class="fmeta">drop more tracks to add · click to browse</div>';
+  sbRender(); sbProcess();
+}
+let sbEngineWarned=false;
+async function sbProcess(){
+  if(SB.busy) return; SB.busy=true; musicBusy(true);
+  try{
+    if(!window.XtrataMusic||!window.XtrataMusicPlayer){ if(!sbEngineWarned){ sbEngineWarned=true; $('#sbHint').innerHTML='<span class="err">Player engine still loading — retrying…</span>'; } }
+    for(;;){
+      const it=SB.items.find(x=>x.status==='queued');
+      if(!it) break;
+      it.status='probing'; sbRender();
+      try{
+
+        it.status='building'; sbRender();
+        const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides||{});
+        if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
+        it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null;
+        it.needs=sbNeeds(r);
+      }catch(e){ it.status='error'; it.err=(e&&e.message)||String(e); }
+      sbRender(); sbQuote();
+    }
+  } finally { SB.busy=false; musicBusy(false); musicFormatHelp(); sbRender(); await sbQuote(); }
+}
+function sbPreviewUrl(it){ if(!it.player) return ''; if(!it.previewUrl){ try{ it.previewUrl=URL.createObjectURL(it.player); }catch(_e){ it.previewUrl=''; } } return it.previewUrl; }
+function sbRow(it,i){
+  const title = it.info? (esc(it.info.title||it.file.name)+(it.info.artist?(' — '+esc(it.info.artist)):'')) : esc(it.file.name);
+  const artSrc = it.info&&it.info.coverB64 ? ('data:'+(it.info.coverMime||'image/jpeg')+';base64,'+it.info.coverB64) : '';
+  let status;
+  if(it.status==='ready'&&it.needs&&it.needs.length) status='<span style="color:var(--warn)">needs '+esc(listOf(it.needs))+' — use 🖼 to add artwork</span>';
+  else if(it.status==='ready') status='<span class="ok">'+sbMib(it.player.size)+' MiB · '+esc(it.info.audioLabel)+(it.info&&it.info.hasCover?' + cover':'')+(it.info&&it.info.hasLyrics?' + lyrics':'')+'</span>'+(it.costUstx?(' · <span style="color:var(--acc);font-weight:700">'+sbCostLabel(it.costUstx)+'</span>'):'');
+  else if(it.status==='building') status='<span style="color:var(--acc2)"><span class="spin"></span>building player…</span>';
+  else if(it.status==='probing') status='<span class="muted"><span class="spin"></span>reading the track…</span>';
+  else if(it.status==='error') status='<span class="err">✗ '+esc(it.err||'failed')+'</span> <a href="#" onclick="sbRetry('+i+');return false" style="margin-left:4px">retry</a>';
+  else status='<span class="muted">queued…</span>';
+  const btn=(fn,label,title)=>'<button class="btn ghost" style="width:auto;margin:0;padding:4px 9px;font-size:11px" onclick="'+fn+'('+i+')" title="'+title+'">'+label+'</button>';
+  return '<div class="sbrow" style="border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:10px">'
+    +'<div style="display:flex;gap:10px;align-items:center">'
+      +'<img alt="" src="'+artSrc+'" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#10120f;flex:none"/>'
+      +'<div style="flex:1;min-width:0"><div class="fname" style="font-size:14px;word-break:break-word">'+title+'</div><div class="fmeta">'+status+'</div></div>'
+      +(it.status==='ready'?btn('sbToggle',(it.show?'▾ hide':'▸ preview'),'Preview this player'):'')
+      +(it.status==='ready'?btn('musicEditTrack','Edit','Edit this track'):'')
+      +(it.status==='ready'?btn('sbArt','🖼','Change this player’s artwork'):'')
+      +(it.info?.hasCover?btn('musicOptimiseTrackArt','Shrink art','Optimise existing artwork'):'')
+      +btn('sbRemove','✕','Remove from batch')
+    +'</div>'
+    +((it.status==='ready'&&it.show)?(it.info?.format==='audio'?'<audio controls src="'+sbPreviewUrl(it)+'" style="width:100%;margin-top:12px"></audio>':'<iframe src="'+sbPreviewUrl(it)+'" title="preview" loading="lazy" sandbox="allow-scripts" style="width:100%;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;background:#10120f;display:block;margin-top:10px"></iframe>'):'')
+    +'</div>';
+}
+function sbRender(){
+  const ready=SB.items.filter(it=>it.status==='ready');
+  const total=SB.items.length;
+  $('#relWrap').style.display=total?'block':'none'; $('#receiptWrap').style.display=total?'block':'none';
+  $('#sRelBatchNote').style.display=total?'block':'none';
+  const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+  $('#sbHead').innerHTML = busy
+    ? '<span class="spin"></span>Building on the fast core — '+ready.length+'/'+total+' player'+(total>1?'s':'')+' ready…'
+    : (total? '✓ '+ready.length+' player'+(ready.length>1?'s':'')+' ready — preview each, swap artwork if you like, then inscribe.' : 'No songs yet.');
+  $('#sbList').innerHTML = SB.items.map((it,i)=>sbRow(it,i)).join('');
+  const needy=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length).length;
+  $('#sbDropped').textContent = needy
+    ? (needy+' song'+(needy>1?'s':'')+' still need artwork or details — add them above and the button will unlock.')
+    : (SB.droppedNote||'');
+  const bytes=ready.reduce((s,it)=>s+it.player.size,0);
+  $('#sbCount').textContent = ready.length+' / '+total+(ready.length?(' · '+sbMib(bytes)+' MiB total'):'');
+  sbUpdateGo();
+}
+async function sbQuote(){
+  SB.EST=null; sbUpdateGo();
+  const run=++SB.quoteRun; const A=window.XtrataAgent;
+  const ready=SB.items.filter(it=>it.status==='ready');
+  if(!ready.length||!A||!A.estimateBatch){ SB.EST=null; SB.stxUsd=null; ready.forEach(it=>{ it.costUstx=null; }); $('#sbPay').textContent='—'; sbUpdateGo(); return; }
+  try{
+    window.XtrataMusicDiagnostics?.log('quote','Calculating costs for '+ready.length+' prepared tracks.');
+    const est=await A.estimateBatch({ itemsBytes:ready.map(it=>it.player.size), parentCount:parentList().length, marginUstx:'0', receipt:wantReceipt(),feeMode:musicFeeMode() });
+    if(run!==SB.quoteRun) return;
+    window.XtrataMusicDiagnostics?.log('quote-ready','Batch quote received.');
+    SB.EST=est; SB.stxUsd=(est.stxUsd!=null?est.stxUsd:null);
+    try{
+      const req=BigInt(est.requiredUstx);
+      const direct=(est.items||[]).map(x=>BigInt(x.protocolFee||'0')+BigInt(x.minerReserve||'0'));
+      const dsum=direct.reduce((a,b)=>a+b,0n);
+      let allocated=0n;
+      for(let i=0;i<ready.length;i++){
+        let share;
+        if(i===ready.length-1) share=req-allocated;              // last song takes the remainder → exact total
+        else if(dsum>0n) share=req*(direct[i]||0n)/dsum;
+        else share=req/BigInt(ready.length);
+        allocated+=share; ready[i].costUstx=share.toString();
+      }
+    }catch(_e){ ready.forEach(it=>{ it.costUstx=null; }); }
+    const pending=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+    $('#sbPay').textContent=stx(est.requiredUstx)+(est.stxUsd?(' · ~$'+(Number(est.requiredUstx)/1e6*est.stxUsd).toFixed(2)):'')+(pending?' (updating…)':'');
+    sbRender();
+  }catch(e){ if(run===SB.quoteRun){ $('#sbPay').textContent='—'; SB.EST=null; SB.stxUsd=null; sbUpdateGo(); } }
+}
+function sbNeeds(r){
+  const n=[];
+  if(r&&r.playerFile&&r.playerFile.size>CHAIN_MAX_BYTES) n.push('a shorter edit (over '+CHAIN_MAX_MB+' MiB inscribed)');
+
+
+
+  return n;
+}
+function sbUpdateGo(){
+  const b=$('#sbGo'); if(!b) return;
+  if(musicJobActive()){ b.disabled=true; b.textContent='Inscription in progress'; return; }
+  const ready=SB.items.filter(it=>it.status==='ready').length;
+  const busy=SB.items.some(it=>['queued','probing','building'].includes(it.status));
+  if(AGENT_STALE&&!SERVER.mock){ b.disabled=true; b.textContent='Agent bundle outdated — redeploy required'; return; }
+  if(busy){ b.disabled=true; b.textContent='Building releases…'; return; }
+  if(SB.items.some(it=>it.status==='error')){ b.disabled=true; b.textContent='Retry or remove failed tracks'; return; }
+  if(!ready){ b.disabled=true; b.textContent='No players ready'; return; }
+  const incomplete=SB.items.filter(it=>it.status==='ready'&&it.needs&&it.needs.length);
+  if(incomplete.length){ b.disabled=true; b.textContent=incomplete.length+' song'+(incomplete.length>1?'s':'')+' still need artwork or details'; return; }
+  if(!SERVER.mock&&!WALLET){ b.disabled=true; b.textContent='Connect your wallet to inscribe'; return; }
+  const pb=parentBlockingMessage();
+  if(pb){ b.disabled=true; b.textContent=pb; return; }
+  b.disabled=!SB.EST; b.textContent = SB.EST? ('Inscribe '+ready+' player'+(ready>1?'s':'')+'  ·  pay '+stx(SB.EST.requiredUstx)) : ('Inscribe '+ready+' player'+(ready>1?'s':''));
+}
+window.sbToggle=(i)=>{ const it=SB.items[i]; if(it){ it.show=!it.show; sbRender(); } };
+window.sbRemove=(i)=>{ if(SB.busy||musicJobActive())return; const it=SB.items[i]; if(!it) return; if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} }
+  SB.items.splice(i,1); if(!SB.items.length){ sbResetUI(); return; } sbRender(); sbQuote(); };
+window.sbRetry=(i)=>{ if(SB.busy||musicJobActive())return; const it=SB.items[i]; if(it){ it.status='queued'; it.err=null; sbRender(); sbProcess(); } };
+window.sbArt=(i)=>{ if(SB.busy||musicJobActive())return; sbArtTarget=i; $('#sbArtPick').click(); };
+$('#sbArtPick').onchange=async()=>{
+  const f=$('#sbArtPick').files[0]; $('#sbArtPick').value=''; const it=SB.items[sbArtTarget]; if(!f||!it) return;
+  if(!/^image\/(png|jpeg|webp)$/.test(f.type)){ $('#sbHint').innerHTML='<span class="err">Artwork must be PNG, JPEG or WebP.</span>'; return; }
+  if(f.size>4*1048576){ $('#sbHint').innerHTML='<span class="err">Artwork over 4 MiB would bloat the inscription — use a smaller image.</span>'; return; }
+  const prev=it.status; it.status='building'; sbRender();
+  try{
+    let cover=f; try{ if(window.XtrataImageOptimizer){ const cr=await window.XtrataImageOptimizer.optimize(f,()=>{}); if(cr.optimizedBytes) cover=cr.file; } }catch(_e){}
+    const b64=await sbReadB64(cover);
+    it.overrides={...it.overrides,format:'artwork',coverB64:b64,coverMime:cover.type||'image/png'};
+    const r=await window.XtrataMusic.build(it.file,()=>{},it.overrides);
+    if(it.previewUrl){ try{URL.revokeObjectURL(it.previewUrl);}catch(_e){} it.previewUrl=null; }
+    it.player=r.playerFile; it.info=r; it.overrides={...it.overrides,appearance:r.appearance,artFit:undefined}; it.status='ready'; it.err=null; it.show=true;
+    it.needs=sbNeeds(r);
+    $('#sbHint').innerHTML='<span class="ok">✓ Artwork updated — preview refreshed.</span>';
+  }catch(e){ it.status=prev==='ready'?'ready':'error'; it.err=(e&&e.message)||String(e); $('#sbHint').innerHTML='<span class="err">Artwork rebuild failed: '+esc(it.err)+'</span>'; }
+  sbRender(); sbQuote();
+};
+$('#sbGo').onclick=async()=>{
+  const ready=SB.items.filter(it=>it.status==='ready'); if(!document.querySelector('#trackEditor').hidden||!ready.length||!SB.EST||SB.busy||musicJobActive()||SB.items.some(it=>it.status!=='ready'||it.needs?.length)) return;
+  if(!SERVER.mock&&!WALLET){ connectWallet(); return; }
+  const b=$('#sbGo'); b.disabled=true; $('#sbHint').textContent='';
+  try{
+    const items=ready.map(it=>({ file:it.player, uri:'xtrata:song/'+((it.info&&it.info.title)?slug(it.info.title):slug(it.file.name)), mime:it.player.type }));
+    const deps=depsList(), parents=parentList();
+    if(window.XtrataWizardFunding&&parents.length) throw new Error('Wizard funding currently supports songs without parent escrow');
+    if(!deps.every(d=>/^\d+$/.test(d))) throw new Error('Dependencies must be token-id uints.');
+    if(!parents.every(d=>/^\d+$/.test(d))) throw new Error('Parent must be a token-id uint.');
+    if(deps.length) items.forEach(it=>{ it.deps=deps; });
+    const payload={ items, parents, marginUstx:'0', strict:false, fastTrack:true, origin:'music', receipt:wantReceipt(),feeMode:musicFeeMode(), user:WALLET||undefined, expectedFunder:WALLET||undefined };
+    PARENT_MSG=null; PARENT_OWNER={}; PARENT_ARRIVED={};
+    setProg('Creating your one-shot deposit…', []);
+    musicSubmitting=true; musicLockJob();
+    const { job }=await api('/api/jobs',{method:'POST',body:payload});
+    musicSubmitting=false;
+    JOB=job; musicLockJob();
+    if(SERVER.mock){ setProg('MOCK — simulating batch inscription…',['pay']); }
+    else{
+      setProg((window.XtrataWizardFunding?'Requesting wizard funding of ':'Opening your wallet to pay ')+stx(job.requiredUstx)+'…', []);
+      try{ await payWallet(job.depositAddress, job.requiredUstx, items.map(it=>it.file)); }
+      catch(e){ if(window.XtrataWizardFunding){ $('#sbHint').textContent=e.message; setProg('Wizard funding stopped — check the local funding plan or payment journal', []); sbUpdateGo(); return; } $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span><br><span class="muted">Send '+stx(job.requiredUstx)+' to '+esc(job.depositAddress)+' to continue.</span>'; }
+      setProg('Waiting for payment to land…', []);
+    }
+    startPoll();
+  }catch(e){ musicSubmitting=false; musicUnlockJob(); $('#prog').className='prog'; $('#sbHint').innerHTML='<span class="err">'+esc(e.message)+'</span>'; sbUpdateGo(); }
+};
+function sbDone(job){
+  $('#prog').className='prog'; $('#musicBatch').style.display='none';
+  const items=job.items||[]; const okItems=items.filter(i=>i.tokenId); const net=job.net||SERVER.net;
+  const R=job.receipt||{};
+  const usdRate=(R.stxUsd!=null)?Number(R.stxUsd):(SB.EST&&SB.EST.stxUsd?Number(SB.EST.stxUsd):null);
+  const usd=u=>usdRate!=null?('$'+(Number(u)/1e6*usdRate).toFixed(2)):null;
+  const both=u=>stx(u)+(usd(u)?(' · '+usd(u)):'');
+  let paidU=R.totalPaid!=null?R.totalPaid:null;
+  if(paidU==null&&R.depositReceived!=null&&job.refundedUstx!=null){ try{ paidU=String(BigInt(R.depositReceived)-BigInt(job.refundedUstx||'0')); }catch(_e){} }
+  const rows=items.map(i=>{
+    const nm=esc((i.uri||'').replace(/^xtrata:(song|audio)\//,'')||'song');
+    const tok=i.tokenId?('<span class="ok">#'+esc(i.tokenId)+'</span>'):('<span class="muted">'+esc((i.status||'—').toLowerCase())+'</span>');
+    const link=(net==='mainnet'&&i.tokenId)?(' · <a href="https://xtrata.xyz/inscription/'+esc(i.tokenId)+'" target="_blank" rel="noopener">open</a>'):'';
+    return '<div class="kv"><span>'+nm+'</span><span>'+tok+link+'</span></div>';
+  }).join('');
+  const settle='<div style="background:linear-gradient(180deg,#0f1f17,#0c1812);border:1px solid #1f5a45;border-radius:12px;padding:14px 16px;margin:14px 0">'
+    +(R.depositReceived!=null?'<div class="kv"><span>Deposit you paid</span><span>'+both(R.depositReceived)+'</span></div>':'')
+    +(job.refundedUstx!=null?'<div class="kv"><span>Unused funds refunded</span><span class="ok">'+both(job.refundedUstx||'0')+'</span></div>':'')
+    +(paidU!=null?('<div class="kv" style="border-top:1px solid #1f5a45;padding-top:10px"><span style="font-weight:700;color:var(--ink)">Total to immortalise '+okItems.length+' song'+(okItems.length>1?'s':'')+'</span><span style="text-align:right"><span style="display:block;font-weight:800;font-size:19px;color:var(--acc)">'+(usd(paidU)||stx(paidU))+'</span>'+(usd(paidU)?('<span class="muted" style="font-size:12px">'+stx(paidU)+'</span>'):'')+'</span></div>'):'')
+    +'<div class="muted" style="font-size:11px;margin-top:8px">On-chain forever — no renewals, no hosting. Full breakdown on your receipt.</div></div>';
+  $('#result').className='result show';
+  $('#result').innerHTML=
+    '<div class="ok" style="font-weight:800;font-size:16px;margin-bottom:8px">✓ Batch inscribed — '+okItems.length+' / '+items.length+' player'+(items.length>1?'s':'')+(job.receiptTokenId?' + receipt':'')+'</div>'
+    +rows
+    +(job.receiptTokenId?'<div class="kv" style="border-top:1px solid var(--line);margin-top:4px;padding-top:8px"><span>Batch receipt</span><span class="ok">#'+esc(job.receiptTokenId)+'</span></div>':'')
+    +settle
+    +'<button class="btn ghost" style="display:block;width:100%;text-align:center" onclick="viewReceipt(\''+esc(job.jobId)+'\')">View receipt</button>'
+    +'<div class="hint" style="margin-top:12px"><a href="#" id="sbAgain">Inscribe more songs</a></div>';
+  const ag=$('#sbAgain'); if(ag) ag.onclick=(e)=>{ e.preventDefault(); sbResetUI(); };
+}
+</script>
+<script src="music-appearance.js?v=2"></script>
+<script src="music-editor.js?v=7"></script>
+<script src="music-artwork.js?v=1"></script>
+<script src="music-artwork-editor.js?v=1"></script>
+</body>
+</html>
