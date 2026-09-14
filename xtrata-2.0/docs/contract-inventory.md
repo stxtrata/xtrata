@@ -470,6 +470,16 @@ Source: `contracts/live/xtrata-arcade-scores-v1.1.clar`
 - `get-fee-recipient()`
 - `get-verifier-pubkey-hash()`
 
+## xtrata-collection-mint-v1.5 (undeployed candidate)
+
+- Source: `contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar`.
+- Generated mainnet candidate: `contracts/live/xtrata-collection-mint-v1.5.clar`; no deployed helper address is asserted.
+- Targets core v3.2.3 with 32-chunk uploads, required registered inventory, per-hash buyer reservations, explicit duplicate rejection and `collection-minted` receipts.
+- Additional reader: `get-hash-reservation(hash)` returns the optional reserving principal.
+- Errors: `u122` already sealed hash; `u123` unregistered hash; `u124` hash reserved by another buyer.
+- Run `npm run contracts:sync` / `npm run contracts:verify` to keep both pinned core references and generated source in sync.
+- Existing app/SDK defaults remain v1.4. See `docs/plans/COLLECTION-MINT-V1.5-AND-STORAGE.md` for policy, integration steps and the reproduced v3.2.3 chunk-purge hazard. No automatic core purge is part of this helper.
+
 ## xtrata-collection-mint-v1.4 (template, active)
 
 Source: `contracts/clarinet/contracts/xtrata-collection-mint-v1.4.clar`
