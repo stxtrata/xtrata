@@ -745,3 +745,7 @@ which case the real owner is the current holder of the source NFT.
 
 To add a collection/contract, see the "Adding a new Forever Twin collection"
 checklist in `docs/app-reference.md` and `docs/forever-twins-linking.md`.
+
+## X-Chess 2.6.0 browser house helper — manual deployment candidate
+
+`contracts/live/xchess-browser-house-v2.clar` is the exact Clarity 4 helper archived in inscription #3048, SHA-256 `7a40233b69c1406ec92e2672d16add3c30c158e4ffa02cab8c4b4cdbc93d089d`. Registered in the browser deployment console and CLI fallback as `xchess-browser-house-v2`. No deployment is claimed by this entry; confirm source through the console after manual signing. Engine #3049 is a board match term. See `notes/xchess-2.6.0-manual-deployment.md`.

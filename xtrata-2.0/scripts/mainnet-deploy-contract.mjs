@@ -27,6 +27,7 @@
 // the end (set-sponsor, market-registry.json entry, relayer allowlist).
 
 import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -55,6 +56,12 @@ const FEE_USTX = BigInt(process.env.XTRATA_MAINNET_FEE_USTX ?? '750000');
 // Add new mainnet contracts HERE (live variant in contracts/live/ first).
 // ---------------------------------------------------------------------------
 const DEPLOYABLE = {
+  'xchess-browser-house-v2': {
+    source: 'contracts/live/xchess-browser-house-v2.clar',
+    clarityVersion: 4,
+    sha256: '7a40233b69c1406ec92e2672d16add3c30c158e4ffa02cab8c4b4cdbc93d089d',
+    notes: 'X-Chess 2.6.0 immutable helper, source inscription #3048. No owner setup; engine #3049 is a per-match board term.'
+  },
   'xtrata-v3-2-3-gateway': {
     source: 'contracts/live/xtrata-v3-2-3-gateway.clar',
     clarityVersion: 4,
@@ -114,6 +121,7 @@ const stripComments = (code) =>
 
 const preflight = (name, entry, codeBody) => {
   const problems = [];
+  if (entry.sha256 && createHash('sha256').update(codeBody).digest('hex') !== entry.sha256) problems.push('Source SHA-256 differs from the pinned release');
   const active = stripComments(codeBody);
 
   if (active.includes('.mock-')) {
