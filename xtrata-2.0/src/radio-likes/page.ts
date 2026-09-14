@@ -1,6 +1,6 @@
 import {createStacksWalletAdapter} from '../lib/wallet/adapter';
 import {showContractCall,type WalletCallProgress} from '../lib/wallet/connect';
-import {buildLikeCall,importCandidates,type LikeChange} from '../lib/radio/onchain-likes';
+import {buildLikeCall,likeFeeSuggestion,importCandidates,type LikeChange} from '../lib/radio/onchain-likes';
 const wallet=createStacksWalletAdapter({appName:'Xtrata Radio',appIcon:'/favicon.ico'});
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 let config:any,tracks:any[]=[],states=new Map<number,{liked:boolean;total:string}>(),busy=false,loading=false,generation=0;
@@ -51,11 +51,28 @@ function render(){
   button.onclick=()=>review([{id:track.id,liked:!state?.liked}]);action.append(button);row.append(title,count,action);el('songs').append(row);
  }
 }
+let feeGeneration=0;
+const selectedChanges=()=>reviewChanges.filter(c=>el('choices').querySelector<HTMLInputElement>(`input[data-id="${c.id}"]`)?.checked);
+async function updateFeeSuggestion(){
+ const run=++feeGeneration,changes=selectedChanges();
+ el<HTMLButtonElement>('approve').disabled=true;
+ el('fee-suggestion').textContent=changes.length?'Calculating a low-fee suggestion…':'Select at least one song.';
+ try {
+  if(!changes.length)return;
+  const fee=await likeFeeSuggestion(config.contract,changes,wallet.getSession());
+  if(run!==feeGeneration)return;
+  el('fee-suggestion').textContent=`Suggested minimum fee: ${fee.totalStx} STX total (${fee.microStx} microSTX).`+(fee.count>1?` Approximately ${fee.perSongStx} STX per song for ${fee.count} songs.`:'')+' In your wallet, choose the custom network fee if its suggestion is higher. This is the standard single-signature relay minimum, not a promise of fast confirmation; a higher fee may be needed when busy. Check the final wallet fee before signing. Xtrata charges no platform fee.';
+  el<HTMLButtonElement>('approve').disabled=false;
+ }catch{if(run===feeGeneration){el('fee-suggestion').textContent='Fee suggestion unavailable. Review the fee shown by your wallet.';el<HTMLButtonElement>('approve').disabled=false;}}
+}
+el('choices').addEventListener('change',()=>void updateFeeSuggestion());
 function review(changes:LikeChange[]){
  diagnostic('REVIEW_OPEN',{count:changes.length});
  reviewWallet=wallet.getSession().address||'';reviewChanges=changes;el('choices').replaceChildren();
  for(const change of changes){const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.checked=true;box.dataset.id=String(change.id);label.append(box,document.createTextNode(`${change.liked?'Like':'Unlike'} #${change.id} · ${tracks.find(t=>t.id===change.id)?.title||''}`));el('choices').append(label,document.createElement('br'));}
  el('review-note').textContent='Up to 25 songs per transaction. Already confirmed likes are skipped on import. Closing or cancelling this review sends nothing.';
+ el('fee-reminder').textContent='';
+ void updateFeeSuggestion();
  el<HTMLDialogElement>('review').showModal();
 }
 async function refresh(){
@@ -88,7 +105,8 @@ el('approve').onclick=async()=>{
  diagnostic('APPROVE_CLICK',{busy,loading,pending:Boolean(pending())});
  if(busy||loading||pending()){diagnostic('APPROVE_BLOCKED');return;}
  let waitingTimer:ReturnType<typeof setInterval>|undefined;
- const changes=reviewChanges.filter(c=>el('choices').querySelector<HTMLInputElement>(`input[data-id="${c.id}"]`)?.checked);
+ const changes=selectedChanges();
+ el('fee-reminder').textContent=el('fee-suggestion').textContent;
  try {
   const session=wallet.getSession();if(session.address!==reviewWallet||session.address!==statesWallet)throw Error('Wallet changed. Review these songs again.');
   const call=buildLikeCall(config.contract,changes,session);const key=pendingKey();busy=true;render();el<HTMLDialogElement>('review').close();status('Review the network fee in your wallet. No platform fee or token transfer is requested.');

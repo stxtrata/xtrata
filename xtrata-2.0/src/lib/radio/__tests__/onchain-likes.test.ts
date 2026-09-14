@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
 import {PostConditionMode,cvToJSON} from '@stacks/transactions';
-import {buildLikeCall,importCandidates} from '../onchain-likes';
+import {buildLikeCall,likeFeeSuggestion,importCandidates} from '../onchain-likes';
 const address='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',contract=address+'.radio-likes';
 const session={isConnected:true,address,network:'mainnet' as const};
 describe('wallet-paid like requests',()=>{
@@ -18,4 +18,13 @@ describe('wallet-paid like requests',()=>{
   expect(importCandidates([{tokenId:'1'},{tokenId:'1'},{tokenId:'2'},{tokenId:'999'}],new Set([1,2]),new Set([2]))).toEqual([1]);
   expect(importCandidates(null,new Set(),new Set())).toEqual([]);
  });
+});
+
+it('measures standard transaction fees for individual changes and batches without network requests',async()=>{
+ const deployed=address+'.xtrata-radio-likes-v1-0';
+ for(const [count,bytes] of [[1,193],[7,404],[25,980]]){
+  const changes=Array.from({length:count},(_,id)=>({id,liked:true}));
+  expect((await likeFeeSuggestion(deployed,changes,session)).microStx).toBe(bytes);
+ }
+ expect((await likeFeeSuggestion(deployed,[{id:1,liked:false}],session)).totalStx).toBe('0.000193');
 });
