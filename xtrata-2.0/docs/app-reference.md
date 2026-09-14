@@ -427,3 +427,5 @@ Radio endorsement diagnostics: `/radio/endorse` includes a bounded local step lo
 On-chain likes review shows a transaction-size-based minimum relay fee suggestion, batch total and per-song cost. It updates with the selection and remains visible during wallet approval; users choose custom fees in their wallet, with no automatic override.
 
 Confirmed on-chain favourites now remove their matching browser-local entries on radio/endorsement state refresh. Pending imports defer cleanup; unconfirmed songs survive. Older successful imports are reconciled as well, preventing repeated import prompts.
+
+The standalone `/radio` page now has header wallet controls showing the complete connected address, Connect/Switch wallet, and Disconnect. `src/radio-likes/wallet.ts` uses the shared wallet adapter and persisted session, refreshes on focus/storage changes, and signals the radio to reload wallet-scoped likes immediately after an action. `build:radio-wallet` generates `/radio/wallet.js` and is included in prebuild. Controls wrap on narrow screens and report errors without initiating payments. Two mocked wallet UI tests and both wallet/radio builds passed.

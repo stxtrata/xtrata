@@ -1780,6 +1780,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   }});
   const refreshChainLikes = (force = false) => { void chainState.refresh(force); };
   window.addEventListener('focus', () => refreshChainLikes(true));
+  window.addEventListener('xtrata:wallet-changed', () => refreshChainLikes(true));
   window.addEventListener('storage', event => {
     if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true);
   });
