@@ -80,3 +80,7 @@ Validation: 13 targeted catalogue/chain-total tests passed, covering cross-walle
 The radio now passes album metadata to its standalone song information, and the catalogue shows Album immediately beside Song. The column is sortable, searchable and included in song details. Migration 016 adds the cached album field; existing HTML metadata is rechecked in bounded background batches on catalogue requests after deployment. Album names can therefore populate gradually. No album is fabricated when metadata omits it.
 
 Migration 016 was applied successfully to the production `xtrata-manage` database on 2026-09-14. The UI/enrichment code still requires deployment.
+
+## Connected-wallet import prompt correction
+
+The automatic local-favourites popup has been removed. The radio now offers imports only after the connected wallet has a successful on-chain state read, filtering out its already-confirmed likes. Manual wallet guidance explains when connection/verification is still needed. A separate pending transaction no longer blocks radio cleanup of songs that are already confirmed liked: no unconfirmed state is promoted or deleted. The existing wallet-switch/stale-response guards still apply. Nine targeted prompt/state/cleanup tests and the radio build passed.
