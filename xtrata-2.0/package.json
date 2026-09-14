@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes",
+    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet",
     "build": "vite build",
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
     "build:agent-one-wallet": "vite build -c vite.agent-one-wallet.config.ts",
@@ -76,7 +76,8 @@
     "test:v3.2.4": "npm run check:v3.2.4 && node tests/xtrata-v3.2.4.migration.test.mjs",
     "wizards:suno": "node scripts/wizard/suno-harness.mjs",
     "wizards:suno:test:browser": "XTRATA_BROWSER_TESTS=1 vitest run scripts/wizard/__tests__/suno-browser.test.ts",
-    "build:radio-likes": "vite build -c vite.radio-likes.config.ts"
+    "build:radio-likes": "vite build -c vite.radio-likes.config.ts",
+    "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

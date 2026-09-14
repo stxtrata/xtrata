@@ -81,3 +81,6 @@
   Cache-Control: no-cache
 /radio/embed.js
   Cache-Control: no-cache
+
+/radio/wallet.js
+  Cache-Control: no-cache

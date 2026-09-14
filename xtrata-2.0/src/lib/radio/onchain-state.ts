@@ -1,3 +1,4 @@
+import {removeConfirmedLocalLikes} from './local-like-cleanup';
 import type {WalletSession} from '../wallet/types';
 type Track={id:number;title:string;artist?:string};
 export type ConfirmedRadioLike={tokenId:string;title:string;artist:string};
@@ -24,6 +25,9 @@ export function createRadioOnchainState(options:{wallet:()=>WalletSession;change
    }
    if(run!==generation||wallet!==address())return;
    state={wallet,status:'ready',likes};
+   try {
+    if(!globalThis.localStorage.getItem(`xtrata.radio.chain.pending:${config.contract}:${wallet}`))removeConfirmedLocalLikes(likes.map(l=>l.tokenId));
+   }catch{ /* Storage may be unavailable; chain likes remain valid. */ }
   }catch{if(run!==generation||wallet!==address())return;state={wallet,status:'unavailable',likes:[]};}
   options.changed();
  }

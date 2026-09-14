@@ -425,3 +425,9 @@ Radio likes migration recovery: the radio now visibly offers preserved local fav
 Radio endorsement diagnostics: `/radio/endorse` includes a bounded local step log (`[radio:likes]` in the console) and visible wallet progress, distinguishing Xverse account preflight/reconnection from the actual signing request. Optional wallet progress callbacks do not change signing behavior. See the on-chain likes guide for reported timeout context and validation.
 
 On-chain likes review shows a transaction-size-based minimum relay fee suggestion, batch total and per-song cost. It updates with the selection and remains visible during wallet approval; users choose custom fees in their wallet, with no automatic override.
+
+Confirmed on-chain favourites now remove their matching browser-local entries on radio/endorsement state refresh. Pending imports defer cleanup; unconfirmed songs survive. Older successful imports are reconciled as well, preventing repeated import prompts.
+
+The standalone `/radio` page now has header wallet controls showing the complete connected address, Connect/Switch wallet, and Disconnect. `src/radio-likes/wallet.ts` uses the shared wallet adapter and persisted session, refreshes on focus/storage changes, and signals the radio to reload wallet-scoped likes immediately after an action. `build:radio-wallet` generates `/radio/wallet.js` and is included in prebuild. Controls wrap on narrow screens and report errors without initiating payments. Two mocked wallet UI tests and both wallet/radio builds passed.
+
+Catalogue on-chain totals use bounded retries per 25-song batch and preserve successful batches when another fails. Responses expose `onchain_likes_status`; the catalogue explains partial/unavailable totals and offers its existing Refresh control. Totals are global contract counts, not the current listener’s endorsement flag.

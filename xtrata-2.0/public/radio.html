@@ -122,6 +122,14 @@
     .art{max-width:420px;margin:0 auto}
     .ctl{justify-content:center}
   }
+  header{flex-wrap:wrap}
+  .radio-wallet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:100%;margin-left:auto;font-size:12px}
+  #radio-wallet-address{overflow-wrap:anywhere;max-width:100%;color:var(--mut);font-family:var(--mono)}
+  .radio-wallet button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+  .radio-wallet button:disabled{opacity:.6;cursor:wait}
+  #radio-wallet-message{flex-basis:100%;color:#ffb9b9;overflow-wrap:anywhere}
+  #radio-wallet-message:empty{display:none}
+  @media(max-width:640px){.radio-wallet{width:100%;margin-left:0}.live{font-size:9px}}
 </style>
 </head>
 <body>
@@ -129,6 +137,12 @@
   <a href="/" title="Xtrata home"><img src="/favicon.svg" alt="Xtrata" /></a>
   <div class="logo"><b>XTRATA</b> <i>RADIO</i></div>
   <div class="live"><b>●</b> BROADCASTING FROM THE CHAIN</div>
+  <div class="radio-wallet" aria-label="Wallet controls">
+    <span id="radio-wallet-address">Wallet not connected</span>
+    <button id="radio-wallet-connect" type="button">Connect wallet</button>
+    <button id="radio-wallet-disconnect" type="button" hidden>Disconnect</button>
+    <span id="radio-wallet-message" role="status"></span>
+  </div>
 </header>
 <main class="paused" id="stage">
   <div>
@@ -265,5 +279,6 @@
 })();
 </script>
 <script src="/xtrata-radio.js" defer></script>
+<script type="module" src="/radio/wallet.js"></script>
 </body>
 </html>
