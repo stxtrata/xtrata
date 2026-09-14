@@ -62,7 +62,14 @@ async function updateFeeSuggestion(){
   if(!changes.length)return;
   const fee=await likeFeeSuggestion(config.contract,changes,wallet.getSession());
   if(run!==feeGeneration)return;
-  el('fee-suggestion').textContent=`Suggested minimum fee: ${fee.totalStx} STX total (${fee.microStx} microSTX).`+(fee.count>1?` Approximately ${fee.perSongStx} STX per song for ${fee.count} songs.`:'')+' In your wallet, choose the custom network fee if its suggestion is higher. This is the standard single-signature relay minimum, not a promise of fast confirmation; a higher fee may be needed when busy. Check the final wallet fee before signing. Xtrata charges no platform fee.';
+  const panel=el('fee-suggestion');panel.replaceChildren();
+  const label=document.createElement('span');label.className='fee-label';label.textContent=fee.count===1?'CUSTOM NETWORK FEE · ONE SONG':'SUGGESTED MINIMUM · BATCH TOTAL';
+  const amount=document.createElement('strong');amount.className='fee-amount';amount.textContent=fee.count===1?'0.0002 STX':fee.totalStx+' STX';
+  const instructions=document.createElement('p');
+  instructions.textContent=fee.count===1?'Choose Custom in your wallet and enter 0.0002 STX (200 microSTX). Pay no more for this like or unlike. If the wallet shows a higher fee, change it or cancel before signing.':'Suggested minimum fee: '+fee.totalStx+' STX total ('+fee.microStx+' microSTX). Approximately '+fee.perSongStx+' STX per song for '+fee.count+' songs. Choose the custom network fee in your wallet if its suggestion is higher.';
+  const note=document.createElement('p');note.className='fee-note';note.textContent=fee.count===1?'We request 0.0002 STX from your wallet. Xtrata charges no platform fee. Confirmation may take longer at this fee; if it is not accepted, cancel and try later.':'This is the standard single-signature relay minimum, not a guarantee of fast confirmation. Xtrata charges no platform fee. Check the final fee before signing.';
+  panel.append(label,amount,instructions,note);
+
   el<HTMLButtonElement>('approve').disabled=false;
  }catch{if(run===feeGeneration){el('fee-suggestion').textContent='Fee suggestion unavailable. Review the fee shown by your wallet.';el<HTMLButtonElement>('approve').disabled=false;}}
 }
@@ -112,7 +119,7 @@ el('approve').onclick=async()=>{
  if(busy||loading||pending()){diagnostic('APPROVE_BLOCKED');return;}
  let waitingTimer:ReturnType<typeof setInterval>|undefined;
  const changes=selectedChanges();
- el('fee-reminder').textContent=el('fee-suggestion').textContent;
+ el('fee-reminder').replaceChildren(...Array.from(el('fee-suggestion').childNodes,node=>node.cloneNode(true)));
  try {
   const session=wallet.getSession();if(session.address!==reviewWallet||session.address!==statesWallet)throw Error('Wallet changed. Review these songs again.');
   const call=buildLikeCall(config.contract,changes,session);const key=pendingKey();busy=true;render();el<HTMLDialogElement>('review').close();status('Review the network fee in your wallet. No platform fee or token transfer is requested.');

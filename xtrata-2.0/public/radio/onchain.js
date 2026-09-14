@@ -12043,7 +12043,7 @@ function bp(t, e, n) {
   if (!e.length || e.length > 25 || e.some((a) => !Number.isSafeInteger(a.id) || a.id < 0 || typeof a.liked != "boolean") || new Set(e.map((a) => a.id)).size !== e.length) throw Error("Select 1–25 different songs.");
   const r = t.split("."), [s, i] = r;
   if (r.length !== 2 || !s.startsWith("SP") || !Tr(s) || !/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(i)) throw Error("Invalid likes contract.");
-  return { contractAddress: s, contractName: i, functionName: e.length === 1 ? "set-liked" : "set-likes", functionArgs: e.length === 1 ? [fh(e[0].id), uh(e[0].liked)] : [ME(e.map((a) => UE({ id: fh(a.id), liked: uh(a.liked) })))], network: new cs(), stxAddress: n.address, sponsored: !1, postConditionMode: lr.Deny, postConditions: [] };
+  return { contractAddress: s, contractName: i, functionName: e.length === 1 ? "set-liked" : "set-likes", functionArgs: e.length === 1 ? [fh(e[0].id), uh(e[0].liked)] : [ME(e.map((a) => UE({ id: fh(a.id), liked: uh(a.liked) })))], network: new cs(), stxAddress: n.address, sponsored: !1, postConditionMode: lr.Deny, postConditions: [], ...e.length === 1 ? { fee: 200n } : {} };
 }
 function yp(t, e, n) {
   return Array.isArray(t) ? [...new Set(t.map((r) => Number(r == null ? void 0 : r.tokenId)).filter((r) => Number.isSafeInteger(r) && e.has(r) && !n.has(r)))] : [];
@@ -12119,7 +12119,16 @@ async function Sp() {
     if (!e.length) return;
     const n = await p6(jt.contract, e, ce.getSession());
     if (t !== Ia) return;
-    rt("fee-suggestion").textContent = `Suggested minimum fee: ${n.totalStx} STX total (${n.microStx} microSTX).` + (n.count > 1 ? ` Approximately ${n.perSongStx} STX per song for ${n.count} songs.` : "") + " In your wallet, choose the custom network fee if its suggestion is higher. This is the standard single-signature relay minimum, not a promise of fast confirmation; a higher fee may be needed when busy. Check the final wallet fee before signing. Xtrata charges no platform fee.", rt("approve").disabled = !1;
+    const r = rt("fee-suggestion");
+    r.replaceChildren();
+    const s = document.createElement("span");
+    s.className = "fee-label", s.textContent = n.count === 1 ? "CUSTOM NETWORK FEE · ONE SONG" : "SUGGESTED MINIMUM · BATCH TOTAL";
+    const i = document.createElement("strong");
+    i.className = "fee-amount", i.textContent = n.count === 1 ? "0.0002 STX" : n.totalStx + " STX";
+    const o = document.createElement("p");
+    o.textContent = n.count === 1 ? "Choose Custom in your wallet and enter 0.0002 STX (200 microSTX). Pay no more for this like or unlike. If the wallet shows a higher fee, change it or cancel before signing." : "Suggested minimum fee: " + n.totalStx + " STX total (" + n.microStx + " microSTX). Approximately " + n.perSongStx + " STX per song for " + n.count + " songs. Choose the custom network fee in your wallet if its suggestion is higher.";
+    const a = document.createElement("p");
+    a.className = "fee-note", a.textContent = n.count === 1 ? "We request 0.0002 STX from your wallet. Xtrata charges no platform fee. Confirmation may take longer at this fee; if it is not accepted, cancel and try later." : "This is the standard single-signature relay minimum, not a guarantee of fast confirmation. Xtrata charges no platform fee. Check the final fee before signing.", r.append(s, i, o, a), rt("approve").disabled = !1;
   } catch {
     t === Ia && (rt("fee-suggestion").textContent = "Fee suggestion unavailable. Review the fee shown by your wallet.", rt("approve").disabled = !1);
   }
@@ -12217,7 +12226,7 @@ rt("approve").onclick = async () => {
   }
   let t;
   const e = mp();
-  rt("fee-reminder").textContent = rt("fee-suggestion").textContent;
+  rt("fee-reminder").replaceChildren(...Array.from(rt("fee-suggestion").childNodes, (n) => n.cloneNode(!0)));
   try {
     const n = ce.getSession();
     if (n.address !== wp || n.address !== Ol) throw Error("Wallet changed. Review these songs again.");

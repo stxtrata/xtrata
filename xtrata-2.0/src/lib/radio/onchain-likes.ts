@@ -7,7 +7,7 @@ export function buildLikeCall(contract:string,changes:LikeChange[],session:Walle
  if(!changes.length||changes.length>25||changes.some(c=>!Number.isSafeInteger(c.id)||c.id<0||typeof c.liked!=='boolean')||new Set(changes.map(c=>c.id)).size!==changes.length)throw Error('Select 1–25 different songs.');
  const parts=contract.split('.');const [contractAddress,contractName]=parts;
  if(parts.length!==2||!contractAddress.startsWith('SP')||!validateStacksAddress(contractAddress)||!/^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(contractName))throw Error('Invalid likes contract.');
- return {contractAddress,contractName,functionName:changes.length===1?'set-liked':'set-likes',functionArgs:changes.length===1?[Cl.uint(changes[0].id),Cl.bool(changes[0].liked)]:[Cl.list(changes.map(c=>Cl.tuple({id:Cl.uint(c.id),liked:Cl.bool(c.liked)})))],network:new StacksMainnet(),stxAddress:session.address,sponsored:false,postConditionMode:PostConditionMode.Deny,postConditions:[]};
+ return {contractAddress,contractName,functionName:changes.length===1?'set-liked':'set-likes',functionArgs:changes.length===1?[Cl.uint(changes[0].id),Cl.bool(changes[0].liked)]:[Cl.list(changes.map(c=>Cl.tuple({id:Cl.uint(c.id),liked:Cl.bool(c.liked)})))],network:new StacksMainnet(),stxAddress:session.address,sponsored:false,postConditionMode:PostConditionMode.Deny,postConditions:[],...(changes.length===1?{fee:200n}:{})};
 }
 export function importCandidates(saved:unknown,eligible:Set<number>,liked:Set<number>):number[]{
  if(!Array.isArray(saved))return [];

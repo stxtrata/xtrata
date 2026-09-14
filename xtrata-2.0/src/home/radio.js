@@ -671,8 +671,15 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     action.target = '_blank'; action.rel = 'noopener';
     action.textContent = id != null ? (isLiked(id) ? 'Review unlike for song #' : 'Like song #') + id + ' on-chain ↗' : 'Connect wallet / choose a song to like ↗';
     likesDialog.append(heading, note, action);
-    const saved = loadLikes();
-    if (Array.isArray(saved) && saved.length) {
+    const confirmed = chainState?.snapshot();
+    const local = loadLikes();
+    const saved = confirmed?.status === 'ready' && Array.isArray(local) ? local.filter(item => item && !confirmed.likes.some(l => l.tokenId === String(item.tokenId))) : [];
+    if (confirmed?.status !== 'ready') {
+      const checking = document.createElement('p');
+      checking.textContent = 'Connect your wallet and wait for its on-chain likes to load before reviewing any remaining local favourites.';
+      likesDialog.append(checking);
+    }
+    if (saved.length) {
       const offer = document.createElement('p');
       offer.textContent = 'Your previous favourites are still saved in this browser. You can review and import them as on-chain likes, up to 25 per transaction.';
       const list = document.createElement('ul');
@@ -1790,14 +1797,6 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   chainLike?.addEventListener('click', event => {
     event.preventDefault(); event.stopPropagation(); openOnchainLikes(nowPlaying?.tokenId);
   });
-  // One explicit migration offer per browser session; never delete the saved list.
-  try {
-    const saved = loadLikes();
-    if (Array.isArray(saved) && saved.length && !sessionStorage.getItem('xtrata.radio.import-offered.v1')) {
-      openOnchainLikes();
-      sessionStorage.setItem('xtrata.radio.import-offered.v1', '1');
-    }
-  } catch { /* Storage/dialog restrictions must not prevent playback. */ }
   const statsLink = root.querySelector('.xtrata-radio__stats');
   statsLink?.addEventListener('click', event => event.stopPropagation());
   let statsRows = null;
@@ -1808,7 +1807,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     if (chainLike) {
       const saved = loadLikes();
       const confirmed = chainState.snapshot();
-      const count = Array.isArray(saved) ? new Set(saved.filter(l => confirmed.status !== 'ready' || !confirmed.likes.some(c => c.tokenId === String(l.tokenId))).map(l => String(l.tokenId))).size : 0;
+      const count = confirmed.status === 'ready' && Array.isArray(saved) ? new Set(saved.filter(l => l && !confirmed.likes.some(c => c.tokenId === String(l.tokenId))).map(l => String(l.tokenId))).size : 0;
       chainLike.href = count ? '/radio/endorse?import=1' : '/radio/endorse' + (id ? '?id=' + encodeURIComponent(id) : '');
       chainLike.textContent = count ? 'IMPORT ' + count + ' FAVOURITES ↗' : 'ON-CHAIN ♥';
       chainLike.title = count ? 'Review saved local favourites for on-chain likes. Wallet approval and network fees apply.' : 'Manage confirmed on-chain likes';
