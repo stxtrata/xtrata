@@ -7,16 +7,17 @@ const name='radio-likes-test';
 const call=(fn:string,args:any[],sender=alice)=>simnet.callPublicFn(name,fn,args,sender);
 const read=(fn:string,args:any[])=>simnet.callReadOnlyFn(name,fn,args,alice).result;
 let id:any;
-beforeEach(()=>{
+function setup(clarityVersion:3|4){
  const source=readFileSync('../live/xtrata-radio-likes-v1.0.clar','utf8').replaceAll('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',admin);
- simnet.deployContract(name,source,{clarityVersion:3},admin);
+ simnet.deployContract(name,source,{clarityVersion},admin);
  simnet.callPublicFn('xtrata-v3-2-3','set-paused',[Cl.bool(false)],admin);
  const data=Buffer.from('song'),hash=createHash('sha256').update(Buffer.concat([Buffer.alloc(32),data])).digest();
  expect(simnet.callPublicFn('xtrata-v3-2-3','begin-inscription',[Cl.buffer(hash),Cl.stringAscii('audio/mpeg'),Cl.uint(data.length),Cl.uint(1)],alice).result).toBeOk(Cl.bool(true));
  simnet.callPublicFn('xtrata-v3-2-3','add-chunk-batch',[Cl.buffer(hash),Cl.list([Cl.buffer(data)])],alice);
  id=(simnet.callPublicFn('xtrata-v3-2-3','seal-inscription',[Cl.buffer(hash),Cl.stringAscii('data:audio/mpeg,test')],alice).result as any).value;
-});
-describe('on-chain radio likes',()=>{
+}
+describe.each([3,4] as const)('on-chain radio likes, Clarity %i',(clarityVersion)=>{
+ beforeEach(()=>setup(clarityVersion));
  it('deduplicates, isolates wallets, removes likes and transfers no STX',()=>{
   const balance=simnet.getAssetsMap().get('STX')!.get(alice);
   expect(call('set-liked',[id,Cl.bool(true)]).result).toBeOk(Cl.bool(true));

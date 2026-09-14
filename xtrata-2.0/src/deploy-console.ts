@@ -90,6 +90,9 @@ import livingSynthRegistrySource from '../contracts/live/proof-of-free-living-sy
 import xchessHelperSource from '../contracts/live/xchess-browser-house-v2.clar?raw';
 import {XCHESS_HELPER_NAME, XCHESS_HELPER_SOURCE, inspectXChessSource} from './lib/deploy/xchess';
 
+import radioLikesSource from '../contracts/live/xtrata-radio-likes-v1.0.clar?raw';
+import {RADIO_LIKES_NAME,RADIO_LIKES_SOURCE,inspectRadioLikesSource} from './lib/deploy/radio-likes';
+
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const HIRO_API = 'https://api.hiro.so';
 
@@ -100,6 +103,7 @@ type Deployable = {
   code: string;
   notes: string;
   xchess?: boolean;
+  radioLikes?: boolean;
   sponsoredMarket?: boolean;
   dropsV11?: boolean;
   proofOfFree?: boolean;
@@ -108,6 +112,7 @@ type Deployable = {
 };
 
 const DEPLOYABLE: Deployable[] = [
+  {name:RADIO_LIKES_NAME,source:RADIO_LIKES_SOURCE,code:radioLikesSource,radioLikes:true,notes:'Wallet-paid song likes and unlikes, no platform fee, and optional imports of up to 25 favourites. No sponsor or admin setup transactions are required.'},
   {
     name: XCHESS_HELPER_NAME,
     source: XCHESS_HELPER_SOURCE,
@@ -343,6 +348,7 @@ const sha256Hex = async (text: string) => {
 const runPreflight = async (entry: Deployable, code: string): Promise<PreflightResult> => {
   const problems: string[] = [];
   const sha256 = await sha256Hex(code);
+  if (entry.radioLikes) problems.push(...inspectRadioLikesSource(code, sha256));
   if (entry.xchess) problems.push(...inspectXChessSource(code, sha256));
   const active = stripComments(code);
   if (active.includes('.mock-')) {
@@ -398,13 +404,13 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     chainStatus = classifyContractInterfaceResponse(response.ok, response.status);
     if (chainStatus === 'deployed') {
       alreadyDeployed = true;
-      if (entry.xchess) {
+      if (entry.xchess || entry.radioLikes) {
         const deployed = await fetch(`${HIRO_API}/v2/contracts/source/${EXPECTED_DEPLOYER}/${entry.name}?proof=0`);
-        if (!deployed.ok) problems.push(`Cannot verify deployed X-Chess source: HTTP ${deployed.status}`);
+        if (!deployed.ok) problems.push(`Cannot verify deployed contract source: HTTP ${deployed.status}`);
         else {
           const body = await deployed.json();
-          if (typeof body.source !== 'string') problems.push('Deployed X-Chess source is unavailable');
-          else problems.push(...inspectXChessSource(body.source, await sha256Hex(body.source)));
+          if (typeof body.source !== 'string') problems.push('Deployed contract source is unavailable');
+          else problems.push(...(entry.radioLikes ? inspectRadioLikesSource : inspectXChessSource)(body.source, await sha256Hex(body.source)));
         }
       }
     } else if (chainStatus === 'unknown') {
@@ -483,7 +489,7 @@ const deployContract = async (name: string) => {
   const stateEntry = states.get(name)!;
   if (stateEntry.busy || !stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
     return;
-  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER) {
+  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || (stateEntry.entry.radioLikes && session.network !== 'mainnet')) {
     stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
     addLog(stateEntry, 'deploy', 'error', stateEntry.error);
     render();
@@ -491,13 +497,13 @@ const deployContract = async (name: string) => {
   }
   stateEntry.busy = true;
   stateEntry.error = null;
-  if (stateEntry.entry.xchess) {
+  if (stateEntry.entry.xchess || stateEntry.entry.radioLikes) {
     render();
     try {
       stateEntry.preflight = await runPreflight(stateEntry.entry, stateEntry.source);
       if (!stateEntry.preflight.ok || stateEntry.preflight.alreadyDeployed)
         throw new Error(stateEntry.preflight.problems.join('; ') || 'Contract is already deployed; its source has been verified.');
-      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER)
+      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || (stateEntry.entry.radioLikes && session.network !== 'mainnet'))
         throw new Error('Signer changed during preflight. Reconnect the deployer before signing.');
     } catch (error) {
       stateEntry.busy = false;
@@ -1768,12 +1774,14 @@ const render = () => {
   for (const stateEntry of states.values()) {
     const { entry, preflight, txId, error, busy, logs } = stateEntry;
     if (entry.livingSynthRole) continue;
-    const card = el('div', { className: entry.dropsV11 || entry.xchess ? 'card featured' : 'card', ...(entry.xchess ? {id:'xchess-deployment'} : {}) });
+    const card = el('div', { className: entry.dropsV11 || entry.xchess || entry.radioLikes ? 'card featured' : 'card', ...(entry.radioLikes ? {id:'radio-likes-deployment'} : entry.xchess ? {id:'xchess-deployment'} : {}) });
     card.append(
       el(
         'h2',
         {},
-        entry.xchess
+        entry.radioLikes
+          ? 'Radio on-chain likes — v1.0'
+          : entry.xchess
           ? 'X-Chess 2.6.0 — browser house helper'
           : entry.proofOfFree
           ? 'Proof of Free v1 — Living Synth v3 controller'
@@ -1784,6 +1792,10 @@ const render = () => {
       el('p', {}, entry.notes)
     );
 
+    if (entry.radioLikes) {
+      card.append(el('p', {}, 'Deploying publishes the callable contract; it does not import favourites or send a like. After confirmation, re-run preflight to verify its source, then set this Cloudflare Pages variable and redeploy the site:'), el('pre', {}, `RADIO_LIKES_CONTRACT=${EXPECTED_DEPLOYER}.${entry.name}`));
+      if (preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source verified byte-for-byte. No admin transaction is required. Activate the address above in Cloudflare.'));
+    }
     if (entry.xchess) {
       card.append(el('p', {}, 'Inscribing the .clar file stores source; this wallet deployment makes it callable. Engine ID 3049 and your new board ID are entered in the board when creating a match, not inserted into this contract.'));
       if (preflight?.ok && preflight.alreadyDeployed)
@@ -1932,7 +1944,7 @@ const render = () => {
           el(
             'button',
             {
-              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER,
+              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || (entry.radioLikes && session.network !== 'mainnet'),
               onclick: () => deployContract(entry.name)
             },
             busy ? 'Working…' : '2. Deploy (sign in wallet)'
@@ -1941,17 +1953,19 @@ const render = () => {
         el(
           'p',
           {},
-          entry.xchess
+          entry.radioLikes
+            ? 'Exact tested source, published as Clarity 4. Review the mainnet contract name and network fee in your wallet. This console requests its existing 0.49 STX deployment fee default; that is a one-time deployment fee, not the fee for a like or unlike.'
+            : entry.xchess
             ? 'Exact tested Clarity 4 source. The wallet must show xchess-browser-house-v2 on mainnet. Review its network fee before signing; the console requests the existing 0.49 STX fee default. No game deposits are made by deployment.'
             : entry.proofOfFree
             ? 'Contract is generated from the audited Drops v1.1 base and the verified engine binding. Download the generated source before signing so it is retained in the release evidence bundle.'
             : 'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
         ),
-        ...(entry.proofOfFree || entry.xchess ? [] : [el('pre', {}, cliCommand(entry))]),
+        ...(entry.proofOfFree || entry.xchess || entry.radioLikes ? [] : [el('pre', {}, cliCommand(entry))]),
         el(
           'p',
           {},
-          entry.xchess ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
+          entry.xchess || entry.radioLikes ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
         )
       );
     }
@@ -1977,7 +1991,7 @@ const render = () => {
           el(
             'button',
             {
-              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER,
+              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || (entry.radioLikes && session.network !== 'mainnet'),
               onclick: () => setSponsor(entry.name, sponsorInput.value)
             },
             busy ? 'Working…' : '3. Set sponsor (sign in wallet)'
@@ -1998,7 +2012,7 @@ const render = () => {
             el(
               'button',
               {
-                disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER,
+                disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || (entry.radioLikes && session.network !== 'mainnet'),
                 onclick: () => setBnsAttestor(entry.name, attestorInput.value)
               },
               busy ? 'Working…' : '4. Set BNS attestor (sign in wallet)'
