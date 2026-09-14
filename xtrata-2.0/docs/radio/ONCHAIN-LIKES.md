@@ -68,3 +68,9 @@ Validation: eight targeted tests passed, including the deployed-name sizes (193 
 Both the radio and endorsement page reconcile local favourites against the connected wallet’s confirmed on-chain likes. Matching local entries are removed, including imports completed before this update; unconfirmed/unimported entries are preserved. Cleanup reads the current storage value so other saved songs survive, deletes the key when empty, and tolerates unavailable or malformed storage without disturbing chain state. A tracked pending transaction defers cleanup; a failed transaction with no confirmed like leaves the song saved. No cleanup runs from a stale wallet response or a failed state read. The endorsement page reports the number removed in its diagnostic log.
 
 Validation: 14 targeted tests passed, including pending-to-confirmed cleanup, failed import preservation, older import reconciliation, duplicate entries and unavailable/malformed storage. Both radio bundles built successfully. No live wallet or transaction was used.
+
+## Catalogue total read reliability
+
+The catalogue reads the contract’s global `total` for each song, independently of the listener’s `liked` flag. During diagnosis the live API returned total 2 for songs 2883 and 2885, while the earlier screenshot displayed unavailable values. Previously any one failed batch discarded every total. `radio-chain-totals.ts` now retries configuration and each failed batch once, preserves successful batches, and returns ready/partial/unavailable/disabled status. The catalogue requests fresh data and explicitly explains missing totals with a Refresh instruction. Unavailable remains null, never a fabricated zero.
+
+Validation: 13 targeted catalogue/chain-total tests passed, covering cross-wallet totals, transient failures, partial results and unavailable configuration. Catalogue JavaScript ESLint passed. No signing or wallet access was performed.
