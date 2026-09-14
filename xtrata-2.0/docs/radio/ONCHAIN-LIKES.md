@@ -84,3 +84,9 @@ Migration 016 was applied successfully to the production `xtrata-manage` databas
 ## Connected-wallet import prompt correction
 
 The automatic local-favourites popup has been removed. The radio now offers imports only after the connected wallet has a successful on-chain state read, filtering out its already-confirmed likes. Manual wallet guidance explains when connection/verification is still needed. A separate pending transaction no longer blocks radio cleanup of songs that are already confirmed liked: no unconfirmed state is promoted or deleted. The existing wallet-switch/stale-response guards still apply. Nine targeted prompt/state/cleanup tests and the radio build passed.
+
+## Single-song custom fee — supersedes the earlier wallet-estimated default
+
+A single like or unlike now requests exactly 200 microSTX (0.0002 STX). Review and the persistent wallet reminder display a prominent fee card instructing users to choose Custom, enter 0.0002 STX, and change a higher fee or cancel. The wallet can override a requested fee; this is not an enforceable wallet fee cap. Confirmation speed is not guaranteed, and users are advised to cancel/try later if that fee is not accepted. Batch requests remain separately sized and do not inherit the single-song fee.
+
+Validation: 12 targeted page/helper tests passed, including exact single-state fee requests, batch isolation and the persistent reminder. The on-chain bundle built successfully. No live signing or transaction was performed.

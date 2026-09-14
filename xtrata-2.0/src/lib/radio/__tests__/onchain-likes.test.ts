@@ -7,10 +7,10 @@ describe('wallet-paid like requests',()=>{
  it('requests explicit states, no sponsorship and no asset transfers',()=>{
   const call=buildLikeCall(contract,[{id:12,liked:false}],session);
   expect(call.functionName).toBe('set-liked');expect(cvToJSON(call.functionArgs[1]).value).toBe(false);
-  expect(call.sponsored).toBe(false);expect(call.postConditionMode).toBe(PostConditionMode.Deny);expect(call.postConditions).toEqual([]);expect(call).not.toHaveProperty('fee');
+  expect(call.sponsored).toBe(false);expect(call.postConditionMode).toBe(PostConditionMode.Deny);expect(call.postConditions).toEqual([]);expect(call.fee).toBe(200n);
  });
  it('bounds imports and rejects duplicate IDs and wrong-network wallets',()=>{
-  const changes=[{id:1,liked:true},{id:2,liked:true}];expect(buildLikeCall(contract,changes,session).functionName).toBe('set-likes');
+  const changes=[{id:1,liked:true},{id:2,liked:true}];expect(buildLikeCall(contract,changes,session).functionName).toBe('set-likes');expect(buildLikeCall(contract,changes,session)).not.toHaveProperty('fee');
   for(const c of [[],[changes[0],changes[0]],Array.from({length:26},(_,id)=>({id,liked:true}))])expect(()=>buildLikeCall(contract,c,session)).toThrow();
   expect(()=>buildLikeCall(contract,changes,{...session,network:'testnet'})).toThrow();
  });
@@ -28,3 +28,5 @@ it('measures standard transaction fees for individual changes and batches withou
  }
  expect((await likeFeeSuggestion(deployed,[{id:1,liked:false}],session)).totalStx).toBe('0.000193');
 });
+
+it('requests exactly 200 microSTX for either single-song state',()=>{for(const liked of [true,false])expect(buildLikeCall(contract,[{id:1,liked}],session).fee).toBe(200n);});
