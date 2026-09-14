@@ -68,6 +68,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     '  <div class="xtrata-radio__display" role="button" tabindex="0" title="Xtrata Radio">',
     '    <div class="xtrata-radio__dmain">',
     '      <div class="xtrata-radio__meta">',
+    '        <a class="xtrata-radio__brand xtrata-radio__chain-like" href="/radio/endorse" target="_blank" rel="noopener">ON-CHAIN ♥</a>',
     '        <a class="xtrata-radio__brand xtrata-radio__stats" href="/radio/catalogue" target="_blank" rel="noopener">SONG STATS ↗</a>',
     '      </div>',
     '      <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
@@ -1743,6 +1744,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   });
   applyAttract();
 
+  const chainLike = root.querySelector('.xtrata-radio__chain-like');
+  chainLike?.addEventListener('click', event => event.stopPropagation());
   const statsLink = root.querySelector('.xtrata-radio__stats');
   statsLink?.addEventListener('click', event => event.stopPropagation());
   let statsRows = null;
@@ -1750,6 +1753,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   let statsLoading = false;
   const updateStats = snap => {
     const id = snap.nowPlaying?.tokenId;
+    if (chainLike) chainLike.href = '/radio/endorse' + (id ? '?id=' + encodeURIComponent(id) : '');
     if (!statsLink) return;
     statsLink.href = '/radio/catalogue' + (id ? '?id=' + encodeURIComponent(id) : '');
     const row = statsRows?.find(item => String(item.id) === String(id));

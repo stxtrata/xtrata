@@ -413,3 +413,7 @@ legacy generic workflow defaults remain unchanged. See
 Radio catalogue thumbnails: migration 014 caches inscribed artwork, served through `/radio/artwork`; the catalogue shows lazy-loaded covers with stable placeholders. See `docs/plans/RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md`.
 
 Radio scrolling metadata includes an `ALBUM:` section after title and artist when inscription metadata supplies an album. Current JSON, legacy album strings, structured inAlbum names, and visible album labels are supported. Tracks without albums retain the existing sequence; no database migration is required.
+
+Wallet-paid on-chain song endorsements are implemented at `/radio/endorse` with separate catalogue counts, explicit like/unlike wallet approval and optional 25-song imports. Activation requires deploying `contracts/live/xtrata-radio-likes-v1.0.clar` and configuring `RADIO_LIKES_CONTRACT`; it is disabled by default. No platform fee or automatic import. See `docs/radio/ONCHAIN-LIKES.md` for architecture, validation and deployment.
+
+The deploy console (`web/deploy-console.html#radio-likes-deployment`) includes Radio on-chain likes v1.0 with pinned source, a fresh preflight at wallet opening, Clarity 4 deployment, and post-deployment source verification plus the Cloudflare configuration value.

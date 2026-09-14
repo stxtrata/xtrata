@@ -5,3 +5,7 @@ input{font:inherit;padding:8px;background:#213226;color:inherit;border:1px solid
 .song-cell{display:flex;align-items:center;gap:10px;min-width:180px}.song-art{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;border-radius:6px;background:#213226;color:#b9cbbf;overflow:hidden}.song-art img{position:absolute;inset:0;width:44px;height:44px;object-fit:cover}.song-cell button{flex:1}
 
 .radio-catalogue .scroll{max-height:75vh;overflow:auto}.radio-catalogue thead th{position:sticky;top:0;background:#101713;z-index:1}
+#review{width:min(640px,calc(100% - 48px));max-height:80vh;overflow:auto;padding:24px;border:1px solid #536857;border-radius:10px;background:#101713;color:#e8eee8}#review::backdrop{background:#000a}
+
+.chain-toolbar{display:flex;gap:8px;flex-wrap:wrap}.chain-likes button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:600px){.chain-likes main{margin:16px auto;padding:20px}.chain-likes table,.chain-likes tbody{display:block}.chain-likes thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.chain-likes tr{display:grid;grid-template-columns:1fr auto;gap:8px;border-bottom:1px solid #35473a;padding:12px 0}.chain-likes td{padding:4px 0;border:0}.chain-likes td:first-child{min-width:0;grid-column:1/-1}.chain-likes td:nth-child(2)::before{content:'On-chain likes: ';color:#b9cbbf}.chain-likes td:nth-child(3){text-align:right}}

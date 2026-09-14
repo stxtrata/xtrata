@@ -6,6 +6,7 @@
   let api;
   let loading;
   const render = (state) => {
+    $('song-like').href = '/radio/endorse' + (state.nowPlaying?.tokenId ? '?id=' + encodeURIComponent(state.nowPlaying.tokenId) : '');
     $('song-stats').href = '/radio/catalogue' + (state.nowPlaying?.tokenId ? '?id=' + encodeURIComponent(state.nowPlaying.tokenId) : '');
     $('play').textContent = state.playing ? 'Ⅱ' : '▶';
     $('play').setAttribute('aria-label', state.playing ? 'Pause radio' : 'Play radio');
