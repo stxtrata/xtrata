@@ -7,6 +7,7 @@
 
 import radioCss from './radio.css?inline';
 import { syncRadioLikes } from '../lib/radio/likes-sync';
+import { radioTickerSections } from '../lib/radio/ticker';
 import { inscriptionMetadata } from '../lib/radio/inscription-metadata';
 import { attachPlayCounter } from '../lib/radio/play-counter';
 
@@ -524,6 +525,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
             src: match[1].replace(/&amp;/g, '&'),
             title: metadata.title || (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
             artist: metadata.artist,
+            album: metadata.album,
             cover: coverMatch ? coverMatch[1] : '',
             tokenId
           };
@@ -1191,19 +1193,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const tickerStep = () => {
     if (!currentTrackInfo) return;
-    const { title, artist } = currentTrackInfo;
-    // Sequential sections: TITLE -> ARTIST -> random info -> repeat.
-    const phase = tickerSlot % 3;
+    const sections = radioTickerSections(currentTrackInfo);
+    const text = sections[tickerSlot % sections.length] ?? pickFiller();
     tickerSlot += 1;
-    const text =
-      phase === 0 ? `♪ ${title}`
-      : phase === 1 ? (artist ? `BY ${artist.toUpperCase()}` : pickFiller())
-      : pickFiller();
     writeScreen(text, tickerStep); // advance only once fully read
   };
 
   const startTicker = (track) => {
-    currentTrackInfo = { title: track.title, artist: track.artist || '' };
+    currentTrackInfo = { title: track.title, artist: track.artist || '', album: track.album || '' };
     tickerSlot = 0;
     tickerStep();
   };

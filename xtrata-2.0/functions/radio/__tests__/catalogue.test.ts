@@ -43,6 +43,7 @@ describe('public catalogue and private sessions',()=>{
 function likesSetup(){
  db.exec(readFileSync(new URL('../../migrations/013_radio_metadata_likes.sql',import.meta.url),'utf8'));
  db.exec(readFileSync(new URL('../../migrations/014_radio_artwork.sql',import.meta.url),'utf8'));
+ db.exec(readFileSync(new URL('../../migrations/015_radio_song_classification.sql',import.meta.url),'utf8'));
  env.TELEMETRY_SALT='test-only-salt';
  env.DB.batch=async(statements:any[])=>{db.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());db.exec('COMMIT');return results;}catch(e){db.exec('ROLLBACK');throw e;}};
 }
@@ -60,7 +61,7 @@ describe('current likes and inscription metadata',()=>{
  });
  it('reads artist from immutable HTML once and reuses cached metadata',async()=>{
   likesSetup();db.exec("UPDATE inscription_index SET mime='text/html' WHERE token_id=1");db.exec("INSERT INTO radio_metadata(token_id,title,artist,status,checked_at) VALUES(1,'Cached','Artist','ready',0)");
-  const fetcher=vi.fn(async()=>new Response('<title>Real song</title><script type="application/json">{"artist":"Real artist"}</script>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetcher);
+  const fetcher=vi.fn(async()=>new Response('<source src="data:audio/mpeg;base64,YQ=="><title>Real song</title><script type="application/json">{"artist":"Real artist"}</script>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetcher);
   await refreshRadioMetadata(env);await refreshRadioMetadata(env);
   expect(fetcher).toHaveBeenCalledTimes(1);expect(fetcher.mock.calls[0][0]).toBe('https://xtrata.xyz/inscription/1');
   const d=await(await get()).json();expect(d.tracks[0].title).toBe('Real song');expect(d.tracks[0].artist).toBe('Real artist');
@@ -74,5 +75,15 @@ describe('catalogue artwork',()=>{
   const response=await artworkRequest({env,request:new Request('https://test/radio/artwork?id=1')});expect(response.headers.get('content-type')).toBe('image/png');expect(await response.text()).toBe('hello');
   expect((await artworkRequest({env,request:new Request('https://test/radio/artwork?id=2')})).status).toBe(404);
   expect((await artworkRequest({env,request:new Request('https://test/radio/artwork?id=bad')})).status).toBe(400);
+ });
+});
+
+describe('song-only catalogue',()=>{
+ it('excludes games and unknown HTML, retains audio and verified players',async()=>{
+  likesSetup();db.exec("UPDATE inscription_index SET mime='text/html' WHERE token_id IN (2,3)");
+  db.exec("INSERT INTO radio_metadata(token_id,title,artist,status,checked_at,is_song) VALUES(2,'X Chess','','ready',0,0),(3,'Song','','ready',0,1)");
+  expect((await(await get()).json()).tracks.map((r:any)=>r.id)).toEqual([1,3]);
+  db.exec('UPDATE radio_metadata SET is_song=NULL WHERE token_id=3');
+  expect((await(await get()).json()).tracks.map((r:any)=>r.id)).toEqual([1]);
  });
 });

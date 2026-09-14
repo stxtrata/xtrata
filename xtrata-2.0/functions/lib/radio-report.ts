@@ -25,7 +25,9 @@ export async function catalogueReport(env: Env, url: URL) {
  }catch{ /* migration 013 optional until deployment */ }
  let covers=new Set<number>();
  try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE status='ready' AND cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
- const tracks=(catalogue.results || []).map((row:any)=>{
+ let verifiedSongs=new Set<number>();
+ try {const result=await queryAll(env,'SELECT token_id FROM radio_metadata WHERE is_song=1');verifiedSongs=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* unverified HTML remains outside the catalogue */ }
+ const tracks=(catalogue.results || []).filter((row:any)=>row.mime?.startsWith('audio/')||verifiedSongs.has(row.token_id)).map((row:any)=>{
   let meta:any={};
   // Decode indexed inline metadata only. Never fetch arbitrary token URLs.
   try { if(row.token_uri?.startsWith('data:application/json,')) meta=JSON.parse(decodeURIComponent(row.token_uri.slice(22))); } catch { /* absent metadata */ }
@@ -34,11 +36,11 @@ export async function catalogueReport(env: Env, url: URL) {
   const cached=enriched.get(row.token_id);
   return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
    artist:cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):''),creator:row.creator,
-   status:row.mime?.startsWith('audio/')?'Audio':'HTML player candidate',
+   status:row.mime?.startsWith('audio/')?'Audio':'Audio player',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
    completion_rate:m.plays?100*m.completions/m.plays:null};
  });
  return {range,since,until:now,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
- notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML candidates may not contain music. Titles/artists are read from inscription metadata and cached. Current likes are the latest synced browser favourites, independent of the period; they are not verified people. Livestream listeners are not included.'};
+ notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists are read from inscription metadata and cached. Current likes are the latest synced browser favourites, independent of the period; they are not verified people. Livestream listeners are not included.'};
 }

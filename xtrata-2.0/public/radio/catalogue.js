@@ -1,8 +1,8 @@
 const el=id=>document.getElementById(id);
-const columns=[['id','ID'],['title','Song'],['artist','Artist'],['plays','Plays'],['current_likes','Current likes'],['completions','Completed'],['duration','Duration (seconds)'],['starts','Starts'],['partials','Partial'],['in_progress','In progress'],['repeats','Repeats'],['unique_browsers','Unique browsers'],['seconds','Listening minutes'],['completion_rate','Completion %'],['last_play','Last play'],['creator','Creator'],['status','Catalogue status']];
+const columns=[['id','ID'],['title','Song'],['artist','Artist'],['plays','Plays'],['current_likes','♥ Current likes'],['completions','Completed'],['duration','Duration (seconds)'],['starts','Starts'],['partials','Partial'],['in_progress','In progress'],['repeats','Repeats'],['unique_browsers','Unique browsers'],['seconds','Listening minutes'],['completion_rate','Completion %'],['last_play','Last play'],['creator','Creator'],['status','Catalogue status']];
 let rows=[],sort='id',direction=1,requestId=0;
 let selected=new URL(location.href).searchParams.get('id');
-const display=(row,key)=>{const v=row[key];if(v===null||v===undefined||v==='')return '—';if(key==='last_play')return new Date(v).toLocaleString();if(key==='seconds')return (v/60).toFixed(1);if(key==='completion_rate'||key==='duration')return Number(v).toFixed(1);return String(v);};
+const display=(row,key)=>{const v=row[key];if(v===null||v===undefined||v==='')return '—';if(key==='current_likes')return '♥ '+String(v);if(key==='last_play')return new Date(v).toLocaleString();if(key==='seconds')return (v/60).toFixed(1);if(key==='completion_rate'||key==='duration')return Number(v).toFixed(1);return String(v);};
 function thumbnail(row){
  const frame=document.createElement('span');frame.className='song-art';frame.textContent='♪';frame.setAttribute('aria-hidden','true');
  if(row.thumbnail){const img=document.createElement('img');img.alt='';img.width=44;img.height=44;img.loading='lazy';img.decoding='async';img.referrerPolicy='no-referrer';img.onerror=()=>img.remove();img.src=row.thumbnail;frame.append(img);}

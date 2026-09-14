@@ -3,3 +3,5 @@
 input{font:inherit;padding:8px;background:#213226;color:inherit;border:1px solid #536857;border-radius:6px}label{display:inline-block;margin:8px}dl{display:grid;grid-template-columns:minmax(100px,180px) 1fr;gap:8px}dd{margin:0;overflow-wrap:anywhere}#detail{padding:20px;border:1px solid #536857;border-radius:8px}th button{border:0;padding:0;background:none}td button{text-align:left}
 
 .song-cell{display:flex;align-items:center;gap:10px;min-width:180px}.song-art{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:0 0 44px;width:44px;height:44px;border-radius:6px;background:#213226;color:#b9cbbf;overflow:hidden}.song-art img{position:absolute;inset:0;width:44px;height:44px;object-fit:cover}.song-cell button{flex:1}
+
+.radio-catalogue .scroll{max-height:75vh;overflow:auto}.radio-catalogue thead th{position:sticky;top:0;background:#101713;z-index:1}
