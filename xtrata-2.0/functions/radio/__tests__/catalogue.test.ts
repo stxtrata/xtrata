@@ -7,6 +7,7 @@ import { refreshRadioMetadata } from '../../lib/radio-metadata';
 import { onRequest } from '../counts';
 import { onRequest as sessions } from '../../debug/radio-sessions';
 import { RADIO_CONTRACT } from '../../lib/radio-report';
+vi.mock('../../inscription/handler',()=>({onInscriptionRequest:({request}: {request:Request})=>fetch(request.url)}));
 const {DatabaseSync}=createRequire(import.meta.url)('node:sqlite');
 let db:any,env:any;
 const key='private-test-key-longer-than-24-characters';

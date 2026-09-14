@@ -59,3 +59,15 @@
 
 /wizard/music-appearance.js
   Cache-Control: no-cache
+
+# Stable radio asset filenames must revalidate after deployment.
+/radio/catalogue.js
+  Cache-Control: no-cache
+/radio/stats.js
+  Cache-Control: no-cache
+/radio/stats.css
+  Cache-Control: no-cache
+/radio/catalogue
+  Cache-Control: no-cache
+/radio/catalogue.html
+  Cache-Control: no-cache

@@ -1,3 +1,4 @@
+import {onInscriptionRequest} from '../inscription/handler';
 import {queryAll,run,type Env} from './db';
 import {inscriptionMetadata,inscriptionArtwork} from '../../src/lib/radio/inscription-metadata';
 import {RADIO_CONTRACT} from './radio-report';
@@ -16,7 +17,8 @@ export async function refreshRadioMetadata(env:Env) {
     WHERE (radio_metadata.status='ready' AND radio_metadata.cover_checked=0) OR (radio_metadata.status!='ready' AND radio_metadata.checked_at<?) RETURNING token_id`,[row.token_id,now,now-86400000]);
    if(!claim.results?.length) continue;
    try {
-    const response=await fetch('https://xtrata.xyz/inscription/'+row.token_id,{signal:AbortSignal.timeout(15000),redirect:'error'});
+    // Invoke the runtime directly: a same-zone fetch can bypass the Pages function.
+    const response=await onInscriptionRequest({env,request:new Request('https://xtrata.xyz/inscription/'+row.token_id,{signal:AbortSignal.timeout(15000)}),params:{tokenId:String(row.token_id)}});
     if(!response.ok||!response.headers.get('content-type')?.includes('text/html')) {await response.body?.cancel();throw Error('Unavailable');}
     const reader=response.body!.getReader(),decoder=new TextDecoder();let html='',size=0;
     while(true){const r=await reader.read();if(r.done)break;size+=r.value.length;if(size>32*1024*1024){await reader.cancel();throw Error('Too large');}html+=decoder.decode(r.value,{stream:true});}
