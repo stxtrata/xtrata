@@ -375,6 +375,17 @@ Notes: examples must prove end-to-end integration with minimal custom code.
 Files: `docs/sdk/test-gates.md`, `docs/sdk/changelog.md`, `docs/sdk/release-notes-template.md`, `packages/xtrata-sdk/**`, `packages/xtrata-reconstruction/**`, `examples/**`, `.github/workflows/ci.yml`, `.github/workflows/sdk-release.yml`.
 Notes: every phase must add tests and pass defined release gates before progressing.
 
+## Radio listening analytics (opt-in, September 2026)
+
+The website and hosted embeds use `src/lib/radio/play-counter.ts` to observe
+playback independently of audio delivery. `functions/radio/plays.ts` accepts
+bounded cumulative observations into D1 after migration 011 and explicit
+`RADIO_COUNTER_ENABLED=1` activation. `/radio/stats.html` uses the existing debug
+sign-in to show partial, qualified, completed and repeat plays over selected
+periods. These are browser-reported analytics, not verified people or votes.
+Rules, privacy choices, limitations, deployment settings and testing notes are in
+[Radio play counter](plans/RADIO-PLAY-COUNTER.md).
+
 ## Collection storage automation (opt-in, September 2026)
 
 `COLLECTION_STORAGE_V2=1` enables verified immutable uploads and tracked manifests
