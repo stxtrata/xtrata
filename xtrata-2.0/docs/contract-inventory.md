@@ -749,3 +749,7 @@ checklist in `docs/app-reference.md` and `docs/forever-twins-linking.md`.
 ## X-Chess 2.6.0 browser house helper — manual deployment candidate
 
 `contracts/live/xchess-browser-house-v2.clar` is the exact Clarity 4 helper archived in inscription #3048, SHA-256 `7a40233b69c1406ec92e2672d16add3c30c158e4ffa02cab8c4b4cdbc93d089d`. Registered in the browser deployment console and CLI fallback as `xchess-browser-house-v2`. No deployment is claimed by this entry; confirm source through the console after manual signing. Engine #3049 is a board match term. See `notes/xchess-2.6.0-manual-deployment.md`.
+
+## Radio likes v1.0 — prepared, not deployed
+
+Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, zero platform fee, idempotent like/unlike and atomic batches of 25. References the existing mainnet v3-2-3/v2-1-0/v1-1-1 core ID namespace. No administrative controls. No deployment address is recorded until deployment is authorized and confirmed. Deployment steps and tests: `docs/radio/ONCHAIN-LIKES.md`.
