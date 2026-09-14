@@ -1330,7 +1330,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         void fetchRelatives(track.tokenId);
         startVu();
         currentTokenId = track.tokenId || null;
-        nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+        nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
         emit();
         persist();
         if (history[history.length - 1] !== track) history.push(track);

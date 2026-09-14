@@ -24,6 +24,8 @@ export async function catalogueReport(env: Env, url: URL) {
   const likes=await queryAll(env,'SELECT token_id,COUNT(*) likes FROM radio_likes GROUP BY token_id');
   likeCounts=new Map((likes.results||[]).map((r:any)=>[r.token_id,r.likes]));likesAvailable=true;
  }catch{ /* migration 013 optional until deployment */ }
+ let albums=new Map<number,string>();
+ try {const result=await queryAll(env,"SELECT token_id,album FROM radio_metadata WHERE album IS NOT NULL");albums=new Map((result.results||[]).map((r:any)=>[r.token_id,r.album]));}catch{ /* migration 016 optional until applied */ }
  let covers=new Set<number>();
  try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE status='ready' AND cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
  let verifiedSongs=new Set<number>();
@@ -36,6 +38,7 @@ export async function catalogueReport(env: Env, url: URL) {
   const inProgress=Number(activeById.get(row.token_id)||0);
   const cached=enriched.get(row.token_id);
   return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
+   album:albums.get(row.token_id) || (typeof meta.album==='string'?meta.album:typeof meta.album?.name==='string'?meta.album.name:typeof meta.inAlbum?.name==='string'?meta.inAlbum.name:'').slice(0,200),
    artist:cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):''),creator:row.creator,
    status:row.mime?.startsWith('audio/')?'Audio':'Audio player',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,

@@ -1,5 +1,5 @@
 const el=id=>document.getElementById(id);
-const columns=[['id','ID'],['title','Song'],['artist','Artist'],['plays','Plays'],['onchain_likes','♥ On-chain likes'],['current_likes','Saved favourites'],['completions','Completed'],['duration','Duration (seconds)'],['starts','Starts'],['partials','Partial'],['in_progress','In progress'],['repeats','Repeats'],['unique_browsers','Unique browsers'],['seconds','Listening minutes'],['completion_rate','Completion %'],['last_play','Last play'],['creator','Creator'],['status','Catalogue status']];
+const columns=[['id','ID'],['title','Song'],['album','Album'],['artist','Artist'],['plays','Plays'],['onchain_likes','♥ On-chain likes'],['current_likes','Saved favourites'],['completions','Completed'],['duration','Duration (seconds)'],['starts','Starts'],['partials','Partial'],['in_progress','In progress'],['repeats','Repeats'],['unique_browsers','Unique browsers'],['seconds','Listening minutes'],['completion_rate','Completion %'],['last_play','Last play'],['creator','Creator'],['status','Catalogue status']];
 let rows=[],sort='id',direction=1,requestId=0;
 let selected=new URL(location.href).searchParams.get('id');
 const display=(row,key)=>{const v=row[key];if(v===null||v===undefined||v==='')return '—';if(key==='onchain_likes')return '♥ '+String(v);if(key==='last_play')return new Date(v).toLocaleString();if(key==='seconds')return (v/60).toFixed(1);if(key==='completion_rate'||key==='duration')return Number(v).toFixed(1);return String(v);};
@@ -16,10 +16,10 @@ function detail(row){
  history.replaceState(null,'','?id='+row.id);
 }
 function render(){
- const visible=el('more').checked?columns:columns.slice(0,7);el('columns').replaceChildren();el('songs').replaceChildren();
+ const visible=el('more').checked?columns:columns.slice(0,8);el('columns').replaceChildren();el('songs').replaceChildren();
  for(const [key,label] of visible){const th=document.createElement('th'),b=document.createElement('button');b.textContent=label+(sort===key?(direction===1?' ↑':' ↓'):'');th.setAttribute('aria-sort',sort===key?(direction===1?'ascending':'descending'):'none');b.onclick=()=>{direction=sort===key?-direction:1;sort=key;render();};th.append(b);el('columns').append(th);}
  const query=el('search').value.toLowerCase();
- const filtered=rows.filter(r=>[r.id,r.title,r.artist,r.creator].some(v=>String(v||'').toLowerCase().includes(query)));
+ const filtered=rows.filter(r=>[r.id,r.title,r.album,r.artist,r.creator].some(v=>String(v||'').toLowerCase().includes(query)));
  filtered.sort((a,b)=>{const x=a[sort],y=b[sort];if(x==null)return y==null?0:1;if(y==null)return -1;return direction*(typeof x==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}));});
  for(const row of filtered){const tr=document.createElement('tr');for(const [key] of visible){const td=document.createElement('td');if(key==='title'){const b=document.createElement('button');b.textContent=display(row,key);b.onclick=()=>detail(row);const song=document.createElement('div');song.className='song-cell';song.append(thumbnail(row),b);td.append(song);}else td.textContent=display(row,key);tr.append(td);}el('songs').append(tr);}
 }

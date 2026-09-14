@@ -165,6 +165,7 @@
       <div class="stn" id="stn">XTRATA FM</div>
       <div class="ttl" id="ttl">— OFF AIR —</div>
       <div class="artst" id="artst"></div>
+      <div class="artst" id="album" hidden></div>
       <div class="idrow">
         <span class="idpill" id="idpill" style="display:none"></span>
         <a class="viewbtn" id="viewbtn" target="_blank" rel="noopener">View inscription ↗</a>
@@ -208,6 +209,9 @@
     $('stn').textContent=(s.band==='liked'?'XTRATA · YOUR STATION':s.band==='chain'?'XTRATA · CHAIN BAND':'XTRATA FM');
     $('ttl').textContent=np?np.title:(s.on?'TUNING…':'— OFF AIR —');
     $('artst').textContent=np&&np.artist?np.artist:'';
+    $('album').textContent=np&&np.album?'Album: '+np.album:'';
+    $('album').title=np&&np.album?np.album:'';
+    $('album').hidden=!(np&&np.album);
     $('power').classList.toggle('on',!!s.on);
     var playing=(typeof s.playing==='boolean')?s.playing:s.on;   // real audio state (fallback for old bundles)
     $('pp').textContent=playing?'⏸':'▶';
