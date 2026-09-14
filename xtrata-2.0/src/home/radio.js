@@ -6,6 +6,8 @@
 // extracted and played, so the station works across formats.
 
 import radioCss from './radio.css?inline';
+import { syncRadioLikes } from '../lib/radio/likes-sync';
+import { inscriptionMetadata } from '../lib/radio/inscription-metadata';
 import { attachPlayCounter } from '../lib/radio/play-counter';
 
 const STORAGE_KEY = 'xtrata.radio.v1';
@@ -31,7 +33,7 @@ const loadLikes = () => {
   catch { return []; }
 };
 const saveLikes = (likes) => {
-  try { window.localStorage.setItem(LIKES_KEY, JSON.stringify(likes.slice(0, 200))); } catch { /* noop */ }
+  try { window.localStorage.setItem(LIKES_KEY, JSON.stringify(likes.slice(0, 200))); syncRadioLikes(); } catch { /* noop */ }
 };
 const loadState = () => {
   try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') || {}; }
@@ -114,6 +116,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const transportButtons = Array.from(root.querySelectorAll('.xtrata-radio__tbtn'));
 
   // --- audio plumbing ---------------------------------------------------
+  try { if (window.localStorage.getItem(LIKES_KEY)) syncRadioLikes(); } catch { /* local-only mode */ }
   const player = new Audio();
   const playCounter = attachPlayCounter(player, document.documentElement.dataset.radioEmbed === 'true' ? 'embed' : 'radio');
   player.preload = 'auto';
@@ -515,12 +518,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         }
         if (match) {
           const titleMatch = html.match(/<title>([^<]*)<\/title>/i);
-          const artistMatch = html.match(/"artist":\s*"([^"]*)"/);
+          const metadata = inscriptionMetadata(html);
           const coverMatch = html.match(/<img[^>]+src="(data:image\/[^"]+)"/i);
           resolved = {
             src: match[1].replace(/&amp;/g, '&'),
-            title: (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
-            artist: artistMatch ? artistMatch[1].trim() : '',
+            title: metadata.title || (titleMatch ? titleMatch[1].trim() : '') || `#${tokenId}`,
+            artist: metadata.artist,
             cover: coverMatch ? coverMatch[1] : '',
             tokenId
           };
@@ -655,6 +658,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const isLiked = (id) => likes.some((l) => l.tokenId === String(id));
   const toggleLike = () => {
     if (!nowPlaying) return false;
+    likes = loadLikes();
     if (isLiked(nowPlaying.tokenId)) {
       likes = likes.filter((l) => l.tokenId !== nowPlaying.tokenId);
       writeScreen('♡ REMOVED FROM YOUR STATION');
@@ -1510,7 +1514,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
     setLoop, toggleLoop: () => setLoop(!player.loop),
     getState: () => stateSnapshot(),
-    unlike: (id) => { likes = likes.filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
+    unlike: (id) => { likes = loadLikes().filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
     playToken: (id) => {
       forcedNext = String(id);
       // Anything cued was chosen to follow the PREVIOUS song, so it is stale the moment

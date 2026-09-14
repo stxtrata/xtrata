@@ -384,7 +384,7 @@ bounded cumulative observations into D1 after migration 011 and explicit
 sign-in to show partial, qualified, completed and repeat plays over selected
 periods. These are browser-reported analytics, not verified people or votes.
 Rules, privacy choices, limitations, deployment settings and testing notes are in
-[Radio play counter](plans/RADIO-PLAY-COUNTER.md). Migration 012 adds permanent anonymous daily summaries. `/radio/counts` is the public API; `/radio/catalogue.html` is its sortable song catalogue. The private session API is `/debug/radio-sessions`, displayed on `/radio/stats.html`. See [statistics access and rollout](plans/RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md).
+[Radio play counter](plans/RADIO-PLAY-COUNTER.md). Migration 012 adds permanent anonymous daily summaries. Migration 013 adds cached artist/title extraction from inscribed players and transactional current browser-like totals. `/radio/counts` is the public API; `/radio/catalogue.html` is its sortable song catalogue. The private session API is `/debug/radio-sessions`, displayed on `/radio/stats.html`. See [statistics access and rollout](plans/RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md).
 
 ## Collection storage automation (opt-in, September 2026)
 
@@ -409,3 +409,5 @@ legacy generic workflow defaults remain unchanged. See
 [implementation and activation notes](plans/COLLECTION-V1.5-CLIENT-INTEGRATION.md).
 
 - X-Chess 2.6.0 manual deployment uses the X-Chess card in `src/deploy-console.ts`, pinned checks in `src/lib/deploy/xchess.ts`, and exact source `contracts/live/xchess-browser-house-v2.clar` (source inscription #3048). It repeats preflight at wallet opening and verifies deployed source bytes afterward. Engine #3049 is a per-match board term. See `docs/notes/xchess-2.6.0-manual-deployment.md`.
+
+Radio catalogue thumbnails: migration 014 caches inscribed artwork, served through `/radio/artwork`; the catalogue shows lazy-loaded covers with stable placeholders. See `docs/plans/RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md`.
