@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Xtrata Radio · Song catalogue</title><link rel="stylesheet" href="/radio/stats.css"></head><body><main>
+<h1>Xtrata Radio · Song catalogue</h1><p>Explore songs and measured listening. Select a song to see its statistics; select Listen to open the player.</p>
+<label>Period <select id="period"><option value="24h">Last 24 hours</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="all">Since counting began</option></select></label>
+<label>Search <input id="search" type="search" placeholder="ID, title, artist or creator"></label>
+<label><input type="checkbox" id="more"> More columns</label> <button id="reload">Refresh</button>
+<p id="status" role="status">Loading…</p><p id="notice"></p><section id="detail" hidden></section>
+<div class="scroll"><table><thead><tr id="columns"></tr></thead><tbody id="songs"></tbody></table></div>
+<p>“—” means unavailable, not zero. <a href="/radio/share">Radio player and embeds</a> · <a href="/radio/guide">Listening and privacy guide</a></p>
+</main><script type="module" src="/radio/catalogue.js"></script></body></html>

@@ -1,9 +1,12 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   if (new URLSearchParams(location.search).get('mode') === 'minimal') document.body.classList.add('minimal');
+  let requestedToken = new URLSearchParams(location.search).get('tokenId');
+  if (!/^\d+$/.test(requestedToken || '')) requestedToken = null;
   let api;
   let loading;
   const render = (state) => {
+    $('song-stats').href = '/radio/catalogue' + (state.nowPlaying?.tokenId ? '?id=' + encodeURIComponent(state.nowPlaying.tokenId) : '');
     $('play').textContent = state.playing ? 'Ⅱ' : '▶';
     $('play').setAttribute('aria-label', state.playing ? 'Pause radio' : 'Play radio');
     $('title').textContent = state.nowPlaying?.title || 'Music from the chain';
@@ -24,7 +27,7 @@
     document.head.append(script);
   }).catch((error) => { loading = null; throw error; }));
   $('play').onclick = async () => {
-    if (api) { api.playPause(); return; }
+    if (api) { if (requestedToken) { api.playToken(requestedToken); requestedToken = null; } else api.playPause(); return; }
     $('play').disabled = true;
     $('status').textContent = 'Loading player…';
     try {

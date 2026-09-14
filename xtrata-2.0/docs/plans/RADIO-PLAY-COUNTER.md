@@ -81,7 +81,7 @@ in a window may correspond to a play qualified before that window.
 The session table retains approximately 90 days. New-session ingestion deletes up
 to 500 expired rows at a time. In an inactive deployment cleanup does not run;
 operators can schedule `DELETE FROM radio_plays WHERE created_at < ...` in D1 for a
-strict retention deadline. No permanent all-time aggregate is currently retained.
+strict retention deadline. Migration 012 adds permanent anonymous daily totals; see [public/private reporting](RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md).
 
 ## Activation (not run against production by this change)
 

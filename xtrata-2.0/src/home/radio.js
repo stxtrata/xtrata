@@ -65,7 +65,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     '  <div class="xtrata-radio__display" role="button" tabindex="0" title="Xtrata Radio">',
     '    <div class="xtrata-radio__dmain">',
     '      <div class="xtrata-radio__meta">',
-    '        <span class="xtrata-radio__brand">XTRATA FM</span>',
+    '        <a class="xtrata-radio__brand xtrata-radio__stats" href="/radio/catalogue" target="_blank" rel="noopener">SONG STATS ↗</a>',
     '      </div>',
     '      <div class="xtrata-radio__screen"><span class="xtrata-radio__screen-text"></span></div>',
     '    </div>',
@@ -1741,6 +1741,27 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     applyAttract();
   });
   applyAttract();
+
+  const statsLink = root.querySelector('.xtrata-radio__stats');
+  statsLink?.addEventListener('click', event => event.stopPropagation());
+  let statsRows = null;
+  let statsAt = 0;
+  let statsLoading = false;
+  const updateStats = snap => {
+    const id = snap.nowPlaying?.tokenId;
+    if (!statsLink) return;
+    statsLink.href = '/radio/catalogue' + (id ? '?id=' + encodeURIComponent(id) : '');
+    const row = statsRows?.find(item => String(item.id) === String(id));
+    statsLink.textContent = row ? row.plays + ' PLAYS · STATS ↗' : 'SONG STATS ↗';
+    if (!statsLoading && Date.now() - statsAt > 60000) {
+      statsLoading = true; statsAt = Date.now();
+      fetch('/radio/counts?range=all').then(response => response.ok ? response.json() : null)
+        .then(data => { statsRows = data?.tracks || null; }).catch(() => {})
+        .finally(() => { statsLoading = false; updateStats(stateSnapshot()); });
+    }
+  };
+  listeners.add(updateStats);
+  updateStats(stateSnapshot());
 
   window.XtrataRadio = api;
   return api;
