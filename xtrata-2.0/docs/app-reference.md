@@ -385,3 +385,14 @@ Exceptions appear in the Storage cleanup panel; normal files need no approval.
 Core chunks and recovery copies are never purged. Deployment bindings, writer
 locking, recovery retention requirements and validation notes are documented in
 [Collection storage automation](plans/COLLECTION-STORAGE-AUTOMATION.md).
+
+
+## Collection v1.5 manager and public mint integration
+
+New standard manager deployments use v1.5 with the exact v3.2.3 target for the
+wallet network. `CollectionInventoryPanel` provides guided hash registration.
+`packages/xtrata-sdk/src/collection-v15.ts` supplies strict granular fee reads and
+bigint staged quotes; `CollectionMintLivePage` rechecks fees before payable steps
+and validates collection receipts. SDK deployment target selection is explicit;
+legacy generic workflow defaults remain unchanged. See
+[implementation and activation notes](plans/COLLECTION-V1.5-CLIENT-INTEGRATION.md).

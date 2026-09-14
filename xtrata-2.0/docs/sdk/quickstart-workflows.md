@@ -148,3 +148,26 @@ These workflow plans are designed so integrators can call `openContractCall` dir
 
 Validation note:
 - Workflow planners fail fast with `SdkValidationError` when critical inputs are malformed (missing sender, invalid hash length, oversized URI, zero/negative spend values, network mismatches).
+
+## Quoting a v1.5 collection mint on core v3.2.3
+
+```ts
+import { readCollectionV15FeeUnits, quoteCollectionV15Mint } from '@xtrata/sdk';
+
+// Supply a read-only adapter that returns the decoded uint (bigint).
+// Unavailable or invalid reads must throw or return null.
+const units = await readCollectionV15FeeUnits(readCoreUint);
+const quote = quoteCollectionV15Mint(units, 33, 1_000_000n);
+// quote.begin: begin cap; quote.upload: zero;
+// quote.seal: reserved collection price + protocol seal fee;
+// quote.total: price + begin + seal, also used by the helper's <=30-chunk route.
+```
+
+Register the verified hashes with `set-registered-token-uri-batch` before opening
+minting. Re-read fees before each payable step. For resumed mints, use the price
+stored in `get-reservation`, not the current phase price. Keep wallet transactions
+in deny mode with sender STX caps. Confirm a collection receipt using
+`get-token-mint-context`; a core hash lookup alone is not proof of a collection
+sale. No write, wallet signing, or deployment occurs when calling these quote
+helpers. Existing SDK workflow defaults are historical; v1.5 clients must use the
+explicit granular quote path above instead of legacy aggregate fee estimates.

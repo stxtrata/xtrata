@@ -6,7 +6,7 @@ Review and implementation notes — 14 September 2026.
 
 Built an undeployed v1.5 collection helper against the actual v3.2.3 core, derived from v1.4. Local source: `contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar`. Generated mainnet candidate: `contracts/live/xtrata-collection-mint-v1.5.clar`. The `live` folder is a source convention, not evidence that this candidate is deployed. No deployment, payment, inscription, or remote storage deletion was performed.
 
-The storage plan below now has an opt-in implementation: [automatic storage cleanup](COLLECTION-STORAGE-AUTOMATION.md). It uses two verification passes, a waiting period and a verified permanent recovery copy before staging eviction; routine cleanup needs no operator approval. It is not deployed or activated. Existing frontend/SDK defaults remain on the historical helper until the new version's integration and deployment are complete. No fictitious deployed address was added to the runtime contract registry.
+The storage plan below now has an opt-in implementation: [automatic storage cleanup](COLLECTION-STORAGE-AUTOMATION.md). It uses two verification passes, a waiting period and a verified permanent recovery copy before staging eviction; routine cleanup needs no operator approval. It is not deployed or activated. The [manager and public mint integration](COLLECTION-V1.5-CLIENT-INTEGRATION.md) is now implemented locally. New standard manager deployments select v1.5; existing collections and generic SDK workflow defaults remain unchanged. No fictitious deployed address was added to the runtime contract registry.
 
 ## Old helper review
 

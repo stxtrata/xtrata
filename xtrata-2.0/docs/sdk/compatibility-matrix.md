@@ -73,3 +73,19 @@ Validation source:
   2. `npm run sdk:test`
   3. `npm run sdk:pack:smoke`
   4. `npm run sdk:examples:smoke`
+
+## Collection helper v1.5 (source candidate)
+
+The manager's new standard collection template targets core v3.2.3. No deployed
+helper address is implied. Existing v1.4 collections and default SDK target
+selection remain unchanged. Select v3.2.3 explicitly with
+`resolveArtistDeployCoreTarget(network, registry, '3.2.3')`; absence of a matching
+network returns null. `buildArtistDeployContractSource` retargets both the v1.5
+core pin and its static duplicate-hash lookup.
+
+v1.5 requires registered inventory and rejects already sealed hashes. Upload ABI:
+32 chunks; client upload policy and helper atomic route: at most 30 chunks. Core
+fee buckets are 32 chunks. Upload transfers zero STX; chunk/batch fees are paid at
+seal. The helper atomic route pays staged begin + seal fees, not the core-native
+single-transaction fee. Read all four units using `readCollectionV15FeeUnits` and
+quote with `quoteCollectionV15Mint`. These helpers have no observed-fee fallback.

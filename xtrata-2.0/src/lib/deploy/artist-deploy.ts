@@ -216,10 +216,13 @@ export const deriveArtistContractName = (params: {
 
 export const resolveArtistDeployCoreTarget = (
   network: NetworkType,
-  registry: readonly ContractRegistryEntry[] = CONTRACT_REGISTRY
+  registry: readonly ContractRegistryEntry[] = CONTRACT_REGISTRY,
+  coreVersion: 'legacy' | '3.2.3' = 'legacy'
 ): ArtistDeployCoreTarget | null => {
   const candidate = registry.find(
-    (entry) => entry.network === network && isCoreEntry(entry)
+    (entry) => entry.network === network && (coreVersion === '3.2.3'
+      ? entry.protocolVersion === '3.2.3' && entry.contractName === 'xtrata-v3-2-3'
+      : isCoreEntry(entry))
   );
   if (!candidate) {
     return null;
@@ -365,6 +368,20 @@ export const buildArtistDeployContractSource = (params: {
   }
 
   let source = templateSource;
+  if (mintType === 'standard' && templateSource.includes('ERR-UNREGISTERED-HASH')) {
+    if (!params.coreContractId.endsWith('.xtrata-v3-2-3')) {
+      errors.push('Collection v1.5 requires core v3.2.3.');
+    }
+    // The duplicate guard is a static Clarity call and must follow the pin.
+    source = replaceLine({
+      source,
+      marker: 'v1.5 duplicate hash guard',
+      pattern: /\(contract-call\? (?:\.[a-zA-Z0-9-]+|'[A-Z0-9]+\.[a-zA-Z0-9-]+) get-id-by-hash hash\)/,
+      replacement: `(contract-call? '${params.coreContractId} get-id-by-hash hash)`,
+      errors
+    });
+  }
+
 
   source = replaceLine({
     source,

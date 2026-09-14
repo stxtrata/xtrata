@@ -72,8 +72,9 @@ invalid placeholder resource names and cannot be deployed unchanged.
 5. Configure allowlisted core IDs and collection metadata `coreContractId` plus
    the full helper `contract_address`. v1.4 and pre-inscribed sale contracts lack
    v1.5's reservation API and are deliberately held for verification; no legacy
-   contract is assumed safe. The v1.5 helper is a candidate; the existing deploy
-   wizard default and public mint fee integration are not switched by this change.
+   contract is assumed safe. The v1.5 helper is an undeployed candidate. The subsequent
+   [client integration](COLLECTION-V1.5-CLIENT-INTEGRATION.md) selects it for new
+   standard manager deployments and implements granular public mint fee caps.
 6. Set `COLLECTION_CLEANUP_WRITERS_LOCKED=1` only after the writer/bucket conditions
    above hold, then set `COLLECTION_CLEANUP_MODE=auto-quarantine`. Deploy the
    scheduled worker using an actual private config derived from
