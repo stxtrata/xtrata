@@ -110,7 +110,7 @@ const HTML = `<!doctype html>
 <div class="wrap">
   <div class="head">
     <div>
-      <h1>Site Health &amp; Issues</h1>
+      <h1>Site Health &amp; Issues</h1><p><a href="/radio/stats">Private radio statistics and session log</a></p>
       <p class="sub">What is going wrong for people on Xtrata — and whether they recover.</p>
     </div>
     <div class="controls">
