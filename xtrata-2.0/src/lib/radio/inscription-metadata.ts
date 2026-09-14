@@ -20,3 +20,22 @@ export function inscriptionMetadata(html: string) {
  artist ||= clean(html.match(/<(?:p|span|div)\b[^>]*class=["'][^"']*\bartist\b[^"']*["'][^>]*>([^<]*)</i)?.[1]);
  return {title,artist};
 }
+
+/** Raster data images and HTTPS artwork only; inscription scripts are never executed. */
+export function safeArtwork(value: unknown): string {
+ if(typeof value!=='string')return '';
+ const source=decode(value).trim();
+ if(source.length<=700000 && /^data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-z0-9+/]+={0,2}$/i.test(source))return source;
+ if(source.length>2048)return '';
+ try {const url=new URL(source);return url.protocol==='https:'&&!url.username&&!url.password?url.href:'';}catch{return '';}
+}
+export function inscriptionArtwork(html: string): string {
+ for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  if(!/application\/(?:ld\+)?json/i.test(match[1]))continue;
+  try {const data=JSON.parse(match[2]),m=data.metadata||data;
+   for(const value of [m.image?.url,m.image,m.artwork,m.cover]) {const cover=safeArtwork(value);if(cover)return cover;}
+  }catch { /* invalid metadata */ }
+ }
+ for(const match of html.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/gi)) {const cover=safeArtwork(match[1]);if(cover)return cover;}
+ return '';
+}

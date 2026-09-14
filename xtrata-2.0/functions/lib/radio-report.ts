@@ -1,3 +1,4 @@
+import { safeArtwork } from '../../src/lib/radio/inscription-metadata';
 import { queryAll, type Env } from './db';
 export const RADIO_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 export async function catalogueReport(env: Env, url: URL) {
@@ -22,6 +23,8 @@ export async function catalogueReport(env: Env, url: URL) {
   const likes=await queryAll(env,'SELECT token_id,COUNT(*) likes FROM radio_likes GROUP BY token_id');
   likeCounts=new Map((likes.results||[]).map((r:any)=>[r.token_id,r.likes]));likesAvailable=true;
  }catch{ /* migration 013 optional until deployment */ }
+ let covers=new Set<number>();
+ try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE status='ready' AND cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
  const tracks=(catalogue.results || []).map((row:any)=>{
   let meta:any={};
   // Decode indexed inline metadata only. Never fetch arbitrary token URLs.
@@ -29,7 +32,7 @@ export async function catalogueReport(env: Env, url: URL) {
   const m:any=byId.get(row.token_id) || {starts:0,plays:0,completions:0,seconds:0,last_play:null,unique_browsers:range==='all'?null:0};
   const inProgress=Number(activeById.get(row.token_id)||0);
   const cached=enriched.get(row.token_id);
-  return {id:row.token_id,current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
+  return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
    artist:cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):''),creator:row.creator,
    status:row.mime?.startsWith('audio/')?'Audio':'HTML player candidate',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,

@@ -409,3 +409,5 @@ legacy generic workflow defaults remain unchanged. See
 [implementation and activation notes](plans/COLLECTION-V1.5-CLIENT-INTEGRATION.md).
 
 - X-Chess 2.6.0 manual deployment uses the X-Chess card in `src/deploy-console.ts`, pinned checks in `src/lib/deploy/xchess.ts`, and exact source `contracts/live/xchess-browser-house-v2.clar` (source inscription #3048). It repeats preflight at wallet opening and verifies deployed source bytes afterward. Engine #3049 is a per-match board term. See `docs/notes/xchess-2.6.0-manual-deployment.md`.
+
+Radio catalogue thumbnails: migration 014 caches inscribed artwork, served through `/radio/artwork`; the catalogue shows lazy-loaded covers with stable placeholders. See `docs/plans/RADIO-STATISTICS-PUBLIC-AND-PRIVATE.md`.

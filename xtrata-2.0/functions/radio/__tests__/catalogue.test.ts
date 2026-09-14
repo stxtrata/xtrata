@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { onRequest as artworkRequest } from '../artwork';
 import { onRequest as likeRequest } from '../likes';
 import { refreshRadioMetadata } from '../../lib/radio-metadata';
 import { onRequest } from '../counts';
@@ -40,6 +41,7 @@ describe('public catalogue and private sessions',()=>{
 
 function likesSetup(){
  db.exec(readFileSync(new URL('../../migrations/013_radio_metadata_likes.sql',import.meta.url),'utf8'));
+ db.exec(readFileSync(new URL('../../migrations/014_radio_artwork.sql',import.meta.url),'utf8'));
  env.TELEMETRY_SALT='test-only-salt';
  env.DB.batch=async(statements:any[])=>{db.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());db.exec('COMMIT');return results;}catch(e){db.exec('ROLLBACK');throw e;}};
 }
@@ -56,10 +58,20 @@ describe('current likes and inscription metadata',()=>{
   expect((await send(Array(201).fill(1))).status).toBe(400);
  });
  it('reads artist from immutable HTML once and reuses cached metadata',async()=>{
-  likesSetup();db.exec("UPDATE inscription_index SET mime='text/html' WHERE token_id=1");
+  likesSetup();db.exec("UPDATE inscription_index SET mime='text/html' WHERE token_id=1");db.exec("INSERT INTO radio_metadata(token_id,title,artist,status,checked_at) VALUES(1,'Cached','Artist','ready',0)");
   const fetcher=vi.fn(async()=>new Response('<title>Real song</title><script type="application/json">{"artist":"Real artist"}</script>',{headers:{'content-type':'text/html'}}));vi.stubGlobal('fetch',fetcher);
   await refreshRadioMetadata(env);await refreshRadioMetadata(env);
   expect(fetcher).toHaveBeenCalledTimes(1);expect(fetcher.mock.calls[0][0]).toBe('https://xtrata.xyz/inscription/1');
   const d=await(await get()).json();expect(d.tracks[0].title).toBe('Real song');expect(d.tracks[0].artist).toBe('Real artist');
+ });
+});
+
+describe('catalogue artwork',()=>{
+ it('serves cached images separately from counts and handles missing artwork',async()=>{
+  likesSetup();db.prepare("INSERT INTO radio_metadata(token_id,title,artist,status,checked_at,cover) VALUES(1,'Song','Artist','ready',0,?)").run('data:image/png;base64,aGVsbG8=');
+  const data=await(await get()).json();expect(data.tracks[0].thumbnail).toBe('/radio/artwork?id=1');expect(JSON.stringify(data)).not.toContain('aGVsbG8=');
+  const response=await artworkRequest({env,request:new Request('https://test/radio/artwork?id=1')});expect(response.headers.get('content-type')).toBe('image/png');expect(await response.text()).toBe('hello');
+  expect((await artworkRequest({env,request:new Request('https://test/radio/artwork?id=2')})).status).toBe(404);
+  expect((await artworkRequest({env,request:new Request('https://test/radio/artwork?id=bad')})).status).toBe(400);
  });
 });

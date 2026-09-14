@@ -137,3 +137,9 @@ Validation: 56 targeted tests cover existing playback/reporting, artist parsing,
 SQLite metadata caching, current-like deduplication and unlikes, stale revisions,
 unknown-token filtering, and client snapshot synchronization. Focused production
 TypeScript, changed JavaScript lint and radio bundle build pass.
+
+### Catalogue thumbnails
+
+Lazy-loaded 44px square covers appear beside titles and in song details. The cache extracts raster data images or HTTPS artwork links from JSON metadata and HTML image tags without executing scripts. Missing or broken artwork leaves a music-note placeholder. Images use no-referrer requests. Embedded covers are limited to 700,000 characters and served separately through `/radio/artwork?id=…`; remote artwork loads from its host.
+
+Apply `014_radio_artwork.sql` before deployment. It adds the cover cache and schedules existing HTML entries for gradual enrichment again (two per counts refresh), without changing listening or like totals.
