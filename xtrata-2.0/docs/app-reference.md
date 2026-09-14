@@ -374,3 +374,14 @@ Notes: examples must prove end-to-end integration with minimal custom code.
 16) SDK hardening and release readiness.
 Files: `docs/sdk/test-gates.md`, `docs/sdk/changelog.md`, `docs/sdk/release-notes-template.md`, `packages/xtrata-sdk/**`, `packages/xtrata-reconstruction/**`, `examples/**`, `.github/workflows/ci.yml`, `.github/workflows/sdk-release.yml`.
 Notes: every phase must add tests and pass defined release gates before progressing.
+
+## Collection storage automation (opt-in, September 2026)
+
+`COLLECTION_STORAGE_V2=1` enables verified immutable uploads and tracked manifests
+following migration 010. The collection storage worker can automatically verify
+sealed content twice, wait through a grace period, verify a separate recovery
+copy, and remove staging bytes. Recovery previews preserve existing asset URLs.
+Exceptions appear in the Storage cleanup panel; normal files need no approval.
+Core chunks and recovery copies are never purged. Deployment bindings, writer
+locking, recovery retention requirements and validation notes are documented in
+[Collection storage automation](plans/COLLECTION-STORAGE-AUTOMATION.md).

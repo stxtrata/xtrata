@@ -1,3 +1,4 @@
+import StorageCleanupPanel from './components/StorageCleanupPanel';
 import {
   useCallback,
   useEffect,
@@ -1163,6 +1164,8 @@ export default function CollectionManagerApp() {
             />
           </div>
         </section>
+
+        {activeCollectionId && <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} />}
 
         {!showAdvancedPanels && (
           <div className="manage-advanced-teaser">

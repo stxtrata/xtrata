@@ -1,3 +1,5 @@
+import { storageEnabled } from '../../lib/collection-storage/common';
+import { validateAssetStorage } from '../../lib/collection-storage/uploads';
 import { jsonResponse, badRequest, notFound, serverError } from '../../lib/utils';
 import { queryAll, run } from '../../lib/db';
 import {
@@ -147,6 +149,9 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       const totalBytes = Number(payload.totalBytes ?? 0);
       const totalChunks = Number(payload.totalChunks ?? 0);
       const expectedHash = String(payload.expectedHash ?? '');
+      if (storageEnabled(env)) {
+        await validateAssetStorage(env, String(collectionId), storageKey, expectedHash, totalBytes, totalChunks);
+      }
       logAssetDebug(requestId, 'payload.received', {
         path,
         totalBytes,
@@ -228,6 +233,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
   }
 
   if (request.method === 'DELETE') {
+    if (storageEnabled(env)) return jsonResponse({ error: 'Use Storage cleanup review to flag and quarantine this file. Asset history is retained.' }, 409);
     try {
       const assetId = new URL(request.url).searchParams.get('assetId')?.trim() ?? '';
       if (!assetId) {

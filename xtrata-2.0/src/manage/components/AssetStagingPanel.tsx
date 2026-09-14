@@ -54,7 +54,7 @@ type UploadReadiness = {
 type UploadTokenResponse = {
   uploadUrl: string;
   key: string;
-  mode?: 'signed' | 'direct';
+  mode?: 'signed' | 'direct' | 'verified';
   binding?: string | null;
   requestId?: string;
   durationMs?: number;
@@ -1082,7 +1082,13 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
           requestId: tokenRequestId
         });
 
+        const verifiedUpload = token.mode === 'verified'
+          ? await storageResponse.json() as { key: string; expectedHash: string }
+          : null;
         const expectedHash = await hexDigest(selectedFile);
+        if (verifiedUpload && verifiedUpload.expectedHash !== expectedHash.replace(/^0x/, '').toLowerCase()) {
+          throw new Error('Server verification does not match the selected file.');
+        }
         const metadataResponse = await fetch(
           `/collections/${encodeURIComponent(normalizedCollectionId)}/assets`,
           {
@@ -1095,7 +1101,7 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
               totalBytes: selectedFile.size,
               totalChunks: chunkCount(selectedFile.size),
               expectedHash,
-              storageKey: token.key
+              storageKey: verifiedUpload?.key ?? token.key
             })
           }
         );

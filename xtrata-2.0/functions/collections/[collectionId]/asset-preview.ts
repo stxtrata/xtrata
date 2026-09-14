@@ -1,3 +1,4 @@
+import { first, recovery, storageEnabled, type StoredObject } from '../../lib/collection-storage/common';
 import {
   badRequest,
   jsonResponse,
@@ -123,7 +124,15 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       );
     }
 
-    const object = await resolved.bucket.get(storageKey);
+    let object = await resolved.bucket.get(storageKey);
+    let binding: string | null = resolved.binding;
+    if (!object && storageEnabled(env)) {
+      const stored = await first<StoredObject>(env, 'SELECT * FROM collection_storage_objects WHERE storage_key = ? AND collection_id = ?', [storageKey, collectionId]);
+      if (stored?.recovery_key && ['quarantining', 'quarantined'].includes(stored.state)) {
+        object = await recovery(env).get(stored.recovery_key);
+        binding = 'COLLECTION_RECOVERY';
+      }
+    }
     if (!object || !object.body) {
       return notFound('Asset content not found in storage.');
     }
@@ -131,7 +140,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
     const headers = new Headers();
     headers.set(
       'Content-Type',
-      object.httpMetadata?.contentType ?? mimeType ?? 'application/octet-stream'
+      mimeType ?? object.httpMetadata?.contentType ?? 'application/octet-stream'
     );
     headers.set(
       'Cache-Control',
@@ -140,7 +149,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
         : PRIVATE_PREVIEW_CACHE_CONTROL
     );
     headers.set('X-Xtrata-Request-Id', requestId);
-    headers.set('X-Xtrata-Asset-Binding', resolved.binding ?? 'unknown');
+    headers.set('X-Xtrata-Asset-Binding', binding ?? 'unknown');
 
     return new Response(object.body, { status: 200, headers });
   } catch (error) {

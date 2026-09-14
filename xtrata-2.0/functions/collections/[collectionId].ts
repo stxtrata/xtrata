@@ -1,3 +1,4 @@
+import { storageEnabled } from '../lib/collection-storage/common';
 import { jsonResponse, badRequest, notFound, serverError } from '../lib/utils';
 import { queryAll, run } from '../lib/db';
 import { getCollectionDeployReadiness } from '../lib/collection-deploy';
@@ -204,6 +205,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
   }
 
   if (request.method === 'DELETE') {
+    if (storageEnabled(env)) return jsonResponse({ error: 'Permanent collection deletion is disabled while reviewed storage is enabled. Archive the collection and use Storage cleanup review.' }, 409);
     try {
       const record = await loadCollectionByIdentifier({
         env,
