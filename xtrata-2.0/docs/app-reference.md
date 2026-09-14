@@ -439,3 +439,5 @@ Radio import prompts wait for a successful read of the connected wallet’s on-c
 Single-song radio likes/unlikes request 200 microSTX (0.0002 STX) and show a prominent custom-fee card before/during wallet approval. Batch imports keep their separately calculated suggestion. Wallet final fee control remains with the user; the UI instructs correcting a higher fee or cancelling.
 
 Radio hearts now link directly to a selected-song endorsement review (`action=review`), using confirmed wallet state to choose like/unlike. Endorsement counts retry failed batches, retain successes, read state after transaction confirmation and refresh while visible when no review/signing is active.
+
+Radio state exposes `likesStatus`; `/radio` uses it to distinguish loading/failure from a confirmed empty list. Failed batches retain the same wallet’s in-memory last-confirmed likes while successful batches update independently. Each failed read retries once.

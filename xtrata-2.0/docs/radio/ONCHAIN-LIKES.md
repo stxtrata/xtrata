@@ -98,3 +98,9 @@ A radio heart click with a selected song now opens `/radio/endorse?id=…&action
 Endorsement reads retry a failed batch once and preserve successful batches. Pending transaction status is checked before reading song states, so confirmation is followed by fresh counts. Visible pages refresh every 30 seconds except during review, loading or wallet approval. Missing batches are explicitly reported; unavailable is never treated as zero or an actionable false like. Wallet storage changes invalidate the review and reload state.
 
 Validation: 12 targeted page/radio UI tests passed, including direct unlike selection, selection preserved through connect and transient state-read recovery. Both bundles and radio JavaScript lint passed. No live signing was performed.
+
+## Radio liked-station read recovery — 2026-09-15
+
+The radio controller retries failed reads once and handles each 25-song batch independently. If a batch fails, previously confirmed likes for that batch and the same wallet remain visible; successful batches replace their state, including removing confirmed unlikes. A failed whole refresh retains the same wallet’s last confirmed list and marks it unavailable. These are in-memory last-confirmed results, not browser favourites. Wallet changes clear the old wallet’s visible likes immediately. The public radio displays refreshing/partial/unavailable/disconnected/empty explanations rather than treating failed reads as an empty wallet. Local-favourite cleanup only uses freshly confirmed positives.
+
+Validation: eight targeted radio state/UI tests passed, including transient recovery, partial batches, successful unlikes, wallet switching and stale responses. Radio build and JavaScript lint passed.
