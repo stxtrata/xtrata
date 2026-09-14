@@ -42,7 +42,7 @@ async function refresh(){
  const run=++generation;loading=true;states.clear();render();
  try {
   const nextConfig=await api();if(run!==generation)return;config=nextConfig;
-  if(!config.enabled){status('On-chain likes are not activated yet. Your saved favourites still work.');return;}
+  if(!config.enabled){status('On-chain likes are not activated on this site yet. Your previous favourites remain saved in this browser; imports and new likes will become available after activation.');return;}
   const session=wallet.getSession(),address=session.network==='mainnet'?session.address:undefined;
   const result=await fetch('/radio/counts?range=all',{cache:'no-store'});if(!result.ok)throw Error('Song catalogue unavailable.');const catalogue=await result.json();if(run!==generation)return;tracks=catalogue.tracks;
   const next=new Map();for(let i=0;i<tracks.length;i+=25){const data=await api({ids:tracks.slice(i,i+25).map(t=>t.id).join(','),...(address?{wallet:address}:{})});if(run!==generation)return;if(data.contract!==config.contract)throw Error('Contract configuration changed. Refresh before continuing.');for(const r of data.rows)next.set(r.id,r);}

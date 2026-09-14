@@ -11765,7 +11765,7 @@ async function vo() {
     const e = await ua();
     if (t !== bn) return;
     if (Xt = e, !Xt.enabled) {
-      ue("On-chain likes are not activated yet. Your saved favourites still work.");
+      ue("On-chain likes are not activated on this site yet. Your previous favourites remain saved in this browser; imports and new likes will become available after activation.");
       return;
     }
     const n = ur.getSession(), r = n.network === "mainnet" ? n.address : void 0, s = await fetch("/radio/counts?range=all", { cache: "no-store" });
