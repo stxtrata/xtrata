@@ -437,3 +437,5 @@ Radio album metadata: the player snapshot now includes `album`, allowing `/radio
 Radio import prompts wait for a successful read of the connected wallet’s on-chain likes. No automatic popup is shown on page load. Confirmed matches are cleaned even if another transaction remains pending; manual guidance remains available while wallet state is unresolved.
 
 Single-song radio likes/unlikes request 200 microSTX (0.0002 STX) and show a prominent custom-fee card before/during wallet approval. Batch imports keep their separately calculated suggestion. Wallet final fee control remains with the user; the UI instructs correcting a higher fee or cancelling.
+
+Radio hearts now link directly to a selected-song endorsement review (`action=review`), using confirmed wallet state to choose like/unlike. Endorsement counts retry failed batches, retain successes, read state after transaction confirmation and refresh while visible when no review/signing is active.
