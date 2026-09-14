@@ -267,7 +267,13 @@ type WalletActionBase = {
   onError?: (error: unknown) => void;
 };
 
+export type WalletCallProgress = 'provider-selected' | 'account-read' | 'account-cached' | 'account-read-failed' | 'account-reconnect' | 'signing-request' | 'legacy-request';
+const reportCallProgress = (callback: ((stage: WalletCallProgress) => void) | undefined, stage: WalletCallProgress) => {
+  try { callback?.(stage); } catch { /* Diagnostics must not interrupt wallet requests. */ }
+};
+
 type WalletContractCallOptions = WalletActionBase & {
+  onProgress?: (stage: WalletCallProgress) => void;
   contractAddress: string;
   contractName: string;
   functionName: string;
@@ -1135,7 +1141,8 @@ const withXverseReadTimeout = <T>(promise: Promise<T>, label: string): Promise<T
 
 const ensureXverseSigningAccount = async (
   rpcProvider: WalletRpcProvider,
-  expectedAddress?: string
+  expectedAddress?: string,
+  onProgress?: (stage: WalletCallProgress) => void
 ) => {
   const assertExpected = (address: string, source: string) => {
     if (expectedAddress && address !== expectedAddress) {
@@ -1156,12 +1163,14 @@ const ensureXverseSigningAccount = async (
   // (canary runs 2026-07-17 and 2026-07-21).
   const cached = readXverseAccountCache();
   if (cached) {
+    reportCallProgress(onProgress, 'account-cached');
     // eslint-disable-next-line no-console
     console.info('[wallet:xverse-preflight]', { stage: 'CACHED_SESSION', address: cached });
     return assertExpected(cached, 'cached-session');
   }
 
   let address: string | null = null;
+  reportCallProgress(onProgress, 'account-read');
   try {
     const response = unwrapProviderResponse(
       await withXverseReadTimeout(rpcProvider.request('wallet_getAccount'), 'wallet_getAccount')
@@ -1177,6 +1186,7 @@ const ensureXverseSigningAccount = async (
     if (isUserCancelledError(error)) {
       throw providerError(error);
     }
+    reportCallProgress(onProgress, 'account-read-failed');
     // Access denied, unsupported and timeouts all mean this browsing session
     // has no readable account yet; fall through to wallet_connect.
     // eslint-disable-next-line no-console
@@ -1192,6 +1202,7 @@ const ensureXverseSigningAccount = async (
   }
 
   let response: unknown;
+  reportCallProgress(onProgress, 'account-reconnect');
   try {
     response = unwrapProviderResponse(await rpcProvider.request('wallet_connect'));
   } catch (error) {
@@ -1223,6 +1234,7 @@ const requestWalletContractCall = async (
   options: WalletContractCallOptions
 ) => {
   if (!isSelectedXverseProvider(provider)) {
+    reportCallProgress(options.onProgress, 'signing-request');
     const response = await requestProvider(
       provider,
       'stx_callContract',
@@ -1245,8 +1257,9 @@ const requestWalletContractCall = async (
   let stage = 'account-preflight';
   let activeAddress: string | undefined;
   const run = async () => {
-    activeAddress = await ensureXverseSigningAccount(rpcProvider, options.stxAddress);
+    activeAddress = await ensureXverseSigningAccount(rpcProvider, options.stxAddress, options.onProgress);
     stage = 'stx_callContract';
+    reportCallProgress(options.onProgress, 'signing-request');
     const params = buildXverseContractCallParams(options);
     // eslint-disable-next-line no-console
     console.info('[wallet:contract-call]', {
@@ -1867,11 +1880,13 @@ export const disconnectWallet = async () => {
 export const showContractCall = (options: WalletContractCallOptions, provider?: StacksProvider) => {
   const activeProvider = provider ?? getStacksProvider();
   const legacyOptions = toLegacyContractCallOptions(options);
+  reportCallProgress(options.onProgress, 'provider-selected');
 
   // Prefer the modern stx_callContract request for any provider that exposes a
   // request() bridge (Xverse, Leather, other WBIP wallets). The legacy popup
   // flow is rejected by current Xverse builds, so it is only a fallback.
   if (!activeProvider || typeof activeProvider.request !== 'function') {
+    reportCallProgress(options.onProgress, 'legacy-request');
     return legacyShowContractCall(legacyOptions, provider);
   }
 
