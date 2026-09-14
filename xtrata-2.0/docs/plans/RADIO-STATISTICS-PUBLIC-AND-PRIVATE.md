@@ -96,3 +96,44 @@ npx eslint src/home/radio.js public/radio/catalogue.js public/radio/sessions.js 
 npx tsc --noEmit --strict --target ES2022 --module ESNext --moduleResolution Bundler --skipLibCheck --lib ES2022,DOM functions/cloudflare-types.d.ts functions/lib/radio-report.ts functions/radio/counts.ts functions/debug/radio-sessions.ts
 npm run build:radio
 ```
+
+## Artist metadata and current likes (migration 013)
+
+Migration `013_radio_metadata_likes.sql` adds cached title/artist records and
+pseudonymous browser favourites. Apply it once after 012, then deploy the new
+radio bundle and Functions through the usual user-driven release. Existing
+reports remain available before 013, showing unavailable like totals rather than
+false zeros. Migration 013 was applied successfully to production `xtrata-manage` on 14 September 2026 through authenticated Wrangler. It added three tables and one index. No Git push or code deployment was performed for this addition.
+
+The public `/radio/counts` handler schedules at most two metadata reads per
+uncached request. It only reads indexed HTML candidates from the fixed
+`https://xtrata.xyz/inscription/<id>` route, never arbitrary metadata URLs. Each
+read has a 15-second timeout and 32 MiB limit; a database claim avoids concurrent
+downloads. Failed reads retry after a day. Successful results are cached;
+inscription scripts are never executed. JSON player metadata, JSON-LD artist
+names, legacy artist strings and visible artist labels are supported. Blank
+artists remain blank. Artist/title enrichment appears progressively as the
+catalogue is requested; refresh later to see newly cached entries.
+
+The local favourites list remains the listener's source of truth. Opening the
+updated radio synchronizes existing favourites when present. Like/unlike sends
+the latest set of up to 200 IDs through `PUT /radio/likes`, with a distinct random
+browser identity hashed with the existing server salt. Writes are transactional,
+idempotent and reject older snapshot revisions. Rapid/offline changes coalesce
+with bounded retry, and resync on the next radio visit. Playback and local liking
+do not wait for the server. Local-storage failures leave favourites local-only.
+
+Current likes are the latest **synced browser favourites**, not historical heart
+clicks, verified people, wallets or votes. Unlike removes the browser's entry.
+The same total appears in every period and private source row; do not sum source
+rows. Multiple devices, clearing browser storage, and storage partitioning can
+create different identities. Losing an identity can leave its last known likes
+on the server; there is no claim of precise current-human counts. The explicit
+favourites feature synchronizes independently of passive listening analytics
+opt-out. Hashed like membership persists until unliked; anonymous browser sync
+state is retained to reject stale writes. No browser IDs are exposed publicly.
+
+Validation: 56 targeted tests cover existing playback/reporting, artist parsing,
+SQLite metadata caching, current-like deduplication and unlikes, stale revisions,
+unknown-token filtering, and client snapshot synchronization. Focused production
+TypeScript, changed JavaScript lint and radio bundle build pass.

@@ -6,9 +6,13 @@ async function refresh() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Statistics unavailable');
     element('tracks').replaceChildren();
+    const likes = data.likes === null ? null : new Map((data.likes || []).map(r => [r.contract+':'+r.token_id,r.current_likes]));
+    const names = new Map((data.metadata || []).map(r => [r.contract+':'+r.token_id,r]));
     for (const row of data.tracks) {
       const tr = document.createElement('tr');
-      for (const value of [`${row.contract} / #${row.token_id} · ${row.source} · rules v${row.rule_version}`, row.starts, row.partials, row.in_progress, row.qualified_plays, row.unique_browsers, Math.max(0,row.qualified_plays-row.unique_browsers),row.completions,(row.session_listening_seconds/60).toFixed(1)]) {
+      const name = names.get(row.contract+':'+row.token_id);
+      const identity = [name?.title,name?.artist,`${row.contract} / #${row.token_id} · ${row.source} · rules v${row.rule_version}`].filter(Boolean).join(' · ');
+      for (const value of [identity, likes ? (likes.get(row.contract+':'+row.token_id)||0) : '—', row.starts, row.partials, row.in_progress, row.qualified_plays, row.unique_browsers, Math.max(0,row.qualified_plays-row.unique_browsers),row.completions,(row.session_listening_seconds/60).toFixed(1)]) {
         const td = document.createElement('td'); td.textContent = String(value); tr.append(td);
       }
       element('tracks').append(tr);

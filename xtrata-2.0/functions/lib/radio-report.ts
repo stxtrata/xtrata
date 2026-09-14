@@ -15,19 +15,27 @@ export async function catalogueReport(env: Env, url: URL) {
  const byId=new Map((metrics.results || []).map((r:any)=>[r.token_id,r]));
  const activeById=new Map((active.results || []).map((r:any)=>[r.token_id,r.active]));
  const durationById=new Map((durations.results || []).map((r:any)=>[r.token_id,r.duration]));
+ let enriched=new Map<number,any>(),likeCounts=new Map<number,number>(),likesAvailable=false;
+ try {
+  const names=await queryAll(env,"SELECT token_id,title,artist FROM radio_metadata WHERE status='ready'");
+  enriched=new Map((names.results||[]).map((r:any)=>[r.token_id,r]));
+  const likes=await queryAll(env,'SELECT token_id,COUNT(*) likes FROM radio_likes GROUP BY token_id');
+  likeCounts=new Map((likes.results||[]).map((r:any)=>[r.token_id,r.likes]));likesAvailable=true;
+ }catch{ /* migration 013 optional until deployment */ }
  const tracks=(catalogue.results || []).map((row:any)=>{
   let meta:any={};
   // Decode indexed inline metadata only. Never fetch arbitrary token URLs.
   try { if(row.token_uri?.startsWith('data:application/json,')) meta=JSON.parse(decodeURIComponent(row.token_uri.slice(22))); } catch { /* absent metadata */ }
   const m:any=byId.get(row.token_id) || {starts:0,plays:0,completions:0,seconds:0,last_play:null,unique_browsers:range==='all'?null:0};
   const inProgress=Number(activeById.get(row.token_id)||0);
-  return {id:row.token_id,title:typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`,
-   artist:typeof meta.artist==='string'?meta.artist.slice(0,200):'',creator:row.creator,
+  const cached=enriched.get(row.token_id);
+  return {id:row.token_id,current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
+   artist:cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):''),creator:row.creator,
    status:row.mime?.startsWith('audio/')?'Audio':'HTML player candidate',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
    completion_rate:m.plays?100*m.completions/m.plays:null};
  });
  return {range,since,until:now,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
- notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML candidates may not contain music. Titles/artists appear only when present in indexed metadata. Livestream listeners are not included.'};
+ notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML candidates may not contain music. Titles/artists are read from inscription metadata and cached. Current likes are the latest synced browser favourites, independent of the period; they are not verified people. Livestream listeners are not included.'};
 }
