@@ -15,6 +15,10 @@ async function api(params:Record<string,string>={}){
 }
 function render(){
  const session=wallet.getSession(),connected=session.isConnected&&session.network==='mainnet'&&statesWallet===session.address,waiting=!!pending();
+ let saved:unknown=[];try{saved=JSON.parse(localStorage.getItem('xtrata.radio.likes')||'[]');}catch{ /* no import available */ }
+ const localCount=Array.isArray(saved)?new Set(saved.map(row=>String(row?.tokenId))).size:0;
+ const remaining=connected&&!loading?importCandidates(saved,new Set(tracks.map(t=>t.id)),new Set([...states].filter(([,s])=>s.liked).map(([id])=>id))).length:localCount;
+ el('import-offer').textContent=localCount ? remaining ? `You have ${remaining} saved favourites to review for on-chain import. ${connected?'Use the import button below.':'Connect your wallet to check which ones still need importing.'} Nothing is published automatically.` : 'All eligible saved favourites are already liked by this wallet on-chain.' : '';
  el('wallet').textContent=connected?`Wallet: ${session.address}`:'';
  el<HTMLButtonElement>('disconnect').disabled=!session.isConnected||busy;
  el<HTMLButtonElement>('connect').disabled=busy;

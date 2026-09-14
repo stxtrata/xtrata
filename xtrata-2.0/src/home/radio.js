@@ -6,7 +6,8 @@
 // extracted and played, so the station works across formats.
 
 import radioCss from './radio.css?inline';
-import { syncRadioLikes } from '../lib/radio/likes-sync';
+import { createRadioOnchainState } from '../lib/radio/onchain-state';
+import { createWalletSessionStore } from '../lib/wallet/session';
 import { radioTickerSections } from '../lib/radio/ticker';
 import { inscriptionMetadata } from '../lib/radio/inscription-metadata';
 import { attachPlayCounter } from '../lib/radio/play-counter';
@@ -32,9 +33,6 @@ const LIKES_KEY = 'xtrata.radio.likes';
 const loadLikes = () => {
   try { return JSON.parse(window.localStorage.getItem(LIKES_KEY) || '[]') || []; }
   catch { return []; }
-};
-const saveLikes = (likes) => {
-  try { window.localStorage.setItem(LIKES_KEY, JSON.stringify(likes.slice(0, 200))); syncRadioLikes(); } catch { /* noop */ }
 };
 const loadState = () => {
   try { return JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null') || {}; }
@@ -118,7 +116,6 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const transportButtons = Array.from(root.querySelectorAll('.xtrata-radio__tbtn'));
 
   // --- audio plumbing ---------------------------------------------------
-  try { if (window.localStorage.getItem(LIKES_KEY)) syncRadioLikes(); } catch { /* local-only mode */ }
   const player = new Audio();
   const playCounter = attachPlayCounter(player, document.documentElement.dataset.radioEmbed === 'true' ? 'embed' : 'radio');
   player.preload = 'auto';
@@ -625,7 +622,8 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   }
 
   // --- likes, bands, presets, events ---------------------------------------
-  let likes = loadLikes();                 // [{tokenId,title,artist,likedAt}]
+  let likes = []; // Confirmed on-chain likes for the currently connected wallet only.
+  let chainState;
   let band = 'fm';                         // 'fm' | 'liked' | 'chain'
   let preset = 'all';                      // within FM: 'music' | 'all'
   // Shuffle is OFF by default: the dial plays in order (likes/curated/chain
@@ -646,7 +644,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    band, preset, nowPlaying, likes: likes.slice(), volumeStep,
+    band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
     relatives: relatives.slice()
@@ -658,21 +656,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // Play/pause state changes must reach subscribers immediately, whatever
   // triggered them (button, media keys, OS controls, stall, ended).
   ['play', 'pause', 'playing', 'ended'].forEach((ev) => player.addEventListener(ev, emit));
-  const isLiked = (id) => likes.some((l) => l.tokenId === String(id));
+  const isLiked = (id) => Boolean(chainState?.snapshot().likes.some(l => l.tokenId === String(id)));
+  const openOnchainLikes = (id) => {
+    const url = '/radio/endorse' + (id != null ? '?id=' + encodeURIComponent(id) : '');
+    window.open(url, '_blank', 'noopener');
+  };
   const toggleLike = () => {
     if (!nowPlaying) return false;
-    likes = loadLikes();
-    if (isLiked(nowPlaying.tokenId)) {
-      likes = likes.filter((l) => l.tokenId !== nowPlaying.tokenId);
-      writeScreen('♡ REMOVED FROM YOUR STATION');
-    } else {
-      likes.unshift({ tokenId: nowPlaying.tokenId, title: nowPlaying.title, artist: nowPlaying.artist || '', likedAt: Date.now() });
-      writeScreen('♥ SAVED TO YOUR STATION');
-      knobTick();
-    }
-    saveLikes(likes);
-    sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1400));
-    emit();
+    openOnchainLikes(nowPlaying.tokenId);
     return isLiked(nowPlaying.tokenId);
   };
   const classifyRelative = (mime) => {
@@ -711,7 +702,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     band = next;
     persistExtras();
     if (on) {
-      writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — NO SONGS SAVED YET (♥ TO ADD)') : 'BAND: CHAIN — FULL EXPLORATION');
+      writeScreen(band === 'fm' ? 'BAND: FM — CURATED + CHAIN' : band === 'liked' ? (likes.length ? 'BAND: LIKED — YOUR STATION' : 'BAND: LIKED — CONNECT WALLET / LIKE ON-CHAIN') : 'BAND: CHAIN — FULL EXPLORATION');
       sectionTimers.push(window.setTimeout(() => { if (currentTrackInfo) tickerStep(); }, 1600));
       // The current song keeps playing — only what's CUED changes.
       requeueForMode();
@@ -903,7 +894,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   // FM plays the curated order (then known chain songs ascending, preset ALL);
   // CHAIN walks every known song by ascending id.
   const sequentialPool = () => {
-    if (band === 'liked') return likes.map((l) => String(l.tokenId));
+    if (band === 'liked') return chainState.snapshot().likes.map((l) => String(l.tokenId));
     const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
     if (band === 'chain') return known;
     if (preset === 'music') return playlist.slice();
@@ -962,6 +953,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     }
     // Band routing: LIKED = your station only; CHAIN = pure exploration;
     // FM = curated (+ discovery unless preset MUSIC).
+    likes = chainState ? chainState.snapshot().likes.slice() : [];
     if (band === 'liked' && likes.length) {
       const pool = likes.map((l) => l.tokenId).filter((id) => !recent.includes(id) && trackCache.get(id) !== null);
       choice = (pool.length ? pool : likes.map((l) => l.tokenId))[Math.floor(Math.random() * (pool.length || likes.length))];
@@ -1507,12 +1499,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     prev: () => skip('prev'),
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
-    getLikes: () => likes.slice(),
+    getLikes: () => chainState.snapshot().likes.slice(),
     cycleBand, setBand, cyclePreset,
     setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
     setLoop, toggleLoop: () => setLoop(!player.loop),
     getState: () => stateSnapshot(),
-    unlike: (id) => { likes = loadLikes().filter((l) => l.tokenId !== String(id)); saveLikes(likes); emit(); },
+    unlike: (id) => openOnchainLikes(id),
     playToken: (id) => {
       forcedNext = String(id);
       // Anything cued was chosen to follow the PREVIOUS song, so it is stale the moment
@@ -1657,7 +1649,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     renderArt(snap);
     renderRelatives(snap);
     renderPctl(snap);
-    faceBtn('heart').classList.toggle('is-lit', Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId)));
+    const heart = faceBtn('heart');
+    const confirmed = Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId));
+    heart.classList.toggle('is-lit', confirmed);
+    heart.setAttribute('aria-pressed', String(confirmed));
+    const chainStatus = chainState?.snapshot().status;
+    heart.title = chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' ? 'On-chain likes unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
+    heart.setAttribute('aria-busy', String(chainStatus === 'loading'));
+    heart.setAttribute('aria-label', heart.title);
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
     faceBtn('shuffle').classList.toggle('is-lit', Boolean(snap.shuffle));
     faceBtn('repeat').classList.toggle('is-lit', Boolean(snap.loop));
@@ -1745,6 +1744,18 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   applyAttract();
 
   const chainLike = root.querySelector('.xtrata-radio__chain-like');
+  const walletSession = createWalletSessionStore();
+  chainState = createRadioOnchainState({wallet: () => walletSession.load(), changed: () => {
+    likes = chainState.snapshot().likes.slice(); emit();
+  }});
+  const refreshChainLikes = (force = false) => { void chainState.refresh(force); };
+  window.addEventListener('focus', () => refreshChainLikes(true));
+  window.addEventListener('storage', event => {
+    if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true);
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshChainLikes(true); });
+  window.setInterval(() => { if (!document.hidden) refreshChainLikes(); }, 15000);
+  refreshChainLikes();
   chainLike?.addEventListener('click', event => event.stopPropagation());
   const statsLink = root.querySelector('.xtrata-radio__stats');
   statsLink?.addEventListener('click', event => event.stopPropagation());
@@ -1753,7 +1764,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   let statsLoading = false;
   const updateStats = snap => {
     const id = snap.nowPlaying?.tokenId;
-    if (chainLike) chainLike.href = '/radio/endorse' + (id ? '?id=' + encodeURIComponent(id) : '');
+    if (chainLike) {
+      const saved = loadLikes();
+      const confirmed = chainState.snapshot();
+      const count = Array.isArray(saved) ? new Set(saved.filter(l => confirmed.status !== 'ready' || !confirmed.likes.some(c => c.tokenId === String(l.tokenId))).map(l => String(l.tokenId))).size : 0;
+      chainLike.href = count ? '/radio/endorse?import=1' : '/radio/endorse' + (id ? '?id=' + encodeURIComponent(id) : '');
+      chainLike.textContent = count ? 'IMPORT ' + count + ' FAVOURITES ↗' : 'ON-CHAIN ♥';
+      chainLike.title = count ? 'Review saved local favourites for on-chain likes. Wallet approval and network fees apply.' : 'Manage confirmed on-chain likes';
+    }
     if (!statsLink) return;
     statsLink.href = '/radio/catalogue' + (id ? '?id=' + encodeURIComponent(id) : '');
     const row = statsRows?.find(item => String(item.id) === String(id));

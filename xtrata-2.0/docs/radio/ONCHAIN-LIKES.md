@@ -2,7 +2,7 @@
 
 ## What is implemented
 
-`/radio/endorse` provides wallet-paid likes, unlikes and a reviewable import of up to 25 saved favourites per transaction. Radio and embed links open this page with the current song first. Connecting, loading saved favourites, or cancelling a review never signs or broadcasts. The existing saved-favourites heart remains a browser convenience and has no network fee.
+`/radio/endorse` provides wallet-paid likes, unlikes and a reviewable import of up to 25 saved favourites per transaction. Radio and embed links open this page with the current song first. Connecting, loading saved favourites, or cancelling a review never signs or broadcasts. The radio heart now displays only confirmed on-chain likes for the connected mainnet wallet. Clicking it opens the wallet action page; it never changes local favourites or publishes a transaction directly. The Liked playlist also uses that wallet’s confirmed on-chain songs.
 
 `contracts/live/xtrata-radio-likes-v1.0.clar` is the canonical deployment source. It has no platform fee, token transfers, owner privileges, administrative mutations or fee setters. Wallets pay the Stacks miner/network fee, reviewed in the wallet. No fixed fee is hardcoded; wallet estimation follows network conditions. Deploying the contract itself also costs a one-time network fee. There is no paid inscription operation for a like.
 
@@ -16,7 +16,7 @@ Minted-ID checks cover the existing v3-2-3, v2-1-0 and v1-1-1 mainnet cores and 
 
 Pending transaction IDs persist per contract/wallet. The action is disabled while pending; Refresh checks status, and explorer links remain available after reload. Confirmed chain state is displayed rather than an optimistic increment. An aborted transaction does not change endorsements, though its network fee may still be paid. If the browser's storage is unavailable, tracking survives in memory for the current page only. Lost response/transaction IDs require checking the wallet/explorer before retrying; an idempotent repeat still costs a network fee.
 
-Local favourites are not automatically published or imported. Import reviews only saved IDs still in the song catalogue and not already confirmed for the wallet. Larger lists require separately reviewed batches. Like/unlike transactions and the associated wallet are public permanently; an unlike clears current state, not historical transactions. Local favourite storage and old browser-favourite totals are not rewritten by this feature.
+The radio offers an import link when this browser has saved favourites that are not yet confirmed on-chain for the connected wallet. The action page explains the remaining eligible favourites before the user reviews a batch. Local favourites are not automatically published or imported. Import reviews only saved IDs still in the song catalogue and not already confirmed for the wallet. Larger lists require separately reviewed batches. Like/unlike transactions and the associated wallet are public permanently; an unlike clears current state, not historical transactions. Local favourite storage and old browser-favourite totals are not rewritten by this feature.
 
 ## Activation — not performed by this implementation
 
@@ -38,3 +38,5 @@ The wallet tests use mocked providers only. Contract tests use disposable simnet
 Implementation checks: 51 application tests and 3 simnet contract tests passed, along with strict TypeScript checks, relevant ESLint checks, contract variant verification and both radio builds. An isolated headless browser with mock data verified desktop/mobile rendering; the mobile page has no horizontal overflow. No live wallet connection, signature, deployment or like transaction was performed.
 
 Deploy-console validation: 16 radio/X-Chess console regression tests and 6 radio-contract tests (Clarity 3 and 4) pass. The radio card uses the established 490,000 microSTX deployment default, independently of the wallet-estimated transaction fees for likes and unlikes. No live wallet was connected during these tests.
+
+Radio migration validation: 46 targeted tests across 10 files passed, including wallet switching, disconnects, stale responses, unavailable reads and import review. Radio ESLint and both radio builds passed. Confirmed state refreshes when returning to the radio and periodically while visible; failures show unavailable and do not substitute browser favourites. No live wallet or paid transaction was used.
