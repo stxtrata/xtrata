@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {inscriptionMetadata,inscriptionArtwork,safeArtwork} from '../inscription-metadata';
+import {inscriptionMetadata,inscriptionArtwork,safeArtwork,inscriptionHasAudio} from '../inscription-metadata';
 describe('inscribed artist extraction',()=>{
  it('reads new music metadata and decodes entities without executing scripts',()=>{
   expect(inscriptionMetadata('<title>A &amp; B</title><script type="application/json" id="xtrata-music-metadata">{"artist":"Singer \\"X\\""}</script>')).toEqual({title:'A & B',artist:'Singer "X"'});
@@ -23,4 +23,10 @@ describe('inscribed artwork',()=>{
   for(const value of ['javascript:alert(1)','data:text/html;base64,aGVsbG8=','data:image/svg+xml;base64,aGVsbG8=','http://example.com/a','https://user:pass@example.com/a','data:image/png;base64,'+'A'.repeat(700000)])expect(safeArtwork(value)).toBe('');
   expect(inscriptionArtwork('<p>No cover</p>')).toBe('');
  });
+});
+
+it('requires an actual embedded audio element rather than an HTML title or script sound',()=>{
+ expect(inscriptionHasAudio('<title>X Chess</title><script>new Audio("move.mp3")</script>')).toBe(false);
+ expect(inscriptionHasAudio('<source src="data:audio/ogg;base64,YQ==">')).toBe(true);
+ expect(inscriptionHasAudio('<source src="data:video/mp4;base64,YQ==">')).toBe(false);
 });

@@ -39,3 +39,8 @@ export function inscriptionArtwork(html: string): string {
  for(const match of html.matchAll(/<img\b[^>]*\bsrc=["']([^"']+)["']/gi)) {const cover=safeArtwork(match[1]);if(cover)return cover;}
  return '';
 }
+
+/** Match the embedded audio source accepted by the radio, not game sound effects in scripts. */
+export function inscriptionHasAudio(html: string): boolean {
+ return /<(?:source|audio)\b[^>]*\bsrc=["']data:audio\/[^"']+["']/i.test(html);
+}
