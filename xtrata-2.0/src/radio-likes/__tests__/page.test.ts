@@ -22,3 +22,19 @@ it('sends only after approval, then blocks duplicate requests while confirmation
  expect(mocks.send.mock.calls[0][0].sponsored).toBe(false);await vi.waitFor(()=>expect(document.getElementById('pending')?.textContent).toContain('pending'));expect(button('import').disabled).toBe(true);
  expect(document.querySelector('#songs')?.textContent).toContain('2');
 });
+it('reports account preflight and recovery separately without logging wallet addresses or favourite titles',async()=>{
+ mocks.send.mockImplementation(options=>{
+  options.onProgress('account-read');
+  expect(document.getElementById('status')?.textContent).toContain('transaction prompt has not been requested');
+  options.onProgress('account-read-failed');options.onProgress('account-reconnect');
+  expect(document.getElementById('status')?.textContent).toContain('account access');
+  options.onError(new Error('Simulated account timeout'));
+ });
+ await import('../page');button('connect').click();await vi.waitFor(()=>expect(button('import').disabled).toBe(false));
+ document.querySelector<HTMLButtonElement>('#songs button')!.click();button('approve').click();
+ await vi.waitFor(()=>expect(document.getElementById('status')?.textContent).toBe('Simulated account timeout'));
+ const log=document.getElementById('diagnostics')?.textContent||'';
+ expect(log).toContain('account-read');expect(log).toContain('account-reconnect');expect(log).toContain('WALLET_ERROR');expect(log).toContain('WALLET_FLOW_SETTLED');
+ expect(log).not.toContain(mocks.session.address);expect(log).not.toContain('First');
+ expect(button('connect').disabled).toBe(false);
+});

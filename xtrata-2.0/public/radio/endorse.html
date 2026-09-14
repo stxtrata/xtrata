@@ -3,6 +3,7 @@
 <p>Saved browser favourites stay separate. Connecting never imports them or sends a transaction automatically.</p>
 <div class="chain-toolbar"><button id="connect">Connect wallet</button> <button id="disconnect" disabled>Disconnect</button> <button id="import" disabled>Import saved favourites</button> <button id="refresh">Refresh confirmed likes</button></div>
 <p id="import-offer"></p>
+<details><summary>Import / wallet diagnostic log</summary><p>Local diagnostic steps only. No keys, signatures or favourite titles are recorded. Copy this text when reporting a problem.</p><pre id="diagnostics" style="white-space:pre-wrap;overflow-wrap:anywhere" aria-live="polite"></pre></details>
 <p id="status" role="status">Checking availability…</p><p id="wallet"></p><p id="pending"></p>
 <div class="scroll"><table><thead><tr><th>Song</th><th>On-chain likes</th><th>Your like</th></tr></thead><tbody id="songs"></tbody></table></div>
 <dialog id="review"><h2>Review on-chain changes</h2><p>These choices and your wallet address will be public. No platform fee. Review the network fee in your wallet before approving.</p><div id="choices"></div><p id="review-note"></p><button id="approve">Continue to wallet</button> <button id="cancel">Cancel</button></dialog>
