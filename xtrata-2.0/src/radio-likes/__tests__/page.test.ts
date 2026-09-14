@@ -18,7 +18,7 @@ it('never sends transactions on connect or import review; cancellation is safe',
 it('sends only after approval, then blocks duplicate requests while confirmation is pending',async()=>{
  mocks.send.mockImplementation(options=>options.onFinish({txId:'0x'+'a'.repeat(64)}));
  await import('../page');button('connect').click();await vi.waitFor(()=>expect(button('import').disabled).toBe(false));
- document.querySelector<HTMLButtonElement>('#songs button')!.click();button('approve').click();await vi.waitFor(()=>expect(mocks.send).toHaveBeenCalledTimes(1));
+ document.querySelector<HTMLButtonElement>('#songs button')!.click();await vi.waitFor(()=>expect(button('approve').disabled).toBe(false));button('approve').click();await vi.waitFor(()=>expect(mocks.send).toHaveBeenCalledTimes(1));
  expect(mocks.send.mock.calls[0][0].sponsored).toBe(false);await vi.waitFor(()=>expect(document.getElementById('pending')?.textContent).toContain('pending'));expect(button('import').disabled).toBe(true);
  expect(document.querySelector('#songs')?.textContent).toContain('2');
 });
@@ -31,10 +31,21 @@ it('reports account preflight and recovery separately without logging wallet add
   options.onError(new Error('Simulated account timeout'));
  });
  await import('../page');button('connect').click();await vi.waitFor(()=>expect(button('import').disabled).toBe(false));
- document.querySelector<HTMLButtonElement>('#songs button')!.click();button('approve').click();
+ document.querySelector<HTMLButtonElement>('#songs button')!.click();await vi.waitFor(()=>expect(button('approve').disabled).toBe(false));button('approve').click();
  await vi.waitFor(()=>expect(document.getElementById('status')?.textContent).toBe('Simulated account timeout'));
  const log=document.getElementById('diagnostics')?.textContent||'';
  expect(log).toContain('account-read');expect(log).toContain('account-reconnect');expect(log).toContain('WALLET_ERROR');expect(log).toContain('WALLET_FLOW_SETTLED');
  expect(log).not.toContain(mocks.session.address);expect(log).not.toContain('First');
  expect(button('connect').disabled).toBe(false);
+});
+it('shows a fee suggestion before approval and updates it when the selection changes',async()=>{
+ await import('../page');button('connect').click();await vi.waitFor(()=>expect(button('import').disabled).toBe(false));
+ document.querySelector<HTMLButtonElement>('#songs button')!.click();
+ await vi.waitFor(()=>expect(document.getElementById('fee-suggestion')?.textContent).toContain('STX total'));
+ expect(document.getElementById('fee-suggestion')?.textContent).toContain('custom network fee');
+ const checkbox=document.querySelector<HTMLInputElement>('#choices input')!;
+ checkbox.checked=false;checkbox.dispatchEvent(new Event('change',{bubbles:true}));
+ expect(button('approve').disabled).toBe(true);
+ expect(document.getElementById('fee-suggestion')?.textContent).toBe('Select at least one song.');
+ expect(mocks.send).not.toHaveBeenCalled();
 });

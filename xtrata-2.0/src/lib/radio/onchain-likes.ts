@@ -1,4 +1,4 @@
-import {Cl,PostConditionMode,validateStacksAddress} from '@stacks/transactions';
+import {Cl,PostConditionMode,validateStacksAddress,makeUnsignedContractCall,AnchorMode} from '@stacks/transactions';
 import {StacksMainnet} from '@stacks/network';
 import type {WalletSession} from '../wallet/types';
 export type LikeChange={id:number;liked:boolean};
@@ -12,4 +12,12 @@ export function buildLikeCall(contract:string,changes:LikeChange[],session:Walle
 export function importCandidates(saved:unknown,eligible:Set<number>,liked:Set<number>):number[]{
  if(!Array.isArray(saved))return [];
  return [...new Set(saved.map(row=>Number(row?.tokenId)).filter(id=>Number.isSafeInteger(id)&&eligible.has(id)&&!liked.has(id)))];
+}
+
+/** Standard single-signature size estimate only; never signs, broadcasts or fetches. */
+export async function likeFeeSuggestion(contract:string,changes:LikeChange[],session:WalletSession){
+ const call=buildLikeCall(contract,changes,session);
+ const tx=await makeUnsignedContractCall({...call,publicKey:'0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798',fee:0n,nonce:0n,anchorMode:AnchorMode.Any});
+ const microStx=tx.serialize().length;
+ return {microStx,totalStx:(microStx/1e6).toFixed(6),perSongStx:(microStx/changes.length/1e6).toFixed(6),count:changes.length};
 }

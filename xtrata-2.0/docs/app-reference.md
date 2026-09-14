@@ -423,3 +423,5 @@ The radio heart and Liked playlist read only confirmed on-chain likes for the co
 Radio likes migration recovery: the radio now visibly offers preserved local favourites in a dialog once per browser session, and the heart opens wallet guidance even without a selected song. Production Wrangler configuration now references the verified deployed radio likes contract; this takes effect on the next production deployment. Preview remains disabled until explicitly configured. See `docs/radio/ONCHAIN-LIKES.md` for verification and test notes.
 
 Radio endorsement diagnostics: `/radio/endorse` includes a bounded local step log (`[radio:likes]` in the console) and visible wallet progress, distinguishing Xverse account preflight/reconnection from the actual signing request. Optional wallet progress callbacks do not change signing behavior. See the on-chain likes guide for reported timeout context and validation.
+
+On-chain likes review shows a transaction-size-based minimum relay fee suggestion, batch total and per-song cost. It updates with the selection and remains visible during wallet approval; users choose custom fees in their wallet, with no automatic override.
