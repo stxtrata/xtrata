@@ -1,3 +1,4 @@
+import { importAllowlist } from '../lib/allowlist-import';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { showContractCall } from '../../lib/wallet/connect';
 import {
@@ -457,7 +458,7 @@ const MUTABLE_ACTIONS: MutableAction[] = [
       },
       {
         key: 'allowlist-mode',
-        label: 'Allowlist mode (0/1/2)',
+        label: 'Who can mint in this phase?' ,
         type: 'uint',
         allowZero: true
       }
@@ -3020,6 +3021,18 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         </div>
         {summaryMessage && <p className="meta-value">{summaryMessage}</p>}
 
+        <div className="collection-studio__grid" aria-label="Mint rule shortcuts">
+          {[
+            ['set-mint-price', 'Public mint price', 'Set the base collection price.'],
+            ['set-phase', 'Early access & price tiers', 'Set a phase price, block window and limits.'],
+            ['set-active-phase', 'Activate a phase', 'Choose which configured phase is active.'],
+            ['set-allowlist-batch', 'Collection allowlist', 'Import eligible wallets and allowances.'],
+            ['set-phase-allowlist-batch', 'Phase allowlist', 'Set wallet allowances for a specific phase.'],
+            ['set-max-per-wallet', 'Wallet limits', 'Limit how many tokens each wallet can mint.']
+          ].filter(([key]) => availableActions.some(action => action.key === key)).map(([key, title, description]) =>
+            <button type="button" className="collection-studio__task" key={key} aria-pressed={selectedActionKey === key}
+              onClick={() => { setSelectedActionKey(key); setActionMessage(null); }}><strong>{title}</strong><span>{description}</span></button>)}
+        </div>
         <nav className="collection-studio__categories" aria-label="Contract settings categories">
           {actionGroups.map(([group, actions]) => <button type="button" key={group}
             className={`button ${selectedAction?.group === group ? '' : 'button--ghost'}`}
@@ -3080,7 +3093,11 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                   {field.label}
                   <InfoTooltip text={fieldTooltip} />
                 </span>
-                {field.type === 'bool' ? (
+                {field.key === 'allowlist-mode' ? (
+                  <select id={fieldId} className="select" value={value} onChange={event => setActionInputs(current => ({ ...current, [field.key]: event.target.value }))}>
+                    <option value="0">Use collection access settings</option><option value="1">Everyone — public phase</option><option value="2">Collection allowlist</option><option value="3">This phase’s allowlist</option>
+                  </select>
+                ) : field.type === 'bool' ? (
                   <select
                     id={fieldId}
                     className="select"
@@ -3092,8 +3109,8 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                       }))
                     }
                   >
-                    <option value="false">false</option>
-                    <option value="true">true</option>
+                    <option value="false">Disabled</option>
+                    <option value="true">Enabled</option>
                   </select>
                 ) : isTextArea ? (
                   <textarea
@@ -3122,6 +3139,22 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                     }
                   />
                 )}
+                {field.type === 'allowlistBatch' && <>
+                  <span className="field__hint">Import a CSV with address,allowance columns, or paste one wallet and allowance per line. Up to 200 unique wallets per transaction.</span>
+                  <input type="file" accept=".csv,.txt,text/csv,text/plain" aria-label="Import wallet allowances"
+                    onChange={async event => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (!file) return;
+                      if (file.size > 100000) { setActionMessage('Choose a wallet list smaller than 100 KB.'); return; }
+                      try {
+                        const result = importAllowlist(await file.text());
+                        if (result.errors.length) { setActionMessage(result.errors.join(' ')); return; }
+                        setActionInputs(current => ({ ...current, [field.key]: result.text }));
+                        setActionMessage(`Imported ${result.count} wallets; removed ${result.duplicates} identical duplicates. Review the list before submitting.`);
+                      } catch { setActionMessage('Could not read the wallet list.'); }
+                    }} />
+                </>}
                 <span className="field__hint">{field.hint ?? fieldTooltip}</span>
               </label>
             );

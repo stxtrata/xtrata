@@ -9587,3 +9587,36 @@ p {
 .collection-studio__storage, .manage-app .app-section { scroll-margin-top: 24px; }
 @media (max-width: 900px) { .collection-studio__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .collection-studio__heading { flex-direction: column; } }
 @media (max-width: 540px) { .collection-studio__grid { grid-template-columns: minmax(0, 1fr); } .collection-studio__task { padding: 18px; } .collection-studio__snapshot { max-width: 100%; } }
+
+.creator-builder { max-width: 1640px; }
+.creator-builder__top { display:flex; justify-content:space-between; align-items:flex-start; gap:24px; margin-bottom:28px; }
+.creator-builder__top h1 { font-size:clamp(24px, 3vw, 36px); margin:10px 0; }
+.creator-builder__top p { color:var(--muted); }
+.creator-builder__layout { display:grid; grid-template-columns:210px minmax(0,1fr) 240px; gap:24px; align-items:start; }
+.creator-builder__sidebar { position:sticky; top:20px; }
+.creator-builder__step { display:flex; width:100%; gap:12px; padding:16px 12px; margin-bottom:6px; border:1px solid transparent; border-radius:12px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+.creator-builder__step[aria-current] { background:var(--surface); border-color:var(--accent); }
+.creator-builder__step:disabled { opacity:.5; cursor:default; }
+.creator-builder__step strong { display:block; font-size:.9rem; }
+.creator-builder__step small { display:block; font-size:.75rem; margin-top:6px; color:var(--muted); }
+.creator-builder__step-number { flex-shrink:0; display:grid; place-items:center; width:25px; height:25px; border:1px solid var(--border); border-radius:50%; font-size:.8rem; }
+.creator-builder__workspace { min-width:0; border:1px solid var(--border); background:var(--surface); border-radius:20px; padding:clamp(16px, 2vw, 28px); }
+.creator-builder__section-heading { padding-bottom:20px; border-bottom:1px solid var(--border); margin-bottom:24px; }
+.creator-builder__section-heading h2 { margin:10px 0; font-size:1.7rem; }
+.creator-builder__section-heading p,.creator-builder__help { font-size:.85rem; line-height:1.6; color:var(--muted); }
+.creator-builder__forms [hidden] { display:none !important; }
+.creator-builder__review { position:sticky; top:20px; padding:20px; border:1px solid var(--border); border-radius:16px; overflow-wrap:anywhere; }
+.creator-builder__review dl { display:grid; grid-template-columns:1fr; gap:6px; }
+.creator-builder__review dt { font-size:.8rem; color:var(--muted); margin-top:12px; }
+.creator-builder__review dd { margin:0; font-weight:600; }
+.creator-builder__review p { font-size:.85rem; line-height:1.6; }
+.creator-builder__footer { border-top:1px solid var(--border); margin-top:24px; padding-top:20px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+.creator-builder__footer > div { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.creator-builder__reason { display:block; flex-basis:100%; max-width:360px; font-size:.8rem; color:var(--muted); }
+.creator-builder__optional { margin-top:24px; padding-top:16px; border-top:1px solid var(--border); }
+.creator-builder summary { cursor:pointer; font-weight:600; padding:10px 0; }
+.creator-builder button:focus-visible,.creator-builder summary:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media(max-width:1200px) { .creator-builder__layout { grid-template-columns:185px minmax(0,1fr); } .creator-builder__review { position:static; grid-column:2; } }
+@media(max-width:760px) { .creator-builder__layout { display:block; } .creator-builder__top { flex-direction:column; } .creator-builder__sidebar { position:static; margin-bottom:20px; } .creator-builder__sidebar nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; } .creator-builder__review { margin-top:20px; } .creator-builder__footer { flex-direction:column; } }
+.creator-builder__cover { aspect-ratio:1; width:100%; display:grid; place-items:center; border:1px dashed var(--border); border-radius:12px; overflow:hidden; margin-top:16px; text-align:center; font-size:.85rem; color:var(--muted); }
+.creator-builder__cover img { width:100%; height:100%; object-fit:contain; }

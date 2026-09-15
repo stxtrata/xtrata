@@ -1788,16 +1788,14 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   return (
     <div className="deploy-wizard">
       <p className="deploy-wizard__intro">
-        Set up the draft and deploy the contract template here. Standard-mint pricing
-        happens later in Step 3 after Step 2 locks the collection fee floor.
+        Create your draft first, then upload and lock your artwork. Return to Prepare contract to review deployment. Mint rules are configured after confirmation.
       </p>
       <p className="meta-value">
         Draft form values auto-save on this browser, so reloads keep your in-progress inputs.
       </p>
       {(selectedDraftAlreadyDeployed || selectedDraftState === 'published') && (
         <div className="alert">
-          Step 1 is deploy-only. Changes here do not update the live contract or live
-          page price for an already deployed collection unless you deploy a new draft.
+          This collection already has a contract. Use Mint rules and Review & launch to update its settings and page. These deployment fields do not change the existing contract.
         </div>
       )}
 
@@ -2166,7 +2164,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
 
       {status && <p className="meta-value">{status}</p>}
 
-      <div className="deploy-wizard__defaults">
+      <details className="deploy-wizard__defaults"><summary>Technical deployment details</summary>
         <p className="deploy-wizard__defaults-title info-label">
           Deploy debug details
           <InfoTooltip text="Low-level diagnostics for template version, wallet context, pricing lock state, and deploy attempts." />
@@ -2218,7 +2216,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         ) : (
           <p className="meta-value">No deploy attempts logged in this browser session yet.</p>
         )}
-      </div>
+      </details>
 
       {collection && (
         <div className="deploy-wizard__result">
