@@ -916,3 +916,35 @@ live minimum byte rate with a 10,000 micro-STX floor, and stops if that exceeds 
 ceiling. Other API errors still stop the run. The inscription runner retains its
 original strict quote policy. Tests cover capped deployment, missing call estimate,
 setup-only completion, inventory registration, and resume without repeat spending.
+
+### Replacing numbered JPEGs before the first mint
+
+Run the local optimizer first. It preserves the originals and writes a separate
+128×128 grayscale JPEG profile (quality 60, MozJPEG). For the dedicated paused
+draft, the replacement sequence is:
+
+```sh
+node scripts/wizard/optimize-numbered-jpegs.mjs
+node scripts/wizard/collection-v15-replace-stage.mjs stage
+node scripts/wizard/collection-v15-keychain.mjs replace
+node scripts/wizard/collection-v15-replace-stage.mjs cleanup
+```
+
+Staging creates new keys/records, checks the original local backup, and downloads
+every new JPEG to verify its bytes. On-chain replacement requires paused=true,
+minted=0 and reserved=0, registers the ten new hashes in one transaction and clears
+each original hash separately (the deployed ABI has no batch clear function).
+Each step waits for the existing six-confirmation gate and journals before sending.
+A changed replacement revision aborts resume. No mint or unpause call is used.
+
+Cleanup re-verifies both on-chain mappings and all new preview bytes, then removes
+only the old unreserved asset IDs using the collection API. The API must explicitly
+confirm object deletion. Missing acknowledgements fail closed for inspection;
+they are not silently marked successful. Originals remain locally backed up. The
+final inventory must match all ten optimized hashes and the exact byte total.
+Legacy staging/registration/mint commands refuse to restore the original profile
+after replacement. Active staging metadata switches to the optimized profile.
+
+For future collections, optimize before uploading/registering to avoid the extra
+11 registry transactions. These files were already one chunk each, so shrinking
+them affects byte-dependent miner costs, not fixed or per-chunk protocol fees.

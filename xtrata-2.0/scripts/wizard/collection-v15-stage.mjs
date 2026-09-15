@@ -7,6 +7,7 @@ import{fileURLToPath}from'node:url';
 const root=dirname(fileURLToPath(import.meta.url)),state=join(root,'.collection-v15'),origin='https://xtrata.xyz',slug='wizard-numbers-1-10';
 const json=async p=>JSON.parse(await readFile(p,'utf8'));
 const config=await json(join(state,'config.json')),chain=await json(join(state,'journal.json'));
+if(chain.replacementComplete)throw new Error('Original fixtures have been replaced; use the replacement workflow.');
 if(chain.steps.deploy?.status!=='confirmed')throw new Error('Confirmed dedicated deployment required before staging.');
 const manifest=await json(resolve(root,'../../../media/wizard-numbered-jpegs/manifest.json'));
 const request=async(path,options={})=>{const r=await fetch(new URL(path,origin),{...options,signal:AbortSignal.timeout(30000)});if(!r.ok){const e=new Error(`Staging API ${r.status}: ${(await r.text()).slice(0,300)}`);e.status=r.status;throw e;}return r.json();};

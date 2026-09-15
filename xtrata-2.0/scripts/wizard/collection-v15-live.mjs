@@ -20,7 +20,7 @@ const json = async p => JSON.parse(await readFile(p,'utf8'));
 const save = async (p,v) => { await writeFile(p+'.tmp',JSON.stringify(v,null,2)+'\n',{mode:0o600}); await rename(p+'.tmp',p); };
 const password = () => { const p = process.env.COLLECTION_WIZARD_PASSPHRASE; if (!p) throw new Error('Provide COLLECTION_WIZARD_PASSPHRASE through a secret manager or hidden terminal input.'); return p; };
 const args = process.argv.slice(2), command = args[0] || 'status';
-if (!['setup','status','authorize','run','prepare','register'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
+if (!['setup','status','authorize','run','prepare','register','replace'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
 await mkdir(directory,{recursive:true,mode:0o700});
 const lock = await open(join(directory,'lock'),'wx',0o600).catch(()=>{ throw new Error('Runner already active or stale lock present. Verify no runner is active before removing its lock.'); });
 try {
@@ -74,6 +74,7 @@ try {
       const manifest=await prepareNumberedJpegs(output);
       const identity=sha(JSON.stringify({address:config.address,source:sha(source),hashes:manifest.items.map(i=>i.rollingHash)}));
       const journal=await json(journalPath).catch(e=>{if(e.code==='ENOENT')return {identity,spent:'0',steps:{}};throw e;});
+      if(journal.replacementComplete&&['run','register'].includes(command))throw new Error('Original inventory has been replaced; refusing the legacy inventory path.');
       if(journal.identity!==identity) throw new Error('Run identity or JPEG bytes changed; refusing resume.');
       const persist=()=>save(journalPath,journal);
       const wait = async txid => {
@@ -114,7 +115,7 @@ try {
         let quote;
         try { quote=await request('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:typeof payload==='string'?payload:Buffer.from(payload).toString('hex'),estimated_len:typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length})});
         } catch(error) {
-          if(!['prepare','register'].includes(command)||error.reason!=='NoEstimateAvailable')throw error;
+          if(!['prepare','register','replace'].includes(command)||error.reason!=='NoEstimateAvailable')throw error;
           const rate=await request('/v2/fees/transfer');
           const size=typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length;
           if(!Number.isFinite(rate)||rate<=0)throw new Error('Invalid minimum fee rate.');
@@ -127,7 +128,7 @@ try {
         if(!Number.isSafeInteger(feeNumber)||feeNumber<=0)throw new Error('Invalid live miner quote.');
         let fee=BigInt(feeNumber);
         if(fee>BigInt(config.maxTxFeeUstx)) {
-          if(!['prepare','register'].includes(command))throw new Error('Live miner quote exceeds per-transaction ceiling.');
+          if(!['prepare','register','replace'].includes(command))throw new Error('Live miner quote exceeds per-transaction ceiling.');
           fee=BigInt(config.maxTxFeeUstx);
           console.log(id+': quote exceeds ceiling; bidding the existing capped fee '+fee+' micro-STX. No automatic fee increase.');
         }
@@ -147,10 +148,25 @@ try {
       expect(await read(helper,'get-owner'),Cl.ok(Cl.principal(config.address)),'helper owner');
       expect(await read(helper,'get-locked-core-contract'),Cl.ok(Cl.contractPrincipal(coreAddress,coreName)),'core binding');
       await step('supply','set-max-supply',[Cl.uint(10)]);
-      if(['prepare','register'].includes(command)) {
+      if(['prepare','register','replace'].includes(command)) {
         await step('metadata','set-collection-metadata',[Cl.stringAscii('Numbers 1-10'),Cl.stringAscii('NUM10'),Cl.stringAscii(''),Cl.stringAscii('Ten numbered JPEGs. Collection setup test.'),Cl.uint(0)]);
         await step('price','set-mint-price',[Cl.uint(0)]);
         expect(await read(helper,'is-paused'),Cl.ok(Cl.bool(true)),'helper remains paused');
+        if(command==='replace') {
+          const replacement=await json(join(directory,'replacement.json'));
+          const optimized=await json(resolve(project,'../media/wizard-numbered-jpegs-optimized/manifest.json'));
+          if(!replacement.staged||optimized.items.length!==10)throw new Error('Verified replacements required.');
+          const entries=optimized.items.map(item=>{const asset=replacement.assets[item.filename];if(!asset?.verified||asset.rollingHash!==item.rollingHash||asset.tokenUri.length>256)throw new Error('Replacement manifest mismatch.');return {hash:Cl.bufferFromHex(item.rollingHash),'token-uri':Cl.stringAscii(asset.tokenUri)};});
+          const revision=sha(JSON.stringify(entries.map(e=>T.cvToHex(e.hash))));
+          if(journal.replacementRevision&&journal.replacementRevision!==revision)throw new Error('Replacement content changed during run.');
+          journal.replacementRevision=revision;await persist();
+          const replacementGuard=async()=>{expect(await read(helper,'is-paused'),Cl.ok(Cl.bool(true)),'paused during replacement');expect(await read(helper,'get-minted-count'),Cl.ok(Cl.uint(0)),'no mints during replacement');expect(await read(helper,'get-reserved-count'),Cl.ok(Cl.uint(0)),'no reservations during replacement');};
+          await replacementGuard();
+          await step('optimized-inventory','set-registered-token-uri-batch',[Cl.list(entries.map(Cl.tuple))]);
+          for(const entry of entries)expect(await read(helper,'get-registered-token-uri',[entry.hash]),Cl.some(Cl.tuple({'token-uri':entry['token-uri']})),'new inventory');
+          for(const item of manifest.items){await replacementGuard();await step('clear-original-'+item.number,'clear-registered-token-uri',[Cl.bufferFromHex(item.rollingHash)]);expect(await read(helper,'get-registered-token-uri',[Cl.bufferFromHex(item.rollingHash)]),Cl.none(),'old inventory removed');}
+          journal.replacementComplete=true;await persist();console.log('On-chain replacement confirmed; no artwork inscribed.');
+        }
         if(command==='register') {
           const staged=await json(join(directory,'staging.json'));
           if(!staged.complete||Object.keys(staged.assets).length!==10)throw new Error('Ten verified staged assets required.');
@@ -165,7 +181,7 @@ try {
           journal.inventoryRegistered=true;
         }
         journal.configurationPrepared=true;await persist();
-        console.log(command==='register'?'Ten staged files registered; helper paused and no inscriptions sent.':'Helper metadata and supply prepared; paused, no inventory registered and no inscriptions sent.');
+        console.log(command==='replace'?'Optimized inventory registered; helper paused and no inscriptions sent.':command==='register'?'Ten staged files registered; helper paused and no inscriptions sent.':'Helper metadata and supply prepared; paused, no inventory registered and no inscriptions sent.');
       } else {
       for(const item of manifest.items) await step('register-'+item.number,'set-registered-token-uri',[Cl.bufferFromHex(item.rollingHash),Cl.stringAscii(`urn:xtrata:wizard:number:${item.number}`)]);
       await step('unpause','set-paused',[Cl.bool(false)]);

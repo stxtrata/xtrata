@@ -183,3 +183,36 @@ objects first, register new/clear old hashes and verify mappings, then remove
 only the superseded unreserved staging assets after preserving a local backup.
 Never overwrite bytes under an already-registered hash. Existing runner identity
 checks intentionally reject silent changes to its original fixture manifest.
+
+## Optimized replacement completed — 15 September 2026
+
+The user approved replacement after being told the fixed protocol fee is unchanged.
+All ten 512×512 originals were replaced in the paused draft with 128×128 quality-60
+grayscale JPEGs. Original size 69,363 bytes; active size 7,273 bytes (89.5% smaller).
+Individual active files are 548–884 bytes. Unsigned atomic call payloads including
+the existing metadata URIs total 12,074 bytes instead of 74,164, before adding the
+same spending postconditions to each profile. No percentage fee saving is assumed.
+
+New hashes were batch registered in transaction
+`0x652d77d1c93b0b9a74fd6905fbd5c17878e65a9ab351c65f3c1ff6b6f7834d7a`;
+ten individually journaled clear calls removed the original registered hashes.
+Each step waited for six confirmations. Replacement fees total **0.095830 STX**.
+All setup plus replacement fees total 1.168030 STX; verified remaining wizard
+balance **14.831970 STX**. All sixteen transactions were successful and canonical;
+minimum observed confirmation count at final verification was fifteen.
+
+Cleanup verified all new on-chain mappings, absent old mappings, new preview bytes,
+paused/unminted/unreserved state and byte-identical local originals before deleting
+old records. The API explicitly acknowledged deletion of each superseded R2 object.
+Final D1 inventory has exactly ten distinct storage keys and 7,273 bytes. Active
+staging now records the optimized profile; original files and replacement history
+remain local. No artwork was inscribed; helper remains paused and page remains draft.
+Earliest active staging expiry is 2026-09-18T12:24:27Z.
+
+Validation: four wizard integration/vault tests pass, including replacement/resume
+and refusal to restore old inventory. The actual Clarity collection suite passes
+21 tests; the new regression proves cleared inventory cannot mint and its replacement
+can. The local original/optimized manifests and all downloaded replacement bytes
+were verified. Missing deletion acknowledgements fail closed rather than falsely
+claiming successful cleanup. A misleading generic completion log was corrected for
+future replacement runs; verified chain state, not that generic line, is authoritative.

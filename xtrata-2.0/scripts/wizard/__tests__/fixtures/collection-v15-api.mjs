@@ -12,7 +12,7 @@ try {
  for(const step of Object.values(journal.steps)){
   const tx=T.deserializeTransaction(step.serialized); const args=tx.payload.functionArgs;
   if(tx.payload.functionName?.content==='set-registered-token-uri-batch')for(const entry of args[0].value)registered.set(T.cvToHex(entry.value.hash),entry.value['token-uri']);
-  if(tx.payload.functionName?.content==='set-registered-token-uri-batch')for(const entry of args[0].value)registered.set(T.cvToHex(entry.value.hash),entry.value['token-uri']);
+  if(tx.payload.functionName?.content==='clear-registered-token-uri')registered.delete(T.cvToHex(args[0]));
   if(tx.payload.functionName?.content==='mint-small-single-tx')minted.push({hash:T.cvToHex(args[1]),chunk:args[4].value[0]});
   nonce++;
  }
@@ -30,6 +30,7 @@ globalThis.fetch=async (url,options={})=>{
   const tx=T.deserializeTransaction(Buffer.from(options.body).toString('hex'));
   const args=tx.payload.functionArgs;
   if(tx.payload.functionName?.content==='set-registered-token-uri-batch')for(const entry of args[0].value)registered.set(T.cvToHex(entry.value.hash),entry.value['token-uri']);
+  if(tx.payload.functionName?.content==='clear-registered-token-uri')registered.delete(T.cvToHex(args[0]));
   if(tx.payload.functionName?.content==='mint-small-single-tx')minted.push({hash:T.cvToHex(args[1]),chunk:args[4].value[0]});
   nonce++;return respond('0x'+tx.txid());
  }
@@ -46,7 +47,7 @@ globalThis.fetch=async (url,options={})=>{
   else if(name==='quote-inscription-fee')result=Cl.ok(Cl.tuple({'total-fee':Cl.uint(10000),'single-tx-eligible':Cl.bool(true)}));
   else if(name==='get-id-by-hash'){const i=minted.findIndex(a=>a.hash===T.cvToHex(args[0]));result=i<0?Cl.none():Cl.some(Cl.uint(i));}
   else if(name==='get-chunk')result=Cl.some(minted[Number(args[0].value)].chunk);
-  else if(name==='get-registered-token-uri')result=Cl.some(Cl.tuple({'token-uri':registered.get(T.cvToHex(args[0]))}));
+  else if(name==='get-registered-token-uri')result=registered.has(T.cvToHex(args[0]))?Cl.some(Cl.tuple({'token-uri':registered.get(T.cvToHex(args[0]))})):Cl.none();
   else if(name==='get-hash-reservation')result=Cl.none();
   else if(name==='get-token-mint-context')result=Cl.some(Cl.tuple({owner:Cl.principal(config.address),'phase-id':Cl.uint(0),'minted-at':Cl.uint(1)}));
   else if(name==='get-minted-id')result=Cl.some(Cl.tuple({'token-id':args[0]}));
