@@ -781,3 +781,35 @@ would need a name first. Plan section 7, open decision 3.
 Nothing here clicks a button, so a broken render, a mislabelled control or copy that promises
 something the code does not do is still invisible to it. That needs the Playwright suite. The two
 are complements: browser tests catch what the user sees, wizards catch what the chain does.
+
+## Collection mint v1.5 — numbered JPEG simulation
+
+From the project directory:
+
+```sh
+node scripts/wizard/collection-v15-run.mjs --dry
+```
+
+This dedicated runner executes the actual Clarity 4 collection v1.5 helper with
+v3.2.3 in Clarinet simnet. It creates ten numbered JPEGs, configures a fresh local
+helper, registers inventory, and exercises four staged mints, four atomic mints
+and one two-item batch. It checks buyer reservation contention/cancellation,
+duplicate rejection, exact stored chunks, NFT ownership, receipt owner/phase,
+per-token index entries and final minted/reserved counters. The helper source must
+match the pinned mainnet candidate apart from replacing the core principal with
+its local counterpart. A failed assertion exits unsuccessfully and writes the
+partial report with the failure.
+
+Files and `v15-test-report.json` stay local in root
+`media/wizard-numbered-jpegs`. Report token IDs are **simulation IDs**, not mainnet
+inscriptions. Placeholder URIs use example.invalid; no staging upload or cleanup
+worker is exercised. The default zero collection price does not test paid splits.
+The existing broader contract suite covers additional adversarial paths.
+
+This runner deliberately has no signing or live broadcast implementation. It
+never loads `.env.wizards` or real keys, reports the existing kill switch, and
+rejects `--broadcast` or unknown arguments. Dry simulation remains available while
+the switch is engaged, consistent with the other wizard tools. A future live
+adapter needs a separate disposable-admin helper, current fee quotes, explicit
+spend authorization and the existing wizard nonce/budget/confirmation rails; do
+not substitute the production deployer to run tests.

@@ -77,3 +77,14 @@ verified as JPEG/512×512 and visually checked using a contact sheet. The genera
 has no network, wallet or signing access. URI values remain unset until staging
 is chosen. The existing wizard collection runner targets direct core minting;
 these files have not been uploaded, registered or minted through the v1.5 helper.
+
+## Dedicated helper test runner
+
+Added `scripts/wizard/collection-v15-run.mjs --dry`. Actual Clarity simulation of
+the numbered JPEG collection passed 156 checks across ten mints (four staged,
+four atomic, two batched), including reservations, cancellation, deduplication,
+byte reconstruction, ownership, receipt attribution and index/counter consistency.
+The source comparison permits only the expected local core principal substitution.
+JSON evidence is saved with the local fixtures; no generated media is committed.
+This is a local runner, not a mainnet adapter or storage lifecycle test. No real
+wallets were read and no STX was spent.
