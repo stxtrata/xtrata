@@ -1,3 +1,4 @@
+import CollectionBuilder from './components/CollectionBuilder';
 import CollectionStudioNav, { type StudioTaskId } from './components/CollectionStudioNav';
 import CollectionInventoryPanel from './components/CollectionInventoryPanel';
 import StorageCleanupPanel from './components/StorageCleanupPanel';
@@ -27,7 +28,7 @@ import InfoTooltip from './components/InfoTooltip';
 import AddressLabel from '../components/AddressLabel';
 import WalletTopBar from '../components/WalletTopBar';
 import { isXtrataOwnerAddress } from '../config/manage';
-import { hasCoverImageMetadata } from '../lib/collections/cover-image';
+import { hasCoverImageMetadata, resolveCollectionCoverImageUrl } from '../lib/collections/cover-image';
 import { resolveCollectionMintPricingMetadata } from '../lib/collection-mint/pricing-metadata';
 import { getNetworkFromAddress } from '../lib/network/guard';
 import { toStacksNetwork } from '../lib/network/stacks';
@@ -80,6 +81,8 @@ type CollectionReadiness = {
 };
 
 type JourneySnapshot = {
+  previewCover?: string | null;
+  previewDescription?: string;
   loading: boolean;
   error: string | null;
   mintType: JourneySignals['mintType'];
@@ -490,6 +493,8 @@ export default function CollectionManagerApp() {
       }
 
       setJourneySnapshot({
+        previewCover: resolveCollectionCoverImageUrl({ coverImage, collectionId: normalizedCollectionId }),
+        previewDescription: toText(collectionPage?.description) || toText(metadataCollection?.description),
         loading: false,
         error: null,
         mintType,
@@ -778,6 +783,26 @@ export default function CollectionManagerApp() {
     }
   };
 
+  if (experienceMode === 'guided') {
+    return <CollectionBuilder collectionId={activeCollectionId} collectionName={activeCollectionLabel}
+      walletKey={`${walletSession.network}:${walletSession.address || 'disconnected'}`}
+      signals={journeySignals} loading={journeySnapshot.loading} error={journeySnapshot.error}
+      previewCover={journeySnapshot.previewCover} previewDescription={journeySnapshot.previewDescription}
+      onRefresh={handleJourneyRefresh} onAdvanced={setAdvancedMode} onCreate={handleCreateNewCollection}
+      wallet={<WalletTopBar walletSession={walletSession} walletPending={walletPending} onConnect={handleConnectWallet} onDisconnect={handleDisconnectWallet} showAddressWhenNamed />}
+      picker={<CollectionListPanel activeCollectionId={activeCollectionId} preferredCollectionId={storedActiveCollectionId} refreshKey={journeyRefreshKey} onSelectCollection={handleSelectCollection} />}
+      deploy={<DeployWizardPanel activeCollectionId={activeCollectionId} createNewToken={createNewCollectionToken} isXtrataOwner={isXtrataOwner} onDraftReady={handleDraftReady} onJourneyRefreshRequested={requestJourneyRefresh} journeyRefreshToken={journeyRefreshKey} />}
+      artwork={<AssetStagingPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} highlightLockAction />}
+      inventory={<CollectionInventoryPanel collectionId={activeCollectionId} />}
+      rules={<><CollectionSettingsPanel mode="guided" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} onJourneyRefreshRequested={requestJourneyRefresh} />
+        <details className="creator-builder__optional"><summary>Price tiers, schedules, payouts and allowlists</summary>
+          <CollectionSettingsPanel mode="advanced" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} onJourneyRefreshRequested={requestJourneyRefresh} />
+        </details></>}
+      page={<><p className="alert">After publishing, return to Mint rules to enable minting. Publishing the page and unpausing the contract are separate actions.</p><PublishOpsPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} /></>}
+      storage={activeCollectionId ? <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} /> : null}
+    />;
+  }
+
   return (
     <div className="app manage-app">
       <header className="app__header">
@@ -862,7 +887,7 @@ export default function CollectionManagerApp() {
               <div className="manage-journey__mode-toggle" role="group" aria-label="Experience mode">
                 <span className="info-label">
                   <button
-                    className={`button ${experienceMode === 'guided' ? '' : 'button--ghost'}`}
+                    className="button button--ghost"
                     type="button"
                     onClick={setGuidedMode}
                   >
