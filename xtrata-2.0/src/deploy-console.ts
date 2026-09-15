@@ -1,3 +1,4 @@
+import { renderRadioPlaysManagement } from './lib/deploy/radio-plays-management';
 import { createCanaryNavigation } from './lib/deploy/canary-navigation';
 import { renderCollectionManagement } from './lib/deploy/collection-v15-management';
 import { PostConditionMode, type ClarityValue } from '@stacks/transactions';
@@ -740,6 +741,7 @@ const callReadJson = async (
     `${HIRO_API}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`,
     {
       method: 'POST',
+      signal: AbortSignal.timeout(30000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: EXPECTED_DEPLOYER,
@@ -1907,7 +1909,8 @@ const render = () => {
         el('a', {href:'/radio/test-wallet',target:'_blank',rel:'noopener noreferrer'}, 'Open Radio Test Wallet →'),
         el('pre', {}, `${EXPECTED_DEPLOYER}.${entry.name}`)
       );
-      if(preflight?.ok&&preflight.alreadyDeployed)card.append(el('p',{className:'ok'},'Deployed source and paid-play configuration verified. Playback activation remains disabled.'));
+      card.append(renderRadioPlaysManagement((name, args) => callReadJson(EXPECTED_DEPLOYER, RADIO_PLAYS_NAME, name, args)));
+      if(preflight?.ok&&preflight.alreadyDeployed)card.append(el('p',{className:'ok'},'Deployed source and paid-play configuration verified. Ordinary radio paid playback remains disabled; dedicated tests require explicit approval.'));
     }
     if (entry.radioLikes) {
       card.append(el('p', {}, 'Deploying publishes the callable contract; it does not import favourites or send a like. After confirmation, re-run preflight to verify its source, then set this Cloudflare Pages variable and redeploy the site:'), el('pre', {}, `RADIO_LIKES_CONTRACT=${EXPECTED_DEPLOYER}.${entry.name}`));
