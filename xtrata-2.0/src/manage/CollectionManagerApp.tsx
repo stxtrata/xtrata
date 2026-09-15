@@ -259,7 +259,7 @@ export default function CollectionManagerApp() {
   const [collapsed, setCollapsed] = useState<Record<PanelKey, boolean>>({
     'sdk-toolkit': true,
     'collection-list': false,
-    'owner-oversight': false,
+    'owner-oversight': true,
     'deploy-wizard': false,
     'launch-controls': false,
     'collection-settings': true,

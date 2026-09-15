@@ -1,3 +1,4 @@
+import { isCurrentCollection } from '../lib/collection-version';
 import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import {
   parseManageJsonResponse,
@@ -256,7 +257,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
   };
 
   const activeCollections = useMemo(
-    () => collections.filter((collection) => !isArchived(collection)),
+    () => collections.filter((collection) => !isArchived(collection) && isCurrentCollection(collection)),
     [collections]
   );
   const archivedCollections = useMemo(
@@ -314,7 +315,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
       </div>
 
       <p className="meta-value">
-        Showing {activeCollections.length} active drop
+        Showing {activeCollections.length} v3.2.3 collection
         {activeCollections.length === 1 ? '' : 's'} for{' '}
         <code>{connectedAddress || 'current wallet'}</code>
         {showArchived && ` · ${archivedCollections.length} removed`}
@@ -324,7 +325,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
       {error && <div className="alert">{error}</div>}
 
       {activeCollections.length === 0 && !isLoading ? (
-        <p>No active drops yet for this wallet. Create one in Step 1.</p>
+        <p>No v3.2.3 collections yet for this wallet. Create a new collection or expand legacy collections below.</p>
       ) : (
         activeCollections.map((collection) => (
           <div
@@ -403,6 +404,16 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
         ))
       )}
 
+      <details className="creator-builder__optional">
+        <summary>Legacy collections ({collections.filter(collection => !isArchived(collection) && !isCurrentCollection(collection)).length})</summary>
+        <p className="meta-value">Older and unversioned collections are hidden from the current v3.2.3 workflow. Opening one does not migrate its contract.</p>
+        {collections.filter(collection => !isArchived(collection) && !isCurrentCollection(collection)).map(collection => (
+          <div className="collection-list__item" key={collection.id}>
+            <strong>{collection.display_name || collection.slug}</strong><p>{collection.state} · {String(collection.metadata?.templateVersion || 'Version not recorded')}</p>
+            <button type="button" className="button button--ghost" onClick={() => handleSelectCollection(collection)}>Open legacy collection</button>
+          </div>
+        ))}
+      </details>
       {showArchived && (
         <>
           <p className="collection-list__summary">

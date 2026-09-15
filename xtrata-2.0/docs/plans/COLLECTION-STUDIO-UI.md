@@ -29,3 +29,13 @@ Mint rule shortcuts expose prices, phases, phase activation, global/phase allowl
 Validation: 12 targeted builder/import/inventory tests passed; production build passed. Isolated mock-data layout inspected at 1440px and 390px with no horizontal overflow. Repository-wide TypeScript checking still encounters existing Vitest typing/configuration conflicts; a newly exposed narrowed-mode comparison was corrected. No real-wallet transactions or production deployment.
 
 Remaining backend work from the broader proposal: signed creator sessions and per-collection write authorization, public-access quotas, automatic phase activation, and deployed cleanup workers. The existing creator access gate remains until these protections exist. Preview reflects saved metadata, not every unsaved form keystroke. This change reuses existing artwork/metadata controls rather than introducing a new bulk metadata schema.
+
+## Current versus legacy collections
+
+The collection picker now defaults to helper v1.5 collections targeting Core v3.2.3 (when a core binding is recorded). Older/unversioned active collections remain accessible in a collapsed Legacy collections disclosure; they are no longer auto-selected on resume. The owner-wide oversight section starts collapsed. These are manager display changes, not changes to the public collection listing or chain contracts.
+
+Production storage audit verified all ten Numbers 1–10 optimized JPEGs byte-for-byte against local originals: 548–884 bytes each, 7,273 bytes total. They belong to the disposable setup wallet SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M, not the connected deployer. The active D1 rows use the replacement `*-128.jpg` names.
+
+A separate user-authorized storage cleanup targets only expired files in undeployed legacy drafts; local backup inventory, file bytes and deletion acknowledgements are retained under ignored root media/collection-cleanup-backup-2026-09-15. Published/deployed collections and the current Numbers collection are excluded. API reservation and shared-storage-reference guards remain authoritative. No on-chain purge or transaction is performed.
+
+Validation: version classification test and Vite production build passed.
