@@ -51,3 +51,12 @@ npm run build:radio-test-wallet
 ```
 
 The browser test uses installed Google Chrome and a temporary local server, with mocked chain traffic. The build emits the page bundle and worker under `public/radio`; keep the referenced worker asset with the bundle. The user handles pushing and deployment. Real funding and payment approval are separate, explicit actions in the UI.
+
+## Canary funding buttons
+
+The paid-play canary offers three numbered buttons: Get dedicated wallet address,
+Confirm funds received, and Review and run a paid test. They open the dedicated
+wallet at the relevant section. Get my dedicated wallet funding address guides
+you through setup if no verified backup exists. Confirm funds received reads the
+confirmed mainnet balance; it does not sign or start playback. The test button
+opens the review controls, where unlocking and explicit approval are still required.

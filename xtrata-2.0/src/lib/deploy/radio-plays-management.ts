@@ -17,6 +17,18 @@ export function renderRadioPlaysManagement(read: Read): HTMLElement {
   const add = (tag: string, text: string) => { const e = document.createElement(tag); e.textContent = text; root.append(e); return e; };
   add('h3', '5. Contract checks and testing');
   add('p', 'Read-only tools: no wallet connection or fee required. This immutable contract has no administrator, pause, fee-setting, reset or withdrawal function. Stop controls in the test wallet stop only that wallet’s future payments.');
+  add('h4', 'Prepare the dedicated wallet');
+  add('p', 'Use these steps in order. Create and verify an encrypted backup before funding. All three buttons open the same dedicated wallet page; they never use the deployer wallet connected here. Close an older test-wallet tab if it holds the signer.');
+  for (const [label, anchor] of [
+    ['1. Get dedicated wallet address', 'wallet-funding'],
+    ['2. Confirm funds received', 'wallet-funding'],
+    ['3. Review and run a paid test', 'wallet-testing']
+  ]) {
+    const link = document.createElement('a'); link.className = 'ghost';
+    link.href = `/radio/test-wallet#${anchor}`; link.target = 'xtrata-radio-test-wallet';
+    link.textContent = label; root.append(link, document.createTextNode(' '));
+  }
+  add('p', 'The funding page shows your verified backup’s address and confirmed balance. Test approval still requires unlocking, enough funds and no unresolved payment. Start with one reviewed play before enabling a limited session.');
   const output = add('pre', 'Choose a check below. Results are public chain data.');
   output.setAttribute('aria-live', 'polite');
   const buttons: HTMLButtonElement[] = [];
