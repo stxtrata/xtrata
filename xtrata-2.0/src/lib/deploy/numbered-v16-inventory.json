@@ -1,0 +1,42 @@
+[
+  {
+    "hash": "f2f68e8696cb389da6354218cc64025937b39dc7d64f4d27a400fdc45822f2d8",
+    "uri": "data:application/json,{\"name\":\"1\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=247b1b65-0dad-4eb1-9dcf-2fe00dad29be\"}"
+  },
+  {
+    "hash": "60aed47f73f2b62610aacd7881bccdc3e0dee6e5d1327027dba74d1ebe50ef1e",
+    "uri": "data:application/json,{\"name\":\"2\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=bf33d760-98b5-40d5-9036-3a88cc7b0b03\"}"
+  },
+  {
+    "hash": "6f6ace11bf96a7ee7edc1e11bd025a30a5a5bd11bbe61cedec6c5b488c85d8d1",
+    "uri": "data:application/json,{\"name\":\"3\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=f3b940e3-4d69-4664-8851-2f21f90f9fa3\"}"
+  },
+  {
+    "hash": "b9f01e6e2fe59ec8e472fad38f44040e9a28e6eaa17ae8e39a0b93d7ac2a8694",
+    "uri": "data:application/json,{\"name\":\"4\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=2b2901c9-7589-43a0-8a22-b13e38018f13\"}"
+  },
+  {
+    "hash": "fedf0220933b9cfe43c0e75cc7d0a13dbab9a33bc4185e020b1e6a6faad2083e",
+    "uri": "data:application/json,{\"name\":\"5\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=50e33474-f3b8-4384-87ac-081d8dc4f9f0\"}"
+  },
+  {
+    "hash": "c2bf2072d26b1796b8c18ea2f5ddf5280a38bbb5f4ffd92232c83c632666e5cc",
+    "uri": "data:application/json,{\"name\":\"6\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=7f8d2389-2efe-4db5-9937-8f16b3655bab\"}"
+  },
+  {
+    "hash": "42d09a65a7ee3003efaaaf4396a28d09ae68fd67d0fed86d876f72eabe4bbd98",
+    "uri": "data:application/json,{\"name\":\"7\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=ddcc28b1-bad8-4233-95c3-ac3c53484f2e\"}"
+  },
+  {
+    "hash": "70b0c92cb91685ad9869e791dd6ea0a8a5899e93d8cb49d4e1425b82c4eeb9fe",
+    "uri": "data:application/json,{\"name\":\"8\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=36bea711-888f-409b-a974-1daef89babdf\"}"
+  },
+  {
+    "hash": "b25c2a06294902c0992ae96ab97d1b6981f10d834412ef60599d2f4c2c6d8ba4",
+    "uri": "data:application/json,{\"name\":\"9\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=03070422-5513-468d-97c9-a88b8ba3955c\"}"
+  },
+  {
+    "hash": "57d0c6a15bb8b43caf6c4f898437120c23c5cea218bacc44160b5d9bbc0e5fce",
+    "uri": "data:application/json,{\"name\":\"10\",\"image\":\"https://xtrata.xyz/collections/b403e9c4-a57e-4769-93da-e3e4eaf4f115/asset-preview?assetId=40552274-2d67-49be-a681-e5d88f4c2771\"}"
+  }
+]

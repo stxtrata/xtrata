@@ -1,3 +1,4 @@
+import { renderNumberedSetup } from './lib/deploy/numbered-v16-setup';
 import { renderRadioPlaysManagement } from './lib/deploy/radio-plays-management';
 import { createCanaryNavigation } from './lib/deploy/canary-navigation';
 import { renderCollectionManagement } from './lib/deploy/collection-v16-management';
@@ -1892,7 +1893,14 @@ const render = () => {
         el('p', {}, 'Before launch: configure metadata, supply, price, recipients and splits; register each inventory hash and URI; review dependencies and phases; keep paused until a disposable-wallet simulation covers duplicate mint rejection, reservations, staged/atomic mint and receipt attribution. Storage cleanup is a separate worker deployment and must verify reconstruction and recovery backup before deletion. Never purge sealed core chunks.'),
         el('button', {className:'ghost', disabled: !stateEntry.source || !preflight?.ok, onclick: () => downloadGeneratedContract(entry.name)}, 'Download verified source'));
     }
-    if (entry.collectionV16) card.append(renderCollectionManagement(collectionManagementCall));
+    if (entry.collectionV16) {
+      card.append(renderNumberedSetup(collectionManagementCall, async () => {
+        const address='SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M', name='collection-v15-wizard-test';
+        if(unwrapCollectionRead(await callReadJson(address,name,'is-paused'))!==true)throw new Error('Old Numbers helper must remain paused.');
+        for(const fn of ['get-minted-count','get-reserved-count'])if(String(unwrapCollectionRead(await callReadJson(address,name,fn)))!=='0')throw new Error('Old helper has mints or reservations; migration stopped.');
+      }, name => callReadJson('SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M','collection-v15-wizard-test',name)));
+      card.append(renderCollectionManagement(collectionManagementCall));
+    }
     if (entry.collectionV16 && preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source and state verified. Review the configuration snapshot below before configuring or opening minting.'));
     if (entry.radioPlays) {
       card.append(
