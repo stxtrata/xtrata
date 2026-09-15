@@ -165,3 +165,21 @@ Tests: three targeted tests pass, including capped fee, missing-estimate fallbac
 setup-only path, ten-item registration without minting, encrypted vault and resume.
 Staging was exercised against the live API and all ten files byte-verified twice;
 resuming reused the existing ten asset records and ten keys.
+
+## JPEG optimization candidates
+
+Prepared 128×128 grayscale quality-60 MozJPEG candidates in a separate local
+`media/wizard-numbered-jpegs-optimized` directory. Ten original JPEGs total 69,363
+bytes (4,353–8,266 each); candidates total 7,273 bytes (548–884 each), an 89.5%
+reduction. All digits were checked in a contact sheet. Original files, staging
+objects and registered hashes remain unchanged pending replacement selection.
+
+Both profiles use one 16 KiB chunk per image, so fixed and chunk protocol fees
+are unchanged; only payload-dependent miner costs can decrease. Replacing the
+current inventory also needs ten old-hash clear transactions and one new batch
+registration, so net cost savings for this already-configured test are not assured.
+Keep paused, require no mint/reservation activity, upload and byte-verify new
+objects first, register new/clear old hashes and verify mappings, then remove
+only the superseded unreserved staging assets after preserving a local backup.
+Never overwrite bytes under an already-registered hash. Existing runner identity
+checks intentionally reject silent changes to its original fixture manifest.
