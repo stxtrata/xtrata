@@ -12,6 +12,11 @@ it('runs encrypted setup and the entire funded workflow against an offline API',
   expect(run(['setup']).status).not.toBe(0);
   expect(run(['run','--broadcast']).status).not.toBe(0);
   expect(run(['authorize','10000000']).status).toBe(0);
+  const prepared=run(['prepare','--broadcast'],true);
+  expect(prepared.stderr).toBe('');expect(prepared.status).toBe(0);
+  const preparation=JSON.parse(readFileSync(join(directory,'journal.json'),'utf8'));
+  expect(preparation.configurationPrepared).toBe(true);
+  expect(Object.keys(preparation.steps).some(k=>k.startsWith('mint-'))).toBe(false);
   const result=run(['run','--broadcast'],true);
   expect(result.stderr).toBe('');expect(result.status).toBe(0);
   const journal=JSON.parse(readFileSync(join(directory,'journal.json'),'utf8'));

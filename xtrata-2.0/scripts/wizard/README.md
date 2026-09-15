@@ -878,3 +878,15 @@ Validation uses a fully offline API transport with ephemeral test keys for setup
 deploy, configuration, all ten mints, final verification and completed-run resume.
 Vault authentication/tampering and budget boundaries are also tested. Actual
 funded mainnet execution still needs the one-time user setup and approved cap.
+
+### Collection setup without inscriptions
+
+For the staging-and-mint-page workflow, use `prepare --broadcast`, **not** `run`.
+It deploys the dedicated helper, sets supply ten, metadata and zero collection
+price, verifies it remains paused, and stops. Inventory registration follows the
+actual R2/D1 upload workflow. No JPEG is inscribed by `prepare`.
+
+`collection-v15-keychain.mjs setup` generates a passphrase in memory, saves and
+checks it in macOS Keychain, then creates the encrypted wallet. `status` prints
+public state. `collection-v15-setup-quote.mjs` quotes unsigned setup payloads;
+if the API has no estimate, it clearly reports the configured fee-ceiling budget.

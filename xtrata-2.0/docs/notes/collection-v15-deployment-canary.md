@@ -108,3 +108,20 @@ Validation: three tests pass, including the entire flow and resume with an offli
 API and ephemeral keys, authenticated-vault tamper rejection and budget boundaries.
 Offline Clarity 4 deploy/call serialization also passed. No real vault was created,
 no funding or live broadcast performed, and no spending cap has been chosen.
+
+## Setup-only wizard and funding — 15 September 2026
+
+Created dedicated public address `SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M`.
+The ignored encrypted vault is paired with the macOS Keychain item
+`xtrata.collection-v15.setup-wizard` / `collection-v15`. No key is printed.
+Added Keychain setup/status wrapper and read-only setup fee quotation command.
+Hiro returned NoEstimateAvailable for the undeployed helper; recommended funding
+is therefore a conservative 16 STX budget: 15 setup transactions at the configured
+1 STX fee ceiling plus reserve, not a claim of actual costs. Funds stay in the
+wizard until spent. The user will fund the address independently.
+
+The new `prepare --broadcast` path deploys and configures supply/metadata/zero
+price, verifies paused state and stops before inventory registration or inscription.
+Register inventory only after real R2 staging URLs exist. The original `run` path
+still explicitly performs test inscriptions and must not be used for this revised
+setup-only task. No real transactions were signed/broadcast during wallet setup.

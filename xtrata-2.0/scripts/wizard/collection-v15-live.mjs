@@ -20,7 +20,7 @@ const json = async p => JSON.parse(await readFile(p,'utf8'));
 const save = async (p,v) => { await writeFile(p+'.tmp',JSON.stringify(v,null,2)+'\n',{mode:0o600}); await rename(p+'.tmp',p); };
 const password = () => { const p = process.env.COLLECTION_WIZARD_PASSPHRASE; if (!p) throw new Error('Provide COLLECTION_WIZARD_PASSPHRASE through a secret manager or hidden terminal input.'); return p; };
 const args = process.argv.slice(2), command = args[0] || 'status';
-if (!['setup','status','authorize','run'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
+if (!['setup','status','authorize','run','prepare'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
 await mkdir(directory,{recursive:true,mode:0o700});
 const lock = await open(join(directory,'lock'),'wx',0o600).catch(()=>{ throw new Error('Runner already active or stale lock present. Verify no runner is active before removing its lock.'); });
 try {
@@ -132,6 +132,13 @@ try {
       expect(await read(helper,'get-owner'),Cl.ok(Cl.principal(config.address)),'helper owner');
       expect(await read(helper,'get-locked-core-contract'),Cl.ok(Cl.contractPrincipal(coreAddress,coreName)),'core binding');
       await step('supply','set-max-supply',[Cl.uint(10)]);
+      if(command==='prepare') {
+        await step('metadata','set-collection-metadata',[Cl.stringAscii('Numbers 1-10'),Cl.stringAscii('NUM10'),Cl.stringAscii(''),Cl.stringAscii('Ten numbered JPEGs. Collection setup test.'),Cl.uint(0)]);
+        await step('price','set-mint-price',[Cl.uint(0)]);
+        expect(await read(helper,'is-paused'),Cl.ok(Cl.bool(true)),'helper remains paused');
+        journal.configurationPrepared=true;await persist();
+        console.log('Helper metadata and supply prepared; paused, no inventory registered and no inscriptions sent.');
+      } else {
       for(const item of manifest.items) await step('register-'+item.number,'set-registered-token-uri',[Cl.bufferFromHex(item.rollingHash),Cl.stringAscii(`urn:xtrata:wizard:number:${item.number}`)]);
       await step('unpause','set-paused',[Cl.bool(false)]);
       expect(await read(helper,'get-mint-price'),Cl.ok(Cl.uint(0)),'zero test collection price');
@@ -161,6 +168,7 @@ try {
       expect(await read(helper,'get-reserved-count'),Cl.ok(Cl.uint(0)),'reserved count');
       await step('pause-completed','set-paused',[Cl.bool(true)]);
       journal.complete=true;await persist();console.log('Ten JPEGs verified; dedicated helper paused.');
+      }
     }
   }
 } finally { await lock.close(); await unlink(join(directory,'lock')); }

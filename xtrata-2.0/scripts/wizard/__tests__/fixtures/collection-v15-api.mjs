@@ -34,7 +34,7 @@ globalThis.fetch=async (url,options={})=>{
   const name=path.split('/').pop(), isCore=path.includes('/xtrata-v3-2-3/');
   const args=JSON.parse(options.body).arguments.map(T.hexToCV);
   let result;
-  if(name==='is-paused')result=Cl.ok(Cl.bool(false));
+  if(name==='is-paused')result=Cl.ok(Cl.bool(!isCore));
   else if(name==='get-owner')result=isCore?Cl.ok(Cl.some(Cl.principal(config.address))):Cl.ok(Cl.principal(config.address));
   else if(name==='get-locked-core-contract')result=Cl.ok(Cl.contractPrincipal('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X','xtrata-v3-2-3'));
   else if(name==='get-mint-price'||name==='get-reserved-count')result=Cl.ok(Cl.uint(0));
