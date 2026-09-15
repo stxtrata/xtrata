@@ -55,3 +55,14 @@ This is an owner configuration interface, not a disposable-wallet mint runner or
 storage-worker controller. The six testing stages describe required evidence;
 they do not claim tests or cleanup have run. No mainnet writes were performed.
 Validation: 14 targeted tests pass and Vite production build passes.
+
+## Canary navigation tidy-up
+
+All top-level canary cards now have native keyboard-accessible disclosure controls.
+A responsive Quick access index opens and jumps to each card in one click; existing
+contract fragment links remain valid. Nested deployment gates and logs collapse
+independently, and Expand all / Collapse all include collection management panels.
+Disclosure state survives console rerenders in memory. Stable scrollbar space and
+wrapping index links keep the layout usable on smaller screens. Navigation never
+runs preflights or wallet actions. Validation: 24 existing collection/X-Chess/radio
+console tests plus 2 navigation tests pass; production Vite build passes.

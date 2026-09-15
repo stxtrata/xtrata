@@ -1,3 +1,4 @@
+import { createCanaryNavigation } from './lib/deploy/canary-navigation';
 import { renderCollectionManagement } from './lib/deploy/collection-v15-management';
 import { PostConditionMode, type ClarityValue } from '@stacks/transactions';
 import collectionV15Source from '../contracts/live/xtrata-collection-mint-v1.5.clar?raw';
@@ -1821,9 +1822,16 @@ const collectionManagementCall = async (name: string, args: ClarityValue[], writ
   } finally { state.busy = false; }
 };
 
+const canaryNavigation = createCanaryNavigation();
+window.addEventListener('hashchange', () => {
+  const app = document.getElementById('app');
+  if (app) canaryNavigation.reveal(app, window.location.hash);
+});
+
 const render = () => {
   const app = document.getElementById('app');
   if (!app) return;
+  canaryNavigation.remember(app);
   app.replaceChildren();
 
   // wallet card
@@ -2208,6 +2216,7 @@ const render = () => {
     }
     app.append(card);
   }
+  canaryNavigation.apply(app);
 };
 
 render();
