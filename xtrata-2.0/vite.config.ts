@@ -1,5 +1,5 @@
 import { resolve } from 'node:path';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const OPUS_GENERATOR_PATH_PREFIX = '/opus-file-generator/';
@@ -52,6 +52,29 @@ const applyContractStudioDevAlias = (
   next();
 };
 
+// Mirror the production document rewrite without intercepting /manage API routes.
+const collectionManagerDevAliasPlugin: Plugin = {
+  name: 'collection-manager-dev-alias',
+  configureServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      const [pathname, query] = (req.url ?? '').split('?');
+      if (pathname === '/manage' || pathname === '/manage/') {
+        req.url = `/workspace.html${query ? `?${query}` : ''}`;
+      }
+      next();
+    });
+  },
+  configurePreviewServer(server) {
+    server.middlewares.use((req, _res, next) => {
+      const [pathname, query] = (req.url ?? '').split('?');
+      if (pathname === '/manage' || pathname === '/manage/') {
+        req.url = `/workspace.html${query ? `?${query}` : ''}`;
+      }
+      next();
+    });
+  }
+};
+
 const wizardDevAliasPlugin = {
   name: 'wizard-dev-alias',
   configureServer(server: { middlewares: { use: typeof applyWizardDevAlias } }) {
@@ -92,7 +115,8 @@ export default defineConfig(({ mode }) => {
       react(),
       opusGeneratorHeadersPlugin,
       wizardDevAliasPlugin,
-      contractStudioDevAliasPlugin
+      contractStudioDevAliasPlugin,
+      collectionManagerDevAliasPlugin
     ],
     define: {
       __XSTRATA_HAS_HIRO_KEY__: JSON.stringify(hasHiroApiKey),
