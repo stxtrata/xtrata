@@ -11,7 +11,7 @@ export async function catalogueChainTotals(env:Env,ids:number[]){
   let failed=false;
   for(let i=0;i<ids.length;i+=25){
    const batch=ids.slice(i,i+25);
-   try{for(const row of await retry(()=>chainStates(config.contract,batch)))totals.set(row.id,row.total);}
+   try{for(const row of await retry(()=>chainStates(config.contract,batch,undefined,env)))totals.set(row.id,row.total);}
    catch{failed=true;}
   }
   if(failed)status=totals.size?'partial':'unavailable';

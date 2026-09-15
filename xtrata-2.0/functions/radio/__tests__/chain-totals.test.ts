@@ -5,7 +5,7 @@ vi.mock('../../lib/radio-chain-likes',()=>({chainConfig:vi.fn(),chainStates:vi.f
 beforeEach(()=>{vi.resetAllMocks();vi.mocked(chainConfig).mockResolvedValue({enabled:true,contract:'contract',network:'mainnet',batchLimit:25,platformFee:0});});
 it('reports the global total even when the default listener has not liked the song',async()=>{
  vi.mocked(chainStates).mockResolvedValue([{id:2883,liked:false,total:'2'}]);
- const result=await catalogueChainTotals({} as any,[2883]);expect(result.status).toBe('ready');expect(result.totals.get(2883)).toBe('2');
+ const env={HIRO_API_KEY:'test-key'};const result=await catalogueChainTotals(env,[2883]);expect(chainStates).toHaveBeenCalledWith('contract',[2883],undefined,env);expect(result.status).toBe('ready');expect(result.totals.get(2883)).toBe('2');
 });
 it('retries a transient failure without dropping successful totals',async()=>{
  vi.mocked(chainStates).mockRejectedValueOnce(Error('rate limited')).mockResolvedValueOnce([{id:1,liked:false,total:'2'}]);
