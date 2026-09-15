@@ -1,3 +1,5 @@
+import collectionV15Source from '../contracts/live/xtrata-collection-mint-v1.5.clar?raw';
+import { COLLECTION_V15_NAME, COLLECTION_V15_READS, inspectCollectionV15Source, inspectCollectionV15State, unwrapCollectionRead } from './lib/deploy/collection-v15-canary';
 /**
  * Xtrata Deploy Console — browser deploys signed by the admin wallet.
  *
@@ -103,6 +105,7 @@ type Deployable = {
   code: string;
   notes: string;
   xchess?: boolean;
+  collectionV15?: boolean;
   radioLikes?: boolean;
   sponsoredMarket?: boolean;
   dropsV11?: boolean;
@@ -112,6 +115,7 @@ type Deployable = {
 };
 
 const DEPLOYABLE: Deployable[] = [
+  { name: COLLECTION_V15_NAME, source: 'contracts/live/xtrata-collection-mint-v1.5.clar', code: collectionV15Source, collectionV15: true, notes: 'Collection mint v1.5 — registered hash inventory, buyer reservations and duplicate protection, pinned to Xtrata v3.2.3.' },
   {name:RADIO_LIKES_NAME,source:RADIO_LIKES_SOURCE,code:radioLikesSource,radioLikes:true,notes:'Wallet-paid song likes and unlikes, no platform fee, and optional imports of up to 25 favourites. No sponsor or admin setup transactions are required.'},
   {
     name: XCHESS_HELPER_NAME,
@@ -350,6 +354,7 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
   const sha256 = await sha256Hex(code);
   if (entry.radioLikes) problems.push(...inspectRadioLikesSource(code, sha256));
   if (entry.xchess) problems.push(...inspectXChessSource(code, sha256));
+  if (entry.collectionV15) problems.push(...inspectCollectionV15Source(code, sha256));
   const active = stripComments(code);
   if (active.includes('.mock-')) {
     problems.push('active code references a .mock- principal (clarinet stand-in)');
@@ -404,13 +409,13 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     chainStatus = classifyContractInterfaceResponse(response.ok, response.status);
     if (chainStatus === 'deployed') {
       alreadyDeployed = true;
-      if (entry.xchess || entry.radioLikes) {
+      if (entry.xchess || entry.radioLikes || entry.collectionV15) {
         const deployed = await fetch(`${HIRO_API}/v2/contracts/source/${EXPECTED_DEPLOYER}/${entry.name}?proof=0`);
         if (!deployed.ok) problems.push(`Cannot verify deployed contract source: HTTP ${deployed.status}`);
         else {
           const body = await deployed.json();
           if (typeof body.source !== 'string') problems.push('Deployed contract source is unavailable');
-          else problems.push(...(entry.radioLikes ? inspectRadioLikesSource : inspectXChessSource)(body.source, await sha256Hex(body.source)));
+          else problems.push(...(entry.collectionV15 ? inspectCollectionV15Source : entry.radioLikes ? inspectRadioLikesSource : inspectXChessSource)(body.source, await sha256Hex(body.source)));
         }
       }
     } else if (chainStatus === 'unknown') {
@@ -420,6 +425,28 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     problems.push('Hiro contract-name check failed; retry before deploying');
   }
 
+  if (entry.collectionV15) {
+    try {
+      const response = await fetch(`${HIRO_API}/v2/contracts/interface/${EXPECTED_DEPLOYER}/xtrata-v3-2-3`);
+      if (!response.ok) throw new Error(`Core ABI: HTTP ${response.status}`);
+      const abi = await response.json();
+      for (const name of ['get-id-by-hash', 'begin-or-get', 'add-chunk-batch', 'seal-recursive']) {
+        if (!abi.functions?.some((fn: {name: string}) => fn.name === name)) problems.push(`Core ABI missing ${name}`);
+      }
+      for (const name of ['is-paused', 'get-begin-fee-unit', 'get-upload-chunk-fee-unit', 'get-upload-batch-fee-unit', 'get-seal-fee-unit']) {
+        const decoded = await callReadJson(EXPECTED_DEPLOYER, 'xtrata-v3-2-3', name);
+        const value = unwrapCollectionRead(decoded);
+        addLog(states.get(entry.name)!, 'core-read', 'info', `${name}: ${JSON.stringify(value)}`);
+        if (name === 'is-paused' && value === true) problems.push('Core is paused; mint testing cannot proceed.');
+      }
+      if (alreadyDeployed) {
+        const reads: Record<string, unknown> = {};
+        for (const name of COLLECTION_V15_READS) reads[name] = await callReadJson(EXPECTED_DEPLOYER, entry.name, name);
+        problems.push(...inspectCollectionV15State(reads));
+        addLog(states.get(entry.name)!, 'collection-state', 'info', JSON.stringify(reads));
+      }
+    } catch (error) { problems.push(`Collection verification failed: ${error instanceof Error ? error.message : String(error)}`); }
+  }
   return {
     ok: problems.length === 0,
     problems,
@@ -487,6 +514,7 @@ const cliCommand = (entry: Deployable) =>
 // Contracts here are Clarity 4, matching what wallets publish — safe to sign.
 const deployContract = async (name: string) => {
   const stateEntry = states.get(name)!;
+  if (stateEntry.entry.collectionV15) return; // Clarity 3 candidate cannot use this Clarity 4 publisher.
   if (stateEntry.busy || !stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
     return;
   if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || (stateEntry.entry.radioLikes && session.network !== 'mainnet')) {
@@ -1774,12 +1802,12 @@ const render = () => {
   for (const stateEntry of states.values()) {
     const { entry, preflight, txId, error, busy, logs } = stateEntry;
     if (entry.livingSynthRole) continue;
-    const card = el('div', { className: entry.dropsV11 || entry.xchess || entry.radioLikes ? 'card featured' : 'card', ...(entry.radioLikes ? {id:'radio-likes-deployment'} : entry.xchess ? {id:'xchess-deployment'} : {}) });
+    const card = el('div', { className: entry.dropsV11 || entry.xchess || entry.radioLikes ? 'card featured' : 'card', ...(entry.collectionV15 ? {id:'collection-v15-deployment'} : entry.radioLikes ? {id:'radio-likes-deployment'} : entry.xchess ? {id:'xchess-deployment'} : {}) });
     card.append(
       el(
         'h2',
         {},
-        entry.radioLikes
+        entry.collectionV15 ? 'Collection mint v1.5 — v3.2.3 helper' : entry.radioLikes
           ? 'Radio on-chain likes — v1.0'
           : entry.xchess
           ? 'X-Chess 2.6.0 — browser house helper'
@@ -1792,6 +1820,12 @@ const render = () => {
       el('p', {}, entry.notes)
     );
 
+    if (entry.collectionV15) {
+      card.append(el('p', {className:'error'}, 'Wallet deployment blocked: this candidate requires Clarity 3; the shared canary publisher uses Clarity 4. Passing read-only checks does not authorize publishing these bytes with a different language version.'),
+        el('p', {}, 'Checks: pinned source SHA-256, mainnet principals, contract-name availability, core ABI and fee reads; if deployed, exact source, core binding, supply/reservation counters and mint index consistency. State snapshots are recorded in the log.'),
+        el('p', {}, 'Before launch: configure metadata, supply, price, recipients and splits; register each inventory hash and URI; review dependencies and phases; keep paused until a disposable-wallet simulation covers duplicate mint rejection, reservations, staged/atomic mint and receipt attribution. Storage cleanup is a separate worker deployment and must verify reconstruction and recovery backup before deletion. Never purge sealed core chunks.'),
+        el('a', {href:'/contracts/live/xtrata-collection-mint-v1.5.clar', download:'xtrata-collection-mint-v1.5.clar'}, 'Download pinned candidate source'));
+    }
     if (entry.radioLikes) {
       card.append(el('p', {}, 'Deploying publishes the callable contract; it does not import favourites or send a like. After confirmation, re-run preflight to verify its source, then set this Cloudflare Pages variable and redeploy the site:'), el('pre', {}, `RADIO_LIKES_CONTRACT=${EXPECTED_DEPLOYER}.${entry.name}`));
       if (preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source verified byte-for-byte. No admin transaction is required. Activate the address above in Cloudflare.'));
@@ -1870,7 +1904,7 @@ const render = () => {
       el('dt', {}, 'Source'),
       el('dd', {}, entry.source),
       el('dt', {}, 'Publish version'),
-      el('dd', {}, 'Clarity 4')
+      el('dd', {}, entry.collectionV15 ? 'Clarity 3 — wallet publisher blocked' : 'Clarity 4')
     );
     if (entry.paymentToken) {
       dl.append(el('dt', {}, 'Payment token'), el('dd', {}, entry.paymentToken));
@@ -1936,7 +1970,7 @@ const render = () => {
 
     // Deploy: wallet-signed. The contracts are Clarity 4, which is exactly
     // what wallets publish, so physical signing is safe (no key handling).
-    if (preflight?.ok && !preflight.alreadyDeployed) {
+    if (preflight?.ok && !preflight.alreadyDeployed && !entry.collectionV15) {
       card.append(
         el(
           'div',
