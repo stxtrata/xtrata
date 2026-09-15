@@ -1,4 +1,4 @@
-/** Pinned candidate; the shared browser publisher currently forces Clarity 4. */
+/** Pinned candidate verified by the Clarity 4 collection simulation suite. */
 export const COLLECTION_V15_NAME = 'xtrata-collection-mint-v1-5';
 export const COLLECTION_V15_CORE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 export const COLLECTION_V15_SHA256 = '0f2dcba375a863a8c3c4ef8516d81fbd305a3c208961a85612f3ee9eb38ede57';

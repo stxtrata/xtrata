@@ -470,10 +470,12 @@ Source: `contracts/live/xtrata-arcade-scores-v1.1.clar`
 - `get-fee-recipient()`
 - `get-verifier-pubkey-hash()`
 
-## xtrata-collection-mint-v1.5 (undeployed candidate)
+## xtrata-collection-mint-v1.5 (deployed mainnet)
+
+- HTML deployment canary: `/web/deploy-console.html#collection-v15-deployment`; Clarity 4 verified with the unchanged source and the 20-test collection simulation suite. Wallet deployment and post-deploy read checks are built in.
 
 - Source: `contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar`.
-- Generated mainnet candidate: `contracts/live/xtrata-collection-mint-v1.5.clar`; no deployed helper address is asserted.
+- Mainnet source: `contracts/live/xtrata-collection-mint-v1.5.clar`; deployed at `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-5`. Transaction `0x6394d38a0e8b8fcb572343ddc8879b480eb065b96824cf88d9e3901bd46bc3e3` succeeded at block 8994852; exact source verified 2026-09-15. See `docs/plans/COLLECTION-V1.5-LIVE-TESTING.md`.
 - Targets core v3.2.3 with 32-chunk uploads, required registered inventory, per-hash buyer reservations, explicit duplicate rejection and `collection-minted` receipts.
 - Additional reader: `get-hash-reservation(hash)` returns the optional reserving principal.
 - Errors: `u122` already sealed hash; `u123` unregistered hash; `u124` hash reserved by another buyer.

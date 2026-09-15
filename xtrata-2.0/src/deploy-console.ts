@@ -534,10 +534,9 @@ const cliCommand = (entry: Deployable) =>
 // Contracts here are Clarity 4, matching what wallets publish — safe to sign.
 const deployContract = async (name: string) => {
   const stateEntry = states.get(name)!;
-  if (stateEntry.entry.collectionV15) return; // Clarity 3 candidate cannot use this Clarity 4 publisher.
   if (stateEntry.busy || !stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
     return;
-  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet')) {
+  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV15 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet')) {
     stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
     addLog(stateEntry, 'deploy', 'error', stateEntry.error);
     render();
@@ -545,13 +544,13 @@ const deployContract = async (name: string) => {
   }
   stateEntry.busy = true;
   stateEntry.error = null;
-  if (stateEntry.entry.xchess || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) {
+  if (stateEntry.entry.collectionV15 || stateEntry.entry.xchess || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) {
     render();
     try {
       stateEntry.preflight = await runPreflight(stateEntry.entry, stateEntry.source);
       if (!stateEntry.preflight.ok || stateEntry.preflight.alreadyDeployed)
         throw new Error(stateEntry.preflight.problems.join('; ') || 'Contract is already deployed; its source has been verified.');
-      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet'))
+      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV15 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet'))
         throw new Error('Signer changed during preflight. Reconnect the deployer before signing.');
     } catch (error) {
       stateEntry.busy = false;
@@ -1841,11 +1840,12 @@ const render = () => {
     );
 
     if (entry.collectionV15) {
-      card.append(el('p', {className:'error'}, 'Wallet deployment blocked: this candidate requires Clarity 3; the shared canary publisher uses Clarity 4. Passing read-only checks does not authorize publishing these bytes with a different language version.'),
+      card.append(el('p', {}, 'Clarity 4 compatibility verified by the collection mint simulation suite. Run preflight, connect the expected mainnet deployer, then use Deploy below. The exact pinned source is rechecked before the wallet opens.'),
         el('p', {}, 'Checks: pinned source SHA-256, mainnet principals, contract-name availability, core ABI and fee reads; if deployed, exact source, core binding, supply/reservation counters and mint index consistency. State snapshots are recorded in the log.'),
         el('p', {}, 'Before launch: configure metadata, supply, price, recipients and splits; register each inventory hash and URI; review dependencies and phases; keep paused until a disposable-wallet simulation covers duplicate mint rejection, reservations, staged/atomic mint and receipt attribution. Storage cleanup is a separate worker deployment and must verify reconstruction and recovery backup before deletion. Never purge sealed core chunks.'),
-        el('a', {href:'/contracts/live/xtrata-collection-mint-v1.5.clar', download:'xtrata-collection-mint-v1.5.clar'}, 'Download pinned candidate source'));
+        el('button', {className:'ghost', disabled: !stateEntry.source || !preflight?.ok, onclick: () => downloadGeneratedContract(entry.name)}, 'Download verified source'));
     }
+    if (entry.collectionV15 && preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source and state verified. Review the configuration snapshot below before configuring or opening minting.'));
     if (entry.radioPlays) {
       card.append(
         el('h3', {}, '1. Local transaction tests'),
@@ -1940,7 +1940,7 @@ const render = () => {
       el('dt', {}, 'Source'),
       el('dd', {}, entry.source),
       el('dt', {}, 'Publish version'),
-      el('dd', {}, entry.collectionV15 ? 'Clarity 3 — wallet publisher blocked' : 'Clarity 4')
+      el('dd', {}, 'Clarity 4')
     );
     if (entry.paymentToken) {
       dl.append(el('dt', {}, 'Payment token'), el('dd', {}, entry.paymentToken));
@@ -1956,7 +1956,7 @@ const render = () => {
           preflight.ok
             ? preflight.alreadyDeployed
               ? 'OK — already deployed'
-              : 'OK — ready for wallet deploy'
+              : entry.collectionV15 ? 'OK — source and chain checks passed; connect the mainnet deployer to sign' : 'OK — ready for wallet deploy'
             : 'FAILED'
         )
       );
@@ -2006,7 +2006,7 @@ const render = () => {
 
     // Deploy: wallet-signed. The contracts are Clarity 4, which is exactly
     // what wallets publish, so physical signing is safe (no key handling).
-    if (preflight?.ok && !preflight.alreadyDeployed && !entry.collectionV15) {
+    if (preflight?.ok && !preflight.alreadyDeployed) {
       card.append(
         el(
           'div',
@@ -2014,7 +2014,7 @@ const render = () => {
           el(
             'button',
             {
-              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || ((entry.radioLikes || entry.radioPlays) && session.network !== 'mainnet'),
+              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || ((entry.collectionV15 || entry.radioLikes || entry.radioPlays) && session.network !== 'mainnet'),
               onclick: () => deployContract(entry.name)
             },
             busy ? 'Working…' : '2. Deploy (sign in wallet)'
@@ -2023,7 +2023,7 @@ const render = () => {
         el(
           'p',
           {},
-          entry.radioPlays ? 'Paid-play helper tested with Clarity 4. The console requests its existing 0.49 STX one-time deployment fee; review it in your wallet. This is separate from per-play fees. Deployment does not enable paid listening.' : entry.radioLikes
+          entry.collectionV15 ? 'Deploy the pinned collection v1.5 source as Clarity 4. Review the contract name and the requested 0.49 STX deployment fee in your wallet. Deployment leaves minting paused; no assets are minted by this step.' : entry.radioPlays ? 'Paid-play helper tested with Clarity 4. The console requests its existing 0.49 STX one-time deployment fee; review it in your wallet. This is separate from per-play fees. Deployment does not enable paid listening.' : entry.radioLikes
             ? 'Exact tested source, published as Clarity 4. Review the mainnet contract name and network fee in your wallet. This console requests its existing 0.49 STX deployment fee default; that is a one-time deployment fee, not the fee for a like or unlike.'
             : entry.xchess
             ? 'Exact tested Clarity 4 source. The wallet must show xchess-browser-house-v2 on mainnet. Review its network fee before signing; the console requests the existing 0.49 STX fee default. No game deposits are made by deployment.'
@@ -2031,11 +2031,11 @@ const render = () => {
             ? 'Contract is generated from the audited Drops v1.1 base and the verified engine binding. Download the generated source before signing so it is retained in the release evidence bundle.'
             : 'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
         ),
-        ...(entry.proofOfFree || entry.xchess || entry.radioLikes || entry.radioPlays ? [] : [el('pre', {}, cliCommand(entry))]),
+        ...(entry.collectionV15 || entry.proofOfFree || entry.xchess || entry.radioLikes || entry.radioPlays ? [] : [el('pre', {}, cliCommand(entry))]),
         el(
           'p',
           {},
-          entry.xchess || entry.radioLikes || entry.radioPlays ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
+          entry.collectionV15 || entry.xchess || entry.radioLikes || entry.radioPlays ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
         )
       );
     }
