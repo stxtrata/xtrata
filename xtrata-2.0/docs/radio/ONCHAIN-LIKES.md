@@ -112,3 +112,31 @@ Favourite title correction: list labels use catalogue metadata, whereas playback
 Saved playback now restores its full song snapshot and artwork before attempting audio playback, and emits the resumed state again after playback begins. The prior path restored only the audio/ticker. A mocked real-radio initialization test verifies the restored title, artist, album and cover without skipping.
 
 Likes loading avoids redundant global-total requests by using `/radio/counts?range=all&chainLikes=0` for catalogue metadata, then reading the connected wallet’s state separately. Failed/partial loads retry on the next normal tick rather than waiting a full minute. Saved-wallet address restoration notifies the radio, and Refresh likes offers a direct manual retry. The catalogue’s default totals behavior is unchanged. Validation: 34 tests and three builds passed; no real wallet or transaction used.
+
+
+### Shared chain-read authentication (2026-09-15)
+
+Live diagnostics reproduced `/radio/counts` returning `onchain_likes_status: unavailable`
+and `/radio/chain-likes?ids=2910,2883` returning HTTP 503. A subsequent configuration
+read succeeded, so this was intermittent upstream access failure, not evidence of
+removed likes. The currently served catalogue script includes Album and the failure
+notice; older screenshots alone do not establish the deployed version.
+
+Radio reads previously called Hiro anonymously even when server API keys were configured.
+Configuration, global totals, wallet state and transaction confirmation now all use the
+existing server-side Hiro key configuration. Authentication/throttling rejection can try
+one alternate configured key within the same 12-second timeout. No keys enter response
+bodies or client bundles. Existing caller retries remain bounded; unavailable data stays
+unavailable rather than becoming a zero total or a fabricated wallet state.
+
+Cloudflare logs tagged `[radio:chain-read]` show only operation, HTTP status (or network
+failure) and whether credentials were configured. They deliberately omit keys, wallet
+addresses, request bodies and upstream response bodies. If failures persist after deployment,
+check those logs and the production Hiro key bindings; this change cannot guarantee
+upstream availability.
+
+Validation: 20 targeted endpoint, totals and catalogue tests passed. Tests use mocked
+read requests, including authenticated config/state reads, rejected-key fallback, shared
+timeout, private diagnostic fields, authenticated confirmation lookup, and environment
+forwarding from catalogue totals. No wallets were opened and no transactions submitted.
+Deployment and live verification remain pending the user's push.

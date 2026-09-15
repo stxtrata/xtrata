@@ -84,3 +84,9 @@
 
 /radio/wallet.js
   Cache-Control: no-cache
+
+/radio/test-wallet*
+  Cache-Control: no-store
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Content-Security-Policy: frame-ancestors 'none'

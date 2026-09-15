@@ -470,10 +470,12 @@ Source: `contracts/live/xtrata-arcade-scores-v1.1.clar`
 - `get-fee-recipient()`
 - `get-verifier-pubkey-hash()`
 
-## xtrata-collection-mint-v1.5 (undeployed candidate)
+## xtrata-collection-mint-v1.5 (deployed mainnet)
+
+- HTML deployment canary: `/web/deploy-console.html#collection-v15-deployment`; Clarity 4 verified with the unchanged source and the 20-test collection simulation suite. Wallet deployment and post-deploy read checks are built in.
 
 - Source: `contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar`.
-- Generated mainnet candidate: `contracts/live/xtrata-collection-mint-v1.5.clar`; no deployed helper address is asserted.
+- Mainnet source: `contracts/live/xtrata-collection-mint-v1.5.clar`; deployed at `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-5`. Transaction `0x6394d38a0e8b8fcb572343ddc8879b480eb065b96824cf88d9e3901bd46bc3e3` succeeded at block 8994852; exact source verified 2026-09-15. See `docs/plans/COLLECTION-V1.5-LIVE-TESTING.md`.
 - Targets core v3.2.3 with 32-chunk uploads, required registered inventory, per-hash buyer reservations, explicit duplicate rejection and `collection-minted` receipts.
 - Additional reader: `get-hash-reservation(hash)` returns the optional reserving principal.
 - Errors: `u122` already sealed hash; `u123` unregistered hash; `u124` hash reserved by another buyer.
@@ -753,3 +755,7 @@ checklist in `docs/app-reference.md` and `docs/forever-twins-linking.md`.
 ## Radio likes v1.0 — prepared, not deployed
 
 Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, zero platform fee, idempotent like/unlike and atomic batches of 25. References the existing mainnet v3-2-3/v2-1-0/v1-1-1 core ID namespace. No administrative controls. No deployment address is recorded until deployment is authorized and confirmed. Deployment steps and tests: `docs/radio/ONCHAIN-LIKES.md`.
+
+## xtrata-radio-plays-v1.0 (prepared, not deployed)
+
+Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Explicit core/master paid starts, atomic 50-microSTX holder payment, wallet-scoped 16-byte receipts and totals. No treasury, custody or admin. Source SHA-256 pinned in browser and CLI deployment registries. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md` for ABI, errors, tests and deployment stages.

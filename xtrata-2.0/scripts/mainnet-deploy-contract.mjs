@@ -56,6 +56,12 @@ const FEE_USTX = BigInt(process.env.XTRATA_MAINNET_FEE_USTX ?? '750000');
 // Add new mainnet contracts HERE (live variant in contracts/live/ first).
 // ---------------------------------------------------------------------------
 const DEPLOYABLE = {
+  'xtrata-radio-plays-v1-0': {
+    source: 'contracts/live/xtrata-radio-plays-v1.0.clar',
+    clarityVersion: 4,
+    sha256: 'b81f1a0e1de406102e739f78d200041a270f498edab1bb3320aec54f33cbbbe1',
+    notes: 'Optional paid starts: 50 microSTX to the explicit master holder; no custody or admin setup. Paid listening remains disabled pending wallet and fee validation.'
+  },
   'xchess-browser-house-v2': {
     source: 'contracts/live/xchess-browser-house-v2.clar',
     clarityVersion: 4,
