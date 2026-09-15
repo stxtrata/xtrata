@@ -185,7 +185,7 @@ function GateContent({ children }: ArtistManagerGateProps) {
   return (
     <div className="app">
       <header className="app__header">
-        <span className="eyebrow">Collection mint v1.5 · Xtrata Core v3.2.3</span>
+        <span className="eyebrow">Collection mint v1.6 · Xtrata Core v3.2.3</span>
         <h1>Create your collection mint</h1>
         <p>Prepare your artwork, configure your mint and launch a collection page. Collectors inscribe the files when they mint.</p>
       </header>
@@ -302,7 +302,7 @@ function GateContent({ children }: ArtistManagerGateProps) {
             <div>
               <span className="eyebrow">From artwork to mint page</span>
               <h2 id="collection-gate-flow">Set up once. Let collectors mint.</h2>
-              <p>The collection mint v1.5 helper works with Xtrata Core v3.2.3 to manage registered artwork hashes, buyer reservations and duplicate protection.</p>
+              <p>The collection mint v1.6 helper works with Xtrata Core v3.2.3 to manage registered artwork hashes, buyer reservations and duplicate protection.</p>
             </div>
           </div>
           <ol className="collection-studio__grid" style={{ listStyle: 'none', padding: 0 }}>

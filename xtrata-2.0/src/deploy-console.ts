@@ -1,9 +1,9 @@
 import { renderRadioPlaysManagement } from './lib/deploy/radio-plays-management';
 import { createCanaryNavigation } from './lib/deploy/canary-navigation';
-import { renderCollectionManagement } from './lib/deploy/collection-v15-management';
+import { renderCollectionManagement } from './lib/deploy/collection-v16-management';
 import { PostConditionMode, type ClarityValue } from '@stacks/transactions';
-import collectionV15Source from '../contracts/live/xtrata-collection-mint-v1.5.clar?raw';
-import { COLLECTION_V15_NAME, COLLECTION_V15_READS, inspectCollectionV15Source, inspectCollectionV15State, unwrapCollectionRead } from './lib/deploy/collection-v15-canary';
+import collectionV16Source from '../contracts/live/xtrata-collection-mint-v1.6.clar?raw';
+import { COLLECTION_V16_NAME, COLLECTION_V16_READS, inspectCollectionV16Source, inspectCollectionV16State, unwrapCollectionRead } from './lib/deploy/collection-v16-canary';
 /**
  * Xtrata Deploy Console — browser deploys signed by the admin wallet.
  *
@@ -111,7 +111,7 @@ type Deployable = {
   code: string;
   notes: string;
   xchess?: boolean;
-  collectionV15?: boolean;
+  collectionV16?: boolean;
   radioLikes?: boolean;
   radioPlays?: boolean;
   sponsoredMarket?: boolean;
@@ -123,7 +123,7 @@ type Deployable = {
 
 const DEPLOYABLE: Deployable[] = [
   {name:RADIO_PLAYS_NAME,source:RADIO_PLAYS_SOURCE,code:radioPlaysSource,radioPlays:true,notes:'Optional paid song starts: atomically pay 0.00005 STX to the current master holder and record a duplicate-protected receipt. No treasury, custody or automatic signing.'},
-  { name: COLLECTION_V15_NAME, source: 'contracts/live/xtrata-collection-mint-v1.5.clar', code: collectionV15Source, collectionV15: true, notes: 'Collection mint v1.5 — registered hash inventory, buyer reservations and duplicate protection, pinned to Xtrata v3.2.3.' },
+  { name: COLLECTION_V16_NAME, source: 'contracts/live/xtrata-collection-mint-v1.6.clar', code: collectionV16Source, collectionV16: true, notes: 'Collection mint v1.6 — registered hash inventory, buyer reservations and duplicate protection, pinned to Xtrata v3.2.3.' },
   {name:RADIO_LIKES_NAME,source:RADIO_LIKES_SOURCE,code:radioLikesSource,radioLikes:true,notes:'Wallet-paid song likes and unlikes, no platform fee, and optional imports of up to 25 favourites. No sponsor or admin setup transactions are required.'},
   {
     name: XCHESS_HELPER_NAME,
@@ -363,7 +363,7 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
   if (entry.radioPlays) problems.push(...inspectRadioPlaysSource(code, sha256));
   if (entry.radioLikes) problems.push(...inspectRadioLikesSource(code, sha256));
   if (entry.xchess) problems.push(...inspectXChessSource(code, sha256));
-  if (entry.collectionV15) problems.push(...inspectCollectionV15Source(code, sha256));
+  if (entry.collectionV16) problems.push(...inspectCollectionV16Source(code, sha256));
   const active = stripComments(code);
   if (active.includes('.mock-')) {
     problems.push('active code references a .mock- principal (clarinet stand-in)');
@@ -418,13 +418,13 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     chainStatus = classifyContractInterfaceResponse(response.ok, response.status);
     if (chainStatus === 'deployed') {
       alreadyDeployed = true;
-      if (entry.xchess || entry.radioLikes || entry.radioPlays || entry.collectionV15) {
+      if (entry.xchess || entry.radioLikes || entry.radioPlays || entry.collectionV16) {
         const deployed = await fetch(`${HIRO_API}/v2/contracts/source/${EXPECTED_DEPLOYER}/${entry.name}?proof=0`);
         if (!deployed.ok) problems.push(`Cannot verify deployed contract source: HTTP ${deployed.status}`);
         else {
           const body = await deployed.json();
           if (typeof body.source !== 'string') problems.push('Deployed contract source is unavailable');
-          else problems.push(...(entry.collectionV15 ? inspectCollectionV15Source : entry.radioPlays ? inspectRadioPlaysSource : entry.radioLikes ? inspectRadioLikesSource : inspectXChessSource)(body.source, await sha256Hex(body.source)));
+          else problems.push(...(entry.collectionV16 ? inspectCollectionV16Source : entry.radioPlays ? inspectRadioPlaysSource : entry.radioLikes ? inspectRadioLikesSource : inspectXChessSource)(body.source, await sha256Hex(body.source)));
         }
       }
     } else if (chainStatus === 'unknown') {
@@ -434,7 +434,7 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
     problems.push('Hiro contract-name check failed; retry before deploying');
   }
 
-  if (entry.collectionV15) {
+  if (entry.collectionV16) {
     try {
       const response = await fetch(`${HIRO_API}/v2/contracts/interface/${EXPECTED_DEPLOYER}/xtrata-v3-2-3`);
       if (!response.ok) throw new Error(`Core ABI: HTTP ${response.status}`);
@@ -450,8 +450,8 @@ const runPreflight = async (entry: Deployable, code: string): Promise<PreflightR
       }
       if (alreadyDeployed) {
         const reads: Record<string, unknown> = {};
-        for (const name of COLLECTION_V15_READS) reads[name] = await callReadJson(EXPECTED_DEPLOYER, entry.name, name);
-        problems.push(...inspectCollectionV15State(reads));
+        for (const name of COLLECTION_V16_READS) reads[name] = await callReadJson(EXPECTED_DEPLOYER, entry.name, name);
+        problems.push(...inspectCollectionV16State(reads));
         addLog(states.get(entry.name)!, 'collection-state', 'info', JSON.stringify(reads));
       }
     } catch (error) { problems.push(`Collection verification failed: ${error instanceof Error ? error.message : String(error)}`); }
@@ -540,7 +540,7 @@ const deployContract = async (name: string) => {
   const stateEntry = states.get(name)!;
   if (stateEntry.busy || !stateEntry.source || !stateEntry.preflight?.ok || stateEntry.preflight.alreadyDeployed)
     return;
-  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV15 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet')) {
+  if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV16 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet')) {
     stateEntry.error = `connect the deployer wallet (${EXPECTED_DEPLOYER}) first`;
     addLog(stateEntry, 'deploy', 'error', stateEntry.error);
     render();
@@ -548,13 +548,13 @@ const deployContract = async (name: string) => {
   }
   stateEntry.busy = true;
   stateEntry.error = null;
-  if (stateEntry.entry.collectionV15 || stateEntry.entry.xchess || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) {
+  if (stateEntry.entry.collectionV16 || stateEntry.entry.xchess || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) {
     render();
     try {
       stateEntry.preflight = await runPreflight(stateEntry.entry, stateEntry.source);
       if (!stateEntry.preflight.ok || stateEntry.preflight.alreadyDeployed)
         throw new Error(stateEntry.preflight.problems.join('; ') || 'Contract is already deployed; its source has been verified.');
-      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV15 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet'))
+      if (!session.isConnected || session.address !== EXPECTED_DEPLOYER || ((stateEntry.entry.collectionV16 || stateEntry.entry.radioLikes || stateEntry.entry.radioPlays) && session.network !== 'mainnet'))
         throw new Error('Signer changed during preflight. Reconnect the deployer before signing.');
     } catch (error) {
       stateEntry.busy = false;
@@ -1790,8 +1790,8 @@ const renderLivingSynthDeployment = () => {
 };
 
 const collectionManagementCall = async (name: string, args: ClarityValue[], write: boolean) => {
-  if (!write) return callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, name, args);
-  const state = states.get(COLLECTION_V15_NAME)!;
+  if (!write) return callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, name, args);
+  const state = states.get(COLLECTION_V16_NAME)!;
   if (state.busy) throw new Error('Wait for the current operation.');
   const guard = () => {
     if (!session.isConnected || session.network !== 'mainnet' || session.address !== EXPECTED_DEPLOYER)
@@ -1800,16 +1800,16 @@ const collectionManagementCall = async (name: string, args: ClarityValue[], writ
   guard();
   state.busy = true;
   try {
-    const preflight = await runPreflight(state.entry, state.source || collectionV15Source);
+    const preflight = await runPreflight(state.entry, state.source || collectionV16Source);
     if (!preflight.ok || !preflight.alreadyDeployed) throw new Error('Deployed contract preflight failed: ' + preflight.problems.join('; '));
     guard();
-    const owner = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, 'get-owner'));
+    const owner = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-owner'));
     if (owner !== session.address) throw new Error('Connected wallet is no longer the contract owner.');
-    if (unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, 'get-finalized')) !== false) throw new Error('Contract is finalized or finalization state is unavailable.');
+    if (unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-finalized')) !== false) throw new Error('Contract is finalized or finalization state is unavailable.');
     guard();
     return await new Promise<string>((resolve, reject) => {
       showContractCall({
-        contractAddress: EXPECTED_DEPLOYER, contractName: COLLECTION_V15_NAME,
+        contractAddress: EXPECTED_DEPLOYER, contractName: COLLECTION_V16_NAME,
         functionName: name, functionArgs: args, appDetails,
         network: toStacksNetwork('mainnet'), stxAddress: session.address,
         postConditionMode: PostConditionMode.Deny, postConditions: [],
@@ -1868,12 +1868,12 @@ const render = () => {
   for (const stateEntry of states.values()) {
     const { entry, preflight, txId, error, busy, logs } = stateEntry;
     if (entry.livingSynthRole) continue;
-    const card = el('div', { className: entry.dropsV11 || entry.xchess || entry.radioLikes || entry.radioPlays ? 'card featured' : 'card', ...(entry.radioPlays ? {id:'radio-plays-deployment'} : entry.collectionV15 ? {id:'collection-v15-deployment'} : entry.radioLikes ? {id:'radio-likes-deployment'} : entry.xchess ? {id:'xchess-deployment'} : {}) });
+    const card = el('div', { className: entry.dropsV11 || entry.xchess || entry.radioLikes || entry.radioPlays ? 'card featured' : 'card', ...(entry.radioPlays ? {id:'radio-plays-deployment'} : entry.collectionV16 ? {id:'collection-v16-deployment'} : entry.radioLikes ? {id:'radio-likes-deployment'} : entry.xchess ? {id:'xchess-deployment'} : {}) });
     card.append(
       el(
         'h2',
         {},
-        entry.radioPlays ? 'Radio paid plays — v1.0' : entry.collectionV15 ? 'Collection mint v1.5 — v3.2.3 helper' : entry.radioLikes
+        entry.radioPlays ? 'Radio paid plays — v1.0' : entry.collectionV16 ? 'Collection mint v1.6 — v3.2.3 helper' : entry.radioLikes
           ? 'Radio on-chain likes — v1.0'
           : entry.xchess
           ? 'X-Chess 2.6.0 — browser house helper'
@@ -1886,14 +1886,14 @@ const render = () => {
       el('p', {}, entry.notes)
     );
 
-    if (entry.collectionV15) {
+    if (entry.collectionV16) {
       card.append(el('p', {}, 'Clarity 4 compatibility verified by the collection mint simulation suite. Run preflight, connect the expected mainnet deployer, then use Deploy below. The exact pinned source is rechecked before the wallet opens.'),
         el('p', {}, 'Checks: pinned source SHA-256, mainnet principals, contract-name availability, core ABI and fee reads; if deployed, exact source, core binding, supply/reservation counters and mint index consistency. State snapshots are recorded in the log.'),
         el('p', {}, 'Before launch: configure metadata, supply, price, recipients and splits; register each inventory hash and URI; review dependencies and phases; keep paused until a disposable-wallet simulation covers duplicate mint rejection, reservations, staged/atomic mint and receipt attribution. Storage cleanup is a separate worker deployment and must verify reconstruction and recovery backup before deletion. Never purge sealed core chunks.'),
         el('button', {className:'ghost', disabled: !stateEntry.source || !preflight?.ok, onclick: () => downloadGeneratedContract(entry.name)}, 'Download verified source'));
     }
-    if (entry.collectionV15) card.append(renderCollectionManagement(collectionManagementCall));
-    if (entry.collectionV15 && preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source and state verified. Review the configuration snapshot below before configuring or opening minting.'));
+    if (entry.collectionV16) card.append(renderCollectionManagement(collectionManagementCall));
+    if (entry.collectionV16 && preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source and state verified. Review the configuration snapshot below before configuring or opening minting.'));
     if (entry.radioPlays) {
       card.append(
         el('h3', {}, '1. Local transaction tests'),
@@ -2006,7 +2006,7 @@ const render = () => {
           preflight.ok
             ? preflight.alreadyDeployed
               ? 'OK — already deployed'
-              : entry.collectionV15 ? 'OK — source and chain checks passed; connect the mainnet deployer to sign' : 'OK — ready for wallet deploy'
+              : entry.collectionV16 ? 'OK — source and chain checks passed; connect the mainnet deployer to sign' : 'OK — ready for wallet deploy'
             : 'FAILED'
         )
       );
@@ -2064,7 +2064,7 @@ const render = () => {
           el(
             'button',
             {
-              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || ((entry.collectionV15 || entry.radioLikes || entry.radioPlays) && session.network !== 'mainnet'),
+              disabled: busy || !session.isConnected || session.address !== EXPECTED_DEPLOYER || ((entry.collectionV16 || entry.radioLikes || entry.radioPlays) && session.network !== 'mainnet'),
               onclick: () => deployContract(entry.name)
             },
             busy ? 'Working…' : '2. Deploy (sign in wallet)'
@@ -2073,7 +2073,7 @@ const render = () => {
         el(
           'p',
           {},
-          entry.collectionV15 ? 'Deploy the pinned collection v1.5 source as Clarity 4. Review the contract name and the requested 0.49 STX deployment fee in your wallet. Deployment leaves minting paused; no assets are minted by this step.' : entry.radioPlays ? 'Paid-play helper tested with Clarity 4. The console requests its existing 0.49 STX one-time deployment fee; review it in your wallet. This is separate from per-play fees. Deployment does not enable paid listening.' : entry.radioLikes
+          entry.collectionV16 ? 'Deploy the pinned collection v1.6 source as Clarity 4. Review the contract name and the requested 0.49 STX deployment fee in your wallet. Deployment leaves minting paused; no assets are minted by this step.' : entry.radioPlays ? 'Paid-play helper tested with Clarity 4. The console requests its existing 0.49 STX one-time deployment fee; review it in your wallet. This is separate from per-play fees. Deployment does not enable paid listening.' : entry.radioLikes
             ? 'Exact tested source, published as Clarity 4. Review the mainnet contract name and network fee in your wallet. This console requests its existing 0.49 STX deployment fee default; that is a one-time deployment fee, not the fee for a like or unlike.'
             : entry.xchess
             ? 'Exact tested Clarity 4 source. The wallet must show xchess-browser-house-v2 on mainnet. Review its network fee before signing; the console requests the existing 0.49 STX fee default. No game deposits are made by deployment.'
@@ -2081,11 +2081,11 @@ const render = () => {
             ? 'Contract is generated from the audited Drops v1.1 base and the verified engine binding. Download the generated source before signing so it is retained in the release evidence bundle.'
             : 'Contract is Clarity 4 — matches what the wallet publishes, verified by the clarinet suite. CLI fallback:'
         ),
-        ...(entry.collectionV15 || entry.proofOfFree || entry.xchess || entry.radioLikes || entry.radioPlays ? [] : [el('pre', {}, cliCommand(entry))]),
+        ...(entry.collectionV16 || entry.proofOfFree || entry.xchess || entry.radioLikes || entry.radioPlays ? [] : [el('pre', {}, cliCommand(entry))]),
         el(
           'p',
           {},
-          entry.collectionV15 || entry.xchess || entry.radioLikes || entry.radioPlays ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
+          entry.collectionV16 || entry.xchess || entry.radioLikes || entry.radioPlays ? 'After confirmation, use Re-run preflight to verify the deployed source hash before using the helper.' : 'After it confirms, hit Re-run preflight — this card flips to the post-deploy admin step.'
         )
       );
     }

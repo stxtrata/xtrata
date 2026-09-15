@@ -25,6 +25,9 @@ export const supportsCollectionSmallSingleTx = (templateVersion: string) => {
   return parts.major === 1 && parts.minor >= 4;
 };
 
+export const collectionSingleTxChunkLimit = (version: string) =>
+  /^xtrata-collection-mint-v1[.-]6$/.test(version.trim()) ? 32 : SMALL_MINT_HELPER_MAX_CHUNKS;
+
 type ShouldUseCollectionSmallSingleTxParams = {
   templateVersion: string;
   chunkCount: number;
@@ -48,6 +51,6 @@ export const shouldUseCollectionSmallSingleTx = (
   const maxChunkCount =
     params.maxChunkCount && params.maxChunkCount > 0
       ? params.maxChunkCount
-      : SMALL_MINT_HELPER_MAX_CHUNKS;
+      : collectionSingleTxChunkLimit(params.templateVersion);
   return params.chunkCount <= maxChunkCount;
 };

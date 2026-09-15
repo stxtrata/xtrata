@@ -57,6 +57,7 @@ import {
 } from './lib/collection-mint/payment-model';
 import { findFirstMatchInBatches } from './lib/collection-mint/resume-scan';
 import {
+  collectionSingleTxChunkLimit,
   shouldUseCollectionSmallSingleTx,
   supportsCollectionSmallSingleTx
 } from './lib/collection-mint/routing';
@@ -64,7 +65,6 @@ import { parseDeployPricingLockSnapshot } from './lib/deploy/pricing-lock';
 import { PUBLIC_CONTRACT } from './config/public';
 import {
   DEFAULT_TOKEN_URI,
-  SMALL_MINT_HELPER_MAX_CHUNKS,
   TX_DELAY_SECONDS
 } from './lib/mint/constants';
 import { getNetworkFromAddress, getNetworkMismatch } from './lib/network/guard';
@@ -2493,7 +2493,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           setUploadState('pending');
           setSealState('pending');
           appendMintLog(
-            `Small-file single-tx route active (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks).`
+            `Small-file single-tx route active (<=${collectionSingleTxChunkLimit(templateVersion)} chunks).`
           );
 
           const singleTxSpendCap = usesV15 ? (await freshV15Quote(chunks.length)).total : resolveSmallSingleTxSpendCap(chunks.length);
@@ -3390,7 +3390,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     supportsSingleTxRoute &&
     mintableAssets.some((asset) => {
       const chunkCount = resolveAssetChunkCount(asset);
-      return chunkCount > 0 && chunkCount <= SMALL_MINT_HELPER_MAX_CHUNKS;
+      return chunkCount > 0 && chunkCount <= collectionSingleTxChunkLimit(templateVersion);
     });
   const estimatedSealFeeUnits =
     collectionMaxChunkCount === null || collectionMaxChunkCount <= 0
@@ -3613,7 +3613,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <div id="live-mint-guide" className="collection-live-page__mint-guide">
                 <p className="collection-live-page__mint-guide-title">
                   {hasSingleTxEligibleAssets
-                    ? `Xtrata mint flow: 1-3 wallet signatures (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks auto-route to single-tx)`
+                    ? `Xtrata mint flow: 1-3 wallet signatures (<=${collectionSingleTxChunkLimit(templateVersion)} chunks auto-route to single-tx)`
                     : 'Xtrata mint flow: minimum 3 wallet signatures'}
                 </p>
                 <div className="collection-live-page__mint-guide-summary">
@@ -3627,7 +3627,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     {hasSingleTxEligibleAssets && (
                       <li>
                         Small-file route: one signature for assets up to{' '}
-                        {SMALL_MINT_HELPER_MAX_CHUNKS} chunks
+                        {collectionSingleTxChunkLimit(templateVersion)} chunks
                       </li>
                     )}
                     <li>Protocol fee range: {protocolFeeRangeLabel}</li>
@@ -3657,7 +3657,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     </span>
                     <span className="collection-live-page__mint-guide-note">
                       {hasSingleTxEligibleAssets
-                        ? `Expected wallet prompts: 1 total for <=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks, otherwise 3+ based on upload batches.`
+                        ? `Expected wallet prompts: 1 total for <=${collectionSingleTxChunkLimit(templateVersion)} chunks, otherwise 3+ based on upload batches.`
                         : estimatedWalletApprovals === null
                           ? 'Expected wallet prompts: at least 3 total (begin, upload, seal).'
                           : `Expected wallet prompts for a max-size mint in this collection: up to ${estimatedWalletApprovals} total (${estimatedUploadTransactionCount} upload batch signatures).`}
@@ -3793,7 +3793,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       <main className="app__main collection-live-page__main">
         <section className="panel app-section" aria-labelledby="collection-mint-progress">
           <div className="panel__header"><div><h2 id="collection-mint-progress">Mint progress</h2>
-            <p>{mintRoute === 'single' ? 'One wallet transaction — your file is uploaded and minted together.' : mintRoute === 'staged' ? 'Continuing the upload and mint process. Confirm each wallet request when prompted.' : supportsSingleTxRoute ? `Fresh files of ${SMALL_MINT_HELPER_MAX_CHUNKS} chunks or fewer mint in one wallet transaction. Larger files and unfinished uploads use the resumable path.` : 'Follow the wallet prompts to complete your mint.'}</p>
+            <p>{mintRoute === 'single' ? 'One wallet transaction — your file is uploaded and minted together.' : mintRoute === 'staged' ? 'Continuing the upload and mint process. Confirm each wallet request when prompted.' : supportsSingleTxRoute ? `Fresh files of ${collectionSingleTxChunkLimit(templateVersion)} chunks or fewer mint in one wallet transaction. Larger files and unfinished uploads use the resumable path.` : 'Follow the wallet prompts to complete your mint.'}</p>
           </div></div>
           <div className="panel__body" role="status" aria-live="polite">
             <strong>{[beginState, uploadState, sealState].includes('error') ? 'Mint needs attention' : sealState === 'done' ? 'Mint confirmed' : mintPending ? 'Mint in progress' : 'Ready when you are'}</strong>

@@ -70,3 +70,7 @@ describe('collection mint routing', () => {
     ).toBe(false);
   });
 });
+
+it('uses the v1.6 32 chunk limit without changing v1.5',()=>{
+ for(const chunkCount of [30,31,32,33])expect(shouldUseCollectionSmallSingleTx({templateVersion:'xtrata-collection-mint-v1.6',chunkCount,hasReservation:false,hasUploadState:false})).toBe(chunkCount<=32);
+});

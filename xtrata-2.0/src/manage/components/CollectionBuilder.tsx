@@ -36,7 +36,7 @@ export default function CollectionBuilder(p: Props) {
   const section = (id: BuilderStepId, content: ReactNode) => visited.has(id) && <div key={id} hidden={step !== id}>{content}</div>;
   return <div className="app manage-app creator-builder">
     <header className="creator-builder__top">
-      <div><span className="eyebrow">Collection studio · v1.5 / Core v3.2.3</span><h1>{p.collectionName || 'Your new collection'}</h1>
+      <div><span className="eyebrow">Collection studio · v1.6 / Core v3.2.3</span><h1>{p.collectionName || 'Your new collection'}</h1>
       <p>{p.loading ? 'Checking saved collection…' : p.signals.published ? 'Published' : 'Draft'} · {p.signals.unpaused === true ? 'Minting enabled' : p.signals.unpaused === false ? 'Minting paused' : 'Mint status unconfirmed'}</p></div>
       <div>{p.wallet}<div className="mint-actions"><button type="button" className="button button--ghost" onClick={() => setShowPicker(!showPicker)}>Switch collection</button><button type="button" className="button button--ghost" onClick={p.onCreate}>New collection</button></div></div>
     </header>

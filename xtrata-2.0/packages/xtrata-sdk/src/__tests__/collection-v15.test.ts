@@ -18,6 +18,7 @@ describe('collection v1.5 staged fee quotes', () => {
   it('leaves legacy and unknown templates outside this fee model', () => {
     expect(isCollectionV15('xtrata-collection-mint-v1.5')).toBe(true);
     expect(isCollectionV15('xtrata-collection-mint-v1.4')).toBe(false);
-    expect(isCollectionV15('xtrata-collection-mint-v1.6')).toBe(false);
+    expect(isCollectionV15('xtrata-collection-mint-v1.6')).toBe(true);
+    expect(isCollectionV15('xtrata-collection-mint-v1.7')).toBe(false);
   });
 });

@@ -37,7 +37,7 @@ import {
 import { useManageWallet } from '../ManageWalletContext';
 import { parseDeployPricingLockSnapshot } from '../../lib/deploy/pricing-lock';
 import InfoTooltip from './InfoTooltip';
-import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.5.clar?raw';
+import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.6.clar?raw';
 import preinscribedTemplateSource from '../../../contracts/clarinet/contracts/xtrata-preinscribed-collection-sale-v1.0.clar?raw';
 
 type CollectionDraft = {
@@ -172,7 +172,7 @@ const compactClaritySourceForDeploy = (source: string) => {
   return result.length > 0 ? result : source;
 };
 
-type DeployTemplateMode = 'standard-v1.5';
+type DeployTemplateMode = 'standard-v1.6';
 
 type ContractNameAvailability = {
   exists: boolean;
@@ -377,7 +377,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const [deployPending, setDeployPending] = useState(false);
   const [draftPending, setDraftPending] = useState(false);
   const [selectedDraftLoading, setSelectedDraftLoading] = useState(false);
-  const deployTemplateMode: DeployTemplateMode = 'standard-v1.5';
+  const deployTemplateMode: DeployTemplateMode = 'standard-v1.6';
   const [deployAttemptId, setDeployAttemptId] = useState<string | null>(null);
   const [deployDebugLog, setDeployDebugLog] = useState<string[]>([]);
   const reviewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -927,7 +927,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     if (mintType === 'pre-inscribed') {
       return 'xtrata-preinscribed-collection-sale-v1.0';
     }
-    return 'xtrata-collection-mint-v1.5';
+    return 'xtrata-collection-mint-v1.6';
   }, [mintType]);
   const deploySourceByteLength = useMemo(
     () => new TextEncoder().encode(deployBuild.source).byteLength,
@@ -1069,7 +1069,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const details = {
       debugVersion: DEPLOY_DEBUG_VERSION,
       clarityVersion: DEPLOY_CLARITY_VERSION,
-      defaultDeployTemplateMode: 'standard-v1.5',
+      defaultDeployTemplateMode: 'standard-v1.6',
       sourceCompactionMode: DEPLOY_SOURCE_COMPACTION_MODE,
       debug14Enabled
     };
@@ -1162,7 +1162,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.5';
+        : 'xtrata-collection-mint-v1.6';
 
     const draftMetadata = {
       mintType,
@@ -1351,7 +1351,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.5';
+        : 'xtrata-collection-mint-v1.6';
     const sourceTemplateLabel = templateVersion;
     let sourceBeforeCompaction = refreshBuild.source;
 

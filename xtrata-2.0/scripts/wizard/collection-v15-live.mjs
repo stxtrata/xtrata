@@ -20,7 +20,7 @@ const json = async p => JSON.parse(await readFile(p,'utf8'));
 const save = async (p,v) => { await writeFile(p+'.tmp',JSON.stringify(v,null,2)+'\n',{mode:0o600}); await rename(p+'.tmp',p); };
 const password = () => { const p = process.env.COLLECTION_WIZARD_PASSPHRASE; if (!p) throw new Error('Provide COLLECTION_WIZARD_PASSPHRASE through a secret manager or hidden terminal input.'); return p; };
 const args = process.argv.slice(2), command = args[0] || 'status';
-if (!['setup','status','authorize','run','prepare','register','replace','launch'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or prepare/register/replace/launch/run --broadcast.');
+if (!['setup','status','authorize','run','prepare','register','replace','launch','retire'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or prepare/register/replace/launch/run --broadcast.');
 await mkdir(directory,{recursive:true,mode:0o700});
 const lock = await open(join(directory,'lock'),'wx',0o600).catch(()=>{ throw new Error('Runner already active or stale lock present. Verify no runner is active before removing its lock.'); });
 try {
@@ -115,7 +115,7 @@ try {
         let quote;
         try { quote=await request('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:typeof payload==='string'?payload:Buffer.from(payload).toString('hex'),estimated_len:typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length})});
         } catch(error) {
-          if(!['prepare','register','replace','launch'].includes(command)||error.reason!=='NoEstimateAvailable')throw error;
+          if(!['prepare','register','replace','launch','retire'].includes(command)||error.reason!=='NoEstimateAvailable')throw error;
           const rate=await request('/v2/fees/transfer');
           const size=typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length;
           if(!Number.isFinite(rate)||rate<=0)throw new Error('Invalid minimum fee rate.');
@@ -128,7 +128,7 @@ try {
         if(!Number.isSafeInteger(feeNumber)||feeNumber<=0)throw new Error('Invalid live miner quote.');
         let fee=BigInt(feeNumber);
         if(fee>BigInt(config.maxTxFeeUstx)) {
-          if(!['prepare','register','replace','launch'].includes(command))throw new Error('Live miner quote exceeds per-transaction ceiling.');
+          if(!['prepare','register','replace','launch','retire'].includes(command))throw new Error('Live miner quote exceeds per-transaction ceiling.');
           fee=BigInt(config.maxTxFeeUstx);
           console.log(id+': quote exceeds ceiling; bidding the existing capped fee '+fee+' micro-STX. No automatic fee increase.');
         }
@@ -142,7 +142,14 @@ try {
         journal.steps[id].status='submitted';await persist();await wait(txid);
         journal.steps[id].status='confirmed';await persist();console.log(id+': confirmed '+txid);
       };
-      if(command==='launch') {
+      if(command==='retire') {
+        const deployed=await request(`/v2/contracts/source/${helper}?proof=0`);
+        if(sha(deployed.source)!==sha(source))throw new Error('Deployed source mismatch.');
+        expect(await read(helper,'get-owner'),Cl.ok(Cl.principal(config.address)),'helper owner');
+        await step('retire-v15-pause','set-paused',[Cl.bool(true)]);
+        expect(await read(helper,'is-paused'),Cl.ok(Cl.bool(true)),'retired helper paused');
+        journal.retired=true;await persist();console.log('v1.5 wizard helper paused; ownership, assets and recovery preserved.');
+      } else if(command==='launch') {
         if(!journal.replacementComplete)throw new Error('Optimized replacement must be complete before launch.');
         const deployed=await request(`/v2/contracts/source/${helper}?proof=0`);
         if(sha(deployed.source)!==sha(source))throw new Error('Deployed source mismatch.');
