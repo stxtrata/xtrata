@@ -189,6 +189,7 @@
   <div class="col-station">
     <div class="likes">
       <h3>♥ YOUR STATION</h3>
+      <button id="refreshLikes" type="button" style="float:right;font:inherit;font-size:12px;background:transparent;color:var(--cyan);border:1px solid var(--line);border-radius:6px;padding:4px 8px;cursor:pointer">Refresh likes</button>
       <div class="hint" id="likesHint">Like songs while they play — they get their own band, and play first when you tune in.</div>
       <div id="likesList"></div>
     </div>
@@ -270,6 +271,7 @@
   }
   function boot(a){
     api=a;a.subscribe(render);
+    $('refreshLikes').addEventListener('click',function(){if(api.refreshLikes)void api.refreshLikes()});
     $('power').addEventListener('click',function(){api.isOn()?api.switchOff():api.switchOn()});
     $('pp').addEventListener('click',function(){api.playPause()});
     $('prev').addEventListener('click',function(){api.prev()});

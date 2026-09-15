@@ -12156,7 +12156,7 @@ async function ps() {
       ce("On-chain likes are not activated on this site yet. Your previous favourites remain saved in this browser; imports and new likes will become available after activation.");
       return;
     }
-    const n = jt.getSession(), r = n.network === "mainnet" ? n.address : void 0, s = await fetch("/radio/counts?range=all", { cache: "no-store" });
+    const n = jt.getSession(), r = n.network === "mainnet" ? n.address : void 0, s = await fetch("/radio/counts?range=all&chainLikes=0", { cache: "no-store" });
     if (!s.ok) throw Error("Song catalogue unavailable.");
     const i = await s.json();
     if (t !== Fe) return;

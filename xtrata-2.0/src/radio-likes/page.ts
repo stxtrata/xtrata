@@ -94,7 +94,7 @@ async function refresh(){
   const nextConfig=await api();if(run!==generation)return;config=nextConfig;diagnostic('CONFIG_READ',{enabled:Boolean(config.enabled)});
   if(!config.enabled){status('On-chain likes are not activated on this site yet. Your previous favourites remain saved in this browser; imports and new likes will become available after activation.');return;}
   const session=wallet.getSession(),address=session.network==='mainnet'?session.address:undefined;
-  const result=await fetch('/radio/counts?range=all',{cache:'no-store'});if(!result.ok)throw Error('Song catalogue unavailable.');const catalogue=await result.json();if(run!==generation)return;tracks=catalogue.tracks;
+  const result=await fetch('/radio/counts?range=all&chainLikes=0',{cache:'no-store'});if(!result.ok)throw Error('Song catalogue unavailable.');const catalogue=await result.json();if(run!==generation)return;tracks=catalogue.tracks;
   // Resolve the transaction first, then fetch its resulting on-chain state.
   const txid=pending();let transactionStatus='';
   if(txid&&address){try{const tx=await api({txid,wallet:address});if(run!==generation)return;

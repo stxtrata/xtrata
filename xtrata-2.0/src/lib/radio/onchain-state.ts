@@ -26,7 +26,7 @@ export function createRadioOnchainState(options:{wallet:()=>WalletSession;change
   try{
    const config=await read('/radio/chain-likes');if(!config.enabled){previous=[];throw Error('Not activated');}
    if(contractSeen&&contractSeen!==config.contract)previous=[];contractSeen=config.contract;
-   const catalogue=await read('/radio/counts?range=all');const tracks=catalogue.tracks as Track[];
+   const catalogue=await read('/radio/counts?range=all&chainLikes=0');const tracks=catalogue.tracks as Track[];
    const likes:ConfirmedRadioLike[]=[];const freshlyConfirmed:string[]=[];let failed=0;
    for(let i=0;i<tracks.length;i+=25){const batch=tracks.slice(i,i+25);
     try{
@@ -39,6 +39,7 @@ export function createRadioOnchainState(options:{wallet:()=>WalletSession;change
    state={wallet,status:failed?'partial':'ready',likes};
    removeConfirmedLocalLikes(freshlyConfirmed);
   }catch{if(run!==generation||wallet!==address())return;state={wallet,status:'unavailable',likes:previous};}
+  if(state.status==='partial'||state.status==='unavailable')last=now()-50000; // Retry a cold-start failure on the next 15s tick.
   options.changed();
  }
  return {snapshot,refresh};

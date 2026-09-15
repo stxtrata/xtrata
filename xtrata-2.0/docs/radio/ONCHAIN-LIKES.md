@@ -106,3 +106,9 @@ The radio controller retries failed reads once and handles each 25-song batch in
 Validation: eight targeted radio state/UI tests passed, including transient recovery, partial batches, successful unlikes, wallet switching and stale responses. Radio build and JavaScript lint passed.
 
 Favourite title correction: list labels use catalogue metadata, whereas playback parses the inscription directly. Previously a non-ready cache status suppressed existing titles and artwork during optional metadata refreshes. Reports now retain those known fields, and radio snapshots prefer meaningful names/artists already resolved by the player over placeholder IDs. Missing/unfetched metadata still uses the inscription number; no names are invented. Validation: 18 targeted tests passed, radio build/lint passed; live D1 inspection was denied (7403), with no remote mutation.
+
+## Reload recovery
+
+Saved playback now restores its full song snapshot and artwork before attempting audio playback, and emits the resumed state again after playback begins. The prior path restored only the audio/ticker. A mocked real-radio initialization test verifies the restored title, artist, album and cover without skipping.
+
+Likes loading avoids redundant global-total requests by using `/radio/counts?range=all&chainLikes=0` for catalogue metadata, then reading the connected wallet’s state separately. Failed/partial loads retry on the next normal tick rather than waiting a full minute. Saved-wallet address restoration notifies the radio, and Refresh likes offers a direct manual retry. The catalogue’s default totals behavior is unchanged. Validation: 34 tests and three builds passed; no real wallet or transaction used.
