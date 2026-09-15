@@ -1,6 +1,6 @@
 /** Local-only radio wizard. Secrets never cross the HTTP boundary. */
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile, rename, open, unlink } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, open, unlink, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { killSwitchEngaged } from './inscribe.mjs';
@@ -39,7 +39,7 @@ export class RadioWizard {
  async api(path,options={}) { const r=await this.request('https://api.hiro.so'+path,{...options,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});if(!r.ok){const e=Error('Chain request failed: HTTP '+r.status);e.status=r.status;throw e;}return r.json(); }
  async read(fn,args=[]) {const r=await this.api(`/v2/contracts/call-read/${OWNER}/${NAME}/${fn}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sender:OWNER,arguments:args.map(T.cvToHex)})});if(!r.okay)throw Error('Contract read failed.');return T.cvToJSON(T.hexToCV(r.result));}
  async journal(){try{return await this.json('journal.json');}catch(e){if(e.code==='ENOENT')return [];throw e;}}
- async status(chain=false){const {address}=await this.json('vault.json');const log=await this.journal();let balance=null;if(chain){const a=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(a.balance).toString();}return {address,balanceMicroSTX:balance,running:this.running,message:this.message,spendCeilingMicroSTX:10000,entries:log.map(({raw,...e})=>e)};}
+ async status(chain=false){const diskRunning=await stat(join(this.dir,'run.lock')).then(()=>true,e=>{if(e.code==='ENOENT')return false;throw e;});const {address}=await this.json('vault.json');const log=await this.journal();let balance=null;if(chain){const a=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(a.balance).toString();}return {address,balanceMicroSTX:balance,running:this.running||diskRunning,message:diskRunning&&!this.running?'A backend run holds the process lock; inspect entries for progress.':this.message,spendCeilingMicroSTX:10000,entries:log.map(({raw,...e})=>e)};}
  stop(){this.stopped=true;this.message='Stopped. Already submitted transactions may confirm.';}
  async reconcile(log) {
   for(const e of log.filter(e=>e.status!=='confirmed')) {
