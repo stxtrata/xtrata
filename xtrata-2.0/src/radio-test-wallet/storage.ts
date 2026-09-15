@@ -1,0 +1,5 @@
+import {WALLET_DB,type Entry} from './model';
+export async function openStore(){return new Promise<IDBDatabase>((resolve,reject)=>{const req=indexedDB.open(WALLET_DB,1);req.onupgradeneeded=()=>req.result.createObjectStore('data');req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(Error('Local wallet storage unavailable.'));});}
+export async function get<T>(key:string):Promise<T|undefined>{const db=await openStore();try{return await new Promise<T|undefined>((resolve,reject)=>{const r=db.transaction('data').objectStore('data').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}finally{db.close();}}
+export async function put(key:string,value:unknown){const db=await openStore();try{await new Promise<void>((resolve,reject)=>{const tx=db.transaction('data','readwrite');tx.objectStore('data').put(value,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(Error('Wallet storage write failed.'));});}finally{db.close();}}
+export const entries=()=>get<Entry[]>('entries').then(v=>v||[]);

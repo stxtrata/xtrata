@@ -1856,8 +1856,9 @@ const render = () => {
         el('p', {}, 'Run preflight below without connecting: verify SHA-256, required core owner APIs and name availability; measure the protected play transaction offline. The 200 microSTX play fee is not approved for activation. Publishing uses a separate deployment fee.'),
         el('h3', {}, '3. Deploy and verify'),
         el('p', {}, 'Connect the expected deployer and use Deploy below for Clarity 4. After confirmation, run preflight again to verify exact deployed source and the 50 microSTX payment, receipt length and three core bindings.'),
-        el('h3', {}, '4. Controlled playback canary — not enabled'),
-        el('p', {}, 'No paid-play wallet or automatic listening integration is enabled by deployment. Before activation: implement the local wallet/queue, settle the measured fee, and separately authorise bounded disposable-wallet tests. Never use personal, deployer or sponsor wallets for payment tests.'),
+        el('h3', {}, '4. Dedicated test wallet — explicit opt-in'),
+        el('p', {}, 'Open the dedicated Radio Test Wallet page below. It creates a separate encrypted local wallet, verifies your backup, shows your funding address and supports individually reviewed paid plays or capped test sessions. Ordinary radio playback remains unchanged. Never use personal, deployer or sponsor wallets for payment tests.'),
+        el('a', {href:'/radio/test-wallet',target:'_blank',rel:'noopener noreferrer'}, 'Open Radio Test Wallet →'),
         el('pre', {}, `${EXPECTED_DEPLOYER}.${entry.name}`)
       );
       if(preflight?.ok&&preflight.alreadyDeployed)card.append(el('p',{className:'ok'},'Deployed source and paid-play configuration verified. Playback activation remains disabled.'));

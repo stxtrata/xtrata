@@ -1,7 +1,7 @@
 # Paid-play helper deployment — v1.0
 
-Prepared, not deployed. The helper does not create a listening wallet or enable
-automatic payments. Existing radio, measured play counts and likes are unchanged.
+The user has deployed and verified this helper on mainnet. Deployment alone does
+not create a listening wallet or enable automatic payments. Existing radio, measured play counts and likes are unchanged.
 
 ## Release
 
@@ -33,10 +33,10 @@ automatic payments. Existing radio, measured play counts and likes are unchanged
 4. Verify: after confirmation, re-run preflight. It must verify exact deployed
    source plus get-config version, fixed 50-microSTX payment, 16-byte receipts and
    all three core bindings. No admin transaction or activation variable is needed
-   for this standalone helper. No radio code currently sends play transactions.
-5. Future playback canary: implement the wallet, policy, durable queue and media
-   adapter from the prototype plan. Test using local simulations/disposable accounts;
-   obtain explicit bounded authorisation before any live funding or broadcast.
+   for this standalone helper. Ordinary radio playback remains unchanged.
+5. Dedicated playback canary: open `/radio/test-wallet` from the deployment card.
+   Follow [Radio Test Wallet](TEST-WALLET.md) to create and back up a separate wallet,
+   review funding and individually approve a payment or bounded session.
    Never test using the user's personal, deployer or sponsor wallets.
 
 The CLI registry also pins these bytes and Clarity version, but this task neither
