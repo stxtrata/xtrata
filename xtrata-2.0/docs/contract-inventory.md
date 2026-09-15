@@ -753,3 +753,7 @@ checklist in `docs/app-reference.md` and `docs/forever-twins-linking.md`.
 ## Radio likes v1.0 — prepared, not deployed
 
 Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, zero platform fee, idempotent like/unlike and atomic batches of 25. References the existing mainnet v3-2-3/v2-1-0/v1-1-1 core ID namespace. No administrative controls. No deployment address is recorded until deployment is authorized and confirmed. Deployment steps and tests: `docs/radio/ONCHAIN-LIKES.md`.
+
+## xtrata-radio-plays-v1.0 (prepared, not deployed)
+
+Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Explicit core/master paid starts, atomic 50-microSTX holder payment, wallet-scoped 16-byte receipts and totals. No treasury, custody or admin. Source SHA-256 pinned in browser and CLI deployment registries. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md` for ABI, errors, tests and deployment stages.
