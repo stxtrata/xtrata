@@ -1,3 +1,5 @@
+> Current testing flow: use the [backend wizard](BACKEND-WIZARD.md). Browser-wallet testing is superseded for this canary.
+
 # Paid-play helper deployment — v1.0
 
 The user has deployed and verified this helper on mainnet. Deployment alone does

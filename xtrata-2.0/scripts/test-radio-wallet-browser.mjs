@@ -50,12 +50,14 @@ try{
  await page.goto(origin+'/radio/test-wallet.html');
  await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Ready.'));
  assert.equal(calls,0);
+ await page.click('#get-address');await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Create your dedicated wallet first'));assert.equal(await page.locator('#funding').isVisible(),false);
  await page.fill('#password','disposable-test-only-password');await page.click('#create');
  await page.waitForFunction(()=>document.querySelector('#status').textContent.includes('Wallet created'));
  assert.equal(await page.locator('#funding').isVisible(),false);
  const download=page.waitForEvent('download');await page.click('#backup');await (await download).saveAs(backup);
  await page.fill('#password','disposable-test-only-password');await page.setInputFiles('#restore',backup);
  await page.waitForFunction(()=>!document.querySelector('#funding').hidden);wallet=await page.locator('#address').textContent();assert.match(wallet,/^SP/);assert.equal(calls,0);
+ await page.click('#get-address');await page.click('#refresh');await page.waitForFunction(()=>document.querySelector('#deposit-status').textContent.includes('Confirmed funds detected'));assert.equal(calls,0);
  await page.fill('#password','disposable-test-only-password');await page.click('#unlock');await page.waitForFunction(()=>document.querySelector('#mode').textContent.includes('Wallet unlocked'));
  await page.click('#preview');await page.waitForSelector('#review[open]');assert.equal(calls,0);await page.click('#approve');
  await page.waitForFunction(()=>document.querySelector('#history').textContent.includes('pending'));

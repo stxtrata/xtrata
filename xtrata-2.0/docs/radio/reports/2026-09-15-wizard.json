@@ -1,0 +1,202 @@
+{
+  "started": "2026-09-15T11:44:48.428Z",
+  "plannedMaximumMicroSTX": 1607,
+  "tests": [
+    {
+      "name": "single-start",
+      "fee": 300,
+      "count": 1,
+      "started": "2026-09-15T11:44:48.973Z",
+      "status": "confirmed",
+      "finished": "2026-09-15T11:45:21.633Z"
+    },
+    {
+      "name": "automated-sequence",
+      "fee": 300,
+      "count": 2,
+      "started": "2026-09-15T11:45:21.791Z",
+      "status": "confirmed",
+      "finished": "2026-09-15T11:46:10.936Z"
+    },
+    {
+      "name": "byte-baseline-fee",
+      "fee": 257,
+      "count": 1,
+      "started": "2026-09-15T11:46:11.121Z",
+      "status": "confirmed",
+      "finished": "2026-09-15T11:46:27.924Z"
+    },
+    {
+      "name": "below-baseline-fee",
+      "fee": 200,
+      "count": 1,
+      "started": "2026-09-15T11:46:28.069Z",
+      "status": "stopped",
+      "error": "Chain request failed: HTTP 400",
+      "finished": "2026-09-15T11:46:28.760Z"
+    }
+  ],
+  "before": {
+    "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+    "balanceMicroSTX": "20000",
+    "running": false,
+    "message": "Idle. No payments authorised.",
+    "spendCeilingMicroSTX": 10000,
+    "entries": []
+  },
+  "totalBefore": {
+    "type": "uint",
+    "value": "0"
+  },
+  "after": {
+    "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+    "balanceMicroSTX": "18643",
+    "running": false,
+    "message": "Chain request failed: HTTP 400",
+    "spendCeilingMicroSTX": 10000,
+    "entries": [
+      {
+        "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+        "core": 3,
+        "song": 2910,
+        "fee": 300,
+        "receipt": "72cb548f1833c20bb628c2ba10411f55",
+        "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+        "txid": "0x54a8480ebc88e58127d158c11919cebc8dc69c197320cdf0ee5ada893655cc88",
+        "status": "confirmed"
+      },
+      {
+        "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+        "core": 3,
+        "song": 2910,
+        "fee": 300,
+        "receipt": "a653e6f032fc18c8dac512d47cfb538c",
+        "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+        "txid": "0xd244a3b0a5cf5c25939e8d2e3482152a16b236c11574e045b4c5ad15d374fcb3",
+        "status": "confirmed"
+      },
+      {
+        "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+        "core": 3,
+        "song": 2910,
+        "fee": 300,
+        "receipt": "3ebf5555ad52c7994f79450d546ca5b1",
+        "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+        "txid": "0x413eb26df9cf0c8793708f92e26aa1479fec68fbbafac05658bc9442644d3785",
+        "status": "confirmed"
+      },
+      {
+        "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+        "core": 3,
+        "song": 2910,
+        "fee": 257,
+        "receipt": "29ff167e916ecfb72f1fb2f53b3cb5a5",
+        "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+        "txid": "0x3b6277ca48da5c5517ab2216c8f8bc7a8f627830ffb73dad3d8f9fb7502ab1f2",
+        "status": "confirmed"
+      },
+      {
+        "address": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+        "core": 3,
+        "song": 2910,
+        "fee": 200,
+        "receipt": "4e4fb90793c324072c4afcdd098118d1",
+        "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+        "txid": "0xe59d90b99e19e4cbe53619891e9cfa99bc2b09abd28c16790944d6cb3eca5960",
+        "status": "prepared"
+      }
+    ]
+  },
+  "stoppedReason": "Chain request failed: HTTP 400",
+  "finished": "2026-09-15T11:46:28.784Z",
+  "totalAfter": {
+    "type": "uint",
+    "value": "4"
+  },
+  "audit": {
+    "at": "2026-09-15T11:46:49.917Z",
+    "balanceMicroSTX": "18643",
+    "transactions": [
+      {
+        "txid": "0x54a8480ebc88e58127d158c11919cebc8dc69c197320cdf0ee5ada893655cc88",
+        "receipt": "72cb548f1833c20bb628c2ba10411f55",
+        "requestedFee": 300,
+        "actualFee": "300",
+        "status": "success",
+        "canonical": true,
+        "block": 8995361,
+        "confirmed": true,
+        "exactHolderTransfer": true,
+        "transfers": [
+          {
+            "asset_event_type": "transfer",
+            "sender": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+            "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+            "amount": "50"
+          }
+        ]
+      },
+      {
+        "txid": "0xd244a3b0a5cf5c25939e8d2e3482152a16b236c11574e045b4c5ad15d374fcb3",
+        "receipt": "a653e6f032fc18c8dac512d47cfb538c",
+        "requestedFee": 300,
+        "actualFee": "300",
+        "status": "success",
+        "canonical": true,
+        "block": 8995363,
+        "confirmed": true,
+        "exactHolderTransfer": true,
+        "transfers": [
+          {
+            "asset_event_type": "transfer",
+            "sender": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+            "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+            "amount": "50"
+          }
+        ]
+      },
+      {
+        "txid": "0x413eb26df9cf0c8793708f92e26aa1479fec68fbbafac05658bc9442644d3785",
+        "receipt": "3ebf5555ad52c7994f79450d546ca5b1",
+        "requestedFee": 300,
+        "actualFee": "300",
+        "status": "success",
+        "canonical": true,
+        "block": 8995365,
+        "confirmed": true,
+        "exactHolderTransfer": true,
+        "transfers": [
+          {
+            "asset_event_type": "transfer",
+            "sender": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+            "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+            "amount": "50"
+          }
+        ]
+      },
+      {
+        "txid": "0x3b6277ca48da5c5517ab2216c8f8bc7a8f627830ffb73dad3d8f9fb7502ab1f2",
+        "receipt": "29ff167e916ecfb72f1fb2f53b3cb5a5",
+        "requestedFee": 257,
+        "actualFee": "257",
+        "status": "success",
+        "canonical": true,
+        "block": 8995367,
+        "confirmed": true,
+        "exactHolderTransfer": true,
+        "transfers": [
+          {
+            "asset_event_type": "transfer",
+            "sender": "SP26RN0PCG00CWN9HXKAGGPD4VMWJQEE2TYW3KH8H",
+            "recipient": "SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX",
+            "amount": "50"
+          }
+        ]
+      },
+      {
+        "txid": "0xe59d90b99e19e4cbe53619891e9cfa99bc2b09abd28c16790944d6cb3eca5960",
+        "error": "Chain request failed: HTTP 404"
+      }
+    ]
+  }
+}

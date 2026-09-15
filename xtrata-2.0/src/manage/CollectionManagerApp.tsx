@@ -1,3 +1,4 @@
+import CollectionStudioNav, { type StudioTaskId } from './components/CollectionStudioNav';
 import CollectionInventoryPanel from './components/CollectionInventoryPanel';
 import StorageCleanupPanel from './components/StorageCleanupPanel';
 import {
@@ -263,6 +264,7 @@ export default function CollectionManagerApp() {
     'publish-ops': false,
     'debug-tools': true
   });
+  const [studioAction, setStudioAction] = useState<{ key: string } | undefined>();
   const [experienceMode, setExperienceMode] = useState<ExperienceMode>('guided');
   const [journeySnapshot, setJourneySnapshot] = useState<JourneySnapshot>(
     INITIAL_JOURNEY_SNAPSHOT
@@ -668,6 +670,23 @@ export default function CollectionManagerApp() {
     setExperienceMode('advanced');
   };
 
+  const openStudioTask = (task: StudioTaskId) => {
+    const actions = { pricing: 'set-mint-price', schedule: 'set-phase', allowlist: 'set-allowlist-batch' };
+    if (task === 'pricing' || task === 'schedule' || task === 'allowlist') {
+      setAdvancedMode();
+      setStudioAction({ key: actions[task] });
+      jumpToPanel('collection-settings', 'manage-contract-action-select');
+      return;
+    }
+    if (task === 'storage') {
+      document.getElementById('manage-storage-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    if (task === 'launch') setExperienceMode('guided');
+    const panels = { collections: 'collection-list', create: 'deploy-wizard', artwork: 'asset-staging', metadata: 'publish-ops', launch: 'launch-controls' } as const;
+    jumpToPanel(panels[task]);
+  };
+
   const handleSelectCollection = (collection: {
     id: string;
     label: string;
@@ -763,7 +782,7 @@ export default function CollectionManagerApp() {
     <div className="app manage-app">
       <header className="app__header">
         <span className="eyebrow">Artist workspace</span>
-        <h1>Launch your collection</h1>
+        <h1>Your collection workspace</h1>
         <p className="meta-value">
           Logged in as:{' '}
           <AddressLabel
@@ -774,7 +793,7 @@ export default function CollectionManagerApp() {
             showAddressWhenNamed
           />
         </p>
-        <p>Follow the guided steps below. Advanced controls are optional and hidden by default.</p>
+        <p>Create, organise and launch from one place. Choose a task below or follow the launch checklist.</p>
         <p className="meta-value">
           Pair your launch with the <a href="/manifests">Manifest Studio</a> — group inscribed
           works into collections and galleries, and publish your own page at{' '}
@@ -812,6 +831,8 @@ export default function CollectionManagerApp() {
         </div>
       </header>
       <main className="app__main">
+        <CollectionStudioNav collectionName={activeCollectionLabel} fileCount={journeySnapshot.activeAssetCount}
+          state={journeySnapshot.loading ? 'Checking status' : journeySnapshot.collectionState ?? ''} onSelect={openStudioTask} />
         <section className="panel app-section manage-journey">
           <div className="panel__header">
             <div>
@@ -872,7 +893,7 @@ export default function CollectionManagerApp() {
             {journeySnapshot.error ? (
               <div className="alert">{journeySnapshot.error}</div>
             ) : null}
-            <div className="manage-journey__steps">
+            <details className="collection-studio__checklist"><summary>View the full launch checklist</summary><div className="manage-journey__steps">
               {journeySteps.map((step, index) => (
                 <button
                   key={step.id}
@@ -911,7 +932,7 @@ export default function CollectionManagerApp() {
                   ) : null}
                 </button>
               ))}
-            </div>
+            </div></details>
           </div>
         </section>
 
@@ -1167,7 +1188,9 @@ export default function CollectionManagerApp() {
           </div>
         </section>
 
-        {activeCollectionId && <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} />}
+        <div id="manage-storage-workspace" className="collection-studio__storage">
+          {activeCollectionId ? <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} /> : <p className="panel">Choose or create a collection to manage its temporary storage.</p>}
+        </div>
 
         {!showAdvancedPanels && (
           <div className="manage-advanced-teaser">
@@ -1191,10 +1214,10 @@ export default function CollectionManagerApp() {
               <div className="panel__header">
                 <div>
                   <h2>
-                    Advanced contract settings
+                    Collection controls
                     <InfoTooltip text="Load the draft to edit display name, contract references, and other advanced launch settings." />
                   </h2>
-                  <p>Use this only if you need detailed contract-level adjustments.</p>
+                  <p>Manage prices, schedules, allowlists and collection settings. Review each change before submitting.</p>
                 </div>
                 <div className="panel__actions">
                   <button
@@ -1211,6 +1234,7 @@ export default function CollectionManagerApp() {
               <div className="panel__body">
                 <CollectionSettingsPanel
                   mode="advanced"
+                  requestedAction={studioAction}
                   activeCollectionId={activeCollectionId}
                   isXtrataOwner={isXtrataOwner}
                   onJourneyRefreshRequested={requestJourneyRefresh}

@@ -781,3 +781,170 @@ would need a name first. Plan section 7, open decision 3.
 Nothing here clicks a button, so a broken render, a mislabelled control or copy that promises
 something the code does not do is still invisible to it. That needs the Playwright suite. The two
 are complements: browser tests catch what the user sees, wizards catch what the chain does.
+
+## Collection mint v1.5 — numbered JPEG simulation
+
+From the project directory:
+
+```sh
+node scripts/wizard/collection-v15-run.mjs --dry
+```
+
+This dedicated runner executes the actual Clarity 4 collection v1.5 helper with
+v3.2.3 in Clarinet simnet. It creates ten numbered JPEGs, configures a fresh local
+helper, registers inventory, and exercises four staged mints, four atomic mints
+and one two-item batch. It checks buyer reservation contention/cancellation,
+duplicate rejection, exact stored chunks, NFT ownership, receipt owner/phase,
+per-token index entries and final minted/reserved counters. The helper source must
+match the pinned mainnet candidate apart from replacing the core principal with
+its local counterpart. A failed assertion exits unsuccessfully and writes the
+partial report with the failure.
+
+Files and `v15-test-report.json` stay local in root
+`media/wizard-numbered-jpegs`. Report token IDs are **simulation IDs**, not mainnet
+inscriptions. Placeholder URIs use example.invalid; no staging upload or cleanup
+worker is exercised. The default zero collection price does not test paid splits.
+The existing broader contract suite covers additional adversarial paths.
+
+This runner deliberately has no signing or live broadcast implementation. It
+never loads `.env.wizards` or real keys, reports the existing kill switch, and
+rejects `--broadcast` or unknown arguments. Dry simulation remains available while
+the switch is engaged, consistent with the other wizard tools. A future live
+adapter needs a separate disposable-admin helper, current fee quotes, explicit
+spend authorization and the existing wizard nonce/budget/confirmation rails; do
+not substitute the production deployer to run tests.
+
+## Dedicated collection wizard — encrypted mainnet automation
+
+`collection-v15-live.mjs` uses a newly generated, job-specific wallet. Its AES-256-GCM
+vault uses a scrypt-derived encryption key; this is encryption, not Base64 encoding.
+The ignored `.collection-v15/` directory holds the encrypted vault, configuration,
+exclusive process lock and transaction journal. Files use mode 0600. Back up this
+folder and the passphrase separately. Losing either loses access to the wallet.
+Private keys never print, enter browser storage or get written in plaintext.
+
+One-time setup, from `xtrata-2.0`, using a hidden terminal prompt (zsh):
+
+```sh
+read -s 'COLLECTION_WIZARD_PASSPHRASE?New passphrase (at least 16 characters): '
+export COLLECTION_WIZARD_PASSPHRASE
+node scripts/wizard/collection-v15-live.mjs setup
+```
+
+Save the passphrase in your password manager. Setup prints only the new public
+address and test contract ID, and leaves spending disabled. Fund only that new
+address independently. Do not import a deployer, sponsor or personal wallet.
+
+Authorize a **lifetime total cap in micro-STX** using
+`node scripts/wizard/collection-v15-live.mjs authorize <approved-cap-microSTX>`.
+No cap has been authorized by this implementation. Configuration defaults to a
+1 STX maximum miner fee per transaction, a 0.1 STX remaining balance floor, and
+six confirmations. A quote over the ceiling stops the run. The total cap includes
+conservatively reserved miner and protocol fees for all previous steps, including
+failed or uncertain transactions. Increasing it is a separate explicit action.
+
+Then start the automatic workflow:
+
+```sh
+node scripts/wizard/collection-v15-live.mjs run --broadcast
+unset COLLECTION_WIZARD_PASSPHRASE
+```
+
+Use the same hidden prompt to unlock on a later run; no setup repeat is needed.
+`HIRO_API_KEY` is supported through the environment; `COLLECTION_WIZARD_API_URL`
+selects the API endpoint. Do not pass either secret on the command line. `status`
+prints public progress without unlocking the vault.
+
+The run deploys the pinned Clarity 4 helper under the dedicated wallet, sets test
+supply to ten, registers the numbered JPEG hashes/URNs, unpauses, performs ten
+atomic helper mints, verifies ownership/chunks/receipt attribution/indexes and
+reservation totals, then pauses the helper. Collection price stays zero. The
+URNs label fixtures; they are not off-chain storage URLs. No production helper
+configuration, paid-split test, external storage deletion or sponsorship is involved.
+The separate simulation runner covers staged/batch/negative scenarios.
+
+Every transaction has a fresh API fee quote, explicit nonce, Deny postconditions,
+spend/balance checks, a kill-switch check, and a journal written **before** sending.
+A restart checks the recorded transaction, waits for canonical confirmation, or
+replays identical signed bytes if the transaction is missing; it does not create
+a replacement transaction or charge the budget again. Run identity pins wallet,
+source and JPEG hashes. Unknown outcomes, API errors, aborts, changed bytes and
+nonce conflicts stop the runner. Resume with the same command after resolving the
+cause. A hard process kill can leave the exclusive `lock` file: remove it only
+after confirming that no instance is running. No unattended background scheduling
+is installed; the foreground runner continues the steps automatically.
+
+Validation uses a fully offline API transport with ephemeral test keys for setup,
+deploy, configuration, all ten mints, final verification and completed-run resume.
+Vault authentication/tampering and budget boundaries are also tested. Actual
+funded mainnet execution still needs the one-time user setup and approved cap.
+
+### Collection setup without inscriptions
+
+For the staging-and-mint-page workflow, use `prepare --broadcast`, **not** `run`.
+It deploys the dedicated helper, sets supply ten, metadata and zero collection
+price, verifies it remains paused, and stops. Inventory registration follows the
+actual R2/D1 upload workflow. No JPEG is inscribed by `prepare`.
+
+`collection-v15-keychain.mjs setup` generates a passphrase in memory, saves and
+checks it in macOS Keychain, then creates the encrypted wallet. `status` prints
+public state. `collection-v15-setup-quote.mjs` quotes unsigned setup payloads;
+if the API has no estimate, it clearly reports the configured fee-ceiling budget.
+
+### Funded setup and staged inventory commands
+
+The dedicated Keychain wrapper supports `prepare` and `register` (setup-only,
+no inscription calls). It unlocks only the dedicated vault and loads the existing
+Hiro API key without printing credentials. The lifetime cap remains explicit.
+
+`node scripts/wizard/collection-v15-stage.mjs` creates/resumes the dedicated draft
+in the existing collection API, records ten JPEGs in D1/R2 and downloads each for
+byte verification. It pins the v1.5 template metadata so the public page selects
+the granular v3.2.3 fee model. It preserves the draft's hidden listing status.
+Intent keys and asset IDs are journaled; resumes reuse existing matching records.
+No cleanup deletion or inscription is involved. The current deployment uses the
+existing staging service, not a newly provisioned isolated cleanup worker.
+
+`node scripts/wizard/collection-v15-keychain.mjs register` registers all ten
+verified rolling hashes and per-item data-JSON metadata URIs in one transaction,
+then reads every mapping and verifies minted count zero. It leaves the helper
+paused. The image URLs refer to the real staged asset-preview endpoints.
+
+For setup-only commands, an estimate above the existing ceiling produces a capped
+bid; fees never auto-increase. An explicit NoEstimateAvailable response uses the
+live minimum byte rate with a 10,000 micro-STX floor, and stops if that exceeds the
+ceiling. Other API errors still stop the run. The inscription runner retains its
+original strict quote policy. Tests cover capped deployment, missing call estimate,
+setup-only completion, inventory registration, and resume without repeat spending.
+
+### Replacing numbered JPEGs before the first mint
+
+Run the local optimizer first. It preserves the originals and writes a separate
+128×128 grayscale JPEG profile (quality 60, MozJPEG). For the dedicated paused
+draft, the replacement sequence is:
+
+```sh
+node scripts/wizard/optimize-numbered-jpegs.mjs
+node scripts/wizard/collection-v15-replace-stage.mjs stage
+node scripts/wizard/collection-v15-keychain.mjs replace
+node scripts/wizard/collection-v15-replace-stage.mjs cleanup
+```
+
+Staging creates new keys/records, checks the original local backup, and downloads
+every new JPEG to verify its bytes. On-chain replacement requires paused=true,
+minted=0 and reserved=0, registers the ten new hashes in one transaction and clears
+each original hash separately (the deployed ABI has no batch clear function).
+Each step waits for the existing six-confirmation gate and journals before sending.
+A changed replacement revision aborts resume. No mint or unpause call is used.
+
+Cleanup re-verifies both on-chain mappings and all new preview bytes, then removes
+only the old unreserved asset IDs using the collection API. The API must explicitly
+confirm object deletion. Missing acknowledgements fail closed for inspection;
+they are not silently marked successful. Originals remain locally backed up. The
+final inventory must match all ten optimized hashes and the exact byte total.
+Legacy staging/registration/mint commands refuse to restore the original profile
+after replacement. Active staging metadata switches to the optimized profile.
+
+For future collections, optimize before uploading/registering to avoid the extra
+11 registry transactions. These files were already one chunk each, so shrinking
+them affects byte-dependent miner costs, not fixed or per-chunk protocol fees.

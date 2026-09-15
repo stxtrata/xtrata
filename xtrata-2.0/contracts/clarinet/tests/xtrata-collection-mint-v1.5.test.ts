@@ -49,6 +49,20 @@ beforeEach(() => {
 });
 
 describe('v1.5 on the actual v3.2.3 core', () => {
+  it('replaces unminted inventory without leaving the superseded hash mintable', () => {
+    const replacement = [Buffer.from('optimized replacement bytes')];
+    expect(call('set-paused', [Cl.bool(true)], admin).result).toBeOk(Cl.bool(true));
+    expect(register(replacement).result).toBeOk(Cl.bool(true));
+    expect(call('clear-registered-token-uri', [Cl.buffer(hash)], admin).result).toBeOk(Cl.bool(true));
+    expect(read('get-registered-token-uri', [Cl.buffer(hash)])).toBeNone();
+    expect(read('get-minted-count')).toBeOk(Cl.uint(0));
+    expect(read('get-reserved-count')).toBeOk(Cl.uint(0));
+    expect(call('set-paused', [Cl.bool(false)], admin).result).toBeOk(Cl.bool(true));
+    expect(begin().result).toBeErr(Cl.uint(123));
+    expect(small(alice, replacement).result.type).toBe(ClarityType.ResponseOk);
+    expect(read('get-minted-count')).toBeOk(Cl.uint(1));
+  });
+
   it('pins the core and rejects a legacy target', () => {
     expect(read('get-locked-core-contract')).toBeOk(target);
     expect(call('mint-begin', [Cl.contractPrincipal(admin, 'xtrata-v2-1-0'), ...declaration()]).result)

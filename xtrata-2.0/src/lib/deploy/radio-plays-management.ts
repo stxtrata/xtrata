@@ -17,6 +17,11 @@ export function renderRadioPlaysManagement(read: Read): HTMLElement {
   const add = (tag: string, text: string) => { const e = document.createElement(tag); e.textContent = text; root.append(e); return e; };
   add('h3', '5. Contract checks and testing');
   add('p', 'Read-only tools: no wallet connection or fee required. This immutable contract has no administrator, pause, fee-setting, reset or withdrawal function. Stop controls in the test wallet stop only that wallet’s future payments.');
+  add('h4', 'Backend wizard funding and automated tests');
+  add('p', 'Start the local backend from the xtrata-2.0 folder. Its encrypted key stays in ignored local files; the browser only sends commands. No extension or deployer wallet is used.');
+  add('pre', 'node scripts/wizard/radio-plays-server.mjs');
+  const wizard = document.createElement('a'); wizard.href = 'http://127.0.0.1:8798'; wizard.target = '_blank'; wizard.rel = 'noopener noreferrer'; wizard.textContent = 'Open backend wizard: get address → confirm funds → run tests'; root.append(wizard);
+  add('p', 'The local panel creates or retrieves the dedicated funding address, checks confirmed funds and runs explicitly approved bounded tests. Keep its backend process running. Funding alone never enables spending.');
   const output = add('pre', 'Choose a check below. Results are public chain data.');
   output.setAttribute('aria-live', 'polite');
   const buttons: HTMLButtonElement[] = [];
@@ -54,7 +59,5 @@ export function renderRadioPlaysManagement(read: Read): HTMLElement {
   const receipt = field('Receipt hex from the test report', '');
   button('Look up payment receipt', async () => read('get-receipt', receiptArgs(payer.value.trim(), receipt.value.trim())));
   add('p', 'A receipt is wallet-scoped and is not the transaction ID. An empty optional value means no receipt is recorded for that wallet and receipt pair.');
-  const link = document.createElement('a'); link.href = '/radio/test-wallet'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Open dedicated wallet for approved paid tests →'; root.append(link);
-  add('p', 'Use the dedicated wallet for fee experiments, single paid starts, capped sessions, Stop/Lock, reconciliation and withdrawal. Never run payment tests with the connected deployer wallet.');
   return root;
 }
