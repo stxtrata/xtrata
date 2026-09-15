@@ -1145,6 +1145,7 @@ type CollectionSettingsPanelProps = {
   activeCollectionId?: string;
   onJourneyRefreshRequested?: () => void;
   mode?: 'guided' | 'advanced';
+  requestedAction?: { key: string };
   onRequestAdvancedControls?: () => void;
   isXtrataOwner?: boolean;
 };
@@ -1173,6 +1174,12 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   const [selectedActionKey, setSelectedActionKey] = useState(
     DEFAULT_ADVANCED_ACTION_KEY
   );
+  useEffect(() => {
+    if (props.requestedAction) {
+      setSelectedActionKey(props.requestedAction.key);
+      setActionMessage(null);
+    }
+  }, [props.requestedAction]);
   const [actionInputs, setActionInputs] = useState<Record<string, string>>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState(false);
@@ -3013,9 +3020,20 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         </div>
         {summaryMessage && <p className="meta-value">{summaryMessage}</p>}
 
+        <nav className="collection-studio__categories" aria-label="Contract settings categories">
+          {actionGroups.map(([group, actions]) => <button type="button" key={group}
+            className={`button ${selectedAction?.group === group ? '' : 'button--ghost'}`}
+            aria-pressed={selectedAction?.group === group}
+            onClick={() => { setSelectedActionKey(actions[0].key); setActionMessage(null); }}>
+            {group}
+          </button>)}
+        </nav>
+        {selectedAction?.group === 'Phase and Allowlist Controls' && <p className="collection-studio__note">
+          Each phase can have its own price, supply limit and wallet allowance. Schedule using block heights (not calendar times), then select the active phase separately. Choose global or phase-specific allowlists to control access.
+        </p>}
         <label className="field field--full">
           <span className="field__label info-label">
-            Mutable action
+            Choose what to update
             <InfoTooltip text={selectedActionTooltipText} />
           </span>
           <select
