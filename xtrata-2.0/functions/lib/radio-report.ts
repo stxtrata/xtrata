@@ -19,7 +19,7 @@ export async function catalogueReport(env: Env, url: URL) {
  const durationById=new Map((durations.results || []).map((r:any)=>[r.token_id,r.duration]));
  let enriched=new Map<number,any>(),likeCounts=new Map<number,number>(),likesAvailable=false;
  try {
-  const names=await queryAll(env,"SELECT token_id,title,artist FROM radio_metadata WHERE status='ready'");
+  const names=await queryAll(env,"SELECT token_id,title,artist FROM radio_metadata WHERE title!='' OR artist!=''");
   enriched=new Map((names.results||[]).map((r:any)=>[r.token_id,r]));
   const likes=await queryAll(env,'SELECT token_id,COUNT(*) likes FROM radio_likes GROUP BY token_id');
   likeCounts=new Map((likes.results||[]).map((r:any)=>[r.token_id,r.likes]));likesAvailable=true;
@@ -27,7 +27,7 @@ export async function catalogueReport(env: Env, url: URL) {
  let albums=new Map<number,string>();
  try {const result=await queryAll(env,"SELECT token_id,album FROM radio_metadata WHERE album IS NOT NULL");albums=new Map((result.results||[]).map((r:any)=>[r.token_id,r.album]));}catch{ /* migration 016 optional until applied */ }
  let covers=new Set<number>();
- try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE status='ready' AND cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
+ try {const result=await queryAll(env,"SELECT token_id FROM radio_metadata WHERE cover!=''");covers=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* migration 014 optional */ }
  let verifiedSongs=new Set<number>();
  try {const result=await queryAll(env,'SELECT token_id FROM radio_metadata WHERE is_song=1');verifiedSongs=new Set((result.results||[]).map((r:any)=>r.token_id));}catch{ /* unverified HTML remains outside the catalogue */ }
  const tracks=(catalogue.results || []).filter((row:any)=>row.mime?.startsWith('audio/')||verifiedSongs.has(row.token_id)).map((row:any)=>{
