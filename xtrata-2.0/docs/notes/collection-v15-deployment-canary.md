@@ -66,3 +66,14 @@ Disclosure state survives console rerenders in memory. Stable scrollbar space an
 wrapping index links keep the layout usable on smaller screens. Navigation never
 runs preflights or wallet actions. Validation: 24 existing collection/X-Chess/radio
 console tests plus 2 navigation tests pass; production Vite build passes.
+
+## Numbered JPEG fixtures
+
+`node scripts/wizard/prepare-numbered-jpegs.mjs` prepares ten local 512×512
+black-on-white numbered JPEGs and a manifest containing byte counts, file SHA-256
+and core rolling hashes (16 KiB chunks). Default output is root
+`media/wizard-numbered-jpegs`; media remains uncommitted. All ten outputs were
+verified as JPEG/512×512 and visually checked using a contact sheet. The generator
+has no network, wallet or signing access. URI values remain unset until staging
+is chosen. The existing wizard collection runner targets direct core minting;
+these files have not been uploaded, registered or minted through the v1.5 helper.
