@@ -47,6 +47,7 @@
     "mainnet:v3.2.3:deploy:broadcast": "node scripts/mainnet-v3.2.3-deploy.mjs --broadcast",
     "test:contracts": "npm run contracts:sync && npm run contracts:verify",
     "test:app": "vitest run",
+    "test:radio-plays": "node scripts/test-radio-plays.mjs",
     "test:clarinet": "npm --prefix contracts/clarinet test",
     "test:report": "npm --prefix contracts/clarinet run test:report",
     "test:watch": "vitest",

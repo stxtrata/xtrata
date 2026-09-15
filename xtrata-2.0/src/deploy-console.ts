@@ -1850,7 +1850,8 @@ const render = () => {
       card.append(
         el('h3', {}, '1. Local transaction tests'),
         el('p', {}, 'Release tests cover exact holder payment, duplicate receipts, ownership changes, invalid masters, proxy calls, escrow rejection and transfer rollback. Run these local simulations for the pinned source; browser preflight does not execute payment tests.'),
-        el('pre', {}, 'npm --prefix contracts/clarinet test -- --run tests/xtrata-radio-plays-v1.0.test.ts\nnpx vitest run src/lib/deploy/__tests__/radio-plays-console.test.ts'),
+        el('p', {}, 'In Terminal, first open the xtrata-2.0 project folder (the folder containing package.json), not your home folder or the outer xtrata repository. Then run the command below. It uses the installed project test runners and never downloads Vitest.'),
+        el('pre', {}, 'npm run test:radio-plays'),
         el('h3', {}, '2. Read-only preflight and fee sizing'),
         el('p', {}, 'Run preflight below without connecting: verify SHA-256, required core owner APIs and name availability; measure the protected play transaction offline. The 200 microSTX play fee is not approved for activation. Publishing uses a separate deployment fee.'),
         el('h3', {}, '3. Deploy and verify'),

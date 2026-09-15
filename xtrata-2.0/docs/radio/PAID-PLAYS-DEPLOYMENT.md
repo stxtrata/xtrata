@@ -81,3 +81,16 @@ advertising 3,600 plays per 1 STX; treasury collection remains out of scope.
 regression tests; Vite production build. All passed. Build retains existing asset,
 PURE annotation and large-chunk warnings. No browser wallet used, no live signing,
 no funds moved. User handles pushing and user-driven deployment.
+
+
+## Running the tests from Terminal
+
+First change into the `xtrata-2.0` folder containing this project's `package.json`,
+then run `npm run test:radio-plays`. Alternatively use
+`npm --prefix "/absolute/path/to/xtrata/xtrata-2.0" run test:radio-plays` from
+any folder. Replace the example path with your checkout location.
+
+The runner resolves both suites from its own location and uses each project's
+installed Vitest version. It checks both runners exist before starting and never
+invokes npx or downloads packages. Running bare npx from your home folder can
+instead download an unrelated Vitest version; interrupt that run with Ctrl+C.
