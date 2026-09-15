@@ -5,7 +5,7 @@ const T=createRequire(new URL('../../../../contracts/clarinet/package.json',impo
 const {Cl}=T;
 const config=JSON.parse(readFileSync(process.env.COLLECTION_WIZARD_STATE_DIR+'/config.json'));
 const source=readFileSync(new URL('../../../../contracts/live/xtrata-collection-mint-v1.5.clar',import.meta.url),'utf8');
-let nonce=0;
+let nonce=0, paused=true, price=Cl.uint(0);
 const minted=[],registered=new Map();
 try {
  const journal=JSON.parse(readFileSync(process.env.COLLECTION_WIZARD_STATE_DIR+'/journal.json'));
@@ -13,6 +13,8 @@ try {
   const tx=T.deserializeTransaction(step.serialized); const args=tx.payload.functionArgs;
   if(tx.payload.functionName?.content==='set-registered-token-uri-batch')for(const entry of args[0].value)registered.set(T.cvToHex(entry.value.hash),entry.value['token-uri']);
   if(tx.payload.functionName?.content==='clear-registered-token-uri')registered.delete(T.cvToHex(args[0]));
+  if(tx.payload.functionName?.content==='set-mint-price')price=args[0];
+  if(tx.payload.functionName?.content==='set-paused')paused=args[0].type===Cl.bool(true).type;
   if(tx.payload.functionName?.content==='mint-small-single-tx')minted.push({hash:T.cvToHex(args[1]),chunk:args[4].value[0]});
   nonce++;
  }
@@ -31,6 +33,8 @@ globalThis.fetch=async (url,options={})=>{
   const args=tx.payload.functionArgs;
   if(tx.payload.functionName?.content==='set-registered-token-uri-batch')for(const entry of args[0].value)registered.set(T.cvToHex(entry.value.hash),entry.value['token-uri']);
   if(tx.payload.functionName?.content==='clear-registered-token-uri')registered.delete(T.cvToHex(args[0]));
+  if(tx.payload.functionName?.content==='set-mint-price')price=args[0];
+  if(tx.payload.functionName?.content==='set-paused')paused=args[0].type===Cl.bool(true).type;
   if(tx.payload.functionName?.content==='mint-small-single-tx')minted.push({hash:T.cvToHex(args[1]),chunk:args[4].value[0]});
   nonce++;return respond('0x'+tx.txid());
  }
@@ -40,10 +44,13 @@ globalThis.fetch=async (url,options={})=>{
   const name=path.split('/').pop(), isCore=path.includes('/xtrata-v3-2-3/');
   const args=JSON.parse(options.body).arguments.map(T.hexToCV);
   let result;
-  if(name==='is-paused')result=Cl.ok(Cl.bool(!isCore));
+  if(name==='is-paused')result=Cl.ok(Cl.bool(isCore?false:paused));
   else if(name==='get-owner')result=isCore?Cl.ok(Cl.some(Cl.principal(config.address))):Cl.ok(Cl.principal(config.address));
   else if(name==='get-locked-core-contract')result=Cl.ok(Cl.contractPrincipal('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X','xtrata-v3-2-3'));
-  else if(name==='get-mint-price'||name==='get-reserved-count')result=Cl.ok(Cl.uint(0));
+  else if(name==='get-mint-price')result=Cl.ok(price);
+  else if(name==='get-reserved-count'||name==='get-active-phase')result=Cl.ok(Cl.uint(0));
+  else if(name==='get-max-supply')result=Cl.ok(Cl.uint(10));
+  else if(name==='get-allowlist-enabled')result=Cl.ok(Cl.bool(false));
   else if(name==='quote-inscription-fee')result=Cl.ok(Cl.tuple({'total-fee':Cl.uint(10000),'single-tx-eligible':Cl.bool(true)}));
   else if(name==='get-id-by-hash'){const i=minted.findIndex(a=>a.hash===T.cvToHex(args[0]));result=i<0?Cl.none():Cl.some(Cl.uint(i));}
   else if(name==='get-chunk')result=Cl.some(minted[Number(args[0].value)].chunk);

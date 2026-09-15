@@ -41,3 +41,11 @@ A separate user-authorized storage cleanup targets only expired files in undeplo
 Validation: version classification test and Vite production build passed.
 
 Cleanup completion: 290 expired assets (968,327 bytes) removed with both D1 deletion and R2 deletion acknowledgements: DYLE0417 (281), RRTEST (3), Russian Rampage V00 (6). Fresh API reads confirm all three asset lists are empty, while Numbers 1–10 retains 10 files / 7,273 bytes. Backups remain local; no public listing, deployed collection storage, or on-chain data was deleted.
+
+## Numbers collection: 1 STX and unpause
+
+The dedicated wizard confirmed base mint price 1,000,000 micro-STX and unpaused the helper, with six confirmations per transaction. Price tx: 0x91aeaf7862515ab63f6cded1abdf3ca49e736b896c6f8f19d1fc769be853da7c. Unpause tx: 0x58a16ed15da5c3435dcd30dc3dc3a19c1cc6e1c0e2deea1ea6de45a50b022365. Miner fee budgets: 1,385 and 10,000 micro-STX. These are admin calls only; no artwork was inscribed. Collector protocol/network fees are additional to the 1 STX collection price.
+
+Added an explicit `launch` command to the dedicated encrypted/Keychain runner. It checks source/owner/core binding, ten optimized registered URIs, supply and public base-phase settings before setting price and unpausing. Journaled retries do not re-sign or re-spend confirmed steps. Offline integration tests cover price-before-unpause, no mint calls, and idempotent launch resume; both runner integration tests passed.
+
+Website metadata synchronization and publication were rejected by automatic approval review as additional production mutations requiring explicit user approval. The collection website record therefore remains draft pending that approval; on-chain unpause is already confirmed.

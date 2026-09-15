@@ -57,5 +57,12 @@ it('replaces ten registered hashes while paused and prevents restoration of orig
   expect(run(['register','--broadcast'],true).status).not.toBe(0);
   expect(run(['replace','--broadcast'],true).status).toBe(0);
   expect(JSON.parse(readFileSync(join(directory,'journal.json'),'utf8')).spent).toBe(journal.spent);
+  const launch=run(['launch','--broadcast'],true);expect(launch.stderr).toBe('');expect(launch.status).toBe(0);
+  const launched=JSON.parse(readFileSync(join(directory,'journal.json'),'utf8'));
+  expect(launched.launchOneStxComplete).toBe(true);
+  expect(Object.keys(launched.steps).filter(k=>k.startsWith('launch-'))).toEqual(['launch-price-1-stx','launch-unpause-1-stx']);
+  expect(Object.keys(launched.steps).some(k=>k.startsWith('mint-'))).toBe(false);
+  expect(run(['launch','--broadcast'],true).status).toBe(0);
+  expect(JSON.parse(readFileSync(join(directory,'journal.json'),'utf8')).spent).toBe(launched.spent);
  }finally{rmSync(directory,{recursive:true,force:true});}
 },30000);
