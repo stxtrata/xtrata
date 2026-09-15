@@ -49,3 +49,11 @@ The dedicated wizard confirmed base mint price 1,000,000 micro-STX and unpaused 
 Added an explicit `launch` command to the dedicated encrypted/Keychain runner. It checks source/owner/core binding, ten optimized registered URIs, supply and public base-phase settings before setting price and unpausing. Journaled retries do not re-sign or re-spend confirmed steps. Offline integration tests cover price-before-unpause, no mint calls, and idempotent launch resume; both runner integration tests passed.
 
 Website metadata synchronization and publication were rejected by automatic approval review as additional production mutations requiring explicit user approval. The collection website record therefore remains draft pending that approval; on-chain unpause is already confirmed.
+
+## Published numbered mint and progress display
+
+After explicit user approval, Numbers 1–10 website metadata was synchronized to raw on-chain price 1 STX and the collection record published. Fresh production API verification confirms state published and price 1 STX. Public-directory visibility was unchanged. The earlier publication approval block is resolved.
+
+The collection mint page now uses a single accessible Mint progress status instead of the legacy three traffic-light rows. It distinguishes atomic versus resumable execution after inspecting actual bytes and existing chain state. The current deployed v1.5 helper enforces MAX-SMALL-MINT-CHUNKS u30 despite a list-32 argument; 31–32 chunks therefore cannot safely be sent through its atomic method. Fresh 1–30-chunk files already auto-route atomically, including all ten optimized JPEGs. Existing reservations/uploads retain resume routing. Supporting 32 chunks requires a revised deployed helper; this UI change does not alter the immutable contract.
+
+Validation: six routing tests passed, including v1.5 boundary coverage at 1/30/31/32/33; Vite build passed. UI code is local pending deployment; production collection publication is complete.

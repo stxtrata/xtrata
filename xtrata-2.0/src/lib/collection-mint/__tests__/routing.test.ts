@@ -14,6 +14,12 @@ describe('collection mint routing', () => {
     );
   });
 
+  it('honors the deployed v1.5 limit: 30 chunks, despite the 32-item ABI list', () => {
+    for (const chunkCount of [1, 30, 31, 32, 33]) {
+      expect(shouldUseCollectionSmallSingleTx({ templateVersion: 'xtrata-collection-mint-v1.5', chunkCount, hasReservation: false, hasUploadState: false })).toBe(chunkCount <= 30);
+    }
+  });
+
   it('does not support single-tx collection mint before v1.4', () => {
     expect(supportsCollectionSmallSingleTx('xtrata-collection-mint-v1.3')).toBe(
       false

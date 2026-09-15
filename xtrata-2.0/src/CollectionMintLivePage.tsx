@@ -908,19 +908,6 @@ const formatCount = (value: bigint | null) => {
 
 const formatItemLabel = (value: bigint) => (value === 1n ? 'item' : 'items');
 
-const formatStepStatus = (state: StepState) => {
-  if (state === 'pending') {
-    return 'In progress';
-  }
-  if (state === 'done') {
-    return 'Complete';
-  }
-  if (state === 'error') {
-    return 'Error';
-  }
-  return 'Idle';
-};
-
 const pause = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(() => resolve(), ms);
@@ -1011,6 +998,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusLastUpdatedAt, setStatusLastUpdatedAt] = useState<number | null>(null);
   const [mintPending, setMintPending] = useState(false);
+  const [mintRoute, setMintRoute] = useState<'single' | 'staged' | null>(null);
   const [mintMessage, setMintMessage] = useState<string | null>(null);
   const [mintLog, setMintLog] = useState<string[]>([]);
   const [mintedTokenIds, setMintedTokenIds] = useState<Record<string, string>>({});
@@ -1470,6 +1458,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   }, []);
 
   const resetSteps = useCallback(() => {
+    setMintRoute(null);
     setBeginState('idle');
     setUploadState('idle');
     setSealState('idle');
@@ -2497,6 +2486,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           hasReservation: progress.hasReservation,
           hasUploadState: progress.uploadState !== null
         });
+        setMintRoute(useSmallSingleTxRoute ? 'single' : 'staged');
         if (useSmallSingleTxRoute) {
           activeStage = 'single';
           setBeginState('pending');
@@ -3801,43 +3791,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       </header>
 
       <main className="app__main collection-live-page__main">
-        <section className="panel app-section collection-live-page__traffic">
-          <div className="panel__header">
-            <div>
-              <h2>Mint traffic lights</h2>
-              <p>Begin, upload, and seal status for the current mint session.</p>
-            </div>
-          </div>
-          <div className="panel__body">
-            <div className="mint-steps">
-              <div className={`mint-step mint-step--${beginState}`}>
-                <strong>1. Begin</strong>
-                <span>{formatStepStatus(beginState)}</span>
-              </div>
-              <div className={`mint-step mint-step--${uploadState}`}>
-                <strong>2. Upload</strong>
-                <span>{formatStepStatus(uploadState)}</span>
-              </div>
-              <div className={`mint-step mint-step--${sealState}`}>
-                <strong>3. Seal</strong>
-                <span>{formatStepStatus(sealState)}</span>
-              </div>
-              {batchProgress && (
-                <div className="mint-step mint-step--pending">
-                  Upload batch {batchProgress.current}/{batchProgress.total}
-                </div>
-              )}
-              {txDelayLabel && formattedTxDelay && (
-                <div className="mint-step mint-step--pending mint-step--countdown">
-                  {txDelayLabel} {formattedTxDelay}s
-                </div>
-              )}
-            </div>
-            {resumeTargetAsset && !mintPending && (
-              <div className="alert">
-                Resume target selected. Mint continues from the last confirmed on-chain step.
-              </div>
-            )}
+        <section className="panel app-section" aria-labelledby="collection-mint-progress">
+          <div className="panel__header"><div><h2 id="collection-mint-progress">Mint progress</h2>
+            <p>{mintRoute === 'single' ? 'One wallet transaction — your file is uploaded and minted together.' : mintRoute === 'staged' ? 'Continuing the upload and mint process. Confirm each wallet request when prompted.' : supportsSingleTxRoute ? `Fresh files of ${SMALL_MINT_HELPER_MAX_CHUNKS} chunks or fewer mint in one wallet transaction. Larger files and unfinished uploads use the resumable path.` : 'Follow the wallet prompts to complete your mint.'}</p>
+          </div></div>
+          <div className="panel__body" role="status" aria-live="polite">
+            <strong>{[beginState, uploadState, sealState].includes('error') ? 'Mint needs attention' : sealState === 'done' ? 'Mint confirmed' : mintPending ? 'Mint in progress' : 'Ready when you are'}</strong>
+            {mintMessage && <p>{mintMessage}</p>}
+            {mintRoute === 'staged' && batchProgress && <p>Uploading batch {batchProgress.current} of {batchProgress.total}</p>}
+            {txDelayLabel && formattedTxDelay && <p>{txDelayLabel} {formattedTxDelay}s</p>}
+            {resumeTargetAsset && !mintPending && <p>Your unfinished mint will continue from its last confirmed step.</p>}
           </div>
         </section>
 
