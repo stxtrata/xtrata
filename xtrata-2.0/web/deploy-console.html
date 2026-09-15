@@ -18,6 +18,18 @@
         background: #101010;
         color: #f4f1ea;
       }
+      html { scrollbar-gutter: stable; }
+      * { box-sizing: border-box; }
+      details { scroll-margin-top: 20px; }
+      summary { cursor: pointer; padding: 10px 0; font-weight: 700; }
+      summary:focus-visible, a:focus-visible { outline: 2px solid #f7d36b; outline-offset: 4px; }
+      summary > h2, summary > .gate-heading { display: inline; }
+      details details { border-top: 1px solid #35312f; margin-top: 10px; }
+      details label { display: block; margin: 12px 0; color: #cfc8bc; }
+      details label input { display: block; width: 100%; margin-top: 6px; padding: 10px; background: #0c0c0b; color: #f4f1ea; border: 1px solid #3a3733; border-radius: 8px; }
+      .canary-index-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 8px; }
+      .canary-index-links a { color: #f4f1ea; text-decoration: none; padding: 12px; border: 1px solid #3a3733; border-radius: 8px; overflow-wrap: anywhere; }
+      .canary-index-links a:hover { border-color: #f7d36b; background: #242016; }
       body {
         margin: 0;
         background: #101010;
@@ -213,8 +225,7 @@
         copyable audit log of every preflight and wallet submission; it never stores keys or signs
         without an explicit wallet confirmation.
       </p>
-      <p><a href="#radio-plays-deployment">Radio paid-play testing and deployment</a></p>
-      <p><a href="#radio-likes-deployment">Radio on-chain likes deployment</a></p>
+
       <div id="app"></div>
     </main>
     <script type="module" src="/src/deploy-console.ts"></script>

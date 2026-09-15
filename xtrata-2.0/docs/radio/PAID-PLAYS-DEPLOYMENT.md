@@ -94,3 +94,16 @@ The runner resolves both suites from its own location and uses each project's
 installed Vitest version. It checks both runners exist before starting and never
 invokes npx or downloads packages. Running bare npx from your home folder can
 instead download an unrelated Vitest version; interrupt that run with Ctrl+C.
+
+## In-canary contract tools
+
+Stage 5 provides wallet-free configuration validation, offline protected-transaction
+size measurement, explicit-core owner/total reads and wallet-scoped receipt lookup.
+Read failures are displayed and requests time out after 30 seconds. Inputs reject
+invalid cores, uint overflow and receipts other than 16 bytes. Results include raw
+decoded chain values for inspection; paid totals are not measured browser plays.
+
+V1.0 has no admin setters, pause, reset, treasury or contract withdrawal. The
+dedicated wallet link provides explicitly approved payment tests and local spending
+controls without using the canary's connected deployer wallet. No real transactions
+were submitted while implementing these modules.

@@ -1,3 +1,7 @@
+import { renderRadioPlaysManagement } from './lib/deploy/radio-plays-management';
+import { createCanaryNavigation } from './lib/deploy/canary-navigation';
+import { renderCollectionManagement } from './lib/deploy/collection-v15-management';
+import { PostConditionMode, type ClarityValue } from '@stacks/transactions';
 import collectionV15Source from '../contracts/live/xtrata-collection-mint-v1.5.clar?raw';
 import { COLLECTION_V15_NAME, COLLECTION_V15_READS, inspectCollectionV15Source, inspectCollectionV15State, unwrapCollectionRead } from './lib/deploy/collection-v15-canary';
 /**
@@ -731,12 +735,13 @@ const callReadJson = async (
   contractAddress: string,
   contractName: string,
   functionName: string,
-  args: ReturnType<typeof uintCV>[] = []
+  args: ClarityValue[] = []
 ) => {
   const response = await fetch(
     `${HIRO_API}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`,
     {
       method: 'POST',
+      signal: AbortSignal.timeout(30000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sender: EXPECTED_DEPLOYER,
@@ -1784,9 +1789,51 @@ const renderLivingSynthDeployment = () => {
   return section;
 };
 
+const collectionManagementCall = async (name: string, args: ClarityValue[], write: boolean) => {
+  if (!write) return callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, name, args);
+  const state = states.get(COLLECTION_V15_NAME)!;
+  if (state.busy) throw new Error('Wait for the current operation.');
+  const guard = () => {
+    if (!session.isConnected || session.network !== 'mainnet' || session.address !== EXPECTED_DEPLOYER)
+      throw new Error('Connect the expected mainnet owner for production configuration. Test wallets belong on the separate test instance.');
+  };
+  guard();
+  state.busy = true;
+  try {
+    const preflight = await runPreflight(state.entry, state.source || collectionV15Source);
+    if (!preflight.ok || !preflight.alreadyDeployed) throw new Error('Deployed contract preflight failed: ' + preflight.problems.join('; '));
+    guard();
+    const owner = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, 'get-owner'));
+    if (owner !== session.address) throw new Error('Connected wallet is no longer the contract owner.');
+    if (unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V15_NAME, 'get-finalized')) !== false) throw new Error('Contract is finalized or finalization state is unavailable.');
+    guard();
+    return await new Promise<string>((resolve, reject) => {
+      showContractCall({
+        contractAddress: EXPECTED_DEPLOYER, contractName: COLLECTION_V15_NAME,
+        functionName: name, functionArgs: args, appDetails,
+        network: toStacksNetwork('mainnet'), stxAddress: session.address,
+        postConditionMode: PostConditionMode.Deny, postConditions: [],
+        onFinish: payload => {
+          const txId = extractWalletTxId(payload);
+          addLog(state, name, 'info', 'Wallet submission received; confirmation and fresh preflight required.', txId ?? undefined);
+          resolve(txId ? `Submitted ${txId}. Wait for confirmation, then re-run preflight.` : 'Wallet returned no transaction ID. Verify before retrying.');
+        },
+        onCancel: () => reject(new Error('Wallet cancelled the configuration transaction.'))
+      });
+    });
+  } finally { state.busy = false; }
+};
+
+const canaryNavigation = createCanaryNavigation();
+window.addEventListener('hashchange', () => {
+  const app = document.getElementById('app');
+  if (app) canaryNavigation.reveal(app, window.location.hash);
+});
+
 const render = () => {
   const app = document.getElementById('app');
   if (!app) return;
+  canaryNavigation.remember(app);
   app.replaceChildren();
 
   // wallet card
@@ -1845,6 +1892,7 @@ const render = () => {
         el('p', {}, 'Before launch: configure metadata, supply, price, recipients and splits; register each inventory hash and URI; review dependencies and phases; keep paused until a disposable-wallet simulation covers duplicate mint rejection, reservations, staged/atomic mint and receipt attribution. Storage cleanup is a separate worker deployment and must verify reconstruction and recovery backup before deletion. Never purge sealed core chunks.'),
         el('button', {className:'ghost', disabled: !stateEntry.source || !preflight?.ok, onclick: () => downloadGeneratedContract(entry.name)}, 'Download verified source'));
     }
+    if (entry.collectionV15) card.append(renderCollectionManagement(collectionManagementCall));
     if (entry.collectionV15 && preflight?.ok && preflight.alreadyDeployed) card.append(el('p', {className:'ok'}, 'Deployed source and state verified. Review the configuration snapshot below before configuring or opening minting.'));
     if (entry.radioPlays) {
       card.append(
@@ -1861,7 +1909,8 @@ const render = () => {
         el('a', {href:'/radio/test-wallet',target:'_blank',rel:'noopener noreferrer'}, 'Open Radio Test Wallet →'),
         el('pre', {}, `${EXPECTED_DEPLOYER}.${entry.name}`)
       );
-      if(preflight?.ok&&preflight.alreadyDeployed)card.append(el('p',{className:'ok'},'Deployed source and paid-play configuration verified. Playback activation remains disabled.'));
+      card.append(renderRadioPlaysManagement((name, args) => callReadJson(EXPECTED_DEPLOYER, RADIO_PLAYS_NAME, name, args)));
+      if(preflight?.ok&&preflight.alreadyDeployed)card.append(el('p',{className:'ok'},'Deployed source and paid-play configuration verified. Ordinary radio paid playback remains disabled; dedicated tests require explicit approval.'));
     }
     if (entry.radioLikes) {
       card.append(el('p', {}, 'Deploying publishes the callable contract; it does not import favourites or send a like. After confirmation, re-run preflight to verify its source, then set this Cloudflare Pages variable and redeploy the site:'), el('pre', {}, `RADIO_LIKES_CONTRACT=${EXPECTED_DEPLOYER}.${entry.name}`));
@@ -2170,6 +2219,7 @@ const render = () => {
     }
     app.append(card);
   }
+  canaryNavigation.apply(app);
 };
 
 render();
