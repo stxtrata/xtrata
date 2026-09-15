@@ -45,7 +45,7 @@ export async function catalogueReport(env: Env, url: URL) {
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
    completion_rate:m.plays?100*m.completions/m.plays:null};
  });
- const {totals:confirmed,status:chainLikesStatus}=await catalogueChainTotals(env,tracks.map((r:any)=>r.id));
+ const {totals:confirmed,status:chainLikesStatus}=url.searchParams.get('chainLikes')==='0'?{totals:new Map<number,string>(),status:'not-requested'}:await catalogueChainTotals(env,tracks.map((r:any)=>r.id));
  for(const track of tracks)Object.assign(track,{onchain_likes:confirmed.get(track.id)??null});
  return {range,since,until:now,onchain_likes_status:chainLikesStatus,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
  notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists are read from inscription metadata and cached. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};

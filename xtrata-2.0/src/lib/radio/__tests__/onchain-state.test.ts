@@ -5,7 +5,7 @@ function setup(){
  let address:string|undefined=alice,time=0,fail=false;const changed=vi.fn();
  const fetcher=vi.fn(async(input:any)=>{const u=new URL(input,'https://test');if(fail)throw Error('offline');const body=u.pathname==='/radio/counts'?{tracks:[{id:1,title:'Song'},{id:2,title:'Other'}]}:u.searchParams.has('ids')?{contract:'contract',rows:[{id:1,liked:u.searchParams.get('wallet')===alice},{id:2,liked:u.searchParams.get('wallet')===bob}]}:{enabled:true,contract:'contract'};return new Response(JSON.stringify(body));});
  const state=createRadioOnchainState({wallet:()=>({isConnected:!!address,address,network:'mainnet'}),fetcher,changed,now:()=>time});
- return {state,fetcher,setWallet:(a?:string)=>{address=a;},advance:()=>{time+=61000;},fail:()=>{fail=true;}};
+ return {state,fetcher,setWallet:(a?:string)=>{address=a;},advance:()=>{time+=61000;},fail:()=>{fail=true;},recover:()=>{fail=false;time+=15000;}};
 }
 describe('radio confirmed likes',()=>{
  it('loads only chain-approved songs and throttles repeated reads',async()=>{
@@ -44,4 +44,10 @@ it('uses already-loaded player metadata without adding unconfirmed favourites',a
  let title='#1';const state=createRadioOnchainState({wallet:()=>({isConnected:true,address:alice,network:'mainnet'}),changed:()=>{},metadata:()=>({title,artist:'Artist'}),fetcher:vi.fn(async(input:any)=>{
   const u=new URL(input,'https://test');return new Response(JSON.stringify(u.pathname==='/radio/counts'?{tracks:[{id:1,title:'Inscription #1'}]}:u.searchParams.has('ids')?{contract:'c',rows:[{id:1,liked:true}]}:{enabled:true,contract:'c'}));
  })});await state.refresh();expect(state.snapshot().likes[0].title).toBe('Inscription #1');title='Real song name';expect(state.snapshot().likes[0]).toMatchObject({title:'Real song name',artist:'Artist'});expect(state.snapshot().likes).toHaveLength(1);
+});
+
+it('recovers an initial failed load on the next retry tick without reconnecting',async()=>{
+ const s=setup();s.fail();await s.state.refresh();expect(s.state.snapshot().status).toBe('unavailable');
+ s.recover();await s.state.refresh();expect(s.state.snapshot().status).toBe('ready');expect(s.state.snapshot().likes).toHaveLength(1);
+ expect(s.fetcher.mock.calls.some(([url])=>String(url).includes('chainLikes=0'))).toBe(true);
 });

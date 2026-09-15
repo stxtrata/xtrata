@@ -1494,6 +1494,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       renderKnob();
       playCounter.select(PLAYABLE_CONTRACT, Number(saved.tokenId));
       player.src = track.src;
+      currentTokenId = track.tokenId || null;
+      nowPlaying = { tokenId: track.tokenId, title: track.title, artist: track.artist || '', album: track.album || '', cover: track.cover || '', href: `/inscription/${track.tokenId}` };
+      emit();
       const begin = () => {
         try { if (Number(saved.position) > 1 && player.currentTime < 1) player.currentTime = Number(saved.position); } catch { /* noop */ }
         currentTokenId = track.tokenId || null;
@@ -1501,6 +1504,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         startTicker(track);
         void fetchRelatives(track.tokenId);
         startVu();
+        emit();
         if (history[history.length - 1] !== track) history.push(track);
         window.setTimeout(() => { void preloadNextTrack(); }, 2000);
         persist();
@@ -1538,6 +1542,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => chainState.snapshot().likes.slice(),
+    refreshLikes: () => chainState.refresh(true),
     cycleBand, setBand, cyclePreset,
     setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
     setLoop, toggleLoop: () => setLoop(!player.loop),
