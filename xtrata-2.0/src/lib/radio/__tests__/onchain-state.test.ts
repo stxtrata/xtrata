@@ -39,3 +39,9 @@ it('preserves failed batches but removes successfully read unlikes',async()=>{
   return new Response(JSON.stringify({enabled:true,contract:'c'}));
  })});await state.refresh();expect(state.snapshot().likes).toHaveLength(26);second=true;await state.refresh(true);expect(state.snapshot().status).toBe('partial');expect(state.snapshot().likes.map(l=>l.tokenId)).toEqual(['25']);
 });
+
+it('uses already-loaded player metadata without adding unconfirmed favourites',async()=>{
+ let title='#1';const state=createRadioOnchainState({wallet:()=>({isConnected:true,address:alice,network:'mainnet'}),changed:()=>{},metadata:()=>({title,artist:'Artist'}),fetcher:vi.fn(async(input:any)=>{
+  const u=new URL(input,'https://test');return new Response(JSON.stringify(u.pathname==='/radio/counts'?{tracks:[{id:1,title:'Inscription #1'}]}:u.searchParams.has('ids')?{contract:'c',rows:[{id:1,liked:true}]}:{enabled:true,contract:'c'}));
+ })});await state.refresh();expect(state.snapshot().likes[0].title).toBe('Inscription #1');title='Real song name';expect(state.snapshot().likes[0]).toMatchObject({title:'Real song name',artist:'Artist'});expect(state.snapshot().likes).toHaveLength(1);
+});

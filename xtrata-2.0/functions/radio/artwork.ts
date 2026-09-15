@@ -5,7 +5,7 @@ export async function onRequest({request,env}:{request:Request;env:Env}) {
  const id=new URL(request.url).searchParams.get('id');
  if(!id||!/^\d{1,10}$/.test(id)||Number(id)<1)return new Response(null,{status:400});
  try {
-  const result=await queryAll(env,"SELECT cover FROM radio_metadata WHERE token_id=? AND status='ready'",[Number(id)]);
+  const result=await queryAll(env,"SELECT cover FROM radio_metadata WHERE token_id=? AND cover!=''",[Number(id)]);
   const cover=safeArtwork((result.results?.[0] as any)?.cover);
   if(cover.startsWith('https:'))return new Response(null,{status:302,headers:{location:cover,'cache-control':'public, max-age=86400','referrer-policy':'no-referrer'}});
   if(cover.startsWith('data:')) {

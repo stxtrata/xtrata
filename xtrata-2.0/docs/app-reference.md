@@ -441,3 +441,5 @@ Single-song radio likes/unlikes request 200 microSTX (0.0002 STX) and show a pro
 Radio hearts now link directly to a selected-song endorsement review (`action=review`), using confirmed wallet state to choose like/unlike. Endorsement counts retry failed batches, retain successes, read state after transaction confirmation and refresh while visible when no review/signing is active.
 
 Radio state exposes `likesStatus`; `/radio` uses it to distinguish loading/failure from a confirmed empty list. Failed batches retain the same wallet’s in-memory last-confirmed likes while successful batches update independently. Each failed read retries once.
+
+Radio favourite names: metadata report and artwork reads now retain previously cached fields when an optional album/artwork refresh is pending or failed. Confirmed wallet likes can also display metadata from the radio’s already-loaded track cache, without additional media downloads or changing like membership. Eighteen catalogue/state tests, radio build and radio lint passed. A live D1 diagnostic query was denied with Cloudflare error 7403, so no live backfill was performed.

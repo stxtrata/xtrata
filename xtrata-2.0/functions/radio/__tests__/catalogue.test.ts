@@ -93,3 +93,11 @@ it('reports inline album names without requiring cached HTML metadata',async()=>
  db.prepare('UPDATE inscription_index SET token_uri=? WHERE token_id=1').run('data:application/json,'+encodeURIComponent(JSON.stringify({name:'Track',album:{name:'Album title'}})));
  const data=await(await get()).json();expect(data.tracks[0].album).toBe('Album title');expect(data.tracks[1].album).toBe('');
 });
+
+it('retains known names and artwork while optional metadata refresh is pending or failed',async()=>{
+ likesSetup();db.exec("INSERT INTO radio_metadata(token_id,title,artist,cover,status,checked_at) VALUES(1,'Known title','Known artist','data:image/png;base64,YQ==','pending',0)");
+ for(const state of ['pending','failed']){
+  db.prepare('UPDATE radio_metadata SET status=? WHERE token_id=1').run(state);
+  const data=await(await get()).json();expect(data.tracks[0].title).toBe('Known title');expect(data.tracks[0].artist).toBe('Known artist');expect(data.tracks[0].thumbnail).toBe('/radio/artwork?id=1');
+ }
+});

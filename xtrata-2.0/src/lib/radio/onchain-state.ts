@@ -4,12 +4,15 @@ type Track={id:number;title:string;artist?:string};
 export type ConfirmedRadioLike={tokenId:string;title:string;artist:string};
 type Snapshot={wallet?:string;status:'disconnected'|'loading'|'ready'|'partial'|'unavailable';likes:ConfirmedRadioLike[]};
 /** Read-only, wallet-scoped state. No local favourites are merged into confirmed likes. */
-export function createRadioOnchainState(options:{wallet:()=>WalletSession;changed:()=>void;fetcher?:typeof fetch;now?:()=>number}){
+export function createRadioOnchainState(options:{wallet:()=>WalletSession;changed:()=>void;metadata?:(id:string)=>{title?:string;artist?:string}|null|undefined;fetcher?:typeof fetch;now?:()=>number}){
  const fetcher=options.fetcher||fetch,now=options.now||Date.now;
  let contractSeen:string|undefined;
  let state:Snapshot={status:'disconnected',likes:[]},generation=0,last=-Infinity,active:AbortController|undefined;
  const address=()=>{const s=options.wallet();return s.isConnected&&s.network==='mainnet'?s.address:undefined;};
- const snapshot=():Snapshot=>state.wallet===address()?state:{wallet:address(),status:address()?'loading':'disconnected',likes:[]};
+ const snapshot=():Snapshot=>{
+  if(state.wallet!==address())return {wallet:address(),status:address()?'loading':'disconnected',likes:[]};
+  return {...state,likes:state.likes.map(l=>{const meta=options.metadata?.(l.tokenId);return {...l,title:meta?.title&&!/^(?:Inscription )?#\d+$/.test(meta.title)?meta.title:l.title,artist:meta?.artist||l.artist};})};
+ };
  async function refresh(force=false){
   const wallet=address();
   if(!force&&wallet===state.wallet&&now()-last<60000)return;

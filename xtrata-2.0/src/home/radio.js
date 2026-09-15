@@ -1783,7 +1783,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const chainLike = root.querySelector('.xtrata-radio__chain-like');
   const walletSession = createWalletSessionStore();
-  chainState = createRadioOnchainState({wallet: () => walletSession.load(), changed: () => {
+  chainState = createRadioOnchainState({wallet: () => walletSession.load(), metadata: id => trackCache.get(String(id)), changed: () => {
     likes = chainState.snapshot().likes.slice(); emit();
   }});
   const refreshChainLikes = (force = false) => { void chainState.refresh(force); };
