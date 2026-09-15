@@ -39,3 +39,5 @@ Production storage audit verified all ten Numbers 1–10 optimized JPEGs byte-fo
 A separate user-authorized storage cleanup targets only expired files in undeployed legacy drafts; local backup inventory, file bytes and deletion acknowledgements are retained under ignored root media/collection-cleanup-backup-2026-09-15. Published/deployed collections and the current Numbers collection are excluded. API reservation and shared-storage-reference guards remain authoritative. No on-chain purge or transaction is performed.
 
 Validation: version classification test and Vite production build passed.
+
+Cleanup completion: 290 expired assets (968,327 bytes) removed with both D1 deletion and R2 deletion acknowledgements: DYLE0417 (281), RRTEST (3), Russian Rampage V00 (6). Fresh API reads confirm all three asset lists are empty, while Numbers 1–10 retains 10 files / 7,273 bytes. Backups remain local; no public listing, deployed collection storage, or on-chain data was deleted.
