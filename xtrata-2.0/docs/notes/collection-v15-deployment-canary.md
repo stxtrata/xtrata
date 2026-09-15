@@ -39,3 +39,19 @@ separately authorized disposable-wallet tests for duplicate rejection,
 reservations, staged and atomic minting and receipt attribution. Storage-worker
 configuration and recovery/reconstruction verification are separate. Never purge
 core chunks belonging to sealed inscriptions.
+
+## Management dropdown — 15 September 2026
+
+The collection card now includes six expandable testing/release stages plus
+read-only inventory, reservation, phase, index and receipt lookups. Production
+configuration forms cover metadata, price, one-time supply, recipients/splits,
+registered URIs, dependencies, wallet limits, allowlists, phases, expiry and pause.
+Drafts and disclosure state survive console rendering in memory. Each write has
+an explicit value review, fresh deployed-source/core preflight, mainnet owner and
+finalization checks, then wallet approval with deny postconditions. Submission is
+not reported as confirmation. Re-run preflight after confirmation.
+
+This is an owner configuration interface, not a disposable-wallet mint runner or
+storage-worker controller. The six testing stages describe required evidence;
+they do not claim tests or cleanup have run. No mainnet writes were performed.
+Validation: 14 targeted tests pass and Vite production build passes.
