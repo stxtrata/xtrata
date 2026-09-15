@@ -88,3 +88,23 @@ The source comparison permits only the expected local core principal substitutio
 JSON evidence is saved with the local fixtures; no generated media is committed.
 This is a local runner, not a mainnet adapter or storage lifecycle test. No real
 wallets were read and no STX was spent.
+
+## Dedicated encrypted live wizard
+
+Added `collection-v15-live.mjs` with explicit setup/status/authorize/run commands.
+Setup generates only a new job-specific wallet, encrypts its key with scrypt and
+AES-256-GCM, and leaves spending disabled. Its ignored state directory contains
+only the encrypted vault, config and resumable journal; setup never prints keys.
+The live flow deploys its own pinned helper, registers ten JPEGs, mints atomically,
+verifies owner/bytes/receipts/indexes/reservations and pauses at completion.
+
+Safety controls include a total lifetime cap, per-transaction quote ceiling,
+balance floor, existing wizard kill switch, mainnet/core/source checks, explicit
+nonces, Deny postconditions, exclusive lock, journal-before-broadcast and six
+canonical confirmations. Resume uses the original transaction bytes. Test URNs
+are labels, not staging URLs; cleanup and paid split testing remain separate.
+
+Validation: three tests pass, including the entire flow and resume with an offline
+API and ephemeral keys, authenticated-vault tamper rejection and budget boundaries.
+Offline Clarity 4 deploy/call serialization also passed. No real vault was created,
+no funding or live broadcast performed, and no spending cap has been chosen.

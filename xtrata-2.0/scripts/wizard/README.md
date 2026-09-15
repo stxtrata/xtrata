@@ -813,3 +813,68 @@ the switch is engaged, consistent with the other wizard tools. A future live
 adapter needs a separate disposable-admin helper, current fee quotes, explicit
 spend authorization and the existing wizard nonce/budget/confirmation rails; do
 not substitute the production deployer to run tests.
+
+## Dedicated collection wizard — encrypted mainnet automation
+
+`collection-v15-live.mjs` uses a newly generated, job-specific wallet. Its AES-256-GCM
+vault uses a scrypt-derived encryption key; this is encryption, not Base64 encoding.
+The ignored `.collection-v15/` directory holds the encrypted vault, configuration,
+exclusive process lock and transaction journal. Files use mode 0600. Back up this
+folder and the passphrase separately. Losing either loses access to the wallet.
+Private keys never print, enter browser storage or get written in plaintext.
+
+One-time setup, from `xtrata-2.0`, using a hidden terminal prompt (zsh):
+
+```sh
+read -s 'COLLECTION_WIZARD_PASSPHRASE?New passphrase (at least 16 characters): '
+export COLLECTION_WIZARD_PASSPHRASE
+node scripts/wizard/collection-v15-live.mjs setup
+```
+
+Save the passphrase in your password manager. Setup prints only the new public
+address and test contract ID, and leaves spending disabled. Fund only that new
+address independently. Do not import a deployer, sponsor or personal wallet.
+
+Authorize a **lifetime total cap in micro-STX** using
+`node scripts/wizard/collection-v15-live.mjs authorize <approved-cap-microSTX>`.
+No cap has been authorized by this implementation. Configuration defaults to a
+1 STX maximum miner fee per transaction, a 0.1 STX remaining balance floor, and
+six confirmations. A quote over the ceiling stops the run. The total cap includes
+conservatively reserved miner and protocol fees for all previous steps, including
+failed or uncertain transactions. Increasing it is a separate explicit action.
+
+Then start the automatic workflow:
+
+```sh
+node scripts/wizard/collection-v15-live.mjs run --broadcast
+unset COLLECTION_WIZARD_PASSPHRASE
+```
+
+Use the same hidden prompt to unlock on a later run; no setup repeat is needed.
+`HIRO_API_KEY` is supported through the environment; `COLLECTION_WIZARD_API_URL`
+selects the API endpoint. Do not pass either secret on the command line. `status`
+prints public progress without unlocking the vault.
+
+The run deploys the pinned Clarity 4 helper under the dedicated wallet, sets test
+supply to ten, registers the numbered JPEG hashes/URNs, unpauses, performs ten
+atomic helper mints, verifies ownership/chunks/receipt attribution/indexes and
+reservation totals, then pauses the helper. Collection price stays zero. The
+URNs label fixtures; they are not off-chain storage URLs. No production helper
+configuration, paid-split test, external storage deletion or sponsorship is involved.
+The separate simulation runner covers staged/batch/negative scenarios.
+
+Every transaction has a fresh API fee quote, explicit nonce, Deny postconditions,
+spend/balance checks, a kill-switch check, and a journal written **before** sending.
+A restart checks the recorded transaction, waits for canonical confirmation, or
+replays identical signed bytes if the transaction is missing; it does not create
+a replacement transaction or charge the budget again. Run identity pins wallet,
+source and JPEG hashes. Unknown outcomes, API errors, aborts, changed bytes and
+nonce conflicts stop the runner. Resume with the same command after resolving the
+cause. A hard process kill can leave the exclusive `lock` file: remove it only
+after confirming that no instance is running. No unattended background scheduling
+is installed; the foreground runner continues the steps automatically.
+
+Validation uses a fully offline API transport with ephemeral test keys for setup,
+deploy, configuration, all ten mints, final verification and completed-run resume.
+Vault authentication/tampering and budget boundaries are also tested. Actual
+funded mainnet execution still needs the one-time user setup and approved cap.
