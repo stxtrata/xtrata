@@ -23,7 +23,7 @@ for(const [name,tx]of plans){
  try {
   const q=await request('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:T.serializePayload(tx.payload),estimated_len:typeof raw==='string'?raw.length/2:raw.length})});
   const fee=q.estimations?.[1]?.fee;if(!Number.isSafeInteger(fee)||fee<=0)throw new Error('Invalid quote');
-  quotes.push({name,count:name==='set-registered-token-uri'?10:1,minerFeeUstx:fee});
+  quotes.push({name,count:name==='set-registered-token-uri'?10:1,minerFeeUstx:fee,priorityFees:q.estimations.map(e=>e.fee)});
  }catch(error){if(!error.message.includes('NoEstimateAvailable'))throw error;quotes.push({name,count:name==='set-registered-token-uri'?10:1,minerFeeUstx:null,reason:'NoEstimateAvailable'});}
 }
 const available=quotes.every(q=>q.minerFeeUstx!==null);

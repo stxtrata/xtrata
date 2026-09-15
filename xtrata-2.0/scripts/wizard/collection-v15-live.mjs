@@ -20,7 +20,7 @@ const json = async p => JSON.parse(await readFile(p,'utf8'));
 const save = async (p,v) => { await writeFile(p+'.tmp',JSON.stringify(v,null,2)+'\n',{mode:0o600}); await rename(p+'.tmp',p); };
 const password = () => { const p = process.env.COLLECTION_WIZARD_PASSPHRASE; if (!p) throw new Error('Provide COLLECTION_WIZARD_PASSPHRASE through a secret manager or hidden terminal input.'); return p; };
 const args = process.argv.slice(2), command = args[0] || 'status';
-if (!['setup','status','authorize','run','prepare'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
+if (!['setup','status','authorize','run','prepare','register'].includes(command)) throw new Error('Use setup, status, authorize <cap-microSTX>, or run --broadcast.');
 await mkdir(directory,{recursive:true,mode:0o700});
 const lock = await open(join(directory,'lock'),'wx',0o600).catch(()=>{ throw new Error('Runner already active or stale lock present. Verify no runner is active before removing its lock.'); });
 try {
@@ -53,7 +53,7 @@ try {
       const api = (process.env.COLLECTION_WIZARD_API_URL || 'https://api.hiro.so').replace(/\/$/,'');
       const request = async (path,options={}) => {
         const response = await fetch(api+path,{...options,signal:AbortSignal.timeout(30000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});
-        if(!response.ok) { const error = new Error(`API HTTP ${response.status} at ${path}`); error.status=response.status; throw error; }
+        if(!response.ok) { const error = new Error(`API HTTP ${response.status} at ${path}`); error.status=response.status;try{error.reason=(await response.json()).reason;}catch{}throw error; }
         return response.json();
       };
       const guard = () => { if(killSwitchEngaged()) throw new Error('Wizard kill switch engaged.'); };
@@ -111,11 +111,26 @@ try {
         const build=fee=>deploy ? T.makeContractDeploy({...options,fee,contractName:config.contractName,codeBody:source,clarityVersion:T.ClarityVersion.Clarity4}) : T.makeContractCall({...options,fee,contractAddress:config.address,contractName:config.contractName,functionName:fn,functionArgs:args});
         const draft=await build(0n);
         const payload=T.serializePayload(draft.payload);
-        const quote=await request('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:typeof payload==='string'?payload:Buffer.from(payload).toString('hex'),estimated_len:typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length})});
+        let quote;
+        try { quote=await request('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:typeof payload==='string'?payload:Buffer.from(payload).toString('hex'),estimated_len:typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length})});
+        } catch(error) {
+          if(!['prepare','register'].includes(command)||error.reason!=='NoEstimateAvailable')throw error;
+          const rate=await request('/v2/fees/transfer');
+          const size=typeof draft.serialize()==='string'?draft.serialize().length/2:draft.serialize().length;
+          if(!Number.isFinite(rate)||rate<=0)throw new Error('Invalid minimum fee rate.');
+          const fallback=Math.max(10000,Math.ceil(rate*size));
+          if(fallback>Number(config.maxTxFeeUstx))throw new Error('Minimum byte fee exceeds transaction ceiling.');
+          quote={estimations:[null,{fee:fallback}]};
+          console.log(id+': no historical cost estimate; using current minimum byte rate with 10000 micro-STX floor.');
+        }
         const feeNumber=quote.estimations?.[1]?.fee;
         if(!Number.isSafeInteger(feeNumber)||feeNumber<=0)throw new Error('Invalid live miner quote.');
-        const fee=BigInt(feeNumber);
-        if(fee>BigInt(config.maxTxFeeUstx)) throw new Error('Live miner quote exceeds per-transaction ceiling.');
+        let fee=BigInt(feeNumber);
+        if(fee>BigInt(config.maxTxFeeUstx)) {
+          if(!['prepare','register'].includes(command))throw new Error('Live miner quote exceeds per-transaction ceiling.');
+          fee=BigInt(config.maxTxFeeUstx);
+          console.log(id+': quote exceeds ceiling; bidding the existing capped fee '+fee+' micro-STX. No automatic fee increase.');
+        }
         assertBudget(BigInt(journal.spent),fee+protocol,BigInt(config.capUstx),BigInt(account.balance),BigInt(config.balanceFloorUstx));
         guard(); const tx=await build(fee); const txid='0x'+tx.txid().replace(/^0x/,'');
         // Charge conservatively and persist before broadcast. Unknown outcomes are never re-signed.
@@ -132,12 +147,25 @@ try {
       expect(await read(helper,'get-owner'),Cl.ok(Cl.principal(config.address)),'helper owner');
       expect(await read(helper,'get-locked-core-contract'),Cl.ok(Cl.contractPrincipal(coreAddress,coreName)),'core binding');
       await step('supply','set-max-supply',[Cl.uint(10)]);
-      if(command==='prepare') {
+      if(['prepare','register'].includes(command)) {
         await step('metadata','set-collection-metadata',[Cl.stringAscii('Numbers 1-10'),Cl.stringAscii('NUM10'),Cl.stringAscii(''),Cl.stringAscii('Ten numbered JPEGs. Collection setup test.'),Cl.uint(0)]);
         await step('price','set-mint-price',[Cl.uint(0)]);
         expect(await read(helper,'is-paused'),Cl.ok(Cl.bool(true)),'helper remains paused');
+        if(command==='register') {
+          const staged=await json(join(directory,'staging.json'));
+          if(!staged.complete||Object.keys(staged.assets).length!==10)throw new Error('Ten verified staged assets required.');
+          const entries=manifest.items.map(item=>{
+            const asset=staged.assets[item.filename];
+            if(!asset?.verified||asset.rollingHash!==item.rollingHash||typeof asset.tokenUri!=='string'||asset.tokenUri.length>256)throw new Error('Staged inventory mismatch.');
+            return {hash:Cl.bufferFromHex(item.rollingHash),'token-uri':Cl.stringAscii(asset.tokenUri)};
+          });
+          await step('inventory','set-registered-token-uri-batch',[Cl.list(entries.map(Cl.tuple))]);
+          for(const entry of entries)expect(await read(helper,'get-registered-token-uri',[entry.hash]),Cl.some(Cl.tuple({'token-uri':entry['token-uri']})),'registered inventory URI');
+          expect(await read(helper,'get-minted-count'),Cl.ok(Cl.uint(0)),'no inscriptions');
+          journal.inventoryRegistered=true;
+        }
         journal.configurationPrepared=true;await persist();
-        console.log('Helper metadata and supply prepared; paused, no inventory registered and no inscriptions sent.');
+        console.log(command==='register'?'Ten staged files registered; helper paused and no inscriptions sent.':'Helper metadata and supply prepared; paused, no inventory registered and no inscriptions sent.');
       } else {
       for(const item of manifest.items) await step('register-'+item.number,'set-registered-token-uri',[Cl.bufferFromHex(item.rollingHash),Cl.stringAscii(`urn:xtrata:wizard:number:${item.number}`)]);
       await step('unpause','set-paused',[Cl.bool(false)]);

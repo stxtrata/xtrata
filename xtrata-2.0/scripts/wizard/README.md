@@ -890,3 +890,29 @@ actual R2/D1 upload workflow. No JPEG is inscribed by `prepare`.
 checks it in macOS Keychain, then creates the encrypted wallet. `status` prints
 public state. `collection-v15-setup-quote.mjs` quotes unsigned setup payloads;
 if the API has no estimate, it clearly reports the configured fee-ceiling budget.
+
+### Funded setup and staged inventory commands
+
+The dedicated Keychain wrapper supports `prepare` and `register` (setup-only,
+no inscription calls). It unlocks only the dedicated vault and loads the existing
+Hiro API key without printing credentials. The lifetime cap remains explicit.
+
+`node scripts/wizard/collection-v15-stage.mjs` creates/resumes the dedicated draft
+in the existing collection API, records ten JPEGs in D1/R2 and downloads each for
+byte verification. It pins the v1.5 template metadata so the public page selects
+the granular v3.2.3 fee model. It preserves the draft's hidden listing status.
+Intent keys and asset IDs are journaled; resumes reuse existing matching records.
+No cleanup deletion or inscription is involved. The current deployment uses the
+existing staging service, not a newly provisioned isolated cleanup worker.
+
+`node scripts/wizard/collection-v15-keychain.mjs register` registers all ten
+verified rolling hashes and per-item data-JSON metadata URIs in one transaction,
+then reads every mapping and verifies minted count zero. It leaves the helper
+paused. The image URLs refer to the real staged asset-preview endpoints.
+
+For setup-only commands, an estimate above the existing ceiling produces a capped
+bid; fees never auto-increase. An explicit NoEstimateAvailable response uses the
+live minimum byte rate with a 10,000 micro-STX floor, and stops if that exceeds the
+ceiling. Other API errors still stop the run. The inscription runner retains its
+original strict quote policy. Tests cover capped deployment, missing call estimate,
+setup-only completion, inventory registration, and resume without repeat spending.

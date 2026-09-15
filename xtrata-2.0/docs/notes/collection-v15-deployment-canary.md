@@ -125,3 +125,43 @@ price, verifies paused state and stops before inventory registration or inscript
 Register inventory only after real R2 staging URLs exist. The original `run` path
 still explicitly performs test inscriptions and must not be used for this revised
 setup-only task. No real transactions were signed/broadcast during wallet setup.
+
+## Funded setup completed — 15 September 2026
+
+Dedicated helper:
+`SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M.collection-v15-wizard-test`.
+Draft page: https://xtrata.xyz/collection/wizard-numbers-1-10
+D1 collection ID: `b403e9c4-a57e-4769-93da-e3e4eaf4f115`.
+
+Confirmed mainnet transactions (each verified canonical with at least six confirmations):
+
+| Step | Transaction | Fee STX |
+| --- | --- | ---: |
+| Deploy | `0x2d2f9205b836f039cb42308ff74a41e0d66dc342ff3bf75a71f0df8293a2afe1` | 1 |
+| Supply | `0x5150ce22c0d701054389d197cb90a3b489aa4a2ac55f9476328f952d393b8283` | 0.01 |
+| Metadata | `0x66f90e7e06ddcf6d7d690be237690682339d388bbb6a2f40ecbdc89443bab41d` | 0.01 |
+| Price | `0x84de4bcea86b1ada9145e0fa9d31f34b6192f1acfcf8e57bc962816a2285f083` | 0.0422 |
+| Inventory batch | `0xf2f95a3327e6b03a4eb3fc922668ed0e95f0a351e320f223a5dd68732190b5b3` | 0.01 |
+
+Total 1.0722 STX; verified remaining balance 14.9278 STX from the user's 16 STX
+funding. Lifetime cap is 15 STX and per-transaction ceiling remains 1 STX.
+Volatile deployment estimates were capped; missing call estimates used the live
+minimum byte rate and a bounded floor. No inscription calls were submitted.
+
+Verified owner, pinned core, exact source, metadata Numbers 1-10 / NUM10,
+supply=10, price=0, minted=0, reserved=0, paused=true. All ten inventory URIs match
+the staged manifest. Ten R2 keys hold 69,363 bytes; every preview download matches
+the local JPEG SHA-256. D1/R2 APIs were reused without cleanup or deletion. Draft
+records currently expire starting 2026-09-18T12:11:16Z; review before expiry.
+
+The real page was inspected without wallet interactions. It shows 0/10, the wizard
+owner, NUM10 and the v1.5 granular fee model (0.201 STX protocol fees for a one-chunk
+buyer mint at the observed core schedule). Template metadata was explicitly set
+to v1.5; omitting it had selected legacy compatibility pricing. The collection is
+still draft, hidden from public listings, and the helper remains paused. Publishing
+and unpausing are the remaining release actions; no buyer mint was performed.
+
+Tests: three targeted tests pass, including capped fee, missing-estimate fallback,
+setup-only path, ten-item registration without minting, encrypted vault and resume.
+Staging was exercised against the live API and all ten files byte-verified twice;
+resuming reused the existing ten asset records and ten keys.
