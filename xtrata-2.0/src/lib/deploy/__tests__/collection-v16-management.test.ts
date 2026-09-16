@@ -2,6 +2,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { collectionArgs, renderCollectionManagement } from '../collection-v16-management';
 describe('collection management', () => {
+  it('pins recipient-editor grants to the correct core and validates permissions', () => {
+    const core='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+    const editor=core.split('.')[0];
+    expect(collectionArgs('set-recipient-editor-access',[core,editor,'true','true'])).toHaveLength(4);
+    expect(() => collectionArgs('set-recipient-editor-access',[core+'bad',editor,'true','true'])).toThrow();
+    expect(() => collectionArgs('set-recipient-editor-access',[core,editor,'yes','true'])).toThrow();
+  });
   it('validates hashes, amounts, booleans and split totals', () => {
     expect(() => collectionArgs('set-registered-token-uri',['bad','uri'])).toThrow();
     expect(() => collectionArgs('set-mint-price',['1.2'])).toThrow();

@@ -1,10 +1,11 @@
-import { boolCV, bufferCV, listCV, standardPrincipalCV, stringAsciiCV, uintCV, validateStacksAddress, type ClarityValue } from '@stacks/transactions';
+import { contractPrincipalCV, boolCV, bufferCV, listCV, standardPrincipalCV, stringAsciiCV, uintCV, validateStacksAddress, type ClarityValue } from '@stacks/transactions';
 
 type Field = [string, string];
 export const collectionActions: Record<string, Field[]> = {
   'set-collection-metadata': [['name','ascii64'],['symbol','ascii16'],['base-uri','ascii256'],['description','ascii256'],['reveal-at','uint']],
   'set-mint-price': [['amount (micro-STX)','uint']],
   'set-max-supply': [['amount — permanent, one-time supply','uint']],
+  'set-recipient-editor-access': [['core contract (must be pinned v3.2.3)','core'],['editor address','principal'],['allow marketplace changes (true/false)','bool'],['allow operator changes (true/false)','bool']],
   'set-recipients': [['artist','principal'],['marketplace','principal'],['operator','principal']],
   'set-splits': [['artist basis points','uint'],['marketplace basis points','uint'],['operator basis points','uint']],
   'set-registered-token-uri': [['protocol rolling hash (32 bytes hex)','hash'],['token-uri','ascii256']],
@@ -20,6 +21,7 @@ export const collectionActions: Record<string, Field[]> = {
   'set-paused': [['paused (true/false)','bool']]
 };
 export const collectionLookups: Record<string, Field[]> = {
+  'get-recipient-editor-access': [['editor address','principal']],
   'get-registered-token-uri': [['rolling hash','hash']],
   'get-hash-reservation': [['rolling hash','hash']],
   'get-reservation': [['buyer','principal'],['rolling hash','hash']],
@@ -35,6 +37,7 @@ export function collectionArgs(name: string, values: string[]): ClarityValue[] {
   const uint = (v: string) => { if (!/^\d+$/.test(v) || BigInt(v) >= 2n ** 128n) throw new Error('Enter an unsigned 128-bit integer.'); return uintCV(BigInt(v)); };
   const args = fields.map(([,type], i) => {
     const raw = values[i], v = raw.trim();
+    if (type === 'core') { if(v !== 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3') throw new Error('Use the pinned v3.2.3 core.'); return contractPrincipalCV(v.split('.')[0],v.split('.')[1]); }
     if (type === 'uint') return uint(v);
     if (type === 'bool') { if (v !== 'true' && v !== 'false') throw new Error('Use true or false.'); return boolCV(v === 'true'); }
     if (type === 'hash') { const h = v.replace(/^0x/,''); if (!/^[a-fA-F0-9]{64}$/.test(h)) throw new Error('Hash must contain exactly 64 hex characters.'); return bufferCV(Uint8Array.from(h.match(/../g)!, b => parseInt(b,16))); }

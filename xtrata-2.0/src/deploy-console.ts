@@ -1816,6 +1816,18 @@ const collectionManagementCall = async (name: string, args: ClarityValue[], writ
     const owner = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-owner'));
     if (owner !== session.address) throw new Error('Connected wallet is no longer the contract owner.');
     if (unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-finalized')) !== false) throw new Error('Contract is finalized or finalization state is unavailable.');
+    if (name === 'set-recipient-editor-access') {
+      const admin = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, 'xtrata-v3-2-3', 'get-admin'));
+      if (admin !== session.address) throw new Error(`Recipient-editor permissions require the core admin ${admin}. No transaction submitted.`);
+    }
+    if (name === 'set-recipients') {
+      const current = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-recipients'));
+      const access = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-recipient-editor-access', [standardPrincipalCV(session.address!)]));
+      for (const [key, index] of [['marketplace', 1], ['operator', 2]] as const) {
+        if (cvToJSON(args[index]).value !== current[key]?.value && access[key]?.value !== true)
+          throw new Error(`Missing ${key} recipient-editor permission. The core admin must use set-recipient-editor-access for ${session.address}, then wait for confirmation before retrying. No transaction submitted.`);
+      }
+    }
     guard();
     return await new Promise<string>((resolve, reject) => {
       showContractCall({
