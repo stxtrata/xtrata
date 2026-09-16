@@ -54,4 +54,22 @@ describe('collection v1.6 wallet deployment',()=>{
  });
  it('blocks mismatched deployed source',async()=>{state='mismatch';await preflight();expect(card().textContent).toContain('source differs');expect(button('Deploy (sign',card())).toBeUndefined();});
  it('verifies an existing deployment and logs state without sending admin calls',async()=>{state='live';await preflight();expect(card().textContent).toContain('Deployed source and state verified');expect(card().textContent).toContain(COLLECTION_V16_CORE);expect(wallet.call).not.toHaveBeenCalled();});
+ it('uses the server-side mainnet proxy for every preflight request',async()=>{
+  state='live';await preflight();
+  for(const [url] of vi.mocked(fetch).mock.calls) expect(String(url)).toMatch(/^\/hiro\/mainnet\//);
+ });
+ it('clears a previous green result when the next check fails',async()=>{
+  state='live';await preflight();expect(card().textContent).toContain('Deployed source and state verified');
+  state='unavailable';await preflight();expect(card().textContent).not.toContain('Deployed source and state verified');
+ });
+
+ it('replaces stale success when an admin preflight fails and never opens the wallet',async()=>{
+  state='live';await preflight();await connect();
+  state='unavailable';vi.spyOn(window,'confirm').mockReturnValueOnce(true);
+  const form=[...card().querySelectorAll('details')].find(d=>d.querySelector('summary')?.textContent==='set-mint-price')!;
+  form.querySelector('input')!.value='1000000';form.querySelector('input')!.dispatchEvent(new Event('input'));form.querySelector('button')!.click();
+  await vi.waitFor(()=>expect(card().textContent).toContain('Deployed contract preflight failed'));
+  expect(card().textContent).not.toContain('Deployed source and state verified');expect(wallet.call).not.toHaveBeenCalled();
+ });
+
 });

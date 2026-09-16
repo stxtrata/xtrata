@@ -27,3 +27,9 @@ The canary now includes six prefilled owner-wallet actions: supply 10, NUM10 met
 On-chain configuration remains pending owner signatures. The disposable wizard does not own v1.6. Backend collection b403e9c4-a57e-4769-93da-e3e4eaf4f115 remains a draft bound to the old helper. After confirmations, verify metadata, payouts and each registration, rebind the existing collection without duplicating storage, then separately unpause and publish. No signatures, mint, publication or storage deletion occurred during this preparation.
 
 Validation: 16 targeted setup/console/management tests pass; Vite production build passes. Browser inspection confirms all six setup buttons are visible in the v1.6 section.
+
+## 2026-09-16 API transport fix
+
+The supplied log showed successful deployment verification followed by an admin preflight fetch failure. The canary used direct unauthenticated api.hiro.so requests, bypassing the shared API-key proxy. All canary chain reads now use /hiro/mainnet, handled by Vite locally and the existing Pages proxy in production; no key enters the browser bundle. Read transport errors identify the contract/function. Admin preflight results replace the saved status, and failures enter the audit log and render instead of leaving an old green result.
+
+Verified locally: API key configured (presence only), proxy HTTP 200, browser v1.6 preflight reports OK — already deployed. 19 targeted console/setup/management tests pass, including stale success replacement on admin failure without opening the wallet. Vite build passed. No on-chain transaction or production website deployment performed. The original generic fetch error does not prove rate limiting or establish the API account's paid-plan status.

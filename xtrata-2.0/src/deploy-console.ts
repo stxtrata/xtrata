@@ -103,7 +103,8 @@ import radioLikesSource from '../contracts/live/xtrata-radio-likes-v1.0.clar?raw
 import {RADIO_LIKES_NAME,RADIO_LIKES_SOURCE,inspectRadioLikesSource} from './lib/deploy/radio-likes';
 
 const EXPECTED_DEPLOYER = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
-const HIRO_API = 'https://api.hiro.so';
+// Keep the paid API key server-side through the shared Vite/Pages proxy.
+const HIRO_API = '/hiro/mainnet';
 
 type Deployable = {
   name: string;
@@ -738,7 +739,9 @@ const callReadJson = async (
   functionName: string,
   args: ClarityValue[] = []
 ) => {
-  const response = await fetch(
+  let response: Response;
+  try {
+    response = await fetch(
     `${HIRO_API}/v2/contracts/call-read/${contractAddress}/${contractName}/${functionName}`,
     {
       method: 'POST',
@@ -750,6 +753,9 @@ const callReadJson = async (
       })
     }
   );
+  } catch {
+    throw new Error(`${contractName}.${functionName}: API proxy request failed or timed out. Retry the check; no transaction was submitted.`);
+  }
   if (!response.ok) throw new Error(`${functionName} read failed with HTTP ${response.status}`);
   const payload = (await response.json()) as { okay?: boolean; result?: string; cause?: string };
   if (!payload.okay || !payload.result) {
@@ -1801,7 +1807,10 @@ const collectionManagementCall = async (name: string, args: ClarityValue[], writ
   guard();
   state.busy = true;
   try {
+    state.preflight = null;
+    state.error = null;
     const preflight = await runPreflight(state.entry, state.source || collectionV16Source);
+    state.preflight = preflight;
     if (!preflight.ok || !preflight.alreadyDeployed) throw new Error('Deployed contract preflight failed: ' + preflight.problems.join('; '));
     guard();
     const owner = unwrapCollectionRead(await callReadJson(EXPECTED_DEPLOYER, COLLECTION_V16_NAME, 'get-owner'));
@@ -1822,7 +1831,11 @@ const collectionManagementCall = async (name: string, args: ClarityValue[], writ
         onCancel: () => reject(new Error('Wallet cancelled the configuration transaction.'))
       });
     });
-  } finally { state.busy = false; }
+  } catch (error) {
+    state.error = error instanceof Error ? error.message : String(error);
+    addLog(state, name, 'error', state.error);
+    throw error;
+  } finally { state.busy = false; render(); }
 };
 
 const canaryNavigation = createCanaryNavigation();
