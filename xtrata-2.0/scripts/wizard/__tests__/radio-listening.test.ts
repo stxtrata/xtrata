@@ -76,3 +76,17 @@ describe('reconciled activity',()=>{
   const view=await s.refreshedSnapshot();expect(view.events[0]).toMatchObject({title:'Example song',artist:'Example artist',recipient:'recipient-address'});expect(view.enabled).toBe(false);expect(view.events[0].outcome).toBe('confirmed');expect(view.events[0].reason).toBe('Paid start confirmed.');expect(w.run).not.toHaveBeenCalled();
  });
 });
+
+describe('continuous listening',()=>{
+ it('keeps consent after count, duration, lease and temporary failures but respects Stop',async()=>{
+  const {s,w}=fixture();w.journal=async()=>[{fee:12000}];w.returnAccount=async()=>({balance:350n});
+  const a=await s.enable({...settings,max:1,continuous:true});
+  s.active.expires=0;s.active.lease=0;
+  w.run=vi.fn().mockRejectedValueOnce(Error('Network unavailable')).mockResolvedValue(undefined);
+  await s.start({id,song,tab,token:a.token});await new Promise(r=>setTimeout(r,0));
+  expect(s.snapshot().enabled).toBe(true);
+  await s.start({id:'d'.repeat(32),song,tab,token:a.token});await new Promise(r=>setTimeout(r,0));
+  expect(w.run).toHaveBeenCalledTimes(2);expect(w.run.mock.calls[1][1].continuous).toBe(true);
+  expect(s.snapshot().enabled).toBe(true);w.stop();expect(s.snapshot().enabled).toBe(false);
+ });
+});

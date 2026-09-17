@@ -230,3 +230,14 @@ Validation: 640 wizard tests passed, one skipped; JavaScript syntax checks passe
 Updated the reconciliation regression to check title, artist and recipient.
 Desktop/mobile playback smoke checks passed after fixing long-address wrapping.
 No real payments were sent. The idle wizard was restarted for the backend update.
+
+### Continuous wizard listening (2026-09-17)
+
+Added explicit continuous mode: removes radio duration/count/test budget and
+reserve limits, retains approval through transient failures and heartbeat gaps,
+and checks unresolved journal entries before future payments. Stop/return and
+fixed-fee safeguards remain. No backlog charging or automatic replacement.
+Validated continuous consent past expiry/count, temporary failure recovery,
+external Stop, and mocked backend spending below reserve and above lifetime test
+budget with duplicate prevention. Bounded desktop/mobile browser checks passed.
+No mainnet payments were sent during implementation.

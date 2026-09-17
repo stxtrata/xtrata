@@ -205,7 +205,7 @@ export class RadioWizard {
    lock=await open(join(this.dir,'run.lock'),'wx',0o600);this.guard();
    const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish or cancel the pending return review first.');
    await this.reconcileReturns();const log=await this.journal();await this.reconcile(log);
-   if(log.reduce((s,e)=>s+e.fee+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
+   if(!context.continuous&&log.reduce((s,e)=>s+e.fee+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
    const source=await this.api(`/v2/contracts/source/${OWNER}/${NAME}?proof=0`);if(sha(source.source)!==HASH)throw Error('Deployed source differs from pinned helper.');
    const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
    const key=await this.key(),{address}=await this.json('vault.json');
@@ -213,7 +213,7 @@ export class RadioWizard {
     this.guard();const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
     if(!Number.isSafeInteger(account.nonce)||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length)throw Error('Conflicting or pending nonce.');
     if(BigInt(account.balance)>1000000n)throw Error('Balance is above 1 STX. Return the excess before starting tests.');
-    if(BigInt(account.balance)<BigInt(p.fee+50+1000))throw Error('Insufficient confirmed balance; retain 0.001 STX reserve.');
+    if(BigInt(account.balance)<BigInt(p.fee+50+(context.continuous?0:1000)))throw Error(context.continuous?'Insufficient confirmed balance for another paid start.':'Insufficient confirmed balance; retain 0.001 STX reserve.');
     const owner=await this.read('get-owner',[T.uintCV(p.core),T.uintCV(p.song)]);const recipient=owner?.success===true?owner.value?.value?.value:null;
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');
     const receipt=randomBytes(16).toString('hex');

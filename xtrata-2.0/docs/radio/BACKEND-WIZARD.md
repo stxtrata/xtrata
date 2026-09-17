@@ -153,3 +153,20 @@ known, inscription ID, and the 50 microSTX recipient address. Confirmed payments
 say “paid to”; unresolved payments show the intended recipient. New radio starts
 save display metadata with their journal entry; older entries use the current
 catalogue where available. Missing metadata falls back to the inscription ID.
+
+### Continuous paid listening
+
+Select **Continuous paid listening**, choose a fixed fee, and enable the session
+once. This explicitly removes radio time/count/session/lifetime test spending
+caps and the 0.001 STX reserve for that session. It can spend the available wizard
+balance until another fee plus 50 microSTX cannot be covered. The 1 STX maximum
+balance guard, fixed fee, transaction verification and single unresolved payment
+rule remain. Manual tests retain their original limits.
+
+Temporary payment failures leave this approval active. Subsequent song starts
+reconcile earlier payments before attempting a new one; free starts are never
+charged later and unknown transactions are never blindly resubmitted. Funding
+again while this mode remains active permits subsequent starts to pay again.
+Heartbeat delays do not expire continuous approval. Stop, Free, return controls,
+settings changes, page close/reload or server restart require a new approval.
+Keep the computer awake and the player open. This is not an always-on service.

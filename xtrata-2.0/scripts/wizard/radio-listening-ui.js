@@ -30,7 +30,7 @@
   void api('start',{token:a.token,tab,id:observed.id,song:observed.song}).then(e=>{
    if(start?.id===observed.id)$('radio-payment').textContent=e.reason;
    window.dispatchEvent(new Event('wizard-refresh'));
-  }).catch(e=>{if(start?.id===observed.id)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;void free();});
+  }).catch(e=>{if(start?.id===observed.id)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;if(!a.continuous)void free();});
  }
  audio.addEventListener('playing',audible);audio.addEventListener('volumechange',audible);
  audio.addEventListener('ended',()=>{if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
@@ -43,16 +43,16 @@
   if(!$('radio-approve').checked){$('radio-payment').textContent='Approve the bounded paid session first.';return;}
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
-   const fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
-   if(!confirm(`Enable up to ${max} paid starts over ${minutes} minutes? Each costs ${fee} microSTX miner fee + 50 microSTX to the holder, up to ${max*(fee+50)} microSTX total. This uses the dedicated wizard on mainnet.`))return;
-   const a=await api('enable',{fee,max,minutes,tab});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token};$('radio-approve').checked=false;
-   mode(`PAID TEST · ${a.used}/${a.max} starts · fee ${a.fee} microSTX + 50 to holder`);
+   const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
+   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid starts over ${minutes} minutes`}? Each costs ${fee} microSTX miner fee + 50 microSTX to the holder, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet.`))return;
+   const a=await api('enable',{fee,max,minutes,tab,continuous});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
+   mode(`${a.continuous?'CONTINUOUS PAID':'PAID TEST'} · ${a.used}${a.continuous?'':'/'+a.max} starts · fee ${a.fee} microSTX + 50 to holder`);
    $('radio-payment').textContent='Paid tests enabled for new song starts. The current song is not charged retrospectively.';
   }catch(e){$('radio-payment').textContent=e.message;}finally{$('radio-enable').disabled=false;}
  };
- function limits(){const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The duration and remaining lifetime budget also apply.`;}
+ function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=continuous;$('radio-paid-minutes').disabled=continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The duration and remaining lifetime budget also apply.`;}
  limits();
- for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes'])$(id).oninput=()=>{limits();$('radio-approve').checked=false;void free();};
+ for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes','radio-continuous'])$(id).oninput=()=>{limits();$('radio-approve').checked=false;void free();};
  async function load(){
   $('radio-load').disabled=true;
   try{const r=await fetch('/radio/catalogue');const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Catalogue unavailable.');tracks=v.tracks;
@@ -66,10 +66,10 @@
   if(polling)return;polling=true;
   try{const s=approval?await api('heartbeat',{token:approval.token,tab}):await api('status');renderEvents(s.events);
    if(approval&&!s.enabled){approval=null;mode('FREE · paid session ended');}
-   else if(approval)mode(`PAID TEST · ${s.used}/${s.max} starts · fee ${s.fee} microSTX + 50 to holder`);
+   else if(approval)mode(`${s.continuous?'CONTINUOUS PAID':'PAID TEST'} · ${s.used}${s.continuous?'':'/'+s.max} starts · fee ${s.fee} microSTX + 50 to holder`);
    else if(s.enabled)mode('FREE in this tab · another tab has a paid session');
    window.dispatchEvent(new Event('wizard-refresh'));
-  }catch(e){if(approval){approval=null;mode('FREE · payment connection unavailable');$('radio-payment').textContent=e.message;}}
+  }catch(e){if(approval){if(!approval.continuous)approval=null;mode('FREE · payment connection unavailable; retrying');$('radio-payment').textContent=e.message;}}
   finally{polling=false;}
  },10000);
  window.addEventListener('pagehide',()=>{if(approval){void fetch('/listening/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:approval.token,tab}),keepalive:true}).catch(()=>{});}audio.pause();});
