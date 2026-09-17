@@ -31,9 +31,9 @@ export default function InclusivePricePreview({ maxChunks }: { maxChunks: number
   const base = total !== null && protocol !== null ? total - protocol : null;
   const platform = base !== null && base >= 0n ? base * 500n / 10000n : null;
   return <section className="collection-settings-panel__group" aria-label="Inclusive pricing preview">
-    <h3>Plan the price collectors pay</h3>
-    <p>Calculation preview only — this does not change your live price or payout settings.</p>
-    <label>Target buyer price, including inscription charges (STX)
+    <h3>Set your advertised sale price</h3>
+    <p>Creator-only calculation preview — this does not change your live price or payout settings. Verify all files and lock the inventory before confirming a price.</p>
+    <label>Advertised sale price (STX)
       <input inputMode="decimal" value={target} onChange={event => setTarget(event.target.value)} />
     </label>
     {error && <p role="alert">{error}</p>}
@@ -41,12 +41,12 @@ export default function InclusivePricePreview({ maxChunks }: { maxChunks: number
     {!valid && <p role="alert">Enter a positive STX amount with up to six decimal places.</p>}
     {base !== null && protocol !== null && <>
       <p>Based on the locked inventory maximum: {maxChunks} chunks. Current mainnet fees; recheck before applying.</p>
-      <dl><dt>Target buyer price</dt><dd>{format(total!)}</dd>
-      <dt>Largest-item inscription allowance, included</dt><dd>{format(protocol)}</dd>
+      <dl><dt>Price shown to buyers</dt><dd>{format(total!)}</dd>
+      <dt>Inscription allowance deducted from your advertised price</dt><dd>{format(protocol)}</dd>
       <dt>Required v1.6 contract sale amount</dt><dd>{base >= 0n ? format(base) : 'Target is below inscription cost'}</dd>
       {platform !== null && <><dt>Example Xtrata share: 5% of contract sale amount</dt><dd>{format(platform)}</dd>
-      <dt>Remaining payout pool</dt><dd>{format(base - platform)}</dd></>}</dl>
-      <p>v1.6 adds each file’s actual inscription cost to the contract sale amount. Using this allowance keeps smaller items below the target; it cannot make mixed-size items cost exactly the same. Payout figures assume a configured 5% share, not a verified live setting.</p>
+      <dt>Creator proceeds per mint (before any artist split)</dt><dd>{format(base - platform)}</dd></>}</dl>
+      <p>Buyers see one advertised price. We subtract the largest-item inscription allowance to calculate the contract sale amount. Smaller files cost the buyer less; your contract payout base stays the same. The 5% platform share is taken from that base, not added to the buyer’s price. These proceeds assume a configured 5% share; verify the actual recipients and splits before signing.</p>
     </>}
     <p>Wallet network fees are additional and variable. Already-inscribed NFTs need a sale/transfer flow; they do not incur a new inscription charge.</p>
   </section>;

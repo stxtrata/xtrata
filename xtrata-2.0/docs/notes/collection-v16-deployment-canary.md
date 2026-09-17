@@ -47,3 +47,7 @@ Added a calculation-only creator panel for v1.6 guided settings. It reads the fo
 The v1.5/v1.6 live mint hero now displays sale amount plus protocol fees for loaded active inventory, as a range where costs differ, and labels wallet network fees separately. Contract prices and transaction caps remain unchanged. This is a local UI change, not a production deployment or migration. Equal mixed-size totals still require new contract behavior. Migration must preserve completed mints and old receipts; only remaining inventory can move after reservation checks.
 
 Validation: eight focused calculator/launch pricing tests pass; Vite production build passes.
+
+## Buyer price presentation refinement
+
+The local v1.5/v1.6 mint hero shows one Price value, calculated with the maximum protocol quote across loaded inventory (including minted items), instead of a range or inscription-included label. Network fees remain separately noted. Creator preview copy now explains the advertised price, deducted allowance, assumed 5% sale-base platform share and creator proceeds. Smaller files reduce buyer spending, not the configured payout base. No on-chain or production changes were made. This remains a calculation preview: persisted price approval and fee-change blocking still require implementation before claiming a guaranteed advertised ceiling.
