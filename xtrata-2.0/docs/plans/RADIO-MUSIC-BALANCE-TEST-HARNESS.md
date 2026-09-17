@@ -5,6 +5,32 @@ building the Music Wallet integration in small, reviewable gates. It authorises
 no signing, broadcasts or spending. Mainnet work always requires a fresh
 disposable wallet and separate, bounded user authorisation.
 
+## Current handoff state
+
+The commands under **Harness shape** are the target interface and are not present
+in `package.json` yet. No harness runner, fake companion, native companion or
+browser extension has been implemented. The next implementation starts at Gate 1;
+Gate 0 is the verified baseline, not evidence that integration already exists.
+
+Baseline rerun on 17 September 2026:
+
+- `npm run test:radio-plays`: 9 contract and 20 deployment-console tests passed.
+- `npm run test:radio-wallet`: 9 browser test-wallet model tests passed.
+- Focused radio/function suite: 15 files and 86 tests passed.
+- `npm run build:radio`: passed; output was 76.06 kB, 30.95 kB gzip. Vite retained
+  the existing `/radio-face.jpg` runtime URL warning.
+
+This is the handoff order:
+
+| Integration stage | Harness evidence required |
+| --- | --- |
+| Schemas and passive UI | Gates 1–2 |
+| Companion policy, journal and recovery | Gate 3 |
+| Authenticated bridge and packaging | Gates 4 and 7 |
+| Shared audible-start hook | Gates 5–6 |
+| Disposable-wallet canary | Gate 8 |
+| Small opt-in rollout | Gate 9 |
+
 ## Purpose
 
 The harness must answer one question repeatedly: can the radio start immediately
@@ -174,9 +200,9 @@ and on-chain likes tests remain unchanged.
 
 **Goal:** prove the real homepage and `/radio` behave correctly under failures.
 
-Use Playwright with generated silent/test audio and the fake companion. Run each
-flow in the homepage widget and standalone radio, then repeat the critical flows
-with two tabs:
+Use Playwright with a generated deterministic audible test tone and the fake
+companion. Run each flow in the homepage widget and standalone radio, then repeat
+the critical flows with two tabs:
 
 | Scenario | Required result |
 | --- | --- |
@@ -192,8 +218,11 @@ with two tabs:
 | Confirmed top-up | support resumes on the next start, never retroactively |
 
 Record request counts, audio start latency, console errors, status transitions
-and screenshots. Compare free-mode latency and radio bundle size to Gate 0 using
-an explicit regression budget agreed before release.
+and screenshots. Under the same local five-run fixture, no-companion mode permits
+zero companion/network requests, zero permission prompts, at most 20 ms additional
+median audio-start latency, at most 50 ms additional p95 latency and at most 5 kB
+additional gzip in the radio bundle versus Gate 0. A deliberate budget change
+requires documented review rather than weakening the assertion during a failure.
 
 **Pass:** all matrices pass in Chromium; zero unhandled errors; no secret-shaped
 material in browser storage or console; free playback never waits for the bridge.
@@ -227,6 +256,11 @@ without duplication; next track; reload while pending; two-tab lease; balance-lo
 fallback; confirmed top-up; and withdrawal after reconciliation. It stops on the
 first mismatch or uncertain submission. It does not test expected failures by
 spending fees on deliberately bad transactions.
+
+Top-up is an explicit operator checkpoint: the harness pauses, displays only the
+disposable address and approved amount, and waits for independently confirmed
+funds. It never opens, controls or signs with a personal wallet and never treats a
+wallet callback as confirmation.
 
 **Pass:** every expected paid start has one canonical contract receipt and exact
 50-microSTX holder transfer; local history, wallet debit, chain event and contract

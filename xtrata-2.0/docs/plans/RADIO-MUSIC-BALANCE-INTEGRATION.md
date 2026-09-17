@@ -1,9 +1,45 @@
 # Xtrata Music Balance: production integration plan
 
-Status: implementation-ready plan, revised 17 September 2026. Planning only; no
+Status: handoff-ready implementation plan, revised 17 September 2026. Planning only; no
 production activation, new wallet, signing or payments are authorised by this
 document. The operator wizard has completed four confirmed mainnet test payments;
 ordinary radio playback is still free and is not connected to that signer.
+
+## Handoff: start here
+
+No production Music Wallet companion, browser extension, `/music-balance` page,
+shared paid-start adapter, status/activity UI or `test:radio-support` runner exists
+yet. The existing backend wizard and browser test wallet are evidence and operator
+tools; do not turn either into the end-user signer or reuse their wallet state.
+
+The first implementation slice is Gates 1–2 of the
+[test harness](RADIO-MUSIC-BALANCE-TEST-HARNESS.md): versioned schemas, deterministic
+fake companion, passive detection and the non-signing status/history UI. It must
+introduce no key, native host, broadcast path or radio payment hook. Commit each
+green gate independently and update its harness report before continuing.
+
+Locked decisions:
+
+- Use the existing immutable paid-play helper and fixed 50-microSTX holder payment.
+- Use a separate locally controlled Music Wallet; never the likes/personal wallet.
+- Normal listening is always available and never waits for a payment component.
+- The website receives public status/history and start outcomes, never signing power.
+- Integrate audible starts once in `src/home/radio.js` for both first-party views.
+- Production uses an authenticated companion/extension bridge, not open localhost.
+
+Decisions that remain gated rather than implied: native packaging and OS keystore
+implementation, final withdrawal reserve, production miner fee, multi-transaction
+throughput, support beyond macOS/Chrome, and canonical resolution for album or
+edition pointers. Do not silently choose these while implementing an earlier gate.
+
+Source-of-truth order for the next implementation:
+
+1. Repository and project `AGENTS.md` rules.
+2. This integration plan for product and architecture decisions.
+3. The linked test harness for executable gates and pass evidence.
+4. The deployed contract source and dated mainnet report for proven chain behaviour.
+5. The backend wizard and browser test wallet as reference code only.
+6. `RADIO-PAID-PLAYS-PROTOTYPE.md` as historical rationale, not current direction.
 
 ## 1. Product decision
 
@@ -143,15 +179,20 @@ The status response contains no secret and exposes only:
 ```ts
 type MusicWalletStatus = {
   schema: 1;
-  installationId: string; // opaque public pairing identifier
   address: string;        // dedicated Music Wallet address
   paired: boolean;
   locked: boolean;
   enabled: boolean;
   network: 'mainnet';
+  policyVersion: string;
+  minerFeeMicroStx: string;
+  holderPaymentMicroStx: string;
+  totalPerStartMicroStx: string;
   confirmedMicroStx: string;
   reservedMicroStx: string;
+  withdrawalReserveMicroStx: string;
   usableMicroStx: string;
+  estimatedStarts: string;
   pendingCount: number;
   attention?: 'low-balance' | 'recovery' | 'offline' | 'policy' | 'active-elsewhere';
   updatedAt: string;
@@ -162,7 +203,11 @@ The native companion is authoritative. The webpage must not infer that support
 is enabled merely because an address or old balance is cached. A cached snapshot
 may render immediately with a visible “checking” state, but automatic payment
 intents wait for a fresh paired, unlocked, enabled status and a playback lease.
-Never confuse this address with the separately connected wallet used for likes.
+Every response must be correlated to the requesting document and request nonce;
+`updatedAt` alone is not proof of freshness. The internal installation/pairing
+identifier stays inside the authenticated extension/native bridge and is not
+exposed to page JavaScript. Never confuse the Music Wallet address with the
+separately connected wallet used for likes.
 
 ### Radio status and activity drawer
 
@@ -213,7 +258,11 @@ type SupportedStart = {
   holderMicroStx: string;
   minerFeeMicroStx?: string;
   totalDebitMicroStx?: string;
+  recipient?: string;
+  receipt?: string;
   txid?: string;
+  confirmedAt?: string;
+  blockHeight?: number;
 };
 ```
 
@@ -221,6 +270,8 @@ The companion returns title/artist only as display hints tied to the canonical
 master. The page may enrich from its existing metadata cache, but core/id and
 verified chain events remain the accounting identity. History must reconcile
 across refresh without requiring the user's ordinary wallet to reconnect.
+`historyPage` is implicitly scoped to the paired local wallet, accepts only an
+opaque cursor and a limit capped at 50, and cannot query an arbitrary address.
 
 ## 5. Shared radio integration and zero impact on free listeners
 
@@ -286,11 +337,11 @@ origins and arbitrary local pages. Inscribed HTML remains sandboxed and cannot
 inherit extension privileges or invoke the bridge.
 
 Expose only `status`, `historyPage`, `acquirePlaybackLease`, `startIntent`,
-`releaseLease` and `openDashboard`; funding/withdrawal/policy changes require native review. No
-arbitrary signing API, caller-selected recipient, arbitrary contract/network,
-nonce, serialized transaction or spending amount. Backend pins helper and verifies
-source/config. Secret key never enters bridge messages. Public pairing identifiers
-are not themselves spending credentials.
+`releaseLease` and `openDashboard`; funding/withdrawal/policy changes require
+native review. No arbitrary signing API, caller-selected recipient, arbitrary
+contract/network, nonce, serialized transaction or spending amount. Backend pins
+helper and verifies source/config. Secret key never enters bridge messages. Public
+pairing identifiers are not themselves spending credentials.
 
 One installation-wide backend writer, durable SQLite transaction journal and
 unique `(wallet, playbackId)` constraint. One automatic-support playback lease
@@ -337,6 +388,12 @@ hold at most three intents for 60 seconds while a normal confirmation completes;
 reserve their full costs immediately. Expired/overflowed intents become free and
 release reservations. No queue replay on a later visit or after funds return.
 Queue pressure changes paid status only; it never delays or rejects audio.
+
+This conservative first release will not pay every song during normal block
+confirmation delays: one transaction may be unresolved while up to three starts
+wait briefly, after which further or expired starts are free. State that limitation
+in the UI and reports. Multi-nonce or multi-unresolved throughput is a later gated
+design decision requiring new recovery tests; it is not a harmless optimisation.
 
 State machine: observed -> reserved -> signed -> submitted/unknown -> confirmed,
 confirmed-abort, definitely-rejected, expired-free or recovery-required. Persist
