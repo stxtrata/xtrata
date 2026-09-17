@@ -88,6 +88,11 @@ Purpose: one-stop map of where code lives and which files to touch for common up
   history, playback idempotence and free-listening fallback. The deployed helper
   and backend wizard have completed four mainnet test payments, but ordinary radio
   playback is not yet connected to the signer.
+- `docs/plans/RADIO-MUSIC-BALANCE-TEST-HARNESS.md` defines the cumulative gated
+  implementation loop: existing baselines, hostile schema tests, passive UI,
+  companion crash recovery, authenticated bridge/lease races, playback semantics,
+  Playwright failures, packaging, separately authorised disposable-wallet canary
+  and opt-in rollback. Its default path is offline and cannot broadcast.
 
 ## Artist manager portal
 

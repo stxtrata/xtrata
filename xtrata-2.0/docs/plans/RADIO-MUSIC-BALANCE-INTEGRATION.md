@@ -445,6 +445,12 @@ browser/OS coverage. Mobile is a separate delivery milestone.
 
 ## 13. Acceptance matrix and release gates
 
+The executable gate sequence, failure matrix, report format and iteration rules
+are defined in the [Support as you listen test harness](RADIO-MUSIC-BALANCE-TEST-HARNESS.md).
+The default harness is offline and cannot broadcast. Its mainnet canary is a
+separate final gate requiring a fresh disposable wallet and separately recorded,
+bounded authorisation.
+
 1. New visitor: identical free audio start latency/controls; zero signing, local
    discovery, wallet prompts or extra chain polling. Lazy stub performance measured.
 2. Funded opted-in user: first eligible start produces one exact payment, both
