@@ -51,3 +51,5 @@ Validation: eight focused calculator/launch pricing tests pass; Vite production 
 ## Buyer price presentation refinement
 
 The local v1.5/v1.6 mint hero shows one Price value, calculated with the maximum protocol quote across loaded inventory (including minted items), instead of a range or inscription-included label. Network fees remain separately noted. Creator preview copy now explains the advertised price, deducted allowance, assumed 5% sale-base platform share and creator proceeds. Smaller files reduce buyer spending, not the configured payout base. No on-chain or production changes were made. This remains a calculation preview: persisted price approval and fee-change blocking still require implementation before claiming a guaranteed advertised ceiling.
+
+The collection price card now uses a consistent green treatment, enlarges the Price label while preserving the numeric price size, and omits the wallet-network-fee caption from the card.

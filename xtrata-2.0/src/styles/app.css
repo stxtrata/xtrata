@@ -6036,6 +6036,17 @@ p {
   opacity: 0.9;
 }
 
+.collection-live-page__hero-price-card--collection {
+  border-color: rgba(74, 222, 128, 0.48);
+  background: #15803d;
+  color: #f0fdf4;
+}
+
+.collection-live-page__hero-price-card--collection .collection-live-page__hero-price-label {
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+}
+
 .collection-live-page__hero-price-card strong {
   font-size: clamp(1.28rem, 2vw, 1.62rem);
   line-height: 1.1;
