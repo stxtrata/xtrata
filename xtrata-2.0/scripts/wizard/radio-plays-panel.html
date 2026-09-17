@@ -18,9 +18,10 @@
 <label class="check"><input id="radio-loop" type="checkbox" checked>Loop the playlist</label>
 <button id="radio-free">Free listens / stop paid tests</button>
 <details><summary>Paid mainnet test settings</summary><p>Fixed miner fee plus 50 microSTX (0.00005 STX) to the holder per eligible start. No platform fee. Only one payment can be unresolved: starts while it is busy stay free, with no catch-up charges. Pause/resume and seeking do not pay again.</p>
-<div class="fields"><label>Miner fee (microSTX)<input id="radio-paid-fee" type="number" min="1" max="1000" value="300"></label><label>Maximum starts<input id="radio-paid-max" type="number" min="1" max="5" value="1"></label><label>Minutes<input id="radio-paid-minutes" type="number" min="1" max="30" value="10"></label></div>
+<div class="fields"><label>Miner fee (microSTX)<input id="radio-paid-fee" type="number" min="1" max="1000" value="300"></label><label>Maximum starts<input id="radio-paid-max" type="number" min="1" max="14" value="10"></label><label>Minutes<input id="radio-paid-minutes" type="number" min="1" max="30" value="10"></label></div>
+<p id="radio-session-help">Approve once for up to 10 starts over 10 minutes. Successful payments do not require another acknowledgement.</p>
 <p>The default miner fee is 0.0003 STX. Up to 0.005 STX per session and the existing 0.01 STX lifetime test ceiling apply. A 0.001 STX reserve remains. Low fees may be rejected; no fee is increased automatically.</p>
-<label class="check"><input id="radio-approve" type="checkbox">I authorise these bounded mainnet payments from my dedicated wizard wallet when new songs begin.</label><button id="radio-enable">Enable paid test listens</button></details>
+<label class="check"><input id="radio-approve" type="checkbox">I authorise this whole paid session from my dedicated wizard wallet when new songs begin.</label><button id="radio-enable">Enable paid test listens</button></details>
 <p id="radio-payment" role="status">Load songs, then press Play. No payment is enabled.</p><details><summary>Recent start outcomes</summary><div id="radio-events">No starts requested.</div></details>
 </section>
 <section id="return-section" aria-labelledby="return-heading"><h2 id="return-heading">2. Return your funds</h2>

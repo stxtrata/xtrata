@@ -47,7 +47,9 @@
    $('radio-payment').textContent='Paid tests enabled for new song starts. The current song is not charged retrospectively.';
   }catch(e){$('radio-payment').textContent=e.message;}finally{$('radio-enable').disabled=false;}
  };
- for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes'])$(id).oninput=()=>{$('radio-approve').checked=false;void free();};
+ function limits(){const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The duration and remaining lifetime budget also apply.`;}
+ limits();
+ for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes'])$(id).oninput=()=>{limits();$('radio-approve').checked=false;void free();};
  async function load(){
   $('radio-load').disabled=true;
   try{const r=await fetch('/radio/catalogue');const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Catalogue unavailable.');tracks=v.tracks;

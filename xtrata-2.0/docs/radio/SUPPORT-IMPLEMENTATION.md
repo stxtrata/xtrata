@@ -203,3 +203,17 @@ receipt still fails closed. The historical error does not prove whether that
 specific read was absent or mismatched, because the old message combined them.
 25 focused wizard tests pass, including delayed/incorrect receipt distinctions
 and recovery of stale outcomes. No payment is sent by this fix.
+
+### Successive paid-start approval (2026-09-17)
+
+Changed the local radio default from one to ten starts per approved session.
+Radio session counts are bounded by the existing 5000-microSTX total instead
+of the separate manual runner's five-test limit. At fee 257 this permits 16
+starts; at fee 300 it permits 14. UI explains that approval covers the whole
+session. Lifetime spending, reserve, expiry, single unresolved payment and stop
+controls remain unchanged. Reload still requires a fresh approval.
+
+Validation: 10 targeted listening tests passed, including ten successive
+confirmations using the same approval and the 16/17-start boundary at fee 257.
+Desktop and mobile browser smoke checks passed with simulated payments only.
+The idle local wizard was restarted; no real payment was sent for this change.

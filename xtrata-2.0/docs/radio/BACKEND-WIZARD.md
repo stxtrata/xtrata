@@ -100,11 +100,14 @@ previous/next, native audio controls and playlist looping. It never executes
 inscription HTML/scripts. Free playback needs no funded wallet or paid approval.
 
 To test payments, expand **Paid mainnet test settings**, choose the fixed miner
-fee, maximum starts (1–5) and duration (1–30 minutes), check the approval box and
-confirm **Enable paid test listens**. Defaults: 300 microSTX miner fee, one start,
+fee, maximum starts (limited by the 0.005 STX session budget) and duration (1–30 minutes), check the approval box and
+confirm **Enable paid test listens**. Defaults: 300 microSTX miner fee, ten starts,
 ten minutes. Each eligible start adds the existing 50-microSTX holder payment.
 The maximum session cost is 5000 microSTX; the existing 10000-microSTX lifetime
 wizard ceiling, 1000-microSTX reserve, mainnet checks and kill switches remain.
+One acknowledgement covers the whole session, including successive confirmed payments.
+At fee 257 microSTX the session cap allows up to 16 starts; at 300 it allows 14.
+The separate manual test runner retains its five-test limit.
 These are real mainnet calls when you enable them in your funded wizard.
 
 Enabling midway through a song never retroactively charges that song. A new

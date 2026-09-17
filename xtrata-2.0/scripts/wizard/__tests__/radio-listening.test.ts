@@ -16,6 +16,19 @@ describe('bounded radio sessions',()=>{
   await expect(s.start({id,song,tab:'c'.repeat(32),token:a.token})).rejects.toThrow('another tab');
   await expect(s.enable(settings)).rejects.toThrow('already');s.disable();
  });
+ it('keeps one approval across ten confirmed starts and stops at the selected cap',async()=>{
+  const {s,w,finish}=fixture(),a=await s.enable({...settings,max:10});
+  for(let n=0;n<10;n++){
+   await s.start({id:n.toString(16).padStart(32,'0'),song,tab,token:a.token});finish();await new Promise(r=>setTimeout(r,0));
+   expect(s.snapshot().enabled).toBe(n<9);
+   if(n<9)expect(s.renew({tab,token:a.token}).used).toBe(n+1);
+  }
+  expect(w.run).toHaveBeenCalledTimes(10);
+ });
+ it('allows sixteen starts at fee 257 but rejects seventeen',async()=>{
+  const {s}=fixture();await expect(s.enable({...settings,fee:257,max:17})).rejects.toThrow('ceiling');
+  expect((await s.enable({...settings,fee:257,max:16})).max).toBe(16);s.disable();
+ });
  it('deduplicates starts and leaves overlapping starts free without replay',async()=>{
   const {s,w,finish}=fixture(),a=await s.enable(settings),p={id,song,tab,token:a.token};
   expect((await s.start(p)).outcome).toBe('requested');await s.start(p);expect(w.run).toHaveBeenCalledTimes(1);

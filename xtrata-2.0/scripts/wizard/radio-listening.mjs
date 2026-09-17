@@ -21,7 +21,9 @@ export class RadioListening {
  renew(input){const a=this.check(input);a.lease=Date.now()+30000;clearTimeout(this.timer);this.timer=setTimeout(()=>this.snapshot(),30100);this.timer.unref?.();return this.snapshot();}
  async enable(p){
   if(!p||Object.keys(p).sort().join(',')!=='fee,max,minutes,tab'||!Number.isInteger(p.minutes)||p.minutes<1||p.minutes>30||typeof p.tab!=='string'||!/^[a-f0-9]{32}$/.test(p.tab))throw Error('Choose a test duration of 1–30 minutes.');
-  policy({core:3,song:0,fee:p.fee,count:p.max});this.snapshot();
+  policy({core:3,song:0,fee:p.fee,count:1});
+  if(!Number.isInteger(p.max)||p.max<1||(p.fee+50)*p.max>5000)throw Error(`Session spending ceiling: choose 1–${Math.floor(5000/(p.fee+50))} starts at this fee (0.005 STX maximum).`);
+  this.snapshot();
   if(this.active||this.inFlight)throw Error('A paid test already owns this wizard. Switch it to Free or stop it first.');
   const epoch=this.wizard.stopEpoch;
   await this.wizard.exclusive(async()=>{
