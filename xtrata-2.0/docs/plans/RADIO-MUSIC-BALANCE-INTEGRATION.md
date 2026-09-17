@@ -1,11 +1,18 @@
 # Xtrata Music Balance: production integration plan
 
+> Superseded on 17 September 2026 by [the simplified local wizard plan](RADIO-MUSIC-BALANCE-SIMPLIFIED.md). The architecture and gates below are historical, not current requirements.
+
 Status: handoff-ready implementation plan, revised 17 September 2026. Planning only; no
 production activation, new wallet, signing or payments are authorised by this
 document. The operator wizard has completed four confirmed mainnet test payments;
 ordinary radio playback is still free and is not connected to that signer.
 
 ## Handoff: start here
+
+Implementation update, 17 September 2026: a read-only protocol, panel, simulator,
+development preview and executable focused harness now exist. See
+[implementation progress](../radio/SUPPORT-IMPLEMENTATION.md) for tested scope
+and remaining gates. The inventory below describes the original handoff baseline.
 
 No production Music Wallet companion, browser extension, `/music-balance` page,
 shared paid-start adapter, status/activity UI or `test:radio-support` runner exists
@@ -60,6 +67,11 @@ mode is ready**, not guaranteed settlement of every click in every network state
 A network cannot promise immediate settlement, and the radio must never wait for
 it. If payment cannot proceed safely, that start is free and visibly unrecorded
 as a paid start. There is no later bill for missed starts.
+
+Review correction: only an intent known never to have been accepted/signed may
+be labelled free. A timeout after submitting an intent is an unknown outcome;
+retain its identity, reconcile it, and do not create a replacement. Music always
+continues. A late result may still confirm an already-authorised payment.
 
 ## 2. What is already proven, and what is not
 

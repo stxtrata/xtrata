@@ -1,3 +1,4 @@
+import {radioArtist} from '../../src/lib/radio/artist-credits.mjs';
 import {catalogueChainTotals} from './radio-chain-totals';
 import { safeArtwork } from '../../src/lib/radio/inscription-metadata';
 import { queryAll, type Env } from './db';
@@ -39,7 +40,7 @@ export async function catalogueReport(env: Env, url: URL) {
   const cached=enriched.get(row.token_id);
   return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
    album:albums.get(row.token_id) || (typeof meta.album==='string'?meta.album:typeof meta.album?.name==='string'?meta.album.name:typeof meta.inAlbum?.name==='string'?meta.inAlbum.name:'').slice(0,200),
-   artist:cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):''),creator:row.creator,
+   artist:radioArtist(row.token_id,cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):'')),creator:row.creator,
    status:row.mime?.startsWith('audio/')?'Audio':'Audio player',
    duration:durationById.get(row.token_id)||null,...m,in_progress:inProgress,
    partials:Math.max(0,m.starts-m.plays-inProgress),repeats:m.unique_browsers===null?null:Math.max(0,m.plays-m.unique_browsers),
@@ -48,5 +49,5 @@ export async function catalogueReport(env: Env, url: URL) {
  const {totals:confirmed,status:chainLikesStatus}=url.searchParams.get('chainLikes')==='0'?{totals:new Map<number,string>(),status:'not-requested'}:await catalogueChainTotals(env,tracks.map((r:any)=>r.id));
  for(const track of tracks)Object.assign(track,{onchain_likes:confirmed.get(track.id)??null});
  return {range,since,until:now,onchain_likes_status:chainLikesStatus,measured_since:(state.results?.[0] as any)?.measured_since,tracks,
- notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists are read from inscription metadata and cached. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};
+ notice:'Browser-reported listening, not verified people or votes. Periods group sessions by start time; completions follow that same group. All-time unique browsers/repeats are unavailable after session cleanup. HTML entries are included only after embedded audio is verified. Titles/artists use inscription metadata and supplied artist-credit corrections. On-chain likes are confirmed wallet endorsements. Saved favourites are synced browser favourites, independent of the period. Neither proves unique people. Livestream listeners are not included.'};
 }

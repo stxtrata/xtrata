@@ -1,3 +1,4 @@
+import {radioArtist} from '../lib/radio/artist-credits.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
 // random rotation of inscribed songs. Tracks are ordinary inscriptions: raw
@@ -11,6 +12,7 @@ import { createWalletSessionStore } from '../lib/wallet/session';
 import { radioTickerSections } from '../lib/radio/ticker';
 import { inscriptionMetadata } from '../lib/radio/inscription-metadata';
 import { attachPlayCounter } from '../lib/radio/play-counter';
+import { attachRadioSupport } from '../lib/radio/support/radio-panel';
 
 const STORAGE_KEY = 'xtrata.radio.v1';
 
@@ -543,6 +545,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       resolved = null;
       definitive = false;
     }
+    if(resolved)resolved.artist=radioArtist(tokenId,resolved.artist||'');
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
@@ -1833,5 +1836,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   updateStats(stateSnapshot());
 
   window.XtrataRadio = api;
+  // Compile-time preview only. No discovery, signing or payment hook is enabled.
+  if (import.meta.env.VITE_RADIO_SUPPORT_PREVIEW === 'true') {
+    try { attachRadioSupport(document); } catch { /* support must never block radio */ }
+  }
   return api;
 };

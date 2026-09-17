@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Build, compare, and test software across a configurable chain of models.">
+  <title>Chain Studio — Model workbench</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <a href="/" class="brand"><span class="brand-mark">≋</span> chain<span>studio</span></a>
+    <button id="new-chain" class="primary new-chain">＋ New chain <kbd>N</kbd></button>
+    <div class="sidebar-heading">YOUR WORKSPACE <span id="run-count">0</span></div>
+    <div id="run-list" class="run-list"></div>
+    <div class="sidebar-bottom"><span class="status-dot"></span><div><strong>Local runner</strong><small id="connection">Connecting…</small></div><span class="local-icon">⌘</span></div>
+  </aside>
+  <main>
+    <header class="topbar"><div><span class="crumb">Workspace</span><span class="slash">/</span><span id="breadcrumb">New chain</span></div><div class="topbar-right"><span class="private-label">◉ Private on this Mac</span><button id="help" class="icon-button" aria-label="How Chain Studio works">?</button></div></header>
+    <div id="content"></div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="Close help">×</button><span class="eyebrow">THE WORKBENCH</span><h2>One idea. Every iteration.</h2><p>Choose a sequence of models and reasoning levels. Each step gets the original request, the latest working prompt, recent evidence, and a copy of the previous output.</p><p><strong>Snapshots stay separate.</strong> Inspect, preview, download, or test a completed version while the next model works.</p><p><strong>Pause</strong> finishes the current step. <strong>Cancel</strong> stops the current agent. Feedback is included when the next stage starts.</p><p>Previews run without network access or browser storage. They support static HTML, CSS, and JavaScript. Apps requiring a server can be downloaded and run separately.</p><p>Token thresholds are checked between stages, so the final stage can exceed the threshold. Model availability is verified by Codex when each stage starts. No estimated dollar prices are invented.</p><p>Command tests run on disposable snapshot copies in the macOS sandbox, without network or inherited credentials. Use a test command that does not require installing dependencies.</p></dialog>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

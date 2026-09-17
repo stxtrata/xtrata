@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Xtrata Music Wallet — read-only development bridge",
+  "version": "0.1.0",
+  "description": "Development bridge. No signing or payment methods.",
+  "permissions": ["nativeMessaging", "storage"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "pair.html" },
+  "content_scripts": [{ "matches": ["https://xtrata.xyz/*"], "js": ["content.js"], "all_frames": false, "run_at": "document_idle" }]
+}
