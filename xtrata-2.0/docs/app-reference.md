@@ -82,6 +82,12 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `docs/plans/MUSIC-ECONOMY-SPEED-UP.md` records payment invariants and rollout limits. `scripts/music-speed-smoke.mjs` checks mobile review, wallet cancellation, pending-payment reloads and zero-payment upgrades with simulated wallets.
 - The page uses the existing agent core with `origin: 'music'`, and the existing init/upload/seal, delivery and recovery machinery. `/music/` intentionally uses the single-threaded encoder so wallet popups retain the standard browser context.
 - `docs/plans/XTRATA-MUSIC-RELEASE.md` records scope, verification and promotion notes. `scripts/music-browser-smoke.mjs` exercises simulated payment workflows; `scripts/music-audio-smoke.mjs` tests real local audio preparation without payments.
+- `docs/plans/RADIO-MUSIC-BALANCE-INTEGRATION.md` is the current production plan
+  for the optional local **Support as you listen** Music Wallet, including passive
+  capability detection, radio balance/status UI, paged sanitised transaction
+  history, playback idempotence and free-listening fallback. The deployed helper
+  and backend wizard have completed four mainnet test payments, but ordinary radio
+  playback is not yet connected to the signer.
 
 ## Artist manager portal
 

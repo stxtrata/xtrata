@@ -1,7 +1,12 @@
 # Paid radio plays: transaction prototype and UI plan
 
-Status: proposed implementation, 15 September 2026. No payment contract deployed,
-wallet created, funds moved or automatic signing enabled by this planning work.
+Status: historical design, updated 17 September 2026. The immutable payment
+contract was subsequently deployed and the dedicated backend wizard completed
+four confirmed mainnet paid starts. This document preserves the original design
+rationale; it is not the current rollout plan and does not authorise more signing
+or payments. See the [mainnet test report](../radio/reports/2026-09-15-wizard.md),
+[backend wizard guide](../radio/BACKEND-WIZARD.md), and current
+[Music Balance integration plan](RADIO-MUSIC-BALANCE-INTEGRATION.md).
 
 ## Outcome and boundaries
 
@@ -11,7 +16,8 @@ and presses Play once. Each actual song start can submit one transaction paying
 start. Autoplay works normally. Ordinary listening remains free; paid recording
 is opt-in and independent of likes and measured listening statistics.
 
-Build a NEW immutable helper contract, provisionally `xtrata-radio-plays-v1-0`.
+The resulting immutable helper contract is `xtrata-radio-plays-v1-0`, deployed at
+`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0`.
 The existing likes helper only changes endorsement state and cannot do payments.
 Do not modify deployed likes or inscription contracts. Version this helper and
 verify its deployed source before enabling any signer. No treasury deduction,

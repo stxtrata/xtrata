@@ -1,7 +1,9 @@
 # Xtrata Music Balance: production integration plan
 
-Status: proposed, 17 September 2026. Planning only; no production activation,
-new wallet, signing or payments are authorised by this document.
+Status: implementation-ready plan, revised 17 September 2026. Planning only; no
+production activation, new wallet, signing or payments are authorised by this
+document. The operator wizard has completed four confirmed mainnet test payments;
+ordinary radio playback is still free and is not connected to that signer.
 
 ## 1. Product decision
 
@@ -123,8 +125,102 @@ on the webpage alone can never authorise spending. The companion is authoritativ
 
 Dashboard: confirmed balance; reserved/pending debit; usable balance; indicative
 starts remaining; current policy; activity; top up; pause; lock; backup; withdraw;
-unpair. Show exact balance only on the dashboard, not in public player telemetry.
-Do not put unbounded signup/testing controls on the production page.
+unpair. Show exact balance only to the local user; never put it in analytics or a
+public API. Do not put unbounded signup/testing controls on the production page.
+
+### Local capability check
+
+The radio performs a passive, bounded capability check only when the installed
+extension announces itself. It must not scan localhost, enumerate extensions,
+poll the chain, show a browser permission prompt or delay audio for ordinary
+visitors. The page asks the bridge for one public status snapshot with a short
+timeout and treats timeout, absence, schema mismatch or denial as `not-available`.
+It retries only after a deliberate user action, an extension status event, or a
+slow background interval while the radio is already active.
+
+The status response contains no secret and exposes only:
+
+```ts
+type MusicWalletStatus = {
+  schema: 1;
+  installationId: string; // opaque public pairing identifier
+  address: string;        // dedicated Music Wallet address
+  paired: boolean;
+  locked: boolean;
+  enabled: boolean;
+  network: 'mainnet';
+  confirmedMicroStx: string;
+  reservedMicroStx: string;
+  usableMicroStx: string;
+  pendingCount: number;
+  attention?: 'low-balance' | 'recovery' | 'offline' | 'policy' | 'active-elsewhere';
+  updatedAt: string;
+};
+```
+
+The native companion is authoritative. The webpage must not infer that support
+is enabled merely because an address or old balance is cached. A cached snapshot
+may render immediately with a visible “checking” state, but automatic payment
+intents wait for a fresh paired, unlocked, enabled status and a playback lease.
+Never confuse this address with the separately connected wallet used for likes.
+
+### Radio status and activity drawer
+
+Reserve a stable area in both the homepage radio and `/radio` for a compact
+**Support as you listen** control. Its collapsed states are:
+
+| State | Display | Behaviour |
+| --- | --- | --- |
+| No companion/pairing | `Support as you listen` | Opens explanation/setup; free playback unchanged |
+| Checking | `Checking Music Wallet…` | No payment intent; audio starts normally |
+| Ready and enabled | green indicator, shortened address, usable balance | Eligible new starts are offered to the companion |
+| Pending | `Supporting…` plus pending count | Audio continues; repeated media events do not duplicate |
+| Paused/locked | amber indicator and reason | Starts are free; opens dashboard to resume/unlock |
+| Low/empty | `Balance empty · listening free` | Starts are free; top-up action available |
+| Recovery/error | `Payment needs attention · listening free` | No new signing; opens local recovery view |
+
+Use “Music Wallet connected” only when the fresh status is paired and available.
+Display a shortened address with Copy and Explorer actions, the confirmed balance,
+reserved/pending amount when non-zero, usable balance, and an indicative number
+of supported starts. Do not use the ordinary wallet's Connect/Disconnect buttons
+for this signer. The control opens the Music Balance dashboard and offers Pause;
+funding, withdrawal, policy changes and recovery always open native review.
+
+Below the summary, an expandable **Supported starts and payments** list shows the
+companion's sanitised journal. The collapsed summary includes confirmed count,
+pending count and confirmed spend. Load the first page only when expanded, then
+paginate with a fixed limit and cursor; do not continuously stream an unbounded
+journal into the radio page.
+
+Each row shows time, artwork thumbnail when already cached, song title, artist,
+master core/id, state, holder payment, miner fee, total debit and a transaction
+link when available. Pending rows show their current stage. Free starts are not
+financial transactions and are omitted from this list. Unknown/recovery rows are
+never labelled failed or charged until reconciliation establishes the outcome.
+The public bridge returns no signed bytes, nonce secrets, private key material or
+raw node responses. Suggested history response:
+
+```ts
+type SupportedStart = {
+  playbackId: string;
+  core: 1 | 2 | 3;
+  masterId: number;
+  title?: string;
+  artist?: string;
+  startedAt: string;
+  state: 'reserved' | 'signed' | 'submitted' | 'unknown' | 'confirmed' |
+    'confirmed-abort' | 'definitely-rejected' | 'recovery-required';
+  holderMicroStx: string;
+  minerFeeMicroStx?: string;
+  totalDebitMicroStx?: string;
+  txid?: string;
+};
+```
+
+The companion returns title/artist only as display hints tied to the canonical
+master. The page may enrich from its existing metadata cache, but core/id and
+verified chain events remain the accounting identity. History must reconcile
+across refresh without requiring the user's ordinary wallet to reconnect.
 
 ## 5. Shared radio integration and zero impact on free listeners
 
@@ -189,8 +285,8 @@ extension ID. Production excludes preview domains, wildcard subdomains, opaque
 origins and arbitrary local pages. Inscribed HTML remains sandboxed and cannot
 inherit extension privileges or invoke the bridge.
 
-Expose only `status`, `acquirePlaybackLease`, `startIntent`, `releaseLease` and
-`openDashboard`; funding/withdrawal/policy changes require native review. No
+Expose only `status`, `historyPage`, `acquirePlaybackLease`, `startIntent`,
+`releaseLease` and `openDashboard`; funding/withdrawal/policy changes require native review. No
 arbitrary signing API, caller-selected recipient, arbitrary contract/network,
 nonce, serialized transaction or spending amount. Backend pins helper and verifies
 source/config. Secret key never enters bridge messages. Public pairing identifiers
@@ -309,6 +405,7 @@ Proposed new code (names may be refined during implementation):
 | Navigation | `index.html`, `public/radio.html`; preserve layout |
 | Setup/dashboard | `public/music-balance.html`, `src/music-balance/` |
 | Shared start adapter | `src/home/radio.js`, new `src/lib/radio/paid-plays/` |
+| Status/activity UI | shared radio renderer plus stable CSS slot; paged sanitised journal view |
 | Pure protocol/policy | reusable master ID, transaction, intent and public status schemas |
 | Native companion | `tools/music-wallet/`: OS vault, SQLite queue, nonce owner, signer, policy, recovery |
 | Browser bridge | `extensions/music-wallet/`: pairing and constrained native messaging |
@@ -316,27 +413,33 @@ Proposed new code (names may be refined during implementation):
 | Tests | unit, simulated transactions, mocked native bridge, real radio Playwright fixtures |
 | Operator tooling | existing wizard/canary retained independently; never user-wallet storage |
 
-A. **Compatibility spike and security design:** signed native host + extension,
+A. **Capability/status vertical slice:** define and test versioned `status` and
+`historyPage` schemas, absence/timeout behaviour, native authentication and a fake
+companion. Render every status and history state against the existing radio with
+no signer and no payment hook. Measure that free visitors get no prompt, polling
+or playback delay.
+
+B. **Compatibility spike and security design:** signed native host + extension,
 pairing, keystore restart behaviour, trusted origin restrictions and zero prompts
 for free users. Confirm package/distribution plan before claiming public readiness.
 
-B. **Shared protocol and recovery:** production policy, persistent idempotence,
+C. **Shared protocol and recovery:** production policy, persistent idempotence,
 master resolver, reserve/nonce accounting; recover definite rejection and unknown
 submission fixtures. Add withdrawal/backup restoration before asking users to fund.
 
-C. **Setup/dashboard:** native creation, backup verification, funding detection,
+D. **Setup/dashboard:** native creation, backup verification, funding detection,
 one-time opt-in and persistent mode. No paid radio hook active yet.
 
-D. **One radio hook:** in-app and standalone using identical integration; mock all
+E. **One radio hook:** in-app and standalone using identical integration; mock all
 payments through exhaustive media/reload/tab tests. No extra local permissions or
 payment bundles for free users. Feature flag remains off.
 
-E. **Own-wallet mainnet canary:** fresh disposable balances, separately bounded
+F. **Own-wallet mainnet canary:** fresh disposable balances, separately bounded
 authorization, long playlist, two-tab/reload/background/sleep tests, exhaustion,
 confirmed top-up, failed-fee recovery, withdrawal and audited receipts. Never test
 with users' existing funded music wallets. Existing initial tests are insufficient.
 
-F. **Small opt-in rollout:** macOS/Chrome first; allowlist capability, staged flags,
+G. **Small opt-in rollout:** macOS/Chrome first; allowlist capability, staged flags,
 rollback that stops new intents while retaining recovery tools. Only then expand
 browser/OS coverage. Mobile is a separate delivery milestone.
 
