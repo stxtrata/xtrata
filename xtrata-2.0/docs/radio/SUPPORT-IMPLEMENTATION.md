@@ -186,3 +186,9 @@ retrying at 257 microSTX; one dedicated-wizard call was submitted with nonce 4,
 song 2910/core 3, network fee 257 and a protected 50-microSTX holder payment.
 Transaction: `0x1f52d78b2c977a59a0d7b59dc5c6ebeefabe6f7f1b30e54dd1da0b1e3c4f0934`.
 No five-start session was enabled by this recovery action.
+
+The retry subsequently confirmed canonically at nonce 4 with exactly 257 microSTX
+miner fee and a 50-microSTX transfer to the master holder. The printed receipt
+matches the original attempt and reports song 2910's paid total as 5. Total debit:
+307 microSTX (0.000307 STX). The local journal was reconciled; no additional
+five-start session was activated by the agent.
