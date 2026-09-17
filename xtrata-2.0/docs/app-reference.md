@@ -82,6 +82,17 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `docs/plans/MUSIC-ECONOMY-SPEED-UP.md` records payment invariants and rollout limits. `scripts/music-speed-smoke.mjs` checks mobile review, wallet cancellation, pending-payment reloads and zero-payment upgrades with simulated wallets.
 - The page uses the existing agent core with `origin: 'music'`, and the existing init/upload/seal, delivery and recovery machinery. `/music/` intentionally uses the single-threaded encoder so wallet popups retain the standard browser context.
 - `docs/plans/XTRATA-MUSIC-RELEASE.md` records scope, verification and promotion notes. `scripts/music-browser-smoke.mjs` exercises simulated payment workflows; `scripts/music-audio-smoke.mjs` tests real local audio preparation without payments.
+- `docs/plans/RADIO-MUSIC-BALANCE-INTEGRATION.md` is the current production plan
+  for the optional local **Support as you listen** Music Wallet, including passive
+  capability detection, radio balance/status UI, paged sanitised transaction
+  history, playback idempotence and free-listening fallback. The deployed helper
+  and backend wizard have completed four mainnet test payments, but ordinary radio
+  playback is not yet connected to the signer.
+- `docs/plans/RADIO-MUSIC-BALANCE-TEST-HARNESS.md` defines the cumulative gated
+  implementation loop: existing baselines, hostile schema tests, passive UI,
+  companion crash recovery, authenticated bridge/lease races, playback semantics,
+  Playwright failures, packaging, separately authorised disposable-wallet canary
+  and opt-in rollback. Its default path is offline and cannot broadcast.
 
 ## Artist manager portal
 
@@ -453,3 +464,5 @@ Paid listening prototype plan: `docs/plans/RADIO-PAID-PLAYS-PROTOTYPE.md` descri
 Paid-play contract candidate implemented: `xtrata-radio-plays-v1.0.clar` and `/web/deploy-console.html#radio-plays-deployment`. Canary includes local test commands, offline 257-byte fee measurement, pinned-source/core-ABI preflight, explicit Clarity 4 publish and post-deploy source/config verification. Nine simnet and twenty canary/regression tests pass; production build passes. Not deployed; listening-wallet integration and automatic payments remain disabled. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md`.
 
 Paid-play test command: `npm run test:radio-plays` from xtrata-2.0, or npm --prefix with an absolute project path from anywhere. The runner locates both installed Vitest versions relative to itself and never downloads a runner. Canary instructions now explicitly identify the required project directory.
+
+Music Balance integration plan (17 September 2026): `docs/plans/RADIO-MUSIC-BALANCE-INTEGRATION.md` supersedes the earlier browser subscription proposal for production planning. Recommends a local OS-protected companion with a paired native-messaging extension, `/music-balance` setup, one shared radio paid-start observer, uninterrupted free fallback, persistent opt-in/top-up policy, durable payment recovery and withdrawal before launch. Initial desktop compatibility is explicit; no code activation or new payments performed by this plan.

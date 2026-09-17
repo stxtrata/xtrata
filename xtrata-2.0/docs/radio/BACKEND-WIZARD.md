@@ -32,4 +32,18 @@ Stop halts future payments. Already broadcast payments can confirm. The existing
 
 Tests exercise contract payments and receipts, not audible playback. A receipt proves this payment call, not listening duration. Failed transactions can consume network fees.
 
-Validation: backend tests use disposable temporary identities and mocked chain responses, including an unknown-submission recovery guard. Canary input tests and production build pass. Implementation performed no mainnet signing or broadcasts. User handles pushing; the local panel works without a website deployment.
+Validation: backend tests use disposable temporary identities and mocked chain
+responses, including an unknown-submission recovery guard. Canary input tests and
+the production build pass. On 15 September 2026 the dedicated backend wizard also
+completed four mainnet paid starts; no personal, deployer or browser wallet was
+used. Three used a 300-microSTX miner fee and one used 257 microSTX, and every
+confirmed transaction transferred exactly 50 microSTX to the current master
+holder. A 200-microSTX attempt returned HTTP 400 and remains unresolved in the
+private journal, so the runner correctly blocks further payments. See the
+[dated mainnet report](reports/2026-09-15-wizard.md) for transaction evidence,
+accounting and limitations. The local panel works without a website deployment.
+
+This wizard remains operator test tooling. Successful mainnet tests do not make
+it a production end-user wallet or connect it automatically to normal radio
+playback. The production path, local discovery boundary and recovery requirements
+are specified in the [Music Balance integration plan](../plans/RADIO-MUSIC-BALANCE-INTEGRATION.md).
