@@ -48,3 +48,8 @@ export const ARTIST_CREDITS = Object.freeze({
 export function radioArtist(id, fallback = "") {
  return Object.hasOwn(ARTIST_CREDITS, String(id)) ? ARTIST_CREDITS[String(id)] : fallback;
 }
+
+const TITLES = Object.freeze({312: 'Smalltalk', 315: 'Entertainment'});
+export function radioTitle(id, fallback = '') {
+ return Object.hasOwn(TITLES, String(id)) ? TITLES[String(id)] : fallback;
+}

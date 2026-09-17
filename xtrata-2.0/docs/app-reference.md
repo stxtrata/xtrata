@@ -466,3 +466,14 @@ Paid-play contract candidate implemented: `xtrata-radio-plays-v1.0.clar` and `/w
 Paid-play test command: `npm run test:radio-plays` from xtrata-2.0, or npm --prefix with an absolute project path from anywhere. The runner locates both installed Vitest versions relative to itself and never downloads a runner. Canary instructions now explicitly identify the required project directory.
 
 Music Balance integration plan (17 September 2026): `docs/plans/RADIO-MUSIC-BALANCE-INTEGRATION.md` supersedes the earlier browser subscription proposal for production planning. Recommends a local OS-protected companion with a paired native-messaging extension, `/music-balance` setup, one shared radio paid-start observer, uninterrupted free fallback, persistent opt-in/top-up policy, durable payment recovery and withdrawal before launch. Initial desktop compatibility is explicit; no code activation or new payments performed by this plan.
+
+## Website Music Support lounge
+
+- Public `/radio/lounge`: `public/radio/lounge.{html,js,css}` plus shared radio bundle.
+- Audible start identity: `src/lib/radio/audible-start.js` (select before `play()`).
+- Chrome bridge: `extensions/music-support/`; exact production lounge origin only.
+- Companion pairing/local consent: `scripts/wizard/music-web-bridge.mjs` and
+  `music-web-approval.{html,js}`, routed by `radio-plays-server.mjs`.
+- Distribution and walkthrough: `scripts/music-support/package.mjs`,
+  `docs/radio/MUSIC-LOUNGE.md`. Existing native-host prototype remains separate.
+- Browser integration: `scripts/radio-support/web-lounge-smoke.mjs`, simulated only.

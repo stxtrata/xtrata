@@ -1,4 +1,4 @@
-import {radioArtist} from '../../src/lib/radio/artist-credits.mjs';
+import {radioArtist,radioTitle} from '../../src/lib/radio/artist-credits.mjs';
 import { RADIO_CONTRACT } from '../lib/radio-report';
 import { queryAll, type Env } from '../lib/db';
 import { configuredDebugKey, hasDebugAccess } from '../lib/debug-auth';
@@ -41,7 +41,7 @@ export async function onRequest({ request, env }: { request: Request; env: Env &
     try { likes=(await queryAll(env,'SELECT ? AS contract,token_id,COUNT(*) current_likes FROM radio_likes GROUP BY token_id',[RADIO_CONTRACT])).results||[]; } catch { /* migration 013 pending */ }
     let metadata: unknown[]=[];
     try { metadata=(await queryAll(env,"SELECT ? AS contract,token_id,title,artist FROM radio_metadata WHERE status='ready'",[RADIO_CONTRACT])).results||[]; } catch { /* optional enrichment */ }
-    return reply({ metadata:metadata.map((row:any)=>({...row,artist:radioArtist(row.token_id,row.artist)})), likes, ruleVersion:RULE_VERSION,range,since,until:now,identity:'pseudonymous browser, not verified person',
+    return reply({ metadata:metadata.map((row:any)=>({...row,title:radioTitle(row.token_id,row.title),artist:radioArtist(row.token_id,row.artist)})), likes, ruleVersion:RULE_VERSION,range,since,until:now,identity:'pseudonymous browser, not verified person',
       notice:'Client-reported analytics, not votes. Partial listens are closed/idle sessions. Listening seconds are attributed to session start; daily chart uses UTC qualification dates. Unique browsers are per track and source; do not sum them across rows.',
       tracks:tracks.results,daily:daily.results });
   } catch { return reply({ error:'Apply migration 011_radio_plays.sql to enable reporting.' },503); }

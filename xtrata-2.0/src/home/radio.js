@@ -1,4 +1,5 @@
-import {radioArtist} from '../lib/radio/artist-credits.mjs';
+import { attachAudibleStart } from '../lib/radio/audible-start.js';
+import {radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
 // random rotation of inscribed songs. Tracks are ordinary inscriptions: raw
@@ -545,7 +546,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       resolved = null;
       definitive = false;
     }
-    if(resolved)resolved.artist=radioArtist(tokenId,resolved.artist||'');
+    if(resolved){resolved.artist=radioArtist(tokenId,resolved.artist||'');resolved.title=radioTitle(tokenId,resolved.title);}
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);
@@ -651,6 +652,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     shuffle: shuffleMode,
     loop: player.loop,
     relatives: relatives.slice()
+  });
+  const supportStarts = attachAudibleStart(player, detail => {
+    window.dispatchEvent(new CustomEvent('xtrata:radio-audible-start', { detail }));
   });
   const emit = () => {
     const snapshot = stateSnapshot();
@@ -1318,6 +1322,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
         await new Promise((resolve) => setTimeout(resolve, (tuningSeconds - elapsed) * 1000));
       }
       if (token !== tuneToken || !on) { endTune(); return; }
+      supportStarts.select(Number(track.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
       if (player.src !== track.src) {
         player.src = track.src;
@@ -1495,6 +1500,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       root.classList.add('is-on');
       applyVolume();
       renderKnob();
+      supportStarts.select(Number(saved.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(saved.tokenId));
       player.src = track.src;
       currentTokenId = track.tokenId || null;

@@ -1,4 +1,4 @@
-import {radioArtist} from '../../src/lib/radio/artist-credits.mjs';
+import {radioArtist,radioTitle} from '../../src/lib/radio/artist-credits.mjs';
 import {catalogueChainTotals} from './radio-chain-totals';
 import { safeArtwork } from '../../src/lib/radio/inscription-metadata';
 import { queryAll, type Env } from './db';
@@ -38,7 +38,7 @@ export async function catalogueReport(env: Env, url: URL) {
   const m:any=byId.get(row.token_id) || {starts:0,plays:0,completions:0,seconds:0,last_play:null,unique_browsers:range==='all'?null:0};
   const inProgress=Number(activeById.get(row.token_id)||0);
   const cached=enriched.get(row.token_id);
-  return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`),
+  return {id:row.token_id,thumbnail:covers.has(row.token_id)?'/radio/artwork?id='+row.token_id:safeArtwork(meta.image?.url || meta.image || meta.artwork || meta.cover),current_likes:likesAvailable?(likeCounts.get(row.token_id)||0):null,title:radioTitle(row.token_id,cached?.title || (typeof meta.name==='string'?meta.name.slice(0,200):`Inscription #${row.token_id}`)),
    album:albums.get(row.token_id) || (typeof meta.album==='string'?meta.album:typeof meta.album?.name==='string'?meta.album.name:typeof meta.inAlbum?.name==='string'?meta.inAlbum.name:'').slice(0,200),
    artist:radioArtist(row.token_id,cached?.artist || (typeof meta.artist==='string'?meta.artist.slice(0,200):'')),creator:row.creator,
    status:row.mime?.startsWith('audio/')?'Audio':'Audio player',
