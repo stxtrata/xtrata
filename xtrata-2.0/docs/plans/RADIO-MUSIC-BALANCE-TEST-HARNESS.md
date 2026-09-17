@@ -7,6 +7,12 @@ disposable wallet and separate, bounded user authorisation.
 
 ## Current handoff state
 
+Implementation update: `npm run test:radio-support` now runs read-only schema and
+DOM checks, with `--gate schemas` or `--gate ui`. Reports explicitly mark the full
+implementation incomplete. Other command examples below remain planned. See
+[progress and review findings](../radio/SUPPORT-IMPLEMENTATION.md). Full Gate 1
+(including lease/start schemas) and Gate 2 (actual radio layout) remain open.
+
 The commands under **Harness shape** are the target interface and are not present
 in `package.json` yet. No harness runner, fake companion, native companion or
 browser extension has been implemented. The next implementation starts at Gate 1;
@@ -208,7 +214,8 @@ the critical flows with two tabs:
 | --- | --- |
 | No installation | normal free playback, no prompt or companion network work |
 | Ready funded wallet | music starts immediately; one pending then confirmed row |
-| Slow companion | music starts immediately; start becomes free after bounded timeout |
+| Slow capability/status lookup | music starts immediately; no intent is sent without readiness |
+| Timeout after start intent | music continues; outcome remains unknown until reconciled; no replacement |
 | Empty/locked/paused | music starts free with an accurate persistent reason |
 | Companion crash | music continues; future starts free; recovery state visible |
 | Offline node | music continues; no unbounded retry or catch-up billing |

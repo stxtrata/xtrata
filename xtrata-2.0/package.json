@@ -81,7 +81,8 @@
     "wizards:suno": "node scripts/wizard/suno-harness.mjs",
     "wizards:suno:test:browser": "XTRATA_BROWSER_TESTS=1 vitest run scripts/wizard/__tests__/suno-browser.test.ts",
     "build:radio-likes": "vite build -c vite.radio-likes.config.ts",
-    "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts"
+    "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts",
+    "test:radio-support": "node scripts/radio-support/harness.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",
