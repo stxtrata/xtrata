@@ -90,3 +90,13 @@ describe('continuous listening',()=>{
   expect(s.snapshot().enabled).toBe(true);w.stop();expect(s.snapshot().enabled).toBe(false);
  });
 });
+
+describe('lounge artwork',()=>{
+ it('accepts bounded raster artwork and refuses executable image formats',async()=>{
+  const media=new RadioMedia(async()=>new Response('png-bytes',{headers:{'content-type':'image/png'}}));
+  expect((await media.artwork(2910)).mime).toBe('image/png');
+  await expect(media.artwork(-1)).rejects.toThrow('Invalid');
+  media.request=async()=>new Response('<svg/>',{headers:{'content-type':'image/svg+xml'}});
+  await expect(media.artwork(2910)).rejects.toThrow('unavailable');
+ });
+});

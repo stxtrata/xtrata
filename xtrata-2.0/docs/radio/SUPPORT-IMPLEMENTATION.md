@@ -241,3 +241,21 @@ Validated continuous consent past expiry/count, temporary failure recovery,
 external Stop, and mocked backend spending below reserve and above lifetime test
 budget with duplicate prevention. Bounded desktop/mobile browser checks passed.
 No mainnet payments were sent during implementation.
+
+### Listener-facing Music Support lounge (2026-09-17)
+
+Added /lounge to the local companion with an artwork-led radio, title/artist/album,
+audible on-air indicator, automatically loaded playlist, funding wallet card,
+continuous support controls, fee explanation, history and reviewed fund returns.
+Operator-only test controls remain on the original page. Uses the same wallet
+and payment machinery, with no signing on page load. Artwork is proxied from a
+fixed endpoint and restricted to bounded raster images; missing art has a sleeve
+fallback. Added npm run music:lounge and a listener guide.
+
+Validation: 27 targeted tests passed including artwork MIME guards. Isolated
+real-audio desktop and mobile browser checks exercised the lounge's continuous
+support, free mode, pause/resume, seeking, pending-payment fallback, reload and
+no horizontal overflow; all payments were simulated. Inspected desktop capture.
+This is a local listener UI, not a deployed website or packaged installer; hosted
+onboarding still needs the authenticated companion distribution described in
+MUSIC-LOUNGE.md. No public-wallet integration or deployment is claimed.

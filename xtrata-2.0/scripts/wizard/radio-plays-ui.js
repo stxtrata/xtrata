@@ -10,9 +10,9 @@ async function api(action,body={}){
  const data=await response.json();if(!response.ok||data.error)throw Error(data.error||'Request failed. Refresh to check status before trying again.');return data;
 }
 function controls(){
- for(const id of ['setup','status','run','return-excess','return-all','warning-excess','warning-all','return-cancel'])$(id).disabled=busy;
+ for(const id of ['setup','status','run','return-excess','return-all','warning-excess','warning-all','return-cancel'])if($(id))$(id).disabled=busy;
  $('copy').disabled=!state?.address;
- $('run').disabled=busy||state?.overLimit||state?.running||!!review||paidRadio;
+ if($('run'))$('run').disabled=busy||state?.overLimit||state?.running||!!review||paidRadio;
  $('return-confirm').disabled=busy||!reviewValid||!review||review.expires<=Date.now()||!$('return-approve').checked;
 }
 function activity(){
@@ -28,10 +28,11 @@ function activity(){
  }
 }
 function render(){
+ if(document.body.hasAttribute('data-music-lounge')){$('setup').textContent=state?.address?'Your support wallet is ready':'Create my support wallet';}
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
  $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
  $('over-limit').hidden=!state?.overLimit;
- if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`You can add up to ${stx(remaining)} STX to reach 1 STX. Check any incoming deposits first. Funding never starts tests.`:'No more funding is needed. Keep no more than 1 STX in this wallet.';}
+ if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`You can add up to ${stx(remaining)} STX to reach 1 STX. Check any incoming deposits first. Funding never enables payments.`:'No more funding is needed. Keep no more than 1 STX in this wallet.';}
  $('wallet-state').textContent=state?.recovery||state?.message||'No status loaded.';activity();controls();
 }
 async function refresh(){
@@ -44,6 +45,7 @@ async function task(work,target='output'){
 }
 function clearReview(){review=null;reviewValid=false;$('return-review').hidden=true;$('return-approve').checked=false;controls();}
 function showReview(q){
+ const disclosure=$('return-section').closest('details');if(disclosure)disclosure.open=true;
  review=q;reviewValid=true;$('return-approve').checked=false;
  $('return-recipient').value=q.recipient;$('return-fee').value=String(q.fee);
  const details=$('return-details');details.replaceChildren();
@@ -61,13 +63,14 @@ $('setup').onclick=()=>task(async()=>{const wallet=await api('setup');state={...
 $('copy').onclick=()=>task(async()=>{await navigator.clipboard.writeText(state.address);$('output').textContent='Funding address copied.';});
 $('status').onclick=()=>task(async()=>{await refresh();$('output').textContent='Status refreshed. No new transaction was sent.';});
 $('stop').onclick=async()=>{window.dispatchEvent(new Event('wizard-stop'));try{const r=await api('stop');reviewValid=false;controls();$('output').textContent=r.message;}catch(e){$('output').textContent=e.message;}};
-$('run').onclick=()=>task(async()=>{
+if($('run'))$('run').onclick=()=>task(async()=>{
  if(!$('approve').checked)throw Error('Approve the bounded run first.');
  const body={};for(const k of ['core','song','fee','count'])body[k]=Number($(k).value);
  if(!confirm(`Run ${body.count} test(s) for song ${body.song}, core ${body.core}, with ${body.fee} microSTX miner fee plus 50 microSTX holder payment per test?`))return;
  $('approve').checked=false;const r=await api('run',body);$('output').textContent=r.message;await refresh();
 });
 for(const [id,mode] of [['return-excess','excess'],['return-all','all'],['warning-excess','excess'],['warning-all','all']])$(id).onclick=()=>{
+ const disclosure=$('return-section').closest('details');if(disclosure)disclosure.open=true;
  $('return-section').scrollIntoView({block:'start'});
  if(!$('return-recipient').value.trim()){$('return-recipient').focus();$('return-message').textContent='Enter your return address, then select Review return '+mode+'.';return;}
  void prepare(mode);

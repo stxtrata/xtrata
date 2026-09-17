@@ -13,8 +13,15 @@ export class RadioMedia {
   const r=await this.request('https://xtrata.xyz/radio/counts?range=all&chainLikes=0',{signal:AbortSignal.timeout(30000),redirect:'error'});
   const data=JSON.parse((await bytes(r,2*1024*1024)).toString());
   if(!Array.isArray(data.tracks))throw Error('Song catalogue unavailable.');
-  this.tracks=data.tracks.filter(t=>Number.isSafeInteger(t.id)&&t.id>=0&&['Audio','Audio player'].includes(t.status)).slice(0,2000).map(t=>({id:t.id,title:String(t.title||`Inscription #${t.id}`).slice(0,200),artist:String(t.artist||'').slice(0,200),album:String(t.album||'').slice(0,200)}));
+  this.tracks=data.tracks.filter(t=>Number.isSafeInteger(t.id)&&t.id>=0&&['Audio','Audio player'].includes(t.status)).slice(0,2000).map(t=>({id:t.id,title:String(t.title||`Inscription #${t.id}`).slice(0,200),artist:String(t.artist||'').slice(0,200),album:String(t.album||'').slice(0,200),hasArtwork:!!t.thumbnail}));
   this.updated=Date.now();return this.tracks;
+ }
+ async artwork(id){
+  if(!Number.isSafeInteger(id)||id<0)throw Error('Invalid song ID.');
+  const response=await this.request(`https://xtrata.xyz/radio/artwork?id=${id}`,{signal:AbortSignal.timeout(15000),redirect:'error'});
+  const mime=(response.headers.get('content-type')||'').split(';')[0];
+  if(!['image/png','image/jpeg','image/webp','image/gif'].includes(mime))throw Error('Artwork unavailable.');
+  return {mime,body:await bytes(response,2*1024*1024)};
  }
  async audio(id){
   if(!Number.isSafeInteger(id)||id<0)throw Error('Invalid song ID.');

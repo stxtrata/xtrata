@@ -15,6 +15,7 @@
  async function select(i){
   if(!tracks.length)return;const version=++loading;audio.pause();index=(i+tracks.length)%tracks.length;
   const track=tracks[index];start={id:crypto.randomUUID().replaceAll('-',''),song:track.id,observed:false};
+  window.dispatchEvent(new CustomEvent('radio-track',{detail:track}));
   $('radio-songs').value=String(index);$('radio-title').textContent=track.title;
   $('radio-info').textContent=[track.artist,track.album&&'Album: '+track.album,'Inscription #'+track.id].filter(Boolean).join(' · ');
   $('radio-payment').textContent='Loading audio. No payment is requested until playback begins.';
