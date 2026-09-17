@@ -217,3 +217,16 @@ Validation: 10 targeted listening tests passed, including ten successive
 confirmations using the same approval and the 16/17-start boundary at fee 257.
 Desktop and mobile browser smoke checks passed with simulated payments only.
 The idle local wizard was restarted; no real payment was sent for this change.
+
+### Play payment details (2026-09-17)
+
+Added title, optional artist and holder payment destination to both wizard play
+lists. New radio journal records retain bounded display metadata; older records
+are labelled from the shared catalogue lookup. Recipient addresses come from the
+payment journal (the confirmed receipt after reconciliation), never song metadata.
+Pending rows explicitly show an intended recipient. Metadata fetch failure does
+not block playback or wallet operations. Addresses wrap on narrow screens.
+Validation: 640 wizard tests passed, one skipped; JavaScript syntax checks passed.
+Updated the reconciliation regression to check title, artist and recipient.
+Desktop/mobile playback smoke checks passed after fixing long-address wrapping.
+No real payments were sent. The idle wizard was restarted for the backend update.

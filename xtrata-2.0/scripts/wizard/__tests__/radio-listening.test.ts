@@ -72,7 +72,7 @@ describe('audio extraction without executing inscription code',()=>{
 describe('reconciled activity',()=>{
  it('refreshes an unknown outcome from the durable journal without re-enabling spending',async()=>{
   const {s,w}=fixture();s.events=[{id,song,outcome:'unknown',reason:'Receipt verification failed.'}];
-  w.journal=async()=>[{playbackId:id,status:'confirmed',txid:'confirmed-tx'}];
-  const view=await s.refreshedSnapshot();expect(view.enabled).toBe(false);expect(view.events[0].outcome).toBe('confirmed');expect(view.events[0].reason).toBe('Paid start confirmed.');expect(w.run).not.toHaveBeenCalled();
+  w.journal=async()=>[{playbackId:id,status:'confirmed',txid:'confirmed-tx',title:'Example song',artist:'Example artist',recipient:'recipient-address'}];
+  const view=await s.refreshedSnapshot();expect(view.events[0]).toMatchObject({title:'Example song',artist:'Example artist',recipient:'recipient-address'});expect(view.enabled).toBe(false);expect(view.events[0].outcome).toBe('confirmed');expect(view.events[0].reason).toBe('Paid start confirmed.');expect(w.run).not.toHaveBeenCalled();
  });
 });

@@ -147,3 +147,9 @@ bytes are persisted before submission. This is not an automatic fee increase or
 a journal deletion, and each live invocation needs explicit spending authority.
 Node failures now retain a bounded reason code when provided, without logging
 raw response data. Recovery tests use disposable wallets and mock network calls.
+
+Play activity and recent start outcomes display the song title, artist when
+known, inscription ID, and the 50 microSTX recipient address. Confirmed payments
+say “paid to”; unresolved payments show the intended recipient. New radio starts
+save display metadata with their journal entry; older entries use the current
+catalogue where available. Missing metadata falls back to the inscription ID.

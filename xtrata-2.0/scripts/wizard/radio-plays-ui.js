@@ -1,3 +1,7 @@
+// Shared display metadata: failures never block wallet operations or playback.
+window.radioSongMetadata=new Map();
+window.radioSongLabel=e=>{const t=e.core&&e.core!==3?null:window.radioSongMetadata.get(e.song);return `${e.title||t?.title||'Song #'+e.song}${(e.artist||t?.artist)?' — '+(e.artist||t.artist):''} · #${e.song}`;};
+void fetch('/radio/catalogue').then(r=>r.ok?r.json():null).then(v=>{for(const t of v?.tracks||[])window.radioSongMetadata.set(t.id,t);window.dispatchEvent(new Event('wizard-song-metadata'));}).catch(()=>{});
 const $=id=>document.getElementById(id);
 let state=null,review=null,busy=false,reviewValid=false,paidRadio=false;
 const stx=value=>{if(value===null||value===undefined)return '—';const n=BigInt(value);return `${n/1000000n}.${(n%1000000n).toString().padStart(6,'0')}`;};
@@ -17,8 +21,9 @@ function activity(){
  if(!entries.length){host.textContent='No payments or returns recorded.';return;}
  for(const e of entries){
   const row=document.createElement('div');row.className='activity-row';
-  const title=document.createElement('strong');title.textContent=e.kind==='return'?`Return ${e.mode} · ${e.status}`:`Song #${e.song} · ${e.status}`;row.append(title);
+  const title=document.createElement('strong');title.textContent=e.kind==='return'?`Return ${e.mode} · ${e.status}`:`${window.radioSongLabel(e)} · ${e.status}`;row.append(title);
   const p=document.createElement('p');p.textContent=e.kind==='return'?`${stx(e.amount)} STX to ${e.recipient} · fee ${stx(e.fee)} STX`:`Core ${e.core} · network fee ${stx(e.fee)} STX`;row.append(p);
+  if(e.kind==='play'){const recipient=document.createElement('p');recipient.textContent=e.recipient?`50 microSTX (0.00005 STX) ${e.status==='confirmed'?'paid to':'intended for'} ${e.recipient}`:'Payment recipient unavailable.';row.append(recipient);}
   if(/^0x[0-9a-f]{64}$/.test(e.txid)){const a=document.createElement('a');a.href=`https://explorer.hiro.so/txid/${e.txid}?chain=mainnet`;a.target='_blank';a.rel='noopener noreferrer';a.textContent='View transaction ↗';row.append(a);}host.append(row);
  }
 }
@@ -84,3 +89,5 @@ void task(async()=>{await refresh();});
 
 window.addEventListener('wizard-paid-mode',e=>{paidRadio=e.detail;controls();});
 window.addEventListener('wizard-refresh',()=>{if(!busy)void task(refresh);});
+
+window.addEventListener('wizard-song-metadata',activity);

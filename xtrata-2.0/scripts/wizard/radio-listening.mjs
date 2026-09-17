@@ -9,6 +9,7 @@ export class RadioListening {
   for(const row of this.events){
    const entry=log.find(e=>e.playbackId===row.id);
    if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason='Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
+   if(entry){row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
   }
   return this.snapshot();
  }
@@ -42,7 +43,8 @@ export class RadioListening {
  async start(p){
   if(!p||Object.keys(p).sort().join(',')!=='id,song,tab,token'||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
   const a=this.check(p);if(this.seen.has(p.id))return this.seen.get(p.id);
-  const row={id:p.id,song:p.song,at:new Date().toISOString(),outcome:'free',reason:''};
+  const track=this.media.tracks?.find(t=>t.id===p.song);
+  const row={title:track?.title,artist:track?.artist,id:p.id,song:p.song,at:new Date().toISOString(),outcome:'free',reason:''};
   this.seen.set(p.id,row);this.events.push(row);
   if(a.used>=a.max){row.reason='Approved start limit reached.';this.disable();return row;}
   if(this.inFlight||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
@@ -53,7 +55,7 @@ export class RadioListening {
    if(existing){row.outcome=existing.status;row.reason='Already recorded; no second payment.';row.txid=existing.txid;return row;}
    // Recheck consent after the asynchronous journal read.
    this.check(p);a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
-   const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token});
+   const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist});
    void operation.then(()=>{row.outcome='confirmed';row.reason='Paid start confirmed.';}).catch(async error=>{
     row.reason=error.message;row.outcome='unavailable';
     try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':'unknown';row.txid=entry.txid;}}catch{row.outcome='unknown';}

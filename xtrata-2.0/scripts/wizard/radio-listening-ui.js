@@ -4,9 +4,12 @@
  let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0;
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
  function mode(text){$('radio-mode').textContent=text;window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
+ let recentEvents=[];
+ window.addEventListener('wizard-song-metadata',()=>renderEvents(recentEvents));
  function renderEvents(events){
+  recentEvents=events;
   const host=$('radio-events');host.replaceChildren();
-  for(const e of events.slice(0,15)){const p=document.createElement('p');p.textContent=`Song #${e.song}: ${e.outcome} — ${e.reason}`;host.append(p);}
+  for(const e of events.slice(0,15)){const p=document.createElement('p');p.textContent=`${window.radioSongLabel(e)}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${e.outcome==='confirmed'?'paid to':'intended for'} ${e.recipient}`:''}`;host.append(p);}
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE · no paid starts');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
  async function select(i){
