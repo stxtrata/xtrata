@@ -1,5 +1,7 @@
 # Xtrata Music Balance: production integration plan
 
+> Superseded on 17 September 2026 by [the simplified local wizard plan](RADIO-MUSIC-BALANCE-SIMPLIFIED.md). The architecture and gates below are historical, not current requirements.
+
 Status: handoff-ready implementation plan, revised 17 September 2026. Planning only; no
 production activation, new wallet, signing or payments are authorised by this
 document. The operator wizard has completed four confirmed mainnet test payments;

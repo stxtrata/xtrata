@@ -1,5 +1,7 @@
 # Support as you listen: implementation test harness
 
+> Superseded on 17 September 2026 by [the simplified local wizard plan](RADIO-MUSIC-BALANCE-SIMPLIFIED.md). The architecture and gates below are historical, not current requirements.
+
 Status: proposed harness, 17 September 2026. This document defines the loop for
 building the Music Wallet integration in small, reviewable gates. It authorises
 no signing, broadcasts or spending. Mainnet work always requires a fresh

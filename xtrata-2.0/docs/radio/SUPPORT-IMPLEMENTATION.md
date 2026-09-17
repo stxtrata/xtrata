@@ -1,5 +1,7 @@
 # Support as you listen: implementation progress
 
+Current direction: [simplified local wizard plan](../plans/RADIO-MUSIC-BALANCE-SIMPLIFIED.md). Reuse the original backend storage model with automatic local key management and a 1 STX supported balance; no mandatory OS keystore or backup ceremony. Existing implementation evidence below is unchanged. No funded wallet or runtime code was changed by this plan revision.
+
 17 September 2026. First implementation slice after reviewing SOL's plans.
 
 ## Review conclusions
