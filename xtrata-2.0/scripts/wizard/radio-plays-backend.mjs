@@ -50,7 +50,7 @@ export class RadioWizard {
   const {address}=await this.json('vault.json');let balance=null,recovery=null;
   if(chain){
    const account=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(account.balance).toString();
-   if(!diskRunning&&!this.running){try{await this.exclusive(async()=>{await this.reconcileReturns();});}catch(e){recovery=e.message;}}
+   if(!diskRunning&&!this.running){try{await this.exclusive(async()=>{await this.reconcile(await this.journal());await this.reconcileReturns();});}catch(e){recovery=e.message;}}
   }
   const log=await this.journal(),returns=await this.optional('returns.json',[]),quote=await this.optional('return-quote.json',null);
   return {address,balanceMicroSTX:balance,overLimit:balance!==null&&BigInt(balance)>1000000n,
@@ -151,7 +151,7 @@ export class RadioWizard {
    e.status='confirmed';e.recipient=r.recipient.value;await this.save('journal.json',log);
   }
  }
- async run(input) {
+ async run(input,context={}) {
   if(this.running)throw Error('Runner already active.');const p=policy(input);this.running=true;this.stopped=false;
   let lock;
   try {
@@ -171,7 +171,7 @@ export class RadioWizard {
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');
     const receipt=randomBytes(16).toString('hex');
     const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],senderKey:key,network:new StacksMainnet(),fee:BigInt(p.fee),nonce:BigInt(account.nonce),anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
-    this.guard();const e={address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
+    this.guard();const e={...(context.playbackId?{playbackId:context.playbackId,listeningSession:context.listeningSession}:{}),createdAt:new Date().toISOString(),address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
     log.push(e);await this.save('journal.json',log);this.guard();
     const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
     e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';

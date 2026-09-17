@@ -9,6 +9,20 @@
 <p id="funding-help">Send up to 1 STX total using Stacks mainnet. Funding never starts tests. The address cannot prevent someone sending more.</p>
 <div id="over-limit" class="warning" hidden role="alert"><strong>Your balance is above the recommended 1 STX.</strong><p>New test payments are paused. Return the excess to leave 1 STX, or return your whole balance.</p><button id="warning-excess">Return excess</button><button id="warning-all">Return all</button></div>
 <p id="wallet-state" aria-live="polite">Get your address to begin.</p></section>
+<section id="listening-section"><h2>Listen and test in real time</h2>
+<p id="radio-mode" class="eyebrow" aria-live="polite">FREE · no paid starts</p>
+<p>Play real inscription audio here. Paid mode uses only this wizard wallet. A paid start records the start and pays the current master holder; it does not prove a full listen.</p>
+<button id="radio-load">Load / refresh songs</button><label>Song<select id="radio-songs"><option>Load songs first</option></select></label>
+<h3 id="radio-title">Xtrata Radio</h3><p id="radio-info">Music from the chain</p>
+<audio id="radio-audio" controls preload="none"></audio><div><button id="radio-prev">Previous</button><button id="radio-play">Play / pause</button><button id="radio-next">Next</button></div>
+<label class="check"><input id="radio-loop" type="checkbox" checked>Loop the playlist</label>
+<button id="radio-free">Free listens / stop paid tests</button>
+<details><summary>Paid mainnet test settings</summary><p>Fixed miner fee plus 50 microSTX (0.00005 STX) to the holder per eligible start. No platform fee. Only one payment can be unresolved: starts while it is busy stay free, with no catch-up charges. Pause/resume and seeking do not pay again.</p>
+<div class="fields"><label>Miner fee (microSTX)<input id="radio-paid-fee" type="number" min="1" max="1000" value="300"></label><label>Maximum starts<input id="radio-paid-max" type="number" min="1" max="5" value="1"></label><label>Minutes<input id="radio-paid-minutes" type="number" min="1" max="30" value="10"></label></div>
+<p>The default miner fee is 0.0003 STX. Up to 0.005 STX per session and the existing 0.01 STX lifetime test ceiling apply. A 0.001 STX reserve remains. Low fees may be rejected; no fee is increased automatically.</p>
+<label class="check"><input id="radio-approve" type="checkbox">I authorise these bounded mainnet payments from my dedicated wizard wallet when new songs begin.</label><button id="radio-enable">Enable paid test listens</button></details>
+<p id="radio-payment" role="status">Load songs, then press Play. No payment is enabled.</p><details><summary>Recent start outcomes</summary><div id="radio-events">No starts requested.</div></details>
+</section>
 <section id="return-section" aria-labelledby="return-heading"><h2 id="return-heading">2. Return your funds</h2>
 <p>Request a return whenever you like. The wizard must be running and pending payments must resolve first. Nothing is sent until you review and approve it.</p>
 <div class="fields"><label>Send to your Stacks mainnet address<input id="return-recipient" type="text" autocomplete="off" spellcheck="false" placeholder="SP… or SM…"></label><label>Network fee (microSTX)<input id="return-fee" type="number" min="1" max="1000" step="1" value="300"></label></div>
@@ -23,4 +37,4 @@
 <div class="fields"><label>Core (1–3)<input id="core" type="number" value="3" min="1" max="3"></label><label>Song ID<input id="song" type="number" value="2910" min="0"></label><label>Network fee (microSTX)<input id="fee" type="number" value="300" min="1" max="1000"></label><label>Tests<input id="count" type="number" value="1" min="1" max="5"></label></div>
 <label class="check"><input id="approve" type="checkbox">I approve this bounded mainnet test run from the dedicated wizard.</label><button id="run">Run approved tests</button><button id="stop">Stop new payments</button><p>Stop cannot reverse signed or submitted transactions. Returns stop the test loop; starting tests again requires a new explicit approval.</p></section>
 <p id="output" role="status" aria-live="polite">Ready.</p>
-</main><script src="/ui.js"></script></body></html>
+</main><script src="/ui.js"></script><script src="/radio.js"></script></body></html>

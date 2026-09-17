@@ -90,3 +90,43 @@ Tests: `npx vitest run scripts/wizard/__tests__/radio-plays-backend.test.ts
 scripts/wizard/__tests__/radio-returns.test.ts` (one command). Browser checks:
 `node scripts/radio-support/wizard-returns-smoke.mjs`. These use temporary wallets
 and mocked chain calls only; screenshots stay under ignored `.artifacts/`.
+
+## Radio inside the local wizard
+
+Use **Load / refresh songs**, choose a song and press **Play / pause**. This local
+player reads the public verified core-3 catalogue and extracts audio from the
+original inscriptions. It shows title, artist and album where available, supports
+previous/next, native audio controls and playlist looping. It never executes
+inscription HTML/scripts. Free playback needs no funded wallet or paid approval.
+
+To test payments, expand **Paid mainnet test settings**, choose the fixed miner
+fee, maximum starts (1–5) and duration (1–30 minutes), check the approval box and
+confirm **Enable paid test listens**. Defaults: 300 microSTX miner fee, one start,
+ten minutes. Each eligible start adds the existing 50-microSTX holder payment.
+The maximum session cost is 5000 microSTX; the existing 10000-microSTX lifetime
+wizard ceiling, 1000-microSTX reserve, mainnet checks and kill switches remain.
+These are real mainnet calls when you enable them in your funded wizard.
+
+Enabling midway through a song never retroactively charges that song. A new
+unmuted playback start can trigger once; resume, seek and buffering cannot trigger
+a second payment. Busy/pending starts stay free, without later catch-up charges.
+Only one unresolved payment is allowed. **Free listens / stop paid tests** ends
+approval while music continues. Signed/submitted payments can still confirm.
+Reload and server restart do not restore paid approval. One tab owns the session;
+a 30-second heartbeat lease and the selected expiry stop abandoned sessions.
+Changing fee/limit controls requires new approval. Starting a return also stops
+paid playback tests, without cancelling already signed transactions.
+
+**Recent start outcomes** explains requested/free/uncertain starts. **Activity**
+shows durable transaction evidence; refresh reconciles pending play and return
+records without broadcasting. A browser start event is not proof of listening
+duration, and this canary does not add browser listening statistics to production.
+
+The old 200-microSTX uncertain test is not bypassed: if it cannot be reconciled,
+enabling paid mode reports the issue and music remains free. Approval cannot
+override that recovery guard. This UI does not modify the deployed contract.
+
+Validation: `npx vitest run scripts/wizard/__tests__/radio-listening.test.ts`
+and `node scripts/radio-support/wizard-listening-smoke.mjs`. The latter plays
+real generated PCM audio in isolated desktop/mobile Chrome and sends only
+simulated chain calls from temporary wizard keys. No funded wallet is used.

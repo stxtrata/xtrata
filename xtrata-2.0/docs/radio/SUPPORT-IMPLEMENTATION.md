@@ -157,3 +157,21 @@ The funded operator wizard's previously unknown play remains unchanged. If still
 unresolved it blocks withdrawal until separately investigated. This release
 adds controls, not an automatic bypass of unknown transactions. Restart the
 local server and open http://127.0.0.1:8798 to use the updated panel.
+
+## Local radio canary — 17 September 2026
+
+Added a free-by-default radio to the local wizard with live catalogue loading,
+verified core-3 audio extraction, song/artist/album display, native playback,
+previous/next and playlist loop. Paid test approval is bounded by fee, starts,
+duration, one tab, heartbeat expiry and the original wizard limits. The backend
+uses the existing protected play call and durable journal with playback IDs;
+free/busy starts are not queued. Stop/free, returns, expiry and failures revoke
+approval. Nothing auto-enables on reload. The public application is unchanged.
+
+Validation: 21 focused radio/wizard tests pass and targeted lint passes. Real
+browser audio checks at 1200px/390px pass for free/paid transitions, mid-song
+activation, pause/resume, seek, busy-free skips and reload; four payment calls
+were simulated. Existing return UI checks also pass at both widths. A read-only
+live media check loaded 47 catalogue entries and verified song 2910's audio/webm
+(4,184,290 bytes). No new mainnet payment was sent. Local screenshots remain
+ignored under `.artifacts/radio-wizard-listening/`.

@@ -1,5 +1,5 @@
 const $=id=>document.getElementById(id);
-let state=null,review=null,busy=false,reviewValid=false;
+let state=null,review=null,busy=false,reviewValid=false,paidRadio=false;
 const stx=value=>{if(value===null||value===undefined)return '—';const n=BigInt(value);return `${n/1000000n}.${(n%1000000n).toString().padStart(6,'0')}`;};
 async function api(action,body={}){
  const response=await fetch('/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -8,7 +8,7 @@ async function api(action,body={}){
 function controls(){
  for(const id of ['setup','status','run','return-excess','return-all','warning-excess','warning-all','return-cancel'])$(id).disabled=busy;
  $('copy').disabled=!state?.address;
- $('run').disabled=busy||state?.overLimit||state?.running||!!review;
+ $('run').disabled=busy||state?.overLimit||state?.running||!!review||paidRadio;
  $('return-confirm').disabled=busy||!reviewValid||!review||review.expires<=Date.now()||!$('return-approve').checked;
 }
 function activity(){
@@ -55,7 +55,7 @@ async function prepare(mode){await task(async()=>{
 $('setup').onclick=()=>task(async()=>{const wallet=await api('setup');state={...state,...wallet};render();$('output').textContent='Address ready. Use Confirm funds to check your balance.';});
 $('copy').onclick=()=>task(async()=>{await navigator.clipboard.writeText(state.address);$('output').textContent='Funding address copied.';});
 $('status').onclick=()=>task(async()=>{await refresh();$('output').textContent='Status refreshed. No new transaction was sent.';});
-$('stop').onclick=async()=>{try{const r=await api('stop');reviewValid=false;controls();$('output').textContent=r.message;}catch(e){$('output').textContent=e.message;}};
+$('stop').onclick=async()=>{window.dispatchEvent(new Event('wizard-stop'));try{const r=await api('stop');reviewValid=false;controls();$('output').textContent=r.message;}catch(e){$('output').textContent=e.message;}};
 $('run').onclick=()=>task(async()=>{
  if(!$('approve').checked)throw Error('Approve the bounded run first.');
  const body={};for(const k of ['core','song','fee','count'])body[k]=Number($(k).value);
@@ -81,3 +81,6 @@ $('return-confirm').onclick=()=>task(async()=>{
 setInterval(()=>{if(review&&review.expires<=Date.now()){reviewValid=false;$('return-expiry').textContent='Review expired. Select Review again to refresh the amount.';controls();}},1000);
 // Read public status on this local panel only. Never create a wallet or sign on load.
 void task(async()=>{await refresh();});
+
+window.addEventListener('wizard-paid-mode',e=>{paidRadio=e.detail;controls();});
+window.addEventListener('wizard-refresh',()=>{if(!busy)void task(refresh);});
