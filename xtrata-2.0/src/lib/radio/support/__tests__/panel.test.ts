@@ -5,6 +5,21 @@ import { exampleStatus, fakeCompanion } from '../fake';
 const flush = async () => { for (let i=0;i<12;i++) await Promise.resolve(); };
 afterEach(() => { document.body.replaceChildren(); vi.useRealTimers(); });
 describe('support panel', () => {
+  it('expires readiness without polling and clears it on revocation', async () => {
+    vi.useFakeTimers();
+    let invalidate!: () => void;
+    const unsubscribe=vi.fn();
+    const bridge={...fakeCompanion(),onInvalidated:(fn:()=>void)=>{invalidate=fn;return unsubscribe;}};
+    const status=vi.spyOn(bridge,'status');
+    const panel=mountSupportPanel(document.body,bridge,100,1000); await flush();
+    await vi.advanceTimersByTimeAsync(1001);
+    expect(document.body.textContent).toContain('expired or disconnected');
+    expect(document.body.textContent).not.toContain('0.020000');
+    expect(status).toHaveBeenCalledTimes(1);
+    await panel.refresh(); invalidate();
+    expect(document.querySelector('details')!.hidden).toBe(true);
+    panel.dispose(); expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
   it('has no requests or timers without a companion', () => {
     const fetch = vi.spyOn(globalThis, 'fetch');
     const panel = mountSupportPanel(document.body);

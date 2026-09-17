@@ -11,6 +11,7 @@ import { createWalletSessionStore } from '../lib/wallet/session';
 import { radioTickerSections } from '../lib/radio/ticker';
 import { inscriptionMetadata } from '../lib/radio/inscription-metadata';
 import { attachPlayCounter } from '../lib/radio/play-counter';
+import { attachRadioSupport } from '../lib/radio/support/radio-panel';
 
 const STORAGE_KEY = 'xtrata.radio.v1';
 
@@ -1833,5 +1834,9 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   updateStats(stateSnapshot());
 
   window.XtrataRadio = api;
+  // Compile-time preview only. No discovery, signing or payment hook is enabled.
+  if (import.meta.env.VITE_RADIO_SUPPORT_PREVIEW === 'true') {
+    try { attachRadioSupport(document); } catch { /* support must never block radio */ }
+  }
   return api;
 };

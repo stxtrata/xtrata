@@ -1,7 +1,7 @@
 import { parsePage, parseStatus, stx, type ReadOnlyCompanion, type Status } from './protocol';
 
 // The caller supplies a transport. No global bridge, local port discovery or signer.
-export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompanion, timeoutMs = 2000) {
+export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompanion, timeoutMs = 2000, freshnessMs = 30000) {
   const doc = host.ownerDocument;
   const section = doc.createElement('section');
   section.className = 'radio-support';
@@ -22,6 +22,16 @@ export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompani
   let current: Status | null = null;
   const seen = new Set<string>(), cursors = new Set<string>();
   const controllers = new Set<AbortController>();
+  let expiry: ReturnType<typeof setTimeout> | undefined;
+  function invalidate() {
+    if (disposed) return;
+    revision++; clearTimeout(expiry); controllers.forEach(c => c.abort());
+    current = null; loading = false; loaded = false; cursor = null;
+    seen.clear(); cursors.clear(); list.replaceChildren(); balance.textContent = '';
+    details.hidden = true; refresh.disabled = false;
+    state.textContent = 'Music Wallet status expired or disconnected · listening free. Check Music Wallet to reconnect.';
+  }
+  const unsubscribe = companion?.onInvalidated?.(invalidate);
   async function request<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const controller = new AbortController(); controllers.add(controller);
     let timer: ReturnType<typeof setTimeout>;
@@ -62,6 +72,7 @@ export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompani
   }
   async function check() {
     const version = ++revision;
+    clearTimeout(expiry);
     controllers.forEach(c => c.abort());
     current = null; cursor = null; loaded = false; loading = false;
     seen.clear(); cursors.clear(); list.replaceChildren(); balance.textContent = '';
@@ -74,6 +85,7 @@ export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompani
       const status = parseStatus(await request(signal => companion.status(signal)));
       if (disposed || version !== revision) return;
       current = status;
+      expiry = setTimeout(invalidate, freshnessMs);
       const cost = BigInt(status.fee) + 50n;
       const reason = status.attention !== 'none' ? status.attention : status.locked ? 'locked' : !status.enabled ? 'paused' : BigInt(status.usable) < cost ? 'balance empty' : 'ready';
       state.textContent = `Music Wallet ${status.address.slice(0, 7)}…${status.address.slice(-5)} · ${reason}. Listening free during this read-only preview.`;
@@ -88,5 +100,5 @@ export function mountSupportPanel(host: HTMLElement, companion?: ReadOnlyCompani
   more.onclick = () => { void loadHistory(); };
   details.ontoggle = () => { if (details.open && !loaded) void loadHistory(); };
   void check();
-  return { refresh: check, dispose() { disposed = true; revision++; controllers.forEach(c => c.abort()); section.remove(); } };
+  return { refresh: check, dispose() { disposed = true; revision++; clearTimeout(expiry); unsubscribe?.(); controllers.forEach(c => c.abort()); section.remove(); } };
 }

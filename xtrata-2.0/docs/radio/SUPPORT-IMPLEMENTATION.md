@@ -34,7 +34,11 @@ normal playlists as fully supported.
 - `scripts/radio-support/preview-smoke.mjs`: isolated headless Chrome layout,
   history, absence, timeout and external-request checks at 1200px and 390px.
 
-No production radio imports these files yet. No new public funding page, key,
+The shared radio now imports a compile-time-gated read-only attachment; default
+builds remove it. Set `VITE_RADIO_SUPPORT_PREVIEW=true` only for preview builds.
+The attachment creates a collapsed panel in the standalone station column or
+homepage hero area, excludes embeds, and performs no requests before expansion.
+No new public funding page, key,
 native host, extension, payment hook, signing method or broadcast command exists.
 The fixture transport is not an authentication implementation. The compact
 read-only types are an initial internal model; lock the native wire schema only
@@ -62,8 +66,22 @@ The four implementation TypeScript modules passed targeted compilation. Browser
 checks passed at both widths; the mobile screenshot was visually inspected.
 Neither a full app build nor a real-radio payment/performance test is claimed.
 
-Next: complete Gate 1's lease/intent schemas and response envelopes; add lifecycle
-freshness/revocation and accounting snapshot rules; then integrate the read-only
-panel into the actual radio behind a disabled feature flag and test both layouts.
+Second slice: added strict start-intent/lease-request schemas and correlated
+response envelopes in `messages.ts`. Extra transaction fields and page-requested
+takeover are rejected. These parsers do not authenticate a caller or authorize
+spending. Response nonces provide correlation only. The panel now expires stale
+status after 30 seconds and supports injected invalidation with cleanup.
+
+20 focused tests and the 86 radio regressions pass. Targeted TypeScript checks
+pass. Default radio build remains 76.06 kB / 30.95 kB gzip; preview-enabled build
+is 78.16 kB / 31.66 kB gzip. Preview build outputs remain ignored artifacts.
+`radio-layout-smoke.mjs` checks both real page layouts at 1200px and 390px.
+The initial homepage check exposed a hidden workspace mount; it was moved after
+the visible homepage hero and covered by regression tests. The standalone check
+uses the preview-enabled bundle; the homepage check injects the same attachment
+into the default development page. Neither check exercises real paid playback.
+
+Next: implement authenticated transport/pairing and lease lifecycle, policy and
+snapshot versioning, durable journal recovery, and the actual media-start observer.
 Full Gates 1–2 remain open. Gates 3–9 remain unimplemented. Do not treat passing
 focused harness checks as production readiness or authority to spend funds.

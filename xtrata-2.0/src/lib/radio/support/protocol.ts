@@ -14,6 +14,7 @@ export type Page = { entries: Entry[]; next: string | null };
 export interface ReadOnlyCompanion {
   status(signal: AbortSignal): Promise<unknown>;
   history(cursor: string | null, limit: number, signal: AbortSignal): Promise<unknown>;
+  onInvalidated?(listener: () => void): () => void;
 }
 function record(value: unknown, keys: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid response');
