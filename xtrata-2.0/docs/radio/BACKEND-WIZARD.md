@@ -28,7 +28,7 @@ Runs allow 1–5 transactions, 1–1000 microSTX fixed network fee each, at most
 
 The deployed helper source hash and mainnet network are verified. Each call has an exact 50 microSTX spend post-condition. Only one run/process and one unresolved payment are allowed. The backend persists signed bytes before sending and waits for the matching confirmed receipt before the next call. No automatic fee increase or replacement transaction is made. A rejected/failed/uncertain submission blocks further runs until operator investigation; do not delete its journal to bypass this.
 
-Stop halts future payments. Already broadcast payments can confirm. The existing wizard `KILL` file and `WIZARD_KILL_SWITCH` are respected. After a crash, inspect whether a runner is alive before removing a stale run.lock. This prototype has no backend withdrawal endpoint; preserve the vault and unused funds for a separately reviewed recovery operation.
+Stop halts future payments. Already broadcast payments can confirm. The existing wizard `KILL` file and `WIZARD_KILL_SWITCH` are respected. After a crash, inspect whether a runner is alive before removing a stale run.lock. Return controls are now available in the local panel; see below. Preserve the vault and journal, especially if any transaction is unresolved.
 
 Tests exercise contract payments and receipts, not audible playback. A receipt proves this payment call, not listening duration. Failed transactions can consume network fees.
 
@@ -47,3 +47,46 @@ This wizard remains operator test tooling. Successful mainnet tests do not make
 it a production end-user wallet or connect it automatically to normal radio
 playback. The production path, local discovery boundary and recovery requirements
 are specified in the [Music Balance integration plan](../plans/RADIO-MUSIC-BALANCE-INTEGRATION.md).
+
+## Wallet return controls — 17 September 2026
+
+Restart the local server to load the updated UI. The canary's local wizard link
+opens the same panel at http://127.0.0.1:8798. Public xtrata.xyz wallet integration
+is still separate work; this page manages the existing local operator wizard.
+
+The panel shows the confirmed balance, copyable funding address, over-1-STX
+warning, return review and transaction activity. Above 1 STX the backend blocks
+new test payments. It cannot reject deposits to the address.
+
+- **Return excess** returns the excess minus the selected network fee, leaving
+  exactly 1 STX. If the excess cannot cover the fee, it explains why.
+- **Return all** returns the balance minus the selected fee, including the
+  listening reserve. It is available regardless of the recommended balance.
+- Enter and check your own mainnet destination. The wizard never guesses it from
+  a deposit sender. Default fee is 300 microSTX; editable from 1 to 1000 microSTX,
+  with no automatic increase. This is an explicit choice, not a confirmation guarantee.
+- Review the exact destination, amount, fee and remaining balance, check approval
+  and select **Confirm and send return**. A review expires after two minutes.
+  Changing inputs, stopping, restarting the server or a changed balance/nonce
+  requires another review. **Cancel review** does not send a transaction.
+- Preparing a return stops the test loop. Cancelled and completed returns leave
+  tests stopped; the operator must explicitly approve another test run. This
+  operator behaviour does not implement production autoplay resumption.
+
+Returns and tests share one process lock and nonce guard. Pending/unknown play
+transactions must resolve before returning funds; an unavailable transaction is
+not permission to spend around it. Refresh checks return confirmations but never
+rebroadcasts. Saved signed returns are journaled and flushed before submission;
+repeated confirmation of their request ID cannot create another transfer. Return
+status and explorer links are shown without exposing keys or signed bytes.
+Kill switches apply to returns too. A signed/submitted transaction may still
+confirm after Stop. An uncertain return blocks later tests and returns.
+
+The previously recorded 200-microSTX play attempt is not altered or removed by
+these controls. If it remains unresolved, the UI will explain that recovery is
+required before a return. Never delete its journal merely to bypass the guard.
+
+Tests: `npx vitest run scripts/wizard/__tests__/radio-plays-backend.test.ts
+scripts/wizard/__tests__/radio-returns.test.ts` (one command). Browser checks:
+`node scripts/radio-support/wizard-returns-smoke.mjs`. These use temporary wallets
+and mocked chain calls only; screenshots stay under ignored `.artifacts/`.

@@ -128,3 +128,32 @@ and show the amount after miner fees. Pending payments reconcile before a
 return; full return releases the listening reserve and disables support. Added
 accounting, duplicate/race and recovery acceptance cases. Documentation only;
 no withdrawal endpoint, live wallet change or transaction was performed.
+
+## Local wizard return UI implemented — 17 September 2026
+
+The original loopback wizard now has a responsive wallet dashboard: copyable
+address, confirmed balance, over-1-STX warning, Return excess, Return all, editable
+fee, exact destination/amount/remaining-balance review, approval, cancellation,
+Stop and public transaction history with explorer links. The canary link now
+describes these controls. This does not activate the public radio companion.
+
+The backend validates mainnet destinations, calculates with integer microSTX,
+shares its run lock across tests/returns, reconciles pending plays and returns,
+flushes signed return records before broadcasting and deduplicates request IDs
+across restarts. Balance/nonce changes, expiry, Stop or restart invalidate an
+unsigned review. Full return includes the reserve. Excess return leaves 1 STX
+after fees. Above-target balances block new tests. Existing operator spending
+caps and kill switches are preserved; no funded wallet was accessed for tests.
+
+Validation: 17 focused backend/deployment tests pass, the existing 34-test support
+harness passes, and targeted ESLint passes. Isolated Chrome checks at 1200px and
+390px exercise the real local server with disposable keys and mocked chain calls:
+wrong-origin/GET/content-type rejection, both returns, fee edits, cancellation,
+review restoration after reload, fresh approval, confirmation history and no
+horizontal overflow. Four transfers were simulated; no live transfer occurred.
+Screenshots are local under `.artifacts/radio-wizard-returns/`.
+
+The funded operator wizard's previously unknown play remains unchanged. If still
+unresolved it blocks withdrawal until separately investigated. This release
+adds controls, not an automatic bypass of unknown transactions. Restart the
+local server and open http://127.0.0.1:8798 to use the updated panel.

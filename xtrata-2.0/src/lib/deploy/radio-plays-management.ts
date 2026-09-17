@@ -20,8 +20,8 @@ export function renderRadioPlaysManagement(read: Read): HTMLElement {
   add('h4', 'Backend wizard funding and automated tests');
   add('p', 'Start the local backend from the xtrata-2.0 folder. Its encrypted key stays in ignored local files; the browser only sends commands. No extension or deployer wallet is used.');
   add('pre', 'node scripts/wizard/radio-plays-server.mjs');
-  const wizard = document.createElement('a'); wizard.href = 'http://127.0.0.1:8798'; wizard.target = '_blank'; wizard.rel = 'noopener noreferrer'; wizard.textContent = 'Open backend wizard: get address → confirm funds → run tests'; root.append(wizard);
-  add('p', 'The local panel creates or retrieves the dedicated funding address, checks confirmed funds and runs explicitly approved bounded tests. Keep its backend process running. Funding alone never enables spending.');
+  const wizard = document.createElement('a'); wizard.href = 'http://127.0.0.1:8798'; wizard.target = '_blank'; wizard.rel = 'noopener noreferrer'; wizard.textContent = 'Open local wizard: balance, return excess / all, and test controls'; root.append(wizard);
+  add('p', 'The local panel creates or retrieves the dedicated funding address, checks confirmed funds, warns above 1 STX, offers reviewed excess/full returns and runs explicitly approved bounded tests. Keep its backend process running. Funding alone never enables spending.');
   const output = add('pre', 'Choose a check below. Results are public chain data.');
   output.setAttribute('aria-live', 'polite');
   const buttons: HTMLButtonElement[] = [];
