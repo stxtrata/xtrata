@@ -317,3 +317,10 @@ companion; older activity rows prefer current credited artist names. Kept paymen
 recipients and immutable inscriptions unchanged. Added typed exports and tests
 for corrected uploader aliases, repeated IDs and missing credits. 33 targeted
 tests passed; radio bundle and clean allowlisted desktop package rebuilt.
+
+### Confirmed song titles (2026-09-18)
+
+Added explicit title corrections: #312 Smalltalk (Hundred Little Reasons),
+#315 Entertainment (melophonic). Shared corrections cover the player, favourites,
+catalogue/private metadata and companion playlist. Eleven focused tests passed;
+radio and desktop package rebuilt. No public lounge deployment was performed.

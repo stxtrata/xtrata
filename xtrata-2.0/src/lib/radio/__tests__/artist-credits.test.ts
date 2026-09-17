@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {ARTIST_CREDITS,radioArtist} from '../artist-credits.mjs';
+import {ARTIST_CREDITS,radioArtist,radioTitle} from '../artist-credits.mjs';
 describe('provided artist credits',()=>{
  it('corrects uploader aliases by exact inscription ID',()=>{
   expect(radioArtist(2885,'jimdotbtc')).toBe('Audionals');
@@ -13,3 +13,5 @@ describe('provided artist credits',()=>{
   expect(Object.values(ARTIST_CREDITS).every(Boolean)).toBe(true);
  });
 });
+
+it('uses the confirmed titles for 312 and 315',()=>{expect(radioTitle(312,'Inscription #312')).toBe('Smalltalk');expect(radioTitle('315','')).toBe('Entertainment');expect(radioTitle(999,'Unchanged')).toBe('Unchanged');});

@@ -1,4 +1,4 @@
-import {radioArtist} from './artist-credits.mjs';
+import {radioArtist,radioTitle} from './artist-credits.mjs';
 import {removeConfirmedLocalLikes} from './local-like-cleanup';
 import type {WalletSession} from '../wallet/types';
 type Track={id:number;title:string;artist?:string};
@@ -12,7 +12,7 @@ export function createRadioOnchainState(options:{wallet:()=>WalletSession;change
  const address=()=>{const s=options.wallet();return s.isConnected&&s.network==='mainnet'?s.address:undefined;};
  const snapshot=():Snapshot=>{
   if(state.wallet!==address())return {wallet:address(),status:address()?'loading':'disconnected',likes:[]};
-  return {...state,likes:state.likes.map(l=>{const meta=options.metadata?.(l.tokenId);return {...l,title:meta?.title&&!/^(?:Inscription )?#\d+$/.test(meta.title)?meta.title:l.title,artist:radioArtist(l.tokenId,meta?.artist||l.artist)};})};
+  return {...state,likes:state.likes.map(l=>{const meta=options.metadata?.(l.tokenId);return {...l,title:radioTitle(l.tokenId,meta?.title&&!/^(?:Inscription )?#\d+$/.test(meta.title)?meta.title:l.title),artist:radioArtist(l.tokenId,meta?.artist||l.artist)};})};
  };
  async function refresh(force=false){
   const wallet=address();
