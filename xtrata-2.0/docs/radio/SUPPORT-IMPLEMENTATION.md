@@ -259,3 +259,18 @@ no horizontal overflow; all payments were simulated. Inspected desktop capture.
 This is a local listener UI, not a deployed website or packaged installer; hosted
 onboarding still needs the authenticated companion distribution described in
 MUSIC-LOUNGE.md. No public-wallet integration or deployment is claimed.
+
+### Customer setup page and desktop source distribution (2026-09-17)
+
+Added /radio/support with installation steps, capability limits, costs, local-key
+risks, funding/return guidance, and an explicit tested-versus-experimental OS and
+browser matrix. Linked it from radio and share pages. Added an allowlisted source
+archive with Mac/Windows launchers, Node 24 preflight and locked dependency setup;
+prebuild generates the download and checksum before static asset copying.
+
+Validation: extracted into a fresh temporary directory; Node 22 was correctly
+rejected, Node 24 installed 75 production packages successfully, and the packaged
+server served the lounge on an isolated local port. No wallet was created and no
+payment sent. Download and responsive page checked in desktop/mobile Chrome.
+Windows/Linux launchers are supplied but not claimed tested. No public deployment
+or signed installer is claimed. The existing live listening session was untouched.

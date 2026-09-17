@@ -47,3 +47,19 @@ Artwork and catalogue metadata are optional. Missing images use the Xtrata
 record sleeve; missing names use inscription IDs. Your payment activity shows
 recipients from the transaction journal and confirmed receipts, not artwork or
 artist metadata.
+
+## Website setup and downloadable package
+
+The customer page is `/radio/support` (`public/radio/support.html`). The public
+radio and embed guide link to it. `npm run build:music-support` produces a
+source-based `.tar.gz` and SHA-256 file under `public/downloads`; prebuild runs
+this automatically so Vite includes them in the deployed site. Outputs are
+ignored, regenerated from an explicit source allowlist, and contain no wallet
+files, history, secrets, node_modules or user media.
+
+Extract into a permanent folder, install Node.js 24, and run `node setup.mjs`.
+Setup uses the committed lockfile with `npm ci --omit=dev --ignore-scripts`.
+It installs dependencies only; wallet creation and spending remain explicit.
+Mac/Windows install and start launchers are included. This is not a signed native
+installer. Windows/Linux remain experimental pending actual platform validation.
+Never overwrite/delete a funded installation; return funds before replacing it.

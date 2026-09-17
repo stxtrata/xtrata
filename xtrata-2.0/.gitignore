@@ -55,3 +55,7 @@ scripts/.cache/
 
 # Dedicated collection wizard encrypted vault and transaction journal
 scripts/wizard/.collection-v15/
+
+# Built from the explicit Music Support package allowlist
+/public/downloads/xtrata-music-support.tar.gz
+/public/downloads/xtrata-music-support.sha256

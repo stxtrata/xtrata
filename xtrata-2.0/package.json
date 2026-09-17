@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet",
+    "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet",
     "build:radio-test-wallet": "vite build -c vite.radio-test-wallet.config.ts",
     "build": "vite build",
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
@@ -82,6 +82,7 @@
     "wizards:suno:test:browser": "XTRATA_BROWSER_TESTS=1 vitest run scripts/wizard/__tests__/suno-browser.test.ts",
     "build:radio-likes": "vite build -c vite.radio-likes.config.ts",
     "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts",
+    "build:music-support": "node scripts/music-support/package.mjs",
     "music:lounge": "node scripts/wizard/radio-plays-server.mjs",
     "test:radio-support": "node scripts/radio-support/harness.mjs"
   },
