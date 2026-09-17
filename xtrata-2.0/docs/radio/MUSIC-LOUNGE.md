@@ -62,3 +62,12 @@ It installs dependencies only; wallet creation and spending remain explicit.
 Mac/Windows install and start launchers are included. This is not a signed native
 installer. Windows/Linux remain experimental pending actual platform validation.
 Never overwrite/delete a funded installation; return funds before replacing it.
+
+## Session mode indicator
+
+**SUPPORT ON** means the session remains authorised for new song starts.
+**SUPPORT WAITING** means approval is retained while the connection recovers.
+**FREE PLAY** means this tab is not paying. Individual starts can remain free
+while another transaction is unresolved; their outcome is shown separately.
+The approval stays checked and the enable button confirms support is on.
+Select Free play before changing the fixed fee or other payment settings.

@@ -284,3 +284,17 @@ return-excess controls. Updated lounge, setup page and current documentation.
 assertion; mocked payments now exercise a 1.5 STX balance and approval above 1 STX.
 Rebuilt the downloadable package. Active local listening was left running;
 backend changes require a restart. No new real payments were submitted.
+
+### Persistent session support controls (2026-09-17)
+
+Made continuous support the operator-page default. While enabled, approval stays
+checked, the enable button says “Music support is on”, and payment settings are
+locked until the user selects Free play. Temporary connection failures keep
+continuous consent and show SUPPORT WAITING; active and disabled modes show
+SUPPORT ON and FREE PLAY. Catalogue refresh preserves the enabled description.
+Ignore stale heartbeat responses when consent changes during the request.
+Closing/reloading the page, explicit Stop/Free or server restart still ends consent.
+Validation: 12 listening unit tests passed. Desktop/mobile simulated-payment
+browser checks passed for both continuous lounge and bounded operator sessions,
+including retained checked approval and disabled enable button. Rebuilt package.
+No real payment or server restart was performed; refresh loads the updated UI.

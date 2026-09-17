@@ -37,8 +37,8 @@ try{for(const width of [1200,390]){
   const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+(lounge?'/lounge':''));
   await page.locator('#radio-load').click();await page.waitForFunction(()=>document.querySelectorAll('#radio-songs option').length===2);
   await page.locator('#radio-play').click();await page.waitForFunction(()=>document.getElementById('radio-audio').currentTime>.05);assert.equal(sent,0);
-  if(!lounge){await page.getByText('Paid mainnet test settings',{exact:true}).click();await page.locator('#radio-paid-max').fill('2');}await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();
-  await page.waitForFunction(()=>/^(PAID TEST|CONTINUOUS PAID)/.test(document.getElementById('radio-mode').textContent));assert.equal(sent,0);
+  if(!lounge){await page.getByText('Paid mainnet test settings',{exact:true}).click();await page.locator('#radio-continuous').uncheck();await page.locator('#radio-paid-max').fill('2');}await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();
+  await page.waitForFunction(()=>/^SUPPORT ON/.test(document.getElementById('radio-mode').textContent));assert.equal(sent,0);assert.equal(await page.locator('#radio-enable').isDisabled(),true);assert.equal(await page.locator('#radio-approve').isChecked(),true);
   await page.locator('#radio-next').click();await page.waitForFunction(()=>document.getElementById('radio-payment').textContent.includes('Payment requested'));
   await new Promise(r=>setTimeout(r,200));assert.equal(sent,1);
   await page.locator('#radio-play').click();await page.locator('#radio-play').click();await page.evaluate(()=>{document.getElementById('radio-audio').currentTime=2;});assert.equal(sent,1);

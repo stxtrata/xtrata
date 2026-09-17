@@ -2,3 +2,5 @@
 
 select{display:block;width:100%;max-width:100%;padding:10px;background:#091413;color:#fff;border:1px solid #6c8279;border-radius:6px;margin:10px 0}audio{width:100%;margin:12px 0}summary{cursor:pointer;padding:10px 0;font-weight:600}
 .activity-row,#radio-events{overflow-wrap:anywhere}
+
+#radio-mode{padding:10px 14px;border-radius:8px;border:1px solid #65736b;background:#1d2824}#radio-mode[data-mode="support"]{color:#d0ffa6;border-color:#99cc70;background:#263c24}#radio-mode[data-mode="waiting"]{color:#ffe0a0;border-color:#b99652;background:#39321f}
