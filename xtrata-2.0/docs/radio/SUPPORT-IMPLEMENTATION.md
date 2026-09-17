@@ -83,5 +83,14 @@ into the default development page. Neither check exercises real paid playback.
 
 Next: implement authenticated transport/pairing and lease lifecycle, policy and
 snapshot versioning, durable journal recovery, and the actual media-start observer.
-Full Gates 1–2 remain open. Gates 3–9 remain unimplemented. Do not treat passing
+Third slice: `tools/music-wallet/simulation.mjs` implements durable SQLite pairing
+state, one active document lease, immutable playback IDs, reservations and atomic
+simulated reconciliation. Eight new tests cover abrupt process exit, forced write
+rollback and duplicate confirmation. The cumulative focused harness has 28 tests.
+Status matches the read-only panel schema; history remains a separate simulated
+ledger until verified chain evidence exists. No private wallet data was opened.
+See [companion notes](../../tools/music-wallet/README.md).
+
+Full Gates 1–2 remain open. Gate 3 has partial simulation coverage; Gates 4–9
+remain unimplemented. Do not treat passing
 focused harness checks as production readiness or authority to spend funds.
