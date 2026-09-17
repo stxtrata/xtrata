@@ -1,3 +1,4 @@
+import InclusivePricePreview from '../../components/collection/InclusivePricePreview';
 import { importAllowlist } from '../lib/allowlist-import';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { showContractCall } from '../../lib/wallet/connect';
@@ -2426,6 +2427,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
 
     return (
       <div className="collection-settings-panel collection-settings-panel--guided">
+        {templateVersion === 'xtrata-collection-mint-v1.6' && !preInscribedMint && <InclusivePricePreview maxChunks={deployPricingLock?.maxChunks ?? null} />}
         <div className="collection-settings-panel__group">
           <h3 className="info-label">
             Guided launch quick actions

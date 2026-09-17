@@ -3336,6 +3336,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const displayedMintPriceMicroStx = useDisplayedMintPrice
     ? collectionMintPricingConfig.mintPriceMicroStx
     : effectiveOnChainMintPrice;
+  const buyerQuotes = usesV15 && effectiveOnChainMintPrice !== null && contractStatus?.v15Fees
+    ? mintableAssets.map(asset => resolveAssetChunkCount(asset)).filter(chunks => chunks > 0)
+        .map(chunks => quoteCollectionV15Mint(contractStatus.v15Fees!, chunks, effectiveOnChainMintPrice).total)
+    : [];
+  const buyerMin = buyerQuotes.length ? buyerQuotes.reduce((a,b) => a < b ? a : b) : null;
+  const buyerMax = buyerQuotes.length ? buyerQuotes.reduce((a,b) => a > b ? a : b) : null;
   const mintPriceLabel = toMicroStxLabel(displayedMintPriceMicroStx);
   const mintPriceDisplay = formatMicroStxWithUsd(displayedMintPriceMicroStx, usdPriceBook);
   const freeMint = isDisplayedCollectionMintFree({
@@ -3524,10 +3530,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 </span>
               </div>
               <div className={`collection-live-page__hero-price-card ${mintPriceToneClass}`}>
-                <span className="collection-live-page__hero-price-label">Mint price</span>
-                <strong>{mintPriceLabel}</strong>
+                <span className="collection-live-page__hero-price-label">{usesV15 ? 'Buyer price · inscription included' : 'Mint price'}</span>
+                <strong>{usesV15 ? buyerMin === null ? 'Calculating total…' : buyerMin === buyerMax ? toMicroStxLabel(buyerMin) : `${toMicroStxLabel(buyerMin)} – ${toMicroStxLabel(buyerMax)}` : mintPriceLabel}</strong>
                 <span className="collection-live-page__hero-price-subtle">
-                  {mintPriceDisplay.secondary ?? '\u00a0'}
+                  {usesV15 ? 'Wallet network fee additional. Total varies by item size when shown as a range.' : mintPriceDisplay.secondary ?? '\u00a0'}
                 </span>
               </div>
               {freeMint && (

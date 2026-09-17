@@ -39,3 +39,11 @@ Verified locally: API key configured (presence only), proxy HTTP 200, browser v1
 Mainnet transaction 0x88d74b88ef336cd14115d743644f0f40e1b8a8fafc8a9e0c7148edde21b35dd3 aborted with err u100: restoration attempted to change all three recipients to the wizard, but marketplace/operator changes require RecipientEditors flags even for the owner. The canary now reads those permissions before opening the wallet, and exposes set/get-recipient-editor-access with the pinned core. Grants remain explicit wallet actions and check the signer is the core admin. No permission was granted automatically.
 
 The old helper's splits are 0/0/0. This is valid: split-payment assigns the unallocated remainder to the operator, so the old wizard received the entire collection price. Earlier advice describing zero splits as necessarily unfinished was incorrect. Preserve both recipients and splits to retain the previous payout behavior. After restoring recipients, editor rights may be revoked with false/false through the same form.
+
+## v1.6 fee-inclusive UI preview
+
+Added a calculation-only creator panel for v1.6 guided settings. It reads the four current v3.2.3 fee units through the server proxy, requires a locked inventory maximum, and calculates target buyer price minus the largest-item protocol allowance. Example payout shares explicitly use 5% of the sale base, not gross buyer spend or verified live splits. No wallet or metadata writes are performed. Unknown fees or missing inventory do not produce a quote.
+
+The v1.5/v1.6 live mint hero now displays sale amount plus protocol fees for loaded active inventory, as a range where costs differ, and labels wallet network fees separately. Contract prices and transaction caps remain unchanged. This is a local UI change, not a production deployment or migration. Equal mixed-size totals still require new contract behavior. Migration must preserve completed mints and old receipts; only remaining inventory can move after reservation checks.
+
+Validation: eight focused calculator/launch pricing tests pass; Vite production build passes.
