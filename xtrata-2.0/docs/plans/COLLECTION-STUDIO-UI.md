@@ -29,3 +29,31 @@ Mint rule shortcuts expose prices, phases, phase activation, global/phase allowl
 Validation: 12 targeted builder/import/inventory tests passed; production build passed. Isolated mock-data layout inspected at 1440px and 390px with no horizontal overflow. Repository-wide TypeScript checking still encounters existing Vitest typing/configuration conflicts; a newly exposed narrowed-mode comparison was corrected. No real-wallet transactions or production deployment.
 
 Remaining backend work from the broader proposal: signed creator sessions and per-collection write authorization, public-access quotas, automatic phase activation, and deployed cleanup workers. The existing creator access gate remains until these protections exist. Preview reflects saved metadata, not every unsaved form keystroke. This change reuses existing artwork/metadata controls rather than introducing a new bulk metadata schema.
+
+## Current versus legacy collections
+
+The collection picker now defaults to helper v1.5 collections targeting Core v3.2.3 (when a core binding is recorded). Older/unversioned active collections remain accessible in a collapsed Legacy collections disclosure; they are no longer auto-selected on resume. The owner-wide oversight section starts collapsed. These are manager display changes, not changes to the public collection listing or chain contracts.
+
+Production storage audit verified all ten Numbers 1–10 optimized JPEGs byte-for-byte against local originals: 548–884 bytes each, 7,273 bytes total. They belong to the disposable setup wallet SP3P8VYRTXYVEH2R85YKASHTD65Z4E4RC13MY7X6M, not the connected deployer. The active D1 rows use the replacement `*-128.jpg` names.
+
+A separate user-authorized storage cleanup targets only expired files in undeployed legacy drafts; local backup inventory, file bytes and deletion acknowledgements are retained under ignored root media/collection-cleanup-backup-2026-09-15. Published/deployed collections and the current Numbers collection are excluded. API reservation and shared-storage-reference guards remain authoritative. No on-chain purge or transaction is performed.
+
+Validation: version classification test and Vite production build passed.
+
+Cleanup completion: 290 expired assets (968,327 bytes) removed with both D1 deletion and R2 deletion acknowledgements: DYLE0417 (281), RRTEST (3), Russian Rampage V00 (6). Fresh API reads confirm all three asset lists are empty, while Numbers 1–10 retains 10 files / 7,273 bytes. Backups remain local; no public listing, deployed collection storage, or on-chain data was deleted.
+
+## Numbers collection: 1 STX and unpause
+
+The dedicated wizard confirmed base mint price 1,000,000 micro-STX and unpaused the helper, with six confirmations per transaction. Price tx: 0x91aeaf7862515ab63f6cded1abdf3ca49e736b896c6f8f19d1fc769be853da7c. Unpause tx: 0x58a16ed15da5c3435dcd30dc3dc3a19c1cc6e1c0e2deea1ea6de45a50b022365. Miner fee budgets: 1,385 and 10,000 micro-STX. These are admin calls only; no artwork was inscribed. Collector protocol/network fees are additional to the 1 STX collection price.
+
+Added an explicit `launch` command to the dedicated encrypted/Keychain runner. It checks source/owner/core binding, ten optimized registered URIs, supply and public base-phase settings before setting price and unpausing. Journaled retries do not re-sign or re-spend confirmed steps. Offline integration tests cover price-before-unpause, no mint calls, and idempotent launch resume; both runner integration tests passed.
+
+Website metadata synchronization and publication were rejected by automatic approval review as additional production mutations requiring explicit user approval. The collection website record therefore remains draft pending that approval; on-chain unpause is already confirmed.
+
+## Published numbered mint and progress display
+
+After explicit user approval, Numbers 1–10 website metadata was synchronized to raw on-chain price 1 STX and the collection record published. Fresh production API verification confirms state published and price 1 STX. Public-directory visibility was unchanged. The earlier publication approval block is resolved.
+
+The collection mint page now uses a single accessible Mint progress status instead of the legacy three traffic-light rows. It distinguishes atomic versus resumable execution after inspecting actual bytes and existing chain state. The current deployed v1.5 helper enforces MAX-SMALL-MINT-CHUNKS u30 despite a list-32 argument; 31–32 chunks therefore cannot safely be sent through its atomic method. Fresh 1–30-chunk files already auto-route atomically, including all ten optimized JPEGs. Existing reservations/uploads retain resume routing. Supporting 32 chunks requires a revised deployed helper; this UI change does not alter the immutable contract.
+
+Validation: six routing tests passed, including v1.5 boundary coverage at 1/30/31/32/33; Vite build passed. UI code is local pending deployment; production collection publication is complete.

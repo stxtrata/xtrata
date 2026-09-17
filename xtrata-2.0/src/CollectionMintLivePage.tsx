@@ -57,6 +57,7 @@ import {
 } from './lib/collection-mint/payment-model';
 import { findFirstMatchInBatches } from './lib/collection-mint/resume-scan';
 import {
+  collectionSingleTxChunkLimit,
   shouldUseCollectionSmallSingleTx,
   supportsCollectionSmallSingleTx
 } from './lib/collection-mint/routing';
@@ -64,7 +65,6 @@ import { parseDeployPricingLockSnapshot } from './lib/deploy/pricing-lock';
 import { PUBLIC_CONTRACT } from './config/public';
 import {
   DEFAULT_TOKEN_URI,
-  SMALL_MINT_HELPER_MAX_CHUNKS,
   TX_DELAY_SECONDS
 } from './lib/mint/constants';
 import { getNetworkFromAddress, getNetworkMismatch } from './lib/network/guard';
@@ -908,19 +908,6 @@ const formatCount = (value: bigint | null) => {
 
 const formatItemLabel = (value: bigint) => (value === 1n ? 'item' : 'items');
 
-const formatStepStatus = (state: StepState) => {
-  if (state === 'pending') {
-    return 'In progress';
-  }
-  if (state === 'done') {
-    return 'Complete';
-  }
-  if (state === 'error') {
-    return 'Error';
-  }
-  return 'Idle';
-};
-
 const pause = (ms: number) =>
   new Promise<void>((resolve) => {
     window.setTimeout(() => resolve(), ms);
@@ -1011,6 +998,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusLastUpdatedAt, setStatusLastUpdatedAt] = useState<number | null>(null);
   const [mintPending, setMintPending] = useState(false);
+  const [mintRoute, setMintRoute] = useState<'single' | 'staged' | null>(null);
   const [mintMessage, setMintMessage] = useState<string | null>(null);
   const [mintLog, setMintLog] = useState<string[]>([]);
   const [mintedTokenIds, setMintedTokenIds] = useState<Record<string, string>>({});
@@ -1470,6 +1458,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   }, []);
 
   const resetSteps = useCallback(() => {
+    setMintRoute(null);
     setBeginState('idle');
     setUploadState('idle');
     setSealState('idle');
@@ -2497,13 +2486,14 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           hasReservation: progress.hasReservation,
           hasUploadState: progress.uploadState !== null
         });
+        setMintRoute(useSmallSingleTxRoute ? 'single' : 'staged');
         if (useSmallSingleTxRoute) {
           activeStage = 'single';
           setBeginState('pending');
           setUploadState('pending');
           setSealState('pending');
           appendMintLog(
-            `Small-file single-tx route active (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks).`
+            `Small-file single-tx route active (<=${collectionSingleTxChunkLimit(templateVersion)} chunks).`
           );
 
           const singleTxSpendCap = usesV15 ? (await freshV15Quote(chunks.length)).total : resolveSmallSingleTxSpendCap(chunks.length);
@@ -3346,6 +3336,12 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const displayedMintPriceMicroStx = useDisplayedMintPrice
     ? collectionMintPricingConfig.mintPriceMicroStx
     : effectiveOnChainMintPrice;
+  const buyerQuotes = usesV15 && effectiveOnChainMintPrice !== null && contractStatus?.v15Fees
+    ? mintableAssets.map(asset => resolveAssetChunkCount(asset)).filter(chunks => chunks > 0)
+        .map(chunks => quoteCollectionV15Mint(contractStatus.v15Fees!, chunks, effectiveOnChainMintPrice).total)
+    : [];
+  const buyerMin = buyerQuotes.length ? buyerQuotes.reduce((a,b) => a < b ? a : b) : null;
+  const buyerMax = buyerQuotes.length ? buyerQuotes.reduce((a,b) => a > b ? a : b) : null;
   const mintPriceLabel = toMicroStxLabel(displayedMintPriceMicroStx);
   const mintPriceDisplay = formatMicroStxWithUsd(displayedMintPriceMicroStx, usdPriceBook);
   const freeMint = isDisplayedCollectionMintFree({
@@ -3400,7 +3396,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     supportsSingleTxRoute &&
     mintableAssets.some((asset) => {
       const chunkCount = resolveAssetChunkCount(asset);
-      return chunkCount > 0 && chunkCount <= SMALL_MINT_HELPER_MAX_CHUNKS;
+      return chunkCount > 0 && chunkCount <= collectionSingleTxChunkLimit(templateVersion);
     });
   const estimatedSealFeeUnits =
     collectionMaxChunkCount === null || collectionMaxChunkCount <= 0
@@ -3534,10 +3530,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 </span>
               </div>
               <div className={`collection-live-page__hero-price-card ${mintPriceToneClass}`}>
-                <span className="collection-live-page__hero-price-label">Mint price</span>
-                <strong>{mintPriceLabel}</strong>
+                <span className="collection-live-page__hero-price-label">{usesV15 ? 'Buyer price · inscription included' : 'Mint price'}</span>
+                <strong>{usesV15 ? buyerMin === null ? 'Calculating total…' : buyerMin === buyerMax ? toMicroStxLabel(buyerMin) : `${toMicroStxLabel(buyerMin)} – ${toMicroStxLabel(buyerMax)}` : mintPriceLabel}</strong>
                 <span className="collection-live-page__hero-price-subtle">
-                  {mintPriceDisplay.secondary ?? '\u00a0'}
+                  {usesV15 ? 'Wallet network fee additional. Total varies by item size when shown as a range.' : mintPriceDisplay.secondary ?? '\u00a0'}
                 </span>
               </div>
               {freeMint && (
@@ -3623,7 +3619,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <div id="live-mint-guide" className="collection-live-page__mint-guide">
                 <p className="collection-live-page__mint-guide-title">
                   {hasSingleTxEligibleAssets
-                    ? `Xtrata mint flow: 1-3 wallet signatures (<=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks auto-route to single-tx)`
+                    ? `Xtrata mint flow: 1-3 wallet signatures (<=${collectionSingleTxChunkLimit(templateVersion)} chunks auto-route to single-tx)`
                     : 'Xtrata mint flow: minimum 3 wallet signatures'}
                 </p>
                 <div className="collection-live-page__mint-guide-summary">
@@ -3637,7 +3633,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     {hasSingleTxEligibleAssets && (
                       <li>
                         Small-file route: one signature for assets up to{' '}
-                        {SMALL_MINT_HELPER_MAX_CHUNKS} chunks
+                        {collectionSingleTxChunkLimit(templateVersion)} chunks
                       </li>
                     )}
                     <li>Protocol fee range: {protocolFeeRangeLabel}</li>
@@ -3667,7 +3663,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     </span>
                     <span className="collection-live-page__mint-guide-note">
                       {hasSingleTxEligibleAssets
-                        ? `Expected wallet prompts: 1 total for <=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks, otherwise 3+ based on upload batches.`
+                        ? `Expected wallet prompts: 1 total for <=${collectionSingleTxChunkLimit(templateVersion)} chunks, otherwise 3+ based on upload batches.`
                         : estimatedWalletApprovals === null
                           ? 'Expected wallet prompts: at least 3 total (begin, upload, seal).'
                           : `Expected wallet prompts for a max-size mint in this collection: up to ${estimatedWalletApprovals} total (${estimatedUploadTransactionCount} upload batch signatures).`}
@@ -3801,43 +3797,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       </header>
 
       <main className="app__main collection-live-page__main">
-        <section className="panel app-section collection-live-page__traffic">
-          <div className="panel__header">
-            <div>
-              <h2>Mint traffic lights</h2>
-              <p>Begin, upload, and seal status for the current mint session.</p>
-            </div>
-          </div>
-          <div className="panel__body">
-            <div className="mint-steps">
-              <div className={`mint-step mint-step--${beginState}`}>
-                <strong>1. Begin</strong>
-                <span>{formatStepStatus(beginState)}</span>
-              </div>
-              <div className={`mint-step mint-step--${uploadState}`}>
-                <strong>2. Upload</strong>
-                <span>{formatStepStatus(uploadState)}</span>
-              </div>
-              <div className={`mint-step mint-step--${sealState}`}>
-                <strong>3. Seal</strong>
-                <span>{formatStepStatus(sealState)}</span>
-              </div>
-              {batchProgress && (
-                <div className="mint-step mint-step--pending">
-                  Upload batch {batchProgress.current}/{batchProgress.total}
-                </div>
-              )}
-              {txDelayLabel && formattedTxDelay && (
-                <div className="mint-step mint-step--pending mint-step--countdown">
-                  {txDelayLabel} {formattedTxDelay}s
-                </div>
-              )}
-            </div>
-            {resumeTargetAsset && !mintPending && (
-              <div className="alert">
-                Resume target selected. Mint continues from the last confirmed on-chain step.
-              </div>
-            )}
+        <section className="panel app-section" aria-labelledby="collection-mint-progress">
+          <div className="panel__header"><div><h2 id="collection-mint-progress">Mint progress</h2>
+            <p>{mintRoute === 'single' ? 'One wallet transaction — your file is uploaded and minted together.' : mintRoute === 'staged' ? 'Continuing the upload and mint process. Confirm each wallet request when prompted.' : supportsSingleTxRoute ? `Fresh files of ${collectionSingleTxChunkLimit(templateVersion)} chunks or fewer mint in one wallet transaction. Larger files and unfinished uploads use the resumable path.` : 'Follow the wallet prompts to complete your mint.'}</p>
+          </div></div>
+          <div className="panel__body" role="status" aria-live="polite">
+            <strong>{[beginState, uploadState, sealState].includes('error') ? 'Mint needs attention' : sealState === 'done' ? 'Mint confirmed' : mintPending ? 'Mint in progress' : 'Ready when you are'}</strong>
+            {mintMessage && <p>{mintMessage}</p>}
+            {mintRoute === 'staged' && batchProgress && <p>Uploading batch {batchProgress.current} of {batchProgress.total}</p>}
+            {txDelayLabel && formattedTxDelay && <p>{txDelayLabel} {formattedTxDelay}s</p>}
+            {resumeTargetAsset && !mintPending && <p>Your unfinished mint will continue from its last confirmed step.</p>}
           </div>
         </section>
 

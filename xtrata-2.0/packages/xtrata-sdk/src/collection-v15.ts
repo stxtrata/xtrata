@@ -6,7 +6,7 @@ export type CollectionV15FeeUnits = {
   seal: bigint;
 };
 export const isCollectionV15 = (version: string) =>
-  /^xtrata-collection-mint-v1[.-]5$/.test(version.trim());
+  /^xtrata-collection-mint-v1[.-][56]$/.test(version.trim());
 
 export const readCollectionV15FeeUnits = async (
   read: (functionName: string) => Promise<bigint | null>

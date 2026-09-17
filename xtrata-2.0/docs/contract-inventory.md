@@ -759,3 +759,7 @@ Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, ze
 ## xtrata-radio-plays-v1.0 (prepared, not deployed)
 
 Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Explicit core/master paid starts, atomic 50-microSTX holder payment, wallet-scoped 16-byte receipts and totals. No treasury, custody or admin. Source SHA-256 pinned in browser and CLI deployment registries. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md` for ABI, errors, tests and deployment stages.
+
+## Collection mint v1.6 candidate (Core v3.2.3)
+
+`contracts/live/xtrata-collection-mint-v1.6.clar` and its Clarinet counterpart retain v1.5 behaviour with a 32-chunk atomic mint ceiling. The updated deployment canary targets `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-6`. As of the preparation run, live preflight passed but wallet deployment remains pending. See `docs/notes/collection-v16-deployment-canary.md` for source hash, tests and v1.5 retirement evidence.
