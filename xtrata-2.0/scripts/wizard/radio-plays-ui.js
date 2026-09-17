@@ -4,6 +4,13 @@ window.radioSongLabel=e=>{const t=e.core&&e.core!==3?null:window.radioSongMetada
 void fetch('/radio/catalogue').then(r=>r.ok?r.json():null).then(v=>{for(const t of v?.tracks||[])window.radioSongMetadata.set(t.id,t);window.dispatchEvent(new Event('wizard-song-metadata'));}).catch(()=>{});
 const $=id=>document.getElementById(id);
 let state=null,review=null,busy=false,reviewValid=false,paidRadio=false;
+const warningSessionKey='xtrata-music-hide-balance-warning';
+let warningHidden=false;try{warningHidden=sessionStorage.getItem(warningSessionKey)==='1';}catch{}
+function balanceWarning(){
+ $('over-limit').hidden=!state?.overLimit||warningHidden;
+ if($('warning-show'))$('warning-show').hidden=!state?.overLimit||!warningHidden;
+}
+for(const [id,hide] of [['warning-hide',true],['warning-show',false]])if($(id))$(id).onclick=()=>{warningHidden=hide;try{if(hide)sessionStorage.setItem(warningSessionKey,'1');else sessionStorage.removeItem(warningSessionKey);}catch{}balanceWarning();};
 const stx=value=>{if(value===null||value===undefined)return '—';const n=BigInt(value);return `${n/1000000n}.${(n%1000000n).toString().padStart(6,'0')}`;};
 async function api(action,body={}){
  const response=await fetch('/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -31,7 +38,7 @@ function render(){
  if(document.body.hasAttribute('data-music-lounge')){$('setup').textContent=state?.address?'Your support wallet is ready':'Create my support wallet';}
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
  $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
- $('over-limit').hidden=!state?.overLimit;
+ balanceWarning();
  if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`Another ${stx(remaining)} STX would bring your balance to our recommended 1 STX. Check any incoming deposits first. Funding never enables payments.`:'We recommend keeping around 1 STX here. A higher balance does not pause payments.';}
  $('wallet-state').textContent=state?.recovery||state?.message||'No status loaded.';activity();controls();
 }

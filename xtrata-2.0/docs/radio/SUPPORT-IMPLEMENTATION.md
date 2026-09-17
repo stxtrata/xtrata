@@ -298,3 +298,12 @@ Validation: 12 listening unit tests passed. Desktop/mobile simulated-payment
 browser checks passed for both continuous lounge and bounded operator sessions,
 including retained checked approval and disabled enable button. Rebuilt package.
 No real payment or server restart was performed; refresh loads the updated UI.
+
+### Session dismissal for balance recommendation (2026-09-17)
+
+Added Hide for this session and Show balance recommendation controls to both
+local player pages. The preference survives balance refreshes and page reloads
+in this tab using sessionStorage (no wallet data); memory fallback applies if
+storage is unavailable. A fresh tab session defaults to showing the warning.
+Payment behaviour and return controls are unchanged. JavaScript syntax and diff
+checks passed; downloadable package rebuilt. No restart or payment performed.
