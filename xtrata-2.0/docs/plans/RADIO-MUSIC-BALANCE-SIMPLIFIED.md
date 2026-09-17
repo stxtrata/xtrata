@@ -54,7 +54,9 @@ transfer. Never advertise a guaranteed maximum possible loss of 1 STX.
 - Funding UI permits only an amount up to 1 STX minus confirmed balance and
   known incoming funding; refresh before requesting a transfer. No auto-top-up.
 - If the observed balance exceeds 1 STX, pause new paid starts and show
-  “Above the supported balance: withdraw the excess to resume.” Music stays free.
+  “This wallet holds more than the recommended 1 STX. Return the excess or
+  return your whole balance.” Show **Return excess** and **Return all** buttons.
+  Music stays free while new paid starts are paused.
 - Never automatically sweep, return or burn excess funds. Provide an explicit,
   locally reviewed withdrawal with recipient, amount and fee before signing.
 - Pending incoming transfers may be missed or change; explain the UI restriction
@@ -64,6 +66,45 @@ After spending down, the user may top up to the target. New funds resume support
 only if the user left it enabled and the policy has not changed. A pause stays
 paused. Losing local state has no platform recovery guarantee; a new installation
 creates a new wallet, not access to the old funds.
+
+## Returning funds
+
+**Return all** stays available in the wallet dashboard at any balance and while
+support is paused, disabled or above the target. Users may request it at any time;
+execution requires the local wizard and network to be available and pending
+payments to be resolved. No seed export or external wallet-signing popup is
+required: the wizard signs the approved return from its own account.
+
+Show a locally reviewed confirmation with the full mainnet destination address,
+amount received, miner fee and balance remaining. Offer a previously confirmed
+return address or let the user enter one. Never assume the last funding sender
+is the user's wallet: deposits can originate from exchanges or third parties.
+Validate the address/network and require explicit approval before every return.
+Do not automatically return funds merely because a balance threshold was crossed.
+
+After reconciling pending transactions, let B be the confirmed spendable balance
+in microSTX, F the reviewed miner fee and T = 1,000,000 microSTX:
+
+- **Return excess:** send B − T − F, leaving exactly 1 STX. Label the amount as
+  “Excess returned after network fee”. If the excess cannot cover the fee, explain
+  that no excess transfer is available at that fee; offer Return all instead.
+- **Return all:** send B − F, leaving zero. Release the ordinary listening reserve
+  for this operation. Disable automatic support so later deposits do not resume
+  it without the user enabling it again. If B cannot cover F, explain why the
+  transfer cannot proceed; do not silently increase fees or request more funds.
+
+Pause new starts and cancel unsigned play intents when preparing a return. Use
+the same exclusive nonce owner and durable journal as plays. Pending or unknown
+signed payments must reconcile first; show their status rather than guessing the
+available balance. Recompute immediately before signing; a changed amount or fee
+requires a refreshed confirmation. A cancelled return restores the previous
+support preference, subject to the existing above-limit/recovery guards.
+
+Prevent double-click and restart duplicates using a persisted return request ID
+and signed transaction. Never create a replacement for an uncertain submission.
+Show pending, confirmed or failed status and an explorer link in activity. After
+Return excess confirms, resume only if support was previously enabled, the
+balance is within target and no explicit user pause or recovery block applies.
 
 ## Keep only the essential connection controls
 
@@ -112,7 +153,10 @@ Likes and measured listening counters retain their current independent behaviour
 3. **Reliable payments:** persist before broadcast, reconcile exact tx/receipt and
    holder transfer, retain unknowns and handle abort fees. Test every crash boundary,
    exhaustion/top-up, pause, duplicates, changed policy and safe withdrawal using
-   simulations. Test actual installed browser-to-native transport separately.
+   simulations. Include exact excess/all arithmetic, insufficient fee balance,
+   reserve release for full return, untrusted funding sender, changed recipient,
+   repeated clicks, pending-play/return races, restart uncertainty and cancellation.
+   Test actual installed browser-to-native transport separately.
 4. **Bounded live canary + rollout:** fresh disposable wizard with separately
    authorised count/fee/spend limits. Reconcile receipts, balances and paid-start
    coverage; record report. Then opt-in rollout with a stop switch. Do not use

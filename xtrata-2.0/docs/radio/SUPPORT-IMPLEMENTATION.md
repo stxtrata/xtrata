@@ -119,3 +119,12 @@ ESLint passes. Repository-wide `tsc --noEmit` currently fails with broad Vitest
 `ExpectStatic` and Vite configuration typing errors; this is not reported as a
 passing typecheck. This transport adds no files to the app TypeScript include
 paths and changes no production bundle.
+
+## Return controls plan clarification — 17 September 2026
+
+The simplified plan now includes an over-1-STX warning, Return excess and an
+always-accessible Return all action. Returns use a user-confirmed destination
+and show the amount after miner fees. Pending payments reconcile before a
+return; full return releases the listening reserve and disables support. Added
+accounting, duplicate/race and recovery acceptance cases. Documentation only;
+no withdrawal endpoint, live wallet change or transaction was performed.
