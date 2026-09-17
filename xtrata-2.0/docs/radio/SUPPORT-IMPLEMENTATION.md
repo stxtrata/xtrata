@@ -274,3 +274,13 @@ server served the lounge on an isolated local port. No wallet was created and no
 payment sent. Download and responsive page checked in desktop/mobile Chrome.
 Windows/Linux launchers are supplied but not claimed tested. No public deployment
 or signed installer is claimed. The existing live listening session was untouched.
+
+### Advisory balance recommendation (2026-09-17)
+
+Removed the above-1-STX blocker from session approval, manual payments, recovery
+and the Run button. Kept the advisory balance flag, gentle warning and optional
+return-excess controls. Updated lounge, setup page and current documentation.
+30 targeted radio tests passed across the run and subsequent corrected status
+assertion; mocked payments now exercise a 1.5 STX balance and approval above 1 STX.
+Rebuilt the downloadable package. Active local listening was left running;
+backend changes require a restart. No new real payments were submitted.

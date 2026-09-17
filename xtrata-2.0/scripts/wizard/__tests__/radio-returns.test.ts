@@ -81,11 +81,11 @@ describe('wizard return controls (disposable wallets, mocked chain)',()=>{
   await expect(reopened.run({core:3,song:2910,fee:300,count:1})).rejects.toThrow('not visible');
   expect(chain.broadcasts).toHaveLength(1);
  }));
- it('blocks pending plays, foreign nonces and above-limit tests',()=>fixture(async({w,chain,api})=>{
+ it('blocks pending plays and foreign nonces',()=>fixture(async({w,chain,api})=>{
   await w.save('journal.json',[{status:'submitted',txid:'0x'+'a'.repeat(64)}]);await expect(w.prepareReturn(input)).rejects.toThrow('not visible');
   await w.save('journal.json',[]);w.api=(path,opts)=>path.endsWith('/nonces')?Promise.resolve({possible_next_nonce:1}):api(path,opts);
   await expect(w.prepareReturn(input)).rejects.toThrow('pending');w.api=api;
-  await expect(w.run({core:3,song:2910,fee:300,count:1})).rejects.toThrow('above 1 STX');expect(chain.broadcasts).toHaveLength(0);
+  expect((await w.status(true)).overLimit).toBe(true);expect(chain.broadcasts).toHaveLength(0);
  }));
  it('uses one process lock for review, payments and returns',()=>fixture(async({w,chain,dir,api})=>{
   const q=await w.prepareReturn(input);let release;

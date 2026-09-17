@@ -44,7 +44,7 @@ describe('bounded radio sessions',()=>{
  });
  it('rejects unsupported audio, funds, fees and lifetime budget',async()=>{
   const {s,w}=fixture();await expect(s.enable({...settings,fee:1000,max:5})).rejects.toThrow('ceiling');
-  w.returnAccount=async()=>({balance:1000001n});await expect(s.enable(settings)).rejects.toThrow('exceeds');
+  w.returnAccount=async()=>({balance:1000001n});expect((await s.enable(settings)).enabled).toBe(true);s.disable();
   w.returnAccount=async()=>({balance:1000n});await expect(s.enable(settings)).rejects.toThrow('funds');
   w.returnAccount=async()=>({balance:1000000n});w.journal=async()=>[{fee:9800}];await expect(s.enable(settings)).rejects.toThrow('lifetime');
   w.journal=async()=>[];const a=await s.enable(settings);expect((await s.start({id,song:4,tab,token:a.token})).outcome).toBe('free');expect(w.run).not.toHaveBeenCalled();s.disable();

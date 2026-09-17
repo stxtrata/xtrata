@@ -12,7 +12,7 @@ async function api(action,body={}){
 function controls(){
  for(const id of ['setup','status','run','return-excess','return-all','warning-excess','warning-all','return-cancel'])if($(id))$(id).disabled=busy;
  $('copy').disabled=!state?.address;
- if($('run'))$('run').disabled=busy||state?.overLimit||state?.running||!!review||paidRadio;
+ if($('run'))$('run').disabled=busy||state?.running||!!review||paidRadio;
  $('return-confirm').disabled=busy||!reviewValid||!review||review.expires<=Date.now()||!$('return-approve').checked;
 }
 function activity(){
@@ -32,7 +32,7 @@ function render(){
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
  $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
  $('over-limit').hidden=!state?.overLimit;
- if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`You can add up to ${stx(remaining)} STX to reach 1 STX. Check any incoming deposits first. Funding never enables payments.`:'No more funding is needed. Keep no more than 1 STX in this wallet.';}
+ if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`Another ${stx(remaining)} STX would bring your balance to our recommended 1 STX. Check any incoming deposits first. Funding never enables payments.`:'We recommend keeping around 1 STX here. A higher balance does not pause payments.';}
  $('wallet-state').textContent=state?.recovery||state?.message||'No status loaded.';activity();controls();
 }
 async function refresh(){

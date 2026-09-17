@@ -161,7 +161,7 @@ export class RadioWizard {
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(address),args[2]]);
    if(receipt.type!=='(optional none)'||receipt.value!==null)throw Error('The play receipt already exists or could not be verified.');
    const source=await this.api(`/v2/contracts/source/${OWNER}/${NAME}?proof=0`);if(sha(source.source)!==HASH)throw Error('Deployed source differs from pinned helper.');
-   if(account.balance>1000000n||account.balance<BigInt(fee+50+1000))throw Error('Balance is outside supported recovery limits.');
+   if(account.balance<BigInt(fee+50+1000))throw Error('Balance is outside supported recovery limits.');
    if(log.reduce((total,row)=>total+row.fee+50,0)-e.fee+fee>10000)throw Error('Recovery exceeds the lifetime test budget.');
    const owner=await this.read('get-owner',[args[0],args[1]]),recipient=owner?.success===true?owner.value?.value?.value:null;
    if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master owner is not eligible.');
@@ -212,7 +212,6 @@ export class RadioWizard {
    for(let i=0;i<p.count;i++) {
     this.guard();const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
     if(!Number.isSafeInteger(account.nonce)||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length)throw Error('Conflicting or pending nonce.');
-    if(BigInt(account.balance)>1000000n)throw Error('Balance is above 1 STX. Return the excess before starting tests.');
     if(BigInt(account.balance)<BigInt(p.fee+50+(context.continuous?0:1000)))throw Error(context.continuous?'Insufficient confirmed balance for another paid start.':'Insufficient confirmed balance; retain 0.001 STX reserve.');
     const owner=await this.read('get-owner',[T.uintCV(p.core),T.uintCV(p.song)]);const recipient=owner?.success===true?owner.value?.value?.value:null;
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');

@@ -32,7 +32,6 @@ export class RadioListening {
    const log=await this.wizard.journal();await this.wizard.reconcile(log);await this.wizard.reconcileReturns();
    if(!p.continuous&&log.reduce((total,e)=>total+e.fee+50,0)+(p.fee+50)*p.max>10000)throw Error('This approval exceeds the remaining 0.01 STX lifetime test budget.');
    const {address}=await this.wizard.json('vault.json'),account=await this.wizard.returnAccount(address);
-   if(account.balance>1000000n)throw Error('Balance exceeds 1 STX. Return the excess before enabling paid tests.');
    if(account.balance<BigInt(p.fee+50+(p.continuous?0:1000)))throw Error('Not enough confirmed funds for the next payment.');
    if(epoch!==this.wizard.stopEpoch)throw Error('Approval was stopped. Enable again when ready.');
    this.active={...p,token:randomBytes(16).toString('hex'),used:0,expires:Date.now()+p.minutes*60000,lease:Date.now()+30000,epoch:this.wizard.stopEpoch};

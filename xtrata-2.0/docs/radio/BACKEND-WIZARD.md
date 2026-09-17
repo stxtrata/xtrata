@@ -55,8 +55,8 @@ opens the same panel at http://127.0.0.1:8798. Public xtrata.xyz wallet integrat
 is still separate work; this page manages the existing local operator wizard.
 
 The panel shows the confirmed balance, copyable funding address, over-1-STX
-warning, return review and transaction activity. Above 1 STX the backend blocks
-new test payments. It cannot reject deposits to the address.
+warning, return review and transaction activity. A balance above 1 STX is advisory
+only: payments remain available. Returning excess funds is optional.
 
 - **Return excess** returns the excess minus the selected network fee, leaving
   exactly 1 STX. If the excess cannot cover the fee, it explains why.
@@ -159,8 +159,7 @@ catalogue where available. Missing metadata falls back to the inscription ID.
 Select **Continuous paid listening**, choose a fixed fee, and enable the session
 once. This explicitly removes radio time/count/session/lifetime test spending
 caps and the 0.001 STX reserve for that session. It can spend the available wizard
-balance until another fee plus 50 microSTX cannot be covered. The 1 STX maximum
-balance guard, fixed fee, transaction verification and single unresolved payment
+balance until another fee plus 50 microSTX cannot be covered. The advisory 1 STX balance recommendation, fixed fee, transaction verification and single unresolved payment
 rule remain. Manual tests retain their original limits.
 
 Temporary payment failures leave this approval active. Subsequent song starts

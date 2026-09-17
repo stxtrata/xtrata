@@ -20,8 +20,7 @@ separate distribution work before a website-only onboarding experience.
 ## Settle in
 
 1. Choose **Create my support wallet**. An existing wallet is reused.
-2. Copy the address and send STX on **Stacks mainnet**, keeping the balance at
-   or below 1 STX. Refresh the balance to check your deposit.
+2. Copy the address and send STX on **Stacks mainnet**, with a recommended balance of 1 STX (higher balances are allowed). Refresh the balance to check your deposit.
 3. Play a song. This is free until you explicitly turn on support.
 4. Review the fee under **Payment details**, approve automatic payments, then
    choose **Turn on music support**. Confirm the amount shown.
@@ -39,7 +38,7 @@ and seeking do not charge again. Unknown transactions must resolve before anothe
 payment. A start is not proof of a completed listen.
 
 Your local app stores the signing key outside browser storage. Losing its files
-can lose the balance; software with access can spend it. Keep at most 1 STX here.
+can lose the balance; software with access can spend it. We recommend keeping at most 1 STX here.
 Under **Manage or return your balance**, enter your own destination address,
 review the return, then confirm it. This stops new support payments.
 
