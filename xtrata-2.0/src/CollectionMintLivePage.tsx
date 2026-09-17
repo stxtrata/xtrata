@@ -3528,12 +3528,18 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   {statePillLabel}
                 </span>
               </div>
-              <div className={`collection-live-page__hero-price-card ${mintPriceToneClass}`}>
+              <div
+                className={`collection-live-page__hero-price-card ${mintPriceToneClass}${
+                  usesV15 ? ' collection-live-page__hero-price-card--collection' : ''
+                }`}
+              >
                 <span className="collection-live-page__hero-price-label">{usesV15 ? 'Price' : 'Mint price'}</span>
                 <strong>{usesV15 ? buyerMax === null ? 'Loading price…' : toMicroStxLabel(buyerMax) : mintPriceLabel}</strong>
-                <span className="collection-live-page__hero-price-subtle">
-                  {usesV15 ? 'Wallet network fee additional.' : mintPriceDisplay.secondary ?? '\u00a0'}
-                </span>
+                {!usesV15 && (
+                  <span className="collection-live-page__hero-price-subtle">
+                    {mintPriceDisplay.secondary ?? '\u00a0'}
+                  </span>
+                )}
               </div>
               {freeMint && (
                 <p className="collection-live-page__hero-media-note">
