@@ -1,6 +1,6 @@
 // Shared display metadata: failures never block wallet operations or playback.
 window.radioSongMetadata=new Map();
-window.radioSongLabel=e=>{const t=e.core&&e.core!==3?null:window.radioSongMetadata.get(e.song);return `${e.title||t?.title||'Song #'+e.song}${(e.artist||t?.artist)?' — '+(e.artist||t.artist):''} · #${e.song}`;};
+window.radioSongLabel=e=>{const t=e.core&&e.core!==3?null:window.radioSongMetadata.get(e.song);return `${e.title||t?.title||'Song #'+e.song}${(t?.artist||e.artist)?' — '+(t?.artist||e.artist):''} · #${e.song}`;};
 void fetch('/radio/catalogue').then(r=>r.ok?r.json():null).then(v=>{for(const t of v?.tracks||[])window.radioSongMetadata.set(t.id,t);window.dispatchEvent(new Event('wizard-song-metadata'));}).catch(()=>{});
 const $=id=>document.getElementById(id);
 let state=null,review=null,busy=false,reviewValid=false,paidRadio=false;

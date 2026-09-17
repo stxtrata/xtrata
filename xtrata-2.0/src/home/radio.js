@@ -1,3 +1,4 @@
+import {radioArtist} from '../lib/radio/artist-credits.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
 // random rotation of inscribed songs. Tracks are ordinary inscriptions: raw
@@ -544,6 +545,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       resolved = null;
       definitive = false;
     }
+    if(resolved)resolved.artist=radioArtist(tokenId,resolved.artist||'');
     radioLog(`verdict #${tokenId}`, resolved ? { playable: true, src: resolved.src.slice(0, 80), title: resolved.title } : (definitive ? 'DUD' : 'TRANSIENT'), tokenId);
     if (resolved || definitive) {
       trackCache.set(tokenId, resolved);

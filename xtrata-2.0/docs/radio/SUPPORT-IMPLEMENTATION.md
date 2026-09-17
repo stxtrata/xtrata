@@ -307,3 +307,13 @@ in this tab using sessionStorage (no wallet data); memory fallback applies if
 storage is unavailable. A fresh tab session defaults to showing the warning.
 Payment behaviour and return controls are unchanged. JavaScript syntax and diff
 checks passed; downloadable package rebuilt. No restart or payment performed.
+
+### CSV artist credits (2026-09-17)
+
+Applied 43 exact-ID artist credits from 111 Audionauts CSV assignment rows via
+one shared registry; five blank credits preserve existing metadata. Integrated
+radio resolution, favourites snapshots, public catalogue, private stats and local
+companion; older activity rows prefer current credited artist names. Kept payment
+recipients and immutable inscriptions unchanged. Added typed exports and tests
+for corrected uploader aliases, repeated IDs and missing credits. 33 targeted
+tests passed; radio bundle and clean allowlisted desktop package rebuilt.
