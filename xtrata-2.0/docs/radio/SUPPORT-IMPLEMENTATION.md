@@ -94,3 +94,26 @@ See [companion notes](../../tools/music-wallet/README.md).
 Full Gates 1–2 remain open. Gate 3 has partial simulation coverage; Gates 4–9
 remain unimplemented. Do not treat passing
 focused harness checks as production readiness or authority to spend funds.
+
+## Read-only transport groundwork — 17 September 2026
+
+Added a development Chrome extension and native-message child host. Requests
+are restricted to status/history from the top-level `https://xtrata.xyz` origin;
+the extension supplies browser sender context, limits concurrent requests and
+times out unresponsive hosts. Native responses are currently fixed unavailable
+results. No wallet database, keys, signing, broadcasts or production page wiring
+were added. Browser permission in the popup is not native payment approval.
+
+Six transport tests cover trusted sender boundaries, unsupported methods,
+fragmented/bounded framing and a real subprocess exchange. The default harness
+includes these alongside the existing UI and SQLite simulation tests. Actual
+installed-browser/native-host authentication, secure storage and real read-only
+wallet status remain outstanding. The radio's default UI is unchanged.
+
+Details: `extensions/music-wallet/README.md`.
+
+Validation: all six harness groups pass (34 focused tests total), and targeted
+ESLint passes. Repository-wide `tsc --noEmit` currently fails with broad Vitest
+`ExpectStatic` and Vite configuration typing errors; this is not reported as a
+passing typecheck. This transport adds no files to the app TypeScript include
+paths and changes no production bundle.
