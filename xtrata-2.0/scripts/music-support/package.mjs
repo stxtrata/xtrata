@@ -8,10 +8,10 @@ const root=fileURLToPath(new URL('../../',import.meta.url));
 const stage=await mkdtemp(join(tmpdir(),'music-support-package-'));
 const out=join(root,'public/downloads');await mkdir(out,{recursive:true});
 // Explicit allowlist: never archive a working directory, vault, journal or .artifacts.
-const names=['radio-plays-server.mjs','radio-plays-backend.mjs','radio-listening.mjs','radio-media.mjs','radio-plays-panel.html','radio-plays-ui.js','radio-plays-ui.css','radio-listening-ui.js','music-lounge.html','music-lounge.css','music-lounge.js','inscribe.mjs','compose.mjs','personas.mjs'];
+const names=['music-web-bridge.mjs','music-web-approval.html','music-web-approval.js','radio-plays-server.mjs','radio-plays-backend.mjs','radio-listening.mjs','radio-media.mjs','radio-plays-panel.html','radio-plays-ui.js','radio-plays-ui.css','radio-listening-ui.js','music-lounge.html','music-lounge.css','music-lounge.js','inscribe.mjs','compose.mjs','personas.mjs'];
 try{
  const target=join(stage,'xtrata-music-support');
- for(const rel of ['package.json','package-lock.json','src/lib/radio/artist-credits.mjs',...names.map(n=>'scripts/wizard/'+n)]){await mkdir(dirname(join(target,rel)),{recursive:true});await copyFile(join(root,rel),join(target,rel));}
+ for(const rel of ['package.json','package-lock.json','src/lib/radio/artist-credits.mjs',...['manifest.json','background.js','content.js','validate.js'].map(n=>'extensions/music-support/'+n),...names.map(n=>'scripts/wizard/'+n)]){await mkdir(dirname(join(target,rel)),{recursive:true});await copyFile(join(root,rel),join(target,rel));}
  await copyFile(join(root,'scripts/music-support/setup.mjs'),join(target,'setup.mjs'));
  await copyFile(join(root,'docs/radio/MUSIC-LOUNGE.md'),join(target,'README.md'));
  await writeFile(join(target,'Install.command'),'#!/bin/sh\ncd "$(dirname "$0")" || exit 1\nnode setup.mjs\nread -r answer\n',{mode:0o755});

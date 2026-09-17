@@ -90,3 +90,10 @@
   Referrer-Policy: no-referrer
   X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'
+
+/radio/lounge
+  Cache-Control: no-cache
+/radio/lounge.html
+  Cache-Control: no-cache
+/radio/lounge.js
+  Cache-Control: no-cache

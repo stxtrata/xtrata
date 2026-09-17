@@ -10,12 +10,20 @@ With the repository installed, run `npm run music:lounge` from `xtrata-2.0`,
 then open <http://127.0.0.1:8798/lounge>. Keep that process running.
 The existing operator panel remains at <http://127.0.0.1:8798/>.
 
-This is a listener-facing local app, not yet a hosted wallet service. Every person
-runs their own copy locally. A public xtrata.xyz page cannot yet securely drive
-this local signer: the current extension/native-host integration is a prototype.
-Do not expose the local server publicly or point multiple users at one wallet.
-A packaged installer and authenticated browser-to-companion integration remain
-separate distribution work before a website-only onboarding experience.
+The public listening room is **https://xtrata.xyz/radio/lounge** after deployment.
+It uses the same radio engine as the free radio. To connect your desktop wallet,
+install the companion and load the included `extensions/music-support` folder
+as an unpacked Chrome extension (Developer mode → Load unpacked). Reload the
+public lounge. Select Connect, open the local review link and approve pairing.
+The website then offers wallet creation, your funding address, balance checking,
+and a separate local review to enable automatic support. Approximately 1 STX is
+recommended, not required. Creation, pairing and funding never enable spending.
+
+This is early access, not a signed installer or Chrome Store release. The new
+extension supports only `https://xtrata.xyz/radio/lounge` (and `.html`), not preview
+domains, arbitrary embeds or other radio pages. It requires the local companion
+running on port 8798. The older `extensions/music-wallet` native-host prototype
+is separate and is not used. Never expose the companion on the public network.
 
 ## Settle in
 
@@ -71,3 +79,32 @@ Never overwrite/delete a funded installation; return funds before replacing it.
 while another transaction is unresolved; their outcome is shown separately.
 The approval stays checked and the enable button confirms support is on.
 Select Free play before changing the fixed fee or other payment settings.
+
+## Public lounge connection and tests
+
+The extension holds ephemeral connection tokens in its own session storage,
+scoped to the browser document. Tokens and signing keys are never returned to
+page JavaScript. The companion accepts only extension-origin bridge requests;
+new connections and spending need separate, explicit local approval. Remote
+commands allow status, creation, support starts and stop/disconnect only. Returns
+remain in the local app. Stopping cancels outstanding approval requests.
+
+The companion owns one paying session. Every audible source start has a unique
+ID; duplicates and starts that occur while busy stay free. It independently
+checks the song through its media loader before using the existing payment
+runner. It does not claim proof of listening. Expiry (12 hours), restart,
+disconnection or two minutes without check-ins revokes the connection. Browser
+sleep or throttling may therefore require reconnection. Approved pending
+transactions may still confirm after Stop. No missed-start payment backlog.
+
+Run `npx vitest run scripts/wizard/__tests__/music-web-bridge.test.ts` and
+`node scripts/radio-support/web-lounge-smoke.mjs` (Playwright Chromium required;
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` optionally selects an installed test browser).
+The latter uses a temporary profile, unpacked extension, isolated local server,
+and simulated wallet. It tests pairing, approval, deduplication and stop without
+keys or real chain transactions. Screenshots go to ignored `.artifacts/web-lounge`.
+
+Build with `npm run build:radio` and `npm run build:music-support`; the full
+application prebuild already runs both. Deploy the website and restart/update
+the local companion code before testing this new connection. Preserve existing
+`.artifacts/radio-wizard` when updating; never replace a funded wallet folder.
