@@ -40,3 +40,12 @@ describe('explicit same-nonce play recovery',()=>{
   state.receipt=Cl.some(Cl.tuple({core:Cl.uint(3)}));await expect(w.retryPreparedPlay(original.txid,257)).rejects.toThrow('receipt');expect(state.sent).toHaveLength(1);
  }));
 });
+
+describe('receipt indexing delay',()=>{
+ it('distinguishes an absent receipt from a mismatched receipt',()=>fixture(async({w,state,original})=>{
+  state.winner={id:original.txid,fee:200};
+  await expect(w.reconcile(await w.journal())).rejects.toMatchObject({code:'RECEIPT_PENDING'});
+  state.receipt=Cl.some(Cl.tuple({core:Cl.uint(3),id:Cl.uint(999),recipient:Cl.standardPrincipal(owner)}));
+  await expect(w.reconcile(await w.journal())).rejects.toThrow('Receipt verification failed');
+ }));
+});

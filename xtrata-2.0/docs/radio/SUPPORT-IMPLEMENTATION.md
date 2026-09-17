@@ -192,3 +192,14 @@ miner fee and a 50-microSTX transfer to the master holder. The printed receipt
 matches the original attempt and reports song 2910's paid total as 5. Total debit:
 307 microSTX (0.000307 STX). The local journal was reconciled; no additional
 five-start session was activated by the agent.
+
+## Late receipt and recent-outcome correction
+
+Recent start outcomes now refresh from the durable play journal and restore
+recorded starts after server restart. A later confirmed payment replaces a stale
+unknown outcome without restoring paid approval. A specifically absent optional
+receipt is now retried within the existing confirmation loop; a mismatched
+receipt still fails closed. The historical error does not prove whether that
+specific read was absent or mismatched, because the old message combined them.
+25 focused wizard tests pass, including delayed/incorrect receipt distinctions
+and recovery of stale outcomes. No payment is sent by this fix.

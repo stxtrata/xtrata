@@ -27,8 +27,8 @@ const server=createServer(async(req,res)=>{
   if(req.url==='/setup')result=await wizard.setup();
   else if(req.url==='/listening/enable')result=await listening.enable(data);
   else if(req.url==='/listening/free')result=listening.free(data);
-  else if(req.url==='/listening/heartbeat')result=listening.renew(data);
-  else if(req.url==='/listening/status')result=listening.snapshot();
+  else if(req.url==='/listening/heartbeat'){listening.renew(data);result=await listening.refreshedSnapshot();}
+  else if(req.url==='/listening/status')result=await listening.refreshedSnapshot();
   else if(req.url==='/listening/start')result=await listening.start(data);
   else if(req.url==='/status')result=await wizard.status(true);
   else if(req.url==='/stop'){wizard.stop();result={message:wizard.message};}

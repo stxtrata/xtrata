@@ -3,6 +3,15 @@ import {policy} from './radio-plays-backend.mjs';
 // One tab, bounded approval, no persistent auto-enable and no backlog.
 export class RadioListening {
  constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
+ async refreshedSnapshot(){
+  const log=await this.wizard.journal();
+  for(const e of log.filter(e=>e.playbackId).slice(-100)){if(!this.events.some(row=>row.id===e.playbackId))this.events.push({id:e.playbackId,song:e.song,at:e.createdAt,outcome:e.status==='confirmed'?'confirmed':'unknown',reason:e.status==='confirmed'?'Paid start confirmed.':'Saved payment awaits reconciliation.',txid:e.confirmedTxid||e.txid});}
+  for(const row of this.events){
+   const entry=log.find(e=>e.playbackId===row.id);
+   if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason='Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
+  }
+  return this.snapshot();
+ }
  snapshot(){
   if(this.active&&(Date.now()>=this.active.expires||Date.now()>=this.active.lease||this.active.epoch!==this.wizard.stopEpoch))this.disable();
   const a=this.active;return {enabled:!!a,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,events:this.events.slice(-100).reverse()};

@@ -193,6 +193,7 @@ export class RadioWizard {
    if(tx.sender_address!==e.address||tx.contract_call?.contract_id!==OWNER+'.'+NAME||tx.contract_call?.function_name!=='play')throw Error('Transaction identity mismatch.');
    if(e.priorAttempts?.length&&(tx.tx_id!==attempt.txid||tx.nonce!==e.recoveryNonce||String(tx.fee_rate)!==String(attempt.fee)))throw Error('Recovered transaction identity mismatch.');
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(e.address),T.bufferCV(Buffer.from(e.receipt,'hex'))]);const r=receipt?.value?.value;
+   if(receipt?.type==='(optional none)'&&receipt.value===null){const error=Error('Confirmed transaction is waiting for its play receipt to become available.');error.code='RECEIPT_PENDING';throw error;}
    if(r?.core?.value!==String(e.core)||r?.id?.value!==String(e.song))throw Error('Receipt verification failed.');
    e.status='confirmed';e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
   }
@@ -222,7 +223,7 @@ export class RadioWizard {
     const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
     e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
     let confirmed=false;
-    for(let attempt=0;attempt<120;attempt++){this.guard();await new Promise(r=>setTimeout(r,5000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(!/pending|not visible/.test(error.message))throw error;}}
+    for(let attempt=0;attempt<120;attempt++){this.guard();await new Promise(r=>setTimeout(r,5000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(error.code!=='RECEIPT_PENDING'&&!/pending|not visible/.test(error.message))throw error;}}
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
    }
    this.message='Run confirmed; receipts verified.';

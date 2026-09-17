@@ -55,3 +55,11 @@ describe('audio extraction without executing inscription code',()=>{
   media.request=async()=>new Response('bytes',{headers:{'content-type':'audio/wav'}});await expect(media.audio(song)).rejects.toThrow('verified');
  });
 });
+
+describe('reconciled activity',()=>{
+ it('refreshes an unknown outcome from the durable journal without re-enabling spending',async()=>{
+  const {s,w}=fixture();s.events=[{id,song,outcome:'unknown',reason:'Receipt verification failed.'}];
+  w.journal=async()=>[{playbackId:id,status:'confirmed',txid:'confirmed-tx'}];
+  const view=await s.refreshedSnapshot();expect(view.enabled).toBe(false);expect(view.events[0].outcome).toBe('confirmed');expect(view.events[0].reason).toBe('Paid start confirmed.');expect(w.run).not.toHaveBeenCalled();
+ });
+});
