@@ -42,7 +42,7 @@ export class RadioWizard {
   } finally {await lock.close();await unlink(join(this.dir,'setup.lock'));}
  }
  async key() { const v=await this.json('vault.json');const d=createDecipheriv('aes-256-gcm',await readFile(join(this.dir,'unlock.key')),Buffer.from(v.iv,'hex'));d.setAAD(Buffer.from(v.address));d.setAuthTag(Buffer.from(v.tag,'hex'));const key=Buffer.concat([d.update(Buffer.from(v.encrypted,'hex')),d.final()]).toString('utf8');if(T.getAddressFromPrivateKey(key,T.TransactionVersion.Mainnet)!==v.address||v.address===OWNER)throw Error('Wizard identity mismatch.');return key; }
- async api(path,options={}) { const r=await this.request('https://api.hiro.so'+path,{...options,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});if(!r.ok){const e=Error('Chain request failed: HTTP '+r.status);e.status=r.status;throw e;}return r.json(); }
+ async api(path,options={}) { const r=await this.request('https://api.hiro.so'+path,{...options,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});if(!r.ok){let reason='';try{const body=await r.json();if(typeof body.reason==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason))reason=body.reason;}catch{/* Keep only a bounded node reason code, never raw response data. */}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}return r.json(); }
  async read(fn,args=[]) {const r=await this.api(`/v2/contracts/call-read/${OWNER}/${NAME}/${fn}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sender:OWNER,arguments:args.map(T.cvToHex)})});if(!r.okay)throw Error('Contract read failed.');return T.cvToJSON(T.hexToCV(r.result));}
  async journal(){try{return await this.json('journal.json');}catch(e){if(e.code==='ENOENT')return [];throw e;}}
  async status(chain=false) {
@@ -141,14 +141,60 @@ export class RadioWizard {
  }
 
  stop(){this.stopEpoch++;this.stopped=true;this.message='Stopped. Already submitted transactions may confirm.';}
+ async retryPreparedPlay(txid,fee){
+  if(typeof txid!=='string'||!/^0x[0-9a-f]{64}$/.test(txid)||!Number.isInteger(fee)||fee<1||fee>1000)throw Error('Invalid explicit recovery request.');
+  return this.exclusive(async()=>{
+   if(killSwitchEngaged())throw Error('Wizard kill switch is engaged.');
+   const epoch=this.stopEpoch;
+   const log=await this.journal(),e=log.find(row=>row.txid===txid);
+   if(!e||e.status!=='prepared'||e.priorAttempts?.length||fee<=e.fee)throw Error('Only a saved prepared attempt can be explicitly retried once at a higher fee.');
+   if(log.some(row=>row!==e&&row.status!=='confirmed'))throw Error('Another payment needs recovery first.');
+   await this.reconcileReturns();
+   const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish the return review first.');
+   try{await this.api('/extended/v1/tx/'+txid);throw Error('Original transaction is visible. Reconcile it instead.');}catch(error){if(error.status!==404)throw error;}
+   const {address}=await this.json('vault.json'),account=await this.returnAccount(address),old=T.deserializeTransaction(Buffer.from(e.raw,'hex'));
+   const args=[T.uintCV(e.core),T.uintCV(e.song),T.bufferCV(Buffer.from(e.receipt,'hex'))];
+   if(e.address!==address||old.txid()!==txid.slice(2)||old.version!==T.TransactionVersion.Mainnet||old.chainId!==1||
+    T.addressToString(old.payload.contractAddress)!==OWNER||old.payload.contractName.content!==NAME||old.payload.functionName.content!=='play'||
+    old.payload.functionArgs.length!==3||args.some((arg,i)=>T.cvToHex(arg)!==T.cvToHex(old.payload.functionArgs[i]))||
+    old.auth.spendingCondition.nonce!==BigInt(account.nonce)||old.auth.spendingCondition.fee!==BigInt(e.fee))throw Error('Saved transaction or available nonce does not match the recovery request.');
+   const receipt=await this.read('get-receipt',[T.standardPrincipalCV(address),args[2]]);
+   if(receipt.type!=='(optional none)'||receipt.value!==null)throw Error('The play receipt already exists or could not be verified.');
+   const source=await this.api(`/v2/contracts/source/${OWNER}/${NAME}?proof=0`);if(sha(source.source)!==HASH)throw Error('Deployed source differs from pinned helper.');
+   if(account.balance>1000000n||account.balance<BigInt(fee+50+1000))throw Error('Balance is outside supported recovery limits.');
+   if(log.reduce((total,row)=>total+row.fee+50,0)-e.fee+fee>10000)throw Error('Recovery exceeds the lifetime test budget.');
+   const owner=await this.read('get-owner',[args[0],args[1]]),recipient=owner?.success===true?owner.value?.value?.value:null;
+   if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master owner is not eligible.');
+   if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
+   const key=await this.key();
+   const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:args,senderKey:key,network:new StacksMainnet(),
+    fee:BigInt(fee),nonce:old.auth.spendingCondition.nonce,anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,
+    postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
+   if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before submission.');
+   await this.save('recovery-original-'+txid.slice(2)+'.json',e);
+   e.priorAttempts=[{txid:e.txid,fee:e.fee}];e.recoveryNonce=account.nonce;e.fee=fee;e.recipient=recipient;e.txid='0x'+tx.txid();e.raw=Buffer.from(tx.serialize()).toString('hex');e.recoveryAt=new Date().toISOString();
+   await this.save('journal.json',log);
+   if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery saved but stopped; reconcile before proceeding.');
+   const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
+   if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Recovery submission outcome unknown. Do not retry automatically.');
+   e.status='submitted';await this.save('journal.json',log);return publicEntry(e);
+  });
+ }
  async reconcile(log) {
   for(const e of log.filter(e=>e.status!=='confirmed')) {
-   let tx;try{tx=await this.api('/extended/v1/tx/'+e.txid);}catch(error){if(error.status===404)throw Error('Saved transaction not visible yet. No replacement or new payment will be made.');throw error;}
-   if(tx.tx_status!=='success'||tx.canonical!==true||tx.is_unanchored!==false)throw Error('Saved transaction remains pending, failed or noncanonical. No new payment permitted.');
+   const attempts=[{txid:e.txid,fee:e.fee},...(e.priorAttempts||[])];let found=null,visible=false;
+   for(const attempt of attempts){
+    let tx;try{tx=await this.api('/extended/v1/tx/'+attempt.txid);}catch(error){if(error.status===404)continue;throw error;}
+    visible=true;
+    if(tx.tx_status==='success'&&tx.canonical===true&&tx.is_unanchored===false){found={tx,attempt};break;}
+   }
+   if(!found)throw Error(visible?'Saved transaction remains pending, failed or noncanonical. No new payment permitted.':'Saved transaction not visible yet. No replacement or new payment will be made.');
+   const {tx,attempt}=found;
    if(tx.sender_address!==e.address||tx.contract_call?.contract_id!==OWNER+'.'+NAME||tx.contract_call?.function_name!=='play')throw Error('Transaction identity mismatch.');
+   if(e.priorAttempts?.length&&(tx.tx_id!==attempt.txid||tx.nonce!==e.recoveryNonce||String(tx.fee_rate)!==String(attempt.fee)))throw Error('Recovered transaction identity mismatch.');
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(e.address),T.bufferCV(Buffer.from(e.receipt,'hex'))]);const r=receipt?.value?.value;
    if(r?.core?.value!==String(e.core)||r?.id?.value!==String(e.song))throw Error('Receipt verification failed.');
-   e.status='confirmed';e.recipient=r.recipient.value;await this.save('journal.json',log);
+   e.status='confirmed';e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
   }
  }
  async run(input,context={}) {

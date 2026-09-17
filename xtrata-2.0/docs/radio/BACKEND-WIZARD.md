@@ -130,3 +130,17 @@ Validation: `npx vitest run scripts/wizard/__tests__/radio-listening.test.ts`
 and `node scripts/radio-support/wizard-listening-smoke.mjs`. The latter plays
 real generated PCM audio in isolated desktop/mobile Chrome and sends only
 simulated chain calls from temporary wizard keys. No funded wallet is used.
+
+### Explicit recovery of a prepared fee test
+
+The operator-only `retryPreparedPlay(txid, fee)` method permits one explicit
+higher-fee retry of a saved prepared call. It requires an absent original tx,
+an unused matching account nonce, no pending nonce, no existing play receipt,
+the pinned helper source, eligible owner, balance/reserve and lifetime budget.
+It preserves the same nonce and receipt, so the two attempts cannot both execute.
+The original signed record is preserved in a private local recovery file; the
+journal links both transaction IDs and reconciles whichever confirms. New signed
+bytes are persisted before submission. This is not an automatic fee increase or
+a journal deletion, and each live invocation needs explicit spending authority.
+Node failures now retain a bounded reason code when provided, without logging
+raw response data. Recovery tests use disposable wallets and mock network calls.

@@ -175,3 +175,14 @@ were simulated. Existing return UI checks also pass at both widths. A read-only
 live media check loaded 47 catalogue entries and verified song 2910's audio/webm
 (4,184,290 bytes). No new mainnet payment was sent. Local screenshots remain
 ignored under `.artifacts/radio-wizard-listening/`.
+
+## Explicit 257-microSTX retry — 17 September 2026
+
+Added and tested a one-time operator recovery method for the prepared low-fee
+attempt. It retains the original nonce/receipt and audit record, checks fresh
+chain state before signing, and reconciles either attempted transaction ID.
+All 23 focused wizard tests and targeted lint pass. The user explicitly requested
+retrying at 257 microSTX; one dedicated-wizard call was submitted with nonce 4,
+song 2910/core 3, network fee 257 and a protected 50-microSTX holder payment.
+Transaction: `0x1f52d78b2c977a59a0d7b59dc5c6ebeefabe6f7f1b30e54dd1da0b1e3c4f0934`.
+No five-start session was enabled by this recovery action.
