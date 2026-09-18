@@ -41,3 +41,23 @@ describe('public paid-play contract reader', () => {
     expect(parsePaidPlayEvent(event({contract_log: {...event().contract_log, value: {repr: 'x'.repeat(2001)}}}))).toBeNull();
   });
 });
+
+describe('payment history filters and supporters', () => {
+  it('searches song metadata and distinguishes paying and receiving wallets', async () => {
+    const {filterPaidPlays} = await import('../../../public/radio/chain-activity.js');
+    const play = parsePaidPlayEvent(event())!;
+    const tracks = new Map([[315, {title: 'Entertainment', artist: 'melophonic'}]]);
+    expect(filterPaidPlays([play], tracks, 'MELOPHONIC')).toHaveLength(1);
+    expect(filterPaidPlays([play], tracks, play.recipient, 'payer')).toHaveLength(0);
+    expect(filterPaidPlays([play], tracks, play.recipient, 'recipient')).toHaveLength(1);
+    expect(filterPaidPlays([{...play, core: 1}], tracks, 'Entertainment')).toHaveLength(0);
+  });
+  it('ranks wallets by paid starts and sums holder payments, excluding miner fees', async () => {
+    const {rankPayers} = await import('../../../public/radio/chain-activity.js');
+    const play = parsePaidPlayEvent(event())!;
+    expect(rankPayers([play, {...play, payer: 'OTHER'}, play])).toEqual([
+      {payer: play.payer, count: 2, amount: 100},
+      {payer: 'OTHER', count: 1, amount: 50}
+    ]);
+  });
+});
