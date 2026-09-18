@@ -11,7 +11,7 @@ export async function launchDesktop(wizard,media){
   isolated.setPermissionRequestHandler((wc,permission,callback)=>callback(permission==='clipboard-sanitized-write'&&localNavigation(wc?.getURL()||'',origin)));
   isolated.setPermissionCheckHandler((_wc,permission,requestingOrigin)=>permission==='clipboard-sanitized-write'&&requestingOrigin===origin);
   await isolated.cookies.set({url:origin,name:'xtrataDesktop',value:token,httpOnly:true,sameSite:'strict',path:'/'});
-  const win=new BrowserWindow({width:1280,height:920,minWidth:390,minHeight:600,title:'Xtrata Music',backgroundColor:'#0c1113',show:false,webPreferences:{session:isolated,nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,webviewTag:false,devTools:!app.isPackaged}});
+  const win=new BrowserWindow({width:1280,height:920,minWidth:390,minHeight:600,title:'Xtrata Music',backgroundColor:'#0c1113',show:false,webPreferences:{session:isolated,nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,webviewTag:false,backgroundThrottling:false,devTools:!app.isPackaged}});
   const visit=url=>{if(externalURL(url))void shell.openExternal(url);};
   win.webContents.setWindowOpenHandler(({url})=>{visit(url);return {action:'deny'};});
   win.webContents.on('will-navigate',(event,url)=>{if(!localNavigation(url,origin)){event.preventDefault();visit(url);}});

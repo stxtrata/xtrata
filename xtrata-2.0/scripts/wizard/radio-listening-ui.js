@@ -24,7 +24,12 @@
   try{await audio.play();}catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
  }
  function audible(){
-  if(!start||start.observed||audio.paused||audio.ended||audio.muted||audio.volume===0||audio.currentSrc!==start.src)return;
+  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src)return;
+  if(audio.muted||audio.volume===0){
+   $('radio-payment').textContent=start.observed?'Muted. Any payment already requested remains recorded; later muted starts stay free.':'Muted · this song is playing free. Unmute to request its support payment.';
+   return;
+  }
+  if(start.observed)return;
   start.observed=true;const observed={...start},a=approval;
   if(!a){$('radio-payment').textContent='Free start. Enabling Paid now applies to the next song.';return;}
   $('radio-payment').textContent='Paid start requested. Music continues while the wallet checks it.';
@@ -35,6 +40,8 @@
   }).catch(e=>{if(start?.id===observed.id)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;if(approval===a){if(!a.continuous)void free();else mode('SUPPORT WAITING · still enabled; checking again automatically');}});
  }
  audio.addEventListener('playing',audible);audio.addEventListener('volumechange',audible);
+ // Recover a missed playing event on track transitions without charging twice.
+ audio.addEventListener('timeupdate',audible);
  audio.addEventListener('ended',()=>{if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
  audio.addEventListener('error',()=>{$('radio-payment').textContent='Audio unavailable. Choose another song. Check activity for any payment already requested.';});
  $('radio-play').onclick=()=>{if(!start)void select(Number($('radio-songs').value)||0);else if(audio.paused)void audio.play().catch(()=>{$('radio-payment').textContent='Could not resume audio.';});else audio.pause();};
