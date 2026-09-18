@@ -17,6 +17,19 @@ playlist, payment history, fixed-fee controls, stop and reviewed returns. Closin
 it stops new payments. Existing submitted transactions can still confirm. The
 playback/payment rules and default fees have not changed.
 
+Both the public hub and local lounge include a read-only recent-activity reader
+for confirmed `xtrata-radio-plays-v1-0` contract logs. It displays the song,
+payer, holder recipient and 0.000050 STX holder payment without connecting to or
+using the listener's wallet. The network fee remains visible on the linked Hiro
+transaction. The public reader refreshes while visible and fails closed to its
+last confirmed display.
+
+AI assistants can follow `docs/radio/AI-MUSIC-SUPPORT-INSTALL.md`; the fallback
+source package includes the same content as `AI AGENT - INSTALL.md` plus the
+reusable `xtrata-music-support-installer` skill. These instructions authorise
+installation and free-mode validation only. Funding and Music Support require
+separate explicit user choices.
+
 ## Wallet storage and existing wizard users
 
 The wallet is under Electron's OS `userData` directory in `support-wallet`.

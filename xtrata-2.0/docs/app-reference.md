@@ -487,3 +487,13 @@ in OS app data. No extension or Node installation is required by app users.
 See `docs/radio/DESKTOP-MUSIC.md` for builds, release signing and simulated tests.
 The previous web/extension player moved to `/radio/browser-lounge` as an advanced
 experimental path. It is no longer the main onboarding route.
+
+The public hub and local lounge now include a read-only live reader for confirmed
+`xtrata-radio-plays-v1-0` print events. `public/radio/chain-activity.js` reads the
+Hiro v2 contract-log endpoint, validates the exact contract/event schema and
+renders recent 50-microSTX holder payments with catalogue metadata and explorer
+links. The public site uses the existing `/hiro/mainnet` proxy; the loopback app
+uses the direct public API. No wallet connection or payment authority is used.
+The source distribution also includes `AI AGENT - INSTALL.md` and the reusable
+`skills/xtrata-music-support-installer/SKILL.md`; the canonical agent guide is
+`docs/radio/AI-MUSIC-SUPPORT-INSTALL.md`.
