@@ -8,7 +8,7 @@ import {RadioListening} from './radio-listening.mjs';
 import {RadioMedia} from './radio-media.mjs';
 import {RadioWizard,policy} from './radio-plays-backend.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
-export function createWizardServer(wizard,origin='http://127.0.0.1:8798',media=new RadioMedia()) {
+export function createWizardServer(wizard,origin='http://127.0.0.1:8798',media=new RadioMedia(),options={}) {
 const listening=new RadioListening(wizard,media);
 const webBridge=new MusicWebBridge(wizard,listening,media);
 const server=createServer(async(req,res)=>{
@@ -16,6 +16,11 @@ const server=createServer(async(req,res)=>{
  try{
   const expectedOrigin=origin??`http://127.0.0.1:${server.address().port}`;
   if(req.headers.host!==new URL(expectedOrigin).host)throw Error('Invalid host.');
+  if(options.desktopToken){
+   if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
+   const path=req.url.split('?')[0];
+   if(!['/lounge','/lounge.css','/lounge.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+  }
   if(req.url==='/web-bridge'&&req.method==='OPTIONS'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Access-Control-Allow-Methods','POST');res.setHeader('Access-Control-Allow-Headers','content-type');res.end();return;}
   if(req.url==='/web-bridge'&&req.method==='POST'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);if(req.headers['content-type']!=='application/json')throw Error('JSON required');let body='';for await(const chunk of req){body+=chunk;if(body.length>2048)throw Error('Request too large');}const result=await webBridge.call(req.headers.origin,JSON.parse(body));res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;}
   if(req.method==='GET'&&['/web-approval','/web-approval.js'].includes(req.url.split('?')[0])){const script=req.url.split('?')[0].endsWith('.js');res.setHeader('Content-Type',script?'text/javascript':'text/html');res.end(await readFile(join(root,'scripts/wizard/music-web-approval.'+(script?'js':'html'))));return;}

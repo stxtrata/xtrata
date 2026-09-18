@@ -49,8 +49,8 @@ export class RadioWizard {
   const diskRunning=await stat(join(this.dir,'run.lock')).then(()=>true,e=>{if(e.code==='ENOENT')return false;throw e;});
   const {address}=await this.json('vault.json');let balance=null,recovery=null;
   if(chain){
-   const account=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(account.balance).toString();
-   if(!diskRunning&&!this.running){try{await this.exclusive(async()=>{await this.reconcile(await this.journal());await this.reconcileReturns();});}catch(e){recovery=e.message;}}
+   try{const account=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(account.balance).toString();}catch{recovery='Balance unavailable. Your funding address is still shown; refresh before enabling support.';}
+   if(balance!==null&&!diskRunning&&!this.running){try{await this.exclusive(async()=>{await this.reconcile(await this.journal());await this.reconcileReturns();});}catch(e){recovery=e.message;}}
   }
   const log=await this.journal(),returns=await this.optional('returns.json',[]),quote=await this.optional('return-quote.json',null);
   return {address,balanceMicroSTX:balance,overLimit:balance!==null&&BigInt(balance)>1000000n,

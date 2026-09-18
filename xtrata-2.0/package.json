@@ -84,7 +84,10 @@
     "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts",
     "build:music-support": "node scripts/music-support/package.mjs",
     "music:lounge": "node scripts/wizard/radio-plays-server.mjs",
-    "test:radio-support": "node scripts/radio-support/harness.mjs"
+    "test:radio-support": "node scripts/radio-support/harness.mjs",
+    "music:desktop": "npm --prefix desktop/music start",
+    "music:desktop:build": "npm --prefix desktop/music run dist:mac",
+    "music:desktop:test": "node scripts/music-support/desktop-smoke.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

@@ -14,6 +14,7 @@ try{
  for(const rel of ['package.json','package-lock.json','src/lib/radio/artist-credits.mjs',...['manifest.json','background.js','content.js','validate.js'].map(n=>'extensions/music-support/'+n),...names.map(n=>'scripts/wizard/'+n)]){await mkdir(dirname(join(target,rel)),{recursive:true});await copyFile(join(root,rel),join(target,rel));}
  await copyFile(join(root,'scripts/music-support/setup.mjs'),join(target,'setup.mjs'));
  await copyFile(join(root,'docs/radio/MUSIC-LOUNGE.md'),join(target,'README.md'));
+ await copyFile(join(root,'docs/radio/DESKTOP-MUSIC.md'),join(target,'DESKTOP-MUSIC.md'));
  await writeFile(join(target,'Install.command'),'#!/bin/sh\ncd "$(dirname "$0")" || exit 1\nnode setup.mjs\nread -r answer\n',{mode:0o755});
  await writeFile(join(target,'Install.cmd'),'@echo off\r\ncd /d "%~dp0"\r\nnode setup.mjs\r\npause\r\n');
  await writeFile(join(target,'Start.command'),'#!/bin/sh\ncd "$(dirname "$0")" || exit 1\nnpm run music:lounge\n',{mode:0o755});

@@ -1,0 +1,52 @@
+name: Music desktop preview
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            arch: arm64
+          - os: macos-latest
+            platform: mac
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: xtrata-2.0/desktop/music
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: xtrata-2.0/desktop/music/package-lock.json
+      - run: npm ci
+      - run: npm run prepare:app
+      - run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        env:
+          CSC_LINK: ${{ secrets.MUSIC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MUSIC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.MUSIC_APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.MUSIC_APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.MUSIC_APPLE_TEAM_ID }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: music-${{ matrix.platform }}-${{ matrix.arch }}-preview
+          path: |
+            xtrata-2.0/.artifacts/music-desktop/*.dmg
+            xtrata-2.0/.artifacts/music-desktop/*.zip
+            xtrata-2.0/.artifacts/music-desktop/*.exe
+            xtrata-2.0/.artifacts/music-desktop/*.AppImage
+          if-no-files-found: error

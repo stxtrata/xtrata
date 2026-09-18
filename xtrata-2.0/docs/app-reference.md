@@ -477,3 +477,13 @@ Music Balance integration plan (17 September 2026): `docs/plans/RADIO-MUSIC-BALA
 - Distribution and walkthrough: `scripts/music-support/package.mjs`,
   `docs/radio/MUSIC-LOUNGE.md`. Existing native-host prototype remains separate.
 - Browser integration: `scripts/radio-support/web-lounge-smoke.mjs`, simulated only.
+
+## Desktop Music and public download hub (current)
+
+`/radio/lounge` is now the customer download/news/help hub, using
+`public/radio/music-hub.{css,js}` and `music-releases.json`. The independent app
+is in `desktop/music`; it embeds the local lounge and creates a separate wallet
+in OS app data. No extension or Node installation is required by app users.
+See `docs/radio/DESKTOP-MUSIC.md` for builds, release signing and simulated tests.
+The previous web/extension player moved to `/radio/browser-lounge` as an advanced
+experimental path. It is no longer the main onboarding route.

@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The Listening Room · Xtrata Music</title><link rel="stylesheet" href="/ui.css"><link rel="stylesheet" href="/lounge.css"></head>
 <body data-music-lounge><main>
-<nav><a class="brand" href="https://xtrata.xyz/radio">✕ XTRATA <span>MUSIC</span></a><span class="local-badge">YOUR LOCAL LISTENING ROOM</span><a href="#wallet">Your wallet ↗</a></nav>
+<nav><a class="brand" href="https://xtrata.xyz/radio">✕ XTRATA <span>MUSIC</span></a><span class="local-badge">YOUR LOCAL LISTENING ROOM</span><a href="https://xtrata.xyz/radio/lounge" target="_blank" rel="noopener">News & help ↗</a><a href="#wallet">Your wallet ↗</a></nav>
 <header class="intro"><p class="eyebrow">GOOD MUSIC. A LITTLE SUPPORT. DIRECTLY.</p><h1>Make yourself<br><em>part of the music.</em></h1><p>Your own listening room. Songs stored on-chain. A tiny payment to the song’s current holder whenever a supported play starts.</p></header>
 <div class="lounge-grid">
 <section id="listening-section" class="player"><div class="player-top"><span class="eyebrow">XTRATA FM / THE LISTENING ROOM</span><span id="on-air">● OFF AIR</span></div>
@@ -19,7 +19,7 @@
 <details class="wallet-notes"><summary>How your local wallet works</summary><p>The app stores a signing key on this computer, outside your browser. You don’t need an external wallet popup for each song. Losing these local files can lose the balance; software with access to them can spend it. We recommend keeping no more than 1 STX here.</p><p>Keep this app running and your computer awake. Closing or reloading the page switches support off. Free listening remains available. A paid start records the start, not a full listen.</p></details></section></aside></div>
 <section class="history"><p class="eyebrow">FOLLOW EVERY LITTLE BIT</p><h2>Your support, in the open.</h2><p>See the song, payment destination and transaction for every start. Pending payments are clearly marked.</p><div id="activity" aria-live="polite">No payments yet.</div></section>
 <details class="returns"><summary>Manage or return your balance</summary><section id="return-section" aria-labelledby="return-heading"><h2 id="return-heading">Take your funds back</h2>
-<p>Request a return whenever you like. The wizard must be running and pending payments must resolve first. Nothing is sent until you review and approve it.</p>
+<p>Request a return whenever you like. The app must be running and pending payments must resolve first. Nothing is sent until you review and approve it.</p>
 <div class="fields"><label>Send to your Stacks mainnet address<input id="return-recipient" type="text" autocomplete="off" spellcheck="false" placeholder="SP… or SM…"></label><label>Network fee (microSTX)<input id="return-fee" type="number" min="1" max="1000" step="1" value="300"></label></div>
 <p>Enter the address you want to receive the funds. We never assume the deposit sender is yours. Default fee: 300 microSTX (0.0003 STX); it is not increased automatically.</p>
 <button id="return-excess">Review return excess</button><button id="return-all">Review return all</button>

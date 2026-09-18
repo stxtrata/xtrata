@@ -3,5 +3,5 @@
  "description":"Connect the Xtrata Music lounge to your local support wallet. Spending requires approval on your computer.",
  "permissions":["storage"],"host_permissions":["http://127.0.0.1:8798/*"],
  "background":{"service_worker":"background.js","type":"module"},
- "content_scripts":[{"matches":["https://xtrata.xyz/radio/lounge","https://xtrata.xyz/radio/lounge.html"],"js":["content.js"],"all_frames":false,"run_at":"document_idle"}]
+ "content_scripts":[{"matches":["https://xtrata.xyz/radio/browser-lounge","https://xtrata.xyz/radio/browser-lounge.html"],"js":["content.js"],"all_frames":false,"run_at":"document_idle"}]
 }
