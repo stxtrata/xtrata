@@ -497,3 +497,8 @@ uses the direct public API. No wallet connection or payment authority is used.
 The source distribution also includes `AI AGENT - INSTALL.md` and the reusable
 `skills/xtrata-music-support-installer/SKILL.md`; the canonical agent guide is
 `docs/radio/AI-MUSIC-SUPPORT-INSTALL.md`.
+
+First desktop preview: `music-v0.1.0-preview.1` provides Apple-silicon Mac DMG/ZIP
+downloads through GitHub Releases. The hub labels unsigned previews explicitly;
+stable downloads retain the signed-release gate. `DESKTOP-PREVIEW-TESTING.md`
+covers installation, free playback, optional support and restart checks.

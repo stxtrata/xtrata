@@ -81,6 +81,15 @@ x64. Windows/Linux output is not validated solely by compiling it.
 
 ## Release gate and hub downloads
 
+The first Apple-silicon Mac test release is `music-v0.1.0-preview.1`, built from
+`360c36447865d79dee563bf67fb0e49c0e161f16`. It contains unsigned DMG and ZIP
+installers, checksums and `DESKTOP-PREVIEW-TESTING.md`. The hub can display an
+unsigned artifact only when both the manifest channel and the download itself
+explicitly identify it as a preview. Stable downloads still require the signed
+assertion. `release-manifest.mjs --preview-tested` verifies the published bytes
+before adding this deliberately labelled testing route. Signing and clean-machine
+validation remain required for a general release.
+
 Local build outputs are in ignored `.artifacts/music-desktop`. They are too large
 for Cloudflare Pages assets. Publish reviewed installers as GitHub release assets
 under stxtrata/xtrata; the hub reads `public/radio/music-releases.json`.
@@ -110,8 +119,10 @@ node scripts/music-support/release-manifest.mjs mac-arm64 /path/to/installer.dmg
 This requires the operator's signing/testing assertion, downloads the published
 bytes to verify SHA-256 against the local installer, then updates the manifest.
 It does not cryptographically attest signing. Review and commit the manifest,
-update dated news/compatibility copy, and deploy the website. Until then the hub
-honestly says downloads are not published. Do not add speculative download URLs.
+update dated news/compatibility copy, and deploy the website. Signed downloads
+remain unavailable until this gate passes. Explicitly labelled preview downloads
+can be offered through the separate preview route above. Do not add speculative
+download URLs.
 
 The previous extension route remains experimental at `/radio/browser-lounge`;
 it is not part of the customer setup journey. The original extension/native-host
