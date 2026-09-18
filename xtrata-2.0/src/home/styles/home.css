@@ -846,6 +846,29 @@
       margin: 4px 0 2px;
     }
 
+    .inscribe-music-option {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 18px;
+      border: 1px solid #a979dd;
+      border-radius: 18px;
+      background: linear-gradient(120deg, #a979dd18, transparent);
+      color: var(--ink);
+      text-decoration: none;
+    }
+    .inscribe-music-option img { flex-shrink: 0; border-radius: 12px; }
+    .inscribe-music-option > span { min-width: 0; }
+    .inscribe-music-option small { display: block; text-transform: uppercase; letter-spacing: .12em; color: #bc8ff2; }
+    .inscribe-music-option strong { display: block; margin: 4px 0; font-size: 21px; }
+    .inscribe-music-option__cta { margin-left: auto; color: #bc8ff2; font-weight: 700; }
+    .inscribe-music-option:hover { border-color: #d4afff; }
+    .inscribe-music-option:focus-visible { outline: 2px solid #d4afff; outline-offset: 4px; }
+    @media (max-width: 600px) {
+      .inscribe-music-option { flex-wrap: wrap; }
+      .inscribe-music-option > span:not(.inscribe-music-option__cta) { flex: 1; }
+      .inscribe-music-option__cta { width: 100%; margin-left: 0; }
+    }
     .inscribe-tabs {
       display: flex;
       gap: 8px;
