@@ -1,0 +1,15 @@
+{
+  "name": "xtrata-music-support",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Xtrata Music listening room and support wallet",
+  "scripts": {
+    "music:lounge": "node scripts/wizard/radio-plays-server.mjs"
+  },
+  "dependencies": {
+    "@noble/hashes": "1.8.0",
+    "@stacks/network": "6.17.0",
+    "@stacks/transactions": "6.17.0"
+  }
+}

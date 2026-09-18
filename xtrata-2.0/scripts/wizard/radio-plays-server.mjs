@@ -59,8 +59,10 @@ server.on('close',()=>{webBridge.close();listening.disable();});
 return server;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
- const wizard=new RadioWizard(join(root,'.artifacts/radio-wizard'));
+ const dataDirectory=process.env.XTRATA_MUSIC_DATA_DIR?resolve(process.env.XTRATA_MUSIC_DATA_DIR):join(root,'.artifacts/radio-wizard');
+ const requestedPort=Number(process.env.XTRATA_MUSIC_PORT||8798);const port=Number.isInteger(requestedPort)&&requestedPort>=1024&&requestedPort<=65535?requestedPort:8798;
+ const wizard=new RadioWizard(dataDirectory);
  if(process.argv[2]==='setup')console.log(JSON.stringify(await wizard.setup()));
  else if(process.argv[2]==='status')console.log(JSON.stringify(await wizard.status(true),null,2));
- else createWizardServer(wizard).listen(8798,'127.0.0.1',()=>console.log('Radio wizard controls: http://127.0.0.1:8798 — no spending starts automatically.'));
+ else {const origin=`http://127.0.0.1:${port}`;createWizardServer(wizard,origin).listen(port,'127.0.0.1',()=>console.log(`Radio wizard controls: ${origin} — no spending starts automatically.`));}
 }
