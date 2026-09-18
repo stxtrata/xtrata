@@ -20,6 +20,24 @@ macOS 26.5.2. Intel Mac, Windows and Linux installers are not included.
 The ZIP is an alternative download of the same application. Extract it and move
 the app to Applications. Use only one installed copy at a time.
 
+### Last-resort Mac quarantine fallback
+
+Use this only when **Open Anyway** is unavailable or still refuses this exact
+preview. First compare the downloaded DMG's SHA-256 with the value on the lounge
+or `SHA256SUMS.txt` attached to the GitHub release. If it matches and Xtrata
+Music is installed in Applications, open Terminal and run exactly:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Xtrata Music.app"
+```
+
+This recursively removes Apple's quarantine attribute from this app bundle, so
+Gatekeeper will no longer assess this copy in its normal way. It does not disable
+Gatekeeper for the whole Mac, but it is still a security bypass. Do not add
+`sudo`, change the path to `/Applications`, or use the command for a download
+whose checksum does not match. A future signed and notarized release will not
+need this fallback.
+
 ## Optional support test
 
 The app creates a separate local support wallet. It does not import your existing

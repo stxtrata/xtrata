@@ -20,8 +20,11 @@ steps that require the user's explicit choice.
   transaction unless the user explicitly asks for that exact action and has
   reviewed the destination and amount.
 - Do not treat permission to install or launch as permission to fund or spend.
-- Do not bypass Gatekeeper, SmartScreen, antivirus or other operating-system
-  security. Ask the user to handle a named security prompt when necessary.
+- Do not silently bypass Gatekeeper, SmartScreen, antivirus or other
+  operating-system security. Ask the user to handle a named security prompt.
+  For the explicitly labelled unsigned Mac preview, an agent may explain the
+  documented quarantine fallback only after the user verifies its SHA-256. Do
+  not run that command for the user or generalise its path.
 - Do not expose the loopback service to a network. It must bind to `127.0.0.1`.
 - Do not delete an existing wallet-data folder. If a wallet may contain funds,
   open the existing app and use its reviewed return flow before removal.
@@ -48,6 +51,19 @@ steps that require the user's explicit choice.
 5. Launch **Xtrata Music** from Applications, Start, or the application menu.
 6. Confirm that the local listening room opens, free playback is available and
    Music Support says it is off. Stop if the app starts payments automatically.
+
+For the unsigned Apple-silicon preview, try Apple's **Privacy & Security → Open
+Anyway** route first. If that fails, and only after the user confirms the DMG
+checksum matches the published value, show the last-resort command from
+`DESKTOP-PREVIEW-TESTING.md`:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Xtrata Music.app"
+```
+
+Explain that it recursively removes quarantine from this app and prevents the
+normal Gatekeeper assessment of this copy. The user must choose and run it. Do
+not add `sudo`, change the target, or run it against an unverified download.
 
 ## Source-package workflow
 
