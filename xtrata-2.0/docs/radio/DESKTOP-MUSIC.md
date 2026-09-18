@@ -90,6 +90,11 @@ assertion. `release-manifest.mjs --preview-tested` verifies the published bytes
 before adding this deliberately labelled testing route. Signing and clean-machine
 validation remain required for a general release.
 
+The preview testing guide uses Apple's **Open Anyway** flow first. It documents
+`xattr -dr com.apple.quarantine "/Applications/Xtrata Music.app"` only as a
+last-resort fallback after SHA-256 verification, with an explicit warning that
+this removes quarantine and bypasses normal Gatekeeper assessment for that app.
+
 Local build outputs are in ignored `.artifacts/music-desktop`. They are too large
 for Cloudflare Pages assets. Publish reviewed installers as GitHub release assets
 under stxtrata/xtrata; the hub reads `public/radio/music-releases.json`.

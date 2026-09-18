@@ -501,4 +501,6 @@ The source distribution also includes `AI AGENT - INSTALL.md` and the reusable
 First desktop preview: `music-v0.1.0-preview.1` provides Apple-silicon Mac DMG/ZIP
 downloads through GitHub Releases. The hub labels unsigned previews explicitly;
 stable downloads retain the signed-release gate. `DESKTOP-PREVIEW-TESTING.md`
-covers installation, free playback, optional support and restart checks.
+covers installation, free playback, optional support and restart checks. Its
+quarantine-removal command is a checksum-gated last resort after **Open Anyway**,
+and is explicitly described as bypassing Gatekeeper for that app bundle.
