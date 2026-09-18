@@ -24,6 +24,7 @@ try{
  const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',dialog=>dialog.accept());await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>document.cookie),'');
  const origin=await app.evaluate(()=>globalThis.testState.origin);assert.equal((await fetch(origin+'/lounge')).status,400);
+ assert.equal(await page.locator('[data-xtrata-chain-plays]').count(),1);assert.equal((await page.evaluate(()=>fetch('/radio-chain-activity.js').then(r=>r.status))),200);
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
  await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();console.log('Support enabled');
  await page.locator('#radio-play').click();await page.waitForFunction(()=>{const a=document.getElementById('radio-audio');return !a.paused&&a.readyState>=3;});for(let i=0;i<30&&(await app.evaluate(()=>globalThis.testState.paid()))===0;i++)await page.waitForTimeout(100);console.log(await page.locator('#radio-payment').textContent());assert.equal(await app.evaluate(()=>globalThis.testState.paid()),1);

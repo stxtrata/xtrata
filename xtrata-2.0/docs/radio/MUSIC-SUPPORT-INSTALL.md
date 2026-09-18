@@ -146,3 +146,14 @@ is reused. Music support must be approved again for the new session.
 
 For current downloads, release notes and help, visit
 <https://xtrata.xyz/radio/lounge>.
+
+## Installing with an AI assistant
+
+This package includes **AI AGENT - INSTALL.md** and a reusable skill in
+`skills/xtrata-music-support-installer`. Give the whole extracted folder to an
+assistant and ask it to install Xtrata Music using that guide. The agent guide
+keeps installation separate from wallet funding and payment approval, forbids
+access to wallet secrets, and includes checks for a safe local installation.
+
+You can say: “Install Xtrata Music from this folder. Follow AI AGENT - INSTALL,
+leave Music Support off, and stop when free playback works.”

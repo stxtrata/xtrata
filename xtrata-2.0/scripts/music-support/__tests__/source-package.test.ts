@@ -18,7 +18,7 @@ describe('source package for nontechnical listeners', () => {
 
   it('provides one-step launchers and excludes wallet data and the browser extension', () => {
     const packager = text('scripts/music-support/package.mjs');
-    for (const name of ['START HERE - Mac.command', 'START HERE - Windows.cmd', 'START HERE - Linux.sh', '1 - READ ME FIRST.html']) {
+    for (const name of ['START HERE - Mac.command', 'START HERE - Windows.cmd', 'START HERE - Linux.sh', '1 - READ ME FIRST.html', 'AI AGENT - INSTALL.md', 'xtrata-music-support-installer/SKILL.md', 'public/radio/chain-activity.js']) {
       expect(packager).toContain(name);
     }
     expect(packager).not.toContain('extensions/music-support/');
@@ -41,5 +41,15 @@ describe('source package for nontechnical listeners', () => {
     for (const phrase of ['The short version', 'Mac: step by step', 'Windows: step by step', 'Create my support wallet', 'Funding never turns payments on', 'Updating safely', 'Troubleshooting', 'What this package cannot do']) {
       expect(readme).toContain(phrase);
     }
+  });
+
+  it('trains agents without expanding installation into wallet authority', () => {
+    const guide = text('docs/radio/AI-MUSIC-SUPPORT-INSTALL.md');
+    const skill = text('skills/xtrata-music-support-installer/SKILL.md');
+    for (const phrase of ['Never request, reveal, copy, log or transmit', 'Installation or launch does not authorise wallet funding or payments', '127.0.0.1', 'free playback']) {
+      expect(guide + skill).toContain(phrase);
+    }
+    expect(skill).toContain('name: xtrata-music-support-installer');
+    expect(text('scripts/music-support/README.html')).toContain('AI AGENT - INSTALL.md');
   });
 });
