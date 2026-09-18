@@ -1,1 +1,16 @@
-{"version":"0.1.0","summary":"Desktop preview 0.1.0 is being prepared. Public installers are not published yet.","downloads":[]}
+{
+  "version": "0.1.0",
+  "summary": "Xtrata Music 0.1.0 desktop preview is available for testing. Preview builds are unsigned; read the installation instructions below.",
+  "downloads": [
+    {
+      "platform": "mac-arm64",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v0.1.0-preview.1/Xtrata-Music-0.1.0-mac-arm64.dmg",
+      "sha256": "7a1b3e6602da8ed910daf0b9412052ba2542f09a6f81a6656ac0ad4ea639700d",
+      "requirements": "Apple silicon (M1 or later). macOS 13+ required; tested on macOS 26.5.2. Unsigned preview for early testing.",
+      "signed": false,
+      "verified": true,
+      "preview": true
+    }
+  ],
+  "channel": "preview"
+}
