@@ -33,3 +33,16 @@ status clarity and background resilience rather than claiming an unproven cause.
 
 Source changes require a rebuilt desktop app; already installed preview binaries
 do not update automatically.
+
+## Playlist updates and song length
+
+The local and desktop player refresh the catalogue every three minutes without
+restarting the current audio or its support approval. Discovery follows the public
+catalogue, so a newly inscribed song must first appear there. A failed refresh
+retains the existing playlist and retries on the next interval.
+
+Audio metadata is checked before playback: tracks shorter than 60 seconds are
+skipped without requesting payment and excluded for the rest of the page session.
+Exactly 60 seconds is eligible. Unknown/unreadable duration does not initiate a
+payment. If every candidate is too short, playback stops rather than looping
+through rejected tracks indefinitely.

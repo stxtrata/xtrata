@@ -10,7 +10,7 @@ async function bytes(response,limit){
 export class RadioMedia {
  constructor(request=fetch){this.request=request;this.loaded=new Set();this.cache=new Map();this.tracks=[];this.updated=0;}
  async catalogue(){
-  if(this.updated>Date.now()-300000)return this.tracks;
+  if(this.updated>Date.now()-150000)return this.tracks;
   const r=await this.request('https://xtrata.xyz/radio/counts?range=all&chainLikes=0',{signal:AbortSignal.timeout(30000),redirect:'error'});
   const data=JSON.parse((await bytes(r,2*1024*1024)).toString());
   if(!Array.isArray(data.tracks))throw Error('Song catalogue unavailable.');

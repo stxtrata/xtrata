@@ -1,7 +1,9 @@
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
  const tab=crypto.randomUUID().replaceAll('-','');
- let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0;
+ let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0,refreshing=false,metadataAbort=null;
+ const shortTracks=new Set();
+ function renderSongs(){const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});list.value=String(index<0?0:index);}
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
  function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
  let recentEvents=[];
@@ -13,18 +15,35 @@
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE PLAY · support off');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
  async function select(i){
-  if(!tracks.length)return;const version=++loading;audio.pause();index=(i+tracks.length)%tracks.length;
+  if(!tracks.length)return;metadataAbort?.abort();const controller=new AbortController();metadataAbort=controller;const version=++loading;audio.pause();index=(i+tracks.length)%tracks.length;
   const track=tracks[index];start={id:crypto.randomUUID().replaceAll('-',''),song:track.id,observed:false};
   window.dispatchEvent(new CustomEvent('radio-track',{detail:track}));
   $('radio-songs').value=String(index);$('radio-title').textContent=track.title;
   $('radio-info').textContent=[track.artist,track.album&&'Album: '+track.album,'Inscription #'+track.id].filter(Boolean).join(' · ');
   $('radio-payment').textContent='Loading audio. No payment is requested until playback begins.';
   start.src=new URL(`/radio/audio?id=${track.id}&playback=${start.id}`,location.origin).href;
-  audio.src=start.src;
-  try{await audio.play();}catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
+  try{
+   await new Promise((resolve,reject)=>{
+    const cleanup=()=>{clearTimeout(timer);audio.removeEventListener('loadedmetadata',ready);audio.removeEventListener('error',failed);controller.signal.removeEventListener('abort',failed);};
+    const ready=()=>{cleanup();resolve();};const failed=()=>{cleanup();reject(Error('Metadata unavailable'));};
+    const timer=setTimeout(failed,60000);
+    audio.addEventListener('loadedmetadata',ready);audio.addEventListener('error',failed);controller.signal.addEventListener('abort',failed,{once:true});
+    audio.src=start.src;audio.load();
+   });
+   if(version!==loading)return;
+   if(!Number.isFinite(audio.duration)||audio.duration<=0)throw Error('Duration unavailable');
+   if(audio.duration<60){
+    shortTracks.add(track.id);tracks=tracks.filter(t=>t.id!==track.id);start=null;renderSongs();
+    $('radio-payment').textContent=`Skipped ${track.title}: songs must be at least 60 seconds. No payment requested.`;
+    if(tracks.length)void select(index%tracks.length);
+    else {index=-1;$('radio-title').textContent='No songs of at least 60 seconds available.';}
+    return;
+   }
+   await audio.play();
+  }catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
  }
  function audible(){
-  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src)return;
+  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src||!Number.isFinite(audio.duration)||audio.duration<60)return;
   if(audio.muted||audio.volume===0){
    $('radio-payment').textContent=start.observed?'Muted. Any payment already requested remains recorded; later muted starts stay free.':'Muted · this song is playing free. Unmute to request its support payment.';
    return;
@@ -63,14 +82,24 @@
  function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=!!approval||continuous;$('radio-paid-minutes').disabled=!!approval||continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The duration and remaining lifetime budget also apply.`;}
  limits();
  for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes','radio-continuous'])$(id).oninput=()=>{limits();$('radio-approve').checked=false;void free();};
- async function load(){
-  $('radio-load').disabled=true;
-  try{const r=await fetch('/radio/catalogue');const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Catalogue unavailable.');tracks=v.tracks;
-   const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});
-   $('radio-payment').textContent=tracks.length?`${tracks.length} songs ready. ${approval?'Music support remains on.':'Press Play to listen free.'}`:'No verified songs available.';
-  }catch(e){$('radio-payment').textContent=e.message;}finally{$('radio-load').disabled=false;}
+ async function load(automatic=false){
+  if(refreshing)return;refreshing=true;$('radio-load').disabled=true;
+  try{
+   const r=await fetch('/radio/catalogue',{signal:AbortSignal.timeout(35000)});const v=await r.json();if(!r.ok||v.error||!Array.isArray(v.tracks))throw Error(v.error||'Catalogue unavailable.');
+   const current=tracks.find(t=>t.id===start?.song);
+   tracks=v.tracks.filter(t=>!shortTracks.has(t.id));
+   // Keep the playing item stable even if a catalogue refresh temporarily omits it.
+   if(current&&!tracks.some(t=>t.id===current.id))tracks.push(current);
+   index=start?tracks.findIndex(t=>t.id===start.song):-1;renderSongs();
+   for(const track of tracks)window.radioSongMetadata?.set(track.id,track);
+   window.dispatchEvent(new Event('wizard-song-metadata'));
+   $('radio-load').title=`Last updated ${new Date().toLocaleTimeString()}. Automatically checks every 3 minutes. Songs under 60 seconds are skipped.`;
+   if(!start)$('radio-payment').textContent=tracks.length?`${tracks.length} songs ready. Songs under 60 seconds are skipped.`:'No verified songs available.';
+  }catch(e){if(!automatic)$('radio-payment').textContent=e.message;}finally{refreshing=false;$('radio-load').disabled=false;}
  }
  $('radio-load').onclick=()=>void load();
+ const catalogueTimer=setInterval(()=>void load(true),180000);
+ window.addEventListener('pagehide',()=>{clearInterval(catalogueTimer);metadataAbort?.abort();});
  let polling=false;
  setInterval(async()=>{
   if(polling)return;polling=true;
