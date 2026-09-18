@@ -1,0 +1,71 @@
+{
+  "name": "xtrata-music-desktop",
+  "productName": "Xtrata Music",
+  "version": "0.1.0",
+  "description": "On-chain music and optional local support payments",
+  "author": "Xtrata",
+  "private": true,
+  "type": "module",
+  "main": "main.mjs",
+  "scripts": {
+    "prepare:app": "node prepare.mjs",
+    "start": "npm run prepare:app && electron .",
+    "pack": "npm run prepare:app && electron-builder --dir",
+    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --publish never",
+    "dist:win": "npm run prepare:app && electron-builder --win nsis --publish never",
+    "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never"
+  },
+  "dependencies": {
+    "@stacks/transactions": "6.17.0",
+    "@stacks/network": "6.17.0",
+    "@noble/hashes": "1.8.0"
+  },
+  "devDependencies": {
+    "electron": "44.4.1",
+    "electron-builder": "26.16.1"
+  },
+  "build": {
+    "appId": "xyz.xtrata.music",
+    "productName": "Xtrata Music",
+    "asar": true,
+    "directories": {
+      "output": "../../.artifacts/music-desktop"
+    },
+    "files": [
+      "main.mjs",
+      "window.mjs",
+      "navigation.mjs",
+      "app/**/*",
+      "package.json"
+    ],
+    "protocols": [
+      {
+        "name": "Xtrata Music",
+        "schemes": [
+          "xtrata-music"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "AudioVideo"
+    },
+    "artifactName": "Xtrata-Music-${version}-${os}-${arch}.${ext}"
+  }
+}

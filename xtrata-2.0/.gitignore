@@ -59,3 +59,6 @@ scripts/wizard/.collection-v15/
 # Built from the explicit Music Support package allowlist
 /public/downloads/xtrata-music-support.tar.gz
 /public/downloads/xtrata-music-support.sha256
+
+# Generated desktop payload (explicit source allowlist)
+/desktop/music/app/

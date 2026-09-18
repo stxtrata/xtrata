@@ -1,0 +1,8 @@
+// Release data contains published artifacts only; never invent a download URL.
+fetch('/radio/music-releases.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error();return r.json();}).then(release=>{
+ if(typeof release.summary==='string')document.getElementById('release-summary').textContent=release.summary;
+ const platforms={'mac-arm64':'Mac · Apple silicon','mac-x64':'Mac · Intel','win-x64':'Windows · Intel/AMD','linux-x64':'Linux · AppImage'};
+ const verified=(release.downloads||[]).filter(d=>{try{const u=new URL(d.url);return platforms[d.platform]&&d.verified===true&&d.signed===true&&u.origin==='https://github.com'&&u.pathname.startsWith('/stxtrata/xtrata/releases/download/')&&/^[a-f0-9]{64}$/.test(d.sha256);}catch{return false;}});
+ if(!verified.length)return;
+ const host=document.getElementById('downloads-list');host.replaceChildren();for(const d of verified){const card=document.createElement('article'),title=document.createElement('h3'),p=document.createElement('p'),link=document.createElement('a'),details=document.createElement('details'),summary=document.createElement('summary'),hash=document.createElement('code');title.textContent=platforms[d.platform];p.textContent=d.requirements||'See release notes for compatibility.';link.className='button';link.href=d.url;link.textContent='Download '+release.version;summary.textContent='Verify download (SHA-256)';hash.textContent=d.sha256;details.append(summary,hash);card.append(title,p,link,details);host.append(card);}
+}).catch(()=>{});

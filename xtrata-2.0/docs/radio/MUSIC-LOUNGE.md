@@ -1,3 +1,12 @@
+# Current customer setup
+
+The normal setup is now the desktop app. The public `/radio/lounge` URL is the
+download/news/help hub. See [Desktop Music](DESKTOP-MUSIC.md) for installation,
+wallet storage, build tests and release gates. No extension is needed for the app.
+
+The notes below describe the developer/local companion and optional experimental
+browser integration. The latter has moved to `/radio/browser-lounge`.
+
 # Your Xtrata Music listening room
 
 The listening room is a simple home for your local music support wallet:
@@ -10,7 +19,7 @@ With the repository installed, run `npm run music:lounge` from `xtrata-2.0`,
 then open <http://127.0.0.1:8798/lounge>. Keep that process running.
 The existing operator panel remains at <http://127.0.0.1:8798/>.
 
-The public listening room is **https://xtrata.xyz/radio/lounge** after deployment.
+The public listening room is **https://xtrata.xyz/radio/browser-lounge** after deployment.
 It uses the same radio engine as the free radio. To connect your desktop wallet,
 install the companion and load the included `extensions/music-support` folder
 as an unpacked Chrome extension (Developer mode → Load unpacked). Reload the
@@ -20,7 +29,7 @@ and a separate local review to enable automatic support. Approximately 1 STX is
 recommended, not required. Creation, pairing and funding never enable spending.
 
 This is early access, not a signed installer or Chrome Store release. The new
-extension supports only `https://xtrata.xyz/radio/lounge` (and `.html`), not preview
+extension supports only `https://xtrata.xyz/radio/browser-lounge` (and `.html`), not preview
 domains, arbitrary embeds or other radio pages. It requires the local companion
 running on port 8798. The older `extensions/music-wallet` native-host prototype
 is separate and is not used. Never expose the companion on the public network.
