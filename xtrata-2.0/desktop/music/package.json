@@ -1,7 +1,7 @@
 {
   "name": "xtrata-music-desktop",
   "productName": "Xtrata Music",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "On-chain music and optional local support payments",
   "author": "Xtrata",
   "private": true,
@@ -13,7 +13,8 @@
     "pack": "npm run prepare:app && electron-builder --dir",
     "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --publish never",
     "dist:win": "npm run prepare:app && electron-builder --win nsis --publish never",
-    "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never"
+    "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never",
+    "release:patch": "node bump-version.mjs"
   },
   "dependencies": {
     "@stacks/transactions": "6.17.0",

@@ -1,9 +1,10 @@
 // Real Electron window, local audio and simulated wallet; no signing or chain access.
 import {_electron as electron} from 'playwright';
-import {writeFile,rm,mkdir,mkdtemp} from 'node:fs/promises';
+import {readFile,writeFile,rm,mkdir,mkdtemp} from 'node:fs/promises';
 import {join,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import assert from 'node:assert/strict';
+const version=JSON.parse(await readFile('desktop/music/package.json','utf8')).version;
 const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-'));
 await writeFile(entry,`
 import {app} from 'electron';
@@ -21,7 +22,7 @@ let app;
 try{
  app=await electron.launch({executablePath:resolve('desktop/music/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'),args:[entry],env:Object.fromEntries(Object.entries(process.env).filter(([k])=>k!=='ELECTRON_RUN_AS_NODE'))});
  console.log('Electron launched');app.process().stderr.on('data',b=>process.stderr.write(b));app.process().stdout.on('data',b=>process.stdout.write(b));
- const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',dialog=>dialog.accept());await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');
+ const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',dialog=>dialog.accept());await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');await page.getByText('Xtrata Music '+version,{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>document.cookie),'');
  const origin=await app.evaluate(()=>globalThis.testState.origin);assert.equal((await fetch(origin+'/lounge')).status,400);
  assert.equal(await page.locator('[data-xtrata-chain-plays]').count(),1);assert.equal((await page.evaluate(()=>fetch('/radio-chain-activity.js').then(r=>r.status))),200);
