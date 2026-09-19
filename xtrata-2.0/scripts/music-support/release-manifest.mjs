@@ -10,4 +10,8 @@ const local=await readFile(resolve(file));const sha256=createHash('sha256').upda
 // Stream the published file and compare bytes before offering it to users.
 const response=await fetch(url,{signal:AbortSignal.timeout(120000)});if(!response.ok)throw Error('Published download is not available.');const hash=createHash('sha256');for await(const chunk of response.body)hash.update(chunk);if(hash.digest('hex')!==sha256)throw Error('Published download checksum differs from the local installer.');
 const path=new URL('../../public/radio/music-releases.json',import.meta.url),release=JSON.parse(await readFile(path,'utf8'));
+const desktop=JSON.parse(await readFile(new URL('../../desktop/music/package.json',import.meta.url),'utf8'));
+if(!basename(file).includes(`-${desktop.version}-`))throw Error('Installer filename must match the desktop version.');
+if(release.version!==desktop.version)release.downloads=[];
+release.version=desktop.version;
 release.downloads=release.downloads.filter(d=>d.platform!==platform);release.downloads.push({platform,url,sha256,requirements,signed:!preview,verified:true,...(preview?{preview:true}:{})});release.channel=release.downloads.some(d=>d.preview)?'preview':'stable';release.summary=release.channel==='preview'?`Xtrata Music ${release.version} desktop preview is available for testing. Preview builds are unsigned; read the installation instructions below.`:`Xtrata Music ${release.version} is available for the platforms below.`;await writeFile(path,JSON.stringify(release,null,2)+'\n');console.log('Verified published bytes and updated the hub manifest. Review, commit and deploy it.');

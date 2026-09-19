@@ -33,3 +33,34 @@ status clarity and background resilience rather than claiming an unproven cause.
 
 Source changes require a rebuilt desktop app; already installed preview binaries
 do not update automatically.
+
+## Playlist updates and song length
+
+The local and desktop player refresh the catalogue every three minutes without
+restarting the current audio or its support approval. Discovery follows the public
+catalogue, so a newly inscribed song must first appear there. A failed refresh
+retains the existing playlist and retries on the next interval.
+
+Audio metadata is checked before playback: tracks shorter than 60 seconds are
+skipped without requesting payment and excluded for the rest of the page session.
+Exactly 60 seconds is eligible. Unknown/unreadable duration does not initiate a
+payment. If every candidate is too short, playback stops rather than looping
+through rejected tracks indefinitely.
+
+## Versions and updates
+
+The lounge shows the running version and a Check for updates button. This checks
+only the public release manifest; it does not access the wallet or approve funds.
+Download the newer app, quit the existing app, replace it in Applications, and
+reopen. The wallet lives separately in application data and is preserved. Enable
+support again when ready. The app does not install updates automatically.
+
+Version 1.0.0 starts the new numbering (the build remains an unsigned preview).
+Before each subsequent release, run `npm --prefix desktop/music run release:patch`
+from the project root, then build and test. This increments 1.0.0 to 1.0.1, etc.,
+and keeps package metadata and the displayed version aligned. Do not bump for
+every individual file save. Update the public release manifest only after the
+corresponding download exists and its checksum has been verified.
+
+For the repository-based local wizard, pull the code, restart the wizard after
+backend changes, and reload the lounge. Keep the existing wallet directory.

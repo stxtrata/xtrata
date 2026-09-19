@@ -9,6 +9,7 @@ import {RadioMedia} from './radio-media.mjs';
 import {RadioWizard,policy} from './radio-plays-backend.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 export function createWizardServer(wizard,origin='http://127.0.0.1:8798',media=new RadioMedia(),options={}) {
+const version=readFile(join(root,'scripts/wizard/music-version.json'),'utf8').then(JSON.parse);
 const listening=new RadioListening(wizard,media);
 const webBridge=new MusicWebBridge(wizard,listening,media);
 const server=createServer(async(req,res)=>{
@@ -19,7 +20,17 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+  }
+  if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
+   const info=await version;let latest=null;
+   if(req.url==='/app-version?check=1'){
+    const response=await fetch('https://xtrata.xyz/radio/music-releases.json',{signal:AbortSignal.timeout(12000),cache:'no-store'});
+    if(!response.ok)throw Error('Update check unavailable. Try again later.');
+    const release=await response.json();
+    if(/^\d+\.\d+\.\d+$/.test(release.version)&&release.downloads?.some(d=>d.verified))latest=release.version;
+   }
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:info.version,latest}));return;
   }
   if(req.url==='/web-bridge'&&req.method==='OPTIONS'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Access-Control-Allow-Methods','POST');res.setHeader('Access-Control-Allow-Headers','content-type');res.end();return;}
   if(req.url==='/web-bridge'&&req.method==='POST'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);if(req.headers['content-type']!=='application/json')throw Error('JSON required');let body='';for await(const chunk of req){body+=chunk;if(body.length>2048)throw Error('Request too large');}const result=await webBridge.call(req.headers.origin,JSON.parse(body));res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;}

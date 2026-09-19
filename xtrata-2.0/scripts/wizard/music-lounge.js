@@ -1,5 +1,16 @@
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
+ async function version(check=false){
+  const button=$('check-update');button.disabled=true;
+  try{
+   const r=await fetch('/app-version'+(check?'?check=1':''));const data=await r.json();if(!r.ok||data.error)throw Error(data.error||'Update check unavailable.');
+   $('app-version').textContent='Xtrata Music '+data.version;
+   if(check){const a=data.version.split('.').map(Number),b=data.latest?.split('.').map(Number);const difference=b?.map((n,i)=>n-a[i]).find(n=>n!==0)||0;
+    $('update-status').textContent=difference>0?`Version ${data.latest} is available. Download it, quit Xtrata Music, replace the app in Applications and reopen. Your wallet stays in place.`:data.latest?'You are running the latest published version or a newer local build.':'No published update is available yet.';
+   }
+  }catch(e){$('update-status').textContent=e.message;}finally{button.disabled=false;}
+ }
+ $('check-update').onclick=()=>void version(true);void version();
  window.addEventListener('radio-track',({detail:track})=>{
   const cover=$('cover');cover.hidden=true;$('cover-fallback').hidden=false;
   cover.alt=`Cover artwork for ${track.title}`;
