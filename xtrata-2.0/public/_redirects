@@ -52,3 +52,6 @@
 /bounties/first-masterpiece/ /proofzero/ 200
 
 /music /music/ 301
+/radio/lounge /music/lounge 301
+/radio/lounge.html /music/lounge 301
+/music/lounge.html /music/lounge 301

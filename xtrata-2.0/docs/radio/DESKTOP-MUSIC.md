@@ -1,6 +1,6 @@
 # Xtrata Music desktop app and public hub
 
-The public home is **https://xtrata.xyz/radio/lounge**. It is now the download,
+The public home is **https://xtrata.xyz/music/lounge**. It is now the download,
 setup, compatibility and news hub. Ordinary users do not install an extension.
 `/radio/support` leads to this hub. The free web radio remains `/radio`.
 

@@ -1,8 +1,8 @@
-> Superseded customer flow: `/radio/lounge` is now the download hub. The browser player moved to `/radio/browser-lounge`. See [Desktop Music](DESKTOP-MUSIC.md).
+> Superseded customer flow: `/music/lounge` is now the download hub. The browser player moved to `/radio/browser-lounge`. See [Desktop Music](DESKTOP-MUSIC.md).
 
 # Website lounge implementation notes — 18 September 2026
 
-Implemented a public listening room at `/radio/lounge`, linked from `/radio` and
+The original public listening room was implemented at `/radio/lounge`, linked from `/radio` and
 the desktop setup page. It offers artwork/metadata, radio controls and a guided
 companion install → extension → local pairing → create → fund → local spending
 approval journey. Balance and recent payment recipients/transaction links are

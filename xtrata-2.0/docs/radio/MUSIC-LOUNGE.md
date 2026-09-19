@@ -1,6 +1,6 @@
 # Current customer setup
 
-The normal setup is now the desktop app. The public `/radio/lounge` URL is the
+The normal setup is now the desktop app. The public `/music/lounge` URL is the
 download/news/help hub. See [Desktop Music](DESKTOP-MUSIC.md) for installation,
 wallet storage, build tests and release gates. No extension is needed for the app.
 

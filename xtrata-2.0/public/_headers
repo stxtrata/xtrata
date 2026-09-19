@@ -91,9 +91,9 @@
   X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'
 
-/radio/lounge
+/music/lounge
   Cache-Control: no-cache
-/radio/lounge.html
+/music/lounge.html
   Cache-Control: no-cache
 /radio/lounge.js
   Cache-Control: no-cache

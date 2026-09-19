@@ -55,7 +55,7 @@ describe('homepage content configuration', () => {
       'xtrata-music-lounge'
     ]);
     expect(HOMEPAGE_CAMPAIGN_BANNERS.at(-1)).toMatchObject({
-      href: '/radio/lounge',
+      href: '/music/lounge',
       title: 'Xtrata Music Lounge',
       eyebrow: 'On-chain pay-per-play',
       newTab: true
