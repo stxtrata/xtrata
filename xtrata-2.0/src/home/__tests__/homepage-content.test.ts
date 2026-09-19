@@ -57,8 +57,11 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_CAMPAIGN_BANNERS.at(-1)).toMatchObject({
       href: '/radio/lounge',
       title: 'Xtrata Music Lounge',
-      eyebrow: 'On-chain pay-per-play'
+      eyebrow: 'On-chain pay-per-play',
+      newTab: true
     });
+    expect(homepageSource).toContain("banner.target = '_blank'");
+    expect(homepageSource).toContain("banner.rel = 'noopener noreferrer'");
     expect(indexHtml).toContain('id="campaignBannerList"');
   });
 
