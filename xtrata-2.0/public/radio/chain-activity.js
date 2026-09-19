@@ -103,6 +103,14 @@ export function rankPayers(plays) {
   return [...groups.values()].sort((a, b) => b.count - a.count || a.payer.localeCompare(b.payer));
 }
 
+const cachedPlay = play => play && /^0x[0-9a-f]{64}$/.test(play.txid)
+  && [1, 2, 3].includes(play.core)
+  && Number.isSafeInteger(play.id) && play.id >= 0
+  && play.amount === 50
+  && Number.isSafeInteger(play.total) && play.total >= 0
+  && /^[A-Z0-9]{3,64}$/.test(play.payer)
+  && /^[A-Z0-9]{3,64}$/.test(play.recipient);
+
 export function mountPaidPlayReaders() {
   for (const host of document.querySelectorAll('[data-xtrata-chain-plays]')) {
     const status = host.querySelector('[data-chain-status]');
@@ -116,8 +124,16 @@ export function mountPaidPlayReaders() {
     let scanning = false, cancelled = false, shown = 50;
     let search, role, view, older, all, more, summary, totals;
     const cacheKey = 'xtrata-paid-play-total-v1:' + PAID_PLAYS_CONTRACT;
+    const historyCacheKey = 'xtrata-paid-play-history-v1:' + PAID_PLAYS_CONTRACT;
     let previousTotal = null;
     try { const saved = JSON.parse(localStorage.getItem(cacheKey)); if (Number.isSafeInteger(saved?.count) && saved.count >= 0) previousTotal = saved; } catch {}
+    if (history) try {
+      const saved = JSON.parse(localStorage.getItem(historyCacheKey));
+      const cached = Array.isArray(saved?.plays) ? saved.plays.slice(0, 10000).filter(cachedPlay) : [];
+      plays = new Map(cached.map(play => [play.txid, play]));
+      if (!previousTotal && Number.isSafeInteger(saved?.count) && saved.count >= plays.size)
+        previousTotal = {count: saved.count, checkedAt: saved.checkedAt};
+    } catch {}
 
     if (history) {
       const disclosure = document.createElement('details');
@@ -209,6 +225,7 @@ export function mountPaidPlayReaders() {
         if (complete) {
           previousTotal = {count: plays.size, checkedAt: Date.now()};
           try { localStorage.setItem(cacheKey, JSON.stringify(previousTotal)); } catch {}
+          try { localStorage.setItem(historyCacheKey, JSON.stringify({...previousTotal, plays: [...plays.values()]})); } catch {}
         }
       } finally { scanning = false; render(); }
     }

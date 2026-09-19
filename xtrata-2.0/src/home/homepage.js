@@ -204,6 +204,10 @@ const renderCampaignBanners = () => {
       `campaign-banner campaign-banner--${item.tone}`,
       `campaign_banner:${item.id}`
     );
+    if (item.newTab) {
+      banner.target = '_blank';
+      banner.rel = 'noopener noreferrer';
+    }
     banner.dataset.campaignId = item.id;
     banner.dataset.campaignStatus = item.status;
 
