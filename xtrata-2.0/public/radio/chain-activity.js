@@ -114,8 +114,15 @@ export function mountPaidPlayReaders() {
     const limit = Math.min(20, Math.max(1, Number(host.dataset.limit) || 12));
     let tracks = new Map(), plays = new Map(), busy = false, offset = 0, complete = false;
     let scanning = false, cancelled = false, shown = 50;
-    let search, role, view, older, all, more, summary;
+    let search, role, view, older, all, more, summary, totals;
+    const cacheKey = 'xtrata-paid-play-total-v1:' + PAID_PLAYS_CONTRACT;
+    let previousTotal = null;
+    try { const saved = JSON.parse(localStorage.getItem(cacheKey)); if (Number.isSafeInteger(saved?.count) && saved.count >= 0) previousTotal = saved; } catch {}
+
     if (history) {
+      const disclosure = document.createElement('details');
+      disclosure.className = 'chain-filter-panel';
+      const toggle = document.createElement('summary'); toggle.textContent = 'Search & filters';
       const controls = document.createElement('div');
       controls.className = 'chain-history-controls';
       controls.innerHTML = `<label>Find a play<input type="search" placeholder="Song, artist, inscription ID, wallet or transaction" data-search></label>
@@ -126,19 +133,15 @@ export function mountPaidPlayReaders() {
       older = controls.querySelector('[data-older]'); all = controls.querySelector('[data-all]');
       summary = document.createElement('p'); summary.setAttribute('aria-live', 'polite');
       more = document.createElement('button'); more.type = 'button'; more.textContent = 'Show more matching payments';
-      list.before(controls, summary); list.after(more);
+      totals = document.createElement('p'); totals.className = 'chain-totals'; totals.setAttribute('aria-live', 'polite');
+      disclosure.append(toggle, controls);
+      list.before(totals, disclosure, summary); list.after(more);
       for (const input of [search, role, view]) input.addEventListener('input', () => {shown = 50; render();});
       more.onclick = () => {shown += 50; render();};
       older.onclick = () => void refresh(true);
-      all.onclick = async () => {
+      all.onclick = () => {
         if (scanning) {cancelled = true; all.textContent = 'Stopping…'; return;}
-        scanning = true; cancelled = false;
-        try {
-          while (!complete && !cancelled) {
-            if (!await refresh(true)) break;
-            await new Promise(resolve => setTimeout(resolve, 300));
-          }
-        } finally {scanning = false; render();}
+        void loadHistory();
       };
     }
     function render() {
@@ -159,7 +162,8 @@ export function mountPaidPlayReaders() {
       if (!visible.length) list.textContent = 'No matching paid starts in the loaded history.';
       if (history) {
         const amount = matches.reduce((sum, play) => sum + play.amount, 0);
-        summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. Load full history to search all payments.`}`;
+        totals.textContent = complete ? `${plays.size.toLocaleString()} total paid starts · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders` : previousTotal ? `${previousTotal.count.toLocaleString()} paid starts at last complete check · updating total automatically…` : `Counting all paid starts… ${plays.size.toLocaleString()} found so far`;
+        summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. Full history loads automatically; totals are provisional until complete.`}`;
         older.disabled = busy || scanning || complete;
         all.disabled = complete || (busy && !scanning);
         all.textContent = scanning ? 'Stop loading history' : 'Load full history';
@@ -194,11 +198,28 @@ export function mountPaidPlayReaders() {
         return false;
       } finally {busy = false; if (button) button.disabled = false; render();}
     };
-    button?.addEventListener('click', () => void refresh());
-    document.addEventListener('visibilitychange', () => {if (!document.hidden) void refresh();});
-    const timer = setInterval(() => void refresh(), 15000);
+    async function loadHistory() {
+      if (!history || scanning || busy) return;
+      scanning = true; cancelled = false; render();
+      try {
+        while (!complete && !cancelled && !document.hidden) {
+          if (!await refresh(true)) break;
+          if (!complete) await new Promise(resolve => setTimeout(resolve, 300));
+        }
+        if (complete) {
+          previousTotal = {count: plays.size, checkedAt: Date.now()};
+          try { localStorage.setItem(cacheKey, JSON.stringify(previousTotal)); } catch {}
+        }
+      } finally { scanning = false; render(); }
+    }
+    async function update() {
+      if (await refresh()) await loadHistory();
+    }
+    button?.addEventListener('click', () => void update());
+    document.addEventListener('visibilitychange', () => {if (!document.hidden) void update();});
+    const timer = setInterval(() => void update(), 15000);
     window.addEventListener('pagehide', () => {cancelled = true; clearInterval(timer);}, {once: true});
-    void refresh();
+    void update();
   }
 }
 
