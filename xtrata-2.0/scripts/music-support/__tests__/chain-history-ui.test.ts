@@ -22,11 +22,21 @@ describe('automatic public history',()=>{
   expect(document.querySelector('.chain-totals')!.textContent).toContain('0.000150 STX');
   newest=4;await vi.advanceTimersByTimeAsync(15000);
   expect(document.querySelector('.chain-totals')!.textContent).toContain('4 total paid starts');
+  expect(JSON.parse(localStorage.getItem(`xtrata-paid-play-history-v1:${PAID_PLAYS_CONTRACT}`)!).plays).toHaveLength(4);
   window.dispatchEvent(new Event('pagehide'));
   mount();
   expect(document.querySelector('.chain-totals')!.textContent).toContain('4 paid starts at last complete check');
+  expect(document.querySelectorAll('.chain-play')).toHaveLength(4);
   await vi.advanceTimersByTimeAsync(1000);
   expect(document.querySelector('.chain-totals')!.textContent).toContain('4 total paid starts');
+ });
+ it('ignores malformed cached history while retaining a valid previous total',()=>{
+  localStorage.setItem(`xtrata-paid-play-total-v1:${PAID_PLAYS_CONTRACT}`,JSON.stringify({count:7,checkedAt:1}));
+  localStorage.setItem(`xtrata-paid-play-history-v1:${PAID_PLAYS_CONTRACT}`,JSON.stringify({count:7,plays:[event(1),{txid:'javascript:bad'}]}));
+  vi.stubGlobal('fetch',vi.fn(()=>new Promise(()=>{})));
+  mount();
+  expect(document.querySelector('.chain-totals')!.textContent).toContain('7 paid starts at last complete check');
+  expect(document.querySelectorAll('.chain-play')).toHaveLength(0);
  });
  it('does not present partial history as a complete total when the service fails',async()=>{
   vi.useFakeTimers();
