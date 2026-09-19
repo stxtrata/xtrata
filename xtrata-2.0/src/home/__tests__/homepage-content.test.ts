@@ -52,8 +52,13 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.id)).toEqual([
       'xtrata-music',
       'forever-twins',
-      'suno-more'
+      'xtrata-music-lounge'
     ]);
+    expect(HOMEPAGE_CAMPAIGN_BANNERS.at(-1)).toMatchObject({
+      href: '/radio/lounge',
+      title: 'Xtrata Music Lounge',
+      eyebrow: 'On-chain pay-per-play'
+    });
     expect(indexHtml).toContain('id="campaignBannerList"');
   });
 

@@ -16,14 +16,14 @@ export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
     tone: 'twins'
   }),
   Object.freeze({
-    id: 'suno-more',
+    id: 'xtrata-music-lounge',
     status: 'live',
-    eyebrow: 'AI music permanence',
-    title: 'Suno More',
-    description: 'Inscribe the master, preserve attribution, and connect editions and remixes.',
-    artwork: '/suno-more/assets/suno-more-logo.webp',
-    href: '/wizard/suno',
-    cta: 'Inscribe a song',
+    eyebrow: 'On-chain pay-per-play',
+    title: 'Xtrata Music Lounge',
+    description: 'Listen to music stored on-chain and send tiny payments directly to song holders.',
+    artwork: '/favicons/xtrata-apple-touch-icon.png',
+    href: '/radio/lounge',
+    cta: 'Enter the lounge',
     tone: 'suno'
   })
 ]);
