@@ -31,7 +31,7 @@ steps that require the user's explicit choice.
 
 ## Choose the installation route
 
-1. Check <https://xtrata.xyz/radio/lounge> for a signed, verified installer for
+1. Check <https://xtrata.xyz/music/lounge> for a signed, verified installer for
    the user's operating system.
 2. Prefer that installer when available. Verify its SHA-256 against the value on
    the hub. It needs no Node.js or browser extension.

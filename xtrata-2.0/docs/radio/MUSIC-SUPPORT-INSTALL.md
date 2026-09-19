@@ -104,7 +104,7 @@ confirm the return. A network fee applies. Wait for unresolved payments first.
    file. It will reuse the separate wallet-data folder.
 5. Confirm that the same funding address appears before deleting the old program
    folder. If it differs, stop and use the support information on the Xtrata
-   Music hub: <https://xtrata.xyz/radio/lounge>.
+   Music hub: <https://xtrata.xyz/music/lounge>.
 
 The separate wallet-data location starts with this simplified package. If you
 previously used an older source package that kept its wallet inside the program
@@ -145,7 +145,7 @@ is reused. Music support must be approved again for the new session.
 - Windows and Linux remain experimental until tested on clean machines.
 
 For current downloads, release notes and help, visit
-<https://xtrata.xyz/radio/lounge>.
+<https://xtrata.xyz/music/lounge>.
 
 ## Installing with an AI assistant
 

@@ -22,7 +22,7 @@ export const HOMEPAGE_CAMPAIGN_BANNERS = Object.freeze([
     title: 'Xtrata Music Lounge',
     description: 'Listen to music stored on-chain and send tiny payments directly to song holders.',
     artwork: '/favicons/xtrata-apple-touch-icon.png',
-    href: '/radio/lounge',
+    href: '/music/lounge',
     newTab: true,
     cta: 'Enter the lounge',
     tone: 'suno'

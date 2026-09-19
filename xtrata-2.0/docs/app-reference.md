@@ -469,7 +469,7 @@ Music Balance integration plan (17 September 2026): `docs/plans/RADIO-MUSIC-BALA
 
 ## Website Music Support lounge
 
-- Public `/radio/lounge`: `public/radio/lounge.{html,js,css}` plus shared radio bundle.
+- Public `/music/lounge`: `music/lounge.html` with `public/radio/music-hub.{js,css}` and the shared chain reader.
 - Audible start identity: `src/lib/radio/audible-start.js` (select before `play()`).
 - Chrome bridge: `extensions/music-support/`; exact production lounge origin only.
 - Companion pairing/local consent: `scripts/wizard/music-web-bridge.mjs` and
@@ -480,13 +480,14 @@ Music Balance integration plan (17 September 2026): `docs/plans/RADIO-MUSIC-BALA
 
 ## Desktop Music and public download hub (current)
 
-`/radio/lounge` is now the customer download/news/help hub, using
+`/music/lounge` is now the customer download/news/help hub, using
 `public/radio/music-hub.{css,js}` and `music-releases.json`. The independent app
 is in `desktop/music`; it embeds the local lounge and creates a separate wallet
 in OS app data. No extension or Node installation is required by app users.
 See `docs/radio/DESKTOP-MUSIC.md` for builds, release signing and simulated tests.
 The previous web/extension player moved to `/radio/browser-lounge` as an advanced
 experimental path. It is no longer the main onboarding route.
+The former `/radio/lounge` address permanently redirects to `/music/lounge`.
 
 The public hub and local lounge now include a read-only live reader for confirmed
 `xtrata-radio-plays-v1-0` print events. `public/radio/chain-activity.js` reads the
