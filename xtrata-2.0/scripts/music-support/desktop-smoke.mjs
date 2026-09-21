@@ -1,9 +1,12 @@
 // Real Electron window, local audio and simulated wallet; no signing or chain access.
 import {_electron as electron} from 'playwright';
 import {readFile,writeFile,rm,mkdir,mkdtemp} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join,resolve,dirname} from 'node:path';
+import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import assert from 'node:assert/strict';
+const executable=resolve(process.env.XTRATA_MUSIC_TEST_ELECTRON||'desktop/music/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron');
+if(existsSync(resolve(dirname(executable),'../Resources/app.asar')))throw Error('Use an unpackaged Electron runtime for simulated-wallet tests.');
 const version=JSON.parse(await readFile('desktop/music/package.json','utf8')).version;
 const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-'));
 await writeFile(entry,`
@@ -20,7 +23,7 @@ app.on('window-all-closed',()=>app.quit());})();
 `);
 let app;
 try{
- app=await electron.launch({executablePath:resolve('desktop/music/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'),args:[entry],env:Object.fromEntries(Object.entries(process.env).filter(([k])=>k!=='ELECTRON_RUN_AS_NODE'))});
+ app=await electron.launch({executablePath:executable,args:[entry],env:Object.fromEntries(Object.entries(process.env).filter(([k])=>k!=='ELECTRON_RUN_AS_NODE'))});
  console.log('Electron launched');app.process().stderr.on('data',b=>process.stderr.write(b));app.process().stdout.on('data',b=>process.stdout.write(b));
  const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',dialog=>dialog.accept());await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');await page.getByText('Xtrata Music '+version,{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>document.cookie),'');
