@@ -489,6 +489,10 @@ The previous web/extension player moved to `/radio/browser-lounge` as an advance
 experimental path. It is no longer the main onboarding route.
 The former `/radio/lounge` address permanently redirects to `/music/lounge`.
 
+Desktop/local playlist refreshes run automatically every three minutes. A manual
+Refresh songs action explicitly bypasses the local media-service catalogue cache,
+so newly indexed songs can be loaded immediately without restarting the app.
+
 The public hub and local lounge now include a read-only live reader for confirmed
 `xtrata-radio-plays-v1-0` print events. `public/radio/chain-activity.js` reads the
 Hiro v2 contract-log endpoint, validates the exact contract/event schema and

@@ -39,7 +39,7 @@ const server=createServer(async(req,res)=>{
   if(req.method==='GET'&&req.url==='/radio-chain-activity.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'public/radio/chain-activity.js')));return;}
   if(req.method==='GET'&&['/','/ui.js','/ui.css','/radio.js'].includes(req.url)){res.setHeader('Content-Type',req.url==='/'?'text/html':req.url==='/ui.css'?'text/css':'text/javascript');res.end(await readFile(req.url==='/radio.js'?join(root,'scripts/wizard/radio-listening-ui.js'):join(root,'scripts/wizard/radio-plays'+(req.url==='/'?'-panel.html':req.url==='/ui.css'?'-ui.css':'-ui.js'))));return;}
   const url=new URL(req.url,expectedOrigin);
-  if(req.method==='GET'&&url.pathname==='/radio/catalogue'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({tracks:await media.catalogue()}));return;}
+  if(req.method==='GET'&&url.pathname==='/radio/catalogue'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({tracks:await media.catalogue(url.searchParams.get('refresh')==='1')}));return;}
   if(req.method==='GET'&&url.pathname==='/radio/artwork'){const artwork=await media.artwork(Number(url.searchParams.get('id')));res.setHeader('Content-Type',artwork.mime);res.setHeader('X-Content-Type-Options','nosniff');res.end(artwork.body);return;}
   if(req.method==='GET'&&url.pathname==='/radio/audio'){
    const id=url.searchParams.get('id');if(!/^(0|[1-9][0-9]*)$/.test(id||''))throw Error('Invalid song ID.');

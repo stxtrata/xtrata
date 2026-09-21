@@ -41,6 +41,10 @@ restarting the current audio or its support approval. Discovery follows the publ
 catalogue, so a newly inscribed song must first appear there. A failed refresh
 retains the existing playlist and retries on the next interval.
 
+The visible Refresh songs button bypasses the local catalogue cache. Use it when a
+new inscription has just appeared in the public catalogue; it should not require
+waiting for the next automatic interval or restarting the app.
+
 Audio metadata is checked before playback: tracks shorter than 60 seconds are
 skipped without requesting payment and excluded for the rest of the page session.
 Exactly 60 seconds is eligible. Unknown/unreadable duration does not initiate a

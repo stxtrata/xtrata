@@ -85,7 +85,7 @@
  async function load(automatic=false){
   if(refreshing)return;refreshing=true;$('radio-load').disabled=true;
   try{
-   const r=await fetch('/radio/catalogue',{signal:AbortSignal.timeout(35000)});const v=await r.json();if(!r.ok||v.error||!Array.isArray(v.tracks))throw Error(v.error||'Catalogue unavailable.');
+   const r=await fetch('/radio/catalogue'+(automatic?'':'?refresh=1'),{signal:AbortSignal.timeout(35000)});const v=await r.json();if(!r.ok||v.error||!Array.isArray(v.tracks))throw Error(v.error||'Catalogue unavailable.');
    const current=tracks.find(t=>t.id===start?.song);
    tracks=v.tracks.filter(t=>!shortTracks.has(t.id));
    // Keep the playing item stable even if a catalogue refresh temporarily omits it.
