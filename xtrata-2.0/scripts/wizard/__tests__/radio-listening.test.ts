@@ -57,6 +57,16 @@ describe('bounded radio sessions',()=>{
 });
 const headers={'content-type':'text/html','x-xtrata-runtime-contract':'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3','x-xtrata-runtime-network':'mainnet'};
 describe('audio extraction without executing inscription code',()=>{
+ it('keeps automatic catalogue reads bounded but lets an explicit refresh bypass the cache',async()=>{
+  let generation=0;
+  const fetcher=vi.fn(async()=>new Response(JSON.stringify({tracks:[{id:song+generation++,status:'Audio player'}]})));
+  const media=new RadioMedia(fetcher);
+  expect((await media.catalogue())[0].id).toBe(song);
+  expect((await media.catalogue())[0].id).toBe(song);
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  expect((await media.catalogue(true))[0].id).toBe(song+1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+ });
  it('reads only a fixed catalogue and extracts audio bytes, never HTML',async()=>{
   const fetcher=vi.fn(async url=>String(url).includes('/radio/counts')?new Response(JSON.stringify({tracks:[{id:song,status:'Audio player',title:'Song'}]})):new Response('<script>stealKeys()</script><audio src="data:audio/wav;base64,UklGRg=="></audio>',{headers}));
   const media=new RadioMedia(fetcher),result=await media.audio(song);expect(result.mime).toBe('audio/wav');expect(result.body.toString()).toBe('RIFF');expect(media.loaded.has(song)).toBe(true);
