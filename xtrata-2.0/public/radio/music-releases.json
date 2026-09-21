@@ -1,12 +1,21 @@
 {
-  "version": "0.1.0",
-  "summary": "Xtrata Music 0.1.0 desktop preview is available for testing. Preview builds are unsigned; read the installation instructions below.",
+  "version": "1.0.1",
+  "summary": "Xtrata Music 1.0.1 desktop preview is available for testing. Preview builds are unsigned; read the installation instructions below.",
   "downloads": [
     {
-      "platform": "mac-arm64",
-      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v0.1.0-preview.1/Xtrata-Music-0.1.0-mac-arm64.dmg",
-      "sha256": "7a1b3e6602da8ed910daf0b9412052ba2542f09a6f81a6656ac0ad4ea639700d",
-      "requirements": "Apple silicon (M1 or later). macOS 13+ required; tested on macOS 26.5.2. Unsigned preview for early testing.",
+      "platform": "mac-universal",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.1-preview.1/Xtrata-Music-1.0.1-mac-universal.dmg",
+      "sha256": "d874f80e18404075fa7eb057a54ba5fd02a5894c998ac07884206016a23c88c4",
+      "requirements": "macOS 13 Ventura or newer. Intel and Apple silicon included. Runtime tested on Apple silicon/macOS 26.5.2; Intel hardware testing pending. Unsigned preview.",
+      "signed": false,
+      "verified": true,
+      "preview": true
+    },
+    {
+      "platform": "mac-universal-legacy",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.1-preview.1/Xtrata-Music-Legacy-1.0.1-mac-universal.dmg",
+      "sha256": "93bf0851fe0aa762867cbab24cc82f3cf0fc10e9e45b844205ad65f58908ecd1",
+      "requirements": "macOS 12 Monterey compatibility preview. Intel and Apple silicon included. Electron 43 runtime tested on Apple silicon/macOS 26.5.2; Monterey and Intel hardware testing pending. Unsigned. Choose Standard on macOS 13+.",
       "signed": false,
       "verified": true,
       "preview": true

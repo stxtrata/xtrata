@@ -1,7 +1,7 @@
 {
   "name": "xtrata-music-desktop",
   "productName": "Xtrata Music",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "On-chain music and optional local support payments",
   "author": "Xtrata",
   "private": true,
@@ -11,10 +11,11 @@
     "prepare:app": "node prepare.mjs",
     "start": "npm run prepare:app && electron .",
     "pack": "npm run prepare:app && electron-builder --dir",
-    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --publish never",
+    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never",
     "dist:win": "npm run prepare:app && electron-builder --win nsis --publish never",
     "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never",
-    "release:patch": "node bump-version.mjs"
+    "release:patch": "node bump-version.mjs",
+    "dist:mac:legacy": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.electronVersion=43.7.3 -c.directories.output=../../.artifacts/music-desktop-legacy '-c.artifactName=Xtrata-Music-Legacy-${version}-${os}-${arch}.${ext}'"
   },
   "dependencies": {
     "@stacks/transactions": "6.17.0",
@@ -37,7 +38,8 @@
       "window.mjs",
       "navigation.mjs",
       "app/**/*",
-      "package.json"
+      "package.json",
+      "!app/smoke-entry.mjs"
     ],
     "protocols": [
       {

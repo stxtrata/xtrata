@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {basename,resolve} from 'node:path';
 const [platform,file,url,requirements,...flags]=process.argv.slice(2);
 const preview=flags.join()==='--preview-tested';
-if(!['mac-arm64','mac-x64','win-x64','linux-x64'].includes(platform)||!file||!url||!requirements||(!preview&&flags.join()!=='--signed-and-tested'))throw Error('Usage: node scripts/music-support/release-manifest.mjs <platform> <local installer> <published GitHub URL> <OS requirements> --signed-and-tested | --preview-tested');
+if(!['mac-universal','mac-universal-legacy','mac-arm64','mac-x64','win-x64','linux-x64'].includes(platform)||!file||!url||!requirements||(!preview&&flags.join()!=='--signed-and-tested'))throw Error('Usage: node scripts/music-support/release-manifest.mjs <platform> <local installer> <published GitHub URL> <OS requirements> --signed-and-tested | --preview-tested');
 const target=new URL(url);if(target.origin!=='https://github.com'||!target.pathname.startsWith('/stxtrata/xtrata/releases/download/')||decodeURIComponent(target.pathname.split('/').pop())!==basename(file))throw Error('Use the published installer URL in the Xtrata GitHub release.');
 const local=await readFile(resolve(file));const sha256=createHash('sha256').update(local).digest('hex');
 // Stream the published file and compare bytes before offering it to users.

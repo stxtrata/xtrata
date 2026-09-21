@@ -148,3 +148,32 @@ notarization, clean-machine release validation and public asset publication are
 still required. The current app uses the default Electron installation icon;
 release branding can replace it before public distribution. Developer and
 preview build artifacts remain local and ignored by Git.
+
+## Version 1.0.1 universal Mac preview
+
+Build the macOS 13+ universal DMG/ZIP with `npm --prefix desktop/music run dist:mac`.
+Build the macOS 12 Monterey universal preview with
+`npm --prefix desktop/music run dist:mac:legacy`. The latter pins Electron 43.7.3;
+the standard build uses 44.4.1. Separate output directories and Legacy artifact
+names prevent collisions. Both retain appId, product name and wallet location.
+Do not run both editions together or delete application data during an update.
+
+Both runtimes are tested with the simulated desktop smoke harness on Apple
+silicon/macOS 26.5.2. Universal binaries include x64 and arm64 slices, but Intel
+and macOS 12 execution require separate hardware validation. The lounge must
+state this limitation. These are unsigned previews, not notarized releases.
+Electron 43 support is temporary; review its upstream maintenance status before
+each future release. Do not extend wallet support to older unmaintained engines.
+
+Version 1.0.1 includes immediate manual catalogue refresh, automatic three-minute
+refresh, the 60-second minimum and the updated Music Lounge address.
+For runtime smoke tests, XTRATA_MUSIC_TEST_ELECTRON may select the Electron
+executable from an unpackaged Electron runtime; the test refuses packaged apps
+and uses a disposable simulated
+wallet, never the app entrypoint with the user's wallet.
+
+Release checks: 13 listening unit tests, targeted JavaScript lint, both Electron
+runtime smoke suites, universal executable architecture/minimum-OS checks and
+archive inspection passed. The lounge cards passed desktop and phone layout
+checks. The full website build passed. Mac 12 and Intel hardware testing remains
+outstanding; the download requirements state this explicitly.
