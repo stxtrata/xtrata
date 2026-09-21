@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bitcoin Staking on Stacks — A Simple Guide</title>
+  <meta name="description" content="A plain-English guide to Bitcoin Staking on Stacks.">
+  <style>
+    :root { --ink:#17202a; --muted:#5c6873; --orange:#e85d04; --cream:#fffaf3; --line:#eadfd1; --blue:#0b5cab; --green:#176b4d; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--cream); font-family: Georgia, 'Times New Roman', serif; font-size:20px; line-height:1.62; }
+    .wrap { max-width:940px; margin:0 auto; padding:28px 22px 70px; }
+    header { background:#17202a; color:white; border-radius:18px; padding:38px 34px; margin-bottom:28px; }
+    .kicker { color:#ffb366; text-transform:uppercase; letter-spacing:.12em; font:700 14px/1.2 Arial,sans-serif; }
+    h1,h2,h3 { font-family: Arial, Helvetica, sans-serif; line-height:1.15; }
+    h1 { font-size:clamp(34px,6vw,58px); margin:12px 0 16px; }
+    h2 { font-size:32px; margin:42px 0 14px; }
+    h3 { font-size:23px; margin:26px 0 8px; }
+    p { margin:0 0 17px; }
+    .lead { font-size:25px; max-width:760px; }
+    .card { background:white; border:1px solid var(--line); border-radius:14px; padding:24px 26px; margin:20px 0; box-shadow:0 5px 18px #4f2b0d0b; }
+    .plain { background:#fff0dc; border-left:7px solid var(--orange); }
+    .warning { background:#fff3cd; border-left:7px solid #c58300; }
+    .safe { background:#e9f5ef; border-left:7px solid var(--green); }
+    .big-number { font:bold 46px Arial,sans-serif; color:var(--orange); display:block; margin:4px 0; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:15px; }
+    .step { border-top:5px solid var(--orange); padding:18px; background:white; border-radius:10px; border-left:1px solid var(--line); border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .step b { font:700 18px Arial,sans-serif; color:var(--orange); display:block; margin-bottom:6px; }
+    ul { padding-left:26px; }
+    li { margin:8px 0; }
+    a { color:var(--blue); text-decoration-thickness:2px; }
+    .small { color:var(--muted); font:16px/1.55 Arial,sans-serif; }
+    table { width:100%; border-collapse:collapse; margin:12px 0 18px; font-size:18px; }
+    th,td { text-align:left; padding:12px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { font-family:Arial,sans-serif; background:#f6eee3; }
+    footer { border-top:1px solid var(--line); margin-top:44px; padding-top:22px; }
+    @media (max-width:600px) { body{font-size:18px} header{padding:28px 22px} .lead{font-size:22px} h2{font-size:28px} .card{padding:20px} }
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <div class="kicker">A plain-English guide · checked 21 September 2026</div>
+    <h1>What does “Bitcoin Staking on Stacks” mean?</h1>
+    <p class="lead">A simple explanation of how Bitcoin Staking earns Bitcoin rewards from Bitcoin, while keeping control of the underlying coins.</p>
+  </header>
+
+  <section class="card plain">
+    <h2 style="margin-top:0">The short version</h2>
+    <p><strong>Bitcoin Staking on Stacks is live and operating now.</strong> It is a working system that pays Bitcoin rewards to participants who bond Bitcoin alongside STX.</p>
+    <p>Stacks is a computer network built to work alongside Bitcoin. Bitcoin Staking lets Bitcoin owners put their Bitcoin into a time-locked arrangement and receive Bitcoin rewards.</p>
+    <p>The Bitcoin is not lent to a company, and it is not moved to a different blockchain. It is locked on the Bitcoin network using a special rule that says when it can be spent again.</p>
+    <p><strong>It is still an investment with risks.</strong> “Self-custody” does not mean “risk-free,” and no advertised rate is guaranteed.</p>
+  </section>
+
+  <section>
+    <h2>What this means for 6 Bitcoin</h2>
+    <div class="grid">
+      <div class="card"><span class="big-number">6 BTC</span><p>The amount being considered for staking.</p></div>
+      <div class="card"><span class="big-number">6 months</span><p>The current Genesis Bond term described by Stacks.</p></div>
+      <div class="card"><span class="big-number">3% target</span><p>The published Genesis Bond target rate for the current bonding period.</p></div>
+    </div>
+    <div class="card warning">
+      <h3>A rough illustration—not a forecast</h3>
+      <p>If 3% applied to all 6 BTC for a full year, the simple arithmetic would be about <strong>0.18 BTC</strong>. For six months, it would be about <strong>0.09 BTC</strong>.</p>
+      <p class="small">This is only an example to make the percentages understandable. The actual product, eligibility, timing, fees, tax treatment, and reward rules must be checked before committing any Bitcoin.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Think of it like a locked savings box</h2>
+    <p>Imagine putting money into a strong box with two keys:</p>
+    <ul>
+      <li>the box is on the Bitcoin network;</li>
+      <li>you keep the keys and no ordinary company holds the Bitcoin for you;</li>
+      <li>the box stays locked for an agreed period;</li>
+      <li>during that period, the Stacks network pays Bitcoin rewards;</li>
+      <li>when the time is up, the Bitcoin is released according to the rules.</li>
+    </ul>
+    <p>It is not exactly a bank account. There is no government deposit guarantee, and there is nobody to call who can reverse a mistaken transaction.</p>
+  </section>
+
+  <section>
+    <h2>Where do the rewards come from?</h2>
+    <p>Stacks has a process called <strong>Proof of Transfer</strong>. In everyday language:</p>
+    <div class="grid">
+      <div class="step"><b>1 · Stacks miners</b>People who run the network commit Bitcoin to compete to write new Stacks records.</div>
+      <div class="step"><b>2 · Stacks stakers</b>People who have committed Bitcoin and STX help secure the network and become eligible for rewards.</div>
+      <div class="step"><b>3 · Bitcoin flows back</b>The Bitcoin committed by miners is distributed according to the Stacks rules.</div>
+    </div>
+    <p class="small">The reward is therefore not magic interest created by a bank. It comes from activity and payments within the Stacks system. If activity, participation, or the rules change, the rewards can change too.</p>
+  </section>
+
+  <section>
+    <h2>What is STX, and why is it mentioned?</h2>
+    <p><strong>STX</strong> is the separate token used by the Stacks network. Bitcoin Staking pairs Bitcoin with STX. In the published Genesis Bond description, the paired STX amount is 5% of the value of the Bitcoin being bonded.</p>
+    <p>For 6 BTC, that does <em>not</em> mean “send 5% of the Bitcoin.” It means acquiring enough STX whose market value is roughly 5% of the Bitcoin value at the time. Because STX and Bitcoin prices move, the dollar amount can change considerably.</p>
+    <div class="card safe"><strong>Important:</strong> do not buy STX, send Bitcoin, or connect a wallet until the exact current instructions have been checked on an official Stacks page and reviewed with someone you trust.</div>
+  </section>
+
+  <section>
+    <h2>What is available to an individual today?</h2>
+    <p>The first Bitcoin Staking “Genesis Bond” is described by Stacks as a closed, whitelisted launch for approved participants. Stacks also says that individual BTC and STX holders can participate through pooled staking services. A pool handles some of the technical work, but it adds another service and counterparty to assess.</p>
+    <table>
+      <thead><tr><th>Route</th><th>What it means</th><th>Main question</th></tr></thead>
+      <tbody>
+        <tr><td>Direct bond</td><td>Your Bitcoin is locked on Bitcoin Layer 1 under your own keys.</td><td>Are you eligible, and can you safely manage the keys and lock-up?</td></tr>
+        <tr><td>Pooled staking</td><td>A pool combines participants and manages the process.</td><td>Who runs it, what are the fees, and how do withdrawals work?</td></tr>
+        <tr><td>Do nothing</td><td>Keep the Bitcoin in its current wallet or custody arrangement.</td><td>This has no staking reward, but avoids the new product risks.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>The risks, in plain English</h2>
+    <div class="card warning">
+      <ul>
+        <li><strong>Lock-up risk:</strong> the Bitcoin may not be immediately spendable. Read the exact dates and early-exit rules.</li>
+        <li><strong>Technology risk:</strong> software, wallets, scripts, and the Stacks network can fail or be attacked.</li>
+        <li><strong>Key risk:</strong> losing a recovery phrase or signing a bad transaction can permanently lose funds.</li>
+        <li><strong>Pool risk:</strong> a pooled service can have fees, delays, bugs, or operational failure.</li>
+        <li><strong>Reward risk:</strong> the rate can be lower than expected, and missing a reward is possible.</li>
+        <li><strong>Price risk:</strong> Bitcoin and STX can fall sharply in US-dollar terms. A Bitcoin reward does not protect against a price fall.</li>
+        <li><strong>Tax risk:</strong> tax treatment can depend on the facts. Ask a qualified tax adviser before starting.</li>
+        <li><strong>Scam risk:</strong> nobody legitimate needs a seed phrase, remote computer access, or an urgent payment to “unlock” staking.</li>
+      </ul>
+    </div>
+    <p><strong>No slashing is not the same as no risk.</strong> Stacks says there is no slashing mechanism that confiscates the Bitcoin principal, but software, key, timing, pool, and market risks still matter.</p>
+  </section>
+
+  <section>
+    <h2>What 3% looks like over one year</h2>
+    <p>This table uses the published <strong>3% target</strong> simply to show the arithmetic for 6 BTC. It assumes the Bitcoin price shown below stays the same for the year. The reward would be about <strong>0.18 BTC</strong> in every row; its dollar value changes with the Bitcoin price.</p>
+    <div class="card" style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Bitcoin price</th><th>Value of 6 BTC</th><th>Interest after 1 year</th><th>Interest value</th><th>Total after interest</th></tr></thead>
+        <tbody>
+          <tr><td><strong>US$81,367</strong><br><span class="small">current example*</span></td><td>US$488,202</td><td>0.18 BTC</td><td><strong>US$14,646</strong></td><td>US$502,848</td></tr>
+          <tr><td><strong>US$100,000</strong><br><span class="small">lower estimate</span></td><td>US$600,000</td><td>0.18 BTC</td><td><strong>US$18,000</strong></td><td>US$618,000</td></tr>
+          <tr><td><strong>US$150,000</strong><br><span class="small">possible bull-market estimate</span></td><td>US$900,000</td><td>0.18 BTC</td><td><strong>US$27,000</strong></td><td>US$927,000</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small">*The current example uses approximately US$81,367 per BTC, seen on 21 September 2026. Bitcoin’s price changes constantly. The table excludes fees, tax, price changes during the year, and any difference between a target rate and the actual reward. It is an illustration, not a promise.</p>
+  </section>
+
+  <footer>
+    <p class="small"><strong>Sources and date:</strong> This page was prepared on 21 September 2026 using the official Stacks materials below. Product terms can change; check the live pages immediately before acting.</p>
+    <p class="small"><a href="https://www.stacks.co/bitcoin-staking">Stacks: Bitcoin Staking</a> · <a href="https://www.stacks.co/blog/bitcoin-staking-genesis-bond-how-it-works">Genesis Bond: How It Works</a> · <a href="https://www.stacks.co/blog/the-genesis-bond-is-live-institutions-begin-bitcoin-staking">Genesis Bond Is Live</a> · <a href="https://docs.stacks.co/understand-stacks/stacking">Stacks documentation: Stacking</a></p>
+    <p class="small">This is an educational explanation, not financial, legal, tax, or personal investment advice.</p>
+  </footer>
+</main>
+</body>
+</html>
