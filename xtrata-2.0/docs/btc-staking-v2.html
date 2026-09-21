@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Your six bitcoin, and why we need Stacks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDEFF1;
+  --raised:#F8F9FA;
+  --ink:#14202C;
+  --soft:#4E5C6B;
+  --rule:#C6CED5;
+  --rule-soft:#DCE2E7;
+  --btc:#A8640A;
+  --btc-fill:#E0940F;
+  --stx:#4536C9;
+  --stx-fill:#5546FF;
+  --warn:#8C3A2B;
+
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#111A22;
+    --raised:#19242E;
+    --ink:#E4EAEF;
+    --soft:#9BAAB7;
+    --rule:#31414F;
+    --rule-soft:#253340;
+    --btc:#F0AB3C;
+    --btc-fill:#E0940F;
+    --stx:#9C93FF;
+    --stx-fill:#6B5DFF;
+    --warn:#E8927F;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#111A22;
+  --raised:#19242E;
+  --ink:#E4EAEF;
+  --soft:#9BAAB7;
+  --rule:#31414F;
+  --rule-soft:#253340;
+  --btc:#F0AB3C;
+  --btc-fill:#E0940F;
+  --stx:#9C93FF;
+  --stx-fill:#6B5DFF;
+  --warn:#E8927F;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:"Source Serif 4","Iowan Old Style","Palatino Linotype",Georgia,serif;
+  font-size:19px;
+  line-height:1.66;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:880px;margin:0 auto;padding:0 22px 90px}
+.prose{max-width:62ch}
+h1,h2,h3,.num,th,td,.label,button,input,.pill{
+  font-family:Archivo,"Helvetica Neue",Arial,sans-serif;
+}
+h1{
+  font-size:clamp(2rem,6.4vw,3.15rem);
+  line-height:1.04;
+  letter-spacing:-.025em;
+  font-weight:700;
+  margin:0 0 .5rem;
+  max-width:16ch;
+}
+h2{
+  font-size:clamp(1.35rem,3.6vw,1.72rem);
+  line-height:1.18;
+  letter-spacing:-.018em;
+  font-weight:600;
+  margin:3.4rem 0 .9rem;
+  max-width:24ch;
+}
+h3{
+  font-size:1.05rem;
+  font-weight:600;
+  letter-spacing:-.008em;
+  margin:2rem 0 .4rem;
+}
+p{margin:0 0 1.05rem}
+a{color:var(--stx)}
+strong{font-weight:600}
+.dek{font-size:1.14rem;color:var(--soft);max-width:44ch;margin-top:0}
+
+/* ---- masthead ---- */
+header{padding:clamp(2.6rem,9vw,5rem) 0 0}
+.kicker{
+  font-family:Archivo,sans-serif;font-size:.82rem;font-weight:500;
+  color:var(--soft);margin:0 0 1.5rem;letter-spacing:.01em;
+}
+
+/* ---- the bond bar ---- */
+.bond{margin:2.8rem 0 0}
+.bar{
+  display:flex;height:76px;border:1px solid var(--rule);
+  border-radius:3px;overflow:hidden;background:var(--raised);
+}
+.bar .btc-seg{
+  flex:0 0 95%;background:var(--btc-fill);
+  display:flex;align-items:center;padding-left:18px;
+  color:#22160B;font-family:Archivo,sans-serif;font-weight:600;
+  font-size:.95rem;letter-spacing:-.01em;
+}
+.bar .stx-seg{flex:1 1 5%;background:var(--stx-fill)}
+.bar-key{
+  display:flex;justify-content:space-between;gap:16px;
+  margin-top:.7rem;font-family:Archivo,sans-serif;font-size:.86rem;
+  line-height:1.4;color:var(--soft);
+}
+.bar-key b{display:block;color:var(--ink);font-weight:600}
+.bar-key .right{text-align:right;max-width:19ch}
+.bar-key .right b{color:var(--stx)}
+
+/* ---- figures ---- */
+.stat-row{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px;background:var(--rule-soft);border:1px solid var(--rule-soft);
+  margin:1.8rem 0 0;border-radius:3px;overflow:hidden;
+}
+.stat{background:var(--raised);padding:1.05rem 1.1rem}
+.stat .label{display:block;font-size:.78rem;color:var(--soft);margin-bottom:.35rem;font-weight:500}
+.stat .num{
+  font-size:1.5rem;font-weight:600;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;line-height:1.1;display:block;
+}
+.stat .num.gap{color:var(--warn)}
+.stat .foot{display:block;font-size:.8rem;color:var(--soft);margin-top:.3rem;font-family:Archivo,sans-serif}
+
+/* ---- tables ---- */
+.scroll{overflow-x:auto;margin:1.5rem 0 .6rem;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:600px;font-size:.92rem}
+th,td{
+  text-align:right;padding:.62rem .7rem;font-variant-numeric:tabular-nums;
+  border-bottom:1px solid var(--rule-soft);white-space:nowrap;
+}
+th{
+  font-weight:600;font-size:.76rem;color:var(--soft);
+  border-bottom:1px solid var(--rule);vertical-align:bottom;line-height:1.3;
+  white-space:normal;
+}
+th:first-child,td:first-child{text-align:left}
+tbody tr:last-child td{border-bottom:none}
+td.hero-col{font-weight:600;color:var(--stx)}
+tr.now{background:var(--raised)}
+tr.now td:first-child::after{
+  content:"done";font-family:Archivo,sans-serif;font-size:.65rem;font-weight:600;
+  color:var(--paper);background:var(--ink);padding:.1rem .34rem;
+  border-radius:2px;margin-left:.45rem;vertical-align:.08em;
+}
+caption{
+  caption-side:bottom;text-align:left;font-size:.85rem;color:var(--soft);
+  padding-top:.8rem;line-height:1.5;font-family:Archivo,sans-serif;
+}
+
+/* ---- calculator ---- */
+.calc{
+  border:1px solid var(--rule);border-radius:3px;
+  background:var(--raised);padding:1.4rem 1.3rem;margin:1.6rem 0;
+}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:1.1rem}
+.field label{display:block;font-family:Archivo,sans-serif;font-size:.78rem;color:var(--soft);margin-bottom:.3rem;font-weight:500}
+.field input{
+  width:100%;font-family:Archivo,sans-serif;font-size:1.06rem;font-weight:600;
+  font-variant-numeric:tabular-nums;padding:.45rem .55rem;
+  border:1px solid var(--rule);border-radius:2px;
+  background:var(--paper);color:var(--ink);
+}
+.field input:focus-visible{outline:2px solid var(--stx);outline-offset:1px}
+.out{
+  margin-top:1.3rem;padding-top:1.1rem;border-top:1px solid var(--rule-soft);
+  font-family:Archivo,sans-serif;font-size:1.02rem;line-height:1.65;
+}
+.out .big{font-size:1.9rem;font-weight:700;letter-spacing:-.03em;display:block;font-variant-numeric:tabular-nums}
+.out .sub{color:var(--soft);font-size:.9rem}
+#verdict{font-weight:600;margin-top:.5rem;display:block}
+
+/* ---- callouts ---- */
+.note{
+  border-left:3px solid var(--stx);padding:.2rem 0 .2rem 1.1rem;
+  margin:1.6rem 0;max-width:60ch;
+}
+.risk{border-left-color:var(--warn)}
+.risk h3{margin-top:0;color:var(--warn)}
+ul{padding-left:1.15rem;margin:0 0 1.05rem;max-width:60ch}
+li{margin-bottom:.5rem}
+footer{
+  margin-top:4.2rem;padding-top:1.4rem;border-top:1px solid var(--rule);
+  font-family:Archivo,sans-serif;font-size:.83rem;color:var(--soft);
+  line-height:1.6;max-width:62ch;
+}
+hr.div{border:none;border-top:1px solid var(--rule);margin:3.4rem 0 0}
+@media (max-width:520px){
+  body{font-size:17.5px}
+  .bar{height:62px}
+  .bar .btc-seg{font-size:.85rem;padding-left:12px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="kicker">A note for Dad &middot; 21 September 2026</p>
+  <h1>Your six bitcoin, and why we need Stacks</h1>
+  <p class="dek">How you get paid in bitcoin without ever handing your bitcoin to anyone &mdash; and the odd little requirement that comes with it.</p>
+
+  <div class="bond">
+    <div class="bar" role="img" aria-label="A bar showing 95 percent bitcoin and a 5 percent sliver of STX">
+      <div class="btc-seg">Your 6 BTC &mdash; stays yours, locked under your own keys</div>
+      <div class="stx-seg"></div>
+    </div>
+    <div class="bar-key">
+      <span><b>$498,000</b>Bitcoin, timelocked on Bitcoin itself</span>
+      <span class="right"><b>$24,900</b>STX, locked alongside it</span>
+    </div>
+  </div>
+</header>
+
+<h2>The deal in one paragraph</h2>
+<div class="prose">
+<p>Stacks is a network built on top of Bitcoin. To produce its blocks, the people running it &mdash; the miners &mdash; have to spend real bitcoin, roughly every ten minutes. That bitcoin doesn't go to a company. It gets paid out to the people who have committed capital to secure the network. That's the whole engine. It has been running since January 2021 and has paid out more than 4,200 BTC in that time.</p>
+<p>What's new, as of this month, is that you can now put <em>bitcoin itself</em> into that arrangement and get bitcoin back. Your six coins would be locked on the Bitcoin blockchain, under your own keys, using a standard timelock that has been part of Bitcoin since 2015. Nobody borrows them. Nobody bridges them to another chain. Nobody can move them &mdash; including Stacks. At the end of the term they unlock and you have them back, plus whatever bitcoin the miners paid out along the way.</p>
+</div>
+
+<h2>So why do we need STX at all?</h2>
+<div class="prose">
+<p>This is the bit that's genuinely confusing, so here it is plainly.</p>
+<p>The amount of bitcoin the miners pay out each period is limited. It's whatever they choose to spend. So the number of bitcoin that can be earning from it at any one time has to be limited too &mdash; otherwise the same pot gets spread across an infinite queue and the yield goes to nothing.</p>
+<p>Stacks needed a way of deciding who gets a place in that queue. The answer they landed on: <strong>you have to lock up STX worth at least 5% of the bitcoin you're putting in.</strong> STX is the network's own token. It's what pays for everything that happens on Stacks, and now it's also the thing that reserves you a slot.</p>
+<p>Think of it less like a deposit and more like a licence. A taxi plate. The car is yours and always was; the plate is what lets you work the rank. You have to own one, there are only so many, and you hold it for as long as you want the pitch.</p>
+<p>Two things follow from that, and they matter:</p>
+<ul>
+  <li>The 5% is measured <strong>in value, not in tokens</strong>. If STX doubles in price, the same slot needs half as many STX. If bitcoin doubles, you need twice as much STX behind it.</li>
+  <li>All the bitcoin yield goes to the bitcoin side. The STX isn't earning the yield &mdash; it's what qualifies you for it.</li>
+</ul>
+</div>
+
+<h2>Where we actually stand</h2>
+<div class="prose">
+<p>At today's prices &mdash; bitcoin around $83,000, STX around 33 cents &mdash; here's the arithmetic on your position.</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="label">Your bitcoin</span><span class="num">6 BTC</span><span class="foot">&asymp; $498,000</span></div>
+  <div class="stat"><span class="label">STX required (5%)</span><span class="num">75,450</span><span class="foot">&asymp; $24,900</span></div>
+  <div class="stat"><span class="label">STX we hold</span><span class="num">40,000</span><span class="foot">&asymp; $13,200</span></div>
+  <div class="stat"><span class="label">Still to buy</span><span class="num gap">35,450</span><span class="foot">&asymp; $11,700</span></div>
+</div>
+
+<div class="prose">
+<p style="margin-top:1.6rem">So your instinct was right: we need to roughly double the STX stack. Not because 40,000 is a small number, but because six bitcoin is a large one.</p>
+<p>Worth noting which way the wind blows here. Every dollar bitcoin goes up, the requirement goes up with it &mdash; so the longer we leave it, in a rising market, the more it costs to cover the same six coins. Every cent STX goes up, the requirement is covered by fewer tokens, and the 40,000 we already hold stretches further.</p>
+</div>
+
+<h2>What it pays</h2>
+<div class="prose">
+<p>The programme is targeting around 3% a year, paid in bitcoin, during this early phase. On six coins:</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><span class="label">Annual yield, in BTC</span><span class="num">0.18 BTC</span><span class="foot">&asymp; $14,900 a year at today's price</span></div>
+  <div class="stat"><span class="label">Bonding term</span><span class="num">6 months</span><span class="foot">then it unlocks, or you renew</span></div>
+</div>
+
+<div class="prose">
+<p style="margin-top:1.6rem">Three per cent doesn't sound thrilling. But it is 3% <em>denominated in bitcoin</em> &mdash; you end the year with more coins than you started with, which is the one thing a bitcoin holder can't normally do without selling something or lending to someone. And it's earned without the coins ever leaving your control.</p>
+</div>
+
+<h2>Work it out yourself</h2>
+<div class="prose">
+<p>Prices move. Change any of these and it recalculates.</p>
+</div>
+
+<div class="calc">
+  <div class="fields">
+    <div class="field">
+      <label for="btcAmt">Bitcoin to stake</label>
+      <input id="btcAmt" type="number" value="6" min="0" step="0.5" inputmode="decimal">
+    </div>
+    <div class="field">
+      <label for="btcPx">Bitcoin price ($)</label>
+      <input id="btcPx" type="number" value="83000" min="0" step="1000" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label for="stxPx">STX price (cents)</label>
+      <input id="stxPx" type="number" value="33" min="0.1" step="1" inputmode="decimal">
+    </div>
+  </div>
+  <div class="out">
+    <span class="big" id="stxNeed">75,455 STX</span>
+    <span class="sub" id="colVal">Collateral required: $24,900 &mdash; 5% of $498,000 of bitcoin</span>
+    <span id="verdict"></span>
+    <span class="sub" id="yieldLine"></span>
+  </div>
+</div>
+
+<hr class="div">
+
+<h2>The bull case</h2>
+<div class="prose">
+<p>Now the part that makes this more than a 3% yield product.</p>
+<p>Every single bitcoin that goes into this arrangement &mdash; yours, a family office's, an ETF issuer's &mdash; drags 5% of its value into STX and locks it there for six months. STX is a small asset. The entire thing is worth about $600 million today. Bitcoin is worth about $1.6 trillion. So it doesn't take much bitcoin arriving before the collateral requirement is large relative to STX itself.</p>
+<p>Here's that arithmetic. The last column answers a specific question: <em>if the STX that gets locked has to come out of, say, 30% of all the STX in existence &mdash; because the rest is on exchanges, in long-term wallets, or otherwise not for sale &mdash; what price does STX have to be at for the sums to work?</em></p>
+</div>
+
+<div class="scroll">
+<table>
+  <caption>Calculated at bitcoin $83,000 and 1.81bn STX in circulation. The final column is arithmetic under one stated assumption, not a forecast &mdash; if more STX were available to lock, the same bitcoin implies a lower price, and vice versa. For scale, STX's all-time high was $3.84 in April 2024.</caption>
+  <thead>
+    <tr>
+      <th>Bitcoin bonded</th>
+      <th>Share of all bitcoin</th>
+      <th>Value of that bitcoin</th>
+      <th>STX collateral needed</th>
+      <th>vs STX's entire market cap today</th>
+      <th>Implied STX price</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="now"><td>250 BTC</td><td>0.001%</td><td>$21m</td><td>$1.0m</td><td>0.2%</td><td class="hero-col">&mdash;</td></tr>
+    <tr><td>3,000 BTC</td><td>0.02%</td><td>$249m</td><td>$12m</td><td>2%</td><td class="hero-col">$0.02</td></tr>
+    <tr><td>10,000 BTC</td><td>0.05%</td><td>$830m</td><td>$42m</td><td>7%</td><td class="hero-col">$0.08</td></tr>
+    <tr><td>25,000 BTC</td><td>0.13%</td><td>$2.1bn</td><td>$104m</td><td>17%</td><td class="hero-col">$0.19</td></tr>
+    <tr><td>50,000 BTC</td><td>0.25%</td><td>$4.2bn</td><td>$208m</td><td>35%</td><td class="hero-col">$0.38</td></tr>
+    <tr><td>100,000 BTC</td><td>0.50%</td><td>$8.3bn</td><td>$415m</td><td>69%</td><td class="hero-col">$0.76</td></tr>
+    <tr><td>250,000 BTC</td><td>1.3%</td><td>$20.8bn</td><td>$1.04bn</td><td>173%</td><td class="hero-col">$1.91</td></tr>
+    <tr><td>500,000 BTC</td><td>2.5%</td><td>$41.5bn</td><td>$2.08bn</td><td>346%</td><td class="hero-col">$3.82</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="prose">
+<p>Look at how modest the bitcoin numbers are. A hundred thousand bitcoin sounds enormous, and in absolute terms it is &mdash; but it's half of one per cent of all the bitcoin there is. Strategy alone holds several times that. A single large ETF holds more. The proposition doesn't need bitcoin holders in general to show up; it needs a rounding error of them.</p>
+<p>And there's a feedback loop built into it. As more bitcoin gets bonded, more STX gets locked away for six months at a time, which means less of it available to buy. If the price rises because of that, the next institution through the door needs fewer tokens for the same slot &mdash; but the ones already locked in are worth more. It cuts both ways on the way down too, which is the honest version of this.</p>
+</div>
+
+<div class="note">
+<h3>The bit that's easy to miss</h3>
+<p>You're not buying STX as a fee. You're buying it and keeping it. If the thing we've just described actually happens, you get the bitcoin yield <em>and</em> you're holding the asset that the whole arrangement is bidding for. At $1.91 the 75,450 STX we'd be holding would be worth around $144,000 &mdash; against roughly $24,900 to assemble it.</p>
+</div>
+
+<h2>What could go wrong</h2>
+
+<div class="note risk">
+<h3>STX is volatile, and you'd be holding $24,900 of it</h3>
+<p>If STX halves, that's roughly $12,400 gone &mdash; most of a year's bitcoin yield, wiped out by the collateral rather than the bitcoin. STX is down about 90% from its 2024 high. That's the trade you're actually making: bitcoin-denominated income, paid for by taking a position in a small, volatile token.</p>
+</div>
+
+<div class="note risk">
+<h3>You can't just turn up</h3>
+<p>Capacity is allocated by a monthly auction, and it's small. The first round, on 10 September, was 250 bitcoin and it filled with institutions &mdash; 21Shares, UTXO Management, HashKey Cloud and Sypher Capital. Around 10% of each period is set aside for ordinary participants via pools. The next round opens in early October. Getting a six-coin slot isn't guaranteed and may take a few attempts.</p>
+</div>
+
+<div class="note risk">
+<h3>It's new code</h3>
+<p>The mechanism underneath &mdash; Stacks miners paying out bitcoin &mdash; has five years behind it. This specific product does not. It went live this month. The bitcoin timelock itself is boring, well-understood Bitcoin, which is the strongest part of the design, but the surrounding machinery is young.</p>
+</div>
+
+<div class="note risk">
+<h3>Six months is six months</h3>
+<p>Once bonded, the coins are locked until the term ends. No early exit. If you'd need to sell inside that window, this isn't for you.</p>
+</div>
+
+<h2>Where it stands today</h2>
+<div class="prose">
+<p>Live, as of 10 September. First bonding period filled at 250 bitcoin. Registration is open for the second, expected early October, with monthly periods after that and capacity rising over time. Target yield 3% in bitcoin, minimum STX pairing 5%, six-month terms.</p>
+<p>In the meantime the STX we hold isn't idle &mdash; STX on its own can be locked for bitcoin rewards the same way it has been since 2021. So there's no dead time while we build the position up.</p>
+</div>
+
+<footer>
+  <p>Figures as at 21 September 2026, all in US dollars: bitcoin &asymp; $83,000, STX &asymp; $0.33, STX in circulation &asymp; 1.81 billion. Prices move; the calculator above is there for exactly that reason.</p>
+  <p>Written by Jim. Not financial advice &mdash; it's an explanation of how the mechanism works and what the arithmetic looks like, so you can make your own call.</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var amt=document.getElementById('btcAmt'),
+      bpx=document.getElementById('btcPx'),
+      spx=document.getElementById('stxPx'),
+      needEl=document.getElementById('stxNeed'),
+      colEl=document.getElementById('colVal'),
+      vEl=document.getElementById('verdict'),
+      yEl=document.getElementById('yieldLine'),
+      HELD=40000;
+
+  function usd(n){
+    return '$'+Math.round(n).toLocaleString('en-US');
+  }
+  function calc(){
+    var a=parseFloat(amt.value)||0,
+        b=parseFloat(bpx.value)||0,
+        s=(parseFloat(spx.value)||0)/100;
+    var btcVal=a*b, col=btcVal*0.05;
+    var need=s>0?col/s:0;
+    needEl.textContent=Math.round(need).toLocaleString('en-US')+' STX';
+    colEl.textContent='Collateral required: '+usd(col)+' \u2014 5% of '+usd(btcVal)+' of bitcoin';
+    var diff=need-HELD;
+    if(diff>0){
+      vEl.textContent='Short by '+Math.round(diff).toLocaleString('en-US')+' STX ('+usd(diff*s)+' to buy)';
+      vEl.style.color='var(--warn)';
+    }else{
+      vEl.textContent='Covered, with '+Math.round(-diff).toLocaleString('en-US')+' STX to spare';
+      vEl.style.color='var(--stx)';
+    }
+    yEl.textContent='At 3%, that bitcoin pays about '+(a*0.03).toFixed(2)+' BTC a year \u2014 around '+usd(a*0.03*b)+'.';
+  }
+  [amt,bpx,spx].forEach(function(el){el.addEventListener('input',calc)});
+  calc();
+})();
+</script>
+</body>
+</html>
