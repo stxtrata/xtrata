@@ -355,3 +355,14 @@ Use normal Windows security handling; do not disable protections. Start with
 free listening and confirm support starts OFF after a restart. Record the
 physical hardware, OS version and the manual checks in the gate table. Wallet
 funding and live return/payment tests need separate explicit authorisation.
+
+## Lounge download publication
+
+At the user's request, the verified installer and evidence were published as
+https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.1-windows-preview.1
+The release targets the original 7f28a6ffc build revision. The manifest utility
+streamed the public EXE and verified its SHA-256 before adding win-x64.
+The lounge has a matching static fallback card and Windows installation steps,
+with unsigned/physical-testing-pending labels. A DOM check verified all three
+platform cards, correct Windows URL/checksum and warning. No app rebuild or
+version change was necessary; this publishes the existing 1.0.1 PC preview.

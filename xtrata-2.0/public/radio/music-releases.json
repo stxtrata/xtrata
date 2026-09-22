@@ -19,6 +19,15 @@
       "signed": false,
       "verified": true,
       "preview": true
+    },
+    {
+      "platform": "win-x64",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.1-windows-preview.1/Xtrata-Music-1.0.1-windows11-preview-x64.exe",
+      "sha256": "4951ae029b83806d3fc2f2f1b8b431ab3cf721ad75b15ac8e4b2b28b0585e1b0",
+      "requirements": "Windows 11 x64 (Intel/AMD). Unsigned testing preview. Native Windows CI checks passed; physical Windows 11 and live payment testing pending. No Node.js or extension required.",
+      "signed": false,
+      "verified": true,
+      "preview": true
     }
   ],
   "channel": "preview"
