@@ -422,3 +422,13 @@ The public lounge now includes the 524 KB patch link and ZIP checksum below
 its platform downloads. This section survives dynamic release-card rendering.
 It explicitly states that the current 1.0.2 installer is unchanged and does
 not include the patch. Future builds from the patched source include it.
+
+### Windows 1.0.3 preparation
+
+Version 1.0.3 includes the visible eight-row song picker directly in the full
+application, so no separate 1.0.2 patch is required. The desktop smoke exercises
+actual mouse selection as well as existing free/support behaviour. Release
+metadata stays on the verified 1.0.2 installer until a native 1.0.3 CI build
+passes and its published checksum is verified. Next step: push the release
+commit, dispatch music-desktop.yml with target=windows, then publish its exact
+installer and update the lounge. No physical-PC or live-payment pass is implied.
