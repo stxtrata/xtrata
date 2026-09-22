@@ -303,3 +303,13 @@ Local Electron execution reached readiness and rejected macOS before wallet
 creation, confirming the corrected startup path. Syntax checks passed. Native
 DPAPI remains unverified and must pass after the corrected harness is pushed.
 No installer has been produced; the test gate has not been bypassed.
+
+## Bounded automated build attempts (maximum five)
+
+Attempt 1: https://github.com/stxtrata/xtrata/actions/runs/35737371806
+Source `6aad58a29`. Native DPAPI, shared/contract tests, both Electron smokes,
+NSIS packaging and payload inspection passed. The final evidence gate refused
+a dirty checkout; upload was therefore not reached. No installer is delivered.
+Attempt 2 adds pathname-only diagnostics to that refusal to identify what the
+runner changed; the clean-source requirement remains unchanged. Four attempts
+remain after attempt 1. Physical/live checks remain NOT RUN.

@@ -24,7 +24,7 @@ function sourceRevision(){
  try{root=execFileSync('git',['rev-parse','--show-toplevel'],{cwd:projectRoot,encoding:'utf8'}).trim();revision=execFileSync('git',['rev-parse','HEAD'],{cwd:root,encoding:'utf8'}).trim();}
  catch{throw Error('Cannot determine the source revision for this release evidence.');}
  const dirty=execFileSync('git',['status','--porcelain','--untracked-files=normal'],{cwd:root,encoding:'utf8'}).trim();
- if(dirty)throw Error('Refusing Windows release evidence from a dirty source tree. Commit or discard unrelated changes, then rebuild.');
+ if(dirty)throw Error('Refusing Windows release evidence from a dirty source tree. Changed paths (no file contents):\n'+dirty+'\nResolve the generating step and rebuild.');
  if(process.env.GITHUB_SHA&&process.env.GITHUB_SHA!==revision)throw Error('The CI source revision does not match the checked-out source tree.');
  return revision;
 }
