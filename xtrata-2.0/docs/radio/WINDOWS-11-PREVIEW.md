@@ -417,3 +417,8 @@ Reproduce after extracting resources/app.asar from the release installer:
 Copy `docs/radio/WINDOWS-102-SONG-PICKER-PATCH.txt` as README.txt into that directory,
 then ZIP the four files. The app remains version 1.0.2 with patch identifier
 song-picker-1. Existing installers are unchanged; future builds include the fix.
+
+The public lounge now includes the 524 KB patch link and ZIP checksum below
+its platform downloads. This section survives dynamic release-card rendering.
+It explicitly states that the current 1.0.2 installer is unchanged and does
+not include the patch. Future builds from the patched source include it.
