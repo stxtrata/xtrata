@@ -45,11 +45,10 @@ The visible Refresh songs button bypasses the local catalogue cache. Use it when
 new inscription has just appeared in the public catalogue; it should not require
 waiting for the next automatic interval or restarting the app.
 
-Audio metadata is checked before playback: tracks shorter than 60 seconds are
-skipped without requesting payment and excluded for the rest of the page session.
-Exactly 60 seconds is eligible. Unknown/unreadable duration does not initiate a
-payment. If every candidate is too short, playback stops rather than looping
-through rejected tracks indefinitely.
+The temporary 60-second minimum is disabled. Any track that the player can load
+can request a supported start, even when its duration is short or cannot be
+read. Audio still has to be available from the verified catalogue; unavailable
+media remains free and does not create a payment.
 
 ## Versions and updates
 

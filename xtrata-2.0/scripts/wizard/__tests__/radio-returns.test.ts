@@ -1,9 +1,9 @@
 import {describe,it,expect,vi} from 'vitest';
-import {mkdtemp,readFile,rm,stat} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {deserializeTransaction} from '@stacks/transactions';
-import {RadioWizard} from '../radio-plays-backend.mjs';
+import {RadioWizard} from './offline-radio-wallet';
 const recipient='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 async function fixture(work){
  const dir=await mkdtemp(join(tmpdir(),'radio-return-test-'));
@@ -38,7 +38,11 @@ describe('wizard return controls (disposable wallets, mocked chain)',()=>{
  it('reviews exact excess/all amounts without unlocking or broadcasting',()=>fixture(async({w,chain,dir})=>{
   const key=vi.spyOn(w,'key');const q=await w.prepareReturn(input);
   expect(q.amount).toBe('499700');expect(q.remaining).toBe('1000000');expect(key).not.toHaveBeenCalled();
-  expect((await stat(join(dir,'return-quote.json'))).mode&0o777).toBe(0o600);
+  // Windows does not implement POSIX permission bits. Its secret protection
+  // is covered by the Windows vault suite and native Electron DPAPI smoke.
+  const quotePath=join(dir,'return-quote.json');
+  expect(JSON.parse(await readFile(quotePath,'utf8'))).toEqual(q);
+  if(process.platform!=='win32')expect((await stat(quotePath)).mode&0o777).toBe(0o600);
   expect((await w.prepareReturn({...input,mode:'all'})).amount).toBe('1499700');
   chain.balance=1000n;expect((await w.prepareReturn({...input,mode:'all'})).amount).toBe('700');
   expect(chain.broadcasts).toHaveLength(0);
@@ -110,6 +114,13 @@ describe('wizard return controls (disposable wallets, mocked chain)',()=>{
   w.api=api;q=await w.prepareReturn(input);const save=w.save.bind(w);
   w.save=async(name,value)=>{if(name==='returns.json')throw Error('Simulated disk full');return save(name,value);};
   await expect(w.confirmReturn(q.id)).rejects.toThrow('disk full');expect(chain.broadcasts).toHaveLength(0);
+ }));
+ it('fails closed after a real filesystem storage fault before a return can sign or broadcast',()=>fixture(async({w,chain,dir})=>{
+  const q=await w.prepareReturn(input),key=vi.spyOn(w,'key');
+  await mkdir(join(dir,'returns.json'));
+  await expect(w.save('returns.json',[])).rejects.toThrow();
+  await expect(w.confirmReturn(q.id)).rejects.toThrow('Wallet storage needs attention');
+  expect(key).not.toHaveBeenCalled();expect(chain.broadcasts).toHaveLength(0);
  }));
  it('respects the kill switch before signing',()=>fixture(async({w,chain})=>{
   const q=await w.prepareReturn(input);const previous=process.env.WIZARD_KILL_SWITCH;

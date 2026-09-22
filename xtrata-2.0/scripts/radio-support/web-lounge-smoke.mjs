@@ -10,7 +10,8 @@ const w={stopEpoch:0,running:false,stop(){this.stopEpoch++;},optional:async name
 try{
  server=createWizardServer(w,null,{audio:async()=>{},loaded:new Set([315]),tracks:[{id:315,title:'Entertainment',artist:'melophonic'}]});await new Promise(r=>server.listen(0,'127.0.0.1',r));const port=server.address().port;
  const ext=join(dir,'extension');await mkdir(ext);for(const name of ['manifest.json','background.js','content.js','validate.js'])await writeFile(join(ext,name),(await readFile('extensions/music-support/'+name,'utf8')).replaceAll('8798',String(port)));
- browser=await chromium.launchPersistentContext(join(dir,'profile'),{channel:'chromium',executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,headless:true,args:['--disable-extensions-except='+ext,'--load-extension='+ext]});
+ const executablePath=process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
+ browser=await chromium.launchPersistentContext(join(dir,'profile'),{...(executablePath?{executablePath}:{channel:'chromium'}),headless:true,args:['--disable-extensions-except='+ext,'--load-extension='+ext]});
  await browser.route('https://xtrata.xyz/**',async route=>{const path=new URL(route.request().url()).pathname;if(path==='/radio/counts')return route.fulfill({json:{tracks:[]}});if(path==='/xtrata-radio.js')return route.fulfill({contentType:'text/javascript',body:'window.XtrataRadio={subscribe:f=>f({playing:false,volumeStep:8}),playPause(){},next(){},prev(){}};'});const file=path==='/radio/browser-lounge'?'/radio/browser-lounge.html':path;try{const body=(await readFile('public'+file,'utf8')).replaceAll('8798',String(port));return route.fulfill({body,contentType:file.endsWith('.html')?'text/html':file.endsWith('.js')?'text/javascript':'text/css'});}catch{return route.abort();}});
  const page=await browser.newPage();await page.goto('https://xtrata.xyz/radio/browser-lounge');
  // Exercise actual content script/worker, with ephemeral test port.

@@ -4,6 +4,14 @@ The public home is **https://xtrata.xyz/music/lounge**. It is now the download,
 setup, compatibility and news hub. Ordinary users do not install an extension.
 `/radio/support` leads to this hub. The free web radio remains `/radio`.
 
+The Windows 11 x64 preview has its own implementation, build and verification
+record in [WINDOWS-11-PREVIEW.md](WINDOWS-11-PREVIEW.md). It uses Electron
+`safeStorage`/Windows DPAPI for a new Windows support wallet and keeps free
+listening available when protected storage cannot be opened. It is an unsigned,
+unpublished preview with a bundled Xtrata Windows icon that still needs native
+installer, checksum and physical Windows checks; it does not change the
+existing Mac release path.
+
 ## Listener journey
 
 Download a published installer → open Xtrata Music → copy the automatically
@@ -35,9 +43,11 @@ separate explicit user choices.
 The wallet is under Electron's OS `userData` directory in `support-wallet`.
 Use Help → Show wallet folder to locate it. This is outside the installation,
 so replacing the app does not replace the wallet. Windows uninstall is configured
-to preserve app data. Deleting wallet data can lose funds. The encrypted key and
-unlocking material remain on the same computer: this is a small spending wallet,
-not secure long-term custody. No cloud recovery or silent migration.
+to preserve app data. Deleting wallet data can lose funds. On Windows, a new
+wallet uses Electron `safeStorage` backed by DPAPI and has no file-held unlocking
+key; a legacy vault is never silently migrated or replaced. Existing Mac wallet
+behaviour is unchanged. This remains a small spending wallet, not secure
+long-term custody: there is no cloud recovery.
 
 The desktop wallet is separate from the developer wizard at
 `.artifacts/radio-wizard`. The app never reads or imports that funded wallet.
@@ -47,7 +57,9 @@ retiring it. No real funds are moved by builds or tests.
 ## Desktop implementation
 
 - `desktop/music/main.mjs`: single instance, automatic local wallet creation,
-  `xtrata-music://open` and Help menu. Deep links do not carry payment commands.
+  `xtrata-music://open` and Help menu. On Windows, an unreadable protected
+  wallet becomes a free-listening-only state; it is never replaced. Deep links
+  do not carry payment commands.
 - `desktop/music/window.mjs`: sandboxed renderer without Node or preload APIs,
   isolated in-memory session and HTTP-only secret cookie, random loopback port.
 - Desktop server mode allows only lounge/media/listening/return endpoints and
@@ -74,10 +86,13 @@ npm run music:desktop:build
 The test uses real Electron with local generated audio and a simulated wallet.
 It checks renderer isolation, private cookie access, paid/free playback and
 pause/resume idempotence. It never accesses the user's wizard or sends funds.
-Current smoke runner uses the Mac Electron executable. Target-specific build
-commands are `dist:mac`, `dist:win`, `dist:linux` in desktop/music. The manual
+The smoke runner selects the local unpackaged Electron executable for its host,
+including `electron.exe` on Windows. Target-specific build commands are
+`dist:mac`, `pack:win`, `dist:win` and `dist:linux` in desktop/music. The manual
 GitHub Actions workflow builds previews for Mac ARM/Intel, Windows x64 and Linux
-x64. Windows/Linux output is not validated solely by compiling it.
+x64; its Windows job also runs the offline wallet suite, native DPAPI smoke,
+Electron smokes, package inspection and artifact report. Those native results
+must still be recorded before a Windows preview is offered.
 
 ## Release gate and hub downloads
 
@@ -135,19 +150,19 @@ prototype is separate. The primary path is now the self-contained desktop app.
 
 ## Implementation verification
 
-44 targeted policy/backend/recovery/return/bridge tests passed. Real Electron
-with a simulated funded wallet passed isolation, private-cookie access,
-paid-start, free-mode and pause/resume checks. A second test ran the actual app
-entrypoint twice with a disposable empty wallet and stubbed networking: the
-address persisted and support stayed off on both launches. Hub browser tests
-passed at desktop and phone widths, including disabled unpublished downloads
-and exclusion of untrusted release links. No user wallet was accessed or funded.
+The current Windows-port verification record, including the full targeted test
+count and native-Windows gates, is maintained in
+[WINDOWS-11-PREVIEW.md](WINDOWS-11-PREVIEW.md). Shared Electron checks use only
+disposable profiles, a simulated wallet and stubbed networking: they cover
+isolation, private-cookie access, paid/free playback, pause/resume idempotence,
+wallet reuse, and second-instance blocking. No user wallet was accessed or
+funded.
 
 Mac ARM64 DMG and ZIP preview builds completed. They remain unsigned; signing,
 notarization, clean-machine release validation and public asset publication are
-still required. The current app uses the default Electron installation icon;
-release branding can replace it before public distribution. Developer and
-preview build artifacts remain local and ignored by Git.
+still required. The Windows package has a dedicated multi-resolution Xtrata ICO;
+Mac branding remains unchanged. Developer and preview build artifacts remain
+local and ignored by Git.
 
 ## Version 1.0.1 universal Mac preview
 
@@ -166,7 +181,7 @@ Electron 43 support is temporary; review its upstream maintenance status before
 each future release. Do not extend wallet support to older unmaintained engines.
 
 Version 1.0.1 includes immediate manual catalogue refresh, automatic three-minute
-refresh, the 60-second minimum and the updated Music Lounge address.
+refresh, the temporary removal of the duration gate and the updated Music Lounge address.
 For runtime smoke tests, XTRATA_MUSIC_TEST_ELECTRON may select the Electron
 executable from an unpackaged Electron runtime; the test refuses packaged apps
 and uses a disposable simulated

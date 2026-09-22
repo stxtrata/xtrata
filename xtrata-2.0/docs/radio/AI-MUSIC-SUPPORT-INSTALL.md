@@ -35,10 +35,13 @@ steps that require the user's explicit choice.
    the user's operating system.
 2. Prefer that installer when available. Verify its SHA-256 against the value on
    the hub. It needs no Node.js or browser extension.
-3. If no signed installer is published, use the supplied
-   `xtrata-music-support.tar.gz` source package. Tell the user that this fallback
-   needs Node.js 24 LTS and keeps a terminal window open while the app runs.
-4. Do not invent a release URL or recommend an unsigned preview as a normal
+3. If no installer is published, the supplied `xtrata-music-support.tar.gz`
+   source package is a fallback only for macOS and Linux. It needs Node.js 24
+   LTS and keeps a terminal window open while the app runs.
+4. On Windows, do not use the source package to create or access a support
+   wallet. It cannot provide Electron safeStorage/Windows DPAPI. Direct the
+   user to the Music Lounge and wait for the Windows desktop preview.
+5. Do not invent a release URL or recommend an unsigned preview as a normal
    public release.
 
 ## Signed desktop installer workflow
@@ -75,11 +78,12 @@ not add `sudo`, change the target, or run it against an unverified download.
 4. Check `node --version`. Continue only with Node.js major version 24. If it is
    missing, direct the user to <https://nodejs.org/en/download> for Node.js 24
    LTS. Do not use an unofficial download or silently install a package manager.
-5. Use the platform launcher:
+5. Use the platform launcher on supported source-package systems:
    - macOS: `START HERE - Mac.command`
-   - Windows: `START HERE - Windows.cmd`
    - Linux: `START HERE - Linux.sh`
-6. The launcher runs the locked installation with lifecycle scripts disabled,
+   - Windows: `START HERE - Windows.cmd` only opens the Music Lounge; it is
+     not a wallet launcher.
+6. The Mac/Linux launcher runs the locked installation with lifecycle scripts disabled,
    starts the service on `127.0.0.1:8798`, and opens
    <http://127.0.0.1:8798/lounge>.
 7. Confirm that the page identifies itself as Xtrata Music and shows free mode.
@@ -87,9 +91,10 @@ not add `sudo`, change the target, or run it against an unverified download.
    with wallet setup.
 
 An agent with shell access may run `node open.mjs` from the extracted package
-instead of double-clicking the launcher. Keep the process attached; closing it
-stops the local app and new support payments. Do not add flags, change the data
-directory, expose the port, or run the command with elevated privileges.
+on macOS or Linux instead of double-clicking the launcher. Keep the process
+attached; closing it stops the local app and new support payments. On Windows,
+`open.mjs` only opens the Music Lounge and exits. Do not add flags, change the
+data directory, expose the port, or run the command with elevated privileges.
 
 ## Optional support-wallet setup
 

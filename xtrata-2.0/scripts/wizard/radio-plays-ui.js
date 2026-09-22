@@ -30,12 +30,12 @@ function activity(){
   const row=document.createElement('div');row.className='activity-row';
   const title=document.createElement('strong');title.textContent=e.kind==='return'?`Return ${e.mode} · ${e.status}`:`${window.radioSongLabel(e)} · ${e.status}`;row.append(title);
   const p=document.createElement('p');p.textContent=e.kind==='return'?`${stx(e.amount)} STX to ${e.recipient} · fee ${stx(e.fee)} STX`:`Core ${e.core} · network fee ${stx(e.fee)} STX`;row.append(p);
-  if(e.kind==='play'){const recipient=document.createElement('p');recipient.textContent=e.recipient?`50 microSTX (0.00005 STX) ${e.status==='confirmed'?'paid to':'intended for'} ${e.recipient}`:'Payment recipient unavailable.';row.append(recipient);}
+  if(e.kind==='play'){const recipient=document.createElement('p');const payment=e.status==='confirmed'?'paid to':e.status==='failed'?'was not paid to':'intended for';recipient.textContent=e.recipient?`50 microSTX (0.00005 STX) ${payment} ${e.recipient}`:'Payment recipient unavailable.';row.append(recipient);}
   if(/^0x[0-9a-f]{64}$/.test(e.txid)){const a=document.createElement('a');a.href=`https://explorer.hiro.so/txid/${e.txid}?chain=mainnet`;a.target='_blank';a.rel='noopener noreferrer';a.textContent='View transaction ↗';row.append(a);}host.append(row);
  }
 }
 function render(){
- if(document.body.hasAttribute('data-music-lounge')){$('setup').textContent=state?.address?'Your support wallet is ready':'Create my support wallet';}
+ if(document.body.hasAttribute('data-music-lounge')){$('setup').hidden=!!state?.address;if($('wallet-ready'))$('wallet-ready').hidden=!state?.address;}
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
  $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
  balanceWarning();

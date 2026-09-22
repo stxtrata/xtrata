@@ -9,6 +9,7 @@ const T = require('@stacks/transactions');
 const { StacksMainnet } = require('@stacks/network');
 const OWNER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', NAME='xtrata-radio-plays-v1-0';
 const HASH='b81f1a0e1de406102e739f78d200041a270f498edab1bb3320aec54f33cbbbe1';
+const WINDOWS_VAULT_SCHEME='windows-dpapi-v1', LOCK_VERSION=1, LOCK_STALE_MS=120000;
 const sha = s => createHash('sha256').update(s).digest('hex');
 function publicEntry(entry){const result={...entry};delete result.raw;return result;}
 export function policy(p) {
@@ -17,31 +18,118 @@ export function policy(p) {
   return p;
 }
 export class RadioWizard {
- constructor(directory, request=fetch) { this.dir=directory;this.request=request;this.running=false;this.stopped=false;this.stopEpoch=0;this.session=randomBytes(16).toString('hex');this.message='Idle. No payments authorised.'; }
+ constructor(directory, request=fetch, options={}) {
+  this.dir=directory;this.request=request;this.running=false;this.stopped=false;this.stopEpoch=0;this.session=randomBytes(16).toString('hex');this.message='Idle. No payments authorised.';
+  this.platform=options.platform||process.platform;this.vaultProtector=options.vaultProtector||null;
+  this.now=options.now||Date.now;this.pid=options.pid||process.pid;this.lockStaleMs=options.lockStaleMs||LOCK_STALE_MS;this.canRecoverStaleLock=options.canRecoverStaleLock===true;
+  this.isProcessAlive=options.isProcessAlive||((pid)=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}});
+  this.storageFault=null;
+ }
  async json(name) { return JSON.parse(await readFile(join(this.dir,name),'utf8')); }
  async save(name,v) {
-  const path=join(this.dir,name),file=await open(path+'.tmp','w',0o600);
-  try {await file.writeFile(JSON.stringify(v));await file.sync();} finally {await file.close();}
-  await rename(path+'.tmp',path);
-  const directory=await open(this.dir,'r');try {await directory.sync();}finally{await directory.close();}
+  const path=join(this.dir,name),temporary=join(this.dir,'.'+name+'.'+this.pid+'.'+randomBytes(8).toString('hex')+'.tmp');let file;
+  try {
+   file=await open(temporary,'wx',0o600);await file.writeFile(JSON.stringify(v));await file.sync();await file.close();file=null;
+   // Rename is an atomic replacement on the local filesystem. A failed write
+   // leaves the last complete record in place and blocks any new spending.
+   await rename(temporary,path);
+   // Flush the committed record too. POSIX additionally flushes the directory
+   // entry; Windows does not expose a directory fsync through Node, so it uses
+   // NTFS's atomic rename together with a second file flush.
+   // Windows FlushFileBuffers requires a handle with write access.
+   const committed=await open(path,this.platform==='win32'?'r+':'r');try{await committed.sync();}finally{await committed.close();}
+   if(this.platform!=='win32'){
+    const directory=await open(this.dir,'r');try{await directory.sync();}finally{await directory.close();}
+   }
+  }catch(error){
+   try{await file?.close();}catch{/* The original error is the useful one. */}
+   this.recordStorageFault(error);throw error;
+  }
  }
- guard() { if(this.stopped||killSwitchEngaged())throw Error('Wizard stopped by operator or kill switch.'); }
+ recordStorageFault(error){this.storageFault='Wallet storage needs attention: '+String(error?.message||error).slice(0,200);this.stopped=true;}
+ ensureStorageHealthy(){if(this.storageFault)throw Error(this.storageFault);}
+ guard() { this.ensureStorageHealthy();if(this.stopped||killSwitchEngaged())throw Error('Wizard stopped by operator or kill switch.'); }
+ async recoverStaleLock(path){
+  let lock,info;
+  try{[lock,info]=await Promise.all([readFile(path,'utf8'),stat(path)]);}catch(error){if(error.code==='ENOENT')return true;throw error;}
+  let record;try{record=JSON.parse(lock);}catch{throw Error('A wallet lock is unreadable. Spending remains disabled until it is inspected.');}
+  if(!record||record.version!==LOCK_VERSION||!Number.isInteger(record.pid)||record.pid<1||!Number.isFinite(record.createdAt))throw Error('A wallet lock is invalid. Spending remains disabled until it is inspected.');
+  if(this.now()-record.createdAt<this.lockStaleMs||info.size>1024)throw Error('Another operation holds the wallet lock. Wait for it to finish.');
+  let alive;try{alive=this.isProcessAlive(record.pid);}catch{throw Error('The existing wallet lock could not be verified. Spending remains disabled.');}
+  if(alive)throw Error('Another operation holds the wallet lock. Wait for it to finish.');
+  // A pathname lock cannot offer a cross-process compare-and-swap in Node.
+  // Only Electron's already-held per-user single-instance guard permits this
+  // conservative stale-lock cleanup; standalone callers fail closed instead.
+  if(!this.canRecoverStaleLock)throw Error('A stale wallet lock was found. Spending remains disabled until the single app instance can recover it.');
+  const quarantine=path+'.stale-'+record.pid+'-'+randomBytes(6).toString('hex');
+  try{await rename(path,quarantine);return true;}catch(error){if(error.code==='ENOENT')return true;throw Error('A stale wallet lock could not be recovered. Spending remains disabled.');}
+ }
+ async acquireLock(name){
+  const path=join(this.dir,name);
+  for(let attempt=0;attempt<2;attempt++){
+   let file;
+   try{
+    file=await open(path,'wx',0o600);const record={version:LOCK_VERSION,pid:this.pid,createdAt:this.now()};await file.writeFile(JSON.stringify(record));await file.sync();return {file,path};
+   }catch(error){
+    try{await file?.close();}catch{/* Preserve the lock write error. */}
+    // A lock that could not be created, written or flushed may be a disk,
+    // permission or interrupted-write fault.  Do not leave the wallet able to
+    // guess at a later spend; any partial lock stays for conservative review.
+    if(error.code!=='EEXIST'){
+     this.recordStorageFault(error);
+     throw Error('Wallet lock could not be written. Spending has been disabled.');
+    }
+    await this.recoverStaleLock(path);
+   }
+  }
+  throw Error('Another operation holds the wallet lock. Wait for it to finish.');
+ }
+ async releaseLock(lock){
+  try{await lock.file.close();await unlink(lock.path);}catch(error){this.recordStorageFault(error);throw Error('Wallet lock cleanup failed. Spending has been disabled.');}
+ }
  async setup() {
   await mkdir(this.dir,{recursive:true,mode:0o700});
-  const lock=await open(join(this.dir,'setup.lock'),'wx',0o600);
+  const lock=await this.acquireLock('setup.lock');
   try {
-   try { const v=await this.json('vault.json');return {address:v.address}; } catch(e) { if(e.code!=='ENOENT')throw e; }
+   try {
+    const v=await this.json('vault.json');
+    if(!v||typeof v.address!=='string'||!T.validateStacksAddress(v.address))throw Error('Wallet data is invalid. It was not replaced.');
+    if(this.platform==='win32'&&v.scheme!==WINDOWS_VAULT_SCHEME)throw Error('A legacy wallet was found. It was not migrated or replaced; recover or return it using the original app before using this Windows preview.');
+    if(v.scheme===WINDOWS_VAULT_SCHEME&&(!this.vaultProtector||this.vaultProtector.scheme!==WINDOWS_VAULT_SCHEME))throw Error('This protected wallet can only be opened by Xtrata Music on Windows. It was not replaced.');
+    // A syntactically valid DPAPI record can still be unreadable for this
+    // Windows user. Verify it during startup so the UI cannot invite support
+    // approval and repeatedly fail later starts from an unavailable wallet.
+    if(this.platform==='win32')await this.key();
+    return {address:v.address};
+   } catch(e) { if(e.code!=='ENOENT')throw e; }
    this.guard();
    const key=randomBytes(32).toString('hex')+'01', address=T.getAddressFromPrivateKey(key,T.TransactionVersion.Mainnet);
+   if(this.platform==='win32'){
+    if(!this.vaultProtector||this.vaultProtector.scheme!==WINDOWS_VAULT_SCHEME)throw Error('Windows protected storage is unavailable. Xtrata Music will not create a spending wallet without DPAPI.');
+    const protectedKey=await this.vaultProtector.protect(key);
+    await this.save('vault.json',{version:2,scheme:WINDOWS_VAULT_SCHEME,address,protectedKey});
+    return {address};
+   }
    const wrapping=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',wrapping,iv);cipher.setAAD(Buffer.from(address));
    const encrypted=Buffer.concat([cipher.update(key,'utf8'),cipher.final()]);
    // Refuse overwrite, including after partial setup. Operator must inspect an interrupted setup.
    await writeFile(join(this.dir,'unlock.key'),wrapping,{flag:'wx',mode:0o600});
    await writeFile(join(this.dir,'vault.json'),JSON.stringify({address,iv:iv.toString('hex'),tag:cipher.getAuthTag().toString('hex'),encrypted:encrypted.toString('hex')}),{flag:'wx',mode:0o600});
    return {address};
-  } finally {await lock.close();await unlink(join(this.dir,'setup.lock'));}
+  } finally {await this.releaseLock(lock);}
  }
- async key() { const v=await this.json('vault.json');const d=createDecipheriv('aes-256-gcm',await readFile(join(this.dir,'unlock.key')),Buffer.from(v.iv,'hex'));d.setAAD(Buffer.from(v.address));d.setAuthTag(Buffer.from(v.tag,'hex'));const key=Buffer.concat([d.update(Buffer.from(v.encrypted,'hex')),d.final()]).toString('utf8');if(T.getAddressFromPrivateKey(key,T.TransactionVersion.Mainnet)!==v.address||v.address===OWNER)throw Error('Wizard identity mismatch.');return key; }
+ async key() {
+  const v=await this.json('vault.json');let key;
+  if(v.scheme===WINDOWS_VAULT_SCHEME){
+   if(this.platform!=='win32'||!this.vaultProtector||this.vaultProtector.scheme!==WINDOWS_VAULT_SCHEME)throw Error('This protected wallet can only be opened by Xtrata Music on Windows. It was not replaced.');
+   const opened=await this.vaultProtector.unprotect(v.protectedKey);key=opened.secret;
+   if(opened.reprotected){await this.save('vault.json',{...v,protectedKey:opened.reprotected});}
+  }else{
+   if(this.platform==='win32')throw Error('A legacy wallet cannot be opened by this Windows preview. It was not replaced.');
+   const d=createDecipheriv('aes-256-gcm',await readFile(join(this.dir,'unlock.key')),Buffer.from(v.iv,'hex'));d.setAAD(Buffer.from(v.address));d.setAuthTag(Buffer.from(v.tag,'hex'));key=Buffer.concat([d.update(Buffer.from(v.encrypted,'hex')),d.final()]).toString('utf8');
+  }
+  if(T.getAddressFromPrivateKey(key,T.TransactionVersion.Mainnet)!==v.address||v.address===OWNER)throw Error('Wizard identity mismatch.');return key;
+ }
  async api(path,options={}) { const r=await this.request('https://api.hiro.so'+path,{...options,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});if(!r.ok){let reason='';try{const body=await r.json();if(typeof body.reason==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason))reason=body.reason;}catch{/* Keep only a bounded node reason code, never raw response data. */}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}return r.json(); }
  async read(fn,args=[]) {const r=await this.api(`/v2/contracts/call-read/${OWNER}/${NAME}/${fn}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sender:OWNER,arguments:args.map(T.cvToHex)})});if(!r.okay)throw Error('Contract read failed.');return T.cvToJSON(T.hexToCV(r.result));}
  async journal(){try{return await this.json('journal.json');}catch(e){if(e.code==='ENOENT')return [];throw e;}}
@@ -55,17 +143,17 @@ export class RadioWizard {
   const log=await this.journal(),returns=await this.optional('returns.json',[]),quote=await this.optional('return-quote.json',null);
   return {address,balanceMicroSTX:balance,overLimit:balance!==null&&BigInt(balance)>1000000n,
    running:this.running||diskRunning,stopped:this.stopped,recovery,
-   message:diskRunning&&!this.running?'A backend operation holds the process lock.':this.message,
+   message:this.storageFault||(diskRunning&&!this.running?'A backend operation holds the process lock.':this.message),
    spendCeilingMicroSTX:10000,entries:log.map(publicEntry),returns:returns.map(publicEntry),
    returnQuote:quote&&quote.expires>Date.now()&&quote.session===this.session&&quote.stopEpoch===this.stopEpoch?quote:null};
  }
  async optional(name,fallback){try{return await this.json(name);}catch(e){if(e.code==='ENOENT')return fallback;throw e;}}
  async exclusive(work){
   if(this.running)throw Error('An operation is active. Stop new payments and wait, then retry.');
-  this.running=true;let lock;
-  try{lock=await open(join(this.dir,'run.lock'),'wx',0o600);return await work();}
-  catch(e){if(e.code==='EEXIST')throw Error('Another operation holds the wallet lock. Wait for it to finish.');throw e;}
-  finally{this.running=false;if(lock){await lock.close();await unlink(join(this.dir,'run.lock'));}}
+  this.running=true;let lock,thrown;
+  try{lock=await this.acquireLock('run.lock');return await work();}
+  catch(e){thrown=e;throw e;}
+  finally{this.running=false;if(lock){try{await this.releaseLock(lock);}catch(error){if(!thrown)throw error;}}}
  }
  async returnAccount(address){
   const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
@@ -104,6 +192,7 @@ export class RadioWizard {
   if(typeof id!=='string'||!/^[0-9a-f]{32}$/.test(id))throw Error('Invalid return request.');
   return this.exclusive(async()=>{
    const epoch=this.stopEpoch;
+   this.ensureStorageHealthy();
    const log=await this.optional('returns.json',[]),existing=log.find(e=>e.id===id);
    if(existing)return publicEntry(existing);
    const q=await this.optional('return-quote.json',null);
@@ -114,6 +203,7 @@ export class RadioWizard {
    if(address!==q.address||account.balance.toString()!==q.balance||account.nonce!==q.nonce)throw Error('Balance or pending payments changed. Review the return again.');
    if(this.returnAmount(q.mode,account.balance,q.fee).toString()!==q.amount)throw Error('Return amount changed. Review again.');
    if(killSwitchEngaged()||epoch!==this.stopEpoch||q.expires<=Date.now())throw Error('Return stopped or review expired.');
+   this.ensureStorageHealthy();
    const key=await this.key();
    const tx=await T.makeSTXTokenTransfer({recipient:q.recipient,amount:BigInt(q.amount),fee:BigInt(q.fee),nonce:BigInt(q.nonce),
     network:new StacksMainnet(),memo:'Xtrata Music return',anchorMode:T.AnchorMode.Any,senderKey:key});
@@ -123,6 +213,7 @@ export class RadioWizard {
    log.push(e);await this.save('returns.json',log);await this.save('return-quote.json',null);
    // Persist before submission. Any failure from this point remains uncertain.
    if(killSwitchEngaged()||epoch!==this.stopEpoch)throw Error('Return saved but stopped. Reconcile before any further transfer.');
+   this.ensureStorageHealthy();
    const response=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
    if(String(response).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected submission response. Refresh to reconcile; do not create another return.');
    e.status='submitted';await this.save('returns.json',log);this.stopped=true;
@@ -145,6 +236,7 @@ export class RadioWizard {
   if(typeof txid!=='string'||!/^0x[0-9a-f]{64}$/.test(txid)||!Number.isInteger(fee)||fee<1||fee>1000)throw Error('Invalid explicit recovery request.');
   return this.exclusive(async()=>{
    if(killSwitchEngaged())throw Error('Wizard kill switch is engaged.');
+   this.ensureStorageHealthy();
    const epoch=this.stopEpoch;
    const log=await this.journal(),e=log.find(row=>row.txid===txid);
    if(!e||e.status!=='prepared'||e.priorAttempts?.length||fee<=e.fee)throw Error('Only a saved prepared attempt can be explicitly retried once at a higher fee.');
@@ -166,6 +258,7 @@ export class RadioWizard {
    const owner=await this.read('get-owner',[args[0],args[1]]),recipient=owner?.success===true?owner.value?.value?.value:null;
    if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master owner is not eligible.');
    if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
+   this.ensureStorageHealthy();
    const key=await this.key();
    const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:args,senderKey:key,network:new StacksMainnet(),
     fee:BigInt(fee),nonce:old.auth.spendingCondition.nonce,anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,
@@ -175,23 +268,30 @@ export class RadioWizard {
    e.priorAttempts=[{txid:e.txid,fee:e.fee}];e.recoveryNonce=account.nonce;e.fee=fee;e.recipient=recipient;e.txid='0x'+tx.txid();e.raw=Buffer.from(tx.serialize()).toString('hex');e.recoveryAt=new Date().toISOString();
    await this.save('journal.json',log);
    if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery saved but stopped; reconcile before proceeding.');
+   this.ensureStorageHealthy();
    const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
    if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Recovery submission outcome unknown. Do not retry automatically.');
    e.status='submitted';await this.save('journal.json',log);return publicEntry(e);
   });
  }
  async reconcile(log) {
-  for(const e of log.filter(e=>e.status!=='confirmed')) {
-   const attempts=[{txid:e.txid,fee:e.fee},...(e.priorAttempts||[])];let found=null,visible=false;
+  for(const e of log.filter(e=>!['confirmed','failed'].includes(e.status))) {
+   const attempts=[{txid:e.txid,fee:e.fee},...(e.priorAttempts||[])];let found=null,failed=null,visible=false;
    for(const attempt of attempts){
     let tx;try{tx=await this.api('/extended/v1/tx/'+attempt.txid);}catch(error){if(error.status===404)continue;throw error;}
     visible=true;
     if(tx.tx_status==='success'&&tx.canonical===true&&tx.is_unanchored===false){found={tx,attempt};break;}
+    if(['abort_by_response','abort_by_post_condition'].includes(tx.tx_status)&&tx.canonical===true&&tx.is_unanchored===false)failed={tx,attempt};
    }
-   if(!found)throw Error(visible?'Saved transaction remains pending, failed or noncanonical. No new payment permitted.':'Saved transaction not visible yet. No replacement or new payment will be made.');
-   const {tx,attempt}=found;
+   if(!found&&!failed)throw Error(visible?'Saved transaction remains pending, failed or noncanonical. No new payment permitted.':'Saved transaction not visible yet. No replacement or new payment will be made.');
+   const {tx,attempt}=found||failed;
    if(tx.sender_address!==e.address||tx.contract_call?.contract_id!==OWNER+'.'+NAME||tx.contract_call?.function_name!=='play')throw Error('Transaction identity mismatch.');
    if(e.priorAttempts?.length&&(tx.tx_id!==attempt.txid||tx.nonce!==e.recoveryNonce||String(tx.fee_rate)!==String(attempt.fee)))throw Error('Recovered transaction identity mismatch.');
+   if(failed&&!found){
+    // A canonical abort is terminal evidence for this exact prepared payment.
+    // It is retained as failed and never re-broadcast or replaced.
+    e.status='failed';e.failedAt=new Date().toISOString();e.failureStatus=tx.tx_status;e.failedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);continue;
+   }
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(e.address),T.bufferCV(Buffer.from(e.receipt,'hex'))]);const r=receipt?.value?.value;
    if(receipt?.type==='(optional none)'&&receipt.value===null){const error=Error('Confirmed transaction is waiting for its play receipt to become available.');error.code='RECEIPT_PENDING';throw error;}
    if(r?.core?.value!==String(e.core)||r?.id?.value!==String(e.song))throw Error('Receipt verification failed.');
@@ -200,9 +300,9 @@ export class RadioWizard {
  }
  async run(input,context={}) {
   if(this.running)throw Error('Runner already active.');const p=policy(input);this.running=true;this.stopped=false;
-  let lock;
+  let lock,thrown;
   try {
-   lock=await open(join(this.dir,'run.lock'),'wx',0o600);this.guard();
+   lock=await this.acquireLock('run.lock');this.guard();
    const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish or cancel the pending return review first.');
    await this.reconcileReturns();const log=await this.journal();await this.reconcile(log);
    if(!context.continuous&&log.reduce((s,e)=>s+e.fee+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
@@ -226,6 +326,6 @@ export class RadioWizard {
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
    }
    this.message='Run confirmed; receipts verified.';
-  }catch(e){this.message=e.message;throw e;}finally{this.running=false;if(lock){await lock.close();await unlink(join(this.dir,'run.lock'));}}
+  }catch(e){thrown=e;this.message=e.message;throw e;}finally{this.running=false;if(lock){try{await this.releaseLock(lock);}catch(error){if(!thrown)throw error;}}}
  }
 }

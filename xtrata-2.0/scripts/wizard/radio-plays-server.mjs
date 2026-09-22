@@ -7,6 +7,7 @@ import {MusicWebBridge} from './music-web-bridge.mjs';
 import {RadioListening} from './radio-listening.mjs';
 import {RadioMedia} from './radio-media.mjs';
 import {RadioWizard,policy} from './radio-plays-backend.mjs';
+import {releasePlatformsForRuntime,verifiedReleaseForPlatforms} from './music-release-policy.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 export function createWizardServer(wizard,origin='http://127.0.0.1:8798',media=new RadioMedia(),options={}) {
 const version=readFile(join(root,'scripts/wizard/music-version.json'),'utf8').then(JSON.parse);
@@ -20,7 +21,7 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
   }
   if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
    const info=await version;let latest=null;
@@ -28,15 +29,19 @@ const server=createServer(async(req,res)=>{
     const response=await fetch('https://xtrata.xyz/radio/music-releases.json',{signal:AbortSignal.timeout(12000),cache:'no-store'});
     if(!response.ok)throw Error('Update check unavailable. Try again later.');
     const release=await response.json();
-    if(/^\d+\.\d+\.\d+$/.test(release.version)&&release.downloads?.some(d=>d.verified))latest=release.version;
+    const releasePlatforms=Array.isArray(options.releasePlatforms)
+      ?options.releasePlatforms
+      :releasePlatformsForRuntime(process.platform,process.arch);
+    latest=verifiedReleaseForPlatforms(release,releasePlatforms);
    }
-   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:info.version,latest}));return;
+   res.setHeader('Content-Type','application/json');res.end(JSON.stringify({version:info.version,latest,platform:options.runtimePlatform||process.platform}));return;
   }
   if(req.url==='/web-bridge'&&req.method==='OPTIONS'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);res.setHeader('Access-Control-Allow-Methods','POST');res.setHeader('Access-Control-Allow-Headers','content-type');res.end();return;}
   if(req.url==='/web-bridge'&&req.method==='POST'){webBridge.extension(req.headers.origin);res.setHeader('Access-Control-Allow-Origin',req.headers.origin);if(req.headers['content-type']!=='application/json')throw Error('JSON required');let body='';for await(const chunk of req){body+=chunk;if(body.length>2048)throw Error('Request too large');}const result=await webBridge.call(req.headers.origin,JSON.parse(body));res.setHeader('Content-Type','application/json');res.end(JSON.stringify(result));return;}
   if(req.method==='GET'&&['/web-approval','/web-approval.js'].includes(req.url.split('?')[0])){const script=req.url.split('?')[0].endsWith('.js');res.setHeader('Content-Type',script?'text/javascript':'text/html');res.end(await readFile(join(root,'scripts/wizard/music-web-approval.'+(script?'js':'html'))));return;}
   if(req.method==='GET'&&['/lounge','/lounge.css','/lounge.js'].includes(req.url)){const ext=req.url==='/lounge'?'html':req.url.endsWith('.css')?'css':'js';res.setHeader('Content-Type',ext==='html'?'text/html':ext==='css'?'text/css':'text/javascript');res.end(await readFile(join(root,'scripts/wizard/music-lounge.'+ext)));return;}
   if(req.method==='GET'&&req.url==='/radio-chain-activity.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'public/radio/chain-activity.js')));return;}
+  if(req.method==='GET'&&req.url==='/radio-policy.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/radio-listening-policy.mjs')));return;}
   if(req.method==='GET'&&['/','/ui.js','/ui.css','/radio.js'].includes(req.url)){res.setHeader('Content-Type',req.url==='/'?'text/html':req.url==='/ui.css'?'text/css':'text/javascript');res.end(await readFile(req.url==='/radio.js'?join(root,'scripts/wizard/radio-listening-ui.js'):join(root,'scripts/wizard/radio-plays'+(req.url==='/'?'-panel.html':req.url==='/ui.css'?'-ui.css':'-ui.js'))));return;}
   const url=new URL(req.url,expectedOrigin);
   if(req.method==='GET'&&url.pathname==='/radio/catalogue'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({tracks:await media.catalogue(url.searchParams.get('refresh')==='1')}));return;}

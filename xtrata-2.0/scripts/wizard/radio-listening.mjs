@@ -5,10 +5,11 @@ export class RadioListening {
  constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
  async refreshedSnapshot(){
   const log=await this.wizard.journal();
-  for(const e of log.filter(e=>e.playbackId).slice(-100)){if(!this.events.some(row=>row.id===e.playbackId))this.events.push({id:e.playbackId,song:e.song,at:e.createdAt,outcome:e.status==='confirmed'?'confirmed':'unknown',reason:e.status==='confirmed'?'Paid start confirmed.':'Saved payment awaits reconciliation.',txid:e.confirmedTxid||e.txid});}
+  for(const e of log.filter(e=>e.playbackId).slice(-100)){if(!this.events.some(row=>row.id===e.playbackId))this.events.push({id:e.playbackId,song:e.song,at:e.createdAt,outcome:e.status==='confirmed'?'confirmed':e.status==='failed'?'failed':'unknown',reason:e.status==='confirmed'?'Paid start confirmed.':e.status==='failed'?`Paid start failed on-chain (${e.failureStatus||'abort'}); it was not retried.`:'Saved payment awaits reconciliation.',txid:e.confirmedTxid||e.failedTxid||e.txid});}
   for(const row of this.events){
    const entry=log.find(e=>e.playbackId===row.id);
    if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason='Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
+   if(entry?.status==='failed'){row.outcome='failed';row.reason=`Paid start failed on-chain (${entry.failureStatus||'abort'}); it was not retried.`;row.txid=entry.failedTxid||entry.txid;}
    if(entry){row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
   }
   return this.snapshot();
@@ -40,14 +41,19 @@ export class RadioListening {
  }
  free(input){this.check(input);this.disable();return this.snapshot();}
  async start(p){
-  if(!p||Object.keys(p).sort().join(',')!=='id,song,tab,token'||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
+  const keys=Object.keys(p||{}).sort().join(',');
+  if(!p||!['duration,id,song,tab,token','id,song,tab,token'].includes(keys)||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
   const a=this.check(p);if(this.seen.has(p.id))return this.seen.get(p.id);
   const track=this.media.tracks?.find(t=>t.id===p.song);
   const row={title:track?.title,artist:track?.artist,id:p.id,song:p.song,at:new Date().toISOString(),outcome:'free',reason:''};
   this.seen.set(p.id,row);this.events.push(row);
+  // A current local client does not send a duration. Older clients may still
+  // include it, but it is deliberately ignored while the duration gate is
+  // disabled. Verify that this service can still load the selected audio so a
+  // malformed or unavailable inscription cannot create a payment.
+  try{await this.media.audio(p.song);}catch{row.reason='Audio could not be verified locally. This start stays free.';return row;}
   if(!a.continuous&&a.used>=a.max){row.reason='Approved start limit reached.';this.disable();return row;}
   if(this.inFlight||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
-  if(!this.media.loaded.has(p.song)){row.reason='Audio was not verified by this local player.';return row;}
   this.inFlight=true;
   try{
    const saved=await this.wizard.journal();const existing=saved.find(e=>e.playbackId===p.id);
@@ -57,7 +63,7 @@ export class RadioListening {
    const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true});
    void operation.then(()=>{row.outcome='confirmed';row.reason='Paid start confirmed.';}).catch(async error=>{
     row.reason=error.message;row.outcome='unavailable';
-    try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':'unknown';row.txid=entry.txid;}}catch{row.outcome='unknown';}
+    try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':entry.status==='failed'?'failed':'unknown';row.txid=entry.confirmedTxid||entry.failedTxid||entry.txid;}}catch{row.outcome='unknown';}
     if(!a.continuous)this.disable();
    }).finally(()=>{this.inFlight=false;if(this.active===a&&!a.continuous&&a.used>=a.max)this.disable();});
    // run() sets its own lock synchronously. Ownership lasts through confirmation.

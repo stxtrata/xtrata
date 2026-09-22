@@ -3,3 +3,13 @@
 .live-payments-link{display:inline-block;padding:13px 18px;border:1px solid #c1e29b;border-radius:10px;background:#c1e29b;color:#15231a;font-size:15px;font-weight:750;text-decoration:none}.live-payments-link:hover{background:#d5efb6}.live-payments-link:focus-visible{outline:2px solid #fff;outline-offset:4px}.live-payments-caption{font-size:13px;color:#acbbb6;max-width:570px}#live-payments{scroll-margin-top:24px}
 
 .chain-filter-panel{border:1px solid #ffffff20;border-radius:12px;padding:12px 16px;margin:16px 0;background:#ffffff03}.chain-filter-panel>summary{cursor:pointer;font-size:14px;font-weight:650;color:#d8e8c9}.chain-filter-panel .chain-history-controls{margin:16px 0 0;display:flex;flex-wrap:wrap;gap:12px;align-items:end}.chain-history-controls label{flex:1 1 190px;min-width:0}.chain-history-controls input,.chain-history-controls select{width:100%;box-sizing:border-box}.chain-totals{padding:16px 20px;border-left:3px solid #c1e29b;background:#c1e29b0b;border-radius:8px;font-size:clamp(17px,2vw,23px);font-weight:650;color:#e7f2dc;line-height:1.5}.chain-feed-heading{align-items:center}#live-payments:focus:not(:focus-visible){outline:none}
+
+/* Payment states use explicit labels as well as colour. */
+#wallet-ready{color:#b9d6c6;font-size:14px;font-weight:600;padding:8px 0;border-bottom:1px solid #ffffff20}
+.support-agreement{border:1px solid #91a8bd;border-radius:10px;padding:16px;background:#162735}.support-agreement strong{display:block;color:#e3edf8;margin-bottom:12px}.support-agreement .check{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.6}.support-agreement input{flex:0 0 auto;width:20px;height:20px;margin-top:2px}.support-agreement.needs-agreement{border:2px solid #ffc46b;padding:15px;background:#342919}#support-consent-prompt{color:#ffd397;font-weight:600;margin-bottom:0}.support-step{font-size:13px}
+body[data-payment-mode] #radio-mode{padding:12px;border:1px solid;border-radius:8px;font-size:12px;font-weight:700}
+body[data-payment-mode="free"] #radio-mode{color:#b8dbff;background:#142f47;border-color:#659fce}body[data-payment-mode="free"] .player{border-color:#659fce}
+body[data-payment-mode="support"] #radio-mode{color:#d4f6b8;background:#29421c;border-color:#a0d477}body[data-payment-mode="support"] .player{border-color:#a0d477}
+body[data-payment-mode="waiting"] #radio-mode{color:#ffdb9a;background:#3b2e15;border-color:#e6b761}body[data-payment-mode="waiting"] .player{border-color:#e6b761}
+
+body[data-music-lounge] [hidden]{display:none!important}
