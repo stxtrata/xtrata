@@ -263,3 +263,16 @@ suite passes locally after the fix. Git attributes resolve to LF for both the
 affected module and paid-play contract. Native rerun remains required after
 the user pushes the correction; packaging/installer/physical/live gates remain
 NOT RUN.
+
+### Third native CI attempt
+
+Run https://github.com/stxtrata/xtrata/actions/runs/35734640000 used
+`89ef8c6ffc1c4ee876e992c3a557ddc079be8a46`. All suites imported successfully;
+86 of 87 shared tests passed on Windows. The sole failure asserted POSIX
+0600 permission bits on the public return quote, but Windows reported 0666.
+The test now verifies the persisted quote equals the reviewed quote on every
+platform and asserts Unix mode bits only on POSIX. Windows vault protection
+and native DPAPI gates remain required, unchanged. The 12 return tests pass
+locally after this correction. Packaging and native DPAPI stages have not yet
+run because the shared-suite gate stopped the workflow. Retry requires this
+small test correction to be pushed; no runtime change or gate bypass is made.

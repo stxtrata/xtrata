@@ -38,7 +38,11 @@ describe('wizard return controls (disposable wallets, mocked chain)',()=>{
  it('reviews exact excess/all amounts without unlocking or broadcasting',()=>fixture(async({w,chain,dir})=>{
   const key=vi.spyOn(w,'key');const q=await w.prepareReturn(input);
   expect(q.amount).toBe('499700');expect(q.remaining).toBe('1000000');expect(key).not.toHaveBeenCalled();
-  expect((await stat(join(dir,'return-quote.json'))).mode&0o777).toBe(0o600);
+  // Windows does not implement POSIX permission bits. Its secret protection
+  // is covered by the Windows vault suite and native Electron DPAPI smoke.
+  const quotePath=join(dir,'return-quote.json');
+  expect(JSON.parse(await readFile(quotePath,'utf8'))).toEqual(q);
+  if(process.platform!=='win32')expect((await stat(quotePath)).mode&0o777).toBe(0o600);
   expect((await w.prepareReturn({...input,mode:'all'})).amount).toBe('1499700');
   chain.balance=1000n;expect((await w.prepareReturn({...input,mode:'all'})).amount).toBe('700');
   expect(chain.broadcasts).toHaveLength(0);
