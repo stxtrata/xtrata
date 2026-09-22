@@ -80,6 +80,7 @@ per-user x64 NSIS preview installer with the stable application identity
 # Install the project and desktop dependencies from their committed lockfiles.
 npm ci --ignore-scripts
 npm ci --prefix desktop/music
+node desktop/music/node_modules/electron/install.js
 npm ci --prefix contracts/clarinet --ignore-scripts
 npm --prefix desktop/music run prepare:app
 
@@ -276,3 +277,16 @@ and native DPAPI gates remain required, unchanged. The 12 return tests pass
 locally after this correction. Packaging and native DPAPI stages have not yet
 run because the shared-suite gate stopped the workflow. Retry requires this
 small test correction to be pushed; no runtime change or gate bypass is made.
+
+### Fourth native CI attempt
+
+Run https://github.com/stxtrata/xtrata/actions/runs/35735967417 used
+`797fea32a90987252424adac74c07c2e1c8eed57`. All 87 shared tests passed on the
+Windows runner, along with contract/deployment checks and source-package
+closure. Native DPAPI testing stopped before launching because Electron's
+runtime executable was absent. The locked Electron 44.4.1 package has an
+explicit install.js entrypoint and no postinstall script. The workflow and
+manual recipe now invoke that installer after npm ci, before native tests.
+The command succeeds locally with the existing pinned runtime. No runtime
+version changed. DPAPI, Electron smokes, NSIS and physical checks remain NOT
+RUN until the corrected workflow is pushed and rerun.

@@ -35,6 +35,9 @@ jobs:
           cache: npm
           cache-dependency-path: xtrata-2.0/desktop/music/package-lock.json
       - run: npm ci
+      # The pinned Electron package requires explicit runtime installation.
+      - name: Install the pinned Electron runtime
+        run: node node_modules/electron/install.js
       - run: npm run prepare:app
       # The shared radio/wallet suite uses mocked offline transport but the
       # actual filesystem implementation. Install only the repository lockfile
