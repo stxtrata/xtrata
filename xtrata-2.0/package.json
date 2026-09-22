@@ -83,6 +83,7 @@
     "build:radio-likes": "vite build -c vite.radio-likes.config.ts",
     "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts",
     "build:music-support": "node scripts/music-support/package.mjs",
+    "test:music-support-package": "node scripts/music-support/source-package-smoke.mjs",
     "music:lounge": "node scripts/wizard/radio-plays-server.mjs",
     "test:radio-support": "node scripts/radio-support/harness.mjs",
     "music:desktop": "npm --prefix desktop/music start",

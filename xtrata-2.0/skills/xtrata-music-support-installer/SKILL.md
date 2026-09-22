@@ -9,9 +9,11 @@ Help the user reach a working local listening room with free mode confirmed.
 
 Prefer a signed and verified desktop installer published by the official Xtrata
 Music hub. Check its platform requirements and SHA-256. If none is published,
-use the supplied source package, Node.js 24 LTS, and its platform-specific
-`START HERE` launcher. Do not invent download links or present unsigned preview
-builds as public releases.
+use the supplied source package only on macOS or Linux, with Node.js 24 LTS and
+its `START HERE` launcher. On Windows, the source package only opens the Music
+Lounge: do not use it to create or access a support wallet because it lacks the
+desktop app's Electron safeStorage/DPAPI protection. Do not invent download
+links or present unsigned preview builds as public releases.
 
 Before acting, read `AI-MUSIC-SUPPORT-INSTALL.md` when it is available in the
 repository, or `AI AGENT - INSTALL.md` when working inside the distributed

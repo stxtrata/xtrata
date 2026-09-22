@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {readFileSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 
 const text = (path:string) => readFileSync(path, 'utf8');
 
@@ -26,6 +26,10 @@ describe('source package for nontechnical listeners', () => {
     expect(packager).not.toContain("'package.json','package-lock.json'");
     expect(packager).not.toContain('vault.json');
     expect(packager).not.toContain('unlock.json');
+    expect(packager).toContain("'radio-listening-policy.mjs'");
+    expect(packager).toContain("'music-release-policy.mjs'");
+    expect(text('scripts/music-support/source-package-smoke.mjs')).toContain('complete relative runtime import closure');
+    expect(packager).toContain("'music-version.json'");
   });
 
   it('keeps the wallet outside the replaceable program folder', () => {
@@ -34,6 +38,14 @@ describe('source package for nontechnical listeners', () => {
     expect(launcher).toContain("'AppData', 'Roaming'");
     expect(launcher).toContain('XTRATA_MUSIC_DATA_DIR');
     expect(launcher).not.toContain("'.artifacts', 'radio-wizard'");
+  });
+
+  it('does not offer an unprotected Windows source-wallet route', () => {
+    const launcher = text('scripts/music-support/open.mjs');
+    const packager = text('scripts/music-support/package.mjs');
+    expect(launcher).toContain("process.platform === 'win32'");
+    expect(launcher).toContain('does not create or access a wallet');
+    expect(packager).toContain('does not create or access a wallet on Windows');
   });
 
   it('documents the whole setup and payment choice in ordinary language', () => {

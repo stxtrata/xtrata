@@ -5,9 +5,10 @@ export function attachAudibleStart(player, notify) {
   let observed = false;
   const emit = () => {
     if (observed || song === null || player.readyState < 3 || player.paused ||
-        player.ended || player.muted || player.volume === 0) return;
+        player.ended || player.muted || player.volume === 0 ||
+        !Number.isFinite(player.duration) || player.duration < 60) return;
     observed = true;
-    notify({ song, id: crypto.randomUUID().replaceAll('-', '') });
+    notify({ song, duration: player.duration, id: crypto.randomUUID().replaceAll('-', '') });
   };
   player.addEventListener('playing', emit);
   player.addEventListener('volumechange', emit);

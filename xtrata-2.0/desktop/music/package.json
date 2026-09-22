@@ -12,7 +12,9 @@
     "start": "npm run prepare:app && electron .",
     "pack": "npm run prepare:app && electron-builder --dir",
     "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never",
-    "dist:win": "npm run prepare:app && electron-builder --win nsis --publish never",
+    "pack:win": "npm run prepare:app && electron-builder --win --x64 --dir --publish never",
+    "dist:win": "npm run prepare:app && electron-builder --win nsis --x64 --publish never",
+    "test:win:storage": "node ../../scripts/music-support/windows-storage-smoke.mjs",
     "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never",
     "release:patch": "node bump-version.mjs",
     "dist:mac:legacy": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.electronVersion=43.7.3 -c.directories.output=../../.artifacts/music-desktop-legacy '-c.artifactName=Xtrata-Music-Legacy-${version}-${os}-${arch}.${ext}'"
@@ -37,9 +39,16 @@
       "main.mjs",
       "window.mjs",
       "navigation.mjs",
+      "release-platforms.mjs",
+      "unavailable-wallet.mjs",
+      "windows-vault-protection.mjs",
       "app/**/*",
       "package.json",
-      "!app/smoke-entry.mjs"
+      "!**/*.map",
+      "!**/*.ts",
+      "!**/*.tsx",
+      "!app/smoke-entry.mjs",
+      "!app/startup-test.mjs"
     ],
     "protocols": [
       {
@@ -58,11 +67,22 @@
       "hardenedRuntime": true
     },
     "win": {
-      "target": "nsis"
+      "icon": "assets/xtrata-music.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Xtrata-Music-${version}-windows11-preview-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "allowElevation": false,
       "deleteAppDataOnUninstall": false
     },
     "linux": {

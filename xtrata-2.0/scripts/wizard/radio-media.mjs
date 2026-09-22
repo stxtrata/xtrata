@@ -1,6 +1,67 @@
 import {radioArtist,radioTitle} from '../../src/lib/radio/artist-credits.mjs';
 const OWNER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const MAX=32*1024*1024;
+const MAX_DURATION_SECONDS=24*60*60;
+
+// This page can play several common audio formats, but payment eligibility is
+// deliberately narrower: it is derived from the verified bytes served here,
+// never from a renderer- or extension-supplied duration.  Unknown formats stay
+// playable and free until a decoder is added and tested for them.
+function wavDuration(body){
+ if(body.length<12||body.subarray(0,4).toString('ascii')!=='RIFF'||body.subarray(8,12).toString('ascii')!=='WAVE')return null;
+ let position=12,rate=0,blockAlign=0,data=0;
+ while(position+8<=body.length){
+  const chunk=body.subarray(position,position+4).toString('ascii');
+  const size=body.readUInt32LE(position+4),end=position+8+size;
+  if(end>body.length)return null;
+  if(chunk==='fmt '&&size>=16){rate=body.readUInt32LE(position+12);blockAlign=body.readUInt16LE(position+20);}
+  if(chunk==='data')data+=size;
+  position=end+(size%2);
+ }
+ const seconds=data/(rate*blockAlign);
+ return Number.isFinite(seconds)&&seconds>0&&seconds<=MAX_DURATION_SECONDS?seconds:null;
+}
+function mp3Frame(body,position){
+ if(position+4>body.length||body[position]!==0xff||(body[position+1]&0xe0)!==0xe0)return null;
+ const version=(body[position+1]>>3)&3,layer=(body[position+1]>>1)&3,bitrateIndex=(body[position+2]>>4)&15,sampleIndex=(body[position+2]>>2)&3,padding=(body[position+2]>>1)&1;
+ if(version===1||layer===0||bitrateIndex===0||bitrateIndex===15||sampleIndex===3)return null;
+ const sampleBase=[44100,48000,32000][sampleIndex];
+ const sampleRate=version===3?sampleBase:version===2?sampleBase/2:sampleBase/4;
+ const tables=version===3
+  ?{1:[0,32,64,96,128,160,192,224,256,288,320,352,384,416,448],2:[0,32,48,56,64,80,96,112,128,160,192,224,256,320,384],3:[0,32,40,48,56,64,80,96,112,128,160,192,224,256,320]}
+  :{1:[0,32,48,56,64,80,96,112,128,144,160,176,192,224,256],2:[0,8,16,24,32,40,48,56,64,80,96,112,128,144,160],3:[0,8,16,24,32,40,48,56,64,80,96,112,128,144,160]};
+ const bitrate=tables[4-layer][bitrateIndex]*1000;
+ const samples=layer===3?384:layer===2?1152:version===3?1152:576;
+ const size=layer===3?Math.floor((12*bitrate/sampleRate)+padding)*4:layer===1&&version!==3?Math.floor((72*bitrate/sampleRate)+padding):Math.floor((144*bitrate/sampleRate)+padding);
+ return Number.isSafeInteger(size)&&size>=4?{size,seconds:samples/sampleRate}:null;
+}
+function mp3Duration(body){
+ let position=0;
+ if(body.length>=10&&body.subarray(0,3).toString('ascii')==='ID3'){
+  const size=((body[6]&0x7f)*0x200000)+((body[7]&0x7f)*0x4000)+((body[8]&0x7f)*0x80)+(body[9]&0x7f);
+  position=10+size+((body[5]&0x10)?10:0);
+  if(position>=body.length)return null;
+ }
+ let frames=0,total=0,scan=0;
+ while(position+4<=body.length){
+  const frame=mp3Frame(body,position);
+  if(!frame){
+   // Permit an ID3v1 tail, but reject broken/interleaved data rather than
+   // estimating a duration from an untrusted partial file.
+   if(frames&&body.length-position===128&&body.subarray(position,position+3).toString('ascii')==='TAG')break;
+   if(!frames&&scan++<4096){position++;continue;}
+   return null;
+  }
+  if(position+frame.size>body.length)return null;
+  total+=frame.seconds;frames++;position+=frame.size;
+  if(total>MAX_DURATION_SECONDS)return null;
+ }
+ return frames&&Number.isFinite(total)&&total>0?total:null;
+}
+export function audioDuration(body){
+ if(!Buffer.isBuffer(body))return null;
+ return wavDuration(body)??mp3Duration(body);
+}
 async function bytes(response,limit){
  if(!response.ok)throw Error(`Music service HTTP ${response.status}`);
  const chunks=[];let total=0;
@@ -39,7 +100,7 @@ export class RadioMedia {
    mime=match[1].toLowerCase();body=Buffer.from(match[2].replace(/\s/g,''),'base64');
   }
   if(!/^audio\/[a-z0-9.+-]+$/.test(mime)||!body.length)throw Error('Unsupported audio inscription.');
-  const result={mime,body};this.loaded.add(id);this.cache.set(id,result);
+  const result={mime,body,duration:audioDuration(body)};this.loaded.add(id);this.cache.set(id,result);
   // Only two tracks' bytes are held; this is not an unbounded media archive.
   while(this.cache.size>2)this.cache.delete(this.cache.keys().next().value);
   return result;

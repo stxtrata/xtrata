@@ -34,6 +34,55 @@ jobs:
           cache-dependency-path: xtrata-2.0/desktop/music/package-lock.json
       - run: npm ci
       - run: npm run prepare:app
+      # The shared radio/wallet suite uses mocked offline transport but the
+      # actual filesystem implementation. Install only the repository lockfile
+      # dependencies on the Windows runner so it cannot reach a real wallet.
+      - if: matrix.platform == 'win'
+        name: Install shared offline test dependencies
+        working-directory: xtrata-2.0
+        run: npm ci --ignore-scripts
+      - if: matrix.platform == 'win'
+        name: Install locked contract test dependencies
+        working-directory: xtrata-2.0
+        run: npm ci --prefix contracts/clarinet --ignore-scripts
+      - if: matrix.platform == 'win'
+        name: Run shared payment and persistence tests
+        working-directory: xtrata-2.0
+        run: >-
+          npx --no-install vitest run
+          scripts/wizard/__tests__/radio-listening.test.ts
+          scripts/wizard/__tests__/radio-listening-policy.test.ts
+          scripts/wizard/__tests__/radio-plays-backend.test.ts
+          scripts/wizard/__tests__/radio-recovery.test.ts
+          scripts/wizard/__tests__/radio-returns.test.ts
+          scripts/wizard/__tests__/radio-windows-vault.test.ts
+          scripts/wizard/__tests__/music-release-policy.test.ts
+          scripts/wizard/__tests__/music-web-bridge.test.ts
+          scripts/music-support/__tests__/desktop.test.ts
+          scripts/music-support/__tests__/source-package.test.ts
+          src/lib/radio/__tests__/audible-start.test.ts
+      - if: matrix.platform == 'win'
+        name: Verify paid-start contract ownership and amount rules
+        working-directory: xtrata-2.0
+        run: npm run test:radio-plays
+      - if: matrix.platform == 'win'
+        name: Verify the source companion package closure
+        working-directory: xtrata-2.0
+        run: node scripts/music-support/source-package-smoke.mjs
+      # This must execute on the native Windows runner: Electron safeStorage
+      # exercises DPAPI with a real temporary filesystem, while transport stays
+      # offline and cannot broadcast a payment.
+      - if: matrix.platform == 'win'
+        run: npm run test:win:storage
+      # These launch the actual Electron entrypoint with a disposable profile,
+      # mocked network transport and no funded wallet. They exercise free mode,
+      # DPAPI startup/persistence, renderer isolation and playback behaviour.
+      - if: matrix.platform == 'win'
+        working-directory: xtrata-2.0
+        run: npm run music:desktop:test
+      - if: matrix.platform == 'win'
+        working-directory: xtrata-2.0
+        run: node scripts/music-support/desktop-startup-smoke.mjs
       - run: npx --no-install electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
         env:
           CSC_LINK: ${{ secrets.MUSIC_CSC_LINK }}
@@ -41,6 +90,13 @@ jobs:
           APPLE_ID: ${{ secrets.MUSIC_APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.MUSIC_APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.MUSIC_APPLE_TEAM_ID }}
+      # This records the exact Windows artifact hash and actual Authenticode
+      # status from the same native build host. It does not imply signing.
+      - if: matrix.platform == 'win'
+        name: Inspect the unpacked app from the final NSIS build
+        run: node ../../scripts/music-support/windows-package-inspect.mjs --asar ../../.artifacts/music-desktop/win-unpacked/resources/app.asar --report ../../.artifacts/music-desktop/windows11-x64-package-inspection.json
+      - if: matrix.platform == 'win'
+        run: node ../../scripts/music-support/windows-preview-report.mjs --artifact-dir ../../.artifacts/music-desktop
       - uses: actions/upload-artifact@v4
         with:
           name: music-${{ matrix.platform }}-${{ matrix.arch }}-preview
@@ -48,5 +104,7 @@ jobs:
             xtrata-2.0/.artifacts/music-desktop/*.dmg
             xtrata-2.0/.artifacts/music-desktop/*.zip
             xtrata-2.0/.artifacts/music-desktop/*.exe
+            xtrata-2.0/.artifacts/music-desktop/*.json
+            xtrata-2.0/.artifacts/music-desktop/*.sha256
             xtrata-2.0/.artifacts/music-desktop/*.AppImage
           if-no-files-found: error

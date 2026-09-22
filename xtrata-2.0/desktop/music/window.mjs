@@ -2,9 +2,9 @@ import {app,BrowserWindow,session,shell} from 'electron';
 import {randomBytes} from 'node:crypto';
 import {createWizardServer} from './app/scripts/wizard/radio-plays-server.mjs';
 import {externalURL,localNavigation} from './navigation.mjs';
-export async function launchDesktop(wizard,media){
+export async function launchDesktop(wizard,media,options={}){
   const token=randomBytes(32).toString('hex');
-  const server=createWizardServer(wizard,null,media,{desktopToken:token});
+  const server=createWizardServer(wizard,null,media,{desktopToken:token,releasePlatforms:options.releasePlatforms||[],runtimePlatform:process.platform});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
   const origin=`http://127.0.0.1:${server.address().port}`;
   const isolated=session.fromPartition('music-'+randomBytes(16).toString('hex'));

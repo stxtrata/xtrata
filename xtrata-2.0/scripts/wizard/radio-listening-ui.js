@@ -1,3 +1,4 @@
+import {eligibleSongDuration} from '/radio-policy.js';
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
  const tab=crypto.randomUUID().replaceAll('-','');
@@ -11,7 +12,7 @@
  function renderEvents(events){
   recentEvents=events;
   const host=$('radio-events');host.replaceChildren();
-  for(const e of events.slice(0,15)){const p=document.createElement('p');p.textContent=`${window.radioSongLabel(e)}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${e.outcome==='confirmed'?'paid to':'intended for'} ${e.recipient}`:''}`;host.append(p);}
+  for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;host.append(p);}
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE PLAY · support off');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
  async function select(i){
@@ -32,7 +33,7 @@
    });
    if(version!==loading)return;
    if(!Number.isFinite(audio.duration)||audio.duration<=0)throw Error('Duration unavailable');
-   if(audio.duration<60){
+   if(!eligibleSongDuration(audio.duration)){
     shortTracks.add(track.id);tracks=tracks.filter(t=>t.id!==track.id);start=null;renderSongs();
     $('radio-payment').textContent=`Skipped ${track.title}: songs must be at least 60 seconds. No payment requested.`;
     if(tracks.length)void select(index%tracks.length);
@@ -43,7 +44,7 @@
   }catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
  }
  function audible(){
-  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src||!Number.isFinite(audio.duration)||audio.duration<60)return;
+  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src||!eligibleSongDuration(audio.duration))return;
   if(audio.muted||audio.volume===0){
    $('radio-payment').textContent=start.observed?'Muted. Any payment already requested remains recorded; later muted starts stay free.':'Muted · this song is playing free. Unmute to request its support payment.';
    return;
@@ -52,7 +53,7 @@
   start.observed=true;const observed={...start},a=approval;
   if(!a){$('radio-payment').textContent='Free start. Enabling Paid now applies to the next song.';return;}
   $('radio-payment').textContent='Paid start requested. Music continues while the wallet checks it.';
-  void api('start',{token:a.token,tab,id:observed.id,song:observed.song}).then(e=>{
+  void api('start',{token:a.token,tab,id:observed.id,song:observed.song,duration:audio.duration}).then(e=>{
    if(start?.id===observed.id)$('radio-payment').textContent=e.reason;
    if(approval===a&&e.outcome==='free')mode('SUPPORT ON · this start plays free while payment checks wait');
    window.dispatchEvent(new Event('wizard-refresh'));
@@ -115,4 +116,7 @@
  window.addEventListener('pagehide',()=>{if(approval){void fetch('/listening/free',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:approval.token,tab}),keepalive:true}).catch(()=>{});}audio.pause();});
  window.addEventListener('wizard-stop',()=>void free());
  mode('FREE PLAY · support off');
+ // The lounge script starts its initial catalogue load after the module has
+ // attached its controls. This avoids a deferred-module race on desktop.
+ window.dispatchEvent(new Event('radio-ready'));
 })();

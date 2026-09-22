@@ -10,6 +10,17 @@ const port = Number.isInteger(requestedPort) && requestedPort >= 1024 && request
 const url = `http://127.0.0.1:${port}/lounge`;
 const major = Number(process.versions.node.split('.')[0]);
 
+// The source companion has no Electron safeStorage/DPAPI bridge. Do not let a
+// plain Node launcher create a Windows spending wallet with weaker protection.
+// The Windows desktop preview is the supported wallet route; this helper only
+// opens its public hub on Windows.
+if (process.platform === 'win32') {
+  console.log('\nXtrata Music Support wallets on Windows require the Xtrata Music desktop preview.');
+  console.log('This source helper will open the official Music Lounge; it does not create or access a wallet.\n');
+  spawnSync('cmd', ['/c', 'start', '', 'https://xtrata.xyz/music/lounge'], {stdio: 'ignore', windowsHide: true});
+  process.exit(0);
+}
+
 if (major !== 24) {
   console.error('\nXtrata Music needs Node.js 24.');
   console.error('Install the LTS version from https://nodejs.org/en/download and double-click START HERE again.\n');

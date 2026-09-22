@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest';
-import {mkdtemp,readFile,rm,stat} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {deserializeTransaction} from '@stacks/transactions';
@@ -110,6 +110,13 @@ describe('wizard return controls (disposable wallets, mocked chain)',()=>{
   w.api=api;q=await w.prepareReturn(input);const save=w.save.bind(w);
   w.save=async(name,value)=>{if(name==='returns.json')throw Error('Simulated disk full');return save(name,value);};
   await expect(w.confirmReturn(q.id)).rejects.toThrow('disk full');expect(chain.broadcasts).toHaveLength(0);
+ }));
+ it('fails closed after a real filesystem storage fault before a return can sign or broadcast',()=>fixture(async({w,chain,dir})=>{
+  const q=await w.prepareReturn(input),key=vi.spyOn(w,'key');
+  await mkdir(join(dir,'returns.json'));
+  await expect(w.save('returns.json',[])).rejects.toThrow();
+  await expect(w.confirmReturn(q.id)).rejects.toThrow('Wallet storage needs attention');
+  expect(key).not.toHaveBeenCalled();expect(chain.broadcasts).toHaveLength(0);
  }));
  it('respects the kill switch before signing',()=>fixture(async({w,chain})=>{
   const q=await w.prepareReturn(input);const previous=process.env.WIZARD_KILL_SWITCH;

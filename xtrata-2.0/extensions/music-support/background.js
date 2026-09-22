@@ -15,7 +15,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
   if(method==='poll'){if(!state.pending)return {pending:false};const p=await call({method:'poll',id:state.pending});if(p.token){state.token=p.token;delete state.pending;await save();return {connected:true};}if(p.approved){delete state.pending;await save();return {approved:true};}return {pending:true};}
   if(!state.token)throw Error('Connect this browser first.');
   if(method==='support'){const p=await call({method,token:state.token,fee:message.fee});state.pending=p.id;await save();return {reviewUrl:'http://127.0.0.1:8798/web-approval?id='+p.id};}
-  const result=await call({method,token:state.token,...(method==='start'?{song:message.song,id:message.startId}:{})});
+  const result=await call({method,token:state.token,...(method==='start'?{song:message.song,id:message.startId,duration:message.duration}:{})});
   if(method==='disconnect')await chrome.storage.session.remove(key);
   return result;
  })().then(reply).catch(()=>reply({error:'Wallet connection unavailable. Start your companion, or reconnect and approve locally.'})).finally(()=>{if(!urgent)active.delete(key);});

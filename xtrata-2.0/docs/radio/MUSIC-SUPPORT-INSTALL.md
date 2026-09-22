@@ -4,22 +4,27 @@ This folder contains the Xtrata Music listening room and its optional Music
 Support wallet. You can listen for free. Support payments remain off until you
 turn them on inside the listening room.
 
-If the Xtrata Music hub offers a signed installer for your computer, use that:
-it is the easiest route and does not require Node.js or a terminal. This source
-package is the fallback until tested, signed desktop installers are published.
+If the Xtrata Music hub offers a desktop installer for your computer, use that:
+it is the easiest route and does not require Node.js or a terminal. The source
+package is a Mac/Linux fallback. On Windows it deliberately opens the Music
+Lounge instead of creating a wallet, because a Windows wallet needs the
+desktop app's built-in Windows protection.
 
 ## The short version
 
 1. Move the extracted **xtrata-music-support** folder somewhere permanent, such
    as Documents. Do not run it from inside the downloaded archive or Downloads.
-2. Install **Node.js 24 LTS** from <https://nodejs.org/en/download> if it is not
-   already installed. Choose the normal recommended installer for your computer.
+2. On Mac or Linux, install **Node.js 24 LTS** from
+   <https://nodejs.org/en/download> if it is not already installed. Choose the
+   normal recommended installer for your computer.
 3. Double-click the START HERE file for your computer:
    - Mac: **START HERE - Mac.command**
-   - Windows: **START HERE - Windows.cmd**
    - Linux: **START HERE - Linux.sh**
-4. The first launch installs the required program files and then opens the
-   listening room automatically. Later launches skip installation and open it.
+   - Windows: **START HERE - Windows.cmd** opens the Music Lounge, where you
+     can download the Windows desktop preview when it is available.
+4. The Mac/Linux first launch installs the required program files and then
+   opens the listening room automatically. Later launches skip installation
+   and open it.
 
 Keep the terminal window that appears open while listening. You may minimise it.
 Closing it closes Xtrata Music and stops new support payments.
@@ -40,18 +45,19 @@ Closing it closes Xtrata Music and stops new support payments.
 
 ## Windows: step by step
 
-1. Right-click the downloaded `.tar.gz` and extract all files. If Windows cannot
-   extract it, use its built-in `tar` support or a reputable archive application.
-2. Move the extracted **xtrata-music-support** folder into Documents.
-3. If Node.js is not installed, visit <https://nodejs.org/en/download>, download
-   Node.js 24 LTS for Windows and follow the normal installer steps.
-4. Double-click **START HERE - Windows.cmd**.
-5. If Windows asks whether you trust the script, check that it came from the
-   official Xtrata download and that the filename is correct before continuing.
-   Do not disable SmartScreen or antivirus protection.
-6. Wait for “Starting Xtrata Music”. Your browser opens the listening room.
+1. Use the Windows 11 x64 Xtrata Music desktop preview from the Music Lounge
+   when it is published. It is the only Windows route that can keep the local
+   support wallet protected with Windows DPAPI.
+2. The **START HERE - Windows.cmd** file in this source package only opens the
+   Music Lounge. It never creates, opens or spends from a Windows wallet.
+3. Do not install Node.js or disable SmartScreen to use this source package on
+   Windows. Free web radio remains available while the desktop preview is
+   being tested.
 
 ## First use: create, fund and enable support
+
+These steps apply to the Mac/Linux source companion or the Windows desktop app.
+On Windows, wait for the desktop preview rather than using the source package.
 
 1. Select **Create my support wallet**. If you have used this installation
    before, the app reuses its separate local wallet. This does not send money
@@ -83,7 +89,8 @@ The wallet is kept outside this program folder so that replacing the program
 does not replace your wallet:
 
 - Mac: `Library/Application Support/Xtrata Music` inside your user folder
-- Windows: `AppData\Roaming\Xtrata Music` inside your user folder
+- Windows desktop app: Electron's per-user `AppData\Roaming\Xtrata Music`
+  area, protected with Windows DPAPI
 - Linux: `.local/share/xtrata-music` unless `XDG_DATA_HOME` is configured
 
 The app manages its signing key locally; there is no cloud recovery. Anyone or
@@ -100,8 +107,9 @@ confirm the return. A network fee applies. Wait for unresolved payments first.
 1. In the old listening room, select **Listen free / pause support**.
 2. Close the old terminal window.
 3. Keep the wallet-data folder listed above. Do not delete it.
-4. Extract the new program into a new permanent folder and use its START HERE
-   file. It will reuse the separate wallet-data folder.
+4. On Mac/Linux, extract the new source companion into a new permanent folder
+   and use its START HERE file. It will reuse the separate wallet-data folder.
+   On Windows, update the desktop app and keep its application-data folder.
 5. Confirm that the same funding address appears before deleting the old program
    folder. If it differs, stop and use the support information on the Xtrata
    Music hub: <https://xtrata.xyz/music/lounge>.
@@ -113,9 +121,10 @@ The new package will not silently copy or move an older signing key.
 
 ## Troubleshooting
 
-**The START HERE file says Node.js is missing.** Install Node.js 24 LTS from the
-official Node.js site, restart your computer if its installer asks, and try the
-START HERE file again.
+**The START HERE file says Node.js is missing.** This applies only to the
+Mac/Linux source companion. Install Node.js 24 LTS from the official Node.js
+site, restart your computer if its installer asks, and try the START HERE file
+again. The Windows source launcher does not need Node.js.
 
 **A browser did not open.** Keep the terminal window open and visit
 <http://127.0.0.1:8798/lounge> manually. This address works only on your own
@@ -142,7 +151,8 @@ is reused. Music support must be approved again for the new session.
 - It cannot recover deleted wallet files or reverse blockchain transactions.
 - It does not need a browser extension for the local listening room.
 - It is an early-access source package rather than a signed app-store installer.
-- Windows and Linux remain experimental until tested on clean machines.
+- The Mac/Linux source companion is an early-access route. Windows support
+  wallets require the dedicated desktop preview and its Windows validation.
 
 For current downloads, release notes and help, visit
 <https://xtrata.xyz/music/lounge>.

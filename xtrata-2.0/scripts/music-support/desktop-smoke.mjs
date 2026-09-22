@@ -5,19 +5,25 @@ import {join,resolve,dirname} from 'node:path';
 import {existsSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import assert from 'node:assert/strict';
-const executable=resolve(process.env.XTRATA_MUSIC_TEST_ELECTRON||'desktop/music/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron');
-if(existsSync(resolve(dirname(executable),'../Resources/app.asar')))throw Error('Use an unpackaged Electron runtime for simulated-wallet tests.');
+const electronRoot='desktop/music/node_modules/electron/dist';
+const bundledElectron=process.platform==='win32'?'electron.exe':process.platform==='darwin'?'Electron.app/Contents/MacOS/Electron':'electron';
+const executable=resolve(process.env.XTRATA_MUSIC_TEST_ELECTRON||join(electronRoot,bundledElectron));
+const packagedAsar=process.platform==='darwin'?resolve(dirname(executable),'../Resources/app.asar'):resolve(dirname(executable),'resources/app.asar');
+if(existsSync(packagedAsar))throw Error('Use an unpackaged Electron runtime for simulated-wallet tests.');
 const version=JSON.parse(await readFile('desktop/music/package.json','utf8')).version;
-const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-'));
+const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-Δ '));
 await writeFile(entry,`
 import {app} from 'electron';
 import {launchDesktop} from '../window.mjs';
 app.setPath('userData',${JSON.stringify(profile)});void (async()=>{await app.whenReady();
 let paid=0,balance=1050;const entries=[];
 const wizard={stopEpoch:0,running:false,stop(){this.stopEpoch++;},setup:async()=>({address:'SIMULATED WALLET'}),status:async()=>({address:'SIMULATED WALLET',balanceMicroSTX:String(balance),entries,returns:[],message:'Simulation only'}),optional:async()=>null,journal:async()=>entries,reconcile:async()=>{},reconcileReturns:async()=>{},exclusive:async f=>f(),json:async()=>({address:'SIMULATED WALLET'}),returnAccount:async()=>({balance:1000000n}),run:async(p,meta)=>{if(balance<p.fee+50)throw Error('Insufficient confirmed balance for another paid start.');balance-=p.fee+50;paid++;entries.push({...p,...meta,status:'confirmed',recipient:'SIMULATED HOLDER',createdAt:new Date().toISOString()});}};
-const samples=8000*60,wav=Buffer.alloc(44+samples*2);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(samples*2,40);
+// Use 61 seconds here. The separate policy unit tests cover the exact 59/60/61
+// boundary; this UI smoke should not depend on browser float rounding for a
+// header that claims to be exactly 60 seconds long.
+const samples=8000*61,wav=Buffer.alloc(44+samples*2);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(samples*2,40);
 const tracks=[{id:312,title:'Short sample',artist:'Test'}, {id:315,title:'Entertainment',artist:'melophonic',album:'Desktop test'}];
-const media={tracks,loaded:new Set([312,315]),catalogue:async()=>tracks,audio:async(id)=>{if(id===312){const short=Buffer.from(wav.subarray(0,44+8000*2));short.writeUInt32LE(short.length-8,4);short.writeUInt32LE(short.length-44,40);return {body:short,mime:'audio/wav'};}return {body:wav,mime:'audio/wav'};}};
+const media={tracks,loaded:new Set([312,315]),catalogue:async()=>tracks,audio:async(id)=>{if(id===312){const short=Buffer.from(wav.subarray(0,44+8000*2));short.writeUInt32LE(short.length-8,4);short.writeUInt32LE(short.length-44,40);return {body:short,mime:'audio/wav',duration:1};}return {body:wav,mime:'audio/wav',duration:61};}};
 const result=await launchDesktop(wizard,media);globalThis.testState={...result,paid:()=>paid};
 app.on('window-all-closed',()=>app.quit());})();
 `);
@@ -32,7 +38,10 @@ try{
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
  await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();console.log('Support enabled');
  await page.locator('#radio-audio').evaluate(a=>{a.muted=true;});
- await page.locator('#radio-play').click();await page.waitForFunction(()=>{const a=document.getElementById('radio-audio');return !a.paused&&a.readyState>=3;});await page.getByText('Muted · this song is playing free. Unmute to request its support payment.',{exact:true}).waitFor();assert.equal(await app.evaluate(()=>globalThis.testState.paid()),0);await page.locator('#radio-audio').evaluate(a=>{a.muted=false;});for(let i=0;i<30&&(await app.evaluate(()=>globalThis.testState.paid()))===0;i++)await page.waitForTimeout(100);assert.equal(await page.locator('#radio-songs option').count(),1);assert.equal(await page.locator('#radio-title').textContent(),'Entertainment');console.log(await page.locator('#radio-payment').textContent());assert.equal(await app.evaluate(()=>globalThis.testState.paid()),1);
+ await page.locator('#radio-play').click();
+ try{await page.waitForFunction(()=>{const a=document.getElementById('radio-audio');return !a.paused&&a.readyState>=3;});}
+ catch(error){const diagnostic=await page.evaluate(()=>{const a=document.getElementById('radio-audio');return {payment:document.getElementById('radio-payment')?.textContent,title:document.getElementById('radio-title')?.textContent,options:document.getElementById('radio-songs')?.options.length,paused:a?.paused,readyState:a?.readyState,duration:a?.duration,error:a?.error?.message};});throw Error(`${error.message}\nRadio diagnostic: ${JSON.stringify(diagnostic)}`);}
+ await page.getByText('Muted · this song is playing free. Unmute to request its support payment.',{exact:true}).waitFor();assert.equal(await app.evaluate(()=>globalThis.testState.paid()),0);await page.locator('#radio-audio').evaluate(a=>{a.muted=false;});for(let i=0;i<30&&(await app.evaluate(()=>globalThis.testState.paid()))===0;i++)await page.waitForTimeout(100);assert.equal(await page.locator('#radio-songs option').count(),1);assert.equal(await page.locator('#radio-title').textContent(),'Entertainment');console.log(await page.locator('#radio-payment').textContent());assert.equal(await app.evaluate(()=>globalThis.testState.paid()),1);
  await page.locator('#radio-play').click();await page.locator('#radio-play').click();await page.waitForTimeout(100);assert.equal(await app.evaluate(()=>globalThis.testState.paid()),1);
  const beforeRefresh=await page.locator('#radio-audio').evaluate(a=>a.src);
  await page.locator('#radio-load').click();
