@@ -6,9 +6,11 @@ Support payments, current contract rules and Mac-compatible application
 architecture for **Windows 11 x64** only. It is a preview until the native
 Windows checks below have passed.
 
-The **1.0.2** source update is prepared but does not yet have a Windows
-installer. It temporarily removes the paid-start duration gate and must pass a
-new native Windows build and smoke run before it replaces this 1.0.1 preview.
+The **1.0.2** Windows installer passed native CI run
+https://github.com/stxtrata/xtrata/actions/runs/35749671121 from source
+`2e51fadfab73de18ae8d16116d2cf03a1ad2b22b`. It temporarily removes the
+paid-start duration gate. Earlier 1.0.1 evidence below is retained as history.
+Physical Windows 11 and supervised live verification remain outstanding.
 
 A Windows testing installer is now available from successful CI run
 https://github.com/stxtrata/xtrata/actions/runs/35738413241 (attempt 3 of the
@@ -370,3 +372,18 @@ The lounge has a matching static fallback card and Windows installation steps,
 with unsigned/physical-testing-pending labels. A DOM check verified all three
 platform cards, correct Windows URL/checksum and warning. No app rebuild or
 version change was necessary; this publishes the existing 1.0.1 PC preview.
+
+## Windows 1.0.2 release — 2026-09-22
+
+Installer: `Xtrata-Music-1.0.2-windows11-preview-x64.exe` (121,152,217 bytes).
+SHA-256: `1c3feb155a656478f9bdae52106ae842aa4cee2c7c2961123edd90af560c325a`.
+The downloaded installer matches the CI checksum and source report.
+Run 35749671121 passed automated Windows wallet/storage, playback, contract,
+Electron, NSIS and package-inspection checks. Unsigned testing preview;
+physical-PC, four-hour soak and live payment/return checks are NOT RUN.
+
+Release: https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.2-windows-preview.1
+
+Lounge labels now use each platform download version independently, retaining
+Mac 1.0.1 while Windows advances to 1.0.2. Release-policy unit tests (4), source
+package closure and desktop/mobile lounge browser smoke passed locally.
