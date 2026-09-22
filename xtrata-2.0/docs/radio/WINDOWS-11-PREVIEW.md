@@ -6,9 +6,21 @@ Support payments, current contract rules and Mac-compatible application
 architecture for **Windows 11 x64** only. It is a preview until the native
 Windows checks below have passed.
 
-No installer or checksum is claimed by this document. A Windows artifact is
-publishable only after it has been built on an authorised native Windows
-environment, inspected, hashed and tested on a physical Windows 11 x64 PC.
+A Windows testing installer is now available from successful CI run
+https://github.com/stxtrata/xtrata/actions/runs/35738413241 (attempt 3 of the
+five authorised attempts). Build source: `7f28a6ffc347fe42110ee44e2eb5fe8ce9ed584f`.
+The hosted runner was Windows Server 2025 x64, image `windows-2025-vs2026`.
+Physical Windows 11 testing and supervised live checks remain outstanding.
+This is a test candidate, not a fully verified public release.
+
+Artifact: `Xtrata-Music-1.0.1-windows11-preview-x64.exe` (121,152,270 bytes).
+SHA-256: `4951ae029b83806d3fc2f2f1b8b431ab3cf721ad75b15ac8e4b2b28b0585e1b0`.
+Download the `music-win-x64-preview` artifact on that run (GitHub login may
+be required). It contains the installer, checksum and two evidence reports.
+A second local hash of the downloaded installer matches the CI checksum.
+The CI Authenticode probe returned Unavailable. Independent inspection of the
+downloaded PE certificate directory found offset=0, size=0: this installer
+has no embedded Authenticode signature. Do not describe it as signed.
 
 ## What stays free and what is optional
 
@@ -169,8 +181,8 @@ a pass.
 | Exact 50 microSTX holder payment, fixed fee, ownership changes and no catch-up | PASSED (offline Clarity simulation) | 29 contract/deploy tests include the current-holder transfer after ownership changes, exact 50 microSTX transfer and duplicate prevention. |
 | DPAPI persistence, unreadable protected data, interrupted-write, corruption and stale-lock recovery | PASSED (adapter simulation + real filesystem) | Windows-vault tests use a simulated DPAPI adapter and actual temporary files. The native smoke implements the same DPAPI/journal/stale-lock path but has not run here. |
 | Existing Mac regression package | PASSED (macOS 26.5.2) | Rebuilt unsigned universal DMG/ZIP and inspected the final ASAR (349 entries; no wallet, test, source-map or TypeScript source files). This is a packaging regression check, not a clean-machine install result. |
-| Native Windows DPAPI smoke and Electron smokes | NOT RUN | The native smoke is implemented for Electron safeStorage/DPAPI, journal pre-broadcast persistence, interrupted temporary files and stale locks. It requires Windows 11 x64. |
-| Native x64 unpacked package, NSIS installer, package inspection and SHA-256 | NOT RUN | Requires an authorised native Windows build. No artifact exists yet. |
+| Native Windows DPAPI smoke and Electron smokes | PASSED (Windows Server 2025 CI) | Run 35738413241: actual DPAPI, durable prepared journal, restart identity, corrupt-vault refusal, stale-lock recovery, isolated playback/consent checks and second-instance exit. Physical Windows 11 remains NOT RUN. |
+| Native x64 unpacked package, NSIS installer, package inspection and SHA-256 | PASSED (Windows Server 2025 CI) | Clean source 7f28a6ffc; 349 ASAR entries/73 payload files inspected. Downloaded installer hash independently matches CI. |
 | Physical Windows 11 installation/upgrade/uninstall/reinstall | NOT RUN | Requires a named physical Windows 11 x64 PC. |
 | Spaces/non-ASCII paths, 100/150/200% scaling, devices, sleep/wake and four-hour soak | NOT RUN | Requires physical Windows hardware and manual observation. |
 | Website download and unsigned-security-warning path | NOT RUN | Requires a reviewed published preview asset and clean Windows machine. |
@@ -321,3 +333,25 @@ as modified by Clarinet's platform-specific generated plan. Attempt 3 runs
 the exact same contract tests in a disposable copy of clarinet/live sources,
 using the same locked installed dependencies. No source file is restored or
 ignored by the evidence gate, which still requires a clean checkout.
+
+Attempt 3: https://github.com/stxtrata/xtrata/actions/runs/35738413241
+Source `7f28a6ffc347fe42110ee44e2eb5fe8ce9ed584f`. SUCCESS. 87 shared tests,
+9 contract tests, 20 deployment-console tests, source closure, actual DPAPI,
+both Electron smokes, NSIS packaging, payload inspection, clean-source report,
+checksum and artifact upload passed. Three of five authorised attempts used;
+stop on success. No live transaction or wallet funding was performed.
+
+### Current handoff checkpoint (supersedes earlier attempt notes)
+
+Installer and JSON/checksum reports were downloaded to ignored local folder
+`.artifacts/windows-preview-35738413241/`. Hash matches the published CI
+artifact. No public release/download manifest was changed. The documentation
+commit recording results is later than the installer source; the installer
+remains tied to the exact 7f28a6ffc revision above.
+
+On the tester's Windows 11 PC: download the artifact ZIP from the successful
+run, extract it, compare SHA-256 with the companion file, and launch the EXE.
+Use normal Windows security handling; do not disable protections. Start with
+free listening and confirm support starts OFF after a restart. Record the
+physical hardware, OS version and the manual checks in the gate table. Wallet
+funding and live return/payment tests need separate explicit authorisation.
