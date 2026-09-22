@@ -1,5 +1,6 @@
-// Shared with the local browser script. Keep paid-start eligibility explicit:
-// unknown duration is never eligible, and exactly sixty seconds is eligible.
-export function eligibleSongDuration(seconds) {
- return Number.isFinite(seconds)&&seconds>=60;
+// Compatibility helper for older local/browser clients. The duration gate is
+// temporarily disabled: every playable catalogue entry may request support.
+// Keep this exported while older desktop and extension code is in circulation.
+export function eligibleSongDuration(_seconds) {
+ return true;
 }

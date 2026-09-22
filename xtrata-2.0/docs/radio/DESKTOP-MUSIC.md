@@ -181,7 +181,7 @@ Electron 43 support is temporary; review its upstream maintenance status before
 each future release. Do not extend wallet support to older unmaintained engines.
 
 Version 1.0.1 includes immediate manual catalogue refresh, automatic three-minute
-refresh, the 60-second minimum and the updated Music Lounge address.
+refresh, the temporary removal of the duration gate and the updated Music Lounge address.
 For runtime smoke tests, XTRATA_MUSIC_TEST_ELECTRON may select the Electron
 executable from an unpackaged Electron runtime; the test refuses packaged apps
 and uses a disposable simulated

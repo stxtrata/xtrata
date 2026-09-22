@@ -1,9 +1,7 @@
-import {eligibleSongDuration} from '/radio-policy.js';
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
  const tab=crypto.randomUUID().replaceAll('-','');
  let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0,refreshing=false,metadataAbort=null;
- const shortTracks=new Set();
  function renderSongs(){const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});list.value=String(index<0?0:index);}
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
  function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
@@ -32,19 +30,11 @@ import {eligibleSongDuration} from '/radio-policy.js';
     audio.src=start.src;audio.load();
    });
    if(version!==loading)return;
-   if(!Number.isFinite(audio.duration)||audio.duration<=0)throw Error('Duration unavailable');
-   if(!eligibleSongDuration(audio.duration)){
-    shortTracks.add(track.id);tracks=tracks.filter(t=>t.id!==track.id);start=null;renderSongs();
-    $('radio-payment').textContent=`Skipped ${track.title}: songs must be at least 60 seconds. No payment requested.`;
-    if(tracks.length)void select(index%tracks.length);
-    else {index=-1;$('radio-title').textContent='No songs of at least 60 seconds available.';}
-    return;
-   }
    await audio.play();
   }catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
  }
  function audible(){
-  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src||!eligibleSongDuration(audio.duration))return;
+  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src)return;
   if(audio.muted||audio.volume===0){
    $('radio-payment').textContent=start.observed?'Muted. Any payment already requested remains recorded; later muted starts stay free.':'Muted · this song is playing free. Unmute to request its support payment.';
    return;
@@ -53,7 +43,7 @@ import {eligibleSongDuration} from '/radio-policy.js';
   start.observed=true;const observed={...start},a=approval;
   if(!a){$('radio-payment').textContent='Free start. Enabling Paid now applies to the next song.';return;}
   $('radio-payment').textContent='Paid start requested. Music continues while the wallet checks it.';
-  void api('start',{token:a.token,tab,id:observed.id,song:observed.song,duration:audio.duration}).then(e=>{
+  void api('start',{token:a.token,tab,id:observed.id,song:observed.song}).then(e=>{
    if(start?.id===observed.id)$('radio-payment').textContent=e.reason;
    if(approval===a&&e.outcome==='free')mode('SUPPORT ON · this start plays free while payment checks wait');
    window.dispatchEvent(new Event('wizard-refresh'));
@@ -80,7 +70,7 @@ import {eligibleSongDuration} from '/radio-policy.js';
    $('radio-payment').textContent='Music support stays on for this session. New song starts can pay; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
   }catch(e){$('radio-payment').textContent=e.message;}finally{$('radio-enable').disabled=!!approval;}
  };
- function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=!!approval||continuous;$('radio-paid-minutes').disabled=!!approval||continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The duration and remaining lifetime budget also apply.`;}
+ function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=!!approval||continuous;$('radio-paid-minutes').disabled=!!approval||continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The remaining lifetime budget also applies.`;}
  limits();
  for(const id of ['radio-paid-fee','radio-paid-max','radio-paid-minutes','radio-continuous'])$(id).oninput=()=>{limits();$('radio-approve').checked=false;void free();};
  async function load(automatic=false){
@@ -88,14 +78,14 @@ import {eligibleSongDuration} from '/radio-policy.js';
   try{
    const r=await fetch('/radio/catalogue'+(automatic?'':'?refresh=1'),{signal:AbortSignal.timeout(35000)});const v=await r.json();if(!r.ok||v.error||!Array.isArray(v.tracks))throw Error(v.error||'Catalogue unavailable.');
    const current=tracks.find(t=>t.id===start?.song);
-   tracks=v.tracks.filter(t=>!shortTracks.has(t.id));
+   tracks=v.tracks.slice();
    // Keep the playing item stable even if a catalogue refresh temporarily omits it.
    if(current&&!tracks.some(t=>t.id===current.id))tracks.push(current);
    index=start?tracks.findIndex(t=>t.id===start.song):-1;renderSongs();
    for(const track of tracks)window.radioSongMetadata?.set(track.id,track);
    window.dispatchEvent(new Event('wizard-song-metadata'));
-   $('radio-load').title=`Last updated ${new Date().toLocaleTimeString()}. Automatically checks every 3 minutes. Songs under 60 seconds are skipped.`;
-   if(!start)$('radio-payment').textContent=tracks.length?`${tracks.length} songs ready. Songs under 60 seconds are skipped.`:'No verified songs available.';
+   $('radio-load').title=`Last updated ${new Date().toLocaleTimeString()}. Automatically checks every 3 minutes.`;
+   if(!start)$('radio-payment').textContent=tracks.length?`${tracks.length} songs ready. Playable songs can receive support.`:'No verified songs available.';
   }catch(e){if(!automatic)$('radio-payment').textContent=e.message;}finally{refreshing=false;$('radio-load').disabled=false;}
  }
  $('radio-load').onclick=()=>void load();

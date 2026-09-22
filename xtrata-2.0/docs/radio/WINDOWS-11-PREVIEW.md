@@ -6,6 +6,10 @@ Support payments, current contract rules and Mac-compatible application
 architecture for **Windows 11 x64** only. It is a preview until the native
 Windows checks below have passed.
 
+The **1.0.2** source update is prepared but does not yet have a Windows
+installer. It temporarily removes the paid-start duration gate and must pass a
+new native Windows build and smoke run before it replaces this 1.0.1 preview.
+
 A Windows testing installer is now available from successful CI run
 https://github.com/stxtrata/xtrata/actions/runs/35738413241 (attempt 3 of the
 five authorised attempts). Build source: `7f28a6ffc347fe42110ee44e2eb5fe8ce9ed584f`.
@@ -27,11 +31,11 @@ has no embedded Authenticode signature. Do not describe it as signed.
 Free listening never needs a wallet, funding or consent. The player shows
 artwork and song, artist and album metadata where it is available. It refreshes
 the catalogue every three minutes without interrupting the current track.
-Tracks shorter than 60 seconds, and tracks whose duration cannot be established,
-remain free and do not create a paid start. Exactly 60 seconds is eligible.
-The payment service derives that decision from the verified WAV or MPEG audio
-bytes it serves; a renderer or browser companion's duration field is only a
-playback hint and cannot make an unknown or short recording payable.
+In the forthcoming 1.0.2 preview, the temporary 60-second duration gate is
+disabled. Every track that can be loaded from the verified catalogue can create
+a paid start, including a short track or one whose duration cannot be
+established. The payment service still verifies that the selected audio is
+available; unavailable media remains free.
 
 Music Support starts **off** every time the application starts. The listener
 must approve it for that session. An eligible new start can pay exactly 50
@@ -173,7 +177,7 @@ a pass.
 | Gate | Status | Evidence or prerequisite |
 | --- | --- | --- |
 | Shared playback, support, journal and return tests | PASSED (macOS 26.5.2) | 87 targeted tests, mocked/offline transport and real temporary filesystem; empty and failed catalogue cases remain playable/retryable without a tight loop. |
-| 59/60/61 seconds and unknown-duration eligibility | PASSED (macOS 26.5.2) | Renderer and payment-service tests use verified WAV/MPEG bytes; 59/unknown stay free, while 60/61 can request one payment. |
+| Short, known and unknown-duration starts | RE-RUN REQUIRED for 1.0.2 | Source tests on macOS prove duration is ignored while the temporary gate is disabled; a new native Windows installer and smoke run are required before publishing. |
 | Consent/race, duplicate event, mute/unmute and refresh behaviour | PASSED (macOS 26.5.2) | Targeted unit suite plus isolated Electron smoke; no real wallet or payment. |
 | Pending/confirmed/failed history, unknown broadcasts and reviewed returns | PASSED (macOS 26.5.2) | Durable journal tests cover prepared/submitted/confirmed/terminal-failed states, no replacement of uncertain starts, and return review/double-submission validation. |
 | Local request authentication, protocol validation and second instance | PASSED (macOS 26.5.2) | Isolated Electron smokes reject unauthenticated local/extension routes; actual entrypoint smoke verifies inert protocol parsing and that a second instance exits. |

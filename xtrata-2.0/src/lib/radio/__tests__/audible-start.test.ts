@@ -8,8 +8,8 @@ it('notifies the selected song before play resolves; pause/resume and seeking do
 it('does not notify inaudible/failed loads and notifies once after unmuting',()=>{
  const player=Object.assign(new EventTarget(),{readyState:0,paused:false,ended:false,muted:false,volume:1,duration:61});const notify=vi.fn(),observer=attachAudibleStart(player,notify);observer.select(315);player.dispatchEvent(new Event('volumechange'));player.readyState=4;player.muted=true;player.dispatchEvent(new Event('playing'));expect(notify).not.toHaveBeenCalled();player.muted=false;player.dispatchEvent(new Event('volumechange'));expect(notify).toHaveBeenCalledTimes(1);observer.dispose();
 });
-it('does not notify tracks shorter than 60 seconds or with unknown duration',()=>{
+it('notifies playable tracks when duration is short or unknown',()=>{
  const player=Object.assign(new EventTarget(),{readyState:4,paused:false,ended:false,muted:false,volume:1,duration:59});const notify=vi.fn(),observer=attachAudibleStart(player,notify);
- observer.select(315);player.dispatchEvent(new Event('playing'));player.duration=Number.NaN;player.dispatchEvent(new Event('volumechange'));expect(notify).not.toHaveBeenCalled();
- player.duration=60;player.dispatchEvent(new Event('playing'));expect(notify).toHaveBeenCalledTimes(1);observer.dispose();
+ observer.select(315);player.dispatchEvent(new Event('playing'));expect(notify).toHaveBeenCalledTimes(1);
+ observer.select(316);player.duration=Number.NaN;player.dispatchEvent(new Event('volumechange'));expect(notify).toHaveBeenCalledTimes(2);observer.dispose();
 });

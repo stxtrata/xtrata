@@ -1,6 +1,5 @@
 import {randomBytes} from 'node:crypto';
 import {policy} from './radio-plays-backend.mjs';
-import {eligibleSongDuration} from './radio-listening-policy.mjs';
 // One tab, bounded approval, no persistent auto-enable and no backlog.
 export class RadioListening {
  constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
@@ -42,18 +41,17 @@ export class RadioListening {
  }
  free(input){this.check(input);this.disable();return this.snapshot();}
  async start(p){
-  if(!p||Object.keys(p).sort().join(',')!=='duration,id,song,tab,token'||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0||typeof p.duration!=='number')throw Error('Invalid playback start.');
+  const keys=Object.keys(p||{}).sort().join(',');
+  if(!p||!['duration,id,song,tab,token','id,song,tab,token'].includes(keys)||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
   const a=this.check(p);if(this.seen.has(p.id))return this.seen.get(p.id);
   const track=this.media.tracks?.find(t=>t.id===p.song);
   const row={title:track?.title,artist:track?.artist,id:p.id,song:p.song,at:new Date().toISOString(),outcome:'free',reason:''};
   this.seen.set(p.id,row);this.events.push(row);
-  // `duration` is retained in the request shape for older local clients, but
-  // is never trusted for money. Parse the verified bytes that this privileged
-  // service served, so an authenticated renderer or extension cannot claim a
-  // short/unknown track is eligible.
-  let verified;
-  try{verified=await this.media.audio(p.song);}catch{row.reason='Audio could not be verified locally. This start stays free.';return row;}
-  if(!eligibleSongDuration(verified?.duration)){row.reason='Verified audio duration was unavailable or under 60 seconds. This start stays free.';return row;}
+  // A current local client does not send a duration. Older clients may still
+  // include it, but it is deliberately ignored while the duration gate is
+  // disabled. Verify that this service can still load the selected audio so a
+  // malformed or unavailable inscription cannot create a payment.
+  try{await this.media.audio(p.song);}catch{row.reason='Audio could not be verified locally. This start stays free.';return row;}
   if(!a.continuous&&a.used>=a.max){row.reason='Approved start limit reached.';this.disable();return row;}
   if(this.inFlight||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
   this.inFlight=true;

@@ -56,16 +56,12 @@ describe('bounded radio sessions',()=>{
   const a=await s.enable(settings);await s.start(paidStart(a.token));await new Promise(r=>setTimeout(r,0));
   expect(s.snapshot().enabled).toBe(false);expect(s.events[0].outcome).toBe('unknown');expect(w.run).toHaveBeenCalledTimes(1);
  });
- it('rechecks duration server-side and pays exactly at the 60-second boundary',async()=>{
-  const {s,w,finish,setDuration}=fixture(),a=await s.enable({...settings,max:2});
-  // The caller claims an eligible duration, but the verified bytes say 59.
-  setDuration(59);expect((await s.start(paidStart(a.token,{id:'c'.repeat(32),duration:61}))).outcome).toBe('free');
-  // Unknown verified duration stays free even if a client claims 61.
-  setDuration(null);expect((await s.start(paidStart(a.token,{id:'d'.repeat(32),duration:61}))).outcome).toBe('free');
-  expect(w.run).not.toHaveBeenCalled();
-  setDuration(60);expect((await s.start(paidStart(a.token,{id:'e'.repeat(32),duration:Number.NaN}))).outcome).toBe('requested');finish();await new Promise(r=>setTimeout(r,0));
-  setDuration(61);expect((await s.start(paidStart(a.token,{id:'f'.repeat(32),duration:0}))).outcome).toBe('requested');
-  expect(w.run).toHaveBeenCalledTimes(2);s.disable();
+ it('pays playable starts even when a duration is short, unavailable or omitted',async()=>{
+  const {s,w,finish,setDuration}=fixture(),a=await s.enable({...settings,max:3});
+  setDuration(59);expect((await s.start(paidStart(a.token,{id:'c'.repeat(32),duration:59}))).outcome).toBe('requested');finish();await new Promise(r=>setTimeout(r,0));
+  setDuration(null);expect((await s.start(paidStart(a.token,{id:'d'.repeat(32),duration:Number.NaN}))).outcome).toBe('requested');finish();await new Promise(r=>setTimeout(r,0));
+  setDuration(61);const {duration,...withoutDuration}=paidStart(a.token,{id:'e'.repeat(32)});expect((await s.start(withoutDuration)).outcome).toBe('requested');
+  expect(w.run).toHaveBeenCalledTimes(3);s.disable();
  });
 });
 const headers={'content-type':'text/html','x-xtrata-runtime-contract':'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3','x-xtrata-runtime-network':'mainnet'};
