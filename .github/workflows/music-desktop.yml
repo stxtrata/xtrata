@@ -69,7 +69,7 @@ jobs:
       - if: matrix.platform == 'win'
         name: Verify paid-start contract ownership and amount rules
         working-directory: xtrata-2.0
-        run: npm run test:radio-plays
+        run: npm run test:radio-plays -- --isolated
       - if: matrix.platform == 'win'
         name: Verify the source companion package closure
         working-directory: xtrata-2.0

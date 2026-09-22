@@ -101,7 +101,7 @@ npx --no-install vitest run `
 # Prove the standalone Mac/Linux source companion has every runtime module and
 # asset it reads, and prove the actual Clarity payment rules offline.
 npm run test:music-support-package
-npm run test:radio-plays
+npm run test:radio-plays -- --isolated
 
 # Native Windows-only storage and actual Electron smoke checks. Both use
 # disposable profiles and mocked/offline transport; they cannot broadcast.
@@ -313,3 +313,11 @@ a dirty checkout; upload was therefore not reached. No installer is delivered.
 Attempt 2 adds pathname-only diagnostics to that refusal to identify what the
 runner changed; the clean-source requirement remains unchanged. Four attempts
 remain after attempt 1. Physical/live checks remain NOT RUN.
+
+Attempt 2: https://github.com/stxtrata/xtrata/actions/runs/35737749316
+Source `56bee3218`. All native tests and packaging/inspection passed again.
+Diagnostics identified only `contracts/clarinet/deployments/default.simnet-plan.yaml`
+as modified by Clarinet's platform-specific generated plan. Attempt 3 runs
+the exact same contract tests in a disposable copy of clarinet/live sources,
+using the same locked installed dependencies. No source file is restored or
+ignored by the evidence gate, which still requires a clean checkout.
