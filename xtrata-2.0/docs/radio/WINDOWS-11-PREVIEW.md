@@ -451,3 +451,20 @@ Release: https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.3-windows-pr
 Source now presents automatic-payment consent as a highlighted first step, with an inline alert and checkbox focus when enable is clicked without agreement. No enable request is sent in that case. Wallet readiness is a non-interactive status; free/support/connection-waiting states have blue/green/amber labels and player borders. Text remains the source of meaning alongside colour. Existing confirmation and payment rules remain intact.
 
 Verification: prepared current desktop source and passed the isolated Electron smoke test, including missing-consent/no-request, wallet status visibility, enabled-state styling, mute/unmute, duplicate prevention and simulated looping payments. Initial checks loaded stale prepared desktop assets; the final passing run used refreshed assets. No real wallet or payments used. These source changes require a new packaged release to reach installed apps; published v1.0.3 is unchanged.
+
+### Windows 1.0.4 build and verification
+
+Source: `076eebe4dc192cd932c8a54f094242764751475a`. Native Windows CI run
+35759763508 passed payment/persistence, contract, source-package, DPAPI,
+desktop consent/playback, startup and package inspection gates. Reproduce by
+running `music-desktop.yml` at that revision with `target=windows`; it installs
+locked dependencies and packages NSIS on Windows. No real payments were made.
+
+Installer: `Xtrata-Music-1.0.4-windows11-preview-x64.exe`, 121,152,949 bytes.
+SHA-256: `5ebd0f73f61c73cc5ba8818713f1e627df15bc00a9ffece6de94980e033ab9dd`.
+Package inspection: 349 archive entries, 73 payload entries, required files
+present, no wallet secrets or development/test files. Reports and installer
+are retained locally under `.artifacts/windows-104/` and attached to release
+`music-v1.0.4-windows-preview.1`. No signing claimed (build report reports
+Authenticode status unavailable). Physical-PC and live-payment checks remain
+NOT RUN. Mac downloads remain at their existing published versions.

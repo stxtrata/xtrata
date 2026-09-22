@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.4",
   "summary": "Xtrata Music desktop previews are available for testing. Each download shows its own version; preview builds are unsigned.",
   "downloads": [
     {
@@ -24,10 +24,10 @@
     },
     {
       "platform": "win-x64",
-      "version": "1.0.3",
-      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.3-windows-preview.1/Xtrata-Music-1.0.3-windows11-preview-x64.exe",
-      "sha256": "25c53b991c35b3d49514ce61941e467a5a2e44b4edcb75943337e640a79f1207",
-      "requirements": "Windows 11 x64 (Intel/AMD). Includes the song-picker fix; no separate patch needed. Unsigned testing preview. Native Windows CI checks passed; physical Windows 11 and live payment testing pending. No Node.js or extension required.",
+      "version": "1.0.4",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.4-windows-preview.1/Xtrata-Music-1.0.4-windows11-preview-x64.exe",
+      "sha256": "5ebd0f73f61c73cc5ba8818713f1e627df15bc00a9ffece6de94980e033ab9dd",
+      "requirements": "Windows 11 x64 (Intel/AMD). Clear automatic-payment agreement, wallet status and free/support mode colours. Includes the song-picker fix. Unsigned testing preview. Native Windows CI checks passed; physical Windows 11 and live payment testing pending. No Node.js or extension required.",
       "signed": false,
       "verified": true,
       "preview": true
