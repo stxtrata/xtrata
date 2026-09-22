@@ -387,3 +387,14 @@ Release: https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.2-windows-pr
 Lounge labels now use each platform download version independently, retaining
 Mac 1.0.1 while Windows advances to 1.0.2. Release-policy unit tests (4), source
 package closure and desktop/mobile lounge browser smoke passed locally.
+
+### Song-picker report after 1.0.2 publication
+
+User reports the Windows native dropdown does not open on mouse click. Added
+an isolated Electron regression check that selects both songs, verifies track
+and artist/album changes, starts free audio and checks zero support charges.
+This check and the existing playback/payment smoke passed on macOS. It verifies
+the change handler, not Windows native popup rendering; the reported Windows
+mouse-opening issue remains unverified/unresolved. No runtime workaround has
+been shipped. Try keyboard navigation (Alt+Down, arrows, Enter) on the affected
+PC; a website-only change cannot replace the installed app.asar UI.
