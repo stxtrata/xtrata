@@ -1,0 +1,4 @@
+# Preserve executable-module hashbangs for the pinned Vite/Vitest parser.
+*.mjs text eol=lf
+# Contract verification hashes exact source bytes, including line endings.
+*.clar text eol=lf

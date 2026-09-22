@@ -247,3 +247,19 @@ application tests or packaging ran; no installer was created. The workflow
 now checks out only `xtrata-2.0` and `.github` (plus Git cone-mode root files).
 Retry is justified once that checkout correction is pushed. This preserves
 all unrelated repository files and leaves the application build inputs intact.
+
+### Second native CI attempt
+
+Run https://github.com/stxtrata/xtrata/actions/runs/35732645259 used
+`ba169f157ea03a3dbf8c02ce1715f40cf0b65b97`. Checkout and dependency installation
+passed. 36 tests passed; five suites could not import the shared backend due
+to a parser SyntaxError. Converting only `scripts/wizard/inscribe.mjs` to CRLF
+locally reproduced the exact same error at the same backend import location;
+restoring LF removed it. The pinned Vite/Vitest transform and this module's
+hashbang require LF source here. Project attributes now enforce LF for `.mjs`
+and `.clar`; the latter also preserves exact deployed-contract source hashes.
+No tests were bypassed and no dependencies upgraded. The full 87-test shared
+suite passes locally after the fix. Git attributes resolve to LF for both the
+affected module and paid-play contract. Native rerun remains required after
+the user pushes the correction; packaging/installer/physical/live gates remain
+NOT RUN.
