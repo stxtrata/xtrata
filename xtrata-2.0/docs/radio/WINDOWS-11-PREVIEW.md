@@ -237,3 +237,13 @@ build is dispatched. No Windows installer has been produced in this follow-up.
 Follow-up validation: 30 backend, Windows-adapter, recovery and return tests
 passed on macOS with offline transport. Workflow YAML parsed successfully with
 Windows as the default. Native Windows DPAPI/build/installation remain NOT RUN.
+
+### First native CI attempt
+
+Run https://github.com/stxtrata/xtrata/actions/runs/35731089585 used
+`d2ecf08b5905b57715c1bc1caa2d11627031700f`. It failed during checkout because
+three unrelated Narrate-AI audio paths exceed Windows filename limits. No
+application tests or packaging ran; no installer was created. The workflow
+now checks out only `xtrata-2.0` and `.github` (plus Git cone-mode root files).
+Retry is justified once that checkout correction is pushed. This preserves
+all unrelated repository files and leaves the application build inputs intact.

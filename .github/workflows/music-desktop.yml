@@ -23,6 +23,12 @@ jobs:
         working-directory: xtrata-2.0/desktop/music
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Other repository projects contain media paths beyond Windows limits.
+          # This build needs only the application and its workflow definitions.
+          sparse-checkout: |
+            xtrata-2.0
+            .github
       - uses: actions/setup-node@v4
         with:
           node-version: 24
