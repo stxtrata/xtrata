@@ -2,7 +2,8 @@ import {describe,it,expect} from 'vitest';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {RadioWizard,policy} from '../radio-plays-backend.mjs';
+import {RadioWizard} from './offline-radio-wallet';
+import {policy} from '../radio-plays-backend.mjs';
 import {cvToHex,Cl,deserializeTransaction} from '@stacks/transactions';
 describe('backend radio wizard',()=>{
  it('validates bounded policies',()=>{expect(policy({core:3,song:2910,fee:300,count:1}).count).toBe(1);for(const value of [{core:4,song:1,fee:300,count:1},{core:3,song:1,fee:1001,count:1},{core:3,song:1,fee:1000,count:5},{core:3,song:-1,fee:300,count:1}])expect(()=>policy(value)).toThrow();});

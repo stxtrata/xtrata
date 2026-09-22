@@ -197,3 +197,43 @@ recovery system. Support payments are optional local actions; the public Lounge
 can read confirmed contract activity without a wallet connection. Closing the
 app ends the session's approval for new support payments. Previously submitted
 transactions may still settle and are shown as pending until they are reconciled.
+
+## Installer handoff — 2026-09-22
+
+Review follow-up to `b29cc1f28`:
+- The committed-file flush now opens a writable handle on Windows, as required
+  by FlushFileBuffers. Mac retains its existing handle mode.
+- Shared backend/recovery/return tests use a test-only Windows vault adapter
+  with real wallet/filesystem code and default-denied network transport.
+  The native Electron smoke still requires actual DPAPI; the adapter is not
+  packaged or used by the application.
+- The manual Music desktop preview workflow defaults to `target=windows`.
+  `target=all` retains the existing other desktop build choices.
+
+After the user pushes this follow-up commit to `main-music-updates`, run:
+
+```sh
+gh workflow run music-desktop.yml --repo stxtrata/xtrata --ref main-music-updates -f target=windows
+```
+
+Watch that run and download its `music-win-x64-preview` artifact only when all
+Windows gates pass. The bundle must contain the NSIS `.exe`, `.sha256`, exact
+source/signing report and package-inspection JSON. A hosted Windows runner is
+CI evidence, not a physical Windows 11 test. No release is published by this
+workflow. No funds are needed for the automated checks.
+
+On the separate Windows 11 x64 PC, compare the checksum, install as the normal
+user and test free audio first. Record hardware/OS, artwork, metadata, loops,
+scaling, audio devices, network recovery, restart and the four-hour soak.
+Verify the same wallet address/history after upgrade and uninstall/reinstall.
+Only then perform separately authorised funding, paid-start and return tests.
+The installed application bundles its runtime; the tester does not need Node
+or developer tools. Keep Windows security protections enabled.
+
+Current blocker: GitHub authentication is available and the remote branch is
+at `b29cc1f28`, but the corrected source must be pushed by the user before a
+build is dispatched. No Windows installer has been produced in this follow-up.
+
+Follow-up validation: 30 backend, Windows-adapter, recovery and return tests
+passed on macOS with offline transport. Workflow YAML parsed successfully with
+Windows as the default. Native Windows DPAPI/build/installation remain NOT RUN.

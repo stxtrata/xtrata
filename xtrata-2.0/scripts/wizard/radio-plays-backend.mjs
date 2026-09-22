@@ -36,7 +36,8 @@ export class RadioWizard {
    // Flush the committed record too. POSIX additionally flushes the directory
    // entry; Windows does not expose a directory fsync through Node, so it uses
    // NTFS's atomic rename together with a second file flush.
-   const committed=await open(path,'r');try{await committed.sync();}finally{await committed.close();}
+   // Windows FlushFileBuffers requires a handle with write access.
+   const committed=await open(path,this.platform==='win32'?'r+':'r');try{await committed.sync();}finally{await committed.close();}
    if(this.platform!=='win32'){
     const directory=await open(this.dir,'r');try{await directory.sync();}finally{await directory.close();}
    }

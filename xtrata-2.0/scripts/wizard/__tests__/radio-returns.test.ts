@@ -3,7 +3,7 @@ import {mkdir,mkdtemp,readFile,rm,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {deserializeTransaction} from '@stacks/transactions';
-import {RadioWizard} from '../radio-plays-backend.mjs';
+import {RadioWizard} from './offline-radio-wallet';
 const recipient='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 async function fixture(work){
  const dir=await mkdtemp(join(tmpdir(),'radio-return-test-'));

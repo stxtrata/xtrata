@@ -1,24 +1,20 @@
 name: Music desktop preview
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Build Windows preview only, or all existing desktop targets
+        type: choice
+        default: windows
+        options:
+          - windows
+          - all
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            platform: mac
-            arch: arm64
-          - os: macos-latest
-            platform: mac
-            arch: x64
-          - os: windows-latest
-            platform: win
-            arch: x64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
+        include: ${{ fromJSON(inputs.target == 'all' && '[{"os":"macos-latest","platform":"mac","arch":"arm64"},{"os":"macos-latest","platform":"mac","arch":"x64"},{"os":"windows-latest","platform":"win","arch":"x64"},{"os":"ubuntu-latest","platform":"linux","arch":"x64"}]' || '[{"os":"windows-latest","platform":"win","arch":"x64"}]') }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read

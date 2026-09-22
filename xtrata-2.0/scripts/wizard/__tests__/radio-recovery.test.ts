@@ -2,7 +2,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {mkdir,mkdtemp,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
-import {RadioWizard} from '../radio-plays-backend.mjs';
+import {RadioWizard} from './offline-radio-wallet';
 import {Cl,cvToHex,deserializeTransaction} from '@stacks/transactions';
 const owner='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 async function fixture(work){

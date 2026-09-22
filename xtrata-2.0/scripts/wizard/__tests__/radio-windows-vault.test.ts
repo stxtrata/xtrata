@@ -48,7 +48,7 @@ describe('Windows protected local wallet (mocked DPAPI adapter, real filesystem)
  it('does not migrate or replace a legacy wallet on Windows',async()=>{
   const dir=await mkdtemp(join(tmpdir(),'radio-legacy-wallet-'));
   try{
-   const mac=new RadioWizard(dir,offline);await mac.setup();const before=await readFile(join(dir,'vault.json'),'utf8');
+   const before=JSON.stringify({version:1,address:'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',encrypted:'legacy-fixture'});await writeFile(join(dir,'vault.json'),before);
    const windows=new RadioWizard(dir,offline,{platform:'win32',vaultProtector:protector()});
    await expect(windows.setup()).rejects.toThrow('legacy wallet');
    expect(await readFile(join(dir,'vault.json'),'utf8')).toBe(before);
