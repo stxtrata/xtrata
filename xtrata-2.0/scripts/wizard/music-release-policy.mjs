@@ -11,10 +11,22 @@ export function releasePlatformsForRuntime(platform, architecture) {
  return [];
 }
 
+export function releaseDownloadVersion(release, download) {
+ const version=Object.hasOwn(download||{},'version')?download?.version:release?.version;
+ return typeof version==='string'&&/^\d+\.\d+\.\d+$/.test(version)?version:null;
+}
+
+function compareVersions(a, b) {
+ const left=a.split('.').map(Number);
+ const right=b.split('.').map(Number);
+ return left[0]-right[0]||left[1]-right[1]||left[2]-right[2];
+}
+
 export function verifiedReleaseForPlatforms(release, platforms) {
- if (!release || !/^\d+\.\d+\.\d+$/.test(release.version) || !Array.isArray(release.downloads)) return null;
+ if (!release || !Array.isArray(release.downloads)) return null;
  const allowed=Array.isArray(platforms)?new Set(platforms):null;
  const safe=download=>download&&download.verified===true&&
    (download.signed===true||(release.channel==='preview'&&download.preview===true&&download.signed===false));
- return release.downloads.some(download=>safe(download)&&(!allowed||allowed.has(download.platform)))?release.version:null;
+ const versions=release.downloads.filter(download=>safe(download)&&(!allowed||allowed.has(download.platform))).map(download=>releaseDownloadVersion(release,download)).filter(Boolean);
+ return versions.sort(compareVersions).at(-1)||null;
 }
