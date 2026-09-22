@@ -398,3 +398,22 @@ the change handler, not Windows native popup rendering; the reported Windows
 mouse-opening issue remains unverified/unresolved. No runtime workaround has
 been shipped. Try keyboard navigation (Alt+Down, arrows, Enter) on the affected
 PC; a website-only change cannot replace the installed app.asar UI.
+
+### Song-picker patch 1
+
+The lounge now displays a native eight-row list instead of a popup select.
+Actual mouse option selection, free playback and the existing payment smoke
+passed in isolated Electron on macOS. Physical Windows popup/list verification
+remains for the reporter. No wallet/payment code changed.
+
+A 524 KiB ZIP contains a replacement app.asar, checksum, payload-diff report
+and manual installation/rollback instructions. It is derived from the released
+Windows 1.0.2 installer, not a newly assembled runtime. Every archive file was
+compared; only app/scripts/wizard/music-lounge.html differs. The builder rejects
+any input except the exact verified Windows 1.0.2 archive hash.
+
+Reproduce after extracting resources/app.asar from the release installer:
+`node scripts/music-support/build-song-picker-patch.mjs <original-app.asar> <output-directory>`
+Copy `docs/radio/WINDOWS-102-SONG-PICKER-PATCH.txt` as README.txt into that directory,
+then ZIP the four files. The app remains version 1.0.2 with patch identifier
+song-picker-1. Existing installers are unchanged; future builds include the fix.

@@ -1,0 +1,40 @@
+Xtrata Music 1.0.2 — Windows song-picker patch 1
+
+This replaces the popup dropdown with a visible, scrollable song list.
+Click a song in the list to play it. Arrow keys still work.
+Only the lounge HTML changed. Wallet/payment code and wallet data are unchanged.
+No installer, Node.js, extension or security-setting change is needed.
+Tested with mouse selection in Electron on macOS; please test on your Windows PC.
+This patch is ONLY for the Windows 1.0.2 preview downloaded from Xtrata.
+
+INSTALL (about one minute)
+1. Extract this ZIP into its own folder. Do not copy files from inside the ZIP.
+2. Completely close Xtrata Music. Check Task Manager if unsure.
+3. Locate the installed application:
+   In Start, search for Xtrata Music, right-click it and choose Open file location.
+   If this shows a shortcut, right-click the shortcut, then Open file location again.
+   You should now see Xtrata Music.exe. Open the resources folder beside it.
+4. Rename the existing app.asar to app.asar.before-song-picker-patch.
+   If that backup already exists, STOP: do not overwrite it.
+5. Copy the app.asar from this extracted patch folder into resources.
+6. Open Xtrata Music normally. The song list should now show eight rows with
+   a scrollbar. Click a song to play it. Music Support starts off as usual.
+
+Your wallet is in a separate application-data folder. Do not move or delete it.
+Do not copy this patch into AppData wallet folders or use it on a Mac.
+If you cannot find resources/app.asar, stop and ask for help.
+
+UNDO
+Close the app, move the patched app.asar out of resources, and rename
+app.asar.before-song-picker-patch back to app.asar. Reopen the app.
+A later full installer may replace this patch.
+
+OPTIONAL CHECK (PowerShell in the extracted patch folder)
+Get-FileHash .\app.asar -Algorithm SHA256
+Expected:
+628197a686d48093951b79ac18ad7ad664d5cf5acb0e90abd77250f3c859b23c
+
+The original Windows 1.0.2 app.asar SHA-256 was:
+3dd13c6ffdc532383a74cc4656e8f58fa2144269011b45d801cbbcafe754a849
+
+Version remains 1.0.2; patch identity is song-picker-1 in patch-report.json.

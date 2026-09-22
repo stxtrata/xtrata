@@ -37,7 +37,8 @@ try{
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
  // Exercise the actual dropdown change handler before enabling any support.
  await page.waitForFunction(()=>document.querySelectorAll('#radio-songs option').length===2);
- await page.locator('#radio-songs').selectOption('1');
+ assert.equal(await page.locator('#radio-songs').getAttribute('size'),'8');
+ await page.getByRole('option',{name:'#315 · Entertainment — melophonic',exact:true}).click();
  await page.waitForFunction(()=>document.getElementById('radio-title').textContent==='Entertainment'&&!document.getElementById('radio-audio').paused);
  assert.match(await page.locator('#radio-info').textContent(),/melophonic.*Desktop test/);
  assert.equal(await app.evaluate(()=>globalThis.testState.paid()),0);
