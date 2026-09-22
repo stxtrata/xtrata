@@ -290,3 +290,16 @@ manual recipe now invoke that installer after npm ci, before native tests.
 The command succeeds locally with the existing pinned runtime. No runtime
 version changed. DPAPI, Electron smokes, NSIS and physical checks remain NOT
 RUN until the corrected workflow is pushed and rerun.
+
+### Fifth native CI attempt
+
+Run https://github.com/stxtrata/xtrata/actions/runs/35736782257 used
+`18b73b95f906d2881437491b7ed1ab033544c32a`. Runtime installation succeeded,
+but the native storage harness timed out. Its main module awaited app.ready
+at top level, blocking completion of Electron module startup. It now schedules
+the asynchronous test without top-level await, matching the real application's
+startup structure. Bounded stage diagnostics contain no keys or wallet data.
+Local Electron execution reached readiness and rejected macOS before wallet
+creation, confirming the corrected startup path. Syntax checks passed. Native
+DPAPI remains unverified and must pass after the corrected harness is pushed.
+No installer has been produced; the test gate has not been bypassed.
