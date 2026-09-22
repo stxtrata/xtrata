@@ -445,3 +445,9 @@ Unsigned preview; physical Windows 11 and supervised live checks remain NOT RUN.
 The full 1.0.3 installer includes the picker patch; the separate patch is only
 for people retaining 1.0.2. Mac downloads remain at their published versions.
 Release: https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.3-windows-preview.1
+
+### Support consent UI follow-up (2026-09-22)
+
+Source now presents automatic-payment consent as a highlighted first step, with an inline alert and checkbox focus when enable is clicked without agreement. No enable request is sent in that case. Wallet readiness is a non-interactive status; free/support/connection-waiting states have blue/green/amber labels and player borders. Text remains the source of meaning alongside colour. Existing confirmation and payment rules remain intact.
+
+Verification: prepared current desktop source and passed the isolated Electron smoke test, including missing-consent/no-request, wallet status visibility, enabled-state styling, mute/unmute, duplicate prevention and simulated looping payments. Initial checks loaded stale prepared desktop assets; the final passing run used refreshed assets. No real wallet or payments used. These source changes require a new packaged release to reach installed apps; published v1.0.3 is unchanged.

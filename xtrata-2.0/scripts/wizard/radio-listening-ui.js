@@ -4,7 +4,7 @@
  let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0,refreshing=false,metadataAbort=null;
  function renderSongs(){const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});list.value=String(index<0?0:index);}
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
- function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
+ function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';document.body.dataset.paymentMode=$('radio-mode').dataset.mode;$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
  let recentEvents=[];
  window.addEventListener('wizard-song-metadata',()=>renderEvents(recentEvents));
  function renderEvents(events){
@@ -57,10 +57,11 @@
  $('radio-play').onclick=()=>{if(!start)void select(Number($('radio-songs').value)||0);else if(audio.paused)void audio.play().catch(()=>{$('radio-payment').textContent='Could not resume audio.';});else audio.pause();};
  $('radio-next').onclick=()=>void select(index+1);$('radio-prev').onclick=()=>void select(index<0?0:index-1);
  $('radio-songs').onchange=()=>void select(Number($('radio-songs').value));
+ $('radio-approve').addEventListener('change',()=>{if($('support-consent-prompt')){$('support-consent-prompt').hidden=true;$('support-agreement').classList.remove('needs-agreement');$('radio-approve').removeAttribute('aria-invalid');}});
  $('radio-free').onclick=()=>void free();
  $('radio-enable').onclick=async()=>{
   if(approval)return;
-  if(!$('radio-approve').checked){$('radio-payment').textContent='Approve music support for this session first.';return;}
+  if(!$('radio-approve').checked){const message='Please tick the agreement above before turning on automatic payments. Listening stays free.';$('radio-payment').textContent=message;const prompt=$('support-consent-prompt');if(prompt){prompt.textContent=message;prompt.hidden=false;$('support-agreement').classList.add('needs-agreement');$('radio-approve').setAttribute('aria-invalid','true');$('radio-approve').scrollIntoView({block:'center',behavior:'smooth'});}$('radio-approve').focus();return;}
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
    const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);

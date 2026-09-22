@@ -35,6 +35,9 @@ try{
  const origin=await app.evaluate(()=>globalThis.testState.origin);assert.equal((await fetch(origin+'/lounge')).status,400);
  assert.equal(await page.locator('[data-xtrata-chain-plays]').count(),1);assert.equal((await page.evaluate(()=>fetch('/radio-chain-activity.js').then(r=>r.status))),200);
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
+ assert.equal(await page.locator('#setup').isVisible(),false);assert.equal(await page.locator('#wallet-ready').isVisible(),true);
+ let enableRequests=0;page.on('request',r=>{if(r.url().endsWith('/listening/enable'))enableRequests++;});
+ await page.locator('#radio-enable').click();assert.equal(await page.locator('#support-consent-prompt').isVisible(),true);assert.equal(await page.locator('#radio-approve').isChecked(),false);assert.equal(enableRequests,0);assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'free');
  // Exercise the actual dropdown change handler before enabling any support.
  await page.waitForFunction(()=>document.querySelectorAll('#radio-songs option').length===2);
  assert.equal(await page.locator('#radio-songs').getAttribute('size'),'8');
@@ -47,7 +50,7 @@ try{
  await page.waitForFunction(()=>document.getElementById('radio-title').textContent==='Short sample'&&!document.getElementById('radio-audio').paused);
  await page.locator('#radio-audio').evaluate(a=>a.pause());
  console.log('Song dropdown changes track and starts free playback');
- await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();console.log('Support enabled');
+ await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'support');assert.equal(await page.locator('#support-consent-prompt').isVisible(),false);console.log('Support enabled');
  await page.locator('#radio-audio').evaluate(a=>{a.muted=true;});
  await page.locator('#radio-play').click();
  try{await page.waitForFunction(()=>{const a=document.getElementById('radio-audio');return !a.paused&&a.readyState>=3;});}

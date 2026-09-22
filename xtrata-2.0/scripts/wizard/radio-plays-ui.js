@@ -35,7 +35,7 @@ function activity(){
  }
 }
 function render(){
- if(document.body.hasAttribute('data-music-lounge')){$('setup').textContent=state?.address?'Your support wallet is ready':'Create my support wallet';}
+ if(document.body.hasAttribute('data-music-lounge')){$('setup').hidden=!!state?.address;if($('wallet-ready'))$('wallet-ready').hidden=!state?.address;}
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
  $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
  balanceWarning();
