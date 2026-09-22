@@ -432,3 +432,16 @@ metadata stays on the verified 1.0.2 installer until a native 1.0.3 CI build
 passes and its published checksum is verified. Next step: push the release
 commit, dispatch music-desktop.yml with target=windows, then publish its exact
 installer and update the lounge. No physical-PC or live-payment pass is implied.
+
+### Windows 1.0.3 published build
+
+Native CI run 35755467455 passed all gates from
+`d31bde18707a3d1b5c769bea6d26b884f04d000f`, including actual mouse selection
+in the visible list. Installer size: 121,152,334 bytes. SHA-256:
+`25c53b991c35b3d49514ce61941e467a5a2e44b4edcb75943337e640a79f1207`.
+Downloaded bytes match the CI checksum. Package inspection found 349 archive
+entries and 73 payload entries with no wallet/test/development files.
+Unsigned preview; physical Windows 11 and supervised live checks remain NOT RUN.
+The full 1.0.3 installer includes the picker patch; the separate patch is only
+for people retaining 1.0.2. Mac downloads remain at their published versions.
+Release: https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.3-windows-preview.1
