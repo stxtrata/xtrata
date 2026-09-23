@@ -215,3 +215,8 @@ selection, connected address, switch and Escape cancellation. All requests are
 intercepted; no real wallet/signing/payment access. The first Xverse simulation
 omitted its Bitcoin RPC bridge and failed; adding the real two-bridge shape made
 the test representative and it passed. Full website build passed.
+
+Live verification found the custom domain still overriding the cache header,
+while the immutable Pages deployment correctly returned no-cache. The fix also
+uses a distinct `music-profile-wallet-v2.js` filename (not only a query string)
+so old cached script URLs cannot be reused. No CDN security settings changed.
