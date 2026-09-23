@@ -18,7 +18,7 @@ $('profile-remove').onclick=()=>void finish();
 async function init(){
  try{
   const fragment=location.hash.slice(1);history.replaceState(null,'',location.pathname);
-  if(!fragment||fragment.length>2048)throw Error('Start a new profile request from the music app.');
+  if(!fragment||fragment.length>2048)throw Error('Reopen “Continue on Xtrata” in the music app to resume your request, or start there if you have not created one. Do not resend a pending transfer.');
   proof=JSON.parse(atob(fragment.replace(/-/g,'+').replace(/_/g,'/')));
   if(!/^[a-f0-9]{64}$/.test(proof.id)||!/^[a-f0-9]{130}$/i.test(proof.supportProof))throw Error('Invalid profile request.');
   ({challenge}=await call({op:'review',...proof}));

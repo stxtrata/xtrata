@@ -38,9 +38,10 @@ An observed pending transfer may confirm for up to one additional hour. It must
 be registered by checking it before the initial deadline; an unobserved transfer
 confirmed after the deadline is not accepted. Users must not resend funds to
 resolve slow confirmation. Failed, noncanonical, unanchored, wrong-address,
-wrong-amount, wrong-memo and reused transfers are rejected. Refreshing the
-verification page requires starting a new request in the app, because the proof
-is removed from the URL and is not stored in browser storage.
+wrong-amount, wrong-memo and reused transfers are rejected. After refreshing the
+verification page, reopen the original Continue link in the app to resume while
+the request is valid. The proof is removed from the website URL and is not stored
+in browser storage; the app retains its Continue link for the current session.
 
 ## Deployment and beta release gates
 
@@ -90,3 +91,39 @@ source-package closure, Heroes and existing beta-download rendering. Website
 browser smoke covers transfer/unlink consent, fragment removal and mobile width.
 Native BNS-owner wallet UI interoperability, actual Windows DPAPI signing,
 physical hardware and live verification payments are NOT RUN in these tests.
+
+## Completed evidence and release checkpoint — 2026-09-23
+
+Desktop payload source: `c4444716d`. Follow-up changes only clarify website resume
+instructions, correct the existing desktop smoke expectation for muted status,
+and record evidence.
+
+- 78 targeted/shared tests passed, including 14 new profile tests.
+- Profile browser smoke passed: transfer, explicit unlink, fragment cleanup and
+  390px mobile layout. Full website build and Pages Functions compilation passed.
+- Isolated Electron desktop smoke passed: new profile controls, free playback,
+  consent, mute/unmute and payment-event regression assertions. No live wallets.
+- Source-package runtime closure passed. Both Mac ASARs contain 357 files; profile
+  runtime files match committed source, version is 1.0.5, and wallet, environment
+  and test-entry files are absent.
+- Standard and Monterey DMG integrity and ZIP CRC checks passed. Both builds are
+  unsigned/not notarized. This is not physical Intel/Monterey installation or real
+  BNS-owner wallet interoperability verification.
+
+Local artifacts, under `.artifacts/` (not committed):
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `music-desktop/Xtrata-Music-1.0.5-mac-universal.dmg` | `1b311d09284a806f5f6fd2f7e87adab7416a8676c7a6d52dffebff8133587207` |
+| `music-desktop/Xtrata-Music-1.0.5-mac-universal.zip` | `f648094652f7fa7bd5f5320d99f6b8bedfc1838f7016d5118389dfcfb36de9bf` |
+| `music-desktop-legacy/Xtrata-Music-Legacy-1.0.5-mac-universal.dmg` | `7126ac8065a71a3c0f1452cf743bf7e590f1e16d19dbf0fbcba110021a006ea3` |
+| `music-desktop-legacy/Xtrata-Music-Legacy-1.0.5-mac-universal.zip` | `437915556a510eb3e176cd59bd21a4fc40da57b87bd5cf0d977426251a41ad35` |
+
+Each artifact has an adjacent `.sha256`. Detailed package evidence is in
+`.artifacts/music-profile/mac-package-report.json`.
+
+Pending: permission to push this branch (requested), native Windows CI build/test
+of 1.0.8, production D1 migration and `MUSIC_PROFILE_ENABLED=1` activation, real
+BNS-owner signature and supervised transfer checks, then release publication and
+additional Lounge beta links. Existing normal/beta downloads remain unchanged.
+No live payment or production migration was made.
