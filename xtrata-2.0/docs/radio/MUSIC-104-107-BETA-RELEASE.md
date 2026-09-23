@@ -113,3 +113,38 @@ Source archive closure and 14 packaging/desktop tests passed. Isolated Chromium
 verified both images decode/render without accessing any wallet. Screenshot:
 `.artifacts/music-logo/lounge.png`. Existing published installers are immutable
 and do not contain this subsequent change; a new installer build is required.
+
+
+## Beta build 2 — in-app Xtrata logo
+
+Runtime source `617c2ed088fd7eb2555d454a47006a2c38f6e20c`, pushed with explicit
+user permission. App versions stay Mac 1.0.4 / Windows 1.0.7; separate `.beta.2`
+release tags preserve the original immutable beta assets. The new logo replaces
+both the header X and default artwork X. Wallet/payment behaviour is unchanged.
+
+Both Mac builds completed, DMGs verified, ZIP CRCs passed, and both ASARs passed
+inspection (354 entries). Packaged logo bytes match the supplied source exactly;
+both HTML image references and Mac version were verified. Windows native CI run
+35898369987 passed all workflow stages, including DPAPI, isolated playback/startup,
+contract tests, package closure and final package inspection (354 entries).
+Local packaging/desktop tests (14) and beta build-label test passed. Real wallet
+or mainnet tests were not performed. Hardware limitations remain as above.
+
+Mac beta 2 artifact hashes (supersede beta 1 only for the new download cards):
+
+| Artifact | SHA-256 |
+|---|---|
+| Xtrata-Music-1.0.4-mac-universal.zip | 2458344bb813f7cf3f5b2f2f249d7fecff9797f93561a4544486c50b4be4a198 |
+| Xtrata-Music-1.0.4-mac-universal.dmg | b8298617734648c27ed6d95c4c4826823f7e5eb125195a0b3c9b8265788c25fd |
+| Xtrata-Music-Legacy-1.0.4-mac-universal.zip | 088ef6a5b3580eb9379ed7893b95d42441ee20a86332b30bcdee3496b2193b8c |
+| Xtrata-Music-Legacy-1.0.4-mac-universal.dmg | de501bf57beace6c8730890bcb341a65f97a29256bb756292081d5585e4949d7 |
+
+Publication and final Windows checksum are recorded below when transfers finish.
+
+Windows beta 2 installer: `Xtrata-Music-1.0.7-windows11-preview-x64.exe`,
+121,569,380 bytes, SHA-256
+`6d22f3804433f25c92bdecf2a5a4b7ad5d8a1e8b2140568775a7bd866f01839a`.
+Downloaded bytes match the native CI report/checksum and source revision.
+CI Authenticode check remains unavailable; independent PE certificate-table
+inspection confirms the installer is unsigned. Final website build and browser
+hub smoke passed. No existing regular download entries were changed.
