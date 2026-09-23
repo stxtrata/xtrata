@@ -3,6 +3,7 @@ import {createServer} from 'node:http';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {dirname,resolve,join} from 'node:path';
 import {readFile} from 'node:fs/promises';
+import {beginMusicProfile} from './music-profile-local.mjs';
 import {MusicWebBridge} from './music-web-bridge.mjs';
 import {RadioListening} from './radio-listening.mjs';
 import {RadioMedia} from './radio-media.mjs';
@@ -21,8 +22,9 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/music-logo.webp','/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/profile/begin','/profile.js','/music-logo.webp','/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
   }
+  if(req.method==='GET'&&req.url==='/profile.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/music-profile-ui.js')));return;}
   if(req.method==='GET'&&req.url==='/music-logo.webp'){res.setHeader('Content-Type','image/webp');res.end(await readFile(join(root,'scripts/wizard/music-logo.webp')));return;}
   if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
    const info=await version;let latest=null;
@@ -61,6 +63,7 @@ const server=createServer(async(req,res)=>{
   let body='';for await(const chunk of req){body+=chunk;if(body.length>2048)throw Error('Request too large.');}
   const data=JSON.parse(body||'{}');let result;
   if(req.url==='/web-review'||req.url==='/web-approve'){if(Object.keys(data).join()!=='id'||typeof data.id!=='string')throw Error('Invalid approval');result=req.url==='/web-review'?webBridge.review(data.id):await webBridge.approve(data.id);}
+  else if(req.url==='/profile/begin')result=await beginMusicProfile(wizard,data);
   else if(req.url==='/setup')result=await wizard.setup();
   else if(req.url==='/listening/enable')result=await listening.enable(data);
   else if(req.url==='/listening/free')result=listening.free(data);

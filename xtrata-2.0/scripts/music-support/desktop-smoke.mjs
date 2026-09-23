@@ -34,6 +34,9 @@ try{
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>document.cookie),'');
  const origin=await app.evaluate(()=>globalThis.testState.origin);assert.equal((await fetch(origin+'/lounge')).status,400);
  assert.equal(await page.locator('[data-xtrata-chain-plays]').count(),1);assert.equal((await page.evaluate(()=>fetch('/radio-chain-activity.js').then(r=>r.status))),200);
+ assert.equal((await page.evaluate(()=>fetch('/profile.js').then(r=>r.status))),200);
+ assert.equal(await page.locator('#profile-link').count(),1);
+ assert.equal(await page.locator('#profile-open').isVisible(),false);
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
  assert.equal(await page.locator('#setup').isVisible(),false);assert.equal(await page.locator('#wallet-ready').isVisible(),true);
  let enableRequests=0;page.on('request',r=>{if(r.url().endsWith('/listening/enable'))enableRequests++;});
