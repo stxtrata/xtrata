@@ -10,8 +10,8 @@
 <div id="over-limit" class="warning" hidden role="alert"><strong>Your balance is above the recommended 1 STX.</strong><p>Payments can continue. We recommend keeping 1 STX here; you can return the excess if you prefer.</p><button id="warning-excess">Return excess</button><button id="warning-all">Return all</button><button id="warning-hide" type="button">Hide for this session</button></div><button id="warning-show" type="button" hidden>Show balance recommendation</button>
 <p id="wallet-state" aria-live="polite">Get your address to begin.</p></section>
 <section id="listening-section"><h2>Listen and test in real time</h2>
-<p id="radio-mode" class="eyebrow" aria-live="polite">FREE · no paid starts</p>
-<p>Play real inscription audio here. Paid mode uses only this wizard wallet. A paid start records the start and pays the current master holder; it does not prove a full listen.</p>
+<p id="radio-mode" class="eyebrow" aria-live="polite">FREE · support off</p>
+<p>Play real inscription audio here. Paid mode uses only this wizard wallet. A threshold listen records reported audible time and pays the current master holder; it does not prove a full listen.</p>
 <button id="radio-load">Load / refresh songs</button><label>Song<select id="radio-songs"><option>Load songs first</option></select></label>
 <h3 id="radio-title">Xtrata Radio</h3><p id="radio-info">Music from the chain</p>
 <audio id="radio-audio" controls preload="none"></audio><div><button id="radio-prev">Previous</button><button id="radio-play">Play / pause</button><button id="radio-next">Next</button></div>
@@ -22,7 +22,7 @@
 <div class="fields"><label>Miner fee (microSTX)<input id="radio-paid-fee" type="number" min="257" max="1000" value="257"></label><label>Maximum starts<input id="radio-paid-max" type="number" min="1" max="14" value="10"></label><label>Minutes<input id="radio-paid-minutes" type="number" min="1" max="30" value="10"></label></div>
 <p id="radio-session-help">Approve once for up to 10 starts over 10 minutes. Successful payments do not require another acknowledgement.</p>
 <p>The default miner fee is 0.0003 STX. In bounded mode, up to 0.005 STX per session and the existing 0.01 STX lifetime test ceiling apply, with a 0.001 STX reserve. Continuous mode removes those limits. Low fees may be rejected; no fee is increased automatically.</p>
-<label class="check"><input id="radio-approve" type="checkbox">I authorise this whole paid session from my dedicated wizard wallet when new songs begin.</label><button id="radio-enable">Enable paid test listens</button></details>
+<label class="check"><input id="radio-approve" type="checkbox">I authorise this whole paid session from my dedicated wizard wallet after songs reach their listening threshold.</label><button id="radio-enable">Enable paid test listens</button></details>
 <p id="radio-payment" role="status">Load songs, then press Play. No payment is enabled.</p><details><summary>Recent start outcomes</summary><div id="radio-events">No starts requested.</div></details>
 </section>
 <section id="return-section" aria-labelledby="return-heading"><h2 id="return-heading">2. Return your funds</h2>

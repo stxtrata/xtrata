@@ -36,6 +36,16 @@ async function fixture(work){
  }finally{await rm(dir,{recursive:true,force:true});}
 }
 describe('queued paid starts with real offline wallet',()=>{
+ it('signs threshold receipts on distinct queued nonces with actual offline wallet code',()=>fixture(async({s,a,state,w})=>{
+  for(let n=1;n<=3;n++){
+   const p={id:n.toString(16).padStart(32,'0'),song:2910,tab,token:a.token};
+   await s.begin(p);s.begins.get(p.id).at-=30000;s.active.beganAt-=30000;
+   expect((await s.qualify({...p,audibleSeconds:30,threshold:30})).outcome).toBe('submitted');
+  }
+  expect(state.sent.map(t=>Number(t.auth.spendingCondition.nonce))).toEqual([0,1,2]);
+  const log=await w.journal();expect(log.every(e=>e.receipt.startsWith('584d01'))).toBe(true);expect(log.every(e=>e.bytes===257&&e.fee===257)).toBe(true);
+ }));
+
  it('submits three rapid starts with distinct nonces and verifies all receipts',()=>fixture(async({w,state,start,confirm})=>{
   for(let n=1;n<=3;n++)expect((await start(n)).outcome).toBe('submitted');
   expect(state.sent.map(t=>Number(t.auth.spendingCondition.nonce))).toEqual([0,1,2]);expect(w.running).toBe(false);

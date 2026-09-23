@@ -21,7 +21,7 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
   }
   if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
    const info=await version;let latest=null;
@@ -41,6 +41,7 @@ const server=createServer(async(req,res)=>{
   if(req.method==='GET'&&['/web-approval','/web-approval.js'].includes(req.url.split('?')[0])){const script=req.url.split('?')[0].endsWith('.js');res.setHeader('Content-Type',script?'text/javascript':'text/html');res.end(await readFile(join(root,'scripts/wizard/music-web-approval.'+(script?'js':'html'))));return;}
   if(req.method==='GET'&&['/lounge','/lounge.css','/lounge.js'].includes(req.url)){const ext=req.url==='/lounge'?'html':req.url.endsWith('.css')?'css':'js';res.setHeader('Content-Type',ext==='html'?'text/html':ext==='css'?'text/css':'text/javascript');res.end(await readFile(join(root,'scripts/wizard/music-lounge.'+ext)));return;}
   if(req.method==='GET'&&req.url==='/radio-chain-activity.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'public/radio/chain-activity.js')));return;}
+  if(req.method==='GET'&&req.url==='/paid-receipt.mjs'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'public/radio/paid-receipt.mjs')));return;}
   if(req.method==='GET'&&req.url==='/radio-policy.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/radio-listening-policy.mjs')));return;}
   if(req.method==='GET'&&['/','/ui.js','/ui.css','/radio.js'].includes(req.url)){res.setHeader('Content-Type',req.url==='/'?'text/html':req.url==='/ui.css'?'text/css':'text/javascript');res.end(await readFile(req.url==='/radio.js'?join(root,'scripts/wizard/radio-listening-ui.js'):join(root,'scripts/wizard/radio-plays'+(req.url==='/'?'-panel.html':req.url==='/ui.css'?'-ui.css':'-ui.js'))));return;}
   const url=new URL(req.url,expectedOrigin);
@@ -64,7 +65,9 @@ const server=createServer(async(req,res)=>{
   else if(req.url==='/listening/free')result=listening.free(data);
   else if(req.url==='/listening/heartbeat'){listening.renew(data);result=await listening.refreshedSnapshot();}
   else if(req.url==='/listening/status')result=await listening.refreshedSnapshot();
-  else if(req.url==='/listening/start')result=await listening.start(data);
+  else if(req.url==='/listening/begin'){listening.app={platform:options.desktopToken?(options.runtimePlatform||process.platform):'dev',version:(await version).version};result=await listening.begin(data);}
+  else if(req.url==='/listening/qualify')result=await listening.qualify(data);
+  else if(req.url==='/listening/start')throw Error('Update the player to use listening thresholds. No payment requested.');
   else if(req.url==='/status')result=await wizard.status(true);
   else if(req.url==='/stop'){wizard.stop();result={message:wizard.message};}
   else if(req.url==='/return/prepare')result=await wizard.prepareReturn(data);

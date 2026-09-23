@@ -1,3 +1,4 @@
+import {decodePaidReceipt} from './paid-receipt.mjs';
 export const PAID_PLAYS_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0';
 
 const unsigned = (repr, name) => {
@@ -26,7 +27,8 @@ export function parsePaidPlayEvent(event) {
   const payer = principal(repr, 'payer');
   const recipient = principal(repr, 'recipient');
   if (!/^0x[0-9a-f]{64}$/.test(txid) || ![1, 2, 3].includes(core) || id === null || amount !== 50 || total === null || !payer || !recipient) return null;
-  return {txid, core, id, amount, total, payer, recipient};
+  const receipt=/\(receipt 0x([a-f0-9]{32})\)/i.exec(repr)?.[1];
+  return {txid, core, id, amount, total, payer, recipient,...(receipt?{receipt}: {})};
 }
 
 const short = value => value.length > 16 ? `${value.slice(0, 7)}…${value.slice(-6)}` : value;
@@ -72,7 +74,7 @@ function row(play, track, fresh) {
   heading.textContent = track?.title || `Song #${play.id}`;
   const meta = document.createElement('p');
   meta.className = 'chain-play-meta';
-  meta.textContent = [track?.artist, `Inscription #${play.id}`, `song total ${play.total}`].filter(Boolean).join(' · ');
+  meta.textContent = [decodePaidReceipt(play.receipt).label, track?.artist, `Inscription #${play.id}`, `song total ${play.total}`].filter(Boolean).join(' · ');
   const payment = document.createElement('p');
   payment.className = 'chain-play-payment';
   payment.textContent = `0.000050 STX from ${short(play.payer)} to ${short(play.recipient)}`;

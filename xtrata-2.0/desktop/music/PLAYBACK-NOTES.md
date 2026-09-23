@@ -1,4 +1,26 @@
-# Continuous support playback
+# Threshold listens — Mac 1.0.4 / Windows 1.0.7
+
+These versions request support after `min(30, max(1, floor(duration)-1))`
+audible seconds; unknown duration uses 30 seconds. The timer counts real elapsed
+time, excludes pause/mute/zero volume/seeking/buffering, and does not accelerate
+with playback speed. Skipping before the threshold remains free. Enabling support
+mid-song applies to the next song. The server registers the first audible moment
+without charging, checks its own elapsed time, and admits each playback once.
+
+On-chain totals now mix threshold listens with starts from older versions and
+legacy bridge clients. Structured receipts distinguish them; reported seconds
+are not on-chain proof. See `docs/radio/RECEIPT-FORMAT.md`.
+
+The desktop smoke test uses local 3/4-second tracks (real thresholds 2/3 seconds),
+an isolated profile and a simulated wallet. There is no production threshold
+override. Minimized looping, consent, mute and duplicate prevention remain tested.
+
+The queued-payment flag remains OFF pending the Phase 5 decision. New release
+versions are staged locally; installers and public download metadata are unchanged.
+
+## Previous-release behaviour and investigation
+
+### Continuous support playback
 
 Music support stays enabled for the session until the listener stops it or
 closes the player. Each eligible new song start costs the selected network fee

@@ -1,3 +1,4 @@
+import {uniqueListenReceipt} from '../../public/radio/paid-receipt.mjs';
 /** Local-only radio wizard. Secrets never cross the HTTP boundary. */
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, open, unlink, stat } from 'node:fs/promises';
@@ -432,7 +433,7 @@ export class RadioWizard {
     if(BigInt(account.balance)<reserved+BigInt(p.fee+50+(context.continuous?0:1000)))throw Error(context.continuous?'Insufficient confirmed balance for another paid start.':'Insufficient confirmed balance; retain 0.001 STX reserve.');
     const owner=await this.read('get-owner',[T.uintCV(p.core),T.uintCV(p.song)]);const recipient=owner?.success===true?owner.value?.value?.value:null;
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');
-    let receipt;do{receipt=randomBytes(16).toString('hex');}while(log.some(e=>e.receipt===receipt));
+    let receipt;if(context.listen)receipt=uniqueListenReceipt(context.listen,log,randomBytes);else do{receipt=randomBytes(16).toString('hex');}while(log.some(e=>e.receipt===receipt));
     const privateKey=T.createStacksPrivateKey(key),publicKey=T.publicKeyToString(T.getPublicKey(privateKey));
     const tx=await T.makeUnsignedContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],publicKey,network:new StacksMainnet(),fee:BigInt(p.fee),nonce,anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
     const sized=sizedPlayFee(tx,chosenFee);tx.setFee(BigInt(sized.fee));authorised();

@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {mountPaidPlayReaders, PAID_PLAYS_CONTRACT} from '../../../public/radio/chain-activity.js';
 const event = (n:number) => ({event_type:'smart_contract_log',tx_id:'0x'+n.toString(16).padStart(64,'0'),contract_log:{contract_id:PAID_PLAYS_CONTRACT,topic:'print',value:{repr:`(tuple (amount u50) (core u3) (event "radio-paid-play") (id u315) (payer 'SP123) (recipient 'SP456) (total u${n}))`}}});
 function mount(){
  document.body.innerHTML='<section data-xtrata-chain-plays data-chain-history><button data-chain-refresh>Refresh</button><p data-chain-status></p><div data-chain-list></div></section>';
  mountPaidPlayReaders();
 }
+beforeEach(()=>vi.stubGlobal('location',new URL('https://xtrata.xyz/music/lounge')));
 afterEach(()=>{window.dispatchEvent(new Event('pagehide'));vi.useRealTimers();vi.unstubAllGlobals();document.body.innerHTML='';localStorage.clear();});
 describe('automatic public history',()=>{
  it('loads every page without clicks, caches the total and catches new payments',async()=>{

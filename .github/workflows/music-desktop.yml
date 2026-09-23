@@ -60,6 +60,7 @@ jobs:
           scripts/wizard/__tests__/radio-plays-backend.test.ts
           scripts/wizard/__tests__/radio-recovery.test.ts
           scripts/wizard/__tests__/radio-queue.test.ts
+          scripts/wizard/__tests__/radio-threshold.test.ts
           scripts/wizard/__tests__/radio-request-budget.test.ts
           scripts/wizard/__tests__/radio-returns.test.ts
           scripts/wizard/__tests__/radio-windows-vault.test.ts

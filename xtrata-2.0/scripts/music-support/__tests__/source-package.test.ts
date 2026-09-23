@@ -18,7 +18,7 @@ describe('source package for nontechnical listeners', () => {
 
   it('provides one-step launchers and excludes wallet data and the browser extension', () => {
     const packager = text('scripts/music-support/package.mjs');
-    for (const name of ['START HERE - Mac.command', 'START HERE - Windows.cmd', 'START HERE - Linux.sh', '1 - READ ME FIRST.html', 'AI AGENT - INSTALL.md', 'xtrata-music-support-installer/SKILL.md', 'public/radio/chain-activity.js']) {
+    for (const name of ['START HERE - Mac.command', 'START HERE - Windows.cmd', 'START HERE - Linux.sh', '1 - READ ME FIRST.html', 'AI AGENT - INSTALL.md', 'xtrata-music-support-installer/SKILL.md', 'public/radio/chain-activity.js', 'public/radio/paid-receipt.mjs']) {
       expect(packager).toContain(name);
     }
     expect(packager).not.toContain('extensions/music-support/');

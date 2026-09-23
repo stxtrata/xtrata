@@ -14,6 +14,7 @@ try{
  for(const rel of ['src/lib/radio/artist-credits.mjs',...names.map(n=>'scripts/wizard/'+n)]){await mkdir(dirname(join(target,rel)),{recursive:true});await copyFile(join(root,rel),join(target,rel));}
  await mkdir(join(target,'public/radio'),{recursive:true});
  await copyFile(join(root,'public/radio/chain-activity.js'),join(target,'public/radio/chain-activity.js'));
+ await copyFile(join(root,'public/radio/paid-receipt.mjs'),join(target,'public/radio/paid-receipt.mjs'));
  await copyFile(join(root,'scripts/music-support/runtime/package.json'),join(target,'package.json'));
  await copyFile(join(root,'scripts/music-support/runtime/package-lock.json'),join(target,'package-lock.json'));
  await copyFile(join(root,'scripts/music-support/setup.mjs'),join(target,'setup.mjs'));
