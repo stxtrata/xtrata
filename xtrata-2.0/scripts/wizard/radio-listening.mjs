@@ -1,5 +1,5 @@
 import {randomBytes} from 'node:crypto';
-import {policy} from './radio-plays-backend.mjs';
+import {policy,publicEntry} from './radio-plays-backend.mjs';
 // One tab, bounded approval, no persistent auto-enable and no backlog.
 export class RadioListening {
  constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
@@ -20,7 +20,7 @@ export class RadioListening {
    const entry=log.find(e=>e.playbackId===row.id);
    if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason='Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
    if(entry?.status==='failed'){row.outcome='failed';row.reason=`Paid start failed on-chain (${entry.failureStatus||'abort'}); it was not retried.`;row.txid=entry.failedTxid||entry.txid;}
-   if(entry){row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
+   if(entry){const diagnostic=publicEntry(entry);for(const key of ['nonce','bytes','fee','feeChosen','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason'])if(diagnostic[key]!==undefined)row[key]=diagnostic[key];row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
   }
   return this.snapshot();
  }
@@ -34,6 +34,7 @@ export class RadioListening {
  async enable(p){
   if(!p||!['fee,max,minutes,tab','continuous,fee,max,minutes,tab'].includes(Object.keys(p).sort().join(','))||(p.continuous!==undefined&&typeof p.continuous!=='boolean')||!Number.isInteger(p.minutes)||p.minutes<1||p.minutes>30||typeof p.tab!=='string'||!/^[a-f0-9]{32}$/.test(p.tab))throw Error('Choose a test duration of 1–30 minutes.');
   policy({core:3,song:0,fee:p.fee,count:1});
+  if(p.fee<257)throw Error('A play requires at least 257 microSTX. Review the fee before approving.');
   if(!Number.isInteger(p.max)||p.max<1||(!p.continuous&&(p.fee+50)*p.max>5000))throw Error(`Session spending ceiling: choose 1–${Math.floor(5000/(p.fee+50))} starts at this fee (0.005 STX maximum).`);
   this.snapshot();
   if(this.active||this.inFlight)throw Error('A paid test already owns this wizard. Switch it to Free or stop it first.');
@@ -70,7 +71,7 @@ export class RadioListening {
    if(existing){row.outcome=existing.status;row.reason='Already recorded; no second payment.';row.txid=existing.txid;return row;}
    // Recheck consent after the asynchronous journal read.
    this.check(p);a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
-   const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true});
+   const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)});
    void operation.then(()=>{row.outcome='confirmed';row.reason='Paid start confirmed.';}).catch(async error=>{
     row.reason=error.message;row.outcome='unavailable';
     try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':entry.status==='failed'?'failed':'unknown';row.txid=entry.confirmedTxid||entry.failedTxid||entry.txid;}}catch{row.outcome='unknown';}

@@ -14,7 +14,7 @@ for(const e of state.entries){
  const transfers=(tx.events||[]).filter(x=>x.event_type==='stx_asset'&&x.asset?.asset_event_type==='transfer').map(x=>x.asset);
  const transfer=transfers.find(x=>x.sender===state.address&&x.recipient===e.recipient&&x.amount==='50');
  const confirmed=tx.tx_status==='success'&&tx.canonical===true&&tx.is_unanchored===false;
- report.audit.transactions.push({txid:e.txid,receipt:e.receipt,requestedFee:e.fee,actualFee:tx.fee_rate,status:tx.tx_status,canonical:tx.canonical,block:tx.block_height,confirmed,exactHolderTransfer:!!transfer,transfers});
+ report.audit.transactions.push({txid:e.txid,receipt:e.receipt,requestedFee:e.fee,nonce:e.nonce,bytes:e.bytes,feeChosen:e.feeChosen,feeReason:e.feeReason,feeEstimates:e.feeEstimates,submittedAt:e.submittedAt,confirmedAt:e.confirmedAt,blockHeight:e.blockHeight,confirmationSeconds:e.confirmationSeconds,rejectionReason:e.rejectionReason,actualFee:tx.fee_rate,status:tx.tx_status,canonical:tx.canonical,block:tx.block_height,confirmed,exactHolderTransfer:!!transfer,transfers});
 }
 await writeFile(join(dir,'audit.json'),JSON.stringify(report,null,2)+'\n');
 console.log(JSON.stringify(report.audit,null,2));

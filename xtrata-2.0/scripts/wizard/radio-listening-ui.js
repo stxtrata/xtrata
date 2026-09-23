@@ -99,7 +99,7 @@
  setInterval(async()=>{
   if(polling)return;polling=true;
   const polledApproval=approval;
-  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
+  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid,nonce:e.nonce,bytes:e.bytes,fee:e.fee,feeChosen:e.feeChosen,feeReason:e.feeReason,feeEstimates:e.feeEstimates,submittedAt:e.submittedAt,confirmedAt:e.confirmedAt,blockHeight:e.blockHeight,confirmationSeconds:e.confirmationSeconds,rejectionReason:e.rejectionReason}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
    if(approval&&!s.enabled){approval=null;mode('FREE PLAY · support session ended');}
    else if(approval&&s.recovery)mode('SUPPORT WAITING · '+s.recovery);
    else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} starts · fee ${s.fee} microSTX + 50 to holder`);

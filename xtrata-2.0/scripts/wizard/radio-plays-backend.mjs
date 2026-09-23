@@ -11,7 +11,19 @@ const OWNER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', NAME='xtrata-radio-play
 const HASH='b81f1a0e1de406102e739f78d200041a270f498edab1bb3320aec54f33cbbbe1';
 const WINDOWS_VAULT_SCHEME='windows-dpapi-v1', LOCK_VERSION=1, LOCK_STALE_MS=120000;
 const sha = s => createHash('sha256').update(s).digest('hex');
-function publicEntry(entry){const result={...entry};delete result.raw;return result;}
+export function publicEntry(entry){
+ const allowed=['playbackId','createdAt','address','core','song','fee','receipt','recipient','txid','status','title','artist','nonce','bytes','feeChosen','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason','failedAt','failureStatus','failedTxid','confirmedTxid','actualFee','recoveryNonce','recoveryAt','resendAttempts','lastResendAt','mode','amount','kind'];
+ const result=Object.fromEntries(allowed.filter(k=>entry[k]!==undefined).map(k=>[k,entry[k]]));
+ if(entry.feeEstimates)result.feeEstimates=Object.fromEntries(['low','medium','high','fetchedAt'].filter(k=>entry.feeEstimates[k]!==undefined).map(k=>[k,entry.feeEstimates[k]]));
+ if(entry.priorAttempts)result.priorAttempts=entry.priorAttempts.map(a=>Object.fromEntries(['txid','fee','submittedAt'].filter(k=>a[k]!==undefined).map(k=>[k,a[k]])));
+ return result;
+}
+export function sizedPlayFee(transaction,chosenFee){
+ const bytes=transaction.serialize().length;
+ if(bytes!==257)throw Error('Unexpected play transaction size: '+bytes+' bytes; signing refused.');
+ if(!Number.isSafeInteger(chosenFee)||chosenFee<1||chosenFee>1000)throw Error('Invalid chosen network fee.');
+ return {bytes,fee:Math.max(chosenFee,bytes)};
+}
 export function policy(p) {
   if (!Number.isInteger(p.core)||p.core<1||p.core>3||!Number.isSafeInteger(p.song)||p.song<0||!Number.isInteger(p.fee)||p.fee<1||p.fee>1000||!Number.isInteger(p.count)||p.count<1||p.count>5) throw Error('Use core 1–3, an integer song ID, fee 1–1000 microSTX and 1–5 tests.');
   if ((p.fee+50)*p.count>5000) throw Error('Run exceeds 0.005 STX ceiling.');
@@ -365,14 +377,14 @@ export class RadioWizard {
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(e.address),T.bufferCV(Buffer.from(e.receipt,'hex'))]);const r=receipt?.value?.value;
    if(receipt?.type==='(optional none)'&&receipt.value===null){const error=Error('Confirmed transaction is waiting for its play receipt to become available.');error.code='RECEIPT_PENDING';throw error;}
    if(r?.core?.value!==String(e.core)||r?.id?.value!==String(e.song))throw Error('Receipt verification failed.');
-   e.status='confirmed';e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
+   e.status='confirmed';e.confirmedAt=new Date(this.now()).toISOString();e.blockHeight=tx.block_height??null;e.confirmationSeconds=e.submittedAt?Math.max(0,Math.floor((this.now()-Date.parse(e.submittedAt))/1000)):null;e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
   }
  }
  async run(input,context={}) {
-  if(this.running)throw Error('Runner already active.');const p=policy(input);this.running=true;this.stopped=false;
+  if(this.running)throw Error('Runner already active.');policy(input);const chosenFee=input.fee,p=policy({...input,fee:Math.max(input.fee,257)});this.running=true;this.stopped=false;
   let lock,thrown;
   try {
-   lock=await this.acquireLock('run.lock');this.guard();
+   lock=await this.acquireLock('run.lock');this.guard();const epoch=this.stopEpoch;const authorised=()=>{this.guard();if(epoch!==this.stopEpoch)throw Error('Payment stopped.');context.authorised?.();};authorised();
    const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish or cancel the pending return review first.');
    await this.reconcileReturns();const log=await this.journal();await this.reconcile(log);
    if(!context.continuous&&log.reduce((s,e)=>s+e.fee+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
@@ -386,11 +398,14 @@ export class RadioWizard {
     const owner=await this.read('get-owner',[T.uintCV(p.core),T.uintCV(p.song)]);const recipient=owner?.success===true?owner.value?.value?.value:null;
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');
     const receipt=randomBytes(16).toString('hex');
-    const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],senderKey:key,network:new StacksMainnet(),fee:BigInt(p.fee),nonce:BigInt(account.nonce),anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
-    this.guard();const e={...(context.playbackId?{playbackId:context.playbackId,listeningSession:context.listeningSession,title:String(context.title||'').slice(0,200),artist:String(context.artist||'').slice(0,200)}:{}),createdAt:new Date().toISOString(),address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
-    log.push(e);await this.save('journal.json',log);this.guard();
-    const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
-    e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
+    const privateKey=T.createStacksPrivateKey(key),publicKey=T.publicKeyToString(T.getPublicKey(privateKey));
+    const tx=await T.makeUnsignedContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],publicKey,network:new StacksMainnet(),fee:BigInt(p.fee),nonce:BigInt(account.nonce),anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
+    const sized=sizedPlayFee(tx,chosenFee);tx.setFee(BigInt(sized.fee));authorised();
+    new T.TransactionSigner(tx).signOrigin(privateKey);
+    this.guard();const e={...(context.playbackId?{playbackId:context.playbackId,listeningSession:context.listeningSession,title:String(context.title||'').slice(0,200),artist:String(context.artist||'').slice(0,200)}:{}),createdAt:new Date().toISOString(),nonce:String(account.nonce),bytes:sized.bytes,feeChosen:chosenFee,feeReason:'floor',feeEstimates:null,address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
+    log.push(e);await this.save('journal.json',log);authorised();
+    let result;try{result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});}catch(error){if(error.status>=400&&error.status<500){e.rejectionReason=error.reason||('HTTP '+error.status);await this.save('journal.json',log);}throw error;}if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
+    e.status='submitted';e.submittedAt=new Date(this.now()).toISOString();await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
     let confirmed=false;
     for(let attempt=0;attempt<20;attempt++){this.guard();await new Promise(r=>setTimeout(r,30000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(error.status!==429&&!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
