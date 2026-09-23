@@ -10,7 +10,7 @@ const bundledElectron=process.platform==='win32'?'electron.exe':process.platform
 const executable=resolve(process.env.XTRATA_MUSIC_TEST_ELECTRON||join(electronRoot,bundledElectron));
 const packagedAsar=process.platform==='darwin'?resolve(dirname(executable),'../Resources/app.asar'):resolve(dirname(executable),'resources/app.asar');
 if(existsSync(packagedAsar))throw Error('Use an unpackaged Electron runtime for simulated-wallet tests.');
-const version=JSON.parse(await readFile('desktop/music/package.json','utf8')).version;
+const version=JSON.parse(await readFile('desktop/music/app/scripts/wizard/music-version.json','utf8')).version;
 const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-Δ '));
 await writeFile(entry,`
 import {app} from 'electron';
@@ -50,6 +50,9 @@ try{
  await page.waitForFunction(()=>document.getElementById('radio-title').textContent==='Short sample'&&!document.getElementById('radio-audio').paused);
  await page.locator('#radio-audio').evaluate(a=>a.pause());
  console.log('Song dropdown changes track and starts free playback');
+ await page.route('**/listening/enable',r=>r.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Saved transaction not visible yet. No replacement or new payment will be made.'})}));
+ await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/Support could not start: Saved transaction/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'free');
+ await page.unroute('**/listening/enable');
  await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'support');assert.equal(await page.locator('#support-consent-prompt').isVisible(),false);console.log('Support enabled');
  await page.locator('#radio-audio').evaluate(a=>{a.muted=true;});
  await page.locator('#radio-play').click();

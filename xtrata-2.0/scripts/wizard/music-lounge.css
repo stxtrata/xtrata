@@ -13,3 +13,5 @@ body[data-payment-mode="support"] #radio-mode{color:#d4f6b8;background:#29421c;b
 body[data-payment-mode="waiting"] #radio-mode{color:#ffdb9a;background:#3b2e15;border-color:#e6b761}body[data-payment-mode="waiting"] .player{border-color:#e6b761}
 
 body[data-music-lounge] [hidden]{display:none!important}
+
+#support-activation-status{padding:12px;border-left:3px solid #ffc46b;background:#342919;color:#ffdb9a}

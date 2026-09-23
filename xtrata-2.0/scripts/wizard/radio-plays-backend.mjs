@@ -155,10 +155,10 @@ export class RadioWizard {
   catch(e){thrown=e;throw e;}
   finally{this.running=false;if(lock){try{await this.releaseLock(lock);}catch(error){if(!thrown)throw error;}}}
  }
- async returnAccount(address){
+ async returnAccount(address,allowPending=false){
   const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
   const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
-  if(!Number.isSafeInteger(account.nonce)||account.nonce<0||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length||nonces.detected_mempool_nonces?.length)throw Error('A pending or conflicting payment must resolve before returning funds.');
+  if(!Number.isSafeInteger(account.nonce)||account.nonce<0||(!allowPending&&(nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length||nonces.detected_mempool_nonces?.length)))throw Error('A pending or conflicting payment must resolve before returning funds.');
   if(!/^(?:0x[0-9a-f]+|[0-9]+)$/i.test(account.balance))throw Error('Invalid chain balance.');
   return {balance:BigInt(account.balance),nonce:account.nonce};
  }
@@ -274,7 +274,40 @@ export class RadioWizard {
    e.status='submitted';await this.save('journal.json',log);return publicEntry(e);
   });
  }
- async reconcile(log) {
+ // Caller must hold the operation lock and provide a current-session consent guard.
+ // Reuses signed bytes; never signs, replaces fees, discards history or fills nonce gaps.
+ async rebroadcastMissing(log, authorised) {
+  const pending=log.filter(e=>!['confirmed','failed'].includes(e.status));
+  if(pending.length!==1)throw Error('Recovery requires exactly one unresolved payment.');
+  const e=pending[0];
+  if(e.priorAttempts?.length)throw Error('A replaced payment requires further reconciliation.');
+  const tries=e.resendAttempts||0;
+  if(tries>=3)throw Error('Recovery retry limit reached. Copy the diagnostic report for Xtrata.');
+  if(e.lastResendAt&&this.now()-e.lastResendAt<60000)return;
+  const {address}=await this.json('vault.json'),tx=T.deserializeTransaction(Buffer.from(e.raw,'hex'));
+  const args=[T.uintCV(e.core),T.uintCV(e.song),T.bufferCV(Buffer.from(e.receipt,'hex'))];
+  tx.verifyOrigin();
+  if(tx.auth.spendingCondition.signer!==T.createAddress(address).hash160)throw Error('Saved payment signer mismatch.');
+  if(e.address!==address||'0x'+tx.txid()!==e.txid||tx.version!==T.TransactionVersion.Mainnet||tx.chainId!==1||
+   T.addressToString(tx.payload.contractAddress)!==OWNER||tx.payload.contractName.content!==NAME||tx.payload.functionName.content!=='play'||
+   tx.payload.functionArgs.length!==3||args.some((a,i)=>T.cvToHex(a)!==T.cvToHex(tx.payload.functionArgs[i]))||
+   tx.auth.spendingCondition.fee!==BigInt(e.fee))throw Error('Saved payment identity mismatch.');
+  const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
+  const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
+  if(!Number.isSafeInteger(account.nonce)||BigInt(account.nonce)!==tx.auth.spendingCondition.nonce||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length||nonces.detected_mempool_nonces?.length)throw Error('Recovery nonce is occupied or uncertain.');
+  if(BigInt(account.balance)<BigInt(e.fee+50))throw Error('Insufficient funds to recover the saved payment.');
+  const receipt=await this.read('get-receipt',[T.standardPrincipalCV(address),args[2]]);
+  if(receipt?.type!=='(optional none)'||receipt.value!==null)throw Error('Saved payment receipt exists or cannot be verified.');
+  // Recheck after asynchronous reads, including a confirmation during diagnosis.
+  try{await this.api('/extended/v1/tx/'+e.txid);return;}catch(error){if(error.status!==404)throw error;}
+  authorised();this.ensureStorageHealthy();if(killSwitchEngaged())throw Error('Wizard stopped by kill switch.');
+  e.resendAttempts=tries+1;e.lastResendAt=this.now();await this.save('journal.json',log);
+  authorised();this.ensureStorageHealthy();if(killSwitchEngaged())throw Error('Wizard stopped by kill switch.');
+  const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
+  if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Recovery response uncertain. Checking the same transaction; no new payment created.');
+  e.status='submitted';await this.save('journal.json',log);
+ }
+ async reconcile(log, authorised=null) {
   for(const e of log.filter(e=>!['confirmed','failed'].includes(e.status))) {
    const attempts=[{txid:e.txid,fee:e.fee},...(e.priorAttempts||[])];let found=null,failed=null,visible=false;
    for(const attempt of attempts){
@@ -283,7 +316,7 @@ export class RadioWizard {
     if(tx.tx_status==='success'&&tx.canonical===true&&tx.is_unanchored===false){found={tx,attempt};break;}
     if(['abort_by_response','abort_by_post_condition'].includes(tx.tx_status)&&tx.canonical===true&&tx.is_unanchored===false)failed={tx,attempt};
    }
-   if(!found&&!failed)throw Error(visible?'Saved transaction remains pending, failed or noncanonical. No new payment permitted.':'Saved transaction not visible yet. No replacement or new payment will be made.');
+   if(!found&&!failed){if(!visible&&authorised)await this.rebroadcastMissing(log,authorised);const error=Error(visible?'Checking an earlier payment on the network. Music continues free.':'Saved transaction not visible yet. Checking the earlier payment; music continues free.');error.code='PAYMENT_UNRESOLVED';throw error;}
    const {tx,attempt}=found||failed;
    if(tx.sender_address!==e.address||tx.contract_call?.contract_id!==OWNER+'.'+NAME||tx.contract_call?.function_name!=='play')throw Error('Transaction identity mismatch.');
    if(e.priorAttempts?.length&&(tx.tx_id!==attempt.txid||tx.nonce!==e.recoveryNonce||String(tx.fee_rate)!==String(attempt.fee)))throw Error('Recovered transaction identity mismatch.');
@@ -322,7 +355,7 @@ export class RadioWizard {
     const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
     e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
     let confirmed=false;
-    for(let attempt=0;attempt<120;attempt++){this.guard();await new Promise(r=>setTimeout(r,5000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(error.code!=='RECEIPT_PENDING'&&!/pending|not visible/.test(error.message))throw error;}}
+    for(let attempt=0;attempt<120;attempt++){this.guard();await new Promise(r=>setTimeout(r,5000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
    }
    this.message='Run confirmed; receipts verified.';

@@ -468,3 +468,17 @@ are retained locally under `.artifacts/windows-104/` and attached to release
 `music-v1.0.4-windows-preview.1`. No signing claimed (build report reports
 Authenticode status unavailable). Physical-PC and live-payment checks remain
 NOT RUN. Mac downloads remain at their existing published versions.
+
+### Mac activation diagnosis (2026-09-23)
+
+Read-only inspection found song 1101 saved as prepared at 02:50 UTC, fee 300
+microSTX; public transaction 0x262dad2ee3cf674cd5ef42d125be0ce2f24e0297c71eea9ef1634af2aba0842a
+returned Not Found from Hiro. This is unresolved submission state, not proof
+that no broadcast occurred. No wallet files were modified and no payment was
+sent. Existing reconciliation intentionally prevents new payments. Mac release
+assets were not changed by the Windows 1.0.4 release.
+
+Added activation progress/errors beside the support button; errors previously
+appeared only beneath the player. Recovery of the saved transaction remains
+outstanding and must not be performed by deleting journal records or silently
+replacing payments. UI source changes require packaging for installed apps.

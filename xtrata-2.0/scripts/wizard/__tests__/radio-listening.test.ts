@@ -141,3 +141,13 @@ describe('lounge artwork',()=>{
   await expect(media.artwork(2910)).rejects.toThrow('unavailable');
  });
 });
+
+describe('support approval with an unresolved saved payment',()=>{
+ it('keeps approval active, performs recovery only with consent, and stops on revocation',async()=>{
+  const {s,w}=fixture();w.reconcile=vi.fn(async(_log,guard)=>{guard?.();throw Object.assign(Error('Checking earlier payment'),{code:'PAYMENT_UNRESOLVED'});});
+  await s.refreshedSnapshot();expect(w.reconcile).not.toHaveBeenCalled();
+  const a=await s.enable({...settings,continuous:true});expect(a.enabled).toBe(true);
+  await s.refreshedSnapshot();expect(s.snapshot().recovery).toBe('Checking earlier payment');expect(s.snapshot().enabled).toBe(true);
+  s.disable();w.reconcile.mockClear();s.nextRecovery=0;await s.refreshedSnapshot();expect(w.reconcile).not.toHaveBeenCalled();
+ });
+});
