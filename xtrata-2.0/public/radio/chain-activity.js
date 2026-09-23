@@ -182,7 +182,10 @@ export function mountPaidPlayReaders() {
       if (!visible.length) list.textContent = 'No matching paid starts in the loaded history.';
       if (history) {
         const amount = matches.reduce((sum, play) => sum + play.amount, 0);
-        totals.textContent = complete ? `${plays.size.toLocaleString()} total paid starts · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders` : previousTotal ? `${previousTotal.count.toLocaleString()} paid starts at last complete check · updating total automatically…` : `Counting all paid starts… ${plays.size.toLocaleString()} found so far`;
+        // Use the same live record set as the summary, not the previous scan's total.
+        totals.textContent = `${plays.size.toLocaleString()} ${complete ? 'total paid starts' : 'paid starts loaded so far'} · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders${complete ? '' : ' · checking full history…'}`;
+        if (!complete && previousTotal?.count > plays.size)
+          totals.textContent += ` (${previousTotal.count.toLocaleString()} at the previous complete check)`;
         summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. ${localHost()?'Choose Load full history to fetch older payments.':'Full history loads automatically;'} Totals are provisional until complete.`}`;
         older.disabled = busy || scanning || complete;
         all.disabled = complete || (busy && !scanning);

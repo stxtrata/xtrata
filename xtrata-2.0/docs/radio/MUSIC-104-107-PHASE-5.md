@@ -100,3 +100,14 @@ Both DMGs pass `hdiutil verify`; both ZIPs pass full CRC integrity and version c
 Checksums are also beside each artifact as `.sha256`. Structured inventory: `.artifacts/music-phase5/mac-artifacts.json`. Inspection reports: `.artifacts/music-desktop/mac-104-inspection.json` and `.artifacts/music-desktop-legacy/mac-104-legacy-inspection.json`.
 
 The build host runs macOS 26.5.2. Minimum supported-OS installation/hardware checks were not performed. Phase 5 remains **partial**, because Windows 1.0.7 needs a native CI rerun after the package-checker correction is pushed.
+
+## Independent public Lounge count correction
+
+The headline previously preferred the cached last-complete count even when the
+loaded confirmed history had overtaken it. Headline and summary now derive from
+the same deduplicated records on every render. Partial history remains labelled
+as partial; a larger previous complete count is historical context only. Search
+continues to filter the matching count without changing the overall headline.
+The public Lounge module URL is cache-busted. All three history UI tests pass,
+including stale-cache/newer-partial-history with a failed subsequent fetch.
+This website change is not included in the already-built Mac artifacts.
