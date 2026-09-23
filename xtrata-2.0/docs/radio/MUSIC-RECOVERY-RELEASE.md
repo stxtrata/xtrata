@@ -1,5 +1,9 @@
 # Shared recovery release checkpoint
 
+Latest release: Mac standard/legacy 1.0.3 and Windows 1.0.6.
+The earlier 1.0.2/1.0.5 evidence below is retained as release history.
+See the request-efficiency build evidence at the end for current artifacts.
+
 Targets: standard/legacy universal Mac 1.0.2; Windows 11 x64 1.0.5.
 One shared source revision; platform versions live in desktop/music/release-versions.json.
 Mac scripts set installer metadata to 1.0.2; prepare.mjs copies the matching in-app version.
@@ -92,6 +96,32 @@ availability. Public quotas still mean zero 429s cannot be guaranteed.
 
 Validation: 98 offline/shared tests passed across 12 suites, including new tests
 for read coalescing/pacing, Retry-After, zero requests during cooldown, no transport
-replay and retained cached balance. All transaction transport was mocked. Native
-Windows verification, rebuilt artifacts and publication are not yet complete at
-this checkpoint. No real payments or funded-wallet changes were made.
+replay and retained cached balance. All transaction transport was mocked. At the initial implementation checkpoint, native Windows verification and
+publication were pending; completed build evidence follows below. No real payments or funded-wallet changes were made.
+
+## Request-efficiency build evidence
+
+Source: `7b6c9e409f6433f836a19aa52215e2ee7bf7f3d5`.
+Native Windows CI: https://github.com/stxtrata/xtrata/actions/runs/35849837995 — PASS.
+Shared tests, contract ownership/amount checks, native DPAPI, desktop playback,
+actual-entrypoint persistence, package inspection and NSIS build all passed.
+Standard and legacy Mac simulated playback checks passed on Apple silicon.
+Both universal binaries contain x86_64 and arm64, report 1.0.3, match critical
+source payloads and pass disk-image integrity checks. ASAR inspection: 349 entries
+each, no wallet/test/development files. Physical Windows, Intel Mac, Monterey,
+four-hour soak and live payments remain NOT RUN for this release. Unsigned previews.
+
+Reproduce using the commands above at this source revision (Windows target only
+for CI); platform versions are Mac 1.0.3 and Windows 1.0.6.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| Xtrata-Music-1.0.3-mac-universal.dmg | 229952797 | e6dfca2dbc6e43398f7e9d34ae2213b5ac98925ae511316489a4ff455130b5e2 |
+| Xtrata-Music-Legacy-1.0.3-mac-universal.dmg | 223858057 | 3599e0076e73db198c5b81ac2269669c023c99891c3b34baf34294e2c9a27371 |
+| Xtrata-Music-1.0.6-windows11-preview-x64.exe | 121155294 | 97f6fb693b49d9debec049cc5a5c71eb3d54233a55e5286db5fe7d7b6e34d014 |
+
+Published previews: `music-v1.0.3-mac-preview.1` and
+`music-v1.0.6-windows-preview.1`. Installer/checksum/inspection reports accompany
+the downloads. Lounge version labels and fallback URLs updated together.
+
+Published installer bytes verified against local SHA-256 for all three downloads.
