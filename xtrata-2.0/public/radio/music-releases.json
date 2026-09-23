@@ -67,6 +67,39 @@
       "verified": true,
       "preview": true,
       "betaBuild": 2
+    },
+    {
+      "platform": "mac-universal",
+      "version": "1.0.5",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.5-mac-beta.1/Xtrata-Music-1.0.5-mac-universal.dmg",
+      "sha256": "1b311d09284a806f5f6fd2f7e87adab7416a8676c7a6d52dffebff8133587207",
+      "requirements": "Optional BNS profile linking for Music Heroes. macOS 13+. Universal Intel/Apple silicon. Unsigned beta; wider hardware and live BNS verification pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
+    },
+    {
+      "platform": "mac-universal-legacy",
+      "version": "1.0.5",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.5-mac-beta.1/Xtrata-Music-Legacy-1.0.5-mac-universal.dmg",
+      "sha256": "7126ac8065a71a3c0f1452cf743bf7e590f1e16d19dbf0fbcba110021a006ea3",
+      "requirements": "Optional BNS profile linking for Music Heroes. macOS 12 Monterey+. Universal Intel/Apple silicon. Unsigned beta; Monterey hardware and live BNS verification pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
+    },
+    {
+      "platform": "win-x64",
+      "version": "1.0.8",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.8-windows-beta.1/Xtrata-Music-1.0.8-windows11-preview-x64.exe",
+      "sha256": "d87a13074c46f4bd3612f6e26b230333bceadff3f7feee1f6e24063b3407043f",
+      "requirements": "Optional BNS profile linking for Music Heroes. Windows 11 x64 (Intel/AMD). Unsigned beta. Native Windows automated checks passed; physical-PC and live BNS verification pending. No Node.js or extension required.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
     }
   ]
 }

@@ -122,8 +122,46 @@ Local artifacts, under `.artifacts/` (not committed):
 Each artifact has an adjacent `.sha256`. Detailed package evidence is in
 `.artifacts/music-profile/mac-package-report.json`.
 
-Pending: permission to push this branch (requested), native Windows CI build/test
-of 1.0.8, production D1 migration and `MUSIC_PROFILE_ENABLED=1` activation, real
-BNS-owner signature and supervised transfer checks, then release publication and
-additional Lounge beta links. Existing normal/beta downloads remain unchanged.
-No live payment or production migration was made.
+## Publication checkpoint — 2026-09-23
+
+- User pushed the implementation. Native Windows CI run
+  [35911031582](https://github.com/stxtrata/xtrata/actions/runs/35911031582)
+  passed against `63c9f98d81362fcc8b90918f0a3cd070a4ee97cf`.
+- Windows: 162 shared tests, 9 ownership/amount contract tests and 20 additional
+  contract tests passed. Native DPAPI protected-storage/journal recovery,
+  isolated Electron playback and single-instance checks passed. Packaged ASAR
+  inspection found 357 entries, required runtime files and no wallet secrets or
+  development/test files. No automated test broadcast a payment.
+- Installer: `Xtrata-Music-1.0.8-windows11-preview-x64.exe`, 121571670 bytes,
+  SHA-256 `d87a13074c46f4bd3612f6e26b230333bceadff3f7feee1f6e24063b3407043f`.
+  Local rehash matches the native CI report/checksum. PE certificate-table
+  offset/size are both zero: this installer is unsigned.
+- Applied migration 017 to the verified existing `xtrata-manage` production D1
+  database (six additive schema queries). Enabled `MUSIC_PROFILE_ENABLED=1`
+  in production/preview configuration. Production deployment `22f07e7c` serves
+  the BNS endpoint; a read-only request for an unused public address returned
+  HTTP 200 with an empty profile list. This is service readiness, not a live
+  ownership-verification test.
+- Lounge changes preserve the three normal downloads and three older beta
+  downloads, adding Mac 1.0.5 standard/legacy and Windows 1.0.8 under the same
+  collapsed Beta Versions section. Six release/render tests, desktop/mobile
+  mocked browser smoke and the full website build passed.
+
+Local Windows evidence: `.artifacts/music-windows-108-beta1/` (installer, checksum,
+source-revision report and package inspection); Mac evidence is listed above.
+Reproduce Windows via the existing `music-desktop.yml` workflow on the exact
+source SHA with `target=windows`; use existing Mac build scripts and lockfiles.
+
+NOT RUN: physical Windows/Intel/Monterey installation and extended hardware
+checks, real BNS-owner signature interoperability, supervised live transfer and
+unlink checks. No funds were moved. These are unsigned optional testing betas,
+not fully validated stable releases.
+
+All 13 uploaded assets (installers, ZIPs, checksum files and reports) matched
+GitHub's SHA-256 digest and byte count. Published as optional prereleases:
+
+- [Mac 1.0.5 beta 1](https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.5-mac-beta.1)
+- [Windows 1.0.8 beta 1](https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.8-windows-beta.1)
+
+Next: deploy and read-only verify the additional Lounge links. No Git push was
+performed; the user retains control of pushing the final website/report commit.
