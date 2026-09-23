@@ -107,3 +107,7 @@
 
 /radio/music-hub.css
   Cache-Control: no-cache
+
+# Profile HTML and wallet code must update together.
+/radio/music-profile.js
+  Cache-Control: no-cache
