@@ -122,3 +122,25 @@ failed because the ASAR library splits internal paths using the host separator.
 The new threshold-content checks passed slash paths on Windows. Normalize those
 paths with `path.join` before extraction; retain every inspection check. Local
 Mac ASAR inspection passes with the correction. Native Windows rerun required.
+
+## Beta publication checkpoint (23 September)
+
+- User explicitly requested publication under a collapsed Beta Versions section,
+  preserving current visible Mac 1.0.3 and Windows 1.0.6 downloads.
+- Both Mac variants rebuilt from runtime revision 1a8c4e77a; updated checksums in
+  `.artifacts/music-phase5/mac-beta-final.json` supersede the earlier table above.
+  Both DMGs verified, both ZIPs passed CRC validation, and both ASARs passed
+  inspection/version/source comparisons. Package-inspection report labels corrected
+  to Mac (the shared inspector retains its historical Windows filename).
+- Final local suite: 197 tests / 27 files passed. Browser hub smoke passed on
+  desktop/mobile, including mouse/keyboard beta disclosure and existing links.
+  Full website build passed.
+- Mac draft release `music-v1.0.4-mac-beta.1` created; asset upload in progress.
+  Do not publish it until all eight assets are uploaded and digests verified.
+- Windows inspection fix committed as badd42927. Awaiting user push or explicit
+  push permission under AGENTS.md; dispatch Windows-only CI after that.
+- Beta section UI prepared; `betaDownloads` is separate from existing `downloads`,
+  so installed apps' existing update checks do not advertise beta builds.
+  Add only published/verified artifact URLs to the beta manifest and HTML fallback.
+- Website production is Cloudflare Pages project xtrata, production branch main.
+  Nothing has yet been deployed by this publication task. Live tests remain NOT RUN.
