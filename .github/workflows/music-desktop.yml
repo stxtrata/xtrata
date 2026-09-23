@@ -55,6 +55,9 @@ jobs:
         working-directory: xtrata-2.0
         run: >-
           npx --no-install vitest run
+          scripts/wizard/__tests__/music-profile.test.ts
+          functions/api/__tests__/music-profile.test.ts
+          functions/api/__tests__/music-profile-transfer.test.ts
           scripts/wizard/__tests__/radio-listening.test.ts
           scripts/wizard/__tests__/radio-listening-policy.test.ts
           scripts/wizard/__tests__/radio-plays-backend.test.ts

@@ -3,6 +3,7 @@ compatibility_date = "2026-02-14"
 pages_build_output_dir = "dist"
 
 [vars]
+MUSIC_PROFILE_ENABLED = "1"
 # Deployed mainnet source verified byte-for-byte on 2026-09-14.
 RADIO_LIKES_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0"
 RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
@@ -40,6 +41,7 @@ bucket_name = "xtrata-runtime-content-cache"
 [env.preview]
 
 [env.preview.vars]
+MUSIC_PROFILE_ENABLED = "1"
 RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
 
 [[env.preview.d1_databases]]

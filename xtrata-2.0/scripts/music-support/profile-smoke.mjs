@@ -1,0 +1,14 @@
+import {chromium} from 'playwright';import {readFile,mkdir} from 'node:fs/promises';import assert from 'node:assert/strict';
+const browser=await chromium.launch({headless:true,channel:'chrome'});
+try{
+ const page=await browser.newPage();page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const c={id:'a'.repeat(64),name:'jim.btc',action:'link',method:'transfer',support:'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7',owner:'SP13MTGDX16JT7PVP60PSV6DQV422KZ8WXGXD34PY',amount:1234,expires:Date.now()+900000};let completed=0;
+ await page.route('**/*',async route=>{const u=new URL(route.request().url());if(u.pathname==='/api/music-profile'){const b=route.request().postDataJSON();if(b.op==='review')return route.fulfill({json:{challenge:c}});completed++;return route.fulfill({json:{ok:true,action:c.action,name:c.name}});}
+ const file=({'/music/profile':'music/profile.html','/radio/music-profile.js':'public/radio/music-profile.js','/radio/music-hub.css':'public/radio/music-hub.css','/radio/music-heroes.css':'public/radio/music-heroes.css'})[u.pathname];if(!file)return route.fulfill({status:404,body:''});return route.fulfill({body:await readFile(file),contentType:file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'text/javascript'});});
+ const fragment=Buffer.from(JSON.stringify({id:c.id,supportProof:'b'.repeat(130)})).toString('base64url');
+ await page.goto('https://profile.test/music/profile#'+fragment);await page.locator('#profile-transfer').waitFor({state:'visible'});assert.equal(new URL(page.url()).hash,'');assert.equal(completed,0);
+ assert.match(await page.locator('#profile-transfer-details').innerText(),/0.001234 STX/);assert.match(await page.locator('#profile-transfer-details').innerText(),/Memo \(required\): XM/);
+ await page.locator('#profile-txid').fill('0x'+'d'.repeat(64));await page.locator('#profile-check').click();await page.waitForFunction(()=>document.querySelector('#profile-status').textContent.includes('is linked'));assert.equal(completed,1);
+ c.action='unlink';c.method='signature';await page.goto('about:blank');await page.goto('https://profile.test/music/profile#'+fragment);await page.locator('#profile-remove').waitFor({state:'visible'});assert.equal(completed,1);await page.locator('#profile-remove').click();await page.waitForFunction(()=>document.querySelector('#profile-status').textContent.includes('removed'));assert.equal(completed,2);
+ await page.setViewportSize({width:390,height:844});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await mkdir('.artifacts/music-profile',{recursive:true});await page.screenshot({path:'.artifacts/music-profile/unlink-mobile.png',fullPage:true});assert.deepEqual(errors,[]);console.log('Profile browser smoke passed: safe fragment removal, transfer instructions, explicit verify/unlink, mobile layout. Network entirely mocked.');
+}finally{await browser.close();}

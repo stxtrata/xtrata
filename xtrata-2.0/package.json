@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet",
+    "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet && npm run build:music-profile",
     "build:radio-test-wallet": "vite build -c vite.radio-test-wallet.config.ts",
     "build": "vite build",
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
@@ -88,7 +88,8 @@
     "test:radio-support": "node scripts/radio-support/harness.mjs",
     "music:desktop": "npm --prefix desktop/music start",
     "music:desktop:build": "npm --prefix desktop/music run dist:mac",
-    "music:desktop:test": "node scripts/music-support/desktop-smoke.mjs"
+    "music:desktop:test": "node scripts/music-support/desktop-smoke.mjs",
+    "build:music-profile": "vite build -c vite.music-profile.config.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

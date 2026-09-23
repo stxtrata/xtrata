@@ -8,7 +8,7 @@ const root=fileURLToPath(new URL('../../',import.meta.url));
 const stage=await mkdtemp(join(tmpdir(),'music-support-package-'));
 const out=process.env.XTRATA_MUSIC_PACKAGE_OUTPUT?resolve(process.env.XTRATA_MUSIC_PACKAGE_OUTPUT):join(root,'public/downloads');await mkdir(out,{recursive:true});
 // Explicit allowlist: never archive a working directory, vault, journal or .artifacts.
-const names=['music-version.json','music-logo.webp','music-web-bridge.mjs','music-web-approval.html','music-web-approval.js','radio-plays-server.mjs','radio-plays-backend.mjs','radio-listening.mjs','radio-listening-policy.mjs','radio-media.mjs','radio-plays-panel.html','radio-plays-ui.js','radio-plays-ui.css','radio-listening-ui.js','music-lounge.html','music-lounge.css','music-lounge.js','music-release-policy.mjs','inscribe.mjs','compose.mjs','personas.mjs'];
+const names=['music-profile-proof.mjs','music-profile-local.mjs','music-profile-ui.js','music-version.json','music-logo.webp','music-web-bridge.mjs','music-web-approval.html','music-web-approval.js','radio-plays-server.mjs','radio-plays-backend.mjs','radio-listening.mjs','radio-listening-policy.mjs','radio-media.mjs','radio-plays-panel.html','radio-plays-ui.js','radio-plays-ui.css','radio-listening-ui.js','music-lounge.html','music-lounge.css','music-lounge.js','music-release-policy.mjs','inscribe.mjs','compose.mjs','personas.mjs'];
 try{
  const target=join(stage,'xtrata-music-support');
  for(const rel of ['src/lib/radio/artist-credits.mjs',...names.map(n=>'scripts/wizard/'+n)]){await mkdir(dirname(join(target,rel)),{recursive:true});await copyFile(join(root,rel),join(target,rel));}

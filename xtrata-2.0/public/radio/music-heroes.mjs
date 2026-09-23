@@ -33,19 +33,35 @@ export function mountHeroes() {
   const reader=document.querySelector('[data-heroes-reader]'); if(!reader)return;
   const list=document.querySelector('#heroes-list'), search=document.querySelector('#hero-search');
   let state={plays:[],tracks:new Map(),complete:false,status:'Loading confirmed payments…'}, shown=50;
+  const profiles=new Map(),checked=new Map();let fetchingProfiles=false;
+  async function loadProfiles(heroes){
+    if(fetchingProfiles)return;
+    const addresses=heroes.map(w=>w.address).filter(a=>/^SP[A-Z0-9]{26,40}$/.test(a)&&Date.now()-(checked.get(a)||0)>300000).slice(0,5);
+    if(!addresses.length)return;fetchingProfiles=true;
+    addresses.forEach(a=>checked.set(a,Date.now()));
+    try{
+      const r=await fetch('/api/music-profile?addresses='+encodeURIComponent(addresses.join(',')),{signal:AbortSignal.timeout(15000),cache:'no-store'});
+      if(r.ok){const data=await r.json();addresses.forEach(a=>profiles.delete(a));for(const p of data.profiles||[])if(addresses.includes(p.address)&&typeof p.name==='string')profiles.set(p.address,p);}
+      else addresses.forEach(a=>profiles.delete(a));
+    }catch{addresses.forEach(a=>profiles.delete(a));}
+    finally{fetchingProfiles=false;render();}
+  }
   function render() {
     const opened=new Set([...list.querySelectorAll('details[open]')].map(n=>n.dataset.address));
     const heroes=aggregateHeroes(state.plays,state.tracks), amount=heroes.reduce((n,w)=>n+w.amount,0n), count=heroes.reduce((n,w)=>n+w.count,0);
     document.querySelector('#hero-totals').textContent=`${count.toLocaleString()} paid plays · ${heroes.length.toLocaleString()} support wallets · ${stx(amount)} STX to holders`;
     document.querySelector('#hero-status').textContent=`${state.complete?'Full history loaded.':'Provisional rankings — full history is loading.'} ${state.status || ''}`;
+    void loadProfiles(heroes);
     const term=search.value.trim().toLowerCase();
-    const matches=heroes.filter(w=>[w.address,...w.songs.flatMap(s=>[s.title,s.artist,String(s.id)])].some(v=>v.toLowerCase().includes(term)));
+    const matches=heroes.filter(w=>[w.address,profiles.get(w.address)?.name||'',...w.songs.flatMap(s=>[s.title,s.artist,String(s.id)])].some(v=>v.toLowerCase().includes(term)));
     list.replaceChildren();
     for(const w of matches.slice(0,shown)) {
       const card=el('details',undefined,'hero-card');card.dataset.address=w.address;card.open=opened.has(w.address);card.style.setProperty('--tier',w.tier[2]);
       const summary=el('summary'), rank=el('span',`#${w.rank}`,'hero-rank'), identity=el('span',undefined,'hero-identity');
-      identity.append(el('strong',w.address),el('span',w.tier[1],'tier-badge'));
-      summary.append(rank,identity,el('strong',`${w.count.toLocaleString()} paid plays`));card.append(summary);
+      const profile=profiles.get(w.address);let evidence;
+      identity.append(el('strong',profile?.name||w.address),el('span',w.tier[1],'tier-badge'));
+      if(profile){identity.append(el('small',w.address),el('small','BNS link verified by Xtrata'));evidence=el('a','View verification evidence');evidence.href='/api/music-profile?addresses='+encodeURIComponent(w.address);evidence.target='_blank';evidence.rel='noopener';}
+      summary.append(rank,identity,el('strong',`${w.count.toLocaleString()} paid plays`));card.append(summary);if(evidence)card.append(evidence);
       const stats=el('div',undefined,'hero-stats');
       const stat=(label,value)=>{const item=el('div');item.append(el('small',label),el('strong',value));stats.append(item);};
       stat('Direct support',`${stx(w.amount)} STX`);stat('Songs supported',String(w.songs.length));stat('Recipients supported',String(w.recipients.size));
