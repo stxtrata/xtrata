@@ -111,3 +111,14 @@ continues to filter the matching count without changing the overall headline.
 The public Lounge module URL is cache-busted. All three history UI tests pass,
 including stale-cache/newer-partial-history with a failed subsequent fetch.
 This website change is not included in the already-built Mac artifacts.
+
+## Publication authorised / Windows inspection correction
+
+The user authorised building and publishing these versions as collapsed Lounge
+betas. Candidate defaults remain unchanged; no live spending is authorised.
+Windows run 35885957625 at 1a8c4e77a passed shared tests, contracts, source closure,
+native DPAPI, desktop playback, startup and NSIS build. Final ASAR content inspection
+failed because the ASAR library splits internal paths using the host separator.
+The new threshold-content checks passed slash paths on Windows. Normalize those
+paths with `path.join` before extraction; retain every inspection check. Local
+Mac ASAR inspection passes with the correction. Native Windows rerun required.

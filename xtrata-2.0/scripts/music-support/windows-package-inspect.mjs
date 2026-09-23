@@ -85,7 +85,7 @@ if(matchedForbidden.length||missingRequired.length){
 
 // No threshold override exists in production. Harnesses use genuine short media.
 for(const path of ['app/scripts/wizard/radio-listening.mjs','app/scripts/wizard/radio-listening-policy.mjs','app/scripts/wizard/radio-listening-ui.js']){
- const source=extractFile(archive,path).toString('utf8');
+ const source=extractFile(archive,join(...path.split('/'))).toString('utf8');
  if(/thresholdOverride|testThreshold|XTRATA_TEST_THRESHOLD/.test(source))throw Error('Test threshold override found in packaged runtime.');
 }
 const report={
