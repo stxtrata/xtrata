@@ -122,6 +122,17 @@
       "verified": true,
       "preview": true,
       "betaBuild": 1
+    },
+    {
+      "platform": "win-x64",
+      "version": "1.0.9",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.9-windows-beta.1/Xtrata-Music-1.0.9-windows11-preview-x64.exe",
+      "sha256": "a3574e685330a46248d513bbd59f6e29911ad370e67666529647722885f79717",
+      "requirements": "Cross-device BNS verification links, Windows input-focus fix and resilient 503 retries. Windows 11 x64 (Intel/AMD). Unsigned beta. Native Windows automated checks passed; physical-PC and live-payment testing pending. No Node.js or extension required.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
     }
   ]
 }

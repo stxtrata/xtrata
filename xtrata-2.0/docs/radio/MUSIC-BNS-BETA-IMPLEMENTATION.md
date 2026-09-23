@@ -361,3 +361,24 @@ release includes standard/Monterey DMG and ZIP archives plus checksum files.
 Two compact Mac 1.0.6 rows have been appended to the release manifest and
 static Lounge fallback; older downloads remain unchanged. Windows 1.0.9
 publication remains blocked pending the native CI rerun from `dfc0a7a26`.
+
+## Completed Windows 1.0.9 publication — 2026-09-24
+
+Native Windows run `35931502187` passed on source
+`f79bc61620db55063d0a3c05f98c0c12eef2e295` after the CI scheduling correction.
+168 shared tests and 29 contract/receipt tests passed, plus DPAPI persistence,
+isolated desktop/startup/single-instance checks and source/package inspection.
+No assertions were removed. Physical PC/audio and live transfers were NOT RUN.
+The signing probe reported Unavailable; this release is advertised as unsigned.
+
+Published prerelease: `music-v1.0.9-windows-beta.1`. Installer:
+`Xtrata-Music-1.0.9-windows11-preview-x64.exe` (121573122 bytes).
+SHA-256: `a3574e685330a46248d513bbd59f6e29911ad370e67666529647722885f79717`.
+The downloaded artifact, native report, checksum file and GitHub asset digest
+all agree. Local evidence: `.artifacts/music-windows-109-beta1/`.
+Reproduce through `music-desktop.yml`, target `windows`, at that source revision.
+
+The Lounge now includes all three new installers as closed compact rows,
+retaining all existing normal and beta versions. Release JSON and static HTML
+use the same verified URL/version/checksum. Compact-row test passed; website
+build and deployments are the final publication checks.
