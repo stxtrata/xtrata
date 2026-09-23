@@ -1,14 +1,14 @@
 import {randomBytes} from 'node:crypto';
 import {policy,publicEntry} from './radio-plays-backend.mjs';
-// One tab, bounded approval, no persistent auto-enable and no backlog.
+// One tab, session approval. Optional bounded chaining retains only signed submissions.
 export class RadioListening {
- constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
+ constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;this.startTail=Promise.resolve();this.waitingStarts=0;}
  async recover(){
-  const a=this.active;if(!a||this.inFlight||this.recovering||this.wizard.running)return;
+  const a=this.active;if(!a||this.inFlight||this.waitingStarts||this.recovering||this.wizard.running)return;
   if(this.nextRecovery&&Date.now()<this.nextRecovery)return;
   const pending=await this.wizard.journal();if(!pending.some(e=>!['confirmed','failed'].includes(e.status))){this.recovery=null;this.recoveryFailures=0;return;}
   this.nextRecovery=Date.now()+30000;this.recovering=true;
-  try{await this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}));});this.recovery=null;this.recoveryFailures=0;}
+  try{this.recoveryTask=this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}));});await this.recoveryTask;this.recovery=null;this.recoveryFailures=0;}
   catch(e){this.recovery=e.message;this.recoveryFailures=(this.recoveryFailures||0)+1;}
   finally{this.recovering=false;}
  }
@@ -52,6 +52,20 @@ export class RadioListening {
  }
  free(input){this.check(input);this.disable();return this.snapshot();}
  async start(p){
+  if(!this.wizard.queuedPaidStarts)return this.startImmediate(p);
+  this.check(p);
+  const free=reason=>({id:p.id,song:p.song,outcome:'free',reason});
+  if(this.waitingStarts>=this.wizard.maxPending)return free('Submission busy. This start stays free.');
+  const deadline=Date.now()+20000;this.waitingStarts++;
+  const task=this.startTail.catch(()=>{}).then(async()=>{
+   if(this.recoveryTask)await this.recoveryTask.catch(()=>{});
+   this.check(p);if(Date.now()>deadline)return free('Submission window elapsed. This start stays free.');
+   return this.startImmediate(p);
+  });
+  this.startTail=task.catch(()=>{});
+  try{return await task;}finally{this.waitingStarts--;}
+ }
+ async startImmediate(p){
   const keys=Object.keys(p||{}).sort().join(',');
   if(!p||!['duration,id,song,tab,token','id,song,tab,token'].includes(keys)||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
   const a=this.check(p);if(this.seen.has(p.id))return this.seen.get(p.id);
@@ -71,7 +85,13 @@ export class RadioListening {
    if(existing){row.outcome=existing.status;row.reason='Already recorded; no second payment.';row.txid=existing.txid;return row;}
    // Recheck consent after the asynchronous journal read.
    this.check(p);a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
-   const operation=this.wizard.run({core:3,song:p.song,fee:a.fee,count:1},{playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)});
+   const input={core:3,song:p.song,fee:a.fee,count:1},context={playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)};
+   if(this.wizard.queuedPaidStarts){
+    try{const entry=await this.wizard.submitNext(input,context);row.outcome=entry.status;row.txid=entry.txid;row.reason='Payment submitted; waiting for confirmation.';return row;}
+    catch(error){const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);row.outcome=entry?'unknown':'free';row.reason=error.message;if(entry)row.txid=entry.txid;return row;}
+    finally{this.inFlight=false;}
+   }
+   const operation=this.wizard.run(input,context);
    void operation.then(()=>{row.outcome='confirmed';row.reason='Paid start confirmed.';}).catch(async error=>{
     row.reason=error.message;row.outcome='unavailable';
     try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':entry.status==='failed'?'failed':'unknown';row.txid=entry.confirmedTxid||entry.failedTxid||entry.txid;}}catch{row.outcome='unknown';}
