@@ -7,6 +7,19 @@ Targets: standard/legacy universal Mac 1.0.4 and native Windows 11 x64 1.0.7.
 Public manifests, download links and releases remain unchanged. No live payment
 or return test has been authorised or run in this phase.
 
+## Publication placement — user requirement
+
+When publication is separately authorised and the release gates are met, keep
+the existing versions and their download links visible on the public Music
+Lounge. Below those existing downloads, add an expandable section labelled
+**Beta Versions**, collapsed by default. Place both Mac 1.0.4 builds (standard
+and legacy) and Windows 1.0.7 in that section, with accurate platform/version
+labels, download links, checksums and preview/signing information. Do not replace
+the existing download cards or promote these beta builds as stable updates.
+Verify the collapsed initial state, expansion by mouse and keyboard, and every
+artifact link/version before publication. This placement request does not
+authorise publication or bypass the remaining validation gates.
+
 ## Build checkpoint
 
 - Standard Mac: PASS — universal 1.0.4 DMG and ZIP built and inspected.
