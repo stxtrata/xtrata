@@ -103,3 +103,13 @@ state, mouse expansion and keyboard collapse. Screenshot and structured check:
 and desktop/mobile browser smoke passed. Publication is complete. Source/report
 commits still need the user-managed push so future repository deployments retain
 these links; no Git push was performed by the agent.
+
+## Subsequent in-app branding change (not in published installers)
+
+The supplied Xtrata X now replaces the text X in the local/desktop Lounge header
+and default artwork placeholder. The WebP is copied into both desktop variants
+and the source companion, and served through the authenticated desktop route.
+Source archive closure and 14 packaging/desktop tests passed. Isolated Chromium
+verified both images decode/render without accessing any wallet. Screenshot:
+`.artifacts/music-logo/lounge.png`. Existing published installers are immutable
+and do not contain this subsequent change; a new installer build is required.

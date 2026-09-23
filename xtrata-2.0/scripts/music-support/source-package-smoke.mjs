@@ -30,6 +30,7 @@ try{
  const packageRoot=join(expanded,'xtrata-music-support');
  const requiredAssets=[
   'scripts/wizard/music-version.json',
+  'scripts/wizard/music-logo.webp',
   'scripts/wizard/music-lounge.html',
   'scripts/wizard/radio-plays-panel.html',
   'scripts/wizard/music-web-approval.html',

@@ -21,8 +21,9 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/music-logo.webp','/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
   }
+  if(req.method==='GET'&&req.url==='/music-logo.webp'){res.setHeader('Content-Type','image/webp');res.end(await readFile(join(root,'scripts/wizard/music-logo.webp')));return;}
   if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
    const info=await version;let latest=null;
    if(req.url==='/app-version?check=1'){
