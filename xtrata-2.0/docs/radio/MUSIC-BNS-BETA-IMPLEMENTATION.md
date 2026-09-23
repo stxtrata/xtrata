@@ -178,3 +178,23 @@ Preview deployment emitted an existing configuration warning that
 deployment or BNS readiness check. This release does not change likes settings.
 No Git push was performed; the user retains control of pushing the final
 website/report commits.
+
+## Profile wallet connection correction — 2026-09-23
+
+The first published page called Connect's legacy structured-signature popup
+helper without a Blockstack login session. Its default-option lookup threw
+“No user data found” before the wallet opened, despite an explicit owner address.
+The page now reuses Xtrata's wallet chooser/session store, displays the connected
+address and offers connect/switch/disconnect. Verify connects if needed, checks
+the connected owner and expiry, then builds the unsigned structured-message
+request directly with the explicit mainnet network/address. It sends that request
+to the selected wallet's signing provider (Xverse's Stacks bridge when its Bitcoin
+bridge handled account selection). No legacy user-data lookup is required.
+Server-side owner-signature verification remains authoritative.
+
+Checks: 17 targeted page/API tests passed, including real request-envelope
+serialization without a legacy session, Xverse bridge selection, wrong-owner
+rejection and cancellation/retry. Mocked browser transfer/unlink/mobile smoke and
+full website build passed. Real extension signing remains user verification; no
+personal wallet was accessed and no signature or transaction was requested.
+This is a website-only correction; installed desktop betas need no rebuild.

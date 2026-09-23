@@ -1,4 +1,6 @@
-import {showSignStructuredMessage} from '@stacks/connect';
+import {signStructuredMessage, legacyNetworkFromConnectNetwork} from '@stacks/connect';
+import {connectWallet, disconnectWallet, getStacksProvider, getSelectedWalletProviderId} from '../lib/wallet/connect';
+import {createWalletSessionStore} from '../lib/wallet/session';
 import {profileData} from '../../scripts/wizard/music-profile-proof.mjs';
 const $=(id:string)=>document.getElementById(id)!;
 const status=(s:string)=>{$('profile-status').textContent=s;};
@@ -9,9 +11,41 @@ async function finish(extra={}){
  try{const d=await call({op:'complete',...proof,...extra});status(d.pending?d.message:d.action==='unlink'?'Your name link has been removed. Payment history is unchanged.':'Your BNS name is linked. Music Heroes can now show it alongside your wallet.');if(!d.pending)$('profile-actions').hidden=true;}
  catch(e){status((e as Error).message);}finally{busy=false;}
 }
+const store=createWalletSessionStore();
+let wallet=store.load();
+function renderWallet(){
+ $('profile-wallet-address').textContent=wallet.address?`Connected: ${wallet.address}`:'Connect the wallet that owns your BNS name.';
+ $('profile-connect').textContent=wallet.isConnected?'Switch wallet':'Connect wallet';
+ $('profile-disconnect').hidden=!wallet.isConnected;
+}
+async function connect(){
+ wallet=await connectWallet({appName:'Xtrata Music Heroes',appIcon:location.origin+'/favicon.ico'});
+ store.save(wallet);renderWallet();
+ return wallet.isConnected;
+}
+$('profile-connect').onclick=async()=>{if(busy)return;busy=true;try{await connect();status(wallet.isConnected?'Wallet connected. You can now verify your BNS link.':'Connection cancelled.');}catch(e){status((e as Error).message);}finally{busy=false;}};
+$('profile-disconnect').onclick=async()=>{if(busy)return;busy=true;try{await disconnectWallet();store.clear();wallet=store.load();renderWallet();status('Wallet disconnected.');}catch(e){status((e as Error).message);}finally{busy=false;}};
+renderWallet();
 $('profile-sign').onclick=async()=>{
  if(busy||!challenge)return;busy=true;status('Approve the profile message in the wallet that owns this BNS name. No transaction is requested.');
- try{await showSignStructuredMessage({...profileData(challenge,'owner'),network:'mainnet',stxAddress:challenge.owner,onFinish:d=>{busy=false;void finish({ownerProof:d.signature});},onCancel:()=>{busy=false;status('Verification cancelled. Nothing changed.');}});}catch(e){busy=false;status((e as Error).message);}
+ try{
+  if(!wallet.isConnected&&!(await connect())){status('Connect your BNS wallet to verify.');return;}
+  if(wallet.address!==challenge.owner)throw Error('The connected wallet does not own this BNS name. Use Switch wallet to select '+challenge.owner+'.');
+  if(Date.now()>challenge.expires)throw Error('This request expired. Start a new request in the music app.');
+  let provider=getStacksProvider();
+  // Xverse's account picker uses its Bitcoin bridge; structured signing lives
+  // on its Stacks bridge. Keep the user's selected wallet family.
+  if(/xverse/i.test(getSelectedWalletProviderId()||'')&&typeof provider?.structuredDataSignatureRequest!=='function'){
+   const w=window as any;provider=w.XverseProviders?.StacksProvider??w.xverseProviders?.StacksProvider;
+  }
+  if(typeof provider?.structuredDataSignatureRequest!=='function')throw Error('This wallet does not expose structured-message signing. Try a supported Stacks wallet or choose transfer verification in the music app.');
+  // Build an unsigned request envelope directly. The legacy popup helper reads
+  // Blockstack user data even when an explicit address was supplied.
+  const token=await signStructuredMessage({...profileData(challenge,'owner'),network:legacyNetworkFromConnectNetwork('mainnet'),stxAddress:challenge.owner});
+  const result=await provider.structuredDataSignatureRequest(token);
+  if(!result?.signature)throw Error('The wallet did not return a signature. Nothing was linked.');
+  busy=false;await finish({ownerProof:result.signature});
+ }catch(e){status((e as Error).message||'Verification cancelled. Nothing changed.');}finally{busy=false;}
 };
 $('profile-check').onclick=()=>void finish({txid:($('profile-txid') as HTMLInputElement).value.trim()});
 $('profile-remove').onclick=()=>void finish();
