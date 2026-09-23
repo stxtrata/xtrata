@@ -324,3 +324,23 @@ beta-row test, and isolated profile browser smoke. Mac packaging is running;
 Windows CI requires the source branch to be pushed with user authorisation.
 Do not add new release URLs until the corresponding artifacts are published
 and checksums verified. No live payment tests have been performed.
+
+Installer checkpoint: source `5490476a6`; both Mac 1.0.6 builds finished.
+DMG integrity checks passed. Packaged runtime matches source and both archives
+contain 357 entries without wallet data or test-entry files. The isolated real
+Electron smoke passed (simulated funds only). Package report:
+`.artifacts/music-106/package-report.json`.
+
+- Standard DMG: `.artifacts/music-desktop/Xtrata-Music-1.0.6-mac-universal.dmg`
+  SHA-256 `dc1de667fd1ef1e1565d68efe94421d05f8ad451741489d829ab8662569fbdf3`
+- Monterey DMG: `.artifacts/music-desktop-legacy/Xtrata-Music-Legacy-1.0.6-mac-universal.dmg`
+  SHA-256 `3df766cdec29dcbd436a09be7191471b0ac422d7daba70b0aa745b11cfc69e64`
+
+Both remain unsigned/unnotarized, with no new physical Monterey/Intel or live
+payment checks. Production website deployed at `d9d8c164.xtrata.pages.dev`;
+its six compact beta rows were verified by HTTP. Full website build passed.
+The new installers are NOT published or advertised. Push approval was requested
+and remains pending; after approval push source, run the Windows workflow,
+inspect/download artifacts, publish immutable beta releases and append verified
+links/checksums to both release JSON and the Lounge fallback. Windows 1.0.9
+has not been built on native Windows yet.
