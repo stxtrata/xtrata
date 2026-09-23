@@ -42,6 +42,8 @@
       "release-platforms.mjs",
       "unavailable-wallet.mjs",
       "windows-vault-protection.mjs",
+      "assets/xtrata-music.png",
+      "assets/xtrata-music.ico",
       "app/**/*",
       "package.json",
       "!**/*.map",
@@ -64,7 +66,8 @@
         "dmg",
         "zip"
       ],
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "icon": "assets/xtrata-music.icns"
     },
     "win": {
       "icon": "assets/xtrata-music.ico",
@@ -87,7 +90,8 @@
     },
     "linux": {
       "target": "AppImage",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "assets/xtrata-music.png"
     },
     "artifactName": "Xtrata-Music-${version}-${os}-${arch}.${ext}"
   }
