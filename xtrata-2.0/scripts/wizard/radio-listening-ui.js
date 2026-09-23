@@ -61,7 +61,8 @@
  $('radio-free').onclick=()=>void free();
  $('radio-enable').onclick=async()=>{
   if(approval)return;
-  if(!$('radio-approve').checked){const message='Please tick the agreement above before turning on automatic payments. Listening stays free.';$('radio-payment').textContent=message;const prompt=$('support-consent-prompt');if(prompt){prompt.textContent=message;prompt.hidden=false;$('support-agreement').classList.add('needs-agreement');$('radio-approve').setAttribute('aria-invalid','true');$('radio-approve').scrollIntoView({block:'center',behavior:'smooth'});}$('radio-approve').focus();return;}
+  const activationStatus=$('support-activation-status');if(activationStatus){activationStatus.hidden=false;activationStatus.textContent='Checking wallet and previous payments…';}
+  if(!$('radio-approve').checked){if(activationStatus)activationStatus.hidden=true;const message='Please tick the agreement above before turning on automatic payments. Listening stays free.';$('radio-payment').textContent=message;const prompt=$('support-consent-prompt');if(prompt){prompt.textContent=message;prompt.hidden=false;$('support-agreement').classList.add('needs-agreement');$('radio-approve').setAttribute('aria-invalid','true');$('radio-approve').scrollIntoView({block:'center',behavior:'smooth'});}$('radio-approve').focus();return;}
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
    const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
@@ -69,7 +70,7 @@
    const a=await api('enable',{fee,max,minutes,tab,continuous});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
    mode(`${a.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${a.used}${a.continuous?'':'/'+a.max} starts · fee ${a.fee} microSTX + 50 to holder`);
    $('radio-payment').textContent='Music support stays on for this session. New song starts can pay; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
-  }catch(e){$('radio-payment').textContent=e.message;}finally{$('radio-enable').disabled=!!approval;}
+  }catch(e){$('radio-payment').textContent=e.message;if(activationStatus){activationStatus.hidden=false;activationStatus.textContent='Support could not start: '+e.message+' Listening remains free. Check wallet activity and refresh the balance to check again.';}}finally{if(activationStatus&&(approval||activationStatus.textContent==='Checking wallet and previous payments…'))activationStatus.hidden=true;$('radio-enable').disabled=!!approval;}
  };
  function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=!!approval||continuous;$('radio-paid-minutes').disabled=!!approval||continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The remaining lifetime budget also applies.`;}
  limits();
