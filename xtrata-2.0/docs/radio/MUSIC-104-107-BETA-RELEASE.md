@@ -148,3 +148,14 @@ Downloaded bytes match the native CI report/checksum and source revision.
 CI Authenticode check remains unavailable; independent PE certificate-table
 inspection confirms the installer is unsigned. Final website build and browser
 hub smoke passed. No existing regular download entries were changed.
+
+Beta build 2 publication complete: `music-v1.0.4-mac-beta.2` and
+`music-v1.0.7-windows-beta.2` published as prereleases (`latest=false`). All 12
+uploaded artifacts/checksum/report files matched GitHub digests. Production
+Lounge deployment https://8a0c3259.xtrata.pages.dev from `9194da400` is live at
+https://xtrata.xyz/music/lounge . All six current/beta links returned HTTP 200;
+live Chromium confirmed correct build-2 labels and URLs, a closed initial beta
+section and preservation of existing downloads. Evidence:
+`.artifacts/music-logo-release/verified.json` and `live-downloads.png`.
+Only the logo source commit was explicitly authorised for push and was pushed.
+Final download-page/report commits remain for the user-managed push.
