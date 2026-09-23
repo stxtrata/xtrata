@@ -144,7 +144,7 @@ describe('lounge artwork',()=>{
 
 describe('support approval with an unresolved saved payment',()=>{
  it('keeps approval active, performs recovery only with consent, and stops on revocation',async()=>{
-  const {s,w}=fixture();w.reconcile=vi.fn(async(_log,guard)=>{guard?.();throw Object.assign(Error('Checking earlier payment'),{code:'PAYMENT_UNRESOLVED'});});
+  const {s,w}=fixture();w.journal=async()=>[{status:'unknown'}];w.reconcile=vi.fn(async(_log,guard)=>{guard?.();throw Object.assign(Error('Checking earlier payment'),{code:'PAYMENT_UNRESOLVED'});});
   await s.refreshedSnapshot();expect(w.reconcile).not.toHaveBeenCalled();
   const a=await s.enable({...settings,continuous:true});expect(a.enabled).toBe(true);
   await s.refreshedSnapshot();expect(s.snapshot().recovery).toBe('Checking earlier payment');expect(s.snapshot().enabled).toBe(true);

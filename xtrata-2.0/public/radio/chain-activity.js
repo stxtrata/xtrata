@@ -35,11 +35,12 @@ const localHost = () => ['127.0.0.1', 'localhost'].includes(location.hostname);
 
 async function json(url) {
   const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.timeout(12000)});
-  if (!response.ok) throw Error(`HTTP ${response.status}`);
+  if (!response.ok) throw Object.assign(Error(`HTTP ${response.status}`),{status:response.status});
   return response.json();
 }
 
 async function logs(offset = 0) {
+  if(localHost()){const data=await json('/chain/plays?offset='+offset);if(!Array.isArray(data.results))throw Error('Invalid contract log response');return {scanned:data.results.length,total:Number.isSafeInteger(data.total)?data.total:null,plays:data.results.map(parsePaidPlayEvent).filter(Boolean)};}
   const bases = localHost() ? ['https://api.mainnet.hiro.so'] : ['/hiro/mainnet', 'https://api.mainnet.hiro.so'];
   const paths = [
     `/extended/v2/smart-contracts/${encodeURIComponent(PAID_PLAYS_CONTRACT)}/logs?limit=20&offset=${offset}`,
@@ -52,6 +53,7 @@ async function logs(offset = 0) {
       if (!Array.isArray(data.results)) throw Error('Invalid contract log response');
       return {scanned: data.results.length, total: Number.isSafeInteger(data.total) ? data.total : null, plays: data.results.map(parsePaidPlayEvent).filter(Boolean)};
     } catch (error) {
+      if(error.status===429)throw error;
       last = error;
     }
   }
@@ -179,7 +181,7 @@ export function mountPaidPlayReaders() {
       if (history) {
         const amount = matches.reduce((sum, play) => sum + play.amount, 0);
         totals.textContent = complete ? `${plays.size.toLocaleString()} total paid starts · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders` : previousTotal ? `${previousTotal.count.toLocaleString()} paid starts at last complete check · updating total automatically…` : `Counting all paid starts… ${plays.size.toLocaleString()} found so far`;
-        summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. Full history loads automatically; totals are provisional until complete.`}`;
+        summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. ${localHost()?'Choose Load full history to fetch older payments.':'Full history loads automatically;'} Totals are provisional until complete.`}`;
         older.disabled = busy || scanning || complete;
         all.disabled = complete || (busy && !scanning);
         all.textContent = scanning ? 'Stop loading history' : 'Load full history';
@@ -220,7 +222,7 @@ export function mountPaidPlayReaders() {
       try {
         while (!complete && !cancelled && !document.hidden) {
           if (!await refresh(true)) break;
-          if (!complete) await new Promise(resolve => setTimeout(resolve, 300));
+          if (!complete) await new Promise(resolve => setTimeout(resolve, localHost()?3000:300));
         }
         if (complete) {
           previousTotal = {count: plays.size, checkedAt: Date.now()};
@@ -230,11 +232,11 @@ export function mountPaidPlayReaders() {
       } finally { scanning = false; render(); }
     }
     async function update() {
-      if (await refresh()) await loadHistory();
+      if (await refresh() && !localHost()) await loadHistory();
     }
     button?.addEventListener('click', () => void update());
     document.addEventListener('visibilitychange', () => {if (!document.hidden) void update();});
-    const timer = setInterval(() => void update(), 15000);
+    const timer = setInterval(() => void update(), localHost()?60000:15000);
     window.addEventListener('pagehide', () => {cancelled = true; clearInterval(timer);}, {once: true});
     void update();
   }

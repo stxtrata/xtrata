@@ -23,7 +23,7 @@ export class RadioWizard {
   this.platform=options.platform||process.platform;this.vaultProtector=options.vaultProtector||null;
   this.now=options.now||Date.now;this.pid=options.pid||process.pid;this.lockStaleMs=options.lockStaleMs||LOCK_STALE_MS;this.canRecoverStaleLock=options.canRecoverStaleLock===true;
   this.isProcessAlive=options.isProcessAlive||((pid)=>{try{process.kill(pid,0);return true;}catch(error){if(error.code==='ESRCH')return false;throw error;}});
-  this.storageFault=null;
+  this.storageFault=null;this.readIntervalMs=options.readIntervalMs??1000;this.apiPending=new Map();this.apiCache=new Map();this.apiTail=Promise.resolve();this.nextReadAt=0;this.cooldownUntil=0;this.rateFailures=0;this.balanceSnapshot=null;this.lastBalanceCheck=null;this.lastPassiveCheck=0;
  }
  async json(name) { return JSON.parse(await readFile(join(this.dir,name),'utf8')); }
  async save(name,v) {
@@ -130,18 +130,55 @@ export class RadioWizard {
   }
   if(T.getAddressFromPrivateKey(key,T.TransactionVersion.Mainnet)!==v.address||v.address===OWNER)throw Error('Wizard identity mismatch.');return key;
  }
- async api(path,options={}) { const r=await this.request('https://api.hiro.so'+path,{...options,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...options.headers}});if(!r.ok){let reason='';try{const body=await r.json();if(typeof body.reason==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason))reason=body.reason;}catch{/* Keep only a bounded node reason code, never raw response data. */}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}return r.json(); }
+ rateLimitError(){const e=Error('Chain service is busy. Checks paused for '+Math.max(1,Math.ceil((this.cooldownUntil-this.now())/1000))+' seconds; listening continues free.');e.status=429;return e;}
+ async api(path,options={}) {
+  const {cacheMs=0,...requestOptions}=options;
+  const read=(requestOptions.method||'GET')==='GET'||path.startsWith('/v2/contracts/call-read/');
+  const key=path+'|'+String(requestOptions.body||'');
+  const ttl=path.includes('/contracts/source/')?3600000:path==='/v2/info'?300000:cacheMs;
+  const cached=this.apiCache.get(key);if(read&&cached&&cached.until>this.now())return structuredClone(cached.value);
+  if(this.now()<this.cooldownUntil)throw this.rateLimitError();
+  if(read&&this.apiPending.has(key))return structuredClone(await this.apiPending.get(key));
+  const perform=async()=>{
+   if(this.now()<this.cooldownUntil)throw this.rateLimitError();
+   const r=await this.request('https://api.hiro.so'+path,{...requestOptions,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...requestOptions.headers}});
+   if(r.status===429){
+    this.rateFailures++;const retry=r.headers?.get?.('retry-after');const seconds=retry&&/^\d+(?:\.\d+)?$/.test(retry)?Number(retry):NaN;
+    const requested=Number.isFinite(seconds)?seconds*1000:retry?Date.parse(retry)-this.now():0;
+    const delay=Math.max(Number.isFinite(requested)?requested:0,Math.min(300000,30000*2**Math.min(this.rateFailures-1,4)));
+    this.cooldownUntil=Math.max(this.cooldownUntil,this.now()+delay);throw this.rateLimitError();
+   }
+   if(!r.ok){let reason='';try{const body=await r.json();if(typeof body.reason==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason))reason=body.reason;}catch{}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}
+   const value=await r.json();this.rateFailures=0;if(read&&ttl){for(const [k,v] of this.apiCache)if(v.until<=this.now())this.apiCache.delete(k);if(this.apiCache.size>=128)this.apiCache.delete(this.apiCache.keys().next().value);this.apiCache.set(key,{until:this.now()+ttl,value});}return value;
+  };
+  // Never queue a signed submission: its caller has just checked consent.
+  if(!read){for(const k of this.apiCache.keys())if(!k.includes('/contracts/source/')&&!k.startsWith('/v2/info|'))this.apiCache.delete(k);return perform();}
+  const task=this.apiTail.catch(()=>{}).then(async()=>{
+   if(this.now()<this.cooldownUntil)throw this.rateLimitError();
+   const delay=this.nextReadAt-this.now();if(delay>0)await new Promise(r=>setTimeout(r,delay));
+   this.nextReadAt=this.now()+this.readIntervalMs;return perform();
+  });
+  this.apiPending.set(key,task);this.apiTail=task.catch(()=>{});
+  try{return structuredClone(await task);}finally{this.apiPending.delete(key);}
+ }
+
  async read(fn,args=[]) {const r=await this.api(`/v2/contracts/call-read/${OWNER}/${NAME}/${fn}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sender:OWNER,arguments:args.map(T.cvToHex)})});if(!r.okay)throw Error('Contract read failed.');return T.cvToJSON(T.hexToCV(r.result));}
  async journal(){try{return await this.json('journal.json');}catch(e){if(e.code==='ENOENT')return [];throw e;}}
  async status(chain=false) {
   const diskRunning=await stat(join(this.dir,'run.lock')).then(()=>true,e=>{if(e.code==='ENOENT')return false;throw e;});
   const {address}=await this.json('vault.json');let balance=null,recovery=null;
   if(chain){
-   try{const account=await this.api(`/v2/accounts/${address}?proof=0`);balance=BigInt(account.balance).toString();}catch{recovery='Balance unavailable. Your funding address is still shown; refresh before enabling support.';}
-   if(balance!==null&&!diskRunning&&!this.running){try{await this.exclusive(async()=>{await this.reconcile(await this.journal());await this.reconcileReturns();});}catch(e){recovery=e.message;}}
+   if(this.now()-this.lastBalanceCheck>=60000||this.lastBalanceCheck===null){
+    this.lastBalanceCheck=this.now();
+    try{const account=await this.api(`/v2/accounts/${address}?proof=0`,{cacheMs:30000});this.balanceSnapshot=BigInt(account.balance).toString();this.balanceStale=false;}
+    catch(e){this.balanceStale=true;this.balanceError=e.status===429?e.message:'Balance unavailable. Showing the last known balance when available.';}
+   }
+   balance=this.balanceSnapshot;if(this.balanceStale)recovery=this.balanceError;
+   // Payment reconciliation belongs to listening/confirmation, not balance refresh.
+   if(!diskRunning&&!this.running&&this.now()-this.lastPassiveCheck>=60000){this.lastPassiveCheck=this.now();try{await this.exclusive(()=>this.reconcileReturns());}catch(e){recovery=e.message;}}
   }
   const log=await this.journal(),returns=await this.optional('returns.json',[]),quote=await this.optional('return-quote.json',null);
-  return {address,balanceMicroSTX:balance,overLimit:balance!==null&&BigInt(balance)>1000000n,
+  return {address,balanceMicroSTX:balance,balanceStale:!!this.balanceStale,rateLimited:this.now()<this.cooldownUntil,overLimit:balance!==null&&BigInt(balance)>1000000n,
    running:this.running||diskRunning,stopped:this.stopped,recovery,
    message:this.storageFault||(diskRunning&&!this.running?'A backend operation holds the process lock.':this.message),
    spendCeilingMicroSTX:10000,entries:log.map(publicEntry),returns:returns.map(publicEntry),
@@ -355,7 +392,7 @@ export class RadioWizard {
     const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
     e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
     let confirmed=false;
-    for(let attempt=0;attempt<120;attempt++){this.guard();await new Promise(r=>setTimeout(r,5000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
+    for(let attempt=0;attempt<20;attempt++){this.guard();await new Promise(r=>setTimeout(r,30000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(error.status!==429&&!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
    }
    this.message='Run confirmed; receipts verified.';

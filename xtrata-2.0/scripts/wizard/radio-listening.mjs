@@ -6,7 +6,8 @@ export class RadioListening {
  async recover(){
   const a=this.active;if(!a||this.inFlight||this.recovering||this.wizard.running)return;
   if(this.nextRecovery&&Date.now()<this.nextRecovery)return;
-  this.nextRecovery=Date.now()+15000;this.recovering=true;
+  const pending=await this.wizard.journal();if(!pending.some(e=>!['confirmed','failed'].includes(e.status))){this.recovery=null;this.recoveryFailures=0;return;}
+  this.nextRecovery=Date.now()+30000;this.recovering=true;
   try{await this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}));});this.recovery=null;this.recoveryFailures=0;}
   catch(e){this.recovery=e.message;this.recoveryFailures=(this.recoveryFailures||0)+1;}
   finally{this.recovering=false;}
@@ -25,7 +26,7 @@ export class RadioListening {
  }
  snapshot(){
   if(this.active&&((!this.active.continuous&&(Date.now()>=this.active.expires||Date.now()>=this.active.lease))||this.active.epoch!==this.wizard.stopEpoch))this.disable();
-  const a=this.active;return {enabled:!!a,continuous:!!a?.continuous,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,recovery:this.recovery||null,recoveryFailures:this.recoveryFailures||0,events:this.events.slice(-100).reverse()};
+  const a=this.active;return {enabled:!!a,continuous:!!a?.continuous,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,recovery:this.wizard.now?.()<this.wizard.cooldownUntil?'Chain service is busy; checks are cooling down. Music continues free.':this.recovery||null,recoveryFailures:this.recoveryFailures||0,events:this.events.slice(-100).reverse()};
  }
  disable(){if(this.active){const epoch=this.active.epoch;clearTimeout(this.timer);this.active=null;if(epoch===this.wizard.stopEpoch)this.wizard.stop();}}
  check(input){this.snapshot();if(!this.active||input.token!==this.active.token||input.tab!==this.active.tab)throw Error('Paid approval is absent, expired or belongs to another tab. Listening stays free.');return this.active;}

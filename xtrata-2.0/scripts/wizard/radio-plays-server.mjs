@@ -21,7 +21,7 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/start'].includes(path))throw Error('Unavailable in desktop app.');
   }
   if(req.method==='GET'&&req.url.split('?')[0]==='/app-version'){
    const info=await version;let latest=null;
@@ -44,6 +44,11 @@ const server=createServer(async(req,res)=>{
   if(req.method==='GET'&&req.url==='/radio-policy.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/radio-listening-policy.mjs')));return;}
   if(req.method==='GET'&&['/','/ui.js','/ui.css','/radio.js'].includes(req.url)){res.setHeader('Content-Type',req.url==='/'?'text/html':req.url==='/ui.css'?'text/css':'text/javascript');res.end(await readFile(req.url==='/radio.js'?join(root,'scripts/wizard/radio-listening-ui.js'):join(root,'scripts/wizard/radio-plays'+(req.url==='/'?'-panel.html':req.url==='/ui.css'?'-ui.css':'-ui.js'))));return;}
   const url=new URL(req.url,expectedOrigin);
+  if(req.method==='GET'&&url.pathname==='/chain/plays'){
+   const offset=Number(url.searchParams.get('offset')||0);if(!Number.isSafeInteger(offset)||offset<0||offset>1000000)throw Error('Invalid history offset.');
+   try{const data=await wizard.api('/extended/v2/smart-contracts/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0/logs?limit=20&offset='+offset,{cacheMs:60000});res.setHeader('Content-Type','application/json');res.end(JSON.stringify(data));}
+   catch(e){res.statusCode=e.status===429?429:503;if(e.status===429)res.setHeader('Retry-After',String(Math.max(1,Math.ceil((wizard.cooldownUntil-wizard.now())/1000))));res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:'Activity temporarily unavailable.'}));}return;
+  }
   if(req.method==='GET'&&url.pathname==='/radio/catalogue'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({tracks:await media.catalogue(url.searchParams.get('refresh')==='1')}));return;}
   if(req.method==='GET'&&url.pathname==='/radio/artwork'){const artwork=await media.artwork(Number(url.searchParams.get('id')));res.setHeader('Content-Type',artwork.mime);res.setHeader('X-Content-Type-Options','nosniff');res.end(artwork.body);return;}
   if(req.method==='GET'&&url.pathname==='/radio/audio'){

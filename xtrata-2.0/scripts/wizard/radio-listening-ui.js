@@ -95,7 +95,7 @@
  $('radio-load').onclick=()=>void load();
  const catalogueTimer=setInterval(()=>void load(true),180000);
  window.addEventListener('pagehide',()=>{clearInterval(catalogueTimer);metadataAbort?.abort();});
- let polling=false;
+ let polling=false,lastWalletRefresh=0;
  setInterval(async()=>{
   if(polling)return;polling=true;
   const polledApproval=approval;
@@ -104,7 +104,7 @@
    else if(approval&&s.recovery)mode('SUPPORT WAITING · '+s.recovery);
    else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} starts · fee ${s.fee} microSTX + 50 to holder`);
    else if(s.enabled)mode('FREE PLAY in this tab · support is active in another tab');
-   window.dispatchEvent(new Event('wizard-refresh'));
+   if(Date.now()-lastWalletRefresh>=60000){lastWalletRefresh=Date.now();window.dispatchEvent(new Event('wizard-refresh'));}
   }catch(e){if(approval&&approval===polledApproval){if(!approval.continuous)approval=null;mode(approval?'SUPPORT WAITING · still enabled; reconnecting automatically':'FREE PLAY · connection unavailable');$('radio-payment').textContent=e.message;}}
   finally{polling=false;}
  },10000);

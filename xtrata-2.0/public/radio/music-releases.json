@@ -1,33 +1,33 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "summary": "Xtrata Music desktop previews are available for testing. Each download shows its own version; preview builds are unsigned.",
   "downloads": [
     {
       "platform": "mac-universal",
-      "version": "1.0.2",
-      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.2-mac-preview.1/Xtrata-Music-1.0.2-mac-universal.dmg",
-      "sha256": "f97f3f0b250d25fd9d2058f12674e2564f446abbd48cedb646188f2e70f1152e",
-      "requirements": "macOS 13 Ventura or newer. Intel and Apple silicon included. Shared payment recovery and clearer support UI. Tested on Apple silicon/macOS 26.5.2; Intel hardware and live recovery testing pending. Unsigned preview.",
+      "version": "1.0.3",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.3-mac-preview.1/Xtrata-Music-1.0.3-mac-universal.dmg",
+      "sha256": "e6dfca2dbc6e43398f7e9d34ae2213b5ac98925ae511316489a4ff455130b5e2",
+      "requirements": "macOS 13 or newer. Universal Intel/Apple silicon. Unsigned preview.",
       "signed": false,
       "verified": true,
       "preview": true
     },
     {
       "platform": "mac-universal-legacy",
-      "version": "1.0.2",
-      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.2-mac-preview.1/Xtrata-Music-Legacy-1.0.2-mac-universal.dmg",
-      "sha256": "37b7f6573b08a92e3462f0ecdd797bcf2ef5e3f9706c17b0f355981233770ee7",
-      "requirements": "macOS 12 Monterey compatibility preview. Intel and Apple silicon included. Shared payment recovery and clearer support UI. Electron 43 tested on Apple silicon/macOS 26.5.2; Monterey, Intel and live recovery testing pending. Unsigned. Choose Standard on macOS 13+.",
+      "version": "1.0.3",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.3-mac-preview.1/Xtrata-Music-Legacy-1.0.3-mac-universal.dmg",
+      "sha256": "3599e0076e73db198c5b81ac2269669c023c99891c3b34baf34294e2c9a27371",
+      "requirements": "macOS 12 Monterey or newer. Universal Intel/Apple silicon. Unsigned legacy preview; Monterey hardware testing pending.",
       "signed": false,
       "verified": true,
       "preview": true
     },
     {
       "platform": "win-x64",
-      "version": "1.0.5",
-      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.5-windows-preview.1/Xtrata-Music-1.0.5-windows11-preview-x64.exe",
-      "sha256": "37e3d9d9b0123426555b534aa71d879aedf1f3011ff3a09ec6681cf88937997f",
-      "requirements": "Windows 11 x64 (Intel/AMD). Shared payment recovery, clearer support agreement and mode colours. Unsigned preview. Native Windows CI passed; physical PC and live payment testing pending. No Node.js or extension required.",
+      "version": "1.0.6",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.6-windows-preview.1/Xtrata-Music-1.0.6-windows11-preview-x64.exe",
+      "sha256": "97f6fb693b49d9debec049cc5a5c71eb3d54233a55e5286db5fe7d7b6e34d014",
+      "requirements": "Windows 11 x64 (Intel/AMD). Unsigned testing preview. Native Windows CI checks passed; physical Windows 11 and live payment testing pending. No Node.js or extension required.",
       "signed": false,
       "verified": true,
       "preview": true
