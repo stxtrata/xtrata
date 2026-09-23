@@ -66,3 +66,32 @@ Final lounge verification passed on desktop/mobile. Its previous hard-coded Mac
 1.0.1 expectation was replaced with checks of all three current manifest entries:
 exact link, visible version and checksum. Published-byte comparisons passed before
 the lounge update was committed. The release remains a testing preview.
+
+## Request-efficiency update — Mac 1.0.3 / Windows 1.0.6
+
+Implementation checkpoint (2026-09-23): overlapping balance/recovery polling and
+local full-history scanning were found in the current source. They plausibly
+explain the reported increase in 429s; no server-side trace proves the exact
+request that exhausted the provider quota.
+
+Shared read requests are serialized at one-second intervals and identical active
+requests are coalesced. Immutable deployed source is cached for an hour, network
+identity for five minutes; spending balance/nonce/ownership/receipt checks remain
+fresh. Display balance refreshes at most once per minute and keeps a labelled
+last-known value during outages. Confirmation polling is every 30 seconds;
+passive balance refresh no longer independently reconciles play transactions.
+Recovery scans only unresolved payments. The local public-payments feed uses the
+same coordinator, refreshes once per minute and loads older history on request
+(three seconds between pages). Website automatic history loading is retained.
+
+HTTP 429 applies a shared cooldown respecting Retry-After (seconds or date), with
+30-second exponential fallback up to five minutes. No queued write/replay or fee
+increase is introduced by the transport. Existing consent-bound, exact-byte
+reconciliation remains in place. Normal audio is independent of chain service
+availability. Public quotas still mean zero 429s cannot be guaranteed.
+
+Validation: 98 offline/shared tests passed across 12 suites, including new tests
+for read coalescing/pacing, Retry-After, zero requests during cooldown, no transport
+replay and retained cached balance. All transaction transport was mocked. Native
+Windows verification, rebuilt artifacts and publication are not yet complete at
+this checkpoint. No real payments or funded-wallet changes were made.

@@ -37,7 +37,7 @@ function activity(){
 function render(){
  if(document.body.hasAttribute('data-music-lounge')){$('setup').hidden=!!state?.address;if($('wallet-ready'))$('wallet-ready').hidden=!state?.address;}
  $('address').textContent=state?.address||'No address loaded';$('balance').textContent=stx(state?.balanceMicroSTX);
- $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':'· confirmed balance';
+ $('balance-label').textContent=state?.balanceMicroSTX==null?'· refresh to check funds':state?.balanceStale?'· last known balance — refresh temporarily unavailable':'· confirmed balance';
  balanceWarning();
  if(state?.balanceMicroSTX!=null){const remaining=1000000n-BigInt(state.balanceMicroSTX);$('funding-help').textContent=remaining>0n?`Another ${stx(remaining)} STX would bring your balance to our recommended 1 STX. Check any incoming deposits first. Funding never enables payments.`:'We recommend keeping around 1 STX here. A higher balance does not pause payments.';}
  $('wallet-state').textContent=state?.recovery||state?.message||'No status loaded.';activity();controls();

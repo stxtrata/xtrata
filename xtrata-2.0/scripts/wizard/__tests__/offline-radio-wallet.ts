@@ -14,6 +14,6 @@ const protector={
 };
 export class RadioWizard extends Backend {
  constructor(dir:string,transport=offline){
-  super(dir,transport,{vaultProtector:process.platform==='win32'?protector:null});
+  super(dir,transport,{readIntervalMs:0,vaultProtector:process.platform==='win32'?protector:null});
  }
 }
