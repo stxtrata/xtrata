@@ -9,12 +9,14 @@ it('keeps current downloads and renders beta versions in a closed disclosure',as
  const entry=(version:string)=>({platform:'win-x64',version,url:`https://github.com/stxtrata/xtrata/releases/download/test/app-${version}.exe`,sha256:'a'.repeat(64),verified:true,signed:false,preview:true});
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>({channel:'preview',downloads:[entry('1.0.6')],betaDownloads:[{...entry('1.0.7'),betaBuild:2},{...entry('1.0.8'),betaBuild:1}]})})));
  new Function(script)();
- await vi.waitFor(()=>expect(document.querySelector('#beta-downloads-list a')!.textContent).toBe('Download beta 1.0.7 · build 2'));
- expect(document.querySelector('#beta-downloads-list a')!.textContent).toBe('Download beta 1.0.7 · build 2');
+ await vi.waitFor(()=>expect(document.querySelector('#beta-downloads-list a')!.textContent).toBe('Windows · Intel/AMD · 1.0.7 · build 2'));
+ expect(document.querySelector('#beta-downloads-list a')!.textContent).toBe('Windows · Intel/AMD · 1.0.7 · build 2');
  expect(document.querySelector('#downloads-list')!.textContent).toContain('1.0.6');
  expect(document.querySelector('#downloads-list')!.textContent).not.toContain('1.0.7');
  expect(document.querySelector('#downloads-list')!.textContent).not.toContain('1.0.8');
- expect([...document.querySelectorAll('#beta-downloads-list a')].map(a=>a.textContent)).toEqual(['Download beta 1.0.7 · build 2','Download beta 1.0.8 · build 1']);
+ expect([...document.querySelectorAll('#beta-downloads-list a')].map(a=>a.textContent)).toEqual(['Windows · Intel/AMD · 1.0.7 · build 2','Windows · Intel/AMD · 1.0.8 · build 1']);
+ expect([...document.querySelectorAll('#beta-downloads-list > details')].every(row=>!(row as HTMLDetailsElement).open)).toBe(true);
+ expect(document.querySelector('#beta-downloads-list > details > summary > a')!.getAttribute('href')).toContain('app-1.0.7.exe');
  expect((document.querySelector('#beta-versions') as HTMLDetailsElement).open).toBe(false);
  expect(document.querySelector('#beta-versions > summary')!.textContent).toBe('Beta Versions');
 });

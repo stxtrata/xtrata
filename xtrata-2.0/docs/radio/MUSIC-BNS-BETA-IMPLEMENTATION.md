@@ -309,3 +309,84 @@ bundle built. Transfer discovery tests include no match, wrong sender and a
 valid exact match. No live transfers or cross-device hardware tests performed.
 This change requires website deployment; the new app-side copy button also
 requires the next installer. No installer or deployment produced in this change.
+
+## Cross-device installer refresh checkpoint
+
+Preparing Mac 1.0.6 (standard and Monterey) and Windows 1.0.9 from the shared
+cross-device verification, confirmation-focus and HTTP 503 retry fixes.
+Beta downloads now render one closed row per platform/version with a direct
+name/version download link and native arrow disclosure for requirements and
+checksum. The no-JavaScript fallback uses the same compact rows. Existing
+stable and beta releases are retained.
+
+Checks completed: 71 targeted wallet/profile/desktop/release tests, one compact
+beta-row test, and isolated profile browser smoke. Mac packaging is running;
+Windows CI requires the source branch to be pushed with user authorisation.
+Do not add new release URLs until the corresponding artifacts are published
+and checksums verified. No live payment tests have been performed.
+
+Installer checkpoint: source `5490476a6`; both Mac 1.0.6 builds finished.
+DMG integrity checks passed. Packaged runtime matches source and both archives
+contain 357 entries without wallet data or test-entry files. The isolated real
+Electron smoke passed (simulated funds only). Package report:
+`.artifacts/music-106/package-report.json`.
+
+- Standard DMG: `.artifacts/music-desktop/Xtrata-Music-1.0.6-mac-universal.dmg`
+  SHA-256 `dc1de667fd1ef1e1565d68efe94421d05f8ad451741489d829ab8662569fbdf3`
+- Monterey DMG: `.artifacts/music-desktop-legacy/Xtrata-Music-Legacy-1.0.6-mac-universal.dmg`
+  SHA-256 `3df766cdec29dcbd436a09be7191471b0ac422d7daba70b0aa745b11cfc69e64`
+
+Both remain unsigned/unnotarized, with no new physical Monterey/Intel or live
+payment checks. Production website deployed at `d9d8c164.xtrata.pages.dev`;
+its six compact beta rows were verified by HTTP. Full website build passed.
+The new installers are NOT published or advertised. Push approval was requested
+and remains pending; after approval push source, run the Windows workflow,
+inspect/download artifacts, publish immutable beta releases and append verified
+links/checksums to both release JSON and the Lounge fallback. Windows 1.0.9
+has not been built on native Windows yet.
+
+## Publication run — Windows CI timing
+
+The user pushed `7344df0bd`. Windows run `35930343721` failed only on four
+5-second timeouts in queue/recovery/return filesystem tests; 164 tests passed.
+To reduce hosted-runner I/O contention, the shared suite now uses one worker
+and a 30-second per-test limit. No assertions or application code changed.
+The three affected suites passed locally: 59 tests. A new native Windows run
+is still required before a Windows installer can be published. Push permission
+for the CI-only fix was requested. Mac assets are uploading to a draft release.
+
+Mac 1.0.6 beta published as `music-v1.0.6-mac-beta.1` at source `5490476a6`.
+All four archive hashes match GitHub's uploaded-asset SHA-256 digests. The
+release includes standard/Monterey DMG and ZIP archives plus checksum files.
+Two compact Mac 1.0.6 rows have been appended to the release manifest and
+static Lounge fallback; older downloads remain unchanged. Windows 1.0.9
+publication remains blocked pending the native CI rerun from `dfc0a7a26`.
+
+## Completed Windows 1.0.9 publication — 2026-09-24
+
+Native Windows run `35931502187` passed on source
+`f79bc61620db55063d0a3c05f98c0c12eef2e295` after the CI scheduling correction.
+168 shared tests and 29 contract/receipt tests passed, plus DPAPI persistence,
+isolated desktop/startup/single-instance checks and source/package inspection.
+No assertions were removed. Physical PC/audio and live transfers were NOT RUN.
+The signing probe reported Unavailable; this release is advertised as unsigned.
+
+Published prerelease: `music-v1.0.9-windows-beta.1`. Installer:
+`Xtrata-Music-1.0.9-windows11-preview-x64.exe` (121573122 bytes).
+SHA-256: `a3574e685330a46248d513bbd59f6e29911ad370e67666529647722885f79717`.
+The downloaded artifact, native report, checksum file and GitHub asset digest
+all agree. Local evidence: `.artifacts/music-windows-109-beta1/`.
+Reproduce through `music-desktop.yml`, target `windows`, at that source revision.
+
+The Lounge now includes all three new installers as closed compact rows,
+retaining all existing normal and beta versions. Release JSON and static HTML
+use the same verified URL/version/checksum. Compact-row test passed; website
+build and deployments are the final publication checks.
+
+Final publication checks passed: website build, production deployment
+`50f7b22c.xtrata.pages.dev`, and main-music-updates preview deployment. Both live
+aliases returned nine beta entries with the correct Windows 1.0.9 checksum;
+the public Windows installer link followed successfully to HTTP 200. Release
+links and evidence committed/pushed in `69b1d5898`. All requested installers
+are now published; only the explicitly unperformed hardware/live-money checks
+remain outside this release verification.

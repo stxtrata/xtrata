@@ -50,11 +50,13 @@ jobs:
         name: Install locked contract test dependencies
         working-directory: xtrata-2.0
         run: npm ci --prefix contracts/clarinet --ignore-scripts
+      # Native durable filesystem operations contend under parallel workers on
+      # hosted Windows. Keep all assertions, with a bounded I/O test budget.
       - if: matrix.platform == 'win'
         name: Run shared payment and persistence tests
         working-directory: xtrata-2.0
         run: >-
-          npx --no-install vitest run
+          npx --no-install vitest run --maxWorkers=1 --minWorkers=1 --testTimeout=30000
           scripts/wizard/__tests__/music-profile.test.ts
           functions/api/__tests__/music-profile.test.ts
           functions/api/__tests__/music-profile-transfer.test.ts
