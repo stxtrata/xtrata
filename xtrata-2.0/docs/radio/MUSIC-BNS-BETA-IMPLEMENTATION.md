@@ -309,3 +309,18 @@ bundle built. Transfer discovery tests include no match, wrong sender and a
 valid exact match. No live transfers or cross-device hardware tests performed.
 This change requires website deployment; the new app-side copy button also
 requires the next installer. No installer or deployment produced in this change.
+
+## Cross-device installer refresh checkpoint
+
+Preparing Mac 1.0.6 (standard and Monterey) and Windows 1.0.9 from the shared
+cross-device verification, confirmation-focus and HTTP 503 retry fixes.
+Beta downloads now render one closed row per platform/version with a direct
+name/version download link and native arrow disclosure for requirements and
+checksum. The no-JavaScript fallback uses the same compact rows. Existing
+stable and beta releases are retained.
+
+Checks completed: 71 targeted wallet/profile/desktop/release tests, one compact
+beta-row test, and isolated profile browser smoke. Mac packaging is running;
+Windows CI requires the source branch to be pushed with user authorisation.
+Do not add new release URLs until the corresponding artifacts are published
+and checksums verified. No live payment tests have been performed.
