@@ -10,7 +10,7 @@ const bundledElectron=process.platform==='win32'?'electron.exe':process.platform
 const executable=resolve(process.env.XTRATA_MUSIC_TEST_ELECTRON||join(electronRoot,bundledElectron));
 const packagedAsar=process.platform==='darwin'?resolve(dirname(executable),'../Resources/app.asar'):resolve(dirname(executable),'resources/app.asar');
 if(existsSync(packagedAsar))throw Error('Use an unpackaged Electron runtime for simulated-wallet tests.');
-const version=JSON.parse(await readFile('desktop/music/package.json','utf8')).version;
+const version=JSON.parse(await readFile('desktop/music/app/scripts/wizard/music-version.json','utf8')).version;
 const entry=resolve('desktop/music/app/smoke-entry.mjs'),profile=await mkdtemp(join(tmpdir(),'music-desktop-test-Δ '));
 await writeFile(entry,`
 import {app} from 'electron';

@@ -3,7 +3,16 @@ import {policy} from './radio-plays-backend.mjs';
 // One tab, bounded approval, no persistent auto-enable and no backlog.
 export class RadioListening {
  constructor(wizard,media){this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;}
+ async recover(){
+  const a=this.active;if(!a||this.inFlight||this.recovering||this.wizard.running)return;
+  if(this.nextRecovery&&Date.now()<this.nextRecovery)return;
+  this.nextRecovery=Date.now()+15000;this.recovering=true;
+  try{await this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}));});this.recovery=null;this.recoveryFailures=0;}
+  catch(e){this.recovery=e.message;this.recoveryFailures=(this.recoveryFailures||0)+1;}
+  finally{this.recovering=false;}
+ }
  async refreshedSnapshot(){
+  await this.recover();
   const log=await this.wizard.journal();
   for(const e of log.filter(e=>e.playbackId).slice(-100)){if(!this.events.some(row=>row.id===e.playbackId))this.events.push({id:e.playbackId,song:e.song,at:e.createdAt,outcome:e.status==='confirmed'?'confirmed':e.status==='failed'?'failed':'unknown',reason:e.status==='confirmed'?'Paid start confirmed.':e.status==='failed'?`Paid start failed on-chain (${e.failureStatus||'abort'}); it was not retried.`:'Saved payment awaits reconciliation.',txid:e.confirmedTxid||e.failedTxid||e.txid});}
   for(const row of this.events){
@@ -16,7 +25,7 @@ export class RadioListening {
  }
  snapshot(){
   if(this.active&&((!this.active.continuous&&(Date.now()>=this.active.expires||Date.now()>=this.active.lease))||this.active.epoch!==this.wizard.stopEpoch))this.disable();
-  const a=this.active;return {enabled:!!a,continuous:!!a?.continuous,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,events:this.events.slice(-100).reverse()};
+  const a=this.active;return {enabled:!!a,continuous:!!a?.continuous,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,recovery:this.recovery||null,recoveryFailures:this.recoveryFailures||0,events:this.events.slice(-100).reverse()};
  }
  disable(){if(this.active){const epoch=this.active.epoch;clearTimeout(this.timer);this.active=null;if(epoch===this.wizard.stopEpoch)this.wizard.stop();}}
  check(input){this.snapshot();if(!this.active||input.token!==this.active.token||input.tab!==this.active.tab)throw Error('Paid approval is absent, expired or belongs to another tab. Listening stays free.');return this.active;}
@@ -30,9 +39,9 @@ export class RadioListening {
   const epoch=this.wizard.stopEpoch;
   await this.wizard.exclusive(async()=>{
    const q=await this.wizard.optional('return-quote.json',null);if(q?.expires>Date.now())throw Error('Finish or cancel the return review first.');
-   const log=await this.wizard.journal();await this.wizard.reconcile(log);await this.wizard.reconcileReturns();
+   const log=await this.wizard.journal();try{await this.wizard.reconcile(log);}catch(e){if(!['PAYMENT_UNRESOLVED','RECEIPT_PENDING'].includes(e.code))throw e;this.recovery=e.message;}await this.wizard.reconcileReturns();
    if(!p.continuous&&log.reduce((total,e)=>total+e.fee+50,0)+(p.fee+50)*p.max>10000)throw Error('This approval exceeds the remaining 0.01 STX lifetime test budget.');
-   const {address}=await this.wizard.json('vault.json'),account=await this.wizard.returnAccount(address);
+   const {address}=await this.wizard.json('vault.json'),account=await this.wizard.returnAccount(address,true);
    if(account.balance<BigInt(p.fee+50+(p.continuous?0:1000)))throw Error('Not enough confirmed funds for the next payment.');
    if(epoch!==this.wizard.stopEpoch)throw Error('Approval was stopped. Enable again when ready.');
    this.active={...p,token:randomBytes(16).toString('hex'),used:0,expires:Date.now()+p.minutes*60000,lease:Date.now()+30000,epoch:this.wizard.stopEpoch};
@@ -53,7 +62,7 @@ export class RadioListening {
   // malformed or unavailable inscription cannot create a payment.
   try{await this.media.audio(p.song);}catch{row.reason='Audio could not be verified locally. This start stays free.';return row;}
   if(!a.continuous&&a.used>=a.max){row.reason='Approved start limit reached.';this.disable();return row;}
-  if(this.inFlight||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
+  if(this.inFlight||this.recovering||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
   this.inFlight=true;
   try{
    const saved=await this.wizard.journal();const existing=saved.find(e=>e.playbackId===p.id);

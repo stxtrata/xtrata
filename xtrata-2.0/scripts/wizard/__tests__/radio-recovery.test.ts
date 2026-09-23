@@ -63,3 +63,31 @@ describe('receipt indexing delay',()=>{
   await expect(w.reconcile(await w.journal())).rejects.toThrow('Receipt verification failed');
  }));
 });
+
+describe('automatic exact-byte recovery under current consent',()=>{
+ it('never resends during passive reconciliation; resends identical bytes and persists its limit across restart',()=>fixture(async({w,state,original,dir})=>{
+  await expect(w.reconcile(await w.journal())).rejects.toMatchObject({code:'PAYMENT_UNRESOLVED'});expect(state.sent).toHaveLength(1);
+  const consent=vi.fn();let now=Date.now();w.now=()=>now;
+  for(let n=0;n<3;n++){await expect(w.reconcile(await w.journal(),consent)).rejects.toMatchObject({code:'PAYMENT_UNRESOLVED'});now+=61000;}
+  expect(state.sent).toHaveLength(4);for(const tx of state.sent)expect(Buffer.from(tx.serialize()).toString('hex')).toBe(original.raw);
+  const restarted=new RadioWizard(dir);restarted.api=w.api;restarted.now=()=>now;
+  await expect(restarted.reconcile(await restarted.journal(),consent)).rejects.toThrow('retry limit');expect(state.sent).toHaveLength(4);
+  expect((await w.journal())[0].resendAttempts).toBe(3);
+ }));
+ it('does not resend when nonce is used, receipt exists, or stop happens after saving',()=>fixture(async({w,state,original})=>{
+  state.nonce=1;await expect(w.reconcile(await w.journal(),()=>{})).rejects.toThrow('nonce');state.nonce=0;
+  state.receipt=Cl.some(Cl.tuple({core:Cl.uint(3)}));await expect(w.reconcile(await w.journal(),()=>{})).rejects.toThrow('receipt');state.receipt=null;
+  const epoch=w.stopEpoch,save=w.save.bind(w);w.save=async(...args)=>{await save(...args);w.stop();};
+  await expect(w.reconcile(await w.journal(),()=>{if(w.stopEpoch!==epoch)throw Error('Consent stopped');})).rejects.toThrow('Consent stopped');expect(state.sent).toHaveLength(1);
+ }));
+ it('backs off an ambiguous submission and never creates a replacement',()=>fixture(async({w,state,original})=>{
+  const api=w.api;w.api=async(path,opts)=>{if(path==='/v2/transactions')throw Error('transport interrupted');return api(path,opts);};
+  await expect(w.reconcile(await w.journal(),()=>{})).rejects.toThrow('transport interrupted');
+  const post=vi.spyOn(w,'api');await expect(w.reconcile(await w.journal(),()=>{})).rejects.toMatchObject({code:'PAYMENT_UNRESOLVED'});
+  expect(post.mock.calls.some(([p])=>p==='/v2/transactions')).toBe(false);expect((await w.journal())[0].txid).toBe(original.txid);
+ }));
+ it('does not resend if the transaction becomes visible during diagnosis',()=>fixture(async({w,state,original})=>{
+  const api=w.api;let lookups=0;w.api=async(path,opts)=>{if(path.startsWith('/extended/v1/tx/')&&++lookups===2)return {tx_status:'pending'};return api(path,opts);};
+  await expect(w.reconcile(await w.journal(),()=>{})).rejects.toMatchObject({code:'PAYMENT_UNRESOLVED'});expect(state.sent).toHaveLength(1);
+ }));
+});

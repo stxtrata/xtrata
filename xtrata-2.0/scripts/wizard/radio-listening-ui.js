@@ -5,7 +5,9 @@
  function renderSongs(){const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});list.value=String(index<0?0:index);}
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
  function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';document.body.dataset.paymentMode=$('radio-mode').dataset.mode;$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
- let recentEvents=[];
+ let recentEvents=[],diagnostic=null,recoveryDismissed=false;
+ if($('dismiss-recovery'))$('dismiss-recovery').onclick=()=>{recoveryDismissed=true;$('recovery-notice').hidden=true;};
+ if($('copy-recovery'))$('copy-recovery').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(diagnostic,null,2));$('recovery-copy-status').textContent='Report copied. No private keys or signed transaction data included.';}catch{$('recovery-copy-status').textContent='Clipboard unavailable. '+JSON.stringify(diagnostic);}};
  window.addEventListener('wizard-song-metadata',()=>renderEvents(recentEvents));
  function renderEvents(events){
   recentEvents=events;
@@ -66,7 +68,7 @@
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
    const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
-   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid starts over ${minutes} minutes`}? Each costs ${fee} microSTX miner fee + 50 microSTX to the holder, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet.`))return;
+   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid starts over ${minutes} minutes`}? Each costs ${fee} microSTX miner fee + 50 microSTX to the holder, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet. It may resend an unresolved previously authorised payment unchanged at its original fee.`))return;
    const a=await api('enable',{fee,max,minutes,tab,continuous});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
    mode(`${a.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${a.used}${a.continuous?'':'/'+a.max} starts · fee ${a.fee} microSTX + 50 to holder`);
    $('radio-payment').textContent='Music support stays on for this session. New song starts can pay; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
@@ -97,8 +99,9 @@
  setInterval(async()=>{
   if(polling)return;polling=true;
   const polledApproval=approval;
-  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);
+  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
    if(approval&&!s.enabled){approval=null;mode('FREE PLAY · support session ended');}
+   else if(approval&&s.recovery)mode('SUPPORT WAITING · '+s.recovery);
    else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} starts · fee ${s.fee} microSTX + 50 to holder`);
    else if(s.enabled)mode('FREE PLAY in this tab · support is active in another tab');
    window.dispatchEvent(new Event('wizard-refresh'));
