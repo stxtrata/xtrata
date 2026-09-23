@@ -16,7 +16,7 @@ await writeFile(entry,`
 import {app} from 'electron';
 import {launchDesktop} from '../window.mjs';
 app.setPath('userData',${JSON.stringify(profile)});void (async()=>{await app.whenReady();
-let paid=0,balance=1050;const entries=[];
+let paid=0,balance=3150;const entries=[];
 const wizard={stopEpoch:0,running:false,stop(){this.stopEpoch++;},setup:async()=>({address:'SIMULATED WALLET'}),status:async()=>({address:'SIMULATED WALLET',balanceMicroSTX:String(balance),entries,returns:[],message:'Simulation only'}),optional:async()=>null,journal:async()=>entries,reconcile:async()=>{},reconcileReturns:async()=>{},exclusive:async f=>f(),json:async()=>({address:'SIMULATED WALLET'}),returnAccount:async()=>({balance:1000000n}),run:async(p,meta)=>{if(balance<p.fee+50)throw Error('Insufficient confirmed balance for another paid start.');balance-=p.fee+50;paid++;entries.push({...p,...meta,status:'confirmed',recipient:'SIMULATED HOLDER',createdAt:new Date().toISOString()});}};
 // Local three/four-second fixtures exercise real thresholds of two/three seconds.
 // There is no runtime threshold override or chain transport in this harness.

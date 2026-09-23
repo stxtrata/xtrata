@@ -71,3 +71,9 @@ it('keeps unknown duration free when the track ends before thirty seconds',async
  await expect(s.qualify({...p,audibleSeconds:10,threshold:30})).rejects.toThrow('threshold');expect(w.run).not.toHaveBeenCalled();
  }finally{s.disable();}
 });
+it('requires explicit cap semantics and budgets the full cap before approving',async()=>{
+ const {s}=fixture();
+ await expect(s.enable({fee:1000,max:5,minutes:10,tab,continuous:false,feeMode:'cap'})).rejects.toThrow('ceiling');
+ try{await s.enable({fee:1000,max:4,minutes:10,tab,continuous:false,feeMode:'cap'});expect(s.active.feeMode).toBe('cap');}finally{s.disable();}
+ await expect(s.enable({fee:1000,max:4,minutes:10,tab,continuous:false,feeMode:'unknown'})).rejects.toThrow();
+});

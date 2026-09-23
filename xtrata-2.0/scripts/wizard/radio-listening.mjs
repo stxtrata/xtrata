@@ -10,7 +10,7 @@ export class RadioListening {
   if(this.nextRecovery&&Date.now()<this.nextRecovery)return;
   const pending=await this.wizard.journal();if(!pending.some(e=>!['confirmed','failed'].includes(e.status))){this.recovery=null;this.recoveryFailures=0;return;}
   this.nextRecovery=Date.now()+30000;this.recovering=true;
-  try{this.recoveryTask=this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}));});await this.recoveryTask;this.recovery=null;this.recoveryFailures=0;}
+  try{this.recoveryTask=this.wizard.exclusive(async()=>{this.check({token:a.token,tab:a.tab});await this.wizard.reconcile(await this.wizard.journal(),()=>this.check({token:a.token,tab:a.tab}),a.feeMode==='cap'?{feeCap:a.fee,listeningSession:a.token,continuous:a.continuous,authorised:()=>this.check({token:a.token,tab:a.tab})}:null);});await this.recoveryTask;this.recovery=null;this.recoveryFailures=0;}
   catch(e){this.recovery=e.message;this.recoveryFailures=(this.recoveryFailures||0)+1;}
   finally{this.recovering=false;}
  }
@@ -22,7 +22,7 @@ export class RadioListening {
    const entry=log.find(e=>e.playbackId===row.id);
    if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason=decodePaidReceipt(entry.receipt).kind==='listen'?'Paid listen confirmed.':'Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
    if(entry?.status==='failed'){row.outcome='failed';row.reason=`Paid start failed on-chain (${entry.failureStatus||'abort'}); it was not retried.`;row.txid=entry.failedTxid||entry.txid;}
-   if(entry){row.receiptLabel=decodePaidReceipt(entry.receipt).label;const diagnostic=publicEntry(entry);for(const key of ['nonce','bytes','fee','feeChosen','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason'])if(diagnostic[key]!==undefined)row[key]=diagnostic[key];row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
+   if(entry){row.receiptLabel=decodePaidReceipt(entry.receipt).label;const diagnostic=publicEntry(entry);for(const key of ['nonce','bytes','fee','feeChosen','feeCap','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason'])if(diagnostic[key]!==undefined)row[key]=diagnostic[key];row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
   }
   return this.snapshot();
  }
@@ -34,7 +34,7 @@ export class RadioListening {
  check(input){this.snapshot();if(!this.active||input.token!==this.active.token||input.tab!==this.active.tab)throw Error('Paid approval is absent, expired or belongs to another tab. Listening stays free.');return this.active;}
  renew(input){const a=this.check(input);a.lease=Date.now()+30000;clearTimeout(this.timer);this.timer=setTimeout(()=>this.snapshot(),30100);this.timer.unref?.();return this.snapshot();}
  async enable(p){
-  if(!p||!['fee,max,minutes,tab','continuous,fee,max,minutes,tab'].includes(Object.keys(p).sort().join(','))||(p.continuous!==undefined&&typeof p.continuous!=='boolean')||!Number.isInteger(p.minutes)||p.minutes<1||p.minutes>30||typeof p.tab!=='string'||!/^[a-f0-9]{32}$/.test(p.tab))throw Error('Choose a test duration of 1–30 minutes.');
+  if(!p||!['fee,max,minutes,tab','continuous,fee,max,minutes,tab','continuous,fee,feeMode,max,minutes,tab'].includes(Object.keys(p).sort().join(','))||(p.feeMode!==undefined&&p.feeMode!=='cap')||(p.continuous!==undefined&&typeof p.continuous!=='boolean')||!Number.isInteger(p.minutes)||p.minutes<1||p.minutes>30||typeof p.tab!=='string'||!/^[a-f0-9]{32}$/.test(p.tab))throw Error('Choose a test duration of 1–30 minutes.');
   policy({core:3,song:0,fee:p.fee,count:1});
   if(p.fee<257)throw Error('A play requires at least 257 microSTX. Review the fee before approving.');
   if(!Number.isInteger(p.max)||p.max<1||(!p.continuous&&(p.fee+50)*p.max>5000))throw Error(`Session spending ceiling: choose 1–${Math.floor(5000/(p.fee+50))} starts at this fee (0.005 STX maximum).`);
@@ -44,7 +44,7 @@ export class RadioListening {
   await this.wizard.exclusive(async()=>{
    const q=await this.wizard.optional('return-quote.json',null);if(q?.expires>Date.now())throw Error('Finish or cancel the return review first.');
    const log=await this.wizard.journal();try{await this.wizard.reconcile(log);}catch(e){if(!['PAYMENT_UNRESOLVED','RECEIPT_PENDING'].includes(e.code))throw e;this.recovery=e.message;}await this.wizard.reconcileReturns();
-   if(!p.continuous&&log.reduce((total,e)=>total+e.fee+50,0)+(p.fee+50)*p.max>10000)throw Error('This approval exceeds the remaining 0.01 STX lifetime test budget.');
+   if(!p.continuous&&log.reduce((total,e)=>total+(e.feeCap||e.fee)+50,0)+(p.fee+50)*p.max>10000)throw Error('This approval exceeds the remaining 0.01 STX lifetime test budget.');
    const {address}=await this.wizard.json('vault.json'),account=await this.wizard.returnAccount(address,true);
    if(account.balance<BigInt(p.fee+50+(p.continuous?0:1000)))throw Error('Not enough confirmed funds for the next payment.');
    if(epoch!==this.wizard.stopEpoch)throw Error('Approval was stopped. Enable again when ready.');
@@ -114,7 +114,7 @@ export class RadioListening {
    if(existing){row.outcome=existing.status;row.reason='Already recorded; no second payment.';row.txid=existing.txid;return row;}
    // Recheck consent after the asynchronous journal read.
    this.check(p);a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
-   const input={core:3,song:p.song,fee:a.fee,count:1},context={listen,playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)};
+   const input={core:3,song:p.song,fee:a.fee,count:1},context={...(a.feeMode==='cap'?{feeCap:a.fee}:{}),listen,playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)};
    if(this.wizard.queuedPaidStarts){
     try{const entry=await this.wizard.submitNext(input,context);row.outcome=entry.status;row.txid=entry.txid;row.reason='Payment submitted; waiting for confirmation.';return row;}
     catch(error){const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);row.outcome=entry?'unknown':'free';row.reason=error.message;if(entry)row.txid=entry.txid;return row;}

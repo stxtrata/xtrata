@@ -11,12 +11,14 @@ const tab='a'.repeat(32);
 async function fixture(work){
  const dir=await mkdtemp(join(tmpdir(),'radio-queue-'));
  try{
-  const state={nonce:0,balance:'1000000',sent:[],status:new Map(),bad:false,foreign:[],missing:[],reads:0};
+  const state={nonce:0,balance:'1000000',sent:[],status:new Map(),bad:false,foreign:[],missing:[],reads:0,estimate:257,estimateReads:0,estimateError:null,transferRate:2};
   const source=await readFile(new URL('../../../contracts/live/xtrata-radio-plays-v1.0.clar',import.meta.url),'utf8');
   let address;
   const transport=async(url,opts)=>{
    let value;state.reads++;
-   if(url.endsWith('/v2/info'))value={network_id:1};
+   if(url.endsWith('/v2/fees/transaction')){state.estimateReads++;if(state.estimateError)return {ok:false,status:state.estimateError==='429'?429:400,json:async()=>({reason:state.estimateError})};value={estimations:[state.estimate,state.estimate+10,state.estimate+20].map(fee=>({fee}))};}
+   else if(url.endsWith('/v2/fees/transfer'))value=state.transferRate;
+   else if(url.endsWith('/v2/info'))value={network_id:1};
    else if(url.includes('/source/'))value={source};
    else if(url.includes('/accounts/'))value={nonce:state.nonce,balance:state.balance};
    else if(url.endsWith('/nonces')){const pending=[...new Set(state.sent.filter(t=>Number(t.auth.spendingCondition.nonce)>=state.nonce&&state.status.get('0x'+t.txid())!=='missing').map(t=>Number(t.auth.spendingCondition.nonce)))];value={possible_next_nonce:pending.length?Math.max(...pending)+1:state.nonce,detected_mempool_nonces:[...pending,...state.foreign],detected_missing_nonces:state.missing};}
@@ -124,3 +126,60 @@ describe('queued paid starts with real offline wallet',()=>{
   await w.exclusive(async()=>w.reconcile(await w.journal()));expect((await w.journal()).map(e=>e.status)).toEqual(['confirmed','confirmed']);
  }));
 });
+
+async function capStart(s,a,n=1){s.active.feeMode='cap';s.active.fee=1000;const p={id:n.toString(16).padStart(32,'0'),song:2910,tab,token:a.token};await s.begin(p);s.begins.get(p.id).at-=30000;s.active.beganAt-=30000;return s.qualify({...p,audibleSeconds:30,threshold:30});}
+const bumpApproval=(s,a)=>({feeCap:1000,listeningSession:a.token,continuous:true,authorised:()=>s.check({token:a.token,tab})});
+describe('capped congestion fees and replacements, real offline wallet',()=>{
+ it('uses floor, caches across receipts, and records estimates/cap',()=>fixture(async({s,a,w,state})=>{
+  await capStart(s,a);await capStart(s,a,2);expect(state.estimateReads).toBe(1);const log=await w.journal();expect(log.map(e=>e.fee)).toEqual([257,257]);expect(log[0]).toMatchObject({feeCap:1000,feeChosen:257,feeReason:'floor',feeEstimates:{low:257}});
+ }));
+ it('uses the low estimate, rejects above cap, and reserves cap headroom',()=>fixture(async({s,a,w,state})=>{
+  state.estimate=700;await capStart(s,a);expect((await w.journal())[0].fee).toBe(700);
+  state.balance='1500';expect((await capStart(s,a,2)).outcome).toBe('free');expect(state.sent).toHaveLength(1);
+  state.balance='1000000';w.feeEstimateCheckedAt=undefined;state.estimate=1001;expect((await capStart(s,a,3)).outcome).toBe('free');expect(state.sent).toHaveLength(1);
+ }));
+ it('uses transfer rate when estimates are unavailable',()=>fixture(async({s,a,w,state})=>{
+  state.estimateError='NoEstimateAvailable';await capStart(s,a);expect((await w.journal())[0].fee).toBe(514);
+ }));
+ it('does not sign during 429 cooldown even with a cached estimate',()=>fixture(async({s,a,w,state})=>{
+  await capStart(s,a);state.estimateError='429';w.feeEstimateCheckedAt=undefined;
+  expect((await capStart(s,a,2)).outcome).toBe('free');expect(state.sent).toHaveLength(1);expect(w.cooldownUntil).toBeGreaterThan(w.now());
+ }));
+ it('bumps only the head twice, then refuses another queued listen',()=>fixture(async({s,a,w,state})=>{
+  await capStart(s,a);await capStart(s,a,2);let now=Date.now()+180001;w.now=()=>now;
+  const bump=()=>w.exclusive(async()=>w.bumpPending(await w.journal(),bumpApproval(s,a)));
+  await bump();let log=await w.journal();expect(log.map(e=>e.fee)).toEqual([386,257]);expect(log[0].priorAttempts).toHaveLength(1);
+  now+=180001;await bump();log=await w.journal();expect(log[0].fee).toBe(579);expect(log[0].priorAttempts).toHaveLength(2);
+  now+=180001;await bump();expect(state.sent).toHaveLength(4);expect((await capStart(s,a,3)).outcome).toBe('free');
+  expect(new Set(state.sent.filter(t=>t.auth.spendingCondition.nonce===0n).map(t=>Buffer.from(t.payload.functionArgs[2].buffer).toString('hex'))).size).toBe(1);
+ }));
+ it.each([0,1])('reconciles winning attempt %s without another holder payment',winner=>fixture(async({s,a,w,state})=>{
+  await capStart(s,a);w.now=()=>Date.now()+180001;await w.exclusive(async()=>w.bumpPending(await w.journal(),bumpApproval(s,a)));
+  const id='0x'+state.sent[winner].txid();state.status.set(id,'success');state.nonce=1;await w.exclusive(async()=>w.reconcile(await w.journal()));
+  expect((await w.journal())[0]).toMatchObject({status:'confirmed',confirmedTxid:id,actualFee:winner?386:257});expect(state.sent).toHaveLength(2);
+ }));
+ it('will not bump prepared, too-young or ended approval; stop during save prevents broadcast',()=>fixture(async({s,a,w,state})=>{
+  await capStart(s,a);const approval=bumpApproval(s,a);await w.exclusive(async()=>w.bumpPending(await w.journal(),approval));expect(state.sent).toHaveLength(1);
+  w.now=()=>Date.now()+180001;let log=await w.journal();log[0].status='prepared';await w.save('journal.json',log);await w.exclusive(async()=>w.bumpPending(await w.journal(),approval));expect(state.sent).toHaveLength(1);
+  log[0].status='submitted';await w.save('journal.json',log);const save=w.save.bind(w);w.save=async(n,v)=>{await save(n,v);if(n==='journal.json')s.disable();};
+  await expect(w.exclusive(async()=>w.bumpPending(await w.journal(),approval))).rejects.toThrow();expect(state.sent).toHaveLength(1);expect((await w.journal())[0].status).toBe('prepared');
+ }));
+});
+
+it('falls back to recent estimates, expires them and backs off failed estimation reads',()=>fixture(async({s,a,w,state})=>{
+ state.estimate=400;await capStart(s,a);const tx=state.sent[0];let now=Date.now()+61000;w.now=()=>now;state.estimateError='ServiceUnavailable';
+ expect((await w.choosePlayFee(tx,1000)).fee).toBe(400);const reads=state.estimateReads;await w.choosePlayFee(tx,1000);expect(state.estimateReads).toBe(reads);
+ now+=600000;expect((await w.choosePlayFee(tx,1000)).fee).toBe(257);
+}));
+it('never bumps beyond cap or from a different session and reuses latest missing bytes',()=>fixture(async({s,a,w,state})=>{
+ await capStart(s,a);w.now=()=>Date.now()+180001;const approval=bumpApproval(s,a);
+ await w.exclusive(async()=>w.bumpPending(await w.journal(),{...approval,listeningSession:'other'}));expect(state.sent).toHaveLength(1);
+ state.estimate=5000;w.feeEstimateCheckedAt=undefined;await w.exclusive(async()=>w.bumpPending(await w.journal(),approval));expect((await w.journal())[0].fee).toBe(1000);
+ const latest=state.sent[1].txid();for(const tx of state.sent)state.status.set('0x'+tx.txid(),'missing');
+ await w.exclusive(async()=>w.rebroadcastMissing(await w.journal(),approval.authorised));expect(state.sent[2].txid()).toBe(latest);
+ expect((await capStart(s,a,2)).outcome).toBe('free');expect(state.sent).toHaveLength(3);
+}));
+it('revoking consent during key access prevents signing a replacement',()=>fixture(async({s,a,w,state})=>{
+ await capStart(s,a);w.now=()=>Date.now()+180001;const key=w.key.bind(w);w.key=async()=>{const value=await key();s.disable();return value;};
+ await expect(w.exclusive(async()=>w.bumpPending(await w.journal(),bumpApproval(s,a)))).rejects.toThrow();expect(state.sent).toHaveLength(1);expect((await w.journal())[0].priorAttempts).toBeUndefined();
+}));
