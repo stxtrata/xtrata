@@ -220,3 +220,31 @@ Live verification found the custom domain still overriding the cache header,
 while the immutable Pages deployment correctly returned no-cache. The fix also
 uses a distinct `music-profile-wallet-v2.js` filename (not only a query string)
 so old cached script URLs cannot be reused. No CDN security settings changed.
+
+## Windows focus recovery fix — prepared 1.0.9 beta
+
+User reproduced non-editable BNS text and an unresponsive verification dropdown
+in Windows 1.0.8 after approving Music Support. Alt+Tab restored editing. This
+matches Electron's confirmed Windows native alert/confirm focus-loss issue:
+https://github.com/electron/electron/issues/40212 . The fields are not disabled by
+BNS logic and no drag region/overlay was found over them.
+
+Replaced native `confirm()` in support, BNS profile and operator-test approval
+with an in-document modal. Cancel has initial focus; Escape, Stop and page exit
+cancel without approving. Only Continue resolves approval. Original approval
+text is preserved. Support rechecks its stop generation and agreement before
+calling enable after the asynchronous confirmation. No wallet/key/payment
+backend changes. Mac release metadata remains 1.0.5; Windows next build is 1.0.9.
+
+Verification: 36 desktop/listening unit tests passed. Real isolated Electron
+smoke on this Mac passed, including mouse focus plus keyboard typing in the BNS
+field before/after approval, method selection, Escape/Stop causing zero enable
+requests, free/muted playback, paid simulated loops, no duplicate resume charge
+and sandbox/cookie checks. No real wallet/payment. The initial test attempted
+platform-dependent dropdown keyboard navigation and hung during shutdown;
+replaced with the selector change assertion while retaining real text typing.
+Native Windows focus and popup behaviour is NOT yet verified: push the commit,
+run existing native Windows CI, then test the resulting new installer on the PC.
+Existing published installers and Lounge links remain unchanged pending that
+build. Temporary workaround for installed 1.0.8: Alt+Tab away and back after a
+native confirmation. Source changes alone do not update an installed app.

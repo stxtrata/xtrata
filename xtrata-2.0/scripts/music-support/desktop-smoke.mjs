@@ -30,17 +30,33 @@ let app;
 try{
  app=await electron.launch({executablePath:executable,args:[entry],env:Object.fromEntries(Object.entries(process.env).filter(([k])=>k!=='ELECTRON_RUN_AS_NODE'))});
  console.log('Electron launched');app.process().stderr.on('data',b=>process.stderr.write(b));app.process().stdout.on('data',b=>process.stdout.write(b));
- const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',dialog=>dialog.accept());await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');await page.getByText('Xtrata Music '+version,{exact:true}).waitFor();
+ const page=await app.firstWindow({timeout:15000});page.setDefaultTimeout(15000);console.log('Window opened');page.on('dialog',()=>{throw Error('Unexpected native dialog: Windows focus regression');});await page.getByText('SIMULATED WALLET',{exact:true}).waitFor();console.log('Wallet rendered');await page.getByText('Xtrata Music '+version,{exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>document.cookie),'');
  const origin=await app.evaluate(()=>globalThis.testState.origin);assert.equal((await fetch(origin+'/lounge')).status,400);
  assert.equal(await page.locator('[data-xtrata-chain-plays]').count(),1);assert.equal((await page.evaluate(()=>fetch('/radio-chain-activity.js').then(r=>r.status))),200);
  assert.equal((await page.evaluate(()=>fetch('/profile.js').then(r=>r.status))),200);
  assert.equal(await page.locator('#profile-link').count(),1);
  assert.equal(await page.locator('#profile-open').isVisible(),false);
+ async function checkProfileInputs(){
+  await page.getByText('Name your Music Heroes profile · optional',{exact:true}).click();
+  await page.locator('#profile-name').click();await page.keyboard.press('ControlOrMeta+A');await page.keyboard.type('focus-test.btc');assert.equal(await page.locator('#profile-name').inputValue(),'focus-test.btc');console.log('BNS input accepts click and real keyboard typing');
+  await page.locator('#profile-method').selectOption('transfer');assert.equal(await page.locator('#profile-method').inputValue(),'transfer');
+  await page.getByText('Name your Music Heroes profile · optional',{exact:true}).click();
+ }
+ await checkProfileInputs();
+
  assert.equal((await page.evaluate(()=>fetch('/web-bridge',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.status))),400);
  assert.equal(await page.locator('#setup').isVisible(),false);assert.equal(await page.locator('#wallet-ready').isVisible(),true);
  let enableRequests=0;page.on('request',r=>{if(r.url().endsWith('/listening/enable'))enableRequests++;});
  await page.locator('#radio-enable').click();assert.equal(await page.locator('#support-consent-prompt').isVisible(),true);assert.equal(await page.locator('#radio-approve').isChecked(),false);assert.equal(enableRequests,0);assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'free');
+ // Cancellation and a stop during pending approval must never enable spending.
+ await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();
+ await page.locator('#music-confirm').waitFor();await page.keyboard.press('Escape');
+ await page.locator('#music-confirm').waitFor({state:'detached'});assert.equal(enableRequests,0);
+ await page.locator('#radio-enable').click();await page.locator('#music-confirm').waitFor();
+ await page.evaluate(()=>window.dispatchEvent(new Event('wizard-stop')));
+ await page.locator('#music-confirm').waitFor({state:'detached'});assert.equal(enableRequests,0);
+ await checkProfileInputs();
  // Exercise the actual dropdown change handler before enabling any support.
  await page.waitForFunction(()=>document.querySelectorAll('#radio-songs option').length===2);
  assert.equal(await page.locator('#radio-songs').getAttribute('size'),'8');
@@ -54,9 +70,9 @@ try{
  await page.locator('#radio-audio').evaluate(a=>a.pause());
  console.log('Song dropdown changes track and starts free playback');
  await page.route('**/listening/enable',r=>r.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Saved transaction not visible yet. No replacement or new payment will be made.'})}));
- await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/Support could not start: Saved transaction/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'free');
+ await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.locator('[data-confirm-accept]').click();await page.getByText(/Support could not start: Saved transaction/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'free');
  await page.unroute('**/listening/enable');
- await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.getByText(/SUPPORT ON ·/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'waiting');assert.match(await page.locator('#radio-mode').textContent(),/MUTED/);assert.equal(await page.locator('#support-consent-prompt').isVisible(),false);console.log('Support enabled; muted status is waiting, without payment requests');
+ await page.locator('#radio-approve').check();await page.locator('#radio-enable').click();await page.locator('[data-confirm-accept]').click();await page.getByText(/SUPPORT ON ·/).waitFor();assert.equal(await page.locator('body').getAttribute('data-payment-mode'),'waiting');assert.match(await page.locator('#radio-mode').textContent(),/MUTED/);assert.equal(await page.locator('#support-consent-prompt').isVisible(),false);console.log('Support enabled; muted status is waiting, without payment requests');await checkProfileInputs();
  await page.locator('#radio-audio').evaluate(a=>{a.muted=true;});
  await page.locator('#radio-songs').selectOption('0');
  try{await page.waitForFunction(()=>{const a=document.getElementById('radio-audio');return !a.paused&&a.readyState>=3;});}
@@ -77,4 +93,4 @@ try{
  const prefs=await app.evaluate(()=>globalThis.testState.window.webContents.getLastWebPreferences());assert.equal(prefs.nodeIntegration,false);assert.equal(prefs.sandbox,true);assert.equal(prefs.contextIsolation,true);
  await mkdir('.artifacts/music-desktop-test',{recursive:true});await page.screenshot({path:'.artifacts/music-desktop-test/lounge.png',fullPage:true});
  console.log('PASS: Electron sandbox, cookie isolation, no extension route, muted start stays free, unmute pays once, minimized automatic loops exhaust simulated funds, no pause/resume duplicate, free playback. No real wallet or payments.');
-}finally{await app?.close();await rm(entry,{force:true});await rm(profile,{recursive:true,force:true});}
+}catch(error){console.error('SMOKE FAILURE',error);throw error;}finally{await app?.close();await rm(entry,{force:true});await rm(profile,{recursive:true,force:true});}
