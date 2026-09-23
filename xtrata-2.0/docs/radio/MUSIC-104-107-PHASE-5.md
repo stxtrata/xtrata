@@ -11,10 +11,16 @@ or return test has been authorised or run in this phase.
 
 - Standard Mac: PASS — universal 1.0.4 DMG and ZIP built and inspected.
 - Legacy Mac: PASS — universal 1.0.4 DMG and ZIP built and inspected with pinned Electron 43.7.3.
-- Windows: BLOCKED pending branch push. GitHub authentication is available, but
-  `git ls-remote --heads origin codex/music-104-107` returned no branch. Repository
-  rules leave pushing to the user; push or explicit branch-only permission was
-  requested. No inaccessible Windows step has been represented as passing.
+- Windows: native run [35881875476](https://github.com/stxtrata/xtrata/actions/runs/35881875476)
+  at `88b515241b8fce75495cad3864281d7e2a23c471` passed shared payment/persistence
+  and contract tests, then failed the source-package closure check. That checker
+  incorrectly resolved the browser import `./radio-policy.js` as a source filename
+  instead of the server's HTTP route. Corrected the checker to verify the exact
+  server route and its packaged target, preserving missing-file failures. Local
+  archive closure smoke and source-package tests pass. This is tooling-only;
+  packaged runtime and completed Mac artifacts are unchanged. Native DPAPI,
+  desktop smoke and installer steps were skipped, not passed. A new push is
+  required before rerunning Windows CI.
 
 Initial standard build failed with ENOSPC (118 MiB free). Removed only generated
 unpacked inspection apps from Phases 2–4, superseded unpacked Mac app output and
@@ -80,4 +86,4 @@ Both DMGs pass `hdiutil verify`; both ZIPs pass full CRC integrity and version c
 
 Checksums are also beside each artifact as `.sha256`. Structured inventory: `.artifacts/music-phase5/mac-artifacts.json`. Inspection reports: `.artifacts/music-desktop/mac-104-inspection.json` and `.artifacts/music-desktop-legacy/mac-104-legacy-inspection.json`.
 
-The build host runs macOS 26.5.2. Minimum supported-OS installation/hardware checks were not performed. Phase 5 remains **partial**, because Windows 1.0.7 requires the source branch to be pushed before the native workflow can run.
+The build host runs macOS 26.5.2. Minimum supported-OS installation/hardware checks were not performed. Phase 5 remains **partial**, because Windows 1.0.7 needs a native CI rerun after the package-checker correction is pushed.
