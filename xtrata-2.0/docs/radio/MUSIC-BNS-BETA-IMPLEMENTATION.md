@@ -354,3 +354,10 @@ and a 30-second per-test limit. No assertions or application code changed.
 The three affected suites passed locally: 59 tests. A new native Windows run
 is still required before a Windows installer can be published. Push permission
 for the CI-only fix was requested. Mac assets are uploading to a draft release.
+
+Mac 1.0.6 beta published as `music-v1.0.6-mac-beta.1` at source `5490476a6`.
+All four archive hashes match GitHub's uploaded-asset SHA-256 digests. The
+release includes standard/Monterey DMG and ZIP archives plus checksum files.
+Two compact Mac 1.0.6 rows have been appended to the release manifest and
+static Lounge fallback; older downloads remain unchanged. Windows 1.0.9
+publication remains blocked pending the native CI rerun from `dfc0a7a26`.

@@ -100,6 +100,28 @@
       "verified": true,
       "preview": true,
       "betaBuild": 1
+    },
+    {
+      "platform": "mac-universal",
+      "version": "1.0.6",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.6-mac-beta.1/Xtrata-Music-1.0.6-mac-universal.dmg",
+      "sha256": "dc1de667fd1ef1e1565d68efe94421d05f8ad451741489d829ab8662569fbdf3",
+      "requirements": "Copyable cross-device BNS verification link and resilient 503 retries. macOS 13+. Universal Intel/Apple silicon. Unsigned beta. Automated checks passed; wider hardware and live-payment verification pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
+    },
+    {
+      "platform": "mac-universal-legacy",
+      "version": "1.0.6",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.6-mac-beta.1/Xtrata-Music-Legacy-1.0.6-mac-universal.dmg",
+      "sha256": "3df766cdec29dcbd436a09be7191471b0ac422d7daba70b0aa745b11cfc69e64",
+      "requirements": "Copyable cross-device BNS verification link and resilient 503 retries. macOS 12 Monterey+. Universal Intel/Apple silicon. Unsigned beta. Automated checks passed; wider hardware and live-payment verification pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 1
     }
   ]
 }
