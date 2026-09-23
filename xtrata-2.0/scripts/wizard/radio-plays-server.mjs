@@ -22,7 +22,7 @@ const server=createServer(async(req,res)=>{
   if(options.desktopToken){
    if(!req.headers.cookie?.split(';').some(c=>c.trim()==='xtrataDesktop='+options.desktopToken))throw Error('Open the desktop app to use this wallet.');
    const path=req.url.split('?')[0];
-   if(!['/profile/begin','/profile.js','/music-logo.webp','/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
+   if(!['/profile/begin','/profile.js','/music-logo.webp','/chain/plays','/app-version','/lounge','/lounge.css','/lounge.js','/radio-chain-activity.js','/radio-policy.js','/paid-receipt.mjs','/ui.js','/ui.css','/radio.js','/radio/catalogue','/radio/audio','/radio/artwork','/setup','/status','/stop','/return/prepare','/return/confirm','/return/cancel','/listening/enable','/listening/free','/listening/heartbeat','/listening/status','/listening/begin','/listening/end','/listening/qualify'].includes(path))throw Error('Unavailable in desktop app.');
   }
   if(req.method==='GET'&&req.url==='/profile.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/music-profile-ui.js')));return;}
   if(req.method==='GET'&&req.url==='/music-logo.webp'){res.setHeader('Content-Type','image/webp');res.end(await readFile(join(root,'scripts/wizard/music-logo.webp')));return;}
@@ -70,6 +70,7 @@ const server=createServer(async(req,res)=>{
   else if(req.url==='/listening/heartbeat'){listening.renew(data);result=await listening.refreshedSnapshot();}
   else if(req.url==='/listening/status')result=await listening.refreshedSnapshot();
   else if(req.url==='/listening/begin'){listening.app={platform:options.desktopToken?(options.runtimePlatform||process.platform):'dev',version:(await version).version};result=await listening.begin(data);}
+  else if(req.url==='/listening/end')result=listening.end(data);
   else if(req.url==='/listening/qualify')result=await listening.qualify(data);
   else if(req.url==='/listening/start')throw Error('Update the player to use listening thresholds. No payment requested.');
   else if(req.url==='/status')result=await wizard.status(true);

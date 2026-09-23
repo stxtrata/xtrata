@@ -1,4 +1,4 @@
-import {describe,it,expect} from 'vitest';
+import {describe,it,expect,vi} from 'vitest';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -15,7 +15,7 @@ async function fixture(work){
   const source=await readFile(new URL('../../../contracts/live/xtrata-radio-plays-v1.0.clar',import.meta.url),'utf8');
   let address;
   const transport=async(url,opts)=>{
-   let value;state.reads++;
+   let value;state.reads++;if(state.unavailable>0&&url.includes(state.unavailablePath)){state.unavailable--;return {ok:false,status:503,json:async()=>({})};}
    if(url.endsWith('/v2/fees/transaction')){state.estimateReads++;if(state.estimateError)return {ok:false,status:state.estimateError==='429'?429:400,json:async()=>({reason:state.estimateError})};value={estimations:[state.estimate,state.estimate+10,state.estimate+20].map(fee=>({fee}))};}
    else if(url.endsWith('/v2/fees/transfer'))value=state.transferRate;
    else if(url.endsWith('/v2/info'))value={network_id:1};
@@ -24,7 +24,7 @@ async function fixture(work){
    else if(url.endsWith('/nonces')){const pending=[...new Set(state.sent.filter(t=>Number(t.auth.spendingCondition.nonce)>=state.nonce&&state.status.get('0x'+t.txid())!=='missing').map(t=>Number(t.auth.spendingCondition.nonce)))];value={possible_next_nonce:pending.length?Math.max(...pending)+1:state.nonce,detected_mempool_nonces:[...pending,...state.foreign],detected_missing_nonces:state.missing};}
    else if(url.endsWith('/get-owner'))value={okay:true,result:cvToHex(Cl.ok(Cl.some(Cl.standardPrincipal(owner))))};
    else if(url.endsWith('/get-receipt')){const hex=Buffer.from(deserializeCV(JSON.parse(opts.body).arguments[1]).buffer).toString('hex');const tx=state.sent.find(t=>Buffer.from(t.payload.functionArgs[2].buffer).toString('hex')===hex&&state.status.get('0x'+t.txid())==='success');value={okay:true,result:cvToHex(tx?Cl.some(Cl.tuple({core:Cl.uint(3),id:Cl.uint(2910),recipient:Cl.standardPrincipal(owner)})):Cl.none())};}
-   else if(url.endsWith('/v2/transactions')){const t=deserializeTransaction(opts.body);state.sent.push(t);state.status.set('0x'+t.txid(),'pending');value=state.bad?'unexpected':t.txid();}
+   else if(url.endsWith('/v2/transactions')){const t=deserializeTransaction(opts.body);state.sent.push(t);state.status.set('0x'+t.txid(),'pending');if(state.accepted503){state.accepted503=false;return {ok:false,status:503,json:async()=>({})};}value=state.bad?'unexpected':t.txid();}
    else if(url.includes('/extended/v1/tx/')){const id=url.split('/').pop(),t=state.sent.find(t=>'0x'+t.txid()===id),status=state.status.get(id);if(!t||status==='missing')return {ok:false,status:404};value={tx_id:id,nonce:Number(t.auth.spendingCondition.nonce),fee_rate:String(t.auth.spendingCondition.fee),tx_status:status,canonical:true,is_unanchored:false,sender_address:address,block_height:100,contract_call:{contract_id:owner+'.xtrata-radio-plays-v1-0',function_name:'play'}};}
    else throw Error('Unexpected offline path '+url);
    return {ok:true,json:async()=>value};
@@ -182,4 +182,30 @@ it('never bumps beyond cap or from a different session and reuses latest missing
 it('revoking consent during key access prevents signing a replacement',()=>fixture(async({s,a,w,state})=>{
  await capStart(s,a);w.now=()=>Date.now()+180001;const key=w.key.bind(w);w.key=async()=>{const value=await key();s.disable();return value;};
  await expect(w.exclusive(async()=>w.bumpPending(await w.journal(),bumpApproval(s,a)))).rejects.toThrow();expect(state.sent).toHaveLength(1);expect((await w.journal())[0].priorAttempts).toBeUndefined();
+}));
+
+describe('503 retries with a real isolated wallet and offline transport',()=>{
+ it('backs off before signing, preserves one playback and charges one session slot',()=>fixture(async({state,start,s,w})=>{
+  const original=setTimeout,delays=[];
+  const timer=vi.spyOn(globalThis,'setTimeout').mockImplementation((fn,ms,...args)=>{if(ms>=5000&&ms<=60000){delays.push(ms);return original(fn,0,...args);}return original(fn,ms,...args);});
+  try{state.unavailablePath='/get-owner';state.unavailable=3;const row=await start(51);expect(row.txid).toMatch(/^0x/);expect(delays).toEqual([5000,10000,20000]);expect(state.sent).toHaveLength(1);expect(await w.journal()).toHaveLength(1);expect(s.active.used).toBe(1);}finally{timer.mockRestore();}
+ }));
+ it('retries an ambiguous broadcast using identical bytes and nonce',()=>fixture(async({state,start,w})=>{
+  const original=setTimeout;const timer=vi.spyOn(globalThis,'setTimeout').mockImplementation((fn,ms,...args)=>original(fn,ms===5000?0:ms,...args));
+  try{state.accepted503=true;await start(52);expect(state.sent).toHaveLength(2);expect(state.sent[0].txid()).toBe(state.sent[1].txid());expect(Buffer.from(state.sent[0].serialize()).equals(Buffer.from(state.sent[1].serialize()))).toBe(true);expect(await w.journal()).toHaveLength(1);}finally{timer.mockRestore();}
+ }));
+ it('cancels backoff when the song ends, then permits a new song',()=>fixture(async({state,start,s,a,w})=>{
+  state.unavailablePath='/get-owner';state.unavailable=10;const pending=start(53);
+  await vi.waitFor(()=>expect(s.events.at(-1)?.reason).toContain('Retrying'));
+  s.end({id:(53).toString(16).padStart(32,'0'),song:2910,tab,token:a.token});await pending;
+  expect(state.sent).toHaveLength(0);expect(await w.journal()).toHaveLength(0);expect(s.snapshot().enabled).toBe(true);
+  state.unavailable=0;await start(54);expect(state.sent).toHaveLength(1);
+ }));
+ it('Stop cancels a retained operation without broadcasting',()=>fixture(async({state,start,s,w})=>{
+  state.unavailablePath='/get-owner';state.unavailable=10;const pending=start(55);await vi.waitFor(()=>expect(s.events.at(-1)?.reason).toContain('Retrying'));s.disable();await pending;expect(state.sent).toHaveLength(0);expect(await w.journal()).toHaveLength(0);
+ }));
+});
+
+it('retains the journal when a 503 broadcast is cancelled at song end',()=>fixture(async({state,start,s,a,w})=>{
+ state.accepted503=true;const task=start(56);await vi.waitFor(()=>expect(s.events.at(-1)?.reason).toContain('Retrying'));s.end({id:(56).toString(16).padStart(32,'0'),song:2910,tab,token:a.token});const result=await task;expect(result.outcome).toBe('unknown');expect(state.sent).toHaveLength(1);expect(await w.journal()).toHaveLength(1);expect((await w.journal())[0].txid).toBe('0x'+state.sent[0].txid());
 }));

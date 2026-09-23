@@ -112,5 +112,5 @@
 /radio/music-profile.js
   Cache-Control: no-cache
 
-/radio/music-profile-wallet-v2.js
+/radio/music-profile-wallet-v3.js
   Cache-Control: no-cache

@@ -220,3 +220,92 @@ Live verification found the custom domain still overriding the cache header,
 while the immutable Pages deployment correctly returned no-cache. The fix also
 uses a distinct `music-profile-wallet-v2.js` filename (not only a query string)
 so old cached script URLs cannot be reused. No CDN security settings changed.
+
+## Windows focus recovery fix — prepared 1.0.9 beta
+
+User reproduced non-editable BNS text and an unresponsive verification dropdown
+in Windows 1.0.8 after approving Music Support. Alt+Tab restored editing. This
+matches Electron's confirmed Windows native alert/confirm focus-loss issue:
+https://github.com/electron/electron/issues/40212 . The fields are not disabled by
+BNS logic and no drag region/overlay was found over them.
+
+Replaced native `confirm()` in support, BNS profile and operator-test approval
+with an in-document modal. Cancel has initial focus; Escape, Stop and page exit
+cancel without approving. Only Continue resolves approval. Original approval
+text is preserved. Support rechecks its stop generation and agreement before
+calling enable after the asynchronous confirmation. No wallet/key/payment
+backend changes. Mac release metadata remains 1.0.5; Windows next build is 1.0.9.
+
+Verification: 36 desktop/listening unit tests passed. Real isolated Electron
+smoke on this Mac passed, including mouse focus plus keyboard typing in the BNS
+field before/after approval, method selection, Escape/Stop causing zero enable
+requests, free/muted playback, paid simulated loops, no duplicate resume charge
+and sandbox/cookie checks. No real wallet/payment. The initial test attempted
+platform-dependent dropdown keyboard navigation and hung during shutdown;
+replaced with the selector change assertion while retaining real text typing.
+Native Windows focus and popup behaviour is NOT yet verified: push the commit,
+run existing native Windows CI, then test the resulting new installer on the PC.
+Existing published installers and Lounge links remain unchanged pending that
+build. Temporary workaround for installed 1.0.8: Alt+Tab away and back after a
+native confirmation. Source changes alone do not update an installed app.
+
+## Current-song 503 retry handling — prepared for the next desktop beta
+
+Payment operations now retain their existing playback identity and retry HTTP
+503 at 5, 10, 20, 40 and then 60-second intervals, honouring a longer Retry-After.
+The retry context is isolated with Node AsyncLocalStorage to the authorised
+playback operation; unrelated requests/returns do not acquire these retries.
+No additional session slot, signature, nonce, receipt or fee increase is created
+by a retry. A 503 from broadcast repeats the same already-journalled bytes.
+Ambiguous submission remains journalled and is never treated as definitely free.
+
+The local player sends an authenticated end notification on song change, end or
+media failure. Stop aborts all retained operations; a new begin also aborts any
+older active operation as a fallback. Cancellation interrupts backoff/network
+waiting. Existing pre-sign/pre-broadcast consent checks still apply. Already
+saved/submitted transactions remain available to the existing reconciliation
+routine after the song ends; this is not a new catch-up charge. The UI/history
+shows the temporary failure and retry interval while retaining the operation.
+This targets chain/payment HTTP 503s, not every media/catalogue failure, 429,
+validation error or arbitrary network exception.
+
+Verification: 74 targeted tests passed. Five additional tests use actual isolated
+wallet/filesystem/signing code with offline transport: increasing delays, one
+session slot/journal entry, identical signed bytes after ambiguous broadcast,
+song-end cancellation allowing a later song, Stop cancellation, and preservation
+of a journalled ambiguous payment when cancelling. Real isolated Electron smoke
+passed for normal playback, BNS fields, approval cancellation, mute/unmute and
+simulated payments. Native Windows/live-chain verification remains NOT RUN.
+No installer has been rebuilt or published for this correction yet.
+
+Cross-device BNS follow-up: current transfer verification requires the user to
+paste a transaction ID and click Check my transfer; a payment alone does not
+complete the association. Asked for the user's public transfer ID before
+changing or diagnosing that existing association. Suggested follow-up is a
+copyable continuation link/details and bounded automatic exact-transfer discovery
+on the verification page; do not relax sender, memo, amount or expiry checks.
+
+## Cross-device transfer verification (2026-09-23)
+
+The app now offers Copy verification link beside Continue on Xtrata. The website
+also offers the same link, so existing app users can open Continue first and
+copy it there. Open the link on the device with the BNS wallet. Copy buttons
+provide the network, BNS name, exact STX amount, recipient, sender and required
+memo, individually or together. The signed request stays in the URL fragment
+while sharing and is removed from the address bar on opening; it is not saved
+to browser storage. Share only with your own device.
+
+The page checks every 30 seconds, slowing to 60 then 120 seconds after errors.
+Discovery examines at most 50 pending and 50 recent account transactions.
+Every candidate passes the existing exact transfer validator, then the specific
+transaction is fetched and validated again. Manual transaction ID remains a
+fallback for unusually busy accounts. Pending matches are retained for the
+existing confirmation grace period. Completion, expiry and page exit stop
+polling. No transactions are signed or sent by automatic checking. Existing
+expiry, ownership, replay and revision guards remain unchanged.
+
+Verification: 19 targeted API/SQLite and page tests passed; profile production
+bundle built. Transfer discovery tests include no match, wrong sender and a
+valid exact match. No live transfers or cross-device hardware tests performed.
+This change requires website deployment; the new app-side copy button also
+requires the next installer. No installer or deployment produced in this change.

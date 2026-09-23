@@ -52,7 +52,23 @@ export async function handleProfile(request:Request,env:any,transport:typeof fet
    if(c.method==='signature'){
     if(!verifyProfile(c,'owner',b.ownerProof,c.owner))throw Error('Approve using the wallet that owns this BNS name.');
    }else{
-    txid=String(b.txid||'').toLowerCase();if(!/^0x[a-f0-9]{64}$/.test(txid))throw Error('Enter the transfer transaction ID.');
+    txid=String(b.txid||row.transfer_seen||'').toLowerCase();
+    if(!txid){
+     const headers:Record<string,string>={};if(env.HIRO_API_KEY)headers['x-api-key']=env.HIRO_API_KEY;
+     // Bounded discovery only; every candidate still passes the exact transfer validator.
+     for(const path of ['/extended/v1/tx/mempool?recipient_address='+c.support+'&limit=50','/extended/v1/address/'+c.support+'/transactions?limit=50']){
+      const r=await transport('https://api.mainnet.hiro.so'+path,{headers,signal:AbortSignal.timeout(6000),cache:'no-store'});
+      if(!r.ok)throw Error('Transfer lookup unavailable. Automatic checking will retry; do not send again.');
+      const data:any=await r.json();
+      for(const candidate of (data.results||[]).slice(0,50)){
+       if(!/^0x[a-f0-9]{64}$/.test(candidate.tx_id||''))continue;
+       try{verifyProfileTransfer(c,candidate,candidate.tx_id,null,now);txid=candidate.tx_id;break;}catch{/* Unrelated transfers are never accepted. */}
+      }
+      if(txid)break;
+     }
+     if(!txid)return reply({pending:true,message:'Waiting for the matching transfer. Checking automatically; do not send again.'});
+    }
+    if(!/^0x[a-f0-9]{64}$/.test(txid))throw Error('Enter the transfer transaction ID.');
     if(row.transfer_seen&&row.transfer_seen!==txid)throw Error('A different transfer is already being verified.');
     const used=await db.prepare('SELECT txid FROM music_profile_transfers WHERE txid=?').bind(txid).first();if(used)throw Error('Transfer already used.');
     const base='https://api.mainnet.hiro.so';const headers:Record<string,string>={};if(env.HIRO_API_KEY)headers['x-api-key']=env.HIRO_API_KEY;

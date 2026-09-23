@@ -13,7 +13,7 @@ function database(){const sql=new DatabaseSync(':memory:');let tail=Promise.reso
  async batch(statements:any[]){const task=tail.then(async()=>{sql.exec('BEGIN');try{const results=[];for(const s of statements)results.push(await s.run());sql.exec('COMMIT');return results;}catch(e){sql.exec('ROLLBACK');throw e;}});tail=task.catch(()=>{});return task;}
 };}
 function harness(){const DB=database(),env={DB,MUSIC_PROFILE_ENABLED:'1'};let currentOwner=owner,offline=false,transfer:any=null;
- const transport=async(url:any)=>{if(offline)throw Error('offline');if(String(url).startsWith('https://api.mainnet.hiro.so/extended/v1/tx/')&&transfer)return Response.json(transfer);if(!String(url).startsWith('https://api.bnsv2.com/names/'))throw Error('Unexpected network call');return Response.json({owner:currentOwner,status:'active',current_burn_block:900000,renewal_height:'1000000'});};
+ const transport=async(url:any)=>{if(offline)throw Error('offline');if(String(url).includes('/tx/mempool?')||String(url).includes('/transactions?'))return Response.json({results:transfer?[transfer]:[]});if(String(url).startsWith('https://api.mainnet.hiro.so/extended/v1/tx/')&&transfer)return Response.json(transfer);if(!String(url).startsWith('https://api.bnsv2.com/names/'))throw Error('Unexpected network call');return Response.json({owner:currentOwner,status:'active',current_burn_block:900000,renewal_height:'1000000'});};
  const call=async(data:any,time=now)=>{const response=await handleProfile(new Request('https://xtrata.xyz/api/music-profile',{method:'POST',headers:{'content-type':'application/json',origin:'https://xtrata.xyz'},body:JSON.stringify(data)}),env,transport as any,time);return {status:response.status,...await response.json() as any};};
  const begin=async(action='link',method='signature')=>(await call({op:'challenge',support,name:'jim.btc',action,method})).challenge;
  const complete=(c:any,extra={})=>call({op:'complete',id:c.id,supportProof:signProfile(c,supportKey),ownerProof:T.signStructuredData({...profileData(c,'owner'),privateKey:T.createStacksPrivateKey(ownerKey)}).data,...extra});
@@ -30,6 +30,13 @@ describe('Music profile associations with transactional SQLite',()=>{
   const h=harness(),c=await h.begin('link','transfer'),txid='0x'+'c'.repeat(64);
   h.setTransfer({tx_id:txid,tx_type:'token_transfer',sender_address:owner,tx_status:'success',canonical:true,is_unanchored:false,block_time:now/1000,token_transfer:{recipient_address:support,amount:String(c.amount),memo:'0x'+Buffer.from('XM'+c.id.slice(0,30)).toString('hex')}});
   expect((await h.complete(c,{txid})).ok).toBe(true);expect(h.DB.sql.prepare('SELECT txid FROM music_profile_transfers').get()!.txid).toBe(txid);expect((await h.complete(c,{txid})).status).toBe(400);h.DB.sql.close();
+ });
+ it('discovers a matching transfer without a transaction ID and ignores unrelated transfers',async()=>{
+  const h=harness(),c=await h.begin('link','transfer'),txid='0x'+'d'.repeat(64);
+  expect((await h.complete(c)).pending).toBe(true);
+  const tx={tx_id:txid,tx_type:'token_transfer',sender_address:owner,tx_status:'success',canonical:true,is_unanchored:false,block_time:now/1000,token_transfer:{recipient_address:support,amount:String(c.amount),memo:'0x'+Buffer.from('XM'+c.id.slice(0,30)).toString('hex')}};
+  h.setTransfer({...tx,sender_address:support});expect((await h.complete(c)).pending).toBe(true);
+  h.setTransfer(tx);expect((await h.complete(c)).ok).toBe(true);expect(h.DB.sql.prepare('SELECT txid FROM music_profile_transfers').get()!.txid).toBe(txid);h.DB.sql.close();
  });
  it('rolls back revision changes when a profile write fails',async()=>{
   const h=harness(),c=await h.begin();h.DB.sql.exec("CREATE TRIGGER reject_profile BEFORE INSERT ON music_profiles BEGIN SELECT RAISE(ABORT,'simulated disk failure'); END");

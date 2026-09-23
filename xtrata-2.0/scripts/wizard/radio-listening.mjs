@@ -4,7 +4,7 @@ import {randomBytes} from 'node:crypto';
 import {policy,publicEntry} from './radio-plays-backend.mjs';
 // One tab, session approval. Optional bounded chaining retains only signed submissions.
 export class RadioListening {
- constructor(wizard,media,app={platform:'dev',version:'1.0.7'}){this.app=app;this.begins=new Map();this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;this.startTail=Promise.resolve();this.waitingStarts=0;}
+ constructor(wizard,media,app={platform:'dev',version:'1.0.7'}){this.app=app;this.begins=new Map();this.playbackControllers=new Map();this.wizard=wizard;this.media=media;this.active=null;this.events=[];this.seen=new Map();this.inFlight=false;this.startTail=Promise.resolve();this.waitingStarts=0;}
  async recover(){
   const a=this.active;if(!a||this.inFlight||this.waitingStarts||this.recovering||this.wizard.running)return;
   if(this.nextRecovery&&Date.now()<this.nextRecovery)return;
@@ -30,7 +30,7 @@ export class RadioListening {
   if(this.active&&((!this.active.continuous&&(Date.now()>=this.active.expires||Date.now()>=this.active.lease))||this.active.epoch!==this.wizard.stopEpoch))this.disable();
   const a=this.active;return {enabled:!!a,continuous:!!a?.continuous,fee:a?.fee??null,max:a?.max??0,used:a?.used??0,expires:a?.expires??null,recovery:this.wizard.now?.()<this.wizard.cooldownUntil?'Chain service is busy; checks are cooling down. Music continues free.':this.recovery||null,recoveryFailures:this.recoveryFailures||0,events:this.events.slice(-100).reverse()};
  }
- disable(){if(this.active){const epoch=this.active.epoch;clearTimeout(this.timer);this.active=null;if(epoch===this.wizard.stopEpoch)this.wizard.stop();}}
+ disable(){for(const c of this.playbackControllers.values())c.abort();this.playbackControllers.clear();if(this.active){const epoch=this.active.epoch;clearTimeout(this.timer);this.active=null;if(epoch===this.wizard.stopEpoch)this.wizard.stop();}}
  check(input){this.snapshot();if(!this.active||input.token!==this.active.token||input.tab!==this.active.tab)throw Error('Paid approval is absent, expired or belongs to another tab. Listening stays free.');return this.active;}
  renew(input){const a=this.check(input);a.lease=Date.now()+30000;clearTimeout(this.timer);this.timer=setTimeout(()=>this.snapshot(),30100);this.timer.unref?.();return this.snapshot();}
  async enable(p){
@@ -58,8 +58,17 @@ export class RadioListening {
   if(!p||Object.keys(p).sort().join(',')!==keys||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0||typeof p.token!=='string'||typeof p.tab!=='string')throw Error('Invalid listening request.');
   if(qualify&&(!Number.isFinite(p.audibleSeconds)||p.audibleSeconds<0||!Number.isInteger(p.threshold)||p.threshold<1||p.threshold>30))throw Error('Invalid audible time.');
  }
+ end(p){
+  this.validateListen(p);this.check(p);
+  const record=this.begins.get(p.id);
+  if(record&&(record.song!==p.song||record.token!==p.token))throw Error('Playback does not match.');
+  if(!record&&this.begins.size>=10000)throw Error('Listening session is full.');
+  this.begins.set(p.id,{...record,song:p.song,token:p.token,ended:true});
+  this.playbackControllers.get(p.id)?.abort();return {ended:true};
+ }
  async begin(p){
   this.validateListen(p);const a=this.check(p);
+  for(const [id,controller] of this.playbackControllers)if(id!==p.id)controller.abort();
   if(this.begins.has(p.id)||this.seen.has(p.id))throw Error('Playback already registered.');
   if(this.begins.size>=10000)throw Error('Listening session is full. Start a new session.');
   if(!this.media.tracks?.some(t=>t.id===p.song))throw Error('Song is not in the catalogue.');
@@ -71,7 +80,7 @@ export class RadioListening {
  }
  async qualify(p){
   this.validateListen(p,true);const a=this.check(p),record=this.begins.get(p.id);
-  if(!record?.ready||record.token!==a.token||record.song!==p.song)throw Error('No verified listening begin. This listen stays free.');
+  if(record?.ended||!record?.ready||record.token!==a.token||record.song!==p.song)throw Error('No verified listening begin. This listen stays free.');
   if(record.qualified||this.seen.has(p.id))throw Error('Listen already qualified.');
   const elapsed=(Date.now()-record.at)/1000;
   if(p.threshold!==record.threshold||p.audibleSeconds<record.threshold||elapsed<record.threshold-2||p.audibleSeconds>elapsed+2)throw Error('Listening threshold has not been verified. This listen stays free.');
@@ -96,7 +105,7 @@ export class RadioListening {
  async startImmediate(p,listen){
   const keys=Object.keys(p||{}).sort().join(',');
   if(!p||!['duration,id,song,tab,token','id,song,tab,token'].includes(keys)||typeof p.id!=='string'||!/^[a-f0-9]{32}$/.test(p.id)||!Number.isSafeInteger(p.song)||p.song<0)throw Error('Invalid playback start.');
-  const a=this.check(p);if(this.seen.has(p.id))return this.seen.get(p.id);
+  const a=this.check(p);if(this.begins.get(p.id)?.ended)throw Error('Song ended. This listen stays free.');if(this.seen.has(p.id))return this.seen.get(p.id);
   if(this.seen.size>=10000)throw Error('Playback history limit reached. Restart the listening service.');
   const track=this.media.tracks?.find(t=>t.id===p.song);
   const row={title:track?.title,artist:track?.artist,id:p.id,song:p.song,at:new Date().toISOString(),outcome:'free',reason:''};
@@ -108,27 +117,28 @@ export class RadioListening {
   try{await this.media.audio(p.song);}catch{row.reason='Audio could not be verified locally. This start stays free.';return row;}
   if(!a.continuous&&a.used>=a.max){row.reason='Approved start limit reached.';this.disable();return row;}
   if(this.inFlight||this.recovering||this.wizard.running){row.reason='Previous wallet operation is still active. This start stays free.';return row;}
-  this.inFlight=true;
+  this.inFlight=true;const controller=new AbortController();this.playbackControllers.set(p.id,controller);
+  const authorised=()=>{this.check(p);if(controller.signal.aborted)throw Error('Song ended or support stopped.');};
   try{
    const saved=await this.wizard.journal();const existing=saved.find(e=>e.playbackId===p.id);
    if(existing){row.outcome=existing.status;row.reason='Already recorded; no second payment.';row.txid=existing.txid;return row;}
    // Recheck consent after the asynchronous journal read.
-   this.check(p);a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
-   const input={core:3,song:p.song,fee:a.fee,count:1},context={...(a.feeMode==='cap'?{feeCap:a.fee}:{}),listen,playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised:()=>this.check(p)};
+   authorised();a.used++;row.outcome='requested';row.reason='Payment requested; check wallet activity for confirmation.';
+   const input={core:3,song:p.song,fee:a.fee,count:1},context={...(a.feeMode==='cap'?{feeCap:a.fee}:{}),listen,playbackId:p.id,listeningSession:a.token,title:track?.title,artist:track?.artist,continuous:a.continuous===true,authorised,retrySignal:controller.signal,onServiceRetry:delay=>{row.reason=`Chain service temporarily unavailable (503). Retrying this song in ${Math.ceil(delay/1000)} seconds.`;row.retryAt=Date.now()+delay;}};
    if(this.wizard.queuedPaidStarts){
     try{const entry=await this.wizard.submitNext(input,context);row.outcome=entry.status;row.txid=entry.txid;row.reason='Payment submitted; waiting for confirmation.';return row;}
     catch(error){const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);row.outcome=entry?'unknown':'free';row.reason=error.message;if(entry)row.txid=entry.txid;return row;}
-    finally{this.inFlight=false;}
+    finally{this.playbackControllers.delete(p.id);this.inFlight=false;}
    }
    const operation=this.wizard.run(input,context);
    void operation.then(()=>{row.outcome='confirmed';row.reason=listen?'Paid listen confirmed.':'Paid start confirmed.';}).catch(async error=>{
     row.reason=error.message;row.outcome='unavailable';
     try{const entry=(await this.wizard.journal()).find(e=>e.playbackId===p.id);if(entry){row.outcome=entry.status==='confirmed'?'confirmed':entry.status==='failed'?'failed':'unknown';row.txid=entry.confirmedTxid||entry.failedTxid||entry.txid;}}catch{row.outcome='unknown';}
-    if(!a.continuous)this.disable();
-   }).finally(()=>{this.inFlight=false;if(this.active===a&&!a.continuous&&a.used>=a.max)this.disable();});
+    if(!a.continuous&&!controller.signal.aborted)this.disable();
+   }).finally(()=>{this.playbackControllers.delete(p.id);this.inFlight=false;if(this.active===a&&!a.continuous&&a.used>=a.max)this.disable();});
    // run() sets its own lock synchronously. Ownership lasts through confirmation.
    return row;
   }catch(error){this.inFlight=false;row.reason=error.message;if(!a.continuous)this.disable();return row;}
-  finally{if(row.outcome!=='requested')this.inFlight=false;}
+  finally{if(row.outcome!=='requested'){this.playbackControllers.delete(p.id);this.inFlight=false;}}
  }
 }

@@ -33,3 +33,18 @@ it('keeps cancellation retryable without completing the link',async()=>{
 it('routes Xverse Bitcoin selection to its structured Stacks signing bridge',async()=>{
  mocks.id.mockReturnValue('XverseProviders.BitcoinProvider');mocks.provider.mockReturnValue({request:vi.fn()});vi.stubGlobal('XverseProviders',{StacksProvider:{structuredDataSignatureRequest:mocks.sign}});await init();(document.querySelector('#profile-sign') as HTMLElement).click();await vi.waitFor(()=>expect(complete).toHaveLength(1));expect(mocks.sign).toHaveBeenCalledOnce();
 });
+
+it('copies a cross-device link after scrubbing the address bar and checks transfers without a transaction ID or signing',async()=>{
+ const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText}});
+ vi.stubGlobal('fetch',vi.fn(async(_u,o)=>{const d=JSON.parse(o.body);if(d.op==='complete')complete.push(d);return {ok:true,json:async()=>d.op==='review'?{challenge:{id:'a'.repeat(64),name:'jim.btc',action:'link',method:'transfer',support:owner,owner,amount:1234,expires:Date.now()+900000}}:{ok:true}};}));
+ await init();expect(location.hash).toBe('');
+ const buttons=Array.from(document.querySelectorAll('button'));
+ buttons.find(b=>b.textContent==='Copy verification link for another device')!.click();
+ expect(writeText.mock.calls[0][0]).toContain('https://xtrata.xyz/music/profile#');
+ buttons.find(b=>b.textContent==='Copy Amount')!.click();expect(writeText).toHaveBeenLastCalledWith('0.001234');
+ buttons.find(b=>b.textContent==='Copy Memo')!.click();expect(writeText).toHaveBeenLastCalledWith('XM'+'a'.repeat(30));
+ // Stop the background timer before exercising the manual fallback.
+ window.dispatchEvent(new Event('pagehide'));
+ (document.querySelector('#profile-check') as HTMLElement).click();await vi.waitFor(()=>expect(complete).toHaveLength(1));
+ expect(complete[0].txid).toBe('');expect(mocks.sign).not.toHaveBeenCalled();expect(mocks.connect).not.toHaveBeenCalled();
+});

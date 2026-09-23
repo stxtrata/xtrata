@@ -1,3 +1,7 @@
+import {AsyncLocalStorage} from 'node:async_hooks';
+const playbackRetryScope=new AsyncLocalStorage();
+export const serviceRetryDelay=attempt=>Math.min(60000,5000*2**Math.min(attempt,4));
+export function waitForPlaybackRetry(ms,signal){return new Promise((resolve,reject)=>{const cancel=()=>{clearTimeout(timer);signal?.removeEventListener('abort',cancel);reject(Error('Song ended or support stopped. No new payment will be sent.'));};const timer=setTimeout(()=>{signal?.removeEventListener('abort',cancel);resolve();},Math.min(ms,2147483647));signal?.addEventListener('abort',cancel,{once:true});if(signal?.aborted)cancel();});}
 import {uniqueListenReceipt} from '../../public/radio/paid-receipt.mjs';
 /** Local-only radio wizard. Secrets never cross the HTTP boundary. */
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
@@ -147,6 +151,20 @@ export class RadioWizard {
  }
  rateLimitError(){const e=Error('Chain service is busy. Checks paused for '+Math.max(1,Math.ceil((this.cooldownUntil-this.now())/1000))+' seconds; listening continues free.');e.status=429;return e;}
  async api(path,options={}) {
+  const context=playbackRetryScope.getStore();
+  for(let attempt=0;;attempt++){
+   try{return await this.apiOnce(path,options);}catch(error){
+    if(error.status!==503||!context?.retrySignal)throw error;
+    if(context.retrySignal.aborted)throw Error('Song ended or support stopped. No new payment will be sent.');
+    context.authorised?.();
+    const delay=Math.max(serviceRetryDelay(attempt),error.retryAfterMs||0);
+    context.onServiceRetry?.(delay);
+    await waitForPlaybackRetry(delay,context.retrySignal);
+    context.authorised?.();
+   }
+  }
+ }
+ async apiOnce(path,options={}) {
   const {cacheMs=0,...requestOptions}=options;
   const read=(requestOptions.method||'GET')==='GET'||path.startsWith('/v2/contracts/call-read/')||path==='/v2/fees/transaction';
   const key=path+'|'+String(requestOptions.body||'');
@@ -156,14 +174,14 @@ export class RadioWizard {
   if(read&&this.apiPending.has(key))return structuredClone(await this.apiPending.get(key));
   const perform=async()=>{
    if(this.now()<this.cooldownUntil)throw this.rateLimitError();
-   const r=await this.request('https://api.hiro.so'+path,{...requestOptions,signal:AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...requestOptions.headers}});
+   const r=await this.request('https://api.hiro.so'+path,{...requestOptions,signal:playbackRetryScope.getStore()?.retrySignal?AbortSignal.any([AbortSignal.timeout(20000),playbackRetryScope.getStore().retrySignal]):AbortSignal.timeout(20000),headers:{...(process.env.HIRO_API_KEY?{'x-api-key':process.env.HIRO_API_KEY}:{}),...requestOptions.headers}});
    if(r.status===429){
     this.rateFailures++;const retry=r.headers?.get?.('retry-after');const seconds=retry&&/^\d+(?:\.\d+)?$/.test(retry)?Number(retry):NaN;
     const requested=Number.isFinite(seconds)?seconds*1000:retry?Date.parse(retry)-this.now():0;
     const delay=Math.max(Number.isFinite(requested)?requested:0,Math.min(300000,30000*2**Math.min(this.rateFailures-1,4)));
     this.cooldownUntil=Math.max(this.cooldownUntil,this.now()+delay);throw this.rateLimitError();
    }
-   if(!r.ok){let reason='';try{const body=await r.json();if(typeof (body.reason||body.error)==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason||body.error))reason=body.reason||body.error;}catch{}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}
+   if(!r.ok){let reason='';try{const body=await r.json();if(typeof (body.reason||body.error)==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason||body.error))reason=body.reason||body.error;}catch{}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;if(r.status===503){const h=r.headers?.get?.('retry-after');const ms=h&&/^\d+(?:\.\d+)?$/.test(h)?Number(h)*1000:Date.parse(h)-this.now();e.retryAfterMs=Number.isFinite(ms)?Math.max(0,ms):0;}throw e;}
    const value=await r.json();this.rateFailures=0;if(read&&ttl){for(const [k,v] of this.apiCache)if(v.until<=this.now())this.apiCache.delete(k);if(this.apiCache.size>=128)this.apiCache.delete(this.apiCache.keys().next().value);this.apiCache.set(key,{until:this.now()+ttl,value});}return value;
   };
   // Never queue a signed submission: its caller has just checked consent.
@@ -453,6 +471,9 @@ export class RadioWizard {
   if(unresolved)throw unresolved;
  }
  async run(input,context={}) {
+  return playbackRetryScope.run(context,()=>this.runOnce(input,context));
+ }
+ async runOnce(input,context={}) {
   if(context.submitOnly&&!this.queuedPaidStarts)throw Error('Queued paid starts are disabled.');if(this.running)throw Error('Runner already active.');policy(input);const chosenFee=context.feeCap?257:input.fee,p=policy({...input,fee:Math.max(input.fee,257)});this.running=true;this.stopped=false;
   let lock,thrown;
   try {

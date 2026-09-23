@@ -1,3 +1,23 @@
+// In-page approval avoids Electron/Windows native-confirm focus loss.
+// Cancellation is the default; only the explicit Continue button approves.
+window.musicConfirm=message=>new Promise(resolve=>{
+ if(document.querySelector('#music-confirm')){resolve(false);return;}
+ const previous=document.activeElement,dialog=document.createElement('dialog');
+ dialog.id='music-confirm';dialog.setAttribute('aria-labelledby','music-confirm-title');
+ const title=document.createElement('h2');title.id='music-confirm-title';title.textContent='Review and confirm';
+ const text=document.createElement('p');text.textContent=message;
+ const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.autofocus=true;
+ const accept=document.createElement('button');accept.type='button';accept.textContent='Continue';accept.dataset.confirmAccept='';
+ let done=false;
+ const finish=approved=>{if(done)return;done=true;window.removeEventListener('wizard-stop',stop);window.removeEventListener('pagehide',stop);dialog.remove();if(previous?.isConnected)previous.focus();resolve(approved);};
+ const stop=()=>finish(false);
+ cancel.onclick=stop;accept.onclick=()=>finish(true);
+ dialog.addEventListener('cancel',e=>{e.preventDefault();stop();});dialog.addEventListener('close',stop);
+ window.addEventListener('wizard-stop',stop);window.addEventListener('pagehide',stop);
+ dialog.append(title,text,cancel,accept);document.body.append(dialog);
+ try{dialog.showModal();cancel.focus();}catch{finish(false);}
+});
+
 // Shared display metadata: failures never block wallet operations or playback.
 window.radioSongMetadata=new Map();
 window.radioSongLabel=e=>{const t=e.core&&e.core!==3?null:window.radioSongMetadata.get(e.song);return `${e.title||t?.title||'Song #'+e.song}${(t?.artist||e.artist)?' — '+(t?.artist||e.artist):''} · #${e.song}`;};
@@ -73,7 +93,7 @@ $('stop').onclick=async()=>{window.dispatchEvent(new Event('wizard-stop'));try{c
 if($('run'))$('run').onclick=()=>task(async()=>{
  if(!$('approve').checked)throw Error('Approve the bounded run first.');
  const body={};for(const k of ['core','song','fee','count'])body[k]=Number($(k).value);
- if(!confirm(`Run ${body.count} test(s) for song ${body.song}, core ${body.core}, with ${body.fee} microSTX miner fee plus 50 microSTX holder payment per test?`))return;
+ if(!await window.musicConfirm(`Run ${body.count} test(s) for song ${body.song}, core ${body.core}, with ${body.fee} microSTX miner fee plus 50 microSTX holder payment per test?`))return;
  $('approve').checked=false;const r=await api('run',body);$('output').textContent=r.message;await refresh();
 });
 for(const [id,mode] of [['return-excess','excess'],['return-all','all'],['warning-excess','excess'],['warning-all','all']])$(id).onclick=()=>{

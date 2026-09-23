@@ -17,8 +17,12 @@ import {AudibleClock,supportModeLabel,miningFeeLabel} from './radio-policy.js';
   for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}${e.receiptLabel?' · '+e.receiptLabel:''}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;const fee=miningFeeLabel(e);if(fee)p.textContent+=' · '+fee;host.append(p);}
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE PLAY · support off');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
+ function endPlayback(){
+  if(!start?.approval)return;
+  void fetch('/listening/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:start.id,song:start.song,token:start.approval.token,tab}),keepalive:true}).catch(()=>{});
+ }
  async function select(i){
-  if(!tracks.length)return;const previousFree=start&&!start.requested;metadataAbort?.abort();const controller=new AbortController();metadataAbort=controller;const version=++loading;if(start&&!start.requested)$('radio-payment').textContent='Skipped — free';audio.pause();index=(i+tracks.length)%tracks.length;
+  if(!tracks.length)return;endPlayback();const previousFree=start&&!start.requested;metadataAbort?.abort();const controller=new AbortController();metadataAbort=controller;const version=++loading;if(start&&!start.requested)$('radio-payment').textContent='Skipped — free';audio.pause();index=(i+tracks.length)%tracks.length;
   const track=tracks[index];start={id:crypto.randomUUID().replaceAll('-',''),song:track.id,observed:false,clock:new AudibleClock(),requested:false,playing:false};
   window.dispatchEvent(new CustomEvent('radio-track',{detail:track}));
   $('radio-songs').value=String(index);$('radio-title').textContent=track.title;
@@ -71,8 +75,8 @@ import {AudibleClock,supportModeLabel,miningFeeLabel} from './radio-policy.js';
  for(const event of ['playing','volumechange','timeupdate','pause','seeking','seeked','waiting','stalled'])audio.addEventListener(event,audible);
  const audibleTimer=setInterval(audible,200);
  window.addEventListener('pagehide',()=>clearInterval(audibleTimer));
- audio.addEventListener('ended',()=>{audible();if(start&&!start.requested)$('radio-payment').textContent=start.unknownDuration?'Duration unknown and listen ended before 30 audible seconds — free.':'Ended before listening threshold — free.';if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
- audio.addEventListener('error',()=>{$('radio-payment').textContent='Audio unavailable. Choose another song. Check activity for any payment already requested.';});
+ audio.addEventListener('ended',()=>{endPlayback();if(start&&!start.requested)$('radio-payment').textContent=start.unknownDuration?'Duration unknown and listen ended before 30 audible seconds — free.':'Ended before listening threshold — free.';if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
+ audio.addEventListener('error',()=>{endPlayback();$('radio-payment').textContent='Audio unavailable. Choose another song. Check activity for any payment already requested.';});
  $('radio-play').onclick=()=>{if(!start)void select(Number($('radio-songs').value)||0);else if(audio.paused)void audio.play().catch(()=>{$('radio-payment').textContent='Could not resume audio.';});else audio.pause();};
  $('radio-next').onclick=()=>void select(index+1);$('radio-prev').onclick=()=>void select(index<0?0:index-1);
  $('radio-songs').onchange=()=>void select(Number($('radio-songs').value));
@@ -85,7 +89,8 @@ import {AudibleClock,supportModeLabel,miningFeeLabel} from './radio-policy.js';
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
    const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
-   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid listens over ${minutes} minutes`}? Network fee usually 257 microSTX; up to ${fee} microSTX if busy, plus 50 microSTX to the holder. You also approve up to two fee increases on the same pending payment within this cap, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet. It may resend an unresolved previously authorised payment unchanged at its original fee.`))return;
+   if(!await window.musicConfirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid listens over ${minutes} minutes`}? Network fee usually 257 microSTX; up to ${fee} microSTX if busy, plus 50 microSTX to the holder. You also approve up to two fee increases on the same pending payment within this cap, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet. It may resend an unresolved previously authorised payment unchanged at its original fee.`))return;
+   if(generation!==modeGeneration||!$('radio-approve').checked)return;
    const a=await api('enable',{fee,max,minutes,tab,continuous,feeMode:'cap'});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
    mode(`${a.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${a.used}${a.continuous?'':'/'+a.max} listens · network fee cap ${a.fee} microSTX + 50 to holder`);
    $('radio-payment').textContent='Music support stays on for this session. New songs can pay after their listening threshold; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
@@ -116,7 +121,8 @@ import {AudibleClock,supportModeLabel,miningFeeLabel} from './radio-policy.js';
  setInterval(async()=>{
   if(polling)return;polling=true;
   const polledApproval=approval;
-  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid,nonce:e.nonce,bytes:e.bytes,fee:e.fee,feeChosen:e.feeChosen,feeCap:e.feeCap,feeReason:e.feeReason,feeEstimates:e.feeEstimates,submittedAt:e.submittedAt,confirmedAt:e.confirmedAt,blockHeight:e.blockHeight,confirmationSeconds:e.confirmationSeconds,rejectionReason:e.rejectionReason}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
+  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);const currentEvent=s.events.find(e=>e.id===start?.id);if(currentEvent?.retryAt&&start?.playing)$('radio-payment').textContent=currentEvent.reason;
+   diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid,nonce:e.nonce,bytes:e.bytes,fee:e.fee,feeChosen:e.feeChosen,feeCap:e.feeCap,feeReason:e.feeReason,feeEstimates:e.feeEstimates,submittedAt:e.submittedAt,confirmedAt:e.confirmedAt,blockHeight:e.blockHeight,confirmationSeconds:e.confirmationSeconds,rejectionReason:e.rejectionReason}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
    if(approval&&!s.enabled){approval=null;mode('FREE PLAY · support session ended');}
    else if(approval&&s.recovery)mode('SUPPORT WAITING · '+s.recovery);
    else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} listens · network fee cap ${s.fee} microSTX + 50 to holder`);

@@ -6,10 +6,20 @@ const $=(id:string)=>document.getElementById(id)!;
 const status=(s:string)=>{$('profile-status').textContent=s;};
 let proof:{id:string;supportProof:string},challenge:any,busy=false;
 async function call(data:any){const r=await fetch('/api/music-profile',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data),signal:AbortSignal.timeout(20000)});const d=await r.json();if(!r.ok)throw Error(d.error||'Verification unavailable.');return d;}
+let complete=false,poll:ReturnType<typeof setTimeout>|undefined,retryDelay=30000;
+window.addEventListener('pagehide',()=>{complete=true;clearTimeout(poll);});
+function schedule(){
+ clearTimeout(poll);if(complete)return;
+ poll=setTimeout(async()=>{await finish();schedule();},retryDelay);
+}
+async function copy(value:string){
+ try{await navigator.clipboard.writeText(value);status('Copied.');}
+ catch{const input=document.createElement('textarea');input.value=value;input.readOnly=true;$('profile-actions').append(input);input.focus();input.select();status('Select and copy the highlighted text.');}
+}
 async function finish(extra={}){
  if(busy)return;busy=true;status('Checking your verification…');
- try{const d=await call({op:'complete',...proof,...extra});status(d.pending?d.message:d.action==='unlink'?'Your name link has been removed. Payment history is unchanged.':'Your BNS name is linked. Music Heroes can now show it alongside your wallet.');if(!d.pending)$('profile-actions').hidden=true;}
- catch(e){status((e as Error).message);}finally{busy=false;}
+ try{const d=await call({op:'complete',...proof,...extra});status(d.pending?d.message:d.action==='unlink'?'Your name link has been removed. Payment history is unchanged.':'Your BNS name is linked. Music Heroes can now show it alongside your wallet.');retryDelay=30000;if(!d.pending){complete=true;clearTimeout(poll);$('profile-actions').hidden=true;}}
+ catch(e){retryDelay=Math.min(retryDelay*2,120000);status((e as Error).message);if(/expired|already used|ownership changed/i.test((e as Error).message)||Date.now()>challenge.expires+3600000){complete=true;clearTimeout(poll);}}finally{busy=false;}
 }
 const store=createWalletSessionStore();
 let wallet=store.load();
@@ -56,11 +66,16 @@ async function init(){
   proof=JSON.parse(atob(fragment.replace(/-/g,'+').replace(/_/g,'/')));
   if(!/^[a-f0-9]{64}$/.test(proof.id)||!/^[a-f0-9]{130}$/i.test(proof.supportProof))throw Error('Invalid profile request.');
   ({challenge}=await call({op:'review',...proof}));
+  const share=document.createElement('button');share.textContent='Copy verification link for another device';share.onclick=()=>void copy('https://xtrata.xyz/music/profile#'+fragment);$('profile-actions').prepend(share);
   $('profile-heading').textContent=challenge.action==='unlink'?'Remove your public name link':`Link ${challenge.name}`;
   $('profile-details').textContent=`Support wallet: ${challenge.support}. ${challenge.action==='link'?'BNS owner: '+challenge.owner+'. ':''}Request expires ${new Date(challenge.expires).toLocaleTimeString()}.`;
   $('profile-actions').hidden=false;$('profile-sign').hidden=challenge.action==='unlink'||challenge.method==='transfer';$('profile-remove').hidden=challenge.action!=='unlink';
   if(challenge.action==='link'&&challenge.method==='transfer'){
    $('profile-transfer').hidden=false;$('profile-transfer-details').textContent=`Amount: 0.${String(challenge.amount).padStart(6,'0')} STX\nTo: ${challenge.support}\nFrom: ${challenge.owner}\nMemo (required): XM${challenge.id.slice(0,30)}`;
+   const fields:Record<string,string>={'Network':'Stacks mainnet','BNS name':challenge.name,'Amount':`0.${String(challenge.amount).padStart(6,'0')}`,'Recipient':challenge.support,'Sender (BNS owner)':challenge.owner,'Memo':'XM'+challenge.id.slice(0,30)};
+   for(const [label,value] of Object.entries(fields)){const button=document.createElement('button');button.textContent='Copy '+label;button.onclick=()=>void copy(value);$('profile-transfer-details').after(button);}
+   const all=document.createElement('button');all.textContent='Copy all transfer details';all.onclick=()=>void copy(Object.entries(fields).map(([k,v])=>k+': '+v).join('\n'));$('profile-transfer-details').after(all);
+   status('Checking automatically for your transfer. Keep this page open; no wallet extension is needed.');schedule();
   }
  }catch(e){status((e as Error).message);}
 }
