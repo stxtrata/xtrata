@@ -344,3 +344,13 @@ and remains pending; after approval push source, run the Windows workflow,
 inspect/download artifacts, publish immutable beta releases and append verified
 links/checksums to both release JSON and the Lounge fallback. Windows 1.0.9
 has not been built on native Windows yet.
+
+## Publication run — Windows CI timing
+
+The user pushed `7344df0bd`. Windows run `35930343721` failed only on four
+5-second timeouts in queue/recovery/return filesystem tests; 164 tests passed.
+To reduce hosted-runner I/O contention, the shared suite now uses one worker
+and a 30-second per-test limit. No assertions or application code changed.
+The three affected suites passed locally: 59 tests. A new native Windows run
+is still required before a Windows installer can be published. Push permission
+for the CI-only fix was requested. Mac assets are uploading to a draft release.
