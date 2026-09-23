@@ -163,5 +163,18 @@ GitHub's SHA-256 digest and byte count. Published as optional prereleases:
 - [Mac 1.0.5 beta 1](https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.5-mac-beta.1)
 - [Windows 1.0.8 beta 1](https://github.com/stxtrata/xtrata/releases/tag/music-v1.0.8-windows-beta.1)
 
-Next: deploy and read-only verify the additional Lounge links. No Git push was
-performed; the user retains control of pushing the final website/report commit.
+Published website revision: `58e90f86d`.
+Production deployment: `776f872c`; branch preview: `1fddc65c`.
+Both the production Lounge and `main-music-updates.xtrata.pages.dev` now serve
+three normal and six beta downloads. Live isolated-browser checks passed for
+correct new version labels, initially collapsed betas and mobile/desktop widths.
+All three new installer URLs returned HTTP 200 with expected byte lengths.
+The profile page returned HTTP 200; production and preview profile endpoints
+returned empty lists for an unused address. These checks do not prove real owner
+signature/transfer interoperability.
+
+Preview deployment emitted an existing configuration warning that
+`RADIO_LIKES_CONTRACT` is absent from preview vars; it did not prevent this
+deployment or BNS readiness check. This release does not change likes settings.
+No Git push was performed; the user retains control of pushing the final
+website/report commits.
