@@ -248,3 +248,39 @@ run existing native Windows CI, then test the resulting new installer on the PC.
 Existing published installers and Lounge links remain unchanged pending that
 build. Temporary workaround for installed 1.0.8: Alt+Tab away and back after a
 native confirmation. Source changes alone do not update an installed app.
+
+## Current-song 503 retry handling — prepared for the next desktop beta
+
+Payment operations now retain their existing playback identity and retry HTTP
+503 at 5, 10, 20, 40 and then 60-second intervals, honouring a longer Retry-After.
+The retry context is isolated with Node AsyncLocalStorage to the authorised
+playback operation; unrelated requests/returns do not acquire these retries.
+No additional session slot, signature, nonce, receipt or fee increase is created
+by a retry. A 503 from broadcast repeats the same already-journalled bytes.
+Ambiguous submission remains journalled and is never treated as definitely free.
+
+The local player sends an authenticated end notification on song change, end or
+media failure. Stop aborts all retained operations; a new begin also aborts any
+older active operation as a fallback. Cancellation interrupts backoff/network
+waiting. Existing pre-sign/pre-broadcast consent checks still apply. Already
+saved/submitted transactions remain available to the existing reconciliation
+routine after the song ends; this is not a new catch-up charge. The UI/history
+shows the temporary failure and retry interval while retaining the operation.
+This targets chain/payment HTTP 503s, not every media/catalogue failure, 429,
+validation error or arbitrary network exception.
+
+Verification: 74 targeted tests passed. Five additional tests use actual isolated
+wallet/filesystem/signing code with offline transport: increasing delays, one
+session slot/journal entry, identical signed bytes after ambiguous broadcast,
+song-end cancellation allowing a later song, Stop cancellation, and preservation
+of a journalled ambiguous payment when cancelling. Real isolated Electron smoke
+passed for normal playback, BNS fields, approval cancellation, mute/unmute and
+simulated payments. Native Windows/live-chain verification remains NOT RUN.
+No installer has been rebuilt or published for this correction yet.
+
+Cross-device BNS follow-up: current transfer verification requires the user to
+paste a transaction ID and click Check my transfer; a payment alone does not
+complete the association. Asked for the user's public transfer ID before
+changing or diagnosing that existing association. Suggested follow-up is a
+copyable continuation link/details and bounded automatic exact-transfer discovery
+on the verification page; do not relax sender, memo, amount or expiry checks.
