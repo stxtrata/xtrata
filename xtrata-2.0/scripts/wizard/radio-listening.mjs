@@ -22,7 +22,7 @@ export class RadioListening {
    const entry=log.find(e=>e.playbackId===row.id);
    if(entry?.status==='confirmed'){row.outcome='confirmed';row.reason=decodePaidReceipt(entry.receipt).kind==='listen'?'Paid listen confirmed.':'Paid start confirmed.';row.txid=entry.confirmedTxid||entry.txid;}
    if(entry?.status==='failed'){row.outcome='failed';row.reason=`Paid start failed on-chain (${entry.failureStatus||'abort'}); it was not retried.`;row.txid=entry.failedTxid||entry.txid;}
-   if(entry){row.receiptLabel=decodePaidReceipt(entry.receipt).label;const diagnostic=publicEntry(entry);for(const key of ['nonce','bytes','fee','feeChosen','feeCap','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason'])if(diagnostic[key]!==undefined)row[key]=diagnostic[key];row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
+   if(entry){row.receiptLabel=decodePaidReceipt(entry.receipt).label;const diagnostic=publicEntry(entry);for(const key of ['nonce','bytes','fee','actualFee','feeChosen','feeCap','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason'])if(diagnostic[key]!==undefined)row[key]=diagnostic[key];row.title=entry.title;row.artist=entry.artist;row.recipient=entry.recipient;}
   }
   return this.snapshot();
  }

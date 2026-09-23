@@ -17,3 +17,16 @@ export class AudibleClock {
   this.previous=now;this.wasAudible=audible;return this.seconds;
  }
 }
+
+export function supportModeLabel(text,enabled,muted,volume){
+ return enabled&&(muted||volume===0)
+  ?'SUPPORT ON · MUTED — listening timer paused; no new payment requests. Earlier requests may still complete.'
+  :text;
+}
+export function miningFeeLabel(event){
+ const settled=['confirmed','failed'].includes(event.outcome);
+ const fee=settled?event.actualFee:(event.feeChosen??event.fee);
+ if(!Number.isSafeInteger(fee)||fee<0)return settled?'Mining fee paid: unavailable':'';
+ const amount=BigInt(fee),stx=`${amount/1000000n}.${String(amount%1000000n).padStart(6,'0')}`;
+ return `Mining fee ${settled?'paid':'selected (not yet confirmed)'}: ${fee} microSTX (${stx} STX)`;
+}

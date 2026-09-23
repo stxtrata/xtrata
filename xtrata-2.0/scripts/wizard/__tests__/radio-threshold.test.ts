@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest';
-import {AudibleClock,listenThreshold} from '../radio-listening-policy.mjs';
+import {AudibleClock,listenThreshold,supportModeLabel,miningFeeLabel} from '../radio-listening-policy.mjs';
 import {encodeListenReceipt,decodePaidReceipt,uniqueListenReceipt} from '../../../public/radio/paid-receipt.mjs';
 import {RadioListening} from '../radio-listening.mjs';
 const tab='a'.repeat(32),id='b'.repeat(32);
@@ -76,4 +76,22 @@ it('requires explicit cap semantics and budgets the full cap before approving',a
  await expect(s.enable({fee:1000,max:5,minutes:10,tab,continuous:false,feeMode:'cap'})).rejects.toThrow('ceiling');
  try{await s.enable({fee:1000,max:4,minutes:10,tab,continuous:false,feeMode:'cap'});expect(s.active.feeMode).toBe('cap');}finally{s.disable();}
  await expect(s.enable({fee:1000,max:4,minutes:10,tab,continuous:false,feeMode:'unknown'})).rejects.toThrow();
+});
+
+describe('player support and fee labels',()=>{
+ it('shows mute or zero volume without clearing support and restores the live label on unmute',()=>{
+  const text='SUPPORT ON · 2 listens · network fee cap 1000 microSTX + 50 to holder';
+  expect(supportModeLabel(text,true,true,1)).toContain('MUTED');
+  expect(supportModeLabel(text,true,false,0)).toContain('no new payment requests');
+  expect(supportModeLabel(text,true,true,1)).toContain('Earlier requests may still complete');
+  expect(supportModeLabel(text,true,false,1)).toBe(text);
+  expect(supportModeLabel('FREE PLAY · support off',false,true,0)).toBe('FREE PLAY · support off');
+ });
+ it('shows the winning transaction fee rather than its cap or replacement fee',()=>{
+  expect(miningFeeLabel({outcome:'confirmed',actualFee:257,fee:900,feeCap:1000})).toBe('Mining fee paid: 257 microSTX (0.000257 STX)');
+  expect(miningFeeLabel({outcome:'failed',actualFee:400})).toContain('paid: 400');
+  expect(miningFeeLabel({outcome:'submitted',feeChosen:300})).toContain('selected (not yet confirmed): 300');
+  expect(miningFeeLabel({outcome:'confirmed',fee:300})).toBe('Mining fee paid: unavailable');
+  expect(miningFeeLabel({outcome:'free'})).toBe('');
+ });
 });

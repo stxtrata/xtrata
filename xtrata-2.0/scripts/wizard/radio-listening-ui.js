@@ -1,11 +1,12 @@
-import {AudibleClock} from './radio-policy.js';
+import {AudibleClock,supportModeLabel,miningFeeLabel} from './radio-policy.js';
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
  const tab=crypto.randomUUID().replaceAll('-','');
  let tracks=[],index=-1,start=null,approval=null,loading=0,modeGeneration=0,refreshing=false,metadataAbort=null;
  function renderSongs(){const list=$('radio-songs');list.replaceChildren();tracks.forEach((t,i)=>{const o=document.createElement('option');o.value=String(i);o.textContent=`#${t.id} · ${t.title}${t.artist?' — '+t.artist:''}`;list.append(o);});list.value=String(index<0?0:index);}
  async function api(action,body={}){const r=await fetch('/listening/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const v=await r.json();if(!r.ok||v.error)throw Error(v.error||'Local service unavailable.');return v;}
- function mode(text){const active=!!approval;$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')?'waiting':'support'):'free';document.body.dataset.paymentMode=$('radio-mode').dataset.mode;$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
+ let modeText='';
+ function mode(text){modeText=text;const active=!!approval;text=supportModeLabel(text,active,audio.muted,audio.volume);$('radio-mode').textContent=text;$('radio-mode').dataset.mode=active?(text.includes('WAITING')||audio.muted||audio.volume===0?'waiting':'support'):'free';document.body.dataset.paymentMode=$('radio-mode').dataset.mode;$('radio-enable').disabled=active;$('radio-enable').textContent=active?'Music support is on':'Turn on music support';$('radio-approve').checked=active;$('radio-approve').disabled=active;for(const id of ['radio-paid-fee','radio-continuous'])$(id).disabled=active;limits();window.dispatchEvent(new CustomEvent('wizard-paid-mode',{detail:!!approval}));}
  let recentEvents=[],diagnostic=null,recoveryDismissed=false;
  if($('dismiss-recovery'))$('dismiss-recovery').onclick=()=>{recoveryDismissed=true;$('recovery-notice').hidden=true;};
  if($('copy-recovery'))$('copy-recovery').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(diagnostic,null,2));$('recovery-copy-status').textContent='Report copied. No private keys or signed transaction data included.';}catch{$('recovery-copy-status').textContent='Clipboard unavailable. '+JSON.stringify(diagnostic);}};
@@ -13,7 +14,7 @@ import {AudibleClock} from './radio-policy.js';
  function renderEvents(events){
   recentEvents=events;
   const host=$('radio-events');host.replaceChildren();
-  for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}${e.receiptLabel?' · '+e.receiptLabel:''}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;host.append(p);}
+  for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}${e.receiptLabel?' · '+e.receiptLabel:''}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;const fee=miningFeeLabel(e);if(fee)p.textContent+=' · '+fee;host.append(p);}
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE PLAY · support off');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
  async function select(i){
@@ -64,6 +65,7 @@ import {AudibleClock} from './radio-policy.js';
    window.dispatchEvent(new Event('wizard-refresh'));
   }).catch(e=>{if(start===observed)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;});
  }
+ audio.addEventListener('volumechange',()=>mode(modeText));
  audio.addEventListener('playing',()=>{if(start)start.playing=true;});
  for(const event of ['pause','waiting','stalled','ended'])audio.addEventListener(event,()=>{if(start)start.playing=false;});
  for(const event of ['playing','volumechange','timeupdate','pause','seeking','seeked','waiting','stalled'])audio.addEventListener(event,audible);

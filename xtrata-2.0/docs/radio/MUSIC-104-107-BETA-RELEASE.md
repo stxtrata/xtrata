@@ -159,3 +159,20 @@ section and preservation of existing downloads. Evidence:
 `.artifacts/music-logo-release/verified.json` and `live-downloads.png`.
 Only the logo source commit was explicitly authorised for push and was pushed.
 Final download-page/report commits remain for the user-managed push.
+
+## Subsequent muted-status and recent mining-fee display
+
+The support banner now immediately shows MUTED when mute is enabled or volume
+is zero, explains that audible timing/new payment requests pause, and notes that
+earlier requests may still complete. Unmuting restores the latest support summary;
+session approval and payment eligibility rules are unchanged. The muted banner
+uses the waiting colour rather than the active-support colour.
+
+Recent plays now include mining fee paid in microSTX and exact six-decimal STX.
+The journal's actualFee follows the winning confirmed/failed transaction, rather
+than showing a later replacement fee or the cap. Pending entries label their fee
+as selected/not yet confirmed; missing historical actual fees show unavailable.
+33 targeted tests pass, including mute/zero-volume/unmute, actual-vs-cap fees,
+failed/pending fees and refreshed journal propagation. UI JavaScript syntax passes.
+These source changes require new desktop installers; published beta build 2 is
+unchanged. No wallets were opened and no payments were sent.
