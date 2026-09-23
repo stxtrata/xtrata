@@ -382,3 +382,11 @@ The Lounge now includes all three new installers as closed compact rows,
 retaining all existing normal and beta versions. Release JSON and static HTML
 use the same verified URL/version/checksum. Compact-row test passed; website
 build and deployments are the final publication checks.
+
+Final publication checks passed: website build, production deployment
+`50f7b22c.xtrata.pages.dev`, and main-music-updates preview deployment. Both live
+aliases returned nine beta entries with the correct Windows 1.0.9 checksum;
+the public Windows installer link followed successfully to HTTP 200. Release
+links and evidence committed/pushed in `69b1d5898`. All requested installers
+are now published; only the explicitly unperformed hardware/live-money checks
+remain outside this release verification.
