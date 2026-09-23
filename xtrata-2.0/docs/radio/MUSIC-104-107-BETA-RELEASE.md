@@ -92,3 +92,14 @@ The Lounge manifest and HTML fallback contain both Mac 1.0.4 variants and Window
 1.0.7 under the closed Beta Versions disclosure. Existing downloads and the
 regular-update version field remain byte-for-byte equivalent as JSON values.
 Website deployment verification is recorded after deployment below.
+
+Production deployed successfully to Cloudflare Pages project `xtrata`, branch
+`main`, from release-page commit `2d5a2b238`. Deployment:
+https://f51df96a.xtrata.pages.dev — live URL https://xtrata.xyz/music/lounge .
+All six existing/beta artifact links returned HTTP 200. Live Chromium verification
+confirmed three existing cards, three beta cards, correct labels, collapsed initial
+state, mouse expansion and keyboard collapse. Screenshot and structured check:
+`.artifacts/music-beta-live/downloads.png` and `verification.json`. Final site build
+and desktop/mobile browser smoke passed. Publication is complete. Source/report
+commits still need the user-managed push so future repository deployments retain
+these links; no Git push was performed by the agent.
