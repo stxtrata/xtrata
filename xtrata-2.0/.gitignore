@@ -65,3 +65,5 @@ scripts/wizard/.collection-v15/
 
 # Generated profile verification browser bundle
 /public/radio/music-profile.js
+
+/public/radio/music-profile-wallet-v2.js

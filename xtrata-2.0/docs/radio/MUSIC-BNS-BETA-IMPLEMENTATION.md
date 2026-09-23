@@ -198,3 +198,25 @@ rejection and cancellation/retry. Mocked browser transfer/unlink/mobile smoke an
 full website build passed. Real extension signing remains user verification; no
 personal wallet was accessed and no signature or transaction was requested.
 This is a website-only correction; installed desktop betas need no rebuild.
+
+### Wallet chooser delivery correction
+
+A fresh browser displayed the shared chooser correctly, including installed
+Leather/Xverse entries. However `/radio/music-profile.js` was served with
+`public, max-age=14400, must-revalidate`, while `/music/*` HTML uses no-cache.
+Returning users could therefore receive the new button with the earlier script
+that never attached its handler. Versioned the script URL to invalidate those
+cached copies immediately and added an exact no-cache header for future updates.
+The working `/music/` page also versions its wallet script.
+
+`node scripts/music-support/profile-connect-smoke.mjs` passed with the actual
+bundled chooser and simulated Leather/Xverse extensions: visible chooser,
+selection, connected address, switch and Escape cancellation. All requests are
+intercepted; no real wallet/signing/payment access. The first Xverse simulation
+omitted its Bitcoin RPC bridge and failed; adding the real two-bridge shape made
+the test representative and it passed. Full website build passed.
+
+Live verification found the custom domain still overriding the cache header,
+while the immutable Pages deployment correctly returned no-cache. The fix also
+uses a distinct `music-profile-wallet-v2.js` filename (not only a query string)
+so old cached script URLs cannot be reused. No CDN security settings changed.
