@@ -144,3 +144,9 @@ Mac ASAR inspection passes with the correction. Native Windows rerun required.
   Add only published/verified artifact URLs to the beta manifest and HTML fallback.
 - Website production is Cloudflare Pages project xtrata, production branch main.
   Nothing has yet been deployed by this publication task. Live tests remain NOT RUN.
+
+## Superseding completed beta release
+
+See `MUSIC-104-107-BETA-RELEASE.md` for final artifacts, replacement Mac checksums,
+Windows successful run 35887901449 and authorised beta publication. The earlier
+blocked checkpoints above are retained as history, not current release status.
