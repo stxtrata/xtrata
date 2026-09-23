@@ -14,7 +14,7 @@ try {
   });
   await page.route('**/*',async route=>{
    const p=new URL(route.request().url()).pathname;
-   const file={'/music/profile':'music/profile.html','/radio/music-profile-wallet-v2.js':'public/radio/music-profile-wallet-v2.js','/radio/music-hub.css':'public/radio/music-hub.css','/radio/music-heroes.css':'public/radio/music-heroes.css'}[p];
+   const file={'/music/profile':'music/profile.html','/radio/music-profile-wallet-v3.js':'public/radio/music-profile-wallet-v3.js','/radio/music-hub.css':'public/radio/music-hub.css','/radio/music-heroes.css':'public/radio/music-heroes.css'}[p];
    if(!file)return route.fulfill({status:404,body:''});
    return route.fulfill({body:await readFile(file),contentType:file.endsWith('.html')?'text/html':file.endsWith('.css')?'text/css':'text/javascript'});
   });

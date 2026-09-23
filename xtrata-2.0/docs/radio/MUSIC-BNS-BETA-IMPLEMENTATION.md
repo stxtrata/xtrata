@@ -284,3 +284,28 @@ complete the association. Asked for the user's public transfer ID before
 changing or diagnosing that existing association. Suggested follow-up is a
 copyable continuation link/details and bounded automatic exact-transfer discovery
 on the verification page; do not relax sender, memo, amount or expiry checks.
+
+## Cross-device transfer verification (2026-09-23)
+
+The app now offers Copy verification link beside Continue on Xtrata. The website
+also offers the same link, so existing app users can open Continue first and
+copy it there. Open the link on the device with the BNS wallet. Copy buttons
+provide the network, BNS name, exact STX amount, recipient, sender and required
+memo, individually or together. The signed request stays in the URL fragment
+while sharing and is removed from the address bar on opening; it is not saved
+to browser storage. Share only with your own device.
+
+The page checks every 30 seconds, slowing to 60 then 120 seconds after errors.
+Discovery examines at most 50 pending and 50 recent account transactions.
+Every candidate passes the existing exact transfer validator, then the specific
+transaction is fetched and validated again. Manual transaction ID remains a
+fallback for unusually busy accounts. Pending matches are retained for the
+existing confirmation grace period. Completion, expiry and page exit stop
+polling. No transactions are signed or sent by automatic checking. Existing
+expiry, ownership, replay and revision guards remain unchanged.
+
+Verification: 19 targeted API/SQLite and page tests passed; profile production
+bundle built. Transfer discovery tests include no match, wrong sender and a
+valid exact match. No live transfers or cross-device hardware tests performed.
+This change requires website deployment; the new app-side copy button also
+requires the next installer. No installer or deployment produced in this change.
