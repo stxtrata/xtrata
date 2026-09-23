@@ -11,7 +11,7 @@ import {createReadStream} from 'node:fs';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const requireFromDesktop=createRequire(pathToFileURL(resolve(root,'desktop/music/package.json')));
-const {listPackage}=requireFromDesktop('@electron/asar');
+const {listPackage,extractFile}=requireFromDesktop('@electron/asar');
 const forbidden=[
  /(^|\/)(unlock\.key|vault\.json|journal\.json|setup\.lock|run\.lock)$/i,
  /(^|\/)(?:id_rsa|id_ed25519|[^/]+\.(?:pem|p12|pfx))$/i,
@@ -23,6 +23,7 @@ const forbidden=[
  /(^|\/)scripts\/music-support(?:\/|$)/i,
 ];
 const required=[
+ 'app/public/radio/paid-receipt.mjs',
  'main.mjs',
  'window.mjs',
  'navigation.mjs',
@@ -82,6 +83,11 @@ if(matchedForbidden.length||missingRequired.length){
  throw Error(`Windows package inspection failed (${parts.join('; ')}).`);
 }
 
+// No threshold override exists in production. Harnesses use genuine short media.
+for(const path of ['app/scripts/wizard/radio-listening.mjs','app/scripts/wizard/radio-listening-policy.mjs','app/scripts/wizard/radio-listening-ui.js']){
+ const source=extractFile(archive,join(...path.split('/'))).toString('utf8');
+ if(/thresholdOverride|testThreshold|XTRATA_TEST_THRESHOLD/.test(source))throw Error('Test threshold override found in packaged runtime.');
+}
 const report={
  schema:'xtrata-music-windows-package-inspection-v1',
  target:'Windows 11 x64 preview',
@@ -91,6 +97,7 @@ const report={
  payloadEntryCount:payloadEntries.length,
  checks:{
   walletSecretsInPackage:false,
+  testThresholdOverrideInRuntime:false,
   developmentOrTestFilesInPackage:false,
   requiredRuntimeFilesPresent:true,
  },

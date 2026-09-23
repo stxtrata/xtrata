@@ -1,31 +1,19 @@
-import {uniqueListenReceipt} from '../../public/radio/paid-receipt.mjs';
+// Frozen Mac 1.0.3 / Windows 1.0.6 backend, source 7b6c9e409.
+// Test-only downgrade compatibility fixture; only import path adapted.
 /** Local-only radio wizard. Secrets never cross the HTTP boundary. */
 import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, open, unlink, stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { killSwitchEngaged } from './inscribe.mjs';
+import { killSwitchEngaged } from '../../inscribe.mjs';
 const require = createRequire(import.meta.url);
 const T = require('@stacks/transactions');
 const { StacksMainnet } = require('@stacks/network');
 const OWNER='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', NAME='xtrata-radio-plays-v1-0';
-export const BUMP_AFTER_MS=180000;
 const HASH='b81f1a0e1de406102e739f78d200041a270f498edab1bb3320aec54f33cbbbe1';
 const WINDOWS_VAULT_SCHEME='windows-dpapi-v1', LOCK_VERSION=1, LOCK_STALE_MS=120000;
 const sha = s => createHash('sha256').update(s).digest('hex');
-export function publicEntry(entry){
- const allowed=['playbackId','createdAt','address','core','song','fee','receipt','recipient','txid','status','title','artist','nonce','bytes','feeChosen','feeReason','feeEstimates','submittedAt','confirmedAt','blockHeight','confirmationSeconds','rejectionReason','failedAt','failureStatus','failedTxid','confirmedTxid','actualFee','recoveryNonce','recoveryAt','resendAttempts','lastResendAt','mode','amount','kind','feeCap'];
- const result=Object.fromEntries(allowed.filter(k=>entry[k]!==undefined).map(k=>[k,entry[k]]));
- if(entry.feeEstimates)result.feeEstimates=Object.fromEntries(['low','medium','high','fetchedAt'].filter(k=>entry.feeEstimates[k]!==undefined).map(k=>[k,entry.feeEstimates[k]]));
- if(entry.priorAttempts)result.priorAttempts=entry.priorAttempts.map(a=>Object.fromEntries(['txid','fee','submittedAt'].filter(k=>a[k]!==undefined).map(k=>[k,a[k]])));
- return result;
-}
-export function sizedPlayFee(transaction,chosenFee){
- const bytes=transaction.serialize().length;
- if(bytes!==257)throw Error('Unexpected play transaction size: '+bytes+' bytes; signing refused.');
- if(!Number.isSafeInteger(chosenFee)||chosenFee<1||chosenFee>1000)throw Error('Invalid chosen network fee.');
- return {bytes,fee:Math.max(chosenFee,bytes)};
-}
+function publicEntry(entry){const result={...entry};delete result.raw;return result;}
 export function policy(p) {
   if (!Number.isInteger(p.core)||p.core<1||p.core>3||!Number.isSafeInteger(p.song)||p.song<0||!Number.isInteger(p.fee)||p.fee<1||p.fee>1000||!Number.isInteger(p.count)||p.count<1||p.count>5) throw Error('Use core 1–3, an integer song ID, fee 1–1000 microSTX and 1–5 tests.');
   if ((p.fee+50)*p.count>5000) throw Error('Run exceeds 0.005 STX ceiling.');
@@ -33,7 +21,6 @@ export function policy(p) {
 }
 export class RadioWizard {
  constructor(directory, request=fetch, options={}) {
-  this.queuedPaidStarts=options.queuedPaidStarts===true;this.maxPending=options.maxPending??5;if(!Number.isInteger(this.maxPending)||this.maxPending<1||this.maxPending>20)throw Error('Pending limit must be 1–20.');
   this.dir=directory;this.request=request;this.running=false;this.stopped=false;this.stopEpoch=0;this.session=randomBytes(16).toString('hex');this.message='Idle. No payments authorised.';
   this.platform=options.platform||process.platform;this.vaultProtector=options.vaultProtector||null;
   this.now=options.now||Date.now;this.pid=options.pid||process.pid;this.lockStaleMs=options.lockStaleMs||LOCK_STALE_MS;this.canRecoverStaleLock=options.canRecoverStaleLock===true;
@@ -148,7 +135,7 @@ export class RadioWizard {
  rateLimitError(){const e=Error('Chain service is busy. Checks paused for '+Math.max(1,Math.ceil((this.cooldownUntil-this.now())/1000))+' seconds; listening continues free.');e.status=429;return e;}
  async api(path,options={}) {
   const {cacheMs=0,...requestOptions}=options;
-  const read=(requestOptions.method||'GET')==='GET'||path.startsWith('/v2/contracts/call-read/')||path==='/v2/fees/transaction';
+  const read=(requestOptions.method||'GET')==='GET'||path.startsWith('/v2/contracts/call-read/');
   const key=path+'|'+String(requestOptions.body||'');
   const ttl=path.includes('/contracts/source/')?3600000:path==='/v2/info'?300000:cacheMs;
   const cached=this.apiCache.get(key);if(read&&cached&&cached.until>this.now())return structuredClone(cached.value);
@@ -163,7 +150,7 @@ export class RadioWizard {
     const delay=Math.max(Number.isFinite(requested)?requested:0,Math.min(300000,30000*2**Math.min(this.rateFailures-1,4)));
     this.cooldownUntil=Math.max(this.cooldownUntil,this.now()+delay);throw this.rateLimitError();
    }
-   if(!r.ok){let reason='';try{const body=await r.json();if(typeof (body.reason||body.error)==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason||body.error))reason=body.reason||body.error;}catch{}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}
+   if(!r.ok){let reason='';try{const body=await r.json();if(typeof body.reason==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(body.reason))reason=body.reason;}catch{}const e=Error('Chain request failed: HTTP '+r.status+(reason?' ('+reason+')':''));e.status=r.status;e.reason=reason;throw e;}
    const value=await r.json();this.rateFailures=0;if(read&&ttl){for(const [k,v] of this.apiCache)if(v.until<=this.now())this.apiCache.delete(k);if(this.apiCache.size>=128)this.apiCache.delete(this.apiCache.keys().next().value);this.apiCache.set(key,{until:this.now()+ttl,value});}return value;
   };
   // Never queue a signed submission: its caller has just checked consent.
@@ -177,68 +164,8 @@ export class RadioWizard {
   try{return structuredClone(await task);}finally{this.apiPending.delete(key);}
  }
 
- async estimatePlayFee(tx){
-  if(this.feeEstimateTask)return this.feeEstimateTask;
-  if(this.feeEstimateCheckedAt!==undefined&&this.now()-this.feeEstimateCheckedAt<60000)return this.feeEstimate&&this.now()-this.feeEstimate.fetchedAt<600000?this.feeEstimate:null;
-  const task=(async()=>{
-   this.feeEstimateCheckedAt=this.now();
-   try{
-    let values;
-    try{const result=await this.api('/v2/fees/transaction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transaction_payload:Buffer.from(T.serializePayload(tx.payload)).toString('hex'),estimated_len:257})});values=result.estimations?.map(e=>Math.ceil(e.fee));}
-    catch(error){if(error.reason!=='NoEstimateAvailable')throw error;const rate=await this.api('/v2/fees/transfer');if(!Number.isFinite(rate)||rate<0)throw Error('Invalid transfer estimate');values=Array(3).fill(Math.ceil(rate*257));}
-    if(!Array.isArray(values)||values.length!==3||values.some(v=>!Number.isSafeInteger(v)||v<0))throw Error('Invalid fee estimate');
-    const [low,medium,high]=values;this.feeEstimate={low,medium,high,fetchedAt:this.now()};return this.feeEstimate;
-   }catch{if(this.feeEstimate&&this.now()-this.feeEstimate.fetchedAt<600000)return this.feeEstimate;return null;}
-  })();this.feeEstimateTask=task;
-  try{return await task;}finally{this.feeEstimateTask=null;}
- }
- async choosePlayFee(tx,cap){
-  if(!Number.isInteger(cap)||cap<257||cap>1000)throw Error('Invalid network fee cap.');
-  sizedPlayFee(tx,257);const estimates=await this.estimatePlayFee(tx),fee=Math.max(257,estimates?.low??257);
-  if(fee>cap)throw Error('Network busy — this listen stays free');
-  return {fee,estimates,reason:fee===257?'floor':'estimate'};
- }
- async bumpPending(log,approval){
-  const e=this.pending(log)[0];if(!e||e.status!=='submitted'||!e.feeCap||e.listeningSession!==approval?.listeningSession||e.feeCap!==approval.feeCap||!Number.isFinite(Date.parse(e.submittedAt))||this.now()-Date.parse(e.submittedAt)<BUMP_AFTER_MS||(e.priorAttempts?.length||0)>=2)return;
-  approval.authorised();this.guard();
-  const visible=await this.api('/extended/v1/tx/'+e.txid);
-  if(visible.tx_status!=='pending'||visible.tx_id!==e.txid||String(visible.nonce)!==e.nonce||visible.sender_address!==e.address||String(visible.fee_rate)!==String(e.fee))return;
-  const tx=this.assertSavedPlay(e,e.address),estimates=await this.estimatePlayFee(tx);
-  if(this.now()<this.cooldownUntil)throw this.rateLimitError();
-  const fee=Math.min(e.feeCap,Math.max(e.fee+1,Math.ceil(e.fee*1.5),estimates?.low??257));if(fee<=e.fee)return;
-  approval.authorised();
-  await this.retryPreparedPlay(e.txid,fee,{...approval,estimates,log});
- }
  async read(fn,args=[]) {const r=await this.api(`/v2/contracts/call-read/${OWNER}/${NAME}/${fn}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sender:OWNER,arguments:args.map(T.cvToHex)})});if(!r.okay)throw Error('Contract read failed.');return T.cvToJSON(T.hexToCV(r.result));}
- async journal(){try{const log=await this.json('journal.json');if(!Array.isArray(log))throw Error('Invalid payment journal.');for(const e of log){if(e.raw){const nonce=T.deserializeTransaction(Buffer.from(e.raw,'hex')).auth.spendingCondition.nonce.toString();if(e.nonce!==undefined&&e.nonce!==nonce)throw Error('Saved nonce differs from signed payment.');e.nonce=nonce;}}return log;}catch(e){if(e.code==='ENOENT')return [];throw e;}}
- assertSavedPlay(e,address){
-  if(!e.raw)throw Error('Saved payment bytes unavailable.');
-  const tx=T.deserializeTransaction(Buffer.from(e.raw,'hex'));
-  tx.verifyOrigin();const args=[T.uintCV(e.core),T.uintCV(e.song),T.bufferCV(Buffer.from(e.receipt,'hex'))];
-  const pc=T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n);
-  if(e.address!==address||tx.auth.spendingCondition.signer!==T.createAddress(address).hash160||'0x'+tx.txid()!==e.txid||tx.version!==T.TransactionVersion.Mainnet||tx.chainId!==1||T.addressToString(tx.payload.contractAddress)!==OWNER||tx.payload.contractName.content!==NAME||tx.payload.functionName.content!=='play'||tx.payload.functionArgs.length!==3||args.some((a,i)=>T.cvToHex(a)!==T.cvToHex(tx.payload.functionArgs[i]))||tx.auth.spendingCondition.fee!==BigInt(e.fee)||tx.postConditionMode!==T.PostConditionMode.Deny||tx.postConditions.values.length!==1||Buffer.from(T.serializePostCondition(tx.postConditions.values[0])).toString('hex')!==Buffer.from(T.serializePostCondition(pc)).toString('hex'))throw Error('Saved payment identity mismatch.');
-  return tx;
- }
- pending(log){return log.filter(e=>!['confirmed','failed'].includes(e.status)).sort((a,b)=>BigInt(a.nonce??0)<BigInt(b.nonce??0)?-1:1);}
- queueNonce(log,account,nonces){
-  if(!Number.isSafeInteger(account.nonce)||account.nonce<0||!Number.isSafeInteger(nonces.possible_next_nonce)||!Array.isArray(nonces.detected_mempool_nonces)||!Array.isArray(nonces.detected_missing_nonces))throw Error('Chain nonce information is incomplete. This start stays free.');
-  const chain=BigInt(account.nonce),known=new Map();
-  for(const e of log){if(!e.raw||typeof e.nonce!=='string'||!/^\d+$/.test(e.nonce))throw Error('Saved payment nonce is unknown. Recovery required.');if(known.has(e.nonce))throw Error('Duplicate saved nonce. Recovery required.');known.set(e.nonce,e);}
-  for(const n of [...nonces.detected_mempool_nonces,...nonces.detected_missing_nonces]){if(!Number.isSafeInteger(n)||n<0)throw Error('Invalid chain nonce.');if(BigInt(n)>=chain&&!known.has(String(n)))throw Error('Foreign or missing wallet nonce. This start stays free.');}
-  if(nonces.detected_missing_nonces.some(n=>BigInt(n)>=chain))throw Error('Saved nonce gap needs recovery before another payment.');
-  const pending=this.pending(log);if(pending.length>=this.maxPending)throw Error('Pending payment limit reached. This start stays free.');
-  for(const e of pending)if(e.status!=='submitted'||BigInt(e.nonce)<chain||(e.resendAttempts||0)>=3)throw Error('Earlier payment is uncertain or needs recovery. This start stays free.');
-  let next=chain;for(const n of known.keys())if(BigInt(n)>=next)next=BigInt(n)+1n;
-  if(next-chain>BigInt(this.maxPending))throw Error('Saved nonce chain is too long.');
-  for(let n=chain;n<next;n++){const e=known.get(String(n));if(!e||e.status!=='submitted')throw Error('Earlier nonce is missing or not accepted. This start stays free.');}
-  if(BigInt(nonces.possible_next_nonce)>next||BigInt(nonces.possible_next_nonce)<chain)throw Error('Chain nonce disagrees with saved payments.');
-  return next;
- }
- async submitNext(input,context){
-  if(!this.queuedPaidStarts)throw Error('Queued paid starts are disabled.');
-  if(input.count!==1||typeof context?.authorised!=='function'||!context.playbackId)throw Error('A queued payment requires current playback consent.');
-  return this.run(input,{...context,submitOnly:true});
- }
+ async journal(){try{return await this.json('journal.json');}catch(e){if(e.code==='ENOENT')return [];throw e;}}
  async status(chain=false) {
   const diskRunning=await stat(join(this.dir,'run.lock')).then(()=>true,e=>{if(e.code==='ENOENT')return false;throw e;});
   const {address}=await this.json('vault.json');let balance=null,recovery=null;
@@ -316,7 +243,7 @@ export class RadioWizard {
    if(this.returnAmount(q.mode,account.balance,q.fee).toString()!==q.amount)throw Error('Return amount changed. Review again.');
    if(killSwitchEngaged()||epoch!==this.stopEpoch||q.expires<=Date.now())throw Error('Return stopped or review expired.');
    this.ensureStorageHealthy();
-   const key=await this.key();if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
+   const key=await this.key();
    const tx=await T.makeSTXTokenTransfer({recipient:q.recipient,amount:BigInt(q.amount),fee:BigInt(q.fee),nonce:BigInt(q.nonce),
     network:new StacksMainnet(),memo:'Xtrata Music return',anchorMode:T.AnchorMode.Any,senderKey:key});
    if(killSwitchEngaged()||epoch!==this.stopEpoch||q.expires<=Date.now())throw Error('Return stopped or review expired.');
@@ -344,24 +271,19 @@ export class RadioWizard {
  }
 
  stop(){this.stopEpoch++;this.stopped=true;this.message='Stopped. Already submitted transactions may confirm.';}
- async retryPreparedPlay(txid,fee,automatic=null){
+ async retryPreparedPlay(txid,fee){
   if(typeof txid!=='string'||!/^0x[0-9a-f]{64}$/.test(txid)||!Number.isInteger(fee)||fee<1||fee>1000)throw Error('Invalid explicit recovery request.');
-  const operation=async()=>{
-   const check=()=>{if(automatic){automatic.authorised();this.guard();}if(this.now()<this.cooldownUntil)throw this.rateLimitError();};check();
+  return this.exclusive(async()=>{
    if(killSwitchEngaged())throw Error('Wizard kill switch is engaged.');
    this.ensureStorageHealthy();
    const epoch=this.stopEpoch;
-   const log=automatic?.log||await this.journal(),e=log.find(row=>row.txid===txid);
-   if(!e||!['prepared','submitted'].includes(e.status)||(e.priorAttempts?.length||0)>=(automatic?2:1)||fee<=e.fee)throw Error('Only a saved prepared attempt can be explicitly retried once at a higher fee.');
-   if(automatic&&(e.status!=='submitted'||e.listeningSession!==automatic.listeningSession||e.feeCap!==automatic.feeCap||fee>e.feeCap))throw Error('Fee replacement has no matching approval.');
-   if(this.pending(log)[0]!==e)throw Error('Another payment needs recovery first.');
+   const log=await this.journal(),e=log.find(row=>row.txid===txid);
+   if(!e||e.status!=='prepared'||e.priorAttempts?.length||fee<=e.fee)throw Error('Only a saved prepared attempt can be explicitly retried once at a higher fee.');
+   if(log.some(row=>row!==e&&row.status!=='confirmed'))throw Error('Another payment needs recovery first.');
    await this.reconcileReturns();
    const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish the return review first.');
-   try{const visible=await this.api('/extended/v1/tx/'+txid);if(e.status!=='submitted'||visible.tx_status!=='pending')throw Error('Original transaction is visible. Reconcile it instead.');}catch(error){if(error.status!==404||automatic)throw error;}
-   const {address}=await this.json('vault.json'),account=await this.returnAccount(address,true),old=this.assertSavedPlay(e,address);
-   const nonces=await this.api(`/extended/v1/address/${address}/nonces`);
-   if(automatic&&(!Number.isSafeInteger(nonces.possible_next_nonce)||!Array.isArray(nonces.detected_mempool_nonces)||!Array.isArray(nonces.detected_missing_nonces)))throw Error('Recovery nonce information is incomplete.');
-   if([...nonces.detected_mempool_nonces||[],...nonces.detected_missing_nonces||[]].some(n=>!log.some(row=>row.nonce===String(n))))throw Error('Foreign recovery nonce.');
+   try{await this.api('/extended/v1/tx/'+txid);throw Error('Original transaction is visible. Reconcile it instead.');}catch(error){if(error.status!==404)throw error;}
+   const {address}=await this.json('vault.json'),account=await this.returnAccount(address),old=T.deserializeTransaction(Buffer.from(e.raw,'hex'));
    const args=[T.uintCV(e.core),T.uintCV(e.song),T.bufferCV(Buffer.from(e.receipt,'hex'))];
    if(e.address!==address||old.txid()!==txid.slice(2)||old.version!==T.TransactionVersion.Mainnet||old.chainId!==1||
     T.addressToString(old.payload.contractAddress)!==OWNER||old.payload.contractName.content!==NAME||old.payload.functionName.content!=='play'||
@@ -370,40 +292,38 @@ export class RadioWizard {
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(address),args[2]]);
    if(receipt.type!=='(optional none)'||receipt.value!==null)throw Error('The play receipt already exists or could not be verified.');
    const source=await this.api(`/v2/contracts/source/${OWNER}/${NAME}?proof=0`);if(sha(source.source)!==HASH)throw Error('Deployed source differs from pinned helper.');
-   if(account.balance<this.pending(log).reduce((sum,row)=>sum+BigInt(row===e?Math.max(fee,row.feeCap||0):(row.feeCap||row.fee))+50n,automatic?.continuous?0n:1000n))throw Error('Balance is outside supported recovery limits.');
-   if(!automatic?.continuous&&log.reduce((total,row)=>total+(row.feeCap||row.fee)+50,0)-(e.feeCap||e.fee)+Math.max(fee,e.feeCap||0)>10000)throw Error('Recovery exceeds the lifetime test budget.');
+   if(account.balance<BigInt(fee+50+1000))throw Error('Balance is outside supported recovery limits.');
+   if(log.reduce((total,row)=>total+row.fee+50,0)-e.fee+fee>10000)throw Error('Recovery exceeds the lifetime test budget.');
    const owner=await this.read('get-owner',[args[0],args[1]]),recipient=owner?.success===true?owner.value?.value?.value:null;
    if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master owner is not eligible.');
    if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
    this.ensureStorageHealthy();
-   check();const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
-   const key=await this.key();check();if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
-   const privateKey=T.createStacksPrivateKey(key),publicKey=T.publicKeyToString(T.getPublicKey(privateKey));
-   const tx=await T.makeUnsignedContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:args,publicKey,network:new StacksMainnet(),
+   const key=await this.key();
+   const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:args,senderKey:key,network:new StacksMainnet(),
     fee:BigInt(fee),nonce:old.auth.spendingCondition.nonce,anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,
     postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
-   sizedPlayFee(tx,fee);check();if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before signing.');
-   new T.TransactionSigner(tx).signOrigin(privateKey);
    if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery stopped before submission.');
    await this.save('recovery-original-'+txid.slice(2)+'.json',e);
-   e.priorAttempts=[...(e.priorAttempts||[]),{txid:e.txid,fee:e.fee,raw:e.raw,submittedAt:e.submittedAt}];e.recoveryNonce=account.nonce;e.status='prepared';e.fee=fee;e.recipient=recipient;e.txid='0x'+tx.txid();e.raw=Buffer.from(tx.serialize()).toString('hex');e.recoveryAt=new Date(this.now()).toISOString();e.feeReason='bump';if(automatic)e.feeEstimates=automatic.estimates;
+   e.priorAttempts=[{txid:e.txid,fee:e.fee}];e.recoveryNonce=account.nonce;e.fee=fee;e.recipient=recipient;e.txid='0x'+tx.txid();e.raw=Buffer.from(tx.serialize()).toString('hex');e.recoveryAt=new Date().toISOString();
    await this.save('journal.json',log);
    if(epoch!==this.stopEpoch||killSwitchEngaged())throw Error('Recovery saved but stopped; reconcile before proceeding.');
-   this.ensureStorageHealthy();check();
-   let result;try{result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});}catch(error){if(error.status>=400&&error.status<500){e.rejectionReason=error.reason||('HTTP '+error.status);await this.save('journal.json',log);}throw error;}
+   this.ensureStorageHealthy();
+   const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
    if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Recovery submission outcome unknown. Do not retry automatically.');
-   e.status='submitted';e.submittedAt=new Date(this.now()).toISOString();await this.save('journal.json',log);return publicEntry(e);
-  };return automatic?operation():this.exclusive(operation);
+   e.status='submitted';await this.save('journal.json',log);return publicEntry(e);
+  });
  }
  // Caller must hold the operation lock and provide a current-session consent guard.
  // Reuses signed bytes; never signs, replaces fees, discards history or fills nonce gaps.
  async rebroadcastMissing(log, authorised) {
-  const pending=this.pending(log);if(!pending.length)return;
-  const e=pending[0];if(!e.raw)throw Error('Saved payment bytes unavailable.');
+  const pending=log.filter(e=>!['confirmed','failed'].includes(e.status));
+  if(pending.length!==1)throw Error('Recovery requires exactly one unresolved payment.');
+  const e=pending[0];
+  if(e.priorAttempts?.length)throw Error('A replaced payment requires further reconciliation.');
   const tries=e.resendAttempts||0;
   if(tries>=3)throw Error('Recovery retry limit reached. Copy the diagnostic report for Xtrata.');
   if(e.lastResendAt&&this.now()-e.lastResendAt<60000)return;
-  const {address}=await this.json('vault.json'),tx=this.assertSavedPlay(e,address);
+  const {address}=await this.json('vault.json'),tx=T.deserializeTransaction(Buffer.from(e.raw,'hex'));
   const args=[T.uintCV(e.core),T.uintCV(e.song),T.bufferCV(Buffer.from(e.receipt,'hex'))];
   tx.verifyOrigin();
   if(tx.auth.spendingCondition.signer!==T.createAddress(address).hash160)throw Error('Saved payment signer mismatch.');
@@ -413,8 +333,8 @@ export class RadioWizard {
    tx.auth.spendingCondition.fee!==BigInt(e.fee))throw Error('Saved payment identity mismatch.');
   const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
   const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
-  if(!Number.isSafeInteger(account.nonce)||BigInt(account.nonce)!==tx.auth.spendingCondition.nonce||(nonces.detected_mempool_nonces||[]).some(n=>n===account.nonce||!pending.some(e=>e.nonce===String(n)))||(nonces.detected_missing_nonces||[]).some(n=>!pending.some(e=>e.nonce===String(n)&&e.raw)))throw Error('Recovery nonce is occupied or uncertain.');
-  if(BigInt(account.balance)<pending.reduce((sum,e)=>sum+BigInt(e.fee)+50n,0n))throw Error('Insufficient funds to recover the saved payment.');
+  if(!Number.isSafeInteger(account.nonce)||BigInt(account.nonce)!==tx.auth.spendingCondition.nonce||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length||nonces.detected_mempool_nonces?.length)throw Error('Recovery nonce is occupied or uncertain.');
+  if(BigInt(account.balance)<BigInt(e.fee+50))throw Error('Insufficient funds to recover the saved payment.');
   const receipt=await this.read('get-receipt',[T.standardPrincipalCV(address),args[2]]);
   if(receipt?.type!=='(optional none)'||receipt.value!==null)throw Error('Saved payment receipt exists or cannot be verified.');
   // Recheck after asynchronous reads, including a confirmation during diagnosis.
@@ -424,11 +344,10 @@ export class RadioWizard {
   authorised();this.ensureStorageHealthy();if(killSwitchEngaged())throw Error('Wizard stopped by kill switch.');
   const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});
   if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Recovery response uncertain. Checking the same transaction; no new payment created.');
-  e.status='submitted';e.submittedAt=new Date(this.now()).toISOString();await this.save('journal.json',log);
+  e.status='submitted';await this.save('journal.json',log);
  }
- async reconcile(log, authorised=null,approval=null) {
-  let unresolved=null;const pending=this.pending(log);
-  for(const e of pending) {
+ async reconcile(log, authorised=null) {
+  for(const e of log.filter(e=>!['confirmed','failed'].includes(e.status))) {
    const attempts=[{txid:e.txid,fee:e.fee},...(e.priorAttempts||[])];let found=null,failed=null,visible=false;
    for(const attempt of attempts){
     let tx;try{tx=await this.api('/extended/v1/tx/'+attempt.txid);}catch(error){if(error.status===404)continue;throw error;}
@@ -436,7 +355,7 @@ export class RadioWizard {
     if(tx.tx_status==='success'&&tx.canonical===true&&tx.is_unanchored===false){found={tx,attempt};break;}
     if(['abort_by_response','abort_by_post_condition'].includes(tx.tx_status)&&tx.canonical===true&&tx.is_unanchored===false)failed={tx,attempt};
    }
-   if(!found&&!failed){if(!visible&&authorised&&e===pending[0])await this.rebroadcastMissing(log,authorised);else if(visible&&approval&&e===pending[0])await this.bumpPending(log,approval);const error=Error(visible?'Checking an earlier payment on the network. Music continues free.':'Saved transaction not visible yet. Checking the earlier payment; music continues free.');error.code='PAYMENT_UNRESOLVED';unresolved=error;continue;}
+   if(!found&&!failed){if(!visible&&authorised)await this.rebroadcastMissing(log,authorised);const error=Error(visible?'Checking an earlier payment on the network. Music continues free.':'Saved transaction not visible yet. Checking the earlier payment; music continues free.');error.code='PAYMENT_UNRESOLVED';throw error;}
    const {tx,attempt}=found||failed;
    if(tx.sender_address!==e.address||tx.contract_call?.contract_id!==OWNER+'.'+NAME||tx.contract_call?.function_name!=='play')throw Error('Transaction identity mismatch.');
    if(e.priorAttempts?.length&&(tx.tx_id!==attempt.txid||tx.nonce!==e.recoveryNonce||String(tx.fee_rate)!==String(attempt.fee)))throw Error('Recovered transaction identity mismatch.');
@@ -446,46 +365,36 @@ export class RadioWizard {
     e.status='failed';e.failedAt=new Date().toISOString();e.failureStatus=tx.tx_status;e.failedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);continue;
    }
    const receipt=await this.read('get-receipt',[T.standardPrincipalCV(e.address),T.bufferCV(Buffer.from(e.receipt,'hex'))]);const r=receipt?.value?.value;
-   if(receipt?.type==='(optional none)'&&receipt.value===null){const error=Error('Confirmed transaction is waiting for its play receipt to become available.');error.code='RECEIPT_PENDING';unresolved=error;continue;}
+   if(receipt?.type==='(optional none)'&&receipt.value===null){const error=Error('Confirmed transaction is waiting for its play receipt to become available.');error.code='RECEIPT_PENDING';throw error;}
    if(r?.core?.value!==String(e.core)||r?.id?.value!==String(e.song))throw Error('Receipt verification failed.');
-   e.status='confirmed';e.confirmedAt=new Date(this.now()).toISOString();e.blockHeight=tx.block_height??null;e.confirmationSeconds=e.submittedAt?Math.max(0,Math.floor((this.now()-Date.parse(e.submittedAt))/1000)):null;e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
+   e.status='confirmed';e.recipient=r.recipient.value;e.confirmedTxid=attempt.txid;e.actualFee=attempt.fee;await this.save('journal.json',log);
   }
-  if(unresolved)throw unresolved;
  }
  async run(input,context={}) {
-  if(context.submitOnly&&!this.queuedPaidStarts)throw Error('Queued paid starts are disabled.');if(this.running)throw Error('Runner already active.');policy(input);const chosenFee=context.feeCap?257:input.fee,p=policy({...input,fee:Math.max(input.fee,257)});this.running=true;this.stopped=false;
+  if(this.running)throw Error('Runner already active.');const p=policy(input);this.running=true;this.stopped=false;
   let lock,thrown;
   try {
-   lock=await this.acquireLock('run.lock');this.guard();const epoch=this.stopEpoch;const authorised=()=>{this.guard();if(epoch!==this.stopEpoch)throw Error('Payment stopped.');context.authorised?.();};authorised();
+   lock=await this.acquireLock('run.lock');this.guard();
    const quote=await this.optional('return-quote.json',null);if(quote?.expires>Date.now())throw Error('Finish or cancel the pending return review first.');
-   await this.reconcileReturns();const log=await this.journal();if(!context.submitOnly)await this.reconcile(log);
-   if(context.playbackId){const existing=log.find(e=>e.playbackId===context.playbackId);if(existing)return publicEntry(existing);}
-   if(!context.continuous&&log.reduce((s,e)=>s+(e.feeCap||e.fee)+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
+   await this.reconcileReturns();const log=await this.journal();await this.reconcile(log);
+   if(!context.continuous&&log.reduce((s,e)=>s+e.fee+50,0)+(p.fee+50)*p.count>10000)throw Error('Lifetime test ceiling of 0.01 STX reached.');
    const source=await this.api(`/v2/contracts/source/${OWNER}/${NAME}?proof=0`);if(sha(source.source)!==HASH)throw Error('Deployed source differs from pinned helper.');
    const info=await this.api('/v2/info');if(info.network_id!==1)throw Error('Mainnet identity check failed.');
    const key=await this.key(),{address}=await this.json('vault.json');
    for(let i=0;i<p.count;i++) {
     this.guard();const account=await this.api(`/v2/accounts/${address}?proof=0`),nonces=await this.api(`/extended/v1/address/${address}/nonces`);
-    if(context.submitOnly)for(const entry of log)this.assertSavedPlay(entry,address);
-    const head=this.pending(log)[0];if(context.feeCap&&head?.feeCap&&(head.listeningSession!==context.listeningSession||(head.priorAttempts?.length||0)>=2||head.fee>=head.feeCap))throw Error('Earlier payment needs recovery before another listen.');
-    const nonce=context.submitOnly?this.queueNonce(log,account,nonces):BigInt(account.nonce);
-    if(!context.submitOnly&&(!Number.isSafeInteger(account.nonce)||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length))throw Error('Conflicting or pending nonce.');
-    const reserved=context.submitOnly?this.pending(log).reduce((sum,e)=>sum+BigInt(e.feeCap||e.fee)+50n,0n):0n;
-    if(BigInt(account.balance)<reserved+BigInt(p.fee+50+(context.continuous?0:1000)))throw Error(context.continuous?'Insufficient confirmed balance for another paid start.':'Insufficient confirmed balance; retain 0.001 STX reserve.');
+    if(!Number.isSafeInteger(account.nonce)||nonces.possible_next_nonce!==account.nonce||nonces.detected_missing_nonces?.length)throw Error('Conflicting or pending nonce.');
+    if(BigInt(account.balance)<BigInt(p.fee+50+(context.continuous?0:1000)))throw Error(context.continuous?'Insufficient confirmed balance for another paid start.':'Insufficient confirmed balance; retain 0.001 STX reserve.');
     const owner=await this.read('get-owner',[T.uintCV(p.core),T.uintCV(p.song)]);const recipient=owner?.success===true?owner.value?.value?.value:null;
     if(typeof recipient!=='string'||recipient.includes('.')||recipient===address)throw Error('Master missing, escrowed or held by payer.');
-    let receipt;if(context.listen)receipt=uniqueListenReceipt(context.listen,log,randomBytes);else do{receipt=randomBytes(16).toString('hex');}while(log.some(e=>e.receipt===receipt));
-    const privateKey=T.createStacksPrivateKey(key),publicKey=T.publicKeyToString(T.getPublicKey(privateKey));
-    const tx=await T.makeUnsignedContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],publicKey,network:new StacksMainnet(),fee:BigInt(p.fee),nonce,anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
-    const sized=sizedPlayFee(tx,chosenFee),choice=context.feeCap?await this.choosePlayFee(tx,context.feeCap):{fee:sized.fee,reason:'floor',estimates:null};p.fee=choice.fee;tx.setFee(BigInt(p.fee));if(this.now()<this.cooldownUntil)throw this.rateLimitError();authorised();
-    new T.TransactionSigner(tx).signOrigin(privateKey);
-    this.guard();const e={...(context.playbackId?{playbackId:context.playbackId,listeningSession:context.listeningSession,title:String(context.title||'').slice(0,200),artist:String(context.artist||'').slice(0,200)}:{}),createdAt:new Date().toISOString(),nonce:String(nonce),bytes:sized.bytes,feeChosen:chosenFee,feeReason:choice.reason,feeEstimates:choice.estimates,...(context.feeCap?{feeCap:context.feeCap}:{}),address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
-    log.push(e);await this.save('journal.json',log);authorised();
-    let result;try{result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});}catch(error){if(error.status>=400&&error.status<500){e.rejectionReason=error.reason||('HTTP '+error.status);await this.save('journal.json',log);}throw error;}if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
-    e.status='submitted';e.submittedAt=new Date(this.now()).toISOString();await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
-    if(context.submitOnly)return publicEntry(e);
+    const receipt=randomBytes(16).toString('hex');
+    const tx=await T.makeContractCall({contractAddress:OWNER,contractName:NAME,functionName:'play',functionArgs:[T.uintCV(p.core),T.uintCV(p.song),T.bufferCV(Buffer.from(receipt,'hex'))],senderKey:key,network:new StacksMainnet(),fee:BigInt(p.fee),nonce:BigInt(account.nonce),anchorMode:T.AnchorMode.Any,postConditionMode:T.PostConditionMode.Deny,postConditions:[T.makeStandardSTXPostCondition(address,T.FungibleConditionCode.Equal,50n)]});
+    this.guard();const e={...(context.playbackId?{playbackId:context.playbackId,listeningSession:context.listeningSession,title:String(context.title||'').slice(0,200),artist:String(context.artist||'').slice(0,200)}:{}),createdAt:new Date().toISOString(),address,core:p.core,song:p.song,fee:p.fee,receipt,recipient,txid:'0x'+tx.txid(),raw:Buffer.from(tx.serialize()).toString('hex'),status:'prepared'};
+    log.push(e);await this.save('journal.json',log);this.guard();
+    const result=await this.api('/v2/transactions',{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:Buffer.from(e.raw,'hex')});if(String(result).replace(/^0x/,'')!==tx.txid())throw Error('Unexpected broadcast response; reconcile before proceeding.');
+    e.status='submitted';await this.save('journal.json',log);this.message='Submitted '+e.txid+'; waiting for confirmation.';
     let confirmed=false;
-    for(let attempt=0;attempt<20;attempt++){this.guard();await new Promise(r=>setTimeout(r,30000));try{await this.reconcile(log,authorised,context.feeCap?{...context,authorised}:null);confirmed=true;break;}catch(error){if(error.status!==429&&!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
+    for(let attempt=0;attempt<20;attempt++){this.guard();await new Promise(r=>setTimeout(r,30000));try{await this.reconcile(log);confirmed=true;break;}catch(error){if(error.status!==429&&!['RECEIPT_PENDING','PAYMENT_UNRESOLVED'].includes(error.code)&&!/pending|not visible/.test(error.message))throw error;}}
     if(!confirmed)throw Error('Confirmation wait expired. No new payment sent.');
    }
    this.message='Run confirmed; receipts verified.';

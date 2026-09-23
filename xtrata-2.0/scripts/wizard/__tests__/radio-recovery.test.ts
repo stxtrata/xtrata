@@ -3,7 +3,7 @@ import {mkdir,mkdtemp,readFile,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {RadioWizard} from './offline-radio-wallet';
-import {Cl,cvToHex,deserializeTransaction} from '@stacks/transactions';
+import {Cl,cvToHex,deserializeTransaction,makeContractCall,AnchorMode,PostConditionMode,makeStandardSTXPostCondition,FungibleConditionCode} from '@stacks/transactions';
 const owner='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 async function fixture(work){
  const dir=await mkdtemp(join(tmpdir(),'radio-recovery-'));
@@ -20,7 +20,12 @@ async function fixture(work){
    throw Error('Unexpected path');
   };
   await expect(w.run({core:3,song:2910,fee:200,count:1})).rejects.toThrow('rejection');
-  const original=(await w.journal())[0];await work({w,state,original,dir});
+  // Simulate an actual pre-upgrade journal: the new signer must not create a
+  // below-floor transaction, but recovery must still read old signed bytes.
+  const original=(await w.journal())[0];
+  const legacy=await makeContractCall({contractAddress:owner,contractName:'xtrata-radio-plays-v1-0',functionName:'play',functionArgs:[Cl.uint(3),Cl.uint(2910),Cl.buffer(Buffer.from(original.receipt,'hex'))],senderKey:await w.key(),fee:200n,nonce:0n,anchorMode:AnchorMode.Any,postConditionMode:PostConditionMode.Deny,postConditions:[makeStandardSTXPostCondition(address,FungibleConditionCode.Equal,50n)]});
+  original.fee=200;original.raw=Buffer.from(legacy.serialize()).toString('hex');original.txid='0x'+legacy.txid();for(const k of ['nonce','bytes','feeChosen','feeReason','feeEstimates'])delete original[k];await w.save('journal.json',[original]);state.sent[0]=legacy;
+  await work({w,state,original,dir});
  }finally{await rm(dir,{recursive:true,force:true});}
 }
 describe('explicit same-nonce play recovery',()=>{

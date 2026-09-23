@@ -1,3 +1,4 @@
+import {decodePaidReceipt} from './paid-receipt.mjs';
 export const PAID_PLAYS_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0';
 
 const unsigned = (repr, name) => {
@@ -26,7 +27,8 @@ export function parsePaidPlayEvent(event) {
   const payer = principal(repr, 'payer');
   const recipient = principal(repr, 'recipient');
   if (!/^0x[0-9a-f]{64}$/.test(txid) || ![1, 2, 3].includes(core) || id === null || amount !== 50 || total === null || !payer || !recipient) return null;
-  return {txid, core, id, amount, total, payer, recipient};
+  const receipt=/\(receipt 0x([a-f0-9]{32})\)/i.exec(repr)?.[1];
+  return {txid, core, id, amount, total, payer, recipient,...(receipt?{receipt}: {})};
 }
 
 const short = value => value.length > 16 ? `${value.slice(0, 7)}…${value.slice(-6)}` : value;
@@ -72,7 +74,7 @@ function row(play, track, fresh) {
   heading.textContent = track?.title || `Song #${play.id}`;
   const meta = document.createElement('p');
   meta.className = 'chain-play-meta';
-  meta.textContent = [track?.artist, `Inscription #${play.id}`, `song total ${play.total}`].filter(Boolean).join(' · ');
+  meta.textContent = [decodePaidReceipt(play.receipt).label, track?.artist, `Inscription #${play.id}`, `song total ${play.total}`].filter(Boolean).join(' · ');
   const payment = document.createElement('p');
   payment.className = 'chain-play-payment';
   payment.textContent = `0.000050 STX from ${short(play.payer)} to ${short(play.recipient)}`;
@@ -180,7 +182,10 @@ export function mountPaidPlayReaders() {
       if (!visible.length) list.textContent = 'No matching paid starts in the loaded history.';
       if (history) {
         const amount = matches.reduce((sum, play) => sum + play.amount, 0);
-        totals.textContent = complete ? `${plays.size.toLocaleString()} total paid starts · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders` : previousTotal ? `${previousTotal.count.toLocaleString()} paid starts at last complete check · updating total automatically…` : `Counting all paid starts… ${plays.size.toLocaleString()} found so far`;
+        // Use the same live record set as the summary, not the previous scan's total.
+        totals.textContent = `${plays.size.toLocaleString()} ${complete ? 'total paid starts' : 'paid starts loaded so far'} · ${(plays.size * 50 / 1000000).toFixed(6)} STX paid to holders${complete ? '' : ' · checking full history…'}`;
+        if (!complete && previousTotal?.count > plays.size)
+          totals.textContent += ` (${previousTotal.count.toLocaleString()} at the previous complete check)`;
         summary.textContent = `${matches.length.toLocaleString()} matching paid starts · ${(amount / 1000000).toFixed(6)} STX to holders · showing ${visible.length} ${ranked ? 'supporters' : 'payments'}. ${complete ? 'Full history loaded.' : `${plays.size.toLocaleString()} paid starts loaded so far. ${localHost()?'Choose Load full history to fetch older payments.':'Full history loads automatically;'} Totals are provisional until complete.`}`;
         older.disabled = busy || scanning || complete;
         all.disabled = complete || (busy && !scanning);

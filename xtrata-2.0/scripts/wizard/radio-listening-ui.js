@@ -1,3 +1,4 @@
+import {AudibleClock} from './radio-policy.js';
 (() => {
  const $=id=>document.getElementById(id),audio=$('radio-audio');
  const tab=crypto.randomUUID().replaceAll('-','');
@@ -12,16 +13,16 @@
  function renderEvents(events){
   recentEvents=events;
   const host=$('radio-events');host.replaceChildren();
-  for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;host.append(p);}
+  for(const e of events.slice(0,15)){const p=document.createElement('p');const payment=e.outcome==='confirmed'?'paid to':e.outcome==='failed'?'was not paid to':'intended for';p.textContent=`${window.radioSongLabel(e)}${e.receiptLabel?' · '+e.receiptLabel:''}: ${e.outcome} — ${e.reason}${e.recipient?` · 50 microSTX ${payment} ${e.recipient}`:''}`;host.append(p);}
  }
  async function free(){modeGeneration++;const old=approval;approval=null;mode('FREE PLAY · support off');if(old){try{await api('free',{token:old.token,tab});}catch(e){$('radio-payment').textContent=e.message;}}}
  async function select(i){
-  if(!tracks.length)return;metadataAbort?.abort();const controller=new AbortController();metadataAbort=controller;const version=++loading;audio.pause();index=(i+tracks.length)%tracks.length;
-  const track=tracks[index];start={id:crypto.randomUUID().replaceAll('-',''),song:track.id,observed:false};
+  if(!tracks.length)return;const previousFree=start&&!start.requested;metadataAbort?.abort();const controller=new AbortController();metadataAbort=controller;const version=++loading;if(start&&!start.requested)$('radio-payment').textContent='Skipped — free';audio.pause();index=(i+tracks.length)%tracks.length;
+  const track=tracks[index];start={id:crypto.randomUUID().replaceAll('-',''),song:track.id,observed:false,clock:new AudibleClock(),requested:false,playing:false};
   window.dispatchEvent(new CustomEvent('radio-track',{detail:track}));
   $('radio-songs').value=String(index);$('radio-title').textContent=track.title;
   $('radio-info').textContent=[track.artist,track.album&&'Album: '+track.album,'Inscription #'+track.id].filter(Boolean).join(' · ');
-  $('radio-payment').textContent='Loading audio. No payment is requested until playback begins.';
+  $('radio-payment').textContent=(previousFree?'Previous song skipped — free. ':'')+'Loading audio. Support is requested only after audible listening reaches its threshold.';
   start.src=new URL(`/radio/audio?id=${track.id}&playback=${start.id}`,location.origin).href;
   try{
    await new Promise((resolve,reject)=>{
@@ -36,25 +37,39 @@
   }catch{if(version===loading)$('radio-payment').textContent='Audio could not start. Press Play to retry, or choose another song. No start payment was requested.';}
  }
  function audible(){
-  if(!start||audio.paused||audio.ended||audio.currentSrc!==start.src)return;
-  if(audio.muted||audio.volume===0){
-   $('radio-payment').textContent=start.observed?'Muted. Any payment already requested remains recorded; later muted starts stay free.':'Muted · this song is playing free. Unmute to request its support payment.';
-   return;
+  if(!start)return;
+  const active=start.playing&&!audio.paused&&!audio.ended&&!audio.muted&&audio.volume>0&&!audio.seeking&&audio.readyState>=3&&audio.currentSrc===start.src;
+  const seconds=start.clock.sample(performance.now(),active);
+  if(!start.observed&&active){
+   start.observed=true;start.approval=approval;
+   if(!approval){$('radio-payment').textContent='Free listen. Turning support on applies to the next song.';return;}
+   const observed=start,a=approval;
+   void api('begin',{token:a.token,tab,id:observed.id,song:observed.song}).then(result=>{
+    if(start!==observed||approval!==a)return;
+    observed.threshold=result.threshold;observed.unknownDuration=result.unknownDuration;
+    // Start timing after the server registration, excluding network setup time.
+    observed.clock=new AudibleClock();audible();
+   }).catch(e=>{observed.requested=true;if(start===observed)$('radio-payment').textContent=`This listen stays free: ${e.message}`;});
   }
-  if(start.observed)return;
-  start.observed=true;const observed={...start},a=approval;
-  if(!a){$('radio-payment').textContent='Free start. Enabling Paid now applies to the next song.';return;}
-  $('radio-payment').textContent='Paid start requested. Music continues while the wallet checks it.';
-  void api('start',{token:a.token,tab,id:observed.id,song:observed.song}).then(e=>{
-   if(start?.id===observed.id)$('radio-payment').textContent=e.reason;
-   if(approval===a&&e.outcome==='free')mode('SUPPORT ON · this start plays free while payment checks wait');
+  if(!start.observed&&(audio.muted||audio.volume===0))$('radio-payment').textContent='Muted — listening timer paused. Unmute to continue.';
+  if(!start.approval||start.approval!==approval||start.requested||start.threshold===undefined)return;
+  if(!active){if(audio.muted||audio.volume===0)$('radio-payment').textContent='Muted — listening timer paused. Unmute to continue.';return;}
+  $('radio-payment').textContent=`Listening… support payment at 0:${String(start.threshold).padStart(2,'0')} · ${Math.floor(seconds)} s audible`;
+  if(seconds<start.threshold)return;
+  start.requested=true;const observed=start,a=approval;
+  $('radio-payment').textContent='Support payment requested. Music continues while the wallet checks it.';
+  void api('qualify',{token:a.token,tab,id:observed.id,song:observed.song,audibleSeconds:seconds,threshold:observed.threshold}).then(e=>{
+   if(start===observed)$('radio-payment').textContent=e.reason;
+   if(approval===a&&e.outcome==='free')mode('SUPPORT ON · this listen plays free while payment checks wait');
    window.dispatchEvent(new Event('wizard-refresh'));
-  }).catch(e=>{if(start?.id===observed.id)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;if(approval===a){if(!a.continuous)void free();else mode('SUPPORT WAITING · still enabled; checking again automatically');}});
+  }).catch(e=>{if(start===observed)$('radio-payment').textContent=`Payment outcome needs checking: ${e.message} No automatic retry will be made.`;});
  }
- audio.addEventListener('playing',audible);audio.addEventListener('volumechange',audible);
- // Recover a missed playing event on track transitions without charging twice.
- audio.addEventListener('timeupdate',audible);
- audio.addEventListener('ended',()=>{if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
+ audio.addEventListener('playing',()=>{if(start)start.playing=true;});
+ for(const event of ['pause','waiting','stalled','ended'])audio.addEventListener(event,()=>{if(start)start.playing=false;});
+ for(const event of ['playing','volumechange','timeupdate','pause','seeking','seeked','waiting','stalled'])audio.addEventListener(event,audible);
+ const audibleTimer=setInterval(audible,200);
+ window.addEventListener('pagehide',()=>clearInterval(audibleTimer));
+ audio.addEventListener('ended',()=>{audible();if(start&&!start.requested)$('radio-payment').textContent=start.unknownDuration?'Duration unknown and listen ended before 30 audible seconds — free.':'Ended before listening threshold — free.';if(index<tracks.length-1||$('radio-loop').checked)void select(index+1);});
  audio.addEventListener('error',()=>{$('radio-payment').textContent='Audio unavailable. Choose another song. Check activity for any payment already requested.';});
  $('radio-play').onclick=()=>{if(!start)void select(Number($('radio-songs').value)||0);else if(audio.paused)void audio.play().catch(()=>{$('radio-payment').textContent='Could not resume audio.';});else audio.pause();};
  $('radio-next').onclick=()=>void select(index+1);$('radio-prev').onclick=()=>void select(index<0?0:index-1);
@@ -68,10 +83,10 @@
   const generation=++modeGeneration;$('radio-enable').disabled=true;
   try{
    const continuous=$('radio-continuous').checked,fee=Number($('radio-paid-fee').value),max=Number($('radio-paid-max').value),minutes=Number($('radio-paid-minutes').value);
-   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid starts over ${minutes} minutes`}? Each costs ${fee} microSTX miner fee + 50 microSTX to the holder, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet. It may resend an unresolved previously authorised payment unchanged at its original fee.`))return;
-   const a=await api('enable',{fee,max,minutes,tab,continuous});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
-   mode(`${a.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${a.used}${a.continuous?'':'/'+a.max} starts · fee ${a.fee} microSTX + 50 to holder`);
-   $('radio-payment').textContent='Music support stays on for this session. New song starts can pay; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
+   if(!confirm(`Enable ${continuous?'continuous paid listening until funds run out or you stop':`up to ${max} paid listens over ${minutes} minutes`}? Network fee usually 257 microSTX; up to ${fee} microSTX if busy, plus 50 microSTX to the holder. You also approve up to two fee increases on the same pending payment within this cap, ${continuous?'using the available wallet balance with no test spending cap':`up to ${max*(fee+50)} microSTX total`}. This uses the dedicated wizard on mainnet. It may resend an unresolved previously authorised payment unchanged at its original fee.`))return;
+   const a=await api('enable',{fee,max,minutes,tab,continuous,feeMode:'cap'});if(generation!==modeGeneration){await api('free',{token:a.token,tab});return;}approval={token:a.token,continuous};$('radio-approve').checked=false;
+   mode(`${a.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${a.used}${a.continuous?'':'/'+a.max} listens · network fee cap ${a.fee} microSTX + 50 to holder`);
+   $('radio-payment').textContent='Music support stays on for this session. New songs can pay after their listening threshold; the current song is not charged retrospectively. Switch to Free play before changing payment settings.';
   }catch(e){$('radio-payment').textContent=e.message;if(activationStatus){activationStatus.hidden=false;activationStatus.textContent='Support could not start: '+e.message+' Listening remains free. Check wallet activity and refresh the balance to check again.';}}finally{if(activationStatus&&(approval||activationStatus.textContent==='Checking wallet and previous payments…'))activationStatus.hidden=true;$('radio-enable').disabled=!!approval;}
  };
  function limits(){const continuous=$('radio-continuous').checked;$('radio-paid-max').disabled=!!approval||continuous;$('radio-paid-minutes').disabled=!!approval||continuous;const fee=Number($('radio-paid-fee').value),max=Math.floor(5000/(fee+50));$('radio-paid-max').max=String(max);$('radio-session-help').textContent=continuous?'One approval lasts until you stop or close this page. New song starts retry checks automatically after interruptions. No time or count limit applies.':`One approval covers the whole session. At this fee, choose up to ${max} starts within the 0.005 STX session cap. The remaining lifetime budget also applies.`;}
@@ -99,10 +114,10 @@
  setInterval(async()=>{
   if(polling)return;polling=true;
   const polledApproval=approval;
-  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
+  try{const s=polledApproval?await api('heartbeat',{token:polledApproval.token,tab}):await api('status');if(approval!==polledApproval)return;renderEvents(s.events);diagnostic={version:$('app-version')?.textContent,at:new Date().toISOString(),reason:s.recovery,failedChecks:s.recoveryFailures,events:s.events.map(e=>({song:e.song,at:e.at,outcome:e.outcome,reason:e.reason,txid:e.txid,nonce:e.nonce,bytes:e.bytes,fee:e.fee,feeChosen:e.feeChosen,feeCap:e.feeCap,feeReason:e.feeReason,feeEstimates:e.feeEstimates,submittedAt:e.submittedAt,confirmedAt:e.confirmedAt,blockHeight:e.blockHeight,confirmationSeconds:e.confirmationSeconds,rejectionReason:e.rejectionReason}))};if($('recovery-notice'))$('recovery-notice').hidden=recoveryDismissed||!(s.recoveryFailures>=10);
    if(approval&&!s.enabled){approval=null;mode('FREE PLAY · support session ended');}
    else if(approval&&s.recovery)mode('SUPPORT WAITING · '+s.recovery);
-   else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} starts · fee ${s.fee} microSTX + 50 to holder`);
+   else if(approval)mode(`${s.continuous?'SUPPORT ON':'SUPPORT ON · bounded test'} · ${s.used}${s.continuous?'':'/'+s.max} listens · network fee cap ${s.fee} microSTX + 50 to holder`);
    else if(s.enabled)mode('FREE PLAY in this tab · support is active in another tab');
    if(Date.now()-lastWalletRefresh>=60000){lastWalletRefresh=Date.now();window.dispatchEvent(new Event('wizard-refresh'));}
   }catch(e){if(approval&&approval===polledApproval){if(!approval.continuous)approval=null;mode(approval?'SUPPORT WAITING · still enabled; reconnecting automatically':'FREE PLAY · connection unavailable');$('radio-payment').textContent=e.message;}}

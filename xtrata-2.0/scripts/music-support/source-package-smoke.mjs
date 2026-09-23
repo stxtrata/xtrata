@@ -30,6 +30,7 @@ try{
  const packageRoot=join(expanded,'xtrata-music-support');
  const requiredAssets=[
   'scripts/wizard/music-version.json',
+  'scripts/wizard/music-logo.webp',
   'scripts/wizard/music-lounge.html',
   'scripts/wizard/radio-plays-panel.html',
   'scripts/wizard/music-web-approval.html',
@@ -38,10 +39,16 @@ try{
  const missingAssets=requiredAssets.filter(asset=>!existsSync(join(packageRoot,asset)));
  if(missingAssets.length)throw Error('Source package is missing runtime assets: '+missingAssets.join(', '));
  const unresolved=[];
+ // Browser modules resolve against HTTP routes, not their source filenames.
+ // Verify the actual server mapping before resolving this one routed import.
+ const server=await readFile(join(packageRoot,'scripts/wizard/radio-plays-server.mjs'),'utf8');
+ const policyRoute="if(req.method==='GET'&&req.url==='/radio-policy.js'){res.setHeader('Content-Type','text/javascript');res.end(await readFile(join(root,'scripts/wizard/radio-listening-policy.mjs')));return;}";
+ if(!server.includes(policyRoute))throw Error('Browser policy route changed: update and verify the package closure mapping.');
  for(const path of await files(packageRoot)){
   if(!['.mjs','.js'].includes(extname(path)))continue;
   for(const specifier of relativeImports(await readFile(path,'utf8'))){
-   const target=resolve(dirname(path),specifier);
+   const routedPolicy=path===join(packageRoot,'scripts/wizard/radio-listening-ui.js')&&specifier==='./radio-policy.js';
+   const target=routedPolicy?join(packageRoot,'scripts/wizard/radio-listening-policy.mjs'):resolve(dirname(path),specifier);
    if(!existsSync(target))unresolved.push(path.slice(packageRoot.length+1)+' -> '+specifier);
   }
  }

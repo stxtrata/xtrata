@@ -6,6 +6,10 @@ const preview={version:'1.0.1',channel:'preview',downloads:[
  {platform:'win-x64',verified:true,preview:true,signed:false},
 ]};
 describe('desktop release platform policy',()=>{
+ it('does not promote optional lounge beta downloads through the regular update check',()=>{
+  const release={...preview,betaDownloads:[{...preview.downloads[1],version:'1.0.7'}]};
+  expect(verifiedReleaseForPlatforms(release,['win-x64'])).toBe('1.0.1');
+ });
  it('derives an empty or exact compatible set when callers do not supply one',()=>{
   expect(releasePlatformsForRuntime('win32','x64')).toEqual(['win-x64']);
   expect(releasePlatformsForRuntime('win32','arm64')).toEqual([]);

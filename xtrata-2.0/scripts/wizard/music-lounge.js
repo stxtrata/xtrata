@@ -22,7 +22,7 @@
  });
  function air(){const playing=!audio.paused&&!audio.ended&&!audio.muted&&audio.volume>0&&audio.readyState>=3;$('on-air').classList.toggle('live',playing);$('on-air').textContent=playing?'● ON AIR':'● OFF AIR';}
  for(const event of ['playing','pause','ended','waiting','volumechange','emptied'])audio.addEventListener(event,air);
- function costs(){const fee=Number($('radio-paid-fee').value);$('cost-preview').textContent=Number.isInteger(fee)&&fee>=1&&fee<=1000?`Each paid start: ${((fee+50)/1000000).toFixed(6)} STX total. 1 STX covers up to ${Math.floor(1000000/(fee+50)).toLocaleString()} starts at this fee.`:'Choose a network fee between 1 and 1000 microSTX.';}
+ function costs(){const fee=Number($('radio-paid-fee').value);$('cost-preview').textContent=Number.isInteger(fee)&&fee>=1&&fee<=1000?`Maximum per listen: ${((fee+50)/1000000).toFixed(6)} STX total. At the cap, 1 STX covers ${Math.floor(1000000/(fee+50)).toLocaleString()} listens. Network fee usually 0.000257 STX; the approved maximum includes recovery increases.`:'Choose a network fee between 1 and 1000 microSTX.';}
  $('radio-paid-fee').addEventListener('input',costs);costs();
  window.addEventListener('radio-ready',()=>$('radio-load').click(),{once:true});
 })();
