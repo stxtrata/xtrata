@@ -28,7 +28,9 @@ export function parsePaidPlayEvent(event) {
   const recipient = principal(repr, 'recipient');
   if (!/^0x[0-9a-f]{64}$/.test(txid) || ![1, 2, 3].includes(core) || id === null || amount !== 50 || total === null || !payer || !recipient) return null;
   const receipt=/\(receipt 0x([a-f0-9]{32})\)/i.exec(repr)?.[1];
-  return {txid, core, id, amount, total, payer, recipient,...(receipt?{receipt}: {})};
+  const rawTime = event.block_time ?? event.burn_block_time;
+  const timestamp = Number.isSafeInteger(rawTime) && rawTime > 0 ? rawTime * 1000 : null;
+  return {txid, core, id, amount, total, payer, recipient, ...(timestamp ? {timestamp} : {}),...(receipt?{receipt}: {})};
 }
 
 const short = value => value.length > 16 ? `${value.slice(0, 7)}…${value.slice(-6)}` : value;
@@ -165,6 +167,7 @@ export function mountPaidPlayReaders() {
       };
     }
     function render() {
+      host.dispatchEvent(new CustomEvent('paid-history', {detail: {plays: [...plays.values()], tracks, complete, busy: busy || scanning, status: status.textContent}}));
       const matches = filterPaidPlays([...plays.values()], tracks, search?.value, role?.value);
       const ranked = view?.value === 'payers';
       const results = ranked ? rankPayers(matches) : matches;
