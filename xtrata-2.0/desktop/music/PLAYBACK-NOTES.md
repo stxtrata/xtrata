@@ -1,4 +1,49 @@
-# Continuous support playback
+# Capped congestion fees — Phase 4
+
+New desktop/local approvals explicitly select a maximum network fee per listen
+(default 1,000 microSTX). The usual floor is 257 microSTX, plus exactly 50 to the
+holder. A higher low estimate is used only within the cap; an estimate above it
+leaves the listen free. All pending balance reservations and bounded budgets
+include the full cap. This can stop support before the balance reaches zero if
+there is not enough balance for the approved maximum; free audio continues.
+
+Estimates are coalesced, checked at most once per minute and share the existing
+read queue/cooldown. When unavailable, an estimate younger than ten minutes is
+used, otherwise the floor. A 429 cooldown still prevents signing/submission.
+
+After three minutes, the oldest visibly pending payment can be replaced at the
+same nonce/receipt, at most twice, within its original cap and only while its
+original approval remains active. Missing payments use saved-byte recovery.
+Prepared/uncertain payments never trigger an automatic fee increase. Stopping,
+closing or restarting does not grant further fee increases. Older fixed-fee
+approvals, legacy bridge clients and operator tests do not gain bump permission.
+
+Queued payments remain default OFF pending the Phase 5 release decision. These
+changes are not yet published and no mainnet canary has been run.
+
+# Threshold listens — Mac 1.0.4 / Windows 1.0.7
+
+These versions request support after `min(30, max(1, floor(duration)-1))`
+audible seconds; unknown duration uses 30 seconds. The timer counts real elapsed
+time, excludes pause/mute/zero volume/seeking/buffering, and does not accelerate
+with playback speed. Skipping before the threshold remains free. Enabling support
+mid-song applies to the next song. The server registers the first audible moment
+without charging, checks its own elapsed time, and admits each playback once.
+
+On-chain totals now mix threshold listens with starts from older versions and
+legacy bridge clients. Structured receipts distinguish them; reported seconds
+are not on-chain proof. See `docs/radio/RECEIPT-FORMAT.md`.
+
+The desktop smoke test uses local 3/4-second tracks (real thresholds 2/3 seconds),
+an isolated profile and a simulated wallet. There is no production threshold
+override. Minimized looping, consent, mute and duplicate prevention remain tested.
+
+The queued-payment flag remains OFF pending the Phase 5 decision. New release
+versions are staged locally; installers and public download metadata are unchanged.
+
+## Previous-release behaviour and investigation
+
+### Continuous support playback
 
 Music support stays enabled for the session until the listener stops it or
 closes the player. Each eligible new song start costs the selected network fee

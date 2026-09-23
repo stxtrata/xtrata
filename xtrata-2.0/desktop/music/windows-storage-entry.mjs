@@ -45,7 +45,7 @@ try{
   };
   const save=reopened.save.bind(reopened);
   reopened.save=async(name,value)=>{await save(name,value);if(name==='journal.json')reopened.stop();};
-  let preparedStopped=false;try{await reopened.run({core:3,song:2910,fee:300,count:1});}catch(error){preparedStopped=/stopped/i.test(String(error?.message));}
+  let preparedStopped=false;try{await reopened.run({core:3,song:2910,fee:257,count:1});}catch(error){preparedStopped=/stopped/i.test(String(error?.message));}
   const journal=await reopened.journal();
   if(!preparedStopped||broadcasts!==0||journal.length!==1||journal[0].status!=='prepared')throw Error('DPAPI journal pre-broadcast safety check failed.');
   stage('prepared journal verified');

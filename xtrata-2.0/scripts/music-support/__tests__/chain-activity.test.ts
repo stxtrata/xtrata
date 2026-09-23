@@ -16,6 +16,11 @@ const event = (overrides:Record<string, unknown> = {}) => ({
 });
 
 describe('public paid-play contract reader', () => {
+  it('preserves supplied chain timestamps without inventing missing dates', () => {
+    expect(parsePaidPlayEvent(event({block_time:1700000000})).timestamp).toBe(1700000000000);
+    expect(parsePaidPlayEvent(event()).timestamp).toBeUndefined();
+    expect(parsePaidPlayEvent(event({block_time:'yesterday'})).timestamp).toBeUndefined();
+  });
   it('extracts the verified public fields from the contract print event', () => {
     expect(parsePaidPlayEvent(event())).toEqual({
       txid,

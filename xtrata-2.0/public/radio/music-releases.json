@@ -33,5 +33,40 @@
       "preview": true
     }
   ],
-  "channel": "preview"
+  "channel": "preview",
+  "betaDownloads": [
+    {
+      "platform": "mac-universal",
+      "version": "1.0.4",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.4-mac-beta.2/Xtrata-Music-1.0.4-mac-universal.dmg",
+      "sha256": "b8298617734648c27ed6d95c4c4826823f7e5eb125195a0b3c9b8265788c25fd",
+      "requirements": "Beta build 2: in-app Xtrata logo. macOS 13+. Universal Intel/Apple silicon. Unsigned beta; wider hardware and live-payment testing pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 2
+    },
+    {
+      "platform": "mac-universal-legacy",
+      "version": "1.0.4",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.4-mac-beta.2/Xtrata-Music-Legacy-1.0.4-mac-universal.dmg",
+      "sha256": "de501bf57beace6c8730890bcb341a65f97a29256bb756292081d5585e4949d7",
+      "requirements": "Beta build 2: in-app Xtrata logo. macOS 12 Monterey+. Universal Intel/Apple silicon. Unsigned legacy beta; Monterey hardware and live-payment testing pending.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 2
+    },
+    {
+      "platform": "win-x64",
+      "version": "1.0.7",
+      "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.7-windows-beta.2/Xtrata-Music-1.0.7-windows11-preview-x64.exe",
+      "sha256": "6d22f3804433f25c92bdecf2a5a4b7ad5d8a1e8b2140568775a7bd866f01839a",
+      "requirements": "Beta build 2: in-app Xtrata logo. Windows 11 x64 (Intel/AMD). Unsigned beta. Native Windows automated checks passed; physical-PC and live-payment testing pending. No Node.js or extension required.",
+      "signed": false,
+      "verified": true,
+      "preview": true,
+      "betaBuild": 2
+    }
+  ]
 }

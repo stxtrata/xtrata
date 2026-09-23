@@ -38,3 +38,12 @@ describe('shared chain request budget (offline)',()=>{
   }finally{await rm(dir,{recursive:true,force:true});}
  });
 });
+it('serializes and coalesces estimation POSTs as reads',async()=>{
+ vi.useFakeTimers();try{
+  const transport=vi.fn(async()=>ok({estimations:[{fee:257},{fee:300},{fee:400}]}));const w=new RadioWizard('/unused',transport);w.readIntervalMs=1000;
+  const a=w.api('/read'),body=JSON.stringify({transaction_payload:'abcd',estimated_len:257});
+  const b=w.api('/v2/fees/transaction',{method:'POST',body}),c=w.api('/v2/fees/transaction',{method:'POST',body});
+  await vi.advanceTimersByTimeAsync(999);expect(transport).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);await Promise.all([a,b,c]);expect(transport).toHaveBeenCalledTimes(2);
+ }finally{vi.useRealTimers();}
+});

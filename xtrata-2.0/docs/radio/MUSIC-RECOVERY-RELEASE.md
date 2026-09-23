@@ -125,3 +125,13 @@ Published previews: `music-v1.0.3-mac-preview.1` and
 the downloads. Lounge version labels and fallback URLs updated together.
 
 Published installer bytes verified against local SHA-256 for all three downloads.
+
+## Illustrated Lounge guides
+
+Added the two user-supplied compressed WebP guides beneath the Lounge introduction,
+installation first and app use second. Large responsive previews open a native
+modal with a full-resolution scrollable image, fixed Close control and Escape
+support. Direct image links remain available without JavaScript. The supplied
+images are unchanged; nearby copy notes that screenshots show an earlier preview.
+Desktop/mobile browser checks passed for both images, scrolling, Close, Escape,
+and existing download/version/checksum behaviour. No desktop rebuild is needed.

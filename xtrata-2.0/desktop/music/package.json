@@ -1,7 +1,7 @@
 {
   "name": "xtrata-music-desktop",
   "productName": "Xtrata Music",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "On-chain music and optional local support payments",
   "author": "Xtrata",
   "private": true,
@@ -11,13 +11,13 @@
     "prepare:app": "node prepare.mjs",
     "start": "npm run prepare:app && electron .",
     "pack": "npm run prepare:app && electron-builder --dir",
-    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.extraMetadata.version=1.0.3",
+    "dist:mac": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.extraMetadata.version=1.0.4",
     "pack:win": "npm run prepare:app && electron-builder --win --x64 --dir --publish never",
     "dist:win": "npm run prepare:app && electron-builder --win nsis --x64 --publish never",
     "test:win:storage": "node ../../scripts/music-support/windows-storage-smoke.mjs",
     "dist:linux": "npm run prepare:app && electron-builder --linux AppImage --publish never",
     "release:patch": "node bump-version.mjs",
-    "dist:mac:legacy": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.electronVersion=43.7.3 -c.directories.output=../../.artifacts/music-desktop-legacy '-c.artifactName=Xtrata-Music-Legacy-${version}-${os}-${arch}.${ext}' -c.extraMetadata.version=1.0.3"
+    "dist:mac:legacy": "npm run prepare:app && electron-builder --mac dmg zip --universal --publish never -c.electronVersion=43.7.3 -c.directories.output=../../.artifacts/music-desktop-legacy '-c.artifactName=Xtrata-Music-Legacy-${version}-${os}-${arch}.${ext}' -c.extraMetadata.version=1.0.4"
   },
   "dependencies": {
     "@stacks/transactions": "6.17.0",
@@ -42,6 +42,8 @@
       "release-platforms.mjs",
       "unavailable-wallet.mjs",
       "windows-vault-protection.mjs",
+      "assets/xtrata-music.png",
+      "assets/xtrata-music.ico",
       "app/**/*",
       "package.json",
       "!**/*.map",
@@ -64,7 +66,8 @@
         "dmg",
         "zip"
       ],
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "icon": "assets/xtrata-music.icns"
     },
     "win": {
       "icon": "assets/xtrata-music.ico",
@@ -87,7 +90,8 @@
     },
     "linux": {
       "target": "AppImage",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "icon": "assets/xtrata-music.png"
     },
     "artifactName": "Xtrata-Music-${version}-${os}-${arch}.${ext}"
   }
