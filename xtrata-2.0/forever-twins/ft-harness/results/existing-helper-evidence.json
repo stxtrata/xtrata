@@ -1,0 +1,424 @@
+{
+  "ranAt": "2026-09-24T14:42:42.819Z",
+  "note": "simnet only; not mainnet state",
+  "results": [
+    {
+      "id": "P1",
+      "title": "Third-party sponsor funds preservation without gaining rights",
+      "checks": [
+        {
+          "label": "sponsor can inscribe a token they do not own",
+          "pass": true,
+          "detail": "{\"type\":\"uint\",\"value\":\"0\"}"
+        },
+        {
+          "label": "twin minted into helper custody",
+          "pass": true,
+          "detail": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.ref-helper-pepe"
+        },
+        {
+          "label": "original stays with holder",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "binding records sponsor only as inscriber",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "sponsor cannot withdraw the twin",
+          "pass": true,
+          "detail": "err 1"
+        }
+      ],
+      "notes": [],
+      "xid": 0
+    },
+    {
+      "id": "P2",
+      "title": "Holder swap both ways; redemption follows the circulating twin",
+      "checks": [
+        {
+          "label": "holder deposits original, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper now owns original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder owns twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin sold/transferred to buyer",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "previous holder cannot redeem",
+          "pass": true,
+          "detail": "err 100"
+        },
+        {
+          "label": "new twin holder redeems original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "buyer owns original, helper owns twin",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "P3",
+      "title": "Caller-controlled mime and token-uri are recorded permanently on the twin",
+      "checks": [
+        {
+          "label": "inscribe accepted with sponsor-chosen mime + URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin token-uri is the sponsor string",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (string-ascii 40))\",\"value\":{\"type\":\"(string-ascii 40)\",\"value\":\"https://not-the-artist.example/meta.json\"}}"
+        },
+        {
+          "label": "twin mime is the sponsor string",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": [
+        "Canonical hash pins bytes only. mime and token-uri are unconstrained inputs to a permissionless function and are immutable after mint."
+      ]
+    },
+    {
+      "id": "P4",
+      "title": "Canonical records are mutable by helper admin until finalised, and inscription does not wait for finalisation",
+      "checks": [
+        {
+          "label": "is-finalized false",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin re-seed silently replaced the canonical hash",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "substitute bytes inscribed and bound before finalisation",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": [
+        "Binding is permanent (map-insert, no delete). Whoever controls the helper admin key before finalize-canonical defines \"genuine\" content."
+      ]
+    },
+    {
+      "id": "P5",
+      "title": "Manual transfer to the helper strands both assets (no recovery path)",
+      "checks": [
+        {
+          "label": "token 4 inscribed; twin escrowed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder manually transfers original to helper address",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper now owns BOTH sides",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "swap-pepe-for-xtrata fails",
+          "pass": true,
+          "detail": "err 1"
+        },
+        {
+          "label": "swap-xtrata-for-pepe fails",
+          "pass": true,
+          "detail": "err 203"
+        },
+        {
+          "label": "binding still reports original with holder (flag disagrees with chain)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": [
+        "No admin rescue exists by design. Viewer resolves \"real owner\" via source get-owner, which now returns the helper itself."
+      ]
+    },
+    {
+      "id": "P6",
+      "title": "Listed originals cannot be deposited until unlisted",
+      "checks": [
+        {
+          "label": "deposit rejected while listed",
+          "pass": true,
+          "detail": "err 403"
+        },
+        {
+          "label": "deposit succeeds after unlisting",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "P7",
+      "title": "Identical bytes for two originals: core mints distinct twins (no dedup)",
+      "checks": [
+        {
+          "label": "both inscriptions succeed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "distinct twin ids",
+          "pass": true,
+          "detail": "5 vs 6"
+        },
+        {
+          "label": "get-id-by-hash returns the first only",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": [
+        "Distinct redeemable identities are preserved, but bytes are stored twice. Editions need a small per-token record that depends on one shared media inscription."
+      ]
+    },
+    {
+      "id": "P8",
+      "title": "Unminted original id is rejected",
+      "checks": [
+        {
+          "label": "inscribe fails with ERR-NO-SUCH-TOKEN (u200)",
+          "pass": true,
+          "detail": "err 200"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "V2-A",
+      "title": "thisisnumberone-v2: stale approval pulls the original back out of helper custody",
+      "checks": [
+        {
+          "label": "owner sets approval for accomplice",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "owner swaps original into helper and receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "accomplice transfers original OUT of helper using stale approval",
+          "pass": true,
+          "detail": "err null"
+        },
+        {
+          "label": "accomplice owns original while owner still holds twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "owner sells the (now unbacked) twin to an innocent buyer",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "innocent twin buyer can no longer redeem (unbacked twin)",
+          "pass": true,
+          "detail": "err 401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "V2-0",
+      "title": "thisisnumberone-v2: control — an ordinary round trip passes (and proves nothing about safety)",
+      "checks": [
+        {
+          "label": "deposit original, receive twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "redeem twin, receive original",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "V2-B",
+      "title": "thisisnumberone-v2: pre-armed buy-now sale moves the original out of helper custody",
+      "checks": [
+        {
+          "label": "owner arms buy-now at 1000 uSTX before depositing",
+          "pass": true,
+          "detail": "err null"
+        },
+        {
+          "label": "ordinary deposit into helper still succeeds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "anyone paying the armed price takes the original from the helper",
+          "pass": true,
+          "detail": "err null"
+        },
+        {
+          "label": "original left helper; twin still circulates",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin can no longer be redeemed",
+          "pass": true,
+          "detail": "err 401"
+        }
+      ],
+      "notes": [
+        "A successful deposit round-trip test would NOT reveal this: sale-data survives ownership change."
+      ]
+    },
+    {
+      "id": "V1-0",
+      "title": "thisisnumberone-v1: control — an ordinary round trip passes (and proves nothing about safety)",
+      "checks": [
+        {
+          "label": "deposit original, receive twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "redeem twin, receive original",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "V1-B",
+      "title": "thisisnumberone-v1: pre-armed buy-now sale moves the original out of helper custody",
+      "checks": [
+        {
+          "label": "owner arms buy-now at 1000 uSTX before depositing",
+          "pass": true,
+          "detail": "err null"
+        },
+        {
+          "label": "ordinary deposit into helper still succeeds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "anyone paying the armed price takes the original from the helper",
+          "pass": true,
+          "detail": "err null"
+        },
+        {
+          "label": "original left helper; twin still circulates",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin can no longer be redeemed",
+          "pass": true,
+          "detail": "err 401"
+        }
+      ],
+      "notes": [
+        "A successful deposit round-trip test would NOT reveal this: sale-data survives ownership change."
+      ]
+    },
+    {
+      "id": "G1",
+      "title": "Gamma template: a live listing blocks deposit; no listing can exist on a helper-held token",
+      "checks": [
+        {
+          "label": "holder lists 101",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit rejected while listed",
+          "pass": true,
+          "detail": "err 106"
+        },
+        {
+          "label": "unlist then deposit",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "stranger cannot list a helper-held original",
+          "pass": true,
+          "detail": "err 104"
+        },
+        {
+          "label": "former holder cannot list a helper-held original",
+          "pass": true,
+          "detail": "err 104"
+        },
+        {
+          "label": "buy-in-ustx cannot move a helper-held original",
+          "pass": true,
+          "detail": "err 106"
+        },
+        {
+          "label": "former holder cannot burn a helper-held original",
+          "pass": true,
+          "detail": "err 104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "G2",
+      "title": "Gamma template: full round trip including resale of the twin",
+      "checks": [
+        {
+          "label": "deposit 102",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin resold",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "new holder redeems",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

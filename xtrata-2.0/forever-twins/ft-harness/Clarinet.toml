@@ -1,0 +1,87 @@
+# Forever Twins simnet harness. Self-contained: does not touch contracts/clarinet.
+# Contract provenance is recorded in the first line of each legacy/core file.
+[project]
+name = "forever-twins-harness"
+requirements = []
+
+# --- traits and core (core = v3.2.3 minus migration functions; stubs satisfy its legacy readers)
+[contracts.sip009-nft-trait]
+path = "contracts/core/sip009-nft-trait.clar"
+clarity_version = 2
+epoch = 2.5
+[contracts.commission-trait]
+path = "contracts/core/commission-trait.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.xtrata-v1-1-1]
+path = "contracts/core/xtrata-v1-1-1.clar"
+clarity_version = 3
+epoch = "latest"
+[contracts.xtrata-v2-1-0]
+path = "contracts/core/xtrata-v2-1-0.clar"
+clarity_version = 3
+epoch = "latest"
+[contracts.xtrata-v3-2-3]
+path = "contracts/core/xtrata-v3-2-3.clar"
+clarity_version = 3
+epoch = "latest"
+
+# --- archived original sources
+[contracts.thisisnumberone-v1]
+path = "contracts/legacy/thisisnumberone-v1.clar"
+clarity_version = 1
+epoch = 2.05
+[contracts.thisisnumberone-v2]
+path = "contracts/legacy/thisisnumberone-v2.clar"
+clarity_version = 1
+epoch = 2.05
+[contracts.gamma-bitcoin-pepe]
+path = "contracts/legacy/gamma-bitcoin-pepe.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.zombie-wabbits]
+path = "contracts/legacy/zombie-wabbits.clar"
+clarity_version = 2
+epoch = "latest"
+
+# --- test doubles
+[contracts.mock-pepe]
+path = "contracts/test-doubles/mock-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.mock-commission]
+path = "contracts/test-doubles/mock-commission.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.probe-shared]
+path = "contracts/test-doubles/probe-shared.clar"
+clarity_version = 4
+epoch = "latest"
+
+# --- current reference helper (pepe-4ever-fakfun; only MASTER/SOURCE/asset changed)
+[contracts.ref-helper-pepe]
+path = "contracts/rendered/ref-helper-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ref-helper-gamma]
+path = "contracts/rendered/ref-helper-gamma.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ref-helper-v1]
+path = "contracts/rendered/ref-helper-v1.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ref-helper-v2]
+path = "contracts/rendered/ref-helper-v2.clar"
+clarity_version = 4
+epoch = "latest"
+
+# --- v2 template instances (rendered by scripts/render-helper.mjs)
+[contracts.ft2-zombie-wabbits]
+path = "contracts/rendered/ft2-zombie-wabbits.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-gamma-pepe]
+path = "contracts/rendered/ft2-gamma-pepe.clar"
+clarity_version = 4
+epoch = "latest"

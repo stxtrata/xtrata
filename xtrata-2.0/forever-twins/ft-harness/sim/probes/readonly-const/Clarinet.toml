@@ -1,0 +1,11 @@
+[project]
+name = "probe"
+requirements = []
+[contracts.mock-pepe]
+path = "contracts/mock-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.probe]
+path = "contracts/probe.clar"
+clarity_version = 4
+epoch = "latest"

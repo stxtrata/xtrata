@@ -1,0 +1,5 @@
+node_modules/
+deployments/
+sim/probes/*/deployments/
+.cache/
+results/live-check-2*.json

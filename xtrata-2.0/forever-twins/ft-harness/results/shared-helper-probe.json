@@ -1,0 +1,91 @@
+{
+  "suite": "shared-helper-probe",
+  "ranAt": "2026-09-24T14:42:46.596Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 8,
+  "fail": 0,
+  "results": [
+    {
+      "id": "S1",
+      "title": "Trait deposit + dynamic with-nft release (mock Pepe, no impl-trait)",
+      "specRef": "6.2",
+      "checks": [
+        {
+          "label": "register source + asset",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit via trait call",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "release with registry-supplied contract + asset name",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "S2",
+      "title": "Allowance rejects a wrong registered asset name",
+      "specRef": "6.2",
+      "checks": [
+        {
+          "label": "release fails (post-condition allowance)",
+          "pass": true,
+          "detail": "err 128"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "S3",
+      "title": "Implicit trait conformance with a Clarity 1 source (ThisIsNumberOne V1)",
+      "specRef": "6.2",
+      "checks": [
+        {
+          "label": "deposit V1 token through <nft-trait>",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "release V1 token with dynamic allowance",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": [
+        "Feasible does not mean safe: V1 still fails custody (existing-helper-evidence V1-B)."
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Read-only functions cannot dispatch through a trait",
+      "specRef": "6.3",
+      "checks": [
+        {
+          "label": "analysis rejects it as a writing operation",
+          "pass": true,
+          "detail": "error: expecting read-only statements, detected a writing operation"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "S5",
+      "title": "Read-only functions cannot call a constant-bound contract principal",
+      "specRef": "7.3",
+      "checks": [
+        {
+          "label": "analysis rejects it; template must inline literals",
+          "pass": true,
+          "detail": "error: expecting read-only statements, detected a writing operation"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

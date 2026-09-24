@@ -1,0 +1,1440 @@
+[
+ {
+  "contract": "belles-witches",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "belles-witches",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "belles-witches",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "belles-witches"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "2500"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "bitcoin-birds",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "bitcoin-birds",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "bitcoin-birds",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "bitcoin-birds"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "400"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "bitcoin-degens",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "bitcoin-degen",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": [
+     "'SP000000000000000000002Q6VF78.bns",
+     "'SP1JTCR202ECC6333N7ZXD7MK7E3ZTEEE1MJ73C60.bnsx-registry",
+     ".conversions"
+    ]
+   },
+   {
+    "listing_gated": false,
+    "function": "burn-token",
+    "asset": "bitcoin-degen",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "bitcoin-degen"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [
+   "'SP000000000000000000002Q6VF78.bns",
+   "'SP1JTCR202ECC6333N7ZXD7MK7E3ZTEEE1MJ73C60.bnsx-registry",
+   ".conversions"
+  ],
+  "bounded_owner_lists": [
+   "50"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn-token"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "bitcoin-pepe",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "bitcoin-pepe",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "bitcoin-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "bitcoin-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "bitcoin-pepe"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx",
+   "toggle-sale-state"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "bitslimes",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "bitslimes",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "bitslimes",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "bitslimes",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "bitslimes"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "blocks",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "blocks",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "blocks",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "blocks"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "blue-ridge-biker",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "blue-ridge-biker",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "blue-ridge-biker",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "blue-ridge-biker"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "6"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "boom-nfts",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "boom",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "boom",
+    "moves": false,
+    "burns": true,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "boom"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "10"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "boomboxes-cycle-6",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "boomboxes-cycle-6",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "boomboxes-cycle-6"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "750"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review"
+ },
+ {
+  "contract": "byte-fighters",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "byte-fighters",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "byte-fighters",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "byte-fighters"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "2500"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "citadels",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "citadels",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "citadels",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "citadels"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "deruptars",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "deruptars",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "deruptars"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review"
+ },
+ {
+  "contract": "fractal-nft",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "fractal-nft",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "fractal-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "fractal-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "fractal-nft"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "free-punks-v0",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "free-punks",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "free-punks",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "free-punks"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "1000"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "leo-cats",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "leo-cats",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "leo-cats",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "leo-cats",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "leo-cats"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx",
+   "toggle-sale-state"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "megapont-ape-club-nft",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "Megapont-Ape-Club",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "Megapont-Ape-Club",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "Megapont-Ape-Club"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "miami-degens",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "miami-degens",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "miami-degens"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review"
+ },
+ {
+  "contract": "nyc-degens",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "nyc-degens",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "nyc-degens"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review"
+ },
+ {
+  "contract": "ordinal-pepe",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "ordinal-pepe",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "ordinal-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "ordinal-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "ordinal-pepe"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "phases-of-satoshi",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "phases-of-satoshi",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "phases-of-satoshi",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "phases-of-satoshi"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "210"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "stacks-pops",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "stacks-pops",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "stacks-pops",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "stacks-pops"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "2500"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "stacks-punks-v3",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "stacks-punks",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "stacks-punks",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "stacks-punks"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "public",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "2500"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "ADAPTER/REVIEW: transfer or owner interface deviates from the standard shape"
+ },
+ {
+  "contract": "stacks-satoshis",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "stacks-satoshis",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "stacks-satoshis",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "stacks-satoshis",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "stacks-satoshis"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "stx-golden-pepe",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "stx-golden-pepe",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "stx-golden-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": true,
+    "function": "buy-in-ustx",
+    "asset": "stx-golden-pepe",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "stx-golden-pepe"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": true,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "buy-in-ustx"
+  ],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [
+   "buy-in-ustx"
+  ],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ },
+ {
+  "contract": "the-explorer-guild",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "The-Explorer-Guild",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "The-Explorer-Guild"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review"
+ },
+ {
+  "contract": "thisisnumberone-v1",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": true,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "buy-now",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": true,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "place-bid",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "close-bidding",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": true,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "my-nft"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "10"
+  ],
+  "approval_storage": false,
+  "sale_or_auction_state": [
+   "accept-offer",
+   "buy-now",
+   "close-bidding",
+   "make-offer",
+   "opening-bid",
+   "place-bid",
+   "set-sale-data"
+  ],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [
+   "buy-now",
+   "place-bid"
+  ],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [
+   "close-bidding"
+  ],
+  "screen_verdict": "CUSTOM REVIEW: token can leave custody without the custodian signing"
+ },
+ {
+  "contract": "thisisnumberone-v2",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": true,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "buy-now",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": true,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "place-bid",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": false,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "close-bidding",
+    "asset": "my-nft",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": true,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "my-nft"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [
+   "10"
+  ],
+  "approval_storage": true,
+  "sale_or_auction_state": [
+   "accept-offer",
+   "buy-now",
+   "close-bidding",
+   "make-offer",
+   "opening-bid",
+   "place-bid",
+   "set-sale-data"
+  ],
+  "burn_functions": [],
+  "unguarded_non_transfer_movers": [
+   "buy-now",
+   "place-bid"
+  ],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [
+   "close-bidding"
+  ],
+  "screen_verdict": "CUSTOM REVIEW: token can leave custody without the custodian signing"
+ },
+ {
+  "contract": "zombie-wabbits",
+  "movers": [
+   {
+    "listing_gated": false,
+    "function": "burn",
+    "asset": "zombie-wabbits",
+    "moves": false,
+    "burns": true,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   },
+   {
+    "listing_gated": false,
+    "function": "transfer",
+    "asset": "zombie-wabbits",
+    "moves": true,
+    "burns": false,
+    "sender_guard": false,
+    "owner_lookup_guard": true,
+    "approval_path": false,
+    "admin_path": false,
+    "external_calls": []
+   }
+  ],
+  "asset_names": [
+   "zombie-wabbits"
+  ],
+  "transfer_signature_sip009": true,
+  "get_owner_kind": "read-only",
+  "transfer_checks_listing": false,
+  "transfer_external_calls": [],
+  "bounded_owner_lists": [],
+  "approval_storage": false,
+  "sale_or_auction_state": [],
+  "burn_functions": [
+   "burn"
+  ],
+  "unguarded_non_transfer_movers": [],
+  "listing_gated_movers": [],
+  "guarded_non_transfer_movers": [],
+  "screen_verdict": "STANDARD CANDIDATE after human review of listed movers/burns/listing gates"
+ }
+]

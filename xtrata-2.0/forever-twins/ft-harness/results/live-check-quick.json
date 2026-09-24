@@ -1,0 +1,350 @@
+{
+  "tool": "forever-twins live-check",
+  "readOnly": true,
+  "ranAt": "2026-09-24T14:44:56.910Z",
+  "api": "https://api.hiro.so",
+  "targets": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/live-check/targets.mainnet.json",
+  "chainTip": {
+    "stacks_tip_height": 9053979,
+    "stacks_tip": "794872a93bd4353d9edd430050e4f3e2ed3f27f9090a6a8f28a83faa887e75c8",
+    "burn_block_height": 968405
+  },
+  "core": {
+    "id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "paused": false,
+    "admin": {
+      "type": "principal",
+      "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+    },
+    "royaltyRecipient": {
+      "type": "principal",
+      "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+    },
+    "quoteOneChunk5KB": {
+      "type": "(tuple (begin-fee uint) (chunk-size uint) (mode uint) (seal-fee uint) (single-tx-eligible bool) (single-tx-fee uint) (total-fee uint) (upload-batch-limit uint) (upload-batches uint))",
+      "value": {
+        "begin-fee": {
+          "type": "uint",
+          "value": "100000"
+        },
+        "chunk-size": {
+          "type": "uint",
+          "value": "16384"
+        },
+        "mode": {
+          "type": "uint",
+          "value": "2"
+        },
+        "seal-fee": {
+          "type": "uint",
+          "value": "101000"
+        },
+        "single-tx-eligible": {
+          "type": "bool",
+          "value": true
+        },
+        "single-tx-fee": {
+          "type": "uint",
+          "value": "11000"
+        },
+        "total-fee": {
+          "type": "uint",
+          "value": "11000"
+        },
+        "upload-batch-limit": {
+          "type": "uint",
+          "value": "32"
+        },
+        "upload-batches": {
+          "type": "uint",
+          "value": "1"
+        }
+      }
+    },
+    "allowedCallers": {
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun": {
+        "type": "bool",
+        "value": false
+      },
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata": {
+        "type": "bool",
+        "value": false
+      },
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata": {
+        "type": "bool",
+        "value": false
+      }
+    },
+    "source": {
+      "status": "comment-or-whitespace-differences",
+      "deployedSha256": "4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7",
+      "referenceSha256": "a613a7415126bc35801f86a1bf1535c4f4b2d0a8b5d0f4db64080c1ae275899f",
+      "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/contracts-reference/rapha-fakfun/xtrata-v3.2.3.rapha-copy.clar"
+    }
+  },
+  "helpers": [
+    {
+      "key": "bitcoin-pepes",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "source": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "interface": "v1",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "referenceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/contracts-reference/rapha-fakfun/pepe-4ever-fakfun.clar"
+      },
+      "state": {
+        "get-owner": {
+          "type": "principal",
+          "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+        },
+        "get-fee": {
+          "type": "uint",
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "type": "uint",
+          "value": "87"
+        },
+        "get-inscribed-count": {
+          "type": "uint",
+          "value": "2089"
+        },
+        "is-finalized": {
+          "type": "bool",
+          "value": false
+        },
+        "get-payouts": {
+          "type": "(tuple (a principal) (b principal))",
+          "value": {
+            "a": {
+              "type": "principal",
+              "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+            },
+            "b": {
+              "type": "principal",
+              "value": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+            }
+          }
+        }
+      }
+    },
+    {
+      "key": "leo-cats",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+      "source": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+      "interface": "v1",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+        "referenceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/contracts-reference/rapha-fakfun/leo-fakfun-xtrata.clar"
+      },
+      "state": {
+        "get-owner": {
+          "type": "principal",
+          "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+        },
+        "get-fee": {
+          "type": "uint",
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "type": "uint",
+          "value": "69"
+        },
+        "get-inscribed-count": {
+          "type": "uint",
+          "value": "101"
+        },
+        "is-finalized": {
+          "type": "bool",
+          "value": false
+        },
+        "get-payouts": {
+          "type": "(tuple (a principal) (b principal))",
+          "value": {
+            "a": {
+              "type": "principal",
+              "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+            },
+            "b": {
+              "type": "principal",
+              "value": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+            }
+          }
+        }
+      }
+    },
+    {
+      "key": "miami-degens",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+      "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+      "interface": "v1",
+      "sourceCompare": {
+        "status": "no-repo-reference",
+        "deployedSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513"
+      },
+      "state": {
+        "get-owner": {
+          "type": "principal",
+          "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+        },
+        "get-fee": {
+          "type": "uint",
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "type": "uint",
+          "value": "69"
+        },
+        "get-inscribed-count": {
+          "type": "uint",
+          "value": "1"
+        },
+        "is-finalized": {
+          "type": "bool",
+          "value": false
+        },
+        "get-payouts": {
+          "type": "(tuple (a principal) (b principal))",
+          "value": {
+            "a": {
+              "type": "principal",
+              "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+            },
+            "b": {
+              "type": "principal",
+              "value": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "sources": [
+    {
+      "id": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "3167becacc4f7fa170e433f4ed6f70dc54b9dfdf5d3f7ac7b5ea75c597194b8a",
+        "referenceSha256": "3167becacc4f7fa170e433f4ed6f70dc54b9dfdf5d3f7ac7b5ea75c597194b8a",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/bitcoin-pepe.clar"
+      },
+      "dataVars": {
+        "metadata-frozen": false,
+        "ipfs-root": "ipfs://ipfs/QmUyubfMu8kSesUtWp6MQLtan5GpufhpkxufmkfkuCRFM3/json/",
+        "last-id": "2090"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "0af728cc305a681503ba67d2ba6448c8aeb5287004e9e7e17be9becb9cb93be3",
+        "referenceSha256": "0af728cc305a681503ba67d2ba6448c8aeb5287004e9e7e17be9becb9cb93be3",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/leo-cats.clar"
+      },
+      "dataVars": {
+        "metadata-frozen": false,
+        "ipfs-root": "ipfs://ipfs/QmaAUry6B3QtuRSt4xSXy5eRHdhemmF8Gr3WSsiQkzHssX/json/",
+        "last-id": "10001"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "e324892255da9fb4d4cde65358b991a4e2c60cb6d323ad5e9305053cfccfd959",
+        "referenceSha256": "e324892255da9fb4d4cde65358b991a4e2c60cb6d323ad5e9305053cfccfd959",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/miami-degens.clar"
+      },
+      "dataVars": {
+        "ipfs-root": "ipfs://QmQcZyB1GEsZgYQXr82CHN2BeqEY53bmMPB89g6ryKPWJU/",
+        "last-id": "420"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "f52b9253aa988cd67dac6c0a8077e8dbe9aa6d74a1043d152780b24a89de00b9",
+        "referenceSha256": "f52b9253aa988cd67dac6c0a8077e8dbe9aa6d74a1043d152780b24a89de00b9",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/megapont-ape-club-nft.clar"
+      },
+      "dataVars": {
+        "metadata-frozen": false,
+        "base-uri": "ipfs://QmRhkJToXrJYhAGBNP6NLNUTTrXSmuNAF2fH2JKphaJPLx/{id}"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v1",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "3231a00885cd7ff14c4433f520aec4b4d4ad1b3767290150827902d30c2cd606",
+        "referenceSha256": "3231a00885cd7ff14c4433f520aec4b4d4ad1b3767290150827902d30c2cd606",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/thisisnumberone-v1.clar"
+      },
+      "dataVars": {
+        "administrator": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ",
+        "base-token-uri": "https://thisisnumberone.com/mesh/v2/asset/",
+        "mint-counter": "5"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ.thisisnumberone-v2",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "4381e1f83a5c0986e6b62e740b25a9cadea2f8f6280d875c3b212213f932bd0b",
+        "referenceSha256": "4381e1f83a5c0986e6b62e740b25a9cadea2f8f6280d875c3b212213f932bd0b",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/thisisnumberone-v2.clar"
+      },
+      "dataVars": {
+        "administrator": "SP3QSAJQ4EA8WXEDSRRKMZZ29NH91VZ6C5X88FGZQ",
+        "base-token-uri": "https://thisisnumberone.com/nfts/",
+        "mint-counter": "1197"
+      },
+      "readOnly": {}
+    },
+    {
+      "id": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.zombie-wabbits",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "9b5fe19e15fc456d8d8f5a37b7f9593163fac1196a3fc9cbe870c4daefabff94",
+        "referenceSha256": "9b5fe19e15fc456d8d8f5a37b7f9593163fac1196a3fc9cbe870c4daefabff94",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/zombie-wabbits.clar"
+      },
+      "dataVars": {
+        "wabbit-counter": "45",
+        "token-wabbit-uri": "https://www.stacksart.com/assets/zombie-wabbits.json",
+        "token-uri": "https://www.stacksart.com/assets/zombie-wabbits.json",
+        "cost-per-mint": "150000000"
+      },
+      "readOnly": {}
+    }
+  ],
+  "anomalies": [
+    {
+      "where": "bitcoin-pepes",
+      "kind": "canonical-not-finalised",
+      "detail": "helper admin can still re-seed canonical hashes for unbound tokens (evidence P4)"
+    },
+    {
+      "where": "leo-cats",
+      "kind": "canonical-not-finalised",
+      "detail": "helper admin can still re-seed canonical hashes for unbound tokens (evidence P4)"
+    },
+    {
+      "where": "miami-degens",
+      "kind": "canonical-not-finalised",
+      "detail": "helper admin can still re-seed canonical hashes for unbound tokens (evidence P4)"
+    }
+  ],
+  "requests": 58
+}

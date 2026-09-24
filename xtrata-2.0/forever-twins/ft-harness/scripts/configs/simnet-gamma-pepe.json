@@ -1,0 +1,2 @@
+{ "collectionKey": "gamma-bitcoin-pepe", "master": ".xtrata-v3-2-3", "source": ".gamma-bitcoin-pepe", "sourceAsset": "bitcoin-pepe",
+  "maxFeeUstx": 5000000, "rescueEnabled": false, "rescueDelayBurnBlocks": 0, "profileTier": "S" }
