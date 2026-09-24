@@ -1,4 +1,4 @@
-;; forever-twin-helper-v2 :: {{COLLECTION_KEY}} :: group {{GROUP}}
+;; forever-twin-helper-v2 :: leaky-g2 :: group G2
 ;; ---------------------------------------------------------------------------
 ;; STATUS: REFERENCE PROTOTYPE for docs/forever-twins-v2-spec.md (FT-SPEC-2).
 ;; Passes the simnet acceptance suite in forever-twins/ft-harness. NOT audited.
@@ -44,17 +44,15 @@
 (define-constant ERR-FEE-CAP (err u214))
 (define-constant ERR-BAD-CANONICAL (err u215))
 (define-constant ERR-RESCUE-DISABLED (err u216))
-;;@G2-BEGIN
 (define-constant ERR-LISTED (err u217))
-;;@G2-END
 
 (define-constant INTERFACE-VERSION u2)
-(define-constant COLLECTION-KEY "{{COLLECTION_KEY}}")
-(define-constant MASTER {{MASTER}})
-(define-constant SOURCE {{SOURCE}})
-(define-constant MAX-FEE u{{MAX_FEE_USTX}})
-(define-constant RESCUE-ENABLED {{RESCUE_ENABLED}})
-(define-constant RESCUE-DELAY u{{RESCUE_DELAY_BURN_BLOCKS}})
+(define-constant COLLECTION-KEY "leaky-g2")
+(define-constant MASTER .xtrata-v3-2-3)
+(define-constant SOURCE .mock-leaky-market)
+(define-constant MAX-FEE u5000000)
+(define-constant RESCUE-ENABLED true)
+(define-constant RESCUE-DELAY u3)
 (define-constant MAX-SINGLE-TX-BYTES u524288)
 
 ;; --- admin-settable, all bounded --------------------------------------------
@@ -97,23 +95,21 @@
 ;; read-only checker cannot resolve a constant-bound contract-call? target and
 ;; would reject get-custody-state / stray-side as "writing". Verified in simnet.
 (define-private (source-owner (token-id uint))
-  (unwrap-panic (contract-call? {{SOURCE}} get-owner token-id)))
+  (unwrap-panic (contract-call? .mock-leaky-market get-owner token-id)))
 
 (define-private (twin-owner (xtrata-id uint))
-  (unwrap-panic (contract-call? {{MASTER}} get-owner xtrata-id)))
-;;@G2-BEGIN
+  (unwrap-panic (contract-call? .xtrata-v3-2-3 get-owner xtrata-id)))
 
 ;; G2: the source's own listing record for this token, whatever its tuple shape.
 (define-private (source-listed (token-id uint))
-  (is-some (contract-call? {{SOURCE}} {{LISTING_READ_FN}} token-id)))
-;;@G2-END
+  (is-some (contract-call? .mock-leaky-market get-listing-in-ustx token-id)))
 
 (define-private (release-twin-to (id uint) (recipient principal))
   (as-contract? ((with-nft MASTER "xtrata-inscription" (list id)))
     (try! (contract-call? MASTER transfer id current-contract recipient))))
 
 (define-private (release-original-to (id uint) (recipient principal))
-  (as-contract? ((with-nft SOURCE "{{SOURCE_ASSET}}" (list id)))
+  (as-contract? ((with-nft SOURCE "leaky" (list id)))
     (try! (contract-call? SOURCE transfer id current-contract recipient))))
 
 (define-private (fee-for-internal (payer principal))
@@ -204,14 +200,10 @@
         (x-id (get xtrata-id b)))
     (asserts! (get xtrata-escrowed b) ERR-WRONG-STATE)
     (asserts! (is-eq (twin-owner x-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
     (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (contract-call? SOURCE transfer token-id tx-sender current-contract))
     (asserts! (is-eq (source-owner token-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
     (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (release-twin-to x-id tx-sender))
     (map-set Bindings token-id (merge b { xtrata-escrowed: false }))
     (print { event: "swap-original-for-twin", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: x-id, holder: tx-sender })
@@ -293,12 +285,7 @@
 ;; =============================================================================
 (define-read-only (get-twin-interface)
   { interface-version: INTERFACE-VERSION, collection-key: COLLECTION-KEY, master: MASTER, source: SOURCE,
-;;@G1-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G1",
-;;@G1-END
-;;@G2-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G2",
-;;@G2-END
+    source-asset: "leaky", route: "standard", group: "G2",
     canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
     inscribed-count: (var-get inscribed-count), swaps-enabled: true,
@@ -308,9 +295,7 @@
 (define-read-only (get-canonical (token-id uint)) (map-get? Canonical token-id))
 (define-read-only (get-original-by-twin (xtrata-id uint)) (map-get? TwinToOriginal xtrata-id))
 (define-read-only (get-rescue (token-id uint)) (map-get? Rescues token-id))
-;;@G2-BEGIN
 (define-read-only (is-source-listed (token-id uint)) (source-listed token-id))
-;;@G2-END
 (define-read-only (fee-for (payer principal)) (fee-for-internal payer))
 (define-read-only (get-fee) (ok (var-get inscribe-fee)))
 (define-read-only (get-free-threshold) (ok (var-get free-threshold)))

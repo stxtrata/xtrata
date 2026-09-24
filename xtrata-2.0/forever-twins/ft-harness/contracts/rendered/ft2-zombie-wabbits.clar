@@ -1,4 +1,4 @@
-;; forever-twin-helper-v2 :: zombie-wabbits
+;; forever-twin-helper-v2 :: zombie-wabbits :: group G1
 ;; ---------------------------------------------------------------------------
 ;; STATUS: REFERENCE PROTOTYPE for docs/forever-twins-v2-spec.md (FT-SPEC-2).
 ;; Passes the simnet acceptance suite in forever-twins/ft-harness. NOT audited.
@@ -8,6 +8,14 @@
 ;; expose SIP-009-shaped `transfer` that requires the current owner as tx-sender,
 ;; a READ-ONLY `get-owner`, and no function that can move a token out of this
 ;; contract without this contract signing. Adapters are separate contracts.
+;;
+;; Groups (docs: forever-twins/Forever-Twins-Collection-Families.md):
+;;   G1  plain owner transfer, no in-contract market            -> base template
+;;   G2  source has its own listing market (list/buy-in-ustx)   -> base + listing
+;;       guard: a deposit is refused unless the source reports NO listing both
+;;       before and after the transfer, so no listing can ever exist on a token
+;;       this contract holds, even if a family member's transfer failed to
+;;       refuse or clear listings (fail-closed; test F-L4).
 ;;
 ;; Guarantees this contract is designed to provide (spec section 7.1):
 ;;   G1 one binding per original, one original per twin, bindings immutable
@@ -270,7 +278,8 @@
 ;; =============================================================================
 (define-read-only (get-twin-interface)
   { interface-version: INTERFACE-VERSION, collection-key: COLLECTION-KEY, master: MASTER, source: SOURCE,
-    source-asset: "zombie-wabbits", route: "standard", canonical-finalized: (var-get canonical-finalized),
+    source-asset: "zombie-wabbits", route: "standard", group: "G1",
+    canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
     inscribed-count: (var-get inscribed-count), swaps-enabled: true,
     rescue-enabled: RESCUE-ENABLED, rescue-delay: RESCUE-DELAY, owner: (var-get contract-owner) })

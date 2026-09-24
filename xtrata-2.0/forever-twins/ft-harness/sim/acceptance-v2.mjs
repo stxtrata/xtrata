@@ -217,7 +217,7 @@ scenario('T20', 'Gamma template: listing blocks deposit; round trip; rescue disa
   check('inscribe', isOk(pub(HG, 'inscribe', [Cl.uint(7), Cl.list([Cl.buffer(b)])], sponsor)));
   pub(G, 'list-in-ustx', [Cl.uint(7), Cl.uint(100), Cl.principal(COMM)], holder);
   const d = pub(HG, 'swap-original-for-twin', [Cl.uint(7)], holder);
-  check('listed original rejected by source (u106)', !isOk(d) && code(d) === '106', code(d));
+  check('listed original rejected by the G2 listing guard (u217) before the source is touched', !isOk(d) && code(d) === '217', code(d));
   pub(G, 'unlist-in-ustx', [Cl.uint(7)], holder);
   check('deposit after unlisting', isOk(pub(HG, 'swap-original-for-twin', [Cl.uint(7)], holder)));
   check('redeem', isOk(pub(HG, 'swap-twin-for-original', [Cl.uint(7)], holder)) && own(G, 7) === holder);

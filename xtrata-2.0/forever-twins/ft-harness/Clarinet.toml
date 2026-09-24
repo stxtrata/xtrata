@@ -85,3 +85,91 @@ epoch = "latest"
 path = "contracts/rendered/ft2-gamma-pepe.clar"
 clarity_version = 4
 epoch = "latest"
+
+# --- G1/G2 family members (prepared by scripts/prepare-legacy.mjs)
+[contracts.citadels]
+path = "contracts/legacy/citadels.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.funky-donuts]
+path = "contracts/legacy/funky-donuts.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.blocks]
+path = "contracts/legacy/blocks.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.the-guests]
+path = "contracts/legacy/the-guests.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bitslimes]
+path = "contracts/legacy/bitslimes.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.leo-cats]
+path = "contracts/legacy/leo-cats.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.tigress]
+path = "contracts/legacy/tigress.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.megapont-ape-club-nft]
+path = "contracts/legacy/megapont-ape-club-nft.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.satoshibles]
+path = "contracts/legacy/satoshibles.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.mock-leaky-market]
+path = "contracts/test-doubles/mock-leaky-market.clar"
+clarity_version = 4
+epoch = "latest"
+
+# --- family helper instances (rendered by scripts/render-all.mjs)
+[contracts.ft2-citadels]
+path = "contracts/rendered/ft2-citadels.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-funky-donuts]
+path = "contracts/rendered/ft2-funky-donuts.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-blocks]
+path = "contracts/rendered/ft2-blocks.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-the-guests]
+path = "contracts/rendered/ft2-the-guests.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-bitslimes]
+path = "contracts/rendered/ft2-bitslimes.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-leo-cats]
+path = "contracts/rendered/ft2-leo-cats.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-tigress]
+path = "contracts/rendered/ft2-tigress.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-megapont-ape-club-nft]
+path = "contracts/rendered/ft2-megapont-ape-club-nft.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-satoshibles]
+path = "contracts/rendered/ft2-satoshibles.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-leaky-g1]
+path = "contracts/rendered/ft2-leaky-g1.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-leaky-g2]
+path = "contracts/rendered/ft2-leaky-g2.clar"
+clarity_version = 4
+epoch = "latest"
