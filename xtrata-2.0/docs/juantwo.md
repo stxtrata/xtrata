@@ -2,8 +2,8 @@
 
 ## Summary
 
-- Added the supplied self-contained JUAN-ITA-FON HTML application at `public/juantwo/index.html`.
-- Added a static rewrite so `https://xtrata.xyz/juantwo` serves that page without requiring a trailing slash.
+- Added the supplied self-contained JUAN-ITA-FON HTML applications at `public/juantwo/index.html`, `public/juantwo/v2/index.html`, and `public/juantwo/v3/index.html`.
+- Added static rewrites so `https://xtrata.xyz/juantwo`, `https://xtrata.xyz/juantwo/v2`, and `https://xtrata.xyz/juantwo/v3` each serve their respective version without requiring a trailing slash.
 
 ## Notes
 
