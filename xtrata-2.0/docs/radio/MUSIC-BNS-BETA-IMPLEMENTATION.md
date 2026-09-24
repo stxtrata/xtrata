@@ -390,3 +390,13 @@ the public Windows installer link followed successfully to HTTP 200. Release
 links and evidence committed/pushed in `69b1d5898`. All requested installers
 are now published; only the explicitly unperformed hardware/live-money checks
 remain outside this release verification.
+
+## Unified Lounge downloads — 2026-09-24
+
+All normal and beta releases now share one disclosure list. The latest beta
+per platform (Windows 1.0.9, standard Mac 1.0.6, Monterey Mac 1.0.6) appears
+first and expanded; older versions remain available collapsed. Numeric version
+and beta-build ordering determine the defaults. Download links, requirements
+and checksums are unchanged. Static fallback mirrors the rendered list.
+Two targeted tests cover ordering/defaults and metadata failure. Full website
+build passed; isolated browser checks cover arrow collapse and mobile layout.
