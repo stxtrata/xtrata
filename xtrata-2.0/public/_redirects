@@ -5,6 +5,8 @@
 /homepage-registry-ledger-v1/ / 302
 /homepage-registry-ledger-v1.html / 302
 /juantwo /juantwo/index.html 200
+/juantwo/v2 /juantwo/v2/index.html 200
+/juantwo/v3 /juantwo/v3/index.html 200
 /opus /opus-file-generator/ 301
 /opus/ /opus-file-generator/ 301
 /opus/* /opus-file-generator/:splat 301
