@@ -1,0 +1,93 @@
+{
+  "suite": "live-check-vs-simnet",
+  "ranAt": "2026-09-24T14:42:48.276Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 12,
+  "fail": 0,
+  "results": [
+    {
+      "id": "L1",
+      "title": "Transport, chain tip and source comparison",
+      "specRef": "10",
+      "checks": [
+        {
+          "label": "chain tip recorded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "core source byte-identical to reference",
+          "pass": true,
+          "detail": "byte-identical"
+        },
+        {
+          "label": "helper source byte-identical to reference",
+          "pass": true,
+          "detail": "byte-identical"
+        },
+        {
+          "label": "differing source code is reported",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "missing data var reported as absent, present var decoded",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "L2",
+      "title": "Binding scan finds seeded anomalies",
+      "specRef": "10",
+      "checks": [
+        {
+          "label": "all 3 bindings scanned",
+          "pass": true,
+          "detail": "3"
+        },
+        {
+          "label": "custody tallies: 2 consistent, 1 stranded",
+          "pass": true,
+          "detail": "{\"consistent\":2,\"inconsistent\":0,\"stranded\":1,\"unknown\":0}"
+        },
+        {
+          "label": "stranded pair flagged (#11)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "unexpected mime flagged (#13)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "canonical changed after binding flagged (#12)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "unfinalised canonical record flagged",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "L3",
+      "title": "Census via mint events + get-owner",
+      "specRef": "10",
+      "checks": [
+        {
+          "label": "6 zombie-wabbits minted ever, none burned",
+          "pass": true,
+          "detail": "{\"mintedEver\":6,\"ids\":[1,2,3,43,44,45],\"burned\":0,\"unknownOwner\":0,\"distinctHolders\":3,\"heldByContracts\":{}}"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

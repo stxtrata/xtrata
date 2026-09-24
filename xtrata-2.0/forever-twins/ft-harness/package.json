@@ -1,0 +1,22 @@
+{
+  "name": "forever-twins-harness",
+  "private": true,
+  "type": "module",
+  "description": "Forever Twins simnet evidence, v2 acceptance tests, source screener and read-only live checks. No keys, no broadcasts.",
+  "scripts": {
+    "render": "node scripts/render-helper.mjs scripts/configs/simnet-zombie-wabbits.json contracts/rendered/ft2-zombie-wabbits.clar && node scripts/render-helper.mjs scripts/configs/simnet-gamma-pepe.json contracts/rendered/ft2-gamma-pepe.clar",
+    "test:existing": "node sim/existing-helper-evidence.mjs",
+    "test:v2": "npm run render && node sim/acceptance-v2.mjs",
+    "test:shared-probe": "node sim/shared-helper-probe.mjs",
+    "test:live-check": "node live-check/test-against-simnet.mjs",
+    "test": "npm run test:existing && npm run test:v2 && npm run test:shared-probe && npm run test:live-check",
+    "screen:fetch": "bash screener/fetch-sources.sh",
+    "screen": "python3 screener/screen_sources.py screener/sources > results/screen.json && python3 screener/summarise.py results/screen.json",
+    "live-check": "node live-check/live-check.mjs"
+  },
+  "dependencies": {
+    "@stacks/clarinet-sdk": "3.24.0",
+    "@stacks/transactions": "^7.2.0"
+  },
+  "engines": { "node": ">=20" }
+}

@@ -1,0 +1,475 @@
+{
+  "suite": "acceptance-v2",
+  "ranAt": "2026-09-24T14:42:44.597Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 70,
+  "fail": 0,
+  "results": [
+    {
+      "id": "T01",
+      "title": "Canonical lifecycle: admin-only, validated, count-checked, one-way",
+      "specRef": "7.4",
+      "checks": [
+        {
+          "label": "non-admin cannot seed",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "zero-size entry rejected",
+          "pass": true,
+          "detail": "215"
+        },
+        {
+          "label": "entry above the 512 KiB single-tx ceiling rejected",
+          "pass": true,
+          "detail": "215"
+        },
+        {
+          "label": "batch seed accepted, count = 7",
+          "pass": true,
+          "detail": "{\"type\":\"uint\",\"value\":\"7\"}"
+        },
+        {
+          "label": "re-seeding an existing id before finalisation does not inflate the count",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T02",
+      "title": "Nobody can inscribe before finalisation",
+      "specRef": "7.4 G3",
+      "checks": [
+        {
+          "label": "inscribe rejected with ERR-NOT-FINALIZED (u208)",
+          "pass": true,
+          "detail": "208"
+        },
+        {
+          "label": "finalise with wrong expected count rejected (u209)",
+          "pass": true,
+          "detail": "209"
+        },
+        {
+          "label": "finalise with correct count accepted",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "seeding after finalisation rejected (u207)",
+          "pass": true,
+          "detail": "207"
+        },
+        {
+          "label": "interface reports finalised + manifest hash",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T03",
+      "title": "Third-party funding: sponsor supplies chunks only; canonical record fixes mime, size, URI",
+      "specRef": "7.5 G2 G4",
+      "checks": [
+        {
+          "label": "sponsor inscribes a token held by someone else",
+          "pass": true,
+          "detail": "null"
+        },
+        {
+          "label": "twin minted into helper custody; original untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin mime = canonical mime",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin token-uri = canonical token-uri",
+          "pass": true,
+          "detail": "{\"type\":\"(string-ascii 43)\",\"value\":\"https://xtrata.xyz/ft/zombie-wabbits/1.json\"}"
+        },
+        {
+          "label": "binding records sponsor as inscriber only",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "reverse lookup twin -> original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "inscribe ABI takes only token-id and chunks",
+          "pass": true,
+          "detail": "token-id,chunks"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T04",
+      "title": "Inscription guards",
+      "specRef": "7.5",
+      "checks": [
+        {
+          "label": "same-length wrong bytes rejected by core hash check (u103), no binding",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes rejected by core shape check (u102), no binding",
+          "pass": true,
+          "detail": "102"
+        },
+        {
+          "label": "correct bytes then succeed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "second inscription of the same original rejected (u201)",
+          "pass": true,
+          "detail": "201"
+        },
+        {
+          "label": "id without a canonical record rejected (u206)",
+          "pass": true,
+          "detail": "206"
+        }
+      ],
+      "notes": [
+        "Open-supply collections: IDs minted after finalisation have no canonical record and cannot be twinned by this instance. Spec 7.4 / D4."
+      ]
+    },
+    {
+      "id": "T05",
+      "title": "Swaps: holder only, both directions, redemption follows the circulating twin",
+      "specRef": "7.5 G4 G5",
+      "checks": [
+        {
+          "label": "sponsor cannot take the twin",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "holder deposits original, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state consistent after deposit",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is ERR-WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        },
+        {
+          "label": "twin resold to buyer",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "previous holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T06",
+      "title": "Admin pause stops new inscriptions only; swaps stay open",
+      "specRef": "7.7 G6",
+      "checks": [
+        {
+          "label": "admin pauses inscriptions",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "inscribe rejected while paused (u211)",
+          "pass": true,
+          "detail": "211"
+        },
+        {
+          "label": "swap still works while paused",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "redeem still works while paused",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T07",
+      "title": "Fees: bounded by MAX-FEE, charged to the payer, free tier respected",
+      "specRef": "7.7",
+      "checks": [
+        {
+          "label": "fee above deploy-time ceiling rejected (u214)",
+          "pass": true,
+          "detail": "214"
+        },
+        {
+          "label": "fee applies (free threshold 0)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "fee recipient received exactly 2 STX",
+          "pass": true,
+          "detail": "2000000"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T08",
+      "title": "Stray original: detected, swaps fail safely, time-locked rescue restores the pair",
+      "specRef": "7.6 D2",
+      "checks": [
+        {
+          "label": "manual transfer of original to helper succeeds at source",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded and inconsistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "stray-side = original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "non-admin cannot propose rescue (u204)",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "execution before the Bitcoin-block delay rejected (u213)",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "execution after the delay returns the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "pair consistent again; twin still escrowed",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T09",
+      "title": "Stray twin: rescue returns only the stray side",
+      "specRef": "7.6",
+      "checks": [
+        {
+          "label": "holder manually sends twin back to helper",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "stray-side = twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "rescue returns the twin, original stays escrowed",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T10",
+      "title": "Unbound original sent to helper: cannot be inscribed; rescuable",
+      "specRef": "7.5 7.6",
+      "checks": [
+        {
+          "label": "holder sends un-inscribed original directly",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "inscription refused: would be born stranded (u210)",
+          "pass": true,
+          "detail": "210"
+        },
+        {
+          "label": "rescue returns it",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T11",
+      "title": "Rescue cannot touch a healthy pair",
+      "specRef": "7.6 G6",
+      "checks": [
+        {
+          "label": "no rescue when nothing is stray (u212)",
+          "pass": true,
+          "detail": "212"
+        },
+        {
+          "label": "only swaps and execute-rescue can release a held token",
+          "pass": true,
+          "detail": "execute-rescue,swap-original-for-twin,swap-twin-for-original"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T12",
+      "title": "Discovery interface and v1-compatible binding shape",
+      "specRef": "7.3",
+      "checks": [
+        {
+          "label": "interface exposes interface-version",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes collection-key",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes master",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes source",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes source-asset",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes route",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes canonical-finalized",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes manifest-hash",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes swaps-enabled",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface exposes rescue-delay",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "get-binding tuple keys identical to v1 (resolver compatible)",
+          "pass": true,
+          "detail": "at,content-hash,inscriber,xtrata-escrowed,xtrata-id"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T13",
+      "title": "Renderer refuses non-standard sources",
+      "specRef": "7.2",
+      "checks": [
+        {
+          "label": "tier C (custom review) cannot be rendered with the standard template",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "T20",
+      "title": "Gamma template: listing blocks deposit; round trip; rescue disabled by config",
+      "specRef": "7.2 7.6",
+      "checks": [
+        {
+          "label": "inscribe",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "listed original rejected by source (u106)",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "deposit after unlisting",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "redeem",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "instance rendered with rescueEnabled=false refuses rescue (u216)",
+          "pass": true,
+          "detail": "216"
+        }
+      ],
+      "notes": [
+        "With rescue disabled, a stray deposit is permanent: decision D2 in the spec."
+      ]
+    }
+  ]
+}

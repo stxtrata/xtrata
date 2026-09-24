@@ -1,0 +1,2 @@
+{ "collectionKey": "zombie-wabbits", "master": ".xtrata-v3-2-3", "source": ".zombie-wabbits", "sourceAsset": "zombie-wabbits",
+  "maxFeeUstx": 5000000, "rescueEnabled": true, "rescueDelayBurnBlocks": 6, "profileTier": "S" }
