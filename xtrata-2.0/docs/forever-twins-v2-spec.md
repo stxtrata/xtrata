@@ -1,6 +1,6 @@
 # Forever Twins v2: self-service helpers, legacy adapters and collection preservation
 
-**Spec id:** FT-SPEC-2 · **Version:** 0.9 (draft for Jim's decisions) · **Date:** 24 September 2026
+**Spec id:** FT-SPEC-2 · **Version:** 0.10 (draft for Jim's decisions) · **Date:** 24 September 2026 · **Live facts:** Stacks tip 9,053,980 (section 3.3)
 **Repo base inspected:** `stxtrata/xtrata@63d353c` (24 Sep 2026)
 **Companion code:** `xtrata-2.0/forever-twins/ft-harness/` (simnet harness, v2 template, screener, live-check)
 **Supersedes:** nothing. Extends `docs/forever-twins-linking.md` and `forever-twins/xtrata-twin-index-v1.md`.
@@ -49,9 +49,22 @@ original admin, where the contract allows it at all. That is a nice extra, not p
 **What we built.** The v2 template in the harness closes all three gaps and passes 70 acceptance checks,
 including against the real Zombie Wabbits contract. [SIM T01–T20]
 
+**What the first mainnet check showed** (tip 9,053,980):
+
+- **Every Bitcoin Pepe appears to have a twin already.** The helper reports 2,089 inscribed against a
+  last token id of 2,089, and every sampled pair is correctly held. A full `--all` scan is needed before
+  saying so publicly.
+- **The existing twins' metadata links point at Pinata**, the same pinned-IPFS infrastructure the project
+  exists to escape. The artwork bytes are on-chain; the link that wallets and marketplaces follow is not
+  (F3a).
+- **No helper has finalised its canonical list.** For Pepes this no longer matters, since every token is
+  bound; for Leo Cats (101 of 10,000) and Miami Degens (1 of 420) it still does.
+- **Zombie Wabbits is complete:** all 45 ids minted, none burned, 30 holders. The open-supply question is
+  moot for the pilot.
+
 **What to do first:**
 
-1. Run `live-check` against mainnet to establish the facts we could not read.
+1. Finish the live checks listed in section 3.3 ("still open").
 2. Make the six decisions in section 13, especially who holds the helper admin key and the stray-token
    policy.
 3. Pilot the v2 template on Zombie Wabbits (section 11), with no shared custody contract yet.
@@ -110,7 +123,21 @@ them immutably. In simnet a canonical image was inscribed as `text/html` with a 
 [SIM P3]
 
 - **Live exposure:** every *unbound* canonical token in the live helpers is exposed, whatever the Fak.fun
-  frontend sends. [LIVE? whether any live twin already carries unexpected values; live-check reports this]
+  frontend sends. At tip 9,053,980 that means Leo Cats and Miami Degens; Bitcoin Pepes appear fully bound.
+  All 199 sampled twins carry `image/png`, so no misuse was seen.
+
+**F3a (live): twin metadata links depend on Pinata.** Of the 199 twins sampled, 196 have a token URI
+on `https://stxnft.mypinata.cloud`. The other three (all Leo Cats) begin `ipfs://ipfs`, which suggests a
+doubled `ipfs/` prefix that most clients will not resolve. [live-check, uriHosts] Token URIs are immutable
+in the core, so these cannot be corrected on the existing twins.
+
+- **What still holds:** the artwork bytes are on-chain and Xtrata-aware viewers render them directly.
+- **What does not:** a wallet or marketplace that follows the token URI depends on Pinata, exactly like
+  the original.
+- **Consequence for public wording:** "the artwork is stored on-chain" is accurate; "the twin no longer
+  depends on IPFS" is not.
+- **Consequence for v2:** decision D3 must be settled before any finalisation, and the canonical token URI
+  must not point at a pinning gateway.
 
 **F4: Canonical content is admin-mutable until finalisation, and inscription does not wait for it.**
 `seed-canonical` overwrites entries with `map-set`. Bindings created meanwhile are permanent. Until
@@ -161,12 +188,50 @@ bytes are stored once per edition. [SIM P7]
   read-only paths.
 - **Still needed:** confirmation on a pinned mainnet fork.
 
-### 3.3 Live facts not verified (read them with `live-check`)
+### 3.3 Live facts (read-only, Stacks tip 9,053,980, burn height 968,406, 24 Sep 2026)
 
-Current helper admin, fee, free threshold, inscribed count and finalisation state; whether the core is
-paused and whether each helper is allowlisted; whether deployed source equals the repo references (and the
-Miami helper's source hash); freeze flags and base URIs of source contracts; the V1/V2 administrator;
-the Zombie Wabbits mint census. [LIVE?]
+Source: `ft-harness/results/live-check-mainnet.json` (1,302 read-only requests). These replace the
+[LIVE?] items in earlier sections where they apply.
+
+**Core `xtrata-v3-2-3`:** not paused; admin `SP3JNSEX…743X`; deployed source differs from the repo copy
+only in comments or whitespace. None of the three helpers is on the allowlist. That is harmless while the
+core is unpaused, but **pausing the core would stop inscription through every helper**.
+
+| Helper | Source vs repo | Admin | Fee | Free tier | Inscribed | Finalised | Sampled | Custody | Twin URI hosts |
+|---|---|---|---|---|---|---|---|---|---|
+| Bitcoin Pepes | byte-identical | `SPV9K21…DC22` | 4 STX | 87 | 2,089 | **no** | 99 | 99 consistent | Pinata 99 |
+| Leo Cats | byte-identical | `SPV9K21…DC22` | 4 STX | 69 | 101 | **no** | 99 | 99 consistent | Pinata 96, `ipfs://ipfs` 3 |
+| Miami Degens | no repo reference (deployed SHA-256 `c0fc432d…6513`, saved as `…DEPLOYED.clar`) | `SPV9K21…DC22` | 4 STX | 69 | 1 | **no** | 1 | 1 consistent | Pinata 1 |
+
+- **Pepe fee differs from the source default.** The live fee is 4 STX, not the 3 STX in the source and in
+  `forever-twins/data/contracts.json` and campaign copy. Correct those documents.
+- **Pepes appear complete.** 2,089 bindings against `last-id` 2,090 (last token id 2,089). A full
+  `--only bitcoin-pepes --all` scan must confirm 2,089 distinct token ids, all consistent and all
+  `image/png`, before a public "every Pepe" claim.
+
+| Source | Source vs archive | Notable state |
+|---|---|---|
+| Bitcoin Pepe | byte-identical | `metadata-frozen = false`; `last-id = 2090` |
+| Leo Cats | byte-identical | `metadata-frozen = false`; `last-id = 10001` |
+| Miami Degens | byte-identical | `last-id = 420` |
+| Megapont Ape Club | byte-identical | `metadata-frozen = false`, so repointing is still possible for the deployer |
+| ThisIsNumberOne V1 | byte-identical | administrator is still the deployer `SP3QSAJ…FGZQ`; mint counter 5, so **Genesis is 5 tokens (ids 0–4)**, not the ~3,333 in the old chronology |
+| ThisIsNumberOne V2 | byte-identical | administrator is still the deployer; mint counter 1,197 (ids 0–1,196) across Smileys, Hash Ones, Singularity and any others |
+| Zombie Wabbits | byte-identical | counter 45; census: **45 minted (ids 1–45), 0 burned, 30 distinct holders** |
+
+**Still open** (not covered by this run):
+
+1. **Full Pepe scan:** `--only bitcoin-pepes --all` (needs `HIRO_API_KEY` in practice).
+2. **Leo's three `ipfs://ipfs` URIs:** exact values. live-check now records up to three sample URIs per
+   host (`uriSamples`).
+3. **Miami helper template check:** does the deployed source match the Pepe/Leo logic apart from
+   constants and names? Diff `…DEPLOYED.clar` against `leo-fakfun-xtrata.clar`.
+4. **Zombie Wabbits closure:** read `wabbit-index` and `rotation` to confirm that a further `mint` call
+   cannot create a 46th token (the counter check alone still passes at 45).
+5. **Zombie Wabbits contract holders:** confirm whether any Wabbits sit in marketplace or other
+   contracts (`census.heldByContracts`).
+6. **ThisIsNumberOne sub-collections:** the V2 id ranges for Smileys, Hash Ones and Singularity, from
+   `nft-data` edition fields.
 
 ---
 
@@ -707,18 +772,20 @@ and `burn`; no market, approvals or owner lists. The real source passes the full
 
 - `ITEM-COUNT` is 45.
 - Ids 45, 1, 44 and 2 were minted to the deployer at deploy.
-- **Public mint is still open** at 150 STX while the counter is at most 45. In simnet the next mints
-  produced 43, 3, 42, so ids are not sequential. [SIM acceptance setup]
+- The public mint (150 STX) is guarded by `counter ≤ 45`. In simnet the mints after deploy produced
+  43, 3, 42, so ids are not sequential. [SIM acceptance setup]
+- **Live:** counter 45; all ids 1–45 minted, none burned, 30 holders (section 3.3). The supply is
+  effectively complete; confirm open item 4 in section 3.3 before finalising.
 - **Every token's metadata URI is the same shared JSON**
   (`https://www.stacksart.com/assets/zombie-wabbits.json`). The token-to-art mapping must be recovered
   from that file.
-- Live supply, holders and whether that URL still resolves are [LIVE?].
+- Whether that shared JSON URL still resolves is not yet known. That is gate P1.
 
 **Gates** (each needs the previous one):
 
 | Gate | Work | Output |
 |---|---|---|
-| P0 | `live-check` census and source equality at a recorded tip | Minted ids, burned ids, source hash |
+| P0 | `live-check` census and source equality at a recorded tip | **Done at tip 9,053,980:** ids 1–45, 0 burned, source byte-identical. Close open items 4–5 of 3.3. |
 | P1 | Recover the shared JSON and every media file; verify MIME and magic bytes; sha256 plus xtrata hash | Draft manifest; byte totals |
 | P2 | Decisions D2, D3, D4, D5 for this collection | Config JSON |
 | P3 | Render; run the acceptance suite with the real source (already green); run it on a mainnet fork | Fork run link |
@@ -762,11 +829,12 @@ under 10 KB claimed). No cheapest-to-most-expensive ranking exists yet.
 | D1 | Architecture | Per-collection v2 template plus discovery registry now; shared custody deferred (5.2). |
 | D2 | Stray policy | Rescue enabled with a 432-burn-block delay and a published recipient rule; disabled only if the admin is a key you would not trust with that power. |
 | D3 | Twin token-URI policy | Resolver URL plus inscribed manifest (7.9). |
-| D4 | Open-supply scope | Declare a snapshot; pre-seed the designed range only where media is provably fixed. |
+| D4 | Open-supply scope | Declare a snapshot; pre-seed the designed range only where media is provably fixed. Moot for the Zombie Wabbits pilot if 3.3 item 4 confirms closure. |
 | D5 | Who holds helper admin and registry curation | Jim or an Xtrata multisig for new helpers; explicit, written arrangement with Rapha for any co-branded ones. |
 | D6 | Fees | Zero helper fee during the pilot; `MAX-FEE` set conservatively at deploy. |
-| D7 | Existing v1 helpers | Run live-check; ask Rapha to finalise canonical records and to confirm the Fak.fun frontend sends fixed mime and URI values; share F3–F5. They cannot be upgraded in place. |
-| D8 | ThisIsNumberOne | Preservation-only now; fund the adapter work in 7.13 only if the custody tests can be made to fail against it. |
+| D7 | Existing v1 helpers | Live-check done (3.3). Ask Rapha to finalise Leo and Miami canonical records (Pepes are fully bound, so finalisation is now cosmetic there), to confirm what the Fak.fun frontend passes as mime and token URI, and to correct the 3 STX fee in copy. Share F3, F3a, F4 and F5. They cannot be upgraded in place. |
+| D8 | ThisIsNumberOne | Preservation-only now; fund the adapter work in 7.13 only if the custody tests can be made to fail against it. The administrator is still the original deployer, so the admin `close-bidding` path is in the creator's hands. |
+| D9 | Existing twins' Pinata dependency (F3a) | Say publicly that the artwork is on-chain and the metadata link is still IPFS-hosted. Have Xtrata viewers and the resolver serve metadata from on-chain data regardless of the stored URI. Ask Rapha whether the frontend can switch future Leo and Miami twins to a non-gateway URI now, because each twin's URI is fixed at mint. |
 
 ---
 

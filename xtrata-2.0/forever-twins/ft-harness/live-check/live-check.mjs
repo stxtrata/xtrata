@@ -82,7 +82,7 @@ async function contractEvents(contractId, wanted, cap) {
     }
     if (rows.length < 50) break;
   }
-  return out;
+  return out.slice(0, cap); // pages are 50 rows; never report more than the cap asked for
 }
 async function mints(assetIdentifier, cap = 20000) {
   const ids = [];
@@ -195,6 +195,8 @@ for (const h of T.helpers) {
       const uri = (await tryRO(T.core.id, 'get-token-uri-raw', [Cl.uint(xid)]))?.value ?? '?';
       const host = String(uri).replace(/^([a-z]+:\/\/[^/]+).*$/i, '$1');
       H.uriHosts[host] = (H.uriHosts[host] ?? 0) + 1;
+      (H.uriSamples ??= {})[host] ??= [];
+      if (H.uriSamples[host].length < 3) H.uriSamples[host].push({ tokenId, xtrataId: xid, uri });
       if (h.expectedUriPattern && !new RegExp(h.expectedUriPattern).test(uri)) anomaly(where, 'unexpected-twin-token-uri', uri);
     }
   }
