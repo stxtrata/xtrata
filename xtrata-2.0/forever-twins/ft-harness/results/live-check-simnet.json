@@ -1,9 +1,9 @@
 {
   "tool": "forever-twins live-check",
   "readOnly": true,
-  "ranAt": "2026-09-24T14:42:48.060Z",
-  "api": "http://127.0.0.1:56481",
-  "targets": "/var/folders/g5/_7z5f_cn4fnf5qld_27jjws00000gn/T/ft-live-9TB2B6/targets.json",
+  "ranAt": "2026-09-24T15:51:43.413Z",
+  "api": "http://127.0.0.1:57917",
+  "targets": "/var/folders/g5/_7z5f_cn4fnf5qld_27jjws00000gn/T/ft-live-I8XVsh/targets.json",
   "chainTip": {
     "stacks_tip_height": 18,
     "stacks_tip": "0xsimnet",
@@ -134,6 +134,25 @@
         "inconsistent": 0,
         "stranded": 1,
         "unknown": 0
+      },
+      "uriSamples": {
+        "https://xtrata.xyz": [
+          {
+            "tokenId": 13,
+            "xtrataId": 2,
+            "uri": "https://xtrata.xyz/i/{id}"
+          },
+          {
+            "tokenId": 12,
+            "xtrataId": 1,
+            "uri": "https://xtrata.xyz/i/{id}"
+          },
+          {
+            "tokenId": 11,
+            "xtrataId": 0,
+            "uri": "https://xtrata.xyz/i/{id}"
+          }
+        ]
       }
     }
   ],

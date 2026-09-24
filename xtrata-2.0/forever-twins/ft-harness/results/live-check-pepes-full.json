@@ -1,0 +1,175 @@
+{
+  "tool": "forever-twins live-check",
+  "readOnly": true,
+  "ranAt": "2026-09-24T15:54:01.689Z",
+  "api": "https://api.hiro.so",
+  "targets": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/live-check/targets.mainnet.json",
+  "chainTip": {
+    "stacks_tip_height": 9054196,
+    "stacks_tip": "8e4dcc100129e9230d42ac802a105ddfc163797af4660a2785d5f094aea4c528",
+    "burn_block_height": 968416
+  },
+  "core": {
+    "id": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "paused": false,
+    "admin": {
+      "type": "principal",
+      "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+    },
+    "royaltyRecipient": {
+      "type": "principal",
+      "value": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+    },
+    "quoteOneChunk5KB": {
+      "type": "(tuple (begin-fee uint) (chunk-size uint) (mode uint) (seal-fee uint) (single-tx-eligible bool) (single-tx-fee uint) (total-fee uint) (upload-batch-limit uint) (upload-batches uint))",
+      "value": {
+        "begin-fee": {
+          "type": "uint",
+          "value": "100000"
+        },
+        "chunk-size": {
+          "type": "uint",
+          "value": "16384"
+        },
+        "mode": {
+          "type": "uint",
+          "value": "2"
+        },
+        "seal-fee": {
+          "type": "uint",
+          "value": "101000"
+        },
+        "single-tx-eligible": {
+          "type": "bool",
+          "value": true
+        },
+        "single-tx-fee": {
+          "type": "uint",
+          "value": "11000"
+        },
+        "total-fee": {
+          "type": "uint",
+          "value": "11000"
+        },
+        "upload-batch-limit": {
+          "type": "uint",
+          "value": "32"
+        },
+        "upload-batches": {
+          "type": "uint",
+          "value": "1"
+        }
+      }
+    },
+    "allowedCallers": {
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun": {
+        "type": "bool",
+        "value": false
+      },
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata": {
+        "type": "bool",
+        "value": false
+      },
+      "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata": {
+        "type": "bool",
+        "value": false
+      }
+    },
+    "source": {
+      "status": "comment-or-whitespace-differences",
+      "deployedSha256": "4d5ed9db022bb345d712ceadbd75d8d9540bd0a5b4d9122017c770b8d00a8ac7",
+      "referenceSha256": "a613a7415126bc35801f86a1bf1535c4f4b2d0a8b5d0f4db64080c1ae275899f",
+      "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/contracts-reference/rapha-fakfun/xtrata-v3.2.3.rapha-copy.clar"
+    }
+  },
+  "helpers": [
+    {
+      "key": "bitcoin-pepes",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "source": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "interface": "v1",
+      "sourceCompare": {
+        "status": "byte-identical",
+        "deployedSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "referenceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/contracts-reference/rapha-fakfun/pepe-4ever-fakfun.clar"
+      },
+      "state": {
+        "get-owner": {
+          "type": "principal",
+          "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+        },
+        "get-fee": {
+          "type": "uint",
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "type": "uint",
+          "value": "87"
+        },
+        "get-inscribed-count": {
+          "type": "uint",
+          "value": "2089"
+        },
+        "is-finalized": {
+          "type": "bool",
+          "value": false
+        },
+        "get-payouts": {
+          "type": "(tuple (a principal) (b principal))",
+          "value": {
+            "a": {
+              "type": "principal",
+              "value": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
+            },
+            "b": {
+              "type": "principal",
+              "value": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+            }
+          }
+        }
+      },
+      "bindingsScanned": 2089,
+      "mimeCounts": {
+        "image/png": 2089
+      },
+      "uriHosts": {
+        "https://stxnft.mypinata.cloud": 2089
+      },
+      "custody": {
+        "consistent": 2089,
+        "inconsistent": 0,
+        "stranded": 0,
+        "unknown": 0
+      },
+      "uriSamples": {
+        "https://stxnft.mypinata.cloud": [
+          {
+            "tokenId": 2089,
+            "xtrataId": 2740,
+            "uri": "https://stxnft.mypinata.cloud/ipfs/QmUyubfMu8kSesUtWp6MQLtan5GpufhpkxufmkfkuCRFM3/json/2089.json"
+          },
+          {
+            "tokenId": 2088,
+            "xtrataId": 2739,
+            "uri": "https://stxnft.mypinata.cloud/ipfs/QmUyubfMu8kSesUtWp6MQLtan5GpufhpkxufmkfkuCRFM3/json/2088.json"
+          },
+          {
+            "tokenId": 2087,
+            "xtrataId": 2738,
+            "uri": "https://stxnft.mypinata.cloud/ipfs/QmUyubfMu8kSesUtWp6MQLtan5GpufhpkxufmkfkuCRFM3/json/2087.json"
+          }
+        ]
+      }
+    }
+  ],
+  "sources": [],
+  "anomalies": [
+    {
+      "where": "bitcoin-pepes",
+      "kind": "canonical-not-finalised",
+      "detail": "helper admin can still re-seed canonical hashes for unbound tokens (evidence P4)"
+    }
+  ],
+  "requests": 12592
+}
