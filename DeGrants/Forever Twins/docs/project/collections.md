@@ -98,3 +98,41 @@ Caveats for Jim:
 
 Seeding takes one `seed-canonical` call per 100 tokens. Any token with art over 512 KB cannot
 use the standard template.
+
+## Third-party sponsor demo candidates (researched 25 Sep 2026)
+
+Both contracts are byte-identical to the deployed source and pass the family suites
+(`family-suite-v3` 537/537 including them). Art was built with the manifest builder in the
+desktop app's browser.
+
+| Collection | Group | Source | Supply | Built | Over 512 KB | Largest | Notes |
+|---|---|---|---|---|---|---|---|
+| See Yourself Out (SZN 2 by Boozy) | G2 (Gamma) | `SP3M05ETW09E98NNFMFHT1WND3ZRX9DV31TFC6DFW.see-yourself-out` | 100 (sold out) | 100/100, 0 failures | **12** (ids 1, 9, 12, 14, 24, 42, 60, 68, 75, 81, 82, 89) | 5,724,376 B (id 82, GIF) | 53 GIF, 47 PNG, all distinct. The 88 in-limit files total 2.43 STX in core fees. Metadata calls it "the first evolving art experiment on Stacks" and it isn't frozen. In-browser manifest sha256 (no snapshot, all 100): `3dfccd19...68991090` |
+| Bitcoin Monkeys | G1 (Degens) | `SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys` | 2,500 (sold out) | sizes for 335 tokens (123 full builds + 212 size-only checks) | **42 of 335 (~12.5%)**, so roughly 260-370 across the collection | 1,432,911 B | PNGs, most 320-400 KB. `get-token-uri` goes through a `conversion` lookup that is the identity for ids 1-2500. Public gateways were very slow on this collection |
+
+Neither can be preserved in full with the standard v3 template: `inscribe` uses the core's
+single-transaction mint, which is capped at 512 KB (32 chunks).
+
+### Option discussed: pre-inscribe the oversized files, then bind them
+
+The Xtrata core already accepts large files through its multi-transaction upload
+(`begin-inscription` -> `add-chunk-batch` -> `seal-inscription`, up to 32 MiB), with the same
+rolling-hash check at seal. The idea: the owner inscribes the oversized files that way, moves
+those Xtrata tokens into the helper, and the helper records them as already-inscribed twins
+before finalisation. Everything else stays a normal sponsor inscription.
+
+This **needs a contract change** (not made; Jim to decide):
+- `seed-canonical` currently rejects entries over 512 KB (u215); it would accept them for tokens
+  that will be pre-bound.
+- A new owner-only, pre-finalisation `bind-preinscribed (token-id, xtrata-id)` that checks the
+  core's recorded hash for `xtrata-id` equals the token's canonical `content-hash`, that the
+  helper owns `xtrata-id`, and that the token isn't already bound; then writes the same
+  `Bindings` entry `inscribe` would (twin in helper custody), with no fee.
+- `inscribe` refuses tokens that are pre-bound (it already refuses bound tokens).
+- New simnet tests for the path, including a wrong-hash bind being refused.
+
+Estimated cost of the pre-inscription part (live core fee units: begin 0.1, seal 0.1, extra batch
+0.1, chunk 0.001 STX):
+- See Yourself Out, 12 files: about 6.6 STX in core fees over roughly 74 transactions.
+- Bitcoin Monkeys, ~310 files of ~0.3-1.4 MB: about 0.23-0.43 STX each, roughly 70-130 STX in
+  core fees and 1,200+ transactions.
