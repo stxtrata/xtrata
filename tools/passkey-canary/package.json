@@ -1,0 +1,13 @@
+{
+  "name": "xtrata-passkey-compatibility-canary",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=22.20.0"},
+  "scripts": {
+    "start": "node serve.mjs",
+    "setup": "node setup.mjs",
+    "build": "node build.mjs",
+    "test": "node --test compatibility.test.mjs",
+    "test:upstream": "npm --prefix upstream test"
+  }
+}
