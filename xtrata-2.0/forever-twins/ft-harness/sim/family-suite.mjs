@@ -37,11 +37,16 @@ const sources = [
 ];
 
 let megapontMintSet = false;
+const giftEnabled = new Set();
 function mintTo(src, kind, to, preferredId) {
   let r;
   if (kind === 'public-mint') r = pub(src, 'mint', [], to);
   else if (kind === 'appended') r = pub(src, 'simnet-mint', [Cl.uint(preferredId), Cl.principal(to)], D);
   else if (kind === 'owner-mint') r = pub(src, 'mint', [Cl.principal(to)], D);
+  else if (kind === 'gift') {
+    if (!giftEnabled.has(src)) { pub(src, 'set-minting-enabled', [Cl.bool(true)], D); giftEnabled.add(src); }
+    r = pub(src, 'gift', [Cl.principal(to)], D);
+  }
   else if (kind === 'owner-mint-via-mint-address') {
     if (!megapontMintSet) { pub(src, 'set-mint-address', [], D); megapontMintSet = true; }
     r = pub(src, 'mint', [Cl.principal(to)], D);

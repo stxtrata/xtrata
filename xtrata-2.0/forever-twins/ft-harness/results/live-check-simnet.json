@@ -1,9 +1,9 @@
 {
   "tool": "forever-twins live-check",
   "readOnly": true,
-  "ranAt": "2026-09-25T12:23:30.914Z",
-  "api": "http://127.0.0.1:42409",
-  "targets": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/tmp/ft-live-eFCvpV/targets.json",
+  "ranAt": "2026-09-25T12:35:55.567Z",
+  "api": "http://127.0.0.1:37287",
+  "targets": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/tmp/ft-live-jgBzNu/targets.json",
   "chainTip": {
     "stacks_tip_height": 20,
     "stacks_tip": "0xsimnet",

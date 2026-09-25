@@ -16,7 +16,8 @@ const only = process.argv.slice(2);
 for (const src of cfg.sources.filter((s) => !only.length || only.includes(s.name))) {
   const archived = readFileSync(join(ROOT, 'screener/sources', `${src.name}.clar`), 'utf8');
   let changed = 0, sip009Done = false;
-  const lines = archived.split('\n').map((l) => {
+  const lines = archived.split('\n').map((l0) => {
+    let l = l0;
     const t = l.trim();
     // any SIP-009 impl (mainnet, testnet or local .nft-trait): first becomes the local trait, duplicates are dropped
     if (/^\(impl-trait\s+'?[A-Z0-9]*\.?nft-trait\.nft-trait\)/.test(t)) {
@@ -25,6 +26,9 @@ for (const src of cfg.sources.filter((s) => !only.length || only.includes(s.name
       return `;; [simnet] duplicate removed: ${t.replace(/'/g, '').replace(/;.*/, '')}`;
     }
     if (t.startsWith('(impl-trait ')) { changed++; return `;; [simnet] removed: ${t.replace(/'/g, '').replace(/;.*/, '')}`; }
+    for (const [from, to] of src.rewrites || []) {
+      if (l.includes(from)) { changed++; l = l.split(from).join(to) + ` ;; [simnet] ${from.replace(/'/g, '')} -> ${to}`; }
+    }
     if (l.includes(COMM)) { changed++; return l.replace(COMM, '.commission-trait.commission') + ' ;; [simnet] commission trait localised'; }
     return l;
   });

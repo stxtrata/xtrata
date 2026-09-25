@@ -10,6 +10,7 @@
     {"name": "tigress", "group": "G2", "family": "gamma", "asset": "tigress", "mint": "appended"},
     {"name": "megapont-ape-club-nft", "group": "G2", "family": "megapont", "asset": "Megapont-Ape-Club", "mint": "owner-mint-via-mint-address"},
     {"name": "satoshibles", "group": "G2", "family": "megapont", "asset": "Satoshibles", "mint": "owner-mint"},
-    {"name": "ordinal-pepe", "group": "G2", "family": "gamma", "asset": "ordinal-pepe", "mint": "appended"}
+    {"name": "ordinal-pepe", "group": "G2", "family": "gamma", "asset": "ordinal-pepe", "mint": "appended"},
+    {"name": "nyc-degens", "group": "G1", "family": "degens", "asset": "nyc-degens", "mint": "gift", "rewrites": [["'SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token", ".miamicoin-token"], ["'SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token", ".newyorkcitycoin-token"]]}
   ]
 }
