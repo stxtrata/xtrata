@@ -8,6 +8,8 @@
 /juantwo/v2 /juantwo/v2/index.html 200
 /juantwo/v3 /juantwo/v3/index.html 200
 /juantwo/v4 /juantwo/v4/index.html 200
+/juantwo/v5 /juantwo/v5/index.html 200
+/juantwo/v6 /juantwo/v6/index.html 200
 /opus /opus-file-generator/ 301
 /opus/ /opus-file-generator/ 301
 /opus/* /opus-file-generator/:splat 301
