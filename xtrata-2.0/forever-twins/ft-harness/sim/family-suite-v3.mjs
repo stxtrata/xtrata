@@ -64,6 +64,7 @@ function mintTo(src, kind, to) {
   if (kind === 'public-mint') r = pub(src, 'mint', [], to);
   else if (kind === 'appended') r = pub(src, 'simnet-mint', [Cl.uint(nextAppended++), Cl.principal(to)], D);
   else if (kind === 'owner-mint') r = pub(src, 'mint', [Cl.principal(to)], D);
+  else if (kind === 'claim') r = pub(src, 'claim', [], to);
   else if (kind === 'gift') {
     if (!giftEnabled.has(src)) { pub(src, 'set-minting-enabled', [Cl.bool(true)], D); giftEnabled.add(src); }
     r = pub(src, 'gift', [Cl.principal(to)], D);

@@ -1,6 +1,6 @@
 {
   "suite": "shared-helper-probe",
-  "ranAt": "2026-09-25T12:35:52.380Z",
+  "ranAt": "2026-09-25T15:57:59.248Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 8,
   "fail": 0,

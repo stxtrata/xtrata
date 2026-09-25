@@ -143,6 +143,22 @@ epoch = "latest"
 path = "contracts/legacy/nyc-degens.clar"
 clarity_version = 2
 epoch = "latest"
+[contracts.see-yourself-out]
+path = "contracts/legacy/see-yourself-out.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bm-conversion]
+path = "contracts/legacy/bm-conversion.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bm-conversion-v2]
+path = "contracts/legacy/bm-conversion-v2.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bitcoin-monkeys]
+path = "contracts/legacy/bitcoin-monkeys.clar"
+clarity_version = 2
+epoch = "latest"
 [contracts.mock-leaky-market]
 path = "contracts/test-doubles/mock-leaky-market.clar"
 clarity_version = 4
@@ -261,5 +277,21 @@ clarity_version = 4
 epoch = "latest"
 [contracts.ft2-nyc-degens]
 path = "contracts/rendered/ft2-nyc-degens.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-see-yourself-out]
+path = "contracts/rendered/ft2-see-yourself-out.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-see-yourself-out]
+path = "contracts/rendered/ft3-see-yourself-out.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-bitcoin-monkeys]
+path = "contracts/rendered/ft2-bitcoin-monkeys.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-bitcoin-monkeys]
+path = "contracts/rendered/ft3-bitcoin-monkeys.clar"
 clarity_version = 4
 epoch = "latest"

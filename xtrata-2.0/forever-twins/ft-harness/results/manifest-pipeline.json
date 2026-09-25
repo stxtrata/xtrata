@@ -1,6 +1,6 @@
 {
   "suite": "manifest-pipeline",
-  "ranAt": "2026-09-25T12:35:39.838Z",
+  "ranAt": "2026-09-25T15:57:51.704Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 24,
   "fail": 0,
