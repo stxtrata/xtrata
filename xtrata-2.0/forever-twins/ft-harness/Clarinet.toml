@@ -173,3 +173,57 @@ epoch = "latest"
 path = "contracts/rendered/ft2-leaky-g2.clar"
 clarity_version = 4
 epoch = "latest"
+
+# --- v3 helper instances (rendered by scripts/render-all-v3.mjs)
+[contracts.ft3-zombie-wabbits]
+path = "contracts/rendered/ft3-zombie-wabbits.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-gamma-pepe]
+path = "contracts/rendered/ft3-gamma-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-citadels]
+path = "contracts/rendered/ft3-citadels.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-funky-donuts]
+path = "contracts/rendered/ft3-funky-donuts.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-blocks]
+path = "contracts/rendered/ft3-blocks.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-the-guests]
+path = "contracts/rendered/ft3-the-guests.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-bitslimes]
+path = "contracts/rendered/ft3-bitslimes.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-leo-cats]
+path = "contracts/rendered/ft3-leo-cats.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-tigress]
+path = "contracts/rendered/ft3-tigress.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-megapont-ape-club-nft]
+path = "contracts/rendered/ft3-megapont-ape-club-nft.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-satoshibles]
+path = "contracts/rendered/ft3-satoshibles.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-leaky-g1]
+path = "contracts/rendered/ft3-leaky-g1.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-leaky-g2]
+path = "contracts/rendered/ft3-leaky-g2.clar"
+clarity_version = 4
+epoch = "latest"

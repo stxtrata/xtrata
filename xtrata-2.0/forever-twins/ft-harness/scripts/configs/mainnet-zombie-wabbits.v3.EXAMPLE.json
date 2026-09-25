@@ -1,0 +1,13 @@
+{
+ "collectionKey": "zombie-wabbits",
+ "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.zombie-wabbits",
+ "sourceAsset": "zombie-wabbits",
+ "group": "G1",
+ "payees": ["<JIM-PAYOUT-ADDRESS>", "<RAPHA-PAYOUT-ADDRESS>"],
+ "initialFeeUstx": 1000000,
+ "maxFeeUstx": 5000000,
+ "rescueEnabled": true,
+ "rescueDelayBurnBlocks": 432,
+ "profileTier": "S"
+}
