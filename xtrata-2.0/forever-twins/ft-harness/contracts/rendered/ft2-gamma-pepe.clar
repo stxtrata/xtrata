@@ -1,4 +1,4 @@
-;; forever-twin-helper-v2 :: gamma-bitcoin-pepe
+;; forever-twin-helper-v2 :: gamma-bitcoin-pepe :: group G2
 ;; ---------------------------------------------------------------------------
 ;; STATUS: REFERENCE PROTOTYPE for docs/forever-twins-v2-spec.md (FT-SPEC-2).
 ;; Passes the simnet acceptance suite in forever-twins/ft-harness. NOT audited.
@@ -8,6 +8,14 @@
 ;; expose SIP-009-shaped `transfer` that requires the current owner as tx-sender,
 ;; a READ-ONLY `get-owner`, and no function that can move a token out of this
 ;; contract without this contract signing. Adapters are separate contracts.
+;;
+;; Groups (docs: forever-twins/Forever-Twins-Collection-Families.md):
+;;   G1  plain owner transfer, no in-contract market            -> base template
+;;   G2  source has its own listing market (list/buy-in-ustx)   -> base + listing
+;;       guard: a deposit is refused unless the source reports NO listing both
+;;       before and after the transfer, so no listing can ever exist on a token
+;;       this contract holds, even if a family member's transfer failed to
+;;       refuse or clear listings (fail-closed; test F-L4).
 ;;
 ;; Guarantees this contract is designed to provide (spec section 7.1):
 ;;   G1 one binding per original, one original per twin, bindings immutable
@@ -36,6 +44,7 @@
 (define-constant ERR-FEE-CAP (err u214))
 (define-constant ERR-BAD-CANONICAL (err u215))
 (define-constant ERR-RESCUE-DISABLED (err u216))
+(define-constant ERR-LISTED (err u217))
 
 (define-constant INTERFACE-VERSION u2)
 (define-constant COLLECTION-KEY "gamma-bitcoin-pepe")
@@ -90,6 +99,10 @@
 
 (define-private (twin-owner (xtrata-id uint))
   (unwrap-panic (contract-call? .xtrata-v3-2-3 get-owner xtrata-id)))
+
+;; G2: the source's own listing record for this token, whatever its tuple shape.
+(define-private (source-listed (token-id uint))
+  (is-some (contract-call? .gamma-bitcoin-pepe get-listing-in-ustx token-id)))
 
 (define-private (release-twin-to (id uint) (recipient principal))
   (as-contract? ((with-nft MASTER "xtrata-inscription" (list id)))
@@ -187,8 +200,10 @@
         (x-id (get xtrata-id b)))
     (asserts! (get xtrata-escrowed b) ERR-WRONG-STATE)
     (asserts! (is-eq (twin-owner x-id) (some current-contract)) ERR-CUSTODY)
+    (asserts! (not (source-listed token-id)) ERR-LISTED)
     (try! (contract-call? SOURCE transfer token-id tx-sender current-contract))
     (asserts! (is-eq (source-owner token-id) (some current-contract)) ERR-CUSTODY)
+    (asserts! (not (source-listed token-id)) ERR-LISTED)
     (try! (release-twin-to x-id tx-sender))
     (map-set Bindings token-id (merge b { xtrata-escrowed: false }))
     (print { event: "swap-original-for-twin", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: x-id, holder: tx-sender })
@@ -270,7 +285,8 @@
 ;; =============================================================================
 (define-read-only (get-twin-interface)
   { interface-version: INTERFACE-VERSION, collection-key: COLLECTION-KEY, master: MASTER, source: SOURCE,
-    source-asset: "bitcoin-pepe", route: "standard", canonical-finalized: (var-get canonical-finalized),
+    source-asset: "bitcoin-pepe", route: "standard", group: "G2",
+    canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
     inscribed-count: (var-get inscribed-count), swaps-enabled: true,
     rescue-enabled: RESCUE-ENABLED, rescue-delay: RESCUE-DELAY, owner: (var-get contract-owner) })
@@ -279,6 +295,7 @@
 (define-read-only (get-canonical (token-id uint)) (map-get? Canonical token-id))
 (define-read-only (get-original-by-twin (xtrata-id uint)) (map-get? TwinToOriginal xtrata-id))
 (define-read-only (get-rescue (token-id uint)) (map-get? Rescues token-id))
+(define-read-only (is-source-listed (token-id uint)) (source-listed token-id))
 (define-read-only (fee-for (payer principal)) (fee-for-internal payer))
 (define-read-only (get-fee) (ok (var-get inscribe-fee)))
 (define-read-only (get-free-threshold) (ok (var-get free-threshold)))

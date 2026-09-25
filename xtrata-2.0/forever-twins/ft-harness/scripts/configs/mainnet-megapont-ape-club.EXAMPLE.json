@@ -1,0 +1,12 @@
+{
+ "collectionKey": "megapont-ape-club",
+ "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+ "sourceAsset": "Megapont-Ape-Club",
+ "maxFeeUstx": 5000000,
+ "rescueEnabled": true,
+ "rescueDelayBurnBlocks": 432,
+ "profileTier": "S",
+ "group": "G2",
+ "listingReadFn": "get-listing-in-ustx"
+}

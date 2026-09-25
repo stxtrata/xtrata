@@ -1,0 +1,2055 @@
+{
+  "suite": "family-suite",
+  "ranAt": "2026-09-25T11:53:47.344Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 278,
+  "fail": 0,
+  "results": [
+    {
+      "id": "zombie-wabbits:F-1",
+      "title": "zombie-wabbits [G1/stacksart] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G1",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "zombie-wabbits:F-2",
+      "title": "zombie-wabbits [G1/stacksart] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "zombie-wabbits:F-5",
+      "title": "zombie-wabbits [G1/stacksart] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "zombie-wabbits:F-3",
+      "title": "zombie-wabbits [G1/stacksart] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "zombie-wabbits:F-4",
+      "title": "zombie-wabbits [G1/stacksart] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "zombie-wabbits:F-6",
+      "title": "zombie-wabbits [G1/stacksart] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 6 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-1",
+      "title": "citadels [G1/stacksart] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G1",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-2",
+      "title": "citadels [G1/stacksart] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-5",
+      "title": "citadels [G1/stacksart] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-3",
+      "title": "citadels [G1/stacksart] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-4",
+      "title": "citadels [G1/stacksart] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "citadels:F-6",
+      "title": "citadels [G1/stacksart] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-1",
+      "title": "funky-donuts [G1/stacksart] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G1",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-2",
+      "title": "funky-donuts [G1/stacksart] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-5",
+      "title": "funky-donuts [G1/stacksart] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-3",
+      "title": "funky-donuts [G1/stacksart] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-4",
+      "title": "funky-donuts [G1/stacksart] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "funky-donuts:F-6",
+      "title": "funky-donuts [G1/stacksart] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-1",
+      "title": "blocks [G1/stacksart] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G1",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-2",
+      "title": "blocks [G1/stacksart] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-5",
+      "title": "blocks [G1/stacksart] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-3",
+      "title": "blocks [G1/stacksart] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-4",
+      "title": "blocks [G1/stacksart] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "blocks:F-6",
+      "title": "blocks [G1/stacksart] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-1",
+      "title": "gamma-bitcoin-pepe [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-L1",
+      "title": "gamma-bitcoin-pepe [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-2",
+      "title": "gamma-bitcoin-pepe [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-5",
+      "title": "gamma-bitcoin-pepe [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-L2",
+      "title": "gamma-bitcoin-pepe [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-3",
+      "title": "gamma-bitcoin-pepe [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-4",
+      "title": "gamma-bitcoin-pepe [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "gamma-bitcoin-pepe:F-6",
+      "title": "gamma-bitcoin-pepe [G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "instance rendered with rescue disabled refuses (u216); stray is permanent (decision D2)",
+          "pass": true,
+          "detail": "216"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-1",
+      "title": "the-guests [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-L1",
+      "title": "the-guests [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-2",
+      "title": "the-guests [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-5",
+      "title": "the-guests [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-L2",
+      "title": "the-guests [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-3",
+      "title": "the-guests [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-4",
+      "title": "the-guests [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "the-guests:F-6",
+      "title": "the-guests [G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-1",
+      "title": "bitslimes [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-L1",
+      "title": "bitslimes [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-2",
+      "title": "bitslimes [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-5",
+      "title": "bitslimes [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-L2",
+      "title": "bitslimes [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-3",
+      "title": "bitslimes [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-4",
+      "title": "bitslimes [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitslimes:F-6",
+      "title": "bitslimes [G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-1",
+      "title": "leo-cats [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-L1",
+      "title": "leo-cats [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-2",
+      "title": "leo-cats [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-5",
+      "title": "leo-cats [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-L2",
+      "title": "leo-cats [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-3",
+      "title": "leo-cats [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-4",
+      "title": "leo-cats [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leo-cats:F-6",
+      "title": "leo-cats [G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-1",
+      "title": "tigress [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-L1",
+      "title": "tigress [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-2",
+      "title": "tigress [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-5",
+      "title": "tigress [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-L2",
+      "title": "tigress [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-3",
+      "title": "tigress [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-4",
+      "title": "tigress [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "tigress:F-6",
+      "title": "tigress [G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-1",
+      "title": "megapont-ape-club-nft [G2/megapont] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-L1",
+      "title": "megapont-ape-club-nft [G2/megapont] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-2",
+      "title": "megapont-ape-club-nft [G2/megapont] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-5",
+      "title": "megapont-ape-club-nft [G2/megapont] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-L2",
+      "title": "megapont-ape-club-nft [G2/megapont] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "507"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-3",
+      "title": "megapont-ape-club-nft [G2/megapont] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-4",
+      "title": "megapont-ape-club-nft [G2/megapont] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "megapont-ape-club-nft:F-6",
+      "title": "megapont-ape-club-nft [G2/megapont] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-1",
+      "title": "satoshibles [G2/megapont] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-L1",
+      "title": "satoshibles [G2/megapont] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-2",
+      "title": "satoshibles [G2/megapont] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-5",
+      "title": "satoshibles [G2/megapont] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "401"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-L2",
+      "title": "satoshibles [G2/megapont] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "401"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "507"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-3",
+      "title": "satoshibles [G2/megapont] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-4",
+      "title": "satoshibles [G2/megapont] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "satoshibles:F-6",
+      "title": "satoshibles [G2/megapont] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leaky:F-L4-G1",
+      "title": "unsafe listing source with the G1 helper",
+      "specRef": "F-L4",
+      "checks": [
+        {
+          "label": "holder lists the original at 1 uSTX, then tries to swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "G1 accepts the deposit (it cannot see listings)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a buyer drains the original out of the G1 helper; twin now unbacked",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "leaky:F-L4-G2",
+      "title": "unsafe listing source with the G2 helper",
+      "specRef": "F-L4",
+      "checks": [
+        {
+          "label": "holder lists the original at 1 uSTX, then tries to swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "G2 refuses the deposit (u217)",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "after unlisting, deposit succeeds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "nothing can be bought from the G2 helper",
+          "pass": true,
+          "detail": "406"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

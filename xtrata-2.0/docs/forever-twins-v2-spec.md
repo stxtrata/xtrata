@@ -422,6 +422,8 @@ principals or asset names, and never guesses a value. [SIM T13]
 | `maxFeeUstx` | Ceiling on `set-fee`, fixed forever at deploy. |
 | `rescueEnabled`, `rescueDelayBurnBlocks` | Decision D2. The delay is in Bitcoin blocks (for example 432 ≈ 3 days). |
 | `profileTier` | Must be `"S"`. |
+| `group` | `"G1"` (plain owner transfer) or `"G2"` (source has its own listing market). G2 adds the listing guard: `swap-original-for-twin` fails with `u217` unless `listingReadFn` reports no listing before and after the deposit. Tested in `sim/family-suite.mjs`. |
+| `listingReadFn` | G2 only; the source's read-only listing lookup (default `get-listing-in-ustx`). Any optional return shape works. |
 
 **Deployment checklist** (for the eventual self-service tool):
 
@@ -552,6 +554,7 @@ Every failure reverts the whole transaction. Swaps are **never** pausable.
 | u206 | NOT-CANONICAL | u214 | FEE-CAP |
 | u207 | FINALIZED | u215 | BAD-CANONICAL |
 | u208 | NOT-FINALIZED | u216 | RESCUE-DISABLED |
+| | | u217 | LISTED (G2 only: the source reports a listing) |
 
 Source and core errors pass through unchanged (for example Gamma `u106` for a listed token, core `u103`).
 
@@ -695,6 +698,7 @@ Run everything with `cd forever-twins/ft-harness && npm ci && npm test`. Result 
 |---|---|---|
 | Evidence on current helper and legacy sources | `sim/existing-helper-evidence.mjs` | 60/60 checks, 15 scenarios |
 | v2 acceptance (real Zombie Wabbits and Gamma sources) | `sim/acceptance-v2.mjs` | 70/70 checks, 14 scenarios |
+| G1/G2 templates on 11 real sources + unsafe-listing control | `sim/family-suite.mjs` | 278/278 checks, 82 scenarios |
 | Shared-helper feasibility and Clarity limits | `sim/shared-helper-probe.mjs` | 8/8 checks, 5 scenarios |
 | live-check end to end against a simnet-backed mock node | `live-check/test-against-simnet.mjs` | 12/12 checks, 3 scenarios |
 
