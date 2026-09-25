@@ -3,6 +3,7 @@
 //
 //   node manifest/build-manifest.mjs manifest/configs/<key>.json [--out manifest/out]
 //        [--ids 1-50 | --ids 3,7,9] [--concurrency 4] [--snapshot-api https://api.hiro.so]
+//        [--api https://api.hiro.so]   (used when the config's metadataUri is "chain")
 //
 // For every token id: fetch the original metadata (if the config has metadataUri),
 // then the media; record sha256, the Xtrata rolling hash, mime (from magic bytes),
@@ -31,6 +32,34 @@ const ids = idsArg
   ? (idsArg.includes('-') ? idsFrom({ from: +idsArg.split('-')[0], to: +idsArg.split('-')[1] }) : idsArg.split(',').map(Number))
   : idsFrom(cfg.ids);
 const partial = Boolean(idsArg);
+
+// metadataUri "chain": read each token's URI from the source's get-token-uri (read-only call-read).
+if (cfg.metadataUri === 'chain') {
+  const { Cl, cvToHex, hexToCV, cvToValue } = await import('@stacks/transactions');
+  const API = (opt('api', process.env.FT_API || 'https://api.hiro.so')).replace(/\/$/, '');
+  const [addr, name] = cfg.source.split('.');
+  const KEY = process.env.HIRO_API_KEY;
+  let gate = Promise.resolve();
+  cfg.metadataUriFor = async (id) => {
+    const turn = gate; let release; gate = new Promise((r) => (release = r)); await turn;
+    try {
+      for (let a = 0; a < 6; a++) {
+        await new Promise((r) => setTimeout(r, KEY ? 150 : 1100));
+        const res = await fetch(`${API}/v2/contracts/call-read/${addr}/${name}/get-token-uri`, {
+          method: 'POST', headers: { 'content-type': 'application/json', ...(KEY ? { 'x-api-key': KEY } : {}) },
+          body: JSON.stringify({ sender: addr, arguments: [cvToHex(Cl.uint(id))] }) });
+        if (res.status === 429 || res.status >= 500) continue;
+        const j = await res.json();
+        if (!j.okay) throw new Error(`get-token-uri(${id}): ${j.cause}`);
+        const v = cvToValue(hexToCV(j.result), true);
+        const uri = v?.value?.value ?? v?.value ?? v;
+        if (typeof uri !== 'string') throw new Error(`get-token-uri(${id}) returned no string`);
+        return uri.split('{id}').join(String(id));
+      }
+      throw new Error(`get-token-uri(${id}): gave up`);
+    } finally { release(); }
+  };
+}
 
 async function fetcher(url) {
   const res = await fetch(url, { redirect: 'follow', headers: { 'user-agent': 'forever-twins-manifest/1' } });

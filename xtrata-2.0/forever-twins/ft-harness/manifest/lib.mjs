@@ -73,7 +73,8 @@ export function pickMedia(meta, field = 'image') {
 
 // fetcher(url) -> { bytes: Uint8Array, contentType: string, status: number }
 export async function buildToken(cfg, id, fetcher) {
-  const metadataUri = cfg.metadataUri ? fill(cfg.metadataUri, id) : null;
+  // cfg.metadataUriFor(id) (e.g. the source's live get-token-uri) wins over the template.
+  const metadataUri = cfg.metadataUriFor ? await cfg.metadataUriFor(id) : cfg.metadataUri ? fill(cfg.metadataUri, id) : null;
   let mediaUri, metaBytes = null;
   if (metadataUri) {
     const m = await fetcher(toHttp(metadataUri, cfg.gateway));
