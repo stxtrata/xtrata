@@ -1,6 +1,6 @@
 {
   "suite": "acceptance-v2",
-  "ranAt": "2026-09-24T14:42:44.597Z",
+  "ranAt": "2026-09-25T11:53:42.742Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 70,
   "fail": 0,
@@ -447,9 +447,9 @@
           "detail": ""
         },
         {
-          "label": "listed original rejected by source (u106)",
+          "label": "listed original rejected by the G2 listing guard (u217) before the source is touched",
           "pass": true,
-          "detail": "106"
+          "detail": "217"
         },
         {
           "label": "deposit after unlisting",

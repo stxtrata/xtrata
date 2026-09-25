@@ -1,11 +1,11 @@
 {
   "tool": "forever-twins live-check",
   "readOnly": true,
-  "ranAt": "2026-09-24T15:51:43.413Z",
-  "api": "http://127.0.0.1:57917",
-  "targets": "/var/folders/g5/_7z5f_cn4fnf5qld_27jjws00000gn/T/ft-live-I8XVsh/targets.json",
+  "ranAt": "2026-09-25T11:53:57.723Z",
+  "api": "http://127.0.0.1:38069",
+  "targets": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/tmp/ft-live-nCjpI6/targets.json",
   "chainTip": {
-    "stacks_tip_height": 18,
+    "stacks_tip_height": 19,
     "stacks_tip": "0xsimnet",
     "burn_block_height": 4
   },
@@ -71,7 +71,7 @@
       "status": "byte-identical",
       "deployedSha256": "2c5c19c8d5d1dc813f86aa2180ddf2bb74a2660f9376095eb80c2831df29aaea",
       "referenceSha256": "2c5c19c8d5d1dc813f86aa2180ddf2bb74a2660f9376095eb80c2831df29aaea",
-      "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/core/xtrata-v3-2-3.clar"
+      "refFile": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/mnt/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/core/xtrata-v3-2-3.clar"
     }
   },
   "helpers": [
@@ -84,7 +84,7 @@
         "status": "byte-identical",
         "deployedSha256": "7df3c53da732910c50be17474953b6eb1dead80fc9ba2f522bb9a0aa7b99d022",
         "referenceSha256": "7df3c53da732910c50be17474953b6eb1dead80fc9ba2f522bb9a0aa7b99d022",
-        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/rendered/ref-helper-gamma.clar"
+        "refFile": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/mnt/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/rendered/ref-helper-gamma.clar"
       },
       "state": {
         "get-owner": {
@@ -163,7 +163,7 @@
         "status": "byte-identical",
         "deployedSha256": "bd296d1330932f21fb88cd2e98013e31ab218b5425c3a2b8387515f37705a776",
         "referenceSha256": "bd296d1330932f21fb88cd2e98013e31ab218b5425c3a2b8387515f37705a776",
-        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/legacy/gamma-bitcoin-pepe.clar"
+        "refFile": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/mnt/xtrata/xtrata-2.0/forever-twins/ft-harness/contracts/legacy/gamma-bitcoin-pepe.clar"
       },
       "dataVars": {
         "metadata-frozen": false,
@@ -179,7 +179,7 @@
         "status": "CODE-DIFFERS",
         "deployedSha256": "4bb375c479da47cbdc33f094d674e6a254b9ee99015c74dde98a86ac98847c65",
         "referenceSha256": "9b5fe19e15fc456d8d8f5a37b7f9593163fac1196a3fc9cbe870c4daefabff94",
-        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/zombie-wabbits.clar"
+        "refFile": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/mnt/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/zombie-wabbits.clar"
       },
       "dataVars": {
         "wabbit-counter": "6"
@@ -235,7 +235,7 @@
         "status": "CODE-DIFFERS",
         "deployedSha256": "4bb375c479da47cbdc33f094d674e6a254b9ee99015c74dde98a86ac98847c65",
         "referenceSha256": "9b5fe19e15fc456d8d8f5a37b7f9593163fac1196a3fc9cbe870c4daefabff94",
-        "refFile": "/Users/melophonic/Documents/GitHub/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/zombie-wabbits.clar"
+        "refFile": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/mnt/xtrata/xtrata-2.0/forever-twins/ft-harness/screener/sources/zombie-wabbits.clar"
       }
     }
   ],
