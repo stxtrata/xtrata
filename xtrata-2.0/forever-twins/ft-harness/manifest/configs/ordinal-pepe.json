@@ -1,0 +1,17 @@
+{
+  "collectionKey": "ordinal-pepe",
+  "source": "SP2ZY7ETKYAN1M7R4HWQ77Q4CVDVH8PVQ41XS0N0S.ordinal-pepe",
+  "sourceAsset": "ordinal-pepe",
+  "ids": {
+    "from": 1,
+    "to": 100
+  },
+  "metadataUri": "chain",
+  "gateway": "https://ipfs.filebase.io",
+  "scope": "minted-at-snapshot",
+  "reviewer": null,
+  "concurrency": 4,
+  "retries": 3,
+  "_twinTokenUri_note": "D3 (spec 7.9) is still Jim's call. This uses the spec's recommended resolver URL; change before building the final manifest if D3 lands differently.",
+  "twinTokenUri": "https://xtrata.xyz/ft/ordinal-pepe/{id}.json"
+}

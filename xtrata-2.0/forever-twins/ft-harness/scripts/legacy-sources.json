@@ -1,14 +1,15 @@
 {
   "_comment": "Archived sources prepared for simnet by scripts/prepare-legacy.mjs. Every change is a [simnet]-marked line: mainnet trait principals localised, plus an appended test mint ONLY where the real mint needs live sale state. Transfer, list, buy, burn and approval code is never touched.",
   "sources": [
-    { "name": "citadels",              "group": "G1", "family": "stacksart", "asset": "citadels",          "mint": "public-mint" },
-    { "name": "funky-donuts",          "group": "G1", "family": "stacksart", "asset": "funky-donuts",      "mint": "public-mint" },
-    { "name": "blocks",                "group": "G1", "family": "stacksart", "asset": "blocks",            "mint": "public-mint" },
-    { "name": "the-guests",            "group": "G2", "family": "gamma",     "asset": "the-guests",        "mint": "appended" },
-    { "name": "bitslimes",             "group": "G2", "family": "gamma",     "asset": "bitslimes",         "mint": "appended" },
-    { "name": "leo-cats",              "group": "G2", "family": "gamma",     "asset": "leo-cats",          "mint": "appended" },
-    { "name": "tigress",               "group": "G2", "family": "gamma",     "asset": "tigress",           "mint": "appended" },
-    { "name": "megapont-ape-club-nft", "group": "G2", "family": "megapont",  "asset": "Megapont-Ape-Club", "mint": "owner-mint-via-mint-address" },
-    { "name": "satoshibles",           "group": "G2", "family": "megapont",  "asset": "Satoshibles",       "mint": "owner-mint" }
+    {"name": "citadels", "group": "G1", "family": "stacksart", "asset": "citadels", "mint": "public-mint"},
+    {"name": "funky-donuts", "group": "G1", "family": "stacksart", "asset": "funky-donuts", "mint": "public-mint"},
+    {"name": "blocks", "group": "G1", "family": "stacksart", "asset": "blocks", "mint": "public-mint"},
+    {"name": "the-guests", "group": "G2", "family": "gamma", "asset": "the-guests", "mint": "appended"},
+    {"name": "bitslimes", "group": "G2", "family": "gamma", "asset": "bitslimes", "mint": "appended"},
+    {"name": "leo-cats", "group": "G2", "family": "gamma", "asset": "leo-cats", "mint": "appended"},
+    {"name": "tigress", "group": "G2", "family": "gamma", "asset": "tigress", "mint": "appended"},
+    {"name": "megapont-ape-club-nft", "group": "G2", "family": "megapont", "asset": "Megapont-Ape-Club", "mint": "owner-mint-via-mint-address"},
+    {"name": "satoshibles", "group": "G2", "family": "megapont", "asset": "Satoshibles", "mint": "owner-mint"},
+    {"name": "ordinal-pepe", "group": "G2", "family": "gamma", "asset": "ordinal-pepe", "mint": "appended"}
   ]
 }

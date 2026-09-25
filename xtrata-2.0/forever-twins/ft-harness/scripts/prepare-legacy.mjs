@@ -11,7 +11,9 @@ const cfg = JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), '
 const SIP009 = "(impl-trait 'SP2PABAF9FTAJYNFZH93XENAJ8FVY99RRM50D2JG9.nft-trait.nft-trait)";
 const COMM = "'SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.commission-trait.commission";
 
-for (const src of cfg.sources) {
+// Optional: node scripts/prepare-legacy.mjs <name> [...] prepares only those sources.
+const only = process.argv.slice(2);
+for (const src of cfg.sources.filter((s) => !only.length || only.includes(s.name))) {
   const archived = readFileSync(join(ROOT, 'screener/sources', `${src.name}.clar`), 'utf8');
   let changed = 0, sip009Done = false;
   const lines = archived.split('\n').map((l) => {

@@ -1,0 +1,19 @@
+{
+  "checkedAt": "2026-09-25T12:14:51.429Z",
+  "stacksTipHeight": 9060018,
+  "how": "registry/clarity-lite.mjs readHelper(), run in a browser against https://api.hiro.so (this session's shell had no route to the Hiro API). Read-only.",
+  "registry": "registry/registry.v1.json",
+  "registryProblems": [],
+  "ok": true,
+  "helpers": [
+    { "key": "bitcoin-pepes", "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun", "interface": "v1", "ok": true, "problems": [],
+      "sourceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+      "state": { "fee": "4000000", "inscribed": "2089", "finalized": false, "owner": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22" } },
+    { "key": "leo-cats", "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata", "interface": "v1", "ok": true, "problems": [],
+      "sourceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+      "state": { "fee": "4000000", "inscribed": "101", "finalized": false, "owner": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22" } },
+    { "key": "miami-degens", "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata", "interface": "v1", "ok": true, "problems": [],
+      "sourceSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513",
+      "state": { "fee": "4000000", "inscribed": "1", "finalized": false, "owner": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22" } }
+  ]
+}

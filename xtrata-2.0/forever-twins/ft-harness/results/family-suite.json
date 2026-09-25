@@ -1,8 +1,8 @@
 {
   "suite": "family-suite",
-  "ranAt": "2026-09-25T11:53:47.344Z",
+  "ranAt": "2026-09-25T12:23:08.112Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
-  "pass": 278,
+  "pass": 306,
   "fail": 0,
   "results": [
     {
@@ -1965,6 +1965,210 @@
     {
       "id": "satoshibles:F-6",
       "title": "satoshibles [G2/megapont] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "admin proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-1",
+      "title": "ordinal-pepe [G2/gamma] sponsor inscribes; canonical metadata on twin",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface reports group G2",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-L1",
+      "title": "ordinal-pepe [G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217) before the source is touched",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-2",
+      "title": "ordinal-pepe [G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-5",
+      "title": "ordinal-pepe [G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-L2",
+      "title": "ordinal-pepe [G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-3",
+      "title": "ordinal-pepe [G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-4",
+      "title": "ordinal-pepe [G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-6",
+      "title": "ordinal-pepe [G2/gamma] stray original rescued after delay",
       "specRef": "F-6",
       "checks": [
         {

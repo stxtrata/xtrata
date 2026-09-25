@@ -1,0 +1,163 @@
+{
+  "suite": "registry-decode",
+  "ranAt": "2026-09-25T12:23:23.198Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 26,
+  "fail": 0,
+  "results": [
+    {
+      "id": "R-1",
+      "title": "clarity-lite decodes get-twin-interface exactly like the SDK",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "collection-key: megapont-ape-club-nft",
+          "pass": true,
+          "detail": "megapont-ape-club-nft vs megapont-ape-club-nft"
+        },
+        {
+          "label": "source: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.megapont-ape-club-nft",
+          "pass": true,
+          "detail": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.megapont-ape-club-nft vs ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.megapont-ape-club-nft"
+        },
+        {
+          "label": "master: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.xtrata-v3-2-3",
+          "pass": true,
+          "detail": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.xtrata-v3-2-3 vs ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.xtrata-v3-2-3"
+        },
+        {
+          "label": "payee-a: STMGEYD8AKTNZZ9FWVMKFD8ZZ1GB14T3D4M5WYCH",
+          "pass": true,
+          "detail": "STMGEYD8AKTNZZ9FWVMKFD8ZZ1GB14T3D4M5WYCH vs STMGEYD8AKTNZZ9FWVMKFD8ZZ1GB14T3D4M5WYCH"
+        },
+        {
+          "label": "payee-b: ST1YBSKDQSKVWWK8Y7RBZMQCP2VHRW1Y9GJY00DGA",
+          "pass": true,
+          "detail": "ST1YBSKDQSKVWWK8Y7RBZMQCP2VHRW1Y9GJY00DGA vs ST1YBSKDQSKVWWK8Y7RBZMQCP2VHRW1Y9GJY00DGA"
+        },
+        {
+          "label": "owner: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM",
+          "pass": true,
+          "detail": "ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM vs ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM"
+        },
+        {
+          "label": "group: G2",
+          "pass": true,
+          "detail": "G2 vs G2"
+        },
+        {
+          "label": "fee: 1000000",
+          "pass": true,
+          "detail": "1000000 vs 1000000"
+        },
+        {
+          "label": "max-fee: 5000000",
+          "pass": true,
+          "detail": "5000000 vs 5000000"
+        },
+        {
+          "label": "canonical-count: 0",
+          "pass": true,
+          "detail": "0 vs 0"
+        },
+        {
+          "label": "canonical-finalized: false",
+          "pass": true,
+          "detail": "false vs false"
+        },
+        {
+          "label": "manifest-hash: 0x0000000000000000000000000000000000000000000000000000000000000000",
+          "pass": true,
+          "detail": "0x0000000000000000000000000000000000000000000000000000000000000000 vs 0x0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        {
+          "label": "interface-version: 3",
+          "pass": true,
+          "detail": "3 vs 3"
+        },
+        {
+          "label": "pending-owner none -> null",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "R-2",
+      "title": "responses, optionals, contract principals, strings, lists",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "case 0",
+          "pass": true,
+          "detail": "{\"ok\":\"4000000\"}"
+        },
+        {
+          "label": "case 1",
+          "pass": true,
+          "detail": "{\"err\":\"204\"}"
+        },
+        {
+          "label": "case 2",
+          "pass": true,
+          "detail": "\"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.xtrata-v3-2-3\""
+        },
+        {
+          "label": "case 3",
+          "pass": true,
+          "detail": "null"
+        },
+        {
+          "label": "case 4",
+          "pass": true,
+          "detail": "false"
+        },
+        {
+          "label": "case 5",
+          "pass": true,
+          "detail": "\"image/png\""
+        },
+        {
+          "label": "case 6",
+          "pass": true,
+          "detail": "[\"1\",\"2\"]"
+        },
+        {
+          "label": "case 7",
+          "pass": true,
+          "detail": "\"-5\""
+        },
+        {
+          "label": "case 8",
+          "pass": true,
+          "detail": "\"0x00ff\""
+        },
+        {
+          "label": "mainnet principal round-trips through c32",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "R-3",
+      "title": "registry rules",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "published registry: one helper per collection, ids valid",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a second helper for the same collection is rejected",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

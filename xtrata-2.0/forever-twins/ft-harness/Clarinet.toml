@@ -123,6 +123,10 @@ epoch = "latest"
 path = "contracts/legacy/satoshibles.clar"
 clarity_version = 2
 epoch = "latest"
+[contracts.ordinal-pepe]
+path = "contracts/legacy/ordinal-pepe.clar"
+clarity_version = 2
+epoch = "latest"
 [contracts.mock-leaky-market]
 path = "contracts/test-doubles/mock-leaky-market.clar"
 clarity_version = 4
@@ -225,5 +229,13 @@ clarity_version = 4
 epoch = "latest"
 [contracts.ft3-leaky-g2]
 path = "contracts/rendered/ft3-leaky-g2.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-ordinal-pepe]
+path = "contracts/rendered/ft2-ordinal-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-ordinal-pepe]
+path = "contracts/rendered/ft3-ordinal-pepe.clar"
 clarity_version = 4
 epoch = "latest"

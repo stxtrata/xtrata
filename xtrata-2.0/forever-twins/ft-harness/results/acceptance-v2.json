@@ -1,6 +1,6 @@
 {
   "suite": "acceptance-v2",
-  "ranAt": "2026-09-25T11:53:42.742Z",
+  "ranAt": "2026-09-25T12:23:00.852Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 70,
   "fail": 0,
