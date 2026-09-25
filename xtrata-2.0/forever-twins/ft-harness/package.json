@@ -9,7 +9,7 @@
     "test:v2": "npm run render && node sim/acceptance-v2.mjs",
     "test:shared-probe": "node sim/shared-helper-probe.mjs",
     "test:live-check": "node live-check/test-against-simnet.mjs",
-    "test": "npm run render && npm run test:existing && npm run test:v2 && npm run test:families && npm run test:v3 && npm run test:manifest && npm run test:registry && npm run test:shared-probe && npm run test:live-check",
+    "test": "npm run render && npm run test:existing && npm run test:v2 && npm run test:families && npm run test:v3 && npm run test:prebind && npm run test:manifest && npm run test:registry && npm run test:shared-probe && npm run test:live-check",
     "screen:fetch": "bash screener/fetch-sources.sh",
     "screen": "python3 screener/screen_sources.py screener/sources > results/screen.json && python3 screener/summarise.py results/screen.json",
     "live-check": "node live-check/live-check.mjs",
@@ -21,7 +21,8 @@
     "manifest:plan": "node manifest/seed-plan.mjs",
     "manifest:check": "node manifest/check-canonical.mjs",
     "test:registry": "node sim/registry-decode.mjs",
-    "registry:verify": "node registry/verify-registry.mjs"
+    "registry:verify": "node registry/verify-registry.mjs",
+    "test:prebind": "npm run render && node sim/prebind-v3.mjs"
   },
   "dependencies": {
     "@stacks/clarinet-sdk": "3.24.0",

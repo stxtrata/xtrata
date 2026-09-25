@@ -35,6 +35,7 @@ export async function checkHelper(text, readOnly, { onProgress } = {}) {
     interfaceVersion: String(i['interface-version']), collectionKey: i['collection-key'], source: i.source,
     sourceAsset: i['source-asset'], group: i.group, finalized: i['canonical-finalized'] === true || i['canonical-finalized'] === 'true',
     canonicalCount: Number(i['canonical-count']), manifestHash: String(i['manifest-hash']).replace(/^0x/, ''),
+    largeUnbound: i['large-unbound'] == null ? null : Number(i['large-unbound']),
   };
   if (iface.collectionKey !== manifest.collectionKey) problems.push(`collection-key ${iface.collectionKey} != ${manifest.collectionKey}`);
   if (iface.source !== manifest.source) problems.push(`source ${iface.source} != ${manifest.source}`);
@@ -47,9 +48,15 @@ export async function checkHelper(text, readOnly, { onProgress } = {}) {
     const c = tupleOf(await readOnly('get-canonical', [Cl.uint(t.id)]));
     const onchain = c && { contentHash: c['content-hash'], mime: c.mime, totalSize: c['total-size'], tokenUri: c['token-uri'] };
     const d = compareEntry(t, onchain);
+    if (t.twin.route === 'preinscribed') {
+      const b = tupleOf(await readOnly('get-binding', [Cl.uint(t.id)]));
+      if (!b) d.push('pre-inscribed twin not bound yet');
+      else if (String(b['content-hash']).toLowerCase() !== String(t.twin.contentHash).toLowerCase()) d.push(`bound twin hash ${b['content-hash']} != ${t.twin.contentHash}`);
+    }
     if (d.length) mismatches.push({ id: t.id, differences: d });
     if (onProgress) onProgress(++n, manifest.tokens.length);
   }
+  if (iface.largeUnbound) problems.push(`${iface.largeUnbound} large entr${iface.largeUnbound === 1 ? 'y' : 'ies'} not yet bound (finalise will refuse, u221)`);
   const ok = problems.length === 0 && mismatches.length === 0;
   return {
     ok, verdict: ok ? (iface.finalized ? 'finalised and matches manifest' : 'seeded record matches manifest; ready to finalise') : 'MISMATCH',

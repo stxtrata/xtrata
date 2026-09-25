@@ -1,0 +1,431 @@
+{
+  "suite": "prebind-v3",
+  "ranAt": "2026-09-25T17:49:25.740Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 62,
+  "fail": 0,
+  "results": [
+    {
+      "id": "bitcoin-monkeys:P-1",
+      "title": "bitcoin-monkeys [v3 G1] large records seed; over the core cap refused",
+      "specRef": "P-1",
+      "checks": [
+        {
+          "label": "entry over 32 MiB refused (u215)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "600 KB and 1.1 MB entries seed alongside a small one",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "interface: large-unbound = 2",
+          "pass": true,
+          "detail": "2"
+        },
+        {
+          "label": "re-seeding an unbound large entry keeps the count exact",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-2",
+      "title": "bitcoin-monkeys [v3 G1] finalise refused while large entries are unbound",
+      "specRef": "P-2",
+      "checks": [
+        {
+          "label": "finalise refused (u221)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-3",
+      "title": "bitcoin-monkeys [v3 G1] bind refusals",
+      "specRef": "P-3",
+      "checks": [
+        {
+          "label": "owner multi-tx inscription of the 600 KB file succeeds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "non-owner cannot bind (u204)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "different bytes refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "right bytes, wrong token-uri refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no such inscription refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "matching twin held by someone else refused (u210)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a bytes-for-another-token twin refused (u220)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-4",
+      "title": "bitcoin-monkeys [v3 G1] bind moves the twin into custody",
+      "specRef": "P-4",
+      "checks": [
+        {
+          "label": "bind ok, returns the xtrata id",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "twin now held by the helper; original untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "binding: same xtrata id, content hash, escrowed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin-to-original recorded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 1, inscribed-count = 1",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no fee taken by the bind",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-5",
+      "title": "bitcoin-monkeys [v3 G1] bound entries are fixed; finalise once all are bound",
+      "specRef": "P-5",
+      "checks": [
+        {
+          "label": "bound entry cannot be re-seeded (u215)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bound token cannot be bound again (u201)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise still refused with one unbound (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "1.1 MB twin (68 chunks, 3 batches) binds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise ok once every large entry is bound",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-6",
+      "title": "bitcoin-monkeys [v3 G1] after finalisation",
+      "specRef": "P-6",
+      "checks": [
+        {
+          "label": "bind after finalisation refused (u207)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "pre-bound token cannot be inscribed (u201)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "sponsor inscribes the small token; each payee gets half",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "inscribed-count = 3",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:P-7",
+      "title": "bitcoin-monkeys [v3 G1] swaps on a pre-bound twin",
+      "specRef": "P-7",
+      "checks": [
+        {
+          "label": "custody consistent before swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps in: original to helper, twin to holder",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after swap in",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps back",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-1",
+      "title": "see-yourself-out [v3 G2] large records seed; over the core cap refused",
+      "specRef": "P-1",
+      "checks": [
+        {
+          "label": "entry over 32 MiB refused (u215)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "600 KB and 1.1 MB entries seed alongside a small one",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "interface: large-unbound = 2",
+          "pass": true,
+          "detail": "2"
+        },
+        {
+          "label": "re-seeding an unbound large entry keeps the count exact",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-2",
+      "title": "see-yourself-out [v3 G2] finalise refused while large entries are unbound",
+      "specRef": "P-2",
+      "checks": [
+        {
+          "label": "finalise refused (u221)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-3",
+      "title": "see-yourself-out [v3 G2] bind refusals",
+      "specRef": "P-3",
+      "checks": [
+        {
+          "label": "owner multi-tx inscription of the 600 KB file succeeds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "non-owner cannot bind (u204)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "different bytes refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "right bytes, wrong token-uri refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no such inscription refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "matching twin held by someone else refused (u210)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a bytes-for-another-token twin refused (u220)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-4",
+      "title": "see-yourself-out [v3 G2] bind moves the twin into custody",
+      "specRef": "P-4",
+      "checks": [
+        {
+          "label": "bind ok, returns the xtrata id",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "twin now held by the helper; original untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "binding: same xtrata id, content hash, escrowed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin-to-original recorded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 1, inscribed-count = 1",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no fee taken by the bind",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-5",
+      "title": "see-yourself-out [v3 G2] bound entries are fixed; finalise once all are bound",
+      "specRef": "P-5",
+      "checks": [
+        {
+          "label": "bound entry cannot be re-seeded (u215)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bound token cannot be bound again (u201)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise still refused with one unbound (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "1.1 MB twin (68 chunks, 3 batches) binds",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise ok once every large entry is bound",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-6",
+      "title": "see-yourself-out [v3 G2] after finalisation",
+      "specRef": "P-6",
+      "checks": [
+        {
+          "label": "bind after finalisation refused (u207)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "pre-bound token cannot be inscribed (u201)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "sponsor inscribes the small token; each payee gets half",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "inscribed-count = 3",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:P-7",
+      "title": "see-yourself-out [v3 G2] swaps on a pre-bound twin",
+      "specRef": "P-7",
+      "checks": [
+        {
+          "label": "custody consistent before swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps in: original to helper, twin to holder",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after swap in",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps back",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

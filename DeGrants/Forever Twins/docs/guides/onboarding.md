@@ -8,7 +8,8 @@ proposing a collection.*
 A collection can use the standard helper if:
 
 - its mint has **finished** (tokens minted later are not covered)
-- every token's art is **512 KB or smaller**
+- every token's art is **32 MB or smaller** (anything over 512 KB is inscribed by us before
+  launch; everything else can be inscribed by anyone)
 - its contract's `transfer` requires the current owner, `get-owner` is read-only, and nothing
   can move a token out of the helper without the helper's signature (profile tier S)
 - the art can still be obtained, from the original host or a verifiable backup

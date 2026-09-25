@@ -52,7 +52,7 @@ builder's own code (`manifest/lib.mjs`) fetched and hashed every token.
 | Ordinal Pepe | G2 | 100 (minted out, `last-id` 101 > limit 100) | IPFS (`ipfs://ipfs/QmRFMu.../json/`, GIF art) | yes: all 100 built, 0 failures | 140,745 B (every token is the same GIF) | no | **Backup** (an edition: one GIF for all 100 tokens) |
 | NYC Degens | G1 | 420 (minted out, `last-id` 420 = limit) | IPFS (`ipfs://QmayEq.../`, id mapped through `.conversion`; identity on every id sampled) | yes for every token built (183 of 420); full build still to run | 129,532 B of 183 built (all PNG) | n/a | **Pick** (G1; added to both family suites 25 Sep, passes) |
 | Satoshibles | G2 | 5,000 (sold out) | Project server (`api.satoshibles.com`, `satoshibles.com/.../image.png`) | yes (ids 1, 5000) | ~150 KB (served as WebP under `.png`) | no | Not now: centralised host and content negotiation make the bytes depend on the client; 50 seeding calls |
-| The Guests | G2 | 500 (minted out) | IPFS (`ipfs://ipfs/QmVumm.../`) | yes (id 1) | **907,785 bytes** (id 1, 1773x1773 PNG) | no | Not with the standard template: over 512 KB |
+| The Guests | G2 | 500 (minted out) | IPFS (`ipfs://ipfs/QmVumm.../`) | yes (id 1) | **907,785 bytes** (id 1, 1773x1773 PNG) | no | Possible now with pre-inscription (D14); not yet sized in full |
 | Zombie Wabbits, Citadels, Funky Donuts, Blocks | G1 | 45 / 2,222 / 3,000 / 2,500 (counters at their caps) | One shared JSON per collection on `stacksart.com/assets/<name>.json` | **no: every one redirects to the Stacks Art homepage** | unknown | n/a | Not now: the on-chain metadata is gone, so a manifest cannot be built from the original source. Record as a preservation-risk finding; needs art recovery first |
 | Fractal NFT | G2 | 18 of 112 minted | IPFS | not checked | | no | Not eligible: mint unfinished |
 | Tigress | G2 | TBD | | | | | Address TBD |
@@ -96,8 +96,8 @@ Caveats for Jim:
 - Bitslimes and NYC Degens were only partly built here (gateway throttling); their full builds
   run on Jim's machine with `npm run manifest:build`. Megapont and Ordinal Pepe were built in full.
 
-Seeding takes one `seed-canonical` call per 100 tokens. Any token with art over 512 KB cannot
-use the standard template.
+Seeding takes one `seed-canonical` call per 100 tokens. Art over 512 KB is pre-inscribed by the
+owner and bound before finalising (D14); art over 32 MiB can't be inscribed at all.
 
 ## Third-party sponsor demo candidates (researched 25 Sep 2026)
 
@@ -121,7 +121,8 @@ rolling-hash check at seal. The idea: the owner inscribes the oversized files th
 those Xtrata tokens into the helper, and the helper records them as already-inscribed twins
 before finalisation. Everything else stays a normal sponsor inscription.
 
-This **needs a contract change** (not made; Jim to decide):
+**Implemented 25 Sep 2026 on Jim's go-ahead (decision D14)**, as designed below; tests in
+`sim/prebind-v3.mjs` (62 checks, G1 and G2). Design:
 - `seed-canonical` currently rejects entries over 512 KB (u215); it would accept them for tokens
   that will be pre-bound.
 - A new owner-only, pre-finalisation `bind-preinscribed (token-id, xtrata-id)` that checks the

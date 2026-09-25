@@ -14,7 +14,8 @@ still required.
 
 ## Owner powers
 
-Before finalisation: seed and finalise the canonical record.
+Before finalisation: seed and finalise the canonical record, and bind pre-inscribed twins
+for art over 512 KB (see below).
 
 After finalisation, exactly three things:
 
@@ -23,6 +24,18 @@ After finalisation, exactly three things:
    on-chain; executable after the delay.
 3. **Hand over ownership**: `propose-ownership`, then `accept-ownership` from the new address;
    `cancel-ownership-proposal` withdraws it.
+
+## Large files (over 512 KB)
+
+`inscribe` uses the core's single-transaction mint, capped at 512 KB. For bigger art (up to the
+core's 32 MiB cap) the record entry is seeded as usual; before finalising, the owner inscribes the
+file through the core's multi-transaction upload (`begin-inscription`, `add-chunk-batch` per 32
+chunks, `seal-inscription` with the record's token-uri) and calls `bind-preinscribed(token-id,
+xtrata-id)`. The helper checks the core's recorded hash, size, mime and token-uri against the
+record, moves the twin from the owner into custody and writes the same binding `inscribe` would.
+No helper fee. `finalize-canonical` refuses (u221) until every large entry is bound, so a
+finalised record never contains a token that can't be twinned. Details:
+`ft-harness/V3-LARGE-FILES.md`. Decision D14.
 
 ## What nobody can do
 
@@ -46,7 +59,7 @@ interface version u3 with `fee`, `max-fee`, `payee-a`, `payee-b`, `pending-owner
 
 ## Test coverage
 
-`family-suite-v3`: **453/453 in the real harness with the real `xtrata-v3-2-3` core** (25 Sep
+`family-suite-v3`: **537/537 in the real harness with the real `xtrata-v3-2-3` core** (25 Sep
 2026; first written against a stand-in core, where it had 341 checks). Covers the family checks
 on 12 real archived sources (Zombie Wabbits, Citadels, Funky Donuts, Blocks, Bitcoin Pepe, The
 Guests, Bitslimes, Leo Cats, Tigress, Ordinal Pepe, Megapont Ape Club, Satoshibles), the

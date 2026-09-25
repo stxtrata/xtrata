@@ -26,8 +26,9 @@ For deploying a v3 helper for one collection. Do every step; tick as you go.
 - [ ] Confirm the twin token-URI policy (D3) and set `twinTokenUri` in
       `manifest/configs/<collection>.json`.
 - [ ] `npm run manifest:build -- manifest/configs/<collection>.json --snapshot-api https://api.hiro.so`
-      (exit 2 means refused: a token over 512 KB or a failed fetch; read `<key>.report.json`).
-- [ ] Count equals supply; `report.largest` under 512 KB; look at `identicalContent`.
+      (exit 2 means refused: a token over 32 MiB or a failed fetch; read `<key>.report.json`).
+- [ ] Count equals supply; look at `identicalContent`. Tokens over 512 KB are listed in
+      `report.preinscribed` with chunk, batch and core-fee estimates (step 5b).
 - [ ] Publish `<key>.manifest.json` byte-for-byte; record the sha256 from `<key>.manifest.sha256`.
 
 ## 4. Deploy
@@ -40,6 +41,12 @@ For deploying a v3 helper for one collection. Do every step; tick as you go.
       Clarity args and unsigned payloads. Sign and send from the owner wallet. Record tx ids.
 - [ ] `npm run manifest:check -- manifest/out/<key>.manifest.json --helper <SP...helper>`
       must say "ready to finalise" (every `get-canonical` entry and the count match).
+
+## 5b. Pre-inscribe large files (only if the plan lists any)
+- [ ] For each entry in the plan's `preinscribe` list: `begin-inscription`, one `add-chunk-batch`
+      per 32 chunks of the art file, `seal-inscription` (note the xtrata id it returns), then
+      `bind-preinscribed(token-id, xtrata-id)`. All from the owner wallet.
+- [ ] `get-large-unbound` is 0 and `manifest:check` says "ready to finalise".
 
 ## 6. Community review (optional but recommended)
 - [ ] Announce the manifest link and helper address; allow time for checks.

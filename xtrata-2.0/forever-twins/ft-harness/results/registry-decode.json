@@ -1,6 +1,6 @@
 {
   "suite": "registry-decode",
-  "ranAt": "2026-09-25T15:57:55.019Z",
+  "ranAt": "2026-09-25T17:49:47.589Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 26,
   "fail": 0,

@@ -15,4 +15,5 @@
 | D11 | 2026-09-25 | Swaps can never be paused or frozen; only inscribing ends, automatically, when every token has a twin. | Holders must always be able to swap back. |
 | D12 | 2026-09-25 | v3 is a new template; v2 kept as tested reference. | Keeps the evidence trail intact. |
 | D13 | 2026-09-25 | Registry lists only helpers matching the published template, one per collection. | Trust anchor for self-serve deployments; prevents double twins. |
+| D14 | 2026-09-25 | Art over 512 KB uses the same v3 helper: the owner pre-inscribes it through the core's multi-tx upload and binds it with `bind-preinscribed` before finalising; finalising requires every large entry bound. Record entries allowed up to 32 MiB. | Jim's call: lets collections like See Yourself Out and Bitcoin Monkeys use one contract. The binding checks the core's hash, size, mime and token-uri, so the "record fixes the twin" guarantee holds. Owner pays the core fees for those files; no helper fee. |
 | — | later | Merkle-root record instead of on-chain seeding, for large collections. | Removes the seeding window; new code, not for Milestone 1. |

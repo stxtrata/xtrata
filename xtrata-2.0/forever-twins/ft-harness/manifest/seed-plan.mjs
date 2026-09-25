@@ -14,7 +14,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { Cl, cvToHex } from '@stacks/transactions';
 import * as tx from '@stacks/transactions';
-import { seedEntries, batches, SEED_BATCH, MAX_BYTES, isAscii } from './lib.mjs';
+import { seedEntries, batches, SEED_BATCH, MAX_BYTES, MAX_RECORD_BYTES, isAscii, multiTxCoreFee, CHUNK_SIZE } from './lib.mjs';
 
 export function entryCV(e) {
   return Cl.tuple({
@@ -43,7 +43,7 @@ export function makePlan(text, helper, { sha256File } = {}) {
   for (const e of entries) {
     if (seen.has(e.id)) throw new Error(`duplicate id ${e.id}`);
     seen.add(e.id);
-    if (!(e.totalSize > 0 && e.totalSize <= MAX_BYTES)) throw new Error(`id ${e.id}: size ${e.totalSize} outside 1..${MAX_BYTES}`);
+    if (!(e.totalSize > 0 && e.totalSize <= MAX_RECORD_BYTES)) throw new Error(`id ${e.id}: size ${e.totalSize} outside 1..${MAX_RECORD_BYTES}`);
     if (!isAscii(e.mime, 64) || !isAscii(e.tokenUri, 256)) throw new Error(`id ${e.id}: mime/token-uri not valid ascii`);
     if (!/^(0x)?[0-9a-f]{64}$/i.test(e.contentHash)) throw new Error(`id ${e.id}: bad content hash`);
   }
@@ -56,15 +56,42 @@ export function makePlan(text, helper, { sha256File } = {}) {
       expectResult: `(ok u${i * SEED_BATCH + b.length})  (running canonical-count, if ids are new)`,
     };
   });
+  // Files over 512 KB: the owner inscribes each through the core's multi-transaction upload,
+  // then binds it. All of this happens after seeding and before finalising.
+  const pre = entries.filter((e) => e.totalSize > MAX_BYTES);
+  const core = manifest.core || 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+  const preinscribe = pre.map((e) => {
+    const f = multiTxCoreFee(e.totalSize);
+    const begin = [Cl.bufferFromHex(e.contentHash.replace(/^0x/, '')), Cl.stringAscii(e.mime), Cl.uint(e.totalSize), Cl.uint(f.chunks)];
+    const seal = [Cl.bufferFromHex(e.contentHash.replace(/^0x/, '')), Cl.stringAscii(e.tokenUri)];
+    return {
+      id: e.id, totalSize: e.totalSize, chunks: f.chunks, batches: f.batches, estCoreFeeUstx: f.ustx,
+      steps: [
+        { contract: core, function: 'begin-inscription', argsHex: begin.map(cvToHex), unsignedPayloadHex: unsignedPayloadHex(core, 'begin-inscription', begin) },
+        ...Array.from({ length: f.batches }, (_, b) => ({ contract: core, function: 'add-chunk-batch',
+          chunkRange: [b * 32, Math.min(f.chunks, (b + 1) * 32) - 1], byteRange: [b * 32 * CHUNK_SIZE, Math.min(e.totalSize, (b + 1) * 32 * CHUNK_SIZE) - 1],
+          note: 'args: (content-hash, list of these 16,384-byte chunks of the file); built from the art file at signing time' })),
+        { contract: core, function: 'seal-inscription', argsHex: seal.map(cvToHex), unsignedPayloadHex: unsignedPayloadHex(core, 'seal-inscription', seal),
+          note: 'returns (ok xtrata-id)' },
+        { contract: helper, function: 'bind-preinscribed', args: { 'token-id': e.id, 'xtrata-id': '<from seal-inscription>' },
+          note: 'owner only, before finalising; checks hash, size, mime and token-uri against the record' },
+      ],
+    };
+  });
   const fin = [Cl.bufferFromHex(sha), Cl.uint(entries.length)];
   steps.push({
     step: steps.length + 1, function: 'finalize-canonical', manifestSha256: sha, expectedCount: entries.length,
     argsHex: fin.map(cvToHex), unsignedPayloadHex: unsignedPayloadHex(helper, 'finalize-canonical', fin),
-    warning: 'ONE-WAY. Run check-canonical.mjs against the seeded helper first; publish the manifest at the same bytes.',
+    warning: 'ONE-WAY. Run check-canonical.mjs against the seeded helper first; publish the manifest at the same bytes.'
+      + (pre.length ? ` Refused (u221) until all ${pre.length} pre-inscribed twin(s) are bound.` : ''),
   });
   return {
     kind: 'forever-twins-seed-plan', helper, collectionKey: manifest.collectionKey, source: manifest.source,
     manifestSha256: sha, count: entries.length, seedCalls: steps.length - 1,
+    preinscribedCount: pre.length, preinscribedCoreFeeUstx: preinscribe.reduce((n, p) => n + p.estCoreFeeUstx, 0),
+    order: pre.length ? 'seed-canonical batches -> preinscribe (each file: begin, batches, seal, bind) -> check -> finalize-canonical'
+                      : 'seed-canonical batches -> check -> finalize-canonical',
+    preinscribe,
     note: 'Unsigned plan. Sender must be the helper owner. Nothing here was signed or broadcast.',
     steps,
   };
@@ -80,5 +107,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const plan = makePlan(readFileSync(path, 'utf8'), helper, { sha256File: existsSync(shaPath) ? readFileSync(shaPath, 'utf8') : undefined });
   const out = opt('out', path.replace(/\.manifest\.json$/, '.seed-plan.json'));
   writeFileSync(out, JSON.stringify(plan, null, 2) + '\n');
-  console.log(`${plan.count} entries -> ${plan.seedCalls} seed-canonical call(s) + finalize-canonical(0x${plan.manifestSha256}, u${plan.count})\nwrote ${out}`);
+  console.log(`${plan.count} entries -> ${plan.seedCalls} seed-canonical call(s)${plan.preinscribedCount ? `, ${plan.preinscribedCount} pre-inscribed file(s) (~${plan.preinscribedCoreFeeUstx / 1e6} STX core fees)` : ''} + finalize-canonical(0x${plan.manifestSha256}, u${plan.count})\nwrote ${out}`);
 }

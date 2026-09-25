@@ -1,6 +1,6 @@
 {
   "suite": "family-suite-v3",
-  "ranAt": "2026-09-25T15:57:22.159Z",
+  "ranAt": "2026-09-25T17:49:20.197Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 537,
   "fail": 0,

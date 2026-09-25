@@ -8,7 +8,7 @@
 | Milestone 1 deadline (Q3 ends 30 Sep) | Late milestone | Confirm due date; aim for 2 Oct; buffer day | Jim |
 | Manifest built from the wrong art | Twins permanently wrong for that collection | Build from original sources, publish, check before finalising; redeploy is cheap before finalising | Jim |
 | Art already lost for a candidate | Can't preserve it | Check resolvability first; record findings for the recap | Jim |
-| Token art over 512 KB | Token can't be seeded | Check sizes during selection | Jim |
+| Token art over 512 KB | Sponsors can't inscribe it | Owner pre-inscribes and binds it before finalising (D14); owner pays those core fees. Over 32 MiB can't be preserved by the core at all | Jim |
 | Owner key lost or stolen | Lost: fee frozen, no rescue. Stolen: fee set up to the cap, strays misdirected | Hardware wallet; two-step handover lets the key move | Jim |
 | Payout key lost | That half goes to a dead address forever | Own wallets with backed-up seeds, never exchange addresses | Jim, Rapha |
 | Holder sends NFT directly to helper | Stray, stuck until rescued; permanent if rescue unavailable | UI warnings, docs, rescue while available | Jim |

@@ -40,7 +40,7 @@ but it is not guaranteed forever.
 ## If your collection doesn't have a helper yet
 
 Ask on X @XtrataLayers or [TBD contact]. See [onboarding.md](onboarding.md) for what we need.
-Collections are a good fit when their mint has finished, each token's art is 512 KB or smaller,
+Collections are a good fit when their mint has finished, each token's art is 32 MB or smaller,
 and the NFT contract uses a standard transfer.
 
 ## FAQ

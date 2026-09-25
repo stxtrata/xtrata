@@ -35,6 +35,15 @@
 ;;   G6 nobody can pause, block or redirect a swap; the owner can move a held
 ;;      token only via the constrained, time-locked rescue path
 ;;   G7 (v3) the fee split is fixed at deploy and always exactly 50/50
+;;
+;; Large files (docs: forever-twins/ft-harness/V3-LARGE-FILES.md): a token whose
+;; art is over 512 KB cannot be inscribed by `inscribe` (the core's single-tx mint
+;; is capped at 32 x 16 KB). Its record entry may be up to the core's 32 MiB cap.
+;; Before finalisation the owner inscribes such a file through the core's
+;; multi-transaction upload and binds it with `bind-preinscribed`, which checks
+;; the core's recorded hash, size, mime and token-uri against the record and
+;; takes the twin into custody. `finalize-canonical` refuses while any large
+;; entry is unbound, so every token in a finalised record can be twinned.
 ;; ---------------------------------------------------------------------------
 
 (define-constant ERR-NO-SUCH-TOKEN (err u200))
@@ -55,6 +64,8 @@
 (define-constant ERR-RESCUE-DISABLED (err u216))
 (define-constant ERR-FEE-ODD (err u218))
 (define-constant ERR-NO-PENDING-OWNER (err u219))
+(define-constant ERR-PREBIND-MISMATCH (err u220))
+(define-constant ERR-PREBIND-PENDING (err u221))
 
 (define-constant INTERFACE-VERSION u3)
 (define-constant COLLECTION-KEY "blocks")
@@ -66,6 +77,7 @@
 (define-constant RESCUE-ENABLED true)
 (define-constant RESCUE-DELAY u3)
 (define-constant MAX-SINGLE-TX-BYTES u524288)
+(define-constant MAX-RECORD-BYTES u33554432) ;; core cap: 2048 chunks x 16,384 bytes
 
 ;; --- owner and fee -------------------------------------------------------------
 (define-data-var contract-owner principal tx-sender)
@@ -76,6 +88,8 @@
 (define-data-var canonical-finalized bool false)
 (define-data-var canonical-count uint u0)
 (define-data-var manifest-hash (buff 32) 0x0000000000000000000000000000000000000000000000000000000000000000)
+;; record entries over MAX-SINGLE-TX-BYTES that are not yet bound; must be 0 to finalise
+(define-data-var large-unbound uint u0)
 (define-map Canonical uint {
   content-hash: (buff 32),
   mime: (string-ascii 64),
@@ -141,18 +155,27 @@
 ;; =============================================================================
 ;; canonical record lifecycle (owner, before finalisation only)
 ;; =============================================================================
+(define-private (is-large (size uint)) (> size MAX-SINGLE-TX-BYTES))
+
 (define-private (seed-one
     (e { id: uint, content-hash: (buff 32), mime: (string-ascii 64), total-size: uint, token-uri: (string-ascii 256) })
     (acc { ok: bool, added: uint }))
-  (let ((rec { content-hash: (get content-hash e), mime: (get mime e), total-size: (get total-size e), token-uri: (get token-uri e) }))
+  (let ((rec { content-hash: (get content-hash e), mime: (get mime e), total-size: (get total-size e), token-uri: (get token-uri e) })
+        (prev (map-get? Canonical (get id e))))
     (if (and (get ok acc)
              (> (get total-size e) u0)
-             (<= (get total-size e) MAX-SINGLE-TX-BYTES)
+             (<= (get total-size e) MAX-RECORD-BYTES)
              (> (len (get mime e)) u0)
-             (> (len (get token-uri e)) u0))
-      (if (map-insert Canonical (get id e) rec)
-        (merge acc { added: (+ (get added acc) u1) })
-        (begin (map-set Canonical (get id e) rec) acc))
+             (> (len (get token-uri e)) u0)
+             ;; a bound entry is fixed: its twin already matches it
+             (is-none (map-get? Bindings (get id e))))
+      (begin
+        ;; keep the count of unbound large entries exact across replacements
+        (match prev p (if (is-large (get total-size p)) (var-set large-unbound (- (var-get large-unbound) u1)) true) true)
+        (if (is-large (get total-size e)) (var-set large-unbound (+ (var-get large-unbound) u1)) true)
+        (if (map-insert Canonical (get id e) rec)
+          (merge acc { added: (+ (get added acc) u1) })
+          (begin (map-set Canonical (get id e) rec) acc)))
       (merge acc { ok: false }))))
 
 (define-public (seed-canonical
@@ -173,10 +196,54 @@
     (try! (assert-owner))
     (asserts! (not (var-get canonical-finalized)) ERR-FINALIZED)
     (asserts! (is-eq expected-count (var-get canonical-count)) ERR-COUNT-MISMATCH)
+    (asserts! (is-eq (var-get large-unbound) u0) ERR-PREBIND-PENDING)
     (var-set manifest-hash manifest)
     (var-set canonical-finalized true)
     (print { event: "canonical-finalized", collection: COLLECTION-KEY, manifest-hash: manifest, canonical-count: expected-count })
     (ok true)))
+
+;; =============================================================================
+;; pre-inscribed twins (owner, before finalisation): for files over 512 KB
+;;  - the owner inscribes the file through the core's multi-tx upload
+;;    (begin-inscription -> add-chunk-batch -> seal-inscription), passing the
+;;    record's content-hash, mime, total-size and token-uri; the core refuses
+;;    any bytes that don't reproduce the hash
+;;  - bind-preinscribed checks the core's record of that inscription against
+;;    this token's canonical entry and moves the twin from the owner into
+;;    custody, exactly the state `inscribe` leaves. No fee is charged.
+;; =============================================================================
+(define-public (bind-preinscribed (token-id uint) (xtrata-id uint))
+  (let (
+      (c (unwrap! (map-get? Canonical token-id) ERR-NOT-CANONICAL))
+      (orig-owner (unwrap! (source-owner token-id) ERR-NO-SUCH-TOKEN))
+      (m (unwrap! (contract-call? MASTER get-inscription-meta xtrata-id) ERR-PREBIND-MISMATCH))
+      (uri (unwrap! (contract-call? MASTER get-token-uri-raw xtrata-id) ERR-PREBIND-MISMATCH))
+      (n (+ (var-get inscribed-count) u1))
+    )
+    (try! (assert-owner))
+    (asserts! (not (var-get canonical-finalized)) ERR-FINALIZED)
+    (asserts! (is-none (map-get? Bindings token-id)) ERR-ALREADY-INSCRIBED)
+    (asserts! (not (is-eq orig-owner current-contract)) ERR-CUSTODY)
+    ;; the twin must be exactly what the record fixes
+    (asserts! (and (get sealed m)
+                   (is-eq (get final-hash m) (get content-hash c))
+                   (is-eq (get total-size m) (get total-size c))
+                   (is-eq (get mime-type m) (get mime c))
+                   (is-eq uri (get token-uri c))) ERR-PREBIND-MISMATCH)
+    ;; the caller must hold it; it moves into custody in this same call
+    (asserts! (is-eq (twin-owner xtrata-id) (some tx-sender)) ERR-CUSTODY)
+    (asserts! (map-insert TwinToOriginal xtrata-id token-id) ERR-ALREADY-INSCRIBED)
+    (try! (contract-call? MASTER transfer xtrata-id tx-sender current-contract))
+    (asserts! (is-eq (twin-owner xtrata-id) (some current-contract)) ERR-CUSTODY)
+    (map-insert Bindings token-id {
+      xtrata-id: xtrata-id, content-hash: (get content-hash c), inscriber: tx-sender,
+      xtrata-escrowed: true, at: stacks-block-height })
+    (if (is-large (get total-size c)) (var-set large-unbound (- (var-get large-unbound) u1)) true)
+    (var-set inscribed-count n)
+    (print { event: "inscribed", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: xtrata-id,
+             content-hash: (get content-hash c), inscriber: tx-sender, inscribed-count: n,
+             fee: u0, route: "preinscribed" })
+    (ok xtrata-id)))
 
 ;; =============================================================================
 ;; inscribe: anyone may fund; the canonical record fixes everything but the chunks
@@ -188,6 +255,8 @@
     )
     (asserts! (var-get canonical-finalized) ERR-NOT-FINALIZED)
     (asserts! (is-none (map-get? Bindings token-id)) ERR-ALREADY-INSCRIBED)
+    ;; large entries are bound before finalisation; this cannot be reached for them
+    (asserts! (not (is-large (get total-size c))) ERR-PREBIND-MISMATCH)
     ;; an original already sitting in this contract would be born stranded
     (asserts! (not (is-eq orig-owner current-contract)) ERR-CUSTODY)
     (try! (charge-fee tx-sender))
@@ -328,7 +397,7 @@
     source-asset: "blocks", route: "standard", group: "G1",
     canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
-    inscribed-count: (var-get inscribed-count), swaps-enabled: true,
+    inscribed-count: (var-get inscribed-count), swaps-enabled: true, large-unbound: (var-get large-unbound),
     fee: (var-get inscribe-fee), max-fee: MAX-FEE, payee-a: PAYEE-A, payee-b: PAYEE-B,
     rescue-enabled: RESCUE-ENABLED, rescue-delay: RESCUE-DELAY,
     owner: (var-get contract-owner), pending-owner: (var-get pending-owner) })
@@ -344,6 +413,7 @@
 (define-read-only (is-finalized) (ok (var-get canonical-finalized)))
 (define-read-only (get-owner) (ok (var-get contract-owner)))
 (define-read-only (get-pending-owner) (ok (var-get pending-owner)))
+(define-read-only (get-large-unbound) (ok (var-get large-unbound)))
 
 ;; Real custody, not the stored flag. `consistent` is false whenever the chain
 ;; disagrees with the binding; viewers must show that state, not hide it.

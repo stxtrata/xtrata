@@ -16,11 +16,13 @@
 | u212 | NO-RESCUE | Not a stray, no rescue pending, or the stray side changed |
 | u213 | TIMELOCK | Rescue delay not yet passed |
 | u214 | FEE-CAP | Fee above `MAX-FEE` |
-| u215 | BAD-CANONICAL | A seeded entry is invalid (size 0 or over 512 KB, empty mime or URI) |
+| u215 | BAD-CANONICAL | A seeded entry is invalid (size 0 or over 32 MiB, empty mime or URI), or the token is already bound |
 | u216 | RESCUE-DISABLED | Helper deployed without rescue |
 | u217 | LISTED | G2 only: the source reports a listing on this token |
 | u218 | FEE-ODD | v3: fee must be even |
 | u219 | NO-PENDING-OWNER | v3: no ownership proposal to accept or cancel |
+| u220 | PREBIND-MISMATCH | v3: `bind-preinscribed` twin doesn't match the record (hash, size, mime or token-uri) or doesn't exist; `inscribe` on a large entry |
+| u221 | PREBIND-PENDING | v3: `finalize-canonical` while a large entry is still unbound |
 
 Errors from the source collection and the Xtrata core pass through unchanged (for example the
 Gamma family's u106 for a listed token).

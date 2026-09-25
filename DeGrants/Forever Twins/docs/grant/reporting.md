@@ -12,6 +12,7 @@ Keep this log current as work lands, so milestone reports are a copy-and-paste j
 | 2026-09-25 | 1.2 groundwork | Core hash check confirmed from source and tests: `mint-single-tx` rejects any chunk that doesn't reproduce the record's content hash (u103) or length (u102). Deployed mainnet core matches the repo copy in every relevant function | `project/architecture.md` |
 | 2026-09-25 | 1.6 groundwork | Manifest builder, seeding plan (unsigned) and read-only checker written and tested end to end in simnet | `ft-harness/manifest/`, `results/manifest-pipeline.json` |
 | 2026-09-25 | 1.2 research | Candidate research: 3 picks + backup; four Stacks Art collections found with dead metadata (preservation-risk finding) | `project/collections.md` |
+| 2026-09-25 | 1.2 groundwork | Large-file support in the v3 helper (D14): `bind-preinscribed`, records up to 32 MiB, finalise gated on all large entries bound. prebind-v3 62/62 (G1 + G2), mutation-checked; full harness 1177/1177. See Yourself Out and Bitcoin Monkeys added to the family suites | `ft-harness/V3-LARGE-FILES.md`, `results/prebind-v3.json` |
 | 2026-09-25 | 1.3 groundwork | Registry v1 (JSON + page + verifier) lists the 3 live v1 helpers; read live from mainnet, code hashes match | `ft-harness/registry/`, `results/registry-check.json` |
 | | 1.2 | Helper #1 deployed | TBD |
 | | 1.2 | Helper #1 canonical record finalised; manifest published | TBD |

@@ -99,7 +99,7 @@ export async function readHelper(reader, e) {
       out.state = {
         finalized: i['canonical-finalized'], canonicalCount: i['canonical-count'], inscribed: i['inscribed-count'],
         fee: i.fee, maxFee: i['max-fee'], group: i.group, manifestHash: i['manifest-hash'], swapsEnabled: i['swaps-enabled'],
-        payeeA: i['payee-a'], payeeB: i['payee-b'], owner: i.owner, pendingOwner: i['pending-owner'], version: i['interface-version'],
+        payeeA: i['payee-a'], payeeB: i['payee-b'], owner: i.owner, pendingOwner: i['pending-owner'], version: i['interface-version'], largeUnbound: i['large-unbound'],
       };
       if (i.source !== e.source) out.problems.push(`interface source ${i.source} != registry ${e.source}`);
       if (i['collection-key'] !== e.key) out.problems.push(`interface collection-key ${i['collection-key']} != registry ${e.key}`);

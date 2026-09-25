@@ -77,6 +77,10 @@ the T1 standard route (profile tier S only).
 - The record's `content-hash` is therefore the **Xtrata rolling hash**, not a plain sha256 of
   the file. The manifest carries both: `xtrataHash` (seeded on-chain) and `sha256` (for anyone
   checking the file by ordinary means).
+- Twins over 512 KB are inscribed by the owner through the core's multi-transaction upload (same
+  rolling-hash check at seal) and bound with `bind-preinscribed`, which re-checks the core's hash,
+  size, mime and token-uri against the record before taking the twin into custody. Finalising
+  requires every such entry to be bound.
 - The manifest hash on-chain lets anyone confirm the published manifest is the one that was
   finalised.
 - The source collection usually has no on-chain art hash, so faithfulness rests on the published

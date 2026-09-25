@@ -1,8 +1,8 @@
 {
   "suite": "manifest-pipeline",
-  "ranAt": "2026-09-25T15:57:51.704Z",
+  "ranAt": "2026-09-25T17:49:28.969Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
-  "pass": 24,
+  "pass": 30,
   "fail": 0,
   "results": [
     {
@@ -29,19 +29,24 @@
           "label": "xtrata hash differs from plain sha256 (rolling hash, not file hash)",
           "pass": true,
           "detail": ""
+        },
+        {
+          "label": "700 KB token marked for pre-inscription",
+          "pass": true,
+          "detail": ""
         }
       ],
       "notes": []
     },
     {
       "id": "M-2",
-      "title": "refusals: over 512 KB, missing art, partial manifest",
+      "title": "refusals: over the 32 MiB core cap, missing art, partial manifest",
       "specRef": "",
       "checks": [
         {
-          "label": "token over 512 KB flagged as oversize",
+          "label": "token over 32 MiB flagged as oversize",
           "pass": true,
-          "detail": "[{\"id\":999,\"bytes\":524289}]"
+          "detail": "[{\"id\":999,\"bytes\":33554433}]"
         },
         {
           "label": "missing art is a failure, not a silent skip",
@@ -61,7 +66,7 @@
         {
           "label": "seed plan refuses an oversize entry",
           "pass": true,
-          "detail": "id 3: size 524289 outside 1..524288"
+          "detail": "id 3: size 33554433 outside 1..33554432"
         }
       ],
       "notes": []
@@ -77,6 +82,11 @@
           "detail": ""
         },
         {
+          "label": "plan: one pre-inscription (begin, 2 batches, seal, bind)",
+          "pass": true,
+          "detail": ""
+        },
+        {
           "label": "plan carries unsigned payloads",
           "pass": true,
           "detail": ""
@@ -88,6 +98,26 @@
         },
         {
           "label": "seed-canonical from the plan: ok, count = n",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "checker: record matches but the large twin is unbound, so not ready",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise refused while the large twin is unbound (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "owner pre-inscription from the plan seals (core hash check passes)",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "bind-preinscribed ok",
           "pass": true,
           "detail": "ok"
         },
@@ -143,17 +173,17 @@
           "detail": "ok"
         },
         {
-          "label": "id 41: 40000 bytes / 3 chunk(s) inscribed",
+          "label": "id 40: 40000 bytes / 3 chunk(s) inscribed",
           "pass": true,
           "detail": "ok"
         },
         {
-          "label": "id 42: 70001 bytes / 5 chunk(s) inscribed",
+          "label": "id 41: 70001 bytes / 5 chunk(s) inscribed",
           "pass": true,
           "detail": "ok"
         },
         {
-          "label": "id 43: 120000 bytes / 8 chunk(s) inscribed",
+          "label": "id 42: 120000 bytes / 8 chunk(s) inscribed",
           "pass": true,
           "detail": "ok"
         },

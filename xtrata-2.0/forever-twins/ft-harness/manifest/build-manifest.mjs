@@ -11,14 +11,17 @@
 //   <out>/<key>.manifest.json        the manifest (hash these exact bytes)
 //   <out>/<key>.manifest.sha256      "<sha256>  <key>.manifest.json"
 //   <out>/<key>.report.json          counts, failures, oversize tokens, largest file
-// REFUSES (exit 2, no manifest written) if any token is over 512 KB or any fetch
-// failed: finalising is one-way, so a partial record can never be completed (D2).
+// Tokens over 512 KB are marked twin.route = "preinscribed": the owner inscribes them
+// through the core's multi-transaction upload and binds them before finalising
+// (report.preinscribed lists them with chunk, batch and core-fee estimates).
+// REFUSES (exit 2, no manifest written) if any token is over 32 MiB (the core's cap)
+// or any fetch failed: finalising is one-way, so a partial record can never be completed (D2).
 // Read-only: GET requests only. No keys, no signing, nothing broadcast.
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildAll, manifestDoc, manifestText, idsFrom, MAX_BYTES } from './lib.mjs';
+import { buildAll, manifestDoc, manifestText, idsFrom, MAX_BYTES, MAX_RECORD_BYTES, multiTxCoreFee } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -75,7 +78,7 @@ async function snapshot(api) {
 }
 
 const t0 = Date.now();
-const { tokens, failures, oversize } = await buildAll(cfg, ids, fetcher, {
+const { tokens, failures, oversize, preinscribed } = await buildAll(cfg, ids, fetcher, {
   concurrency: Number(opt('concurrency', cfg.concurrency || 4)),
   onProgress: (d, n) => { if (d % 25 === 0 || d === n) process.stderr.write(`  ${d}/${n}\n`); },
 });
@@ -88,16 +91,18 @@ const dupes = {};
 for (const t of tokens) (dupes[t.twin.contentHash] ||= []).push(t.id);
 const report = {
   collectionKey: cfg.collectionKey, requested: ids.length, built: tokens.length, partial,
-  failures, oversize, maxBytes: MAX_BYTES, largest, mimes, mediaHosts: hosts,
+  failures, oversize, maxSingleTxBytes: MAX_BYTES, maxRecordBytes: MAX_RECORD_BYTES, largest, mimes, mediaHosts: hosts,
+  preinscribed: preinscribed.map((p) => ({ ...p, ...multiTxCoreFee(p.bytes) })),
+  preinscribedCoreFeeUstx: preinscribed.reduce((n, p) => n + multiTxCoreFee(p.bytes).ustx, 0),
   identicalContent: Object.values(dupes).filter((v) => v.length > 1),
   seedingCalls: Math.ceil(tokens.length / 100), seconds: Math.round((Date.now() - t0) / 1000),
 };
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, `${cfg.collectionKey}.report.json`), JSON.stringify(report, null, 2) + '\n');
-console.log(JSON.stringify({ ...report, failures: failures.length, oversize: oversize.length }, null, 2));
+console.log(JSON.stringify({ ...report, failures: failures.length, oversize: oversize.length, preinscribed: preinscribed.length }, null, 2));
 
 if (failures.length || oversize.length) {
-  console.error(`REFUSED: ${failures.length} fetch failure(s), ${oversize.length} token(s) over ${MAX_BYTES} bytes. No manifest written. See ${cfg.collectionKey}.report.json`);
+  console.error(`REFUSED: ${failures.length} fetch failure(s), ${oversize.length} token(s) over ${MAX_RECORD_BYTES} bytes (the core's cap). No manifest written. See ${cfg.collectionKey}.report.json`);
   process.exit(2);
 }
 const doc = manifestDoc(cfg, tokens, await snapshot(opt('snapshot-api')).catch(() => null));

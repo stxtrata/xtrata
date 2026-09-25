@@ -8,7 +8,9 @@
 
 export const CHUNK_SIZE = 16384;
 export const MAX_SINGLE_TX_CHUNKS = 32;
-export const MAX_BYTES = CHUNK_SIZE * MAX_SINGLE_TX_CHUNKS; // 524,288 = 512 KB
+export const MAX_BYTES = CHUNK_SIZE * MAX_SINGLE_TX_CHUNKS; // 524,288 = 512 KB: largest file `inscribe` can take
+export const MAX_RECORD_BYTES = CHUNK_SIZE * 2048; // 33,554,432 = 32 MiB: core cap; larger files are pre-inscribed and bound
+export const UPLOAD_BATCH = 32; // chunks per add-chunk-batch
 export const SEED_BATCH = 100;
 export const SPEC = 'FT-SPEC-2';
 
@@ -101,7 +103,8 @@ export async function buildToken(cfg, id, fetcher) {
       mime, totalSize: bytes.length, tokenUri,
     },
   };
-  if (bytes.length > MAX_BYTES) entry.oversize = true;
+  if (bytes.length > MAX_BYTES) entry.twin.route = 'preinscribed'; // owner inscribes via multi-tx upload, then bind-preinscribed
+  if (bytes.length > MAX_RECORD_BYTES) entry.oversize = true;
   if (!isAscii(mime, 64)) entry.badMime = true;
   return entry;
 }
@@ -126,7 +129,8 @@ export async function buildAll(cfg, ids, fetcher, { concurrency = 4, onProgress 
   await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
   tokens.sort((a, b) => a.id - b.id);
   failures.sort((a, b) => a.id - b.id);
-  return { tokens, failures, oversize: tokens.filter((t) => t.oversize).map((t) => ({ id: t.id, bytes: t.twin.totalSize })) };
+  return { tokens, failures, oversize: tokens.filter((t) => t.oversize).map((t) => ({ id: t.id, bytes: t.twin.totalSize })),
+    preinscribed: tokens.filter((t) => t.twin.route === 'preinscribed' && !t.oversize).map((t) => ({ id: t.id, bytes: t.twin.totalSize })) };
 }
 
 // Deterministic manifest document (key order fixed). The published file's bytes are
@@ -158,6 +162,14 @@ export function idsFrom(spec) {
 }
 
 // Record entries exactly as seed-canonical takes them (plain values; callers make CVs).
+// Core fees for the owner's multi-transaction upload of one file (begin + seal; the seal fee
+// covers the first batch's chunks and every extra batch). Units are read live in practice.
+export function multiTxCoreFee(totalSize, units = { begin: 100000, seal: 100000, batch: 100000, chunk: 1000 }) {
+  const chunks = Math.ceil(totalSize / CHUNK_SIZE), batches = Math.ceil(chunks / UPLOAD_BATCH);
+  return { chunks, batches, transactions: batches + 2,
+    ustx: units.begin + units.seal + Math.min(chunks, UPLOAD_BATCH) * units.chunk + (batches - 1) * units.batch };
+}
+
 export function seedEntries(manifest) {
   return manifest.tokens.map((t) => ({
     id: t.id, contentHash: t.twin.contentHash, mime: t.twin.mime, totalSize: t.twin.totalSize, tokenUri: t.twin.tokenUri,
