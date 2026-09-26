@@ -37,7 +37,7 @@ import {
 import { useManageWallet } from '../ManageWalletContext';
 import { parseDeployPricingLockSnapshot } from '../../lib/deploy/pricing-lock';
 import InfoTooltip from './InfoTooltip';
-import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.6.clar?raw';
+import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar?raw';
 import preinscribedTemplateSource from '../../../contracts/clarinet/contracts/xtrata-preinscribed-collection-sale-v1.0.clar?raw';
 
 type CollectionDraft = {
@@ -172,7 +172,7 @@ const compactClaritySourceForDeploy = (source: string) => {
   return result.length > 0 ? result : source;
 };
 
-type DeployTemplateMode = 'standard-v1.6';
+type DeployTemplateMode = 'standard-v1.7';
 
 type ContractNameAvailability = {
   exists: boolean;
@@ -199,7 +199,13 @@ const checkContractNameAvailability = async (params: {
     if (response.status === 404) {
       return { exists: false, status: response.status, error: null, url };
     }
-    return { exists: false, status: response.status, error: null, url };
+    // Rate limits / server errors mean "could not check", never "name is free".
+    return {
+      exists: false,
+      status: response.status,
+      error: `Name lookup returned HTTP ${response.status}`,
+      url
+    };
   } catch (error) {
     return {
       exists: false,
@@ -347,6 +353,11 @@ const parseStoredDraft = (value: string | null): DeployWizardDraftStorage | null
 
 type DeployWizardPanelProps = {
   activeCollectionId?: string;
+  /**
+   * Guided builder stage. `basics` names the collection and creates the draft;
+   * deployment is only offered in `contract`, after artwork is uploaded and locked.
+   */
+  stage?: 'basics' | 'contract';
   createNewToken?: number;
   isXtrataOwner?: boolean;
   onDraftReady?: (collection: {
@@ -377,7 +388,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const [deployPending, setDeployPending] = useState(false);
   const [draftPending, setDraftPending] = useState(false);
   const [selectedDraftLoading, setSelectedDraftLoading] = useState(false);
-  const deployTemplateMode: DeployTemplateMode = 'standard-v1.6';
+  const deployTemplateMode: DeployTemplateMode = 'standard-v1.7';
   const [deployAttemptId, setDeployAttemptId] = useState<string | null>(null);
   const [deployDebugLog, setDeployDebugLog] = useState<string[]>([]);
   const reviewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -653,10 +664,15 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       contractName,
       network: coreTarget.network,
       label: coreTarget.contractId,
-      protocolVersion:
-        contractName.includes('v3-0-0') || contractName.includes('v3.0.0')
-          ? '3.0.0'
-          : '2.1.0'
+      // Only reached when the core is not in the registry: infer from the name,
+      // including v3.2.3 (previously every non-v3.0.0 core was treated as 2.1.0).
+      protocolVersion: /v3[-.]2[-.][23]/.test(contractName)
+        ? '3.2.3'
+        : /v3[-.]4[-.]0/.test(contractName)
+          ? '3.4.0'
+          : contractName.includes('v3-0-0') || contractName.includes('v3.0.0')
+            ? '3.0.0'
+            : '2.1.0'
     };
   }, [coreContractEntry, coreTarget]);
   const previewClient = useMemo(
@@ -664,8 +680,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     [previewContract]
   );
   const previewLegacyContract = useMemo(
-    () => (coreContractEntry ? getLegacyContract(coreContractEntry) : null),
-    [coreContractEntry]
+    // Newest-only rule: standard collections depend on inscriptions in the current
+    // core only (seal-recursive rejects anything else), so never query the legacy core.
+    () => (coreContractEntry && mintType !== 'standard' ? getLegacyContract(coreContractEntry) : null),
+    [coreContractEntry, mintType]
   );
   const previewLegacyClient = useMemo(
     () =>
@@ -927,7 +945,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     if (mintType === 'pre-inscribed') {
       return 'xtrata-preinscribed-collection-sale-v1.0';
     }
-    return 'xtrata-collection-mint-v1.6';
+    return 'xtrata-collection-mint-v1.7';
   }, [mintType]);
   const deploySourceByteLength = useMemo(
     () => new TextEncoder().encode(deployBuild.source).byteLength,
@@ -974,6 +992,9 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const selectedDraftState = toText(collection?.state).toLowerCase();
   const selectedDraftAlreadyDeployed = toText(collection?.contract_address).length > 0;
 
+  // Deploy diagnostics are for support: shown (and logged) only with ?debug=1.
+  const deployDebugVisible =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1';
   const appendDeployDebug = (message: string, details?: Record<string, unknown>) => {
     const timestamp = new Date().toISOString();
     const suffix = details ? ` ${debugStringify(details)}` : '';
@@ -982,8 +1003,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       ...previous.slice(-(DEPLOY_DEBUG_LOG_LIMIT - 1)),
       line
     ]);
-    // eslint-disable-next-line no-console
-    console.debug('[xtrata:deploy]', message, details ?? {});
+    if (deployDebugVisible) {
+      // eslint-disable-next-line no-console
+      console.debug('[xtrata:deploy]', message, details ?? {});
+    }
   };
 
   const appendDeployDebug14 = useCallback(
@@ -1069,7 +1092,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const details = {
       debugVersion: DEPLOY_DEBUG_VERSION,
       clarityVersion: DEPLOY_CLARITY_VERSION,
-      defaultDeployTemplateMode: 'standard-v1.6',
+      defaultDeployTemplateMode: 'standard-v1.7',
       sourceCompactionMode: DEPLOY_SOURCE_COMPACTION_MODE,
       debug14Enabled
     };
@@ -1086,6 +1109,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
 
   const handleOpenReview = async () => {
     setStatus(null);
+    if (selectedDraftAlreadyDeployed) {
+      setStatus('This collection already has a contract. Continue to Mint rules.');
+      return;
+    }
     const refreshed = await refreshSelectedDraft('review-open');
     const refreshedLock = parseDeployPricingLockSnapshot(refreshed?.metadata ?? null);
     appendDeployDebug('Review modal opened', {
@@ -1162,7 +1189,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.6';
+        : 'xtrata-collection-mint-v1.7';
 
     const draftMetadata = {
       mintType,
@@ -1209,7 +1236,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         slug,
         templateVersion
       });
-      setStatus('Creating draft ID for Step 2 uploads...');
+      setStatus('Saving your collection draft...');
       const createResponse = await fetch('/collections', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1239,7 +1266,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       });
       props.onJourneyRefreshRequested?.();
       setStatus(
-        `Draft ready for Step 2 uploads. Collection ID: ${created.id}.`
+        'Draft saved. Continue to Artwork & metadata to upload your files.'
       );
     } catch (error) {
       appendDeployDebug('Draft create failed', {
@@ -1256,6 +1283,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
 
   const handleDeploy = async () => {
     setStatus(null);
+    if (selectedDraftAlreadyDeployed) {
+      setStatus('This collection already has a contract. Deploying again would create a second, separate contract, so it is disabled.');
+      return;
+    }
     const attemptId = `${Date.now().toString(36)}-${Math.random()
       .toString(36)
       .slice(2, 8)}`;
@@ -1351,7 +1382,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.6';
+        : 'xtrata-collection-mint-v1.7';
     const sourceTemplateLabel = templateVersion;
     let sourceBeforeCompaction = refreshBuild.source;
 
@@ -1496,6 +1527,18 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       slugReused: created.slugReused === true,
       lookupUrl: contractNameAvailability.url
     });
+    if (!contractNameAvailability.exists && contractNameAvailability.error) {
+      appendDeployDebug('Deploy blocked: contract-name availability unknown', {
+        attemptId,
+        contractName,
+        error: contractNameAvailability.error
+      });
+      setDeployPending(false);
+      setStatus(
+        'Could not confirm your contract name is free right now, so nothing was sent to your wallet. Wait a moment and try again.'
+      );
+      return;
+    }
     if (contractNameAvailability.exists) {
       const fullContractId = `${session.address}.${contractName}`;
       const explorerUrl =
@@ -1913,12 +1956,12 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
           <div className="field field--full">
             <span className="field__label info-label">
               Standard mint pricing
-              <InfoTooltip text="Standard-mint price is configured later in Step 3 after Step 2 locks the collection fee floor." />
+              <InfoTooltip text="The price collectors pay is set in Mint rules, after your artwork is locked and the contract is deployed." />
             </span>
             <span className="field__hint">
-              Step 1 deploys the standard-mint contract with a 0 STX on-chain payout
-              base. After Step 2 locks the collection and fee floor, set the single
-              mint price collectors pay in Step 3, or choose free mint there.
+              Your contract deploys with a 0 STX price and stays paused. After your
+              artwork is locked, set the price collectors pay in Mint rules, or choose
+              free mint there.
             </span>
           </div>
         )}
@@ -2087,11 +2130,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
               : 'mint-step mint-step--pending'
           }
         >
-          <span className="meta-label">Standard mint pricing moves to Step 3</span>
+          <span className="meta-label">You'll set the price after deploying</span>
           <span className="meta-value">
-            Deploy writes a 0 STX on-chain payout base for standard mints. After Step 2
-            locks the collection fee floor, Step 3 sets the one mint price collectors
-            actually see and pay.
+            Your contract deploys paused with a 0 STX price, so nobody can mint yet. After
+            your artwork is locked, you set the one price collectors pay in Mint rules.
           </span>
           <span className="meta-value">
             Draft context:{' '}
@@ -2100,14 +2142,14 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
           </span>
           {collectionDeployPricingLock ? (
             <span className="meta-value">
-              Step 2 lock ready: {collectionDeployPricingLock.assetCount} assets, max{' '}
+              Artwork locked: {collectionDeployPricingLock.assetCount} files, largest{' '}
               {collectionDeployPricingLock.maxChunks} chunks, locked{' '}
               {new Date(collectionDeployPricingLock.lockedAt).toLocaleString()}.
             </span>
           ) : (
             <span className="meta-value">
-              No Step 2 lock yet. Deploy can still proceed, but Step 3 price setup stays
-              unavailable until assets are uploaded and locked.
+              Artwork not locked yet. Upload and lock your files in Artwork &amp; metadata
+              before deploying — pricing depends on your largest file.
             </span>
           )}
         </div>
@@ -2138,33 +2180,45 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
           </button>
           <InfoTooltip text="Reloads draft metadata and deploy status from backend for the selected collection." />
         </span>
-        <span className="info-label">
-          <button
-            className="button button--ghost"
-            type="button"
-            onClick={handleCreateDraftOnly}
-            disabled={deployPending || draftPending}
-          >
-            {draftPending ? 'Saving draft...' : 'Create draft ID for uploads'}
-          </button>
-          <InfoTooltip text="Creates a draft record without deploying yet so you can move into staging and lock flow." />
-        </span>
-        <span className="info-label">
-          <button
-            className="button"
-            type="button"
-            onClick={handleOpenReview}
-            disabled={deployPending || draftPending}
-          >
-            {deployPending ? 'Waiting for wallet...' : 'Review deployment'}
-          </button>
-          <InfoTooltip text="Opens final deploy checklist before wallet confirmation." />
-        </span>
+        {props.stage !== 'contract' || !normalizedActiveCollectionId ? (
+          <span className="info-label">
+            <button
+              className={props.stage === 'basics' ? 'button' : 'button button--ghost'}
+              type="button"
+              onClick={handleCreateDraftOnly}
+              disabled={deployPending || draftPending || selectedDraftAlreadyDeployed}
+            >
+              {draftPending
+                ? 'Saving...'
+                : normalizedActiveCollectionId
+                  ? 'Save collection details'
+                  : 'Create collection draft'}
+            </button>
+            <InfoTooltip text="Saves your collection so you can upload artwork. Nothing is deployed and no wallet approval is needed." />
+          </span>
+        ) : null}
+        {props.stage !== 'basics' ? (
+          <span className="info-label">
+            <button
+              className="button"
+              type="button"
+              onClick={handleOpenReview}
+              disabled={deployPending || draftPending || selectedDraftAlreadyDeployed}
+            >
+              {selectedDraftAlreadyDeployed
+                ? 'Contract deployed'
+                : deployPending
+                  ? 'Waiting for wallet...'
+                  : 'Review deployment'}
+            </button>
+            <InfoTooltip text="Opens the final checklist before your wallet asks you to approve the deployment." />
+          </span>
+        ) : null}
       </div>
 
       {status && <p className="meta-value">{status}</p>}
 
-      <details className="deploy-wizard__defaults"><summary>Technical deployment details</summary>
+      {deployDebugVisible && <details className="deploy-wizard__defaults"><summary>Technical deployment details</summary>
         <p className="deploy-wizard__defaults-title info-label">
           Deploy debug details
           <InfoTooltip text="Low-level diagnostics for template version, wallet context, pricing lock state, and deploy attempts." />
@@ -2198,10 +2252,10 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
             Standard deploy default: {formatMicroStx(BigInt(preflightSummary.onChainMintPriceMicroStx))}
           </li>
           <li>
-            Step 3 pricing mode:{' '}
+            Pricing:{' '}
             {mintType === 'standard'
-              ? 'Collector-facing price is set later in launch controls.'
-              : 'Sale price is set in Step 1.'}
+              ? 'Collector-facing price is set later in Mint rules.'
+              : 'Sale price is set in Collection basics.'}
           </li>
           <li>Latest deploy attempt id: {deployAttemptId ?? 'none yet'}</li>
         </ul>
@@ -2216,7 +2270,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         ) : (
           <p className="meta-value">No deploy attempts logged in this browser session yet.</p>
         )}
-      </details>
+      </details>}
 
       {collection && (
         <div className="deploy-wizard__result">
@@ -2292,8 +2346,8 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
                   </p>
                   {deployBuild.resolved.mintType === 'standard' && (
                     <p className="meta-value">
-                      Collector-facing mint price is not set in Step 1. After Step 2
-                      locks the fee floor, set the single buyer price in Step 3.
+                      Your contract deploys paused with a 0 STX price. After deployment,
+                      set the price collectors pay in Mint rules.
                     </p>
                   )}
                   {deployBuild.resolved.mintType === 'standard' && (
@@ -2324,7 +2378,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
                   </p>
                   {deployBuild.resolved.mintType === 'standard' && (
                     <p>
-                      <strong>Step 2 lock status:</strong>{' '}
+                      <strong>Artwork lock:</strong>{' '}
                       {collectionDeployPricingLock
                         ? `${collectionDeployPricingLock.assetCount} assets, max ${collectionDeployPricingLock.maxChunks} chunks`
                         : 'Not locked yet'}

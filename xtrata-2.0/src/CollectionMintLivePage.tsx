@@ -1,4 +1,4 @@
-import { isCollectionV15, readCollectionV15FeeUnits, quoteCollectionV15Mint, type CollectionV15FeeUnits } from '../packages/xtrata-sdk/src/collection-v15';
+import { isCollectionV15, isFixedPriceCollection, readCollectionV15FeeUnits, quoteCollectionV15Mint, type CollectionV15FeeUnits } from '../packages/xtrata-sdk/src/collection-v15';
 import { startJourney, event } from './lib/telemetry/client';
 import { classify } from './lib/telemetry/classify';
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
@@ -350,7 +350,7 @@ const CollectionLiveGalleryMedia = ({
       <iframe
         src={previewUrl}
         title={asset.filename ?? asset.path}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
       />
     );
   }
@@ -1106,6 +1106,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   }, [metadata]);
 
   const usesV15 = isCollectionV15(templateVersion);
+  // v1.7: one fixed collector price for every file; protocol fees come out of it.
+  const fixedPrice = isFixedPriceCollection(templateVersion);
 
   const coreClient = useMemo(
     () =>
@@ -1507,8 +1509,8 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     const units = contractStatus?.v15Fees;
     const price = contractStatus?.activePhaseMintPrice ?? contractStatus?.mintPrice;
     if (!units || price == null || chunks < 1) return null;
-    return quoteCollectionV15Mint(units, chunks, price);
-  }, [contractStatus]);
+    return quoteCollectionV15Mint(units, chunks, price, { fixedPrice });
+  }, [contractStatus, fixedPrice]);
 
   const useMintPriceSealCap =
     !usesV15 && collectionMintPaymentModel === 'seal' &&
@@ -2424,7 +2426,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         const latest = await loadContractStatus({ silent: true });
         const price = reservedPrice ?? latest?.activePhaseMintPrice ?? latest?.mintPrice;
         if (!latest?.v15Fees || price == null) throw new Error('Verified core fees and collection price are unavailable.');
-        return quoteCollectionV15Mint(latest.v15Fees, chunks, price);
+        return quoteCollectionV15Mint(latest.v15Fees, chunks, price, { fixedPrice });
       };
       try {
         const rawBytes = await fetchAssetBytes(asset.asset_id);
@@ -2818,7 +2820,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       templateVersion,
       useMintPriceTotalCap,
       useMintPriceSealCap,
-      waitForMintProgress, usesV15, loadContractStatus, collectionContract, contractStatus?.v15Fees
+      waitForMintProgress, usesV15, fixedPrice, loadContractStatus, collectionContract, contractStatus?.v15Fees
     ]
   );
 
@@ -3338,7 +3340,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     : effectiveOnChainMintPrice;
   const buyerQuotes = usesV15 && effectiveOnChainMintPrice !== null && contractStatus?.v15Fees
     ? assets.map(asset => resolveAssetChunkCount(asset)).filter(chunks => chunks > 0)
-        .map(chunks => quoteCollectionV15Mint(contractStatus.v15Fees!, chunks, effectiveOnChainMintPrice).total)
+        .map(chunks => quoteCollectionV15Mint(contractStatus.v15Fees!, chunks, effectiveOnChainMintPrice, { fixedPrice }).total)
     : [];
   const buyerMax = buyerQuotes.length ? buyerQuotes.reduce((a,b) => a > b ? a : b) : null;
   const mintPriceLabel = toMicroStxLabel(displayedMintPriceMicroStx);

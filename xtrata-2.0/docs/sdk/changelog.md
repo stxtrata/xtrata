@@ -1,6 +1,6 @@
 # SDK Changelog
 
-Generated: 2026-09-14T15:53:21.870Z
+Generated: 2026-09-26T15:26:08.873Z
 
 ## Package versions
 
@@ -11,6 +11,7 @@ Generated: 2026-09-14T15:53:21.870Z
 
 | Iteration | Scope | API change | Gate | Owner |
 | --- | --- | --- | --- | --- |
+| 2026-09-26-01 | Collection v1.6/v1.7 recognition (`isCollectionV15` now v1.5–v1.7), v1.7 fixed collector price (`isFixedPriceCollection`, `quoteCollectionV15Mint(..., { fixedPrice })`), all static core calls pinned on deploy | yes | pass | Claude |
 | 2026-09-14-01 | Collection v1.5 explicit deployment target and granular staged fee quote APIs, manager inventory and public mint integration | yes | pass | Codex |
 | 2026-05-30-03 | Production upload/runtime batch ceiling hardening (30-chunk app/SDK upload cap, 30-chunk Cloudflare cold-cache read cap, protected runtime cache purge validation, production readiness reporting) | yes | pass | Codex |
 | 2026-05-30-02 | Cloudflare cold-cache reconstruction scaling hardening (paid subrequest ceiling, terminal quota handling, upstream-attempt diagnostics, adaptive max batch probe, chunk-size compatibility review) | yes | pass | Codex |

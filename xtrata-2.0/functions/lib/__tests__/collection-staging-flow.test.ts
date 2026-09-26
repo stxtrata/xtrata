@@ -121,12 +121,15 @@ describe('collection staging integration flow', () => {
     });
 
     queryAllMock.mockImplementation(async (_env: unknown, query: string, binds: unknown[]) => {
-      if (query.includes('SELECT state, metadata FROM collections WHERE id = ? LIMIT 1')) {
+      if (/^SELECT [a-z_, ]+ FROM collections WHERE id = \? LIMIT 1$/.test(query)) {
         return {
           results: [
             {
+              id: collectionRow.id,
               state: collectionRow.state,
-              metadata: collectionRow.metadata
+              metadata: collectionRow.metadata,
+              contract_address: collectionRow.contract_address ?? null,
+              artist_address: collectionRow.artist_address ?? null
             }
           ]
         };

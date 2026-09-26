@@ -187,6 +187,11 @@ plan:
             path: contracts/xtrata-collection-mint-v1.6.clar
             clarity-version: 4
         - emulated-contract-publish:
+            contract-name: xtrata-collection-mint-v1-7
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: contracts/xtrata-collection-mint-v1.7.clar
+            clarity-version: 4
+        - emulated-contract-publish:
             contract-name: xtrata-commerce
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-commerce.clar
@@ -196,14 +201,14 @@ plan:
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-drops-v1.0.clar
             clarity-version: 4
+      epoch: "3.3"
+    - id: 2
+      transactions:
         - emulated-contract-publish:
             contract-name: xtrata-drops-v1-1
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-drops-v1.1.clar
             clarity-version: 4
-      epoch: "3.3"
-    - id: 2
-      transactions:
         - emulated-contract-publish:
             contract-name: xtrata-drops-v1-2
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
@@ -324,6 +329,9 @@ plan:
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-v3.2.2.clar
             clarity-version: 3
+      epoch: "3.3"
+    - id: 3
+      transactions:
         - emulated-contract-publish:
             contract-name: xtrata-vault
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM

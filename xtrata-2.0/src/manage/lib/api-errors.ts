@@ -7,6 +7,8 @@ const FUNCTIONS_UNAVAILABLE_HINT =
 const API_SETUP_HINT =
   'Check that Functions are deployed for this environment and that project root/functions routing is correct (or use local Pages Functions with DB/R2 bindings).';
 
+export const CREATOR_SESSION_EXPIRED_EVENT = 'xtrata:creator-session-expired';
+
 const isLikelyHtmlResponse = (text: string) => HTML_RESPONSE_PATTERN.test(text);
 
 const formatEndpointLabel = (endpointLabel: string) => endpointLabel.trim() || 'API';
@@ -80,6 +82,10 @@ export const parseManageJsonResponse = async <T>(
   const requestId = extractPayloadRequestId(payload) ?? headerRequestId;
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      // Session expired or signed out elsewhere: let the studio ask to sign in again.
+      window.dispatchEvent(new CustomEvent(CREATOR_SESSION_EXPIRED_EVENT));
+    }
     const message = extractErrorMessage(payload);
     throw new Error(
       withRequestIdSuffix(

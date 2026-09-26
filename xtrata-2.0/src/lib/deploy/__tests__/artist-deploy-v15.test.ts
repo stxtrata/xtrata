@@ -22,3 +22,12 @@ describe('v1.5 source and target integration', () => {
     expect(sdkResolve('mainnet',CONTRACT_REGISTRY,'3.2.3')?.contractId).toBe(params.coreContractId);
   });
 });
+describe('v1.7 template pinning', () => {
+  const v17 = readFileSync(new URL('../../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar', import.meta.url), 'utf8');
+  it.each([buildArtistDeployContractSource, sdkBuild])('pins every static core call, including the fee reads', build => {
+    const result = build({ ...params, templateSources: { standardSource: v17, preinscribedSource: '' } });
+    expect(result.errors).toEqual([]);
+    expect(result.source).not.toMatch(/\(contract-call\? \.xtrata-v3-2-3/);
+    expect(result.source.split(`(contract-call? '${params.coreContractId} `).length - 1).toBe(8);
+  });
+});

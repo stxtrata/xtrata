@@ -10,7 +10,8 @@ export default defineConfig({
       'src/**/*.test.tsx',
       'functions/**/*.test.ts',
       'scripts/**/*.test.ts',
-      'packages/**/*.test.ts'
+      'packages/**/*.test.ts',
+      'canaries/**/*.test.ts'
     ]
   }
 });

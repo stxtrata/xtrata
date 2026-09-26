@@ -1,3 +1,4 @@
+import { creatorAuthMode, isCreatorAllowlisted, readCreatorSession } from '../lib/creator-auth';
 const asTrimmedString = (value: unknown) =>
   typeof value === 'string' ? value.trim() : '';
 
@@ -27,14 +28,22 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
 
   const active = candidates.find((candidate) => candidate.value.length > 0) ?? null;
 
+  // The full list is only shown to admins once sign-in is enforced; everyone
+  // else learns whether their own signed-in wallet is allowed.
+  const { session } = await readCreatorSession(request, env as never);
+  const self = session ? await isCreatorAllowlisted(env as never, session.address) : null;
+  const revealList = creatorAuthMode(env as never) !== 'enforce' || session?.admin === true;
   return new Response(
     JSON.stringify({
-      source: active?.key ?? null,
-      raw: active?.value ?? '',
-      hasValue: !!active
+      source: revealList ? active?.key ?? null : null,
+      raw: revealList ? active?.value ?? '' : '',
+      hasValue: !!active,
+      signedInAddress: session?.address ?? null,
+      allowed: self ? self.allowed : null,
+      allowlistChecked: self ? self.checked : null
     }),
     {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' }
     }
   );
 };

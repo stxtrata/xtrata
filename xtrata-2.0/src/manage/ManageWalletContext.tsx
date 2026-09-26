@@ -1,5 +1,13 @@
-import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
+import { requestStructuredSignature } from '../lib/wallet/structured-sign';
+import {
+  fetchCreatorSession,
+  signInCreator,
+  signOutCreator,
+  type CreatorSessionState
+} from './lib/creator-session';
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
+import { CREATOR_SESSION_EXPIRED_EVENT } from './lib/api-errors';
 import { createWalletSessionStore } from '../lib/wallet/session';
 import type { WalletSession } from '../lib/wallet/types';
 
@@ -10,6 +18,11 @@ type ManageWalletContextValue = {
   walletSession: WalletSession;
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
+  /** Server sign-in (7-day session cookie), separate from the wallet connection. */
+  creatorSession: CreatorSessionState;
+  refreshCreatorSession: () => Promise<void>;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const ManageWalletContext = createContext<ManageWalletContextValue | null>(null);
@@ -37,6 +50,16 @@ export function ManageWalletProvider({ children }: ManageWalletProviderProps) {
     []
   );
   const [walletSession, setWalletSession] = useState(walletSessionStore.load());
+  const [creatorSession, setCreatorSession] = useState<CreatorSessionState>({ status: 'loading' });
+  const refreshCreatorSession = useCallback(async () => {
+    setCreatorSession(await fetchCreatorSession());
+  }, []);
+  useEffect(() => {
+    void refreshCreatorSession();
+    const onExpired = () => void refreshCreatorSession();
+    window.addEventListener(CREATOR_SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(CREATOR_SESSION_EXPIRED_EVENT, onExpired);
+  }, [refreshCreatorSession]);
 
   useEffect(() => {
     const session = walletAdapter.getSession();
@@ -50,7 +73,21 @@ export function ManageWalletProvider({ children }: ManageWalletProviderProps) {
     setWalletSession(session);
   };
 
+  const signIn = async () => {
+    const address = walletAdapter.getSession().address ?? walletSession.address;
+    if (!address) throw new Error('Connect your wallet first.');
+    setCreatorSession(await signInCreator(address, requestStructuredSignature));
+  };
+
+  const signOut = async () => {
+    await signOutCreator();
+    setCreatorSession(await fetchCreatorSession());
+  };
+
   const disconnect = async () => {
+    // Disconnecting the wallet also ends the studio session on this browser.
+    await signOutCreator();
+    void refreshCreatorSession();
     await walletAdapter.disconnect();
     const session = walletAdapter.getSession();
     walletSessionStore.save(session);
@@ -58,8 +95,8 @@ export function ManageWalletProvider({ children }: ManageWalletProviderProps) {
   };
 
   const value = useMemo(
-    () => ({ walletAdapter, walletSession, connect, disconnect }),
-    [walletAdapter, walletSession]
+    () => ({ walletAdapter, walletSession, connect, disconnect, creatorSession, refreshCreatorSession, signIn, signOut }),
+    [walletAdapter, walletSession, creatorSession, refreshCreatorSession]
   );
 
   return <ManageWalletContext.Provider value={value}>{children}</ManageWalletContext.Provider>;

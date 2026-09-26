@@ -904,8 +904,10 @@ export default function OwnerOversightPanel() {
       [collectionId]: null
     }));
 
+    // Each PATCH is saved individually; keep the UI in step with whatever was
+    // actually saved, including when a later update fails part-way.
+    const updatedById = new Map<string, CollectionRecord>();
     try {
-      const updatedById = new Map<string, CollectionRecord>();
       for (const collection of changed) {
         const nextOrder = nextOrderById.get(collection.id);
         if (!nextOrder) {
@@ -928,12 +930,6 @@ export default function OwnerOversightPanel() {
         updatedById.set(updated.id, updated);
       }
 
-      if (updatedById.size > 0) {
-        setCollections((current) =>
-          current.map((entry) => updatedById.get(entry.id) ?? entry)
-        );
-      }
-
       setPublicVisibilityMessageByCollectionId((current) => ({
         ...current,
         [collectionId]: `${moved.display_name ?? moved.slug} is now position ${
@@ -943,12 +939,17 @@ export default function OwnerOversightPanel() {
     } catch (updateError) {
       setPublicVisibilityMessageByCollectionId((current) => ({
         ...current,
-        [collectionId]: toManageApiErrorMessage(
+        [collectionId]: `${toManageApiErrorMessage(
           updateError,
           'Unable to update public page order.'
-        )
+        )} Saved ${updatedById.size} of ${changed.length} position changes; reload to confirm the current order.`
       }));
     } finally {
+      if (updatedById.size > 0) {
+        setCollections((current) =>
+          current.map((entry) => updatedById.get(entry.id) ?? entry)
+        );
+      }
       setPublicOrderPendingCollectionId(null);
     }
   };

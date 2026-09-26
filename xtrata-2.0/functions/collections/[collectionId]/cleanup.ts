@@ -6,6 +6,8 @@ import { scanCollection } from '../../lib/collection-storage/runner';
 
 export const onRequest: PagesFunction = async ({ request, env, params }) => {
   const headers = { 'Cache-Control': 'private, no-store' };
+  // Storage operations token only. A browser session is deliberately NOT enough:
+  // inscribed HTML viewed on this origin could otherwise ride an admin's cookie.
   if (!cleanupAccess(request, env)) return jsonResponse({ error: 'Storage operations access required.' }, 401, headers);
   if (!storageEnabled(env)) return jsonResponse({ error: 'Verified storage is not enabled. Apply migration 010 and configure the storage worker.' }, 503, headers);
   const collectionId = String(params.collectionId ?? '');

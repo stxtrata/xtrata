@@ -1173,7 +1173,7 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
       return {
         canUpload: false,
         reason:
-          'Enter a collection ID first. Copy it from "Your drops" after creating a draft in Step 1.'
+          'Create or select a collection first (Collection basics).'
       };
     }
     if (uploadsLocked) {
@@ -1277,10 +1277,11 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
         ) : (
           <div className="asset-staging__section-body">
             <form className="field" onSubmit={handleSubmit}>
-              <label className="field__label">
+{!props.activeCollectionId?.trim() ? (
+                            <label className="field__label">
                 <span className="info-label">
                   Collection ID
-                  <InfoTooltip text="Use the ID shown in Step 1 under 'Your drops'. It identifies which drop these files belong to." />
+                  <InfoTooltip text="Identifies which collection these files belong to." />
                 </span>
                 <input
                   className="input"
@@ -1297,6 +1298,7 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
                   Tip: click "Copy ID" in Your drops, then paste it here.
                 </span>
               </label>
+              ) : null}
 
               <label className="field__label">
                 <span className="info-label">
@@ -1559,9 +1561,9 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
                       uploadsLocked
                     }
                   >
-                    {lockPending ? 'Locking...' : 'Lock staged assets for pricing'}
+                    {lockPending ? 'Locking...' : 'Lock files for pricing'}
                   </button>
-                  <InfoTooltip text="Saves the pricing-lock snapshot (asset count + max chunks) used later by Step 3 to calculate the standard-mint fee floor." />
+                  <InfoTooltip text="Freezes your file list so the studio can work out the inscription cost of your largest file. Pricing in Mint rules depends on it. Uploading more files later unlocks it again." />
                 </span>
               </div>
 
@@ -1916,7 +1918,7 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
                           <iframe
                             src={selectedPreviewUrl}
                             title={getAssetDisplayName(selectedPreviewAsset)}
-                            sandbox="allow-scripts allow-same-origin"
+                            sandbox="allow-scripts"
                           />
                         ) : selectedPreviewMediaKind === 'text' ? (
                           selectedPreviewTextPending ? (
