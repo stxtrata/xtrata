@@ -45,6 +45,9 @@ describe('asset-preview route', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Content-Type')).toBe('text/html');
+    // Uploaded HTML never runs with the site's origin (or its sign-in cookie).
+    expect(response.headers.get('Content-Security-Policy')).toBe('sandbox allow-scripts');
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(await response.text()).toContain('<html>');
     expect(bucket.get).toHaveBeenCalledWith('col-1/asset-1');
   });

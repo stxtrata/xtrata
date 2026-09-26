@@ -43,7 +43,20 @@ export type JourneySignals = {
   unpaused: boolean | null;
   uploadReadinessReason: string | null;
   deployReadinessReason: string | null;
+  /**
+   * v1.5/v1.6 only: every uploaded file registered on the contract (verified by
+   * the studio for the current file set). `false` blocks launch; undefined/null
+   * means registration does not apply to this collection or is not tracked yet.
+   */
+  inventoryRegistered?: boolean | null;
+  /** On-chain reads failed: price/supply/pause are unknown, not "not set". */
+  chainReadFailed?: boolean;
 };
+
+export const CHAIN_READ_FAILED_MESSAGE =
+  'Could not read your contract right now. Nothing needs resubmitting — refresh in a moment.';
+export const INVENTORY_NOT_REGISTERED_MESSAGE =
+  'Register your uploaded files on the contract (Prepare contract) before opening minting.';
 
 type JourneyStepDefinition = {
   id: JourneyStepId;
@@ -166,7 +179,10 @@ const getDoneState = (
         doneNote: null
       };
     case 'deploy-contract':
-      return { done: signals.deployReady, doneNote: null };
+      return {
+        done: signals.deployReady && signals.inventoryRegistered !== false,
+        doneNote: null
+      };
     case 'configure-launch':
       return {
         done:
@@ -226,7 +242,19 @@ const getBlockedReason = (
     if (signals.deployReadinessReason) {
       return signals.deployReadinessReason;
     }
+    if (signals.deployReady && signals.inventoryRegistered === false) {
+      return INVENTORY_NOT_REGISTERED_MESSAGE;
+    }
     return null;
+  }
+
+  if (
+    signals.chainReadFailed &&
+    (stepId === 'configure-launch' ||
+      stepId === 'publish-backend' ||
+      stepId === 'unpause-contract')
+  ) {
+    return CHAIN_READ_FAILED_MESSAGE;
   }
 
   if (stepId === 'publish-backend' && !signals.deployReady) {

@@ -12,6 +12,12 @@ import {
   stripDeployPricingLockFromMetadata
 } from '../../lib/collections';
 import { getCollectionDeployReadiness } from '../../lib/collection-deploy';
+import {
+  isCollectionCommitted,
+  resolveAssetTtlMs,
+  sweepExpiredDraftAssets
+} from '../../lib/asset-retention';
+import { authorizeCreator, denyPrivateRead } from '../../lib/creator-auth';
 
 const logAssetDebug = (
   requestId: string,
@@ -75,7 +81,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
     try {
       const collectionResult = await queryAll(
         env,
-        'SELECT state, metadata FROM collections WHERE id = ? LIMIT 1',
+        'SELECT id, state, metadata, contract_address, artist_address FROM collections WHERE id = ? LIMIT 1',
         [collectionId]
       );
       const collectionRow = (collectionResult.results ?? [])[0] as
@@ -85,12 +91,13 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
         collectionRow !== undefined &&
         isCollectionPublished(collectionRow.state) &&
         isCollectionPublicVisible(parseCollectionMetadata(collectionRow.metadata));
+      if (collectionRow && !isCollectionPublished(collectionRow.state)) {
+        const denied = await denyPrivateRead(request, env, collectionRow);
+        if (denied) return denied;
+      }
       if (!isPublicCollection) {
-        await run(
-          env,
-          'UPDATE assets SET state = ? WHERE collection_id = ? AND expires_at IS NOT NULL AND expires_at < ? AND state = ?',
-          ['expired', collectionId, Date.now(), 'draft']
-        );
+        // Committed (deployed or published) collections never expire their files.
+        await sweepExpiredDraftAssets(env, collectionId, collectionRow ?? null);
       }
       const result = await queryAll(
         env,
@@ -113,6 +120,10 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
         env,
         collectionId
       });
+      const uploadDecision = await authorizeCreator(request, env, {
+        action: 'add-asset', collection: readiness.collection ?? { id: collectionId, artist_address: null }
+      });
+      if (!uploadDecision.allowed) return uploadDecision.response!;
       const contractAddress = String(readiness.collection?.contract_address ?? '')
         .trim();
       logAssetDebug(requestId, 'readiness.checked', {
@@ -177,8 +188,9 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
           `Collection storage limit exceeded. Limit: ${(limitBytes / (1024 * 1024)).toFixed(0)} MB.`
         );
       }
-      const ttlMs = Number(env.COLLECTION_ASSET_TTL_MS ?? 3 * 24 * 60 * 60 * 1000);
-      const expiresAt = Date.now() + ttlMs;
+      const expiresAt = isCollectionCommitted(readiness.collection ?? null)
+        ? null
+        : Date.now() + resolveAssetTtlMs(env);
       const assetId = crypto.randomUUID();
       await run(
         env,
@@ -242,7 +254,7 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
 
       const collectionResult = await queryAll(
         env,
-        'SELECT state, metadata FROM collections WHERE id = ? LIMIT 1',
+        'SELECT id, state, metadata, artist_address FROM collections WHERE id = ? LIMIT 1',
         [collectionId]
       );
       const collectionRow = (collectionResult.results ?? [])[0] as
@@ -251,6 +263,8 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       if (!collectionRow) {
         return notFound('Collection not found.');
       }
+      const deleteDecision = await authorizeCreator(request, env, { action: 'delete-asset', collection: collectionRow });
+      if (!deleteDecision.allowed) return deleteDecision.response!;
 
       const collectionState = String(collectionRow.state ?? 'draft')
         .trim()

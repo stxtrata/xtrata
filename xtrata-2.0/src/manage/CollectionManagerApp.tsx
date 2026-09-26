@@ -1,6 +1,9 @@
 import CollectionBuilder from './components/CollectionBuilder';
 import CollectionStudioNav, { type StudioTaskId } from './components/CollectionStudioNav';
 import CollectionInventoryPanel from './components/CollectionInventoryPanel';
+import CreatorSessionBadge from './components/CreatorSessionBadge';
+import ReservationsPanel from './components/ReservationsPanel';
+import FileRetentionNotice from './components/FileRetentionNotice';
 import StorageCleanupPanel from './components/StorageCleanupPanel';
 import {
   useCallback,
@@ -8,7 +11,8 @@ import {
   useMemo,
   useState,
   type KeyboardEvent,
-  type MouseEvent
+  type MouseEvent,
+  type ReactNode
 } from 'react';
 import {
   callReadOnlyFunction,
@@ -34,6 +38,13 @@ import { getNetworkFromAddress } from '../lib/network/guard';
 import { toStacksNetwork } from '../lib/network/stacks';
 import { useManageWallet } from './ManageWalletContext';
 import { resolveCollectionContractLink } from './lib/contract-link';
+import { isCollectionV15 } from '../../packages/xtrata-sdk/src/collection-v15';
+import {
+  collectInventoryHashes,
+  computeInventoryDigest,
+  isInventoryRegistrationCurrent,
+  parseInventoryRegistrationRecord
+} from './lib/inventory-registration';
 import {
   deriveJourneyStepStates,
   getRecommendedJourneyStepId,
@@ -98,7 +109,21 @@ type JourneySnapshot = {
   hasLivePageDescription: boolean;
   uploadReadinessReason: string | null;
   deployReadinessReason: string | null;
+  inventoryRegistered: boolean | null;
+  chainReadFailed: boolean;
+  stagedFileCount: number;
 };
+
+/** A <details> that mounts its (heavy) content only once opened. */
+function LazyDetails(props: { className?: string; summary: string; children: ReactNode }) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <details className={props.className} onToggle={(event) => { if ((event.currentTarget as HTMLDetailsElement).open) setOpened(true); }}>
+      <summary>{props.summary}</summary>
+      {opened ? props.children : null}
+    </details>
+  );
+}
 
 const MANAGE_PANEL_IDS: Record<PanelKey, string> = {
   'sdk-toolkit': 'manage-sdk-toolkit',
@@ -127,7 +152,10 @@ const INITIAL_JOURNEY_SNAPSHOT: JourneySnapshot = {
   hasLivePageCover: false,
   hasLivePageDescription: false,
   uploadReadinessReason: null,
-  deployReadinessReason: null
+  deployReadinessReason: null,
+  inventoryRegistered: null,
+  chainReadFailed: false,
+  stagedFileCount: 0
 };
 
 const isActiveAssetState = (value: unknown) => {
@@ -304,11 +332,11 @@ export default function CollectionManagerApp() {
     if (typeof window === 'undefined' || !activeCollectionStorageKey) {
       return;
     }
+    // Only record a selection. Clearing happens explicitly ("New collection"):
+    // the initial empty state must not erase the collection we want to resume.
     try {
       if (activeCollectionId.trim()) {
         window.localStorage.setItem(activeCollectionStorageKey, activeCollectionId.trim());
-      } else {
-        window.localStorage.removeItem(activeCollectionStorageKey);
       }
     } catch {
       // Ignore storage write failures; selection remains in-memory.
@@ -331,7 +359,9 @@ export default function CollectionManagerApp() {
       published: journeySnapshot.collectionState === 'published',
       unpaused: journeySnapshot.unpaused,
       uploadReadinessReason: journeySnapshot.uploadReadinessReason,
-      deployReadinessReason: journeySnapshot.deployReadinessReason
+      deployReadinessReason: journeySnapshot.deployReadinessReason,
+      inventoryRegistered: journeySnapshot.inventoryRegistered,
+      chainReadFailed: journeySnapshot.chainReadFailed
     }),
     [walletConnected, hasActiveCollection, journeySnapshot]
   );
@@ -356,13 +386,11 @@ export default function CollectionManagerApp() {
     () => journeySteps.filter((step) => step.status === 'blocked').length,
     [journeySteps]
   );
-  const lockStepFocused =
-    experienceMode === 'guided' && activeJourneyStepId === 'lock-staged-assets';
-  const assetStagingHeading = lockStepFocused
-    ? 'Step 4: Lock staged assets'
-    : 'Step 2: Upload your artwork';
+  // The advanced workspace always shows every panel; the guided builder has its own steps.
+  const lockStepFocused = false;
+  const assetStagingHeading = 'Artwork & metadata';
   const assetStagingSummary = lockStepFocused
-    ? 'Lock the collection so Step 3 can calculate the fee floor. Click "Lock staged assets for pricing" to continue.'
+    ? ''
     : 'Upload files once and prepare the manifest for launch day.';
 
   const refreshJourneySnapshot = useCallback(async () => {
@@ -431,6 +459,11 @@ export default function CollectionManagerApp() {
       let launchMintPriceConfigured = false;
       let launchMaxSupplyConfigured = false;
       let unpaused: boolean | null = null;
+      let chainReadFailed = false;
+      let inventoryRegistered: boolean | null = null;
+      const usesRegisteredInventory =
+        !preInscribedMint && isCollectionV15(toText(metadata?.templateVersion));
+      const inventoryHashes = collectInventoryHashes(assets);
 
       if (deployReady) {
         const resolvedTarget = resolveCollectionContractLink({
@@ -439,6 +472,17 @@ export default function CollectionManagerApp() {
           contractAddress: toText(collection.contract_address),
           metadata
         });
+        if (resolvedTarget && usesRegisteredInventory) {
+          // Registration is a launch gate for v1.5/v1.6: unknown hashes or a
+          // stale verification both count as "not registered yet".
+          const digest = inventoryHashes ? await computeInventoryDigest(inventoryHashes) : null;
+          inventoryRegistered = isInventoryRegistrationCurrent({
+            record: parseInventoryRegistrationRecord(metadata),
+            contractId: resolvedTarget.contractId,
+            hashCount: inventoryHashes?.length ?? 0,
+            digest
+          });
+        }
         if (resolvedTarget) {
           try {
             const network =
@@ -480,14 +524,19 @@ export default function CollectionManagerApp() {
             launchMintPriceConfigured = preInscribedMint
               ? mintPriceValue !== null
               : pricingMetadata.mode !== 'raw-on-chain' ||
-                  (collectionState === 'published' && mintPriceValue !== null);
+                  (collectionState === 'published' && mintPriceValue !== null) ||
+                  // v1.5/v1.6: a price set from the advanced controls is still a
+                  // price; don't deadlock launch on the metadata display mode.
+                  (usesRegisteredInventory && mintPriceValue !== null && mintPriceValue > 0n);
             launchMaxSupplyConfigured =
               preInscribedMint ||
               (maxSupplyValue !== null && maxSupplyValue > 0n);
           } catch {
+            // A failed read is "could not check", not "not configured".
             unpaused = null;
             launchMintPriceConfigured = false;
             launchMaxSupplyConfigured = false;
+            chainReadFailed = true;
           }
         }
       }
@@ -514,7 +563,10 @@ export default function CollectionManagerApp() {
         uploadReadinessReason:
           readiness.ready === true ? null : toText(readiness.reason) || null,
         deployReadinessReason:
-          deployReady ? null : toText(readiness.reason) || null
+          deployReady ? null : toText(readiness.reason) || null,
+        inventoryRegistered,
+        chainReadFailed,
+        stagedFileCount: inventoryHashes?.length ?? activeAssetCount
       });
     } catch (error) {
       setJourneySnapshot((current) => ({
@@ -687,7 +739,6 @@ export default function CollectionManagerApp() {
       document.getElementById('manage-storage-workspace')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    if (task === 'launch') setExperienceMode('guided');
     const panels = { collections: 'collection-list', create: 'deploy-wizard', artwork: 'asset-staging', metadata: 'publish-ops', launch: 'launch-controls' } as const;
     jumpToPanel(panels[task]);
   };
@@ -730,13 +781,50 @@ export default function CollectionManagerApp() {
 
   const handleCreateNewCollection = useCallback(() => {
     setStoredActiveCollectionId('');
+    if (typeof window !== 'undefined' && activeCollectionStorageKey) {
+      try {
+        window.localStorage.removeItem(activeCollectionStorageKey);
+      } catch {
+        // Selection is in-memory only when storage is unavailable.
+      }
+    }
     setActiveCollectionId('');
     setActiveCollectionLabel('');
     setCreateNewCollectionToken((current) => current + 1);
     setActiveJourneyStepId('create-draft');
     requestJourneyRefresh();
     jumpToPanel('deploy-wizard');
-  }, [jumpToPanel, requestJourneyRefresh]);
+  }, [jumpToPanel, requestJourneyRefresh, activeCollectionStorageKey]);
+
+  // Guided mode has no always-mounted picker, so resume the saved collection here.
+  useEffect(() => {
+    const storedId = storedActiveCollectionId.trim();
+    if (experienceMode !== 'guided' || !storedId || activeCollectionId.trim()) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(`/collections/${encodeURIComponent(storedId)}`, {
+          cache: 'no-store'
+        });
+        if (!response.ok || cancelled) return;
+        const record = (await response.json()) as Record<string, unknown>;
+        const state = toText(record.state).toLowerCase();
+        const owner = toText(record.artist_address).toUpperCase();
+        const wallet = walletSession.address?.trim().toUpperCase() ?? '';
+        if (cancelled || state === 'archived' || (owner && wallet && owner !== wallet)) return;
+        setActiveCollectionId(toText(record.id) || storedId);
+        setActiveCollectionLabel(toText(record.display_name) || toText(record.slug));
+        requestJourneyRefresh();
+      } catch {
+        // Resume is best-effort; the creator can still pick from Switch collection.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [experienceMode, storedActiveCollectionId, activeCollectionId, walletSession.address, requestJourneyRefresh]);
 
   const handleJourneyStepClick = (stepId: JourneyStepId) => {
     const step = journeySteps.find((candidate) => candidate.id === stepId);
@@ -783,23 +871,45 @@ export default function CollectionManagerApp() {
     }
   };
 
+  const standardMintForChecks = journeySnapshot.mintType !== 'pre-inscribed';
+  const advancedLaunchChecks = [
+      { label: 'Contract confirmed on-chain', ok: journeySignals.deployReady, hint: 'finish Prepare contract' },
+      ...(journeySignals.inventoryRegistered === null || journeySignals.inventoryRegistered === undefined
+        ? []
+        : [{ label: 'Every uploaded file registered on the contract', ok: journeySignals.inventoryRegistered, hint: 'check and register files in Prepare contract' }]),
+      ...(journeySignals.chainReadFailed
+        ? [{ label: 'Contract status readable', ok: false, hint: 'could not read your contract — refresh readiness' }]
+        : []),
+      ...(standardMintForChecks
+        ? [{ label: 'Max supply set', ok: journeySignals.launchMaxSupplyConfigured, hint: 'set it in Mint rules' }]
+        : []),
+      { label: 'Price set', ok: journeySignals.launchMintPriceConfigured, hint: 'set it in Mint rules' }
+    ];
   if (experienceMode === 'guided') {
+    const launchChecks = advancedLaunchChecks;
     return <CollectionBuilder collectionId={activeCollectionId} collectionName={activeCollectionLabel}
       walletKey={`${walletSession.network}:${walletSession.address || 'disconnected'}`}
       signals={journeySignals} loading={journeySnapshot.loading} error={journeySnapshot.error}
       previewCover={journeySnapshot.previewCover} previewDescription={journeySnapshot.previewDescription}
       onRefresh={handleJourneyRefresh} onAdvanced={setAdvancedMode} onCreate={handleCreateNewCollection}
-      wallet={<WalletTopBar walletSession={walletSession} walletPending={walletPending} onConnect={handleConnectWallet} onDisconnect={handleDisconnectWallet} showAddressWhenNamed />}
+      wallet={<><WalletTopBar walletSession={walletSession} walletPending={walletPending} onConnect={handleConnectWallet} onDisconnect={handleDisconnectWallet} showAddressWhenNamed /><CreatorSessionBadge /></>}
       picker={<CollectionListPanel activeCollectionId={activeCollectionId} preferredCollectionId={storedActiveCollectionId} refreshKey={journeyRefreshKey} onSelectCollection={handleSelectCollection} />}
-      deploy={<DeployWizardPanel activeCollectionId={activeCollectionId} createNewToken={createNewCollectionToken} isXtrataOwner={isXtrataOwner} onDraftReady={handleDraftReady} onJourneyRefreshRequested={requestJourneyRefresh} journeyRefreshToken={journeyRefreshKey} />}
-      artwork={<AssetStagingPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} highlightLockAction />}
-      inventory={<CollectionInventoryPanel collectionId={activeCollectionId} />}
-      rules={<><CollectionSettingsPanel mode="guided" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} onJourneyRefreshRequested={requestJourneyRefresh} />
-        <details className="creator-builder__optional"><summary>Price tiers, schedules, payouts and allowlists</summary>
+      deploy={(stage) => <DeployWizardPanel stage={stage} activeCollectionId={activeCollectionId} createNewToken={createNewCollectionToken} isXtrataOwner={isXtrataOwner} onDraftReady={handleDraftReady} onJourneyRefreshRequested={requestJourneyRefresh} journeyRefreshToken={journeyRefreshKey} />}
+      artwork={<><FileRetentionNotice collectionId={activeCollectionId} refreshKey={journeyRefreshKey} /><AssetStagingPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} highlightLockAction /></>}
+      retention={<FileRetentionNotice collectionId={activeCollectionId} refreshKey={journeyRefreshKey} compact />}
+      inventory={<CollectionInventoryPanel key={activeCollectionId} collectionId={activeCollectionId} refreshKey={journeyRefreshKey} onVerified={requestJourneyRefresh} />}
+      rules={<><CollectionSettingsPanel mode="guided" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} stagedFileCount={journeySnapshot.stagedFileCount} onJourneyRefreshRequested={requestJourneyRefresh} />
+        <LazyDetails className="creator-builder__optional" summary="Optional: schedules, allowlists, wallet limits and payouts">
           <CollectionSettingsPanel mode="advanced" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} onJourneyRefreshRequested={requestJourneyRefresh} />
-        </details></>}
-      page={<><p className="alert">After publishing, return to Mint rules to enable minting. Publishing the page and unpausing the contract are separate actions.</p><PublishOpsPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} /></>}
-      storage={activeCollectionId ? <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} /> : null}
+        </LazyDetails></>}
+      page={<>
+        <ol className="creator-launch-steps meta-value"><li>Add your cover image and description.</li><li>Publish your mint page.</li><li>Open minting (at the bottom of this step).</li></ol>
+        <PublishOpsPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh}
+          priceConfigured={journeySignals.deployReady && !journeySignals.chainReadFailed ? journeySignals.launchMintPriceConfigured : undefined}
+          studioBlockers={launchChecks.filter((check) => !check.ok && check.label !== 'Price set').map((check) => `${check.label}: ${check.hint ?? 'not ready'}.`)} />
+        <CollectionSettingsPanel mode="launch" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} launchChecks={launchChecks} onJourneyRefreshRequested={requestJourneyRefresh} />
+      </>}
+      storage={activeCollectionId ? <><ReservationsPanel key={`res-${activeCollectionId}`} collectionId={activeCollectionId} /><StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} /></> : null}
     />;
   }
 
@@ -825,6 +935,7 @@ export default function CollectionManagerApp() {
           <code>/g/your-name.btc</code>. <a href="/agent-one/">Inscription Wizard</a> ·{' '}
           <a href="/g/512">Example gallery link format</a>
         </p>
+        <CreatorSessionBadge />
         <WalletTopBar
           walletSession={walletSession}
           walletPending={walletPending}
@@ -1069,10 +1180,10 @@ export default function CollectionManagerApp() {
           <div className="panel__header">
             <div>
               <h2>
-                Step 1: Deploy / draft setup
-                <InfoTooltip text="Create a draft and deploy with a locked template using drop basics plus Xtrata-managed payout defaults. Standard-mint pricing is set later in Step 3." />
+                Collection basics &amp; contract
+                <InfoTooltip text="Create a draft and deploy with a locked template using collection basics plus Xtrata-managed payout defaults. The price collectors pay is set in Registration, supply & price." />
               </h2>
-              <p>Set drop basics and deploy the contract template here. Standard mint price is configured later in Step 3 after Step 2 locks the fee floor.</p>
+              <p>Set collection basics and deploy the contract here. The price is set after your artwork is locked and the contract is deployed.</p>
             </div>
             <div className="panel__actions">
               <button
@@ -1110,7 +1221,7 @@ export default function CollectionManagerApp() {
                 <InfoTooltip
                   text={
                     lockStepFocused
-                      ? 'Locking staged assets writes the pricing lock that Step 3 uses to calculate the standard-mint fee floor.'
+                      ? 'Locking files records the largest file so pricing can include its inscription cost.'
                       : 'Upload files to Cloudflare, compute hashes/chunks, and store manifest rows for minting.'
                   }
                 />
@@ -1138,7 +1249,7 @@ export default function CollectionManagerApp() {
           </div>
         </section>
 
-        {!showAdvancedPanels && (
+        {(
           <section
             className={`panel app-section${collapsed['launch-controls'] ? ' panel--collapsed' : ''}`}
             id={MANAGE_PANEL_IDS['launch-controls']}
@@ -1147,12 +1258,11 @@ export default function CollectionManagerApp() {
             <div className="panel__header">
               <div>
                 <h2>
-                  Step 3: Launch controls
-                  <InfoTooltip text="Set the single collector-facing mint price, supply, and pause state from one guided panel." />
+                  Registration, supply &amp; price
+                  <InfoTooltip text="Register every file on your contract, set max supply once, and set the price collectors pay." />
                 </h2>
                 <p>
-                  Use quick actions to set the collector-facing mint price, supply, and
-                  launch pause state.
+                  Register your files, set how many can be minted and the price collectors pay.
                 </p>
               </div>
               <div className="panel__actions">
@@ -1168,13 +1278,13 @@ export default function CollectionManagerApp() {
               </div>
             </div>
             <div className="panel__body">
-              <CollectionInventoryPanel key={`${activeCollectionId}:${journeyRefreshKey}`} collectionId={activeCollectionId} />
+              <CollectionInventoryPanel key={activeCollectionId} collectionId={activeCollectionId} refreshKey={journeyRefreshKey} onVerified={requestJourneyRefresh} />
               <CollectionSettingsPanel
                 mode="guided"
                 activeCollectionId={activeCollectionId}
                 isXtrataOwner={isXtrataOwner}
+                stagedFileCount={journeySnapshot.stagedFileCount}
                 onJourneyRefreshRequested={requestJourneyRefresh}
-                onRequestAdvancedControls={setAdvancedMode}
               />
             </div>
           </section>
@@ -1188,10 +1298,10 @@ export default function CollectionManagerApp() {
           <div className="panel__header">
             <div>
               <h2>
-                Step 4: Go live
-                <InfoTooltip text="Mark a collection published, refresh reservations, and release stuck slots." />
+                Review &amp; launch
+                <InfoTooltip text="Publish your mint page, then open minting. Monitor reservations afterwards." />
               </h2>
-              <p>Publish when ready, then monitor reservations and clear expired slots.</p>
+              <p>Publish your page, then open minting when every check passes.</p>
             </div>
             <div className="panel__actions">
               <button
@@ -1209,7 +1319,12 @@ export default function CollectionManagerApp() {
             <PublishOpsPanel
               activeCollectionId={activeCollectionId}
               onJourneyRefreshRequested={requestJourneyRefresh}
+              priceConfigured={journeySignals.deployReady && !journeySignals.chainReadFailed ? journeySignals.launchMintPriceConfigured : undefined}
+              studioBlockers={advancedLaunchChecks.filter((check) => !check.ok && check.label !== 'Price set').map((check) => `${check.label}: ${check.hint ?? 'not ready'}.`)}
             />
+            <CollectionSettingsPanel mode="launch" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner}
+              launchChecks={advancedLaunchChecks} onJourneyRefreshRequested={requestJourneyRefresh} />
+            {activeCollectionId ? <ReservationsPanel key={`res-${activeCollectionId}`} collectionId={activeCollectionId} /> : null}
           </div>
         </section>
 
@@ -1217,17 +1332,6 @@ export default function CollectionManagerApp() {
           {activeCollectionId ? <StorageCleanupPanel key={activeCollectionId} collectionId={activeCollectionId} /> : <p className="panel">Choose or create a collection to manage its temporary storage.</p>}
         </div>
 
-        {!showAdvancedPanels && (
-          <div className="manage-advanced-teaser">
-            <p>Need deeper controls? Switch to Advanced mode to edit contract settings and run diagnostics.</p>
-            <span className="info-label">
-              <button className="button button--ghost" type="button" onClick={setAdvancedMode}>
-                Open advanced tools
-              </button>
-              <InfoTooltip text="Switches from guided layout to full advanced panel set." />
-            </span>
-          </div>
-        )}
 
         {showAdvancedPanels && (
           <>

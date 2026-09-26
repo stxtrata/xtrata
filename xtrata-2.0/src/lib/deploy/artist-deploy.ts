@@ -380,6 +380,15 @@ export const buildArtistDeployContractSource = (params: {
       replacement: `(contract-call? '${params.coreContractId} get-id-by-hash hash)`,
       errors
     });
+    // v1.7+ also reads fee units and upload state from the core statically;
+    // every static core call must follow the same pin.
+    source = source.replace(
+      /\(contract-call\? (?:\.xtrata-v3-2-3|'[A-Z0-9]+\.xtrata-v3-2-3) /g,
+      `(contract-call? '${params.coreContractId} `
+    );
+    if (/\(contract-call\? \.[a-zA-Z0-9-]+ /.test(source)) {
+      errors.push('Template still contains an unpinned static core call.');
+    }
   }
 
 

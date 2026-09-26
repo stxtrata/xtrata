@@ -1,11 +1,11 @@
 {
   "tool": "forever-twins live-check",
   "readOnly": true,
-  "ranAt": "2026-09-25T11:53:57.723Z",
-  "api": "http://127.0.0.1:38069",
-  "targets": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/tmp/ft-live-nCjpI6/targets.json",
+  "ranAt": "2026-09-25T17:49:56.207Z",
+  "api": "http://127.0.0.1:46105",
+  "targets": "/sessions/rcw-01fgkawmfabjwym2ecnk5yxv/tmp/ft-live-qKOKul/targets.json",
   "chainTip": {
-    "stacks_tip_height": 19,
+    "stacks_tip_height": 20,
     "stacks_tip": "0xsimnet",
     "burn_block_height": 4
   },

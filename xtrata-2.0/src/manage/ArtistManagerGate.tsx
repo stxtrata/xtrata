@@ -29,7 +29,10 @@ type ArtistManagerGateProps = {
 };
 
 function GateContent({ children }: ArtistManagerGateProps) {
-  const { walletSession, connect, disconnect } = useManageWallet();
+  const { walletSession, connect, disconnect, creatorSession, signIn, refreshCreatorSession } = useManageWallet();
+  const [signInPending, setSignInPending] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => resolveInitialTheme());
   const [walletPending, setWalletPending] = useState(false);
   const connectedAddress = walletSession.address ?? null;
@@ -152,7 +155,16 @@ function GateContent({ children }: ArtistManagerGateProps) {
         (resolvedAddress) => resolvedAddress === normalizedConnectedAddress
       )
     : false;
-  const allowed = literalAddressAllowed || runtimeLiteralAllowed || bnsAddressAllowed;
+  // Legacy browser-side check: only used while server sign-in is not set up.
+  const legacyAllowed = literalAddressAllowed || runtimeLiteralAllowed || bnsAddressAllowed;
+  const sessionMatchesWallet =
+    creatorSession.status === 'signed-in' &&
+    !!normalizedConnectedAddress &&
+    creatorSession.address.toUpperCase() === normalizedConnectedAddress;
+  const allowed =
+    creatorSession.status === 'unavailable'
+      ? legacyAllowed
+      : sessionMatchesWallet && (creatorSession.admin || creatorSession.allowlisted);
   const awaitingBnsAllowlistResolution =
     !!normalizedConnectedAddress &&
     !literalAddressAllowed &&
@@ -182,19 +194,48 @@ function GateContent({ children }: ArtistManagerGateProps) {
     return <>{children}</>;
   }
 
+  const handleSignIn = async () => {
+    setSignInPending(true);
+    setSignInError(null);
+    try {
+      await signIn();
+    } catch (error) {
+      setSignInError(error instanceof Error ? error.message : 'Sign-in was cancelled. Nothing changed.');
+    } finally {
+      setSignInPending(false);
+    }
+  };
+
+  const copyAddress = async () => {
+    if (!connectedAddress) return;
+    try {
+      await navigator.clipboard.writeText(connectedAddress);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const signedInElsewhere =
+    creatorSession.status === 'signed-in' && !sessionMatchesWallet;
+  const notListed =
+    sessionMatchesWallet && creatorSession.status === 'signed-in' && !creatorSession.allowlisted;
+  const listUnchecked =
+    notListed && creatorSession.status === 'signed-in' && !creatorSession.allowlistChecked;
+
   return (
     <div className="app">
       <header className="app__header">
-        <span className="eyebrow">Collection mint v1.6 · Xtrata Core v3.2.3</span>
-        <h1>Create your collection mint</h1>
-        <p>Prepare your artwork, configure your mint and launch a collection page. Collectors inscribe the files when they mint.</p>
+        <span className="eyebrow">Xtrata collection studio</span>
+        <h1>Create your collection</h1>
+        <p>Upload your artwork, set a price and publish a mint page. Collectors inscribe each file on-chain when they mint it.</p>
       </header>
       <main className="app__main">
         <section className="panel app-section">
           <div className="panel__header">
             <div>
-              <h2>Connect to your collection workspace</h2>
-              <p>Access currently requires an approved creator wallet. Connecting checks access; deploying and changing contract settings require separate transaction approvals.</p>
+              <h2>Sign in to your collection studio</h2>
+              <p>Two quick steps: connect your wallet, then sign a short message to prove it's yours. Signing is free, isn't a transaction and moves no funds. It keeps you signed in on this browser for 7 days.</p>
             </div>
             <div className="panel__actions">
               <label className="theme-select" htmlFor="artist-gate-theme-select">
@@ -216,103 +257,84 @@ function GateContent({ children }: ArtistManagerGateProps) {
             </div>
           </div>
           <div className="panel__body">
-            <WalletTopBar
-              walletSession={walletSession}
-              walletPending={walletPending}
-              onConnect={handleConnectWallet}
-              onDisconnect={handleDisconnectWallet}
-              showAddressWhenNamed
-            />
-            <div className="meta-grid">
-              <div>
-                <span className="meta-label">Connected address</span>
-                <span className="meta-value">
-                  {connectedAddress ? (
-                    <AddressLabel
-                      className="meta-value"
-                      address={connectedAddress}
-                      network={walletSession.network}
-                      showAddressWhenNamed
-                    />
-                  ) : (
-                    'Not connected'
-                  )}
-                </span>
-              </div>
-              <div>
-                <span className="meta-label">Workspace access list</span>
-                <span className="meta-value">
-                  {allowlist.length > 0 ? allowlist.join(', ') : 'None'}
-                </span>
-              </div>
-              <div>
-                <span className="meta-label">Access configuration</span>
-                <span className="meta-value">
-                  {runtimeAllowlistSource
-                    ? `Runtime env (${runtimeAllowlistSource})${buildAllowlist.length > 0 ? ' + build env' : ''}`
-                    : 'Build env (VITE_ARTIST_ALLOWLIST)'}
-                </span>
-              </div>
-              {bnsAllowlist.length > 0 && (
-                <div>
-                  <span className="meta-label">Resolved .btc names</span>
+            <ol className="creator-gate-steps">
+              <li data-done={walletSession.isConnected ? 'true' : 'false'}>
+                <strong>1. Connect your wallet</strong>
+                <WalletTopBar
+                  walletSession={walletSession}
+                  walletPending={walletPending}
+                  onConnect={handleConnectWallet}
+                  onDisconnect={handleDisconnectWallet}
+                  showAddressWhenNamed
+                />
+                {connectedAddress ? (
                   <span className="meta-value">
-                    {bnsAllowlist
-                      .map((name) => {
-                        const resolved = resolvedBnsAllowlist[name];
-                        if (resolved) {
-                          return `${name} -> ${resolved}`;
-                        }
-                        return bnsResolutionPending
-                          ? `${name} -> resolving...`
-                          : `${name} -> unresolved`;
-                      })
-                      .join(', ')}
+                    Connected:{' '}
+                    <AddressLabel className="meta-value" address={connectedAddress} network={walletSession.network} showAddressWhenNamed />
                   </span>
+                ) : null}
+              </li>
+              {creatorSession.status !== 'unavailable' ? (
+                <li data-done={sessionMatchesWallet ? 'true' : 'false'}>
+                  <strong>2. Sign in</strong>
+                  {creatorSession.status === 'loading' ? (
+                    <span className="meta-value">Checking…</span>
+                  ) : sessionMatchesWallet ? (
+                    <span className="meta-value">Signed in.</span>
+                  ) : (
+                    <div className="mint-actions">
+                      <button type="button" className="button" disabled={!walletSession.isConnected || signInPending} onClick={() => void handleSignIn()}>
+                        {signInPending ? 'Check your wallet…' : 'Sign in with your wallet'}
+                      </button>
+                    </div>
+                  )}
+                  {signedInElsewhere ? (
+                    <span className="meta-value">You're signed in with a different wallet. Sign in again with this one.</span>
+                  ) : null}
+                  {signInError ? <div className="alert" role="alert">{signInError}</div> : null}
+                </li>
+              ) : null}
+            </ol>
+            {creatorSession.status === 'unavailable' && walletSession.isConnected && awaitingBnsAllowlistResolution && (
+              <div className="alert">Checking your wallet against the creator list…</div>
+            )}
+            {listUnchecked ? (
+              <div className="alert" role="status">
+                Couldn't check the creator list right now.{' '}
+                <button type="button" className="button button--ghost button--mini" onClick={() => void refreshCreatorSession()}>Try again</button>
+              </div>
+            ) : null}
+            {(notListed && !listUnchecked) ||
+            (creatorSession.status === 'unavailable' && walletSession.isConnected && !legacyAllowed && !awaitingBnsAllowlistResolution) ? (
+              <div className="alert creator-gate-request">
+                <p><strong>This wallet isn't on the creator list yet.</strong> The studio is open to approved creators while it's in early access.</p>
+                <div className="mint-actions">
+                  <a className="button" href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Request access</a>
+                  <button type="button" className="button button--ghost" onClick={() => void copyAddress()}>
+                    {copied ? 'Address copied' : 'Copy my wallet address'}
+                  </button>
                 </div>
-              )}
-            </div>
-            {allowlist.length === 0 && (
-              <div className="alert">
-                No allowlist entries loaded. Set `VITE_ARTIST_ALLOWLIST` at build time, or set runtime `ARTIST_ALLOWLIST`, then redeploy.
+                <p className="meta-value">Send @XtrataLayers your wallet address. This list is separate from any collector allowlist you set up for your own mint.</p>
               </div>
-            )}
-            {!walletSession.isConnected && (
-              <div className="alert">
-                Connect a wallet to check access.
-              </div>
-            )}
-            {walletSession.isConnected && awaitingBnsAllowlistResolution && (
-              <div className="alert">
-                Checking allowlist .btc names against your connected wallet...
-              </div>
-            )}
-            {walletSession.isConnected && !allowed && !awaitingBnsAllowlistResolution && (
-              <div className="alert">
-                This wallet does not have collection workspace access yet. Connect an approved
-                creator wallet or request access from @XtrataLayers. This access list is
-                separate from the collector allowlists you configure for your mint.
-              </div>
-            )}
+            ) : null}
           </div>
         </section>
 
         <section className="collection-studio" aria-labelledby="collection-gate-flow">
           <div className="collection-studio__heading">
             <div>
-              <span className="eyebrow">From artwork to mint page</span>
-              <h2 id="collection-gate-flow">Set up once. Let collectors mint.</h2>
-              <p>The collection mint v1.6 helper works with Xtrata Core v3.2.3 to manage registered artwork hashes, buyer reservations and duplicate protection.</p>
+              <span className="eyebrow">What you'll do</span>
+              <h2 id="collection-gate-flow">Six guided steps from artwork to mint page</h2>
             </div>
           </div>
           <ol className="collection-studio__grid" style={{ listStyle: 'none', padding: 0 }}>
             {[
-              ['Create your collection', 'Choose a name, supply and collection details. Prepare and deploy your collection helper from the workspace.'],
-              ['Upload and organise artwork', 'Stage files in temporary storage, preview them and organise metadata. Uploading here does not inscribe the artwork.'],
-              ['Set prices and access', 'Configure prices, payouts, wallet limits and collector allowlists. Use phases for price tiers and mint windows defined by block heights.'],
-              ['Prepare your mint page', 'Add a cover and description, review the staged inventory and register its hashes before launch.'],
-              ['Review and launch', 'Check readiness, publish your collection page and enable minting when ready. Collectors complete inscription through the mint flow.'],
-              ['Manage storage after minting', 'Review retention and cleanup status. Cleanup requires verification and recovery safeguards; a matching on-chain hash alone is not enough to delete a file.']
+              ['Collection basics', 'Name your collection. Nothing is deployed and no wallet approval is needed yet.'],
+              ['Artwork & metadata', 'Upload your files and lock them for pricing. Uploading doesn’t inscribe anything.'],
+              ['Prepare contract', 'Deploy your collection contract, then register every file on it. Both are wallet approvals.'],
+              ['Mint rules', 'Set how many can be minted (permanent) and the one price collectors pay.'],
+              ['Review & launch', 'Add a cover and description, publish your page, then open minting.'],
+              ['Manage collection', 'Watch mints, handle reservations and review file storage.']
             ].map(([title, description], index) => (
               <li className="collection-studio__task" style={{ cursor: 'default' }} key={title}>
                 <span className="collection-studio__number">{String(index + 1).padStart(2, '0')}</span>
@@ -320,8 +342,7 @@ function GateContent({ children }: ArtistManagerGateProps) {
               </li>
             ))}
           </ol>
-          <p className="collection-studio__note">Temporary storage has a retention window. Review expiry and cleanup availability in the workspace before launch. On-chain configuration and minting incur fees, shown in their respective transaction flows.</p>
-          <p>Need creator access? <a href="https://x.com/XtrataLayers" target="_blank" rel="noreferrer">Contact @XtrataLayers</a>.</p>
+          <p className="collection-studio__note">Uploaded files are kept for 3 days while you set up (you can extend once by 14 days). Once your contract is deployed they're kept until minted.</p>
         </section>
       </main>
     </div>

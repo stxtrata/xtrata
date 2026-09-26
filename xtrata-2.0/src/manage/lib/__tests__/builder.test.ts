@@ -9,3 +9,15 @@ describe('creator builder gates',()=>{
  it('does not require staged artwork or standard supply for pre-inscribed collections',()=>{const s={...draft,mintType:'pre-inscribed' as const,deployReady:true,launchMintPriceConfigured:true};expect(getBuilderGates(s).launch).toBeNull();expect(getBuilderCompletion(s).artwork).toBe(true);});
  it('does not call a published but paused collection launched',()=>{expect(getBuilderCompletion({...draft,published:true,unpaused:false}).launch).toBe(false);});
 });
+describe('registration and read-failure gates',()=>{
+ const ready={...draft,deployReady:true,launchMintPriceConfigured:true,launchMaxSupplyConfigured:true};
+ it('blocks launch until every uploaded file is registered on the contract',()=>{
+  expect(getBuilderGates({...ready,inventoryRegistered:false}).launch).toMatch(/Register your uploaded files/);
+  expect(getBuilderCompletion({...ready,inventoryRegistered:false}).contract).toBe(false);
+  expect(getBuilderGates({...ready,inventoryRegistered:true}).launch).toBeNull();
+  expect(getBuilderCompletion({...ready,inventoryRegistered:true}).contract).toBe(true);
+ });
+ it('says a failed chain read is unknown rather than asking to set price again',()=>{
+  expect(getBuilderGates({...draft,deployReady:true,chainReadFailed:true}).launch).toMatch(/Could not read your contract/);
+ });
+});

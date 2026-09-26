@@ -760,6 +760,14 @@ Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, ze
 
 Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Explicit core/master paid starts, atomic 50-microSTX holder payment, wallet-scoped 16-byte receipts and totals. No treasury, custody or admin. Source SHA-256 pinned in browser and CLI deployment registries. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md` for ABI, errors, tests and deployment stages.
 
-## Collection mint v1.6 candidate (Core v3.2.3)
+## Collection mint v1.7 (Core v3.2.3) — current template for new collections
 
-`contracts/live/xtrata-collection-mint-v1.6.clar` and its Clarinet counterpart retain v1.5 behaviour with a 32-chunk atomic mint ceiling. The updated deployment canary targets `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-6`. As of the preparation run, live preflight passed but wallet deployment remains pending. See `docs/notes/collection-v16-deployment-canary.md` for source hash, tests and v1.5 retirement evidence.
+`contracts/live/xtrata-collection-mint-v1.7.clar` (Clarinet counterpart `contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar`, SHA-256 `d76e697e3d26fc828af21f046881b05e518ef456e86d863181672b55e2c16999`) is v1.6 plus a **fixed collector price**: `mint-price` and every phase price are the all-in amount a collector pays in protocol + collection payments, identical for every file. At seal the helper deducts that file's Xtrata fees (begin fee recorded at reservation + staged seal fee read live from the pinned core) and pays the remainder through the splits. Price `u0` is a free mint (collectors pay protocol fees only). New reservations the price cannot cover fail with `u125 ERR-PRICE-BELOW-FEES` before any fee is paid; if fees rise mid-mint the payout is reduced (never below zero) instead of failing. New read-only `get-mint-quote (total-chunks)` and `get-fee-model` (`"fixed-collector-price"`). Every static core call (duplicate guard, fee units, upload state) is pinned on deploy by `buildArtistDeployContractSource` / SDK `deploy.ts`.
+
+Each collection deploys its own copy from this template through the studio; there is no central v1.7 deployment. Existing v1.5/v1.6 collections keep their original "price + protocol fees" model. Tests: `contracts/clarinet/tests/xtrata-collection-mint-v1.7.test.ts` (30: every v1.6 behaviour plus fixed-price totals, payout, u125 refusal, free mint, fee-rise, quote).
+
+Fee policy: Xtrata commits to giving creators at least 7 days' notice before raising protocol fee units.
+
+## Collection mint v1.6 (Core v3.2.3) — deployed, superseded for new collections
+
+`contracts/live/xtrata-collection-mint-v1.6.clar` and its Clarinet counterpart retain v1.5 behaviour with a 32-chunk atomic mint ceiling. Deployed on mainnet as `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-collection-mint-v1-6` and verified on 2026-09-15 (Numbers 1–10 runs on it). See `docs/notes/collection-v16-deployment-canary.md` for source hash, tests and v1.5 retirement evidence.

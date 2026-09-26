@@ -1,0 +1,199 @@
+{
+  "suite": "manifest-pipeline",
+  "ranAt": "2026-09-25T17:49:28.969Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 30,
+  "fail": 0,
+  "results": [
+    {
+      "id": "M-1",
+      "title": "builder: hashes, mime from magic bytes, fixed token-uri",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "every token built, none refused",
+          "pass": true,
+          "detail": "[]"
+        },
+        {
+          "label": "mime sniffed (png + svg)",
+          "pass": true,
+          "detail": "image/svg+xml"
+        },
+        {
+          "label": "token-uri is the fixed twin URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "xtrata hash differs from plain sha256 (rolling hash, not file hash)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "700 KB token marked for pre-inscription",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "M-2",
+      "title": "refusals: over the 32 MiB core cap, missing art, partial manifest",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "token over 32 MiB flagged as oversize",
+          "pass": true,
+          "detail": "[{\"id\":999,\"bytes\":33554433}]"
+        },
+        {
+          "label": "missing art is a failure, not a silent skip",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "exactly 512 KB is accepted",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "seed plan refuses a partial manifest",
+          "pass": true,
+          "detail": "refusing a partial manifest (scope: declared-subset (1-5) - NOT for finalisation)"
+        },
+        {
+          "label": "seed plan refuses an oversize entry",
+          "pass": true,
+          "detail": "id 3: size 33554433 outside 1..33554432"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "M-3",
+      "title": "seeding plan applied by the owner; checker before finalisation",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "plan: 1 seed call(s) + finalize",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "plan: one pre-inscription (begin, 2 batches, seal, bind)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "plan carries unsigned payloads",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "checker on an unseeded helper: MISMATCH (count 0, entries missing)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "seed-canonical from the plan: ok, count = n",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "checker: record matches but the large twin is unbound, so not ready",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise refused while the large twin is unbound (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "owner pre-inscription from the plan seals (core hash check passes)",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "bind-preinscribed ok",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "checker: seeded record matches, ready to finalise",
+          "pass": true,
+          "detail": "[]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "M-4",
+      "title": "finalise from the plan; checker after finalisation",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "finalize-canonical(manifest sha256, count) ok",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "checker: finalised and matches manifest (hash included)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "checker catches an edited manifest (token-uri + manifest hash)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "M-5",
+      "title": "builder hash == core hash: the manifest bytes inscribe through the real core",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "id 3: 900 bytes / 1 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 4: 67 bytes / 1 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 5: 16385 bytes / 2 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 40: 40000 bytes / 3 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 41: 70001 bytes / 5 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 42: 120000 bytes / 8 chunk(s) inscribed",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "hash helper agrees with lib",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

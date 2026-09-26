@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Twins Registry</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b675f; --line: #e6e2d9;
+    --ok: #1f7a4d; --warn: #9a5b00; --bad: #b3261e; --accent: #c2410c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #151412; --panel: #1d1c19; --ink: #efece6; --muted: #a39e94; --line: #34312c; --ok: #5cc38e; --warn: #e3a44a; --bad: #f08a80; --accent: #f08a4b; }
+  }
+  :root[data-theme="dark"] { --bg: #151412; --panel: #1d1c19; --ink: #efece6; --muted: #a39e94; --line: #34312c; --ok: #5cc38e; --warn: #e3a44a; --bad: #f08a80; --accent: #f08a4b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1040px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .lede { color: var(--muted); margin: 0 0 20px; max-width: 70ch; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; color: var(--muted); font-size: 13px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  table { width: 100%; border-collapse: collapse; min-width: 760px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; word-break: break-all; color: var(--muted); }
+  .pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .notes { margin-top: 20px; color: var(--muted); font-size: 13px; }
+  .notes li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Forever Twins registry</h1>
+  <p class="lede">Every listed helper, read live from Stacks mainnet. One helper per collection. Twins are verified against the
+    helper's finalised canonical record plus the on-chain manifest hash.</p>
+  <div class="bar"><button id="reload">Refresh</button><span id="status">Loading…</span></div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Collection</th><th>Helper</th><th>Code</th><th>Record</th><th class="num">Twins</th><th class="num">Fee (STX)</th><th>Checks</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <ul class="notes" id="notes"></ul>
+</main>
+<script type="module">
+import { makeReader, readHelper, registryProblems } from './clarity-lite.mjs';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const stx = (u) => (u == null ? '–' : (Number(u) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 }));
+const explorer = (id) => `https://explorer.hiro.so/txid/${encodeURIComponent(id)}?chain=mainnet`;
+
+async function load() {
+  $('status').textContent = 'Reading chain…';
+  const reg = await (await fetch('./registry.v1.json', { cache: 'no-store' })).json();
+  const reader = makeReader(new URLSearchParams(location.search).get('api') || 'https://api.hiro.so');
+  const regIssues = registryProblems(reg);
+  $('notes').innerHTML = reg.rules.map((r) => `<li>${esc(r)}</li>`).join('') + regIssues.map((r) => `<li class="bad">${esc(r)}</li>`).join('');
+  $('rows').innerHTML = reg.helpers.map((e) => `<tr id="r-${esc(e.key)}"><td>${esc(e.name)}<div class="mono">${esc(e.source)}</div></td>
+    <td><a href="${explorer(e.helper)}" target="_blank" rel="noopener">${esc(e.helper.split('.')[1])}</a><div class="mono">${esc(e.interface)} · ${esc(e.group)}</div></td>
+    <td colspan="5" class="mono">reading…</td></tr>`).join('');
+  let done = 0;
+  for (const e of reg.helpers) {
+    const r = await readHelper(reader, e);
+    const s = r.state || {};
+    const code = e.expectedSourceSha256 ? (r.sourceSha256 === e.expectedSourceSha256 ? '<span class="pill ok">matches</span>' : '<span class="pill bad">differs</span>') : '<span class="pill warn">not recorded</span>';
+    const rec = s.finalized === true ? '<span class="pill ok">finalised</span>' : '<span class="pill warn">not finalised</span>';
+    const checks = r.ok ? '<span class="ok">ok</span>' : r.problems.map((p) => `<div class="bad">${esc(p)}</div>`).join('');
+    const row = $(`r-${e.key}`);
+    row.innerHTML = row.innerHTML.replace(/<td colspan="5"[\s\S]*<\/td>$/, '') +
+      `<td>${code}</td><td>${rec}${s.canonicalCount != null ? `<div class="mono">${esc(s.canonicalCount)} in record</div>` : ''}</td>
+       <td class="num">${esc(s.inscribed ?? '–')}</td><td class="num">${stx(s.fee)}</td><td>${checks}</td>`;
+    $('status').textContent = `Read ${++done} of ${reg.helpers.length} helpers`;
+  }
+  $('status').textContent = `Read ${done} helpers from ${reader ? 'mainnet' : ''} at ${new Date().toLocaleTimeString()}`;
+}
+$('reload').onclick = () => load().catch((e) => { $('status').textContent = String(e); });
+load().catch((e) => { $('status').textContent = String(e); });
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 // ownership, no pause. Runs the G1/G2 family checks (F-*) against every prepared
 // real source with a v3 helper, then the v3-specific checks (V3-*).
 //
-//  F-1  sponsor inscribes; twin carries the canonical URI; fee split 50/50
+//  F-1  forged or wrong-length chunks refused by the core (u103/u102); sponsor inscribes; twin carries the canonical URI; fee split 50/50
 //  F-2  holder swaps in; custody consistent; swap charges no fee; repeat is u203
 //  F-3  a stranger cannot swap somebody else's original
 //  F-4  twin resale: old holder cannot redeem, new holder can
@@ -58,11 +58,17 @@ const sources = [
 ].filter((x) => deployed(C(x.name)) && deployed(C(x.helper ?? `ft3-${x.name}`)));
 
 let megapontMintSet = false, nextAppended = 3001;
+const giftEnabled = new Set();
 function mintTo(src, kind, to) {
   let r;
   if (kind === 'public-mint') r = pub(src, 'mint', [], to);
   else if (kind === 'appended') r = pub(src, 'simnet-mint', [Cl.uint(nextAppended++), Cl.principal(to)], D);
   else if (kind === 'owner-mint') r = pub(src, 'mint', [Cl.principal(to)], D);
+  else if (kind === 'claim') r = pub(src, 'claim', [], to);
+  else if (kind === 'gift') {
+    if (!giftEnabled.has(src)) { pub(src, 'set-minting-enabled', [Cl.bool(true)], D); giftEnabled.add(src); }
+    r = pub(src, 'gift', [Cl.principal(to)], D);
+  }
   else if (kind === 'owner-mint-via-mint-address') {
     if (!megapontMintSet) { pub(src, 'set-mint-address', [], D); megapontMintSet = true; }
     r = pub(src, 'mint', [Cl.principal(to)], D);
@@ -92,6 +98,13 @@ for (const src of sources) {
 
   scenario(`${src.name}:F-1`, `${tag} sponsor inscribes; canonical URI; fee split 50/50`, 'F-1');
   check(`fee-for(sponsor) quotes the full fee (${FEE})`, feeFor(H, sponsor) === FEE, feeFor(H, sponsor));
+  // core hash check through the v3 helper: the sponsor supplies only the chunks
+  const good = mediaFor(src.name, A), forged = Buffer.from(good); forged[forged.length - 2] ^= 1;
+  const rF = pub(H, 'inscribe', [Cl.uint(A), Cl.list([Cl.buffer(forged)])], sponsor);
+  check('same-length wrong bytes refused by the core hash check (u103); no binding, no fee', code(rF) === '103'
+    && ro(H, 'get-binding', [Cl.uint(A)]).result.type === 'none' && stxEvents(rF) === 0, code(rF));
+  const rL = pub(H, 'inscribe', [Cl.uint(A), Cl.list([Cl.buffer(Buffer.concat([good, Buffer.from(' ')]))])], sponsor);
+  check('wrong-length bytes refused by the core shape check (u102)', code(rL) === '102', code(rL));
   const rA = inscribe(H, src.name, A, sponsor), rB = inscribe(H, src.name, B, sponsor);
   check('sponsor inscribes A and B (held by others)', isOk(rA) && isOk(rB), `${code(rA)} ${code(rB)}`);
   check(`each payee receives exactly ${HALF} per inscription`, paidTo(rA, PA) === HALF && paidTo(rA, PB) === HALF && paidTo(rB, PA) === HALF && paidTo(rB, PB) === HALF,

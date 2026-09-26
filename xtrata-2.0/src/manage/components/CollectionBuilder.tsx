@@ -6,8 +6,12 @@ type Props = {
   collectionId: string; collectionName: string; walletKey: string;
   previewCover?: string | null; previewDescription?: string;
   signals: JourneySignals; loading: boolean; error: string | null;
-  wallet: ReactNode; picker: ReactNode; deploy: ReactNode; artwork: ReactNode;
+  wallet: ReactNode; picker: ReactNode; artwork: ReactNode;
+  /** One DeployWizardPanel shared by Basics and Prepare contract so form state survives; the stage decides which actions it offers. */
+  deploy: (stage: 'basics' | 'contract') => ReactNode;
   inventory: ReactNode; rules: ReactNode; page: ReactNode; storage: ReactNode;
+  /** Compact file-expiry line for the summary sidebar. */
+  retention?: ReactNode;
   onRefresh: () => void; onAdvanced: () => void; onCreate: () => void;
 };
 export default function CollectionBuilder(p: Props) {
@@ -36,7 +40,7 @@ export default function CollectionBuilder(p: Props) {
   const section = (id: BuilderStepId, content: ReactNode) => visited.has(id) && <div key={id} hidden={step !== id}>{content}</div>;
   return <div className="app manage-app creator-builder">
     <header className="creator-builder__top">
-      <div><span className="eyebrow">Collection studio · v1.6 / Core v3.2.3</span><h1>{p.collectionName || 'Your new collection'}</h1>
+      <div><span className="eyebrow">Collection studio</span><h1>{p.collectionName || 'Your new collection'}</h1>
       <p>{p.loading ? 'Checking saved collection…' : p.signals.published ? 'Published' : 'Draft'} · {p.signals.unpaused === true ? 'Minting enabled' : p.signals.unpaused === false ? 'Minting paused' : 'Mint status unconfirmed'}</p></div>
       <div>{p.wallet}<div className="mint-actions"><button type="button" className="button button--ghost" onClick={() => setShowPicker(!showPicker)}>Switch collection</button><button type="button" className="button button--ghost" onClick={p.onCreate}>New collection</button></div></div>
     </header>
@@ -55,7 +59,7 @@ export default function CollectionBuilder(p: Props) {
         {p.error && <div role="alert" className="alert">{p.error}</div>}
         {gates[step] && <div role="status" className="alert">{gates[step]}</div>}
         <div className="creator-builder__forms">
-          <div hidden={step !== 'basics' && step !== 'contract'}>{p.deploy}</div>
+          <div hidden={step !== 'basics' && step !== 'contract'}>{p.deploy(step === 'contract' ? 'contract' : 'basics')}</div>
           {section('artwork', p.artwork)}
           {section('contract', p.inventory)}
           {section('rules', p.rules)}
@@ -69,8 +73,11 @@ export default function CollectionBuilder(p: Props) {
       <aside className="creator-builder__review" aria-label="Collection summary"><span className="eyebrow">Your collection</span><h3>{p.collectionName || 'Untitled collection'}</h3>
         <div className="creator-builder__cover">{p.previewCover ? <img src={p.previewCover} alt={`${p.collectionName || 'Collection'} cover`} /> : <span>Set your cover in<br />Review & launch</span>}</div>
         {p.previewDescription && <p>{p.previewDescription}</p>}
-        <dl><dt>Active files</dt><dd>{p.signals.activeAssetCount}</dd><dt>Inventory</dt><dd>{p.signals.deployPricingLockPresent ? 'Staging locked' : 'Preparing'}</dd><dt>Contract</dt><dd>{p.signals.deployReady ? 'Confirmed' : 'Not confirmed'}</dd><dt>Mint price</dt><dd>{p.signals.launchMintPriceConfigured ? 'Configured' : 'Needs configuration'}</dd><dt>Page details</dt><dd>{p.signals.hasLivePageDescription && p.signals.hasLivePageCover ? 'Prepared' : 'Needs cover / description'}</dd></dl>
-        <p>Artwork stays in temporary storage until collectors mint. Review file expiry before launch.</p>
+        <dl><dt>Active files</dt><dd>{p.signals.activeAssetCount}</dd><dt>Inventory</dt><dd>{p.signals.deployPricingLockPresent ? 'Staging locked' : 'Preparing'}</dd><dt>Contract</dt><dd>{p.signals.deployReady ? 'Confirmed' : p.signals.deployPending ? 'Waiting for confirmation' : 'Not deployed'}</dd>
+          {p.signals.inventoryRegistered !== null && p.signals.inventoryRegistered !== undefined && <><dt>Files registered</dt><dd>{p.signals.inventoryRegistered ? 'All registered' : 'Needs registering'}</dd></>}
+          <dt>Max supply</dt><dd>{p.signals.mintType === 'pre-inscribed' ? 'n/a' : p.signals.chainReadFailed ? 'Could not check' : p.signals.launchMaxSupplyConfigured ? 'Set' : 'Not set'}</dd>
+          <dt>Mint price</dt><dd>{p.signals.chainReadFailed ? 'Could not check' : p.signals.launchMintPriceConfigured ? 'Set' : 'Not set'}</dd><dt>Page details</dt><dd>{p.signals.hasLivePageDescription && p.signals.hasLivePageCover ? 'Prepared' : 'Needs cover / description'}</dd></dl>
+        {p.retention ?? <p>Artwork stays in temporary storage until collectors mint.</p>}
         {p.collectionId && <a href={`/collection/${encodeURIComponent(p.collectionId)}`} target="_blank" rel="noreferrer">Open saved mint-page preview ↗</a>}
         <p className="creator-builder__help">Preview reflects saved data. Registration and final launch checks remain in their action panels.</p>
       </aside>

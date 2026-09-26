@@ -2,6 +2,7 @@ import { storageEnabled } from '../../lib/collection-storage/common';
 import { createUploadIntent, putVerifiedUpload, boundedBody } from '../../lib/collection-storage/uploads';
 import { badRequest, jsonResponse, serverError } from '../../lib/utils';
 import { getCollectionDeployReadiness } from '../../lib/collection-deploy';
+import { authorizeCreator } from '../../lib/creator-auth';
 import {
   canStageUploadsBeforeDeploy,
   isCollectionUploadsLocked
@@ -103,7 +104,7 @@ const ensureReadiness = async (params: {
       reason: `Uploads are locked while collection state is "${collectionState}".`
     };
   }
-  return { ok: true as const };
+  return { ok: true as const, collection: readiness.collection };
 };
 
 const summarizeCapabilities = (capabilities: BindingCapability[]) =>
@@ -154,6 +155,12 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       env: requestEnv,
       collectionId
     });
+    if (readiness.ok) {
+      const decision = await authorizeCreator(request, env, {
+        action: 'upload-url', collection: readiness.collection ?? { id: collectionId, artist_address: null }
+      });
+      if (!decision.allowed) return decision.response!;
+    }
     logDebug(requestId, 'readiness.checked', {
       ready: readiness.ok,
       reason: readiness.ok ? null : readiness.reason

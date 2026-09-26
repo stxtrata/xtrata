@@ -11,6 +11,7 @@ import {
   normalizeSlug,
   parseCollectionMetadata
 } from './lib/collections';
+import { authorizeCreator, creatorAuthMode, readCreatorSession } from './lib/creator-auth';
 
 const PUBLIC_COLLECTIONS_CACHE_CONTROL =
   'public, max-age=60, s-maxage=120, stale-while-revalidate=300';
@@ -62,7 +63,22 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
                 : "SELECT * FROM collections WHERE LOWER(COALESCE(state, 'draft')) != 'archived' ORDER BY created_at DESC"
             );
       const rows = (result.results ?? []).map(mapRow);
+      // Enforce mode: unpublished records are visible only to their creator or an admin.
+      let viewer: { address: string; admin: boolean } | null = null;
+      const enforce = creatorAuthMode(env) === 'enforce';
+      if (enforce) {
+        const read = await readCreatorSession(request, env);
+        if (!read.ok) {
+          return jsonResponse({ error: 'Sign-in is temporarily unavailable, so drafts cannot be listed. Try again shortly.' }, 503,
+            { 'Cache-Control': PRIVATE_NO_STORE_CACHE_CONTROL });
+        }
+        viewer = read.session;
+      }
       const filtered = rows.filter((row) => {
+        if (enforce && !isCollectionPublished(row.state) && !viewer?.admin &&
+            String(row.artist_address ?? '').toUpperCase() !== (viewer?.address ?? '').toUpperCase()) {
+          return false;
+        }
         if (publishedOnly && !isCollectionPublished(row.state)) {
           return false;
         }
@@ -93,7 +109,12 @@ export const onRequest: PagesFunction = async ({ request, env }) => {
 
   if (request.method === 'POST') {
     try {
+      const decision = await authorizeCreator(request, env, { action: 'create-collection', requireAllowlist: true });
+      if (!decision.allowed) return decision.response!;
       const payload = (await request.json()) as Record<string, unknown>;
+      // A signed-in creator always creates drafts as themselves; only an admin
+      // (or an unauthenticated caller in log/off mode) may name another address.
+      if (decision.address && !decision.admin) payload.artistAddress = decision.address;
       if (typeof payload.artistAddress !== 'string' || payload.artistAddress.trim() === '') {
         return badRequest('artistAddress is required.');
       }

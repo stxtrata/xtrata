@@ -123,6 +123,42 @@ epoch = "latest"
 path = "contracts/legacy/satoshibles.clar"
 clarity_version = 2
 epoch = "latest"
+[contracts.ordinal-pepe]
+path = "contracts/legacy/ordinal-pepe.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.conversion]
+path = "contracts/legacy/conversion.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.miamicoin-token]
+path = "contracts/test-doubles/citycoin-stub.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.newyorkcitycoin-token]
+path = "contracts/test-doubles/citycoin-stub.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.nyc-degens]
+path = "contracts/legacy/nyc-degens.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.see-yourself-out]
+path = "contracts/legacy/see-yourself-out.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bm-conversion]
+path = "contracts/legacy/bm-conversion.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bm-conversion-v2]
+path = "contracts/legacy/bm-conversion-v2.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bitcoin-monkeys]
+path = "contracts/legacy/bitcoin-monkeys.clar"
+clarity_version = 2
+epoch = "latest"
 [contracts.mock-leaky-market]
 path = "contracts/test-doubles/mock-leaky-market.clar"
 clarity_version = 4
@@ -225,5 +261,37 @@ clarity_version = 4
 epoch = "latest"
 [contracts.ft3-leaky-g2]
 path = "contracts/rendered/ft3-leaky-g2.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-ordinal-pepe]
+path = "contracts/rendered/ft2-ordinal-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-ordinal-pepe]
+path = "contracts/rendered/ft3-ordinal-pepe.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-nyc-degens]
+path = "contracts/rendered/ft3-nyc-degens.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-nyc-degens]
+path = "contracts/rendered/ft2-nyc-degens.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-see-yourself-out]
+path = "contracts/rendered/ft2-see-yourself-out.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-see-yourself-out]
+path = "contracts/rendered/ft3-see-yourself-out.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft2-bitcoin-monkeys]
+path = "contracts/rendered/ft2-bitcoin-monkeys.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-bitcoin-monkeys]
+path = "contracts/rendered/ft3-bitcoin-monkeys.clar"
 clarity_version = 4
 epoch = "latest"

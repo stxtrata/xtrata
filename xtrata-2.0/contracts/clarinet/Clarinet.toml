@@ -286,3 +286,8 @@ epoch = 'latest'
 path = 'contracts/xtrata-collection-mint-v1.6.clar'
 clarity_version = 4
 epoch = 'latest'
+
+[contracts.xtrata-collection-mint-v1-7]
+path = 'contracts/xtrata-collection-mint-v1.7.clar'
+clarity_version = 4
+epoch = 'latest'

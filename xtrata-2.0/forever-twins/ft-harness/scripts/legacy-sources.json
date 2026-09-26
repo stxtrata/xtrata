@@ -1,14 +1,18 @@
 {
   "_comment": "Archived sources prepared for simnet by scripts/prepare-legacy.mjs. Every change is a [simnet]-marked line: mainnet trait principals localised, plus an appended test mint ONLY where the real mint needs live sale state. Transfer, list, buy, burn and approval code is never touched.",
   "sources": [
-    { "name": "citadels",              "group": "G1", "family": "stacksart", "asset": "citadels",          "mint": "public-mint" },
-    { "name": "funky-donuts",          "group": "G1", "family": "stacksart", "asset": "funky-donuts",      "mint": "public-mint" },
-    { "name": "blocks",                "group": "G1", "family": "stacksart", "asset": "blocks",            "mint": "public-mint" },
-    { "name": "the-guests",            "group": "G2", "family": "gamma",     "asset": "the-guests",        "mint": "appended" },
-    { "name": "bitslimes",             "group": "G2", "family": "gamma",     "asset": "bitslimes",         "mint": "appended" },
-    { "name": "leo-cats",              "group": "G2", "family": "gamma",     "asset": "leo-cats",          "mint": "appended" },
-    { "name": "tigress",               "group": "G2", "family": "gamma",     "asset": "tigress",           "mint": "appended" },
-    { "name": "megapont-ape-club-nft", "group": "G2", "family": "megapont",  "asset": "Megapont-Ape-Club", "mint": "owner-mint-via-mint-address" },
-    { "name": "satoshibles",           "group": "G2", "family": "megapont",  "asset": "Satoshibles",       "mint": "owner-mint" }
+    {"name": "citadels", "group": "G1", "family": "stacksart", "asset": "citadels", "mint": "public-mint"},
+    {"name": "funky-donuts", "group": "G1", "family": "stacksart", "asset": "funky-donuts", "mint": "public-mint"},
+    {"name": "blocks", "group": "G1", "family": "stacksart", "asset": "blocks", "mint": "public-mint"},
+    {"name": "the-guests", "group": "G2", "family": "gamma", "asset": "the-guests", "mint": "appended"},
+    {"name": "bitslimes", "group": "G2", "family": "gamma", "asset": "bitslimes", "mint": "appended"},
+    {"name": "leo-cats", "group": "G2", "family": "gamma", "asset": "leo-cats", "mint": "appended"},
+    {"name": "tigress", "group": "G2", "family": "gamma", "asset": "tigress", "mint": "appended"},
+    {"name": "megapont-ape-club-nft", "group": "G2", "family": "megapont", "asset": "Megapont-Ape-Club", "mint": "owner-mint-via-mint-address"},
+    {"name": "satoshibles", "group": "G2", "family": "megapont", "asset": "Satoshibles", "mint": "owner-mint"},
+    {"name": "ordinal-pepe", "group": "G2", "family": "gamma", "asset": "ordinal-pepe", "mint": "appended"},
+    {"name": "nyc-degens", "group": "G1", "family": "degens", "asset": "nyc-degens", "mint": "gift", "rewrites": [["'SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token", ".miamicoin-token"], ["'SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token", ".newyorkcitycoin-token"]]},
+    {"name": "see-yourself-out", "group": "G2", "family": "gamma", "asset": "see-yourself-out", "mint": "appended"},
+    {"name": "bitcoin-monkeys", "group": "G1", "family": "degens", "asset": "bitcoin-monkeys", "mint": "claim", "rewrites": [["'SP466FNC0P7JWTNM2R9T199QRZN1MYEDTAR0KP27.miamicoin-token", ".miamicoin-token"], ["'SP2H8PY27SEZ03MWRKS5XABZYQN17ETGQS3527SA5.newyorkcitycoin-token", ".newyorkcitycoin-token"], [".conversion lookup", ".bm-conversion lookup"], [".conversion-v2 lookup", ".bm-conversion-v2 lookup"], ["(define-data-var target-block uint u39350)", "(define-data-var target-block uint u0)"], ["(try! (set-mint-time u39380))", "(try! (set-mint-time u0))"]]}
   ]
 }

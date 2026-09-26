@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:canary:collection-v17": "node scripts/build-collection-v17-canary.mjs",
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
     "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet && npm run build:music-profile",

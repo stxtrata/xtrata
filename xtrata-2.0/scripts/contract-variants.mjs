@@ -6,6 +6,14 @@ const ROOT = process.cwd();
 
 const VARIANT_SETS = [
   {
+    id: 'xtrata-collection-mint-v1.7',
+    syncMode: 'pinned-core',
+    variants: [
+      { name: 'clarinet', file: 'contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar', core: '.xtrata-v3-2-3' },
+      { name: 'mainnet-candidate', file: 'contracts/live/xtrata-collection-mint-v1.7.clar', core: "'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3" }
+    ]
+  },
+  {
     id: 'xtrata-collection-mint-v1.6',
     syncMode: 'pinned-core',
     variants: [

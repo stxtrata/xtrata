@@ -26,8 +26,10 @@ import {
   type CollectionMiningFeeGuidance
 } from '../../lib/collection-mint/mining-fee-guidance';
 import { resolveCollectionMintPricingMetadata } from '../../lib/collection-mint/pricing-metadata';
-import { supportsCollectionSmallSingleTx } from '../../lib/collection-mint/routing';
-import { SMALL_MINT_HELPER_MAX_CHUNKS } from '../../lib/mint/constants';
+import {
+  collectionSingleTxChunkLimit,
+  supportsCollectionSmallSingleTx
+} from '../../lib/collection-mint/routing';
 import {
   parseManageJsonResponse,
   toManageApiErrorMessage
@@ -214,6 +216,13 @@ const unwrapReadOnly = (value: ClarityValue) => {
 type PublishOpsPanelProps = {
   activeCollectionId?: string;
   onJourneyRefreshRequested?: () => void;
+  /**
+   * Studio-computed publish prerequisites (e.g. file registration, max supply)
+   * that this panel cannot see on its own. Each entry blocks publishing.
+   */
+  studioBlockers?: string[];
+  /** When provided, replaces the metadata-only price check (v1.5/v1.6 read the chain). */
+  priceConfigured?: boolean;
 };
 
 export default function PublishOpsPanel(props: PublishOpsPanelProps) {
@@ -357,8 +366,8 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
       return false;
     }
     const chunkCount = Math.floor(feeGuidance.chunkCount);
-    return chunkCount > 0 && chunkCount <= SMALL_MINT_HELPER_MAX_CHUNKS;
-  }, [feeGuidance, readiness.mintType, supportsSingleTxTemplate]);
+    return chunkCount > 0 && chunkCount <= collectionSingleTxChunkLimit(templateVersion);
+  }, [feeGuidance, readiness.mintType, supportsSingleTxTemplate, templateVersion]);
 
   const callCollectionReadOnly = async (
     functionName: string,
@@ -676,15 +685,15 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
       setMessage('Collection id required.');
       return;
     }
-    const response = await fetch(
-      `/collections/${encodeURIComponent(normalizedCollectionId)}/publish`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: 'published' })
-      }
-    );
     try {
+      const response = await fetch(
+        `/collections/${encodeURIComponent(normalizedCollectionId)}/publish`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'published' })
+        }
+      );
       await parseManageJsonResponse(response, 'Publish');
       setMessage('Collection published.');
       await loadReadiness();
@@ -1078,21 +1087,23 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
       return blockers;
     }
     if (!readiness.contractConnected) {
-      blockers.push('Deploy the contract in Step 1 before publishing.');
+      blockers.push('Deploy your contract in Prepare contract before publishing.');
     }
     if (readiness.mintType !== 'pre-inscribed' && readiness.activeAssets <= 0) {
-      blockers.push('Upload at least one artwork file in Step 2 before publishing.');
+      blockers.push('Upload at least one artwork file in Artwork & metadata before publishing.');
     }
-    if (
-      readiness.mintType === 'standard' &&
-      metadataPricing.mode === 'raw-on-chain'
-    ) {
+    const priceConfigured =
+      props.priceConfigured ?? metadataPricing.mode !== 'raw-on-chain';
+    if (readiness.mintType === 'standard' && !priceConfigured) {
       blockers.push(
-        'Set the mint price in Step 3 before publishing. Standard deploys start with a 0 STX on-chain payout base.'
+        'Set the price collectors pay in Mint rules before publishing. New contracts start with a 0 STX price.'
       );
     }
+    for (const blocker of props.studioBlockers ?? []) {
+      blockers.push(blocker);
+    }
     return blockers;
-  }, [collection?.state, collectionId, metadataPricing.mode, readiness]);
+  }, [collection?.state, collectionId, metadataPricing.mode, readiness, props.priceConfigured, props.studioBlockers]);
 
   const canPublish = publishBlockers.length === 0;
   const normalizedCollectionId = collectionId.trim();
@@ -1142,6 +1153,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
 
   return (
     <div className="publish-ops-panel">
+      {!props.activeCollectionId ? (
       <label className="field">
         <span className="field__label info-label">
           Collection ID
@@ -1174,6 +1186,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           <InfoTooltip text="Reloads backend reservation rows and on-chain reservation counters for this drop." />
         </span>
       </label>
+      ) : null}
 
       {livePagePath ? (
         <div className="deploy-wizard__defaults">
@@ -1441,7 +1454,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           <label className="field">
             <span className="field__label info-label">
               Choose collection image
-              <InfoTooltip text="Only image files staged in Step 2 are listed here." />
+              <InfoTooltip text="Only image files you uploaded in Artwork & metadata are listed here." />
             </span>
             <select
               className="select"
@@ -1464,7 +1477,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
             </select>
             <span className="field__hint">
               {availableImageAssets.length === 0
-                ? 'Upload at least one image in Step 2 to use it as collection cover art.'
+                ? 'Upload at least one image in Artwork & metadata to use it as collection cover art.'
                 : `${availableImageAssets.length} image asset${
                     availableImageAssets.length === 1 ? '' : 's'
                   } available.`}
@@ -1622,7 +1635,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
               Mint flow for largest file:{' '}
               <strong>
                 {largestFileUsesSingleTxFlow
-                  ? `Single transaction (begin + upload + seal in one wallet confirmation, <=${SMALL_MINT_HELPER_MAX_CHUNKS} chunks).`
+                  ? `Single transaction (begin + upload + seal in one wallet confirmation, <=${collectionSingleTxChunkLimit(templateVersion)} chunks).`
                   : 'Standard 3-stage route (begin -> upload batch(es) -> seal).'}
               </strong>
             </p>

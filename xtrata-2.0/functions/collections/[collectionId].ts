@@ -2,6 +2,8 @@ import { storageEnabled } from '../lib/collection-storage/common';
 import { jsonResponse, badRequest, notFound, serverError } from '../lib/utils';
 import { queryAll, run } from '../lib/db';
 import { getCollectionDeployReadiness } from '../lib/collection-deploy';
+import { retainCommittedAssets } from '../lib/asset-retention';
+import { authorizeCreator, denyPrivateRead } from '../lib/creator-auth';
 import {
   canonicalizeManageCollectionMetadata,
   mergeCollectionMetadata,
@@ -113,6 +115,10 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
         return notFound('Collection not found.');
       }
       const mappedRecord = mapRow(record);
+      if (!isCollectionPublished(mappedRecord.state)) {
+        const denied = await denyPrivateRead(request, env, record);
+        if (denied) return denied;
+      }
       const shouldPublicCache =
         isCollectionPublished(mappedRecord.state) &&
         isCollectionPublicVisible(mappedRecord.metadata);
@@ -141,10 +147,31 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       if (!resolvedCollectionId) {
         return serverError('Collection record is missing an id.');
       }
+      const decision = await authorizeCreator(request, env, { action: 'patch-collection', collection: existingRecord });
+      if (!decision.allowed) return decision.response!;
       const currentState = String(existingRecord.state ?? 'draft')
         .trim()
         .toLowerCase();
       const payload = (await request.json()) as Record<string, unknown>;
+      // Publishing has its own endpoint with readiness checks; PATCH may only
+      // archive or restore a draft.
+      if (typeof payload.state === 'string') {
+        const nextState = payload.state.trim().toLowerCase();
+        if (nextState === 'published') {
+          return badRequest('Use Publish to make a collection live; it runs the launch checks.');
+        }
+        if (nextState !== 'archived' && nextState !== 'draft') {
+          return badRequest('Unsupported collection state.');
+        }
+        if (currentState === 'published') {
+          return badRequest('Published collections cannot be archived or reset here.');
+        }
+        payload.state = nextState;
+      }
+      if (typeof payload.artistAddress === 'string' && decision.address && !decision.admin &&
+          payload.artistAddress.trim().toUpperCase() !== decision.address.toUpperCase()) {
+        return badRequest('Only an Xtrata admin can change a collection\'s creator.');
+      }
       const draftSettingsLocked =
         currentState === 'published' || currentState === 'archived';
       if (
@@ -171,6 +198,10 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
         updates.push('contract_address = ?');
         binds.push(payload.contractAddress.trim());
       }
+      if (payload.metadata && typeof payload.metadata === 'object') {
+        // Server-managed: the one-time file extension counter.
+        delete (payload.metadata as Record<string, unknown>).assetRetention;
+      }
       if (Object.prototype.hasOwnProperty.call(payload, 'metadata')) {
         const mergedMetadata = canonicalizeManageCollectionMetadata(
           mergeCollectionMetadata(existingRecord.metadata, payload.metadata)
@@ -189,6 +220,10 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       binds.push(resolvedCollectionId);
       const query = `UPDATE collections SET ${updates.join(', ')}, updated_at = ? WHERE id = ?`;
       await run(env, query, binds);
+      if (typeof payload.contractAddress === 'string' && payload.contractAddress.trim()) {
+        // Deployment commits the inventory: its files must never expire.
+        await retainCommittedAssets(env, resolvedCollectionId);
+      }
       const updated = await queryAll(
         env,
         'SELECT * FROM collections WHERE id = ?',
@@ -213,6 +248,13 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       });
       if (!record) {
         return notFound('Collection not found.');
+      }
+      const deleteDecision = await authorizeCreator(request, env, { action: 'delete-collection', collection: record });
+      if (!deleteDecision.allowed) return deleteDecision.response!;
+      // A deployed contract means these files are (or will be) collector inventory.
+      // Don't rely on a chain read here: a Hiro outage must never allow deletion.
+      if (String(record.contract_address ?? '').trim()) {
+        return badRequest('This collection has a deployed contract, so it cannot be deleted. Its files are kept until minted.');
       }
       const resolvedCollectionId = String(record.id ?? '').trim();
       if (!resolvedCollectionId) {

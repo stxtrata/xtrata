@@ -1,0 +1,47 @@
+{
+  "registry": "forever-twins",
+  "version": 1,
+  "network": "mainnet",
+  "core": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+  "rules": [
+    "One helper per source collection. A second helper for the same collection is never listed.",
+    "v3 entries are listed only if the deployed code's sha256 equals the sha256 of the published template rendered with that entry's config.",
+    "v1 entries are the three helpers live before the grant (built with Rapha / Fak.fun). They predate get-twin-interface and are read through their own getters.",
+    "A twin is verified against its helper's finalised canonical record plus the on-chain manifest hash."
+  ],
+  "helpers": [
+    {
+      "key": "bitcoin-pepes",
+      "name": "Bitcoin Pepes",
+      "source": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "interface": "v1",
+      "group": "G2",
+      "status": "live",
+      "expectedSourceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+      "evidence": "live-check 2026-09-24: deployed source byte-identical to contracts-reference/rapha-fakfun/pepe-4ever-fakfun.clar"
+    },
+    {
+      "key": "leo-cats",
+      "name": "LEO Cats",
+      "source": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+      "interface": "v1",
+      "group": "G2",
+      "status": "live",
+      "expectedSourceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+      "evidence": "live-check 2026-09-24: deployed source byte-identical to contracts-reference/rapha-fakfun/leo-fakfun-xtrata.clar"
+    },
+    {
+      "key": "miami-degens",
+      "name": "Miami Degens",
+      "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+      "interface": "v1",
+      "group": "G1",
+      "status": "live",
+      "expectedSourceSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513",
+      "evidence": "live-check 2026-09-24: deployed source hash recorded (no earlier repo reference; copy saved as miami-degens-fakfun-xtrata.DEPLOYED.clar)"
+    }
+  ]
+}

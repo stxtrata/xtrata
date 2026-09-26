@@ -99,3 +99,21 @@ describe('collection template deploy helpers', () => {
     expect(result.errors.length).toBeGreaterThan(0);
   });
 });
+
+describe('admin template on the newest helper (v1.7)', () => {
+  it('builds the live v1.7 source against core v3.2.3 and refuses older cores', async () => {
+    const { readFileSync } = await import('node:fs');
+    const v17 = readFileSync(new URL('../../../../contracts/live/xtrata-collection-mint-v1.7.clar', import.meta.url), 'utf8');
+    const core = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
+    const build = (coreId: string) => buildCollectionMintContractSource({
+      templateSource: v17,
+      draft: { ...createDefaultCollectionTemplateDraft(coreId), collectionName: 'Demo', collectionSymbol: 'DEMO' },
+      policy: createDefaultCollectionTemplatePolicy(coreId),
+      fallbackCoreContractId: coreId
+    });
+    const ok = build(core);
+    expect(ok.errors).toEqual([]);
+    expect(ok.source.split(`(contract-call? '${core} `).length - 1).toBe(8);
+    expect(build('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v2-1-0').errors.join(' ')).toMatch(/requires core v3.2.3/);
+  });
+});

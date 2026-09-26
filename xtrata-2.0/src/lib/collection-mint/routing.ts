@@ -26,7 +26,7 @@ export const supportsCollectionSmallSingleTx = (templateVersion: string) => {
 };
 
 export const collectionSingleTxChunkLimit = (version: string) =>
-  /^xtrata-collection-mint-v1[.-]6$/.test(version.trim()) ? 32 : SMALL_MINT_HELPER_MAX_CHUNKS;
+  /^xtrata-collection-mint-v1[.-][67]$/.test(version.trim()) ? 32 : SMALL_MINT_HELPER_MAX_CHUNKS;
 
 type ShouldUseCollectionSmallSingleTxParams = {
   templateVersion: string;

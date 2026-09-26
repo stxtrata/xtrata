@@ -57,3 +57,46 @@ After explicit user approval, Numbers 1–10 website metadata was synchronized t
 The collection mint page now uses a single accessible Mint progress status instead of the legacy three traffic-light rows. It distinguishes atomic versus resumable execution after inspecting actual bytes and existing chain state. The current deployed v1.5 helper enforces MAX-SMALL-MINT-CHUNKS u30 despite a list-32 argument; 31–32 chunks therefore cannot safely be sent through its atomic method. Fresh 1–30-chunk files already auto-route atomically, including all ten optimized JPEGs. Existing reservations/uploads retain resume routing. Supporting 32 chunks requires a revised deployed helper; this UI change does not alter the immutable contract.
 
 Validation: six routing tests passed, including v1.5 boundary coverage at 1/30/31/32/33; Vite build passed. UI code is local pending deployment; production collection publication is complete.
+
+## 2026-09-26: guided studio overhaul, sign-in, file retention, v1.7
+
+This section supersedes the v1.5 and 30-chunk references above.
+
+**Guided flow (six steps).**
+1. Collection basics: saves the draft only.
+2. Artwork & metadata: upload, then lock files for pricing. A retention notice shows the expiry date and offers the one-time "Keep my files" extension.
+3. Prepare contract: deploy (disabled once a contract exists), then register every file. The registration check reads each file on the contract and on the core, and flags files already inscribed elsewhere. A verified pass is saved as `metadata.inventoryRegistration`: contract id plus the SHA-256 of the sorted hashes. Any change to the files invalidates it.
+4. Mint rules:
+   - Max supply: set once, prefilled with the file count, warns on mismatch, needs an explicit acknowledgement, re-reads the chain before sending and waits for confirmation.
+   - Price: priced from the four v3.2.3 fee units.
+   - Optional controls for schedules, allowlists, limits and payouts sit in a lazily mounted disclosure.
+5. Review & launch: cover and description, then publish (the server re-checks registration and on-chain supply), then **Open minting**. The checklist covers registration, supply, price and the active phase window, and Open minting is disabled until every item passes.
+6. Manage: reservations (find and release expired ones) and storage cleanup.
+
+**Pricing.**
+- v1.5/v1.6: the collector price is the contract price plus the live fee quote for the largest file.
+- v1.7 (new collections): one fixed collector price for every file. The contract deducts each file's fees and pays out the rest.
+- The site's stored price is a cache, rewritten from the chain whenever the studio reads a different value.
+- If fee units change after pricing, a banner appears (v1.5/1.6 also get a "Keep my advertised price" action).
+- Policy: 7 days' notice before raising fees.
+
+**Preflights (the wallet never opens for a call the contract will reject).**
+- Signer role: owner, operator or finance admin.
+- Recipient editor rights.
+- Splits must total 100% or less; a 0/0/0 warning appears on the launch step.
+- Phase start must not be after its end.
+- Pasted allowlists are de-duplicated and conflicts rejected, the same as CSV import.
+- Finalize only when sold out with no reservations.
+
+**Sign-in and write protection.**
+- A SIP-018 signed challenge creates a 7-day HttpOnly session, with a Sign out button. Implemented in `functions/lib/creator-auth.ts` and `functions/manage/session.ts`, backed by migration 018.
+- Writes require the collection's creator or an admin (`XTRATA_ADMIN_ADDRESSES`, defaulting to the owner address).
+- The creator allowlist is checked server-side. The gate offers "Request access" and no longer reveals the list.
+- PATCH cannot publish.
+- Reservations use per-reservation tokens.
+- `CREATOR_AUTH_MODE`: `log` (default) records would-be refusals in `creator_auth_audit`; `enforce` blocks them; `off` is the rollback.
+
+**File retention.**
+- Deployed or published collections never expire their files (`functions/lib/asset-retention.ts`).
+- Drafts: 3 days, plus one 14-day extension.
+- Production repair on 2026-09-26 (`scripts/collection-expiry-restore.mjs`): 419 files protected and 252 restored after byte, hash and on-chain checks. The rollback is under `_claude_scratch/expiry-restore/`.

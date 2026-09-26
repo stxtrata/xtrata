@@ -281,6 +281,18 @@ export const buildCollectionMintContractSource = (params: {
 
   let source = params.templateSource;
 
+  // v1.5+ helpers (registered inventory) pin static core calls; they only work
+  // with core v3.2.3 and every static call must follow the pin.
+  if (source.includes('ERR-UNREGISTERED-HASH')) {
+    if (!resolvedDraft.coreContract.endsWith('.xtrata-v3-2-3')) {
+      errors.push('Collection mint v1.5+ requires core v3.2.3. Select the v3.2.3 core contract.');
+    }
+    source = source.replace(
+      /\(contract-call\? (?:\.xtrata-v3-2-3|'[A-Z0-9]+\.xtrata-v3-2-3) /g,
+      `(contract-call? '${resolvedDraft.coreContract} `
+    );
+  }
+
   source = replaceLine({
     source,
     pattern: /^\(define-constant ALLOWED-XTRATA-CONTRACT '.*\)$/m,

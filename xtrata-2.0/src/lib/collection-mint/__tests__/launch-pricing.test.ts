@@ -85,3 +85,45 @@ describe('resolveManagedCollectionMintPrice', () => {
     expect(price).toBe(800_000n);
   });
 });
+
+describe('v1.5/v1.6 fee floor (core v3.2.3 staged fees)', () => {
+  const units = { begin: 100_000n, chunk: 2_000n, batch: 100_000n, seal: 100_000n };
+
+  it('matches the live-page quote for the largest locked file', async () => {
+    const { resolveV15CollectionMintFeeFloor } = await import('../launch-pricing');
+    const { quoteCollectionV15Mint } = await import('../../../../packages/xtrata-sdk/src/collection-v15');
+    for (const maxChunks of [1, 30, 32, 33, 64, 65]) {
+      const floor = resolveV15CollectionMintFeeFloor({ maxChunks, units })!;
+      expect(floor.totalProtocolFeeMicroStx).toBe(quoteCollectionV15Mint(units, maxChunks, 0n).total);
+    }
+    // 32 chunks: begin 0.1 + seal 0.1 + 32 × 0.002 = 0.264 STX
+    expect(resolveV15CollectionMintFeeFloor({ maxChunks: 32, units })!.totalProtocolFeeMicroStx).toBe(264_000n);
+    expect(resolveV15CollectionMintFeeFloor({ maxChunks: 0, units })).toBeNull();
+  });
+
+  it('differs from the legacy single-unit floor that misprices v3.2.3', async () => {
+    const { resolveV15CollectionMintFeeFloor } = await import('../launch-pricing');
+    const legacy = resolveLockedCollectionMintFeeFloor({ maxChunks: 1, feeUnitMicroStx: units.batch })!;
+    const current = resolveV15CollectionMintFeeFloor({ maxChunks: 1, units })!;
+    expect(current.totalProtocolFeeMicroStx).toBe(202_000n);
+    expect(legacy.totalProtocolFeeMicroStx).not.toBe(current.totalProtocolFeeMicroStx);
+  });
+
+  it('shows contract price + floor and ignores stale metadata when a v1.5/v1.6 floor is supplied', () => {
+    const pricing = resolveCollectionMintPricingMetadata({
+      mode: 'price-includes-total-fees', mintPriceMicroStx: '1000000', onChainMintPriceMicroStx: '700000'
+    });
+    expect(resolveManagedCollectionMintPrice({
+      paymentModel: 'seal', contractMintPriceMicroStx: 736_000n, pricing,
+      pricingLockMaxChunks: 32, feeUnitMicroStx: 100_000n, feeFloorMicroStx: 264_000n
+    })).toBe(1_000_000n);
+  });
+
+  it('reports an unknown collector price when v1.5/v1.6 fees could not be read', () => {
+    const pricing = resolveCollectionMintPricingMetadata(null);
+    expect(resolveManagedCollectionMintPrice({
+      paymentModel: 'seal', contractMintPriceMicroStx: 736_000n, pricing,
+      pricingLockMaxChunks: 32, feeUnitMicroStx: null, feeFloorMicroStx: null
+    })).toBeNull();
+  });
+});

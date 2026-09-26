@@ -1,6 +1,6 @@
 {
   "suite": "live-check-vs-simnet",
-  "ranAt": "2026-09-25T11:53:58.030Z",
+  "ranAt": "2026-09-25T17:49:56.533Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
   "pass": 12,
   "fail": 0,

@@ -21,6 +21,8 @@ type CollectionRecord = {
 type CollectionReadiness = {
   ready: boolean;
   reason: string;
+  /** True only when the contract deployment is confirmed on-chain. */
+  deployReady?: boolean;
 };
 
 type CollectionListPanelProps = {
@@ -66,6 +68,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
   const [showArchived, setShowArchived] = useState(false);
   const [copiedCollectionId, setCopiedCollectionId] = useState<string | null>(null);
   const [pendingCollectionId, setPendingCollectionId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { walletSession } = useManageWallet();
   const connectedAddress = walletSession.address?.trim() ?? '';
 
@@ -128,9 +131,11 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
           'Collection readiness'
         );
 
-        if (readiness.ready) {
+        // `ready` is upload readiness (true for undeployed drafts too); only a
+        // confirmed deployment blocks removal.
+        if (readiness.deployReady === true) {
           setError(
-            'This drop has a confirmed on-chain deployment and cannot be removed from the list.'
+            'This collection has a confirmed on-chain deployment and cannot be removed from the list.'
           );
           return;
         }
@@ -348,7 +353,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
             <p className="meta-value">
               <span className="info-label">
                 Collection ID
-                <InfoTooltip text="Unique manager identifier used across Step 2, Step 3, and Step 4." />
+                <InfoTooltip text="Unique identifier for this collection in the studio." />
               </span>
               : <code>{collection.id}</code>
             </p>
@@ -443,7 +448,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
                 <p className="meta-value">
                   <span className="info-label">
                     Collection ID
-                    <InfoTooltip text="Unique manager identifier used across Step 2, Step 3, and Step 4." />
+                    <InfoTooltip text="Unique identifier for this collection in the studio." />
                   </span>
                   : <code>{collection.id}</code>
                 </p>
@@ -477,13 +482,21 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        if (confirmDeleteId !== collection.id) {
+                          setConfirmDeleteId(collection.id);
+                          return;
+                        }
+                        setConfirmDeleteId(null);
                         void deleteCollection(collection);
                       }}
+                      onBlur={() => setConfirmDeleteId((current) => (current === collection.id ? null : current))}
                       disabled={pendingCollectionId !== null}
                     >
                       {pendingCollectionId === collection.id
                         ? 'Deleting...'
-                        : 'Delete permanently'}
+                        : confirmDeleteId === collection.id
+                          ? 'Click again to delete forever'
+                          : 'Delete permanently'}
                     </button>
                     <InfoTooltip text="Permanent cleanup of this archived draft and linked storage records. This cannot be undone." />
                   </span>

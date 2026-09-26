@@ -150,6 +150,10 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
     );
     headers.set('X-Xtrata-Request-Id', requestId);
     headers.set('X-Xtrata-Asset-Binding', binding ?? 'unknown');
+    // Creator-uploaded bytes must never run with this site's origin (and so its
+    // sign-in cookie): force an opaque, sandboxed origin even on direct visits.
+    headers.set('Content-Security-Policy', 'sandbox allow-scripts');
+    headers.set('X-Content-Type-Options', 'nosniff');
 
     return new Response(object.body, { status: 200, headers });
   } catch (error) {

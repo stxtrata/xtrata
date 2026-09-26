@@ -1,8 +1,8 @@
 {
   "suite": "family-suite-v3",
-  "ranAt": "2026-09-25T11:53:51.499Z",
+  "ranAt": "2026-09-25T17:49:20.197Z",
   "environment": "clarinet-sdk simnet (local). Not mainnet state.",
-  "pass": 397,
+  "pass": 537,
   "fail": 0,
   "results": [
     {
@@ -14,6 +14,16 @@
           "label": "fee-for(sponsor) quotes the full fee (1000000)",
           "pass": true,
           "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
         },
         {
           "label": "sponsor inscribes A and B (held by others)",
@@ -184,6 +194,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -350,6 +370,16 @@
           "label": "fee-for(sponsor) quotes the full fee (1000000)",
           "pass": true,
           "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
         },
         {
           "label": "sponsor inscribes A and B (held by others)",
@@ -520,6 +550,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -686,6 +726,16 @@
           "label": "fee-for(sponsor) quotes the full fee (1000000)",
           "pass": true,
           "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
         },
         {
           "label": "sponsor inscribes A and B (held by others)",
@@ -912,6 +962,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -1134,6 +1194,16 @@
           "label": "fee-for(sponsor) quotes the full fee (1000000)",
           "pass": true,
           "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
         },
         {
           "label": "sponsor inscribes A and B (held by others)",
@@ -1360,6 +1430,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -1582,6 +1662,16 @@
           "label": "fee-for(sponsor) quotes the full fee (1000000)",
           "pass": true,
           "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
         },
         {
           "label": "sponsor inscribes A and B (held by others)",
@@ -1808,6 +1898,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -2027,6 +2127,16 @@
           "detail": "1000000"
         },
         {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
           "label": "sponsor inscribes A and B (held by others)",
           "pass": true,
           "detail": "ok ok"
@@ -2195,6 +2305,820 @@
     {
       "id": "satoshibles:F-6",
       "title": "satoshibles [v3 G2/megapont] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a non-owner cannot propose a rescue (u204)",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "owner proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-1",
+      "title": "ordinal-pepe [v3 G2/gamma] sponsor inscribes; canonical URI; fee split 50/50",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "fee-for(sponsor) quotes the full fee (1000000)",
+          "pass": true,
+          "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": "ok ok"
+        },
+        {
+          "label": "each payee receives exactly 500000 per inscription",
+          "pass": true,
+          "detail": "500000/500000"
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: v3, group G2, fee 1000000, both payees",
+          "pass": true,
+          "detail": "[\"3\",\"G2\",\"1000000\"]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-L1",
+      "title": "ordinal-pepe [v3 G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217)",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-2",
+      "title": "ordinal-pepe [v3 G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "swap charges no fee",
+          "pass": true,
+          "detail": "0"
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-5",
+      "title": "ordinal-pepe [v3 G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-L2",
+      "title": "ordinal-pepe [v3 G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-3",
+      "title": "ordinal-pepe [v3 G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-4",
+      "title": "ordinal-pepe [v3 G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original, no fee",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "ordinal-pepe:F-6",
+      "title": "ordinal-pepe [v3 G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a non-owner cannot propose a rescue (u204)",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "owner proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-1",
+      "title": "nyc-degens [v3 G1/degens] sponsor inscribes; canonical URI; fee split 50/50",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "fee-for(sponsor) quotes the full fee (1000000)",
+          "pass": true,
+          "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": "ok ok"
+        },
+        {
+          "label": "each payee receives exactly 500000 per inscription",
+          "pass": true,
+          "detail": "500000/500000"
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: v3, group G1, fee 1000000, both payees",
+          "pass": true,
+          "detail": "[\"3\",\"G1\",\"1000000\"]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-2",
+      "title": "nyc-degens [v3 G1/degens] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "swap charges no fee",
+          "pass": true,
+          "detail": "0"
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-5",
+      "title": "nyc-degens [v3 G1/degens] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "500"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-3",
+      "title": "nyc-degens [v3 G1/degens] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-4",
+      "title": "nyc-degens [v3 G1/degens] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original, no fee",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "nyc-degens:F-6",
+      "title": "nyc-degens [v3 G1/degens] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a non-owner cannot propose a rescue (u204)",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "owner proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-1",
+      "title": "see-yourself-out [v3 G2/gamma] sponsor inscribes; canonical URI; fee split 50/50",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "fee-for(sponsor) quotes the full fee (1000000)",
+          "pass": true,
+          "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": "ok ok"
+        },
+        {
+          "label": "each payee receives exactly 500000 per inscription",
+          "pass": true,
+          "detail": "500000/500000"
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: v3, group G2, fee 1000000, both payees",
+          "pass": true,
+          "detail": "[\"3\",\"G2\",\"1000000\"]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-L1",
+      "title": "see-yourself-out [v3 G2/gamma] listed original refused by helper guard",
+      "specRef": "F-L1",
+      "checks": [
+        {
+          "label": "holder lists A on the source market",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "helper reports A as listed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "deposit refused by the G2 guard (u217)",
+          "pass": true,
+          "detail": "217"
+        },
+        {
+          "label": "holder unlists",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-2",
+      "title": "see-yourself-out [v3 G2/gamma] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "swap charges no fee",
+          "pass": true,
+          "detail": "0"
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-5",
+      "title": "see-yourself-out [v3 G2/gamma] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot burn it",
+          "pass": true,
+          "detail": "104"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-L2",
+      "title": "see-yourself-out [v3 G2/gamma] no listing can exist on a held original",
+      "specRef": "F-L2",
+      "checks": [
+        {
+          "label": "stranger cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "former holder cannot list it",
+          "pass": true,
+          "detail": "104"
+        },
+        {
+          "label": "nobody can buy it",
+          "pass": true,
+          "detail": "106"
+        },
+        {
+          "label": "helper reports no listing",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-3",
+      "title": "see-yourself-out [v3 G2/gamma] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-4",
+      "title": "see-yourself-out [v3 G2/gamma] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original, no fee",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:F-6",
+      "title": "see-yourself-out [v3 G2/gamma] stray original rescued after delay",
+      "specRef": "F-6",
+      "checks": [
+        {
+          "label": "holder2 sends B straight to the helper by mistake",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody state reports stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a non-owner cannot propose a rescue (u204)",
+          "pass": true,
+          "detail": "204"
+        },
+        {
+          "label": "owner proposes rescue to the sender",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "too early: TIMELOCK (u213) before 3 Bitcoin blocks",
+          "pass": true,
+          "detail": "213"
+        },
+        {
+          "label": "rescue returns B; pair consistent again",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "normal swap works afterwards",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-1",
+      "title": "bitcoin-monkeys [v3 G1/degens] sponsor inscribes; canonical URI; fee split 50/50",
+      "specRef": "F-1",
+      "checks": [
+        {
+          "label": "fee-for(sponsor) quotes the full fee (1000000)",
+          "pass": true,
+          "detail": "1000000"
+        },
+        {
+          "label": "same-length wrong bytes refused by the core hash check (u103); no binding, no fee",
+          "pass": true,
+          "detail": "103"
+        },
+        {
+          "label": "wrong-length bytes refused by the core shape check (u102)",
+          "pass": true,
+          "detail": "102"
+        },
+        {
+          "label": "sponsor inscribes A and B (held by others)",
+          "pass": true,
+          "detail": "ok ok"
+        },
+        {
+          "label": "each payee receives exactly 500000 per inscription",
+          "pass": true,
+          "detail": "500000/500000"
+        },
+        {
+          "label": "twins in helper custody; originals untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin URI is the canonical URI",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: v3, group G1, fee 1000000, both payees",
+          "pass": true,
+          "detail": "[\"3\",\"G1\",\"1000000\"]"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-2",
+      "title": "bitcoin-monkeys [v3 G1/degens] holder swaps in",
+      "specRef": "F-2",
+      "checks": [
+        {
+          "label": "holder swaps A in, receives twin",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "swap charges no fee",
+          "pass": true,
+          "detail": "0"
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "repeat deposit is WRONG-STATE (u203)",
+          "pass": true,
+          "detail": "203"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-5",
+      "title": "bitcoin-monkeys [v3 G1/degens] held original cannot be moved through the source",
+      "specRef": "F-5",
+      "checks": [
+        {
+          "label": "former holder cannot transfer it out",
+          "pass": true,
+          "detail": "500"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-3",
+      "title": "bitcoin-monkeys [v3 G1/degens] stranger cannot swap another holder's original",
+      "specRef": "F-3",
+      "checks": [
+        {
+          "label": "swap by non-owner fails; B stays with its holder",
+          "pass": true,
+          "detail": "1"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-4",
+      "title": "bitcoin-monkeys [v3 G1/degens] twin resale then redemption",
+      "specRef": "F-4",
+      "checks": [
+        {
+          "label": "holder sells the twin",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "old holder cannot redeem",
+          "pass": true,
+          "detail": "100"
+        },
+        {
+          "label": "buyer redeems the original, no fee",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after redemption",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:F-6",
+      "title": "bitcoin-monkeys [v3 G1/degens] stray original rescued after delay",
       "specRef": "F-6",
       "checks": [
         {

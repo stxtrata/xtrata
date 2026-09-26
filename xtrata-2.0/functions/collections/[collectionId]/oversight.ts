@@ -1,5 +1,7 @@
 import { badRequest, jsonResponse, notFound, serverError } from '../../lib/utils';
 import { queryAll, type Env } from '../../lib/db';
+import { authorizeCreator } from '../../lib/creator-auth';
+import { cleanupAccess } from '../../lib/collection-storage/auth';
 
 type DbRow = Record<string, unknown>;
 
@@ -176,6 +178,11 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
     const collection = (collectionResult.results?.[0] as DbRow | undefined) ?? null;
     if (!collection) {
       return notFound('Collection not found.');
+    }
+    // Lists storage keys: admins (or the storage operations token) only.
+    if (!cleanupAccess(request, env, true) && !cleanupAccess(request, env)) {
+      const decision = await authorizeCreator(request, env, { action: 'oversight', adminOnly: true });
+      if (!decision.allowed) return decision.response!;
     }
 
     const metadata = parseMetadata(collection.metadata);
