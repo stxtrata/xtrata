@@ -238,11 +238,14 @@ export default function CollectionCoverImage(props: CollectionCoverImageProps) {
     () => (classifyUrl(resolvedUrl) === 'runtime-content' ? resolvedUrl : null),
     [resolvedUrl]
   );
+  // The saved cover may not carry a mime type (e.g. the unsaved studio preview);
+  // fall back to what the chain says so HTML covers still open in a frame.
+  const effectiveMimeType = coverMimeType ?? inscriptionMetaQuery.data?.mimeType ?? null;
   const shouldUseRuntimeFrame = useMemo(
     () =>
       !!runtimeEndpointUrl &&
-      isExecutableRuntimeMimeType(coverMimeType),
-    [runtimeEndpointUrl, coverMimeType]
+      isExecutableRuntimeMimeType(effectiveMimeType),
+    [runtimeEndpointUrl, effectiveMimeType]
   );
   const shouldUseInscriptionBlob = useMemo(
     () =>
