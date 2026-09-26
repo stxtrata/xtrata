@@ -63,6 +63,49 @@ export const parseInscriptionTokenId = (value: unknown): string | null => {
 export const isSvgCoverImageMimeType = (value: unknown) =>
   toText(value).toLowerCase() === 'image/svg+xml';
 
+/**
+ * What an on-chain inscription can be used as a collection cover.
+ *  - image: shown as an <img>
+ *  - html:  shown live in a sandboxed runtime frame (animated or recursive covers)
+ *  - script / other: cannot display on its own; a page has to load it
+ */
+export type CoverMimeKind = 'image' | 'html' | 'script' | 'unsupported';
+
+const SCRIPT_MIME_TYPES = new Set([
+  'text/javascript',
+  'application/javascript',
+  'application/x-javascript',
+  'text/ecmascript',
+  'application/ecmascript'
+]);
+
+export const classifyCoverMimeType = (value: unknown): CoverMimeKind => {
+  const mimeType = toText(value).toLowerCase().split(';')[0].trim();
+  if (mimeType.startsWith('image/')) {
+    return 'image';
+  }
+  if (mimeType === 'text/html' || mimeType === 'application/xhtml+xml') {
+    return 'html';
+  }
+  if (SCRIPT_MIME_TYPES.has(mimeType)) {
+    return 'script';
+  }
+  return 'unsupported';
+};
+
+/** Null when the inscription can be a cover, else a plain-language reason. */
+export const coverInscriptionMimeProblem = (tokenId: string, mimeType: unknown) => {
+  const kind = classifyCoverMimeType(mimeType);
+  if (kind === 'image' || kind === 'html') {
+    return null;
+  }
+  const shown = toText(mimeType) || 'unknown';
+  if (kind === 'script') {
+    return `Inscription #${tokenId} is a script (${shown}). A script can't be shown on its own — it needs a page that loads it. Use an image or HTML inscription instead, for example the HTML page (or one of your items) that loads this script.`;
+  }
+  return `Inscription #${tokenId} is ${shown}. Covers can be an image or an HTML inscription.`;
+};
+
 const parseRuntimeContentUrl = (value: unknown) => {
   const imageUrl = toText(value);
   if (!imageUrl) {

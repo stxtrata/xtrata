@@ -136,3 +136,17 @@ describe('collection cover image helpers', () => {
     ).toBe(false);
   });
 });
+
+describe('cover inscription mime types', () => {
+  it('accepts images and HTML, explains scripts and other types', async () => {
+    const { classifyCoverMimeType, coverInscriptionMimeProblem } = await import('../cover-image');
+    expect(classifyCoverMimeType('image/webp')).toBe('image');
+    expect(classifyCoverMimeType('text/html; charset=utf-8')).toBe('html');
+    expect(classifyCoverMimeType('text/javascript')).toBe('script');
+    expect(classifyCoverMimeType('audio/mpeg')).toBe('unsupported');
+    expect(coverInscriptionMimeProblem('3059', 'text/html')).toBeNull();
+    expect(coverInscriptionMimeProblem('12', 'image/png')).toBeNull();
+    expect(coverInscriptionMimeProblem('3060', 'text/javascript')).toMatch(/is a script .*needs a page that loads it/);
+    expect(coverInscriptionMimeProblem('7', 'audio/mpeg')).toMatch(/image or an HTML inscription/);
+  });
+});

@@ -15,6 +15,7 @@ import { createXtrataClient } from '../../lib/contract/client';
 import {
   buildRuntimeInscriptionContentUrl,
   normalizeCoverImageSource,
+  coverInscriptionMimeProblem,
   parseInscriptionTokenId,
   type CoverImageSource
 } from '../../lib/collections/cover-image';
@@ -832,10 +833,12 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           );
           return;
         }
-        if (!isImageMimeType(inscriptionMeta.mimeType)) {
-          setCoverMessage(
-            `Inscription #${normalizedTokenId} mime type is ${inscriptionMeta.mimeType}, not image/*.`
-          );
+        const mimeProblem = coverInscriptionMimeProblem(
+          normalizedTokenId,
+          inscriptionMeta.mimeType
+        );
+        if (mimeProblem) {
+          setCoverMessage(mimeProblem);
           return;
         }
 
@@ -1446,7 +1449,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           >
             <option value="collection-asset">Image from this collection</option>
             <option value="inscribed-image-url">Existing inscribed image URL</option>
-            <option value="inscription-id">Existing inscription ID (on-chain)</option>
+            <option value="inscription-id">Existing inscription ID (image or HTML, on-chain)</option>
           </select>
         </label>
 
@@ -1503,7 +1506,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           <label className="field">
             <span className="field__label info-label">
               Existing inscription ID
-              <InfoTooltip text="Enter an inscription token ID. Save checks that connected wallet is the collection owner and also owns this inscription." />
+              <InfoTooltip text="Enter an inscription token ID. Images show as a picture; HTML inscriptions play live in a sandboxed frame. Save checks that the connected wallet owns both the collection and this inscription." />
             </span>
             <input
               className="input"
