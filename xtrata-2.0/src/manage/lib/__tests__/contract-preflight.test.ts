@@ -56,3 +56,17 @@ describe('splits, phases, finalize', () => {
     expect(finalizePreflight({ maxSupply: null, minted: 1n, reserved: 0n })).toMatch(/Could not read/);
   });
 });
+
+describe('payout split launch gate', () => {
+  it('blocks a paid mint with 0/0/0 splits, allows the standard split and free mints, and never treats a failed read as ok', async () => {
+    const { payoutSplitCheck, isStandardCreatorSplit, STANDARD_CREATOR_SPLIT } = await import('../contract-preflight');
+    const zero = { artist: 0n, marketplace: 0n, operator: 0n };
+    expect(payoutSplitCheck(zero, 20_000_000n).ok).toBe(false);
+    expect(payoutSplitCheck(zero, 20_000_000n).hint).toMatch(/Payout split/);
+    expect(payoutSplitCheck({ ...STANDARD_CREATOR_SPLIT }, 20_000_000n).ok).toBe(true);
+    expect(payoutSplitCheck(zero, 0n).ok).toBe(true);
+    expect(payoutSplitCheck(null, 20_000_000n).ok).toBe(false);
+    expect(isStandardCreatorSplit({ artist: 9500n, marketplace: 250n, operator: 250n })).toBe(true);
+    expect(isStandardCreatorSplit({ artist: 10000n, marketplace: 0n, operator: 0n })).toBe(false);
+  });
+});

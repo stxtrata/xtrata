@@ -76,6 +76,27 @@ export function splitsPreflight(artist: bigint, marketplace: bigint, operator: b
   return null;
 }
 
+/** The standard creator split: 95% artist, 2.5% Xtrata marketplace, 2.5% Xtrata operator. */
+export const STANDARD_CREATOR_SPLIT = { artist: 9500n, marketplace: 250n, operator: 250n } as const;
+type Splits = { artist: bigint; marketplace: bigint; operator: bigint };
+export const isStandardCreatorSplit = (s: Splits) =>
+  s.artist === STANDARD_CREATOR_SPLIT.artist && s.marketplace === STANDARD_CREATOR_SPLIT.marketplace && s.operator === STANDARD_CREATOR_SPLIT.operator;
+export const formatBps = (bps: bigint) => `${Number(bps) / 100}%`;
+
+/**
+ * Launch gate: a paid mint must not open with 0/0/0 splits (every payout would
+ * go to the operator address). A failed read is "could not check", never "ok".
+ */
+export function payoutSplitCheck(splits: Splits | null, price: bigint | null, loading = false) {
+  const label = 'Payout split set';
+  if (price === 0n) return { label, ok: true };
+  if (!splits) return { label, ok: false, hint: loading ? 'checking…' : 'could not read the payout split — refresh on-chain status' };
+  if (splits.artist + splits.marketplace + splits.operator === 0n) {
+    return { label, ok: false, hint: 'set it in Mint rules → 3. Payout split (standard: 95% to you)' };
+  }
+  return { label, ok: true };
+}
+
 export function splitsWarning(splits: { artist: bigint; marketplace: bigint; operator: bigint } | null, price: bigint | null) {
   if (!splits || price === null || price === 0n) return null;
   const total = splits.artist + splits.marketplace + splits.operator;

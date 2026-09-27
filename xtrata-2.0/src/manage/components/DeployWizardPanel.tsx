@@ -2162,7 +2162,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         </p>
         <ul>
           <li>Contract code is locked and generated internally by the app.</li>
-          <li>Payout split defaults to 95% artist, 2.5% marketplace, 2.5% operator unless the deployed on-chain mint price is 0 STX, in which case deploy writes 0/0/0.</li>
+          <li>Payout split: the standard is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator). Contracts deploy at 0 STX with no split, so you set it in one click in Mint rules → 3. Payout split. Minting stays locked until it is set.</li>
           <li>Operator payout address is fixed to Xtrata defaults for this flow.</li>
           <li>Advanced royalty and URI logic is hidden in this beginner flow.</li>
         </ul>
