@@ -489,7 +489,8 @@ const renderMusic = async () => {
       const cover = element('span', 'home-song__cover');
       cover.append(image(track.cover, '', 'home-song__img'), playBadge());
       if (track.plays === 0) cover.append(element('span', 'home-song__new', 'New'));
-      const meta = [`#${track.id}`, formatDuration(track.duration), track.plays ? `${track.plays} plays` : '']
+      // Play counts are used for sorting only; they are not shown on the card.
+      const meta = [`#${track.id}`, formatDuration(track.duration)]
         .filter(Boolean)
         .join(' · ');
       const text = element('span', 'home-song__text');

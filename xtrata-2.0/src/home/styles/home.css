@@ -8280,3 +8280,10 @@
     :root[data-page='home'] body.has-ledger .living-hero--wall.registry-intro {
       display: grid;
     }
+
+    /* A mouse click should not leave the browser focus box around a cover;
+       keyboard focus still shows it. */
+    .home-song:focus:not(:focus-visible),
+    .home-fresh__card:focus:not(:focus-visible),
+    .home-tile:focus:not(:focus-visible),
+    .home-aud__cover:focus:not(:focus-visible) { outline: none; }
