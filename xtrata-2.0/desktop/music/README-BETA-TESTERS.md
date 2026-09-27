@@ -1,6 +1,6 @@
 # Xtrata Music — beta tester installation guide
 
-For friends testing Xtrata Music with James. This guide takes you from downloading the app to playing music, including the extra clicks needed for these unsigned beta builds.
+For all Xtrata Music Beta Testers. This guide takes you from downloading the app to playing music, including the extra clicks needed for these unsigned beta builds.
 
 **Downloads:** https://xtrata.xyz/music/lounge#downloads
 
