@@ -2,7 +2,11 @@ import { importAllowlist } from '../lib/allowlist-import';
 import {
   activePhaseOpen,
   finalizePreflight,
+  formatBps,
+  isStandardCreatorSplit,
+  payoutSplitCheck,
   phaseWindowPreflight,
+  STANDARD_CREATOR_SPLIT,
   signerPreflight,
   splitsPreflight,
   splitsWarning,
@@ -93,6 +97,7 @@ type ContractSummary = {
   mintedCount?: bigint | null;
   reservedCount?: bigint | null;
   splits?: { artist: bigint; marketplace: bigint; operator: bigint } | null;
+  recipients?: { artist: string; marketplace: string; operator: string } | null;
   activePhase?: ActivePhaseState;
   /** True when the active phase could not be read (not the same as "no phase"). */
   activePhaseUnknown?: boolean;
@@ -1231,7 +1236,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   const [guidedFreeMintEnabled, setGuidedFreeMintEnabled] = useState(false);
   const [quickActionMessage, setQuickActionMessage] = useState<string | null>(null);
   const [quickActionPending, setQuickActionPending] = useState<
-    'set-mint-price' | 'set-max-supply' | 'pause' | 'unpause' | null
+    'set-mint-price' | 'set-max-supply' | 'set-splits' | 'pause' | 'unpause' | null
   >(null);
 
   const { walletSession, walletAdapter, connect } = useManageWallet();
@@ -1883,17 +1888,25 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       let mintedCount: bigint | null = null;
       let reservedCount: bigint | null = null;
       let splits: ContractSummary['splits'] = null;
+      let recipients: ContractSummary['recipients'] = null;
       let activePhase: ActivePhaseState = null;
       let activePhaseUnknown = false;
       let currentBlock: bigint | null = null;
       if (!preInscribedMint) {
         const safe = async <T,>(fn: () => Promise<T>) => { try { return await fn(); } catch { return null; } };
-        const [mintedCv, reservedCv, splitsCv, activeCv] = await Promise.all([
+        const [mintedCv, reservedCv, splitsCv, activeCv, recipientsCv] = await Promise.all([
           safe(() => callContractReadOnly('get-minted-count', [], summaryTarget)),
           safe(() => callContractReadOnly('get-reserved-count', [], summaryTarget)),
           safe(() => callContractReadOnly('get-splits', [], summaryTarget)),
-          safe(() => callContractReadOnly('get-active-phase', [], summaryTarget))
+          safe(() => callContractReadOnly('get-active-phase', [], summaryTarget)),
+          safe(() => callContractReadOnly('get-recipients', [], summaryTarget))
         ]);
+        const recipientsValue = recipientsCv ? toRecord(toPrimitive(recipientsCv)) : null;
+        if (recipientsValue) {
+          const pick = (v: unknown) => toText(leaf(v)) || null;
+          const [ra, rm, ro] = [pick(recipientsValue.artist), pick(recipientsValue.marketplace), pick(recipientsValue.operator)];
+          recipients = ra && rm && ro ? { artist: ra, marketplace: rm, operator: ro } : null;
+        }
         mintedCount = mintedCv ? parseUintPrimitive(toPrimitive(mintedCv)) : null;
         reservedCount = reservedCv ? parseUintPrimitive(toPrimitive(reservedCv)) : null;
         const splitsValue = splitsCv ? toRecord(toPrimitive(splitsCv)) : null;
@@ -1947,6 +1960,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         mintedCount,
         reservedCount,
         splits,
+        recipients,
         activePhase,
         activePhaseUnknown,
         currentBlock
@@ -2342,7 +2356,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   };
 
   const runQuickAction = async (params: {
-    pendingKey: 'set-mint-price' | 'set-max-supply' | 'pause' | 'unpause';
+    pendingKey: 'set-mint-price' | 'set-max-supply' | 'set-splits' | 'pause' | 'unpause';
     functionName: string;
     functionArgs: ClarityValue[];
     successLabel: string;
@@ -2622,6 +2636,31 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
   };
 
+  // Standard creator split: 95% artist, 2.5% Xtrata marketplace, 2.5% Xtrata
+  // operator. Contracts deploy at price 0, which writes 0/0/0, so this is the
+  // step that actually sets it.
+  const runQuickSetStandardSplits = async () => {
+    const fresh = await loadContractSummary();
+    if (!fresh || !fresh.splits) {
+      setQuickActionMessage('Could not read the current payout split on-chain. Nothing was sent — try again in a moment.');
+      return;
+    }
+    if (isStandardCreatorSplit(fresh.splits)) {
+      setQuickActionMessage('The standard payout split is already set. Nothing was sent.');
+      return;
+    }
+    const result = await runQuickAction({
+      pendingKey: 'set-splits',
+      functionName: 'set-splits',
+      functionArgs: [uintCV(STANDARD_CREATOR_SPLIT.artist), uintCV(STANDARD_CREATOR_SPLIT.marketplace), uintCV(STANDARD_CREATOR_SPLIT.operator)],
+      successLabel: 'Set payout split',
+      awaitOnChainConfirmation: true
+    });
+    if (result?.status === 'confirmed') {
+      setQuickActionMessage('Payout split confirmed on-chain: 95% to you, 2.5% + 2.5% to Xtrata.');
+    }
+  };
+
   const runQuickPause = async () => {
     await runQuickAction({
       pendingKey: 'pause',
@@ -2820,9 +2859,14 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
           : []),
         ...(!preInscribedMint && summary?.activePhaseUnknown
           ? [{ label: 'Mint phase checked', ok: false, hint: 'could not read the active phase — refresh on-chain status' }]
-          : [])
+          : []),
+        ...(!preInscribedMint ? [payoutSplitCheck(summary?.splits ?? null, summary?.mintPriceMicroStx ?? null, summaryLoading)] : [])
       ];
-      const payoutNote = !preInscribedMint ? splitsWarning(summary?.splits ?? null, summary?.mintPriceMicroStx ?? null) : null;
+      // 0/0/0 is now a blocking check above; the note only covers partial splits.
+      const launchSplits = summary?.splits ?? null;
+      const payoutNote = !preInscribedMint && launchSplits && launchSplits.artist + launchSplits.marketplace + launchSplits.operator > 0n
+        ? splitsWarning(launchSplits, summary?.mintPriceMicroStx ?? null)
+        : null;
       const checksPass = checks.every((check) => check.ok);
       const minting = pausedValue === false;
       const canOpen =
@@ -3119,6 +3163,39 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
           </div>
         </div>
 
+        {!preInscribedMint ? (
+          <div className="collection-settings-panel__group">
+            <h3 className="info-label">
+              3. Payout split
+              <InfoTooltip text="How each mint's payout (the price minus the inscription cost) is shared. The standard split is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator)." />
+            </h3>
+            {(() => {
+              const splits = summary?.splits ?? null;
+              if (!splits) {
+                return <p className="meta-value">{summaryLoading ? 'Checking the payout split…' : 'Could not read the payout split right now. Refresh on-chain status.'}</p>;
+              }
+              if (isStandardCreatorSplit(splits)) {
+                return <p className="meta-value">✓ Standard split set: <strong>95% to you</strong>, 2.5% Xtrata marketplace, 2.5% Xtrata operator.</p>;
+              }
+              const total = splits.artist + splits.marketplace + splits.operator;
+              return (
+                <>
+                  <p className="meta-value">
+                    {total === 0n
+                      ? 'Not set yet. Until it is, 100% of every payout would go to the Xtrata operator address, not to you. Minting stays locked until this is set.'
+                      : `Custom split on-chain: ${formatBps(splits.artist)} artist, ${formatBps(splits.marketplace)} marketplace, ${formatBps(splits.operator)} operator${total < 10000n ? ` (the remaining ${formatBps(10000n - total)} goes to the operator address)` : ''}.`}
+                  </p>
+                  <div className="mint-actions">
+                    <button className="button" type="button" onClick={() => void runQuickSetStandardSplits()} disabled={!contractReady || quickActionsBusy}>
+                      {quickActionPending === 'set-splits' ? 'Waiting for confirmation…' : 'Set standard split (95% to you)'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        ) : null}
+
         <p className="meta-value">
           Next: optional schedules, payouts and allowlists are below. When you're done, continue to{' '}
           <strong>Review &amp; launch</strong> to publish your page and open minting.
@@ -3363,6 +3440,33 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
               {formatMicroStx(summary?.coreFeeUnitMicroStx ?? null)}
             </span>
           </div>
+          {!preInscribedMint ? (
+            <>
+              <div className="collection-settings-panel__summary-item">
+                <span className="meta-label info-label">
+                  Payout split
+                  <InfoTooltip text="Share of each payout (price minus inscription cost) sent to the artist, marketplace and operator recipients. Standard: 95% / 2.5% / 2.5%. 0/0/0 sends everything to the operator." />
+                </span>
+                <span className="meta-value">
+                  {summary?.splits
+                    ? `${formatBps(summary.splits.artist)} / ${formatBps(summary.splits.marketplace)} / ${formatBps(summary.splits.operator)}${
+                        summary.splits.artist + summary.splits.marketplace + summary.splits.operator === 0n ? ' — not set' : ''}`
+                    : 'Unknown'}
+                </span>
+              </div>
+              {([['artist', 'Artist recipient'], ['marketplace', 'Marketplace recipient'], ['operator', 'Operator recipient']] as const).map(([key, label]) => (
+                <div className="collection-settings-panel__summary-item" key={key}>
+                  <span className="meta-label info-label">
+                    {label}
+                    <InfoTooltip text={`Wallet that receives the ${key} share of each payout${summary?.splits ? ` (${formatBps(summary.splits[key])})` : ''}.`} />
+                  </span>
+                  <span className="meta-value" title={summary?.recipients?.[key] ?? undefined}>
+                    {summary?.recipients?.[key] ?? 'Unknown'}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : null}
         </div>
         {summaryMessage && <p className="meta-value">{summaryMessage}</p>}
 

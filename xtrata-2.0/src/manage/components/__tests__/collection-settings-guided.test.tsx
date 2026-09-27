@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { boolCV, contractPrincipalCV, noneCV, uintCV } from '@stacks/transactions';
+import { boolCV, contractPrincipalCV, noneCV, standardPrincipalCV, tupleCV, uintCV } from '@stacks/transactions';
 import CollectionSettingsPanel from '../CollectionSettingsPanel';
 
 const ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
@@ -37,7 +37,7 @@ beforeEach(() => {
   mocked.write.mockReset();
   mocked.published = false;
   mocked.template = 'xtrata-collection-mint-v1.6';
-  mocked.chain = { paused: true, price: 0n, supply: 0n };
+  mocked.chain = { paused: true, price: 0n, supply: 0n, splits: [0n, 0n, 0n] };
   mocked.read.mockReset().mockImplementation(async ({ functionName }: { functionName: string }) => {
     const ok = (value: unknown) => ({ type: 7, value }) as never; // ResponseOk wrapper
     if (functionName in FEES) return ok(uintCV(FEES[functionName]));
@@ -48,9 +48,12 @@ beforeEach(() => {
       case 'get-max-supply': return ok(uintCV(mocked.chain.supply as bigint));
       case 'get-finalized': return ok(boolCV(false));
       case 'get-active-phase': return ok(uintCV(0));
+      case 'get-splits': { const [a, m, o] = mocked.chain.splits as bigint[]; return ok(tupleCV({ artist: uintCV(a), marketplace: uintCV(m), operator: uintCV(o) })); }
       case 'get-minted-count': return ok(uintCV(0));
       case 'get-reserved-count': return ok(uintCV(0));
       case 'get-pending-owner': return ok(noneCV());
+      case 'get-recipients': return ok(tupleCV({ artist: standardPrincipalCV(ADDRESS), marketplace: standardPrincipalCV('SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB'), operator: standardPrincipalCV('SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB') }));
+      case 'get-owner': case 'get-finance-admin': case 'get-operator-admin': return ok(standardPrincipalCV(ADDRESS));
       default: return ok(contractPrincipalCV(ADDRESS, 'owner'));
     }
   });
@@ -129,5 +132,47 @@ describe('launch mode', () => {
     await screen.findByText(/Paused — collectors cannot mint yet/);
     await waitFor(() => expect((screen.getByRole('button', { name: 'Open minting' }) as HTMLButtonElement).disabled).toBe(false));
     expect(mocked.write).not.toHaveBeenCalled();
+  });
+});
+
+describe('payout split', () => {
+  it('guided Mint rules offers the standard 95% split when it is 0/0/0', async () => {
+    mocked.template = 'xtrata-collection-mint-v1.7';
+    mocked.chain.price = 20_000_000n;
+    render(<CollectionSettingsPanel mode="guided" activeCollectionId="c1" stagedFileCount={10} />);
+    await screen.findByText(/Not set yet\. Until it is, 100% of every payout would go to the Xtrata operator/);
+    fireEvent.click(screen.getByRole('button', { name: 'Set standard split (95% to you)' }));
+    await waitFor(() => expect(mocked.write).toHaveBeenCalled());
+    const call = mocked.write.mock.calls[0][0];
+    expect(call.functionName).toBe('set-splits');
+    expect(call.functionArgs.map((a: any) => BigInt(a.value))).toEqual([9500n, 250n, 250n]);
+  });
+
+  it('shows the standard split as done', async () => {
+    mocked.chain.splits = [9500n, 250n, 250n];
+    render(<CollectionSettingsPanel mode="guided" activeCollectionId="c1" stagedFileCount={10} />);
+    await screen.findByText(/Standard split set/);
+    expect(screen.queryByRole('button', { name: 'Set standard split (95% to you)' })).toBeNull();
+  });
+
+  it('keeps Open minting locked while a paid mint has 0/0/0 splits', async () => {
+    mocked.published = true;
+    mocked.chain.price = 20_000_000n;
+    render(<CollectionSettingsPanel mode="launch" activeCollectionId="c1" launchChecks={[{ label: 'Price set', ok: true }]} />);
+    await screen.findByText(/Paused — collectors cannot mint yet/);
+    await screen.findByText(/Payout split set/);
+    expect((screen.getByRole('button', { name: 'Open minting' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+});
+
+describe('advanced contract status', () => {
+  it('shows the payout split and all three recipients', async () => {
+    mocked.chain.splits = [9500n, 250n, 250n];
+    render(<CollectionSettingsPanel activeCollectionId="c1" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh on-chain status' }));
+    await screen.findByText('95% / 2.5% / 2.5%');
+    expect(screen.getByText('Artist recipient')).toBeTruthy();
+    expect(screen.getAllByText('SP2Z5RE2TDDAE9VGSNQB4DKG5KKZPVP720Z0MV4BB')).toHaveLength(2);
+    expect(screen.getAllByText(ADDRESS).length).toBeGreaterThan(0);
   });
 });
