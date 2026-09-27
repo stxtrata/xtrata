@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  classifyCoverMimeType,
   isSvgCoverImageMimeType,
   normalizeCoverImageSource,
   resolveCollectionCoverImageUrl,
@@ -29,6 +30,10 @@ type CollectionCoverImageProps = {
   debugLabel?: string;
   pixelateOnUpscale?: boolean;
 };
+
+// Covers are display-only: a live HTML cover keeps animating but can't be
+// clicked, tapped, scrolled or focused (so it never starts sound or navigates).
+const NON_INTERACTIVE_FRAME_STYLE = { pointerEvents: 'none' as const };
 
 const toNullableText = (value: string | null | undefined) => {
   const trimmed = value?.trim();
@@ -592,6 +597,27 @@ export default function CollectionCoverImage(props: CollectionCoverImageProps) {
     return <div className={props.placeholderClassName}>{message}</div>;
   }
 
+  // An HTML file from the collection's own uploads, shown as a still cover.
+  // The preview route serves it with `CSP: sandbox`, so it never runs with the
+  // site's origin; the frame additionally ignores clicks, taps and focus.
+  if (
+    coverSource === 'collection-asset' &&
+    classifyCoverMimeType(coverSummary.mimeType) === 'html'
+  ) {
+    return (
+      <iframe
+        title={props.alt}
+        src={resolvedUrl}
+        loading={props.loading ?? 'lazy'}
+        sandbox="allow-scripts"
+        referrerPolicy="no-referrer"
+        tabIndex={-1}
+        style={NON_INTERACTIVE_FRAME_STYLE}
+        onError={() => setLoadFailed(true)}
+      />
+    );
+  }
+
   if (shouldUseRuntimeFrame && runtimeLauncherUrl) {
     return (
       <iframe
@@ -600,6 +626,8 @@ export default function CollectionCoverImage(props: CollectionCoverImageProps) {
         loading={props.loading ?? 'lazy'}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
+        tabIndex={-1}
+        style={NON_INTERACTIVE_FRAME_STYLE}
         onLoad={() => {
           if (!shouldLog('cover', 'debug')) {
             return;

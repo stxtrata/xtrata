@@ -52,7 +52,19 @@ describe('asset-preview route', () => {
     expect(bucket.get).toHaveBeenCalledWith('col-1/asset-1');
   });
 
-  it('keeps cover-art guard for non-image assets when purpose=cover', async () => {
+  it('serves an HTML file as cover art, still sandboxed', async () => {
+    const bucket = { get: vi.fn().mockResolvedValue({ body: new TextEncoder().encode('<html>cover</html>'), httpMetadata: {} }) };
+    const response = await onRequest({
+      request: new Request('https://xtrata.xyz/collections/col-1/asset-preview?assetId=asset-1&purpose=cover'),
+      env: { COLLECTION_ASSETS: bucket },
+      params: { collectionId: 'col-1' }
+    } as any);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Security-Policy')).toBe('sandbox allow-scripts');
+  });
+
+  it('keeps cover-art guard for other file types when purpose=cover', async () => {
+    queryAllMock.mockResolvedValueOnce({ results: [{ asset_id: 'asset-1', storage_key: 'col-1/asset-1', mime_type: 'audio/mpeg', collection_state: 'published', collection_metadata: '{}' }] });
     const response = await onRequest({
       request: new Request(
         'https://xtrata.xyz/collections/col-1/asset-preview?assetId=asset-1&purpose=cover'
@@ -63,7 +75,7 @@ describe('asset-preview route', () => {
 
     expect(response.status).toBe(400);
     expect(await response.text()).toContain(
-      'Selected asset is not an image and cannot be used as cover art'
+      'Selected asset is not an image or HTML file and cannot be used as cover art'
     );
   });
 });

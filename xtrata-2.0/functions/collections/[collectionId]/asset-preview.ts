@@ -28,6 +28,12 @@ const toNullableString = (value: unknown) => {
 const isImageMimeType = (mimeType: string | null) =>
   Boolean(mimeType && mimeType.toLowerCase().startsWith('image/'));
 
+// HTML covers are allowed; they are still served with `CSP: sandbox` below.
+const isHtmlMimeType = (mimeType: string | null) => {
+  const normalized = (mimeType ?? '').toLowerCase().split(';')[0].trim();
+  return normalized === 'text/html' || normalized === 'application/xhtml+xml';
+};
+
 const PUBLIC_PREVIEW_CACHE_CONTROL =
   'public, max-age=300, s-maxage=900, stale-while-revalidate=3600';
 const PRIVATE_PREVIEW_CACHE_CONTROL = 'private, no-store, max-age=0';
@@ -107,9 +113,9 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
     if (!storageKey) {
       return badRequest(`Asset is missing a storage key. Request ID: ${requestId}`);
     }
-    if (coverPreviewOnly && !isImageMimeType(mimeType)) {
+    if (coverPreviewOnly && !isImageMimeType(mimeType) && !isHtmlMimeType(mimeType)) {
       return badRequest(
-        `Selected asset is not an image and cannot be used as cover art. Request ID: ${requestId}`
+        `Selected asset is not an image or HTML file and cannot be used as cover art. Request ID: ${requestId}`
       );
     }
 

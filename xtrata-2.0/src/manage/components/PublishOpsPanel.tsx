@@ -15,6 +15,7 @@ import { createXtrataClient } from '../../lib/contract/client';
 import {
   buildRuntimeInscriptionContentUrl,
   normalizeCoverImageSource,
+  classifyCoverMimeType,
   coverInscriptionMimeProblem,
   parseInscriptionTokenId,
   type CoverImageSource
@@ -130,8 +131,11 @@ const toMultilineText = (value: unknown) => {
   return value.replace(/\r\n/g, '\n');
 };
 
-const isImageMimeType = (mimeType: string) =>
-  mimeType.trim().toLowerCase().startsWith('image/');
+// HTML files show as a still, non-interactive live frame on the collection page.
+const isCoverAssetMimeType = (mimeType: string) => {
+  const kind = classifyCoverMimeType(mimeType);
+  return kind === 'image' || kind === 'html';
+};
 
 const isValidCoverUrl = (value: string) =>
   /^(https?:\/\/|ipfs:\/\/|data:image\/)/i.test(value);
@@ -737,7 +741,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
     let coverImage: Record<string, unknown>;
     if (coverSource === 'collection-asset') {
       if (!selectedCoverAssetId) {
-        setCoverMessage('Choose an image from the collection first.');
+        setCoverMessage('Choose an image or HTML file from the collection first.');
         return;
       }
       const selectedAsset = assets.find(
@@ -747,8 +751,8 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
         setCoverMessage('Selected image is no longer available. Refresh and choose again.');
         return;
       }
-      if (!isImageMimeType(selectedAsset.mime_type)) {
-        setCoverMessage('Selected asset is not an image.');
+      if (!isCoverAssetMimeType(selectedAsset.mime_type)) {
+        setCoverMessage('Selected file is not an image or HTML file.');
         return;
       }
       coverImage = {
@@ -1000,11 +1004,11 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
     void refreshOnChainReservedCount();
   }, [collectionContractTarget, walletSession.address, walletSession.network]);
 
-  const availableImageAssets = useMemo(
+  const availableCoverAssets = useMemo(
     () =>
       assets.filter((asset) => {
         const state = String(asset.state ?? '').toLowerCase();
-        return state !== 'expired' && isImageMimeType(asset.mime_type);
+        return state !== 'expired' && isCoverAssetMimeType(asset.mime_type);
       }),
     [assets]
   );
@@ -1013,25 +1017,25 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
     if (coverSource !== 'collection-asset') {
       return;
     }
-    if (availableImageAssets.length === 0) {
+    if (availableCoverAssets.length === 0) {
       if (selectedCoverAssetId !== '') {
         setSelectedCoverAssetId('');
       }
       return;
     }
-    const selectedStillExists = availableImageAssets.some(
+    const selectedStillExists = availableCoverAssets.some(
       (asset) => asset.asset_id === selectedCoverAssetId
     );
     if (!selectedStillExists) {
-      setSelectedCoverAssetId(availableImageAssets[0].asset_id);
+      setSelectedCoverAssetId(availableCoverAssets[0].asset_id);
     }
-  }, [coverSource, availableImageAssets, selectedCoverAssetId]);
+  }, [coverSource, availableCoverAssets, selectedCoverAssetId]);
 
   const selectedCoverAsset = useMemo(
     () =>
-      availableImageAssets.find((asset) => asset.asset_id === selectedCoverAssetId) ??
+      availableCoverAssets.find((asset) => asset.asset_id === selectedCoverAssetId) ??
       null,
-    [availableImageAssets, selectedCoverAssetId]
+    [availableCoverAssets, selectedCoverAssetId]
   );
 
   const previewCoverImage = useMemo(() => {
@@ -1041,7 +1045,8 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
       }
       return {
         source: 'collection-asset',
-        assetId: selectedCoverAsset.asset_id
+        assetId: selectedCoverAsset.asset_id,
+        mimeType: selectedCoverAsset.mime_type
       };
     }
     if (coverSource === 'inscribed-image-url') {
@@ -1447,7 +1452,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
               setCoverMessage(null);
             }}
           >
-            <option value="collection-asset">Image from this collection</option>
+            <option value="collection-asset">Image or HTML file from this collection</option>
             <option value="inscribed-image-url">Existing inscribed image URL</option>
             <option value="inscription-id">Existing inscription ID (image or HTML, on-chain)</option>
           </select>
@@ -1456,8 +1461,8 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
         {coverSource === 'collection-asset' ? (
           <label className="field">
             <span className="field__label info-label">
-              Choose collection image
-              <InfoTooltip text="Only image files you uploaded in Artwork & metadata are listed here." />
+              Choose collection file
+              <InfoTooltip text="Image and HTML files you uploaded in Artwork & metadata are listed here. An HTML file is shown live but can't be clicked or played on the cover." />
             </span>
             <select
               className="select"
@@ -1466,12 +1471,12 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
                 setSelectedCoverAssetId(event.target.value);
                 setCoverMessage(null);
               }}
-              disabled={availableImageAssets.length === 0}
+              disabled={availableCoverAssets.length === 0}
             >
-              {availableImageAssets.length === 0 ? (
-                <option value="">No image assets available</option>
+              {availableCoverAssets.length === 0 ? (
+                <option value="">No image or HTML files available</option>
               ) : (
-                availableImageAssets.map((asset) => (
+                availableCoverAssets.map((asset) => (
                   <option key={asset.asset_id} value={asset.asset_id}>
                     {asset.filename ?? asset.path}
                   </option>
@@ -1479,11 +1484,11 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
               )}
             </select>
             <span className="field__hint">
-              {availableImageAssets.length === 0
-                ? 'Upload at least one image in Artwork & metadata to use it as collection cover art.'
-                : `${availableImageAssets.length} image asset${
-                    availableImageAssets.length === 1 ? '' : 's'
-                  } available.`}
+              {availableCoverAssets.length === 0
+                ? 'Upload at least one image or HTML file in Artwork & metadata to use it as collection cover art.'
+                : `${availableCoverAssets.length} file${
+                    availableCoverAssets.length === 1 ? '' : 's'
+                  } available. HTML covers are shown live but can't be clicked.`}
             </span>
           </label>
         ) : coverSource === 'inscribed-image-url' ? (
