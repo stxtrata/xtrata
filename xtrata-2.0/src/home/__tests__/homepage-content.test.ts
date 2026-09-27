@@ -67,6 +67,9 @@ describe('homepage content configuration', () => {
 
   it('plays homepage songs through the one site radio, never a second player', () => {
     expect(homepageSource).toContain('api.playToken(tokenId)');
+    // Silent visuals (the Audionauts logo) start the same radio in place.
+    expect(homepageSource).toContain('const toggleRadio = (fallbackHref) =>');
+    expect(homepageSource).toContain('api.switchOn();');
     expect(homepageSource).not.toMatch(/new Audio\(|createElement\('audio'\)/);
   });
 
@@ -148,17 +151,12 @@ describe('homepage content configuration', () => {
   // once in the hero stage and again in the grid) plus three radio tracks cued
   // while the radio was switched off. Both are easy to reintroduce by accident.
   it('does not fetch inscription media before the visitor asks for it', () => {
-    // Iframe previews mount on press, never at render time.
-    expect(homepageSource).toContain('const mountPreviewFrame =');
-    expect(homepageSource).toContain('createPreviewPoster(frame, preview)');
-    expect(homepageSource).toContain("poster.className = 'object-preview__launch'");
-    expect(homeStyles).toContain('.object-preview__launch {');
-    // The only place an iframe src is assigned is inside the on-press mount.
-    const iframeSrcAssignments = homepageSource.match(/iframe\.src\s*=/g) ?? [];
-    expect(iframeSrcAssignments).toHaveLength(1);
-    const mountBody =
-      homepageSource.match(/const mountPreviewFrame = \([\s\S]*?\n\};/)?.[0] ?? '';
-    expect(mountBody).toContain('iframe.src = preview.src;');
+    // The homepage mounts no inscription iframes at all: the chess board is
+    // drawn locally and posters are plain images, so nothing heavy loads
+    // until the visitor chooses to open something.
+    expect(homepageSource).not.toContain("createElement('iframe')");
+    expect(homepageSource).not.toMatch(/iframe\.src\s*=/);
+    expect(homepageSource).toContain("img.loading = options.eager ? 'eager' : 'lazy';");
   });
 
   it('keeps the radio silent on the wire until it is switched on', () => {

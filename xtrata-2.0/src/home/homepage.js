@@ -99,57 +99,6 @@ const svgIcon = (kind) => {
 };
 
 // ---------------------------------------------------------------------------
-// Inscription previews that mount on press.
-// An iframe preview is a whole HTML inscription: it downloads megabytes and then
-// runs scripts. Auto-loading them was the bulk of what a first-time visitor
-// waited for, before they had asked to see anything. So they mount on demand:
-// a poster until someone presses it.
-const mountPreviewFrame = (frame, preview) => {
-  const iframe = document.createElement('iframe');
-  iframe.src = preview.src;
-  iframe.title = preview.title;
-  iframe.sandbox = 'allow-scripts allow-pointer-lock allow-forms allow-popups';
-  iframe.allow = 'autoplay; fullscreen';
-  iframe.tabIndex = 0;
-  frame.prepend(iframe);
-  frame.dataset.loaded = 'true';
-  iframe.focus({ preventScroll: true });
-};
-
-const createPreviewPoster = (frame, preview) => {
-  const poster = document.createElement('button');
-  poster.type = 'button';
-  poster.className = 'object-preview__launch';
-  poster.setAttribute('aria-label', `Load ${preview.title}`);
-  if (preview.poster) {
-    poster.append(image(preview.poster, '', 'object-preview__poster'));
-  }
-  poster.append(
-    element('span', 'object-preview__launch-icon', '▶'),
-    element('span', 'object-preview__launch-text', preview.launchLabel || 'Load interactive object')
-  );
-  poster.addEventListener(
-    'click',
-    () => {
-      poster.remove();
-      mountPreviewFrame(frame, preview);
-    },
-    { once: true }
-  );
-  return poster;
-};
-
-const createPreview = (preview) => {
-  const frame = element('div', `object-preview object-preview--${preview.type}`);
-  frame.dataset.loaded = 'false';
-  frame.append(createPreviewPoster(frame, preview));
-  if (preview.label) {
-    frame.append(element('span', 'object-preview__meta', preview.label));
-  }
-  return frame;
-};
-
-// ---------------------------------------------------------------------------
 // Chess board: 64 plain squares, so the homepage never downloads the
 // X Chess inscription until someone chooses to play.
 const CHESS_GLYPHS = { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟︎' };
@@ -222,6 +171,20 @@ const syncSongButtons = () => {
       badge.replaceChildren(svgIcon(playing ? 'pause' : 'play'));
     }
   });
+  const radioPlaying = Boolean(radioSnapshot?.playing);
+  document.querySelectorAll('[data-radio-toggle]').forEach((node) => {
+    node.classList.toggle('is-playing', radioPlaying);
+    node.setAttribute('aria-pressed', radioPlaying ? 'true' : 'false');
+    const badge = node.querySelector('.home-play-badge');
+    if (badge && badge.dataset.state !== String(radioPlaying)) {
+      badge.dataset.state = String(radioPlaying);
+      badge.replaceChildren(svgIcon(radioPlaying ? 'pause' : 'play'));
+    }
+    const text = node.querySelector('[data-radio-label]');
+    if (text) {
+      text.textContent = radioPlaying ? 'Xtrata Radio is playing' : text.dataset.radioLabel;
+    }
+  });
   renderNowPlaying();
 };
 
@@ -262,6 +225,33 @@ const songButton = (song, className, content) => {
   button.setAttribute('aria-label', `Play ${song.title}${song.artist ? ` by ${song.artist}` : ''}`);
   button.append(...content);
   button.addEventListener('click', () => playSong(song.id));
+  return button;
+};
+
+// Plays (or pauses) the site radio in place. Used where the visual is silent,
+// like the Audionauts logo, so pressing it still gives the visitor sound.
+const toggleRadio = (fallbackHref) => {
+  const api = radioApi();
+  if (!api) {
+    window.open(fallbackHref || '/radio', '_blank', 'noopener');
+    return;
+  }
+  if (!api.isOn()) {
+    api.switchOn();
+  } else {
+    api.playPause();
+  }
+};
+
+const radioButton = (className, label, fallbackHref, action, content) => {
+  const button = element('button', className);
+  button.type = 'button';
+  button.dataset.radioToggle = 'true';
+  button.dataset.homeAction = action;
+  button.setAttribute('aria-pressed', 'false');
+  button.setAttribute('aria-label', label);
+  button.append(...content);
+  button.addEventListener('click', () => toggleRadio(fallbackHref));
   return button;
 };
 
@@ -450,6 +440,16 @@ const renderWall = () => {
       );
       return;
     }
+    if (item.kind === 'radio') {
+      mount.append(
+        radioButton(classes, `${item.title}: play Xtrata Radio`, item.href, `wall:${item.id}`, [
+          image(item.image, item.title, 'home-tile__img', { eager: i < 4 }),
+          playBadge(),
+          wallCaption(item)
+        ])
+      );
+      return;
+    }
     const tile = actionLink(item.href, '', classes, `wall:${item.id}`, { newTab: item.newTab });
     if (item.kind === 'chess') {
       const foot = element('span', 'home-tile__chess-foot');
@@ -549,7 +549,7 @@ const renderAudionauts = () => {
   const stats = element('div', 'home-aud__stats');
   [
     [String(a.editions), 'editions'],
-    ['1', 'endless on-chain stream'],
+    ['Now', 'soundtrack on the radio'],
     [live ? 'Now' : a.mintLabel, 'mint opens']
   ].forEach(([value, label]) => {
     const stat = element('div', 'home-aud__stat');
@@ -569,22 +569,21 @@ const renderAudionauts = () => {
     element(
       'p',
       'home-aud__body',
-      'Each Audionaut carries a real inscribed song. The stream here is itself an inscription, generating its sound and picture live from the chain.'
+      'Each Audionaut carries a real inscribed song, and the soundtrack is already playing on Xtrata Radio.'
     ),
     stats,
     actions
   );
   const media = element('div', 'home-aud__media');
-  media.append(
-    createPreview({
-      type: 'iframe',
-      src: `/i/${a.streamTokenId}`,
-      title: `AUDIONAUTS infinite stream, inscription #${a.streamTokenId}`,
-      poster: '/home/wall/audionauts-3059.webp',
-      launchLabel: 'Play the stream here',
-      label: `HTML stream · #${a.streamTokenId}`
-    })
-  );
+  const cue = element('span', 'home-aud__listen-cue');
+  const cueText = element('span', '', 'Play Xtrata Radio');
+  cueText.dataset.radioLabel = 'Play Xtrata Radio';
+  cue.append(playBadge(), cueText);
+  const listen = radioButton('home-aud__listen', 'Audionauts: play Xtrata Radio', a.listenHref, 'audionauts:radio', [
+    image(a.poster, 'Audionauts', 'home-aud__poster'),
+    cue
+  ]);
+  media.append(listen);
   const sound = element('div', 'home-aud__sound');
   const covers = element('div', 'home-aud__covers');
   a.soundtrackIds.forEach((id) => {
@@ -677,7 +676,7 @@ const renderFresh = async () => {
         }
         thumb.append(element('span', 'home-fresh__kind', kindLabel[item.kind]));
         if (item.pinned) thumb.append(element('span', 'home-fresh__pin', 'Pinned'));
-        if (item.song) thumb.append(playBadge());
+        if (item.song || item.radio) thumb.append(playBadge());
         const text = element('span', 'home-fresh__text');
         text.append(
           element('strong', 'home-fresh__title', item.title),
@@ -685,9 +684,11 @@ const renderFresh = async () => {
         );
         if (item.song) {
           mount.append(songButton(item.song, 'home-fresh__card', [thumb, text]));
+        } else if (item.radio) {
+          mount.append(radioButton('home-fresh__card', `${item.title}: play Xtrata Radio`, item.href, `fresh:${item.id}`, [thumb, text]));
         } else {
           const card = actionLink(item.href, '', 'home-fresh__card', `fresh:${item.id}`, {
-            newTab: item.href.startsWith('/i/')
+            newTab: !item.href.startsWith('/xplorer')
           });
           card.append(thumb, text);
           mount.append(card);
@@ -726,7 +727,7 @@ const renderPlay = () => {
   mount.replaceChildren();
   HOMEPAGE_PLAY.forEach((item) => {
     const card = actionLink(item.href, '', `home-play home-tone--${item.tone}`, `play:${item.id}`, {
-      newTab: item.href.startsWith('/i/')
+      newTab: !item.href.startsWith('/xplorer')
     });
     const media = element('span', 'home-play__media');
     media.append(

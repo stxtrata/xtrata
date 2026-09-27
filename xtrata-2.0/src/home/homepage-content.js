@@ -53,10 +53,11 @@ export const HOMEPAGE_WALL = Object.freeze([
     href: '/i/3072', newTab: true, tokenId: 3072
   }),
   Object.freeze({
-    id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
-    eyebrow: 'Coming this week · listen now', title: 'Audionauts infinite stream',
-    image: '/home/wall/audionauts-3059.webp', badge: '#3059',
-    href: '/i/3059', newTab: true
+    // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
+    id: 'audionauts-stream', kind: 'radio', size: 'wide', tone: 'teal',
+    eyebrow: 'Coming this week · press to listen', title: 'Audionauts',
+    image: '/home/wall/audionauts-3059.webp',
+    href: '/radio'
   }),
   Object.freeze({
     id: 'timeloop', kind: 'image', size: 'tall', tone: 'paper',
@@ -109,7 +110,9 @@ export const HOMEPAGE_AUDIONAUTS = Object.freeze({
   status: 'soon',
   mintLabel: 'This week',
   editions: 111,
-  streamTokenId: 3059,
+  // #3059 is the (silent) Audionauts logo, so "listen" goes to the radio.
+  listenHref: '/radio',
+  poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
   mintHref: null,
   soundtrackIds: Object.freeze([3062, 3061, 3058, 2910, 2892, 3036]),
@@ -138,7 +141,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
   size: 12,
   pinned: Object.freeze([
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS // Infinite Stream', by: 'HTML stream', image: '/home/wall/audionauts-3059.webp', href: '/i/3059' },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Coming this week', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),
@@ -154,7 +157,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
 export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'chess', kind: 'chess', tag: '#3072 · Chess', title: 'Challenge anyone', copy: 'Play a person on-chain, or the computer for practice. Casual games are free.', href: '/i/3072', tone: 'amber' },
   { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
-  { id: 'audionauts-stream', image: '/home/wall/audionauts-3059.webp', tag: '#3059 · Generative', title: 'An endless stream', copy: 'Sound and picture generated live by one inscription. It never plays the same way twice.', href: '/i/3059', tone: 'teal' },
+  { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
   { id: 'vst-1107', image: '/home/wall/vst-1107.webp', tag: '#1107 · Instrument', title: 'VST late night', copy: 'A working music object. Press the artwork and it plays, straight from the chain.', href: '/xplorer?gallery=jim-music&sel=1107', tone: 'plain' }
 ]);
 
@@ -266,7 +269,7 @@ export const validateHomepageContent = () => {
     if (item.kind !== 'song' && !isNavigableHref(item.href)) {
       errors.push(`Homepage wall tile ${item.id} needs a navigable href.`);
     }
-    if (item.kind === 'image' && !item.image) {
+    if ((item.kind === 'image' || item.kind === 'radio') && !item.image) {
       errors.push(`Homepage wall tile ${item.id} needs an image.`);
     }
   });
