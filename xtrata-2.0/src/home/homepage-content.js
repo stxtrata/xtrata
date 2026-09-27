@@ -9,7 +9,7 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     id: 'music-app', tag: 'New', tone: 'violet',
     title: 'Xtrata Music is out for Mac and Windows.',
     line: "Every play pays the song's holder, on-chain.",
-    cta: 'Get the app', href: '/music/'
+    cta: 'Get the app', href: '/music/lounge', newTab: true
   }),
   Object.freeze({
     id: 'chess', tag: 'Play', tone: 'amber',
@@ -163,7 +163,7 @@ export const HOMEPAGE_PLAY = Object.freeze([
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([
   { id: 'music-app', tone: 'violet', art: 'covers', tag: 'App · Mac and Windows', title: 'Xtrata Music', copy: "Listen to on-chain songs. Every play pays the song's holder.",
-    actions: [{ label: 'Download', href: '/music/', primary: true }, { label: 'Put your music on', href: '/music/' }] },
+    actions: [{ label: 'Download', href: '/music/lounge', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
   { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · live', title: 'Forever Twins', copy: 'Give an existing collection a self-contained, fully on-chain twin. Holders keep the link.',
