@@ -24,3 +24,14 @@ it('keeps the same unified defaults when release metadata is unavailable',async(
  expect(rows.slice(0,3).every(r=>r.open&&r.textContent!.includes('Latest beta'))).toBe(true);
  expect(rows[0].textContent).toContain('1.0.9');expect(rows.slice(3).every(r=>!r.open)).toBe(true);
 });
+
+it('offers the published guide bundles without changing the original downloads',async()=>{
+ setup();const release=JSON.parse(readFileSync('public/radio/music-releases.json','utf8'));
+ vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,json:async()=>release})));new Function(script)();
+ await vi.waitFor(()=>expect(document.querySelectorAll('#downloads-list a[href$="-with-guide.zip"]')).toHaveLength(3));
+ for(const d of release.betaDownloads.filter(d=>d.guideBundle)){
+  expect(document.querySelector(`a[href="${d.url}"]`)).not.toBeNull();
+  expect(document.querySelector(`a[href="${d.guideBundle.url}"]`)).not.toBeNull();
+ }
+ expect(document.querySelector('a[download][href="/downloads/Xtrata-Music-Beta-Guide.txt"]')).not.toBeNull();
+});

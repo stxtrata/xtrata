@@ -110,7 +110,11 @@
       "signed": false,
       "verified": true,
       "preview": true,
-      "betaBuild": 1
+      "betaBuild": 1,
+      "guideBundle": {
+        "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.6-mac-beta.1/Xtrata-Music-1.0.6-mac-universal-with-guide.zip",
+        "sha256": "7fe0a461f37f06dde970fdfa687d3731ec2d6af1ccf97c8a3191ebbede62fbef"
+      }
     },
     {
       "platform": "mac-universal-legacy",
@@ -121,7 +125,11 @@
       "signed": false,
       "verified": true,
       "preview": true,
-      "betaBuild": 1
+      "betaBuild": 1,
+      "guideBundle": {
+        "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.6-mac-beta.1/Xtrata-Music-Legacy-1.0.6-mac-universal-with-guide.zip",
+        "sha256": "aa50bbe25e584f4648145eb74ed2d38e7706e16bdc15d054fe28925665e057be"
+      }
     },
     {
       "platform": "win-x64",
@@ -132,7 +140,11 @@
       "signed": false,
       "verified": true,
       "preview": true,
-      "betaBuild": 1
+      "betaBuild": 1,
+      "guideBundle": {
+        "url": "https://github.com/stxtrata/xtrata/releases/download/music-v1.0.9-windows-beta.1/Xtrata-Music-1.0.9-windows11-preview-x64-with-guide.zip",
+        "sha256": "d8e456b77950edcd6c8a5323b37b14a27e0a92f5fa2addb362da415977fe9c20"
+      }
     }
   ]
 }

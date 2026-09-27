@@ -1,3 +1,4 @@
+import '../../desktop/music/prepare-guide.mjs';
 import {mkdtemp,mkdir,copyFile,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname,resolve} from 'node:path';

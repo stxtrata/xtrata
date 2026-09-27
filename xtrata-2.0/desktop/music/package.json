@@ -93,6 +93,33 @@
       "category": "AudioVideo",
       "icon": "assets/xtrata-music.png"
     },
-    "artifactName": "Xtrata-Music-${version}-${os}-${arch}.${ext}"
+    "artifactName": "Xtrata-Music-${version}-${os}-${arch}.${ext}",
+    "extraResources": [
+      {
+        "from": "guide/Xtrata-Music-Beta-Guide.txt",
+        "to": "Xtrata-Music-Beta-Guide.txt"
+      }
+    ],
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 180,
+          "type": "file"
+        },
+        {
+          "x": 410,
+          "y": 180,
+          "type": "link",
+          "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 300,
+          "type": "file",
+          "path": "guide/Xtrata-Music-Beta-Guide.txt"
+        }
+      ]
+    }
   }
 }

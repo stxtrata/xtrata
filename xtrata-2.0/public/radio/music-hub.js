@@ -16,6 +16,7 @@ fetch('/radio/music-releases.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw E
   row.className='beta-download-row';row.open=latest.has(d);link.className='beta-download-link';link.href=d.url;
   link.textContent=platforms[d.platform]+' · '+versionOf(d)+(d.beta?' · Beta':' · Preview')+(d.betaBuild?' · build '+d.betaBuild:'')+(latest.has(d)?' · Latest beta':'');
   heading.append(link);p.textContent=d.requirements||'See release notes for compatibility.';summary.textContent='Verify download (SHA-256)';hash.textContent=d.sha256;details.append(summary,hash);row.append(heading,p,details);
+  if(d.guideBundle){try{const u=new URL(d.guideBundle.url);if(u.origin==='https://github.com'&&u.pathname.startsWith('/stxtrata/xtrata/releases/download/')&&/^[a-f0-9]{64}$/.test(d.guideBundle.sha256)){const bundle=document.createElement('p'),a=document.createElement('a'),check=document.createElement('details'),label=document.createElement('summary'),code=document.createElement('code');a.href=u.href;a.textContent='Download installer + guide (ZIP)';bundle.append(a);label.textContent='Verify installer + guide ZIP (SHA-256)';code.textContent=d.guideBundle.sha256;check.append(label,code);row.append(bundle,check);}}catch{/* Keep the verified original download. */}}
   if(d.preview){const note=document.createElement('p');note.textContent=previewNote(d.platform);row.append(note);}host.append(row);
  }
 

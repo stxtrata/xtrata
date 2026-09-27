@@ -71,3 +71,6 @@ public/radio/music-profile-wallet-v3.js
 
 # Audionauts V1 recursive item files (staged for upload via the collection studio, not source)
 _claude_scratch/audionauts-v1-recursive*
+
+/desktop/music/guide/
+/public/downloads/Xtrata-Music-Beta-Guide.txt
