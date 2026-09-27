@@ -1547,6 +1547,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           <span className="field__hint">
             {collectionDescriptionInput.length}/
             {COLLECTION_PAGE_DESCRIPTION_MAX_LENGTH.toString()} characters
+            {' '}· Links starting with https:// become clickable on the collection page.
           </span>
         </label>
 

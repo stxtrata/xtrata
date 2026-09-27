@@ -6246,6 +6246,12 @@ p {
   overflow-wrap: anywhere;
 }
 
+.collection-live-page__description a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .collection-live-page__hero-stats {
   display: grid;
   gap: 8px;

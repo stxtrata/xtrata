@@ -96,6 +96,7 @@ import { createStacksWalletAdapter } from './lib/wallet/adapter';
 import { createWalletSessionStore } from './lib/wallet/session';
 import type { WalletSession } from './lib/wallet/types';
 import AddressLabel from './components/AddressLabel';
+import LinkifiedText from './components/LinkifiedText';
 import CollectionCoverImage from './components/CollectionCoverImage';
 import TokenCardMedia from './components/TokenCardMedia';
 import WalletTopBar from './components/WalletTopBar';
@@ -3580,7 +3581,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 />
               </div>
             </div>
-            <p className="collection-live-page__description">{collectionDescription}</p>
+            <p className="collection-live-page__description">
+              <LinkifiedText text={collectionDescription} />
+            </p>
             <div className="collection-live-page__hero-stats">
               <article className="collection-live-page__hero-stat">
                 <span className="meta-label">Minted / max</span>
