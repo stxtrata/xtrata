@@ -306,10 +306,19 @@ export const buildArtistDeployContractSource = (params: {
     if (!params.coreContractId.endsWith('.xtrata-v3-2-3')) {
       errors.push('Collection v1.5 requires core v3.2.3.');
     }
-    for (const [role, paidBps] of [['artist', 9500], ['marketplace', 250], ['operator', 250]] as const) {
-      source = replaceLine({ source, marker: `${role}-bps`,
-        pattern: new RegExp(`^\\(define-data-var ${role}-bps uint u\\d+\\)$`, 'm'),
-        replacement: `(define-data-var ${role}-bps uint u${resolved.mintPriceMicroStx === 0n ? 0 : paidBps})`, errors });
+    if (/^\(define-constant ARTIST-BPS u\d+\)$/m.test(source)) {
+      // v1.8+: fixed 95 / 2.5 / 2.5 split hard-coded in the template; verify, don't substitute.
+      for (const [name, expected] of [['ARTIST-BPS', 9500], ['MARKETPLACE-BPS', 250], ['OPERATOR-BPS', 250]] as const) {
+        if (!new RegExp(`^\\(define-constant ${name} u${expected}\\)$`, 'm').test(source)) {
+          errors.push(`Template payout split constant ${name} is not u${expected}.`);
+        }
+      }
+    } else {
+      for (const [role, paidBps] of [['artist', 9500], ['marketplace', 250], ['operator', 250]] as const) {
+        source = replaceLine({ source, marker: `${role}-bps`,
+          pattern: new RegExp(`^\\(define-data-var ${role}-bps uint u\\d+\\)$`, 'm'),
+          replacement: `(define-data-var ${role}-bps uint u${resolved.mintPriceMicroStx === 0n ? 0 : paidBps})`, errors });
+      }
     }
     // The duplicate guard is a static Clarity call and must follow the pin.
     source = replaceLine({

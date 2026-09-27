@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isCollectionV15, quoteCollectionV15Mint, readCollectionV15FeeUnits } from '../collection-v15';
+import { isCollectionV15, isFixedPriceCollection, isFixedSplitCollection, quoteCollectionV15Mint, readCollectionV15FeeUnits } from '../collection-v15';
 const units = { begin: 123n, chunk: 7n, batch: 81n, seal: 99n };
 describe('collection v1.5 staged fee quotes', () => {
   it.each([[1,106n],[30,309n],[32,323n],[33,404n],[64,404n],[65,485n]])('quotes %s chunks across core fee boundaries', (chunks, seal) => {
@@ -19,8 +19,13 @@ describe('collection v1.5 staged fee quotes', () => {
     expect(isCollectionV15('xtrata-collection-mint-v1.5')).toBe(true);
     expect(isCollectionV15('xtrata-collection-mint-v1.4')).toBe(false);
     expect(isCollectionV15('xtrata-collection-mint-v1.6')).toBe(true);
-    // v1.7 (fixed collector price) shares the staged fee units; later versions stay outside until reviewed.
+    // v1.7 (fixed collector price) and v1.8 (+ fixed payout split) share the staged fee units;
+    // later versions stay outside until reviewed.
     expect(isCollectionV15('xtrata-collection-mint-v1.7')).toBe(true);
-    expect(isCollectionV15('xtrata-collection-mint-v1.8')).toBe(false);
+    expect(isCollectionV15('xtrata-collection-mint-v1.8')).toBe(true);
+    expect(isCollectionV15('xtrata-collection-mint-v1.9')).toBe(false);
+    expect(isFixedPriceCollection('xtrata-collection-mint-v1.8')).toBe(true);
+    expect(isFixedSplitCollection('xtrata-collection-mint-v1.8')).toBe(true);
+    expect(isFixedSplitCollection('xtrata-collection-mint-v1.7')).toBe(false);
   });
 });

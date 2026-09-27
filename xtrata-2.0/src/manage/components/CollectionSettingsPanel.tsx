@@ -50,6 +50,7 @@ import {
 import {
   isCollectionV15,
   isFixedPriceCollection,
+  isFixedSplitCollection,
   quoteCollectionV15Mint,
   readCollectionV15FeeUnits,
   type CollectionV15FeeUnits
@@ -1264,6 +1265,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   const usesV15Fees = isCollectionV15(templateVersion);
   /** v1.7: the on-chain price IS the collector price; fees come out of it. */
   const fixedPrice = isFixedPriceCollection(templateVersion);
+  const fixedSplit = isFixedSplitCollection(templateVersion);
   const collectionMintPaymentModel = useMemo(
     () => resolveCollectionMintPaymentModel(templateVersion),
     [templateVersion]
@@ -1353,12 +1355,14 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   }, [metadataCollection]);
   const availableActions = useMemo(
     () =>
-      canManageLockedRecipients
+      (canManageLockedRecipients
         ? MUTABLE_ACTIONS
         : MUTABLE_ACTIONS.filter(
             (action) => !XTRATA_OWNER_ONLY_ACTION_KEYS.has(action.key)
-          ),
-    [canManageLockedRecipients]
+          )
+      // v1.8+ hard-codes the split; the contract has no set-splits to call.
+      ).filter((action) => !(fixedSplit && action.key === 'set-splits')),
+    [canManageLockedRecipients, fixedSplit]
   );
 
   const selectedAction = useMemo(
@@ -3175,7 +3179,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                 return <p className="meta-value">{summaryLoading ? 'Checking the payout split…' : 'Could not read the payout split right now. Refresh on-chain status.'}</p>;
               }
               if (isStandardCreatorSplit(splits)) {
-                return <p className="meta-value">✓ Standard split set: <strong>95% to you</strong>, 2.5% Xtrata marketplace, 2.5% Xtrata operator.</p>;
+                return <p className="meta-value">✓ {fixedSplit ? 'Fixed by your contract' : 'Standard split set'}: <strong>95% to you</strong>, 2.5% Xtrata marketplace, 2.5% Xtrata operator.{fixedSplit ? ' Nothing to set here.' : ''}</p>;
               }
               const total = splits.artist + splits.marketplace + splits.operator;
               return (

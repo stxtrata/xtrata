@@ -176,3 +176,24 @@ describe('advanced contract status', () => {
     expect(screen.getAllByText(ADDRESS).length).toBeGreaterThan(0);
   });
 });
+
+describe('v1.8 fixed split', () => {
+  it('v1.7 still offers the split action (control case)', async () => {
+    render(<CollectionSettingsPanel activeCollectionId="c1" />);
+    await waitFor(() => expect(screen.queryAllByRole('option').length).toBeGreaterThan(0));
+    expect(screen.getByRole('option', { name: 'Set payout splits' })).toBeTruthy();
+  });
+
+  it('offers no split action and labels the split as fixed by the contract', async () => {
+    mocked.template = 'xtrata-collection-mint-v1.8';
+    mocked.chain.splits = [9500n, 250n, 250n];
+    const { unmount } = render(<CollectionSettingsPanel activeCollectionId="c1" />);
+    await screen.findByRole('button', { name: 'Refresh on-chain status' });
+    await waitFor(() => expect(screen.queryAllByRole('option').length).toBeGreaterThan(0));
+    expect(screen.queryByRole('option', { name: 'Set payout splits' })).toBeNull();
+    unmount();
+    render(<CollectionSettingsPanel mode="guided" activeCollectionId="c1" stagedFileCount={10} />);
+    await screen.findByText(/Fixed by your contract/);
+    expect(screen.queryByRole('button', { name: 'Set standard split (95% to you)' })).toBeNull();
+  });
+});

@@ -5,16 +5,20 @@ export type CollectionV15FeeUnits = {
   batch: bigint;
   seal: bigint;
 };
-/** Helpers on core v3.2.3's staged fee model with registered inventory (v1.5–v1.7). */
+/** Helpers on core v3.2.3's staged fee model with registered inventory (v1.5–v1.8). */
 export const isCollectionV15 = (version: string) =>
-  /^xtrata-collection-mint-v1[.-][5-7]$/.test(version.trim());
+  /^xtrata-collection-mint-v1[.-][5-8]$/.test(version.trim());
 
 /**
  * v1.7+: `mint-price` is the fixed all-in amount a collector pays for any file.
  * The helper deducts that file's protocol fees and pays out the rest.
  */
 export const isFixedPriceCollection = (version: string) =>
-  /^xtrata-collection-mint-v1[.-]7$/.test(version.trim());
+  /^xtrata-collection-mint-v1[.-][78]$/.test(version.trim());
+
+/** v1.8+: the payout split is hard-coded (95 / 2.5 / 2.5); there is no set-splits. */
+export const isFixedSplitCollection = (version: string) =>
+  /^xtrata-collection-mint-v1[.-]8$/.test(version.trim());
 
 export const readCollectionV15FeeUnits = async (
   read: (functionName: string) => Promise<bigint | null>

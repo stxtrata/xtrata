@@ -37,7 +37,7 @@ import {
 import { useManageWallet } from '../ManageWalletContext';
 import { parseDeployPricingLockSnapshot } from '../../lib/deploy/pricing-lock';
 import InfoTooltip from './InfoTooltip';
-import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar?raw';
+import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.8.clar?raw';
 import preinscribedTemplateSource from '../../../contracts/clarinet/contracts/xtrata-preinscribed-collection-sale-v1.0.clar?raw';
 
 type CollectionDraft = {
@@ -172,7 +172,7 @@ const compactClaritySourceForDeploy = (source: string) => {
   return result.length > 0 ? result : source;
 };
 
-type DeployTemplateMode = 'standard-v1.7';
+type DeployTemplateMode = 'standard-v1.8';
 
 type ContractNameAvailability = {
   exists: boolean;
@@ -388,7 +388,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const [deployPending, setDeployPending] = useState(false);
   const [draftPending, setDraftPending] = useState(false);
   const [selectedDraftLoading, setSelectedDraftLoading] = useState(false);
-  const deployTemplateMode: DeployTemplateMode = 'standard-v1.7';
+  const deployTemplateMode: DeployTemplateMode = 'standard-v1.8';
   const [deployAttemptId, setDeployAttemptId] = useState<string | null>(null);
   const [deployDebugLog, setDeployDebugLog] = useState<string[]>([]);
   const reviewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -945,7 +945,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     if (mintType === 'pre-inscribed') {
       return 'xtrata-preinscribed-collection-sale-v1.0';
     }
-    return 'xtrata-collection-mint-v1.7';
+    return 'xtrata-collection-mint-v1.8';
   }, [mintType]);
   const deploySourceByteLength = useMemo(
     () => new TextEncoder().encode(deployBuild.source).byteLength,
@@ -1092,7 +1092,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const details = {
       debugVersion: DEPLOY_DEBUG_VERSION,
       clarityVersion: DEPLOY_CLARITY_VERSION,
-      defaultDeployTemplateMode: 'standard-v1.7',
+      defaultDeployTemplateMode: 'standard-v1.8',
       sourceCompactionMode: DEPLOY_SOURCE_COMPACTION_MODE,
       debug14Enabled
     };
@@ -1189,7 +1189,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.7';
+        : 'xtrata-collection-mint-v1.8';
 
     const draftMetadata = {
       mintType,
@@ -1382,7 +1382,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.7';
+        : 'xtrata-collection-mint-v1.8';
     const sourceTemplateLabel = templateVersion;
     let sourceBeforeCompaction = refreshBuild.source;
 
@@ -2162,7 +2162,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         </p>
         <ul>
           <li>Contract code is locked and generated internally by the app.</li>
-          <li>Payout split: the standard is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator). Contracts deploy at 0 STX with no split, so you set it in one click in Mint rules → 3. Payout split. Minting stays locked until it is set.</li>
+          <li>Payout split is fixed in the contract: 95% to you, 2.5% Xtrata marketplace, 2.5% Xtrata operator. It is set from the moment you deploy and cannot be changed later, by you or anyone else.</li>
           <li>Operator payout address is fixed to Xtrata defaults for this flow.</li>
           <li>Advanced royalty and URI logic is hidden in this beginner flow.</li>
         </ul>

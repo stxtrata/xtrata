@@ -1,5 +1,5 @@
 /**
- * Read-only preflights for collection mint helper (v1.5–v1.7) admin calls.
+ * Read-only preflights for collection mint helper (v1.5–v1.8) admin calls.
  * Rule: never open the wallet for a transaction the contract will reject.
  * Role table generated from the helper source (assert-owner / assert-config-admin /
  * assert-finance-admin / assert-main-xtrata-admin / recipient-editor checks).

@@ -31,3 +31,23 @@ describe('v1.7 template pinning', () => {
     expect(result.source.split(`(contract-call? '${params.coreContractId} `).length - 1).toBe(8);
   });
 });
+
+describe('v1.8 fixed payout split', () => {
+  const v18 = readFileSync(new URL('../../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.8.clar', import.meta.url), 'utf8');
+  it.each([buildArtistDeployContractSource, sdkBuild])('deploys with the hard-coded 95 / 2.5 / 2.5 split at any price, including 0', build => {
+    for (const mintPriceStx of ['0', '20']) {
+      const result = build({ ...params, input: { ...params.input, mintPriceStx }, templateSources: { standardSource: v18, preinscribedSource: '' } });
+      expect(result.errors).toEqual([]);
+      expect(result.source).toContain('(define-constant ARTIST-BPS u9500)');
+      expect(result.source).toContain('(define-constant MARKETPLACE-BPS u250)');
+      expect(result.source).toContain('(define-constant OPERATOR-BPS u250)');
+      expect(result.source).not.toContain('(define-public (set-splits');
+      expect(result.source.split(`(contract-call? '${params.coreContractId} `).length - 1).toBe(8);
+    }
+  });
+  it.each([buildArtistDeployContractSource, sdkBuild])('refuses a template whose split constants were altered', build => {
+    const tampered = v18.replace('(define-constant MARKETPLACE-BPS u250)', '(define-constant MARKETPLACE-BPS u0)');
+    const result = build({ ...params, templateSources: { standardSource: tampered, preinscribedSource: '' } });
+    expect(result.errors.join(' ')).toMatch(/MARKETPLACE-BPS is not u250/);
+  });
+});

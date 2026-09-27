@@ -117,6 +117,21 @@ const isCoreEntry = (entry: ContractRegistryEntry) =>
 const escapeClarityAscii = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
+/** v1.8+ templates hard-code the payout split as constants (no set-splits). */
+export const FIXED_PAYOUT_SPLIT = { artist: 9500, marketplace: 250, operator: 250 } as const;
+export const hasFixedPayoutSplit = (source: string) => /^\(define-constant ARTIST-BPS u\d+\)$/m.test(source);
+export const fixedPayoutSplitProblem = (source: string) => {
+  for (const [name, expected] of [['ARTIST-BPS', FIXED_PAYOUT_SPLIT.artist], ['MARKETPLACE-BPS', FIXED_PAYOUT_SPLIT.marketplace], ['OPERATOR-BPS', FIXED_PAYOUT_SPLIT.operator]] as const) {
+    if (!new RegExp(`^\\(define-constant ${name} u${expected}\\)$`, 'm').test(source)) {
+      return `Template payout split constant ${name} is not u${expected}.`;
+    }
+  }
+  if (/\(define-public \(set-splits/.test(source)) {
+    return 'Fixed-split template must not expose set-splits.';
+  }
+  return null;
+};
+
 const replaceLine = (params: {
   source: string;
   marker: string;
@@ -424,29 +439,38 @@ export const buildArtistDeployContractSource = (params: {
     errors
   });
 
-  source = replaceLine({
-    source,
-    marker: 'artist-bps',
-    pattern: /^\(define-data-var artist-bps uint u\d+\)$/m,
-    replacement: `(define-data-var artist-bps uint u${payoutSplits.artistBps.toString()})`,
-    errors
-  });
+  if (hasFixedPayoutSplit(source)) {
+    // v1.8+: the split is a hard-coded constant the creator cannot change.
+    // Nothing to substitute; just refuse a template whose constants drifted.
+    const problem = fixedPayoutSplitProblem(source);
+    if (problem) {
+      errors.push(problem);
+    }
+  } else {
+    source = replaceLine({
+      source,
+      marker: 'artist-bps',
+      pattern: /^\(define-data-var artist-bps uint u\d+\)$/m,
+      replacement: `(define-data-var artist-bps uint u${payoutSplits.artistBps.toString()})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'marketplace-bps',
-    pattern: /^\(define-data-var marketplace-bps uint u\d+\)$/m,
-    replacement: `(define-data-var marketplace-bps uint u${payoutSplits.marketplaceBps.toString()})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'marketplace-bps',
+      pattern: /^\(define-data-var marketplace-bps uint u\d+\)$/m,
+      replacement: `(define-data-var marketplace-bps uint u${payoutSplits.marketplaceBps.toString()})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'operator-bps',
-    pattern: /^\(define-data-var operator-bps uint u\d+\)$/m,
-    replacement: `(define-data-var operator-bps uint u${payoutSplits.operatorBps.toString()})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'operator-bps',
+      pattern: /^\(define-data-var operator-bps uint u\d+\)$/m,
+      replacement: `(define-data-var operator-bps uint u${payoutSplits.operatorBps.toString()})`,
+      errors
+    });
+  }
 
   if (mintType === 'standard') {
     source = replaceLine({
