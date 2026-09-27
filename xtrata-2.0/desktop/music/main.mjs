@@ -43,7 +43,7 @@ else {
   Menu.setApplicationMenu(Menu.buildFromTemplate([
    ...(process.platform==='darwin'?[{label:'Xtrata Music',submenu:[{role:'about'},{type:'separator'},{role:'quit'}]}]:[]),
    {label:'Edit',submenu:[{role:'copy'},{role:'paste'},{role:'selectAll'}]},
-   {label:'Help',submenu:[{label:'Downloads, help & news',click:()=>visit('https://xtrata.xyz/music/lounge')},{label:'Show wallet folder',click:()=>shell.openPath(app.getPath('userData'))}]}
+   {label:'Help',submenu:[{label:'Beta tester installation guide',click:async()=>{const error=await shell.openPath(app.isPackaged?join(process.resourcesPath,'Xtrata-Music-Beta-Guide.txt'):join(app.getAppPath(),'guide','Xtrata-Music-Beta-Guide.txt'));if(error)dialog.showErrorBox('Could not open the guide',error);}},{label:'Downloads, help & news',click:()=>visit('https://xtrata.xyz/music/lounge')},{label:'Show wallet folder',click:()=>shell.openPath(app.getPath('userData'))}]}
   ]));
 
  }catch(error){if(!quitting)dialog.showErrorBox('Xtrata Music could not start','Your wallet files have not been removed. Close any other copy and try again.\n\n'+error.message);app.quit();}
