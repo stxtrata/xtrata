@@ -7263,3 +7263,210 @@
       letter-spacing: 0.14em;
       text-transform: uppercase;
     }
+
+    /* ── Xtrata Collections "coming soon" announcement ──────────────────────
+       Uses the theme tokens only, so it follows classic / terminal / midnight /
+       neon. Remove with the matching block in index.html at launch. */
+    .collections-soon {
+      --soon-accent: 255, 150, 84;
+      /* Text-weight accent: darker on the light theme for contrast. */
+      --soon-ink: 176, 74, 16;
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-columns: 108px minmax(0, 1fr) auto auto;
+      align-items: center;
+      gap: 18px;
+      margin-top: 12px;
+      padding: 16px 20px;
+      overflow: hidden;
+      border: 1px solid rgba(var(--soon-accent), 0.45);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      color: var(--ink);
+    }
+
+    body[data-theme="terminal"] .collections-soon,
+    body[data-theme="midnight"] .collections-soon,
+    body[data-theme="neon"] .collections-soon {
+      --soon-ink: 255, 160, 100;
+    }
+
+    .collections-soon::before {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background:
+        radial-gradient(circle at 0 50%, rgba(var(--soon-accent), 0.2), transparent 38%),
+        linear-gradient(100deg, rgba(var(--soon-accent), 0.06), transparent 55%),
+        repeating-linear-gradient(90deg, transparent 0 23px, rgba(var(--soon-accent), 0.05) 23px 24px);
+      content: '';
+    }
+
+    .collections-soon__art {
+      position: relative;
+      width: 108px;
+      height: 70px;
+    }
+
+    .collections-soon__tile {
+      position: absolute;
+      top: 8px;
+      display: grid;
+      width: 48px;
+      height: 56px;
+      place-items: end start;
+      padding: 5px 6px;
+      border: 1px solid rgba(var(--soon-accent), 0.5);
+      border-radius: 9px;
+      background:
+        linear-gradient(160deg, rgba(var(--soon-accent), 0.32), rgba(var(--soon-accent), 0.04) 70%),
+        #07090d;
+      color: rgb(var(--soon-accent));
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
+      transition: transform 0.25s ease;
+    }
+
+    /* Back tiles peek out to the right, so their numbers sit top-right. */
+    .collections-soon__tile--back { left: 54px; place-items: start end; transform: rotate(10deg); opacity: 0.6; }
+    .collections-soon__tile--mid { left: 24px; place-items: start end; transform: rotate(3deg); opacity: 0.85; }
+    .collections-soon__tile--front { left: 0; transform: rotate(-5deg); }
+
+    .collections-soon:hover .collections-soon__tile--back { transform: rotate(14deg) translateX(4px); }
+    .collections-soon:hover .collections-soon__tile--mid { transform: rotate(5deg) translateX(3px); }
+
+    .collections-soon__body {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+
+    .collections-soon__pill {
+      display: inline-flex;
+      align-items: center;
+      justify-self: start;
+      gap: 6px;
+      padding: 3px 9px;
+      border: 1px solid rgba(var(--soon-accent), 0.5);
+      border-radius: 999px;
+      background: rgba(var(--soon-accent), 0.12);
+      color: rgb(var(--soon-ink));
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .collections-soon__pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgb(var(--soon-accent));
+      box-shadow: 0 0 12px rgba(var(--soon-accent), 0.8);
+      animation: collections-soon-pulse 2.2s ease-in-out infinite;
+    }
+
+    @keyframes collections-soon-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    .collections-soon__title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+    }
+
+    .collections-soon__copy {
+      max-width: 62ch;
+      margin: 0;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .collections-soon__steps {
+      display: flex;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .collections-soon__steps li {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px 6px 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    .collections-soon__steps li span {
+      display: grid;
+      width: 18px;
+      height: 18px;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(var(--soon-accent), 0.18);
+      color: rgb(var(--soon-ink));
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .collections-soon__cta {
+      padding: 10px 14px;
+      border: 1px solid rgba(var(--soon-accent), 0.7);
+      border-radius: 11px;
+      background: rgba(var(--soon-accent), 0.14);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 850;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.16s ease, transform 0.16s ease;
+    }
+
+    .collections-soon__cta:hover {
+      background: rgba(var(--soon-accent), 0.26);
+      color: var(--ink);
+      transform: translateY(-1px);
+    }
+
+    .collections-soon__cta:focus-visible {
+      outline: 2px solid rgb(var(--soon-ink));
+      outline-offset: 3px;
+    }
+
+    @media (max-width: 1100px) {
+      .collections-soon { grid-template-columns: 108px minmax(0, 1fr) auto; }
+      .collections-soon__steps { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .collections-soon {
+        grid-template-columns: 70px minmax(0, 1fr);
+        gap: 12px;
+        padding: 14px;
+      }
+      .collections-soon__art { width: 70px; height: 60px; transform: scale(0.82); transform-origin: left center; }
+      .collections-soon__title { font-size: 18px; }
+      .collections-soon__copy { font-size: 12px; }
+      .collections-soon__cta { grid-column: 1 / -1; text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .collections-soon__pulse { animation: none; }
+      .collections-soon__tile,
+      .collections-soon__cta { transition: none; }
+    }
