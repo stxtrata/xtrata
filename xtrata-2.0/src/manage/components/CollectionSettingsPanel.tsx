@@ -1092,7 +1092,7 @@ const resolveCoreContractArgs = (coreContractId: string | null): BuildActionArgs
       args: [],
       notices: [],
       error:
-        'Unable to resolve the locked core contract ID. Refresh on-chain status before setting recipient editor access.'
+        "Couldn't read which core contract this collection is locked to — the blockchain API may be busy. Wait a moment and submit again. Nothing was sent."
     };
   }
   return {
@@ -1761,6 +1761,25 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   }, [usesV15Fees, preInscribedMint, summary, lockedMintFeeFloor, metadataRecord, collectionPricingMetadata.mode,
       collectionId, fixedPrice, syncStandardMintPricingMetadata]);
 
+  /** Locked core contract ID, read with one retry. Null means "could not read". */
+  const readLockedCoreContractId = async (target?: ContractTarget) => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const cv = await callContractReadOnly('get-locked-core-contract', [], target);
+        const raw = toText(toPrimitive(cv));
+        if (parseContractPrincipal(raw)) {
+          return raw;
+        }
+      } catch {
+        // retry once below
+      }
+      if (attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+    }
+    return null;
+  };
+
   const callContractReadOnly = async (
     functionName: string,
     functionArgs: ClarityValue[] = [],
@@ -1842,13 +1861,14 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       let coreFeeUnitMicroStx: bigint | null = null;
       let coreFeeUnits: CollectionV15FeeUnits | null = null;
 
+      // The locked core read and the fee reads are separate: a failed (e.g.
+      // rate-limited) fee read must not erase a core contract ID that loaded fine.
+      coreContractId = await readLockedCoreContractId({
+        address: resolvedAddress,
+        contractName: resolvedName
+      });
       try {
-        const lockedCoreCv = await callContractReadOnly('get-locked-core-contract', [], {
-          address: resolvedAddress,
-          contractName: resolvedName
-        });
-        const lockedCoreRaw = toText(toPrimitive(lockedCoreCv));
-        coreContractId = lockedCoreRaw || null;
+        const lockedCoreRaw = coreContractId ?? '';
         const parsedCoreTarget = parseContractPrincipal(lockedCoreRaw);
         if (parsedCoreTarget) {
           const feeUnitCv = await callContractReadOnly('get-fee-unit', [], parsedCoreTarget);
@@ -1863,7 +1883,6 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
           }
         }
       } catch {
-        coreContractId = null;
         coreFeeUnitMicroStx = null;
         coreFeeUnits = null;
       }
@@ -2046,7 +2065,11 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       ? action?.functionName === 'set-phase' ? 'Phase price collectors pay (STX)' : 'Price collectors pay (STX)'
       : field.label;
 
-  const buildActionArgs = (action: MutableAction): BuildActionArgsResult => {
+  const buildActionArgs = (
+    action: MutableAction,
+    coreContractIdOverride?: string | null
+  ): BuildActionArgsResult => {
+    const coreContractIdForArgs = coreContractIdOverride ?? summary?.coreContractId ?? null;
     const args: ClarityValue[] = [];
     const notices: string[] = [];
 
@@ -2276,7 +2299,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
 
     if (action.functionName === 'set-recipients') {
-      const fixedRecipients = resolveFixedRecipientArgs(summary?.coreContractId ?? null);
+      const fixedRecipients = resolveFixedRecipientArgs(coreContractIdForArgs);
       if (fixedRecipients.error) {
         return fixedRecipients;
       }
@@ -2285,7 +2308,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
 
     if (action.functionName === 'set-recipient-editor-access') {
-      const coreArgs = resolveCoreContractArgs(summary?.coreContractId ?? null);
+      const coreArgs = resolveCoreContractArgs(coreContractIdForArgs);
       if (coreArgs.error) {
         return coreArgs;
       }
@@ -2305,7 +2328,17 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       setActionMessage('Enter a valid deployed contract address and name first.');
       return;
     }
-    const parsed = buildActionArgs(selectedAction);
+    let coreContractIdOverride: string | null = null;
+    if (
+      CORE_ADMIN_FUNCTIONS.has(selectedAction.functionName) ||
+      selectedAction.functionName === 'set-recipients'
+    ) {
+      if (!parseContractPrincipal(summary?.coreContractId ?? '')) {
+        setActionMessage('Reading the collection\'s core contract…');
+        coreContractIdOverride = await readLockedCoreContractId();
+      }
+    }
+    const parsed = buildActionArgs(selectedAction, coreContractIdOverride);
     if (parsed.error) {
       setActionMessage(parsed.error);
       return;
