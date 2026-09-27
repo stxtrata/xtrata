@@ -8273,3 +8273,10 @@
       .home-kp.home-panel { grid-template-columns: 1fr; }
       .home-kp__media { order: -1; }
     }
+
+    /* The Living Wall is the homepage for everyone, so it stays visible when a
+       connected wallet has inscriptions (body.has-ledger used to hide the old
+       intro hero, which was a "connect your wallet" introduction). */
+    :root[data-page='home'] body.has-ledger .living-hero--wall.registry-intro {
+      display: grid;
+    }
