@@ -1,3 +1,4 @@
+import { stripFormatting } from './components/LinkifiedText';
 import {
   useEffect,
   useMemo,
@@ -874,9 +875,10 @@ export default function SimplePublicHome() {
           collection.id;
         const symbol = toText(metadataCollection?.symbol);
         const description =
-          toMultilineText(metadataCollectionPage?.description) ||
-          toMultilineText(metadataCollection?.description) ||
-          'This collection is live and ready for minting.';
+          stripFormatting(
+            toMultilineText(metadataCollectionPage?.description) ||
+              toMultilineText(metadataCollection?.description)
+          ) || 'This collection is live and ready for minting.';
         const liveKey = toText(collection.slug) || collection.id;
         const livePath = `/collection/${encodeURIComponent(liveKey)}`;
         const contractTarget = resolveCollectionContractTarget(collection);

@@ -176,3 +176,62 @@ describe('advanced contract status', () => {
     expect(screen.getAllByText(ADDRESS).length).toBeGreaterThan(0);
   });
 });
+
+describe('recipient editor access survives a flaky read', () => {
+  const selectEditorAccess = async (container: HTMLElement) => {
+    const select = await waitFor(() => {
+      const el = container.querySelector('#manage-contract-action-select') as HTMLSelectElement | null;
+      if (!el) throw new Error('no action select yet');
+      return el;
+    });
+    const groupButton = screen.queryAllByRole('button', { name: 'Ownership and Roles' })[0];
+    if (groupButton) fireEvent.click(groupButton);
+    fireEvent.change(select, { target: { value: 'set-recipient-editor-access' } });
+    const editor = await waitFor(() => {
+      const el = container.querySelector('#action-set-recipient-editor-access-editor') as HTMLInputElement | null;
+      if (!el) throw new Error('no editor field yet');
+      return el;
+    });
+    fireEvent.change(editor, { target: { value: ADDRESS } });
+    fireEvent.change(container.querySelector('#action-set-recipient-editor-access-can-operator')!, { target: { value: 'true' } });
+  };
+  const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Submit wallet transaction' }));
+  const coreArg = () => {
+    const call = mocked.write.mock.calls.at(-1)?.[0] as { functionName: string; functionArgs: Array<{ type: number; address?: string; contractName?: string; value?: string }> };
+    return call;
+  };
+
+  it('keeps the core contract when the fee read fails', async () => {
+    const base = mocked.read.getMockImplementation()!;
+    mocked.read.mockImplementation(async (opts: { functionName: string }) => {
+      if (opts.functionName === 'get-fee-unit') throw new Error('429 rate limited');
+      return base(opts);
+    });
+    const { container } = render(<CollectionSettingsPanel mode="advanced" activeCollectionId="c1" isXtrataOwner />);
+    await screen.findByText(/On-chain status refreshed|Payout split/);
+    await selectEditorAccess(container);
+    submit();
+    await waitFor(() => expect(mocked.write).toHaveBeenCalled());
+    const call = coreArg();
+    expect(call.functionName).toBe('set-recipient-editor-access');
+    expect(JSON.stringify(call.functionArgs[0])).toContain('xtrata-v3-2-3');
+  });
+
+  it('reads the core contract on submit when the refresh could not', async () => {
+    const base = mocked.read.getMockImplementation()!;
+    let lockedReads = 0;
+    mocked.read.mockImplementation(async (opts: { functionName: string }) => {
+      if (opts.functionName === 'get-locked-core-contract') {
+        lockedReads += 1;
+        if (lockedReads <= 2) throw new Error('429 rate limited');
+      }
+      return base(opts);
+    });
+    const { container } = render(<CollectionSettingsPanel mode="advanced" activeCollectionId="c1" isXtrataOwner />);
+    await waitFor(() => expect(lockedReads).toBeGreaterThanOrEqual(2), { timeout: 4000 });
+    await selectEditorAccess(container);
+    submit();
+    await waitFor(() => expect(mocked.write).toHaveBeenCalled(), { timeout: 4000 });
+    expect(JSON.stringify(coreArg().functionArgs[0])).toContain('xtrata-v3-2-3');
+  });
+});

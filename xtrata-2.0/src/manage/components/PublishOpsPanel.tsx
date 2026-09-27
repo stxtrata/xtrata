@@ -39,6 +39,7 @@ import {
 import { parseContractPrincipal } from '../lib/contract-link';
 import { useManageWallet } from '../ManageWalletContext';
 import InfoTooltip from './InfoTooltip';
+import LinkifiedText from '../../components/LinkifiedText';
 
 type CollectionRecord = {
   id: string;
@@ -1531,7 +1532,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
         <label className="field">
           <span className="field__label info-label">
             Collection description
-            <InfoTooltip text="Update the public collection summary text shown under the hero image. Line breaks are supported." />
+            <InfoTooltip text="Update the public collection summary text shown under the hero image. Line breaks are supported. Wrap text in **double asterisks** for bold or *single asterisks* for italic." />
           </span>
           <textarea
             className="textarea"
@@ -1547,7 +1548,7 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
           <span className="field__hint">
             {collectionDescriptionInput.length}/
             {COLLECTION_PAGE_DESCRIPTION_MAX_LENGTH.toString()} characters
-            {' '}· Links starting with https:// become clickable on the collection page.
+            {' '}· **bold** and *italic* are supported, and links starting with https:// become clickable on the collection page.
           </span>
         </label>
 
@@ -1599,7 +1600,9 @@ export default function PublishOpsPanel(props: PublishOpsPanelProps) {
             <InfoTooltip text="Preview of the public hero section using your saved metadata + cover settings." />
           </p>
           <h3>{previewTitle}</h3>
-          <p className="collection-live-preview__description">{previewDescription}</p>
+          <p className="collection-live-preview__description">
+            <LinkifiedText text={previewDescription} />
+          </p>
           <div className="collection-live-preview__meta">
             <span>Ticker: {previewSymbol}</span>
             <span>State: {liveState}</span>
