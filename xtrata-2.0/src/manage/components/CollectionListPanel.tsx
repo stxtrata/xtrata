@@ -5,6 +5,7 @@ import {
   toManageApiErrorMessage
 } from '../lib/api-errors';
 import { useManageWallet } from '../ManageWalletContext';
+import { isXtrataOwnerAddress } from '../../config/manage';
 import InfoTooltip from './InfoTooltip';
 
 type CollectionRecord = {
@@ -71,6 +72,11 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const { walletSession } = useManageWallet();
   const connectedAddress = walletSession.address?.trim() ?? '';
+  // The Xtrata owner can open any creator's collection (e.g. to grant
+  // recipient-editor access); everyone else only sees their own.
+  const isXtrataOwner = isXtrataOwnerAddress(connectedAddress);
+  const [showAllCreators, setShowAllCreators] = useState(true);
+  const viewingAllCreators = isXtrataOwner && showAllCreators;
 
   const loadCollections = useCallback(
     async (includeArchived: boolean) => {
@@ -78,7 +84,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
       setError(null);
       try {
         const search = new URLSearchParams();
-        if (connectedAddress) {
+        if (connectedAddress && !viewingAllCreators) {
           search.set('artistAddress', connectedAddress);
         }
         if (includeArchived) {
@@ -97,7 +103,7 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
         setIsLoading(false);
       }
     },
-    [connectedAddress]
+    [connectedAddress, viewingAllCreators]
   );
 
   useEffect(() => {
@@ -317,12 +323,25 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
           </button>
           <InfoTooltip text="Show or hide drafts you removed from the active list." />
         </span>
+        {isXtrataOwner ? (
+          <span className="info-label">
+            <button
+              className="button button--ghost button--mini"
+              type="button"
+              onClick={() => setShowAllCreators((current) => !current)}
+              disabled={isLoading || pendingCollectionId !== null}
+            >
+              {showAllCreators ? 'Show only my collections' : "Show every creator's collections"}
+            </button>
+            <InfoTooltip text="Xtrata owner only: list collections from every creator, so you can open one and use the Xtrata-only contract actions on it." />
+          </span>
+        ) : null}
       </div>
 
       <p className="meta-value">
         Showing {activeCollections.length} v3.2.3 collection
         {activeCollections.length === 1 ? '' : 's'} for{' '}
-        <code>{connectedAddress || 'current wallet'}</code>
+        {viewingAllCreators ? <strong>every creator (Xtrata owner view)</strong> : <code>{connectedAddress || 'current wallet'}</code>}
         {showArchived && ` · ${archivedCollections.length} removed`}
       </p>
 
@@ -350,6 +369,12 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
             <p>
               {collection.slug} · {collection.state}
             </p>
+            {viewingAllCreators ? (
+              <p className="meta-value">
+                Creator: <code>{collection.artist_address}</code>
+                {collection.artist_address?.toUpperCase() === connectedAddress.toUpperCase() ? ' (you)' : ''}
+              </p>
+            ) : null}
             <p className="meta-value">
               <span className="info-label">
                 Collection ID
@@ -379,7 +404,8 @@ export default function CollectionListPanel(props: CollectionListPanelProps) {
                 </button>
                 <InfoTooltip text="Copy this drop ID to paste into other launch steps." />
               </span>
-              {!isPublished(collection) && (
+              {!isPublished(collection) &&
+                (!viewingAllCreators || collection.artist_address?.toUpperCase() === connectedAddress.toUpperCase()) && (
                 <span className="info-label">
                   <button
                     className="button button--ghost button--mini"
