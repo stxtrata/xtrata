@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BUILDER_STEPS, getBuilderCompletion, getBuilderGates, type BuilderStepId } from '../lib/builder';
 import type { JourneySignals } from '../lib/journey';
+import CollectionCoverImage from '../../components/CollectionCoverImage';
 
 type Props = {
   collectionId: string; collectionName: string; walletKey: string;
   previewCover?: string | null; previewDescription?: string;
+  /** Saved cover record; rendered with the same component as the public pages (images and HTML). */
+  previewCoverImage?: unknown; previewCoreContractId?: string | null;
   signals: JourneySignals; loading: boolean; error: string | null;
   wallet: ReactNode; picker: ReactNode; artwork: ReactNode;
   /** One DeployWizardPanel shared by Basics and Prepare contract so form state survives; the stage decides which actions it offers. */
@@ -71,7 +74,10 @@ export default function CollectionBuilder(p: Props) {
         </footer>
       </main>
       <aside className="creator-builder__review" aria-label="Collection summary"><span className="eyebrow">Your collection</span><h3>{p.collectionName || 'Untitled collection'}</h3>
-        <div className="creator-builder__cover">{p.previewCover ? <img src={p.previewCover} alt={`${p.collectionName || 'Collection'} cover`} /> : <span>Set your cover in<br />Review & launch</span>}</div>
+        <div className="creator-builder__cover">{p.previewCover ? <CollectionCoverImage coverImage={p.previewCoverImage} collectionId={p.collectionId || null}
+          fallbackCoreContractId={p.previewCoreContractId ?? null} fallbackUrl={p.previewCover} alt={`${p.collectionName || 'Collection'} cover`}
+          placeholderClassName="creator-builder__cover-note" emptyMessage="Set your cover in Review & launch" loadingMessage="Loading cover…"
+          errorMessage="Cover unavailable. Check it in Review & launch." debugLabel={`builder-cover:${p.collectionId}`} /> : <span>Set your cover in<br />Review & launch</span>}</div>
         {p.previewDescription && <p>{p.previewDescription}</p>}
         <dl><dt>Active files</dt><dd>{p.signals.activeAssetCount}</dd><dt>Inventory</dt><dd>{p.signals.deployPricingLockPresent ? 'Staging locked' : 'Preparing'}</dd><dt>Contract</dt><dd>{p.signals.deployReady ? 'Confirmed' : p.signals.deployPending ? 'Waiting for confirmation' : 'Not deployed'}</dd>
           {p.signals.inventoryRegistered !== null && p.signals.inventoryRegistered !== undefined && <><dt>Files registered</dt><dd>{p.signals.inventoryRegistered ? 'All registered' : 'Needs registering'}</dd></>}

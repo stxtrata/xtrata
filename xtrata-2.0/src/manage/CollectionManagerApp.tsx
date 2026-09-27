@@ -93,6 +93,9 @@ type CollectionReadiness = {
 
 type JourneySnapshot = {
   previewCover?: string | null;
+  /** The saved cover record itself, so the preview can render HTML covers too. */
+  previewCoverImage?: unknown;
+  previewCoreContractId?: string | null;
   previewDescription?: string;
   loading: boolean;
   error: string | null;
@@ -543,6 +546,8 @@ export default function CollectionManagerApp() {
 
       setJourneySnapshot({
         previewCover: resolveCollectionCoverImageUrl({ coverImage, collectionId: normalizedCollectionId }),
+        previewCoverImage: coverImage ?? null,
+        previewCoreContractId: toText(metadata?.coreContractId) || null,
         previewDescription: toText(collectionPage?.description) || toText(metadataCollection?.description),
         loading: false,
         error: null,
@@ -890,7 +895,8 @@ export default function CollectionManagerApp() {
     return <CollectionBuilder collectionId={activeCollectionId} collectionName={activeCollectionLabel}
       walletKey={`${walletSession.network}:${walletSession.address || 'disconnected'}`}
       signals={journeySignals} loading={journeySnapshot.loading} error={journeySnapshot.error}
-      previewCover={journeySnapshot.previewCover} previewDescription={journeySnapshot.previewDescription}
+      previewCover={journeySnapshot.previewCover} previewCoverImage={journeySnapshot.previewCoverImage}
+      previewCoreContractId={journeySnapshot.previewCoreContractId} previewDescription={journeySnapshot.previewDescription}
       onRefresh={handleJourneyRefresh} onAdvanced={setAdvancedMode} onCreate={handleCreateNewCollection}
       wallet={<><WalletTopBar walletSession={walletSession} walletPending={walletPending} onConnect={handleConnectWallet} onDisconnect={handleDisconnectWallet} showAddressWhenNamed /><CreatorSessionBadge /></>}
       picker={<CollectionListPanel activeCollectionId={activeCollectionId} preferredCollectionId={storedActiveCollectionId} refreshKey={journeyRefreshKey} onSelectCollection={handleSelectCollection} />}
