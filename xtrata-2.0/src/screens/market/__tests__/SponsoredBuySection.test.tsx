@@ -134,21 +134,33 @@ describe('SponsoredBuySection', () => {
   });
 
   it('shows progress labels while the relayer works', async () => {
-    let resolveStatus: (j: SponsorJob) => void = () => {};
-    const client = makeClient({
-      status: vi.fn().mockImplementation(
-        () => new Promise<SponsorJob>((resolve) => { resolveStatus = resolve; })
-      )
-    });
+    // The hook polls every pollIntervalMs, so several status checks can be in
+    // flight at once. Hold every one of them and release them together: resolving
+    // only the most recent one made this test depend on scheduling, and it timed
+    // out when the whole suite ran on a busy machine.
+    const pending: Array<(j: SponsorJob) => void> = [];
+    let settled: SponsorJob | null = null;
+    const status = vi.fn().mockImplementation(() =>
+      settled
+        ? Promise.resolve(settled)
+        : new Promise<SponsorJob>((resolve) => { pending.push(resolve); })
+    );
+    const client = makeClient({ status });
     render(<SponsoredBuySection {...baseProps} client={client} />);
     screen.getByRole('button', { name: /no STX needed/i }).click();
     await waitFor(() => {
       expect(screen.getByRole('status')).toBeTruthy();
     });
     expect(screen.getByText(/broadcast — confirming/i)).toBeTruthy();
-    resolveStatus(job('SETTLED', { buy: 'tx-buy' }));
-    await waitFor(() => {
-      expect(screen.getByText(/purchase complete/i)).toBeTruthy();
-    });
+    // Only settle once the relayer is actually being polled.
+    await waitFor(() => expect(status).toHaveBeenCalled());
+    settled = job('SETTLED', { buy: 'tx-buy' });
+    pending.splice(0).forEach((resolve) => resolve(settled as SponsorJob));
+    await waitFor(
+      () => {
+        expect(screen.getByText(/purchase complete/i)).toBeTruthy();
+      },
+      { timeout: 5000 }
+    );
   });
 });

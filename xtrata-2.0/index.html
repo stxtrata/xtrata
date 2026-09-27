@@ -99,6 +99,7 @@
       <a href="/" data-nav="home" target="_self">Home</a>
       <a href="/xplorer" data-nav="xplorer" target="_self">Explore</a>
       <a href="/inscribe" data-nav="inscribe" target="_self">Inscribe</a>
+      <a href="/music/" data-nav="music">Music</a>
       <a href="/drops" data-nav="drops" target="_self">Free drops</a>
       <a href="/market" data-nav="market" target="_self">Buy &amp; sell</a>
       <a href="/my-wallet" data-nav="my-wallet" target="_self">My Xtrata</a>
@@ -110,69 +111,77 @@
     </nav>
     </div>
 
-    <!-- Xtrata Collections announcement. Static on purpose: delete this block
-         (and the .collections-soon rules in home.css) when Collections launch. -->
-    <section class="collections-soon home-only" aria-labelledby="collectionsSoonTitle">
-      <div class="collections-soon__art" aria-hidden="true">
-        <span class="collections-soon__tile collections-soon__tile--back"><span>#111</span></span>
-        <span class="collections-soon__tile collections-soon__tile--mid"><span>#002</span></span>
-        <span class="collections-soon__tile collections-soon__tile--front"><span>#001</span></span>
-      </div>
-      <div class="collections-soon__body">
-        <span class="collections-soon__pill"><span class="collections-soon__pulse"></span>Coming soon</span>
-        <h2 class="collections-soon__title" id="collectionsSoonTitle">Xtrata Collections</h2>
-        <p class="collections-soon__copy">Launch a whole collection, fully on-chain. Upload your files, set a price and open minting in one guided studio. Each piece is inscribed by the collector who mints it.</p>
-      </div>
-      <ol class="collections-soon__steps" aria-label="How it works">
-        <li><span>1</span>Upload</li>
-        <li><span>2</span>Price</li>
-        <li><span>3</span>Collectors mint</li>
-      </ol>
-      <a class="collections-soon__cta" href="https://x.com/XtrataLayers" target="_blank" rel="noopener noreferrer" data-home-action="announce:collections-follow">Follow for launch news →</a>
-    </section>
+    <!-- One rotating strip replaces the Collections banner and the campaign cards.
+         Slides live in HOMEPAGE_STRIP_SLIDES (src/home/homepage-content.js). -->
+    <section class="home-strip home-only" id="homeStrip" aria-label="What's new on Xtrata" data-tone="violet"></section>
 
-    <section class="campaign-rail home-only" id="campaignBannerList" aria-label="Current Xtrata campaigns"></section>
-
-    <section class="living-hero registry-intro home-only" id="registryIntro" aria-labelledby="registryIntroTitle">
+    <section class="living-hero living-hero--wall registry-intro home-only" id="registryIntro" aria-labelledby="registryIntroTitle">
       <div class="living-hero__copy">
-        <span class="section-kicker section-kicker--live" id="registryModeBadge">A living world of permanent digital objects</span>
-        <h1 class="living-hero__title" id="registryIntroTitle">Create something <em>the internet cannot forget.</em></h1>
-        <p class="living-hero__lead" id="registryIntroLead">Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain.</p>
+        <span class="section-kicker section-kicker--live" id="registryModeBadge">On Xtrata this week</span>
+        <h1 class="living-hero__title" id="registryIntroTitle">Everything here <em>is alive, and on-chain.</em></h1>
+        <p class="living-hero__lead" id="registryIntroLead">Every tile is a real inscription. Press one to play it, hear it or open it.</p>
         <div class="living-hero__actions">
-          <a class="btn hero-btn" href="/xplorer" target="_self" data-home-action="hero:explore">Explore what's alive</a>
-          <button class="btn secondary hero-btn" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
-          <a class="btn secondary hero-btn" href="/drops" target="_self" data-home-action="hero:claim">Claim drops</a>
+          <button class="btn hero-btn hero-btn--lime" id="introPrepareButton" type="button" data-home-action="hero:create">Create yours</button>
+          <a class="btn secondary hero-btn" href="#fresh" target="_self" data-home-action="hero:fresh">See everything new</a>
         </div>
-        <div class="living-hero__trust">
-          <span>Fully on-chain</span>
-          <span>Made through Stacks</span>
-          <span>Anchored to Bitcoin</span>
-          <span>Sponsored claims need no STX</span>
-        </div>
+        <div class="home-now" id="homeNowPlaying" aria-live="polite"></div>
         <div class="living-hero__wallet">
           <button class="text-button" id="introConnectButton" type="button" data-home-action="hero:wallet-connect">Connect a wallet</button>
           <a class="text-button" id="introMyWalletLink" href="/my-wallet" target="_self" hidden>Open My Xtrata</a>
           <span>to collect, claim, or create</span>
         </div>
       </div>
-      <div class="living-hero__stage" id="featuredObjectStage" aria-label="Featured Xtrata objects"></div>
+      <div class="living-hero__stage home-wall" id="featuredObjectStage" aria-label="Featured Xtrata objects"></div>
     </section>
 
-    <section class="home-activity home-only" aria-labelledby="activityTitle">
-      <div class="home-activity__intro">
-        <span class="section-kicker">Alive now</span>
-        <h2 id="activityTitle">Follow the work, not the transactions.</h2>
+    <section class="home-panel home-music home-only" id="music" aria-labelledby="homeMusicTitle">
+      <div class="home-panel__head">
+        <div>
+          <span class="home-kicker home-kicker--violet">Xtrata Music · press a cover to play</span>
+          <h2 class="home-panel__title" id="homeMusicTitle">Songs that live on Bitcoin. <em>Hear one now.</em></h2>
+        </div>
+        <div class="home-tabs" id="homeMusicTabs" role="tablist" aria-label="Sort songs"></div>
+        <a class="home-btn home-btn--ghost" href="/music/lounge" target="_blank" rel="noopener" data-home-action="music:lounge">All songs in the Lounge →</a>
       </div>
-      <div class="home-activity__list" id="homeActivityList"></div>
+      <div class="home-shelf" id="homeMusicShelf"></div>
+      <p class="home-panel__foot">Free to play here, through Xtrata Radio. In the Xtrata Music app, every play sends a micropayment to the song's holder.</p>
     </section>
 
-    <section class="homepage-section home-only" id="possibilities" aria-labelledby="possibilitiesTitle">
-      <div class="section-heading">
-        <span class="section-kicker">All of this is Xtrata</span>
-        <h2 id="possibilitiesTitle">A file is only the beginning.</h2>
-        <p>Every example below opens a real Xtrata object, collection, or live product surface.</p>
+    <section class="home-panel home-aud home-only" id="homeAudionauts" aria-label="Audionauts, a new collection on Xtrata"></section>
+
+    <section class="home-panel home-kp home-only" id="homeKpLoops" aria-label="KP Loops by Kieron Pepper"></section>
+
+    <section class="home-panel home-fresh home-only" id="fresh" aria-labelledby="homeFreshTitle">
+      <div class="home-panel__head">
+        <div>
+          <span class="home-kicker home-kicker--lime">Fresh on-chain</span>
+          <h2 class="home-panel__title" id="homeFreshTitle">Just inscribed. <em>Go and try it.</em></h2>
+        </div>
+        <div class="home-chips" id="homeFreshFilters" aria-label="Filter by type"></div>
+        <a class="home-btn home-btn--ghost" href="/xplorer" target="_self" data-home-action="fresh:xplorer">Open the Xplorer →</a>
       </div>
-      <div class="possibility-grid" id="possibilityGrid"></div>
+      <div class="home-fresh__grid" id="homeFresh"></div>
+    </section>
+
+    <section class="home-panel home-playrow home-only" id="play" aria-labelledby="homePlayTitle">
+      <div class="home-panel__head">
+        <div>
+          <span class="home-kicker home-kicker--amber">Play</span>
+          <h2 class="home-panel__title" id="homePlayTitle">Games and instruments <em>you can play right now.</em></h2>
+        </div>
+        <a class="home-btn home-btn--ghost" href="/xplorer?gallery=code-various" target="_self" data-home-action="play:more">More playable objects →</a>
+      </div>
+      <div class="home-play__grid" id="homePlayGrid"></div>
+    </section>
+
+    <section class="home-panel home-programmes home-only" aria-labelledby="homeProgTitle">
+      <div class="home-panel__head">
+        <div>
+          <span class="home-kicker">What's live on Xtrata</span>
+          <h2 class="home-panel__title" id="homeProgTitle">Four ways in, <em>all running today.</em></h2>
+        </div>
+      </div>
+      <div class="home-prog__grid" id="homeProgrammes"></div>
     </section>
 
     <section class="homepage-section home-only" aria-labelledby="intentTitle">

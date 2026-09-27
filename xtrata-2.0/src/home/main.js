@@ -4137,7 +4137,7 @@
       if (dom.registryModeBadge) {
         dom.registryModeBadge.textContent =
           PAGE_MODE === 'home'
-            ? 'A living world of permanent digital objects'
+            ? 'On Xtrata this week'
             : hasLedger
               ? 'Live registry view'
               : 'Permanent media records';
@@ -4145,7 +4145,7 @@
       if (dom.registryIntroLead) {
         dom.registryIntroLead.textContent =
           PAGE_MODE === 'home'
-            ? 'Make, collect, trade, connect and build with songs, art, apps, games and ideas that live fully on-chain.'
+            ? 'Every tile is a real inscription. Press one to play it, hear it or open it.'
             : state.curatedGalleryTitle
               ? `${state.curatedGalleryTitle} is open below in Wallet Inscriptions.`
               : state.homeLatestView

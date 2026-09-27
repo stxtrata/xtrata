@@ -1,10 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  HOMEPAGE_ACTIVITY_DOORS,
-  HOMEPAGE_CAMPAIGN_BANNERS,
+  HOMEPAGE_AUDIONAUTS,
+  HOMEPAGE_FRESH,
   HOMEPAGE_INTENTS,
-  HOMEPAGE_OBJECTS,
+  HOMEPAGE_KP_LOOPS,
+  HOMEPAGE_PLAY,
+  HOMEPAGE_PROGRAMMES,
+  HOMEPAGE_STRIP_SLIDES,
+  HOMEPAGE_WALL,
   validateHomepageContent
 } from '../homepage-content.js';
 
@@ -28,41 +32,57 @@ describe('homepage content configuration', () => {
     expect(validateHomepageContent()).toEqual([]);
   });
 
-  it('keeps featured object ids and intent ids unique', () => {
-    const objectIds = HOMEPAGE_OBJECTS.map((item) => item.id);
-    const intentIds = HOMEPAGE_INTENTS.map((item) => item.id);
-    const activityIds = HOMEPAGE_ACTIVITY_DOORS.map((item) => item.id);
-    const campaignIds = HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.id);
-
-    expect(new Set(campaignIds).size).toBe(campaignIds.length);
-    expect(new Set(objectIds).size).toBe(objectIds.length);
-    expect(new Set(intentIds).size).toBe(intentIds.length);
-    expect(new Set(activityIds).size).toBe(activityIds.length);
+  it('keeps every content list keyed by unique ids', () => {
+    for (const list of [HOMEPAGE_STRIP_SLIDES, HOMEPAGE_WALL, HOMEPAGE_PLAY, HOMEPAGE_PROGRAMMES, HOMEPAGE_INTENTS, HOMEPAGE_FRESH.pinned]) {
+      const ids = list.map((item) => item.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
   });
 
-  it('uses real navigable destinations for featured content', () => {
-    const hrefs = [
-      ...HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.href),
-      ...HOMEPAGE_OBJECTS.map((item) => item.href),
-      ...HOMEPAGE_INTENTS.map((item) => item.href)
-    ];
+  it('replaces the stacked banners with one rotating strip', () => {
+    expect(indexHtml).toContain('id="homeStrip"');
+    expect(indexHtml).not.toContain('id="campaignBannerList"');
+    expect(indexHtml).not.toContain('class="collections-soon');
+    expect(HOMEPAGE_STRIP_SLIDES.map((item) => item.id)).toEqual(
+      expect.arrayContaining(['music-app', 'chess', 'kp-loops', 'audionauts', 'forever-twins'])
+    );
+    // A rotating banner must respect reduced motion and pause while being read.
+    expect(homepageSource).toContain("matchMedia?.('(prefers-reduced-motion: reduce)')");
+    expect(homepageSource).toContain('mount.onmouseenter = () => { paused = true; };');
+  });
 
-    expect(hrefs.every((href) => href.startsWith('/') || href.startsWith('https://'))).toBe(true);
-    expect(HOMEPAGE_OBJECTS.some((item) => item.preview.src?.includes('/i/'))).toBe(true);
-    expect(HOMEPAGE_CAMPAIGN_BANNERS.map((item) => item.id)).toEqual([
-      'xtrata-music',
-      'forever-twins',
-      'xtrata-music-lounge'
-    ]);
-    expect(HOMEPAGE_CAMPAIGN_BANNERS.at(-1)).toMatchObject({
-      href: '/music/lounge',
-      title: 'Xtrata Music Lounge',
-      eyebrow: 'On-chain pay-per-play',
-      newTab: true
-    });
-    expect(homepageSource).toContain("banner.target = '_blank'");
-    expect(homepageSource).toContain("banner.rel = 'noopener noreferrer'");
-    expect(indexHtml).toContain('id="campaignBannerList"');
+  it('fills the 4x3 Living Wall exactly on desktop', () => {
+    const cells = HOMEPAGE_WALL.reduce(
+      (sum, tile) => sum + ({ big: 4, wide: 2, tall: 2 }[tile.size] ?? 1),
+      0
+    );
+    expect(cells).toBe(12);
+    expect(HOMEPAGE_WALL.find((tile) => tile.kind === 'chess')).toMatchObject({ href: '/i/3072', title: 'On-Chain Chess' });
+  });
+
+  it('draws the chess board locally instead of loading the X Chess inscription', () => {
+    expect(homepageSource).toContain('const createChessBoard =');
+    expect(indexHtml).not.toContain('/i/3072"></iframe');
+  });
+
+  it('plays homepage songs through the one site radio, never a second player', () => {
+    expect(homepageSource).toContain('api.playToken(tokenId)');
+    // Silent visuals (the Audionauts logo) start the same radio in place.
+    expect(homepageSource).toContain('const toggleRadio = (fallbackHref) =>');
+    expect(homepageSource).toContain('api.switchOn();');
+    expect(homepageSource).not.toMatch(/new Audio\(|createElement\('audio'\)/);
+  });
+
+  it('reports a failed catalogue read as failed rather than as no songs', () => {
+    expect(homepageSource).toContain(".catch(() => ({ ok: false, tracks: [] }))");
+    expect(homepageSource).toContain('Live play counts could not be loaded just now');
+  });
+
+  it('keeps launch panels honest about what is live', () => {
+    expect(HOMEPAGE_AUDIONAUTS.status === 'live' ? HOMEPAGE_AUDIONAUTS.mintHref : 'soon').toBeTruthy();
+    expect(HOMEPAGE_KP_LOOPS.stationHref).toBe('/kp-loops/#kp-loops');
+    expect(indexHtml).toContain('id="homeKpLoops"');
+    expect(indexHtml).toContain('id="homeAudionauts"');
   });
 
   it('keeps off-page previews and third-party signed brand assets out of other routes', () => {
@@ -131,17 +151,12 @@ describe('homepage content configuration', () => {
   // once in the hero stage and again in the grid) plus three radio tracks cued
   // while the radio was switched off. Both are easy to reintroduce by accident.
   it('does not fetch inscription media before the visitor asks for it', () => {
-    // Iframe previews mount on press, never at render time.
-    expect(homepageSource).toContain('const mountPreviewFrame =');
-    expect(homepageSource).toContain('createPreviewPoster(frame, preview)');
-    expect(homepageSource).toContain("poster.className = 'object-preview__launch'");
-    expect(homeStyles).toContain('.object-preview__launch {');
-    // The only place an iframe src is assigned is inside the on-press mount.
-    const iframeSrcAssignments = homepageSource.match(/iframe\.src\s*=/g) ?? [];
-    expect(iframeSrcAssignments).toHaveLength(1);
-    const mountBody =
-      homepageSource.match(/const mountPreviewFrame = \([\s\S]*?\n\};/)?.[0] ?? '';
-    expect(mountBody).toContain('iframe.src = preview.src;');
+    // The homepage mounts no inscription iframes at all: the chess board is
+    // drawn locally and posters are plain images, so nothing heavy loads
+    // until the visitor chooses to open something.
+    expect(homepageSource).not.toContain("createElement('iframe')");
+    expect(homepageSource).not.toMatch(/iframe\.src\s*=/);
+    expect(homepageSource).toContain("img.loading = options.eager ? 'eager' : 'lazy';");
   });
 
   it('keeps the radio silent on the wire until it is switched on', () => {
