@@ -18,6 +18,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: 'Play now', href: '/i/3072', newTab: true
   }),
   Object.freeze({
+    id: 'astro-blaster', tag: 'New', tone: 'cyan',
+    title: 'Astro Blaster 3 is live.',
+    line: 'Every top score lives on Bitcoin. Post yours on-chain.',
+    cta: 'Play now', href: '/i/3075', newTab: true
+  }),
+  Object.freeze({
     id: 'kp-loops', tag: 'Play', tone: 'pink',
     title: 'KP Loops by Kieron Pepper.',
     line: "Signature drum loops from The Prodigy's former live drummer. Play them now.",
@@ -141,6 +147,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
   size: 12,
   pinned: Object.freeze([
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
+    { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
     { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Coming this week', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
@@ -158,7 +165,7 @@ export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'chess', kind: 'chess', tag: '#3072 · Chess', title: 'Challenge anyone', copy: 'Play a person on-chain, or the computer for practice. Casual games are free.', href: '/i/3072', tone: 'amber' },
   { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
   { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
-  { id: 'vst-1107', image: '/home/wall/vst-1107.webp', tag: '#1107 · Instrument', title: 'VST late night', copy: 'A working music object. Press the artwork and it plays, straight from the chain.', href: '/xplorer?gallery=jim-music&sel=1107', tone: 'plain' }
+  { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' }
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([

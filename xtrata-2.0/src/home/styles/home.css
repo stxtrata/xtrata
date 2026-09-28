@@ -8287,3 +8287,7 @@
     .home-fresh__card:focus:not(:focus-visible),
     .home-tile:focus:not(:focus-visible),
     .home-aud__cover:focus:not(:focus-visible) { outline: none; }
+
+    /* Astro Blaster 3 (cyan) */
+    .home-strip[data-tone='cyan'] { --strip-accent: #4ee6ff; }
+    .home-play.home-tone--cyan { border-color: rgba(78, 230, 255, 0.35); background: #060b1a; }
