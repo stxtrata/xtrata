@@ -12,7 +12,7 @@
     same score contract under its own game-id.
 
     Before inscription: fill CONFIG.moduleIds with minted ids
-      node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> \
+      node parent/fill-ids.mjs --css <id> --kit <id> --music <id> --scores <id> --room <id> \
         --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> \
         --drift <id> --stack <id> --hopper <id> \
         --tiles <id> --merge2048 <id> --defence <id> \
@@ -69,6 +69,7 @@
       moduleIds: {
         css: 0,
         kit: 0,
+        music: 0,
         scores: 0,
         room: 0,
         snake: 0,
@@ -103,6 +104,7 @@
     var MODULES = [
       { key: 'css', file: 'arcade-room.css', type: 'css' },
       { key: 'kit', file: 'arcade-kit.js', type: 'js' },
+      { key: 'music', file: 'arcade-music.js', type: 'js' },
       { key: 'scores', file: 'score-client.js', type: 'js' },
       { key: 'room', file: 'arcade-room.js', type: 'js' },
       { key: 'snake', file: 'game-neon-snake.js', type: 'js' },

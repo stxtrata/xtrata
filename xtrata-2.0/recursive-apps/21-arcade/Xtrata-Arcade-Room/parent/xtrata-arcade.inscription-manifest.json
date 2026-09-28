@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v2.0-twenty-one-cabinets",
+  "release": "v2.1-music-engine",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -50,9 +50,18 @@
       "key": "kit",
       "path": "modules/arcade-kit.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13290,
-      "sha256": "5c38bc2e4ca4151f7dc9ff9966ed4cd90c89bec2021bea9561b5aae13cf07f4f",
+      "sizeBytes": 13544,
+      "sha256": "6ca9a37179f069deed4c36de531df1e9f3eebfd1c46eb6904f800f94a5fe1ddf",
       "mintOrder": 2,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "music",
+      "path": "modules/arcade-music.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 23133,
+      "sha256": "b4e8afe80709de45d7feb4716d1656a161c71fea8a1cf581517db70fcb1555ea",
+      "mintOrder": 3,
       "mintedInscriptionId": 0
     },
     {
@@ -61,25 +70,25 @@
       "mimeType": "text/javascript",
       "sizeBytes": 26664,
       "sha256": "c56e751d1e3624201f7fa8e355e5c0d09a1610a1422aac5cdafb15e3aab9da36",
-      "mintOrder": 3,
+      "mintOrder": 4,
       "mintedInscriptionId": 0
     },
     {
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 27200,
-      "sha256": "01edf179fd9fa04653fc5b6516ad4e8e934d029be02e9f1e769eb281d0642fee",
-      "mintOrder": 4,
+      "sizeBytes": 27561,
+      "sha256": "7ebf21fc71c941e0ea8f5f824d6e06dceb3c96f606a2a9fd2c2e9f37e0234fd4",
+      "mintOrder": 5,
       "mintedInscriptionId": 0
     },
     {
       "key": "snake",
       "path": "modules/game-neon-snake.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 8851,
-      "sha256": "dac22e4d88d967cf246c4dc306f0acb4dafeea1b85a60a170e7cdd33517c6773",
-      "mintOrder": 5,
+      "sizeBytes": 21422,
+      "sha256": "0561b67a49330deedd0cd5398a09971840f8ce8161384b8a4dc33d934b2cb6c7",
+      "mintOrder": 6,
       "mintedInscriptionId": 0
     },
     {
@@ -88,16 +97,16 @@
       "mimeType": "text/javascript",
       "sizeBytes": 16258,
       "sha256": "d12e0b9fd3a8e59e117ec3ae8913393a2cd79ebb571eda320e4af7ac6c1ce548",
-      "mintOrder": 6,
+      "mintOrder": 7,
       "mintedInscriptionId": 0
     },
     {
       "key": "cave",
       "path": "modules/game-cave-diver.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 11661,
-      "sha256": "3e623e5b67bbd18b3885a3462ef257386e114a830c0a089beb4109009c97832d",
-      "mintOrder": 7,
+      "sizeBytes": 24630,
+      "sha256": "f52b8a9be409520dd7742de5d1cb1bed42b5fe0ed0179632c85fb905a862d171",
+      "mintOrder": 8,
       "mintedInscriptionId": 0
     },
     {
@@ -106,7 +115,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 12945,
       "sha256": "b5eaba815b541104bafa4833ef7505f095ec49f4fbff175f18680455ddab7d1e",
-      "mintOrder": 8,
+      "mintOrder": 9,
       "mintedInscriptionId": 0
     },
     {
@@ -115,16 +124,16 @@
       "mimeType": "text/javascript",
       "sizeBytes": 12558,
       "sha256": "b92043d4218bc10b4b52614b73bc3c151e80bfaa71b826dac8fb91258258c2b3",
-      "mintOrder": 9,
+      "mintOrder": 10,
       "mintedInscriptionId": 0
     },
     {
       "key": "bricks",
       "path": "modules/game-brick-breaker.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13998,
-      "sha256": "072f88e52fbf9fe87cd0d9d3b2bcb912294d076d979c899c53032f8e5fada073",
-      "mintOrder": 10,
+      "sizeBytes": 30972,
+      "sha256": "c4dba9dbbe4a6ae7789cecaef0ccdb90f89f70ce6331e44543b386059251b9a4",
+      "mintOrder": 11,
       "mintedInscriptionId": 0
     },
     {
@@ -133,7 +142,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 12521,
       "sha256": "5320a0250bc5441938324453f4dfa2ea8a00e079e38ed5d644a303272b4d0b96",
-      "mintOrder": 11,
+      "mintOrder": 12,
       "mintedInscriptionId": 0
     },
     {
@@ -142,7 +151,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 8119,
       "sha256": "51e60c42fa6aabd9b979d7edc5f4dddd34a2fce8b91cc5269fa9cf337e13fa2c",
-      "mintOrder": 12,
+      "mintOrder": 13,
       "mintedInscriptionId": 0
     },
     {
@@ -151,7 +160,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 16588,
       "sha256": "d4f0c1fbb315a4179a916cbfc220afd88f9cfd65beccca2cf5b6d428d08d8cd2",
-      "mintOrder": 13,
+      "mintOrder": 14,
       "mintedInscriptionId": 0
     },
     {
@@ -160,7 +169,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 8889,
       "sha256": "944fed9e418ce6f48635dcb064053b68cb40b1bafec30dac0cc38e42de0c43b7",
-      "mintOrder": 14,
+      "mintOrder": 15,
       "mintedInscriptionId": 0
     },
     {
@@ -169,7 +178,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 9589,
       "sha256": "a1f0a1ecccf76fe181fc022bbd08a826af6d4a3c736a2dfb0cfc74e087e7dd3c",
-      "mintOrder": 15,
+      "mintOrder": 16,
       "mintedInscriptionId": 0
     },
     {
@@ -178,7 +187,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 14242,
       "sha256": "2544b9198c369e0a8fa68f1be93ab129e33e624321be2b581eedf2fb4c9a8250",
-      "mintOrder": 16,
+      "mintOrder": 17,
       "mintedInscriptionId": 0
     },
     {
@@ -187,7 +196,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 17012,
       "sha256": "7b22075bc7c4f23d579b76ff9f874aa87576da850eb286d9f61f2432d513882b",
-      "mintOrder": 17,
+      "mintOrder": 18,
       "mintedInscriptionId": 0
     },
     {
@@ -196,7 +205,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 13497,
       "sha256": "4cc34eaec70c45d964b4630609e69591c5c7710022f0d01d62a1d83cffd7d816",
-      "mintOrder": 18,
+      "mintOrder": 19,
       "mintedInscriptionId": 0
     },
     {
@@ -205,7 +214,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 10288,
       "sha256": "c67efb4fa08f37467c8baa862b7cb8662fa7f661ea077f55702d4df5252e0501",
-      "mintOrder": 19,
+      "mintOrder": 20,
       "mintedInscriptionId": 0
     },
     {
@@ -214,7 +223,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 13636,
       "sha256": "db2b7e3ac63b17e005645705a996e8e7525799f0df86bbeaeb382465e03a2d67",
-      "mintOrder": 20,
+      "mintOrder": 21,
       "mintedInscriptionId": 0
     },
     {
@@ -223,7 +232,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 10186,
       "sha256": "0618446c04132c76b82516306ece74303edd9aa7f89f02dd5565e8d23296dc70",
-      "mintOrder": 21,
+      "mintOrder": 22,
       "mintedInscriptionId": 0
     },
     {
@@ -232,7 +241,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 10780,
       "sha256": "db5b81f237c142d2645213bdf8932d7c74775127c0009fab8f2f510a2c559724",
-      "mintOrder": 22,
+      "mintOrder": 23,
       "mintedInscriptionId": 0
     },
     {
@@ -241,7 +250,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 8847,
       "sha256": "93811845e749918cf653913541cbab9301b8ef4a637f835f41a384affe2a2076",
-      "mintOrder": 23,
+      "mintOrder": 24,
       "mintedInscriptionId": 0
     },
     {
@@ -250,7 +259,7 @@
       "mimeType": "text/javascript",
       "sizeBytes": 11758,
       "sha256": "eac313f550a0d0be02a788955c89db7902b0f1046ebe1713a1084d83099c882d",
-      "mintOrder": 24,
+      "mintOrder": 25,
       "mintedInscriptionId": 0
     },
     {
@@ -259,17 +268,18 @@
       "mimeType": "text/javascript",
       "sizeBytes": 8573,
       "sha256": "35d603c203c3616e68f1aa5f32cedf4bc8200b3b5307f8cb1499ae4322b5a3e2",
-      "mintOrder": 25,
+      "mintOrder": 26,
       "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 26,
+    "mintOrder": 27,
     "dependencyOrder": [
       "css",
       "kit",
+      "music",
       "scores",
       "room",
       "snake",

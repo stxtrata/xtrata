@@ -9,6 +9,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const leaves = [
   ['css', 'arcade-room.css', 'text/css'],
   ['kit', 'arcade-kit.js', 'text/javascript'],
+  ['music', 'arcade-music.js', 'text/javascript'],
   ['scores', 'score-client.js', 'text/javascript'],
   ['room', 'arcade-room.js', 'text/javascript'],
   ['snake', 'game-neon-snake.js', 'text/javascript'],
@@ -36,7 +37,7 @@ const leaves = [
 const manifest = {
   schema: 'xtrata-standalone-inscription-manifest@1',
   appId: 'xtrata_arcade_room',
-  release: 'v2.0-twenty-one-cabinets',
+  release: 'v2.1-music-engine',
   createdAt: new Date().toISOString().slice(0, 10),
   contentContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-v3-2-3', network: 'mainnet' },
   scoreContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-arcade-scores-v1-3', network: 'mainnet',

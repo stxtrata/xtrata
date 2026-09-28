@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const m = (f) => readFileSync(join(here, '..', 'modules', f), 'utf8').replace(/<\/script/gi, '<\\/script');
-const js = ['arcade-kit.js', 'score-client.js', 'arcade-room.js', 'game-neon-snake.js', 'game-block-drop.js', 'game-cave-diver.js', 'game-orbit-merge.js', 'game-block-runner.js', 'game-brick-breaker.js', 'game-rock-drift.js', 'game-stack-tower.js', 'game-road-hopper.js', 'game-tile-tap.js', 'game-merge-2048.js', 'game-block-defence.js', 'game-maze-muncher.js', 'game-invader-wave.js', 'game-helix-drop.js', 'game-bubble-pop.js', 'game-swerve.js', 'game-lunar-lander.js', 'game-reflex-tap.js', 'game-mine-sprint.js', 'game-pong-streak.js'];
+const js = ['arcade-kit.js', 'arcade-music.js', 'score-client.js', 'arcade-room.js', 'game-neon-snake.js', 'game-block-drop.js', 'game-cave-diver.js', 'game-orbit-merge.js', 'game-block-runner.js', 'game-brick-breaker.js', 'game-rock-drift.js', 'game-stack-tower.js', 'game-road-hopper.js', 'game-tile-tap.js', 'game-merge-2048.js', 'game-block-defence.js', 'game-maze-muncher.js', 'game-invader-wave.js', 'game-helix-drop.js', 'game-bubble-pop.js', 'game-swerve.js', 'game-lunar-lander.js', 'game-reflex-tap.js', 'game-mine-sprint.js', 'game-pong-streak.js'];
 const html = `<title>Xtrata Arcade</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <style>${m('arcade-room.css')}</style>

@@ -152,6 +152,10 @@
     }
     return {
       unlock: unlock, tone: tone, noise: noise, arp: arp,
+      // Shared graph access for the music engine: it plays through the same
+      // master gain, so the mute button silences music and effects alike.
+      context: function () { return ensure(); },
+      bus: function () { ensure(); return master; },
       isMuted: function () { return muted; }, setMuted: setMuted
     };
   })();

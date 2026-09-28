@@ -18,7 +18,7 @@ const FILES = { 101: 'arcade-room.css', 102: 'arcade-kit.js', 103: 'score-client
   114: 'game-tile-tap.js', 115: 'game-merge-2048.js', 116: 'game-block-defence.js',
   117: 'game-maze-muncher.js', 118: 'game-invader-wave.js', 119: 'game-helix-drop.js',
   120: 'game-bubble-pop.js', 121: 'game-swerve.js', 122: 'game-lunar-lander.js',
-  123: 'game-reflex-tap.js', 124: 'game-mine-sprint.js', 125: 'game-pong-streak.js' };
+  123: 'game-reflex-tap.js', 124: 'game-mine-sprint.js', 125: 'game-pong-streak.js', 126: 'arcade-music.js' };
 const CHUNK = 16384;
 const P1 = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', P2 = 'SP000000000000000000002Q6VF78';
 
@@ -29,7 +29,7 @@ function server() {
       if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
       let body = fs.readFileSync(f);
       if (f.endsWith('xtrata-arcade-parent.template.html')) {
-        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110, drift: 111, stack: 112, hopper: 113, tiles: 114, merge2048: 115, defence: 116, muncher: 117, invaders: 118, helix: 119, bubbles: 120, swerve: 121, lander: 122, reflex: 123, mines: 124, pong: 125 }');
+        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, music: 126, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110, drift: 111, stack: 112, hopper: 113, tiles: 114, merge2048: 115, defence: 116, muncher: 117, invaders: 118, helix: 119, bubbles: 120, swerve: 121, lander: 122, reflex: 123, mines: 124, pong: 125 }');
       }
       const type = f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : 'text/javascript';
       rsp.writeHead(200, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
@@ -76,7 +76,7 @@ async function mockApi(ctx) {
 (async () => {
   const srv = await server();
   const base = `http://127.0.0.1:${srv.address().port}`;
-  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--autoplay-policy=no-user-gesture-required'] });
   const errors = [];
   let n = 0;
   const check = (c, m) => { assert.ok(c, m); n++; console.log('  ✓', m); };
@@ -90,7 +90,7 @@ async function mockApi(ctx) {
   await page.goto(base + '/tests/mock-host.html');
   const frame = page.frames().find((f) => f !== page.mainFrame());
   await frame.waitForSelector('.xa-cab', { timeout: 20000 });
-  check((await frame.$$('.xa-cab')).length === 21, 'parent loaded 25 leaves from get-chunk and room shows 21 cabinets');
+  check((await frame.$$('.xa-cab')).length === 21, 'parent loaded 26 leaves from get-chunk and room shows 21 cabinets');
   check(stats.chunkReads >= 14, `modules read via get-chunk (${stats.chunkReads} calls)`);
   await frame.waitForFunction(() => document.querySelector('[data-game="xa_neon_snake"] .xa-top1').textContent !== '…');
   check((await frame.textContent('[data-game="xa_neon_snake"] .xa-top1')).includes('1,000 JIM'), 'snake cabinet shows chain #1 from get-top10');
@@ -114,7 +114,13 @@ async function mockApi(ctx) {
 
   /* ---------- 2. Neon Snake: play, die, submit via generic contract call ---------- */
   await frame.click('[data-play="xa_neon_snake"]');
+  await frame.evaluate(() => { window.__steps = 0; });
   await frame.waitForFunction(() => window.XARoom._session() && window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await frame.evaluate(() => { window.XA.music.onStep(() => { window.__steps++; }); });
+  await page.waitForTimeout(700);
+  const mus = await frame.evaluate(() => ({ playing: window.XA.music.isPlaying(), steps: window.__steps, tempo: window.XA.music.tempo() }));
+  check(mus.playing && mus.steps >= 3 && mus.tempo > 90, 'music engine: snake soundtrack is scheduling (' + mus.steps + ' steps @ ' + Math.round(mus.tempo) + ' bpm)');
+  check((await frame.evaluate(() => window.XA.music.degToMidi(7, 57, 'minor', 0))) === 69 && (await frame.evaluate(() => window.XA.music.degToMidi(-1, 57, 'minor', 0))) === 55, 'music engine: scale degrees map to the right notes');
   await frame.focus('.xa-stage');
   await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(700);
@@ -123,6 +129,8 @@ async function mockApi(ctx) {
   // steer into the bottom wall
   await frame.waitForSelector('.xa-over', { timeout: 15000 });
   check(true, 'snake dies on wall and shows game over');
+  await page.waitForTimeout(1600);
+  check(!(await frame.evaluate(() => window.XA.music.isPlaying())), 'music engine: game over tape-stops the soundtrack');
   await frame.waitForSelector('.xa-name', { timeout: 5000 });
   const verdict = await frame.textContent('.xa-verdict');
   check(/#1/.test(verdict), 'score 5000 ranks #1: ' + verdict.trim());

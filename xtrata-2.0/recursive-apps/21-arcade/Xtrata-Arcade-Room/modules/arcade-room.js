@@ -205,6 +205,7 @@
     var game = XA.games.filter(function (g) { return g.id === id; })[0];
     if (!game) return;
     endSession();
+    if (XA.music) { XA.music.stop(0.15); XA.music.clearListeners(); }
 
     var canvas = h('canvas', { 'aria-label': game.title + ' playfield' });
     var stage = h('div', { class: 'xa-stage' }, [canvas]);
@@ -353,6 +354,7 @@
     if (!s) return;
     if (s.state === 'play' && force !== false) {
       s.state = 'paused';
+      if (XA.music) XA.music.pause();
       s.input.reset();
       setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-pause' }, [
         h('h3', { text: 'PAUSED' }),
@@ -366,6 +368,7 @@
       s.state = 'play';
       s.acc = 0;
       s.input.reset();
+      if (XA.music) XA.music.resume();
       setOverlay(null);
     }
   }
@@ -374,6 +377,7 @@
     if (!session) return;
     session.input.destroy();
     session = null;
+    if (XA.music) { XA.music.stop(0.35); XA.music.clearListeners(); }
     if (gameEl) { gameEl.remove(); gameEl = null; }
     roomEl.removeAttribute('aria-hidden');
     cabinets.forEach(function (c) { refreshCabinet(c); });
@@ -396,6 +400,8 @@
     var s = session;
     s.state = 'over';
     s.input.reset();
+    // Games may already have stopped their music (e.g. their own death cue).
+    if (XA.music && XA.music.isPlaying()) XA.music.tapeStop(1.3);
     var g = s.game;
     var score = s.score;
     var prevBest = S.localBest(g.id);

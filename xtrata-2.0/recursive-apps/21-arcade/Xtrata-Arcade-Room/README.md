@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v2.0 prototype, all 21 cabinets)
+# Xtrata Arcade Room (v2.1 prototype, all 21 cabinets + music engine)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -8,12 +8,12 @@ parent that lists it.
 
 | Cabinet     | Leaf                         | game-id          | Controls |
 |-------------|------------------------------|------------------|----------|
-| Neon Snake  | `modules/game-neon-snake.js` | `xa_neon_snake`  | arrows/WASD, swipe, d-pad |
+| Neon Snake  | `modules/game-neon-snake.js` | `xa_neon_snake`  | arrows/WASD, swipe, d-pad · stages, portals, power-ups |
 | Block Drop  | `modules/game-block-drop.js` | `xa_block_drop`  | ←→ ↑/X Z Space C, swipes, 7 pads |
-| Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold |
+| Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold · four depth zones |
 | Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift |
 | Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down |
-| Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch, drag + tap |
+| Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch/laser, drag + tap · 20 levels, 4 bosses |
 | Rock Drift | `modules/game-rock-drift.js` | `xa_rock_drift` | ←→ turn, ↑ thrust, Space fire; 4 touch pads |
 | Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop |
 | Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad |
@@ -38,6 +38,7 @@ The `xa_` prefix keeps these boards separate from the older 21-arcade slots.
 modules/
   arcade-room.css     room + HUD + pads styles
   arcade-kit.js       registry, input (keys/pads/swipe/hold), synth audio, particles
+  arcade-music.js     shared music engine: sequencer + synths, layers, tempo/key/filter, stingers
   score-client.js     ONLY module with network/wallet access: board reads + submit
   arcade-room.js      cabinets, attract screens, scoreboards, sessions, game-over flow
   game-*.js           cartridges: XA.registerGame({ id, size, create(api), attract })
@@ -53,7 +54,7 @@ tests/
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~332 KB for all 21 games (Astro Blaster's leaves are ~590 KB for one).
+Leaves total ~399 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
@@ -65,6 +66,46 @@ A cartridge never sees the wallet. `create(api)` receives:
 
 and returns `{ update(dt), render(ctx) }`. The room runs a fixed 60 Hz step,
 countdown, pause, shake, particles and the game-over screen.
+
+## Music engine (`XA.music`)
+
+One sequencer and a small synth rack shared by every cartridge. Songs are data;
+games steer them live.
+
+```js
+XA.music.play({
+  bpm: 104, key: 57, scale: 'minor', chords: [0, 5, 2, 6],       // i–VI–III–VII
+  tracks: [
+    { name: 'kick', inst: 'kick', layer: 0.25, pattern: 'x...x...x...x...' },
+    { name: 'bass', inst: 'bass', layer: 0.1, chord: true, octave: -2, pattern: '0 . 0 . ^0 . 0 .' },
+    { name: 'arp',  inst: 'arp',  layer: 0.6, chord: true, octave: 1,
+      fn: function (i) { return [0, 2, 4, 7][i.step % 4]; } }   // generative line
+  ]
+});
+XA.music.setIntensity(0.7);           // tracks with layer <= 0.7 fade in
+XA.music.setTempo(140, 1.5);          // ramp
+XA.music.note('pluck', 4, { chord: true, quantize: '16' });   // in key, on the grid
+```
+
+Instruments: kick, snare, clap, hat, shaker, bass, sub, lead, pluck, marimba,
+bell, pad, arp, riser. Also `setKey/transpose/setScale`, `setFilter`, `setTrack`,
+`stinger`, `duck`, `tapeStop`, `pause/resume`, `pulse()` for beat-synced visuals
+and `onStep()` callbacks. The room pauses, resumes, tape-stops and stops music
+around every session, and music plays through the kit's master gain, so the mute
+button covers it.
+
+How the three showcase games drive it:
+
+- **Neon Snake**: layers unlock as the snake grows, speed sets the tempo, each
+  stage modulates up a tone, bites play chord tones, SLOW-MO drops tempo under a
+  filter, GHOST switches to a whole-tone scale, MAGNET adds a bell line.
+- **Cave Diver**: four zone scores (pentatonic reef, dorian kelp with a 12-over-16
+  ostinato, sparse phrygian abyss, harmonic-minor vents) crossfade as you dive;
+  depth drives a low-pass filter; pearl chains climb the scale on the beat.
+- **Brick Breaker**: each level generates its own theme (key, mode, progression,
+  seeded motif); the arrangement fills in as the wall empties; combos walk up the
+  scale in 16ths; lasers fire in key; bosses get a heavier track; clears land a
+  stinger on the next bar.
 
 ## How a score gets posted
 
@@ -100,8 +141,8 @@ Until then, posting works when the arcade runs inside the `/runtime` page.
 ## Mint order
 
 1. `node parent/build-manifest.mjs` and check sizes/hashes
-2. Inscribe the 25 leaves in manifest order (css, kit, scores, room, then the 12 cartridges in `MODULES` order)
-3. `node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> --drift <id> --stack <id> --hopper <id> --tiles <id> --merge2048 <id> --defence <id> --muncher <id> --invaders <id> --helix <id> --bubbles <id> --swerve <id> --lander <id> --reflex <id> --mines <id> --pong <id>`
+2. Inscribe the 26 leaves in manifest order (css, kit, music, scores, room, then the 21 cartridges in `MODULES` order)
+3. `node parent/fill-ids.mjs --css <id> --kit <id> --music <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> --drift <id> --stack <id> --hopper <id> --tiles <id> --merge2048 <id> --defence <id> --muncher <id> --invaders <id> --helix <id> --bubbles <id> --swerve <id> --lander <id> --reflex <id> --mines <id> --pong <id>`
 4. Inscribe `parent/xtrata-arcade-parent.template.html`
 5. `node parent/fill-ids.mjs --parent <id>` for the runtime deep link (only matters for a re-mint)
 
