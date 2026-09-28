@@ -225,7 +225,11 @@
     KeyZ: 'b', KeyJ: 'b',
     KeyX: 'c', KeyK: 'c',
     KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
-    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4',
+    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4', Digit5: 'k5',
+    Digit6: 'k6', Digit7: 'k7', Digit8: 'k8', Digit9: 'k9',
+    Numpad1: 'k1', Numpad2: 'k2', Numpad3: 'k3', Numpad4: 'k4', Numpad5: 'k5',
+    Numpad6: 'k6', Numpad7: 'k7', Numpad8: 'k8', Numpad9: 'k9',
+    KeyF: 'f',
     Enter: 'start',
     Escape: 'pause', KeyP: 'pause'
   };

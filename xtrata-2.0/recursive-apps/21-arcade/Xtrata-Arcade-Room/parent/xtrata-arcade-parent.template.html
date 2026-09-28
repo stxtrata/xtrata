@@ -17,7 +17,8 @@
         --drift <id> --stack <id> --hopper <id> \
         --tiles <id> --merge2048 <id> --defence <id> \
         --muncher <id> --invaders <id> --helix <id> \
-        --bubbles <id> --swerve <id> --lander <id>
+        --bubbles <id> --swerve <id> --lander <id> \
+        --reflex <id> --mines <id> --pong <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
   -->
@@ -87,7 +88,10 @@
         helix: 0,
         bubbles: 0,
         swerve: 0,
-        lander: 0
+        lander: 0,
+        reflex: 0,
+        mines: 0,
+        pong: 0
       },
       scoreContract: {
         contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -118,7 +122,10 @@
       { key: 'helix', file: 'game-helix-drop.js', type: 'js' },
       { key: 'bubbles', file: 'game-bubble-pop.js', type: 'js' },
       { key: 'swerve', file: 'game-swerve.js', type: 'js' },
-      { key: 'lander', file: 'game-lunar-lander.js', type: 'js' }
+      { key: 'lander', file: 'game-lunar-lander.js', type: 'js' },
+      { key: 'reflex', file: 'game-reflex-tap.js', type: 'js' },
+      { key: 'mines', file: 'game-mine-sprint.js', type: 'js' },
+      { key: 'pong', file: 'game-pong-streak.js', type: 'js' }
     ];
 
     var fillEl = document.getElementById('xb-fill');

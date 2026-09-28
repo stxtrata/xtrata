@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v1.5-eighteen-cabinets",
+  "release": "v2.0-twenty-one-cabinets",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -30,7 +30,10 @@
       "xa_helix_drop",
       "xa_bubble_pop",
       "xa_swerve",
-      "xa_lunar_lander"
+      "xa_lunar_lander",
+      "xa_reflex_tap",
+      "xa_mine_sprint",
+      "xa_pong_streak"
     ]
   },
   "leafModules": [
@@ -47,8 +50,8 @@
       "key": "kit",
       "path": "modules/arcade-kit.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13058,
-      "sha256": "848880936ebc850fdcef28571785eefe70968ec19a48f1bf91f674631697dd06",
+      "sizeBytes": 13290,
+      "sha256": "5c38bc2e4ca4151f7dc9ff9966ed4cd90c89bec2021bea9561b5aae13cf07f4f",
       "mintOrder": 2,
       "mintedInscriptionId": 0
     },
@@ -231,12 +234,39 @@
       "sha256": "db5b81f237c142d2645213bdf8932d7c74775127c0009fab8f2f510a2c559724",
       "mintOrder": 22,
       "mintedInscriptionId": 0
+    },
+    {
+      "key": "reflex",
+      "path": "modules/game-reflex-tap.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 8847,
+      "sha256": "93811845e749918cf653913541cbab9301b8ef4a637f835f41a384affe2a2076",
+      "mintOrder": 23,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "mines",
+      "path": "modules/game-mine-sprint.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 11758,
+      "sha256": "eac313f550a0d0be02a788955c89db7902b0f1046ebe1713a1084d83099c882d",
+      "mintOrder": 24,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "pong",
+      "path": "modules/game-pong-streak.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 8573,
+      "sha256": "35d603c203c3616e68f1aa5f32cedf4bc8200b3b5307f8cb1499ae4322b5a3e2",
+      "mintOrder": 25,
+      "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 23,
+    "mintOrder": 26,
     "dependencyOrder": [
       "css",
       "kit",
@@ -259,7 +289,10 @@
       "helix",
       "bubbles",
       "swerve",
-      "lander"
+      "lander",
+      "reflex",
+      "mines",
+      "pong"
     ]
   }
 }

@@ -481,7 +481,11 @@ button { font: inherit; color: inherit; }
     KeyZ: 'b', KeyJ: 'b',
     KeyX: 'c', KeyK: 'c',
     KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
-    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4',
+    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4', Digit5: 'k5',
+    Digit6: 'k6', Digit7: 'k7', Digit8: 'k8', Digit9: 'k9',
+    Numpad1: 'k1', Numpad2: 'k2', Numpad3: 'k3', Numpad4: 'k4', Numpad5: 'k5',
+    Numpad6: 'k6', Numpad7: 'k7', Numpad8: 'k8', Numpad9: 'k9',
+    KeyF: 'f',
     Enter: 'start',
     Escape: 'pause', KeyP: 'pause'
   };
@@ -7297,7 +7301,694 @@ button { font: inherit; color: inherit; }
   });
 })(window);
 </script>
+<script>/* game-reflex-tap.js */
+/*
+ * Xtrata Arcade cartridge #19 — REFLEX TAP
+ * Blocks pop out of a 3x3 grid. Hit the cyan ones fast (quicker hits score
+ * more), leave the red ones alone. Miss a cyan block or hit a red one and
+ * you lose a heart. It gets faster, and busier, as you go.
+ * Contract game-id: xa_reflex_tap (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-reflex-tap');
+  var U = XA.util;
+
+  var W = 400, H = 520, N = 3, CELL = 116, GAP = 12;
+  var GX = (W - (N * CELL + (N - 1) * GAP)) / 2, GY = 110;
+  var ACCENT = '#3ff0ff', GOOD = '#3ff0ff', BAD = '#ff4d6d', GOLD = '#ffd23f';
+
+  function create(api) {
+    var rng = api.rng;
+    var holes = [];
+    for (var i = 0; i < N * N; i++) holes.push({ kind: null, t: 0, life: 0, hitT: 0, hitKind: null });
+    var hits = 0, streak = 0, hearts = 3;
+    var spawnT = 0.9, elapsed = 0;
+    var over = false, overT = 0, t = 0;
+
+    function level() { return 1 + Math.floor(hits / 12); }
+    function lifeFor() { return Math.max(0.55, 1.35 - hits * 0.012); }
+    function spawn() {
+      var free = holes.map(function (h, i) { return h.kind ? -1 : i; }).filter(function (i) { return i >= 0; });
+      if (!free.length) return;
+      var idx = free[Math.floor(rng() * free.length)];
+      var roll = rng();
+      var kind = roll < Math.min(0.32, 0.08 + hits * 0.004) ? 'bad' : roll > 0.95 ? 'gold' : 'good';
+      holes[idx].kind = kind;
+      holes[idx].t = 0;
+      holes[idx].life = kind === 'bad' ? lifeFor() * 1.3 : lifeFor() * (kind === 'gold' ? 0.7 : 1);
+    }
+    function hurt(i, why) {
+      hearts--;
+      streak = 0;
+      api.shake(7);
+      api.audio.tone(150, 0.25, { type: 'sawtooth', vol: 0.22, slide: 0.6 });
+      var c = centre(i);
+      api.fx.text(c.x, c.y - 40, why, BAD, 12);
+      if (hearts <= 0) over = true;
+    }
+    function centre(i) {
+      var r = Math.floor(i / N), c = i % N;
+      return { x: GX + c * (CELL + GAP) + CELL / 2, y: GY + r * (CELL + GAP) + CELL / 2 };
+    }
+    function whack(i) {
+      var h = holes[i];
+      var c = centre(i);
+      if (!h.kind) {
+        api.audio.tone(120, 0.04, { type: 'square', vol: 0.05 });
+        return;
+      }
+      if (h.kind === 'bad') {
+        h.hitKind = 'bad'; h.hitT = 0.3; h.kind = null;
+        api.fx.burst(c.x, c.y, BAD, 20, 180, 0.6);
+        hurt(i, 'NOT THAT ONE');
+        return;
+      }
+      var speedBonus = Math.round(20 * Math.max(0, 1 - h.t / h.life));
+      streak++;
+      hits++;
+      var mult = 1 + Math.min(4, Math.floor(streak / 8));
+      var pts = (10 + speedBonus) * mult * (h.kind === 'gold' ? 3 : 1);
+      api.addScore(pts);
+      api.fx.burst(c.x, c.y, h.kind === 'gold' ? GOLD : GOOD, 16, 160, 0.5);
+      api.fx.text(c.x, c.y - 30, '+' + pts, h.kind === 'gold' ? GOLD : '#fff', 12);
+      api.audio.tone(520 + Math.min(streak, 20) * 25, 0.06, { type: 'square', vol: 0.14 });
+      h.hitKind = h.kind; h.hitT = 0.25; h.kind = null;
+    }
+
+    return {
+      // Read-only test hook: what is on screen right now.
+      debug: function () { return { good: holes.map(function (h, i) { return h.kind === 'good' || h.kind === 'gold' ? i : -1; }).filter(function (i) { return i >= 0; }), hearts: hearts, hits: hits }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        holes.forEach(function (h) { if (h.hitT > 0) h.hitT -= dt; });
+        if (over) { overT += dt; if (overT > 1.1) api.gameOver(); return; }
+        elapsed += dt;
+        // input: click/tap a cell, or keys 1-9 (top-left to bottom-right)
+        if (inp.hit('hold')) {
+          var p = api.pointer();
+          var c = Math.floor((p.x - GX) / (CELL + GAP)), r = Math.floor((p.y - GY) / (CELL + GAP));
+          if (c >= 0 && c < N && r >= 0 && r < N) whack(r * N + c);
+        }
+        for (var k = 1; k <= 9; k++) if (inp.hit('k' + k)) whack(k - 1);
+        if (over) return;
+
+        holes.forEach(function (h, i) {
+          if (!h.kind) return;
+          h.t += dt;
+          if (h.t >= h.life) {
+            var was = h.kind;
+            h.kind = null;
+            if (was === 'good') hurt(i, 'TOO SLOW');
+          }
+        });
+        spawnT -= dt;
+        if (spawnT <= 0) {
+          spawn();
+          if (hits > 20 && rng() < Math.min(0.5, hits / 120)) spawn();
+          spawnT = Math.max(0.32, 0.95 - hits * 0.011) * (0.7 + rng() * 0.6);
+        }
+        api.setStatus('HEARTS ' + hearts + '  ·  HITS ' + hits + '  ·  STREAK ' + streak + (streak >= 8 ? '  ·  x' + (1 + Math.min(4, Math.floor(streak / 8))) : ''));
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#060718';
+        ctx.fillRect(0, 0, W, H);
+        // hearts
+        for (var l = 0; l < 3; l++) {
+          ctx.save();
+          ctx.fillStyle = l < hearts ? BAD : 'rgba(255,77,109,0.18)';
+          if (l < hearts) { ctx.shadowColor = BAD; ctx.shadowBlur = 10; }
+          var hx = W / 2 - 40 + l * 40, hy = 50;
+          ctx.beginPath();
+          ctx.moveTo(hx, hy + 8);
+          ctx.bezierCurveTo(hx - 16, hy - 4, hx - 8, hy - 16, hx, hy - 6);
+          ctx.bezierCurveTo(hx + 8, hy - 16, hx + 16, hy - 4, hx, hy + 8);
+          ctx.fill();
+          ctx.restore();
+        }
+        for (var i = 0; i < N * N; i++) {
+          var r = Math.floor(i / N), c = i % N;
+          var x = GX + c * (CELL + GAP), y = GY + r * (CELL + GAP);
+          var h = holes[i];
+          ctx.fillStyle = '#10132e';
+          U.roundRect(ctx, x, y, CELL, CELL, 16); ctx.fill();
+          ctx.strokeStyle = 'rgba(63,240,255,0.18)'; ctx.lineWidth = 2;
+          U.roundRect(ctx, x, y, CELL, CELL, 16); ctx.stroke();
+          ctx.fillStyle = 'rgba(200,220,255,0.25)';
+          ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(String(i + 1), x + 10, y + 18);
+          if (h.kind) {
+            var pop = Math.min(1, h.t / 0.08);
+            var remain = 1 - h.t / h.life;
+            var col = h.kind === 'bad' ? BAD : h.kind === 'gold' ? GOLD : GOOD;
+            var s = (CELL - 30) * (0.6 + 0.4 * pop);
+            ctx.save();
+            ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 20;
+            U.roundRect(ctx, x + (CELL - s) / 2, y + (CELL - s) / 2, s, s, 12); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            if (h.kind === 'bad') {
+              ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+              ctx.beginPath(); ctx.moveTo(x + 40, y + 40); ctx.lineTo(x + CELL - 40, y + CELL - 40);
+              ctx.moveTo(x + CELL - 40, y + 40); ctx.lineTo(x + 40, y + CELL - 40); ctx.stroke();
+            } else {
+              ctx.beginPath(); ctx.arc(x + CELL / 2, y + CELL / 2, 14, 0, 7); ctx.fill();
+            }
+            // countdown ring
+            ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(x + CELL / 2, y + CELL / 2, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * remain); ctx.stroke();
+            ctx.restore();
+          } else if (h.hitT > 0) {
+            ctx.save();
+            ctx.globalAlpha = h.hitT * 3;
+            ctx.strokeStyle = h.hitKind === 'bad' ? BAD : '#ffffff'; ctx.lineWidth = 4;
+            U.roundRect(ctx, x + 6, y + 6, CELL - 12, CELL - 12, 12); ctx.stroke();
+            ctx.restore();
+          }
+        }
+        ctx.fillStyle = 'rgba(200,220,255,0.45)';
+        ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('HIT CYAN · SKIP RED · GOLD = x3', W / 2, H - 22);
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#060718';
+    ctx.fillRect(0, 0, w, h);
+    var size = Math.min(w, h) * 0.26, gap = size * 0.12;
+    var ox = (w - size * 3 - gap * 2) / 2, oy = (h - size * 3 - gap * 2) / 2;
+    var lit = Math.floor(t * 2.5) % 9, bad = (lit * 5 + 3) % 9;
+    for (var i = 0; i < 9; i++) {
+      var x = ox + (i % 3) * (size + gap), y = oy + Math.floor(i / 3) * (size + gap);
+      ctx.fillStyle = '#10132e';
+      ctx.fillRect(x, y, size, size);
+      if (i === lit || i === bad) {
+        ctx.save();
+        var col = i === lit ? GOOD : BAD;
+        ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12;
+        ctx.fillRect(x + size * 0.15, y + size * 0.15, size * 0.7, size * 0.7);
+        ctx.restore();
+      }
+    }
+  }
+
+  XA.registerGame({
+    id: 'xa_reflex_tap',
+    order: 19,
+    title: 'Reflex Tap',
+    tagline: 'Hit the cyan. Never the red.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'TAP THE CYAN BLOCKS · LEAVE THE RED ONES',
+    controls: 'Click / tap · or keys 1–9 (top-left to bottom-right)',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-mine-sprint.js */
+/*
+ * Xtrata Arcade cartridge #20 — MINE SPRINT
+ * Timed minesweeper runs. Clear a board to bank a speed bonus and move
+ * straight on to a bigger, denser one. The first click is always safe.
+ * Hit a mine and the sprint is over; everything banked so far counts.
+ * Contract game-id: xa_mine_sprint (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-mine-sprint');
+  var U = XA.util;
+
+  var W = 420, H = 500, TOP = 64, AREA = 396;
+  var ACCENT = '#39ff88', MINE = '#ff4d6d', FLAG = '#ffd23f';
+  var NUM = ['', '#3ff0ff', '#39ff88', '#ffd23f', '#ff9f1c', '#ff4d6d', '#ff3fa4', '#b04dff', '#ffffff'];
+  var BTN = { x: W - 118, y: 14, w: 106, h: 34 };
+
+  function create(api) {
+    var rng = api.rng;
+    var level = 0, cols, rows, mines, cs, ox;
+    var cells;               // { mine, n, open, flag }
+    var placed = false, opened = 0, time = 0, flagMode = false;
+    var cursor = { c: 0, r: 0 };
+    var press = null;
+    var over = false, overT = 0, clearT = 0, boom = null, t = 0;
+
+    function newBoard() {
+      level++;
+      cols = rows = Math.min(13, 8 + level);
+      mines = Math.round(cols * rows * Math.min(0.2, 0.12 + level * 0.012));
+      cs = Math.floor(AREA / cols);
+      ox = (W - cs * cols) / 2;
+      cells = [];
+      for (var i = 0; i < cols * rows; i++) cells.push({ mine: false, n: 0, open: false, flag: false });
+      placed = false; opened = 0; time = 0;
+      cursor = { c: Math.floor(cols / 2), r: Math.floor(rows / 2) };
+    }
+    function idx(c, r) { return r * cols + c; }
+    function around(c, r, fn) {
+      for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        var nc = c + dc, nr = r + dr;
+        if (nc >= 0 && nc < cols && nr >= 0 && nr < rows) fn(nc, nr);
+      }
+    }
+    function place(sc, sr) {
+      var n = 0;
+      while (n < mines) {
+        var c = Math.floor(rng() * cols), r = Math.floor(rng() * rows);
+        if (Math.abs(c - sc) <= 1 && Math.abs(r - sr) <= 1) continue;
+        var cell = cells[idx(c, r)];
+        if (cell.mine) continue;
+        cell.mine = true; n++;
+      }
+      for (var r2 = 0; r2 < rows; r2++) for (var c2 = 0; c2 < cols; c2++) {
+        var k = 0;
+        around(c2, r2, function (nc, nr) { if (cells[idx(nc, nr)].mine) k++; });
+        cells[idx(c2, r2)].n = k;
+      }
+      placed = true;
+    }
+    newBoard();
+
+    function explode(c, r) {
+      over = true;
+      boom = { c: c, r: r };
+      cells.forEach(function (cell) { if (cell.mine) cell.open = true; });
+      api.fx.burst(ox + c * cs + cs / 2, TOP + r * cs + cs / 2, MINE, 50, 260, 1);
+      api.shake(14);
+      api.audio.noise(0.7, { vol: 0.35, cutoff: 800 });
+    }
+    function reveal(c, r) {
+      var cell = cells[idx(c, r)];
+      if (cell.open || cell.flag) return;
+      if (!placed) place(c, r);
+      if (cell.mine) { explode(c, r); return; }
+      var stack = [[c, r]], gained = 0;
+      while (stack.length) {
+        var p = stack.pop(), cc = cells[idx(p[0], p[1])];
+        if (cc.open || cc.flag || cc.mine) continue;
+        cc.open = true; opened++; gained++;
+        if (cc.n === 0) around(p[0], p[1], function (nc, nr) { stack.push([nc, nr]); });
+      }
+      api.addScore(gained * 2);
+      api.audio.tone(gained > 1 ? 660 : 520, 0.04, { type: 'triangle', vol: 0.1 });
+      if (opened === cols * rows - mines) {
+        var bonus = 150 * level + Math.max(0, Math.round((40 + level * 20 - time) * 8 * level));
+        api.addScore(bonus);
+        api.fx.text(W / 2, TOP + 120, 'CLEARED IN ' + time.toFixed(1) + 's', ACCENT, 15);
+        api.fx.text(W / 2, TOP + 150, '+' + bonus, FLAG, 15);
+        api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+        cells.forEach(function (cell) { if (cell.mine) cell.flag = true; });
+        clearT = 1.8;
+      }
+    }
+    function chord(c, r) {
+      var cell = cells[idx(c, r)];
+      if (!cell.open || !cell.n) return;
+      var flags = 0;
+      around(c, r, function (nc, nr) { if (cells[idx(nc, nr)].flag) flags++; });
+      if (flags !== cell.n) return;
+      around(c, r, function (nc, nr) { if (!over) reveal(nc, nr); });
+    }
+    function toggleFlag(c, r) {
+      var cell = cells[idx(c, r)];
+      if (cell.open) return;
+      cell.flag = !cell.flag;
+      api.audio.tone(cell.flag ? 880 : 440, 0.04, { type: 'square', vol: 0.08 });
+    }
+    function act(c, r, flag) {
+      cursor = { c: c, r: r };
+      var cell = cells[idx(c, r)];
+      if (cell.open) chord(c, r);
+      else if (flag) toggleFlag(c, r);
+      else reveal(c, r);
+    }
+    function cellAt(x, y) {
+      var c = Math.floor((x - ox) / cs), r = Math.floor((y - TOP) / cs);
+      return c >= 0 && c < cols && r >= 0 && r < rows ? { c: c, r: r } : null;
+    }
+    function inBtn(x, y) { return x >= BTN.x && x <= BTN.x + BTN.w && y >= BTN.y && y <= BTN.y + BTN.h; }
+
+    return {
+      // Read-only test hook.
+      // Mine positions are deliberately not exposed.
+      debug: function () { return { cols: cols, rows: rows, placed: placed, opened: opened, level: level }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        if (over) { overT += dt; if (overT > 1.8) api.gameOver(); return; }
+        if (clearT > 0) { clearT -= dt; if (clearT <= 0) newBoard(); return; }
+        if (placed) time += dt;
+
+        // pointer: tap = reveal (or flag in flag mode), long-press = flag
+        var p = api.pointer();
+        if (inp.hit('hold')) press = { x: p.x, y: p.y, t: t, done: false };
+        if (press && !press.done && p.down && t - press.t > 0.38) {
+          var lc = cellAt(press.x, press.y);
+          if (lc && !cells[idx(lc.c, lc.r)].open) { toggleFlag(lc.c, lc.r); api.shake(1.5); }
+          press.done = true;
+        }
+        if (inp.hit('release') && press) {
+          if (!press.done) {
+            if (inBtn(press.x, press.y)) { flagMode = !flagMode; api.audio.tone(700, 0.05, { type: 'triangle', vol: 0.1 }); }
+            else { var pc = cellAt(press.x, press.y); if (pc) act(pc.c, pc.r, flagMode); }
+          }
+          press = null;
+        }
+        // keyboard cursor
+        if (inp.hit('left')) cursor.c = Math.max(0, cursor.c - 1);
+        if (inp.hit('right')) cursor.c = Math.min(cols - 1, cursor.c + 1);
+        if (inp.hit('up')) cursor.r = Math.max(0, cursor.r - 1);
+        if (inp.hit('down')) cursor.r = Math.min(rows - 1, cursor.r + 1);
+        if (inp.hit('a')) act(cursor.c, cursor.r, false);
+        if (inp.hit('f') || inp.hit('d')) act(cursor.c, cursor.r, true);
+        var flags = cells.filter(function (c) { return c.flag; }).length;
+        api.setStatus('BOARD ' + level + '  ·  ' + cols + '×' + rows + '  ·  MINES ' + (mines - flags) + '  ·  ' + time.toFixed(1) + 's');
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#05070f';
+        ctx.fillRect(0, 0, W, H);
+        // timer + mines
+        U.glowText(ctx, time.toFixed(1) + 's', 70, 31, 16, ACCENT);
+        // flag mode toggle
+        ctx.save();
+        ctx.fillStyle = flagMode ? 'rgba(255,210,63,0.2)' : 'rgba(255,255,255,0.05)';
+        ctx.strokeStyle = flagMode ? FLAG : 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+        U.roundRect(ctx, BTN.x, BTN.y, BTN.w, BTN.h, 8); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = flagMode ? FLAG : 'rgba(255,255,255,0.7)';
+        ctx.font = '800 12px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(flagMode ? '⚑ FLAG MODE' : '⚑ FLAG: OFF', BTN.x + BTN.w / 2, BTN.y + BTN.h / 2 + 1);
+        ctx.restore();
+
+        for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
+          var cell = cells[idx(c, r)];
+          var x = ox + c * cs, y = TOP + r * cs;
+          if (cell.open) {
+            ctx.fillStyle = cell.mine ? (boom && boom.c === c && boom.r === r ? '#5a0f1f' : '#2a0f18') : '#0d1422';
+            ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+            if (cell.mine) {
+              ctx.save();
+              ctx.fillStyle = MINE; ctx.shadowColor = MINE; ctx.shadowBlur = 10;
+              ctx.beginPath(); ctx.arc(x + cs / 2, y + cs / 2, cs * 0.24, 0, 7); ctx.fill();
+              ctx.fillRect(x + cs / 2 - 1, y + cs * 0.15, 2, cs * 0.7);
+              ctx.fillRect(x + cs * 0.15, y + cs / 2 - 1, cs * 0.7, 2);
+              ctx.restore();
+            } else if (cell.n) {
+              ctx.fillStyle = NUM[cell.n];
+              ctx.font = '900 ' + Math.floor(cs * 0.55) + 'px ui-monospace, Menlo, Consolas, monospace';
+              ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+              ctx.fillText(String(cell.n), x + cs / 2, y + cs / 2 + 1);
+            }
+          } else {
+            ctx.fillStyle = '#1b2446';
+            ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.08)';
+            ctx.fillRect(x + 1, y + 1, cs - 2, 3);
+            if (cell.flag) {
+              ctx.save();
+              ctx.fillStyle = FLAG; ctx.shadowColor = FLAG; ctx.shadowBlur = 8;
+              ctx.beginPath();
+              ctx.moveTo(x + cs * 0.35, y + cs * 0.2); ctx.lineTo(x + cs * 0.72, y + cs * 0.35); ctx.lineTo(x + cs * 0.35, y + cs * 0.5);
+              ctx.fill();
+              ctx.fillRect(x + cs * 0.33, y + cs * 0.2, 2, cs * 0.6);
+              ctx.restore();
+            }
+          }
+        }
+        // keyboard cursor
+        ctx.strokeStyle = 'rgba(57,255,136,0.8)'; ctx.lineWidth = 2;
+        ctx.strokeRect(ox + cursor.c * cs + 1, TOP + cursor.r * cs + 1, cs - 2, cs - 2);
+        // long-press progress
+        if (press && !press.done && api.pointer().down) {
+          var k = Math.min(1, (t - press.t) / 0.38);
+          if (k > 0.2) {
+            ctx.strokeStyle = FLAG; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(press.x, press.y, 18, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2); ctx.stroke();
+          }
+        }
+        if (!placed && !over) {
+          ctx.fillStyle = 'rgba(200,255,220,0.7)';
+          ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText('FIRST TAP IS ALWAYS SAFE · HOLD TO FLAG', W / 2, H - 14);
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#05070f';
+    ctx.fillRect(0, 0, w, h);
+    var n = 8, cs = Math.min(w, h) * 0.9 / n, ox = (w - cs * n) / 2, oy = (h - cs * n) / 2;
+    var reveal = (t * 6) % (n * n + 20);
+    var nums = [0, 1, 1, 2, 0, 1, 3, 2];
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) {
+      var i = r * n + c, x = ox + c * cs, y = oy + r * cs;
+      var order = (i * 29) % (n * n);
+      if (order < reveal) {
+        ctx.fillStyle = '#0d1422'; ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+        var v = nums[(r * 3 + c * 5) % 8];
+        if (v) { ctx.fillStyle = NUM[v]; ctx.font = '900 ' + Math.floor(cs * 0.55) + 'px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(v), x + cs / 2, y + cs / 2); }
+      } else {
+        ctx.fillStyle = '#1b2446'; ctx.fillRect(x + 1, y + 1, cs - 2, cs - 2);
+        if ((i * 7) % 11 === 0) { ctx.fillStyle = FLAG; ctx.fillRect(x + cs * 0.35, y + cs * 0.25, cs * 0.3, cs * 0.25); }
+      }
+    }
+  }
+
+  XA.registerGame({
+    id: 'xa_mine_sprint',
+    order: 20,
+    title: 'Mine Sprint',
+    tagline: 'Sweep fast. Don’t guess wrong.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'TAP TO REVEAL · HOLD (OR FLAG MODE) TO FLAG',
+    controls: 'Click reveal · hold to flag · or arrows + Space, F to flag',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-pong-streak.js */
+/*
+ * Xtrata Arcade cartridge #21 — PONG STREAK
+ * You against the machine. Every return scores more the longer the rally
+ * runs; get one past the machine for a big bonus, but it levels up and
+ * gets sharper each time. The ball speeds up on every hit. Three lives.
+ * Contract game-id: xa_pong_streak (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-pong-streak');
+  var U = XA.util;
+
+  var W = 420, H = 600, PW = 84, PH = 12, BR = 7;
+  var PY = H - 44, AY = 44;
+  var ACCENT = '#b98cff', YOU = '#3ff0ff', CPU = '#ff3fa4';
+
+  function create(api) {
+    var rng = api.rng;
+    var you = { x: W / 2 }, cpu = { x: W / 2, err: 0 };
+    var ball = null, serveT = 1, rally = 0, best = 0, level = 1, lives = 3;
+    var lastMoved = api.pointer().moved;
+    var over = false, overT = 0, t = 0, flash = 0;
+
+    function serve() {
+      var a = Math.PI / 2 + (rng() - 0.5) * 0.9;
+      var sp = 300 + (level - 1) * 12;
+      ball = { x: W / 2, y: H / 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp };
+      rally = 0;
+      cpu.err = (rng() - 0.5) * Math.max(20, 110 - level * 12);
+    }
+    function predictX(targetY) {
+      // straight-line prediction with wall reflections
+      var x = ball.x, y = ball.y, vx = ball.vx, vy = ball.vy;
+      if (vy >= 0) return W / 2;
+      var tt = (y - targetY) / -vy;
+      x += vx * tt;
+      var span = W - 2 * BR;
+      x -= BR;
+      x = ((x % (2 * span)) + 2 * span) % (2 * span);
+      if (x > span) x = 2 * span - x;
+      return x + BR;
+    }
+    function paddleHit(px, dirUp) {
+      var off = U.clamp((ball.x - px) / (PW / 2), -1, 1);
+      var sp = Math.min(780, Math.hypot(ball.vx, ball.vy) * 1.045);
+      var ang = off * 1.05;           // up to ~60 degrees
+      ball.vx = Math.sin(ang) * sp;
+      ball.vy = (dirUp ? -1 : 1) * Math.cos(ang) * sp;
+    }
+
+    return {
+      // Read-only test hook: what is on screen right now.
+      debug: function () { return { ball: ball && { x: ball.x, y: ball.y, vy: ball.vy }, rally: rally, lives: lives }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        if (flash > 0) flash -= dt;
+        // player paddle: pointer when it moves, otherwise keys
+        var p = api.pointer();
+        if (p.moved !== lastMoved) { lastMoved = p.moved; you.x = p.x; }
+        if (inp.held('left')) you.x -= 540 * dt;
+        if (inp.held('right')) you.x += 540 * dt;
+        you.x = U.clamp(you.x, PW / 2, W - PW / 2);
+        if (over) { overT += dt; if (overT > 1.2) api.gameOver(); return; }
+
+        if (!ball) {
+          serveT -= dt;
+          if (serveT <= 0) serve();
+          cpu.x += (W / 2 - cpu.x) * Math.min(1, dt * 3);
+          api.setStatus('LEVEL ' + level + '  ·  LIVES ' + lives + '  ·  BEST RALLY ' + best);
+          return;
+        }
+        // CPU: aims at the predicted landing spot plus a per-rally error
+        var target = ball.vy < 0 ? predictX(AY + PH) + cpu.err : W / 2 + (ball.x - W / 2) * 0.3;
+        var maxV = 200 + level * 38;
+        cpu.x += U.clamp(target - cpu.x, -maxV * dt, maxV * dt);
+        cpu.x = U.clamp(cpu.x, PW / 2, W - PW / 2);
+
+        var steps = 3;
+        for (var s = 0; s < steps && ball; s++) {
+          var h = dt / steps;
+          ball.x += ball.vx * h; ball.y += ball.vy * h;
+          if (ball.x < BR) { ball.x = BR; ball.vx = Math.abs(ball.vx); api.audio.tone(300, 0.03, { type: 'square', vol: 0.06 }); }
+          if (ball.x > W - BR) { ball.x = W - BR; ball.vx = -Math.abs(ball.vx); api.audio.tone(300, 0.03, { type: 'square', vol: 0.06 }); }
+          // your paddle
+          if (ball.vy > 0 && ball.y + BR >= PY && ball.y + BR <= PY + PH + 10 && Math.abs(ball.x - you.x) <= PW / 2 + BR) {
+            ball.y = PY - BR;
+            paddleHit(you.x, true);
+            rally++;
+            best = Math.max(best, rally);
+            var pts = 10 * (1 + Math.floor(rally / 5)) * level;
+            api.addScore(pts);
+            if (rally % 5 === 0) api.fx.text(W / 2, H / 2, 'RALLY ' + rally, YOU, 14);
+            api.fx.burst(ball.x, PY, YOU, 8, 100, 0.3);
+            api.audio.tone(440 + Math.min(rally, 20) * 20, 0.05, { type: 'square', vol: 0.14 });
+            cpu.err = (rng() - 0.5) * Math.max(16, 110 - level * 12 - rally * 2);
+          }
+          // CPU paddle
+          if (ball.vy < 0 && ball.y - BR <= AY + PH && ball.y - BR >= AY - 10 && Math.abs(ball.x - cpu.x) <= PW / 2 + BR) {
+            ball.y = AY + PH + BR;
+            paddleHit(cpu.x, false);
+            api.fx.burst(ball.x, AY + PH, CPU, 8, 100, 0.3);
+            api.audio.tone(330, 0.05, { type: 'square', vol: 0.12 });
+          }
+          if (ball.y > H + 20) {
+            lives--;
+            api.shake(8); flash = 0.4;
+            api.audio.tone(140, 0.4, { type: 'sawtooth', slide: 0.4, vol: 0.25 });
+            ball = null; serveT = 1.1;
+            if (lives <= 0) over = true;
+          } else if (ball.y < -20) {
+            var bonus = 100 * level;
+            api.addScore(bonus);
+            api.fx.text(W / 2, H / 2 - 30, 'POINT! +' + bonus, CPU, 16);
+            api.fx.burst(ball.x, 0, CPU, 30, 200, 0.8);
+            api.audio.arp([523, 659, 784], 0.07, { type: 'square', vol: 0.18 });
+            level++;
+            api.fx.text(W / 2, H / 2, 'MACHINE LEVEL ' + level, ACCENT, 13);
+            ball = null; serveT = 1.2;
+          }
+        }
+        if (ball) api.fx.trail(ball.x, ball.y, 'rgba(255,255,255,0.4)', 0, 0);
+        api.setStatus('LEVEL ' + level + '  ·  LIVES ' + lives + '  ·  RALLY ' + rally + '  ·  BEST ' + best);
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#07061a';
+        ctx.fillRect(0, 0, W, H);
+        if (flash > 0) { ctx.fillStyle = 'rgba(255,77,109,' + flash * 0.4 + ')'; ctx.fillRect(0, 0, W, H); }
+        // centre line
+        ctx.fillStyle = 'rgba(185,140,255,0.25)';
+        for (var x = 6; x < W; x += 24) ctx.fillRect(x, H / 2 - 1, 12, 2);
+        ctx.strokeStyle = 'rgba(185,140,255,0.3)'; ctx.lineWidth = 2;
+        ctx.strokeRect(2, 2, W - 4, H - 4);
+        // lives / level
+        for (var l = 0; l < lives; l++) { ctx.fillStyle = YOU; ctx.fillRect(12 + l * 16, H - 16, 10, 6); }
+        ctx.fillStyle = 'rgba(255,200,240,0.6)';
+        ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText('MACHINE LV ' + level, W - 12, 20);
+        // rally counter
+        if (rally > 1) {
+          ctx.save();
+          ctx.globalAlpha = 0.18;
+          U.glowText(ctx, String(rally), W / 2, H / 2 + 60, 60, ACCENT);
+          ctx.restore();
+        }
+        function paddle(px, py, col) {
+          ctx.save();
+          ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 16;
+          U.roundRect(ctx, px - PW / 2, py, PW, PH, 6); ctx.fill();
+          ctx.restore();
+        }
+        paddle(cpu.x, AY, CPU);
+        paddle(you.x, PY, YOU);
+        if (ball) {
+          ctx.save();
+          ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 14;
+          ctx.beginPath(); ctx.arc(ball.x, ball.y, BR, 0, 7); ctx.fill();
+          ctx.restore();
+        } else if (!over) {
+          ctx.save();
+          ctx.globalAlpha = 0.5 + Math.sin(t * 8) * 0.4;
+          U.glowText(ctx, 'READY', W / 2, H / 2 - 40, 14, '#e6d9ff');
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#07061a';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(185,140,255,0.25)';
+    for (var x = 4; x < w; x += 14) ctx.fillRect(x, h / 2 - 1, 7, 2);
+    var k = (t * 0.7) % 2, up = k > 1;
+    var f = up ? 2 - k : k;
+    var by = h * 0.12 + f * h * 0.76;
+    var bx = w / 2 + Math.sin(t * 2.1) * w * 0.35;
+    var pw = w * 0.2;
+    ctx.fillStyle = CPU; ctx.fillRect(bx - pw / 2 + Math.sin(t * 3) * 6, h * 0.08, pw, h * 0.03);
+    ctx.fillStyle = YOU; ctx.fillRect(bx - pw / 2 - Math.sin(t * 2.5) * 6, h * 0.89, pw, h * 0.03);
+    ctx.fillStyle = '#fff'; ctx.shadowColor = '#fff'; ctx.shadowBlur = 10;
+    ctx.beginPath(); ctx.arc(bx, by, h * 0.025, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  XA.registerGame({
+    id: 'xa_pong_streak',
+    order: 21,
+    title: 'Pong Streak',
+    tagline: 'Keep the rally alive. Beat the machine.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'DRAG LEFT AND RIGHT TO MOVE YOUR PADDLE',
+    controls: 'Mouse / drag or ←→ to move',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
 <script>
-window.XA_CONFIG = { subtitle: 'Preview cabinet · eighteen games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
+window.XA_CONFIG = { subtitle: 'Preview cabinet · twenty-one games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
 XARoom.boot(document.getElementById('xa-root'));
 </script>
