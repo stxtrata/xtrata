@@ -18,6 +18,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: 'Play now', href: '/i/3072', newTab: true
   }),
   Object.freeze({
+    id: 'astro-blaster', tag: 'New', tone: 'cyan',
+    title: 'Astro Blaster 3 is live.',
+    line: 'Every top score lives on Bitcoin. Post yours on-chain.',
+    cta: 'Play now', href: '/i/3075', newTab: true
+  }),
+  Object.freeze({
     id: 'kp-loops', tag: 'Play', tone: 'pink',
     title: 'KP Loops by Kieron Pepper.',
     line: "Signature drum loops from The Prodigy's former live drummer. Play them now.",
@@ -45,12 +51,27 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
 
 // The Living Wall beside the hero headline. Order matters: the grid is
 // 4 columns x 3 rows on desktop and the spans below fill it exactly.
-//   chess: 2x2   audionauts: 2x1   timeloop: 1x2   then four 1x1 tiles.
+//   astro blaster: 2x2 (top billing)   chess: 1x2   two songs: 1x1
+//   audionauts: 2x1   twins + DYLE: 1x1. Timeloop lives in the Play row.
 export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
-    id: 'chess', kind: 'chess', size: 'big', tone: 'amber',
+    id: 'astro-blaster', kind: 'image', size: 'big', tone: 'cyan',
+    eyebrow: 'New · play', title: 'Astro Blaster 3', subtitle: 'Every top score lives on Bitcoin.',
+    image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
+    href: '/i/3075', newTab: true
+  }),
+  Object.freeze({
+    id: 'chess', kind: 'chess', size: 'tall', tone: 'amber',
     eyebrow: 'Play', title: 'On-Chain Chess', cta: 'Play free',
     href: '/i/3072', newTab: true, tokenId: 3072
+  }),
+  Object.freeze({
+    id: 'song-3062', kind: 'song', tokenId: 3062,
+    title: 'Neon Portal Bloom', subtitle: 'BotCupid'
+  }),
+  Object.freeze({
+    id: 'song-3058', kind: 'song', tokenId: 3058,
+    title: 'The Judge Is in the House', subtitle: '3ai3'
   }),
   Object.freeze({
     // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
@@ -58,16 +79,6 @@ export const HOMEPAGE_WALL = Object.freeze([
     eyebrow: 'Coming this week · press to listen', title: 'Audionauts',
     image: '/home/wall/audionauts-3059.webp',
     href: '/radio'
-  }),
-  Object.freeze({
-    id: 'timeloop', kind: 'image', size: 'tall', tone: 'paper',
-    eyebrow: 'Play · mystery', title: 'Timeloop Detective', subtitle: 'One day. One heist. Rewind.',
-    image: '/home/wall/timeloop-3047.webp', position: 'top',
-    href: '/i/3047', newTab: true
-  }),
-  Object.freeze({
-    id: 'song-3062', kind: 'song', tokenId: 3062,
-    title: 'Neon Portal Bloom', subtitle: 'BotCupid'
   }),
   Object.freeze({
     id: 'forever-twins', kind: 'image', tone: 'orange',
@@ -79,10 +90,6 @@ export const HOMEPAGE_WALL = Object.freeze([
     id: 'dyle-296', kind: 'image', tone: 'pink', pixelated: true,
     eyebrow: 'Collect', title: 'Art by DYLE',
     image: '/i/296', href: '/xplorer?wallet=dyle.btc&sel=296'
-  }),
-  Object.freeze({
-    id: 'song-3058', kind: 'song', tokenId: 3058,
-    title: 'The Judge Is in the House', subtitle: '3ai3'
   })
 ]);
 
@@ -141,6 +148,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
   size: 12,
   pinned: Object.freeze([
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
+    { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
     { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Coming this week', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
@@ -158,7 +166,7 @@ export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'chess', kind: 'chess', tag: '#3072 · Chess', title: 'Challenge anyone', copy: 'Play a person on-chain, or the computer for practice. Casual games are free.', href: '/i/3072', tone: 'amber' },
   { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
   { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
-  { id: 'vst-1107', image: '/home/wall/vst-1107.webp', tag: '#1107 · Instrument', title: 'VST late night', copy: 'A working music object. Press the artwork and it plays, straight from the chain.', href: '/xplorer?gallery=jim-music&sel=1107', tone: 'plain' }
+  { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' }
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([

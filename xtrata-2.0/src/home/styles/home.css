@@ -8287,3 +8287,27 @@
     .home-fresh__card:focus:not(:focus-visible),
     .home-tile:focus:not(:focus-visible),
     .home-aud__cover:focus:not(:focus-visible) { outline: none; }
+
+    /* Astro Blaster 3 (cyan) */
+    .home-strip[data-tone='cyan'] { --strip-accent: #4ee6ff; }
+    .home-play.home-tone--cyan { border-color: rgba(78, 230, 255, 0.35); background: #060b1a; }
+
+    /* Living Wall: Astro Blaster 3 top billing; dense packing so the phone
+       layout backfills beside the tall tile. */
+    .living-hero__stage.home-wall { grid-auto-flow: dense; }
+    .home-tone--cyan .home-tile__eyebrow { color: #4ee6ff; }
+    .home-tile--big.home-tone--cyan { border-color: rgba(78, 230, 255, 0.45); }
+    .home-tile--big.home-tone--cyan .home-tile__title { font-size: 24px; }
+    .home-tile--big.home-tone--cyan .home-tile__sub { font-size: 13.5px; }
+    /* Chess in the tall slot: stack the caption and button under the board. */
+    .home-tile--tall.home-tile--chess { padding: 12px; gap: 10px; }
+    .home-tile--tall.home-tile--chess .home-tile__chess-foot { flex-direction: column; align-items: flex-start; }
+    .home-tile--tall.home-tile--chess .home-tile__title { font-size: 17px; }
+    @media (max-width: 600px) {
+      /* Astro Blaster keeps a tall full-width slot on phones. */
+      .home-tile--big:not(.home-tile--chess) { grid-row: span 2; }
+    }
+    .home-tile--big.home-tone--cyan .home-tile__caption {
+      padding-top: 64px;
+      background: linear-gradient(rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.94) 55%);
+    }

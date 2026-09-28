@@ -580,7 +580,7 @@
     list.innerHTML = '';
     entries.forEach(function (e) {
       var li = document.createElement('li');
-      var v = e.verify, vtxt = v === 'ok' ? '<small class="v-ok">✓ Verified</small>' : v === 'bad' ? '<small class="v-bad">✗ Mismatch</small>' : v === 'err' ? '<small class="v-wait">Not checked</small>' : '<small class="v-wait">Checking…</small>';
+      var vk = verifyKey(e), v = e.verify || verifyCache[vk] || (verifyErr[vk] ? 'err' : null), vtxt = v === 'ok' ? '<small class="v-ok">✓ Verified</small>' : v === 'bad' ? '<small class="v-bad">✗ Mismatch</small>' : v === 'err' ? '<small class="v-wait">Not checked</small>' : '<small class="v-wait">Checking…</small>';
       li.innerHTML = '<span class="rk">' + e.rank + '</span><span class="nm">' + esc(e.name) + '<small>' + esc(e.player.slice(0, 6) + '…' + e.player.slice(-4)) + '</small></span>' +
         '<span class="sc">' + R.fmt(e.score) + vtxt + '</span>';
       var wb = document.createElement('button'); wb.className = 'btn small'; wb.textContent = 'Watch';
@@ -598,13 +598,16 @@
   var verifyQueue = Promise.resolve();
   var verifyCache = {}; // replay hash -> 'ok' | 'bad'
   var verifyQueued = {};
+  var verifyErr = {}; // failed reads: shown as "Not checked", retried on the next fetch (never cached as a result)
+  // entries are re-created on every fetch, so results live in the cache (switching tabs mid-check used to leave "Checking…")
+  function verifyKey(e) { return e.replayHash + ':' + e.score + ':' + e.player; }
   function verifyEntries(ref, entries) {
     var daily = ref.board === CHAIN_CONFIG.boards.daily;
     entries.forEach(function (e) {
-      var key = e.replayHash + ':' + e.score + ':' + e.player;
+      var key = verifyKey(e);
       if (verifyCache[key]) { e.verify = verifyCache[key]; return; }
       if (verifyQueued[key]) return;
-      verifyQueued[key] = true;
+      verifyQueued[key] = true; delete verifyErr[key];
       verifyQueue = verifyQueue.then(function () {
         return Chain.fetchReplay(ref.board, ref.period, e).then(function (bytes) {
           e._bytes = bytes;
@@ -613,7 +616,7 @@
             score: e.score, period: daily ? ref.period : null, mode: daily ? AB3.MODE_DAILY : AB3.MODE_CAMPAIGN,
             pilot: e.pHash, chunk: 6000
           });
-        }).then(function (r) { e.verify = r.ok ? 'ok' : 'bad'; verifyCache[key] = e.verify; }, function () { e.verify = 'err'; })
+        }).then(function (r) { e.verify = r.ok ? 'ok' : 'bad'; verifyCache[key] = e.verify; }, function () { e.verify = 'err'; verifyErr[key] = true; })
           .then(function () { delete verifyQueued[key]; if (app.screen === 'scrBoard') renderBoard(); });
       });
     });
