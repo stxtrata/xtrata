@@ -51,12 +51,27 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
 
 // The Living Wall beside the hero headline. Order matters: the grid is
 // 4 columns x 3 rows on desktop and the spans below fill it exactly.
-//   chess: 2x2   audionauts: 2x1   timeloop: 1x2   then four 1x1 tiles.
+//   astro blaster: 2x2 (top billing)   chess: 1x2   two songs: 1x1
+//   audionauts: 2x1   twins + DYLE: 1x1. Timeloop lives in the Play row.
 export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
-    id: 'chess', kind: 'chess', size: 'big', tone: 'amber',
+    id: 'astro-blaster', kind: 'image', size: 'big', tone: 'cyan',
+    eyebrow: 'New · play', title: 'Astro Blaster 3', subtitle: 'Every top score lives on Bitcoin.',
+    image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
+    href: '/i/3075', newTab: true
+  }),
+  Object.freeze({
+    id: 'chess', kind: 'chess', size: 'tall', tone: 'amber',
     eyebrow: 'Play', title: 'On-Chain Chess', cta: 'Play free',
     href: '/i/3072', newTab: true, tokenId: 3072
+  }),
+  Object.freeze({
+    id: 'song-3062', kind: 'song', tokenId: 3062,
+    title: 'Neon Portal Bloom', subtitle: 'BotCupid'
+  }),
+  Object.freeze({
+    id: 'song-3058', kind: 'song', tokenId: 3058,
+    title: 'The Judge Is in the House', subtitle: '3ai3'
   }),
   Object.freeze({
     // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
@@ -64,16 +79,6 @@ export const HOMEPAGE_WALL = Object.freeze([
     eyebrow: 'Coming this week · press to listen', title: 'Audionauts',
     image: '/home/wall/audionauts-3059.webp',
     href: '/radio'
-  }),
-  Object.freeze({
-    id: 'timeloop', kind: 'image', size: 'tall', tone: 'paper',
-    eyebrow: 'Play · mystery', title: 'Timeloop Detective', subtitle: 'One day. One heist. Rewind.',
-    image: '/home/wall/timeloop-3047.webp', position: 'top',
-    href: '/i/3047', newTab: true
-  }),
-  Object.freeze({
-    id: 'song-3062', kind: 'song', tokenId: 3062,
-    title: 'Neon Portal Bloom', subtitle: 'BotCupid'
   }),
   Object.freeze({
     id: 'forever-twins', kind: 'image', tone: 'orange',
@@ -85,10 +90,6 @@ export const HOMEPAGE_WALL = Object.freeze([
     id: 'dyle-296', kind: 'image', tone: 'pink', pixelated: true,
     eyebrow: 'Collect', title: 'Art by DYLE',
     image: '/i/296', href: '/xplorer?wallet=dyle.btc&sel=296'
-  }),
-  Object.freeze({
-    id: 'song-3058', kind: 'song', tokenId: 3058,
-    title: 'The Judge Is in the House', subtitle: '3ai3'
   })
 ]);
 
