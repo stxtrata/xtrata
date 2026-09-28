@@ -1,0 +1,6 @@
+node_modules/
+upstream/node_modules/
+upstream/dist/
+upstream/demo-dist/
+*.local.json
+.env*

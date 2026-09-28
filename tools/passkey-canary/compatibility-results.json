@@ -1,0 +1,96 @@
+{
+  "checkedAt": "2026-09-12T20:30:08.540Z",
+  "provenance": {
+    "generatedAt": "2026-09-12T20:02:19.618Z",
+    "upstreamCommit": "1e85e68ab95fcb6e0965b99a19b2f68271854540",
+    "upstreamVersion": "0.4.0",
+    "xtrataCommit": "edc785580637d002a5406463fd780160a74cdffb",
+    "xtrataSeedSha256": "8afb98a014b947efa73506a70c82d3a5aa5eb8bfcac64212d55a56181d9123bd",
+    "xtrataBundleSha256": "b217ae010fbf63f513d4cc02e8a905600f5470a2eca4525e8c89919992e77b65",
+    "vectorSha256": "2821395dcbe04ca1c92e2ea9a954214808a6deeea1a3c8e6d6c67816b8511ab4",
+    "dependencies": {
+      "xtrataTransactions": "6.17.0",
+      "xtrataBip32": "1.1.3",
+      "xtrataBip39": "1.1.0",
+      "upstreamTransactions": "7.5.0"
+    }
+  },
+  "matches": [
+    {
+      "vector": "all-zero",
+      "network": "mainnet",
+      "address": "SP37B02PN2BK8T1DCEQBF8E0MD5B6CQ06Y25J1AYH",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "all-zero",
+      "network": "testnet",
+      "address": "ST37B02PN2BK8T1DCEQBF8E0MD5B6CQ06Y0XHXKVA",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "all-ff",
+      "network": "mainnet",
+      "address": "SP2VRDRY5G0KFBKTSWFBHDY4W6AXH2BDJR4MH0SW3",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "all-ff",
+      "network": "testnet",
+      "address": "ST2VRDRY5G0KFBKTSWFBHDY4W6AXH2BDJR501FD1K",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "counter-0..31",
+      "network": "mainnet",
+      "address": "SP5Y2VZYN3B1Y38AQR1970XYBN3QF0D0A0PXRPZ7",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "counter-0..31",
+      "network": "testnet",
+      "address": "ST5Y2VZYN3B1Y38AQR1970XYBN3QF0D0A2AXRMH2",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "sha256-tagged",
+      "network": "mainnet",
+      "address": "SP3JA93Y4FPDNZ9QVXXSBATCZKB0QE60CQ0W61DG9",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "sha256-tagged",
+      "network": "testnet",
+      "address": "ST3JA93Y4FPDNZ9QVXXSBATCZKB0QE60CQ0P897NK",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "Xtrata 24-word lock",
+      "network": "mainnet",
+      "address": "SP1JAHE8GEHB0MCBGR8J6W0AA7TJEE1XKFTFJMQ5W",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "Xtrata 24-word lock",
+      "network": "testnet",
+      "address": "ST1JAHE8GEHB0MCBGR8J6W0AA7TJEE1XKFSD2Q80H",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "Xtrata 12-word import",
+      "network": "mainnet",
+      "address": "SPC5KHM41H6WHAST7MWWDD807YSPRQKJ69FSH54J",
+      "threeWayMatch": true
+    },
+    {
+      "vector": "Xtrata 12-word import",
+      "network": "testnet",
+      "address": "STC5KHM41H6WHAST7MWWDD807YSPRQKJ68T330BQ",
+      "threeWayMatch": true
+    }
+  ],
+  "negativeControlGroups": 1,
+  "adapterCases": "standard, sponsored, eight refusal cases",
+  "actualWebAuthnCeremonies": 0,
+  "broadcasts": 0
+}
