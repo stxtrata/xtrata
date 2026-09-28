@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Astro Blaster 3.0.1: wallet address on top-level pages (2026-09-28)
+
+- **Why:** on `/i/3073` the game is the whole page, so its "Use my wallet" button (which asks the embedding viewer) was hidden and players had to paste their address.
+- **Change:** the pilot screen now reads the address directly from an injected Xverse or Leather wallet when not embedded (or when no host answers), with an in-game chooser on every connect, Xverse `wallet_disconnect` → `wallet_connect`, Leather `getAddresses`, never `stx_getAccounts`, mainnet only. Read-only; submitting is unchanged. Game version shown in the title footer. Engine and `release/sim.js` byte-identical to 3.0.0.
+- **Verified:** engine tests; browser checks of the built file at top level (Xverse, Leather, testnet refused, cancel, no wallet) and sandboxed (with and without an answering host).
+
 ## Astro Blaster 3 + arcade leaderboard v2 + /arcade/submit (2026-09-28)
 
 - **Why:** every `submit-score` on `xtrata-arcade-scores-v1-3` since February came from two developer wallets and none failed — other players never reached a wallet prompt. The public viewer bridge refuses contract calls, the only signing host was `/admin`, the homepage tile pointed at the pre-fix parent #73, and the "open a full page" fallback had lost its listener. Rebuilt from scratch rather than patched.

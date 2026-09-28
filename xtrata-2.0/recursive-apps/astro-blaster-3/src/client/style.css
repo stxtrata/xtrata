@@ -149,3 +149,6 @@ body:not(.playing) #hudButtons { display: none; }
 .toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%); z-index: 30; background: rgba(5,10,31,0.9); border: 1px solid var(--line); padding: 10px 16px; border-radius: 12px; font-size: 13.5px; max-width: calc(100% - 32px); text-align: center; }
 
 @media (prefers-reduced-motion: reduce) { .card { animation: none; } }
+
+.walletChoices { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
+.walletChoices .fine { width:100%; margin:0; }

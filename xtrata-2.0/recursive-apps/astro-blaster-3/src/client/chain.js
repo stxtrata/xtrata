@@ -1,8 +1,10 @@
 // ---------------------------------------------------------------------------
 // Chain: read-only leaderboard access and the submit hand-off.
-// The game never talks to a wallet. Submitting hands the finished run to the
+// The game never signs. It may read a wallet address (pilot); submitting hands the finished run to the
 // Xtrata submit page (overlay when embedded on xtrata.xyz, new tab otherwise).
 // ---------------------------------------------------------------------------
+
+var GAME_VERSION = '3.0.1';
 
 var CHAIN_CONFIG = {
   network: 'mainnet',
@@ -267,7 +269,7 @@ var Chain = (function () {
     var nonce = 'ab3n-' + Math.floor(Math.random() * 1e9), reqId = 'ab3r-' + Math.floor(Math.random() * 1e9);
     return new Promise(function (resolve, reject) {
       var token = null, done = false;
-      var helloTimer = setTimeout(function () { finish(new Error('This viewer cannot share a wallet address. Paste it instead.')); }, 2500);
+      var helloTimer = setTimeout(function () { var e = new Error('This viewer cannot share a wallet address. Paste it instead.'); e.noHost = true; finish(e); }, 2500);
       var reqTimer = null;
       function finish(err, val) {
         if (done) return; done = true;
@@ -294,8 +296,107 @@ var Chain = (function () {
     });
   }
 
+  // ------------------------------------------------------------ direct wallet (top-level pages, e.g. /i/<id>)
+  // Read-only: asks an injected wallet extension for its Stacks address. Nothing
+  // is ever signed here. Follows the Xtrata wallet playbook: providers are read
+  // from the window the extension injects into, the chooser is shown on every
+  // connect, Xverse drops its previous session first (or it silently reuses the
+  // old account), and stx_getAccounts is never used (it raises a false
+  // "network mismatch" prompt in Xverse).
+  function walletHost() {
+    try { if (window.top && window.top !== window && window.top.location.origin === window.location.origin) return window.top; } catch (e) { /* cross-origin parent */ }
+    return window;
+  }
+  function listWallets() {
+    var w = walletHost(), out = [];
+    var leather = w.LeatherProvider;
+    if (leather && typeof leather.request === 'function') out.push({ id: 'leather', name: 'Leather', provider: leather });
+    var xv = (w.XverseProviders && w.XverseProviders.BitcoinProvider) || (w.xverseProviders && w.xverseProviders.BitcoinProvider);
+    if (!xv) {
+      var reg = [].concat(w.btc_providers || [], w.webbtc_providers || []);
+      for (var i = 0; i < reg.length; i++) {
+        var info = reg[i] || {};
+        if (!/xverse/i.test(String(info.id || '') + ' ' + String(info.name || ''))) continue;
+        var found = String(info.id || '').split('.').reduce(function (o, k) { return o ? o[k] : undefined; }, w);
+        if (found && typeof found.request === 'function') { xv = found; break; }
+      }
+    }
+    if (xv && typeof xv.request === 'function') out.push({ id: 'xverse', name: 'Xverse', provider: xv });
+    return out;
+  }
+  function walletError(e) {
+    var o = e && typeof e === 'object' ? e : {};
+    var inner = o.error && typeof o.error === 'object' ? o.error : o;
+    var msg = String(inner.message || o.message || (typeof o.error === 'string' ? o.error : '') || e || 'The wallet refused the request.');
+    var err = new Error(msg); err.code = inner.code; return err;
+  }
+  function unwrapWallet(r) {
+    if (r && typeof r === 'object') {
+      if (r.error) throw walletError(r);
+      if (r.status === 'error') throw walletError(r.result || r);
+    }
+    return r;
+  }
+  // Walks a wallet response for Stacks addresses; prefers mainnet.
+  function addressesIn(v, out, depth) {
+    out = out || []; depth = depth || 0;
+    if (!v || depth > 6) return out;
+    if (typeof v === 'string') { var a = validateAddress(v); if (a) out.push(a); return out; }
+    if (Array.isArray(v)) { for (var i = 0; i < v.length; i++) addressesIn(v[i], out, depth + 1); return out; }
+    if (typeof v === 'object') for (var k in v) if (Object.prototype.hasOwnProperty.call(v, k)) addressesIn(v[k], out, depth + 1);
+    return out;
+  }
+  function pickMainnet(list) {
+    for (var i = 0; i < list.length; i++) if (list[i].version === 22 || list[i].version === 20) return list[i];
+    if (list.length) throw new Error('The wallet shared a testnet address. Switch it to mainnet and try again.');
+    throw new Error('The wallet did not share a Stacks address.');
+  }
+  function isCancel(e) {
+    var m = String((e && e.message) || '').toLowerCase();
+    return (e && (e.code === 4001 || e.code === -31001)) || /cancel|reject|denied|closed/.test(m);
+  }
+  function directAddress(wallet) {
+    var p = wallet.provider;
+    var req = function (method, params) { return Promise.resolve(p.request(method, params)).then(unwrapWallet, function (e) { throw walletError(e); }); };
+    var run;
+    if (wallet.id === 'xverse') {
+      run = req('wallet_disconnect').catch(function () { /* best effort */ }).then(function () {
+        return req('wallet_connect', { addresses: ['stacks'], network: 'Mainnet', message: 'Astro Blaster 3 reads your address to bind your runs to it. Nothing is signed.' });
+      });
+    } else {
+      run = req('getAddresses').catch(function (e) {
+        if (isCancel(e)) throw e;
+        return req('stx_getAddresses');
+      });
+    }
+    return run.then(function (r) { return pickMainnet(addressesIn(r)); }, function (e) {
+      throw isCancel(e) ? new Error('Cancelled in the wallet. You can paste your address instead.') : e;
+    });
+  }
+  function isEmbedded() { try { return window.parent !== window; } catch (e) { return true; } }
+
+  // Embedded on xtrata.xyz: ask the host. Top-level (or a host that cannot
+  // answer): use an injected wallet directly. `choose(list)` resolves to one
+  // entry of the list, or null when the player closes the chooser.
+  function requestWalletAddress(choose) {
+    var direct = function () {
+      var list = listWallets();
+      if (!list.length) return Promise.reject(new Error('No Stacks wallet was found in this browser. Install or enable Xverse or Leather, or paste your address.'));
+      return Promise.resolve(choose(list)).then(function (w) {
+        if (!w) throw new Error('No wallet chosen. You can paste your address instead.');
+        return directAddress(w);
+      });
+    };
+    if (!isEmbedded()) return direct();
+    return requestHostAddress().catch(function (e) {
+      // only when no host answered at all; a refusal from the host stands
+      if (e && e.noHost && listWallets().length) return direct();
+      throw e;
+    });
+  }
+
   return {
-    validateAddress: validateAddress, requestHostAddress: requestHostAddress,
+    validateAddress: validateAddress, requestHostAddress: requestHostAddress, requestWalletAddress: requestWalletAddress, isEmbedded: isEmbedded,
     sha256: sha256, hex: hex, unhex: unhex, principalToString: principalToString, parseAddress: parseAddress,
     cvUint: cvUint, cvAscii: cvAscii, decodeCV: decodeCV, callReadOnly: callReadOnly,
     fetchPeriod: fetchPeriod, fetchTop10: fetchTop10, fetchReplay: fetchReplay, estimateRank: estimateRank,

@@ -27,6 +27,12 @@ A 52-byte little-endian header followed by the deflate-raw input log:
 `0-2 "AB3" · 3 format · 4-23 pilot hash160 · 24 pilot version · 25 mode · 26-27 engine · 28-31 seed · 32-35 period · 36-39 frames · 40-47 score (f64) · 48-51 state hash`.
 The contract requires bytes 4-23 to equal the submitting wallet's hash160.
 
+## Releases
+
+- **3.0.0** — inscription #3073 (parents #73, #2805).
+- **3.0.1** — "Use my wallet" on the pilot screen now works everywhere. Inside the xtrata.xyz viewer it asks the host (as before); on a top-level page such as `/i/<id>` it reads the address straight from Xverse or Leather (chooser every time, Xverse drops its old session first, never `stx_getAccounts`; read-only, nothing is signed). Engine unchanged (v1), so every existing score and replay stays valid.
+  To ship: inscribe `release/astro-blaster-3.html` with parent #3073, then re-run the canary's production step with the new id (only `engine-id` changes; board mode is untouched) and point the homepage tile at it.
+
 ## Launch checklist
 
 1. **Contract.** Deploy `xtrata-arcade-scores-v2` with the web-wallet canary: `npm run build:canary:arcade-scores-v2`, serve `canaries/build/`, and run steps 1–11 (see `canaries/arcade-scores-v2/README.md`). It deploys at Clarity 4 and proves submit, copy refusal, void and ban on chain. The game and the submit page assume deployer `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`; if you deploy from another address, change `CHAIN_CONFIG` in `src/client/chain.js` and `ARCADE_CONTRACT` in `src/arcade-submit/core.ts`, then rebuild **before** inscribing.

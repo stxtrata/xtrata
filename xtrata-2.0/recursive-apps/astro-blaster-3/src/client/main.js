@@ -36,6 +36,7 @@
   }
   applySettings();
   $('engineV').textContent = AB3.ENGINE_VERSION;
+  $('gameV').textContent = GAME_VERSION;
 
   // ------------------------------------------------------------ screens
   var SCREENS = ['scrTitle', 'scrPilot', 'scrBoard', 'scrHow', 'scrSettings', 'scrPause', 'scrCards', 'scrDock', 'scrResults'];
@@ -77,8 +78,7 @@
     pendingStart = then || null;
     $('pilotInput').value = pilot ? pilot.address : '';
     $('pilotMsg').textContent = ''; $('pilotMsg').className = 'msg';
-    var embedded = false; try { embedded = window.parent !== window; } catch (e) { embedded = true; }
-    $('btnPilotWallet').classList.toggle('hidden', !embedded);
+    hideWalletChoices();
     $('btnPilotSave').textContent = then ? 'Save and play' : 'Save';
     $('btnPilotSkip').classList.toggle('hidden', !then);
     show('scrPilot', true);
@@ -95,10 +95,37 @@
     savePilot(v);
   });
   $('pilotInput').addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') $('btnPilotSave').click(); });
+  function hideWalletChoices() { var box = $('walletChoices'); box.classList.add('hidden'); box.textContent = ''; }
+  // Shown on every connect (the wallet playbook's rule), so the player always picks.
+  function chooseWallet(list) {
+    return new Promise(function (resolve) {
+      var box = $('walletChoices');
+      box.textContent = '';
+      var label = document.createElement('div'); label.className = 'fine'; label.textContent = 'Choose a wallet:';
+      box.appendChild(label);
+      list.forEach(function (w) {
+        var b = document.createElement('button'); b.className = 'btn small'; b.textContent = w.name;
+        b.addEventListener('click', function () { hideWalletChoices(); resolve(w); });
+        box.appendChild(b);
+      });
+      var c = document.createElement('button'); c.className = 'btn small ghost'; c.textContent = 'Cancel';
+      c.addEventListener('click', function () { hideWalletChoices(); resolve(null); });
+      box.appendChild(c);
+      box.classList.remove('hidden');
+    });
+  }
+  var walletBusy = false;
   $('btnPilotWallet').addEventListener('click', function () {
-    $('pilotMsg').className = 'msg'; $('pilotMsg').textContent = 'Asking xtrata.xyz for your wallet address…';
-    Chain.requestHostAddress().then(function (v) { $('pilotInput').value = v.address; $('pilotMsg').className = 'msg ok'; $('pilotMsg').textContent = 'Got it. Press Save and play.'; },
-      function (e) { $('pilotMsg').className = 'msg err'; $('pilotMsg').textContent = e.message; });
+    if (walletBusy) return;
+    walletBusy = true; $('btnPilotWallet').disabled = true;
+    $('pilotMsg').className = 'msg';
+    $('pilotMsg').textContent = Chain.isEmbedded() ? 'Asking xtrata.xyz for your wallet address…' : 'Pick your wallet, then approve in it. Nothing is signed.';
+    Chain.requestWalletAddress(chooseWallet).then(function (v) {
+      $('pilotInput').value = v.address; $('pilotMsg').className = 'msg ok';
+      $('pilotMsg').textContent = 'Got it: ' + short(v.address) + '. Press ' + $('btnPilotSave').textContent + '.';
+    }, function (e) { $('pilotMsg').className = 'msg err'; $('pilotMsg').textContent = e.message; }).then(function () {
+      walletBusy = false; $('btnPilotWallet').disabled = false; hideWalletChoices();
+    });
   });
   $('btnPilotSkip').addEventListener('click', function () { var go = pendingStart; pendingStart = null; if (go) go(true); });
   updatePilot();
