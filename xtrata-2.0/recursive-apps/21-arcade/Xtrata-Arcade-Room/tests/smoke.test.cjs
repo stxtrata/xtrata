@@ -421,6 +421,14 @@ async function mockApi(ctx) {
   const r = await f2.evaluate(() => window.XAScores.submit({ gameId: 'xa_block_drop', score: 777, name: 'NARROW' }));
   const calls2 = await page2.evaluate(() => window.__calls.map((c) => c.method));
   check(r.ok && r.route === 'host:arcade' && calls2.join(',') === 'wallet_connect,xtrata_submitArcadeScore', 'narrow host method used when supported');
+  check(/^0x[0-9a-f]{64}$/.test(r.txid), 'narrow host txid passed through');
+  // Same shape the xtrata.xyz host parser (src/lib/viewer/arcade-score.ts) accepts.
+  const np = await page2.evaluate(() => window.__calls[1].params);
+  check(np.contract === 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3' &&
+    np.network === 'mainnet' && np.gameId === 'xa_block_drop' && np.mode === 'score' &&
+    np.score === '777' && np.name === 'NARROW' && /^S[PM]/.test(np.address) &&
+    Object.keys(np).sort().join(',') === 'address,contract,gameId,mode,name,network,score',
+    'narrow request carries only the seven fields the host validates');
   await page2.close();
 
   /* ---------- 6. Direct page, no wallet: view-only ---------- */

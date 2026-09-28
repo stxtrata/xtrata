@@ -1,4 +1,5 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
+import { ARCADE_SCORE_METHODS, type ArcadeReview } from './arcade-score';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -14,7 +15,7 @@ type Payment = {
   network: 'mainnet' | 'testnet';
 };
 export type WalletReview =
-  SaveReview | { kind: 'connect'; label: string } | ({ kind: 'transfer'; label: string } & Payment);
+  SaveReview | ArcadeReview | { kind: 'connect'; label: string } | ({ kind: 'transfer'; label: string } & Payment);
 type Options = {
   host: Window;
   wallet: WalletAdapter;
@@ -22,6 +23,14 @@ type Options = {
   transfer: (request: WalletStxTransferOptions) => void;
   sessionChanged: (session: WalletSession) => void;
   gameSave?: (
+    method: string,
+    params: unknown,
+    session: WalletSession,
+    label: string,
+    guard: () => void
+  ) => Promise<unknown>;
+  /** Narrow arcade high-score method; absent means the method stays unsupported (-32601). */
+  arcadeScore?: (
     method: string,
     params: unknown,
     session: WalletSession,
@@ -204,10 +213,11 @@ export function installPublicWalletBridge(options: Options) {
       if (
         !connects.has(method) &&
         !transfers.has(method) &&
-        !(GAME_SAVE_METHODS.has(method) && options.gameSave)
+        !(GAME_SAVE_METHODS.has(method) && options.gameSave) &&
+        !(ARCADE_SCORE_METHODS.has(method) && options.arcadeScore)
       )
         throw failure(
-          'This public viewer supports wallet connection and native STX payments only.',
+          'This public viewer supports wallet connection, native STX payments and arcade scores only.',
           -32601
         );
       if (busy || options.isBusy?.())
@@ -233,7 +243,13 @@ export function installPublicWalletBridge(options: Options) {
         }
         if (!grant!.authorized)
           throw failure('Connect this preview before requesting a payment.', 4100);
-        if (GAME_SAVE_METHODS.has(method) && options.gameSave) {
+        const narrow =
+          GAME_SAVE_METHODS.has(method) && options.gameSave
+            ? options.gameSave
+            : ARCADE_SCORE_METHODS.has(method) && options.arcadeScore
+              ? options.arcadeScore
+              : null;
+        if (narrow) {
           const initial = checkedSession(options.wallet.getSession());
           const guard = () => {
             if (!alive()) throw failure('The preview changed. Reconnect and review again.', 4001);
@@ -242,7 +258,7 @@ export function installPublicWalletBridge(options: Options) {
               network: initial.network
             } as Payment);
           };
-          return await options.gameSave(method, p.params, initial, entry.label, guard);
+          return await narrow(method, p.params, initial, entry.label, guard);
         }
         const payment = parsePublicPayment(p.params, options.wallet.getSession());
         const initial = checkedSession(options.wallet.getSession(), payment);
@@ -338,7 +354,9 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
         ? 'Connect this preview to your wallet?'
         : request.kind === 'save'
           ? 'Publish this game checkpoint?'
-          : 'Review preview payment';
+          : request.kind === 'arcade'
+            ? 'Post this arcade score?'
+            : 'Review preview payment';
     const text = document.createElement('p');
     text.style.whiteSpace = 'pre-line';
     text.textContent =
@@ -346,7 +364,9 @@ export function reviewPublicWalletRequest(request: WalletReview): Promise<boolea
         ? `${request.label}\nShare your selected wallet address with this preview. Payments still require a separate approval.`
         : request.kind === 'save'
           ? `${request.label}\nFrom: ${request.address}\nNetwork: mainnet\nSave: ${request.bytes.toLocaleString()} bytes\nProtocol fee: ${stx(request.protocolFee)} STX, plus the wallet’s network fee\nContract: ${request.contract}\n\nYour progress, journal and linked notes will be public and permanent. The save will reference Timeloop Detective #3040. Check the wallet’s final fee before signing.`
-          : `${request.label}\nNetwork: ${request.network}\nFrom: ${request.address}\nTo: ${request.recipient}\nAmount: ${stx(request.amount)} STX\nRequested fee: ${request.fee ? `${stx(request.fee)} STX` : 'wallet estimate'}\nMemo: ${request.memo || '(none)'}\n\nCheck the wallet’s final amount and fee before signing.`;
+          : request.kind === 'arcade'
+            ? `${request.label}\nGame: ${request.gameId}\n${request.mode === 'time' ? 'Time' : 'Score'}: ${request.score}\nName: ${request.name}\nFrom: ${request.address}\nNetwork: mainnet\nLeaderboard fee: up to ${stx(request.fee)} STX, plus the wallet’s network fee\nContract: ${request.contract}\n\nThe name, score and your address will be public and permanent. If another player pushes this score out of the top 10 before it confirms, the transaction fails and only the network fee is spent.`
+            : `${request.label}\nNetwork: ${request.network}\nFrom: ${request.address}\nTo: ${request.recipient}\nAmount: ${stx(request.amount)} STX\nRequested fee: ${request.fee ? `${stx(request.fee)} STX` : 'wallet estimate'}\nMemo: ${request.memo || '(none)'}\n\nCheck the wallet’s final amount and fee before signing.`;
     const cancel = document.createElement('button');
     cancel.textContent = 'Cancel';
     const approve = document.createElement('button');

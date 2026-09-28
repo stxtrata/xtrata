@@ -203,6 +203,7 @@
     } from '/src/lib/viewer/runtime-inline.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
+    import { runArcadeScore, readArcadeFeeUnit } from '/src/lib/viewer/arcade-score.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
@@ -9917,6 +9918,26 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             onFinish: (value) => finish(resolve, value), onCancel: () => finish(reject, Object.assign(new Error('Save publication cancelled.'), {code:4001})), onError: (error) => finish(reject, error) }); } catch (error) { finish(reject, error); }
         })
       }),
+      arcadeScore: (method, params, session, label, guard) => {
+        // Stay inside the arcade cartridge's 170-second bridge window end to end.
+        const started = Date.now();
+        return runArcadeScore(method, params, {
+          session, label, guard,
+          readFee: () => readArcadeFeeUnit(session.address),
+          review: reviewPublicWalletRequest,
+          submit: (options) => new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(Object.assign(new Error('No wallet response. Check your wallet history before posting again.'), {code:-32002})),
+              Math.max(1000, Math.min(90000, 160000 - (Date.now() - started))));
+            const finish = (fn, value) => { clearTimeout(timer); fn(value); };
+            // No sender field and Deny mode only (WALLET-PLAYBOOK §2); the host built every argument.
+            try { showContractCall({ contractAddress: options.contractAddress, contractName: options.contractName,
+              functionName: options.functionName, functionArgs: options.functionArgs,
+              network: session.network, stxAddress: session.address,
+              postConditionMode: PostConditionMode.Deny, postConditions: options.postConditions,
+              onFinish: (value) => finish(resolve, value), onCancel: () => finish(reject, Object.assign(new Error('Score submission cancelled.'), {code:4001})), onError: (error) => finish(reject, error) }); } catch (error) { finish(reject, error); }
+          })
+        });
+      },
       isBusy: () => state.busy,
       pendingChanged: setBusy,
       sessionChanged: (session) => {

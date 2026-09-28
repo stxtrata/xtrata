@@ -27,7 +27,7 @@
     if (d.bridgeToken !== TOKEN) return reply(false, { message: 'bad token', code: -32600 });
     if (d.method === 'wallet_connect') return reply(true, { address: ADDRESS, addresses: [ADDRESS], network: 'mainnet' });
     if (d.method === 'xtrata_submitArcadeScore') {
-      return narrow ? reply(true, { txid: 'feedbeef' }) : reply(false, { message: 'unsupported', code: -32601 });
+      return narrow ? reply(true, { status: 'submitted', txid: '0x' + 'fe'.repeat(32), contract: d.params && d.params.contract }) : reply(false, { message: 'unsupported', code: -32601 });
     }
     if (d.method === 'stx_callContract') return reply(true, { txid: '0xabc123' });
     reply(false, { message: 'unsupported', code: -32601 });

@@ -2,6 +2,19 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Public viewer: narrow arcade high-score method (2026-09-28)
+
+- **Why:** the public viewer's wallet bridge refuses `stx_callContract`, so arcade cartridges opened on xtrata.xyz (rather than `/runtime`) could connect but never post a score. That is why Astro Blaster scores never landed for other players.
+- **What:** new `xtrata_submitArcadeScore` bridge method, following the `GAME_SAVE_METHODS` precedent (`src/lib/viewer/arcade-score.ts`). The cartridge sends only `gameId`, `mode`, `score`, `name` (plus echo fields `contract`, `network`, `address` that must agree with the host). The host:
+  - pins the contract to `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3` and the function to `submit-score`, and rebuilds all four Clarity arguments itself;
+  - validates `gameId` `^[a-z0-9_]{3,32}$`, score a positive uint128, name 3–12 printable ASCII;
+  - reads `get-fee-unit` itself, rejects values outside the contract's FEE-MIN/FEE-MAX, and treats a failed read as a failure, never as zero;
+  - shows a host-owned review (game, score, name, address, fee cap), re-reads the fee after approval and aborts if it moved;
+  - signs through the existing `showContractCall` path in Deny mode with one STX post-condition `≤ fee` from the connected address, no `sender` field (playbook §2), with the account/network guard rechecked after review.
+- Without an `arcadeScore` handler the bridge still answers `-32601`, so cartridges keep falling back to the generic route on `/runtime`. Generic `stx_callContract` remains refused on the public viewer.
+- **Not touched:** wizard bundles (they do not import the viewer bridge), so no `AGENT_BUILD` bump.
+- **Verified:** `npx vitest run src/lib/viewer src/lib/wallet/__tests__ src/agent-one/__tests__/wallet-payment.test.ts` — 273 tests green (11 new in `arcade-score.test.ts`, 2 new bridge tests); `vite build` succeeds; no new `tsc` errors in source files. **Still owed (§10.5):** the manual desktop + mobile canary — connect, then post one real score from an arcade cartridge on the public viewer with Xverse and Leather.
+
 ## Fees: the contract has five units, the client modelled one (2026-08-03)
 
 - **Why:** `estimateContractFees` computed `feeUnit × (1 + ceil(chunks/32))` from a single `get-fee-unit` read. The contract charges from **five** units, and two of them do not equal that aggregate on mainnet — `upload-chunk-fee-unit` is **1,000** and `single-tx-fee-unit` is **10,000**, where the contract *source* defaults say 2,000 and 100,000. `get-fee-unit` is a legacy aggregate that predates the granular units and no longer describes the model.

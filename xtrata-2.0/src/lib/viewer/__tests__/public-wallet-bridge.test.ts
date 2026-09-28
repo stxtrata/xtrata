@@ -21,7 +21,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-function setup(gameSave?: any) {
+function setup(gameSave?: any, arcadeScore?: any) {
   const wallet = {
     getSession: vi.fn(() => ({ ...session })),
     connect: vi.fn(async () => ({ ...session })),
@@ -35,6 +35,7 @@ function setup(gameSave?: any) {
   const bridge = installPublicWalletBridge({
     host: window,
     gameSave,
+    arcadeScore,
     wallet,
     review,
     transfer,
@@ -335,6 +336,48 @@ describe('scoped game-save bridge', () => {
     await f.request('stx_requestAccounts');
     expect(await f.request('xtrata_saveGame', {})).toMatchObject({ ok: true });
     expect(gameSave.mock.calls[0][0]).toBe('xtrata_saveGame');
+    h.wallet.getSession.mockReturnValue({ ...session, address: recipient });
+    expect(() => latestGuard!()).toThrow(/changed/);
+    expect(h.pendingChanged.mock.calls.at(-1)).toEqual([false]);
+  });
+});
+
+describe('scoped arcade score bridge', () => {
+  it('stays unsupported (-32601) when the host has no arcade handler, so cartridges fall back', async () => {
+    const h = setup(),
+      f = await h.frame();
+    await f.request('stx_requestAccounts');
+    expect(await f.request('xtrata_submitArcadeScore', {})).toMatchObject({
+      ok: false,
+      error: { code: -32601 }
+    });
+  });
+  it('requires consent, routes only the narrow method and rechecks the account', async () => {
+    let latestGuard: (() => void) | undefined;
+    const arcadeScore = vi.fn(async (_method, _params, _session, _label, guard) => {
+      latestGuard = guard;
+      guard();
+      return { status: 'submitted', txid: '0x' + 'c'.repeat(64) };
+    });
+    const gameSave = vi.fn();
+    const h = setup(gameSave, arcadeScore),
+      f = await h.frame();
+    expect(await f.request('xtrata_submitArcadeScore', { score: '5' })).toMatchObject({
+      ok: false,
+      error: { code: 4100 }
+    });
+    expect(arcadeScore).not.toHaveBeenCalled();
+    await f.request('stx_requestAccounts');
+    expect(await f.request('xtrata_submitArcadeScore', { score: '5' })).toMatchObject({
+      ok: true,
+      result: { status: 'submitted' }
+    });
+    expect(arcadeScore.mock.calls[0][0]).toBe('xtrata_submitArcadeScore');
+    expect(arcadeScore.mock.calls[0][1]).toEqual({ score: '5' });
+    expect(arcadeScore.mock.calls[0][3]).toBe('Inscription #123');
+    expect(gameSave).not.toHaveBeenCalled();
+    // A generic contract call is still refused even with the arcade handler installed.
+    expect(await f.request('stx_callContract', {})).toMatchObject({ ok: false, error: { code: -32601 } });
     h.wallet.getSession.mockReturnValue({ ...session, address: recipient });
     expect(() => latestGuard!()).toThrow(/changed/);
     expect(h.pendingChanged.mock.calls.at(-1)).toEqual([false]);
