@@ -91,7 +91,8 @@
     "music:desktop": "npm --prefix desktop/music start",
     "music:desktop:build": "npm --prefix desktop/music run dist:mac",
     "music:desktop:test": "node scripts/music-support/desktop-smoke.mjs",
-    "build:music-profile": "vite build -c vite.music-profile.config.ts"
+    "build:music-profile": "vite build -c vite.music-profile.config.ts",
+    "build:canary:arcade-scores-v2": "node scripts/build-arcade-scores-v2-canary.mjs"
   },
   "dependencies": {
     "@noble/hashes": "^1.4.0",

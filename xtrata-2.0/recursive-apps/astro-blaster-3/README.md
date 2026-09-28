@@ -29,9 +29,9 @@ The contract requires bytes 4-23 to equal the submitting wallet's hash160.
 
 ## Launch checklist
 
-1. **Contract.** Deploy `contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar` (Clarity 3) as `xtrata-arcade-scores-v2`. The game and the submit page assume deployer `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`; if you deploy from another address, change `CHAIN_CONFIG` in `src/client/chain.js` and `ARCADE_CONTRACT` in `src/arcade-submit/core.ts`, then rebuild **before** inscribing.
+1. **Contract.** Deploy `xtrata-arcade-scores-v2` with the web-wallet canary: `npm run build:canary:arcade-scores-v2`, serve `canaries/build/`, and run steps 1–11 (see `canaries/arcade-scores-v2/README.md`). It deploys at Clarity 4 and proves submit, copy refusal, void and ban on chain. The game and the submit page assume deployer `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X`; if you deploy from another address, change `CHAIN_CONFIG` in `src/client/chain.js` and `ARCADE_CONTRACT` in `src/arcade-submit/core.ts`, then rebuild **before** inscribing.
 2. **Inscribe** `release/astro-blaster-3.html` as `text/html` (about 192 KB, fits a single-transaction mint).
-3. **Register the boards** (owner):
+3. **Register the boards** (owner) — the canary's last step does this once you enter the inscription id:
    - `set-board "astro3" u0 u10000000000 u0 <inscription-id> false true`
    - `set-board "astro3-daily" u0 u10000000000 u0 <inscription-id> true true`
    (mode 0 = higher wins; cap 10 billion; no entry fee; engine id = the inscription.)

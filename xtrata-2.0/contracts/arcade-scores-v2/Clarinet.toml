@@ -8,5 +8,5 @@ requirements = []
 
 [contracts.xtrata-arcade-scores-v2]
 path = 'contracts/xtrata-arcade-scores-v2.clar'
-clarity_version = 3
+clarity_version = 4
 epoch = 'latest'
