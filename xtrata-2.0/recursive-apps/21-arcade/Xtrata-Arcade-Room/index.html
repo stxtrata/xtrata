@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Xtrata Arcade (local dev)</title>
+  <!-- Local/off-chain dev page. Do NOT inscribe this file; inscribe parent/ instead. -->
+  <link rel="stylesheet" href="modules/arcade-room.css">
+</head>
+<body>
+  <div id="xa-root"></div>
+  <script src="modules/arcade-kit.js"></script>
+  <script src="modules/score-client.js"></script>
+  <script src="modules/arcade-room.js"></script>
+  <script src="modules/game-neon-snake.js"></script>
+  <script src="modules/game-block-drop.js"></script>
+  <script src="modules/game-cave-diver.js"></script>
+  <script>XARoom.boot(document.getElementById('xa-root'));</script>
+</body>
+</html>

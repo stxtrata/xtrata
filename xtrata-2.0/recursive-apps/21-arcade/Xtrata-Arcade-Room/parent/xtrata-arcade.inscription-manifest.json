@@ -1,0 +1,100 @@
+{
+  "schema": "xtrata-standalone-inscription-manifest@1",
+  "appId": "xtrata_arcade_room",
+  "release": "v1-prototype",
+  "createdAt": "2026-09-28",
+  "contentContract": {
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "name": "xtrata-v3-2-3",
+    "network": "mainnet"
+  },
+  "scoreContract": {
+    "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "name": "xtrata-arcade-scores-v1-3",
+    "network": "mainnet",
+    "gameIds": [
+      "xa_neon_snake",
+      "xa_block_drop",
+      "xa_cave_diver"
+    ]
+  },
+  "leafModules": [
+    {
+      "key": "css",
+      "path": "modules/arcade-room.css",
+      "mimeType": "text/css",
+      "sizeBytes": 14419,
+      "sha256": "577d04fc6c60bfddee8f2b43e93fd19a7d6cead9a0c0c5e122ea5c96aca221bd",
+      "mintOrder": 1,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "kit",
+      "path": "modules/arcade-kit.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 12621,
+      "sha256": "7a5d1ebe211d53e07bceb4a51475f6b30fe4bb53ae9f42a79d6959ccba223fcd",
+      "mintOrder": 2,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "scores",
+      "path": "modules/score-client.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 26664,
+      "sha256": "c56e751d1e3624201f7fa8e355e5c0d09a1610a1422aac5cdafb15e3aab9da36",
+      "mintOrder": 3,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "room",
+      "path": "modules/arcade-room.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 25834,
+      "sha256": "1d2132ff585bf2527db6447360f3a10e2487e1741d00cce0f9758d6ae01bbe3e",
+      "mintOrder": 4,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "snake",
+      "path": "modules/game-neon-snake.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 8851,
+      "sha256": "dac22e4d88d967cf246c4dc306f0acb4dafeea1b85a60a170e7cdd33517c6773",
+      "mintOrder": 5,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "blocks",
+      "path": "modules/game-block-drop.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 16258,
+      "sha256": "d12e0b9fd3a8e59e117ec3ae8913393a2cd79ebb571eda320e4af7ac6c1ce548",
+      "mintOrder": 6,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "cave",
+      "path": "modules/game-cave-diver.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 11661,
+      "sha256": "3e623e5b67bbd18b3885a3462ef257386e114a830c0a089beb4109009c97832d",
+      "mintOrder": 7,
+      "mintedInscriptionId": 0
+    }
+  ],
+  "parent": {
+    "path": "parent/xtrata-arcade-parent.template.html",
+    "mimeType": "text/html",
+    "mintOrder": 8,
+    "dependencyOrder": [
+      "css",
+      "kit",
+      "scores",
+      "room",
+      "snake",
+      "blocks",
+      "cave"
+    ]
+  }
+}

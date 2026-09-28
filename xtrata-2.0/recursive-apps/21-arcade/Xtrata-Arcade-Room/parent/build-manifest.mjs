@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+// Writes parent/xtrata-arcade.inscription-manifest.json with size + sha256 per leaf.
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const leaves = [
+  ['css', 'arcade-room.css', 'text/css'],
+  ['kit', 'arcade-kit.js', 'text/javascript'],
+  ['scores', 'score-client.js', 'text/javascript'],
+  ['room', 'arcade-room.js', 'text/javascript'],
+  ['snake', 'game-neon-snake.js', 'text/javascript'],
+  ['blocks', 'game-block-drop.js', 'text/javascript'],
+  ['cave', 'game-cave-diver.js', 'text/javascript']
+];
+const manifest = {
+  schema: 'xtrata-standalone-inscription-manifest@1',
+  appId: 'xtrata_arcade_room',
+  release: 'v1-prototype',
+  createdAt: new Date().toISOString().slice(0, 10),
+  contentContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-v3-2-3', network: 'mainnet' },
+  scoreContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-arcade-scores-v1-3', network: 'mainnet',
+    gameIds: ['xa_neon_snake', 'xa_block_drop', 'xa_cave_diver'] },
+  leafModules: leaves.map(([key, file, mimeType], i) => {
+    const buf = readFileSync(join(here, '..', 'modules', file));
+    return { key, path: 'modules/' + file, mimeType, sizeBytes: buf.length,
+      sha256: createHash('sha256').update(buf).digest('hex'), mintOrder: i + 1, mintedInscriptionId: 0 };
+  }),
+  parent: { path: 'parent/xtrata-arcade-parent.template.html', mimeType: 'text/html', mintOrder: leaves.length + 1,
+    dependencyOrder: leaves.map(([k]) => k) }
+};
+const out = join(here, 'xtrata-arcade.inscription-manifest.json');
+writeFileSync(out, JSON.stringify(manifest, null, 2) + '\n');
+const total = manifest.leafModules.reduce((a, m) => a + m.sizeBytes, 0);
+console.log(`Wrote ${out} — ${manifest.leafModules.length} leaves, ${total.toLocaleString()} bytes`);

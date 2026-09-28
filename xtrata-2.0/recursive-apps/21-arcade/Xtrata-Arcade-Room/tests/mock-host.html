@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Mock Xtrata host</title>
+<style>html,body{margin:0;height:100%;background:#000}iframe{border:0;width:100%;height:100%}</style></head>
+<body>
+<!-- Test harness: behaves like the xtrata.xyz runtime page's wallet bridge.
+     ?narrow=1  → host supports xtrata_submitArcadeScore
+     otherwise  → narrow method returns -32601 and the generic stx_callContract is used. -->
+<iframe id="f" sandbox="allow-scripts" src="../parent/xtrata-arcade-parent.template.html"></iframe>
+<script>
+  var ADDRESS = 'SP000000000000000000002Q6VF78';
+  var narrow = /narrow=1/.test(location.search);
+  var TOKEN = 'mock-token-123';
+  window.__calls = [];
+  window.addEventListener('message', function (ev) {
+    var d = ev.data || {};
+    var src = ev.source;
+    if (d.type === 'xtrata:wallet:hello') {
+      src.postMessage({ type: 'xtrata:wallet:hello-ack', nonce: d.nonce, bridgeToken: TOKEN }, '*');
+      return;
+    }
+    if (d.type === 'xtrata:arcade:wallet-intent') { window.__calls.push({ intent: d.intent, payload: d.payload }); return; }
+    if (d.type !== 'xtrata:wallet:request') return;
+    window.__calls.push({ method: d.method, params: d.params, token: d.bridgeToken });
+    function reply(ok, v) {
+      src.postMessage(Object.assign({ type: 'xtrata:wallet:response', requestId: d.requestId, ok: ok }, ok ? { result: v } : { error: v }), '*');
+    }
+    if (d.bridgeToken !== TOKEN) return reply(false, { message: 'bad token', code: -32600 });
+    if (d.method === 'wallet_connect') return reply(true, { address: ADDRESS, addresses: [ADDRESS], network: 'mainnet' });
+    if (d.method === 'xtrata_submitArcadeScore') {
+      return narrow ? reply(true, { txid: 'feedbeef' }) : reply(false, { message: 'unsupported', code: -32601 });
+    }
+    if (d.method === 'stx_callContract') return reply(true, { txid: '0xabc123' });
+    reply(false, { message: 'unsupported', code: -32601 });
+  });
+</script>
+</body></html>

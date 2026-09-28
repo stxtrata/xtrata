@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Xtrata Arcade</title>
+  <!--
+    Xtrata Arcade — recursive parent (v1 prototype)
+
+    Loads the leaf modules below from the Xtrata core contract (get-chunk),
+    injects them in order, then boots the room. Every cabinet posts to the
+    same score contract under its own game-id.
+
+    Before inscription: fill CONFIG.moduleIds with minted ids
+      node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> \
+        --snake <id> --blocks <id> --cave <id>
+    While an id is 0 the loader falls back to ../modules/<file> so this exact
+    file can be tested over HTTP before anything is minted.
+  -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #05060f; color: #eef1ff; }
+    #xa-boot {
+      position: fixed; inset: 0; display: grid; place-items: center; z-index: 50;
+      font: 700 13px/1.4 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em;
+      background: radial-gradient(700px 360px at 50% 30%, rgba(255,63,164,.16), transparent 70%), #05060f;
+      transition: opacity .3s ease;
+    }
+    #xa-boot.is-done { opacity: 0; pointer-events: none; }
+    .xb { width: min(360px, calc(100% - 32px)); text-align: center; }
+    .xb h1 { margin: 0 0 18px; font: 900 30px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .1em; color: #fff;
+      text-shadow: 0 0 6px #ff3fa4, 0 0 20px #ff3fa4; }
+    .xb h1 span { color: #3ff0ff; text-shadow: 0 0 6px #3ff0ff, 0 0 20px #3ff0ff; }
+    .xb-bar { height: 8px; border-radius: 4px; background: #151935; overflow: hidden; }
+    .xb-fill { height: 100%; width: 0; background: linear-gradient(90deg, #ff3fa4, #3ff0ff); box-shadow: 0 0 12px #3ff0ff; transition: width .2s ease; }
+    .xb-msg { margin-top: 12px; color: #9aa3c7; min-height: 1.4em; }
+    .xb-err { margin-top: 12px; color: #ff4d6d; white-space: pre-wrap; text-align: left; font-size: 12px; }
+    .xb-err button { margin-top: 10px; font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #555; background: #151935; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="xa-root"></div>
+  <div id="xa-boot" role="status" aria-live="polite">
+    <div class="xb">
+      <h1>XTRATA <span>ARCADE</span></h1>
+      <div class="xb-bar"><div class="xb-fill" id="xb-fill"></div></div>
+      <div class="xb-msg" id="xb-msg">Loading cabinets from Stacks…</div>
+      <div class="xb-err" id="xb-err" hidden></div>
+    </div>
+  </div>
+  <script>
+  (function () {
+    'use strict';
+
+    var CONFIG = {
+      contentContractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+      contentContractName: 'xtrata-v3-2-3',
+      readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+      network: 'mainnet',
+      maxChunksPerModule: 512,
+      // Filled after this parent is minted (fill-ids.mjs --parent <id>); used for
+      // the "open on xtrata.xyz" secure-runtime link.
+      parentTokenId: 0,
+      runtimeOrigin: 'https://xtrata.xyz',
+      moduleIds: {
+        css: 0,
+        kit: 0,
+        scores: 0,
+        room: 0,
+        snake: 0,
+        blocks: 0,
+        cave: 0
+      },
+      scoreContract: {
+        contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+        contractName: 'xtrata-arcade-scores-v1-3'
+      }
+    };
+
+    // Order matters: kit → scores → room → cartridges.
+    var MODULES = [
+      { key: 'css', file: 'arcade-room.css', type: 'css' },
+      { key: 'kit', file: 'arcade-kit.js', type: 'js' },
+      { key: 'scores', file: 'score-client.js', type: 'js' },
+      { key: 'room', file: 'arcade-room.js', type: 'js' },
+      { key: 'snake', file: 'game-neon-snake.js', type: 'js' },
+      { key: 'blocks', file: 'game-block-drop.js', type: 'js' },
+      { key: 'cave', file: 'game-cave-diver.js', type: 'js' }
+    ];
+
+    var fillEl = document.getElementById('xb-fill');
+    var msgEl = document.getElementById('xb-msg');
+    var errEl = document.getElementById('xb-err');
+    var done = 0;
+    function progress(text) {
+      fillEl.style.width = Math.round((done / MODULES.length) * 100) + '%';
+      if (text) msgEl.textContent = text;
+    }
+
+    function hasRealOrigin() {
+      try { return /^https?:$/.test(location.protocol) && location.origin !== 'null'; } catch (e) { return false; }
+    }
+    function apiBases() {
+      var out = [];
+      if (hasRealOrigin() && /xtrata\.xyz$/.test(location.hostname)) out.push(location.origin + '/hiro/' + CONFIG.network);
+      out.push(CONFIG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so');
+      return out;
+    }
+    function uintHex(v) { return '0x01' + BigInt(v).toString(16).padStart(32, '0'); }
+    function hexToBytes(hex) {
+      var c = String(hex || '').replace(/^0x/i, '');
+      var out = new Uint8Array(c.length / 2);
+      for (var i = 0; i < out.length; i++) out[i] = parseInt(c.substr(i * 2, 2), 16);
+      return out;
+    }
+    // (ok (some buff)) / (some buff) / none → bytes (empty when absent)
+    function bufferFromCv(hex) {
+      var b = hexToBytes(hex), p = 0;
+      while (p < b.length && (b[p] === 0x07 || b[p] === 0x0a)) p++;
+      if (p >= b.length || b[p] === 0x08 || b[p] === 0x09) return new Uint8Array(0);
+      if (b[p] !== 0x02) throw new Error('Unexpected Clarity type 0x' + b[p].toString(16));
+      var len = ((b[p + 1] << 24) | (b[p + 2] << 16) | (b[p + 3] << 8) | b[p + 4]) >>> 0;
+      return b.slice(p + 5, p + 5 + len);
+    }
+    async function readOnly(fn, args) {
+      var bases = apiBases(), last;
+      for (var i = 0; i < bases.length; i++) {
+        var url = bases[i] + '/v2/contracts/call-read/' + CONFIG.contentContractAddress + '/' + CONFIG.contentContractName + '/' + fn;
+        for (var attempt = 0; attempt < 3; attempt++) {
+          try {
+            var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sender: CONFIG.readSender, arguments: args }) });
+            if (res.status === 429) { await new Promise(function (r) { setTimeout(r, 600 * (attempt + 1)); }); continue; }
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var body = await res.json();
+            if (!body.okay) throw new Error(body.cause || 'read failed');
+            return body.result;
+          } catch (e) { last = e; }
+        }
+      }
+      throw last || new Error('read failed');
+    }
+    async function loadFromChain(id) {
+      var parts = [], total = 0;
+      for (var i = 0; i < CONFIG.maxChunksPerModule; i++) {
+        var bytes = bufferFromCv(await readOnly('get-chunk', [uintHex(id), uintHex(i)]));
+        if (!bytes.length) break;
+        parts.push(bytes); total += bytes.length;
+      }
+      if (!parts.length) throw new Error('Inscription #' + id + ' returned no data');
+      var out = new Uint8Array(total), o = 0;
+      parts.forEach(function (p) { out.set(p, o); o += p.length; });
+      return new TextDecoder('utf-8').decode(out);
+    }
+    async function loadModule(m) {
+      var id = Number(CONFIG.moduleIds[m.key] || 0);
+      var text;
+      if (id > 0) text = await loadFromChain(id);
+      else {
+        // Pre-mint test mode: sibling modules folder over HTTP.
+        var res = await fetch('../modules/' + m.file, { cache: 'no-store' });
+        if (!res.ok) throw new Error(m.file + ' HTTP ' + res.status + ' (set CONFIG.moduleIds.' + m.key + ')');
+        text = await res.text();
+      }
+      done++;
+      progress('Loaded ' + done + ' / ' + MODULES.length);
+      return text;
+    }
+    function inject(m, text) {
+      if (m.type === 'css') {
+        var st = document.createElement('style');
+        st.setAttribute('data-xa-module', m.key);
+        st.textContent = text;
+        document.head.appendChild(st);
+        return;
+      }
+      var s = document.createElement('script');
+      s.setAttribute('data-xa-module', m.key);
+      s.text = text + '\n//# sourceURL=xa-' + m.key + '.js';
+      document.body.appendChild(s);
+    }
+
+    async function boot() {
+      progress();
+      // Fetch in parallel (chunks within a module stay sequential), inject in order.
+      var texts = await Promise.all(MODULES.map(loadModule));
+      MODULES.forEach(function (m, i) { inject(m, texts[i]); });
+      window.XA_CONFIG = {
+        scores: {
+          network: CONFIG.network,
+          contractAddress: CONFIG.scoreContract.contractAddress,
+          contractName: CONFIG.scoreContract.contractName,
+          readSender: CONFIG.readSender,
+          runtimeOrigin: CONFIG.runtimeOrigin,
+          contentContractId: CONFIG.contentContractAddress + '.' + CONFIG.contentContractName,
+          parentTokenId: CONFIG.parentTokenId
+        }
+      };
+      if (!window.XARoom) throw new Error('Room module did not initialise.');
+      window.XARoom.boot(document.getElementById('xa-root'));
+      document.getElementById('xa-boot').classList.add('is-done');
+      setTimeout(function () { var b = document.getElementById('xa-boot'); if (b) b.remove(); }, 400);
+    }
+    boot().catch(function (e) {
+      msgEl.textContent = 'The arcade could not load.';
+      errEl.hidden = false;
+      errEl.textContent = (e && e.message) || String(e);
+      var retry = document.createElement('button');
+      retry.textContent = 'Retry';
+      retry.onclick = function () { location.reload(); };
+      errEl.appendChild(document.createElement('br'));
+      errEl.appendChild(retry);
+      console.error('[xa:parent]', e);
+    });
+  })();
+  </script>
+</body>
+</html>

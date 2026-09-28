@@ -1,0 +1,2763 @@
+<title>Xtrata Arcade</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>/* Xtrata Arcade — room styles (leaf module) */
+:root {
+  --xa-bg: #05060f;
+  --xa-floor: #0a0c1c;
+  --xa-panel: #10132a;
+  --xa-panel-2: #171b38;
+  --xa-line: rgba(140, 160, 255, 0.18);
+  --xa-text: #eef1ff;
+  --xa-dim: #9aa3c7;
+  --xa-faint: #5d6590;
+  --xa-pink: #ff3fa4;
+  --xa-cyan: #3ff0ff;
+  --xa-green: #39ff88;
+  --xa-gold: #ffd23f;
+  --xa-red: #ff4d6d;
+  --xa-radius: 14px;
+  --xa-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --xa-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--xa-bg); color: var(--xa-text); }
+body { font: 15px/1.45 var(--xa-sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+button { font: inherit; color: inherit; }
+.xa-hidden { display: none !important; }
+
+/* ------------------------------------------------------------ room */
+.xa-room {
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 500px at 50% -120px, rgba(255, 63, 164, 0.16), transparent 70%),
+    radial-gradient(900px 400px at 90% 110%, rgba(63, 240, 255, 0.10), transparent 70%),
+    linear-gradient(transparent 62%, rgba(110, 90, 255, 0.07) 62%) 0 0 / 100% 100%,
+    var(--xa-bg);
+  padding: 20px 16px 48px;
+}
+.xa-floor-grid {
+  position: fixed; inset: auto 0 0 0; height: 38vh; pointer-events: none; z-index: 0;
+  background:
+    linear-gradient(rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 100% 36px,
+    linear-gradient(90deg, rgba(110, 90, 255, 0.22) 1px, transparent 1px) 0 0 / 60px 100%;
+  transform: perspective(420px) rotateX(58deg);
+  transform-origin: bottom;
+  mask-image: linear-gradient(transparent, #000 70%);
+  -webkit-mask-image: linear-gradient(transparent, #000 70%);
+  opacity: 0.55;
+}
+.xa-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; }
+.xa-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.xa-logo { font: 900 clamp(24px, 5vw, 42px)/1 var(--xa-mono); letter-spacing: 0.08em; margin: 0; }
+.xa-logo span:first-child {
+  color: #fff; text-shadow: 0 0 6px var(--xa-pink), 0 0 18px var(--xa-pink), 0 0 38px rgba(255, 63, 164, 0.6);
+}
+.xa-logo span:last-child {
+  color: var(--xa-cyan); text-shadow: 0 0 6px var(--xa-cyan), 0 0 20px rgba(63, 240, 255, 0.7);
+  animation: xa-flicker 6s infinite;
+}
+@keyframes xa-flicker { 0%, 92%, 100% { opacity: 1 } 93% { opacity: .4 } 94% { opacity: 1 } 96% { opacity: .6 } }
+.xa-sub { margin: 8px 0 0; color: var(--xa-dim); font-size: 14px; }
+.xa-top-actions { display: flex; gap: 8px; align-items: center; }
+.xa-pill {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px;
+  border-radius: 999px; border: 1px solid var(--xa-line); background: var(--xa-panel);
+  font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; cursor: pointer;
+}
+.xa-pill:hover { border-color: rgba(140, 160, 255, 0.45); }
+.xa-pill:focus-visible, .xa-btn:focus-visible, .xa-icon:focus-visible { outline: 2px solid var(--xa-cyan); outline-offset: 2px; }
+.xa-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--xa-faint); box-shadow: 0 0 8px currentColor; }
+.xa-dot.is-on { background: var(--xa-green); color: var(--xa-green); }
+.xa-dot.is-warn { background: var(--xa-gold); color: var(--xa-gold); }
+.xa-icon {
+  width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--xa-line); background: var(--xa-panel);
+  cursor: pointer; display: grid; place-items: center; font-size: 16px;
+}
+
+.xa-cabinets {
+  display: grid; gap: 22px; margin-top: 28px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+.xa-cab {
+  --c: var(--xa-cyan);
+  position: relative; display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #151935, #0c0f22 60%, #090b19);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px 18px 10px 10px; padding: 12px 12px 14px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5), 0 18px 40px rgba(0, 0, 0, 0.55), 0 0 32px -12px var(--c);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+.xa-cab:hover { transform: translateY(-3px); box-shadow: 0 0 0 1px rgba(0, 0, 0, .5), 0 24px 50px rgba(0, 0, 0, .6), 0 0 44px -10px var(--c); }
+.xa-marquee {
+  border-radius: 10px; padding: 10px 12px; text-align: center;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.xa-marquee h2 {
+  margin: 0; font: 900 20px/1.1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; text-shadow: 0 0 6px var(--c), 0 0 18px var(--c);
+}
+.xa-marquee p { margin: 4px 0 0; font-size: 12px; color: var(--xa-dim); }
+.xa-screen {
+  position: relative; margin: 12px 4px 0; border-radius: 12px; overflow: hidden;
+  aspect-ratio: 4 / 3; background: #000;
+  box-shadow: inset 0 0 0 3px #050610, inset 0 0 30px rgba(0, 0, 0, .9), 0 0 0 1px rgba(255, 255, 255, .05);
+}
+.xa-screen canvas { width: 100%; height: 100%; display: block; }
+.xa-screen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .18) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply;
+}
+.xa-insert {
+  position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; pointer-events: none;
+  font: 800 11px/1 var(--xa-mono); letter-spacing: .2em; color: #fff; text-shadow: 0 0 8px var(--c);
+  animation: xa-blink 1.2s steps(2) infinite;
+}
+@keyframes xa-blink { 50% { opacity: 0 } }
+.xa-cab-stats { display: flex; justify-content: space-between; gap: 8px; margin: 12px 6px 0; font: 700 12px/1.3 var(--xa-mono); }
+.xa-cab-stats div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xa-cab-stats span:first-child { color: var(--xa-faint); font-size: 10px; letter-spacing: .12em; }
+.xa-cab-stats b { color: var(--xa-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.xa-cab-stats .xa-right { text-align: right; align-items: flex-end; }
+.xa-cab-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+
+.xa-btn {
+  min-height: 44px; padding: 10px 16px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--xa-line); background: var(--xa-panel-2);
+  font: 800 13px/1 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase;
+}
+.xa-btn:hover { border-color: rgba(140, 160, 255, 0.5); }
+.xa-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.xa-btn-play {
+  --c: var(--xa-cyan);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 32%, #10132a), color-mix(in srgb, var(--c) 14%, #0b0d1f));
+  border-color: color-mix(in srgb, var(--c) 70%, transparent);
+  box-shadow: 0 0 16px -4px var(--c), inset 0 1px 0 rgba(255, 255, 255, .2);
+  color: #fff;
+}
+.xa-btn-primary { background: linear-gradient(180deg, #ff5bb3, #d81f84); border-color: #ff8cc9; color: #fff; box-shadow: 0 0 18px -4px var(--xa-pink); }
+.xa-foot { margin-top: 34px; color: var(--xa-faint); font-size: 12.5px; text-align: center; }
+.xa-foot code { font-family: var(--xa-mono); color: var(--xa-dim); }
+
+/* ----------------------------------------------------- scoreboard */
+.xa-modal {
+  position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 16px;
+  background: rgba(3, 4, 12, .76); backdrop-filter: blur(4px);
+}
+.xa-card {
+  width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto;
+  background: var(--xa-panel); border: 1px solid var(--xa-line); border-radius: var(--xa-radius);
+  padding: 20px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+}
+.xa-card h3 { margin: 0; font: 900 18px/1.2 var(--xa-mono); letter-spacing: .1em; text-transform: uppercase; }
+.xa-tabs { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }
+.xa-tab { padding: 8px 12px; border-radius: 8px; border: 1px solid var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }
+.xa-tab[aria-selected="true"] { color: #fff; border-color: var(--c, var(--xa-cyan)); box-shadow: 0 0 12px -4px var(--c, var(--xa-cyan)); }
+.xa-board { list-style: none; margin: 0; padding: 0; font: 600 14px/1.2 var(--xa-mono); }
+.xa-board li {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 8px; border-bottom: 1px solid rgba(255, 255, 255, .05);
+}
+.xa-board li:nth-child(1) .xa-rank { color: var(--xa-gold); text-shadow: 0 0 10px var(--xa-gold); }
+.xa-board li:nth-child(2) .xa-rank { color: #d9e2ff; }
+.xa-board li:nth-child(3) .xa-rank { color: #ffae6b; }
+.xa-board li.is-you { background: rgba(57, 255, 136, .08); border-radius: 8px; }
+.xa-rank { font-weight: 900; color: var(--xa-dim); }
+.xa-who { min-width: 0; }
+.xa-who b { display: block; }
+.xa-who small { color: var(--xa-faint); font-size: 11px; }
+.xa-pts { font-weight: 900; font-variant-numeric: tabular-nums; }
+.xa-empty, .xa-error { padding: 22px 8px; text-align: center; color: var(--xa-dim); }
+.xa-error { color: var(--xa-gold); }
+.xa-card-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px; flex-wrap: wrap; color: var(--xa-faint); font-size: 12px; }
+
+/* ------------------------------------------------------ game view */
+.xa-game {
+  position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column;
+  background: radial-gradient(900px 500px at 50% 40%, #0c1030, var(--xa-bg));
+}
+.xa-hud {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-bottom: 1px solid var(--xa-line); background: rgba(5, 6, 15, .75);
+  font: 800 13px/1 var(--xa-mono); letter-spacing: .08em;
+}
+.xa-hud .xa-title { text-transform: uppercase; color: #fff; text-shadow: 0 0 10px var(--c); white-space: nowrap; }
+.xa-hud-stats { display: flex; gap: 18px; margin-left: auto; align-items: baseline; }
+.xa-hud-stats div { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.xa-hud-stats small { font-size: 9px; color: var(--xa-faint); letter-spacing: .14em; }
+.xa-hud-stats b { font-size: 16px; font-variant-numeric: tabular-nums; }
+#xa-score { color: #fff; text-shadow: 0 0 10px var(--c); }
+.xa-status { padding: 6px 14px; min-height: 26px; text-align: center; font: 700 11px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-dim); }
+.xa-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; padding: 6px 10px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.xa-stage canvas { display: block; border-radius: 10px; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 0 40px -12px var(--c); }
+.xa-overlay {
+  position: absolute; inset: 0; display: grid; place-items: center; z-index: 5; padding: 16px;
+  background: rgba(3, 4, 12, .72);
+}
+.xa-countdown { font: 900 72px/1 var(--xa-mono); color: #fff; text-shadow: 0 0 20px var(--c), 0 0 50px var(--c); pointer-events: none; background: none; }
+.xa-over { width: min(420px, 100%); text-align: center; }
+.xa-over h3 { margin: 0; font: 900 26px/1 var(--xa-mono); letter-spacing: .14em; color: #fff; text-shadow: 0 0 12px var(--xa-pink); }
+.xa-final { margin: 14px 0 4px; font: 900 44px/1 var(--xa-mono); font-variant-numeric: tabular-nums; color: #fff; text-shadow: 0 0 16px var(--c); }
+.xa-badge { display: inline-block; margin-top: 6px; padding: 5px 10px; border-radius: 999px; font: 800 11px/1 var(--xa-mono); letter-spacing: .1em; background: rgba(57, 255, 136, .14); color: var(--xa-green); }
+.xa-verdict { margin: 12px 0 0; color: var(--xa-dim); font-size: 14px; }
+.xa-verdict b { color: var(--xa-gold); }
+.xa-submit { margin-top: 14px; padding: 14px; border-radius: 12px; border: 1px solid var(--xa-line); background: var(--xa-panel); text-align: left; }
+.xa-submit label { display: block; font: 700 11px/1 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); margin-bottom: 6px; }
+.xa-name {
+  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--xa-line);
+  background: #070919; color: #fff; font: 800 18px/1 var(--xa-mono); letter-spacing: .12em; text-transform: uppercase;
+}
+.xa-name:focus { outline: 2px solid var(--xa-cyan); outline-offset: 1px; }
+.xa-submit .xa-btn { width: 100%; margin-top: 10px; }
+.xa-note { margin: 8px 0 0; font-size: 12px; color: var(--xa-faint); }
+.xa-msg { margin: 10px 0 0; font-size: 13px; }
+.xa-msg.is-ok { color: var(--xa-green); }
+.xa-msg.is-err { color: var(--xa-red); }
+.xa-msg a { color: var(--xa-cyan); }
+.xa-over-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+.xa-pause h3 { text-align: center; }
+
+/* touch pads */
+.xa-pads { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 14px calc(12px + env(safe-area-inset-bottom)); }
+.xa-pad-group { display: grid; gap: 8px; }
+.xa-pad {
+  width: 60px; height: 60px; border-radius: 16px; border: 1px solid rgba(140, 160, 255, .3);
+  background: rgba(23, 27, 56, .85); font: 900 18px/1 var(--xa-mono); color: #fff; touch-action: none;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+.xa-pad.is-down { background: color-mix(in srgb, var(--c) 40%, #171b38); box-shadow: 0 0 18px -4px var(--c); }
+.xa-pad.xa-wide { font-size: 12px; letter-spacing: .06em; }
+.xa-dpad { grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(2, 60px); }
+.xa-dpad .up { grid-column: 2; grid-row: 1; }
+.xa-dpad .left { grid-column: 1; grid-row: 2; }
+.xa-dpad .down { grid-column: 2; grid-row: 2; }
+.xa-dpad .right { grid-column: 3; grid-row: 2; }
+.xa-pad-hint { flex: 1; text-align: center; font: 700 12px/1.3 var(--xa-mono); letter-spacing: .12em; color: var(--xa-faint); }
+.xa-row { grid-auto-flow: column; align-self: end; }
+.xa-grid2 { grid-template-columns: repeat(2, auto); }
+
+@media (max-width: 520px) {
+  .xa-hud { gap: 8px; padding: 8px 10px; }
+  .xa-hud .xa-title { display: none; }
+  .xa-hud-stats { gap: 12px; }
+  .xa-pad { width: 54px; height: 54px; }
+  .xa-pads { padding-left: 10px; padding-right: 10px; }
+  .xa-dpad { grid-template-columns: repeat(3, 54px); grid-template-rows: repeat(2, 54px); }
+  .xa-cabinets { gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .xa-logo span:last-child, .xa-insert { animation: none; }
+  .xa-cab { transition: none; }
+}
+</style>
+<div id="xa-root"></div>
+<script>/* arcade-kit.js */
+/*
+ * Xtrata Arcade — shared kit (leaf module)
+ *
+ * Every game cartridge and the room itself depend on this module. It owns:
+ *   - the game registry            XA.registerGame(def) / XA.games
+ *   - input (keys, touch pads, swipes, hold)   XA.createInput(el)
+ *   - a tiny WebAudio synth        XA.audio
+ *   - particles / floating text    XA.createFx()
+ *   - small helpers                XA.util
+ *
+ * No network access and no wallet code live here, so a cartridge can never
+ * reach the score contract except through the room.
+ */
+(function (root) {
+  'use strict';
+  if (root.XA && root.XA.kitVersion) return;
+
+  var KIT_VERSION = '1.0.0';
+
+  /* ------------------------------------------------------------ util */
+  function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  // mulberry32 — small seeded RNG so a run can be replayed from its seed.
+  function rng(seed) {
+    var s = (seed >>> 0) || 0x9e3779b9;
+    var f = function () {
+      s = (s + 0x6d2b79f5) >>> 0;
+      var t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    f.int = function (n) { return Math.floor(f() * n); };
+    f.range = function (a, b) { return a + f() * (b - a); };
+    f.pick = function (arr) { return arr[Math.floor(f() * arr.length)]; };
+    return f;
+  }
+  function newSeed() {
+    try {
+      var a = new Uint32Array(1);
+      root.crypto.getRandomValues(a);
+      return a[0] >>> 0;
+    } catch (e) {
+      return (Date.now() ^ (Math.random() * 4294967296)) >>> 0;
+    }
+  }
+  function store(key, value) {
+    try {
+      if (value === undefined) {
+        var raw = root.localStorage.getItem('xa:' + key);
+        return raw == null ? null : JSON.parse(raw);
+      }
+      root.localStorage.setItem('xa:' + key, JSON.stringify(value));
+    } catch (e) { /* storage may be blocked in sandboxed frames */ }
+    return null;
+  }
+  function fmt(n) {
+    return String(Math.floor(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+  function glowText(ctx, text, x, y, size, color, align, weight) {
+    ctx.save();
+    ctx.font = (weight || 800) + ' ' + size + 'px "Press Start 2P", ui-monospace, Menlo, Consolas, monospace';
+    ctx.textAlign = align || 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = color;
+    ctx.shadowBlur = size * 0.6;
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.globalAlpha = 0.35;
+    ctx.fillText(text, x, y);
+    ctx.restore();
+  }
+  function roundRect(ctx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  /* ----------------------------------------------------------- audio */
+  var audio = (function () {
+    var ctx = null;
+    var master = null;
+    var muted = !!store('muted');
+    function ensure() {
+      if (ctx) return ctx;
+      var AC = root.AudioContext || root.webkitAudioContext;
+      if (!AC) return null;
+      try {
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 0.32;
+        master.connect(ctx.destination);
+      } catch (e) { ctx = null; }
+      return ctx;
+    }
+    function unlock() {
+      var c = ensure();
+      if (c && c.state === 'suspended' && c.resume) c.resume();
+    }
+    // tone(freq, dur, {type, vol, slide, delay})
+    function tone(freq, dur, o) {
+      o = o || {};
+      var c = ensure();
+      if (!c || muted) return;
+      var t0 = c.currentTime + (o.delay || 0);
+      var osc = c.createOscillator();
+      var g = c.createGain();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(freq, t0);
+      if (o.slide) osc.frequency.exponentialRampToValueAtTime(Math.max(20, freq * o.slide), t0 + dur);
+      var v = o.vol == null ? 0.25 : o.vol;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(v, t0 + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      osc.connect(g); g.connect(master);
+      osc.start(t0); osc.stop(t0 + dur + 0.02);
+    }
+    function noise(dur, o) {
+      o = o || {};
+      var c = ensure();
+      if (!c || muted) return;
+      var len = Math.max(1, Math.floor(c.sampleRate * dur));
+      var buf = c.createBuffer(1, len, c.sampleRate);
+      var d = buf.getChannelData(0);
+      for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      var filter = c.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = o.cutoff || 1800;
+      var g = c.createGain();
+      g.gain.value = o.vol == null ? 0.3 : o.vol;
+      src.connect(filter); filter.connect(g); g.connect(master);
+      src.start(c.currentTime + (o.delay || 0));
+    }
+    function arp(notes, step, o) {
+      for (var i = 0; i < notes.length; i++) {
+        tone(notes[i], step * 1.4, Object.assign({}, o, { delay: i * step }));
+      }
+    }
+    function setMuted(m) {
+      muted = !!m;
+      store('muted', muted);
+      if (master) master.gain.value = muted ? 0 : 0.32;
+    }
+    return {
+      unlock: unlock, tone: tone, noise: noise, arp: arp,
+      isMuted: function () { return muted; }, setMuted: setMuted
+    };
+  })();
+
+  /* -------------------------------------------------------------- fx */
+  function createFx() {
+    var parts = [];
+    var texts = [];
+    return {
+      burst: function (x, y, color, n, speed, life) {
+        n = n || 14; speed = speed || 120; life = life || 0.6;
+        for (var i = 0; i < n; i++) {
+          var a = Math.random() * Math.PI * 2;
+          var s = speed * (0.35 + Math.random() * 0.65);
+          parts.push({ x: x, y: y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+            life: life * (0.6 + Math.random() * 0.4), max: life, color: color,
+            size: 1.5 + Math.random() * 2.5 });
+        }
+        if (parts.length > 900) parts.splice(0, parts.length - 900);
+      },
+      trail: function (x, y, color, vx, vy) {
+        parts.push({ x: x, y: y, vx: vx || 0, vy: vy || 0, life: 0.35, max: 0.35, color: color, size: 2 });
+      },
+      text: function (x, y, str, color, size) {
+        texts.push({ x: x, y: y, str: str, color: color || '#fff', life: 0.9, size: size || 14 });
+      },
+      update: function (dt) {
+        var i;
+        for (i = parts.length - 1; i >= 0; i--) {
+          var p = parts[i];
+          p.life -= dt;
+          if (p.life <= 0) { parts.splice(i, 1); continue; }
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.vx *= 0.96; p.vy *= 0.96;
+        }
+        for (i = texts.length - 1; i >= 0; i--) {
+          texts[i].life -= dt;
+          texts[i].y -= 28 * dt;
+          if (texts[i].life <= 0) texts.splice(i, 1);
+        }
+      },
+      draw: function (ctx) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (var i = 0; i < parts.length; i++) {
+          var p = parts[i];
+          ctx.globalAlpha = Math.max(0, p.life / p.max);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+        }
+        ctx.restore();
+        for (var j = 0; j < texts.length; j++) {
+          var t = texts[j];
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, t.life * 2);
+          glowText(ctx, t.str, t.x, t.y, t.size, t.color);
+          ctx.restore();
+        }
+      },
+      clear: function () { parts.length = 0; texts.length = 0; }
+    };
+  }
+
+  /* ----------------------------------------------------------- input */
+  var KEYMAP = {
+    ArrowUp: 'up', KeyW: 'up',
+    ArrowDown: 'down', KeyS: 'down',
+    ArrowLeft: 'left', KeyA: 'left',
+    ArrowRight: 'right', KeyD: 'right',
+    Space: 'a',
+    KeyZ: 'b', KeyJ: 'b',
+    KeyX: 'c', KeyK: 'c',
+    KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
+    Enter: 'start',
+    Escape: 'pause', KeyP: 'pause'
+  };
+
+  // One input object per play session. `surface` receives pointer events
+  // (hold + swipe); on-screen pads call press()/release() directly.
+  function createInput(surface) {
+    var held = {};
+    var hitQ = {};
+    var swipes = [];
+    var pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null, swiped: false };
+    var listeners = [];
+
+    function press(name) {
+      if (!held[name]) hitQ[name] = true;
+      held[name] = true;
+    }
+    function release(name) { held[name] = false; }
+    function on(target, type, fn, opts) {
+      target.addEventListener(type, fn, opts);
+      listeners.push(function () { target.removeEventListener(type, fn, opts); });
+    }
+
+    on(root, 'keydown', function (e) {
+      var name = KEYMAP[e.code];
+      if (!name) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      press(name);
+    });
+    on(root, 'keyup', function (e) {
+      var name = KEYMAP[e.code];
+      if (name) release(name);
+    });
+    on(root, 'blur', function () { held = {}; pointer.down = false; });
+
+    if (surface) {
+      var SWIPE = 24;
+      on(surface, 'pointerdown', function (e) {
+        // Leave real UI (overlay buttons, name input) alone: capturing the
+        // pointer here would retarget their click to the surface.
+        var t = e.target;
+        if (t && t !== surface && t.closest && t.closest('button, a, input, select, textarea, [data-xa-ui]')) return;
+        audio.unlock();
+        pointer.down = true; pointer.id = e.pointerId; pointer.swiped = false;
+        pointer.sx = pointer.x = e.clientX; pointer.sy = pointer.y = e.clientY;
+        pointer.t = performance.now();
+        press('hold');
+        try { surface.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      }, { passive: false });
+      on(surface, 'pointermove', function (e) {
+        if (!pointer.down || e.pointerId !== pointer.id) return;
+        pointer.x = e.clientX; pointer.y = e.clientY;
+        var dx = pointer.x - pointer.sx, dy = pointer.y - pointer.sy;
+        if (Math.abs(dx) > SWIPE || Math.abs(dy) > SWIPE) {
+          var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+          swipes.push(dir);
+          pointer.swiped = true;
+          pointer.sx = pointer.x; pointer.sy = pointer.y;
+        }
+      });
+      var end = function (e) {
+        if (e.pointerId !== pointer.id) return;
+        if (pointer.down && !pointer.swiped && performance.now() - pointer.t < 260) swipes.push('tap');
+        pointer.down = false;
+        release('hold');
+      };
+      on(surface, 'pointerup', end);
+      on(surface, 'pointercancel', end);
+    }
+
+    return {
+      // held: is the virtual button down right now?
+      held: function (name) { return !!held[name]; },
+      // hit: was it pressed since the last endFrame()? (edge-triggered)
+      hit: function (name) { return !!hitQ[name]; },
+      takeSwipes: function () { var s = swipes; swipes = []; return s; },
+      pointer: pointer,
+      press: press,
+      release: release,
+      endFrame: function () { hitQ = {}; },
+      reset: function () { held = {}; hitQ = {}; swipes = []; },
+      destroy: function () { listeners.forEach(function (off) { off(); }); listeners = []; }
+    };
+  }
+
+  /* -------------------------------------------------------- registry */
+  var games = [];
+  function registerGame(def) {
+    var required = ['id', 'title', 'create', 'attract', 'size'];
+    for (var i = 0; i < required.length; i++) {
+      if (!def[required[i]]) throw new Error('Game is missing "' + required[i] + '"');
+    }
+    if (!/^[a-z0-9_]{3,32}$/.test(def.id)) throw new Error('Invalid game id ' + def.id);
+    if (games.some(function (g) { return g.id === def.id; })) return;
+    def.mode = def.mode === 'time' ? 'time' : 'score';
+    games.push(def);
+    games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });
+    if (typeof root.dispatchEvent === 'function') {
+      try { root.dispatchEvent(new CustomEvent('xa:game-registered', { detail: def.id })); } catch (e) {}
+    }
+  }
+
+  root.XA = {
+    kitVersion: KIT_VERSION,
+    games: games,
+    registerGame: registerGame,
+    createInput: createInput,
+    createFx: createFx,
+    audio: audio,
+    util: {
+      clamp: clamp, lerp: lerp, rng: rng, newSeed: newSeed, store: store,
+      fmt: fmt, glowText: glowText, roundRect: roundRect
+    }
+  };
+})(typeof window !== 'undefined' ? window : this);
+</script>
+<script>/* score-client.js */
+/*
+ * Xtrata Arcade — score client (leaf module)
+ *
+ * The only module that talks to the network or a wallet. Shared by every
+ * cartridge in the room; each game is just a different `game-id` on the same
+ * contract (xtrata-arcade-scores-v1-3 by default).
+ *
+ * Reads:   Hiro `call-read` → get-top10 / get-fee-unit, decoded here.
+ * Writes:  submit-score, signed in this priority order:
+ *   1. Host bridge, narrow method   `xtrata_submitArcadeScore`  (host builds tx)
+ *   2. Host bridge, generic         `stx_callContract`          (runtime page)
+ *   3. Direct wallet provider       (only when the page is top-level)
+ *   4. Nothing can sign here        → hand the player the secure-runtime link
+ *
+ * Every write is Deny-mode with a single STX post-condition capped at the
+ * contract's current fee, so a signature can never move more than the fee.
+ *
+ * A read that FAILED is reported as { ok:false } — never as an empty board.
+ */
+(function (root) {
+  'use strict';
+  if (root.XAScores) return;
+
+  var CFG = {
+    network: 'mainnet',
+    contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-arcade-scores-v1-3',
+    readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    apiBases: null,               // default: same-origin /hiro proxy (if any) then Hiro
+    runtimeOrigin: 'https://xtrata.xyz',
+    contentContractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3',
+    parentTokenId: 0,
+    boardTtlMs: 45000,
+    bridgeTimeoutMs: 170000,
+    appName: 'xtrata-arcade'
+  };
+
+  var HEX = '0123456789abcdef';
+  var C32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+
+  function err(message, code) {
+    var e = new Error(message);
+    if (code !== undefined) e.code = code;
+    return e;
+  }
+  function log() {
+    try {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[xa:scores]');
+      console.log.apply(console, args);
+    } catch (e) {}
+  }
+
+  /* ---------------------------------------------------------- bytes */
+  function hexToBytes(hex) {
+    var clean = String(hex || '').replace(/^0x/i, '');
+    if (clean.length % 2) throw err('Invalid hex length');
+    var out = new Uint8Array(clean.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(clean.substr(i * 2, 2), 16);
+    return out;
+  }
+  function bytesToHex(bytes) {
+    var s = '';
+    for (var i = 0; i < bytes.length; i++) s += HEX[bytes[i] >> 4] + HEX[bytes[i] & 15];
+    return s;
+  }
+  function asciiBytes(str) {
+    var out = new Uint8Array(str.length);
+    for (var i = 0; i < str.length; i++) out[i] = str.charCodeAt(i) & 0x7f;
+    return out;
+  }
+
+  /* --------------------------------------------------------- sha256 */
+  var K = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ]);
+  function sha256(msg) {
+    var h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]);
+    var l = msg.length;
+    var padLen = ((l + 9 + 63) >> 6) << 6;
+    var buf = new Uint8Array(padLen);
+    buf.set(msg); buf[l] = 0x80;
+    var bits = l * 8;
+    buf[padLen - 4] = (bits >>> 24) & 255; buf[padLen - 3] = (bits >>> 16) & 255;
+    buf[padLen - 2] = (bits >>> 8) & 255; buf[padLen - 1] = bits & 255;
+    var w = new Uint32Array(64);
+    for (var off = 0; off < padLen; off += 64) {
+      for (var i = 0; i < 16; i++) {
+        w[i] = (buf[off + i * 4] << 24) | (buf[off + i * 4 + 1] << 16) | (buf[off + i * 4 + 2] << 8) | buf[off + i * 4 + 3];
+      }
+      for (i = 16; i < 64; i++) {
+        var a0 = w[i - 15], a1 = w[i - 2];
+        var s0 = ((a0 >>> 7) | (a0 << 25)) ^ ((a0 >>> 18) | (a0 << 14)) ^ (a0 >>> 3);
+        var s1 = ((a1 >>> 17) | (a1 << 15)) ^ ((a1 >>> 19) | (a1 << 13)) ^ (a1 >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+      var a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], hh = h[7];
+      for (i = 0; i < 64; i++) {
+        var S1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+        var ch = (e & f) ^ (~e & g);
+        var t1 = (hh + S1 + ch + K[i] + w[i]) | 0;
+        var S0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+        var mj = (a & b) ^ (a & c) ^ (b & c);
+        var t2 = (S0 + mj) | 0;
+        hh = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += hh;
+    }
+    var out = new Uint8Array(32);
+    for (i = 0; i < 8; i++) {
+      out[i * 4] = h[i] >>> 24; out[i * 4 + 1] = (h[i] >>> 16) & 255;
+      out[i * 4 + 2] = (h[i] >>> 8) & 255; out[i * 4 + 3] = h[i] & 255;
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------ c32 */
+  function c32encode(bytes) {
+    var lead = 0;
+    while (lead < bytes.length && bytes[lead] === 0) lead++;
+    var n = BigInt('0x' + (bytesToHex(bytes) || '0'));
+    var s = '';
+    while (n > 0n) { s = C32[Number(n % 32n)] + s; n = n / 32n; }
+    for (var i = 0; i < lead; i++) s = '0' + s;
+    return s;
+  }
+  function c32address(version, hash160) {
+    var payload = new Uint8Array(21);
+    payload[0] = version; payload.set(hash160, 1);
+    var check = sha256(sha256(payload)).slice(0, 4);
+    var data = new Uint8Array(24);
+    data.set(hash160); data.set(check, 20);
+    return 'S' + C32[version] + c32encode(data);
+  }
+  function c32decodeAddress(address) {
+    var a = String(address || '').trim().toUpperCase();
+    if (!/^S[0-9A-Z]{20,41}$/.test(a)) throw err('Invalid Stacks address');
+    var version = C32.indexOf(a[1]);
+    var body = a.slice(2);
+    var n = 0n;
+    for (var i = 0; i < body.length; i++) {
+      var v = C32.indexOf(body[i]);
+      if (v < 0) throw err('Invalid Stacks address');
+      n = n * 32n + BigInt(v);
+    }
+    var bytes = hexToBytes(n.toString(16).padStart(48, '0'));
+    var hash160 = bytes.slice(0, 20);
+    if (c32address(version, hash160) !== a) throw err('Stacks address checksum mismatch');
+    return { version: version, hash160: hash160 };
+  }
+  function isMainnetAddress(a) {
+    try { c32decodeAddress(a); } catch (e) { return false; }
+    return /^S[PM]/.test(String(a).toUpperCase());
+  }
+
+  /* ---------------------------------------------------- Clarity codec */
+  function cvUint(value) {
+    var n = BigInt(value);
+    if (n < 0n) throw err('uint cannot be negative');
+    return '0x01' + n.toString(16).padStart(32, '0');
+  }
+  function cvAscii(str) {
+    var s = String(str);
+    if (!/^[\x20-\x7e]*$/.test(s)) throw err('string-ascii must be printable ASCII');
+    return '0x0d' + s.length.toString(16).padStart(8, '0') + bytesToHex(asciiBytes(s));
+  }
+  // Minimal deserializer: enough for the leaderboard contract's return types.
+  function decodeCV(hex) {
+    var b = hexToBytes(hex);
+    var p = 0;
+    function u32() { var v = ((b[p] << 24) | (b[p + 1] << 16) | (b[p + 2] << 8) | b[p + 3]) >>> 0; p += 4; return v; }
+    function big(nbytes, signed) {
+      var v = BigInt('0x' + bytesToHex(b.slice(p, p + nbytes)));
+      if (signed && b[p] & 0x80) v -= (1n << BigInt(nbytes * 8));
+      p += nbytes;
+      return v;
+    }
+    function read() {
+      var t = b[p++];
+      switch (t) {
+        case 0x00: return { type: 'int', value: big(16, true) };
+        case 0x01: return { type: 'uint', value: big(16, false) };
+        case 0x02: { var n = u32(); var v = b.slice(p, p + n); p += n; return { type: 'buffer', value: v }; }
+        case 0x03: return { type: 'bool', value: true };
+        case 0x04: return { type: 'bool', value: false };
+        case 0x05: { var ver = b[p++]; var h = b.slice(p, p + 20); p += 20;
+          return { type: 'principal', value: c32address(ver, h) }; }
+        case 0x06: { var ver2 = b[p++]; var h2 = b.slice(p, p + 20); p += 20;
+          var ln = b[p++]; var name = String.fromCharCode.apply(null, b.slice(p, p + ln)); p += ln;
+          return { type: 'principal', value: c32address(ver2, h2) + '.' + name }; }
+        case 0x07: return { type: 'ok', value: read() };
+        case 0x08: return { type: 'err', value: read() };
+        case 0x09: return { type: 'none', value: null };
+        case 0x0a: return { type: 'some', value: read() };
+        case 0x0b: { var len = u32(); var arr = []; for (var i = 0; i < len; i++) arr.push(read()); return { type: 'list', value: arr }; }
+        case 0x0c: { var cnt = u32(); var obj = {};
+          for (var j = 0; j < cnt; j++) {
+            var kl = b[p++]; var key = String.fromCharCode.apply(null, b.slice(p, p + kl)); p += kl;
+            obj[key] = read();
+          }
+          return { type: 'tuple', value: obj }; }
+        case 0x0d: { var sl = u32(); var s = String.fromCharCode.apply(null, b.slice(p, p + sl)); p += sl; return { type: 'ascii', value: s }; }
+        case 0x0e: { var ul = u32(); var ub = b.slice(p, p + ul); p += ul;
+          return { type: 'utf8', value: new TextDecoder().decode(ub) }; }
+        default: throw err('Unsupported Clarity type 0x' + t.toString(16));
+      }
+    }
+    return read();
+  }
+
+  /* STX post-condition, wire format (for direct wallet routes).
+     type 0x00 STX | principal 0x02 standard(version,hash160) | code | u64 amount */
+  var CONDITION_LTE = 0x05;
+  function stxPostConditionHex(address, amount) {
+    var d = c32decodeAddress(address);
+    var amt = BigInt(amount).toString(16).padStart(16, '0');
+    return '0x00' + '02' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160) +
+      CONDITION_LTE.toString(16).padStart(2, '0') + amt;
+  }
+
+  /* ---------------------------------------------------------- reads */
+  function hasRealOrigin() {
+    try { return /^https?:$/.test(root.location.protocol) && root.location.origin !== 'null'; }
+    catch (e) { return false; }
+  }
+  function apiBases() {
+    if (Array.isArray(CFG.apiBases) && CFG.apiBases.length) return CFG.apiBases.slice();
+    var out = [];
+    if (hasRealOrigin() && /xtrata\.xyz$/.test(root.location.hostname)) {
+      out.push(root.location.origin + '/hiro/' + CFG.network);
+    }
+    out.push(CFG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so');
+    return out;
+  }
+  async function callRead(fn, args) {
+    var bases = apiBases();
+    var last = null;
+    for (var i = 0; i < bases.length; i++) {
+      var url = bases[i].replace(/\/+$/, '') + '/v2/contracts/call-read/' +
+        CFG.contractAddress + '/' + CFG.contractName + '/' + fn;
+      try {
+        var res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sender: CFG.readSender, arguments: args || [] })
+        });
+        if (!res.ok) throw err('HTTP ' + res.status);
+        var body = await res.json();
+        if (!body || body.okay !== true || typeof body.result !== 'string') {
+          throw err(body && body.cause ? String(body.cause) : 'read-only call failed');
+        }
+        return decodeCV(body.result);
+      } catch (e) { last = e; }
+    }
+    throw last || err('read-only call failed');
+  }
+
+  function modeUint(mode) { return mode === 'time' ? 1 : 0; }
+
+  var boardCache = {};
+  // → { ok:true, entries:[{rank,name,player,score,updatedAt}], at } | { ok:false, error }
+  async function getTop10(gameId, mode, force) {
+    var key = gameId + ':' + modeUint(mode);
+    var hit = boardCache[key];
+    if (!force && hit && hit.ok && Date.now() - hit.at < CFG.boardTtlMs) return hit;
+    try {
+      var cv = await callRead('get-top10', [cvAscii(gameId), cvUint(modeUint(mode))]);
+      if (cv.type !== 'ok' || cv.value.type !== 'list') throw err('unexpected get-top10 shape');
+      var entries = [];
+      cv.value.value.forEach(function (slot, idx) {
+        if (slot.type !== 'some') return;
+        var t = slot.value.value;
+        entries.push({
+          rank: idx + 1,
+          name: t.name.value,
+          player: t.player.value,
+          score: Number(t.score.value),
+          updatedAt: Number(t['updated-at'].value)
+        });
+      });
+      var out = { ok: true, entries: entries, at: Date.now() };
+      boardCache[key] = out;
+      return out;
+    } catch (e) {
+      log('board read failed', gameId, e && e.message);
+      // Keep serving a stale good board, but flag it.
+      if (hit && hit.ok) return Object.assign({}, hit, { stale: true });
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+  // 'yes' | 'no' | 'unknown' — unknown when the board could not be read.
+  function qualifies(board, score, mode) {
+    if (!board || !board.ok) return 'unknown';
+    if (!(score > 0)) return 'no';
+    if (board.entries.length < 10) return 'yes';
+    var last = board.entries[board.entries.length - 1].score;
+    return (mode === 'time' ? score < last : score > last) ? 'yes' : 'no';
+  }
+  var feeCache = null;
+  async function getFee() {
+    if (feeCache && Date.now() - feeCache.at < 60000) return feeCache;
+    try {
+      var cv = await callRead('get-fee-unit', []);
+      if (cv.type !== 'ok' || cv.value.type !== 'uint') throw err('unexpected fee shape');
+      feeCache = { ok: true, value: cv.value.value.toString(), at: Date.now() };
+      return feeCache;
+    } catch (e) {
+      return { ok: false, error: e && e.message ? e.message : String(e) };
+    }
+  }
+
+  /* --------------------------------------------------- host bridge */
+  var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };
+  function bridgeTargets() {
+    var out = [];
+    try { if (root.opener && root.opener !== root) out.push(root.opener); } catch (e) {}
+    try { if (root.parent && root.parent !== root) out.push(root.parent); } catch (e) {}
+    try { if (root.top && root.top !== root && out.indexOf(root.top) < 0) out.push(root.top); } catch (e) {}
+    return out;
+  }
+  function postOrigin() {
+    if (bridge.hostOrigin) return bridge.hostOrigin;
+    return hasRealOrigin() ? root.location.origin : '*';
+  }
+  function listen() {
+    if (bridge.listening) return;
+    bridge.listening = true;
+    root.addEventListener('message', function (ev) {
+      var d = ev && ev.data;
+      if (!d || typeof d !== 'object') return;
+      if (d.type === 'xtrata:wallet:hello-ack') {
+        if (bridge.token || d.nonce !== bridge.nonce || typeof d.bridgeToken !== 'string') return;
+        bridge.token = d.bridgeToken;
+        bridge.hostOrigin = ev.origin && ev.origin !== 'null' ? ev.origin : '';
+        log('host bridge granted by', bridge.hostOrigin || '(opaque origin)');
+        emit();
+        return;
+      }
+      if (d.type !== 'xtrata:wallet:response') return;
+      var okOrigin = (bridge.hostOrigin && ev.origin === bridge.hostOrigin) ||
+        (hasRealOrigin() && ev.origin === root.location.origin);
+      if (!okOrigin) return;
+      var entry = bridge.pending[d.requestId];
+      if (!entry) return;
+      delete bridge.pending[d.requestId];
+      clearTimeout(entry.timer);
+      if (d.ok) entry.resolve(d.result);
+      else {
+        var detail = d.error || {};
+        entry.reject(err(detail.message || 'Host wallet bridge rejected the request.',
+          typeof detail.code === 'number' ? detail.code : undefined));
+      }
+    });
+  }
+  function hello() {
+    var targets = bridgeTargets();
+    if (!targets.length || bridge.token) return;
+    if (!bridge.nonce) {
+      try { bridge.nonce = root.crypto.randomUUID(); }
+      catch (e) { bridge.nonce = 'xa-' + Date.now().toString(36) + Math.random().toString(36).slice(2); }
+    }
+    bridge.tries++;
+    targets.forEach(function (t) {
+      try {
+        t.postMessage({ type: 'xtrata:wallet:hello', app: CFG.appName, version: 'v1',
+          nonce: bridge.nonce, wants: ['wallet-bridge', 'arcade-score'] }, '*');
+      } catch (e) {}
+    });
+    if (bridge.tries < 6) setTimeout(hello, 600 * bridge.tries);
+  }
+  function bridgeRequest(method, params, timeoutMs) {
+    if (!bridge.token) return Promise.reject(err('No host wallet bridge.', -32001));
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.reject(err('No host window.', -32001));
+    return new Promise(function (resolve, reject) {
+      var id = 'xa-' + (++bridge.seq) + '-' + Date.now().toString(36);
+      var timer = setTimeout(function () {
+        delete bridge.pending[id];
+        reject(err('No wallet response. Check your wallet history before retrying.', -32002));
+      }, timeoutMs || CFG.bridgeTimeoutMs);
+      bridge.pending[id] = { resolve: resolve, reject: reject, timer: timer };
+      var msg = { type: 'xtrata:wallet:request', requestId: id, bridgeToken: bridge.token,
+        method: method, params: params == null ? null : params };
+      targets.forEach(function (t) { try { t.postMessage(msg, postOrigin()); } catch (e) {} });
+    });
+  }
+
+  /* ------------------------------------------------- direct wallets */
+  function isTopLevel() {
+    try { return root.top === root; } catch (e) { return false; }
+  }
+  function directProvider() {
+    if (!isTopLevel()) return null;
+    if (root.LeatherProvider && typeof root.LeatherProvider.request === 'function') {
+      return { kind: 'leather', p: root.LeatherProvider };
+    }
+    var x = root.XverseProviders && root.XverseProviders.BitcoinProvider;
+    if (x && typeof x.request === 'function') return { kind: 'xverse', p: x };
+    return null;
+  }
+  function unwrap(r) {
+    if (r && r.error) throw err(r.error.message || 'Wallet error', r.error.code);
+    if (r && r.status === 'error') throw err((r.error && r.error.message) || 'Wallet error');
+    return r && r.result !== undefined ? r.result : r;
+  }
+  function findStxAddress(payload) {
+    var found = '';
+    (function walk(v, depth) {
+      if (found || depth > 6 || v == null) return;
+      if (typeof v === 'string') {
+        if (/^S[PMTN][0-9A-Z]{20,41}$/.test(v)) {
+          try { c32decodeAddress(v); found = v; } catch (e) { /* not an address */ }
+        }
+        return;
+      }
+      if (typeof v !== 'object') return;
+      // Prefer entries explicitly marked as STX / stacks.
+      if ((v.symbol === 'STX' || v.purpose === 'stacks') && typeof v.address === 'string') {
+        found = v.address; return;
+      }
+      Object.keys(v).forEach(function (k) { walk(v[k], depth + 1); });
+    })(payload, 0);
+    return found;
+  }
+
+  /* --------------------------------------------------------- state */
+  var state = { address: '', via: '' };
+  var subs = [];
+  function emit() { subs.forEach(function (fn) { try { fn(status()); } catch (e) {} }); }
+  function status() {
+    var route = bridge.token ? 'host' : directProvider() ? 'direct' : 'none';
+    return { route: route, address: state.address, network: CFG.network,
+      contract: CFG.contractAddress + '.' + CFG.contractName };
+  }
+
+  async function connect() {
+    var s = status();
+    var result;
+    if (s.route === 'host') {
+      result = await bridgeRequest('wallet_connect', { app: CFG.appName }, 120000);
+      state.via = 'host';
+    } else if (s.route === 'direct') {
+      var d = directProvider();
+      if (d.kind === 'leather') result = unwrap(await d.p.request('getAddresses'));
+      else result = unwrap(await d.p.request('wallet_connect', {
+        addresses: ['stacks'], message: 'Connect to Xtrata Arcade to post high scores.' }));
+      state.via = d.kind;
+    } else {
+      throw err('No wallet is reachable from here. Open the arcade on xtrata.xyz.', 4900);
+    }
+    var address = findStxAddress(result);
+    if (!address) throw err('The wallet did not return a Stacks address.');
+    if (CFG.network === 'mainnet' && !/^S[PM]/.test(address)) {
+      throw err('Switch your wallet to Stacks mainnet and connect again.');
+    }
+    state.address = address;
+    emit();
+    return address;
+  }
+  function disconnect() { state.address = ''; state.via = ''; emit(); }
+
+  function cleanName(name) {
+    return String(name || '').replace(/[^A-Za-z0-9_.\- ]/g, '').trim().slice(0, 12);
+  }
+  function runtimeUrl() {
+    // Without a minted parent id there is no runtime page to deep-link to yet.
+    if (!(Number(CFG.parentTokenId) > 0)) return CFG.runtimeOrigin.replace(/\/+$/, '') + '/';
+    var u = CFG.runtimeOrigin.replace(/\/+$/, '') + '/runtime/?contractId=' +
+      encodeURIComponent(CFG.contentContractId) + '&network=' + CFG.network;
+    if (Number(CFG.parentTokenId) > 0) u += '&tokenId=' + CFG.parentTokenId;
+    return u;
+  }
+  function openRuntime() {
+    var url = runtimeUrl();
+    if (!(Number(CFG.parentTokenId) > 0)) return url;
+    bridgeTargets().forEach(function (t) {
+      try {
+        t.postMessage({ type: 'xtrata:arcade:wallet-intent', intent: 'open-runtime',
+          payload: { runtimeUrl: url }, bridgeToken: bridge.token || '' }, postOrigin());
+      } catch (e) {}
+    });
+    return url;
+  }
+  function txidOf(r) {
+    if (!r) return '';
+    if (typeof r === 'string') return r;
+    return r.txid || r.txId || (r.result && (r.result.txid || r.result.txId)) || '';
+  }
+
+  /*
+   * submit({ gameId, score, name, mode }) →
+   *   { ok:true, txid, route } |
+   *   { ok:false, needsRuntime:true, runtimeUrl, reason }   (no signer here)
+   * Throws on user cancel / wallet errors.
+   */
+  async function submit(input) {
+    var gameId = String(input.gameId || '');
+    var mode = input.mode === 'time' ? 'time' : 'score';
+    var score = Math.floor(Number(input.score));
+    var name = cleanName(input.name);
+    if (!/^[a-z0-9_]{3,32}$/.test(gameId)) throw err('Invalid game id.');
+    if (!(score > 0) || score > Number.MAX_SAFE_INTEGER) throw err('Score must be a positive whole number.');
+    if (name.length < 3) throw err('Name needs 3–12 letters or numbers.');
+
+    var s = status();
+    if (s.route === 'none') {
+      return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),
+        reason: 'This page cannot reach a wallet.' };
+    }
+    if (!state.address) await connect();
+    var address = state.address;
+
+    var fee = await getFee();
+    if (!fee.ok) throw err('Could not read the submission fee right now. Try again in a moment.');
+
+    var contract = CFG.contractAddress + '.' + CFG.contractName;
+    var args = [cvAscii(gameId), cvUint(modeUint(mode)), cvUint(score), cvAscii(name)];
+    var r;
+
+    if (s.route === 'host') {
+      // 1. Narrow method: host rebuilds the call itself from these four fields.
+      try {
+        r = await bridgeRequest('xtrata_submitArcadeScore', {
+          contract: contract, network: CFG.network, address: address,
+          gameId: gameId, mode: mode, score: String(score), name: name
+        });
+        return { ok: true, txid: txidOf(r), route: 'host:arcade' };
+      } catch (e) {
+        if (e.code !== -32601) throw e;
+      }
+      // 2. Generic contract call (the secure /runtime page supports this).
+      try {
+        r = await bridgeRequest('stx_callContract', {
+          contract: contract,
+          contractAddress: CFG.contractAddress,
+          contractName: CFG.contractName,
+          functionName: 'submit-score',
+          functionArgs: args,
+          network: CFG.network,
+          postConditionMode: 'deny',
+          postConditions: [{ type: 'stx', principal: address, amount: fee.value, conditionCode: 'lte' }]
+        });
+        return { ok: true, txid: txidOf(r), route: 'host:contract-call' };
+      } catch (e2) {
+        if (e2.code !== -32601) throw e2;
+        return { ok: false, needsRuntime: true, runtimeUrl: openRuntime(),
+          reason: 'This viewer does not sign score transactions yet.' };
+      }
+    }
+
+    // 3. Direct provider (top-level page). Never send `sender` (wallet playbook §2).
+    var d = directProvider();
+    var params = {
+      contract: contract,
+      functionName: 'submit-score',
+      functionArgs: args,
+      arguments: args,
+      postConditionMode: 'deny',
+      postConditions: [stxPostConditionHex(address, fee.value)]
+    };
+    if (d.kind === 'leather') params.network = CFG.network;
+    r = unwrap(await d.p.request('stx_callContract', params));
+    return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind };
+  }
+
+  /* ------------------------------------------------------ local PBs */
+  function localBest(gameId) {
+    var v = root.XA && root.XA.util.store('pb:' + gameId);
+    return typeof v === 'number' ? v : 0;
+  }
+  function recordLocal(gameId, score) {
+    var best = localBest(gameId);
+    if (score > best && root.XA) root.XA.util.store('pb:' + gameId, score);
+    return Math.max(best, score);
+  }
+
+  /* ----------------------------------------------------------- boot */
+  (function boot() {
+    listen();
+    try {
+      var t = new URLSearchParams(root.location.search || '').get('walletBridgeToken');
+      if (t) { bridge.token = t.trim(); log('host bridge token from URL'); }
+    } catch (e) {}
+    hello();
+  })();
+
+  root.XAScores = {
+    configure: function (patch) {
+      Object.keys(patch || {}).forEach(function (k) { if (k in CFG) CFG[k] = patch[k]; });
+      boardCache = {}; feeCache = null;
+      emit();
+    },
+    config: function () { return Object.assign({}, CFG); },
+    getTop10: getTop10,
+    qualifies: qualifies,
+    getFee: getFee,
+    status: status,
+    onChange: function (fn) { subs.push(fn); fn(status()); },
+    connect: connect,
+    disconnect: disconnect,
+    submit: submit,
+    runtimeUrl: runtimeUrl,
+    openRuntime: openRuntime,
+    cleanName: cleanName,
+    localBest: localBest,
+    recordLocal: recordLocal,
+    shortAddress: function (a) { a = String(a || ''); return a.length > 12 ? a.slice(0, 5) + '…' + a.slice(-4) : a; },
+    // exposed for tests
+    _codec: { cvUint: cvUint, cvAscii: cvAscii, decodeCV: decodeCV, c32address: c32address,
+      c32decodeAddress: c32decodeAddress, stxPostConditionHex: stxPostConditionHex, sha256: sha256,
+      bytesToHex: bytesToHex, hexToBytes: hexToBytes, isMainnetAddress: isMainnetAddress }
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+</script>
+<script>/* arcade-room.js */
+/*
+ * Xtrata Arcade — the room (leaf module)
+ *
+ * Builds the arcade floor from whatever cartridges registered with XA, runs
+ * one play session at a time, and owns the game-over → on-chain submit flow.
+ * Cartridges never see the wallet: they only report a score through `api`.
+ *
+ * Boot: the parent sets window.XA_CONFIG (optional) and calls XARoom.boot().
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA, S = root.XAScores;
+  if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-room');
+  var U = XA.util;
+  var doc = root.document;
+
+  function h(tag, attrs, kids) {
+    var el = doc.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (v == null || v === false) return;
+      if (k === 'class') el.className = v;
+      else if (k === 'text') el.textContent = v;
+      else if (k === 'style') el.setAttribute('style', v);
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : v);
+    });
+    (kids || []).forEach(function (c) { if (c != null) el.appendChild(typeof c === 'string' ? doc.createTextNode(c) : c); });
+    return el;
+  }
+  function $(sel, ctx) { return (ctx || doc).querySelector(sel); }
+
+  var rootEl, roomEl, gameEl, modalEl;
+  var cabinets = [];            // { game, canvas, ctx, statsEl }
+  var session = null;
+  var raf = 0, lastTs = 0;
+  var walletStatus = S.status();
+  var boards = {};              // gameId → last board result
+
+  /* ------------------------------------------------------ room view */
+  function buildRoom() {
+    var cfg = root.XA_CONFIG || {};
+    var walletBtn = h('button', { class: 'xa-pill', id: 'xa-wallet', type: 'button', onclick: onWalletClick },
+      [h('span', { class: 'xa-dot' }), h('span', { class: 'xa-wallet-label', text: 'Wallet' })]);
+    var muteBtn = h('button', { class: 'xa-icon', id: 'xa-mute', type: 'button', 'aria-label': 'Toggle sound', onclick: function () {
+      XA.audio.setMuted(!XA.audio.isMuted()); XA.audio.unlock(); paintMute();
+    } });
+    var boardsBtn = h('button', { class: 'xa-pill', type: 'button', onclick: function () { openBoards(XA.games[0] && XA.games[0].id); } },
+      [h('span', { text: '🏆' }), h('span', { text: 'High scores' })]);
+
+    var grid = h('div', { class: 'xa-cabinets' });
+    XA.games.forEach(function (g) {
+      var canvas = h('canvas', { width: 320, height: 240, 'aria-hidden': 'true' });
+      var stats = h('div', { class: 'xa-cab-stats' }, [
+        h('div', {}, [h('span', { text: 'YOUR BEST' }), h('b', { class: 'xa-pb', text: U.fmt(S.localBest(g.id)) })]),
+        h('div', { class: 'xa-right' }, [h('span', { text: 'CHAIN #1' }), h('b', { class: 'xa-top1', text: '…' })])
+      ]);
+      var cab = h('article', { class: 'xa-cab', style: '--c:' + g.color, 'data-game': g.id }, [
+        h('div', { class: 'xa-marquee' }, [h('h2', { text: g.title }), h('p', { text: g.tagline || '' })]),
+        h('div', { class: 'xa-screen' }, [canvas, h('div', { class: 'xa-insert', text: 'PRESS PLAY' })]),
+        stats,
+        h('div', { class: 'xa-cab-actions' }, [
+          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', 'data-play': g.id,
+            onclick: function () { startGame(g.id); } }, ['▶ Play']),
+          h('button', { class: 'xa-btn', type: 'button', 'aria-label': g.title + ' high scores',
+            onclick: function () { openBoards(g.id); } }, ['🏆'])
+        ])
+      ]);
+      grid.appendChild(cab);
+      cabinets.push({ game: g, canvas: canvas, ctx: canvas.getContext('2d'), el: cab });
+    });
+
+    roomEl = h('main', { class: 'xa-room' }, [
+      h('div', { class: 'xa-floor-grid' }),
+      h('div', { class: 'xa-wrap' }, [
+        h('header', { class: 'xa-top' }, [
+          h('div', {}, [
+            h('h1', { class: 'xa-logo' }, [h('span', { text: 'XTRATA ' }), h('span', { text: 'ARCADE' })]),
+            h('p', { class: 'xa-sub', text: cfg.subtitle || (XA.games.length + ' cabinets · one on-chain leaderboard contract · built on Stacks') })
+          ]),
+          h('div', { class: 'xa-top-actions' }, [boardsBtn, walletBtn, muteBtn])
+        ]),
+        grid,
+        h('p', { class: 'xa-foot' }, [
+          'Top 10 per game lives on-chain in ',
+          h('code', { text: S.config().contractName }),
+          '. Posting a score costs the contract fee plus the network fee.'
+        ])
+      ])
+    ]);
+    rootEl.appendChild(roomEl);
+    paintMute();
+    paintWallet();
+  }
+
+  function paintMute() {
+    var b = $('#xa-mute');
+    if (b) b.textContent = XA.audio.isMuted() ? '🔇' : '🔊';
+  }
+  function paintWallet() {
+    var b = $('#xa-wallet');
+    if (!b) return;
+    var dot = $('.xa-dot', b), label = $('.xa-wallet-label', b);
+    dot.className = 'xa-dot';
+    if (walletStatus.address) {
+      dot.classList.add('is-on');
+      label.textContent = S.shortAddress(walletStatus.address);
+      b.title = 'Connected ' + walletStatus.address;
+    } else if (walletStatus.route === 'none') {
+      dot.classList.add('is-warn');
+      label.textContent = 'View only';
+      b.title = 'Scores can be posted when the arcade is opened on xtrata.xyz';
+    } else {
+      label.textContent = 'Connect';
+      b.title = 'Connect a Stacks wallet to post high scores';
+    }
+  }
+  async function onWalletClick() {
+    XA.audio.unlock();
+    if (walletStatus.address) { S.disconnect(); return; }
+    if (walletStatus.route === 'none') {
+      openInfo('View-only here',
+        'This copy of the arcade cannot reach a wallet, so you can play and see the boards but not post scores. ' +
+        'Open the arcade on Xtrata to post.', S.runtimeUrl());
+      return;
+    }
+    try { await S.connect(); } catch (e) { openInfo('Wallet not connected', e.message || String(e)); }
+  }
+
+  async function refreshCabinet(cab, force) {
+    var g = cab.game;
+    $('.xa-pb', cab.el).textContent = U.fmt(S.localBest(g.id));
+    var board = await S.getTop10(g.id, g.mode, force);
+    boards[g.id] = board;
+    var el = $('.xa-top1', cab.el);
+    if (!board.ok) { el.textContent = 'offline'; el.title = board.error || ''; return; }
+    var top = board.entries[0];
+    el.textContent = top ? U.fmt(top.score) + ' ' + top.name : 'be first';
+    el.title = top ? top.name + ' · ' + top.player : 'No scores yet';
+  }
+
+  /* ----------------------------------------------------- scoreboard */
+  function closeModal() {
+    if (modalEl) { modalEl.remove(); modalEl = null; }
+  }
+  function modal(card) {
+    closeModal();
+    modalEl = h('div', { class: 'xa-modal', role: 'dialog', 'aria-modal': 'true', onclick: function (e) {
+      if (e.target === modalEl) closeModal();
+    } }, [card]);
+    rootEl.appendChild(modalEl);
+    var f = card.querySelector('button');
+    if (f) f.focus();
+  }
+  function openInfo(title, text, link) {
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: title }),
+      h('p', { class: 'xa-verdict', text: text }),
+      link ? h('p', { class: 'xa-note' }, [h('a', { href: link, target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Open on xtrata.xyz ↗' })]) : null,
+      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+  }
+  function boardList(board, game, highlight) {
+    if (!board) return h('div', { class: 'xa-empty', text: 'Loading…' });
+    if (!board.ok) return h('div', { class: 'xa-error', text: 'Couldn’t reach the leaderboard right now. It isn’t empty — try again in a moment.' });
+    if (!board.entries.length) return h('div', { class: 'xa-empty', text: 'No scores yet. The first run that lands here is permanent until someone beats it.' });
+    return h('ol', { class: 'xa-board' }, board.entries.map(function (e) {
+      var you = walletStatus.address && e.player === walletStatus.address;
+      return h('li', { class: you || (highlight && highlight === e.rank) ? 'is-you' : '' }, [
+        h('span', { class: 'xa-rank', text: '#' + e.rank }),
+        h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' · you' : '') })]),
+        h('span', { class: 'xa-pts', text: U.fmt(e.score) })
+      ]);
+    }));
+  }
+  function openBoards(gameId) {
+    var game = XA.games.filter(function (g) { return g.id === gameId; })[0] || XA.games[0];
+    var body = h('div', {}, [boardList(boards[game.id], game)]);
+    var tabs = h('div', { class: 'xa-tabs', role: 'tablist' }, XA.games.map(function (g) {
+      return h('button', { class: 'xa-tab', role: 'tab', type: 'button', style: '--c:' + g.color,
+        'aria-selected': g.id === game.id ? 'true' : 'false', onclick: function () { openBoards(g.id); } }, [g.title]);
+    }));
+    var foot = h('div', { class: 'xa-card-foot' }, [
+      h('span', { text: 'Your best: ' + U.fmt(S.localBest(game.id)) }),
+      h('span', {}, [
+        h('button', { class: 'xa-btn', type: 'button', style: 'margin-right:8px', onclick: async function () {
+          body.replaceChildren(boardList(null));
+          boards[game.id] = await S.getTop10(game.id, game.mode, true);
+          body.replaceChildren(boardList(boards[game.id], game));
+        } }, ['↻ Refresh']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: closeModal }, ['Close'])
+      ])
+    ]);
+    modal(h('div', { class: 'xa-card', style: '--c:' + game.color }, [h('h3', { text: 'High scores' }), tabs, body, foot]));
+    if (!boards[game.id]) S.getTop10(game.id, game.mode).then(function (b) {
+      boards[game.id] = b;
+      if (modalEl && body.isConnected) body.replaceChildren(boardList(b, game));
+    });
+  }
+
+  /* ------------------------------------------------------- session */
+  function startGame(id) {
+    XA.audio.unlock();
+    closeModal();
+    var game = XA.games.filter(function (g) { return g.id === id; })[0];
+    if (!game) return;
+    endSession();
+
+    var canvas = h('canvas', { 'aria-label': game.title + ' playfield' });
+    var stage = h('div', { class: 'xa-stage' }, [canvas]);
+    var scoreEl = h('b', { id: 'xa-score', text: '0' });
+    var bestEl = h('b', { text: U.fmt(S.localBest(game.id)) });
+    var hiEl = h('b', { text: '…' });
+    var statusEl = h('div', { class: 'xa-status', 'aria-live': 'polite' });
+    var pauseBtn = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Pause', text: '❚❚', onclick: function () { togglePause(); } });
+    gameEl = h('section', { class: 'xa-game', style: '--c:' + game.color }, [
+      h('div', { class: 'xa-hud' }, [
+        h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Back to the arcade', text: '◀', onclick: function () { endSession(); } }),
+        h('span', { class: 'xa-title', text: game.title }),
+        h('div', { class: 'xa-hud-stats' }, [
+          h('div', {}, [h('small', { text: 'SCORE' }), scoreEl]),
+          h('div', {}, [h('small', { text: 'BEST' }), bestEl]),
+          h('div', {}, [h('small', { text: 'CHAIN #1' }), hiEl])
+        ]),
+        pauseBtn
+      ]),
+      statusEl,
+      stage
+    ]);
+    var input = XA.createInput(stage);
+    var pads = buildPads(game.touch, input);
+    if (pads) gameEl.appendChild(pads);
+    rootEl.appendChild(gameEl);
+    roomEl.setAttribute('aria-hidden', 'true');
+
+    var seed = U.newSeed();
+    var fx = XA.createFx();
+    session = {
+      game: game, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,
+      score: 0, shake: 0, state: 'countdown', countdown: 3.0, acc: 0, seed: seed,
+      scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()
+    };
+    var s = session;
+    var api = {
+      W: game.size.w, H: game.size.h, input: input, audio: XA.audio, fx: fx,
+      rng: U.rng(seed), seed: seed,
+      shake: function (n) { s.shake = Math.max(s.shake, n); },
+      addScore: function (n) { if (s.state === 'play') s.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (s.state === 'play') s.score = Math.max(0, Math.floor(n)); },
+      getScore: function () { return s.score; },
+      setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },
+      gameOver: function () { if (s.state === 'play') finish(); }
+    };
+    s.instance = game.create(api);
+    fit();
+    showCountdown();
+    S.getTop10(game.id, game.mode).then(function (b) {
+      boards[game.id] = b;
+      if (session !== s) return;
+      hiEl.textContent = b.ok ? (b.entries[0] ? U.fmt(b.entries[0].score) : '—') : 'offline';
+    });
+  }
+
+  function buildPads(kind, input) {
+    var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;
+    if (!coarse && !/[?&]pads=1/.test(root.location.search || '')) return null;
+    function pad(name, label, cls) {
+      var b = h('button', { class: 'xa-pad ' + (cls || '') + ' ' + name, type: 'button', 'aria-label': name, text: label });
+      function down(e) { e.preventDefault(); XA.audio.unlock(); b.classList.add('is-down'); input.press(name); try { b.setPointerCapture(e.pointerId); } catch (x) {} }
+      function up() { b.classList.remove('is-down'); input.release(name); }
+      b.addEventListener('pointerdown', down);
+      b.addEventListener('pointerup', up);
+      b.addEventListener('pointercancel', up);
+      b.addEventListener('lostpointercapture', up);
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      return b;
+    }
+    if (kind === 'dpad') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-hint', text: 'SWIPE OR USE THE PAD' }),
+        h('div', { class: 'xa-pad-group xa-dpad' }, [pad('up', '▲'), pad('left', '◀'), pad('down', '▼'), pad('right', '▶')])
+      ]);
+    }
+    if (kind === 'blocks') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '◀'), pad('down', '▼'), pad('right', '▶')]),
+        h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '⟲'), pad('c', '⟳'), pad('d', 'HOLD', 'xa-wide'), pad('a', '⤓')])
+      ]);
+    }
+    if (kind === 'hold') {
+      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: 'TOUCH AND HOLD ANYWHERE ON THE SCREEN TO SWIM' })]);
+    }
+    return null;
+  }
+
+  function fit() {
+    if (!session) return;
+    var s = session, g = s.game;
+    var rect = s.stage.getBoundingClientRect();
+    var availW = Math.max(100, rect.width - 20), availH = Math.max(100, rect.height - 12);
+    var scale = Math.min(availW / g.size.w, availH / g.size.h);
+    var dpr = Math.min(root.devicePixelRatio || 1, 2.5);
+    s.scale = scale;
+    s.dpr = dpr;
+    s.canvas.style.width = Math.floor(g.size.w * scale) + 'px';
+    s.canvas.style.height = Math.floor(g.size.h * scale) + 'px';
+    s.canvas.width = Math.floor(g.size.w * scale * dpr);
+    s.canvas.height = Math.floor(g.size.h * scale * dpr);
+  }
+
+  function setOverlay(el) {
+    if (!session) return;
+    if (session.overlay) session.overlay.remove();
+    session.overlay = el;
+    if (el) session.stage.appendChild(el);
+  }
+  function showCountdown() {
+    var n = h('div', { class: 'xa-countdown', text: '3' });
+    setOverlay(h('div', { class: 'xa-overlay', style: 'background:rgba(3,4,12,.35)' }, [n]));
+    session.countEl = n;
+    XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 });
+  }
+
+  function togglePause(force) {
+    var s = session;
+    if (!s) return;
+    if (s.state === 'play' && force !== false) {
+      s.state = 'paused';
+      s.input.reset();
+      setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-pause' }, [
+        h('h3', { text: 'PAUSED' }),
+        h('div', { class: 'xa-over-actions' }, [
+          h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + s.game.color, type: 'button', onclick: function () { togglePause(); } }, ['Resume']),
+          h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['Quit'])
+        ])
+      ])]));
+      $('.xa-overlay button', s.stage).focus();
+    } else if (s.state === 'paused' && force !== true) {
+      s.state = 'play';
+      s.acc = 0;
+      s.input.reset();
+      setOverlay(null);
+    }
+  }
+
+  function endSession() {
+    if (!session) return;
+    session.input.destroy();
+    session = null;
+    if (gameEl) { gameEl.remove(); gameEl = null; }
+    roomEl.removeAttribute('aria-hidden');
+    cabinets.forEach(function (c) { refreshCabinet(c); });
+    var btn = $('[data-play]');
+    if (btn) btn.focus();
+  }
+
+  /* --------------------------------------------------- game over */
+  function insertRank(board, score, mode) {
+    if (!board || !board.ok) return 0;
+    for (var i = 0; i < 10; i++) {
+      var e = board.entries[i];
+      if (!e) return i + 1;
+      if (mode === 'time' ? score < e.score : score > e.score) return i + 1;
+    }
+    return 0;
+  }
+
+  async function finish() {
+    var s = session;
+    s.state = 'over';
+    s.input.reset();
+    var g = s.game;
+    var score = s.score;
+    var prevBest = S.localBest(g.id);
+    var best = S.recordLocal(g.id, score);
+    var isPb = score > prevBest && score > 0;
+    XA.audio.arp(isPb ? [523, 659, 784, 1047] : [392, 330, 262], 0.09, { type: 'triangle', vol: 0.2 });
+
+    var verdict = h('p', { class: 'xa-verdict', text: 'Checking the on-chain board…' });
+    var submitBox = h('div', { class: 'xa-submit xa-hidden' });
+    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id); } }, ['↻ Play again']);
+    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
+      h('h3', { text: 'GAME OVER' }),
+      h('div', { class: 'xa-final', text: U.fmt(score) }),
+      isPb ? h('span', { class: 'xa-badge', text: '★ NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + U.fmt(best) }),
+      verdict,
+      submitBox,
+      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])])
+    ])]));
+    again.focus();
+
+    if (!(score > 0)) { verdict.textContent = 'Score something to get on the board.'; return; }
+    var board = await S.getTop10(g.id, g.mode, true);
+    if (session !== s) return;
+    boards[g.id] = board;
+    var rank = insertRank(board, score, g.mode);
+    if (!board.ok) {
+      verdict.textContent = 'Couldn’t check the leaderboard right now — you can still try to post.';
+    } else if (rank) {
+      verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');
+    } else {
+      var tenth = board.entries[9];
+      verdict.textContent = 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';
+      return;
+    }
+    buildSubmit(submitBox, s, score, rank);
+  }
+
+  function buildSubmit(box, s, score, rank) {
+    var g = s.game;
+    var st = S.status();
+    box.classList.remove('xa-hidden');
+    if (st.route === 'none') {
+      box.replaceChildren(
+        h('p', { class: 'xa-note', style: 'margin:0', text: 'This copy of the arcade can’t reach a wallet, so this score can’t be posted from here. Open the arcade on Xtrata to post your runs.' }),
+        h('a', { class: 'xa-btn', href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'display:block;text-align:center;text-decoration:none;margin-top:10px' }, ['Open on xtrata.xyz ↗'])
+      );
+      return;
+    }
+    var name = h('input', { class: 'xa-name', id: 'xa-name', maxlength: '12', autocomplete: 'off', spellcheck: 'false',
+      value: U.store('name') || '', placeholder: 'AAA', 'aria-describedby': 'xa-name-note' });
+    name.addEventListener('input', function () {
+      var c = S.cleanName(name.value).toUpperCase();
+      if (c !== name.value) name.value = c;
+    });
+    var msg = h('p', { class: 'xa-msg', 'aria-live': 'polite' });
+    var btn = h('button', { class: 'xa-btn xa-btn-primary', type: 'button' }, ['Post score on-chain']);
+    var feeNote = h('p', { class: 'xa-note', id: 'xa-name-note', text: '3–12 letters or numbers. Your wallet will ask you to confirm.' });
+    S.getFee().then(function (f) {
+      if (f.ok) feeNote.textContent = '3–12 letters or numbers. Fee ' + (Number(f.value) / 1e6) + ' STX plus network fee, capped by a post-condition.';
+    });
+    btn.addEventListener('click', async function () {
+      var n = S.cleanName(name.value).toUpperCase();
+      if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }
+      U.store('name', n);
+      btn.disabled = true; name.disabled = true;
+      msg.className = 'xa-msg'; msg.textContent = 'Check your wallet to confirm…';
+      try {
+        var r = await S.submit({ gameId: g.id, mode: g.mode, score: score, name: n });
+        if (r.ok) {
+          var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
+          msg.className = 'xa-msg is-ok';
+          msg.replaceChildren('Submitted! It shows on the board once the transaction confirms. ',
+            tx ? h('a', { href: 'https://explorer.hiro.so/txid/' + tx + '?chain=' + S.config().network, target: '_blank', rel: 'noopener', text: 'View transaction ↗' }) : '');
+          btn.textContent = 'Posted ✓';
+          XA.audio.arp([784, 988, 1175, 1568], 0.07, { type: 'square', vol: 0.18 });
+        } else if (r.needsRuntime) {
+          msg.className = 'xa-msg is-err';
+          msg.replaceChildren(r.reason + ' ', h('a', { href: r.runtimeUrl, target: '_blank', rel: 'noopener', text: 'Open the secure runtime ↗' }));
+          btn.disabled = false; name.disabled = false;
+        }
+      } catch (e) {
+        msg.className = 'xa-msg is-err';
+        msg.textContent = (e && e.message) || 'The wallet did not sign.';
+        btn.disabled = false; name.disabled = false;
+      }
+    });
+    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, btn, msg);
+  }
+
+  /* ---------------------------------------------------------- loop */
+  var STEP = 1 / 60;
+  var attractT = 0, attractAcc = 0;
+  function frame(ts) {
+    raf = root.requestAnimationFrame(frame);
+    var dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+    lastTs = ts;
+    if (session) runSession(dt);
+    else runAttract(dt);
+  }
+  function runAttract(dt) {
+    attractT += dt;
+    attractAcc += dt;
+    if (attractAcc < 1 / 30) return;
+    attractAcc = 0;
+    cabinets.forEach(function (c) {
+      var r = c.canvas.getBoundingClientRect();
+      if (!r.width) return;
+      var dpr = Math.min(root.devicePixelRatio || 1, 2);
+      var w = Math.round(r.width * dpr), hgt = Math.round(r.height * dpr);
+      if (c.canvas.width !== w || c.canvas.height !== hgt) { c.canvas.width = w; c.canvas.height = hgt; }
+      c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      try { c.game.attract(c.ctx, r.width, r.height, attractT); } catch (e) {}
+    });
+  }
+  function runSession(dt) {
+    var s = session;
+    var g = s.game;
+    if (s.state === 'countdown') {
+      var before = Math.ceil(s.countdown);
+      s.countdown -= dt;
+      var now = Math.ceil(s.countdown);
+      if (now !== before && now > 0) { s.countEl.textContent = String(now); XA.audio.tone(440, 0.1, { type: 'square', vol: 0.15 }); }
+      if (s.countdown <= 0) {
+        s.state = 'play';
+        s.input.reset();
+        setOverlay(null);
+        XA.audio.tone(880, 0.16, { type: 'square', vol: 0.18 });
+      }
+    } else if (s.state === 'play') {
+      if (s.input.hit('pause')) { togglePause(); }
+      else {
+        s.acc += dt;
+        var steps = 0;
+        while (s.acc >= STEP && steps < 6 && session === s && s.state === 'play') {
+          s.instance.update(STEP);
+          s.input.endFrame();
+          s.fx.update(STEP);
+          s.acc -= STEP;
+          steps++;
+        }
+      }
+    } else if (s.state === 'over') {
+      s.fx.update(dt);
+    }
+    if (session !== s) return;
+    s.scoreEl.textContent = U.fmt(s.score);
+
+    var ctx = s.ctx, k = s.scale * s.dpr;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    if (s.shake > 0.1) {
+      ctx.translate((Math.random() - 0.5) * s.shake, (Math.random() - 0.5) * s.shake);
+      s.shake *= Math.pow(0.02, dt);
+    } else s.shake = 0;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();
+    s.instance.render(ctx);
+    s.fx.draw(ctx);
+    ctx.restore();
+  }
+
+  /* ---------------------------------------------------------- boot */
+  function boot(mount) {
+    if (rootEl) return;
+    var cfg = root.XA_CONFIG || {};
+    if (cfg.scores) S.configure(cfg.scores);
+    rootEl = mount || doc.getElementById('xa-root') || doc.body;
+    buildRoom();
+    S.onChange(function (st) {
+      walletStatus = st;
+      paintWallet();
+    });
+    cabinets.forEach(function (c) { refreshCabinet(c); });
+    root.addEventListener('resize', fit);
+    doc.addEventListener('visibilitychange', function () { if (doc.hidden) togglePause(true); });
+    root.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modalEl) { closeModal(); return; }
+      if (!session) return;
+      if (e.key === 'Enter' && session.state === 'over' && doc.activeElement && doc.activeElement.id !== 'xa-name' &&
+          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id);
+      if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && session.state === 'paused') togglePause();
+    });
+    raf = root.requestAnimationFrame(frame);
+  }
+
+  root.XARoom = {
+    boot: boot,
+    start: startGame,
+    back: endSession,
+    _session: function () { return session; }
+  };
+})(window);
+</script>
+<script>/* game-neon-snake.js */
+/*
+ * Xtrata Arcade cartridge #1 — NEON SNAKE
+ * Eat, grow, don't bite yourself. Speed climbs with length, quick successive
+ * bites build a combo multiplier, and new wall blocks appear every 8 bites.
+ * Contract game-id: xa_neon_snake (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-neon-snake');
+  var U = XA.util;
+
+  var W = 480, H = 480, CELL = 20, COLS = 24, ROWS = 24;
+  var COLOR = '#39ff88', FOOD = '#ff3fa4', GOLD = '#ffd23f', WALL = '#6a7bff';
+  var DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+  function create(api) {
+    var rng = api.rng;
+    var snake = [];
+    for (var i = 0; i < 4; i++) snake.push({ x: 8 - i, y: 12 });
+    var dir = 'right';
+    var queue = [];
+    var grow = 0;
+    var tick = 0;
+    var walls = {};
+    var food = null, gold = null;
+    var eaten = 0, combo = 1, comboTimer = 0;
+    var dead = false, deathT = 0;
+    var t = 0;
+
+    function key(x, y) { return x + ',' + y; }
+    function occupied(x, y) {
+      if (walls[key(x, y)]) return true;
+      for (var i = 0; i < snake.length; i++) if (snake[i].x === x && snake[i].y === y) return true;
+      return false;
+    }
+    function freeCell(avoidHead) {
+      for (var tries = 0; tries < 500; tries++) {
+        var x = 1 + rng.int(COLS - 2), y = 1 + rng.int(ROWS - 2);
+        if (occupied(x, y)) continue;
+        if (food && food.x === x && food.y === y) continue;
+        if (gold && gold.x === x && gold.y === y) continue;
+        if (avoidHead && Math.abs(x - snake[0].x) + Math.abs(y - snake[0].y) < 6) continue;
+        return { x: x, y: y };
+      }
+      return null;
+    }
+    function interval() {
+      return Math.max(0.052, 0.125 - snake.length * 0.0016);
+    }
+    food = freeCell(false);
+
+    function turn(d) {
+      var last = queue.length ? queue[queue.length - 1] : dir;
+      if (d === last) return;
+      var a = DIRS[d], b = DIRS[last];
+      if (a[0] === -b[0] && a[1] === -b[1]) return;
+      if (queue.length < 3) queue.push(d);
+    }
+
+    function die() {
+      dead = true;
+      var h = snake[0];
+      api.fx.burst(h.x * CELL + CELL / 2, h.y * CELL + CELL / 2, COLOR, 40, 220, 0.9);
+      api.shake(10);
+      api.audio.tone(220, 0.35, { type: 'sawtooth', slide: 0.25, vol: 0.3 });
+      api.audio.noise(0.3, { vol: 0.25 });
+    }
+
+    function step() {
+      if (queue.length) dir = queue.shift();
+      var d = DIRS[dir];
+      var nx = snake[0].x + d[0], ny = snake[0].y + d[1];
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) return die();
+      // Moving into the tail cell is legal because the tail moves away (unless growing).
+      var tail = snake[snake.length - 1];
+      var hitsTail = tail.x === nx && tail.y === ny && grow === 0;
+      if (occupied(nx, ny) && !hitsTail) return die();
+      snake.unshift({ x: nx, y: ny });
+      if (grow > 0) grow--; else snake.pop();
+
+      var cx = nx * CELL + CELL / 2, cy = ny * CELL + CELL / 2;
+      if (food && nx === food.x && ny === food.y) {
+        combo = comboTimer > 0 ? Math.min(5, combo + 1) : 1;
+        comboTimer = 3.2;
+        var pts = 10 * combo;
+        api.addScore(pts);
+        api.fx.burst(cx, cy, FOOD, 18, 140);
+        api.fx.text(cx, cy - 10, '+' + pts + (combo > 1 ? ' x' + combo : ''), FOOD, 12);
+        api.audio.tone(520 + combo * 90, 0.08, { type: 'square', vol: 0.2 });
+        grow += 2;
+        eaten++;
+        food = freeCell(false);
+        if (eaten % 8 === 0) {
+          for (var k = 0; k < 2; k++) { var w = freeCell(true); if (w) walls[key(w.x, w.y)] = true; }
+          api.audio.arp([392, 523, 659], 0.06, { type: 'triangle', vol: 0.18 });
+          api.setStatus('WALLS +2');
+        }
+        if (!gold && eaten % 5 === 0) { gold = freeCell(true); if (gold) gold.life = 6; }
+      } else if (gold && nx === gold.x && ny === gold.y) {
+        var g = 50 + Math.round(gold.life * 10);
+        api.addScore(g);
+        api.fx.burst(cx, cy, GOLD, 30, 200);
+        api.fx.text(cx, cy - 10, '+' + g, GOLD, 14);
+        api.audio.arp([660, 880, 1320], 0.05, { type: 'square', vol: 0.2 });
+        grow += 4;
+        gold = null;
+      }
+      api.fx.trail(cx, cy, COLOR, (Math.random() - 0.5) * 30, (Math.random() - 0.5) * 30);
+    }
+
+    return {
+      update: function (dt) {
+        t += dt;
+        if (dead) {
+          deathT += dt;
+          if (deathT > 0.9) api.gameOver();
+          return;
+        }
+        var inp = api.input;
+        ['up', 'down', 'left', 'right'].forEach(function (d) { if (inp.hit(d)) turn(d); });
+        inp.takeSwipes().forEach(function (s) { if (DIRS[s]) turn(s); });
+        if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) combo = 1; }
+        if (gold) { gold.life -= dt; if (gold.life <= 0) gold = null; }
+        tick += dt;
+        var iv = interval();
+        while (tick >= iv && !dead) { tick -= iv; step(); }
+        api.setStatus('LEN ' + snake.length + (combo > 1 ? '  COMBO x' + combo : ''));
+      },
+      render: function (ctx) {
+        ctx.fillStyle = '#05060f';
+        ctx.fillRect(0, 0, W, H);
+        // grid
+        ctx.strokeStyle = 'rgba(57,255,136,0.06)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (var gx = 0; gx <= COLS; gx++) { ctx.moveTo(gx * CELL + 0.5, 0); ctx.lineTo(gx * CELL + 0.5, H); }
+        for (var gy = 0; gy <= ROWS; gy++) { ctx.moveTo(0, gy * CELL + 0.5); ctx.lineTo(W, gy * CELL + 0.5); }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(57,255,136,0.5)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(1, 1, W - 2, H - 2);
+
+        // walls
+        ctx.save();
+        ctx.shadowColor = WALL; ctx.shadowBlur = 10; ctx.fillStyle = WALL;
+        Object.keys(walls).forEach(function (k) {
+          var p = k.split(','); ctx.fillRect(+p[0] * CELL + 2, +p[1] * CELL + 2, CELL - 4, CELL - 4);
+        });
+        ctx.restore();
+
+        // food
+        var pulse = 1 + Math.sin(t * 8) * 0.15;
+        function orb(o, color, r) {
+          ctx.save();
+          ctx.shadowColor = color; ctx.shadowBlur = 16; ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(o.x * CELL + CELL / 2, o.y * CELL + CELL / 2, r * pulse, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        if (food) orb(food, FOOD, 6);
+        if (gold) {
+          orb(gold, GOLD, 7);
+          ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(gold.x * CELL + CELL / 2, gold.y * CELL + CELL / 2, 12, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (gold.life / 6));
+          ctx.stroke();
+        }
+
+        // snake
+        ctx.save();
+        ctx.shadowColor = COLOR; ctx.shadowBlur = 12;
+        for (var i = snake.length - 1; i >= 0; i--) {
+          var s = snake[i];
+          var f = 1 - i / (snake.length + 4);
+          ctx.fillStyle = dead ? 'rgba(255,80,80,' + (0.3 + 0.7 * f) + ')' : 'rgba(57,255,136,' + (0.35 + 0.65 * f) + ')';
+          var inset = i === 0 ? 1 : 2.5;
+          U.roundRect(ctx, s.x * CELL + inset, s.y * CELL + inset, CELL - inset * 2, CELL - inset * 2, 5);
+          ctx.fill();
+        }
+        ctx.restore();
+        // eyes
+        var h = snake[0], d = DIRS[dir];
+        ctx.fillStyle = '#05060f';
+        var ex = h.x * CELL + CELL / 2 + d[0] * 4, ey = h.y * CELL + CELL / 2 + d[1] * 4;
+        ctx.beginPath();
+        ctx.arc(ex - d[1] * 4, ey - d[0] * 4, 2, 0, 7);
+        ctx.arc(ex + d[1] * 4, ey + d[0] * 4, 2, 0, 7);
+        ctx.fill();
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#05060f';
+    ctx.fillRect(0, 0, w, h);
+    var cell = Math.max(6, Math.round(w / 18));
+    ctx.strokeStyle = 'rgba(57,255,136,0.07)';
+    ctx.beginPath();
+    for (var x = 0; x < w; x += cell) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, h); }
+    for (var y = 0; y < h; y += cell) { ctx.moveTo(0, y + 0.5); ctx.lineTo(w, y + 0.5); }
+    ctx.stroke();
+    ctx.save();
+    ctx.shadowColor = COLOR; ctx.shadowBlur = 10;
+    for (var i = 0; i < 16; i++) {
+      var tt = t * 3 - i * 0.18;
+      var px = w / 2 + Math.sin(tt * 0.9) * w * 0.33;
+      var py = h / 2 + Math.sin(tt * 1.7) * h * 0.28;
+      ctx.fillStyle = 'rgba(57,255,136,' + (1 - i / 18) + ')';
+      ctx.fillRect(Math.round(px / cell) * cell + 1, Math.round(py / cell) * cell + 1, cell - 2, cell - 2);
+    }
+    ctx.shadowColor = FOOD; ctx.fillStyle = FOOD;
+    ctx.beginPath();
+    ctx.arc(w * 0.72, h * 0.3, cell * 0.35 * (1 + Math.sin(t * 6) * 0.15), 0, 7);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_neon_snake',
+    order: 1,
+    title: 'Neon Snake',
+    tagline: 'Eat. Grow. Don’t bite yourself.',
+    color: COLOR,
+    size: { w: W, h: H },
+    touch: 'dpad',
+    controls: 'Arrows / WASD · swipe on mobile',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-block-drop.js */
+/*
+ * Xtrata Arcade cartridge #2 — BLOCK DROP
+ * Falling-block line clearer: 7-bag randomiser, SRS rotation + wall kicks,
+ * hold, ghost piece, lock delay, back-to-back and combo scoring.
+ * Contract game-id: xa_block_drop (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-block-drop');
+  var U = XA.util;
+
+  var W = 440, H = 580;
+  var COLS = 10, ROWS = 22, HIDDEN = 2, CELL = 27;
+  var BX = 16, BY = 20;                 // board origin (visible rows)
+  var PX = BX + COLS * CELL + 16;       // side panel x
+  var ACCENT = '#3ff0ff';
+
+  var SHAPES = {
+    I: [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]],
+    O: [[1, 1], [1, 1]],
+    T: [[0, 1, 0], [1, 1, 1], [0, 0, 0]],
+    S: [[0, 1, 1], [1, 1, 0], [0, 0, 0]],
+    Z: [[1, 1, 0], [0, 1, 1], [0, 0, 0]],
+    J: [[1, 0, 0], [1, 1, 1], [0, 0, 0]],
+    L: [[0, 0, 1], [1, 1, 1], [0, 0, 0]]
+  };
+  var COLORS = { I: '#3ff0ff', O: '#ffd23f', T: '#b04dff', S: '#39ff88', Z: '#ff4d6d', J: '#4d7bff', L: '#ff9a3f' };
+  var TYPES = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+
+  // SRS kicks in (x, y-up). Converted to screen coords (y-down) when applied.
+  var KICKS = {
+    '0>1': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+    '1>0': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+    '1>2': [[0, 0], [1, 0], [1, -1], [0, 2], [1, 2]],
+    '2>1': [[0, 0], [-1, 0], [-1, 1], [0, -2], [-1, -2]],
+    '2>3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]],
+    '3>2': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+    '3>0': [[0, 0], [-1, 0], [-1, -1], [0, 2], [-1, 2]],
+    '0>3': [[0, 0], [1, 0], [1, 1], [0, -2], [1, -2]]
+  };
+  var KICKS_I = {
+    '0>1': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+    '1>0': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+    '1>2': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]],
+    '2>1': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+    '2>3': [[0, 0], [2, 0], [-1, 0], [2, 1], [-1, -2]],
+    '3>2': [[0, 0], [-2, 0], [1, 0], [-2, -1], [1, 2]],
+    '3>0': [[0, 0], [1, 0], [-2, 0], [1, -2], [-2, 1]],
+    '0>3': [[0, 0], [-1, 0], [2, 0], [-1, 2], [2, -1]]
+  };
+
+  function rotateCW(m) {
+    var n = m.length, out = [];
+    for (var y = 0; y < n; y++) { out.push([]); for (var x = 0; x < n; x++) out[y][x] = m[n - 1 - x][y]; }
+    return out;
+  }
+  var ROT = {};
+  TYPES.forEach(function (t) {
+    var r = [SHAPES[t]];
+    for (var i = 1; i < 4; i++) r.push(rotateCW(r[i - 1]));
+    ROT[t] = r;
+  });
+
+  function gravity(level) {
+    return Math.max(0.012, Math.pow(0.8 - (level - 1) * 0.007, level - 1));
+  }
+
+  function drawCell(ctx, x, y, size, color, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(x + 1, y + 1, size - 2, Math.max(2, size * 0.18));
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x + 1, y + size - 1 - size * 0.14, size - 2, size * 0.14);
+    ctx.restore();
+  }
+
+  function create(api) {
+    var rng = api.rng;
+    var grid = [];
+    for (var r = 0; r < ROWS; r++) grid.push(new Array(COLS).fill(null));
+    var bag = [];
+    var queue = [];
+    var cur = null;
+    var hold = null, holdUsed = false;
+    var level = 1, lines = 0, combo = -1, b2b = false;
+    var fallT = 0, lockT = 0, lockResets = 0;
+    var dasDir = null, dasT = 0, arrT = 0;
+    var clearing = null;       // { rows:[], t }
+    var over = false, overT = 0;
+    var t = 0;
+
+    function nextType() {
+      if (!bag.length) {
+        bag = TYPES.slice();
+        for (var i = bag.length - 1; i > 0; i--) { var j = rng.int(i + 1); var tmp = bag[i]; bag[i] = bag[j]; bag[j] = tmp; }
+      }
+      return bag.pop();
+    }
+    while (queue.length < 4) queue.push(nextType());
+
+    function cells(p, rot, ox, oy) {
+      var m = ROT[p.type][rot == null ? p.rot : rot];
+      var out = [];
+      for (var y = 0; y < m.length; y++) for (var x = 0; x < m.length; x++) {
+        if (m[y][x]) out.push([x + (ox == null ? p.x : ox), y + (oy == null ? p.y : oy)]);
+      }
+      return out;
+    }
+    function fits(p, rot, ox, oy) {
+      var cs = cells(p, rot, ox, oy);
+      for (var i = 0; i < cs.length; i++) {
+        var x = cs[i][0], y = cs[i][1];
+        if (x < 0 || x >= COLS || y >= ROWS) return false;
+        if (y >= 0 && grid[y][x]) return false;
+      }
+      return true;
+    }
+    function spawn(type) {
+      var size = ROT[type][0].length;
+      cur = { type: type, rot: 0, x: Math.floor((COLS - size) / 2), y: 0 };
+      fallT = 0; lockT = 0; lockResets = 0;
+      if (!fits(cur)) { topOut(); return; }
+      // Drop one row immediately if possible so the piece enters view promptly.
+      if (fits(cur, cur.rot, cur.x, cur.y + 1)) cur.y++;
+    }
+    function topOut() {
+      over = true;
+      api.shake(12);
+      api.audio.tone(330, 0.5, { type: 'sawtooth', slide: 0.2, vol: 0.3 });
+      api.audio.noise(0.4, { vol: 0.2 });
+      for (var y = HIDDEN; y < ROWS; y++) for (var x = 0; x < COLS; x++) {
+        if (grid[y][x]) api.fx.burst(BX + x * CELL + CELL / 2, BY + (y - HIDDEN) * CELL + CELL / 2, grid[y][x], 2, 90);
+      }
+    }
+    function grounded() { return !fits(cur, cur.rot, cur.x, cur.y + 1); }
+    function touchLock() {
+      if (grounded() && lockResets < 15) { lockT = 0; lockResets++; }
+    }
+    function move(dx) {
+      if (cur && fits(cur, cur.rot, cur.x + dx, cur.y)) {
+        cur.x += dx;
+        touchLock();
+        api.audio.tone(180, 0.03, { type: 'square', vol: 0.08 });
+        return true;
+      }
+      return false;
+    }
+    function rotate(dirn) {
+      if (!cur || cur.type === 'O') return;
+      var from = cur.rot, to = (cur.rot + dirn + 4) % 4;
+      var table = cur.type === 'I' ? KICKS_I : KICKS;
+      var kicks = table[from + '>' + to];
+      for (var i = 0; i < kicks.length; i++) {
+        var nx = cur.x + kicks[i][0], ny = cur.y - kicks[i][1];
+        if (fits(cur, to, nx, ny)) {
+          cur.x = nx; cur.y = ny; cur.rot = to;
+          touchLock();
+          api.audio.tone(420, 0.04, { type: 'triangle', vol: 0.12 });
+          return;
+        }
+      }
+    }
+    function ghostY() {
+      var y = cur.y;
+      while (fits(cur, cur.rot, cur.x, y + 1)) y++;
+      return y;
+    }
+    function lock() {
+      var cs = cells(cur);
+      var color = COLORS[cur.type];
+      var above = true;
+      cs.forEach(function (c) {
+        if (c[1] >= 0) grid[c[1]][c[0]] = color;
+        if (c[1] >= HIDDEN) above = false;
+      });
+      api.audio.tone(140, 0.06, { type: 'square', vol: 0.12 });
+      if (above) { cur = null; topOut(); return; }
+      var full = [];
+      for (var y = 0; y < ROWS; y++) if (grid[y].every(Boolean)) full.push(y);
+      cur = null;
+      holdUsed = false;
+      if (full.length) {
+        clearing = { rows: full, t: 0 };
+        score(full.length);
+        full.forEach(function (row) {
+          for (var x = 0; x < COLS; x++) {
+            api.fx.burst(BX + x * CELL + CELL / 2, BY + (row - HIDDEN) * CELL + CELL / 2, grid[row][x], 3, 160, 0.5);
+          }
+        });
+      } else {
+        combo = -1;
+        spawn(queue.shift()); queue.push(nextType());
+      }
+    }
+    function score(n) {
+      combo++;
+      var base = [0, 100, 300, 500, 800][n] * level;
+      var tetris = n === 4;
+      if (tetris && b2b) base = Math.floor(base * 1.5);
+      b2b = tetris ? true : (n > 0 ? false : b2b);
+      var bonus = combo > 0 ? 50 * combo * level : 0;
+      api.addScore(base + bonus);
+      lines += n;
+      var label = ['', 'SINGLE', 'DOUBLE', 'TRIPLE', 'QUAD!'][n];
+      var cy = BY + (clearing.rows[0] - HIDDEN) * CELL;
+      api.fx.text(BX + COLS * CELL / 2, cy, label + ' +' + (base + bonus), tetris ? '#ffd23f' : ACCENT, tetris ? 16 : 13);
+      if (combo > 0) api.fx.text(BX + COLS * CELL / 2, cy + 22, 'COMBO ' + combo, '#ff3fa4', 11);
+      api.shake(n * 2.5);
+      api.audio.arp(n === 4 ? [523, 659, 784, 1047] : [440, 554, 659].slice(0, n + 1), 0.05, { type: 'square', vol: 0.18 });
+      var newLevel = 1 + Math.floor(lines / 10);
+      if (newLevel > level) {
+        level = newLevel;
+        api.fx.text(BX + COLS * CELL / 2, BY + 200, 'LEVEL ' + level, '#ffd23f', 18);
+        api.audio.arp([392, 523, 659, 784], 0.07, { type: 'triangle', vol: 0.2 });
+      }
+    }
+    function hardDrop() {
+      var gy = ghostY();
+      var dist = gy - cur.y;
+      for (var i = 0; i < 4; i++) {
+        api.fx.trail(BX + (cur.x + 1 + Math.random() * 2) * CELL, BY + (gy - HIDDEN) * CELL, COLORS[cur.type], 0, -120);
+      }
+      cur.y = gy;
+      api.addScore(dist * 2);
+      api.shake(3);
+      lock();
+    }
+    function doHold() {
+      if (!cur || holdUsed) return;
+      var t0 = cur.type;
+      if (hold) spawn(hold); else { spawn(queue.shift()); queue.push(nextType()); }
+      hold = t0;
+      holdUsed = true;
+      api.audio.tone(300, 0.06, { type: 'triangle', vol: 0.12 });
+    }
+
+    spawn(queue.shift()); queue.push(nextType());
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        if (over) { overT += dt; if (overT > 1.1) api.gameOver(); inp.takeSwipes(); return; }
+
+        if (clearing) {
+          clearing.t += dt;
+          if (clearing.t > 0.22) {
+            clearing.rows.forEach(function (row) {
+              grid.splice(row, 1);
+              grid.unshift(new Array(COLS).fill(null));
+            });
+            clearing = null;
+            spawn(queue.shift()); queue.push(nextType());
+          }
+          inp.takeSwipes();
+          return;
+        }
+        if (!cur) return;
+
+        // Rotation / hold / hard drop (edge triggered)
+        if (inp.hit('up') || inp.hit('c')) rotate(1);
+        if (inp.hit('b')) rotate(-1);
+        if (inp.hit('d')) doHold();
+        if (!cur) return;
+        if (inp.hit('a')) { hardDrop(); return; }
+
+        // Swipe / tap controls on the canvas
+        var sw = inp.takeSwipes();
+        for (var i = 0; i < sw.length && cur; i++) {
+          if (sw[i] === 'tap') rotate(1);
+          else if (sw[i] === 'left') move(-1);
+          else if (sw[i] === 'right') move(1);
+          else if (sw[i] === 'down') { hardDrop(); return; }
+          else if (sw[i] === 'up') doHold();
+        }
+        if (!cur) return;
+
+        // DAS / ARR horizontal movement
+        var L = inp.held('left'), R = inp.held('right');
+        var want = L && !R ? -1 : R && !L ? 1 : 0;
+        if (inp.hit('left')) { dasDir = -1; dasT = 0; arrT = 0; move(-1); }
+        else if (inp.hit('right')) { dasDir = 1; dasT = 0; arrT = 0; move(1); }
+        else if (want && want === dasDir) {
+          dasT += dt;
+          if (dasT > 0.16) { arrT += dt; while (arrT > 0.045) { arrT -= 0.045; if (!move(want)) break; } }
+        } else if (want) { dasDir = want; dasT = 0; } else dasDir = null;
+
+        // Gravity (soft drop while down is held)
+        var g = gravity(level);
+        var soft = inp.held('down');
+        var interval = soft ? Math.min(g, 0.035) : g;
+        if (grounded()) {
+          lockT += dt;
+          if (lockT >= 0.5) lock();
+        } else {
+          fallT += dt;
+          while (fallT >= interval && cur && !grounded()) {
+            fallT -= interval;
+            cur.y++;
+            if (soft) api.addScore(1);
+          }
+          if (cur && grounded()) fallT = 0;
+        }
+        api.setStatus('LV ' + level + '  LINES ' + lines);
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#05060f';
+        ctx.fillRect(0, 0, W, H);
+        // board
+        ctx.fillStyle = '#0a0d1e';
+        ctx.fillRect(BX, BY, COLS * CELL, (ROWS - HIDDEN) * CELL);
+        ctx.strokeStyle = 'rgba(63,240,255,0.06)';
+        ctx.beginPath();
+        for (var x = 1; x < COLS; x++) { ctx.moveTo(BX + x * CELL + 0.5, BY); ctx.lineTo(BX + x * CELL + 0.5, BY + (ROWS - HIDDEN) * CELL); }
+        for (var y = 1; y < ROWS - HIDDEN; y++) { ctx.moveTo(BX, BY + y * CELL + 0.5); ctx.lineTo(BX + COLS * CELL, BY + y * CELL + 0.5); }
+        ctx.stroke();
+        ctx.save();
+        ctx.strokeStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 12; ctx.lineWidth = 2;
+        ctx.strokeRect(BX - 2, BY - 2, COLS * CELL + 4, (ROWS - HIDDEN) * CELL + 4);
+        ctx.restore();
+
+        for (y = HIDDEN; y < ROWS; y++) for (x = 0; x < COLS; x++) {
+          if (!grid[y][x]) continue;
+          var flash = clearing && clearing.rows.indexOf(y) >= 0;
+          drawCell(ctx, BX + x * CELL, BY + (y - HIDDEN) * CELL, CELL, flash ? '#ffffff' : grid[y][x], flash ? 1 - clearing.t * 3 : 1);
+        }
+        if (cur && !over) {
+          var gy = ghostY();
+          ctx.save();
+          ctx.strokeStyle = COLORS[cur.type]; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5;
+          cells(cur, cur.rot, cur.x, gy).forEach(function (c) {
+            if (c[1] >= HIDDEN) ctx.strokeRect(BX + c[0] * CELL + 2.5, BY + (c[1] - HIDDEN) * CELL + 2.5, CELL - 5, CELL - 5);
+          });
+          ctx.restore();
+          cells(cur).forEach(function (c) {
+            if (c[1] >= HIDDEN) drawCell(ctx, BX + c[0] * CELL, BY + (c[1] - HIDDEN) * CELL, CELL, COLORS[cur.type]);
+          });
+        }
+
+        // side panel
+        function mini(type, cx, cy, size, dim) {
+          if (!type) return;
+          var m = ROT[type][0];
+          var minX = 9, maxX = -1, minY = 9, maxY = -1;
+          for (var yy = 0; yy < m.length; yy++) for (var xx = 0; xx < m.length; xx++) if (m[yy][xx]) {
+            minX = Math.min(minX, xx); maxX = Math.max(maxX, xx); minY = Math.min(minY, yy); maxY = Math.max(maxY, yy);
+          }
+          var w = (maxX - minX + 1) * size, h = (maxY - minY + 1) * size;
+          for (yy = 0; yy < m.length; yy++) for (xx = 0; xx < m.length; xx++) if (m[yy][xx]) {
+            drawCell(ctx, cx - w / 2 + (xx - minX) * size, cy - h / 2 + (yy - minY) * size, size, COLORS[type], dim ? 0.35 : 1);
+          }
+        }
+        function label(text, yy) {
+          ctx.fillStyle = 'rgba(200,220,255,0.6)';
+          ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(text, PX, yy);
+        }
+        var pw = W - PX - 12;
+        label('NEXT', BY + 10);
+        ctx.strokeStyle = 'rgba(63,240,255,0.25)';
+        ctx.strokeRect(PX, BY + 18, pw, 200);
+        mini(queue[0], PX + pw / 2, BY + 62, 20);
+        mini(queue[1], PX + pw / 2, BY + 130, 15);
+        mini(queue[2], PX + pw / 2, BY + 186, 15);
+        label('HOLD', BY + 246);
+        ctx.strokeRect(PX, BY + 254, pw, 76);
+        mini(hold, PX + pw / 2, BY + 292, 18, holdUsed);
+        label('LEVEL', BY + 360);
+        U.glowText(ctx, String(level), PX + pw / 2, BY + 388, 20, '#ffd23f');
+        label('LINES', BY + 426);
+        U.glowText(ctx, String(lines), PX + pw / 2, BY + 454, 20, ACCENT);
+        if (b2b) { label('B2B', BY + 496); }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#05060f';
+    ctx.fillRect(0, 0, w, h);
+    var size = Math.max(6, Math.floor(h / 14));
+    var cols = Math.floor(w / size);
+    var ox = (w - cols * size) / 2;
+    var stack = [3, 4, 2, 5, 5, 3, 1, 4, 6, 2, 3, 5, 4, 2];
+    var palette = TYPES.map(function (k) { return COLORS[k]; });
+    for (var x = 0; x < cols; x++) {
+      var hgt = stack[x % stack.length];
+      for (var y = 0; y < hgt; y++) {
+        drawCell(ctx, ox + x * size, h - (y + 1) * size, size, palette[(x * 3 + y) % 7], 0.9);
+      }
+    }
+    var cyc = (t * 0.7) % 1;
+    var type = TYPES[Math.floor(t * 0.7) % 7];
+    var m = ROT[type][Math.floor(t * 1.4) % 4];
+    var px = ox + Math.floor(cols / 2 - 1) * size;
+    var py = -size * 2 + cyc * (h - size * 6);
+    for (var yy = 0; yy < m.length; yy++) for (var xx = 0; xx < m.length; xx++) if (m[yy][xx]) {
+      drawCell(ctx, px + xx * size, py + yy * size, size, COLORS[type]);
+    }
+  }
+
+  XA.registerGame({
+    id: 'xa_block_drop',
+    order: 2,
+    title: 'Block Drop',
+    tagline: 'Stack, clear, survive the speed-up.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'blocks',
+    controls: '←→ move · ↑/X rotate · Z counter · Space drop · C hold',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-cave-diver.js */
+/*
+ * Xtrata Arcade cartridge #3 — CAVE DIVER
+ * One button: hold to swim up, release to sink. Thread an endless cave that
+ * narrows and speeds up; grab pearls for a combo, skim walls for CLOSE bonus.
+ * Contract game-id: xa_cave_diver (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-cave-diver');
+  var U = XA.util;
+
+  var W = 600, H = 400, COL = 12, PLAYER_X = 150, R = 9;
+  var ACCENT = '#ff9a3f', WALL = '#19c3b0', PEARL = '#ffe66d', JELLY = '#ff4fd8';
+
+  function create(api) {
+    var rng = api.rng;
+    var cols = [];          // { top, bot } per COL-wide world column
+    var firstCol = 0;       // world index of cols[0]
+    var center = H / 2, drift = 0;
+    var dist = 0, speed = 190;
+    var y = H / 2, vy = 0;
+    var started = false, dead = false, deadT = 0;
+    var pearls = [], jellies = [];
+    var pickups = 0, bonus = 0, chain = 0, closeCd = 0, bubbleT = 0;
+    var t = 0;
+
+    function gapFor(d) { return U.lerp(250, 118, U.clamp(d / 14000, 0, 1)); }
+    function genCol(index) {
+      var d = index * COL;
+      drift += (rng() - 0.5) * 3.2;
+      drift *= 0.94;
+      center += drift;
+      var gap = gapFor(d);
+      var margin = 26;
+      center = U.clamp(center, margin + gap / 2, H - margin - gap / 2);
+      var wobble = Math.sin(index * 0.35) * 6;
+      var c = { top: center - gap / 2 + wobble, bot: center + gap / 2 + wobble };
+      // Spawn pickups and hazards inside the gap.
+      if (index > 40 && rng() < 0.045) {
+        pearls.push({ x: d, y: U.lerp(c.top + 22, c.bot - 22, rng()), got: false });
+      }
+      if (d > 2500 && rng() < 0.012 + U.clamp(d / 60000, 0, 0.02)) {
+        jellies.push({ x: d, baseY: (c.top + c.bot) / 2, amp: (c.bot - c.top) * 0.28, phase: rng() * 6, r: 11 });
+      }
+      return c;
+    }
+    function colAt(worldX) {
+      var i = Math.floor(worldX / COL) - firstCol;
+      return cols[U.clamp(i, 0, cols.length - 1)];
+    }
+    function fill() {
+      var need = Math.ceil((dist + W + COL * 4) / COL);
+      while (firstCol + cols.length < need) cols.push(genCol(firstCol + cols.length));
+      var drop = Math.floor((dist - COL * 4) / COL) - firstCol;
+      if (drop > 0) { cols.splice(0, drop); firstCol += drop; }
+      pearls = pearls.filter(function (p) { return p.x > dist - 40; });
+      jellies = jellies.filter(function (j) { return j.x > dist - 40; });
+    }
+    for (var i = 0; i < 40; i++) cols.push(genCol(i));
+    center = H / 2;
+    fill();
+
+    function die() {
+      dead = true;
+      api.fx.burst(PLAYER_X, y, ACCENT, 36, 230, 0.9);
+      api.fx.burst(PLAYER_X, y, '#bfefff', 20, 120, 1.1);
+      api.shake(12);
+      api.audio.tone(200, 0.4, { type: 'sawtooth', slide: 0.3, vol: 0.28 });
+      api.audio.noise(0.35, { vol: 0.25, cutoff: 900 });
+    }
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        var hold = inp.held('hold') || inp.held('a') || inp.held('up');
+        inp.takeSwipes();
+        if (dead) { deadT += dt; if (deadT > 1) api.gameOver(); return; }
+        if (!started) {
+          y = H / 2 + Math.sin(t * 3) * 8;
+          if (hold) { started = true; vy = -120; api.audio.tone(600, 0.08, { type: 'triangle', vol: 0.15 }); }
+          return;
+        }
+        // physics
+        vy += (hold ? -1450 : 1050) * dt;
+        vy = U.clamp(vy, -380, 420);
+        y += vy * dt;
+        speed = Math.min(430, 190 + dist * 0.012);
+        dist += speed * dt;
+        fill();
+
+        var wx = dist + PLAYER_X;
+        // wall collision: sample three columns under the player
+        var near = 999;
+        for (var k = -1; k <= 1; k++) {
+          var c = colAt(wx + k * R);
+          if (y - R < c.top || y + R > c.bot) { die(); return; }
+          near = Math.min(near, y - R - c.top, c.bot - (y + R));
+        }
+        closeCd -= dt;
+        if (near < 7 && closeCd <= 0) {
+          closeCd = 1.1;
+          bonus += 15;
+          api.fx.text(PLAYER_X + 30, y - 18, 'CLOSE +15', '#bfefff', 11);
+          api.audio.tone(900, 0.05, { type: 'sine', vol: 0.12 });
+        }
+        // pearls
+        pearls.forEach(function (p) {
+          if (p.got) return;
+          var dx = p.x - wx, dy = p.y - y;
+          if (dx * dx + dy * dy < (R + 9) * (R + 9)) {
+            p.got = true;
+            chain = Math.min(10, chain + 1);
+            var pts = 20 * chain;
+            pickups += pts;
+            api.fx.burst(PLAYER_X + dx, p.y, PEARL, 16, 150);
+            api.fx.text(PLAYER_X + dx, p.y - 16, '+' + pts + (chain > 1 ? ' x' + chain : ''), PEARL, 12);
+            api.audio.tone(700 + chain * 60, 0.07, { type: 'square', vol: 0.16 });
+          } else if (dx < -30 && !p.missed) {
+            p.missed = true;
+            if (chain > 1) api.fx.text(PLAYER_X, y + 22, 'CHAIN LOST', '#8899aa', 10);
+            chain = 0;
+          }
+        });
+        // jellies
+        for (var j = 0; j < jellies.length; j++) {
+          var jl = jellies[j];
+          var jy = jl.baseY + Math.sin(t * 1.6 + jl.phase) * jl.amp;
+          var ddx = jl.x - wx, ddy = jy - y;
+          if (ddx * ddx + ddy * ddy < (R + jl.r - 2) * (R + jl.r - 2)) { die(); return; }
+        }
+        // distance score: 1 point per 10px travelled
+        api.setScore(Math.floor(dist / 10) + pickups + bonus);
+        bubbleT += dt;
+        if (bubbleT > 0.05) {
+          bubbleT = 0;
+          api.fx.trail(PLAYER_X - 12, y + (Math.random() - 0.5) * 6, 'rgba(190,240,255,0.8)', -speed * 0.4, -20 - Math.random() * 30);
+        }
+        api.setStatus(Math.floor(dist / 10) + ' m' + (chain > 1 ? '  CHAIN x' + chain : ''));
+      },
+
+      render: function (ctx) {
+        var g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#031526');
+        g.addColorStop(1, '#010812');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        // far parallax rocks
+        ctx.fillStyle = 'rgba(25,195,176,0.07)';
+        ctx.beginPath();
+        ctx.moveTo(0, H);
+        for (var x = 0; x <= W; x += 20) {
+          var px = x + dist * 0.25;
+          ctx.lineTo(x, H - 60 - Math.sin(px * 0.01) * 30 - Math.sin(px * 0.023) * 18);
+        }
+        ctx.lineTo(W, H);
+        ctx.fill();
+        // light rays
+        ctx.save();
+        ctx.globalAlpha = 0.05;
+        ctx.fillStyle = '#9fe8ff';
+        for (var r = 0; r < 4; r++) {
+          var rx = ((r * 190 - dist * 0.1) % (W + 200) + W + 200) % (W + 200) - 100;
+          ctx.beginPath();
+          ctx.moveTo(rx, 0); ctx.lineTo(rx + 60, 0); ctx.lineTo(rx - 40, H); ctx.lineTo(rx - 90, H);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // cave walls
+        var offset = dist - firstCol * COL;
+        function wall(isTop) {
+          ctx.beginPath();
+          ctx.moveTo(-COL, isTop ? 0 : H);
+          for (var i = 0; i < cols.length; i++) {
+            var sx = i * COL - offset;
+            if (sx < -COL * 2 || sx > W + COL * 2) continue;
+            ctx.lineTo(sx, isTop ? cols[i].top : cols[i].bot);
+          }
+          ctx.lineTo(W + COL, isTop ? 0 : H);
+          ctx.closePath();
+        }
+        ctx.save();
+        [true, false].forEach(function (isTop) {
+          var wg = ctx.createLinearGradient(0, isTop ? 0 : H, 0, H / 2);
+          wg.addColorStop(0, '#04241f');
+          wg.addColorStop(1, '#0b4a42');
+          ctx.fillStyle = wg;
+          wall(isTop);
+          ctx.fill();
+          ctx.strokeStyle = WALL; ctx.lineWidth = 2; ctx.shadowColor = WALL; ctx.shadowBlur = 12;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        });
+        ctx.restore();
+
+        // pearls
+        pearls.forEach(function (p) {
+          if (p.got) return;
+          var sx = p.x - dist;
+          if (sx < -20 || sx > W + 20) return;
+          ctx.save();
+          ctx.shadowColor = PEARL; ctx.shadowBlur = 14; ctx.fillStyle = PEARL;
+          ctx.beginPath();
+          var s = 7 + Math.sin(t * 5 + p.x) * 1.2;
+          ctx.moveTo(sx, p.y - s); ctx.lineTo(sx + s, p.y); ctx.lineTo(sx, p.y + s); ctx.lineTo(sx - s, p.y);
+          ctx.fill();
+          ctx.restore();
+        });
+        // jellies
+        jellies.forEach(function (jl) {
+          var sx = jl.x - dist;
+          if (sx < -30 || sx > W + 30) return;
+          var jy = jl.baseY + Math.sin(t * 1.6 + jl.phase) * jl.amp;
+          ctx.save();
+          ctx.shadowColor = JELLY; ctx.shadowBlur = 16;
+          ctx.fillStyle = 'rgba(255,79,216,0.8)';
+          ctx.beginPath();
+          ctx.arc(sx, jy, jl.r, Math.PI, 0);
+          ctx.lineTo(sx + jl.r, jy + 2);
+          ctx.lineTo(sx - jl.r, jy + 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255,79,216,0.6)'; ctx.lineWidth = 1.5;
+          for (var k = -1; k <= 1; k++) {
+            ctx.beginPath();
+            ctx.moveTo(sx + k * 6, jy + 2);
+            ctx.quadraticCurveTo(sx + k * 6 + Math.sin(t * 6 + k) * 4, jy + 10, sx + k * 6, jy + 18);
+            ctx.stroke();
+          }
+          ctx.restore();
+        });
+
+        // the carp
+        if (!dead) {
+          ctx.save();
+          ctx.translate(PLAYER_X, y);
+          ctx.rotate(U.clamp(vy / 900, -0.5, 0.5));
+          ctx.shadowColor = ACCENT; ctx.shadowBlur = 14;
+          ctx.fillStyle = ACCENT;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          var wag = Math.sin(t * 18) * 4;
+          ctx.beginPath();
+          ctx.moveTo(-10, 0); ctx.lineTo(-21, -7 + wag); ctx.lineTo(-21, 7 + wag);
+          ctx.closePath();
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = '#fff3e0';
+          ctx.beginPath(); ctx.ellipse(2, 2, 7, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#05060f';
+          ctx.beginPath(); ctx.arc(7, -2.5, 1.8, 0, 7); ctx.fill();
+          ctx.restore();
+        }
+        if (!started && !dead) {
+          ctx.save();
+          ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.4;
+          U.glowText(ctx, 'HOLD TO SWIM', W / 2, H / 2 + 60, 16, '#bfefff');
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#031526'); g.addColorStop(1, '#010812');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    var off = t * 60;
+    function edge(isTop) {
+      ctx.beginPath();
+      ctx.moveTo(0, isTop ? 0 : h);
+      for (var x = 0; x <= w; x += 6) {
+        var c = h / 2 + Math.sin((x + off) * 0.018) * h * 0.14;
+        var gap = h * 0.5 + Math.sin((x + off) * 0.05) * h * 0.04;
+        ctx.lineTo(x, isTop ? c - gap / 2 : c + gap / 2);
+      }
+      ctx.lineTo(w, isTop ? 0 : h);
+      ctx.closePath();
+      ctx.fillStyle = '#083a34';
+      ctx.fill();
+      ctx.strokeStyle = WALL; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.save();
+    ctx.shadowColor = WALL; ctx.shadowBlur = 8;
+    edge(true); edge(false);
+    ctx.restore();
+    var px = w * 0.3;
+    var py = h / 2 + Math.sin((px + off) * 0.018) * h * 0.14;
+    ctx.save();
+    ctx.shadowColor = ACCENT; ctx.shadowBlur = 10; ctx.fillStyle = ACCENT;
+    ctx.beginPath(); ctx.ellipse(px, py, 8, 5, 0, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(px - 13, py - 5 + Math.sin(t * 16) * 2); ctx.lineTo(px - 13, py + 5 + Math.sin(t * 16) * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_cave_diver',
+    order: 3,
+    title: 'Cave Diver',
+    tagline: 'Hold to swim. Let go to sink.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hold',
+    controls: 'Hold Space / ↑ / tap-and-hold',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>
+window.XA_CONFIG = { subtitle: 'Preview cabinet · three games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
+XARoom.boot(document.getElementById('xa-root'));
+</script>

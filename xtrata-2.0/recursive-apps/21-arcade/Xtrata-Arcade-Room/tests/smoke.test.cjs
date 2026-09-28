@@ -1,0 +1,214 @@
+// End-to-end smoke test: parent loader (mocked get-chunk), room, all three games,
+// game-over → submit through a mock host wallet bridge.
+// Run: NODE_PATH=<dir with playwright + @stacks/transactions> node tests/smoke.test.cjs [outDir]
+const { chromium } = require('playwright');
+const T = require('@stacks/transactions');
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const assert = require('assert');
+
+const ROOT = path.join(__dirname, '..');
+const OUT = process.argv[2] || path.join(ROOT, 'tests', 'out');
+fs.mkdirSync(OUT, { recursive: true });
+const FILES = { 101: 'arcade-room.css', 102: 'arcade-kit.js', 103: 'score-client.js', 104: 'arcade-room.js',
+  105: 'game-neon-snake.js', 106: 'game-block-drop.js', 107: 'game-cave-diver.js' };
+const CHUNK = 16384;
+const P1 = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', P2 = 'SP000000000000000000002Q6VF78';
+
+function server() {
+  return new Promise((res) => {
+    const s = http.createServer((req, rsp) => {
+      const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]));
+      if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
+      let body = fs.readFileSync(f);
+      if (f.endsWith('xtrata-arcade-parent.template.html')) {
+        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107 }');
+      }
+      const type = f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : 'text/javascript';
+      rsp.writeHead(200, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
+      rsp.end(body);
+    }).listen(0, () => res(s));
+  });
+}
+const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'POST, OPTIONS' };
+const entry = (name, player, score) => T.someCV(T.tupleCV({ name: T.stringAsciiCV(name), player: T.standardPrincipalCV(player), score: T.uintCV(score), 'updated-at': T.uintCV(170000) }));
+function board(entries) {
+  const l = entries.map((e) => entry(...e));
+  while (l.length < 10) l.push(T.noneCV());
+  return T.cvToHex(T.responseOkCV(T.listCV(l)));
+}
+const SNAKE_BOARD = board(Array.from({ length: 10 }, (_, i) => [['JIM', 'ZED', 'ACE', 'NEO', 'MAX', 'KAI', 'LEO', 'RAY', 'SKY', 'OZZ'][i], i % 2 ? P2 : P1, 1000 - i * 100]));
+const EMPTY_BOARD = board([]);
+const stats = { chunkReads: 0, boardReads: {}, feeReads: 0 };
+
+async function mockApi(ctx) {
+  await ctx.route('https://api.mainnet.hiro.so/**', async (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const url = req.url();
+    const args = (JSON.parse(req.postData() || '{}').arguments) || [];
+    const ok = (result) => route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'application/json' }, body: JSON.stringify({ okay: true, result }) });
+    if (url.endsWith('/xtrata-v3-2-3/get-chunk')) {
+      stats.chunkReads++;
+      const id = Number(T.cvToValue(T.hexToCV(args[0]))), idx = Number(T.cvToValue(T.hexToCV(args[1])));
+      const data = fs.readFileSync(path.join(ROOT, 'modules', FILES[id]));
+      const part = data.subarray(idx * CHUNK, (idx + 1) * CHUNK);
+      return ok(part.length ? T.cvToHex(T.someCV(T.bufferCV(part))) : T.cvToHex(T.noneCV()));
+    }
+    if (url.endsWith('/get-fee-unit')) { stats.feeReads++; return ok(T.cvToHex(T.responseOkCV(T.uintCV(30000)))); }
+    if (url.endsWith('/get-top10')) {
+      const gid = T.cvToValue(T.hexToCV(args[0]));
+      stats.boardReads[gid] = (stats.boardReads[gid] || 0) + 1;
+      if (gid === 'xa_cave_diver') return route.fulfill({ status: 503, headers: cors, body: 'down' });
+      return ok(gid === 'xa_neon_snake' ? SNAKE_BOARD : EMPTY_BOARD);
+    }
+    return route.fulfill({ status: 404, headers: cors });
+  });
+}
+
+(async () => {
+  const srv = await server();
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined });
+  const errors = [];
+  let n = 0;
+  const check = (c, m) => { assert.ok(c, m); n++; console.log('  ✓', m); };
+
+  /* ---------- 1. Parent inside a sandboxed iframe of a mock host ---------- */
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 } });
+  await mockApi(ctx);
+  const page = await ctx.newPage();
+  page.on('pageerror', (e) => errors.push('page: ' + e.message));
+  page.on('console', (m) => { if (m.type() === 'error' && !/503|Failed to load resource/.test(m.text())) errors.push('console: ' + m.text()); });
+  await page.goto(base + '/tests/mock-host.html');
+  const frame = page.frames().find((f) => f !== page.mainFrame());
+  await frame.waitForSelector('.xa-cab', { timeout: 20000 });
+  check((await frame.$$('.xa-cab')).length === 3, 'parent loaded 7 leaves from get-chunk and room shows 3 cabinets');
+  check(stats.chunkReads >= 14, `modules read via get-chunk (${stats.chunkReads} calls)`);
+  await frame.waitForFunction(() => document.querySelector('[data-game="xa_neon_snake"] .xa-top1').textContent !== '…');
+  check((await frame.textContent('[data-game="xa_neon_snake"] .xa-top1')).includes('1,000 JIM'), 'snake cabinet shows chain #1 from get-top10');
+  await frame.waitForFunction(() => document.querySelector('[data-game="xa_cave_diver"] .xa-top1').textContent !== '…');
+  check((await frame.textContent('[data-game="xa_cave_diver"] .xa-top1')) === 'offline', 'failed board read shows offline, not empty');
+  check((await frame.textContent('[data-game="xa_block_drop"] .xa-top1')) === 'be first', 'empty board shows be first');
+  await frame.waitForFunction(() => window.XAScores.status().route === 'host');
+  check(true, 'hello handshake granted host bridge');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: path.join(OUT, '01-room.png') });
+
+  // scoreboard modal
+  await frame.click('[data-game="xa_neon_snake"] .xa-cab-actions .xa-btn:not(.xa-btn-play)');
+  await frame.waitForSelector('.xa-board li');
+  check((await frame.$$('.xa-board li')).length === 10, 'scoreboard lists 10 entries');
+  await page.screenshot({ path: path.join(OUT, '02-scores.png') });
+  await frame.click('.xa-tab:nth-child(3)');
+  await frame.waitForSelector('.xa-error');
+  check(true, 'cave board error state distinct from empty');
+  await frame.press('body', 'Escape');
+
+  /* ---------- 2. Neon Snake: play, die, submit via generic contract call ---------- */
+  await frame.click('[data-play="xa_neon_snake"]');
+  await frame.waitForFunction(() => window.XARoom._session() && window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await frame.focus('.xa-stage');
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: path.join(OUT, '03-snake.png') });
+  await frame.evaluate(() => { window.XARoom._session().score = 5000; });
+  // steer into the bottom wall
+  await frame.waitForSelector('.xa-over', { timeout: 15000 });
+  check(true, 'snake dies on wall and shows game over');
+  await frame.waitForSelector('.xa-name', { timeout: 5000 });
+  const verdict = await frame.textContent('.xa-verdict');
+  check(/#1/.test(verdict), 'score 5000 ranks #1: ' + verdict.trim());
+  await frame.fill('.xa-name', 'tester!!');
+  check((await frame.inputValue('.xa-name')) === 'TESTER', 'name is sanitised and uppercased');
+  await page.screenshot({ path: path.join(OUT, '04-gameover.png') });
+  await frame.click('.xa-btn-primary');
+  try { await frame.waitForSelector('.xa-msg.is-ok', { timeout: 8000 }); }
+  catch (e) { console.error('msg:', await frame.textContent('.xa-msg'), JSON.stringify(await page.evaluate(() => window.__calls))); throw e; }
+  const calls = await page.evaluate(() => window.__calls);
+  const methods = calls.map((c) => c.method);
+  check(methods.join(',') === 'wallet_connect,xtrata_submitArcadeScore,stx_callContract', 'bridge order: connect → narrow → generic (' + methods.join(',') + ')');
+  const narrowCall = calls[1].params;
+  check(narrowCall.gameId === 'xa_neon_snake' && narrowCall.score === '5000' && narrowCall.name === 'TESTER' && narrowCall.contract.endsWith('xtrata-arcade-scores-v1-3'), 'narrow request carries only game/score/name/contract');
+  const cc = calls[2].params;
+  check(cc.functionName === 'submit-score' && cc.postConditionMode === 'deny', 'generic call targets submit-score in deny mode');
+  const decoded = cc.functionArgs.map((h) => T.cvToValue(T.hexToCV(h)));
+  check(JSON.stringify(decoded.map(String)) === JSON.stringify(['xa_neon_snake', '0', '5000', 'TESTER']), 'functionArgs decode to (game-id, mode, score, name)');
+  check(cc.postConditions.length === 1 && cc.postConditions[0].amount === '30000' && cc.postConditions[0].conditionCode === 'lte' && cc.postConditions[0].principal === P2, 'single STX post-condition ≤ contract fee from connected wallet');
+  check(!('sender' in cc), 'no sender field on stx_callContract');
+  check((await frame.getAttribute('.xa-msg a', 'href')).includes('0xabc123'), 'explorer link uses returned txid');
+  await page.screenshot({ path: path.join(OUT, '05-submitted.png') });
+
+  /* ---------- 3. Block Drop: play with keys, hard-drop until top-out ---------- */
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)'); // back to room
+  await frame.click('[data-play="xa_block_drop"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  for (let i = 0; i < 6; i++) {
+    await page.keyboard.press(i % 2 ? 'ArrowLeft' : 'ArrowRight');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(80);
+  }
+  await page.screenshot({ path: path.join(OUT, '06-blockdrop.png') });
+  const bdScore = await frame.evaluate(() => window.XARoom._session().score);
+  check(bdScore > 0, 'block drop hard drops add score (' + bdScore + ')');
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Space'); await page.waitForTimeout(40); }
+  await frame.waitForSelector('.xa-over', { timeout: 15000 });
+  check(true, 'block drop tops out into game over');
+  await frame.waitForFunction(() => /top 10/.test(document.querySelector('.xa-verdict').textContent), null, { timeout: 5000 });
+  check(true, 'empty board: any score makes the top 10');
+
+  /* ---------- 4. Cave Diver: hold to swim, crash ---------- */
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
+  await frame.click('[data-play="xa_cave_diver"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await page.keyboard.down('Space'); await page.waitForTimeout(250); await page.keyboard.up('Space');
+  for (let i = 0; i < 8; i++) { await page.keyboard.down('Space'); await page.waitForTimeout(160); await page.keyboard.up('Space'); await page.waitForTimeout(170); }
+  await page.screenshot({ path: path.join(OUT, '07-cave.png') });
+  const caveScore = await frame.evaluate(() => window.XARoom._session().score);
+  check(caveScore > 0, 'cave diver distance scores (' + caveScore + ')');
+  await frame.waitForSelector('.xa-over', { timeout: 20000 });
+  check(true, 'cave diver crashes into game over');
+  await frame.waitForFunction(() => /Couldn/.test(document.querySelector('.xa-verdict').textContent), null, { timeout: 5000 });
+  check(true, 'board offline → still offers to post, with honest message');
+  await page.screenshot({ path: path.join(OUT, '08-cave-over.png') });
+
+  /* ---------- 5. Narrow host method path ---------- */
+  const page2 = await ctx.newPage();
+  await page2.goto(base + '/tests/mock-host.html?narrow=1');
+  const f2 = page2.frames().find((f) => f !== page2.mainFrame());
+  await f2.waitForSelector('.xa-cab', { timeout: 20000 });
+  await f2.waitForFunction(() => window.XAScores.status().route === 'host');
+  const r = await f2.evaluate(() => window.XAScores.submit({ gameId: 'xa_block_drop', score: 777, name: 'NARROW' }));
+  const calls2 = await page2.evaluate(() => window.__calls.map((c) => c.method));
+  check(r.ok && r.route === 'host:arcade' && calls2.join(',') === 'wallet_connect,xtrata_submitArcadeScore', 'narrow host method used when supported');
+  await page2.close();
+
+  /* ---------- 6. Direct page, no wallet: view-only ---------- */
+  const mobile = await browser.newContext({ viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  await mockApi(mobile);
+  const p3 = await mobile.newPage();
+  p3.on('pageerror', (e) => errors.push('mobile: ' + e.message));
+  await p3.goto(base + '/index.html');
+  await p3.waitForSelector('.xa-cab');
+  check((await p3.evaluate(() => window.XAScores.status().route)) === 'none', 'standalone page with no wallet is view-only');
+  await p3.waitForTimeout(500);
+  await p3.screenshot({ path: path.join(OUT, '09-mobile-room.png') });
+  await p3.click('[data-play="xa_block_drop"]');
+  await p3.waitForSelector('.xa-pad');
+  check((await p3.$$('.xa-pad')).length === 7, 'block drop shows 7 touch pads on mobile');
+  await p3.waitForTimeout(3300);
+  await p3.screenshot({ path: path.join(OUT, '10-mobile-blocks.png') });
+  const noScroll = await p3.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+  check(noScroll, 'no horizontal scroll at 390px');
+  await p3.click('.xa-hud .xa-icon');
+  await p3.click('[data-play="xa_neon_snake"]');
+  await p3.waitForTimeout(3300);
+  await p3.screenshot({ path: path.join(OUT, '11-mobile-snake.png') });
+
+  await browser.close();
+  srv.close();
+  if (errors.length) { console.error('Page errors:\n' + errors.join('\n')); process.exit(1); }
+  console.log(`\nsmoke tests passed: ${n}`);
+})().catch((e) => { console.error(e); process.exit(1); });
