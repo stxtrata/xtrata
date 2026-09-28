@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Astro Blaster 3.0.2: sign scores in the game on top-level pages (2026-09-28)
+
+- **Why:** on `/i/<id>` (and preview hosts) Submit opened `https://xtrata.xyz/arcade/submit`, which production does not serve until this branch ships, so players landed on the homepage. X Chess signs from the page itself.
+- **Change:** when the game is the top-level page and a wallet extension is present, Submit re-verifies the run, reads the board and rank, connects the pilot wallet (chooser; any other account is refused before signing) and sends `submit-score` in deny mode through the bundled Xtrata wallet module — the X Chess/canary port of the playbook rules. Free boards only; otherwise it links to the submit page. Viewer embeds keep the host path. Submit links stay on the current Xtrata host. The pilot button uses the same module. Engine and `release/sim.js` unchanged.
+- **Verified:** browser run of the built file against a simnet-backed wallet and API: pilot connect, full campaign run to game over, in-game submit accepted `(ok u1)` and listed; after reload the chooser appears in the results box, a wrong account is refused with no signing request, and the daily run is accepted; the 3.0.1 pilot checks still pass; engine tests pass.
+
 ## Astro Blaster 3.0.1: wallet address on top-level pages (2026-09-28)
 
 - **Why:** on `/i/3073` the game is the whole page, so its "Use my wallet" button (which asks the embedding viewer) was hidden and players had to paste their address.

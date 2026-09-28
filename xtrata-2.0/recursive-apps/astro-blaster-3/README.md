@@ -30,8 +30,9 @@ The contract requires bytes 4-23 to equal the submitting wallet's hash160.
 ## Releases
 
 - **3.0.0** — inscription #3073 (parents #73, #2805).
-- **3.0.1** — "Use my wallet" on the pilot screen now works everywhere. Inside the xtrata.xyz viewer it asks the host (as before); on a top-level page such as `/i/<id>` it reads the address straight from Xverse or Leather (chooser every time, Xverse drops its old session first, never `stx_getAccounts`; read-only, nothing is signed). Engine unchanged (v1), so every existing score and replay stays valid.
-  To ship: inscribe `release/astro-blaster-3.html` with parent #3073, then re-run the canary's production step with the new id (only `engine-id` changes; board mode is untouched) and point the homepage tile at it.
+- **3.0.1** — inscription #3074. "Use my wallet" on top-level pages such as `/i/<id>` (reads the address straight from Xverse or Leather).
+- **3.0.2** — on a top-level page with a wallet extension, **Submit to chain signs in the game**, the way X Chess does, through the same bundled wallet module (`canaries/collection-v17/wallet.ts`: chooser every connect, Xverse account preflight, never `sender`, never `stx_getAccounts`, 90 s watchdog). Before the wallet opens it re-verifies the run, reads the board (free boards only; a board with a fee falls back to the submit page) and checks the rank; a wallet that is not the pilot is refused before anything is signed. Inside the xtrata.xyz viewer the host still signs. Links to `/arcade/submit` now stay on the current Xtrata host (previews included). Engine unchanged (v1): every score and replay stays valid. File ~318 KB.
+  To ship: inscribe `release/astro-blaster-3.html` with parent #3074 (or #3073), then re-run the canary's production step with the new id and point the homepage tile at it.
 
 ## Launch checklist
 

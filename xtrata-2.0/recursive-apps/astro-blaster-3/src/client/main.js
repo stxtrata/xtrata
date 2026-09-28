@@ -95,21 +95,22 @@
     savePilot(v);
   });
   $('pilotInput').addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') $('btnPilotSave').click(); });
-  function hideWalletChoices() { var box = $('walletChoices'); box.classList.add('hidden'); box.textContent = ''; }
+  function hideWalletChoices(id) { var box = $(id || 'walletChoices'); if (box) { box.classList.add('hidden'); box.textContent = ''; } }
   // Shown on every connect (the wallet playbook's rule), so the player always picks.
-  function chooseWallet(list) {
+  function chooseWallet(list, boxId) {
+    boxId = boxId || 'walletChoices';
     return new Promise(function (resolve) {
-      var box = $('walletChoices');
+      var box = $(boxId);
       box.textContent = '';
       var label = document.createElement('div'); label.className = 'fine'; label.textContent = 'Choose a wallet:';
       box.appendChild(label);
       list.forEach(function (w) {
         var b = document.createElement('button'); b.className = 'btn small'; b.textContent = w.name;
-        b.addEventListener('click', function () { hideWalletChoices(); resolve(w); });
+        b.addEventListener('click', function () { hideWalletChoices(boxId); resolve(w.id); });
         box.appendChild(b);
       });
       var c = document.createElement('button'); c.className = 'btn small ghost'; c.textContent = 'Cancel';
-      c.addEventListener('click', function () { hideWalletChoices(); resolve(null); });
+      c.addEventListener('click', function () { hideWalletChoices(boxId); resolve(null); });
       box.appendChild(c);
       box.classList.remove('hidden');
     });
@@ -373,7 +374,7 @@
       var lastName = store.get('name', '');
       box.innerHTML = '<h3>' + esc(label) + '</h3><p>' + esc(hint) + '</p>' +
         '<div class="row"><input type="text" id="nameInput" maxlength="12" placeholder="Name (3–12)" autocomplete="off" autocapitalize="characters" spellcheck="false" value="' + esc(lastName) + '">' +
-        '<button class="btn primary" id="btnSubmit">Submit to chain</button></div><div class="msg" id="submitMsg"></div>';
+        '<button class="btn primary" id="btnSubmit">Submit to chain</button></div><div class="msg" id="submitMsg"></div><div class="walletChoices hidden" id="submitChoices" role="group" aria-label="Choose a wallet"></div>';
       $('btnSubmit').addEventListener('click', function () { doSubmit(run, bytes); });
       $('nameInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') doSubmit(run, bytes); e.stopPropagation(); });
     });
@@ -387,8 +388,9 @@
     }
     store.set('name', name);
     var payload = Chain.buildPayload({ board: run.board, period: run.period, score: run.st.score, name: name, replay: bytes, pilot: run.pilot.address });
-    msg.className = 'msg'; msg.textContent = 'Opening the Xtrata submit page…';
     $('btnSubmit').disabled = true;
+    if (!Chain.isEmbedded() && Chain.directWallet()) { directSubmit(run, bytes, name, payload); return; }
+    msg.className = 'msg'; msg.textContent = 'Opening the Xtrata submit page…';
     Chain.handOff(payload).then(function (res) {
       if (res.mode === 'host') {
         msg.className = 'msg ok'; msg.textContent = 'xtrata.xyz is opening the submit page. Confirm there with the wallet for ' + short(run.pilot.address) + '.';
@@ -413,6 +415,72 @@
         });
       }
       $('btnSubmit').disabled = false;
+    });
+  }
+  // Top-level page with a wallet extension: sign here, the way X Chess does,
+  // through the bundled Xtrata wallet module. Checks first, then one wallet prompt.
+  var SUBMIT_ERRORS = {
+    101: 'The leaderboard is paused.', 102: 'This leaderboard does not exist yet.', 103: 'This leaderboard is closed.',
+    104: 'This score is outside the allowed range.', 105: 'That name is not allowed.', 106: 'That day’s board has closed.',
+    108: 'You already have an equal or better score on this board.', 109: 'This score is no longer in the Top 10.',
+    113: 'This run was flown for a different wallet.', 114: 'This wallet is barred from this leaderboard.'
+  };
+  var progressText = {
+    'account-read': 'Checking the active wallet account. Nothing is signed yet…',
+    'account-cached': 'Wallet account confirmed. Preparing the transaction…',
+    'account-read-failed': 'The wallet did not share its account. Trying its connection flow…',
+    'account-reconnect': 'Waiting for your wallet to confirm account access…',
+    'signing-request': 'Approve the transaction in your wallet. Check the network fee before signing.'
+  };
+  function linkFallback(payload, text) {
+    var msg = $('submitMsg'), url = Chain.submitLink(payload);
+    msg.className = 'msg err';
+    msg.innerHTML = esc(text) + ' <a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:var(--cyan)">Use the submit page instead</a>';
+    $('btnSubmit').disabled = false;
+  }
+  function directSubmit(run, bytes, name, payload) {
+    var msg = $('submitMsg'), W = Chain.directWallet(), pilotAddr = run.pilot.address;
+    var say = function (t, cls) { msg.className = 'msg' + (cls ? ' ' + cls : ''); msg.textContent = t; };
+    var done = function () { $('btnSubmit').disabled = false; };
+    say('Checking the run and the leaderboard…');
+    AB3.verifyReplay(bytes, { pilot: run.pilot.hash, chunk: 6000 }).then(function (v) {
+      if (!v.ok) throw new Error('This run did not verify (' + v.reason + ').');
+      return Chain.fetchBoard(run.board).catch(function (e) { throw new Error('Could not read the leaderboard right now (' + e.message + '). Try again in a moment.'); }).then(function (b) {
+        if (!b) throw new Error('This leaderboard does not exist yet.');
+        if (!b.enabled) throw new Error('This leaderboard is closed.');
+        if (b.fee > 0) { linkFallback(payload, 'This board has an entry fee.'); return null; }
+        return Chain.previewRank(run.board, run.period, v.score, run.pilot).then(function (rank) {
+          if (rank === 0) throw new Error('The contract would refuse this score right now: it is not in the Top 10, or you already hold an equal or better entry.');
+          return v;
+        }, function () { return v; }); // rank unknown: the contract checks again
+      });
+    }).then(function (v) {
+      if (!v) return null;
+      if (W.connectedAddress() === pilotAddr) return v;
+      say('Choose your wallet to sign. It must be ' + short(pilotAddr) + '.');
+      return W.connect(function (list) { return chooseWallet(list, 'submitChoices'); }).then(function (addr) {
+        if (addr !== pilotAddr) throw new Error('This run was flown as ' + pilotAddr + ', but the wallet connected ' + addr + '. Switch to the pilot account and try again.');
+        return v;
+      });
+    }).then(function (v) {
+      if (!v) return null;
+      say('Opening your wallet…');
+      return W.submit({
+        contractAddress: CHAIN_CONFIG.contractAddress, contractName: CHAIN_CONFIG.contractName,
+        board: run.board, period: run.period, score: v.score, name: name, replay: bytes, address: pilotAddr,
+        onProgress: function (stage) { if (progressText[stage]) say(progressText[stage]); }
+      });
+    }).then(function (txId) {
+      if (!txId) return;
+      msg.className = 'msg ok';
+      msg.innerHTML = 'Submitted. Your score appears once transaction <a href="https://explorer.hiro.so/txid/' + esc(txId) + '?chain=mainnet" target="_blank" rel="noopener" style="color:var(--cyan)">' + esc(txId.slice(0, 12)) + '…</a> confirms (usually a few minutes).';
+    }, function (e) {
+      var text = String((e && e.message) || e || 'The wallet request failed.');
+      var m = /\(err u(\d+)\)/.exec(text);
+      if (m && SUBMIT_ERRORS[+m[1]]) text = SUBMIT_ERRORS[+m[1]];
+      if (/cancel/i.test(text)) say('Cancelled. Nothing was sent. You can submit again.');
+      else say(text, 'err');
+      done();
     });
   }
   function selectLink() { var r = document.createRange(); r.selectNodeContents($('linkBox')); var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); toast('Link selected — copy it'); }

@@ -1,6 +1,17 @@
 // Builds release/astro-blaster-3.html: one self-contained file, no external requests except the Stacks API.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { simSource } from './build-sim.mjs';
+import { createRequire } from 'node:module';
+// The wallet layer (top-level pages only) is the shared Xtrata wallet module,
+// bundled once with esbuild from the site's node_modules.
+const siteRequire = createRequire(new URL('../../../package.json', import.meta.url));
+const { build: esbuild } = siteRequire('esbuild');
+const walletBundle = (await esbuild({
+  entryPoints: [new URL('../src/client/wallet-entry.ts', import.meta.url).pathname],
+  absWorkingDir: new URL('../../../', import.meta.url).pathname,
+  bundle: true, format: 'iife', platform: 'browser', target: 'es2020', minify: true, write: false, legalComments: 'none',
+  define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"' }
+})).outputFiles[0].text;
 const r = (f) => readFileSync(new URL('../' + f, import.meta.url), 'utf8');
 // Production: no test hooks, and the attract-mode autopilot lives privately in
 // the client scope instead of on the global AB3 object.
@@ -8,7 +19,7 @@ function page({ test }) {
   let client = ['chain', 'render', 'audio', 'input', 'main'].map((f) => r(`src/client/${f}.js`)).join('\n');
   if (!test) client = client.replace(/\/\*TEST-HOOKS-START\*\/[\s\S]*?\/\*TEST-HOOKS-END\*\//g, '');
   const botScope = test ? '' : `var CMD = AB3.CMD, W = AB3.W, H = AB3.H;\nfunction clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }\n${r('src/sim/bot.js')}\n`;
-  const js = simSource({ bot: test }) + `\n(function () {\n'use strict';\nvar SECTORS = AB3.SECTORS;\n${botScope}${client}\n})();\n`;
+  const js = simSource({ bot: test }) + '\n' + walletBundle + `\n(function () {\n'use strict';\nvar SECTORS = AB3.SECTORS;\n${botScope}${client}\n})();\n`;
   const html = r('src/client/shell.html');
   return html.replace('/*CSS*/', () => r('src/client/style.css')).replace('/*JS*/', () => js.replace(/<\/script/gi, '<\\/script'));
 }
