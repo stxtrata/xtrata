@@ -74,6 +74,10 @@
 
 /radio/onchain.js
   Cache-Control: no-cache
+/arcade/submit.js
+  Cache-Control: no-cache
+/arcade/submit
+  Cache-Control: no-cache
 /radio/endorse
   Cache-Control: no-cache
 

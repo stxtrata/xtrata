@@ -204,6 +204,7 @@
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
+    import { openArcadeSubmit } from '/src/lib/viewer/arcade-submit-host.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
       mergeDependencySources,
@@ -9917,6 +9918,8 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             onFinish: (value) => finish(resolve, value), onCancel: () => finish(reject, Object.assign(new Error('Save publication cancelled.'), {code:4001})), onError: (error) => finish(reject, error) }); } catch (error) { finish(reject, error); }
         })
       }),
+      // Arcade scores: the host reviews, then opens the top-level /arcade/submit page.
+      arcadeSubmit: (payload, label, id) => openArcadeSubmit(window, payload, label, id),
       isBusy: () => state.busy,
       pendingChanged: setBusy,
       sessionChanged: (session) => {

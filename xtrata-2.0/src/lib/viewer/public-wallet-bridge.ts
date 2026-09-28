@@ -30,7 +30,15 @@ type Options = {
   ) => Promise<unknown>;
   isBusy?: () => boolean;
   pendingChanged?: (pending: boolean) => void;
+  /**
+   * Arcade score hand-off. The game never signs: the host reviews the request and
+   * opens the top-level /arcade/submit page, which signs through src/lib/wallet.
+   * Resolves with the opened window, or null when the player cancels.
+   */
+  arcadeSubmit?: (payload: Record<string, unknown>, label: string, id: string) => Promise<Window | null>;
 };
+const ARCADE_ID = /^[A-Za-z0-9-]{1,64}$/;
+const ARCADE_MAX_PAYLOAD = 120_000;
 const failure = (message: string, code = -32602) => Object.assign(new Error(message), { code });
 const connects = new Set([
   'stx_requestAccounts',
@@ -122,6 +130,8 @@ export function installPublicWalletBridge(options: Options) {
   type Entry = { frame: HTMLIFrameElement; label: string; grant?: Grant; reset: () => void };
   const entries = new Set<Entry>();
   let busy = false;
+  const arcadePending = new Map<string, { entry: Entry; send: (data: unknown) => void; tab: Window | null; expires: number }>();
+  let arcadeDialogOpen = false; // one host review at a time; repeated requests are refused, never stacked
   const usable = (entry: Entry) =>
     entry.frame.isConnected &&
     entry.frame.getClientRects().length > 0 &&
@@ -134,12 +144,59 @@ export function installPublicWalletBridge(options: Options) {
         entries.delete(entry);
       }
   };
+  const onArcadeResult = (event: MessageEvent) => {
+    // Results come back from the /arcade/submit tab this host opened (same origin only).
+    const p = event.data;
+    if (event.origin !== options.host.location.origin || typeof p?.id !== 'string') return;
+    const pending = arcadePending.get(p.id);
+    if (!pending || (pending.tab && event.source !== pending.tab) || pending.expires < Date.now()) return;
+    if (!pending.entry.frame.isConnected) { arcadePending.delete(p.id); return; }
+    const txId = typeof p.txId === 'string' && /^0x[0-9a-f]{64}$/i.test(p.txId) ? p.txId : undefined;
+    const error = typeof p.error === 'string' ? p.error.slice(0, 300) : undefined;
+    pending.send({ type: 'xtrata:arcade:submit-result', id: p.id, txId, error, cancelled: p.cancelled === true || undefined });
+    if (txId) arcadePending.delete(p.id);
+  };
+  const onArcadeSubmit = (event: MessageEvent, entry: Entry, send: (data: unknown) => void) => {
+    const p = event.data;
+    if (!options.arcadeSubmit || typeof p.id !== 'string' || !ARCADE_ID.test(p.id)) return;
+    const payload = p.payload;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return;
+    let size = 0;
+    try { size = JSON.stringify(payload).length; } catch { return; }
+    if (size > ARCADE_MAX_PAYLOAD) {
+      send({ type: 'xtrata:arcade:submit-result', id: p.id, error: 'This replay is too large to submit.' });
+      return;
+    }
+    if (arcadeDialogOpen) {
+      send({ type: 'xtrata:arcade:submit-result', id: p.id, error: 'A score submission is already waiting for you.' });
+      return;
+    }
+    for (const [key, pending] of arcadePending) if (pending.entry === entry || pending.expires < Date.now()) arcadePending.delete(key);
+    arcadeDialogOpen = true;
+    const record = { entry, send, tab: null as Window | null, expires: Date.now() + 30 * 60_000 };
+    arcadePending.set(p.id, record);
+    send({ type: 'xtrata:arcade:submit-opened', id: p.id });
+    options.arcadeSubmit(payload as Record<string, unknown>, entry.label, p.id).finally(() => { arcadeDialogOpen = false; }).then(
+      (tab) => {
+        if (tab) record.tab = tab;
+        else { arcadePending.delete(p.id); send({ type: 'xtrata:arcade:submit-result', id: p.id, cancelled: true }); }
+      },
+      (error) => {
+        arcadePending.delete(p.id);
+        send({ type: 'xtrata:arcade:submit-result', id: p.id, error: error instanceof Error ? error.message : 'Could not open the submit page.' });
+      }
+    );
+  };
   const onMessage = (event: MessageEvent) => {
     const p = event.data;
+    if (p && typeof p === 'object' && p.type === 'xtrata:arcade:submit-result') {
+      onArcadeResult(event);
+      return;
+    }
     if (
       !p ||
       typeof p !== 'object' ||
-      !['xtrata:wallet:hello', 'xtrata:wallet:request'].includes(p.type)
+      !['xtrata:wallet:hello', 'xtrata:wallet:request', 'xtrata:arcade:submit'].includes(p.type)
     )
       return;
     prune();
@@ -149,6 +206,10 @@ export function installPublicWalletBridge(options: Options) {
     if (!entry || !['null', options.host.location.origin].includes(event.origin)) return;
     const send = (data: unknown) =>
       (event.source as Window).postMessage(data, event.origin === 'null' ? '*' : event.origin);
+    if (p.type === 'xtrata:arcade:submit') {
+      onArcadeSubmit(event, entry, send);
+      return;
+    }
     if (p.type === 'xtrata:wallet:hello') {
       if (typeof p.nonce !== 'string' || !p.nonce || p.nonce.length > 128) return;
       // A new handshake rotates the token but preserves explicit consent only for
@@ -314,6 +375,7 @@ export function installPublicWalletBridge(options: Options) {
     },
     dispose() {
       options.host.removeEventListener('message', onMessage);
+      arcadePending.clear();
       for (const entry of entries) entry.frame.removeEventListener('load', entry.reset);
       entries.clear();
     }
