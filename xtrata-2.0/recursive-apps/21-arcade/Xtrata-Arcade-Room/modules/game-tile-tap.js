@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-tile-tap');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600, LANES = 4, LW = W / LANES, TH = 138, PERFECT_ZONE = 170;
   var ACCENT = '#3ff0ff', HOT = '#ff3fa4';
@@ -25,6 +26,29 @@
     var midi = k === 3 ? chord[0] + 12 : chord[k];
     if (Math.floor(i / 32) % 2 === 1 && i % 2 === 1) midi += 12; // second pass climbs
     return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  // Music: the engine plays a G-major dance backing (I-V-vi-IV, no lead);
+  // the PLAYER performs the lead. Each good tap plays the next note of this
+  // chord-relative phrase, so a clean run sounds like the song.
+  var LEAD = ('4 2 4 5 4 2 0 2 4 4 5 4 2 1 0 -1 ' +
+    '0 2 4 2 5 4 2 0 2 4 2 0 -1 0 1 0').split(' ').map(Number);
+  function song() {
+    return {
+      bpm: 112, key: 55, scale: 'major', chords: [0, 4, 5, 3], seed: 10,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: -1, params: { cutoff: 1500 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.08, gain: 0.6, pattern: 'x...x...x...x...' },
+        { name: 'bass', inst: 'bass', layer: 0.2, gain: 0.42, chord: true, octave: -2, params: { cutoff: 800 },
+          pattern: '. . 0 . . . 0 . . . 0 . . . ^0 .' },
+        { name: 'clap', inst: 'clap', layer: 0.32, gain: 0.45, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.45, gain: 0.4, pattern: '..x...x...x...x.' },
+        { name: 'shaker', inst: 'shaker', layer: 0.6, gain: 0.35, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'keys', inst: 'marimba', layer: 0.75, gain: 0.3, chord: true, octave: 0,
+          fn: function (i) { return i.stepInBar % 4 === 2 ? [{ deg: 2 }, { deg: 4 }] : null; } }
+      ]
+    };
   }
 
   function create(api) {
@@ -49,13 +73,32 @@
       while (topY() > -TH * 2) tiles.push({ lane: laneFor(), y: topY() - TH, hit: false, fade: 0 });
     }
     fill();
+    var lastBpm = 112, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var bpm = 112 + Math.round(U.clamp((speed - 360) / 790, 0, 1) * 18) * 2;
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 0.8); }
+      var it = Math.round(U.clamp(0.1 + count / 90 + Math.min(perfectStreak, 20) * 0.015, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function end(lane) {
       over = true;
       badLane = lane;
       api.shake(9);
-      api.audio.tone(110, 0.5, { type: 'sawtooth', vol: 0.28, slide: 0.5 });
-      api.audio.tone(116, 0.5, { type: 'sawtooth', vol: 0.2, slide: 0.5 });
+      var m = M();
+      if (m) {
+        // a muted semitone clash (B against C), then the band drops back
+        m.note('pluck', 2, { octave: 0, gain: 0.6, params: { cutoff: 900, decay: 0.5 } });
+        m.note('pluck', 3, { octave: 0, gain: 0.5, params: { cutoff: 900, decay: 0.5 } });
+        m.duck(0.6, 0.9);
+      } else {
+        api.audio.tone(110, 0.5, { type: 'sawtooth', vol: 0.28, slide: 0.5 });
+        api.audio.tone(116, 0.5, { type: 'sawtooth', vol: 0.2, slide: 0.5 });
+      }
     }
     function tap(lane) {
       if (over) return;
@@ -72,9 +115,16 @@
       var pts = 10;
       if (perfect) { perfectStreak++; pts += 5; } else perfectStreak = 0;
       api.addScore(pts);
-      var f = noteAt(count - 1);
-      api.audio.tone(f, 0.32, { type: 'triangle', vol: 0.22 });
-      api.audio.tone(f * 2, 0.12, { type: 'sine', vol: 0.06 });
+      var m = M();
+      if (m) {
+        // the player's lead: next note of the phrase, over whatever chord is playing
+        m.note('pluck', LEAD[(count - 1) % LEAD.length], { chord: true, octave: 1, gain: perfect ? 0.8 : 0.65, params: { decay: 0.42 } });
+        syncMusic();
+      } else {
+        var f = noteAt(count - 1);
+        api.audio.tone(f, 0.32, { type: 'triangle', vol: 0.22 });
+        api.audio.tone(f * 2, 0.12, { type: 'sine', vol: 0.06 });
+      }
       var cx = lane * LW + LW / 2, cy = next.y + TH / 2;
       api.fx.burst(cx, cy, perfect ? HOT : ACCENT, perfect ? 16 : 8, 150, 0.4);
       if (perfect && perfectStreak > 2 && perfectStreak % 5 === 0) api.fx.text(W / 2, 90, 'PERFECT x' + perfectStreak, HOT, 14);

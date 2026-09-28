@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-orbit-merge');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 420, H = 600;
   var LEFT = 26, RIGHT = W - 26, FLOOR = H - 22, DANGER = 118, DROP_Y = 64;
@@ -29,6 +30,25 @@
   ];
   var POINTS = TIERS.map(function (_, i) { return (i + 1) * (i + 2) / 2 * 2; }); // 2,6,12,20,…
   var G = 1500, SUB = 4;
+
+  // Soundtrack: slow, dreamy lydian drift; drums only arrive as the jar fills.
+  function song() {
+    return {
+      bpm: 76, key: 53, scale: 'lydian', chords: [0, 1, 0, 4], barsPerChord: 2, seed: 41,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.36, chord: true, octave: -1, params: { cutoff: 900, attack: 1.2, release: 1.6 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 2, steps: 32 }, { deg: 4, steps: 32 }, { deg: 6, steps: 32 }] : null; } },
+        { name: 'bells', inst: 'bell', layer: 0, gain: 0.3, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.22 ? { deg: [0, 2, 3, 4, 6, 7][Math.floor(i.rng() * 6)], vel: 0.5 + i.rng() * 0.3 } : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.18, gain: 0.3, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'sub', inst: 'sub', layer: 0.3, gain: 0.45, chord: true, octave: -2, pattern: '0 - - - - - - - . . 4 - - - . .' },
+        { name: 'marimba', inst: 'marimba', layer: 0.45, gain: 0.32, chord: true, rate: 2,
+          fn: function (i) { return [0, 4, 2, 6, 4, 7, 2, 4][(i.step / 2) % 8]; } },
+        { name: 'kick', inst: 'kick', layer: 0.65, gain: 0.45, pattern: 'x.........x.....' },
+        { name: 'rim', inst: 'clap', layer: 0.8, gain: 0.3, pattern: '........x.......' }
+      ]
+    };
+  }
 
   function planet(ctx, x, y, t, tier, alpha) {
     var d = TIERS[tier];
@@ -80,6 +100,7 @@
     var chain = 0, chainT = 0;
     var over = false, overT = 0;
     var t = 0;
+    var musicQ = -1, musicTense = false;
     var stars = [];
     for (var i = 0; i < 60; i++) stars.push({ x: rng() * W, y: rng() * H, s: rng() * 1.5 + 0.3, p: rng() * 6 });
 
@@ -115,7 +136,12 @@
         api.fx.burst(x, y, '#ffffff', 40, 220, 1);
         api.fx.text(x, y, 'SUPERNOVA +' + nova, '#ffe36e', 18);
         api.shake(16);
-        api.audio.arp([523, 659, 784, 1047, 1319], 0.07, { type: 'square', vol: 0.22 });
+        var mn = M();
+        if (mn) {
+          mn.note('riser', 0, { dur: 1.2, gain: 0.4 });
+          mn.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6 }, { deg: 11, at: 8 }, { deg: 14, at: 10, steps: 8 }],
+            { inst: 'bell', quantize: '8', octave: 1, gain: 0.7 });
+        } else api.audio.arp([523, 659, 784, 1047, 1319], 0.07, { type: 'square', vol: 0.22 });
         return;
       }
       var pts = Math.round(POINTS[tier] * mult);
@@ -125,7 +151,12 @@
       api.fx.burst(x, y, TIERS[tier].c, 12 + tier * 3, 120 + tier * 20);
       api.fx.text(x, y - TIERS[tier].r - 6, '+' + pts + (chain > 1 ? ' x' + mult : ''), TIERS[tier].c, 11 + Math.min(tier, 6));
       api.shake(Math.min(10, tier * 1.2));
-      api.audio.tone(330 * Math.pow(1.122, tier), 0.14, { type: 'sine', vol: 0.2, slide: 1.5 });
+      var m = M();
+      if (m) {
+        // bigger planet = deeper note
+        m.note(tier >= 5 ? 'bell' : 'marimba', 9 - tier, { quantize: '8', octave: tier >= 5 ? -1 : 0, gain: 0.55 + tier * 0.03 });
+        if (tier >= 7) m.stinger([{ deg: 7 - tier, at: 0 }, { deg: 11 - tier, at: 2 }, { deg: 14 - tier, at: 4, steps: 6 }], { inst: 'bell', quantize: 'beat', gain: 0.6 });
+      } else api.audio.tone(330 * Math.pow(1.122, tier), 0.14, { type: 'sine', vol: 0.2, slide: 1.5 });
       if (tier >= 6) api.fx.text(W / 2, 150, TIERS[tier].n.toUpperCase() + '!', TIERS[tier].c, 16);
     }
 
@@ -174,6 +205,18 @@
       if (orbs.some(function (o) { return o.dead; })) orbs = orbs.filter(function (o) { return !o.dead; });
     }
 
+    // jar fill -> layers; planets over the line -> filter tension (edge-triggered)
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var top = FLOOR;
+      for (var k = 0; k < orbs.length; k++) if (orbs[k].age > 0.8) top = Math.min(top, orbs[k].y - TIERS[orbs[k].tier].r);
+      var q = Math.round(U.clamp((FLOOR - top) / (FLOOR - DANGER), 0, 1) * 20) / 20;
+      if (q !== musicQ) { musicQ = q; m.setIntensity(q); }
+      var tense = dangerT > 0;
+      if (tense !== musicTense) { musicTense = tense; m.setFilter(tense ? 1500 : 18000, tense ? 0.5 : 1); }
+    }
+
     function gameOver() {
       over = true;
       api.shake(12);
@@ -182,6 +225,8 @@
         setTimeout(function () { api.fx.burst(o.x, o.y, TIERS[o.tier].c, 10, 160); }, k * 25);
       });
     }
+
+    if (M()) M().play(song(), { fade: 1.6, intensity: 0 });
 
     return {
       update: function (dt) {
@@ -211,6 +256,7 @@
         var above = orbs.some(function (o) { return o.age > 1.2 && o.y - TIERS[o.tier].r < DANGER && Math.abs(o.vy) < 120; });
         dangerT = above ? dangerT + dt : Math.max(0, dangerT - dt * 2);
         if (dangerT > 2.2) gameOver();
+        syncMusic();
 
         var biggest = orbs.reduce(function (m, o) { return Math.max(m, o.tier); }, 0);
         api.setStatus('NEXT ' + TIERS[next].n.toUpperCase() + '   BIGGEST ' + TIERS[biggest].n.toUpperCase());

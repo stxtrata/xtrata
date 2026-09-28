@@ -10,11 +10,38 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-helix-drop');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600, CX = W / 2;
   var R = 150, RI = 34, SQ = 0.32, SEG = 12, STEP = Math.PI * 2 / SEG, GAP_Y = 118, BALL_R = 11;
   var FRONT = Math.PI / 2, MID = (R + RI) / 2;
   var ACCENT = '#ff9f1c', SAFE = '#3ff0ff', DANGER = '#ff2d55';
+
+  // Music: C# minor drum & bass at 170 - half-time drums while shallow, full
+  // two-step break deeper down. Each gap fallen through plays the next note
+  // of a descending run (reset on landing); an ignited ball opens the filter
+  // and adds a riser until it lands.
+  var CLOSED = 4200;
+  function song() {
+    return {
+      bpm: 170, key: 49, scale: 'minor', chords: [0, 0, 5, 6], seed: 15, filter: CLOSED,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: 0, params: { cutoff: 1000, attack: 0.8, release: 1.5 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 2, steps: 32 }, { deg: 4, steps: 32 }] : null; } },
+        { name: 'sub', inst: 'sub', layer: 0.08, gain: 0.5, chord: true, octave: -1, pattern: '0 - - - - - - - . . 0 - - - - .' },
+        { name: 'hkick', inst: 'kick', layer: 0.15, maxLayer: 0.5, gain: 0.6, pattern: 'x.........x.....' },
+        { name: 'hsnare', inst: 'snare', layer: 0.15, maxLayer: 0.5, gain: 0.4, pattern: '........x.......' },
+        { name: 'hat', inst: 'hat', layer: 0.3, gain: 0.25, pattern: '..x...x...x...xx' },
+        { name: 'kick', inst: 'kick', layer: 0.5, gain: 0.6, pattern: 'x.........x.....' },
+        { name: 'snare', inst: 'snare', layer: 0.5, gain: 0.42, pattern: '....x..x.x..x...' },
+        { name: 'reese', inst: 'bass', layer: 0.62, gain: 0.3, chord: true, octave: -1, params: { cutoff: 500, q: 2 },
+          pattern: '0 - - - - - . 0 - - . 2 - - 1 -' },
+        { name: 'shaker', inst: 'shaker', layer: 0.72, gain: 0.3, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'stab', inst: 'bell', layer: 0.85, gain: 0.25, chord: true, octave: 1,
+          fn: function (i) { return i.stepInBar === 6 || (i.stepInBar === 14 && i.bar % 2) ? [{ deg: 4, vel: 0.6 }, { deg: 7, vel: 0.5 }] : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -42,6 +69,25 @@
     }
     function ring(k) { while (rings.length <= k) rings.push(makeRing(rings.length)); return rings[k]; }
     for (var i = 0; i < 12; i++) ring(i);
+    var run = 0, fireOn = false, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    // ignited ball: open the filter + riser; any landing closes it again
+    function setFire(on) {
+      if (on === fireOn) return;
+      fireOn = on;
+      var m = M();
+      if (!m) return;
+      m.setFilter(on ? 16000 : CLOSED, on ? 0.25 : 0.5);
+      if (on) m.note('riser', 0, { dur: 0.8, gain: 0.4 });
+    }
+    function landed() {
+      run = 0;
+      setFire(false);
+      var m = M();
+      if (!m) return;
+      var it = Math.round(U.clamp(0.1 + passed / 55, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function segUnderBall() {
       var local = ((FRONT - rot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
@@ -57,7 +103,13 @@
         var pts = 10 * combo;
         api.addScore(pts);
         if (combo > 1) api.fx.text(CX + 40, sy - cam - 10, '+' + pts, combo >= 3 ? ACCENT : '#fff', 11 + Math.min(combo, 5));
-        api.audio.tone(300 + Math.min(combo, 12) * 60, 0.06, { type: 'triangle', vol: 0.12 });
+        var m = M();
+        if (m) {
+          // a cascade: every gap in one fall is the next note down the scale
+          m.note('pluck', 9 - Math.min(run, 16), { octave: 0, gain: 0.7, params: { decay: 0.35 } });
+          run++;
+          setFire(combo >= 3);
+        } else api.audio.tone(300 + Math.min(combo, 12) * 60, 0.06, { type: 'triangle', vol: 0.12 });
         nextRing = k + 1;
         return false;
       }
@@ -70,7 +122,9 @@
         api.fx.text(CX, sy - cam - 20, 'SMASH', ACCENT, 15);
         api.shake(7);
         api.audio.noise(0.25, { vol: 0.28, cutoff: 1400 });
+        if (M()) M().note('sub', 0, { octave: -2, dur: 0.4, gain: 0.8 });
         combo = 0;
+        landed();
         nextRing = k + 1;
         ball.vy = -520;
         return true;
@@ -80,12 +134,14 @@
         api.fx.burst(CX, sy - cam + MID * SQ, DANGER, 36, 220, 0.9);
         api.shake(12);
         api.audio.tone(160, 0.5, { type: 'sawtooth', slide: 0.3, vol: 0.28 });
+        setFire(false);
         return true;
       }
       // normal bounce
       ball.y = sy - BALL_R;
       ball.vy = -600;
       combo = 0;
+      landed();
       var local = ((FRONT - rot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
       rg.splats.push(local);
       if (rg.splats.length > 5) rg.splats.shift();

@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-merge-2048');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 440, H = 520, N = 4, PAD = 12, BOARD = 416, BX = (W - BOARD) / 2, BY = 88;
   var CELL = (BOARD - PAD * (N + 1)) / N;
@@ -19,6 +20,30 @@
     2: '#2b3a7a', 4: '#34479a', 8: '#b04dff', 16: '#d43fd8', 32: '#ff3fa4', 64: '#ff4d6d',
     128: '#ff9f1c', 256: '#ffd23f', 512: '#39ff88', 1024: '#3ff0ff', 2048: '#ffffff'
   };
+
+  // Music: swung lo-fi in Eb major, IVmaj7-iii7-ii7-Imaj7 under a low-pass.
+  // Each merge plays a marimba note whose degree is log2 of the new tile, so
+  // bigger tiles climb the scale; each new best tile unlocks a layer.
+  var LOFI = 3200, TENSE = 700;
+  function song() {
+    return {
+      bpm: 80, key: 51, scale: 'major', chords: [3, 2, 1, 0], swing: 0.3, seed: 2048, filter: LOFI,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: 0, params: { cutoff: 900, attack: 0.6, release: 1.4 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }, { deg: 6, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.1, gain: 0.55, pattern: 'x.....x...x.....' },
+        { name: 'hat', inst: 'hat', layer: 0.2, gain: 0.3, pattern: 'x.x.x.x.x.x.x.xx' },
+        { name: 'snare', inst: 'snare', layer: 0.3, gain: 0.4, pattern: '....x.......x...' },
+        { name: 'bass', inst: 'sub', layer: 0.42, gain: 0.5, chord: true, octave: -1,
+          pattern: '0 - - - . . . 4 - . 0 - - - . .' },
+        { name: 'keys', inst: 'marimba', layer: 0.6, gain: 0.28, chord: true, octave: 1,
+          fn: function (i) { return i.stepInBar === 3 || i.stepInBar === 11 ? [{ deg: 2, vel: 0.6 }, { deg: 6, vel: 0.5 }] : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.72, gain: 0.3, pattern: '..x...x...x..xx.' },
+        { name: 'bell', inst: 'bell', layer: 0.85, gain: 0.25, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.3 ? { deg: [4, 6, 7, 9][Math.floor(i.rng() * 4)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -44,6 +69,20 @@
       tiles.push(tile);
     }
     spawn(); spawn();
+    var tense = false;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function lvl(v) { return Math.round(Math.log(v) / Math.LN2); }
+    function empties() {
+      var n = 0;
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!grid[r][c]) n++;
+      return n;
+    }
+    // Board nearly full: squeeze the filter; release when space opens up.
+    function setTense(on) {
+      if (on === tense) return;
+      tense = on;
+      if (M()) M().setFilter(on ? TENSE : LOFI, on ? 1.2 : 0.6);
+    }
 
     function canMove() {
       for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
@@ -61,7 +100,7 @@
       var dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
       var order = [0, 1, 2, 3];
       if (dr > 0 || dc > 0) order.reverse();
-      var moved = false, gained = 0, merges = 0;
+      var moved = false, gained = 0, merges = 0, bestBefore = best, mergedVals = [];
       tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; tl.merged = false; });
       var dead = [];
       order.forEach(function (i) {
@@ -85,6 +124,7 @@
               dead.push(tl);
               gained += other.v;
               merges++;
+              mergedVals.push(other.v);
               if (other.v > best) best = other.v;
               moved = true;
               return;
@@ -103,7 +143,27 @@
       moves++;
       anim = SLIDE;
       dead.forEach(function (d) { d.dying = true; });
-      api.audio.tone(merges ? 330 + Math.log2(best) * 30 : 220, 0.06, { type: 'triangle', vol: merges ? 0.16 : 0.08 });
+      var m = M();
+      if (m && merges) {
+        // one marimba note per merge (distinct degrees ring together as a chord)
+        var seen = {};
+        mergedVals.sort(function (a, b) { return a - b; }).forEach(function (v) {
+          var d = Math.min(12, lvl(v) - 1);
+          if (seen[d] || d < 0) return;
+          seen[d] = true;
+          m.note('marimba', d, { octave: 1, quantize: '16', gain: 0.75 });
+        });
+        if (best > bestBefore) {
+          m.setIntensity(U.clamp((lvl(best) - 2) / 9, 0, 1));
+          if (best >= 128) {
+            var top = lvl(best) - 7;   // 128 -> 0 ... 2048 -> 4
+            m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7 + top, at: 4, steps: 6 }],
+              { inst: 'bell', quantize: '8', octave: 1, gain: 0.45 });
+          }
+        }
+      } else {
+        api.audio.tone(merges ? 330 + Math.log2(best) * 30 : 220, 0.06, { type: 'triangle', vol: merges ? 0.16 : 0.08 });
+      }
       if (gained) {
         api.addScore(gained);
         if (merges > 1) api.fx.text(W - 80, 44, merges + ' MERGES +' + gained, ACCENT, 11);
@@ -113,7 +173,7 @@
         api.fx.text(W / 2, BY + BOARD / 2, '2048!', '#ffffff', 28);
         api.fx.burst(W / 2, BY + BOARD / 2, '#ffd23f', 80, 300, 1.2);
         api.shake(10);
-        api.audio.arp([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'square', vol: 0.2 });
+        if (!m) api.audio.arp([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'square', vol: 0.2 });
       }
     }
 
@@ -127,6 +187,7 @@
       });
       tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; });
       spawn();
+      setTense(empties() <= 2);
       if (!canMove()) {
         over = true;
         api.shake(6);

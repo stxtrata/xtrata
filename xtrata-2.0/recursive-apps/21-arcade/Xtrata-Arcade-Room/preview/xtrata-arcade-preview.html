@@ -2821,6 +2821,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-drop');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 440, H = 580;
   var COLS = 10, ROWS = 22, HIDDEN = 2, CELL = 27;
@@ -2878,6 +2879,39 @@ button { font: inherit; color: inherit; }
     return Math.max(0.012, Math.pow(0.8 - (level - 1) * 0.007, level - 1));
   }
 
+  // Soundtrack: a minor-key folk dance (harmonic minor, oom-pah bass, fiddle line).
+  var FIDDLE = [
+    '4 - 2 4 5 - 4 2 1 - 0 1 2 - . .',
+    '3 - 2 3 4 - 3 2 0 - _6 0 1 - . .',
+    '4 - 2 4 5 - 7 5 4 - 2 1 0 - . .',
+    '1 - 2 3 4 - 2 1 0 - - - . . . .'
+  ].join(' ');
+  function song() {
+    return {
+      bpm: 118, key: 50, scale: 'harmonic', chords: [0, 3, 4, 0], seed: 23,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.45, chord: true, octave: -2, params: { cutoff: 650 },
+          pattern: '0 . . . 4 . . . 0 . . . 4 . 2 .' },
+        { name: 'chop', inst: 'pluck', layer: 0, gain: 0.26, chord: true, params: { decay: 0.12, cutoff: 2600 },
+          fn: function (i) { return i.stepInBar % 4 === 2 ? [0, 2, 4] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.18, gain: 0.55, pattern: 'x...x...x...x...' },
+        { name: 'snare', inst: 'snare', layer: 0.32, gain: 0.35, pattern: '....x.......x..x' },
+        { name: 'hat', inst: 'hat', layer: 0.4, maxLayer: 0.72, gain: 0.3, pattern: '..x...x...x...x.' },
+        { name: 'fiddle', inst: 'lead', layer: 0.5, gain: 0.28, octave: 1, params: { wave: 'triangle', cutoff: 2200 }, pattern: FIDDLE },
+        { name: 'ohat', inst: 'hat', layer: 0.72, gain: 0.32, params: { open: true }, pattern: '..x...x...x...xx' },
+        { name: 'tense', inst: 'arp', layer: 0.8, gain: 0.24, chord: true, octave: 1, params: { cutoff: 1800 },
+          fn: function (i) { return [0, 2, 4, 2, 0, 4, 7, 4][i.step % 8]; } }
+      ]
+    };
+  }
+  // Line-clear stingers grow with the number of lines.
+  var CLEAR_STINGS = [null,
+    [{ deg: 4 }, { deg: 7, at: 2, steps: 2 }],
+    [{ deg: 2 }, { deg: 4, at: 1 }, { deg: 7, at: 2, steps: 2 }],
+    [{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 3, steps: 3 }],
+    [{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6 }, { deg: 11, at: 8 }, { deg: 14, at: 10, steps: 6 }]
+  ];
+
   function drawCell(ctx, x, y, size, color, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -2907,6 +2941,26 @@ button { font: inherit; color: inherit; }
     var clearing = null;       // { rows:[], t }
     var over = false, overT = 0;
     var t = 0;
+
+    // --- music hooks (never touch gameplay RNG) ---
+    function stackRows() {
+      for (var y = HIDDEN; y < ROWS; y++) for (var x = 0; x < COLS; x++) if (grid[y][x]) return ROWS - y;
+      return 0;
+    }
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var h = stackRows();
+      var v = U.clamp(0.05 + Math.max(0, h - 2) / 13 * 0.8 + (level - 1) * 0.06, 0, 1);
+      m.setIntensity(Math.round(v * 20) / 20);
+    }
+    function levelMusic() {
+      var m = M();
+      if (!m) return;
+      m.setTempo(Math.min(162, 118 + (level - 1) * 4), 2);
+      m.setKey(45 + ((level - 1) * 5 + 5) % 12);
+      m.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 9, at: 6, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.5 });
+    }
 
     function nextType() {
       if (!bag.length) {
@@ -2938,6 +2992,7 @@ button { font: inherit; color: inherit; }
       var size = ROT[type][0].length;
       cur = { type: type, rot: 0, x: Math.floor((COLS - size) / 2), y: 0 };
       fallT = 0; lockT = 0; lockResets = 0;
+      syncMusic();
       if (!fits(cur)) { topOut(); return; }
       // Drop one row immediately if possible so the piece enters view promptly.
       if (fits(cur, cur.rot, cur.x, cur.y + 1)) cur.y++;
@@ -3025,12 +3080,18 @@ button { font: inherit; color: inherit; }
       api.fx.text(BX + COLS * CELL / 2, cy, label + ' +' + (base + bonus), tetris ? '#ffd23f' : ACCENT, tetris ? 16 : 13);
       if (combo > 0) api.fx.text(BX + COLS * CELL / 2, cy + 22, 'COMBO ' + combo, '#ff3fa4', 11);
       api.shake(n * 2.5);
-      api.audio.arp(n === 4 ? [523, 659, 784, 1047] : [440, 554, 659].slice(0, n + 1), 0.05, { type: 'square', vol: 0.18 });
+      var m = M();
+      if (m) {
+        m.stinger(CLEAR_STINGS[n], { inst: n === 4 ? 'lead' : 'pluck', quantize: n === 4 ? 'beat' : '8', octave: 1, gain: n === 4 ? 0.45 : 0.6,
+          params: n === 4 ? { wave: 'triangle', cutoff: 2800 } : null });
+        if (n === 4) m.note('riser', 0, { dur: 1, gain: 0.45 });
+      } else api.audio.arp(n === 4 ? [523, 659, 784, 1047] : [440, 554, 659].slice(0, n + 1), 0.05, { type: 'square', vol: 0.18 });
       var newLevel = 1 + Math.floor(lines / 10);
       if (newLevel > level) {
         level = newLevel;
         api.fx.text(BX + COLS * CELL / 2, BY + 200, 'LEVEL ' + level, '#ffd23f', 18);
-        api.audio.arp([392, 523, 659, 784], 0.07, { type: 'triangle', vol: 0.2 });
+        if (m) levelMusic();
+        else api.audio.arp([392, 523, 659, 784], 0.07, { type: 'triangle', vol: 0.2 });
       }
     }
     function hardDrop() {
@@ -3042,6 +3103,8 @@ button { font: inherit; color: inherit; }
       cur.y = gy;
       api.addScore(dist * 2);
       api.shake(3);
+      var m = M();
+      if (m) m.note('kick', 0, { quantize: '16', gain: dist > 8 ? 0.8 : 0.55 });
       lock();
     }
     function doHold() {
@@ -3053,6 +3116,7 @@ button { font: inherit; color: inherit; }
       api.audio.tone(300, 0.06, { type: 'triangle', vol: 0.12 });
     }
 
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
     spawn(queue.shift()); queue.push(nextType());
 
     return {
@@ -3730,6 +3794,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-orbit-merge');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 420, H = 600;
   var LEFT = 26, RIGHT = W - 26, FLOOR = H - 22, DANGER = 118, DROP_Y = 64;
@@ -3749,6 +3814,25 @@ button { font: inherit; color: inherit; }
   ];
   var POINTS = TIERS.map(function (_, i) { return (i + 1) * (i + 2) / 2 * 2; }); // 2,6,12,20,…
   var G = 1500, SUB = 4;
+
+  // Soundtrack: slow, dreamy lydian drift; drums only arrive as the jar fills.
+  function song() {
+    return {
+      bpm: 76, key: 53, scale: 'lydian', chords: [0, 1, 0, 4], barsPerChord: 2, seed: 41,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.36, chord: true, octave: -1, params: { cutoff: 900, attack: 1.2, release: 1.6 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 2, steps: 32 }, { deg: 4, steps: 32 }, { deg: 6, steps: 32 }] : null; } },
+        { name: 'bells', inst: 'bell', layer: 0, gain: 0.3, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.22 ? { deg: [0, 2, 3, 4, 6, 7][Math.floor(i.rng() * 6)], vel: 0.5 + i.rng() * 0.3 } : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.18, gain: 0.3, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'sub', inst: 'sub', layer: 0.3, gain: 0.45, chord: true, octave: -2, pattern: '0 - - - - - - - . . 4 - - - . .' },
+        { name: 'marimba', inst: 'marimba', layer: 0.45, gain: 0.32, chord: true, rate: 2,
+          fn: function (i) { return [0, 4, 2, 6, 4, 7, 2, 4][(i.step / 2) % 8]; } },
+        { name: 'kick', inst: 'kick', layer: 0.65, gain: 0.45, pattern: 'x.........x.....' },
+        { name: 'rim', inst: 'clap', layer: 0.8, gain: 0.3, pattern: '........x.......' }
+      ]
+    };
+  }
 
   function planet(ctx, x, y, t, tier, alpha) {
     var d = TIERS[tier];
@@ -3800,6 +3884,7 @@ button { font: inherit; color: inherit; }
     var chain = 0, chainT = 0;
     var over = false, overT = 0;
     var t = 0;
+    var musicQ = -1, musicTense = false;
     var stars = [];
     for (var i = 0; i < 60; i++) stars.push({ x: rng() * W, y: rng() * H, s: rng() * 1.5 + 0.3, p: rng() * 6 });
 
@@ -3835,7 +3920,12 @@ button { font: inherit; color: inherit; }
         api.fx.burst(x, y, '#ffffff', 40, 220, 1);
         api.fx.text(x, y, 'SUPERNOVA +' + nova, '#ffe36e', 18);
         api.shake(16);
-        api.audio.arp([523, 659, 784, 1047, 1319], 0.07, { type: 'square', vol: 0.22 });
+        var mn = M();
+        if (mn) {
+          mn.note('riser', 0, { dur: 1.2, gain: 0.4 });
+          mn.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6 }, { deg: 11, at: 8 }, { deg: 14, at: 10, steps: 8 }],
+            { inst: 'bell', quantize: '8', octave: 1, gain: 0.7 });
+        } else api.audio.arp([523, 659, 784, 1047, 1319], 0.07, { type: 'square', vol: 0.22 });
         return;
       }
       var pts = Math.round(POINTS[tier] * mult);
@@ -3845,7 +3935,12 @@ button { font: inherit; color: inherit; }
       api.fx.burst(x, y, TIERS[tier].c, 12 + tier * 3, 120 + tier * 20);
       api.fx.text(x, y - TIERS[tier].r - 6, '+' + pts + (chain > 1 ? ' x' + mult : ''), TIERS[tier].c, 11 + Math.min(tier, 6));
       api.shake(Math.min(10, tier * 1.2));
-      api.audio.tone(330 * Math.pow(1.122, tier), 0.14, { type: 'sine', vol: 0.2, slide: 1.5 });
+      var m = M();
+      if (m) {
+        // bigger planet = deeper note
+        m.note(tier >= 5 ? 'bell' : 'marimba', 9 - tier, { quantize: '8', octave: tier >= 5 ? -1 : 0, gain: 0.55 + tier * 0.03 });
+        if (tier >= 7) m.stinger([{ deg: 7 - tier, at: 0 }, { deg: 11 - tier, at: 2 }, { deg: 14 - tier, at: 4, steps: 6 }], { inst: 'bell', quantize: 'beat', gain: 0.6 });
+      } else api.audio.tone(330 * Math.pow(1.122, tier), 0.14, { type: 'sine', vol: 0.2, slide: 1.5 });
       if (tier >= 6) api.fx.text(W / 2, 150, TIERS[tier].n.toUpperCase() + '!', TIERS[tier].c, 16);
     }
 
@@ -3894,6 +3989,18 @@ button { font: inherit; color: inherit; }
       if (orbs.some(function (o) { return o.dead; })) orbs = orbs.filter(function (o) { return !o.dead; });
     }
 
+    // jar fill -> layers; planets over the line -> filter tension (edge-triggered)
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var top = FLOOR;
+      for (var k = 0; k < orbs.length; k++) if (orbs[k].age > 0.8) top = Math.min(top, orbs[k].y - TIERS[orbs[k].tier].r);
+      var q = Math.round(U.clamp((FLOOR - top) / (FLOOR - DANGER), 0, 1) * 20) / 20;
+      if (q !== musicQ) { musicQ = q; m.setIntensity(q); }
+      var tense = dangerT > 0;
+      if (tense !== musicTense) { musicTense = tense; m.setFilter(tense ? 1500 : 18000, tense ? 0.5 : 1); }
+    }
+
     function gameOver() {
       over = true;
       api.shake(12);
@@ -3902,6 +4009,8 @@ button { font: inherit; color: inherit; }
         setTimeout(function () { api.fx.burst(o.x, o.y, TIERS[o.tier].c, 10, 160); }, k * 25);
       });
     }
+
+    if (M()) M().play(song(), { fade: 1.6, intensity: 0 });
 
     return {
       update: function (dt) {
@@ -3931,6 +4040,7 @@ button { font: inherit; color: inherit; }
         var above = orbs.some(function (o) { return o.age > 1.2 && o.y - TIERS[o.tier].r < DANGER && Math.abs(o.vy) < 120; });
         dangerT = above ? dangerT + dt : Math.max(0, dangerT - dt * 2);
         if (dangerT > 2.2) gameOver();
+        syncMusic();
 
         var biggest = orbs.reduce(function (m, o) { return Math.max(m, o.tier); }, 0);
         api.setStatus('NEXT ' + TIERS[next].n.toUpperCase() + '   BIGGEST ' + TIERS[biggest].n.toUpperCase());
@@ -4065,10 +4175,37 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-runner');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 600, H = 340, GROUND = 284, PX = 92;
   var ACCENT = '#ff9f1c', BIT = '#3ff0ff', HAZARD = '#ff4d6d', DRONE = '#c77dff';
   var SIZE = 30, DUCK = 17;
+
+  // Soundtrack: bright major chiptune that speeds up with the run.
+  var KEYS = [60, 62, 64, 65, 67, 69];
+  function song() {
+    var hook = [
+      '4 . 4 5 7 . 4 . 2 . 2 4 5 . . .',
+      '4 . 4 5 7 . 9 . 7 . 5 4 2 . . .',
+      '0 . 2 . 4 . 7 . 5 - 4 . 2 . 4 .',
+      '5 . 4 . 2 . 1 . 0 - - - . . . .'
+    ].join(' ');
+    return {
+      bpm: 128, key: 60, scale: 'major', chords: [0, 5, 3, 4], seed: 5,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.4, chord: true, octave: -2, params: { cutoff: 1100, q: 3 },
+          pattern: '0 . ^0 . 0 . ^0 . 0 . ^0 . 0 . ^0 4' },
+        { name: 'arp', inst: 'arp', layer: 0, gain: 0.2, chord: true, octave: 1, params: { cutoff: 2000 },
+          fn: function (i) { return [0, 2, 4, 7, 4, 2][i.step % 6]; } },
+        { name: 'kick', inst: 'kick', layer: 0.15, gain: 0.55, pattern: 'x...x...x...x...' },
+        { name: 'hat', inst: 'hat', layer: 0.3, gain: 0.28, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'snare', inst: 'snare', layer: 0.42, gain: 0.35, pattern: '....x.......x...' },
+        { name: 'lead', inst: 'lead', layer: 0.6, gain: 0.24, octave: 1, params: { wave: 'square', cutoff: 2100 }, pattern: hook },
+        { name: 'chime', inst: 'bell', layer: 0.82, gain: 0.25, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.stepInBar === 0 || i.stepInBar === 12 ? { deg: [0, 4, 2, 7][i.bar % 4], vel: 0.6 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -4078,6 +4215,7 @@ button { font: inherit; color: inherit; }
     var nextGap = 520;
     var dead = false, deadT = 0, started = false;
     var spin = 0, t = 0, bitChain = 0;
+    var mBpm = 128, mInt = -1, mDuck = false, jumpNotes = 0, jumpNoteT = 0, keyStep = 0;
     var skyline = [];
     for (var i = 0; i < 24; i++) skyline.push({ w: 30 + rng() * 50, h: 40 + rng() * 110, gap: 4 + rng() * 16 });
 
@@ -4115,6 +4253,8 @@ button { font: inherit; color: inherit; }
       api.audio.noise(0.25, { vol: 0.2 });
     }
 
+    if (M()) M().play(song(), { fade: 1, intensity: 0 });
+
     return {
       update: function (dt) {
         t += dt;
@@ -4136,8 +4276,15 @@ button { font: inherit; color: inherit; }
         if (grounded && jumpBuffer > 0) {
           grounded = false; vy = -640; jumpBuffer = 0; duckT = 0; wantDuck = false;
           y = GROUND - SIZE;
-          api.audio.tone(520, 0.08, { type: 'square', vol: 0.12, slide: 1.6 });
+          var mj = M();
+          if (mj) { mj.note('arp', 0, { quantize: '16', chord: true, octave: 1, gain: 0.55 }); jumpNotes = 1; jumpNoteT = 0.1; }
+          else api.audio.tone(520, 0.08, { type: 'square', vol: 0.12, slide: 1.6 });
         }
+        // holding the jump climbs an arpeggio while still rising
+        if (!grounded && jumpNotes && jumpNotes < 5 && jumpHeld && vy < 0) {
+          jumpNoteT -= dt;
+          if (jumpNoteT <= 0 && M()) { M().note('arp', [0, 2, 4, 7, 9][jumpNotes], { quantize: '16', chord: true, octave: 1, gain: 0.5 }); jumpNotes++; jumpNoteT = 0.1; }
+        } else if (grounded) jumpNotes = 0;
         if (!grounded) {
           // Variable jump: short tap = short hop. Duck in the air = fast fall.
           var grav = vy < 0 && jumpHeld ? 1500 : 2900;
@@ -4148,6 +4295,10 @@ button { font: inherit; color: inherit; }
             grounded = true; vy = 0;
             api.fx.burst(PX + SIZE / 2, GROUND, 'rgba(255,159,28,0.7)', 6, 70, 0.3);
           }
+        }
+        if (wantDuck !== mDuck) {
+          mDuck = wantDuck;
+          if (M()) M().setFilter(mDuck ? 650 : 18000, mDuck ? 0.08 : 0.35);
         }
         ducking = wantDuck;
         var hh = h();
@@ -4182,7 +4333,8 @@ button { font: inherit; color: inherit; }
             bonus += pts;
             api.fx.burst(bx, b.y, BIT, 8, 90, 0.4);
             if (bitChain % 4 === 0) api.fx.text(bx, b.y - 12, 'CHAIN ' + bitChain, BIT, 10);
-            api.audio.tone(880 + (bitChain % 8) * 60, 0.05, { type: 'square', vol: 0.1 });
+            if (M()) M().note('pluck', (bitChain - 1) % 8, { octave: 2, gain: 0.35 });
+            else api.audio.tone(880 + (bitChain % 8) * 60, 0.05, { type: 'square', vol: 0.1 });
           } else if (bx < PX - 20 && !b.missed) { b.missed = true; bitChain = 0; }
         }
         obstacles = obstacles.filter(function (o) { return o.x - dist > -120; });
@@ -4193,7 +4345,19 @@ button { font: inherit; color: inherit; }
         if (metres >= milestone) {
           api.fx.text(W / 2, 80, milestone + ' m', ACCENT, 16);
           milestone += 500;
-          api.audio.arp([523, 784], 0.07, { type: 'triangle', vol: 0.15 });
+          var mm = M();
+          if (mm) {
+            keyStep = (keyStep + 1) % KEYS.length;
+            mm.setKey(KEYS[keyStep]);
+            mm.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 4 }], { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.65 });
+          } else api.audio.arp([523, 784], 0.07, { type: 'triangle', vol: 0.15 });
+        }
+        var ms = M();
+        if (ms) {
+          var bpm = 128 + Math.round((speed - 330) / 490 * 9) * 4;
+          if (bpm !== mBpm) { mBpm = bpm; ms.setTempo(bpm, 1.5); }
+          var iv = Math.round(U.clamp(0.1 + metres / 2400, 0, 1) * 20) / 20;
+          if (iv !== mInt) { mInt = iv; ms.setIntensity(iv); }
         }
         api.setStatus(metres + ' m  ·  ' + Math.round(speed / 10) + ' km/h' + (bitChain > 1 ? '  ·  BITS x' + bitChain : ''));
       },
@@ -4972,10 +5136,33 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-rock-drift');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 560, H = 480;
   var ACCENT = '#7df9ff', ROCK = '#c9d4ff', UFO = '#ff4fd8';
   var SIZES = [{ r: 40, pts: 20, spd: 45 }, { r: 22, pts: 50, spd: 80 }, { r: 12, pts: 100, spd: 125 }];
+
+  // Soundtrack: dark phrygian pad over a two-note heartbeat that races as the wave thins out.
+  var MASS = [7, 3, 1];        // a big rock is 7 small-rock "units" of work
+  var SONG_CUT = 2400;
+  function song() {
+    return {
+      bpm: 64, key: 52, scale: 'phrygian', chords: [0, 1, 0, -1], barsPerChord: 2, seed: 77, filter: SONG_CUT,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: -1, params: { cutoff: 700, attack: 0.9, release: 1.4 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 1, steps: 32 }, { deg: 4, steps: 32 }] : null; } },
+        { name: 'heart', inst: 'sub', layer: 0, gain: 0.6, octave: -2, pattern: '0 - . 1 - . . . . . . . . . . .' },
+        { name: 'thump', inst: 'kick', layer: 0.2, gain: 0.45, pattern: 'X..x............' },
+        { name: 'tick', inst: 'hat', layer: 0.3, gain: 0.22, pattern: '....x.......x.x.' },
+        { name: 'drone', inst: 'bass', layer: 0.45, gain: 0.3, chord: true, octave: -2, params: { cutoff: 420, q: 8 },
+          pattern: '. . . . . . . . 0 . 0 . . . 1 .' },
+        { name: 'glint', inst: 'bell', layer: 0.6, gain: 0.22, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.18 ? { deg: [0, 1, 4, 5, 7][Math.floor(i.rng() * 5)], vel: 0.5 } : null; } },
+        { name: 'pulse', inst: 'arp', layer: 0.8, gain: 0.18, chord: true, params: { cutoff: 1200 },
+          fn: function (i) { return i.step % 2 ? null : [0, 1, 4, 1][(i.step / 2) % 4]; } }
+      ]
+    };
+  }
 
   function wrap(o) {
     if (o.x < -50) o.x += W + 100; else if (o.x > W + 50) o.x -= W + 100;
@@ -4995,6 +5182,7 @@ button { font: inherit; color: inherit; }
     var fireCd = 0, respawnT = 0, waveT = 0;
     var over = false, overT = 0;
     var t = 0;
+    var waveMass = 1, mBpm = 0, mInt = -1, mThrust = false, mClear = false;
     var stars = [];
     for (var i = 0; i < 70; i++) stars.push({ x: rng() * W, y: rng() * H, s: rng() < 0.1 ? 2 : 1 });
 
@@ -5010,9 +5198,21 @@ button { font: inherit; color: inherit; }
       for (var k = 0; k < n; k++) pts.push(0.72 + rng() * 0.36);
       return { x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: size, r: s.r, rot: rng() * 6, spin: (rng() - 0.5) * 1.6, pts: pts };
     }
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var left = 0;
+      for (var k = 0; k < rocks.length; k++) left += MASS[rocks[k].size];
+      var gone = U.clamp(1 - left / waveMass, 0, 1);
+      var bpm = 64 + Math.round(gone * gone * 18) * 4;          // 64 -> 136 as the last rocks go
+      if (bpm !== mBpm) { mBpm = bpm; m.setTempo(bpm, 0.8); }
+      var iv = Math.round(U.clamp(0.08 + (wave - 1) * 0.1 + gone * 0.45, 0, 1) * 20) / 20;
+      if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+    }
     function startWave() {
       wave++;
       var n = Math.min(11, 3 + wave);
+      waveMass = n * MASS[0]; mClear = false;
       for (var k = 0; k < n; k++) {
         // spawn on the edges, away from the ship
         var edge = rng() < 0.5;
@@ -5022,6 +5222,7 @@ button { font: inherit; color: inherit; }
       }
       api.fx.text(W / 2, H / 2 - 60, 'WAVE ' + wave, ACCENT, 18);
       api.audio.arp([392, 523, 659], 0.07, { type: 'triangle', vol: 0.16 });
+      syncMusic();
     }
     function add(pts, x, y) {
       score += pts;
@@ -5040,6 +5241,12 @@ button { font: inherit; color: inherit; }
       api.fx.burst(r.x, r.y, ROCK, 10 + (2 - r.size) * 10, 120 + r.size * 40, 0.6);
       api.shake(4 - r.size);
       api.audio.noise(0.18 + (2 - r.size) * 0.1, { vol: 0.22, cutoff: 700 + r.size * 800 });
+      var m = M();
+      if (m) {
+        var top = [0, 4, 7][r.size];   // large low, small high; each split falls a step
+        m.stinger([{ deg: top + 1 }, { deg: top, at: 1, steps: 2 }], { inst: r.size ? 'pluck' : 'marimba', quantize: '16', octave: r.size - 1, gain: 0.5,
+          params: { cutoff: 1800, decay: 0.2 } });
+      }
       if (r.size < 2) {
         var base = Math.atan2(r.vy, r.vx);
         rocks.push(makeRock(r.x, r.y, r.size + 1, base + 0.6 + rng() * 0.4));
@@ -5054,6 +5261,7 @@ button { font: inherit; color: inherit; }
       ship = null;
       lives--;
       if (lives <= 0) { over = true; return; }
+      if (M()) M().duck(0.7, 1.4);
       respawnT = 1.6;
     }
     function hits(a, b, r) {
@@ -5061,6 +5269,7 @@ button { font: inherit; color: inherit; }
       return dx * dx + dy * dy < r * r;
     }
 
+    if (M()) M().play(song(), { fade: 1.5, intensity: 0 });
     newShip();
     startWave();
 
@@ -5101,6 +5310,16 @@ button { font: inherit; color: inherit; }
           }
         }
         updateWorld(dt);
+        var mu = M();
+        if (mu) {
+          var th = !!(ship && ship.thrust);
+          if (th !== mThrust) { mThrust = th; mu.setFilter(th ? 16000 : SONG_CUT, th ? 0.25 : 0.6); }
+          syncMusic();
+          if (!rocks.length && !mClear) {
+            mClear = true;
+            mu.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 8, at: 6 }, { deg: 7, at: 8, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+          }
+        }
 
         if (!rocks.length && !ufo) {
           waveT += dt;
@@ -5276,6 +5495,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-stack-tower');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600;
   var SLAB_H = 26, DEPTH = 14, BASE_W = 200, BASE_Y = 470, PERFECT = 5;
@@ -5283,6 +5503,32 @@ button { font: inherit; color: inherit; }
 
   function hue(n) { return (200 + n * 9) % 360; }
   function col(n, l) { return 'hsl(' + hue(n) + ',85%,' + l + '%)'; }
+
+  // Soundtrack: warm major groove; the tower itself plays the melody, one note per floor.
+  var TUNE = [
+    [0, 2, 4, 2, 4, 5, 4, 6, 7, 4],
+    [4, 5, 7, 5, 7, 9, 8, 7, 6, 7],
+    [7, 6, 4, 6, 7, 9, 11, 9, 10, 11]
+  ];
+  var KEYS = [55, 60, 57, 62, 59, 64];
+  function song() {
+    return {
+      bpm: 100, key: 55, scale: 'major', chords: [0, 2, 3, 4], seed: 9,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.32, chord: true, octave: -1, params: { cutoff: 1300 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'bass', inst: 'bass', layer: 0.1, gain: 0.4, chord: true, octave: -2, params: { cutoff: 600, q: 2 },
+          pattern: '0 - . . . . 0 . . . 4 - . . 2 .' },
+        { name: 'shaker', inst: 'shaker', layer: 0.2, gain: 0.3, pattern: '..x...x...x...x.' },
+        { name: 'kick', inst: 'kick', layer: 0.3, gain: 0.55, pattern: 'x.....x...x.....' },
+        { name: 'clap', inst: 'clap', layer: 0.45, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'counter', inst: 'marimba', layer: 0.6, gain: 0.3, chord: true, rate: 2,
+          fn: function (i) { return [4, 2, 0, 2, 4, 5, 4, 2][(i.step / 2) % 8]; } },
+        { name: 'sparkle', inst: 'bell', layer: 0.8, gain: 0.22, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.rng() < 0.5 ? { deg: [0, 2, 4][Math.floor(i.rng() * 3)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function slab(ctx, x, y, w, n, alpha) {
     ctx.save();
@@ -5315,6 +5561,7 @@ button { font: inherit; color: inherit; }
     var perfectRun = 0;
     var over = false, overT = 0, fallT = 0;
     var t = 0;
+    var mInt = -1;
 
     function yOf(i) { return BASE_Y - i * SLAB_H; }
     function spawn() {
@@ -5325,7 +5572,21 @@ button { font: inherit; color: inherit; }
       // Enter from just off the edge so the slab is on screen almost at once.
       cur = { x: fromLeft ? -top.w * 0.35 : W - top.w * 0.65, w: top.w, dir: fromLeft ? 1 : -1, speed: speed };
     }
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
     spawn();
+
+    // floor n (1-based) plays the next note of the tune
+    function tuneDeg(n) { return TUNE[Math.floor((n - 1) / 10) % TUNE.length][(n - 1) % 10]; }
+    function syncMusic(m) {
+      var iv = Math.round(U.clamp((tower.length - 1) / 40 + Math.min(perfectRun, 6) * 0.07, 0, 1) * 20) / 20;
+      if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+      var n = tower.length - 1;
+      if (n > 0 && n % 10 === 0) {
+        m.setKey(KEYS[(n / 10) % KEYS.length]);
+        m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+        m.note('riser', 0, { dur: 0.6, gain: 0.3 });
+      }
+    }
 
     function drop() {
       var n = tower.length;
@@ -5353,7 +5614,9 @@ button { font: inherit; color: inherit; }
         api.addScore(10 + bonus);
         api.fx.text(x + w / 2, y - 26 + cam, perfectRun > 1 ? 'PERFECT x' + perfectRun : 'PERFECT', '#ffffff', 13);
         api.fx.burst(x + w / 2, y + cam, col(n, 70), 20, 180, 0.5);
-        api.audio.tone(440 * Math.pow(1.0595, Math.min(perfectRun, 24) * 2), 0.14, { type: 'triangle', vol: 0.2 });
+        var mp = M();
+        if (mp) mp.note('bell', tuneDeg(n), { quantize: '16', octave: 2, gain: 0.7 + Math.min(perfectRun, 5) * 0.04 });
+        else api.audio.tone(440 * Math.pow(1.0595, Math.min(perfectRun, 24) * 2), 0.14, { type: 'triangle', vol: 0.2 });
       } else {
         perfectRun = 0;
         tower.push({ x: left, w: overlap });
@@ -5362,9 +5625,14 @@ button { font: inherit; color: inherit; }
         var cutW = cur.w - overlap;
         debris.push({ x: cutX, y: y, w: cutW, n: n, vy: 0, vx: (off > 0 ? 1 : -1) * 40, rot: 0, vr: (off > 0 ? 1 : -1) * 1.5 });
         api.addScore(10);
-        api.audio.tone(300 + Math.min(n, 40) * 6, 0.07, { type: 'square', vol: 0.12 });
+        var mt = M();
+        if (mt) {
+          mt.note('pluck', tuneDeg(n), { quantize: '16', octave: 1, gain: 0.45, params: { cutoff: 2600 } });
+          mt.note('marimba', tuneDeg(n) + 1, { quantize: '16', octave: 0, gain: 0.18 });   // soft rub = "off" note
+        } else api.audio.tone(300 + Math.min(n, 40) * 6, 0.07, { type: 'square', vol: 0.12 });
         api.shake(2);
       }
+      if (M()) syncMusic(M());
       camTarget = Math.max(0, (tower.length - 9) * SLAB_H);
       spawn();
     }
@@ -5494,10 +5762,31 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-road-hopper');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 420, H = 600, C = 42, COLS = 10, HOP = 0.11;
   var ACCENT = '#39ff88';
   var CAR_COLORS = ['#ff4d6d', '#3ff0ff', '#ffd23f', '#b04dff', '#ff9f1c', '#4d7bff'];
+
+  // Soundtrack: bouncy mixolydian marimba tune; roads bring the drums, rivers wash them out.
+  function song() {
+    return {
+      bpm: 112, key: 58, scale: 'mixolydian', chords: [0, 6, 0, 3], seed: 31, swing: 0.12,
+      tracks: [
+        { name: 'marimba', inst: 'marimba', layer: 0, gain: 0.34, chord: true,
+          pattern: '0 . 2 4 . 2 7 . 4 . 2 . 4 5 4 2' },
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.4, chord: true, octave: -2, params: { cutoff: 800, q: 3 },
+          pattern: '0 . . 0 . . 4 . 0 . . 0 . . 4 .' },
+        { name: 'shaker', inst: 'shaker', layer: 0.12, gain: 0.32, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'kick', inst: 'kick', layer: 0.3, gain: 0.5, pattern: 'x.....x.x.......' },
+        { name: 'hat', inst: 'hat', layer: 0.4, gain: 0.26, pattern: '..x...x...x...x.' },
+        { name: 'clap', inst: 'clap', layer: 0.5, gain: 0.34, pattern: '....x.......x...' },
+        { name: 'bells', inst: 'bell', layer: 0.72, gain: 0.22, chord: true, octave: 1, pattern: '. . . . 4 . . . . . 7 . . . 6 .' },
+        { name: 'pad', inst: 'pad', layer: 2, gain: 0.4, chord: true, octave: -1, params: { cutoff: 1500, attack: 0.6 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }, { deg: 6, steps: 16 }] : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -5509,6 +5798,7 @@ button { font: inherit; color: inherit; }
     var maxRow = 0, coins = 0;
     var dead = false, deadT = 0, deathKind = '';
     var t = 0;
+    var hopDeg = 0, mZone = 'grass', mInt = -1, mBpm = 112;
 
     function speedScale(r) { return 1 + Math.min(1.4, r / 120); }
 
@@ -5609,17 +5899,45 @@ button { font: inherit; color: inherit; }
       player.fromRow = player.row; player.fromX = player.x;
       player.row = nr; player.x = landX;
       player.hop = HOP;
-      api.audio.tone(d === 'down' ? 360 : 480, 0.045, { type: 'triangle', vol: 0.1 });
+      var m = M();
+      if (m) {
+        if (nr > player.fromRow) hopDeg = hopDeg >= 9 ? 3 : hopDeg + 1;       // forward climbs the scale
+        else if (nr < player.fromRow) hopDeg = hopDeg <= -3 ? 3 : hopDeg - 1; // back steps down
+        m.note('marimba', hopDeg, { quantize: '16', octave: 1, gain: nr === player.fromRow ? 0.35 : 0.6 });
+      } else api.audio.tone(d === 'down' ? 360 : 480, 0.045, { type: 'triangle', vol: 0.1 });
     }
 
     function land() {
       var rw = row(player.row);
+      var m = M();
       if (player.row > maxRow) {
         maxRow = player.row;
         if (maxRow % 50 === 0) {
           api.fx.text(W / 2, 120, maxRow + ' ROWS', ACCENT, 16);
-          api.audio.arp([523, 659, 784], 0.06, { type: 'triangle', vol: 0.16 });
+          if (m) {
+            m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.6 });
+            m.transpose(maxRow % 100 ? 5 : -5);
+          } else api.audio.arp([523, 659, 784], 0.06, { type: 'triangle', vol: 0.16 });
+        } else if (maxRow % 10 === 0 && m) {
+          m.stinger([{ deg: 4 }, { deg: 7, at: 2, steps: 2 }], { inst: 'marimba', quantize: '8', octave: 1, gain: 0.55 });
         }
+        if (m) {
+          var iv = Math.round(U.clamp(0.1 + maxRow / 160, 0, 1) * 20) / 20;
+          if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+          var bpm = 112 + Math.min(8, Math.floor(maxRow / 25)) * 2;
+          if (bpm !== mBpm) { mBpm = bpm; m.setTempo(bpm, 2); }
+        }
+      }
+      var zone = rw.type === 'river' ? 'river' : rw.type === 'grass' ? 'grass' : 'road';
+      if (m && zone !== mZone) {
+        var wasRiver = mZone === 'river';
+        mZone = zone;
+        var drums = zone === 'river' ? false : zone === 'road' ? true : null;
+        m.setTrack('kick', drums); m.setTrack('hat', drums);
+        m.setTrack('clap', zone === 'river' ? false : null);
+        m.setTrack('pad', zone === 'river' ? true : null);
+        if (zone === 'river') m.setFilter(1500, 0.8);
+        else if (wasRiver) m.setFilter(18000, 0.5);
       }
       if (rw.type === 'river' && !logUnder(rw, player.x)) die('splash');
       if (rw.type === 'grass' && rw.coin === colOf(player.x)) {
@@ -5627,9 +5945,12 @@ button { font: inherit; color: inherit; }
         coins++;
         api.fx.burst(player.x, screenY(player.row) + C / 2, '#ffd23f', 14, 120);
         api.fx.text(player.x, screenY(player.row), '+25', '#ffd23f', 11);
-        api.audio.arp([988, 1319], 0.04, { type: 'square', vol: 0.12 });
+        if (m) m.stinger([{ deg: 7 }, { deg: 9, at: 1 }], { inst: 'bell', quantize: '16', octave: 1, gain: 0.5 });
+        else api.audio.arp([988, 1319], 0.04, { type: 'square', vol: 0.12 });
       }
     }
+
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
 
     return {
       update: function (dt) {
@@ -5884,6 +6205,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-tile-tap');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600, LANES = 4, LW = W / LANES, TH = 138, PERFECT_ZONE = 170;
   var ACCENT = '#3ff0ff', HOT = '#ff3fa4';
@@ -5899,6 +6221,29 @@ button { font: inherit; color: inherit; }
     var midi = k === 3 ? chord[0] + 12 : chord[k];
     if (Math.floor(i / 32) % 2 === 1 && i % 2 === 1) midi += 12; // second pass climbs
     return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  // Music: the engine plays a G-major dance backing (I-V-vi-IV, no lead);
+  // the PLAYER performs the lead. Each good tap plays the next note of this
+  // chord-relative phrase, so a clean run sounds like the song.
+  var LEAD = ('4 2 4 5 4 2 0 2 4 4 5 4 2 1 0 -1 ' +
+    '0 2 4 2 5 4 2 0 2 4 2 0 -1 0 1 0').split(' ').map(Number);
+  function song() {
+    return {
+      bpm: 112, key: 55, scale: 'major', chords: [0, 4, 5, 3], seed: 10,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: -1, params: { cutoff: 1500 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.08, gain: 0.6, pattern: 'x...x...x...x...' },
+        { name: 'bass', inst: 'bass', layer: 0.2, gain: 0.42, chord: true, octave: -2, params: { cutoff: 800 },
+          pattern: '. . 0 . . . 0 . . . 0 . . . ^0 .' },
+        { name: 'clap', inst: 'clap', layer: 0.32, gain: 0.45, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.45, gain: 0.4, pattern: '..x...x...x...x.' },
+        { name: 'shaker', inst: 'shaker', layer: 0.6, gain: 0.35, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'keys', inst: 'marimba', layer: 0.75, gain: 0.3, chord: true, octave: 0,
+          fn: function (i) { return i.stepInBar % 4 === 2 ? [{ deg: 2 }, { deg: 4 }] : null; } }
+      ]
+    };
   }
 
   function create(api) {
@@ -5923,13 +6268,32 @@ button { font: inherit; color: inherit; }
       while (topY() > -TH * 2) tiles.push({ lane: laneFor(), y: topY() - TH, hit: false, fade: 0 });
     }
     fill();
+    var lastBpm = 112, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var bpm = 112 + Math.round(U.clamp((speed - 360) / 790, 0, 1) * 18) * 2;
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 0.8); }
+      var it = Math.round(U.clamp(0.1 + count / 90 + Math.min(perfectStreak, 20) * 0.015, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function end(lane) {
       over = true;
       badLane = lane;
       api.shake(9);
-      api.audio.tone(110, 0.5, { type: 'sawtooth', vol: 0.28, slide: 0.5 });
-      api.audio.tone(116, 0.5, { type: 'sawtooth', vol: 0.2, slide: 0.5 });
+      var m = M();
+      if (m) {
+        // a muted semitone clash (B against C), then the band drops back
+        m.note('pluck', 2, { octave: 0, gain: 0.6, params: { cutoff: 900, decay: 0.5 } });
+        m.note('pluck', 3, { octave: 0, gain: 0.5, params: { cutoff: 900, decay: 0.5 } });
+        m.duck(0.6, 0.9);
+      } else {
+        api.audio.tone(110, 0.5, { type: 'sawtooth', vol: 0.28, slide: 0.5 });
+        api.audio.tone(116, 0.5, { type: 'sawtooth', vol: 0.2, slide: 0.5 });
+      }
     }
     function tap(lane) {
       if (over) return;
@@ -5946,9 +6310,16 @@ button { font: inherit; color: inherit; }
       var pts = 10;
       if (perfect) { perfectStreak++; pts += 5; } else perfectStreak = 0;
       api.addScore(pts);
-      var f = noteAt(count - 1);
-      api.audio.tone(f, 0.32, { type: 'triangle', vol: 0.22 });
-      api.audio.tone(f * 2, 0.12, { type: 'sine', vol: 0.06 });
+      var m = M();
+      if (m) {
+        // the player's lead: next note of the phrase, over whatever chord is playing
+        m.note('pluck', LEAD[(count - 1) % LEAD.length], { chord: true, octave: 1, gain: perfect ? 0.8 : 0.65, params: { decay: 0.42 } });
+        syncMusic();
+      } else {
+        var f = noteAt(count - 1);
+        api.audio.tone(f, 0.32, { type: 'triangle', vol: 0.22 });
+        api.audio.tone(f * 2, 0.12, { type: 'sine', vol: 0.06 });
+      }
       var cx = lane * LW + LW / 2, cy = next.y + TH / 2;
       api.fx.burst(cx, cy, perfect ? HOT : ACCENT, perfect ? 16 : 8, 150, 0.4);
       if (perfect && perfectStreak > 2 && perfectStreak % 5 === 0) api.fx.text(W / 2, 90, 'PERFECT x' + perfectStreak, HOT, 14);
@@ -6113,6 +6484,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-merge-2048');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 440, H = 520, N = 4, PAD = 12, BOARD = 416, BX = (W - BOARD) / 2, BY = 88;
   var CELL = (BOARD - PAD * (N + 1)) / N;
@@ -6122,6 +6494,30 @@ button { font: inherit; color: inherit; }
     2: '#2b3a7a', 4: '#34479a', 8: '#b04dff', 16: '#d43fd8', 32: '#ff3fa4', 64: '#ff4d6d',
     128: '#ff9f1c', 256: '#ffd23f', 512: '#39ff88', 1024: '#3ff0ff', 2048: '#ffffff'
   };
+
+  // Music: swung lo-fi in Eb major, IVmaj7-iii7-ii7-Imaj7 under a low-pass.
+  // Each merge plays a marimba note whose degree is log2 of the new tile, so
+  // bigger tiles climb the scale; each new best tile unlocks a layer.
+  var LOFI = 3200, TENSE = 700;
+  function song() {
+    return {
+      bpm: 80, key: 51, scale: 'major', chords: [3, 2, 1, 0], swing: 0.3, seed: 2048, filter: LOFI,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: 0, params: { cutoff: 900, attack: 0.6, release: 1.4 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }, { deg: 6, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.1, gain: 0.55, pattern: 'x.....x...x.....' },
+        { name: 'hat', inst: 'hat', layer: 0.2, gain: 0.3, pattern: 'x.x.x.x.x.x.x.xx' },
+        { name: 'snare', inst: 'snare', layer: 0.3, gain: 0.4, pattern: '....x.......x...' },
+        { name: 'bass', inst: 'sub', layer: 0.42, gain: 0.5, chord: true, octave: -1,
+          pattern: '0 - - - . . . 4 - . 0 - - - . .' },
+        { name: 'keys', inst: 'marimba', layer: 0.6, gain: 0.28, chord: true, octave: 1,
+          fn: function (i) { return i.stepInBar === 3 || i.stepInBar === 11 ? [{ deg: 2, vel: 0.6 }, { deg: 6, vel: 0.5 }] : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.72, gain: 0.3, pattern: '..x...x...x..xx.' },
+        { name: 'bell', inst: 'bell', layer: 0.85, gain: 0.25, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.3 ? { deg: [4, 6, 7, 9][Math.floor(i.rng() * 4)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -6147,6 +6543,20 @@ button { font: inherit; color: inherit; }
       tiles.push(tile);
     }
     spawn(); spawn();
+    var tense = false;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function lvl(v) { return Math.round(Math.log(v) / Math.LN2); }
+    function empties() {
+      var n = 0;
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!grid[r][c]) n++;
+      return n;
+    }
+    // Board nearly full: squeeze the filter; release when space opens up.
+    function setTense(on) {
+      if (on === tense) return;
+      tense = on;
+      if (M()) M().setFilter(on ? TENSE : LOFI, on ? 1.2 : 0.6);
+    }
 
     function canMove() {
       for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
@@ -6164,7 +6574,7 @@ button { font: inherit; color: inherit; }
       var dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
       var order = [0, 1, 2, 3];
       if (dr > 0 || dc > 0) order.reverse();
-      var moved = false, gained = 0, merges = 0;
+      var moved = false, gained = 0, merges = 0, bestBefore = best, mergedVals = [];
       tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; tl.merged = false; });
       var dead = [];
       order.forEach(function (i) {
@@ -6188,6 +6598,7 @@ button { font: inherit; color: inherit; }
               dead.push(tl);
               gained += other.v;
               merges++;
+              mergedVals.push(other.v);
               if (other.v > best) best = other.v;
               moved = true;
               return;
@@ -6206,7 +6617,27 @@ button { font: inherit; color: inherit; }
       moves++;
       anim = SLIDE;
       dead.forEach(function (d) { d.dying = true; });
-      api.audio.tone(merges ? 330 + Math.log2(best) * 30 : 220, 0.06, { type: 'triangle', vol: merges ? 0.16 : 0.08 });
+      var m = M();
+      if (m && merges) {
+        // one marimba note per merge (distinct degrees ring together as a chord)
+        var seen = {};
+        mergedVals.sort(function (a, b) { return a - b; }).forEach(function (v) {
+          var d = Math.min(12, lvl(v) - 1);
+          if (seen[d] || d < 0) return;
+          seen[d] = true;
+          m.note('marimba', d, { octave: 1, quantize: '16', gain: 0.75 });
+        });
+        if (best > bestBefore) {
+          m.setIntensity(U.clamp((lvl(best) - 2) / 9, 0, 1));
+          if (best >= 128) {
+            var top = lvl(best) - 7;   // 128 -> 0 ... 2048 -> 4
+            m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7 + top, at: 4, steps: 6 }],
+              { inst: 'bell', quantize: '8', octave: 1, gain: 0.45 });
+          }
+        }
+      } else {
+        api.audio.tone(merges ? 330 + Math.log2(best) * 30 : 220, 0.06, { type: 'triangle', vol: merges ? 0.16 : 0.08 });
+      }
       if (gained) {
         api.addScore(gained);
         if (merges > 1) api.fx.text(W - 80, 44, merges + ' MERGES +' + gained, ACCENT, 11);
@@ -6216,7 +6647,7 @@ button { font: inherit; color: inherit; }
         api.fx.text(W / 2, BY + BOARD / 2, '2048!', '#ffffff', 28);
         api.fx.burst(W / 2, BY + BOARD / 2, '#ffd23f', 80, 300, 1.2);
         api.shake(10);
-        api.audio.arp([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'square', vol: 0.2 });
+        if (!m) api.audio.arp([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'square', vol: 0.2 });
       }
     }
 
@@ -6230,6 +6661,7 @@ button { font: inherit; color: inherit; }
       });
       tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; });
       spawn();
+      setTense(empties() <= 2);
       if (!canMove()) {
         over = true;
         api.shake(6);
@@ -6356,12 +6788,37 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-defence');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 480, H = 560, GROUND = 520;
   var ACCENT = '#39ff88', ENEMY = '#ff4d6d', BLAST = '#ffd23f';
   var SILO_X = [40, 240, 440];
   var CITY_X = [96, 144, 192, 288, 336, 384];
   var AMMO = 10;
+
+  // Music: tense D harmonic minor at 124. Threats on screen drive the layers,
+  // warheads near the towers force an alarm, detonations boom in key and each
+  // extra kill from one blast (and its chain) climbs the scale.
+  function song() {
+    return {
+      bpm: 124, key: 50, scale: 'harmonic', chords: [0, 5, 3, 4], seed: 12,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: -1, params: { cutoff: 1200 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'pulse', inst: 'bass', layer: 0.1, gain: 0.4, chord: true, octave: -2, params: { cutoff: 600 },
+          pattern: '0 0 . 0 0 . 0 . 0 0 . 0 0 . ^0 .' },
+        { name: 'kick', inst: 'kick', layer: 0.25, gain: 0.6, pattern: 'x...x...x...x...' },
+        { name: 'snare', inst: 'snare', layer: 0.4, gain: 0.4, pattern: '....x.......x..x' },
+        { name: 'hat', inst: 'hat', layer: 0.55, gain: 0.25, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'arp', inst: 'arp', layer: 0.65, gain: 0.3, chord: true, octave: 1,
+          fn: function (i) { return [0, 2, 4, 7, 4, 2][i.step % 6]; } },
+        { name: 'strings', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'sawtooth', cutoff: 1800 },
+          pattern: '4 - - - 3 - - - 2 - - - 1 - - - 0 - - - -1 - - - 0 - - - - - - -' },
+        { name: 'alarm', inst: 'lead', layer: 2, gain: 0.26, octave: 0, params: { wave: 'sawtooth', cutoff: 1600 },
+          pattern: '7 - - - 6 - - - 7 - - - 6 - - -' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -6436,10 +6893,26 @@ button { font: inherit; color: inherit; }
       });
       blasts.push({ x: e.x, y: GROUND - 4, r: 0, max: 26, t: 0, life: 0.7, enemy: true });
       api.shake(hitSomething ? 9 : 4);
+      if (hitSomething && M()) { M().duck(0.55, 0.9); M().note('sub', 0, { octave: -2, dur: 0.8, gain: 0.8 }); }
       api.audio.noise(0.35, { vol: hitSomething ? 0.35 : 0.2, cutoff: 700 });
     }
 
     startWave();
+    var lastInt = -1, alarmOn = false, calm = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic(dt) {
+      var m = M();
+      if (!m) return;
+      if (calm > 0) calm -= dt;
+      var it = calm > 0 ? 0 : Math.round(U.clamp(enemies.length / 9 + (wave - 1) * 0.05, 0, 1) * 10) / 10;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+      var close = !over && enemies.some(function (e) { return e.y > GROUND - 150; });
+      if (close !== alarmOn) {
+        alarmOn = close;
+        m.setTrack('alarm', close ? true : null);
+        if (close) m.note('riser', 0, { dur: 0.9, gain: 0.35 });
+      }
+    }
 
     return {
       // Read-only test hook: the lowest incoming warhead.
@@ -6488,8 +6961,9 @@ button { font: inherit; color: inherit; }
           var m = interceptors[i];
           m.left -= dt;
           if (m.left <= 0) {
-            blasts.push({ x: m.tx, y: m.ty, r: 0, max: 38, t: 0, life: 1.1 });
+            blasts.push({ x: m.tx, y: m.ty, r: 0, max: 38, t: 0, life: 1.1, ch: { n: 0 } });
             api.audio.noise(0.25, { vol: 0.18, cutoff: 2200 });
+            if (M()) M().note('sub', 0, { chord: true, octave: -1, dur: 0.35, gain: 0.55 });
             interceptors.splice(i, 1);
           } else { m.x += m.vx * dt; m.y += m.vy * dt; }
         }
@@ -6512,16 +6986,17 @@ button { font: inherit; color: inherit; }
             for (var s = 0; s < 2; s++) spawnEnemy(e.x, e.y, tg2[Math.floor(rng() * tg2.length)]);
             api.audio.tone(500, 0.06, { type: 'sawtooth', vol: 0.08 });
           }
-          var killed = false;
+          var killed = false, kb = null;
           for (var j = 0; j < blasts.length; j++) {
             var bj = blasts[j];
-            if (!bj.enemy && Math.hypot(e.x - bj.x, e.y - bj.y) < bj.r + 2) { killed = true; break; }
+            if (!bj.enemy && Math.hypot(e.x - bj.x, e.y - bj.y) < bj.r + 2) { killed = true; kb = bj; break; }
           }
           if (killed) {
             chain++;
             enemies.splice(i, 1);
             addPts(25 * wave * chain, e.x, e.y - 12);
-            blasts.push({ x: e.x, y: e.y, r: 0, max: 22, t: 0, life: 0.6 });
+            blasts.push({ x: e.x, y: e.y, r: 0, max: 22, t: 0, life: 0.6, ch: kb && kb.ch });
+            if (M() && kb && kb.ch) { kb.ch.n++; M().note('bell', Math.min(14, kb.ch.n - 1), { chord: true, octave: 1, gain: 0.5 }); }
             api.fx.burst(e.x, e.y, ENEMY, 10, 130, 0.5);
             continue;
           }
@@ -6533,6 +7008,7 @@ button { font: inherit; color: inherit; }
           api.audio.tone(90, 1, { type: 'sawtooth', vol: 0.3, slide: 0.5 });
           api.shake(16);
         }
+        syncMusic(dt);
         if (over) { overT += dt; if (overT > 1.6) api.gameOver(); return; }
 
         // wave cleared
@@ -6545,6 +7021,11 @@ button { font: inherit; color: inherit; }
             var bonus = alive * 100 * Math.min(wave, 6) + ammo * 5 * Math.min(wave, 6);
             addPts(bonus);
             api.fx.text(W / 2, 250, 'WAVE ' + wave + ' CLEAR  +' + bonus, BLAST, 14);
+            if (M()) {
+              // resolve on V -> i, then strip back to the pad for a breath
+              M().stinger([{ deg: 4 }, { deg: 6, at: 2 }, { deg: 7, at: 4, steps: 8 }, { deg: 9, at: 4, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.5 });
+              calm = 2.5;
+            }
             startWave();
           }
         }
@@ -6697,6 +7178,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-maze-muncher');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var MAP = [
     '###################',
@@ -6730,6 +7212,32 @@ button { font: inherit; color: inherit; }
   var ORDER = ['up', 'left', 'down', 'right'];
   var DOOR = { x: 9, y: 8 }, HOUSE = { x: 9, y: 9 }, EXIT = { x: 9, y: 7 };
   var CORNERS = [{ x: 17, y: -2 }, { x: 1, y: -2 }, { x: 18, y: 22 }, { x: 0, y: 22 }];
+
+  // Music: chirpy chiptune in C dorian at 120. The emptier the maze, the more
+  // layers play. A power core flips to phrygian, speeds up and forces a frantic
+  // arp; glitches eaten in one power run climb a note ladder; each cleared
+  // maze plays a fanfare and moves the tune to a new key.
+  var BPM = 120, KEY = 60, KEYS = [0, 2, 5, 3, 7];
+  function song() {
+    return {
+      bpm: BPM, key: KEY, scale: 'dorian', chords: [0, 3, 0, 6], seed: 13,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.38, chord: true, octave: -2, params: { cutoff: 700, q: 3 },
+          pattern: '0 . ^0 . 0 . ^0 . 0 . ^0 . 4 . ^0 .' },
+        { name: 'hat', inst: 'hat', layer: 0.1, gain: 0.3, pattern: 'x.x.x.x.x.x.x.x.' },
+        { name: 'kick', inst: 'kick', layer: 0.22, gain: 0.55, pattern: 'x.......x.x.....' },
+        { name: 'snare', inst: 'snare', layer: 0.35, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'chip', inst: 'arp', layer: 0.48, gain: 0.28, chord: true, octave: 1, params: { cutoff: 3000 },
+          fn: function (i) { return i.step % 2 ? null : [0, 2, 4, 2][(i.step >> 1) % 4]; } },
+        { name: 'tune', inst: 'pluck', layer: 0.62, gain: 0.32, octave: 1, params: { wave: 'square', cutoff: 2600, decay: 0.2 },
+          pattern: '4 . 2 . 4 . 5 . 4 . 2 . 0 . . . 3 . 5 . 6 - 5 . 4 . 3 . 2 . . .' },
+        { name: 'counter', inst: 'marimba', layer: 0.8, gain: 0.3, chord: true, octave: 2, rate: 2,
+          fn: function (i) { return i.rng() < 0.45 ? { deg: [0, 2, 4, 6][Math.floor(i.rng() * 4)], vel: 0.6 } : null; } },
+        { name: 'frantic', inst: 'arp', layer: 2, gain: 0.3, chord: true, octave: 2, params: { cutoff: 4200 },
+          fn: function (i) { return [0, 1, 2, 4, 2, 1][i.step % 6]; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -6769,6 +7277,21 @@ button { font: inherit; color: inherit; }
     }
     resetPellets();
     resetActors();
+    var total = left, powerOn = false, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var pw = frightT > 0 && dying <= 0;
+      if (pw !== powerOn) {
+        powerOn = pw;
+        m.setScale(pw ? 'phrygian' : 'dorian');
+        m.setTempo(pw ? BPM + 24 : BPM + (level - 1) * 3, 0.4);
+        m.setTrack('frantic', pw ? true : null);
+      }
+      var it = Math.round(U.clamp(0.08 + (1 - left / total) * 0.95, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function speedPlayer() { return Math.min(8.6, 6.4 + level * 0.25); }
     function speedGlitch(g) {
@@ -6856,13 +7379,16 @@ button { font: inherit; color: inherit; }
         api.addScore(10);
         api.audio.tone(t % 0.3 < 0.15 ? 520 : 440, 0.03, { type: 'triangle', vol: 0.07 });
       }
+      syncMusic();
       if (!bonus && bonusShown < 2 && (left === 120 || left === 50)) {
         bonus = { x: 9, y: 11, life: 9 }; bonusShown++;
       }
       if (left <= 0) {
         clearT = 2;
         api.fx.text(W / 2, TOP + T * 10, 'MAZE CLEAR', ACCENT, 18);
-        api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.2 });
+        if (M()) M().stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 6, at: 6 }, { deg: 7, at: 7, steps: 6 }],
+          { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.55, params: { wave: 'square', decay: 0.3 } });
+        else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.2 });
       }
       void xy;
     }
@@ -6873,6 +7399,7 @@ button { font: inherit; color: inherit; }
       dying = 1.4;
       api.shake(8);
       api.audio.tone(500, 0.9, { type: 'sawtooth', slide: 0.15, vol: 0.25 });
+      if (M()) M().duck(0.6, 1.4);
       api.fx.burst(px(player.x), py(player.y), ACCENT, 30, 180, 0.9);
     }
 
@@ -6883,6 +7410,7 @@ button { font: inherit; color: inherit; }
         ['up', 'down', 'left', 'right'].forEach(function (d) { if (inp.hit(d) || inp.held(d)) player.want = d; });
         inp.takeSwipes().forEach(function (s) { if (DIRS[s]) player.want = s; });
         if (over) { overT += dt; if (overT > 1.2) api.gameOver(); return; }
+        syncMusic();
         if (dying > 0) {
           dying -= dt;
           if (dying <= 0) {
@@ -6894,7 +7422,10 @@ button { font: inherit; color: inherit; }
         }
         if (clearT > 0) {
           clearT -= dt;
-          if (clearT <= 0) { level++; resetPellets(); resetActors(); readyT = 1.6; bonusShown = 0; }
+          if (clearT <= 0) {
+            level++; resetPellets(); resetActors(); readyT = 1.6; bonusShown = 0;
+            if (M()) { M().setKey(KEY + KEYS[(level - 1) % KEYS.length]); M().setTempo(BPM + (level - 1) * 3, 1); }
+          }
           return;
         }
         if (readyT > 0) { readyT -= dt; return; }
@@ -6930,7 +7461,11 @@ button { font: inherit; color: inherit; }
               api.addScore(pts);
               api.fx.text(px(g.x), py(g.y), String(pts), '#3ff0ff', 12);
               api.fx.burst(px(g.x), py(g.y), '#3ff0ff', 16, 140);
-              api.audio.arp([800, 1200, 1600], 0.04, { type: 'square', vol: 0.16 });
+              if (M()) {
+                // a ladder that climbs with every glitch eaten in this power run
+                var b0 = (eatChain - 1) * 2;
+                M().stinger([{ deg: b0 }, { deg: b0 + 2, at: 1 }, { deg: b0 + 4, at: 2, steps: 3 }], { inst: 'arp', quantize: '16', octave: 1, gain: 0.6 });
+              } else api.audio.arp([800, 1200, 1600], 0.04, { type: 'square', vol: 0.16 });
               g.state = 'eyes';
             } else if (g.state === 'normal' || g.state === 'leaving') {
               loseLife();
@@ -7095,6 +7630,7 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-invader-wave');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 480, H = 560, PY = 522, GROUND = 540;
   var COLS = 11, ROWS = 5, CW = 34, CH = 30, PIX = 3;
@@ -7130,6 +7666,31 @@ button { font: inherit; color: inherit; }
     for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) if (spr[r][c]) ctx.fillRect(x + c * px, y + r * px, px, px);
   }
 
+  // Music: F minor synth march. The bass walks four steps down every bar and
+  // its tempo follows the formation - fewer invaders, faster march. The
+  // mystery ship forces a wobbling siren; each cleared wave lifts the key.
+  var KEY = 53;
+  function song() {
+    return {
+      bpm: 96, key: KEY, scale: 'minor', chords: [0, 0, 5, 4], seed: 14,
+      tracks: [
+        { name: 'march', inst: 'bass', layer: 0, gain: 0.45, chord: true, octave: -2, rate: 4, params: { cutoff: 650, q: 4 },
+          pattern: '0 -1 -2 -3' },
+        { name: 'pad', inst: 'pad', layer: 0.12, gain: 0.32, chord: true, octave: 0, params: { cutoff: 1300, attack: 0.3 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.25, gain: 0.55, pattern: 'x.......x.......' },
+        { name: 'snare', inst: 'snare', layer: 0.38, gain: 0.35, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.5, gain: 0.25, pattern: '..x...x...x...x.' },
+        { name: 'synth', inst: 'arp', layer: 0.62, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1800 },
+          fn: function (i) { return i.stepInBar % 2 ? null : [0, 4, 2, 4, 0, 4, 2, 7][(i.stepInBar >> 1)]; } },
+        { name: 'lead', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'triangle', cutoff: 2200 },
+          pattern: '7 - - - 6 - 4 - 3 - - - 4 - - - 2 - - - 3 - 2 - 0 - - - -1 - - -' },
+        { name: 'siren', inst: 'lead', layer: 2, gain: 0.24, octave: 1, params: { wave: 'sine', cutoff: 3000 },
+          fn: function (i) { return i.stepInBar % 4 === 0 ? { deg: (i.stepInBar >> 2) % 2 ? 4 : 5, steps: 4 } : null; } }
+      ]
+    };
+  }
+
   function create(api) {
     var rng = api.rng;
     var aliens = [], formation = { x: 0, y: 0, dir: 1, step: 0, frame: 0 };
@@ -7163,6 +7724,19 @@ button { font: inherit; color: inherit; }
       api.fx.text(W / 2, 250, 'WAVE ' + wave, ACCENT, 18);
     }
     startWave();
+    var lastBpm = 96, lastInt = -1, sirenOn = false, shotN = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic(liveN) {
+      var m = M();
+      if (!m) return;
+      var frac = liveN / (COLS * ROWS);
+      var bpm = Math.min(188, Math.round((96 + (1 - frac) * 72 + (wave - 1) * 4) / 4) * 4);
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 0.5); }
+      var it = Math.round(U.clamp(0.1 + (1 - frac) * 0.8 + (wave - 1) * 0.1, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+      var s = !!ufo && !over;
+      if (s !== sirenOn) { sirenOn = s; m.setTrack('siren', s ? true : null); }
+    }
 
     function alienPos(a) { return { x: formation.x + a.c * CW, y: formation.y + a.r * CH }; }
     function alive() { return aliens.filter(function (a) { return a.alive; }); }
@@ -7194,6 +7768,7 @@ button { font: inherit; color: inherit; }
       api.shake(10);
       api.audio.noise(0.6, { vol: 0.3, cutoff: 900 });
       if (lives <= 0) over = true;
+      else if (M()) M().duck(0.5, 1.2);
     }
 
     return {
@@ -7214,6 +7789,7 @@ button { font: inherit; color: inherit; }
             shots.push({ x: player.x, y: PY - 12 });
             fireCd = 0.32;
             api.audio.tone(900, 0.06, { type: 'square', vol: 0.08, slide: 0.4 });
+            if (M()) M().note('arp', [0, 2, 4][shotN++ % 3], { chord: true, octave: 2, gain: 0.12 });
           }
         } else {
           player.respawn -= dt;
@@ -7234,7 +7810,8 @@ button { font: inherit; color: inherit; }
           if ((formation.dir > 0 && maxX + 6 > W - 8) || (formation.dir < 0 && minX - 6 < 8)) {
             formation.y += 14; formation.dir *= -1;
           } else formation.x += 6 * formation.dir;
-          api.audio.tone([98, 92, 87, 82][Math.floor(t * 10) % 4], 0.05, { type: 'square', vol: 0.06 });
+          // with music on, the march bass carries the footsteps
+          if (!M()) api.audio.tone([98, 92, 87, 82][Math.floor(t * 10) % 4], 0.05, { type: 'square', vol: 0.06 });
         }
         // invaders erase bunkers they touch, and win if they land
         live.forEach(function (a) {
@@ -7305,7 +7882,7 @@ button { font: inherit; color: inherit; }
           if (ufoT <= 0) { var fl = rng() < 0.5; ufo = { x: fl ? -30 : W + 30, v: fl ? 110 : -110 }; }
         } else {
           ufo.x += ufo.v * dt;
-          if (Math.floor(t * 12) % 2) api.audio.tone(ufo.x % 40 < 20 ? 700 : 620, 0.03, { type: 'sine', vol: 0.03 });
+          if (!M() && Math.floor(t * 12) % 2) api.audio.tone(ufo.x % 40 < 20 ? 700 : 620, 0.03, { type: 'sine', vol: 0.03 });
           if (ufo.x < -50 || ufo.x > W + 50) { ufo = null; ufoT = 18 + rng() * 10; }
         }
 
@@ -7313,9 +7890,13 @@ button { font: inherit; color: inherit; }
           var bonus = 100 * wave;
           addPts(bonus);
           api.fx.text(W / 2, 280, 'WAVE CLEAR +' + bonus, '#ffd23f', 15);
-          api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+          if (M()) {
+            M().stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 7, at: 6, steps: 6 }], { inst: 'lead', quantize: 'beat', octave: 1, gain: 0.4, params: { wave: 'triangle', cutoff: 2600 } });
+            M().setKey(KEY + (wave % 6) * 2 - (wave % 6 > 3 ? 12 : 0));
+          } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
           clearT = 1.8;
         }
+        syncMusic(alive().length);
         api.setStatus('WAVE ' + wave + '  ·  CANNONS ' + lives + '  ·  INVADERS ' + alive().length);
       },
 
@@ -7425,11 +8006,38 @@ button { font: inherit; color: inherit; }
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-helix-drop');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600, CX = W / 2;
   var R = 150, RI = 34, SQ = 0.32, SEG = 12, STEP = Math.PI * 2 / SEG, GAP_Y = 118, BALL_R = 11;
   var FRONT = Math.PI / 2, MID = (R + RI) / 2;
   var ACCENT = '#ff9f1c', SAFE = '#3ff0ff', DANGER = '#ff2d55';
+
+  // Music: C# minor drum & bass at 170 - half-time drums while shallow, full
+  // two-step break deeper down. Each gap fallen through plays the next note
+  // of a descending run (reset on landing); an ignited ball opens the filter
+  // and adds a riser until it lands.
+  var CLOSED = 4200;
+  function song() {
+    return {
+      bpm: 170, key: 49, scale: 'minor', chords: [0, 0, 5, 6], seed: 15, filter: CLOSED,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: 0, params: { cutoff: 1000, attack: 0.8, release: 1.5 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 2, steps: 32 }, { deg: 4, steps: 32 }] : null; } },
+        { name: 'sub', inst: 'sub', layer: 0.08, gain: 0.5, chord: true, octave: -1, pattern: '0 - - - - - - - . . 0 - - - - .' },
+        { name: 'hkick', inst: 'kick', layer: 0.15, maxLayer: 0.5, gain: 0.6, pattern: 'x.........x.....' },
+        { name: 'hsnare', inst: 'snare', layer: 0.15, maxLayer: 0.5, gain: 0.4, pattern: '........x.......' },
+        { name: 'hat', inst: 'hat', layer: 0.3, gain: 0.25, pattern: '..x...x...x...xx' },
+        { name: 'kick', inst: 'kick', layer: 0.5, gain: 0.6, pattern: 'x.........x.....' },
+        { name: 'snare', inst: 'snare', layer: 0.5, gain: 0.42, pattern: '....x..x.x..x...' },
+        { name: 'reese', inst: 'bass', layer: 0.62, gain: 0.3, chord: true, octave: -1, params: { cutoff: 500, q: 2 },
+          pattern: '0 - - - - - . 0 - - . 2 - - 1 -' },
+        { name: 'shaker', inst: 'shaker', layer: 0.72, gain: 0.3, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'stab', inst: 'bell', layer: 0.85, gain: 0.25, chord: true, octave: 1,
+          fn: function (i) { return i.stepInBar === 6 || (i.stepInBar === 14 && i.bar % 2) ? [{ deg: 4, vel: 0.6 }, { deg: 7, vel: 0.5 }] : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -7457,6 +8065,25 @@ button { font: inherit; color: inherit; }
     }
     function ring(k) { while (rings.length <= k) rings.push(makeRing(rings.length)); return rings[k]; }
     for (var i = 0; i < 12; i++) ring(i);
+    var run = 0, fireOn = false, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    // ignited ball: open the filter + riser; any landing closes it again
+    function setFire(on) {
+      if (on === fireOn) return;
+      fireOn = on;
+      var m = M();
+      if (!m) return;
+      m.setFilter(on ? 16000 : CLOSED, on ? 0.25 : 0.5);
+      if (on) m.note('riser', 0, { dur: 0.8, gain: 0.4 });
+    }
+    function landed() {
+      run = 0;
+      setFire(false);
+      var m = M();
+      if (!m) return;
+      var it = Math.round(U.clamp(0.1 + passed / 55, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function segUnderBall() {
       var local = ((FRONT - rot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
@@ -7472,7 +8099,13 @@ button { font: inherit; color: inherit; }
         var pts = 10 * combo;
         api.addScore(pts);
         if (combo > 1) api.fx.text(CX + 40, sy - cam - 10, '+' + pts, combo >= 3 ? ACCENT : '#fff', 11 + Math.min(combo, 5));
-        api.audio.tone(300 + Math.min(combo, 12) * 60, 0.06, { type: 'triangle', vol: 0.12 });
+        var m = M();
+        if (m) {
+          // a cascade: every gap in one fall is the next note down the scale
+          m.note('pluck', 9 - Math.min(run, 16), { octave: 0, gain: 0.7, params: { decay: 0.35 } });
+          run++;
+          setFire(combo >= 3);
+        } else api.audio.tone(300 + Math.min(combo, 12) * 60, 0.06, { type: 'triangle', vol: 0.12 });
         nextRing = k + 1;
         return false;
       }
@@ -7485,7 +8118,9 @@ button { font: inherit; color: inherit; }
         api.fx.text(CX, sy - cam - 20, 'SMASH', ACCENT, 15);
         api.shake(7);
         api.audio.noise(0.25, { vol: 0.28, cutoff: 1400 });
+        if (M()) M().note('sub', 0, { octave: -2, dur: 0.4, gain: 0.8 });
         combo = 0;
+        landed();
         nextRing = k + 1;
         ball.vy = -520;
         return true;
@@ -7495,12 +8130,14 @@ button { font: inherit; color: inherit; }
         api.fx.burst(CX, sy - cam + MID * SQ, DANGER, 36, 220, 0.9);
         api.shake(12);
         api.audio.tone(160, 0.5, { type: 'sawtooth', slide: 0.3, vol: 0.28 });
+        setFire(false);
         return true;
       }
       // normal bounce
       ball.y = sy - BALL_R;
       ball.vy = -600;
       combo = 0;
+      landed();
       var local = ((FRONT - rot) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
       rg.splats.push(local);
       if (rg.splats.length > 5) rg.splats.shift();
@@ -7688,6 +8325,27 @@ button { font: inherit; color: inherit; }
   var SX = W / 2, SY = 548, SPEED = 880;
   var ACCENT = '#ff8fd8';
   var PALETTE = ['#ff4d6d', '#ffd23f', '#39ff88', '#3ff0ff', '#b04dff', '#ff9f1c'];
+  var M = function () { return XA.music; };
+
+  // Bubbly C major pentatonic: marimba + bell + soft shaker. Each colour is a scale degree.
+  function song() {
+    return {
+      bpm: 100, key: 60, scale: 'pentatonic', chords: [0, 3, 1, 4], seed: 16, swing: 0.1,
+      tracks: [
+        { name: 'mallet', inst: 'marimba', layer: 0, gain: 0.42, chord: true, pattern: '0 . 2 . . 4 . 2 . 0 . . 2 . . .' },
+        { name: 'bell', inst: 'bell', layer: 0.08, gain: 0.26, chord: true, octave: 1, rate: 4,
+          fn: function (i) { return i.rng() < 0.45 ? { deg: [0, 2, 4, 5][Math.floor(i.rng() * 4)], vel: 0.55 } : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.18, gain: 0.38, pattern: 'x.xxx.xxx.xxx.xX' },
+        { name: 'bass', inst: 'sub', layer: 0.3, gain: 0.5, chord: true, octave: -2, pattern: '0 . . . . . 0 . . . 2 . . . . .' },
+        { name: 'kick', inst: 'kick', layer: 0.45, gain: 0.5, pattern: 'x.......x.....x.' },
+        { name: 'pad', inst: 'pad', layer: 0.58, gain: 0.3, chord: true, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'tension', inst: 'arp', layer: 0.8, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1500 },
+          fn: function (i) { return [0, 1, 2, 1][i.step % 4]; } },
+        { name: 'hat', inst: 'hat', layer: 0.8, gain: 0.3, pattern: '..x...x...x...xx' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -7740,6 +8398,17 @@ button { font: inherit; color: inherit; }
     fillBoard();
     current = pick(); next = pick();
 
+    // Danger = how far the lowest bubble has crept towards the line.
+    var lastI = -1;
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var d = U.clamp((lowestRow() - 3) / (MAX_ROWS - 5), 0, 1);
+      var v = Math.round(U.clamp(d + (board - 1) * 0.03, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+    }
+    if (M()) { M().play(song(), { fade: 1.2, intensity: 0 }); syncMusic(); }
+
     function pushCeiling() {
       grid.unshift(null);
       parity ^= 1;
@@ -7754,6 +8423,7 @@ button { font: inherit; color: inherit; }
       }
       api.shake(5);
       api.audio.tone(90, 0.3, { type: 'square', vol: 0.18 });
+      if (M()) { M().duck(0.55, 0.8); M().note('sub', 0, { octave: -2, dur: 0.4, gain: 0.6 }); }
       api.fx.text(W / 2, TOP + 20, 'CEILING DROP', ACCENT, 12);
     }
     function lowestRow() {
@@ -7793,7 +8463,11 @@ button { font: inherit; color: inherit; }
         });
         var pts = group.length * 10 + Math.max(0, group.length - 3) * 10;
         api.addScore(pts);
-        api.audio.arp([523, 659, 784].slice(0, Math.min(3, group.length - 1)), 0.04, { type: 'triangle', vol: 0.16 });
+        var m = M();
+        if (m) {
+          m.note('marimba', colour, { quantize: '16', octave: 1, gain: 0.85 });
+          if (group.length > 4) m.note('bell', colour, { quantize: '16', octave: 2, gain: 0.35 });
+        } else api.audio.arp([523, 659, 784].slice(0, Math.min(3, group.length - 1)), 0.04, { type: 'triangle', vol: 0.16 });
         // drop anything no longer connected to the ceiling
         var anchored = {}, st = [];
         for (var c0 = 0; c0 < cols(0); c0++) if (grid[0][c0] >= 0) st.push([0, c0]);
@@ -7803,10 +8477,11 @@ button { font: inherit; color: inherit; }
           anchored[kk] = true;
           neighbours(q[0], q[1]).forEach(function (n) { st.push(n); });
         }
-        var dropped = 0;
+        var dropped = 0, dropCols = [];
         for (var rr = 0; rr < grid.length; rr++) for (var cc = 0; cc < cols(rr); cc++) {
           if (grid[rr][cc] >= 0 && !anchored[rr + ',' + cc]) {
             falling.push({ x: cx(rr, cc), y: cy(rr), vy: -60 - rng() * 80, vx: (rng() - 0.5) * 80, c: grid[rr][cc] });
+            if (dropCols.length < 8) dropCols.push(grid[rr][cc]);
             grid[rr][cc] = -1;
             dropped++;
           }
@@ -7815,19 +8490,32 @@ button { font: inherit; color: inherit; }
           var dp = 20 * dropped * Math.min(8, dropped);
           api.addScore(dp);
           api.fx.text(W / 2, cy(r) + 30, 'DROP x' + dropped + '  +' + dp, '#ffd23f', 13);
-          api.audio.arp([392, 523, 659, 784, 1047].slice(0, Math.min(5, dropped + 1)), 0.05, { type: 'square', vol: 0.16 });
+          if (m) {
+            // one bell per orphan, a 16th apart, always climbing
+            var t0 = m.nextGrid('16'), sps = 15 / Math.max(40, m.tempo() || 100), deg = -1;
+            dropCols.sort(function (a, b) { return a - b; }).forEach(function (c, i) {
+              deg = Math.max(deg + 1, c);
+              m.note('bell', deg, { at: t0 + (i + 1) * sps, octave: 1, gain: 0.45 });
+            });
+          } else api.audio.arp([392, 523, 659, 784, 1047].slice(0, Math.min(5, dropped + 1)), 0.05, { type: 'square', vol: 0.16 });
         }
         if (lowestRow() < 0) {
           var bonus = 1000 * board;
           api.addScore(bonus);
           api.fx.text(W / 2, H / 2, 'BOARD CLEAR +' + bonus, '#39ff88', 16);
           clearT = 1.5;
+          if (m) {
+            m.stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 5, at: 6, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+            var nextKey = 60 + (board * 5) % 12;
+            m.setKey(nextKey > 65 ? nextKey - 12 : nextKey);
+          }
         }
       } else {
         misses++;
         api.audio.tone(260, 0.05, { type: 'square', vol: 0.1 });
         if (misses >= missLimit) { misses = 0; pushCeiling(); }
       }
+      syncMusic();
       if (lowestRow() >= MAX_ROWS - 1) {
         over = true;
         api.shake(12);
@@ -7854,7 +8542,7 @@ button { font: inherit; color: inherit; }
         if (over) { overT += dt; if (overT > 1.3) api.gameOver(); return; }
         if (clearT > 0) {
           clearT -= dt;
-          if (clearT <= 0) { board++; fillBoard(); misses = 0; current = pick(); next = pick(); }
+          if (clearT <= 0) { board++; fillBoard(); misses = 0; current = pick(); next = pick(); syncMusic(); }
           return;
         }
         // aim with the pointer when it moves, or with the keys
@@ -8005,6 +8693,33 @@ button { font: inherit; color: inherit; }
 
   var W = 400, H = 600, PY = 480, SEGH = 10, PR = 8;
   var ACCENT = '#3ff0ff', GATE = '#ffd23f', BLOCK = '#ff3fa4';
+  var M = function () { return XA.music; };
+  var TONES = [0, 2, 4, 7, 9, 11, 14, 16];
+
+  // Driving E dorian synthwave: Em - A - D - Bm, two bars each.
+  function song() {
+    var hook = [
+      '4 - - - - - 2 - 1 - 0 - - - . .',
+      '. . . . . . . . . . . . . . . .',
+      '4 - - - 6 - - - 7 - - - 6 - 4 -',
+      '2 - - - - - - - . . . . . . . .'
+    ].join(' ');
+    return {
+      bpm: 118, key: 52, scale: 'dorian', chords: [0, 3, 6, 4], barsPerChord: 2, seed: 17,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: -1, params: { cutoff: 1400 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'bass', inst: 'bass', layer: 0.08, gain: 0.45, chord: true, octave: -2, rate: 2, params: { cutoff: 650 },
+          pattern: '0 0 ^0 0 0 0 ^0 0' },
+        { name: 'kick', inst: 'kick', layer: 0.2, gain: 0.58, pattern: 'x...x...x...x...' },
+        { name: 'arp', inst: 'arp', layer: 0.34, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1900 },
+          fn: function (i) { return [0, 2, 4, 7, 4, 2, 4, 9][i.step % 8]; } },
+        { name: 'snare', inst: 'snare', layer: 0.5, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.6, gain: 0.34, pattern: '..x...x...x...x.' },
+        { name: 'lead', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'triangle', cutoff: 2200 }, pattern: hook }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -8059,6 +8774,27 @@ button { font: inherit; color: inherit; }
     function sy(wy) { return PY - (wy - dist); }   // world → screen: the road ahead is above the player
     genTo(dist + PY + 200);
 
+    var lastI = -1, lastBpm = 118, lastMile = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    // Intensity from speed + gate streak, tempo from speed, key up every 500 m.
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var sp = (speed - 240) / 380;
+      var v = Math.round(U.clamp(0.12 + sp * 0.7 + Math.min(streak, 8) * 0.03, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+      var bpm = Math.round(118 + sp * 24);
+      if (Math.abs(bpm - lastBpm) >= 1) { lastBpm = bpm; m.setTempo(bpm, 1.5); }
+      var mile = Math.floor(dist / 5000);
+      if (mile !== lastMile) {
+        lastMile = mile;
+        m.note('riser', 0, { dur: 0.9, gain: 0.35 });
+        m.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 4 }], { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.5 });
+        m.setKey(52 + (mile * 2) % 12);
+        api.fx.text(W / 2, 140, (mile * 500) + ' m', ACCENT, 13);
+      }
+    }
+
     function die() {
       dead = true;
       api.fx.burst(x, PY, ACCENT, 36, 240, 0.9);
@@ -8099,7 +8835,11 @@ button { font: inherit; color: inherit; }
         if (Math.min(x - PR - s.l, s.r - x - PR) < 5 && closeCd <= 0) {
           closeCd = 0.9; bonus += 10;
           api.fx.text(x, PY - 24, 'CLOSE +10', '#bfefff', 10);
-          api.audio.tone(1000, 0.04, { type: 'sine', vol: 0.1 });
+          var mm = M();
+          if (mm) {
+            mm.note('riser', 0, { dur: 0.3, gain: 0.3 });
+            mm.note('pluck', TONES[Math.floor(Math.random() * 4) + 2], { chord: true, quantize: '16', octave: 1, gain: 0.5 });
+          } else api.audio.tone(1000, 0.04, { type: 'sine', vol: 0.1 });
         }
         for (var i = 0; i < blocks.length; i++) {
           var b = blocks[i];
@@ -8114,10 +8854,12 @@ button { font: inherit; color: inherit; }
               bonus += pts;
               api.fx.text(x, PY - 30, 'GATE +' + pts, GATE, 12);
               api.fx.burst(x, PY, GATE, 16, 150, 0.5);
-              api.audio.tone(660 + Math.min(streak, 8) * 60, 0.08, { type: 'square', vol: 0.14 });
+              if (M()) M().note('pluck', TONES[Math.min(streak, 8) - 1], { chord: true, quantize: '16', octave: 1, gain: 0.7 });
+              else api.audio.tone(660 + Math.min(streak, 8) * 60, 0.08, { type: 'square', vol: 0.14 });
             } else if (streak) { streak = 0; api.fx.text(x, PY - 30, 'MISSED', '#8899aa', 10); }
           }
         });
+        syncMusic();
         trail.unshift({ x: x, wy: wy });
         if (trail.length > 40) trail.pop();
         api.setScore(Math.floor(dist / 10) + bonus);
@@ -8249,6 +8991,29 @@ button { font: inherit; color: inherit; }
   var G = 30, THRUST = 78, TURN = 2.6, BURN = 55;
   var SAFE_VY = 42, SAFE_VX = 28, SAFE_A = 0.22;
   var ACCENT = '#c9d4ff', OK = '#39ff88', WARN = '#ffd23f', BAD = '#ff4d6d';
+  var M = function () { return XA.music; };
+  var CLOSED = 2400, OPEN = 9000;
+
+  // Ambient F lydian, no drums: pad + bells + sub drone. Ticks arrive with the ground.
+  function song() {
+    return {
+      bpm: 70, key: 53, scale: 'lydian', chords: [0, 4, 5, 1], barsPerChord: 2, seed: 18, filter: CLOSED,
+      tracks: [
+        { name: 'drone', inst: 'sub', layer: 0, gain: 0.38, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? { deg: 0, steps: 16, vel: 0.7 } : null; } },
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.36, chord: true, octave: -1, params: { attack: 1.4, release: 2.2, cutoff: 900 },
+          fn: function (i) { return i.step % 32 === 0 ? [{ deg: 0, steps: 30 }, { deg: 2, steps: 30 }, { deg: 4, steps: 30 }, { deg: 6, steps: 30 }] : null; } },
+        { name: 'bells', inst: 'bell', layer: 0, gain: 0.28, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.16 ? { deg: [0, 2, 4, 6, 7][Math.floor(i.rng() * 5)], vel: 0.5 } : null; } },
+        { name: 'thrust', inst: 'pad', layer: 2, gain: 0.4, octave: -2, rate: 4, params: { attack: 0.06, release: 0.5, cutoff: 420 },
+          fn: function () { return [{ deg: 0, steps: 4 }, { deg: 4, steps: 4 }]; } },
+        { name: 'tick1', inst: 'hat', layer: 0.3, maxLayer: 0.6, gain: 0.28, pattern: 'x...x...x...x...' },
+        { name: 'tick2', inst: 'hat', layer: 0.6, maxLayer: 0.85, gain: 0.3, pattern: 'x.x.x.x.x.x.x.xx' },
+        { name: 'tick3', inst: 'hat', layer: 0.85, gain: 0.32, pattern: 'xxxxXxxxxxxxXxxx' },
+        { name: 'heart', inst: 'sub', layer: 0.6, gain: 0.4, chord: true, octave: -1, pattern: '0 . . 0 . . . . . . . . . . . .' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -8285,7 +9050,10 @@ button { font: inherit; color: inherit; }
     }
     function spawn() {
       ship = { x: 60 + rng() * (W - 120), y: 40, vx: (rng() - 0.5) * 70, vy: 5, a: (rng() - 0.5) * 0.6, burn: false, legs: 0 };
+      // new pad: shift the key round the circle of fifths (kept in a mid register)
+      if (level > 1 && M() && lastKeyLevel !== level) { lastKeyLevel = level; M().setKey(53 + ((level - 1) * 7) % 12); }
     }
+    var lastKeyLevel = 1;
     function groundAt(x) {
       var i = U.clamp(Math.floor(x / STEP), 0, N - 2);
       var f = (x - i * STEP) / STEP;
@@ -8297,6 +9065,33 @@ button { font: inherit; color: inherit; }
     }
     newSurface();
 
+    var burnOn = false, band = 0, fuelWarn = false;
+    if (M()) M().play(song(), { fade: 1.6, intensity: 0 });
+    function setBurn(on) {
+      if (on === burnOn) return;
+      burnOn = on;
+      var m = M();
+      if (!m) return;
+      m.setTrack('thrust', on ? true : null);
+      m.setFilter(on ? OPEN : CLOSED, on ? 0.25 : 0.9);
+    }
+    // altitude bands (edge-guarded): ticks get denser near the surface
+    function setBand(b) {
+      if (b === band) return;
+      band = b;
+      if (M()) M().setIntensity([0, 0.3, 0.6, 0.9][b]);
+    }
+    function musicTick(alt) {
+      var flying = !!ship && landedT <= 0;
+      setBurn(flying && ship.burn);
+      setBand(!flying ? 0 : alt > 180 ? 0 : alt > 100 ? 1 : alt > 45 ? 2 : 3);
+      if (!fuelWarn && fuel < 200) {
+        fuelWarn = true;
+        if (M()) M().stinger([{ deg: 3 }, { deg: 0, at: 2 }, { deg: 3, at: 4 }, { deg: 0, at: 6, steps: 4 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.4 });
+        else api.audio.tone(880, 0.1, { type: 'sine', vol: 0.1 });
+      } else if (fuelWarn && fuel > 260) fuelWarn = false;
+    }
+
     function crash(reason) {
       api.fx.burst(ship.x, ship.y, '#ff9f1c', 40, 220, 1);
       api.fx.burst(ship.x, ship.y, ACCENT, 20, 160, 0.8);
@@ -8304,6 +9099,8 @@ button { font: inherit; color: inherit; }
       api.shake(12);
       api.audio.noise(0.7, { vol: 0.35, cutoff: 700 });
       ship = null;
+      musicTick(0);
+      if (M()) { M().duck(0.6, 1.4); M().note('sub', -7, { octave: -1, dur: 1, gain: 0.7 }); }
       ships--;
       crashT = 1.6;
     }
@@ -8357,10 +9154,16 @@ button { font: inherit; color: inherit; }
             fuel = Math.min(1000, fuel + 250);
             api.fx.text(s.x, s.y - 40, 'LANDED x' + pad.mult + '  +' + pts, OK, 14);
             api.fx.burst(s.x, pad.y, OK, 20, 120, 0.6);
-            api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'triangle', vol: 0.2 });
+            var m = M();
+            if (m) {
+              m.stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 7, at: 6, steps: 10 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.6 });
+              m.stinger([{ deg: 0, steps: 16 }, { deg: 4, steps: 16 }], { inst: 'pad', quantize: 'beat', octave: 0, gain: 0.5 });
+            } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'triangle', vol: 0.2 });
             landedT = 2;
+            setBurn(false); setBand(0);
           } else crash(!pad ? 'MISSED THE PAD' : s.vy >= SAFE_VY ? 'TOO FAST' : Math.abs(s.a) >= SAFE_A ? 'NOT LEVEL' : 'DRIFTING');
         }
+        musicTick(ship ? Math.min(groundAt(ship.x - 8), groundAt(ship.x + 8)) - ship.y - 10 : 0);
         if (ship) api.setStatus('LEVEL ' + level + '  ·  MODULES ' + ships + '  ·  FUEL ' + Math.round(fuel));
       },
 
@@ -8498,6 +9301,28 @@ button { font: inherit; color: inherit; }
   var W = 400, H = 520, N = 3, CELL = 116, GAP = 12;
   var GX = (W - (N * CELL + (N - 1) * GAP)) / 2, GY = 110;
   var ACCENT = '#3ff0ff', GOOD = '#3ff0ff', BAD = '#ff4d6d', GOLD = '#ffd23f';
+  var M = function () { return XA.music; };
+  // Taps walk this pentatonic phrase, each one landing on the next 16th.
+  var PHRASE = [0, 2, 4, 3, 2, 4, 5, 7, 4, 5, 7, 6, 5, 4, 2, 1];
+
+  // Metronome groove in D major pentatonic; tempo climbs with the level.
+  function song() {
+    return {
+      bpm: 116, key: 62, scale: 'pentatonic', chords: [0, 4, 3, 1], seed: 19,
+      tracks: [
+        { name: 'click', inst: 'hat', layer: 0, gain: 0.34, pattern: 'X...x...x...x...' },
+        { name: 'tock', inst: 'marimba', layer: 0, gain: 0.2, octave: 2, pattern: '0 . . . . . . . . . . . . . . .' },
+        { name: 'kick', inst: 'kick', layer: 0.15, gain: 0.55, pattern: 'x.......x.......' },
+        { name: 'bass', inst: 'bass', layer: 0.3, gain: 0.4, chord: true, octave: -2, params: { cutoff: 800 },
+          pattern: '0 . . 0 . . 0 . . . 0 . 3 . . .' },
+        { name: 'clap', inst: 'clap', layer: 0.45, gain: 0.4, pattern: '....x.......x...' },
+        { name: 'shaker', inst: 'shaker', layer: 0.6, gain: 0.3, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'pad', inst: 'pad', layer: 0.75, gain: 0.26, chord: true, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 3, steps: 16 }] : null; } },
+        { name: 'kick2', inst: 'kick', layer: 0.9, gain: 0.4, pattern: '......x.......x.' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -8506,6 +9331,16 @@ button { font: inherit; color: inherit; }
     var hits = 0, streak = 0, hearts = 3;
     var spawnT = 0.9, elapsed = 0;
     var over = false, overT = 0, t = 0;
+    var phraseAt = 0, lastI = -1, lastBpm = 116;
+    if (M()) M().play(song(), { fade: 1, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var v = Math.round(U.clamp(streak / 24 + (level() - 1) * 0.05, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+      var bpm = Math.min(150, 116 + (level() - 1) * 4);
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 2); }
+    }
 
     function level() { return 1 + Math.floor(hits / 12); }
     function lifeFor() { return Math.max(0.55, 1.35 - hits * 0.012); }
@@ -8523,7 +9358,13 @@ button { font: inherit; color: inherit; }
       hearts--;
       streak = 0;
       api.shake(7);
-      api.audio.tone(150, 0.25, { type: 'sawtooth', vol: 0.22, slide: 0.6 });
+      var m = M();
+      if (m) {
+        m.note('bass', -5, { octave: -2, dur: 0.12, gain: 0.7, params: { cutoff: 260, q: 2 } });
+        m.duck(0.45, 0.6);
+        phraseAt = 0;
+        syncMusic();
+      } else api.audio.tone(150, 0.25, { type: 'sawtooth', vol: 0.22, slide: 0.6 });
       var c = centre(i);
       api.fx.text(c.x, c.y - 40, why, BAD, 12);
       if (hearts <= 0) over = true;
@@ -8553,7 +9394,13 @@ button { font: inherit; color: inherit; }
       api.addScore(pts);
       api.fx.burst(c.x, c.y, h.kind === 'gold' ? GOLD : GOOD, 16, 160, 0.5);
       api.fx.text(c.x, c.y - 30, '+' + pts, h.kind === 'gold' ? GOLD : '#fff', 12);
-      api.audio.tone(520 + Math.min(streak, 20) * 25, 0.06, { type: 'square', vol: 0.14 });
+      var m = M();
+      if (m) {
+        var deg = PHRASE[phraseAt++ % PHRASE.length];
+        m.note('pluck', deg, { quantize: '16', octave: 1, gain: 0.75 });
+        if (h.kind === 'gold') m.note('bell', deg, { quantize: '16', octave: 2, gain: 0.45 });
+        syncMusic();
+      } else api.audio.tone(520 + Math.min(streak, 20) * 25, 0.06, { type: 'square', vol: 0.14 });
       h.hitKind = h.kind; h.hitT = 0.25; h.kind = null;
     }
 
@@ -8712,6 +9559,29 @@ button { font: inherit; color: inherit; }
   var ACCENT = '#39ff88', MINE = '#ff4d6d', FLAG = '#ffd23f';
   var NUM = ['', '#3ff0ff', '#39ff88', '#ffd23f', '#ff9f1c', '#ff4d6d', '#ff3fa4', '#b04dff', '#ffffff'];
   var BTN = { x: W - 118, y: 14, w: 106, h: 34 };
+  var M = function () { return XA.music; };
+  var ARP = [0, 2, 4, 7, 9, 11, 14, 16];
+
+  // Tense B harmonic-minor clock. Music only ever reacts to cells already
+  // revealed (public info) -- never to hidden mines.
+  function song() {
+    return {
+      bpm: 96, key: 59, scale: 'harmonic', chords: [0, 5, 3, 4], seed: 20,
+      tracks: [
+        { name: 'tick', inst: 'hat', layer: 0, gain: 0.26, pattern: 'X.x.x.x.X.x.x.x.' },
+        { name: 'pulse', inst: 'bass', layer: 0, gain: 0.34, chord: true, octave: -2, params: { cutoff: 380, q: 3 },
+          pattern: '0 . . . 0 . . . 0 . . . 0 . . .' },
+        { name: 'tock', inst: 'shaker', layer: 0.15, gain: 0.32, pattern: '..x...x...x...xx' },
+        { name: 'pad', inst: 'pad', layer: 0.3, gain: 0.28, chord: true, octave: -1, params: { cutoff: 700 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.5, gain: 0.45, pattern: 'x.....x...x.....' },
+        { name: 'arp', inst: 'arp', layer: 0.7, gain: 0.2, chord: true, octave: 1, rate: 2, params: { cutoff: 1400 },
+          fn: function (i) { return [0, 2, 4, 2][(i.step / 2) % 4]; } },
+        { name: 'glint', inst: 'bell', layer: 0.88, gain: 0.24, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.rng() < 0.4 ? { deg: [0, 2, 4][Math.floor(i.rng() * 3)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -8759,6 +9629,15 @@ button { font: inherit; color: inherit; }
     }
     newBoard();
 
+    var lastI = -1, noteBudget = 4;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var v = Math.round(Math.pow(U.clamp(opened / Math.max(1, cols * rows - mines), 0, 1), 1.6) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+    }
+
     function explode(c, r) {
       over = true;
       boom = { c: c, r: r };
@@ -8780,13 +9659,27 @@ button { font: inherit; color: inherit; }
         if (cc.n === 0) around(p[0], p[1], function (nc, nr) { stack.push([nc, nr]); });
       }
       api.addScore(gained * 2);
-      api.audio.tone(gained > 1 ? 660 : 520, 0.04, { type: 'triangle', vol: 0.1 });
+      var m = M();
+      if (!m) api.audio.tone(gained > 1 ? 660 : 520, 0.04, { type: 'triangle', vol: 0.1 });
+      else if (noteBudget > 0) {
+        noteBudget--;
+        // one revealed number: its marimba degree IS the number shown
+        if (gained === 1) m.note('marimba', cell.n, { quantize: '16', octave: 1, gain: 0.8 });
+        else {
+          var t0 = m.nextGrid('16'), sps = 15 / Math.max(40, m.tempo() || 96);
+          for (var a = 0; a < Math.min(8, gained); a++) m.note('marimba', ARP[a], { at: t0 + a * sps * 0.5, chord: true, octave: 1, gain: 0.65 });
+        }
+      }
+      syncMusic();
       if (opened === cols * rows - mines) {
         var bonus = 150 * level + Math.max(0, Math.round((40 + level * 20 - time) * 8 * level));
         api.addScore(bonus);
         api.fx.text(W / 2, TOP + 120, 'CLEARED IN ' + time.toFixed(1) + 's', ACCENT, 15);
         api.fx.text(W / 2, TOP + 150, '+' + bonus, FLAG, 15);
-        api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+        if (m) {
+          m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+          m.setKey(59 + [0, 3, 5, -4, -2][level % 5]);
+        } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
         cells.forEach(function (cell) { if (cell.mine) cell.flag = true; });
         clearT = 1.8;
       }
@@ -8803,7 +9696,8 @@ button { font: inherit; color: inherit; }
       var cell = cells[idx(c, r)];
       if (cell.open) return;
       cell.flag = !cell.flag;
-      api.audio.tone(cell.flag ? 880 : 440, 0.04, { type: 'square', vol: 0.08 });
+      if (M()) M().note('bell', cell.flag ? 0 : -3, { octave: -1, quantize: '16', gain: 0.45 });
+      else api.audio.tone(cell.flag ? 880 : 440, 0.04, { type: 'square', vol: 0.08 });
     }
     function act(c, r, flag) {
       cursor = { c: c, r: r };
@@ -8827,7 +9721,8 @@ button { font: inherit; color: inherit; }
         var inp = api.input;
         inp.takeSwipes();
         if (over) { overT += dt; if (overT > 1.8) api.gameOver(); return; }
-        if (clearT > 0) { clearT -= dt; if (clearT <= 0) newBoard(); return; }
+        if (clearT > 0) { clearT -= dt; if (clearT <= 0) { newBoard(); syncMusic(); } return; }
+        noteBudget = 4;
         if (placed) time += dt;
 
         // pointer: tap = reveal (or flag in flag mode), long-press = flag
@@ -8980,6 +9875,27 @@ button { font: inherit; color: inherit; }
   var W = 420, H = 600, PW = 84, PH = 12, BR = 7;
   var PY = H - 44, AY = 44;
   var ACCENT = '#b98cff', YOU = '#3ff0ff', CPU = '#ff3fa4';
+  var M = function () { return XA.music; };
+  var CT = [0, 2, 4, 6];   // chord tones; rally hits climb through them
+
+  // G dorian disco-funk vamp: Gm7 - C7, two bars each.
+  function song() {
+    return {
+      bpm: 112, key: 55, scale: 'dorian', chords: [0, 3], barsPerChord: 2, seed: 21,
+      tracks: [
+        { name: 'ohat', inst: 'hat', layer: 0, gain: 0.3, params: { open: true }, pattern: '..x...x...x...x.' },
+        { name: 'bass', inst: 'bass', layer: 0.1, gain: 0.45, chord: true, octave: -2, params: { cutoff: 1100 },
+          pattern: '0 . ^0 . . 0 . 4 0 . ^0 . 6 . 4 .' },
+        { name: 'kick', inst: 'kick', layer: 0.25, gain: 0.56, pattern: 'x...x...x...x...' },
+        { name: 'clap', inst: 'clap', layer: 0.4, gain: 0.42, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.55, gain: 0.24, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'stab', inst: 'pluck', layer: 0.7, gain: 0.3, chord: true, params: { cutoff: 2600, decay: 0.12 },
+          fn: function (i) { return i.stepInBar === 6 || i.stepInBar === 14 ? [0, 2, 4, 6] : null; } },
+        { name: 'strings', inst: 'pad', layer: 0.85, gain: 0.24, chord: true, params: { cutoff: 2200, attack: 0.3 },
+          fn: function (i) { return i.step % 32 === 0 ? [{ deg: 4, steps: 32 }, { deg: 6, steps: 32 }, { deg: 9, steps: 32 }] : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -8987,12 +9903,32 @@ button { font: inherit; color: inherit; }
     var ball = null, serveT = 1, rally = 0, best = 0, level = 1, lives = 3;
     var lastMoved = api.pointer().moved;
     var over = false, overT = 0, t = 0, flash = 0;
+    var hitN = 0, lastI = -1, lastBpm = 112;
+    if (M()) M().play(song(), { fade: 1, intensity: 0 });
+    // groove builds with the rally; tempo follows ball speed (event-driven)
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var v = Math.round(U.clamp(rally / 24 + (level - 1) * 0.04, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+      var sp = ball ? Math.hypot(ball.vx, ball.vy) : 300;
+      var bpm = Math.round(108 + U.clamp((sp - 300) / 480, 0, 1) * 28);
+      if (Math.abs(bpm - lastBpm) >= 1) { lastBpm = bpm; m.setTempo(bpm, 0.8); }
+    }
+    function hitNote(inst, gain) {
+      var m = M();
+      if (!m) return false;
+      var k = hitN++ % 12;
+      m.note(inst, CT[k % 4] + 7 * Math.floor(k / 4), { chord: true, quantize: '8', gain: gain });
+      return true;
+    }
 
     function serve() {
       var a = Math.PI / 2 + (rng() - 0.5) * 0.9;
       var sp = 300 + (level - 1) * 12;
       ball = { x: W / 2, y: H / 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp };
-      rally = 0;
+      rally = 0; hitN = 0;
+      syncMusic();
       cpu.err = (rng() - 0.5) * Math.max(20, 110 - level * 12);
     }
     function predictX(targetY) {
@@ -9013,6 +9949,11 @@ button { font: inherit; color: inherit; }
       var ang = off * 1.05;           // up to ~60 degrees
       ball.vx = Math.sin(ang) * sp;
       ball.vy = (dirUp ? -1 : 1) * Math.cos(ang) * sp;
+    }
+
+    function wallTick() {
+      if (M()) M().note('hat', 0, { gain: 0.3, vel: 0.6 });
+      else api.audio.tone(300, 0.03, { type: 'square', vol: 0.06 });
     }
 
     return {
@@ -9048,8 +9989,8 @@ button { font: inherit; color: inherit; }
         for (var s = 0; s < steps && ball; s++) {
           var h = dt / steps;
           ball.x += ball.vx * h; ball.y += ball.vy * h;
-          if (ball.x < BR) { ball.x = BR; ball.vx = Math.abs(ball.vx); api.audio.tone(300, 0.03, { type: 'square', vol: 0.06 }); }
-          if (ball.x > W - BR) { ball.x = W - BR; ball.vx = -Math.abs(ball.vx); api.audio.tone(300, 0.03, { type: 'square', vol: 0.06 }); }
+          if (ball.x < BR) { ball.x = BR; ball.vx = Math.abs(ball.vx); wallTick(); }
+          if (ball.x > W - BR) { ball.x = W - BR; ball.vx = -Math.abs(ball.vx); wallTick(); }
           // your paddle
           if (ball.vy > 0 && ball.y + BR >= PY && ball.y + BR <= PY + PH + 10 && Math.abs(ball.x - you.x) <= PW / 2 + BR) {
             ball.y = PY - BR;
@@ -9060,7 +10001,11 @@ button { font: inherit; color: inherit; }
             api.addScore(pts);
             if (rally % 5 === 0) api.fx.text(W / 2, H / 2, 'RALLY ' + rally, YOU, 14);
             api.fx.burst(ball.x, PY, YOU, 8, 100, 0.3);
-            api.audio.tone(440 + Math.min(rally, 20) * 20, 0.05, { type: 'square', vol: 0.14 });
+            if (!hitNote('pluck', 0.7)) api.audio.tone(440 + Math.min(rally, 20) * 20, 0.05, { type: 'square', vol: 0.14 });
+            syncMusic();
+            if (rally % 10 === 0 && M()) {
+              M().stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4, steps: 4 }], { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.55 });
+            }
             cpu.err = (rng() - 0.5) * Math.max(16, 110 - level * 12 - rally * 2);
           }
           // CPU paddle
@@ -9068,12 +10013,14 @@ button { font: inherit; color: inherit; }
             ball.y = AY + PH + BR;
             paddleHit(cpu.x, false);
             api.fx.burst(ball.x, AY + PH, CPU, 8, 100, 0.3);
-            api.audio.tone(330, 0.05, { type: 'square', vol: 0.12 });
+            if (!hitNote('marimba', 0.6)) api.audio.tone(330, 0.05, { type: 'square', vol: 0.12 });
+            syncMusic();
           }
           if (ball.y > H + 20) {
             lives--;
             api.shake(8); flash = 0.4;
             api.audio.tone(140, 0.4, { type: 'sawtooth', slide: 0.4, vol: 0.25 });
+            if (M()) M().duck(0.5, 0.9);
             ball = null; serveT = 1.1;
             if (lives <= 0) over = true;
           } else if (ball.y < -20) {
@@ -9081,7 +10028,8 @@ button { font: inherit; color: inherit; }
             api.addScore(bonus);
             api.fx.text(W / 2, H / 2 - 30, 'POINT! +' + bonus, CPU, 16);
             api.fx.burst(ball.x, 0, CPU, 30, 200, 0.8);
-            api.audio.arp([523, 659, 784], 0.07, { type: 'square', vol: 0.18 });
+            if (M()) M().stinger([{ deg: 4 }, { deg: 6, at: 2 }, { deg: 7, at: 4, steps: 6 }], { inst: 'bell', quantize: '8', octave: 1, gain: 0.55 });
+            else api.audio.arp([523, 659, 784], 0.07, { type: 'square', vol: 0.18 });
             level++;
             api.fx.text(W / 2, H / 2, 'MACHINE LEVEL ' + level, ACCENT, 13);
             ball = null; serveT = 1.2;

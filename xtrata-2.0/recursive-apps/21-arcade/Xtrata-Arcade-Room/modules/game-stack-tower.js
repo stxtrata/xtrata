@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-stack-tower');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 400, H = 600;
   var SLAB_H = 26, DEPTH = 14, BASE_W = 200, BASE_Y = 470, PERFECT = 5;
@@ -17,6 +18,32 @@
 
   function hue(n) { return (200 + n * 9) % 360; }
   function col(n, l) { return 'hsl(' + hue(n) + ',85%,' + l + '%)'; }
+
+  // Soundtrack: warm major groove; the tower itself plays the melody, one note per floor.
+  var TUNE = [
+    [0, 2, 4, 2, 4, 5, 4, 6, 7, 4],
+    [4, 5, 7, 5, 7, 9, 8, 7, 6, 7],
+    [7, 6, 4, 6, 7, 9, 11, 9, 10, 11]
+  ];
+  var KEYS = [55, 60, 57, 62, 59, 64];
+  function song() {
+    return {
+      bpm: 100, key: 55, scale: 'major', chords: [0, 2, 3, 4], seed: 9,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.32, chord: true, octave: -1, params: { cutoff: 1300 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'bass', inst: 'bass', layer: 0.1, gain: 0.4, chord: true, octave: -2, params: { cutoff: 600, q: 2 },
+          pattern: '0 - . . . . 0 . . . 4 - . . 2 .' },
+        { name: 'shaker', inst: 'shaker', layer: 0.2, gain: 0.3, pattern: '..x...x...x...x.' },
+        { name: 'kick', inst: 'kick', layer: 0.3, gain: 0.55, pattern: 'x.....x...x.....' },
+        { name: 'clap', inst: 'clap', layer: 0.45, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'counter', inst: 'marimba', layer: 0.6, gain: 0.3, chord: true, rate: 2,
+          fn: function (i) { return [4, 2, 0, 2, 4, 5, 4, 2][(i.step / 2) % 8]; } },
+        { name: 'sparkle', inst: 'bell', layer: 0.8, gain: 0.22, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.rng() < 0.5 ? { deg: [0, 2, 4][Math.floor(i.rng() * 3)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function slab(ctx, x, y, w, n, alpha) {
     ctx.save();
@@ -49,6 +76,7 @@
     var perfectRun = 0;
     var over = false, overT = 0, fallT = 0;
     var t = 0;
+    var mInt = -1;
 
     function yOf(i) { return BASE_Y - i * SLAB_H; }
     function spawn() {
@@ -59,7 +87,21 @@
       // Enter from just off the edge so the slab is on screen almost at once.
       cur = { x: fromLeft ? -top.w * 0.35 : W - top.w * 0.65, w: top.w, dir: fromLeft ? 1 : -1, speed: speed };
     }
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
     spawn();
+
+    // floor n (1-based) plays the next note of the tune
+    function tuneDeg(n) { return TUNE[Math.floor((n - 1) / 10) % TUNE.length][(n - 1) % 10]; }
+    function syncMusic(m) {
+      var iv = Math.round(U.clamp((tower.length - 1) / 40 + Math.min(perfectRun, 6) * 0.07, 0, 1) * 20) / 20;
+      if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+      var n = tower.length - 1;
+      if (n > 0 && n % 10 === 0) {
+        m.setKey(KEYS[(n / 10) % KEYS.length]);
+        m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+        m.note('riser', 0, { dur: 0.6, gain: 0.3 });
+      }
+    }
 
     function drop() {
       var n = tower.length;
@@ -87,7 +129,9 @@
         api.addScore(10 + bonus);
         api.fx.text(x + w / 2, y - 26 + cam, perfectRun > 1 ? 'PERFECT x' + perfectRun : 'PERFECT', '#ffffff', 13);
         api.fx.burst(x + w / 2, y + cam, col(n, 70), 20, 180, 0.5);
-        api.audio.tone(440 * Math.pow(1.0595, Math.min(perfectRun, 24) * 2), 0.14, { type: 'triangle', vol: 0.2 });
+        var mp = M();
+        if (mp) mp.note('bell', tuneDeg(n), { quantize: '16', octave: 2, gain: 0.7 + Math.min(perfectRun, 5) * 0.04 });
+        else api.audio.tone(440 * Math.pow(1.0595, Math.min(perfectRun, 24) * 2), 0.14, { type: 'triangle', vol: 0.2 });
       } else {
         perfectRun = 0;
         tower.push({ x: left, w: overlap });
@@ -96,9 +140,14 @@
         var cutW = cur.w - overlap;
         debris.push({ x: cutX, y: y, w: cutW, n: n, vy: 0, vx: (off > 0 ? 1 : -1) * 40, rot: 0, vr: (off > 0 ? 1 : -1) * 1.5 });
         api.addScore(10);
-        api.audio.tone(300 + Math.min(n, 40) * 6, 0.07, { type: 'square', vol: 0.12 });
+        var mt = M();
+        if (mt) {
+          mt.note('pluck', tuneDeg(n), { quantize: '16', octave: 1, gain: 0.45, params: { cutoff: 2600 } });
+          mt.note('marimba', tuneDeg(n) + 1, { quantize: '16', octave: 0, gain: 0.18 });   // soft rub = "off" note
+        } else api.audio.tone(300 + Math.min(n, 40) * 6, 0.07, { type: 'square', vol: 0.12 });
         api.shake(2);
       }
+      if (M()) syncMusic(M());
       camTarget = Math.max(0, (tower.length - 9) * SLAB_H);
       spawn();
     }

@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-maze-muncher');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var MAP = [
     '###################',
@@ -43,6 +44,32 @@
   var ORDER = ['up', 'left', 'down', 'right'];
   var DOOR = { x: 9, y: 8 }, HOUSE = { x: 9, y: 9 }, EXIT = { x: 9, y: 7 };
   var CORNERS = [{ x: 17, y: -2 }, { x: 1, y: -2 }, { x: 18, y: 22 }, { x: 0, y: 22 }];
+
+  // Music: chirpy chiptune in C dorian at 120. The emptier the maze, the more
+  // layers play. A power core flips to phrygian, speeds up and forces a frantic
+  // arp; glitches eaten in one power run climb a note ladder; each cleared
+  // maze plays a fanfare and moves the tune to a new key.
+  var BPM = 120, KEY = 60, KEYS = [0, 2, 5, 3, 7];
+  function song() {
+    return {
+      bpm: BPM, key: KEY, scale: 'dorian', chords: [0, 3, 0, 6], seed: 13,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.38, chord: true, octave: -2, params: { cutoff: 700, q: 3 },
+          pattern: '0 . ^0 . 0 . ^0 . 0 . ^0 . 4 . ^0 .' },
+        { name: 'hat', inst: 'hat', layer: 0.1, gain: 0.3, pattern: 'x.x.x.x.x.x.x.x.' },
+        { name: 'kick', inst: 'kick', layer: 0.22, gain: 0.55, pattern: 'x.......x.x.....' },
+        { name: 'snare', inst: 'snare', layer: 0.35, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'chip', inst: 'arp', layer: 0.48, gain: 0.28, chord: true, octave: 1, params: { cutoff: 3000 },
+          fn: function (i) { return i.step % 2 ? null : [0, 2, 4, 2][(i.step >> 1) % 4]; } },
+        { name: 'tune', inst: 'pluck', layer: 0.62, gain: 0.32, octave: 1, params: { wave: 'square', cutoff: 2600, decay: 0.2 },
+          pattern: '4 . 2 . 4 . 5 . 4 . 2 . 0 . . . 3 . 5 . 6 - 5 . 4 . 3 . 2 . . .' },
+        { name: 'counter', inst: 'marimba', layer: 0.8, gain: 0.3, chord: true, octave: 2, rate: 2,
+          fn: function (i) { return i.rng() < 0.45 ? { deg: [0, 2, 4, 6][Math.floor(i.rng() * 4)], vel: 0.6 } : null; } },
+        { name: 'frantic', inst: 'arp', layer: 2, gain: 0.3, chord: true, octave: 2, params: { cutoff: 4200 },
+          fn: function (i) { return [0, 1, 2, 4, 2, 1][i.step % 6]; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -82,6 +109,21 @@
     }
     resetPellets();
     resetActors();
+    var total = left, powerOn = false, lastInt = -1;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var pw = frightT > 0 && dying <= 0;
+      if (pw !== powerOn) {
+        powerOn = pw;
+        m.setScale(pw ? 'phrygian' : 'dorian');
+        m.setTempo(pw ? BPM + 24 : BPM + (level - 1) * 3, 0.4);
+        m.setTrack('frantic', pw ? true : null);
+      }
+      var it = Math.round(U.clamp(0.08 + (1 - left / total) * 0.95, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+    }
 
     function speedPlayer() { return Math.min(8.6, 6.4 + level * 0.25); }
     function speedGlitch(g) {
@@ -169,13 +211,16 @@
         api.addScore(10);
         api.audio.tone(t % 0.3 < 0.15 ? 520 : 440, 0.03, { type: 'triangle', vol: 0.07 });
       }
+      syncMusic();
       if (!bonus && bonusShown < 2 && (left === 120 || left === 50)) {
         bonus = { x: 9, y: 11, life: 9 }; bonusShown++;
       }
       if (left <= 0) {
         clearT = 2;
         api.fx.text(W / 2, TOP + T * 10, 'MAZE CLEAR', ACCENT, 18);
-        api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.2 });
+        if (M()) M().stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 6, at: 6 }, { deg: 7, at: 7, steps: 6 }],
+          { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.55, params: { wave: 'square', decay: 0.3 } });
+        else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.2 });
       }
       void xy;
     }
@@ -186,6 +231,7 @@
       dying = 1.4;
       api.shake(8);
       api.audio.tone(500, 0.9, { type: 'sawtooth', slide: 0.15, vol: 0.25 });
+      if (M()) M().duck(0.6, 1.4);
       api.fx.burst(px(player.x), py(player.y), ACCENT, 30, 180, 0.9);
     }
 
@@ -196,6 +242,7 @@
         ['up', 'down', 'left', 'right'].forEach(function (d) { if (inp.hit(d) || inp.held(d)) player.want = d; });
         inp.takeSwipes().forEach(function (s) { if (DIRS[s]) player.want = s; });
         if (over) { overT += dt; if (overT > 1.2) api.gameOver(); return; }
+        syncMusic();
         if (dying > 0) {
           dying -= dt;
           if (dying <= 0) {
@@ -207,7 +254,10 @@
         }
         if (clearT > 0) {
           clearT -= dt;
-          if (clearT <= 0) { level++; resetPellets(); resetActors(); readyT = 1.6; bonusShown = 0; }
+          if (clearT <= 0) {
+            level++; resetPellets(); resetActors(); readyT = 1.6; bonusShown = 0;
+            if (M()) { M().setKey(KEY + KEYS[(level - 1) % KEYS.length]); M().setTempo(BPM + (level - 1) * 3, 1); }
+          }
           return;
         }
         if (readyT > 0) { readyT -= dt; return; }
@@ -243,7 +293,11 @@
               api.addScore(pts);
               api.fx.text(px(g.x), py(g.y), String(pts), '#3ff0ff', 12);
               api.fx.burst(px(g.x), py(g.y), '#3ff0ff', 16, 140);
-              api.audio.arp([800, 1200, 1600], 0.04, { type: 'square', vol: 0.16 });
+              if (M()) {
+                // a ladder that climbs with every glitch eaten in this power run
+                var b0 = (eatChain - 1) * 2;
+                M().stinger([{ deg: b0 }, { deg: b0 + 2, at: 1 }, { deg: b0 + 4, at: 2, steps: 3 }], { inst: 'arp', quantize: '16', octave: 1, gain: 0.6 });
+              } else api.audio.arp([800, 1200, 1600], 0.04, { type: 'square', vol: 0.16 });
               g.state = 'eyes';
             } else if (g.state === 'normal' || g.state === 'leaving') {
               loseLife();

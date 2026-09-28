@@ -9,10 +9,33 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-rock-drift');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 560, H = 480;
   var ACCENT = '#7df9ff', ROCK = '#c9d4ff', UFO = '#ff4fd8';
   var SIZES = [{ r: 40, pts: 20, spd: 45 }, { r: 22, pts: 50, spd: 80 }, { r: 12, pts: 100, spd: 125 }];
+
+  // Soundtrack: dark phrygian pad over a two-note heartbeat that races as the wave thins out.
+  var MASS = [7, 3, 1];        // a big rock is 7 small-rock "units" of work
+  var SONG_CUT = 2400;
+  function song() {
+    return {
+      bpm: 64, key: 52, scale: 'phrygian', chords: [0, 1, 0, -1], barsPerChord: 2, seed: 77, filter: SONG_CUT,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: -1, params: { cutoff: 700, attack: 0.9, release: 1.4 },
+          fn: function (i) { return i.stepInBar === 0 && i.bar % 2 === 0 ? [{ deg: 0, steps: 32 }, { deg: 1, steps: 32 }, { deg: 4, steps: 32 }] : null; } },
+        { name: 'heart', inst: 'sub', layer: 0, gain: 0.6, octave: -2, pattern: '0 - . 1 - . . . . . . . . . . .' },
+        { name: 'thump', inst: 'kick', layer: 0.2, gain: 0.45, pattern: 'X..x............' },
+        { name: 'tick', inst: 'hat', layer: 0.3, gain: 0.22, pattern: '....x.......x.x.' },
+        { name: 'drone', inst: 'bass', layer: 0.45, gain: 0.3, chord: true, octave: -2, params: { cutoff: 420, q: 8 },
+          pattern: '. . . . . . . . 0 . 0 . . . 1 .' },
+        { name: 'glint', inst: 'bell', layer: 0.6, gain: 0.22, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.18 ? { deg: [0, 1, 4, 5, 7][Math.floor(i.rng() * 5)], vel: 0.5 } : null; } },
+        { name: 'pulse', inst: 'arp', layer: 0.8, gain: 0.18, chord: true, params: { cutoff: 1200 },
+          fn: function (i) { return i.step % 2 ? null : [0, 1, 4, 1][(i.step / 2) % 4]; } }
+      ]
+    };
+  }
 
   function wrap(o) {
     if (o.x < -50) o.x += W + 100; else if (o.x > W + 50) o.x -= W + 100;
@@ -32,6 +55,7 @@
     var fireCd = 0, respawnT = 0, waveT = 0;
     var over = false, overT = 0;
     var t = 0;
+    var waveMass = 1, mBpm = 0, mInt = -1, mThrust = false, mClear = false;
     var stars = [];
     for (var i = 0; i < 70; i++) stars.push({ x: rng() * W, y: rng() * H, s: rng() < 0.1 ? 2 : 1 });
 
@@ -47,9 +71,21 @@
       for (var k = 0; k < n; k++) pts.push(0.72 + rng() * 0.36);
       return { x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: size, r: s.r, rot: rng() * 6, spin: (rng() - 0.5) * 1.6, pts: pts };
     }
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var left = 0;
+      for (var k = 0; k < rocks.length; k++) left += MASS[rocks[k].size];
+      var gone = U.clamp(1 - left / waveMass, 0, 1);
+      var bpm = 64 + Math.round(gone * gone * 18) * 4;          // 64 -> 136 as the last rocks go
+      if (bpm !== mBpm) { mBpm = bpm; m.setTempo(bpm, 0.8); }
+      var iv = Math.round(U.clamp(0.08 + (wave - 1) * 0.1 + gone * 0.45, 0, 1) * 20) / 20;
+      if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+    }
     function startWave() {
       wave++;
       var n = Math.min(11, 3 + wave);
+      waveMass = n * MASS[0]; mClear = false;
       for (var k = 0; k < n; k++) {
         // spawn on the edges, away from the ship
         var edge = rng() < 0.5;
@@ -59,6 +95,7 @@
       }
       api.fx.text(W / 2, H / 2 - 60, 'WAVE ' + wave, ACCENT, 18);
       api.audio.arp([392, 523, 659], 0.07, { type: 'triangle', vol: 0.16 });
+      syncMusic();
     }
     function add(pts, x, y) {
       score += pts;
@@ -77,6 +114,12 @@
       api.fx.burst(r.x, r.y, ROCK, 10 + (2 - r.size) * 10, 120 + r.size * 40, 0.6);
       api.shake(4 - r.size);
       api.audio.noise(0.18 + (2 - r.size) * 0.1, { vol: 0.22, cutoff: 700 + r.size * 800 });
+      var m = M();
+      if (m) {
+        var top = [0, 4, 7][r.size];   // large low, small high; each split falls a step
+        m.stinger([{ deg: top + 1 }, { deg: top, at: 1, steps: 2 }], { inst: r.size ? 'pluck' : 'marimba', quantize: '16', octave: r.size - 1, gain: 0.5,
+          params: { cutoff: 1800, decay: 0.2 } });
+      }
       if (r.size < 2) {
         var base = Math.atan2(r.vy, r.vx);
         rocks.push(makeRock(r.x, r.y, r.size + 1, base + 0.6 + rng() * 0.4));
@@ -91,6 +134,7 @@
       ship = null;
       lives--;
       if (lives <= 0) { over = true; return; }
+      if (M()) M().duck(0.7, 1.4);
       respawnT = 1.6;
     }
     function hits(a, b, r) {
@@ -98,6 +142,7 @@
       return dx * dx + dy * dy < r * r;
     }
 
+    if (M()) M().play(song(), { fade: 1.5, intensity: 0 });
     newShip();
     startWave();
 
@@ -138,6 +183,16 @@
           }
         }
         updateWorld(dt);
+        var mu = M();
+        if (mu) {
+          var th = !!(ship && ship.thrust);
+          if (th !== mThrust) { mThrust = th; mu.setFilter(th ? 16000 : SONG_CUT, th ? 0.25 : 0.6); }
+          syncMusic();
+          if (!rocks.length && !mClear) {
+            mClear = true;
+            mu.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 8, at: 6 }, { deg: 7, at: 8, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+          }
+        }
 
         if (!rocks.length && !ufo) {
           waveT += dt;

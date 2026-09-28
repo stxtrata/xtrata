@@ -14,6 +14,28 @@
   var W = 400, H = 520, N = 3, CELL = 116, GAP = 12;
   var GX = (W - (N * CELL + (N - 1) * GAP)) / 2, GY = 110;
   var ACCENT = '#3ff0ff', GOOD = '#3ff0ff', BAD = '#ff4d6d', GOLD = '#ffd23f';
+  var M = function () { return XA.music; };
+  // Taps walk this pentatonic phrase, each one landing on the next 16th.
+  var PHRASE = [0, 2, 4, 3, 2, 4, 5, 7, 4, 5, 7, 6, 5, 4, 2, 1];
+
+  // Metronome groove in D major pentatonic; tempo climbs with the level.
+  function song() {
+    return {
+      bpm: 116, key: 62, scale: 'pentatonic', chords: [0, 4, 3, 1], seed: 19,
+      tracks: [
+        { name: 'click', inst: 'hat', layer: 0, gain: 0.34, pattern: 'X...x...x...x...' },
+        { name: 'tock', inst: 'marimba', layer: 0, gain: 0.2, octave: 2, pattern: '0 . . . . . . . . . . . . . . .' },
+        { name: 'kick', inst: 'kick', layer: 0.15, gain: 0.55, pattern: 'x.......x.......' },
+        { name: 'bass', inst: 'bass', layer: 0.3, gain: 0.4, chord: true, octave: -2, params: { cutoff: 800 },
+          pattern: '0 . . 0 . . 0 . . . 0 . 3 . . .' },
+        { name: 'clap', inst: 'clap', layer: 0.45, gain: 0.4, pattern: '....x.......x...' },
+        { name: 'shaker', inst: 'shaker', layer: 0.6, gain: 0.3, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'pad', inst: 'pad', layer: 0.75, gain: 0.26, chord: true, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 3, steps: 16 }] : null; } },
+        { name: 'kick2', inst: 'kick', layer: 0.9, gain: 0.4, pattern: '......x.......x.' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -22,6 +44,16 @@
     var hits = 0, streak = 0, hearts = 3;
     var spawnT = 0.9, elapsed = 0;
     var over = false, overT = 0, t = 0;
+    var phraseAt = 0, lastI = -1, lastBpm = 116;
+    if (M()) M().play(song(), { fade: 1, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var v = Math.round(U.clamp(streak / 24 + (level() - 1) * 0.05, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+      var bpm = Math.min(150, 116 + (level() - 1) * 4);
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 2); }
+    }
 
     function level() { return 1 + Math.floor(hits / 12); }
     function lifeFor() { return Math.max(0.55, 1.35 - hits * 0.012); }
@@ -39,7 +71,13 @@
       hearts--;
       streak = 0;
       api.shake(7);
-      api.audio.tone(150, 0.25, { type: 'sawtooth', vol: 0.22, slide: 0.6 });
+      var m = M();
+      if (m) {
+        m.note('bass', -5, { octave: -2, dur: 0.12, gain: 0.7, params: { cutoff: 260, q: 2 } });
+        m.duck(0.45, 0.6);
+        phraseAt = 0;
+        syncMusic();
+      } else api.audio.tone(150, 0.25, { type: 'sawtooth', vol: 0.22, slide: 0.6 });
       var c = centre(i);
       api.fx.text(c.x, c.y - 40, why, BAD, 12);
       if (hearts <= 0) over = true;
@@ -69,7 +107,13 @@
       api.addScore(pts);
       api.fx.burst(c.x, c.y, h.kind === 'gold' ? GOLD : GOOD, 16, 160, 0.5);
       api.fx.text(c.x, c.y - 30, '+' + pts, h.kind === 'gold' ? GOLD : '#fff', 12);
-      api.audio.tone(520 + Math.min(streak, 20) * 25, 0.06, { type: 'square', vol: 0.14 });
+      var m = M();
+      if (m) {
+        var deg = PHRASE[phraseAt++ % PHRASE.length];
+        m.note('pluck', deg, { quantize: '16', octave: 1, gain: 0.75 });
+        if (h.kind === 'gold') m.note('bell', deg, { quantize: '16', octave: 2, gain: 0.45 });
+        syncMusic();
+      } else api.audio.tone(520 + Math.min(streak, 20) * 25, 0.06, { type: 'square', vol: 0.14 });
       h.hitKind = h.kind; h.hitT = 0.25; h.kind = null;
     }
 

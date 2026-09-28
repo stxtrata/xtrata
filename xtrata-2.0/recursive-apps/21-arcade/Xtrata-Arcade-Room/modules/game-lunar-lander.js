@@ -15,6 +15,29 @@
   var G = 30, THRUST = 78, TURN = 2.6, BURN = 55;
   var SAFE_VY = 42, SAFE_VX = 28, SAFE_A = 0.22;
   var ACCENT = '#c9d4ff', OK = '#39ff88', WARN = '#ffd23f', BAD = '#ff4d6d';
+  var M = function () { return XA.music; };
+  var CLOSED = 2400, OPEN = 9000;
+
+  // Ambient F lydian, no drums: pad + bells + sub drone. Ticks arrive with the ground.
+  function song() {
+    return {
+      bpm: 70, key: 53, scale: 'lydian', chords: [0, 4, 5, 1], barsPerChord: 2, seed: 18, filter: CLOSED,
+      tracks: [
+        { name: 'drone', inst: 'sub', layer: 0, gain: 0.38, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? { deg: 0, steps: 16, vel: 0.7 } : null; } },
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.36, chord: true, octave: -1, params: { attack: 1.4, release: 2.2, cutoff: 900 },
+          fn: function (i) { return i.step % 32 === 0 ? [{ deg: 0, steps: 30 }, { deg: 2, steps: 30 }, { deg: 4, steps: 30 }, { deg: 6, steps: 30 }] : null; } },
+        { name: 'bells', inst: 'bell', layer: 0, gain: 0.28, chord: true, octave: 1, rate: 2,
+          fn: function (i) { return i.rng() < 0.16 ? { deg: [0, 2, 4, 6, 7][Math.floor(i.rng() * 5)], vel: 0.5 } : null; } },
+        { name: 'thrust', inst: 'pad', layer: 2, gain: 0.4, octave: -2, rate: 4, params: { attack: 0.06, release: 0.5, cutoff: 420 },
+          fn: function () { return [{ deg: 0, steps: 4 }, { deg: 4, steps: 4 }]; } },
+        { name: 'tick1', inst: 'hat', layer: 0.3, maxLayer: 0.6, gain: 0.28, pattern: 'x...x...x...x...' },
+        { name: 'tick2', inst: 'hat', layer: 0.6, maxLayer: 0.85, gain: 0.3, pattern: 'x.x.x.x.x.x.x.xx' },
+        { name: 'tick3', inst: 'hat', layer: 0.85, gain: 0.32, pattern: 'xxxxXxxxxxxxXxxx' },
+        { name: 'heart', inst: 'sub', layer: 0.6, gain: 0.4, chord: true, octave: -1, pattern: '0 . . 0 . . . . . . . . . . . .' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -51,7 +74,10 @@
     }
     function spawn() {
       ship = { x: 60 + rng() * (W - 120), y: 40, vx: (rng() - 0.5) * 70, vy: 5, a: (rng() - 0.5) * 0.6, burn: false, legs: 0 };
+      // new pad: shift the key round the circle of fifths (kept in a mid register)
+      if (level > 1 && M() && lastKeyLevel !== level) { lastKeyLevel = level; M().setKey(53 + ((level - 1) * 7) % 12); }
     }
+    var lastKeyLevel = 1;
     function groundAt(x) {
       var i = U.clamp(Math.floor(x / STEP), 0, N - 2);
       var f = (x - i * STEP) / STEP;
@@ -63,6 +89,33 @@
     }
     newSurface();
 
+    var burnOn = false, band = 0, fuelWarn = false;
+    if (M()) M().play(song(), { fade: 1.6, intensity: 0 });
+    function setBurn(on) {
+      if (on === burnOn) return;
+      burnOn = on;
+      var m = M();
+      if (!m) return;
+      m.setTrack('thrust', on ? true : null);
+      m.setFilter(on ? OPEN : CLOSED, on ? 0.25 : 0.9);
+    }
+    // altitude bands (edge-guarded): ticks get denser near the surface
+    function setBand(b) {
+      if (b === band) return;
+      band = b;
+      if (M()) M().setIntensity([0, 0.3, 0.6, 0.9][b]);
+    }
+    function musicTick(alt) {
+      var flying = !!ship && landedT <= 0;
+      setBurn(flying && ship.burn);
+      setBand(!flying ? 0 : alt > 180 ? 0 : alt > 100 ? 1 : alt > 45 ? 2 : 3);
+      if (!fuelWarn && fuel < 200) {
+        fuelWarn = true;
+        if (M()) M().stinger([{ deg: 3 }, { deg: 0, at: 2 }, { deg: 3, at: 4 }, { deg: 0, at: 6, steps: 4 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.4 });
+        else api.audio.tone(880, 0.1, { type: 'sine', vol: 0.1 });
+      } else if (fuelWarn && fuel > 260) fuelWarn = false;
+    }
+
     function crash(reason) {
       api.fx.burst(ship.x, ship.y, '#ff9f1c', 40, 220, 1);
       api.fx.burst(ship.x, ship.y, ACCENT, 20, 160, 0.8);
@@ -70,6 +123,8 @@
       api.shake(12);
       api.audio.noise(0.7, { vol: 0.35, cutoff: 700 });
       ship = null;
+      musicTick(0);
+      if (M()) { M().duck(0.6, 1.4); M().note('sub', -7, { octave: -1, dur: 1, gain: 0.7 }); }
       ships--;
       crashT = 1.6;
     }
@@ -123,10 +178,16 @@
             fuel = Math.min(1000, fuel + 250);
             api.fx.text(s.x, s.y - 40, 'LANDED x' + pad.mult + '  +' + pts, OK, 14);
             api.fx.burst(s.x, pad.y, OK, 20, 120, 0.6);
-            api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'triangle', vol: 0.2 });
+            var m = M();
+            if (m) {
+              m.stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 7, at: 6, steps: 10 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.6 });
+              m.stinger([{ deg: 0, steps: 16 }, { deg: 4, steps: 16 }], { inst: 'pad', quantize: 'beat', octave: 0, gain: 0.5 });
+            } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'triangle', vol: 0.2 });
             landedT = 2;
+            setBurn(false); setBand(0);
           } else crash(!pad ? 'MISSED THE PAD' : s.vy >= SAFE_VY ? 'TOO FAST' : Math.abs(s.a) >= SAFE_A ? 'NOT LEVEL' : 'DRIFTING');
         }
+        musicTick(ship ? Math.min(groundAt(ship.x - 8), groundAt(ship.x + 8)) - ship.y - 10 : 0);
         if (ship) api.setStatus('LEVEL ' + level + '  ·  MODULES ' + ships + '  ·  FUEL ' + Math.round(fuel));
       },
 

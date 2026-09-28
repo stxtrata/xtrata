@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v2.1 prototype, all 21 cabinets + music engine)
+# Xtrata Arcade Room (v2.2 prototype, all 21 cabinets, every one scored)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -54,7 +54,7 @@ tests/
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~399 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
+Leaves total ~453 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
@@ -107,6 +107,29 @@ How the three showcase games drive it:
   scale in 16ths; lasers fire in key; bosses get a heavier track; clears land a
   stinger on the next bar.
 
+Every other cabinet has its own score too, each built around its mechanic:
+
+| Cabinet | Sound | What drives it |
+|---|---|---|
+| Block Drop | D harmonic minor folk dance, 118 bpm+ | stack height → layers; level → tempo + key; line clears → stinger sized to lines; hard drop → kick |
+| Orbit Merge | F lydian space pads, 76 bpm | jar fill → layers, danger line closes the filter; merges → bigger planet, lower bell |
+| Block Runner | C major chiptune, 128 bpm | speed → tempo; jump climbs an arp; duck dips the filter; every 500 m → key up |
+| Rock Drift | E phrygian heartbeat, 64→136 bpm | rock left in the wave → tempo; thrust opens the filter; splits fall in pitch by size |
+| Stack Tower | G major, 100 bpm | each floor plays the next note of a climbing melody; perfects an octave up; every 10 floors → key change |
+| Road Hopper | Bb mixolydian swing, 112 bpm | hops walk the scale up/down; roads bring drums, rivers bring pads |
+| Tile Tap | G major pop, 112 bpm+ | **you play the lead**: each correct tap is the next melody note; tile speed → tempo |
+| Merge 2048 | Eb lo-fi, 80 bpm swing | merges play degree log2(tile); best tile → layers + stinger; full board closes the filter |
+| Block Defence | D harmonic minor, 124 bpm | warheads on screen → layers; near-miss siren; chain kills climb the scale |
+| Maze Muncher | C dorian chiptune, 120 bpm | maze eaten → layers; power core → phrygian, faster, frantic arp |
+| Invader Wave | F minor march, 96→188 bpm | invaders left → march tempo; mystery ship → siren track |
+| Helix Drop | C# minor drum & bass, 170 bpm | each gap passed steps a falling run; fireball opens the filter |
+| Bubble Pop | C major pentatonic, 100 bpm | each colour is a note; dropped bubbles cascade; danger adds tension |
+| Swerve | E dorian synthwave, 118 bpm+ | speed → tempo; close shaves → riser + pluck; 500 m → key up |
+| Lunar Lander | F lydian ambient, 70 bpm, no drums | thrust opens the filter; altitude bands bring a ticking clock; landing resolves |
+| Reflex Tap | D pentatonic click, 116 bpm+ | each hit plays the next note on the 16th grid; streak → layers |
+| Mine Sprint | B harmonic minor clock, 96 bpm | revealed numbers are notes (only revealed cells, never hidden mines) |
+| Pong Streak | G dorian disco, 108–136 bpm | ball speed → tempo; each hit climbs the chord; rally → layers |
+
 ## How a score gets posted
 
 `score-client.js` tries, in order:
@@ -123,20 +146,22 @@ How the three showcase games drive it:
 
 Board reads that fail show **offline**, never an empty board.
 
-## Still needed on the host (xtrata.xyz)
+## Host method on xtrata.xyz
 
-The public viewer (`src/lib/viewer/public-wallet-bridge.ts`) refuses contract
-calls, which is why Astro Blaster scores never landed for other players. Add a
-narrow method alongside the existing `GAME_SAVE_METHODS` precedent:
+The public viewer used to refuse contract calls, which is why Astro Blaster
+scores never landed for other players. It now answers the narrow
+`xtrata_submitArcadeScore` method (`src/lib/viewer/arcade-score.ts`, wired in
+`src/home/main.js`), following the `GAME_SAVE_METHODS` precedent:
 
-- method `xtrata_submitArcadeScore`, contract pinned to `xtrata-arcade-scores-v1-3`,
-  function pinned to `submit-score`
-- validate `gameId` `^[a-z0-9_]{3,32}$`, `score` positive integer, `name` 3–12 printable ASCII
-- read `get-fee-unit` on the host, build a Deny-mode STX post-condition `≤ fee`
-- host-owned review dialog: game, score, name, fee
-- follow WALLET-PLAYBOOK §10 (tests, bundle rebuild, desktop + mobile canary)
+- contract pinned to `xtrata-arcade-scores-v1-3`, function pinned to `submit-score`;
+  the host rebuilds all four Clarity arguments
+- validates `gameId` `^[a-z0-9_]{3,32}$`, `score` positive uint128, `name` 3–12 printable ASCII
+- reads `get-fee-unit` itself (a failed read is an error, never zero), host-owned
+  review dialog, re-reads the fee after approval, Deny mode with one STX
+  post-condition `≤ fee`, no `sender`
 
-Until then, posting works when the arcade runs inside the `/runtime` page.
+It goes live with the next xtrata.xyz deploy, after the WALLET-PLAYBOOK §10
+desktop + mobile canary. Until then, posting works inside the `/runtime` page.
 
 ## Mint order
 
@@ -154,6 +179,8 @@ Before minting, the parent can be tested over HTTP: ids left at `0` load from `.
 # needs playwright + @stacks/transactions@6 on NODE_PATH
 node tests/codec.test.cjs
 CHROME_PATH=/path/to/chromium node tests/smoke.test.cjs /tmp/arcade-shots
+# per-cabinet soundtrack check (mashes inputs, reports tempo/layers/notes)
+CHROME_PATH=/path/to/chromium node tests/music-check.cjs [xa_game_id ...]
 ```
 
 ## Known limits (v1.3 contract)

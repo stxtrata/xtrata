@@ -10,6 +10,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-invader-wave');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 480, H = 560, PY = 522, GROUND = 540;
   var COLS = 11, ROWS = 5, CW = 34, CH = 30, PIX = 3;
@@ -45,6 +46,31 @@
     for (var r = 0; r < 8; r++) for (var c = 0; c < 8; c++) if (spr[r][c]) ctx.fillRect(x + c * px, y + r * px, px, px);
   }
 
+  // Music: F minor synth march. The bass walks four steps down every bar and
+  // its tempo follows the formation - fewer invaders, faster march. The
+  // mystery ship forces a wobbling siren; each cleared wave lifts the key.
+  var KEY = 53;
+  function song() {
+    return {
+      bpm: 96, key: KEY, scale: 'minor', chords: [0, 0, 5, 4], seed: 14,
+      tracks: [
+        { name: 'march', inst: 'bass', layer: 0, gain: 0.45, chord: true, octave: -2, rate: 4, params: { cutoff: 650, q: 4 },
+          pattern: '0 -1 -2 -3' },
+        { name: 'pad', inst: 'pad', layer: 0.12, gain: 0.32, chord: true, octave: 0, params: { cutoff: 1300, attack: 0.3 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.25, gain: 0.55, pattern: 'x.......x.......' },
+        { name: 'snare', inst: 'snare', layer: 0.38, gain: 0.35, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.5, gain: 0.25, pattern: '..x...x...x...x.' },
+        { name: 'synth', inst: 'arp', layer: 0.62, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1800 },
+          fn: function (i) { return i.stepInBar % 2 ? null : [0, 4, 2, 4, 0, 4, 2, 7][(i.stepInBar >> 1)]; } },
+        { name: 'lead', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'triangle', cutoff: 2200 },
+          pattern: '7 - - - 6 - 4 - 3 - - - 4 - - - 2 - - - 3 - 2 - 0 - - - -1 - - -' },
+        { name: 'siren', inst: 'lead', layer: 2, gain: 0.24, octave: 1, params: { wave: 'sine', cutoff: 3000 },
+          fn: function (i) { return i.stepInBar % 4 === 0 ? { deg: (i.stepInBar >> 2) % 2 ? 4 : 5, steps: 4 } : null; } }
+      ]
+    };
+  }
+
   function create(api) {
     var rng = api.rng;
     var aliens = [], formation = { x: 0, y: 0, dir: 1, step: 0, frame: 0 };
@@ -78,6 +104,19 @@
       api.fx.text(W / 2, 250, 'WAVE ' + wave, ACCENT, 18);
     }
     startWave();
+    var lastBpm = 96, lastInt = -1, sirenOn = false, shotN = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic(liveN) {
+      var m = M();
+      if (!m) return;
+      var frac = liveN / (COLS * ROWS);
+      var bpm = Math.min(188, Math.round((96 + (1 - frac) * 72 + (wave - 1) * 4) / 4) * 4);
+      if (bpm !== lastBpm) { lastBpm = bpm; m.setTempo(bpm, 0.5); }
+      var it = Math.round(U.clamp(0.1 + (1 - frac) * 0.8 + (wave - 1) * 0.1, 0, 1) * 20) / 20;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+      var s = !!ufo && !over;
+      if (s !== sirenOn) { sirenOn = s; m.setTrack('siren', s ? true : null); }
+    }
 
     function alienPos(a) { return { x: formation.x + a.c * CW, y: formation.y + a.r * CH }; }
     function alive() { return aliens.filter(function (a) { return a.alive; }); }
@@ -109,6 +148,7 @@
       api.shake(10);
       api.audio.noise(0.6, { vol: 0.3, cutoff: 900 });
       if (lives <= 0) over = true;
+      else if (M()) M().duck(0.5, 1.2);
     }
 
     return {
@@ -129,6 +169,7 @@
             shots.push({ x: player.x, y: PY - 12 });
             fireCd = 0.32;
             api.audio.tone(900, 0.06, { type: 'square', vol: 0.08, slide: 0.4 });
+            if (M()) M().note('arp', [0, 2, 4][shotN++ % 3], { chord: true, octave: 2, gain: 0.12 });
           }
         } else {
           player.respawn -= dt;
@@ -149,7 +190,8 @@
           if ((formation.dir > 0 && maxX + 6 > W - 8) || (formation.dir < 0 && minX - 6 < 8)) {
             formation.y += 14; formation.dir *= -1;
           } else formation.x += 6 * formation.dir;
-          api.audio.tone([98, 92, 87, 82][Math.floor(t * 10) % 4], 0.05, { type: 'square', vol: 0.06 });
+          // with music on, the march bass carries the footsteps
+          if (!M()) api.audio.tone([98, 92, 87, 82][Math.floor(t * 10) % 4], 0.05, { type: 'square', vol: 0.06 });
         }
         // invaders erase bunkers they touch, and win if they land
         live.forEach(function (a) {
@@ -220,7 +262,7 @@
           if (ufoT <= 0) { var fl = rng() < 0.5; ufo = { x: fl ? -30 : W + 30, v: fl ? 110 : -110 }; }
         } else {
           ufo.x += ufo.v * dt;
-          if (Math.floor(t * 12) % 2) api.audio.tone(ufo.x % 40 < 20 ? 700 : 620, 0.03, { type: 'sine', vol: 0.03 });
+          if (!M() && Math.floor(t * 12) % 2) api.audio.tone(ufo.x % 40 < 20 ? 700 : 620, 0.03, { type: 'sine', vol: 0.03 });
           if (ufo.x < -50 || ufo.x > W + 50) { ufo = null; ufoT = 18 + rng() * 10; }
         }
 
@@ -228,9 +270,13 @@
           var bonus = 100 * wave;
           addPts(bonus);
           api.fx.text(W / 2, 280, 'WAVE CLEAR +' + bonus, '#ffd23f', 15);
-          api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+          if (M()) {
+            M().stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 7, at: 6, steps: 6 }], { inst: 'lead', quantize: 'beat', octave: 1, gain: 0.4, params: { wave: 'triangle', cutoff: 2600 } });
+            M().setKey(KEY + (wave % 6) * 2 - (wave % 6 > 3 ? 12 : 0));
+          } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
           clearT = 1.8;
         }
+        syncMusic(alive().length);
         api.setStatus('WAVE ' + wave + '  ·  CANNONS ' + lives + '  ·  INVADERS ' + alive().length);
       },
 

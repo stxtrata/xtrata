@@ -11,12 +11,37 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-defence');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 480, H = 560, GROUND = 520;
   var ACCENT = '#39ff88', ENEMY = '#ff4d6d', BLAST = '#ffd23f';
   var SILO_X = [40, 240, 440];
   var CITY_X = [96, 144, 192, 288, 336, 384];
   var AMMO = 10;
+
+  // Music: tense D harmonic minor at 124. Threats on screen drive the layers,
+  // warheads near the towers force an alarm, detonations boom in key and each
+  // extra kill from one blast (and its chain) climbs the scale.
+  function song() {
+    return {
+      bpm: 124, key: 50, scale: 'harmonic', chords: [0, 5, 3, 4], seed: 12,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.35, chord: true, octave: -1, params: { cutoff: 1200 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'pulse', inst: 'bass', layer: 0.1, gain: 0.4, chord: true, octave: -2, params: { cutoff: 600 },
+          pattern: '0 0 . 0 0 . 0 . 0 0 . 0 0 . ^0 .' },
+        { name: 'kick', inst: 'kick', layer: 0.25, gain: 0.6, pattern: 'x...x...x...x...' },
+        { name: 'snare', inst: 'snare', layer: 0.4, gain: 0.4, pattern: '....x.......x..x' },
+        { name: 'hat', inst: 'hat', layer: 0.55, gain: 0.25, pattern: 'xxxxxxxxxxxxxxxx' },
+        { name: 'arp', inst: 'arp', layer: 0.65, gain: 0.3, chord: true, octave: 1,
+          fn: function (i) { return [0, 2, 4, 7, 4, 2][i.step % 6]; } },
+        { name: 'strings', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'sawtooth', cutoff: 1800 },
+          pattern: '4 - - - 3 - - - 2 - - - 1 - - - 0 - - - -1 - - - 0 - - - - - - -' },
+        { name: 'alarm', inst: 'lead', layer: 2, gain: 0.26, octave: 0, params: { wave: 'sawtooth', cutoff: 1600 },
+          pattern: '7 - - - 6 - - - 7 - - - 6 - - -' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -91,10 +116,26 @@
       });
       blasts.push({ x: e.x, y: GROUND - 4, r: 0, max: 26, t: 0, life: 0.7, enemy: true });
       api.shake(hitSomething ? 9 : 4);
+      if (hitSomething && M()) { M().duck(0.55, 0.9); M().note('sub', 0, { octave: -2, dur: 0.8, gain: 0.8 }); }
       api.audio.noise(0.35, { vol: hitSomething ? 0.35 : 0.2, cutoff: 700 });
     }
 
     startWave();
+    var lastInt = -1, alarmOn = false, calm = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic(dt) {
+      var m = M();
+      if (!m) return;
+      if (calm > 0) calm -= dt;
+      var it = calm > 0 ? 0 : Math.round(U.clamp(enemies.length / 9 + (wave - 1) * 0.05, 0, 1) * 10) / 10;
+      if (it !== lastInt) { lastInt = it; m.setIntensity(it); }
+      var close = !over && enemies.some(function (e) { return e.y > GROUND - 150; });
+      if (close !== alarmOn) {
+        alarmOn = close;
+        m.setTrack('alarm', close ? true : null);
+        if (close) m.note('riser', 0, { dur: 0.9, gain: 0.35 });
+      }
+    }
 
     return {
       // Read-only test hook: the lowest incoming warhead.
@@ -143,8 +184,9 @@
           var m = interceptors[i];
           m.left -= dt;
           if (m.left <= 0) {
-            blasts.push({ x: m.tx, y: m.ty, r: 0, max: 38, t: 0, life: 1.1 });
+            blasts.push({ x: m.tx, y: m.ty, r: 0, max: 38, t: 0, life: 1.1, ch: { n: 0 } });
             api.audio.noise(0.25, { vol: 0.18, cutoff: 2200 });
+            if (M()) M().note('sub', 0, { chord: true, octave: -1, dur: 0.35, gain: 0.55 });
             interceptors.splice(i, 1);
           } else { m.x += m.vx * dt; m.y += m.vy * dt; }
         }
@@ -167,16 +209,17 @@
             for (var s = 0; s < 2; s++) spawnEnemy(e.x, e.y, tg2[Math.floor(rng() * tg2.length)]);
             api.audio.tone(500, 0.06, { type: 'sawtooth', vol: 0.08 });
           }
-          var killed = false;
+          var killed = false, kb = null;
           for (var j = 0; j < blasts.length; j++) {
             var bj = blasts[j];
-            if (!bj.enemy && Math.hypot(e.x - bj.x, e.y - bj.y) < bj.r + 2) { killed = true; break; }
+            if (!bj.enemy && Math.hypot(e.x - bj.x, e.y - bj.y) < bj.r + 2) { killed = true; kb = bj; break; }
           }
           if (killed) {
             chain++;
             enemies.splice(i, 1);
             addPts(25 * wave * chain, e.x, e.y - 12);
-            blasts.push({ x: e.x, y: e.y, r: 0, max: 22, t: 0, life: 0.6 });
+            blasts.push({ x: e.x, y: e.y, r: 0, max: 22, t: 0, life: 0.6, ch: kb && kb.ch });
+            if (M() && kb && kb.ch) { kb.ch.n++; M().note('bell', Math.min(14, kb.ch.n - 1), { chord: true, octave: 1, gain: 0.5 }); }
             api.fx.burst(e.x, e.y, ENEMY, 10, 130, 0.5);
             continue;
           }
@@ -188,6 +231,7 @@
           api.audio.tone(90, 1, { type: 'sawtooth', vol: 0.3, slide: 0.5 });
           api.shake(16);
         }
+        syncMusic(dt);
         if (over) { overT += dt; if (overT > 1.6) api.gameOver(); return; }
 
         // wave cleared
@@ -200,6 +244,11 @@
             var bonus = alive * 100 * Math.min(wave, 6) + ammo * 5 * Math.min(wave, 6);
             addPts(bonus);
             api.fx.text(W / 2, 250, 'WAVE ' + wave + ' CLEAR  +' + bonus, BLAST, 14);
+            if (M()) {
+              // resolve on V -> i, then strip back to the pad for a breath
+              M().stinger([{ deg: 4 }, { deg: 6, at: 2 }, { deg: 7, at: 4, steps: 8 }, { deg: 9, at: 4, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.5 });
+              calm = 2.5;
+            }
             startWave();
           }
         }

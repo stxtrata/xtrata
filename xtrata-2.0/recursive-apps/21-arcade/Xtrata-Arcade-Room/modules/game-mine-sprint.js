@@ -15,6 +15,29 @@
   var ACCENT = '#39ff88', MINE = '#ff4d6d', FLAG = '#ffd23f';
   var NUM = ['', '#3ff0ff', '#39ff88', '#ffd23f', '#ff9f1c', '#ff4d6d', '#ff3fa4', '#b04dff', '#ffffff'];
   var BTN = { x: W - 118, y: 14, w: 106, h: 34 };
+  var M = function () { return XA.music; };
+  var ARP = [0, 2, 4, 7, 9, 11, 14, 16];
+
+  // Tense B harmonic-minor clock. Music only ever reacts to cells already
+  // revealed (public info) -- never to hidden mines.
+  function song() {
+    return {
+      bpm: 96, key: 59, scale: 'harmonic', chords: [0, 5, 3, 4], seed: 20,
+      tracks: [
+        { name: 'tick', inst: 'hat', layer: 0, gain: 0.26, pattern: 'X.x.x.x.X.x.x.x.' },
+        { name: 'pulse', inst: 'bass', layer: 0, gain: 0.34, chord: true, octave: -2, params: { cutoff: 380, q: 3 },
+          pattern: '0 . . . 0 . . . 0 . . . 0 . . .' },
+        { name: 'tock', inst: 'shaker', layer: 0.15, gain: 0.32, pattern: '..x...x...x...xx' },
+        { name: 'pad', inst: 'pad', layer: 0.3, gain: 0.28, chord: true, octave: -1, params: { cutoff: 700 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.5, gain: 0.45, pattern: 'x.....x...x.....' },
+        { name: 'arp', inst: 'arp', layer: 0.7, gain: 0.2, chord: true, octave: 1, rate: 2, params: { cutoff: 1400 },
+          fn: function (i) { return [0, 2, 4, 2][(i.step / 2) % 4]; } },
+        { name: 'glint', inst: 'bell', layer: 0.88, gain: 0.24, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.rng() < 0.4 ? { deg: [0, 2, 4][Math.floor(i.rng() * 3)], vel: 0.5 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -62,6 +85,15 @@
     }
     newBoard();
 
+    var lastI = -1, noteBudget = 4;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var v = Math.round(Math.pow(U.clamp(opened / Math.max(1, cols * rows - mines), 0, 1), 1.6) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+    }
+
     function explode(c, r) {
       over = true;
       boom = { c: c, r: r };
@@ -83,13 +115,27 @@
         if (cc.n === 0) around(p[0], p[1], function (nc, nr) { stack.push([nc, nr]); });
       }
       api.addScore(gained * 2);
-      api.audio.tone(gained > 1 ? 660 : 520, 0.04, { type: 'triangle', vol: 0.1 });
+      var m = M();
+      if (!m) api.audio.tone(gained > 1 ? 660 : 520, 0.04, { type: 'triangle', vol: 0.1 });
+      else if (noteBudget > 0) {
+        noteBudget--;
+        // one revealed number: its marimba degree IS the number shown
+        if (gained === 1) m.note('marimba', cell.n, { quantize: '16', octave: 1, gain: 0.8 });
+        else {
+          var t0 = m.nextGrid('16'), sps = 15 / Math.max(40, m.tempo() || 96);
+          for (var a = 0; a < Math.min(8, gained); a++) m.note('marimba', ARP[a], { at: t0 + a * sps * 0.5, chord: true, octave: 1, gain: 0.65 });
+        }
+      }
+      syncMusic();
       if (opened === cols * rows - mines) {
         var bonus = 150 * level + Math.max(0, Math.round((40 + level * 20 - time) * 8 * level));
         api.addScore(bonus);
         api.fx.text(W / 2, TOP + 120, 'CLEARED IN ' + time.toFixed(1) + 's', ACCENT, 15);
         api.fx.text(W / 2, TOP + 150, '+' + bonus, FLAG, 15);
-        api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+        if (m) {
+          m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+          m.setKey(59 + [0, 3, 5, -4, -2][level % 5]);
+        } else api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
         cells.forEach(function (cell) { if (cell.mine) cell.flag = true; });
         clearT = 1.8;
       }
@@ -106,7 +152,8 @@
       var cell = cells[idx(c, r)];
       if (cell.open) return;
       cell.flag = !cell.flag;
-      api.audio.tone(cell.flag ? 880 : 440, 0.04, { type: 'square', vol: 0.08 });
+      if (M()) M().note('bell', cell.flag ? 0 : -3, { octave: -1, quantize: '16', gain: 0.45 });
+      else api.audio.tone(cell.flag ? 880 : 440, 0.04, { type: 'square', vol: 0.08 });
     }
     function act(c, r, flag) {
       cursor = { c: c, r: r };
@@ -130,7 +177,8 @@
         var inp = api.input;
         inp.takeSwipes();
         if (over) { overT += dt; if (overT > 1.8) api.gameOver(); return; }
-        if (clearT > 0) { clearT -= dt; if (clearT <= 0) newBoard(); return; }
+        if (clearT > 0) { clearT -= dt; if (clearT <= 0) { newBoard(); syncMusic(); } return; }
+        noteBudget = 4;
         if (placed) time += dt;
 
         // pointer: tap = reveal (or flag in flag mode), long-press = flag

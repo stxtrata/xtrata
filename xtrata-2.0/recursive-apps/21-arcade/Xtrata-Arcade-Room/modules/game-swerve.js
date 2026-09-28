@@ -13,6 +13,33 @@
 
   var W = 400, H = 600, PY = 480, SEGH = 10, PR = 8;
   var ACCENT = '#3ff0ff', GATE = '#ffd23f', BLOCK = '#ff3fa4';
+  var M = function () { return XA.music; };
+  var TONES = [0, 2, 4, 7, 9, 11, 14, 16];
+
+  // Driving E dorian synthwave: Em - A - D - Bm, two bars each.
+  function song() {
+    var hook = [
+      '4 - - - - - 2 - 1 - 0 - - - . .',
+      '. . . . . . . . . . . . . . . .',
+      '4 - - - 6 - - - 7 - - - 6 - 4 -',
+      '2 - - - - - - - . . . . . . . .'
+    ].join(' ');
+    return {
+      bpm: 118, key: 52, scale: 'dorian', chords: [0, 3, 6, 4], barsPerChord: 2, seed: 17,
+      tracks: [
+        { name: 'pad', inst: 'pad', layer: 0, gain: 0.34, chord: true, octave: -1, params: { cutoff: 1400 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'bass', inst: 'bass', layer: 0.08, gain: 0.45, chord: true, octave: -2, rate: 2, params: { cutoff: 650 },
+          pattern: '0 0 ^0 0 0 0 ^0 0' },
+        { name: 'kick', inst: 'kick', layer: 0.2, gain: 0.58, pattern: 'x...x...x...x...' },
+        { name: 'arp', inst: 'arp', layer: 0.34, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1900 },
+          fn: function (i) { return [0, 2, 4, 7, 4, 2, 4, 9][i.step % 8]; } },
+        { name: 'snare', inst: 'snare', layer: 0.5, gain: 0.38, pattern: '....x.......x...' },
+        { name: 'hat', inst: 'hat', layer: 0.6, gain: 0.34, pattern: '..x...x...x...x.' },
+        { name: 'lead', inst: 'lead', layer: 0.8, gain: 0.26, octave: 1, params: { wave: 'triangle', cutoff: 2200 }, pattern: hook }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -67,6 +94,27 @@
     function sy(wy) { return PY - (wy - dist); }   // world → screen: the road ahead is above the player
     genTo(dist + PY + 200);
 
+    var lastI = -1, lastBpm = 118, lastMile = 0;
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
+    // Intensity from speed + gate streak, tempo from speed, key up every 500 m.
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var sp = (speed - 240) / 380;
+      var v = Math.round(U.clamp(0.12 + sp * 0.7 + Math.min(streak, 8) * 0.03, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+      var bpm = Math.round(118 + sp * 24);
+      if (Math.abs(bpm - lastBpm) >= 1) { lastBpm = bpm; m.setTempo(bpm, 1.5); }
+      var mile = Math.floor(dist / 5000);
+      if (mile !== lastMile) {
+        lastMile = mile;
+        m.note('riser', 0, { dur: 0.9, gain: 0.35 });
+        m.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 4 }], { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.5 });
+        m.setKey(52 + (mile * 2) % 12);
+        api.fx.text(W / 2, 140, (mile * 500) + ' m', ACCENT, 13);
+      }
+    }
+
     function die() {
       dead = true;
       api.fx.burst(x, PY, ACCENT, 36, 240, 0.9);
@@ -107,7 +155,11 @@
         if (Math.min(x - PR - s.l, s.r - x - PR) < 5 && closeCd <= 0) {
           closeCd = 0.9; bonus += 10;
           api.fx.text(x, PY - 24, 'CLOSE +10', '#bfefff', 10);
-          api.audio.tone(1000, 0.04, { type: 'sine', vol: 0.1 });
+          var mm = M();
+          if (mm) {
+            mm.note('riser', 0, { dur: 0.3, gain: 0.3 });
+            mm.note('pluck', TONES[Math.floor(Math.random() * 4) + 2], { chord: true, quantize: '16', octave: 1, gain: 0.5 });
+          } else api.audio.tone(1000, 0.04, { type: 'sine', vol: 0.1 });
         }
         for (var i = 0; i < blocks.length; i++) {
           var b = blocks[i];
@@ -122,10 +174,12 @@
               bonus += pts;
               api.fx.text(x, PY - 30, 'GATE +' + pts, GATE, 12);
               api.fx.burst(x, PY, GATE, 16, 150, 0.5);
-              api.audio.tone(660 + Math.min(streak, 8) * 60, 0.08, { type: 'square', vol: 0.14 });
+              if (M()) M().note('pluck', TONES[Math.min(streak, 8) - 1], { chord: true, quantize: '16', octave: 1, gain: 0.7 });
+              else api.audio.tone(660 + Math.min(streak, 8) * 60, 0.08, { type: 'square', vol: 0.14 });
             } else if (streak) { streak = 0; api.fx.text(x, PY - 30, 'MISSED', '#8899aa', 10); }
           }
         });
+        syncMusic();
         trail.unshift({ x: x, wy: wy });
         if (trail.length > 40) trail.pop();
         api.setScore(Math.floor(dist / 10) + bonus);

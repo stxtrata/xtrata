@@ -9,6 +9,7 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-drop');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 440, H = 580;
   var COLS = 10, ROWS = 22, HIDDEN = 2, CELL = 27;
@@ -66,6 +67,39 @@
     return Math.max(0.012, Math.pow(0.8 - (level - 1) * 0.007, level - 1));
   }
 
+  // Soundtrack: a minor-key folk dance (harmonic minor, oom-pah bass, fiddle line).
+  var FIDDLE = [
+    '4 - 2 4 5 - 4 2 1 - 0 1 2 - . .',
+    '3 - 2 3 4 - 3 2 0 - _6 0 1 - . .',
+    '4 - 2 4 5 - 7 5 4 - 2 1 0 - . .',
+    '1 - 2 3 4 - 2 1 0 - - - . . . .'
+  ].join(' ');
+  function song() {
+    return {
+      bpm: 118, key: 50, scale: 'harmonic', chords: [0, 3, 4, 0], seed: 23,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.45, chord: true, octave: -2, params: { cutoff: 650 },
+          pattern: '0 . . . 4 . . . 0 . . . 4 . 2 .' },
+        { name: 'chop', inst: 'pluck', layer: 0, gain: 0.26, chord: true, params: { decay: 0.12, cutoff: 2600 },
+          fn: function (i) { return i.stepInBar % 4 === 2 ? [0, 2, 4] : null; } },
+        { name: 'kick', inst: 'kick', layer: 0.18, gain: 0.55, pattern: 'x...x...x...x...' },
+        { name: 'snare', inst: 'snare', layer: 0.32, gain: 0.35, pattern: '....x.......x..x' },
+        { name: 'hat', inst: 'hat', layer: 0.4, maxLayer: 0.72, gain: 0.3, pattern: '..x...x...x...x.' },
+        { name: 'fiddle', inst: 'lead', layer: 0.5, gain: 0.28, octave: 1, params: { wave: 'triangle', cutoff: 2200 }, pattern: FIDDLE },
+        { name: 'ohat', inst: 'hat', layer: 0.72, gain: 0.32, params: { open: true }, pattern: '..x...x...x...xx' },
+        { name: 'tense', inst: 'arp', layer: 0.8, gain: 0.24, chord: true, octave: 1, params: { cutoff: 1800 },
+          fn: function (i) { return [0, 2, 4, 2, 0, 4, 7, 4][i.step % 8]; } }
+      ]
+    };
+  }
+  // Line-clear stingers grow with the number of lines.
+  var CLEAR_STINGS = [null,
+    [{ deg: 4 }, { deg: 7, at: 2, steps: 2 }],
+    [{ deg: 2 }, { deg: 4, at: 1 }, { deg: 7, at: 2, steps: 2 }],
+    [{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 3, steps: 3 }],
+    [{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6 }, { deg: 11, at: 8 }, { deg: 14, at: 10, steps: 6 }]
+  ];
+
   function drawCell(ctx, x, y, size, color, alpha) {
     ctx.save();
     ctx.globalAlpha = alpha == null ? 1 : alpha;
@@ -95,6 +129,26 @@
     var clearing = null;       // { rows:[], t }
     var over = false, overT = 0;
     var t = 0;
+
+    // --- music hooks (never touch gameplay RNG) ---
+    function stackRows() {
+      for (var y = HIDDEN; y < ROWS; y++) for (var x = 0; x < COLS; x++) if (grid[y][x]) return ROWS - y;
+      return 0;
+    }
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var h = stackRows();
+      var v = U.clamp(0.05 + Math.max(0, h - 2) / 13 * 0.8 + (level - 1) * 0.06, 0, 1);
+      m.setIntensity(Math.round(v * 20) / 20);
+    }
+    function levelMusic() {
+      var m = M();
+      if (!m) return;
+      m.setTempo(Math.min(162, 118 + (level - 1) * 4), 2);
+      m.setKey(45 + ((level - 1) * 5 + 5) % 12);
+      m.stinger([{ deg: 0 }, { deg: 4, at: 2 }, { deg: 7, at: 4 }, { deg: 9, at: 6, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.5 });
+    }
 
     function nextType() {
       if (!bag.length) {
@@ -126,6 +180,7 @@
       var size = ROT[type][0].length;
       cur = { type: type, rot: 0, x: Math.floor((COLS - size) / 2), y: 0 };
       fallT = 0; lockT = 0; lockResets = 0;
+      syncMusic();
       if (!fits(cur)) { topOut(); return; }
       // Drop one row immediately if possible so the piece enters view promptly.
       if (fits(cur, cur.rot, cur.x, cur.y + 1)) cur.y++;
@@ -213,12 +268,18 @@
       api.fx.text(BX + COLS * CELL / 2, cy, label + ' +' + (base + bonus), tetris ? '#ffd23f' : ACCENT, tetris ? 16 : 13);
       if (combo > 0) api.fx.text(BX + COLS * CELL / 2, cy + 22, 'COMBO ' + combo, '#ff3fa4', 11);
       api.shake(n * 2.5);
-      api.audio.arp(n === 4 ? [523, 659, 784, 1047] : [440, 554, 659].slice(0, n + 1), 0.05, { type: 'square', vol: 0.18 });
+      var m = M();
+      if (m) {
+        m.stinger(CLEAR_STINGS[n], { inst: n === 4 ? 'lead' : 'pluck', quantize: n === 4 ? 'beat' : '8', octave: 1, gain: n === 4 ? 0.45 : 0.6,
+          params: n === 4 ? { wave: 'triangle', cutoff: 2800 } : null });
+        if (n === 4) m.note('riser', 0, { dur: 1, gain: 0.45 });
+      } else api.audio.arp(n === 4 ? [523, 659, 784, 1047] : [440, 554, 659].slice(0, n + 1), 0.05, { type: 'square', vol: 0.18 });
       var newLevel = 1 + Math.floor(lines / 10);
       if (newLevel > level) {
         level = newLevel;
         api.fx.text(BX + COLS * CELL / 2, BY + 200, 'LEVEL ' + level, '#ffd23f', 18);
-        api.audio.arp([392, 523, 659, 784], 0.07, { type: 'triangle', vol: 0.2 });
+        if (m) levelMusic();
+        else api.audio.arp([392, 523, 659, 784], 0.07, { type: 'triangle', vol: 0.2 });
       }
     }
     function hardDrop() {
@@ -230,6 +291,8 @@
       cur.y = gy;
       api.addScore(dist * 2);
       api.shake(3);
+      var m = M();
+      if (m) m.note('kick', 0, { quantize: '16', gain: dist > 8 ? 0.8 : 0.55 });
       lock();
     }
     function doHold() {
@@ -241,6 +304,7 @@
       api.audio.tone(300, 0.06, { type: 'triangle', vol: 0.12 });
     }
 
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
     spawn(queue.shift()); queue.push(nextType());
 
     return {

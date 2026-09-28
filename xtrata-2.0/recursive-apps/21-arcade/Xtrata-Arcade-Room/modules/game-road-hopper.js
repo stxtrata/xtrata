@@ -10,10 +10,31 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-road-hopper');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 420, H = 600, C = 42, COLS = 10, HOP = 0.11;
   var ACCENT = '#39ff88';
   var CAR_COLORS = ['#ff4d6d', '#3ff0ff', '#ffd23f', '#b04dff', '#ff9f1c', '#4d7bff'];
+
+  // Soundtrack: bouncy mixolydian marimba tune; roads bring the drums, rivers wash them out.
+  function song() {
+    return {
+      bpm: 112, key: 58, scale: 'mixolydian', chords: [0, 6, 0, 3], seed: 31, swing: 0.12,
+      tracks: [
+        { name: 'marimba', inst: 'marimba', layer: 0, gain: 0.34, chord: true,
+          pattern: '0 . 2 4 . 2 7 . 4 . 2 . 4 5 4 2' },
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.4, chord: true, octave: -2, params: { cutoff: 800, q: 3 },
+          pattern: '0 . . 0 . . 4 . 0 . . 0 . . 4 .' },
+        { name: 'shaker', inst: 'shaker', layer: 0.12, gain: 0.32, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'kick', inst: 'kick', layer: 0.3, gain: 0.5, pattern: 'x.....x.x.......' },
+        { name: 'hat', inst: 'hat', layer: 0.4, gain: 0.26, pattern: '..x...x...x...x.' },
+        { name: 'clap', inst: 'clap', layer: 0.5, gain: 0.34, pattern: '....x.......x...' },
+        { name: 'bells', inst: 'bell', layer: 0.72, gain: 0.22, chord: true, octave: 1, pattern: '. . . . 4 . . . . . 7 . . . 6 .' },
+        { name: 'pad', inst: 'pad', layer: 2, gain: 0.4, chord: true, octave: -1, params: { cutoff: 1500, attack: 0.6 },
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }, { deg: 6, steps: 16 }] : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -25,6 +46,7 @@
     var maxRow = 0, coins = 0;
     var dead = false, deadT = 0, deathKind = '';
     var t = 0;
+    var hopDeg = 0, mZone = 'grass', mInt = -1, mBpm = 112;
 
     function speedScale(r) { return 1 + Math.min(1.4, r / 120); }
 
@@ -125,17 +147,45 @@
       player.fromRow = player.row; player.fromX = player.x;
       player.row = nr; player.x = landX;
       player.hop = HOP;
-      api.audio.tone(d === 'down' ? 360 : 480, 0.045, { type: 'triangle', vol: 0.1 });
+      var m = M();
+      if (m) {
+        if (nr > player.fromRow) hopDeg = hopDeg >= 9 ? 3 : hopDeg + 1;       // forward climbs the scale
+        else if (nr < player.fromRow) hopDeg = hopDeg <= -3 ? 3 : hopDeg - 1; // back steps down
+        m.note('marimba', hopDeg, { quantize: '16', octave: 1, gain: nr === player.fromRow ? 0.35 : 0.6 });
+      } else api.audio.tone(d === 'down' ? 360 : 480, 0.045, { type: 'triangle', vol: 0.1 });
     }
 
     function land() {
       var rw = row(player.row);
+      var m = M();
       if (player.row > maxRow) {
         maxRow = player.row;
         if (maxRow % 50 === 0) {
           api.fx.text(W / 2, 120, maxRow + ' ROWS', ACCENT, 16);
-          api.audio.arp([523, 659, 784], 0.06, { type: 'triangle', vol: 0.16 });
+          if (m) {
+            m.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 6, at: 3 }, { deg: 7, at: 4 }, { deg: 9, at: 6, steps: 6 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.6 });
+            m.transpose(maxRow % 100 ? 5 : -5);
+          } else api.audio.arp([523, 659, 784], 0.06, { type: 'triangle', vol: 0.16 });
+        } else if (maxRow % 10 === 0 && m) {
+          m.stinger([{ deg: 4 }, { deg: 7, at: 2, steps: 2 }], { inst: 'marimba', quantize: '8', octave: 1, gain: 0.55 });
         }
+        if (m) {
+          var iv = Math.round(U.clamp(0.1 + maxRow / 160, 0, 1) * 20) / 20;
+          if (iv !== mInt) { mInt = iv; m.setIntensity(iv); }
+          var bpm = 112 + Math.min(8, Math.floor(maxRow / 25)) * 2;
+          if (bpm !== mBpm) { mBpm = bpm; m.setTempo(bpm, 2); }
+        }
+      }
+      var zone = rw.type === 'river' ? 'river' : rw.type === 'grass' ? 'grass' : 'road';
+      if (m && zone !== mZone) {
+        var wasRiver = mZone === 'river';
+        mZone = zone;
+        var drums = zone === 'river' ? false : zone === 'road' ? true : null;
+        m.setTrack('kick', drums); m.setTrack('hat', drums);
+        m.setTrack('clap', zone === 'river' ? false : null);
+        m.setTrack('pad', zone === 'river' ? true : null);
+        if (zone === 'river') m.setFilter(1500, 0.8);
+        else if (wasRiver) m.setFilter(18000, 0.5);
       }
       if (rw.type === 'river' && !logUnder(rw, player.x)) die('splash');
       if (rw.type === 'grass' && rw.coin === colOf(player.x)) {
@@ -143,9 +193,12 @@
         coins++;
         api.fx.burst(player.x, screenY(player.row) + C / 2, '#ffd23f', 14, 120);
         api.fx.text(player.x, screenY(player.row), '+25', '#ffd23f', 11);
-        api.audio.arp([988, 1319], 0.04, { type: 'square', vol: 0.12 });
+        if (m) m.stinger([{ deg: 7 }, { deg: 9, at: 1 }], { inst: 'bell', quantize: '16', octave: 1, gain: 0.5 });
+        else api.audio.arp([988, 1319], 0.04, { type: 'square', vol: 0.12 });
       }
     }
+
+    if (M()) M().play(song(), { fade: 1.2, intensity: 0 });
 
     return {
       update: function (dt) {

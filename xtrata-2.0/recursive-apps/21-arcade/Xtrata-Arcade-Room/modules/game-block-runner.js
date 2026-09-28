@@ -9,10 +9,37 @@
   var XA = root.XA;
   if (!XA) throw new Error('arcade-kit must load before game-block-runner');
   var U = XA.util;
+  var M = function () { return XA.music; };
 
   var W = 600, H = 340, GROUND = 284, PX = 92;
   var ACCENT = '#ff9f1c', BIT = '#3ff0ff', HAZARD = '#ff4d6d', DRONE = '#c77dff';
   var SIZE = 30, DUCK = 17;
+
+  // Soundtrack: bright major chiptune that speeds up with the run.
+  var KEYS = [60, 62, 64, 65, 67, 69];
+  function song() {
+    var hook = [
+      '4 . 4 5 7 . 4 . 2 . 2 4 5 . . .',
+      '4 . 4 5 7 . 9 . 7 . 5 4 2 . . .',
+      '0 . 2 . 4 . 7 . 5 - 4 . 2 . 4 .',
+      '5 . 4 . 2 . 1 . 0 - - - . . . .'
+    ].join(' ');
+    return {
+      bpm: 128, key: 60, scale: 'major', chords: [0, 5, 3, 4], seed: 5,
+      tracks: [
+        { name: 'bass', inst: 'bass', layer: 0, gain: 0.4, chord: true, octave: -2, params: { cutoff: 1100, q: 3 },
+          pattern: '0 . ^0 . 0 . ^0 . 0 . ^0 . 0 . ^0 4' },
+        { name: 'arp', inst: 'arp', layer: 0, gain: 0.2, chord: true, octave: 1, params: { cutoff: 2000 },
+          fn: function (i) { return [0, 2, 4, 7, 4, 2][i.step % 6]; } },
+        { name: 'kick', inst: 'kick', layer: 0.15, gain: 0.55, pattern: 'x...x...x...x...' },
+        { name: 'hat', inst: 'hat', layer: 0.3, gain: 0.28, pattern: 'x.xxx.xxx.xxx.xx' },
+        { name: 'snare', inst: 'snare', layer: 0.42, gain: 0.35, pattern: '....x.......x...' },
+        { name: 'lead', inst: 'lead', layer: 0.6, gain: 0.24, octave: 1, params: { wave: 'square', cutoff: 2100 }, pattern: hook },
+        { name: 'chime', inst: 'bell', layer: 0.82, gain: 0.25, chord: true, octave: 2, rate: 4,
+          fn: function (i) { return i.stepInBar === 0 || i.stepInBar === 12 ? { deg: [0, 4, 2, 7][i.bar % 4], vel: 0.6 } : null; } }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -22,6 +49,7 @@
     var nextGap = 520;
     var dead = false, deadT = 0, started = false;
     var spin = 0, t = 0, bitChain = 0;
+    var mBpm = 128, mInt = -1, mDuck = false, jumpNotes = 0, jumpNoteT = 0, keyStep = 0;
     var skyline = [];
     for (var i = 0; i < 24; i++) skyline.push({ w: 30 + rng() * 50, h: 40 + rng() * 110, gap: 4 + rng() * 16 });
 
@@ -59,6 +87,8 @@
       api.audio.noise(0.25, { vol: 0.2 });
     }
 
+    if (M()) M().play(song(), { fade: 1, intensity: 0 });
+
     return {
       update: function (dt) {
         t += dt;
@@ -80,8 +110,15 @@
         if (grounded && jumpBuffer > 0) {
           grounded = false; vy = -640; jumpBuffer = 0; duckT = 0; wantDuck = false;
           y = GROUND - SIZE;
-          api.audio.tone(520, 0.08, { type: 'square', vol: 0.12, slide: 1.6 });
+          var mj = M();
+          if (mj) { mj.note('arp', 0, { quantize: '16', chord: true, octave: 1, gain: 0.55 }); jumpNotes = 1; jumpNoteT = 0.1; }
+          else api.audio.tone(520, 0.08, { type: 'square', vol: 0.12, slide: 1.6 });
         }
+        // holding the jump climbs an arpeggio while still rising
+        if (!grounded && jumpNotes && jumpNotes < 5 && jumpHeld && vy < 0) {
+          jumpNoteT -= dt;
+          if (jumpNoteT <= 0 && M()) { M().note('arp', [0, 2, 4, 7, 9][jumpNotes], { quantize: '16', chord: true, octave: 1, gain: 0.5 }); jumpNotes++; jumpNoteT = 0.1; }
+        } else if (grounded) jumpNotes = 0;
         if (!grounded) {
           // Variable jump: short tap = short hop. Duck in the air = fast fall.
           var grav = vy < 0 && jumpHeld ? 1500 : 2900;
@@ -92,6 +129,10 @@
             grounded = true; vy = 0;
             api.fx.burst(PX + SIZE / 2, GROUND, 'rgba(255,159,28,0.7)', 6, 70, 0.3);
           }
+        }
+        if (wantDuck !== mDuck) {
+          mDuck = wantDuck;
+          if (M()) M().setFilter(mDuck ? 650 : 18000, mDuck ? 0.08 : 0.35);
         }
         ducking = wantDuck;
         var hh = h();
@@ -126,7 +167,8 @@
             bonus += pts;
             api.fx.burst(bx, b.y, BIT, 8, 90, 0.4);
             if (bitChain % 4 === 0) api.fx.text(bx, b.y - 12, 'CHAIN ' + bitChain, BIT, 10);
-            api.audio.tone(880 + (bitChain % 8) * 60, 0.05, { type: 'square', vol: 0.1 });
+            if (M()) M().note('pluck', (bitChain - 1) % 8, { octave: 2, gain: 0.35 });
+            else api.audio.tone(880 + (bitChain % 8) * 60, 0.05, { type: 'square', vol: 0.1 });
           } else if (bx < PX - 20 && !b.missed) { b.missed = true; bitChain = 0; }
         }
         obstacles = obstacles.filter(function (o) { return o.x - dist > -120; });
@@ -137,7 +179,19 @@
         if (metres >= milestone) {
           api.fx.text(W / 2, 80, milestone + ' m', ACCENT, 16);
           milestone += 500;
-          api.audio.arp([523, 784], 0.07, { type: 'triangle', vol: 0.15 });
+          var mm = M();
+          if (mm) {
+            keyStep = (keyStep + 1) % KEYS.length;
+            mm.setKey(KEYS[keyStep]);
+            mm.stinger([{ deg: 0 }, { deg: 2, at: 1 }, { deg: 4, at: 2 }, { deg: 7, at: 4, steps: 4 }], { inst: 'pluck', quantize: 'beat', octave: 1, gain: 0.65 });
+          } else api.audio.arp([523, 784], 0.07, { type: 'triangle', vol: 0.15 });
+        }
+        var ms = M();
+        if (ms) {
+          var bpm = 128 + Math.round((speed - 330) / 490 * 9) * 4;
+          if (bpm !== mBpm) { mBpm = bpm; ms.setTempo(bpm, 1.5); }
+          var iv = Math.round(U.clamp(0.1 + metres / 2400, 0, 1) * 20) / 20;
+          if (iv !== mInt) { mInt = iv; ms.setIntensity(iv); }
         }
         api.setStatus(metres + ' m  ·  ' + Math.round(speed / 10) + ' km/h' + (bitChain > 1 ? '  ·  BITS x' + bitChain : ''));
       },

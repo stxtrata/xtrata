@@ -37,7 +37,7 @@ const leaves = [
 const manifest = {
   schema: 'xtrata-standalone-inscription-manifest@1',
   appId: 'xtrata_arcade_room',
-  release: 'v2.1-music-engine',
+  release: 'v2.2-full-soundtrack',
   createdAt: new Date().toISOString().slice(0, 10),
   contentContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-v3-2-3', network: 'mainnet' },
   scoreContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-arcade-scores-v1-3', network: 'mainnet',

@@ -16,6 +16,27 @@
   var SX = W / 2, SY = 548, SPEED = 880;
   var ACCENT = '#ff8fd8';
   var PALETTE = ['#ff4d6d', '#ffd23f', '#39ff88', '#3ff0ff', '#b04dff', '#ff9f1c'];
+  var M = function () { return XA.music; };
+
+  // Bubbly C major pentatonic: marimba + bell + soft shaker. Each colour is a scale degree.
+  function song() {
+    return {
+      bpm: 100, key: 60, scale: 'pentatonic', chords: [0, 3, 1, 4], seed: 16, swing: 0.1,
+      tracks: [
+        { name: 'mallet', inst: 'marimba', layer: 0, gain: 0.42, chord: true, pattern: '0 . 2 . . 4 . 2 . 0 . . 2 . . .' },
+        { name: 'bell', inst: 'bell', layer: 0.08, gain: 0.26, chord: true, octave: 1, rate: 4,
+          fn: function (i) { return i.rng() < 0.45 ? { deg: [0, 2, 4, 5][Math.floor(i.rng() * 4)], vel: 0.55 } : null; } },
+        { name: 'shaker', inst: 'shaker', layer: 0.18, gain: 0.38, pattern: 'x.xxx.xxx.xxx.xX' },
+        { name: 'bass', inst: 'sub', layer: 0.3, gain: 0.5, chord: true, octave: -2, pattern: '0 . . . . . 0 . . . 2 . . . . .' },
+        { name: 'kick', inst: 'kick', layer: 0.45, gain: 0.5, pattern: 'x.......x.....x.' },
+        { name: 'pad', inst: 'pad', layer: 0.58, gain: 0.3, chord: true, octave: -1,
+          fn: function (i) { return i.stepInBar === 0 ? [{ deg: 0, steps: 16 }, { deg: 2, steps: 16 }, { deg: 4, steps: 16 }] : null; } },
+        { name: 'tension', inst: 'arp', layer: 0.8, gain: 0.26, chord: true, octave: 1, params: { cutoff: 1500 },
+          fn: function (i) { return [0, 1, 2, 1][i.step % 4]; } },
+        { name: 'hat', inst: 'hat', layer: 0.8, gain: 0.3, pattern: '..x...x...x...xx' }
+      ]
+    };
+  }
 
   function create(api) {
     var rng = api.rng;
@@ -68,6 +89,17 @@
     fillBoard();
     current = pick(); next = pick();
 
+    // Danger = how far the lowest bubble has crept towards the line.
+    var lastI = -1;
+    function syncMusic() {
+      var m = M();
+      if (!m) return;
+      var d = U.clamp((lowestRow() - 3) / (MAX_ROWS - 5), 0, 1);
+      var v = Math.round(U.clamp(d + (board - 1) * 0.03, 0, 1) * 20) / 20;
+      if (v !== lastI) { lastI = v; m.setIntensity(v); }
+    }
+    if (M()) { M().play(song(), { fade: 1.2, intensity: 0 }); syncMusic(); }
+
     function pushCeiling() {
       grid.unshift(null);
       parity ^= 1;
@@ -82,6 +114,7 @@
       }
       api.shake(5);
       api.audio.tone(90, 0.3, { type: 'square', vol: 0.18 });
+      if (M()) { M().duck(0.55, 0.8); M().note('sub', 0, { octave: -2, dur: 0.4, gain: 0.6 }); }
       api.fx.text(W / 2, TOP + 20, 'CEILING DROP', ACCENT, 12);
     }
     function lowestRow() {
@@ -121,7 +154,11 @@
         });
         var pts = group.length * 10 + Math.max(0, group.length - 3) * 10;
         api.addScore(pts);
-        api.audio.arp([523, 659, 784].slice(0, Math.min(3, group.length - 1)), 0.04, { type: 'triangle', vol: 0.16 });
+        var m = M();
+        if (m) {
+          m.note('marimba', colour, { quantize: '16', octave: 1, gain: 0.85 });
+          if (group.length > 4) m.note('bell', colour, { quantize: '16', octave: 2, gain: 0.35 });
+        } else api.audio.arp([523, 659, 784].slice(0, Math.min(3, group.length - 1)), 0.04, { type: 'triangle', vol: 0.16 });
         // drop anything no longer connected to the ceiling
         var anchored = {}, st = [];
         for (var c0 = 0; c0 < cols(0); c0++) if (grid[0][c0] >= 0) st.push([0, c0]);
@@ -131,10 +168,11 @@
           anchored[kk] = true;
           neighbours(q[0], q[1]).forEach(function (n) { st.push(n); });
         }
-        var dropped = 0;
+        var dropped = 0, dropCols = [];
         for (var rr = 0; rr < grid.length; rr++) for (var cc = 0; cc < cols(rr); cc++) {
           if (grid[rr][cc] >= 0 && !anchored[rr + ',' + cc]) {
             falling.push({ x: cx(rr, cc), y: cy(rr), vy: -60 - rng() * 80, vx: (rng() - 0.5) * 80, c: grid[rr][cc] });
+            if (dropCols.length < 8) dropCols.push(grid[rr][cc]);
             grid[rr][cc] = -1;
             dropped++;
           }
@@ -143,19 +181,32 @@
           var dp = 20 * dropped * Math.min(8, dropped);
           api.addScore(dp);
           api.fx.text(W / 2, cy(r) + 30, 'DROP x' + dropped + '  +' + dp, '#ffd23f', 13);
-          api.audio.arp([392, 523, 659, 784, 1047].slice(0, Math.min(5, dropped + 1)), 0.05, { type: 'square', vol: 0.16 });
+          if (m) {
+            // one bell per orphan, a 16th apart, always climbing
+            var t0 = m.nextGrid('16'), sps = 15 / Math.max(40, m.tempo() || 100), deg = -1;
+            dropCols.sort(function (a, b) { return a - b; }).forEach(function (c, i) {
+              deg = Math.max(deg + 1, c);
+              m.note('bell', deg, { at: t0 + (i + 1) * sps, octave: 1, gain: 0.45 });
+            });
+          } else api.audio.arp([392, 523, 659, 784, 1047].slice(0, Math.min(5, dropped + 1)), 0.05, { type: 'square', vol: 0.16 });
         }
         if (lowestRow() < 0) {
           var bonus = 1000 * board;
           api.addScore(bonus);
           api.fx.text(W / 2, H / 2, 'BOARD CLEAR +' + bonus, '#39ff88', 16);
           clearT = 1.5;
+          if (m) {
+            m.stinger([{ deg: 0 }, { deg: 2, at: 2 }, { deg: 4, at: 4 }, { deg: 5, at: 6, steps: 8 }], { inst: 'bell', quantize: 'beat', octave: 1, gain: 0.55 });
+            var nextKey = 60 + (board * 5) % 12;
+            m.setKey(nextKey > 65 ? nextKey - 12 : nextKey);
+          }
         }
       } else {
         misses++;
         api.audio.tone(260, 0.05, { type: 'square', vol: 0.1 });
         if (misses >= missLimit) { misses = 0; pushCeiling(); }
       }
+      syncMusic();
       if (lowestRow() >= MAX_ROWS - 1) {
         over = true;
         api.shake(12);
@@ -182,7 +233,7 @@
         if (over) { overT += dt; if (overT > 1.3) api.gameOver(); return; }
         if (clearT > 0) {
           clearT -= dt;
-          if (clearT <= 0) { board++; fillBoard(); misses = 0; current = pick(); next = pick(); }
+          if (clearT <= 0) { board++; fillBoard(); misses = 0; current = pick(); next = pick(); syncMusic(); }
           return;
         }
         // aim with the pointer when it moves, or with the keys
