@@ -13,7 +13,7 @@
 
     Before inscription: fill CONFIG.moduleIds with minted ids
       node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> \
-        --snake <id> --blocks <id> --cave <id>
+        --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
   -->
@@ -68,7 +68,10 @@
         room: 0,
         snake: 0,
         blocks: 0,
-        cave: 0
+        cave: 0,
+        merge: 0,
+        runner: 0,
+        bricks: 0
       },
       scoreContract: {
         contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -84,7 +87,10 @@
       { key: 'room', file: 'arcade-room.js', type: 'js' },
       { key: 'snake', file: 'game-neon-snake.js', type: 'js' },
       { key: 'blocks', file: 'game-block-drop.js', type: 'js' },
-      { key: 'cave', file: 'game-cave-diver.js', type: 'js' }
+      { key: 'cave', file: 'game-cave-diver.js', type: 'js' },
+      { key: 'merge', file: 'game-orbit-merge.js', type: 'js' },
+      { key: 'runner', file: 'game-block-runner.js', type: 'js' },
+      { key: 'bricks', file: 'game-brick-breaker.js', type: 'js' }
     ];
 
     var fillEl = document.getElementById('xb-fill');

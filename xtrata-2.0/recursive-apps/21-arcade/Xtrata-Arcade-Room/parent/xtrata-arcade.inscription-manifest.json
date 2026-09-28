@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v1-prototype",
+  "release": "v1.1-six-cabinets",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -15,7 +15,10 @@
     "gameIds": [
       "xa_neon_snake",
       "xa_block_drop",
-      "xa_cave_diver"
+      "xa_cave_diver",
+      "xa_orbit_merge",
+      "xa_block_runner",
+      "xa_brick_breaker"
     ]
   },
   "leafModules": [
@@ -32,8 +35,8 @@
       "key": "kit",
       "path": "modules/arcade-kit.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 12621,
-      "sha256": "7a5d1ebe211d53e07bceb4a51475f6b30fe4bb53ae9f42a79d6959ccba223fcd",
+      "sizeBytes": 12998,
+      "sha256": "a3928331476b36ce741793f699df381285fb9c56b23e0bb59de5f13117242032",
       "mintOrder": 2,
       "mintedInscriptionId": 0
     },
@@ -50,8 +53,8 @@
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 25834,
-      "sha256": "1d2132ff585bf2527db6447360f3a10e2487e1741d00cce0f9758d6ae01bbe3e",
+      "sizeBytes": 26362,
+      "sha256": "a7d6f0c1de90210e169f51d06047b7b0318045763f5915aaafc7bd3a64cf6d20",
       "mintOrder": 4,
       "mintedInscriptionId": 0
     },
@@ -81,12 +84,39 @@
       "sha256": "3e623e5b67bbd18b3885a3462ef257386e114a830c0a089beb4109009c97832d",
       "mintOrder": 7,
       "mintedInscriptionId": 0
+    },
+    {
+      "key": "merge",
+      "path": "modules/game-orbit-merge.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 12945,
+      "sha256": "b5eaba815b541104bafa4833ef7505f095ec49f4fbff175f18680455ddab7d1e",
+      "mintOrder": 8,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "runner",
+      "path": "modules/game-block-runner.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 12558,
+      "sha256": "b92043d4218bc10b4b52614b73bc3c151e80bfaa71b826dac8fb91258258c2b3",
+      "mintOrder": 9,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "bricks",
+      "path": "modules/game-brick-breaker.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 13998,
+      "sha256": "072f88e52fbf9fe87cd0d9d3b2bcb912294d076d979c899c53032f8e5fada073",
+      "mintOrder": 10,
+      "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 8,
+    "mintOrder": 11,
     "dependencyOrder": [
       "css",
       "kit",
@@ -94,7 +124,10 @@
       "room",
       "snake",
       "blocks",
-      "cave"
+      "cave",
+      "merge",
+      "runner",
+      "bricks"
     ]
   }
 }

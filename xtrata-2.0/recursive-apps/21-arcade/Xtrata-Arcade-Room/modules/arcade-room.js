@@ -228,7 +228,7 @@
       stage
     ]);
     var input = XA.createInput(stage);
-    var pads = buildPads(game.touch, input);
+    var pads = buildPads(game.touch, input, game);
     if (pads) gameEl.appendChild(pads);
     rootEl.appendChild(gameEl);
     roomEl.setAttribute('aria-hidden', 'true');
@@ -249,7 +249,13 @@
       setScore: function (n) { if (s.state === 'play') s.score = Math.max(0, Math.floor(n)); },
       getScore: function () { return s.score; },
       setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },
-      gameOver: function () { if (s.state === 'play') finish(); }
+      gameOver: function () { if (s.state === 'play') finish(); },
+      // Pointer in playfield units. `moved` increments on every move/press, so a
+      // game can tell "the pointer is steering" from "the keys are steering".
+      pointer: function () {
+        var p = input.pointer, r = canvas.getBoundingClientRect();
+        return { x: (p.x - r.left) / s.scale, y: (p.y - r.top) / s.scale, down: p.down, moved: p.moved };
+      }
     };
     s.instance = game.create(api);
     fit();
@@ -261,7 +267,7 @@
     });
   }
 
-  function buildPads(kind, input) {
+  function buildPads(kind, input, game) {
     var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;
     if (!coarse && !/[?&]pads=1/.test(root.location.search || '')) return null;
     function pad(name, label, cls) {
@@ -286,6 +292,9 @@
         h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '◀'), pad('down', '▼'), pad('right', '▶')]),
         h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '⟲'), pad('c', '⟳'), pad('d', 'HOLD', 'xa-wide'), pad('a', '⤓')])
       ]);
+    }
+    if (kind === 'hint') {
+      return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: game.touchHint || '' })]);
     }
     if (kind === 'hold') {
       return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: 'TOUCH AND HOLD ANYWHERE ON THE SCREEN TO SWIM' })]);

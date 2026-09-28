@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v1 prototype)
+# Xtrata Arcade Room (v1.1 prototype, six cabinets)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -11,6 +11,9 @@ parent that lists it.
 | Neon Snake  | `modules/game-neon-snake.js` | `xa_neon_snake`  | arrows/WASD, swipe, d-pad |
 | Block Drop  | `modules/game-block-drop.js` | `xa_block_drop`  | ←→ ↑/X Z Space C, swipes, 7 pads |
 | Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold |
+| Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift |
+| Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down |
+| Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch, drag + tap |
 
 The `xa_` prefix keeps these boards separate from the older 21-arcade slots.
 
@@ -30,18 +33,20 @@ parent/
   build-preview.mjs                     single-file view-only preview bundle
 tests/
   codec.test.cjs      Clarity / c32 / post-condition codec vs @stacks/transactions
-  smoke.test.cjs      Playwright: parent loader, 3 games, submit via mock host
+  smoke.test.cjs      Playwright: parent loader, all 6 games, submit via mock host
   mock-host.html      fake xtrata.xyz wallet bridge for the smoke test
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~116 KB (Astro Blaster's leaves are ~590 KB).
+Leaves total ~160 KB for six games (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
 A cartridge never sees the wallet. `create(api)` receives:
 
-`W, H, input, audio, fx, rng (seeded), seed, shake(n), addScore(n), setScore(n), getScore(), setStatus(text), gameOver()`
+`W, H, input, audio, fx, rng (seeded), seed, shake(n), addScore(n), setScore(n), getScore(), setStatus(text), gameOver(), pointer()`
+
+`pointer()` returns `{ x, y, down, moved }` in playfield units; `moved` ticks on every move so a game can tell pointer steering from key steering. `input.hit('release')` fires once per touch/click release.
 
 and returns `{ update(dt), render(ctx) }`. The room runs a fixed 60 Hz step,
 countdown, pause, shake, particles and the game-over screen.
@@ -80,8 +85,8 @@ Until then, posting works when the arcade runs inside the `/runtime` page.
 ## Mint order
 
 1. `node parent/build-manifest.mjs` and check sizes/hashes
-2. Inscribe the 7 leaves in manifest order (css, kit, scores, room, snake, blocks, cave)
-3. `node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id>`
+2. Inscribe the 10 leaves in manifest order (css, kit, scores, room, snake, blocks, cave, merge, runner, bricks)
+3. `node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id>`
 4. Inscribe `parent/xtrata-arcade-parent.template.html`
 5. `node parent/fill-ids.mjs --parent <id>` for the runtime deep link (only matters for a re-mint)
 

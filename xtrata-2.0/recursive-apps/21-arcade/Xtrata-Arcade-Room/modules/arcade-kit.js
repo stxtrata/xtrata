@@ -235,7 +235,7 @@
     var held = {};
     var hitQ = {};
     var swipes = [];
-    var pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null, swiped: false };
+    var pointer = { down: false, x: 0, y: 0, sx: 0, sy: 0, t: 0, id: null, swiped: false, moved: 0 };
     var listeners = [];
 
     function press(name) {
@@ -270,15 +270,20 @@
         if (t && t !== surface && t.closest && t.closest('button, a, input, select, textarea, [data-xa-ui]')) return;
         audio.unlock();
         pointer.down = true; pointer.id = e.pointerId; pointer.swiped = false;
-        pointer.sx = pointer.x = e.clientX; pointer.sy = pointer.y = e.clientY;
+        pointer.sx = pointer.x = e.clientX; pointer.sy = pointer.y = e.clientY; pointer.moved++;
         pointer.t = performance.now();
         press('hold');
         try { surface.setPointerCapture(e.pointerId); } catch (err) {}
         e.preventDefault();
       }, { passive: false });
       on(surface, 'pointermove', function (e) {
-        if (!pointer.down || e.pointerId !== pointer.id) return;
-        pointer.x = e.clientX; pointer.y = e.clientY;
+        // Hover (mouse) still updates the position so aiming games can follow it.
+        if (!pointer.down) {
+          if (e.pointerType === 'mouse') { pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++; }
+          return;
+        }
+        if (e.pointerId !== pointer.id) return;
+        pointer.x = e.clientX; pointer.y = e.clientY; pointer.moved++;
         var dx = pointer.x - pointer.sx, dy = pointer.y - pointer.sy;
         if (Math.abs(dx) > SWIPE || Math.abs(dy) > SWIPE) {
           var dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
@@ -292,6 +297,8 @@
         if (pointer.down && !pointer.swiped && performance.now() - pointer.t < 260) swipes.push('tap');
         pointer.down = false;
         release('hold');
+        // Edge event so a press+release inside one frame is never lost.
+        hitQ.release = true;
       };
       on(surface, 'pointerup', end);
       on(surface, 'pointercancel', end);
