@@ -14,7 +14,8 @@
     Before inscription: fill CONFIG.moduleIds with minted ids
       node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> \
         --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> \
-        --drift <id> --stack <id> --hopper <id>
+        --drift <id> --stack <id> --hopper <id> \
+        --tiles <id> --merge2048 <id> --defence <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
   -->
@@ -75,7 +76,10 @@
         bricks: 0,
         drift: 0,
         stack: 0,
-        hopper: 0
+        hopper: 0,
+        tiles: 0,
+        merge2048: 0,
+        defence: 0
       },
       scoreContract: {
         contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -97,7 +101,10 @@
       { key: 'bricks', file: 'game-brick-breaker.js', type: 'js' },
       { key: 'drift', file: 'game-rock-drift.js', type: 'js' },
       { key: 'stack', file: 'game-stack-tower.js', type: 'js' },
-      { key: 'hopper', file: 'game-road-hopper.js', type: 'js' }
+      { key: 'hopper', file: 'game-road-hopper.js', type: 'js' },
+      { key: 'tiles', file: 'game-tile-tap.js', type: 'js' },
+      { key: 'merge2048', file: 'game-merge-2048.js', type: 'js' },
+      { key: 'defence', file: 'game-block-defence.js', type: 'js' }
     ];
 
     var fillEl = document.getElementById('xb-fill');

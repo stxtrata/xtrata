@@ -481,6 +481,7 @@ button { font: inherit; color: inherit; }
     KeyZ: 'b', KeyJ: 'b',
     KeyX: 'c', KeyK: 'c',
     KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
+    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4',
     Enter: 'start',
     Escape: 'pause', KeyP: 'pause'
   };
@@ -4674,7 +4675,820 @@ button { font: inherit; color: inherit; }
   });
 })(window);
 </script>
+<script>/* game-tile-tap.js */
+/*
+ * Xtrata Arcade cartridge #10 — TILE TAP
+ * Four lanes of falling tiles. Tap the lowest tile before it leaves the
+ * screen; every tile plays the next note of the tune. Tap the wrong lane or
+ * let one slip past and the song ends. It speeds up as you go.
+ * Contract game-id: xa_tile_tap (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-tile-tap');
+  var U = XA.util;
+
+  var W = 400, H = 600, LANES = 4, LW = W / LANES, TH = 138, PERFECT_ZONE = 170;
+  var ACCENT = '#3ff0ff', HOT = '#ff3fa4';
+  var LANE_KEYS = [['left', 'k1'], ['down', 'k2'], ['up', 'k3'], ['right', 'k4']];
+  var LANE_LABELS = ['←', '↓', '↑', '→'];
+
+  // An original looping tune: i–VI–III–VII in A minor as rolling arpeggios.
+  var CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];
+  var SHAPE = [0, 1, 2, 3, 2, 1, 0, 2];
+  function noteAt(i) {
+    var chord = CHORDS[Math.floor(i / 8) % CHORDS.length];
+    var k = SHAPE[i % 8];
+    var midi = k === 3 ? chord[0] + 12 : chord[k];
+    if (Math.floor(i / 32) % 2 === 1 && i % 2 === 1) midi += 12; // second pass climbs
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+
+  function create(api) {
+    var rng = api.rng;
+    var tiles = [];          // { lane, y, hit, fade }
+    var nextIndex = 0;       // index into tiles of the lowest untapped tile
+    var count = 0, perfectStreak = 0;
+    var speed = 0, started = false;
+    var over = false, overT = 0, badLane = -1, flash = 0;
+    var t = 0;
+    var lastLane = -1;
+
+    function laneFor() {
+      var l;
+      do { l = Math.floor(rng() * LANES); } while (l === lastLane && rng() < 0.6);
+      lastLane = l;
+      return l;
+    }
+    // Fill the screen upwards; the first tile sits on the start line.
+    function topY() { return tiles.length ? tiles[tiles.length - 1].y : H - TH - 20 + TH; }
+    function fill() {
+      while (topY() > -TH * 2) tiles.push({ lane: laneFor(), y: topY() - TH, hit: false, fade: 0 });
+    }
+    fill();
+
+    function end(lane) {
+      over = true;
+      badLane = lane;
+      api.shake(9);
+      api.audio.tone(110, 0.5, { type: 'sawtooth', vol: 0.28, slide: 0.5 });
+      api.audio.tone(116, 0.5, { type: 'sawtooth', vol: 0.2, slide: 0.5 });
+    }
+    function tap(lane) {
+      if (over) return;
+      var next = tiles[nextIndex];
+      // Only tiles already on screen can be tapped; early taps are ignored.
+      if (!next || next.y + TH < 24) return;
+      if (next.lane !== lane) { end(lane); return; }
+      if (!started) { started = true; speed = 360; }
+      next.hit = true;
+      nextIndex++;
+      count++;
+      var bottom = next.y + TH;
+      var perfect = bottom > H - PERFECT_ZONE && bottom <= H + 4;
+      var pts = 10;
+      if (perfect) { perfectStreak++; pts += 5; } else perfectStreak = 0;
+      api.addScore(pts);
+      var f = noteAt(count - 1);
+      api.audio.tone(f, 0.32, { type: 'triangle', vol: 0.22 });
+      api.audio.tone(f * 2, 0.12, { type: 'sine', vol: 0.06 });
+      var cx = lane * LW + LW / 2, cy = next.y + TH / 2;
+      api.fx.burst(cx, cy, perfect ? HOT : ACCENT, perfect ? 16 : 8, 150, 0.4);
+      if (perfect && perfectStreak > 2 && perfectStreak % 5 === 0) api.fx.text(W / 2, 90, 'PERFECT x' + perfectStreak, HOT, 14);
+      if (count % 25 === 0) {
+        api.fx.text(W / 2, 130, count + ' TILES', ACCENT, 16);
+      }
+    }
+
+    return {
+      // Read-only test hook.
+      debug: function () { var n = tiles[nextIndex]; return { nextLane: n ? n.lane : -1, count: count }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        if (flash > 0) flash -= dt;
+        if (over) {
+          inp.takeSwipes();
+          overT += dt;
+          if (overT > 1.2) api.gameOver();
+          return;
+        }
+        // lane input: keys, or a press on the playfield
+        for (var l = 0; l < LANES; l++) {
+          if (inp.hit(LANE_KEYS[l][0]) || inp.hit(LANE_KEYS[l][1])) tap(l);
+        }
+        if (inp.hit('hold')) {
+          var p = api.pointer();
+          if (p.x >= 0 && p.x <= W) tap(U.clamp(Math.floor(p.x / LW), 0, LANES - 1));
+        }
+        inp.takeSwipes();
+        if (over) return;
+
+        if (started) {
+          speed = Math.min(1150, 360 + count * 4.2);
+          var dy = speed * dt;
+          tiles.forEach(function (tl) { tl.y += dy; if (tl.hit) tl.fade = Math.min(1, tl.fade + dt * 4); });
+          var next = tiles[nextIndex];
+          if (next && next.y > H) {
+            // Scroll back so the missed tile is visible, then end.
+            var back = next.y - (H - TH);
+            tiles.forEach(function (tl) { tl.y -= back; });
+            end(next.lane);
+            flash = 1;
+            return;
+          }
+          // drop tiles far below, keep indices aligned
+          while (tiles.length && tiles[0].y > H + TH && tiles[0].hit) { tiles.shift(); nextIndex--; }
+          fill();
+        }
+        api.setStatus('TILES ' + count + '  ·  SPEED x' + (Math.max(speed, 360) / 360).toFixed(1) + (perfectStreak > 2 ? '  ·  PERFECT x' + perfectStreak : ''));
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#060715';
+        ctx.fillRect(0, 0, W, H);
+        // perfect zone glow
+        var g = ctx.createLinearGradient(0, H - PERFECT_ZONE, 0, H);
+        g.addColorStop(0, 'rgba(255,63,164,0)');
+        g.addColorStop(1, 'rgba(255,63,164,0.12)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, H - PERFECT_ZONE, W, PERFECT_ZONE);
+        for (var l = 1; l < LANES; l++) {
+          ctx.fillStyle = 'rgba(63,240,255,0.12)';
+          ctx.fillRect(l * LW - 0.5, 0, 1, H);
+        }
+        if (over && badLane >= 0) {
+          ctx.fillStyle = 'rgba(255,77,109,' + (0.25 + Math.sin(t * 20) * 0.15) + ')';
+          ctx.fillRect(badLane * LW, 0, LW, H);
+        }
+        tiles.forEach(function (tl, i) {
+          if (tl.y > H + 4 || tl.y + TH < -4) return;
+          var x = tl.lane * LW;
+          ctx.save();
+          if (tl.hit) {
+            ctx.globalAlpha = 0.25 * (1 - tl.fade) + 0.08;
+            ctx.fillStyle = ACCENT;
+            ctx.fillRect(x + 3, tl.y + 3, LW - 6, TH - 6);
+          } else {
+            var isNext = i === nextIndex;
+            var tg = ctx.createLinearGradient(0, tl.y, 0, tl.y + TH);
+            tg.addColorStop(0, '#12163a');
+            tg.addColorStop(1, isNext ? '#1d4a78' : '#161c46');
+            ctx.fillStyle = tg;
+            ctx.shadowColor = isNext ? ACCENT : '#6a7bff';
+            ctx.shadowBlur = isNext ? 18 : 8;
+            U.roundRect(ctx, x + 3, tl.y + 3, LW - 6, TH - 6, 8); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = isNext ? ACCENT : 'rgba(106,123,255,0.6)';
+            ctx.lineWidth = 2;
+            U.roundRect(ctx, x + 3, tl.y + 3, LW - 6, TH - 6, 8); ctx.stroke();
+            ctx.fillStyle = isNext ? ACCENT : 'rgba(106,123,255,0.8)';
+            ctx.fillRect(x + 14, tl.y + TH - 14, LW - 28, 4);
+            if (!started && i === 0) U.glowText(ctx, 'START', x + LW / 2, tl.y + TH / 2, 13, ACCENT);
+          }
+          ctx.restore();
+        });
+        // lane keys
+        ctx.save();
+        ctx.font = '800 14px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = 'rgba(200,230,255,0.35)';
+        for (l = 0; l < LANES; l++) ctx.fillText(LANE_LABELS[l] + ' ' + (l + 1), l * LW + LW / 2, H - 10);
+        ctx.restore();
+        if (flash > 0 && Math.floor(t * 10) % 2) {
+          ctx.fillStyle = 'rgba(255,77,109,0.2)';
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#060715';
+    ctx.fillRect(0, 0, w, h);
+    var lw = w / 4, th = h / 3.2;
+    for (var l = 1; l < 4; l++) { ctx.fillStyle = 'rgba(63,240,255,0.12)'; ctx.fillRect(l * lw, 0, 1, h); }
+    var off = (t * h * 0.5) % th;
+    var lanes = [2, 0, 3, 1, 2, 3, 0, 1];
+    var base = Math.floor(t * 0.5 * h / th);
+    for (var i = -1; i < 5; i++) {
+      var lane = lanes[((base - i) % 8 + 8) % 8];
+      var y = h - (i + 1) * th + off;
+      var isNext = i === 0;
+      ctx.save();
+      ctx.fillStyle = isNext ? '#1d4a78' : '#161c46';
+      ctx.shadowColor = isNext ? ACCENT : '#6a7bff'; ctx.shadowBlur = 10;
+      ctx.fillRect(lane * lw + 2, y + 2, lw - 4, th - 4);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.globalAlpha = 0.5 + Math.sin(t * 8) * 0.3;
+    ctx.fillStyle = HOT;
+    ctx.fillRect(0, h - 4, w, 4);
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_tile_tap',
+    order: 10,
+    title: 'Tile Tap',
+    tagline: 'Every tile is a note. Don’t miss.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'TAP THE LOWEST TILE IN ITS LANE',
+    controls: '← ↓ ↑ → or 1 2 3 4 for the four lanes · click a lane',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-merge-2048.js */
+/*
+ * Xtrata Arcade cartridge #11 — MERGE 2048
+ * Slide the whole grid; equal tiles merge and add their value to your
+ * score. A new 2 (or sometimes 4) appears after every move. Reaching 2048
+ * is a milestone, not the end: keep going until no move is left.
+ * Contract game-id: xa_merge_2048 (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-merge-2048');
+  var U = XA.util;
+
+  var W = 440, H = 520, N = 4, PAD = 12, BOARD = 416, BX = (W - BOARD) / 2, BY = 88;
+  var CELL = (BOARD - PAD * (N + 1)) / N;
+  var SLIDE = 0.1;
+  var ACCENT = '#ffae3f';
+  var COLORS = {
+    2: '#2b3a7a', 4: '#34479a', 8: '#b04dff', 16: '#d43fd8', 32: '#ff3fa4', 64: '#ff4d6d',
+    128: '#ff9f1c', 256: '#ffd23f', 512: '#39ff88', 1024: '#3ff0ff', 2048: '#ffffff'
+  };
+
+  function create(api) {
+    var rng = api.rng;
+    var grid = [];           // grid[r][c] = tile | null
+    var tiles = [];          // all live tiles (for drawing and animation)
+    var nextId = 1;
+    var anim = 0;            // >0 while tiles slide
+    var best = 2, reached2048 = false;
+    var moves = 0;
+    var over = false, overT = 0;
+    var t = 0;
+    for (var r = 0; r < N; r++) grid.push([null, null, null, null]);
+
+    function cellX(c) { return BX + PAD + c * (CELL + PAD); }
+    function cellY(r) { return BY + PAD + r * (CELL + PAD); }
+    function spawn() {
+      var empty = [];
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (!grid[r][c]) empty.push([r, c]);
+      if (!empty.length) return;
+      var e = empty[Math.floor(rng() * empty.length)];
+      var tile = { id: nextId++, v: rng() < 0.9 ? 2 : 4, r: e[0], c: e[1], fr: e[0], fc: e[1], born: 0.12, pop: 0 };
+      grid[e[0]][e[1]] = tile;
+      tiles.push(tile);
+    }
+    spawn(); spawn();
+
+    function canMove() {
+      for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+        var tl = grid[r][c];
+        if (!tl) return true;
+        if (c < N - 1 && grid[r][c + 1] && grid[r][c + 1].v === tl.v) return true;
+        if (r < N - 1 && grid[r + 1][c] && grid[r + 1][c].v === tl.v) return true;
+      }
+      return false;
+    }
+
+    function move(dir) {
+      if (anim > 0 || over) return;
+      var dr = dir === 'up' ? -1 : dir === 'down' ? 1 : 0;
+      var dc = dir === 'left' ? -1 : dir === 'right' ? 1 : 0;
+      var order = [0, 1, 2, 3];
+      if (dr > 0 || dc > 0) order.reverse();
+      var moved = false, gained = 0, merges = 0;
+      tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; tl.merged = false; });
+      var dead = [];
+      order.forEach(function (i) {
+        order.forEach(function (j) {
+          var r = dr ? i : j, c = dc ? i : j;
+          var tl = grid[r][c];
+          if (!tl) return;
+          var nr = r, nc = c;
+          while (true) {
+            var tr = nr + dr, tc = nc + dc;
+            if (tr < 0 || tr >= N || tc < 0 || tc >= N) break;
+            var other = grid[tr][tc];
+            if (!other) { nr = tr; nc = tc; continue; }
+            if (other.v === tl.v && !other.merged && !tl.merged) {
+              // merge into `other`; `tl` slides onto it and disappears
+              grid[r][c] = null;
+              tl.r = tr; tl.c = tc;
+              other.v *= 2;
+              other.merged = true;
+              other.pop = 0.18;
+              dead.push(tl);
+              gained += other.v;
+              merges++;
+              if (other.v > best) best = other.v;
+              moved = true;
+              return;
+            }
+            break;
+          }
+          if (nr !== r || nc !== c) {
+            grid[r][c] = null;
+            grid[nr][nc] = tl;
+            tl.r = nr; tl.c = nc;
+            moved = true;
+          }
+        });
+      });
+      if (!moved) { api.audio.tone(140, 0.04, { type: 'square', vol: 0.05 }); return; }
+      moves++;
+      anim = SLIDE;
+      dead.forEach(function (d) { d.dying = true; });
+      api.audio.tone(merges ? 330 + Math.log2(best) * 30 : 220, 0.06, { type: 'triangle', vol: merges ? 0.16 : 0.08 });
+      if (gained) {
+        api.addScore(gained);
+        if (merges > 1) api.fx.text(W - 80, 44, merges + ' MERGES +' + gained, ACCENT, 11);
+      }
+      if (best >= 2048 && !reached2048) {
+        reached2048 = true;
+        api.fx.text(W / 2, BY + BOARD / 2, '2048!', '#ffffff', 28);
+        api.fx.burst(W / 2, BY + BOARD / 2, '#ffd23f', 80, 300, 1.2);
+        api.shake(10);
+        api.audio.arp([523, 659, 784, 1047, 1319, 1568], 0.08, { type: 'square', vol: 0.2 });
+      }
+    }
+
+    function afterSlide() {
+      tiles = tiles.filter(function (tl) {
+        if (tl.dying) {
+          api.fx.burst(cellX(tl.c) + CELL / 2, cellY(tl.r) + CELL / 2, COLORS[Math.min(tl.v * 2, 2048)] || '#fff', 8, 110, 0.35);
+          return false;
+        }
+        return true;
+      });
+      tiles.forEach(function (tl) { tl.fr = tl.r; tl.fc = tl.c; });
+      spawn();
+      if (!canMove()) {
+        over = true;
+        api.shake(6);
+        api.audio.tone(200, 0.5, { type: 'sawtooth', slide: 0.5, vol: 0.25 });
+      }
+    }
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        var dirs = [];
+        ['up', 'down', 'left', 'right'].forEach(function (d) { if (inp.hit(d)) dirs.push(d); });
+        inp.takeSwipes().forEach(function (s) { if (s !== 'tap') dirs.push(s); });
+        if (over) { overT += dt; if (overT > 1.4) api.gameOver(); return; }
+        if (anim > 0) {
+          anim -= dt;
+          if (anim <= 0) { anim = 0; afterSlide(); }
+        } else if (dirs.length) move(dirs[0]);
+        tiles.forEach(function (tl) {
+          if (tl.born > 0) tl.born = Math.max(0, tl.born - dt);
+          if (tl.pop > 0 && anim === 0) tl.pop = Math.max(0, tl.pop - dt);
+        });
+        api.setStatus('BEST TILE ' + best + '  ·  MOVES ' + moves);
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#07071a';
+        ctx.fillRect(0, 0, W, H);
+        U.glowText(ctx, String(best), W / 2, 44, 30, COLORS[Math.min(best, 2048)] || '#fff');
+        ctx.fillStyle = 'rgba(200,210,255,0.45)';
+        ctx.font = '700 10px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('BEST TILE', W / 2, 72);
+
+        ctx.save();
+        ctx.fillStyle = '#10122e';
+        ctx.shadowColor = ACCENT; ctx.shadowBlur = 16;
+        U.roundRect(ctx, BX, BY, BOARD, BOARD, 14); ctx.fill();
+        ctx.restore();
+        for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
+          ctx.fillStyle = 'rgba(255,255,255,0.04)';
+          U.roundRect(ctx, cellX(c), cellY(r), CELL, CELL, 10); ctx.fill();
+        }
+        var k = anim > 0 ? 1 - anim / SLIDE : 1;
+        var ease = 1 - Math.pow(1 - k, 3);
+        tiles.slice().sort(function (a, b) { return (a.dying ? 0 : 1) - (b.dying ? 0 : 1); }).forEach(function (tl) {
+          var x = cellX(tl.fc) + (cellX(tl.c) - cellX(tl.fc)) * ease;
+          var y = cellY(tl.fr) + (cellY(tl.r) - cellY(tl.fr)) * ease;
+          var s = 1;
+          if (tl.born > 0) s = 1 - tl.born / 0.12;
+          if (tl.pop > 0 && anim === 0) s = 1 + Math.sin((tl.pop / 0.18) * Math.PI) * 0.12;
+          var v = tl.dying ? tl.v : tl.v;
+          var col = COLORS[Math.min(v, 2048)] || '#ffffff';
+          ctx.save();
+          ctx.translate(x + CELL / 2, y + CELL / 2);
+          ctx.scale(s, s);
+          ctx.fillStyle = col;
+          ctx.shadowColor = col; ctx.shadowBlur = v >= 128 ? 22 : 8;
+          U.roundRect(ctx, -CELL / 2, -CELL / 2, CELL, CELL, 10); ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = v >= 256 && v !== 512 ? '#1a1030' : '#ffffff';
+          var size = v < 100 ? 38 : v < 1000 ? 32 : v < 10000 ? 26 : 20;
+          ctx.font = '900 ' + size + 'px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(String(v), 0, 2);
+          ctx.restore();
+        });
+        if (moves === 0 && !over) {
+          ctx.save();
+          ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.4;
+          U.glowText(ctx, 'SWIPE OR USE THE ARROWS', W / 2, H - 6, 11, '#ffe2bd');
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#07071a';
+    ctx.fillRect(0, 0, w, h);
+    var size = Math.min(w, h) * 0.8, cell = size / 4, x0 = (w - size) / 2, y0 = (h - size) / 2;
+    var vals = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
+    for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) {
+      var idx = (r * 4 + c + Math.floor(t)) % 13;
+      ctx.fillStyle = 'rgba(255,255,255,0.05)';
+      ctx.fillRect(x0 + c * cell + 3, y0 + r * cell + 3, cell - 6, cell - 6);
+      if (idx >= vals.length || (r + c + Math.floor(t)) % 3 === 0) continue;
+      var v = vals[idx];
+      ctx.fillStyle = COLORS[v];
+      ctx.fillRect(x0 + c * cell + 3, y0 + r * cell + 3, cell - 6, cell - 6);
+      ctx.fillStyle = v >= 256 && v !== 512 ? '#1a1030' : '#fff';
+      ctx.font = '900 ' + Math.floor(cell * (v < 100 ? 0.38 : v < 1000 ? 0.3 : 0.24)) + 'px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(v), x0 + c * cell + cell / 2, y0 + r * cell + cell / 2);
+    }
+  }
+
+  XA.registerGame({
+    id: 'xa_merge_2048',
+    order: 11,
+    title: 'Merge 2048',
+    tagline: 'Slide, merge, reach 2048 and beyond.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'dpad',
+    controls: 'Arrows / WASD or swipe to slide the grid',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-block-defence.js */
+/*
+ * Xtrata Arcade cartridge #12 — BLOCK DEFENCE
+ * Missiles rain down on six block towers. Aim and fire interceptors from
+ * three silos; each blast hangs in the air and takes out anything that
+ * flies into it. Later waves bring faster warheads that split. Survive
+ * the wave for bonus points on saved towers and unused ammo.
+ * Contract game-id: xa_block_defence (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-block-defence');
+  var U = XA.util;
+
+  var W = 480, H = 560, GROUND = 520;
+  var ACCENT = '#39ff88', ENEMY = '#ff4d6d', BLAST = '#ffd23f';
+  var SILO_X = [40, 240, 440];
+  var CITY_X = [96, 144, 192, 288, 336, 384];
+  var AMMO = 10;
+
+  function create(api) {
+    var rng = api.rng;
+    var cities = CITY_X.map(function (x, i) { return { x: x, alive: true, h: 3 + (i * 7) % 3 }; });
+    var silos = SILO_X.map(function (x) { return { x: x, ammo: AMMO, alive: true }; });
+    var interceptors = [], blasts = [], enemies = [];
+    var wave = 0, toSpawn = 0, spawnT = 0, between = 0;
+    var aim = { x: W / 2, y: 260 };
+    var lastMoved = api.pointer().moved;
+    var score = 0, nextCity = 10000;
+    var over = false, overT = 0;
+    var t = 0;
+
+    function startWave() {
+      wave++;
+      toSpawn = 8 + wave * 3;
+      spawnT = 0.6;
+      silos.forEach(function (s) { s.ammo = AMMO; s.alive = true; });
+      api.fx.text(W / 2, 200, 'WAVE ' + wave, ACCENT, 18);
+      api.audio.arp([392, 494, 587], 0.08, { type: 'triangle', vol: 0.16 });
+    }
+    function speed() { return 34 + wave * 7; }
+    function targets() {
+      var list = [];
+      cities.forEach(function (c) { if (c.alive) list.push(c.x); });
+      silos.forEach(function (s) { if (s.alive) list.push(s.x); });
+      return list.length ? list : [W / 2];
+    }
+    function spawnEnemy(x, y, tx) {
+      var sp = speed() * (0.85 + rng() * 0.3);
+      var dx = tx - x, dy = GROUND - y, d = Math.hypot(dx, dy);
+      enemies.push({ sx: x, sy: y, x: x, y: y, vx: dx / d * sp, vy: dy / d * sp,
+        split: wave >= 3 && rng() < Math.min(0.35, 0.08 * (wave - 2)) ? 180 + rng() * 150 : 0 });
+    }
+    function fire(siloIdx, tx, ty) {
+      var s = silos[siloIdx];
+      if (!s || !s.alive || s.ammo <= 0) return false;
+      if (ty > GROUND - 30) ty = GROUND - 30;
+      s.ammo--;
+      var sx = s.x, sy = GROUND - 14;
+      var d = Math.hypot(tx - sx, ty - sy);
+      var sp = siloIdx === 1 ? 620 : 480;
+      interceptors.push({ sx: sx, sy: sy, x: sx, y: sy, tx: tx, ty: ty, vx: (tx - sx) / d * sp, vy: (ty - sy) / d * sp, left: d / sp });
+      api.audio.tone(700, 0.08, { type: 'square', vol: 0.1, slide: 1.8 });
+      return true;
+    }
+    function fireNearest(tx, ty) {
+      var order = [0, 1, 2].sort(function (a, b) { return Math.abs(SILO_X[a] - tx) - Math.abs(SILO_X[b] - tx); });
+      for (var i = 0; i < order.length; i++) if (fire(order[i], tx, ty)) return;
+      api.audio.tone(120, 0.05, { type: 'square', vol: 0.06 });
+    }
+    function addPts(n, x, y) {
+      score += n;
+      api.addScore(n);
+      if (x != null) api.fx.text(x, y, '+' + n, '#fff', 10);
+      if (score >= nextCity) {
+        nextCity += 10000;
+        var dead = cities.filter(function (c) { return !c.alive; });
+        if (dead.length) { dead[0].alive = true; api.fx.text(dead[0].x, GROUND - 40, 'REBUILT', ACCENT, 11); }
+      }
+    }
+    function hitGround(e) {
+      var hitSomething = false;
+      cities.forEach(function (c) {
+        if (c.alive && Math.abs(c.x - e.x) < 20) {
+          c.alive = false; hitSomething = true;
+          api.fx.burst(c.x, GROUND - 14, ACCENT, 30, 180, 0.9);
+        }
+      });
+      silos.forEach(function (s) {
+        if (s.alive && Math.abs(s.x - e.x) < 20) { s.alive = false; s.ammo = 0; hitSomething = true; api.fx.burst(s.x, GROUND - 10, '#9aa3c7', 24, 160, 0.8); }
+      });
+      blasts.push({ x: e.x, y: GROUND - 4, r: 0, max: 26, t: 0, life: 0.7, enemy: true });
+      api.shake(hitSomething ? 9 : 4);
+      api.audio.noise(0.35, { vol: hitSomething ? 0.35 : 0.2, cutoff: 700 });
+    }
+
+    startWave();
+
+    return {
+      // Read-only test hook: the lowest incoming warhead.
+      debug: function () {
+        var low = null;
+        enemies.forEach(function (e) { if (!low || e.y > low.y) low = e; });
+        return { enemy: low && { x: low.x, y: low.y, vx: low.vx, vy: low.vy }, wave: wave };
+      },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        // aim: pointer when it moves, arrows otherwise
+        var p = api.pointer();
+        if (p.moved !== lastMoved) { lastMoved = p.moved; aim.x = p.x; aim.y = p.y; }
+        if (inp.held('left')) aim.x -= 360 * dt;
+        if (inp.held('right')) aim.x += 360 * dt;
+        if (inp.held('up')) aim.y -= 360 * dt;
+        if (inp.held('down')) aim.y += 360 * dt;
+        aim.x = U.clamp(aim.x, 6, W - 6); aim.y = U.clamp(aim.y, 36, GROUND - 30);
+
+        if (!over) {
+          if (inp.hit('hold')) { aim.x = U.clamp(p.x, 6, W - 6); aim.y = U.clamp(p.y, 36, GROUND - 30); fireNearest(aim.x, aim.y); }
+          if (inp.hit('a')) fireNearest(aim.x, aim.y);
+          if (inp.hit('b')) fire(0, aim.x, aim.y);
+          if (inp.hit('c')) fire(1, aim.x, aim.y);
+          if (inp.hit('d')) fire(2, aim.x, aim.y);
+        }
+
+        // spawn
+        if (!over && toSpawn > 0) {
+          spawnT -= dt;
+          if (spawnT <= 0) {
+            var burst = 1 + (rng() < 0.3 ? 1 : 0) + (wave > 4 && rng() < 0.3 ? 1 : 0);
+            for (var b = 0; b < burst && toSpawn > 0; b++, toSpawn--) {
+              var tg = targets();
+              spawnEnemy(20 + rng() * (W - 40), -6, tg[Math.floor(rng() * tg.length)] + (rng() - 0.5) * 10);
+            }
+            spawnT = Math.max(0.45, 1.8 - wave * 0.12) * (0.6 + rng() * 0.8);
+          }
+        }
+
+        var i;
+        // interceptors fly to their mark and burst
+        for (i = interceptors.length - 1; i >= 0; i--) {
+          var m = interceptors[i];
+          m.left -= dt;
+          if (m.left <= 0) {
+            blasts.push({ x: m.tx, y: m.ty, r: 0, max: 38, t: 0, life: 1.1 });
+            api.audio.noise(0.25, { vol: 0.18, cutoff: 2200 });
+            interceptors.splice(i, 1);
+          } else { m.x += m.vx * dt; m.y += m.vy * dt; }
+        }
+        // blasts grow then shrink
+        for (i = blasts.length - 1; i >= 0; i--) {
+          var bl = blasts[i];
+          bl.t += dt;
+          var k = bl.t / bl.life;
+          bl.r = bl.max * Math.sin(Math.min(1, k) * Math.PI);
+          if (k >= 1) blasts.splice(i, 1);
+        }
+        // enemies
+        var chain = 0;
+        for (i = enemies.length - 1; i >= 0; i--) {
+          var e = enemies[i];
+          e.x += e.vx * dt; e.y += e.vy * dt;
+          if (e.split && e.y > e.split) {
+            e.split = 0;
+            var tg2 = targets();
+            for (var s = 0; s < 2; s++) spawnEnemy(e.x, e.y, tg2[Math.floor(rng() * tg2.length)]);
+            api.audio.tone(500, 0.06, { type: 'sawtooth', vol: 0.08 });
+          }
+          var killed = false;
+          for (var j = 0; j < blasts.length; j++) {
+            var bj = blasts[j];
+            if (!bj.enemy && Math.hypot(e.x - bj.x, e.y - bj.y) < bj.r + 2) { killed = true; break; }
+          }
+          if (killed) {
+            chain++;
+            enemies.splice(i, 1);
+            addPts(25 * wave * chain, e.x, e.y - 12);
+            blasts.push({ x: e.x, y: e.y, r: 0, max: 22, t: 0, life: 0.6 });
+            api.fx.burst(e.x, e.y, ENEMY, 10, 130, 0.5);
+            continue;
+          }
+          if (e.y >= GROUND - 4) { enemies.splice(i, 1); hitGround(e); }
+        }
+
+        if (!over && !cities.some(function (c) { return c.alive; })) {
+          over = true;
+          api.audio.tone(90, 1, { type: 'sawtooth', vol: 0.3, slide: 0.5 });
+          api.shake(16);
+        }
+        if (over) { overT += dt; if (overT > 1.6) api.gameOver(); return; }
+
+        // wave cleared
+        if (toSpawn === 0 && !enemies.length && !interceptors.length) {
+          between += dt;
+          if (between > 0.8) {
+            between = 0;
+            var alive = cities.filter(function (c) { return c.alive; }).length;
+            var ammo = silos.reduce(function (a, s) { return a + (s.alive ? s.ammo : 0); }, 0);
+            var bonus = alive * 100 * Math.min(wave, 6) + ammo * 5 * Math.min(wave, 6);
+            addPts(bonus);
+            api.fx.text(W / 2, 250, 'WAVE ' + wave + ' CLEAR  +' + bonus, BLAST, 14);
+            startWave();
+          }
+        }
+        var ammoLeft = silos.map(function (s) { return s.alive ? s.ammo : 'X'; }).join(' / ');
+        api.setStatus('WAVE ' + wave + '  ·  AMMO ' + ammoLeft + '  ·  TOWERS ' + cities.filter(function (c) { return c.alive; }).length);
+      },
+
+      render: function (ctx) {
+        var g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#02030c'); g.addColorStop(1, '#0a1428');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        // ground
+        ctx.fillStyle = '#0c1f16';
+        ctx.fillRect(0, GROUND, W, H - GROUND);
+        ctx.save();
+        ctx.strokeStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 8; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, GROUND); ctx.lineTo(W, GROUND); ctx.stroke();
+        ctx.restore();
+        // cities: stacks of blocks
+        cities.forEach(function (c) {
+          if (!c.alive) {
+            ctx.fillStyle = '#2a1a1a';
+            ctx.fillRect(c.x - 14, GROUND - 6, 28, 6);
+            return;
+          }
+          for (var k = 0; k < c.h; k++) {
+            ctx.save();
+            ctx.fillStyle = k === c.h - 1 ? '#7dffb8' : ACCENT;
+            ctx.shadowColor = ACCENT; ctx.shadowBlur = 8;
+            var w = 26 - k * 4;
+            ctx.fillRect(c.x - w / 2, GROUND - (k + 1) * 11, w, 10);
+            ctx.restore();
+          }
+        });
+        // silos
+        silos.forEach(function (s, i) {
+          ctx.save();
+          ctx.fillStyle = s.alive ? '#3a4a8a' : '#2a2a3a';
+          ctx.beginPath(); ctx.moveTo(s.x - 22, GROUND); ctx.lineTo(s.x - 10, GROUND - 16); ctx.lineTo(s.x + 10, GROUND - 16); ctx.lineTo(s.x + 22, GROUND); ctx.fill();
+          if (s.alive) {
+            ctx.fillStyle = '#cfe0ff';
+            for (var a = 0; a < s.ammo; a++) ctx.fillRect(s.x - 18 + (a % 5) * 8, GROUND + 8 + Math.floor(a / 5) * 8, 5, 5);
+          }
+          ctx.fillStyle = 'rgba(200,210,255,0.4)';
+          ctx.font = '700 9px ui-monospace, Menlo, Consolas, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(['Z', 'X', 'C'][i], s.x, GROUND - 20);
+          ctx.restore();
+        });
+        // enemy trails
+        ctx.save();
+        ctx.lineWidth = 1.5;
+        enemies.forEach(function (e) {
+          var gr = ctx.createLinearGradient(e.sx, e.sy, e.x, e.y);
+          gr.addColorStop(0, 'rgba(255,77,109,0)');
+          gr.addColorStop(1, 'rgba(255,77,109,0.8)');
+          ctx.strokeStyle = gr;
+          ctx.beginPath(); ctx.moveTo(e.sx, e.sy); ctx.lineTo(e.x, e.y); ctx.stroke();
+          ctx.fillStyle = '#fff'; ctx.shadowColor = ENEMY; ctx.shadowBlur = 10;
+          ctx.fillRect(e.x - 2, e.y - 2, 4, 4);
+          ctx.shadowBlur = 0;
+        });
+        // interceptors
+        interceptors.forEach(function (m) {
+          ctx.strokeStyle = 'rgba(57,255,136,0.6)';
+          ctx.beginPath(); ctx.moveTo(m.sx, m.sy); ctx.lineTo(m.x, m.y); ctx.stroke();
+          ctx.fillStyle = '#fff'; ctx.fillRect(m.x - 1.5, m.y - 1.5, 3, 3);
+          ctx.strokeStyle = 'rgba(57,255,136,0.5)';
+          ctx.beginPath(); ctx.moveTo(m.tx - 4, m.ty - 4); ctx.lineTo(m.tx + 4, m.ty + 4); ctx.moveTo(m.tx + 4, m.ty - 4); ctx.lineTo(m.tx - 4, m.ty + 4); ctx.stroke();
+        });
+        ctx.restore();
+        // blasts
+        blasts.forEach(function (b) {
+          ctx.save();
+          var col = b.enemy ? ENEMY : (Math.floor(t * 20) % 2 ? BLAST : '#ffffff');
+          ctx.fillStyle = col; ctx.globalAlpha = 0.85;
+          ctx.shadowColor = col; ctx.shadowBlur = 20;
+          ctx.beginPath(); ctx.arc(b.x, b.y, Math.max(0, b.r), 0, 7); ctx.fill();
+          ctx.restore();
+        });
+        // crosshair
+        if (!over) {
+          ctx.save();
+          ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.shadowColor = ACCENT; ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(aim.x, aim.y, 9, 0, 7);
+          ctx.moveTo(aim.x - 15, aim.y); ctx.lineTo(aim.x - 5, aim.y);
+          ctx.moveTo(aim.x + 5, aim.y); ctx.lineTo(aim.x + 15, aim.y);
+          ctx.moveTo(aim.x, aim.y - 15); ctx.lineTo(aim.x, aim.y - 5);
+          ctx.moveTo(aim.x, aim.y + 5); ctx.lineTo(aim.x, aim.y + 15);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#040818';
+    ctx.fillRect(0, 0, w, h);
+    var gy = h * 0.9;
+    ctx.fillStyle = '#0c1f16'; ctx.fillRect(0, gy, w, h - gy);
+    for (var c = 0; c < 6; c++) {
+      var cx = w * (0.15 + c * 0.14);
+      ctx.fillStyle = ACCENT;
+      ctx.fillRect(cx - w * 0.03, gy - h * 0.06, w * 0.06, h * 0.06);
+      ctx.fillRect(cx - w * 0.02, gy - h * 0.1, w * 0.04, h * 0.04);
+    }
+    ctx.lineWidth = 1.5;
+    for (var i = 0; i < 4; i++) {
+      var k = ((t * 0.25 + i * 0.27) % 1);
+      var sx = w * (0.1 + i * 0.25), tx = w * (0.8 - i * 0.2);
+      var x = sx + (tx - sx) * k, y = gy * k;
+      ctx.strokeStyle = 'rgba(255,77,109,0.8)';
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(x, y); ctx.stroke();
+      if (k > 0.55 && k < 0.75 && i % 2 === 0) {
+        ctx.fillStyle = BLAST; ctx.shadowColor = BLAST; ctx.shadowBlur = 14;
+        ctx.beginPath(); ctx.arc(x, y, h * 0.08 * Math.sin((k - 0.55) / 0.2 * Math.PI), 0, 7); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+  }
+
+  XA.registerGame({
+    id: 'xa_block_defence',
+    order: 12,
+    title: 'Block Defence',
+    tagline: 'Shield the towers. Blast the warheads.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'TAP THE SKY TO FIRE AN INTERCEPTOR THERE',
+    controls: 'Click to fire · or arrows to aim, Space / Z X C to fire',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
 <script>
-window.XA_CONFIG = { subtitle: 'Preview cabinet · nine games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
+window.XA_CONFIG = { subtitle: 'Preview cabinet · twelve games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
 XARoom.boot(document.getElementById('xa-root'));
 </script>

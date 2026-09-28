@@ -225,6 +225,7 @@
     KeyZ: 'b', KeyJ: 'b',
     KeyX: 'c', KeyK: 'c',
     KeyC: 'd', ShiftLeft: 'd', ShiftRight: 'd',
+    Digit1: 'k1', Digit2: 'k2', Digit3: 'k3', Digit4: 'k4',
     Enter: 'start',
     Escape: 'pause', KeyP: 'pause'
   };
