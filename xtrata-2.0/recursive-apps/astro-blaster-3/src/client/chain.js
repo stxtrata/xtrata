@@ -4,7 +4,7 @@
 // Xtrata submit page (overlay when embedded on xtrata.xyz, new tab otherwise).
 // ---------------------------------------------------------------------------
 
-var GAME_VERSION = '3.0.2';
+var GAME_VERSION = '3.0.3';
 
 var CHAIN_CONFIG = {
   network: 'mainnet',
