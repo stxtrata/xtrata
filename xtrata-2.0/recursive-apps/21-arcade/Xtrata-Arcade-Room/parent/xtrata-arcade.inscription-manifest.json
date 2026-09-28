@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v1.1-six-cabinets",
+  "release": "v1.2-nine-cabinets",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -18,7 +18,10 @@
       "xa_cave_diver",
       "xa_orbit_merge",
       "xa_block_runner",
-      "xa_brick_breaker"
+      "xa_brick_breaker",
+      "xa_rock_drift",
+      "xa_stack_tower",
+      "xa_road_hopper"
     ]
   },
   "leafModules": [
@@ -53,8 +56,8 @@
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 26362,
-      "sha256": "a7d6f0c1de90210e169f51d06047b7b0318045763f5915aaafc7bd3a64cf6d20",
+      "sizeBytes": 26660,
+      "sha256": "2d20a45308067166a7abff5eeaf88fbeae7d51a9adbb007f154316b4a8362d61",
       "mintOrder": 4,
       "mintedInscriptionId": 0
     },
@@ -111,12 +114,39 @@
       "sha256": "072f88e52fbf9fe87cd0d9d3b2bcb912294d076d979c899c53032f8e5fada073",
       "mintOrder": 10,
       "mintedInscriptionId": 0
+    },
+    {
+      "key": "drift",
+      "path": "modules/game-rock-drift.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 12521,
+      "sha256": "5320a0250bc5441938324453f4dfa2ea8a00e079e38ed5d644a303272b4d0b96",
+      "mintOrder": 11,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "stack",
+      "path": "modules/game-stack-tower.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 8119,
+      "sha256": "51e60c42fa6aabd9b979d7edc5f4dddd34a2fce8b91cc5269fa9cf337e13fa2c",
+      "mintOrder": 12,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "hopper",
+      "path": "modules/game-road-hopper.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 16588,
+      "sha256": "d4f0c1fbb315a4179a916cbfc220afd88f9cfd65beccca2cf5b6d428d08d8cd2",
+      "mintOrder": 13,
+      "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 11,
+    "mintOrder": 14,
     "dependencyOrder": [
       "css",
       "kit",
@@ -127,7 +157,10 @@
       "cave",
       "merge",
       "runner",
-      "bricks"
+      "bricks",
+      "drift",
+      "stack",
+      "hopper"
     ]
   }
 }

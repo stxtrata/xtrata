@@ -13,7 +13,8 @@ const OUT = process.argv[2] || path.join(ROOT, 'tests', 'out');
 fs.mkdirSync(OUT, { recursive: true });
 const FILES = { 101: 'arcade-room.css', 102: 'arcade-kit.js', 103: 'score-client.js', 104: 'arcade-room.js',
   105: 'game-neon-snake.js', 106: 'game-block-drop.js', 107: 'game-cave-diver.js',
-  108: 'game-orbit-merge.js', 109: 'game-block-runner.js', 110: 'game-brick-breaker.js' };
+  108: 'game-orbit-merge.js', 109: 'game-block-runner.js', 110: 'game-brick-breaker.js',
+  111: 'game-rock-drift.js', 112: 'game-stack-tower.js', 113: 'game-road-hopper.js' };
 const CHUNK = 16384;
 const P1 = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', P2 = 'SP000000000000000000002Q6VF78';
 
@@ -24,7 +25,7 @@ function server() {
       if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
       let body = fs.readFileSync(f);
       if (f.endsWith('xtrata-arcade-parent.template.html')) {
-        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110 }');
+        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110, drift: 111, stack: 112, hopper: 113 }');
       }
       const type = f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : 'text/javascript';
       rsp.writeHead(200, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
@@ -85,7 +86,7 @@ async function mockApi(ctx) {
   await page.goto(base + '/tests/mock-host.html');
   const frame = page.frames().find((f) => f !== page.mainFrame());
   await frame.waitForSelector('.xa-cab', { timeout: 20000 });
-  check((await frame.$$('.xa-cab')).length === 6, 'parent loaded 10 leaves from get-chunk and room shows 6 cabinets');
+  check((await frame.$$('.xa-cab')).length === 9, 'parent loaded 13 leaves from get-chunk and room shows 9 cabinets');
   check(stats.chunkReads >= 14, `modules read via get-chunk (${stats.chunkReads} calls)`);
   await frame.waitForFunction(() => document.querySelector('[data-game="xa_neon_snake"] .xa-top1').textContent !== '…');
   check((await frame.textContent('[data-game="xa_neon_snake"] .xa-top1')).includes('1,000 JIM'), 'snake cabinet shows chain #1 from get-top10');
@@ -214,6 +215,40 @@ async function mockApi(ctx) {
   await page.screenshot({ path: path.join(OUT, '14-bricks.png') });
   check((await frame.evaluate(() => window.XARoom._session().score)) > 0, 'brick breaker: ball breaks bricks');
   await frame.click('.xa-hud .xa-icon');
+
+  /* ---------- 4e. Rock Drift: turn, thrust, fire ---------- */
+  await frame.click('[data-play="xa_rock_drift"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await page.keyboard.down('Space');
+  for (let i = 0; i < 12; i++) { await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(160); await page.keyboard.up('ArrowLeft'); await page.waitForTimeout(160); }
+  await page.keyboard.down('ArrowUp'); await page.waitForTimeout(300); await page.keyboard.up('ArrowUp');
+  await page.keyboard.up('Space');
+  await page.screenshot({ path: path.join(OUT, '15-drift.png') });
+  check((await frame.evaluate(() => window.XARoom._session().score)) > 0, 'rock drift: shots split rocks and score');
+  await frame.click('.xa-hud .xa-icon');
+
+  /* ---------- 4f. Stack Tower: drop slabs, then miss ---------- */
+  await frame.click('[data-play="xa_stack_tower"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  for (let i = 0; i < 6; i++) { await page.waitForTimeout(700); await page.keyboard.press('Space'); }
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(OUT, '16-stack.png') });
+  check((await frame.evaluate(() => window.XARoom._session().score)) >= 10, 'stack tower: dropped slabs score');
+  for (let i = 0; i < 40 && !(await frame.$('.xa-over')); i++) { await page.keyboard.press('Space'); await page.waitForTimeout(90); }
+  await frame.waitForSelector('.xa-over', { timeout: 8000 });
+  check(true, 'stack tower: a clean miss ends the run');
+
+  /* ---------- 4g. Road Hopper: hop forward ---------- */
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
+  await frame.click('[data-play="xa_road_hopper"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  for (let i = 0; i < 3; i++) { await page.keyboard.press('ArrowUp'); await page.waitForTimeout(160); }
+  check((await frame.evaluate(() => window.XARoom._session().score)) === 30, 'road hopper: three safe hops score 30');
+  for (let i = 0; i < 10; i++) { await page.keyboard.press('ArrowUp'); await page.waitForTimeout(200); }
+  await page.screenshot({ path: path.join(OUT, '17-hopper.png') });
+  await frame.waitForSelector('.xa-over', { timeout: 30000 });
+  check(true, 'road hopper: run ends (hit, splash or caught by the screen)');
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
 
   /* ---------- 5. Narrow host method path ---------- */
   const page2 = await ctx.newPage();

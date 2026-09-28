@@ -1525,6 +1525,12 @@ button { font: inherit; color: inherit; }
         h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '⟲'), pad('c', '⟳'), pad('d', 'HOLD', 'xa-wide'), pad('a', '⤓')])
       ]);
     }
+    if (kind === 'ship') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '⟲'), pad('right', '⟳')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide'), pad('a', 'FIRE', 'xa-wide')])
+      ]);
+    }
     if (kind === 'hint') {
       return h('div', { class: 'xa-pads' }, [h('div', { class: 'xa-pad-hint', text: game.touchHint || '' })]);
     }
@@ -3757,7 +3763,918 @@ button { font: inherit; color: inherit; }
   });
 })(window);
 </script>
+<script>/* game-rock-drift.js */
+/*
+ * Xtrata Arcade cartridge #7 — ROCK DRIFT
+ * Thrust, rotate, split rocks. Big rocks break into smaller, faster ones;
+ * a saucer shows up from wave 2 and shoots back. Extra ship every 10,000.
+ * Contract game-id: xa_rock_drift (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-rock-drift');
+  var U = XA.util;
+
+  var W = 560, H = 480;
+  var ACCENT = '#7df9ff', ROCK = '#c9d4ff', UFO = '#ff4fd8';
+  var SIZES = [{ r: 40, pts: 20, spd: 45 }, { r: 22, pts: 50, spd: 80 }, { r: 12, pts: 100, spd: 125 }];
+
+  function wrap(o) {
+    if (o.x < -50) o.x += W + 100; else if (o.x > W + 50) o.x -= W + 100;
+    if (o.y < -50) o.y += H + 100; else if (o.y > H + 50) o.y -= H + 100;
+  }
+  function wrapTight(o, r) {
+    if (o.x < -r) o.x += W + 2 * r; else if (o.x > W + r) o.x -= W + 2 * r;
+    if (o.y < -r) o.y += H + 2 * r; else if (o.y > H + r) o.y -= H + 2 * r;
+  }
+
+  function create(api) {
+    var rng = api.rng;
+    var ship = null;
+    var rocks = [], bullets = [], ufoShots = [];
+    var ufo = null, ufoT = 12;
+    var wave = 0, lives = 3, nextLife = 10000, score = 0;
+    var fireCd = 0, respawnT = 0, waveT = 0;
+    var over = false, overT = 0;
+    var t = 0;
+    var stars = [];
+    for (var i = 0; i < 70; i++) stars.push({ x: rng() * W, y: rng() * H, s: rng() < 0.1 ? 2 : 1 });
+
+    function newShip() {
+      ship = { x: W / 2, y: H / 2, vx: 0, vy: 0, a: -Math.PI / 2, inv: 2.5, thrust: false };
+    }
+    function makeRock(x, y, size, ang) {
+      var s = SIZES[size];
+      var a = ang == null ? rng() * Math.PI * 2 : ang;
+      var sp = s.spd * (0.7 + rng() * 0.6) * (1 + wave * 0.05);
+      var pts = [];
+      var n = 9 + Math.floor(rng() * 4);
+      for (var k = 0; k < n; k++) pts.push(0.72 + rng() * 0.36);
+      return { x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, size: size, r: s.r, rot: rng() * 6, spin: (rng() - 0.5) * 1.6, pts: pts };
+    }
+    function startWave() {
+      wave++;
+      var n = Math.min(11, 3 + wave);
+      for (var k = 0; k < n; k++) {
+        // spawn on the edges, away from the ship
+        var edge = rng() < 0.5;
+        var x = edge ? (rng() < 0.5 ? -30 : W + 30) : rng() * W;
+        var y = edge ? rng() * H : (rng() < 0.5 ? -30 : H + 30);
+        rocks.push(makeRock(x, y, 0));
+      }
+      api.fx.text(W / 2, H / 2 - 60, 'WAVE ' + wave, ACCENT, 18);
+      api.audio.arp([392, 523, 659], 0.07, { type: 'triangle', vol: 0.16 });
+    }
+    function add(pts, x, y) {
+      score += pts;
+      api.addScore(pts);
+      if (score >= nextLife) {
+        nextLife += 10000;
+        lives = Math.min(6, lives + 1);
+        api.fx.text(W / 2, 60, 'EXTRA SHIP', '#39ff88', 14);
+        api.audio.arp([659, 784, 1047], 0.08, { type: 'square', vol: 0.18 });
+      }
+      if (x != null) api.fx.text(x, y, '+' + pts, '#fff', 10);
+    }
+    function breakRock(r, idx) {
+      rocks.splice(idx, 1);
+      add(SIZES[r.size].pts, r.x, r.y - r.r);
+      api.fx.burst(r.x, r.y, ROCK, 10 + (2 - r.size) * 10, 120 + r.size * 40, 0.6);
+      api.shake(4 - r.size);
+      api.audio.noise(0.18 + (2 - r.size) * 0.1, { vol: 0.22, cutoff: 700 + r.size * 800 });
+      if (r.size < 2) {
+        var base = Math.atan2(r.vy, r.vx);
+        rocks.push(makeRock(r.x, r.y, r.size + 1, base + 0.6 + rng() * 0.4));
+        rocks.push(makeRock(r.x, r.y, r.size + 1, base - 0.6 - rng() * 0.4));
+      }
+    }
+    function killShip() {
+      api.fx.burst(ship.x, ship.y, ACCENT, 40, 220, 1);
+      api.fx.burst(ship.x, ship.y, '#ffffff', 16, 140, 0.8);
+      api.shake(12);
+      api.audio.noise(0.6, { vol: 0.35, cutoff: 600 });
+      ship = null;
+      lives--;
+      if (lives <= 0) { over = true; return; }
+      respawnT = 1.6;
+    }
+    function hits(a, b, r) {
+      var dx = a.x - b.x, dy = a.y - b.y;
+      return dx * dx + dy * dy < r * r;
+    }
+
+    newShip();
+    startWave();
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        if (over) { overT += dt; if (overT > 1.2) api.gameOver(); updateWorld(dt); return; }
+
+        if (!ship) {
+          respawnT -= dt;
+          // Respawn only when the centre is clear.
+          if (respawnT <= 0 && !rocks.some(function (r) { return hits(r, { x: W / 2, y: H / 2 }, r.r + 70); })) newShip();
+        } else {
+          if (inp.held('left')) ship.a -= 4.4 * dt;
+          if (inp.held('right')) ship.a += 4.4 * dt;
+          ship.thrust = inp.held('up');
+          if (ship.thrust) {
+            ship.vx += Math.cos(ship.a) * 330 * dt;
+            ship.vy += Math.sin(ship.a) * 330 * dt;
+            if (Math.random() < 0.7) api.fx.trail(ship.x - Math.cos(ship.a) * 12, ship.y - Math.sin(ship.a) * 12, '#ffb35c',
+              -Math.cos(ship.a) * 120 + (Math.random() - 0.5) * 40, -Math.sin(ship.a) * 120 + (Math.random() - 0.5) * 40);
+          }
+          var sp = Math.hypot(ship.vx, ship.vy);
+          if (sp > 340) { ship.vx *= 340 / sp; ship.vy *= 340 / sp; }
+          ship.vx *= Math.pow(0.55, dt); ship.vy *= Math.pow(0.55, dt);
+          ship.x += ship.vx * dt; ship.y += ship.vy * dt;
+          wrapTight(ship, 12);
+          if (ship.inv > 0) ship.inv -= dt;
+          fireCd -= dt;
+          var firing = inp.held('a') || inp.held('c') || inp.held('hold');
+          if (firing && fireCd <= 0 && bullets.length < 6) {
+            fireCd = 0.17;
+            bullets.push({ x: ship.x + Math.cos(ship.a) * 14, y: ship.y + Math.sin(ship.a) * 14,
+              vx: ship.vx + Math.cos(ship.a) * 520, vy: ship.vy + Math.sin(ship.a) * 520, life: 0.85 });
+            api.audio.tone(880, 0.05, { type: 'square', vol: 0.08, slide: 0.5 });
+          }
+        }
+        updateWorld(dt);
+
+        if (!rocks.length && !ufo) {
+          waveT += dt;
+          if (waveT > 1.4) { waveT = 0; startWave(); }
+        }
+        api.setStatus('WAVE ' + wave + '  ·  SHIPS ' + lives + '  ·  ROCKS ' + rocks.length);
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#03040c';
+        ctx.fillRect(0, 0, W, H);
+        stars.forEach(function (s) {
+          ctx.fillStyle = 'rgba(200,220,255,' + (0.3 + (s.s - 1) * 0.4) + ')';
+          ctx.fillRect(s.x, s.y, s.s, s.s);
+        });
+        // lives
+        for (var l = 0; l < lives; l++) drawShip(ctx, 18 + l * 18, 18, -Math.PI / 2, 0.6, false);
+
+        ctx.save();
+        ctx.strokeStyle = ROCK; ctx.lineWidth = 2; ctx.shadowColor = ROCK; ctx.shadowBlur = 8;
+        rocks.forEach(function (r) {
+          ctx.beginPath();
+          for (var k = 0; k < r.pts.length; k++) {
+            var a = r.rot + k / r.pts.length * Math.PI * 2;
+            var px = r.x + Math.cos(a) * r.r * r.pts[k], py = r.y + Math.sin(a) * r.r * r.pts[k];
+            if (k) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+          }
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(201,212,255,0.06)';
+          ctx.fill();
+          ctx.stroke();
+        });
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = '#fff'; ctx.shadowColor = ACCENT; ctx.shadowBlur = 10;
+        bullets.forEach(function (b) { ctx.fillRect(b.x - 1.5, b.y - 1.5, 3, 3); });
+        ctx.fillStyle = UFO; ctx.shadowColor = UFO;
+        ufoShots.forEach(function (b) { ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, 7); ctx.fill(); });
+        ctx.restore();
+
+        if (ufo) {
+          ctx.save();
+          ctx.translate(ufo.x, ufo.y);
+          ctx.strokeStyle = UFO; ctx.shadowColor = UFO; ctx.shadowBlur = 14; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.ellipse(0, 0, 20, 7, 0, 0, 7); ctx.stroke();
+          ctx.beginPath(); ctx.ellipse(0, -6, 9, 7, 0, Math.PI, 0); ctx.stroke();
+          ctx.restore();
+        }
+        if (ship && !(ship.inv > 0 && Math.floor(t * 12) % 2)) drawShip(ctx, ship.x, ship.y, ship.a, 1, ship.thrust);
+      }
+    };
+
+    function drawShip(ctx, x, y, a, k, thrust) {
+      ctx.save();
+      ctx.translate(x, y); ctx.rotate(a); ctx.scale(k, k);
+      ctx.strokeStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 12; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-10, -9); ctx.lineTo(-6, 0); ctx.lineTo(-10, 9); ctx.closePath();
+      ctx.fillStyle = 'rgba(125,249,255,0.12)'; ctx.fill(); ctx.stroke();
+      if (thrust && Math.floor(t * 30) % 2) {
+        ctx.strokeStyle = '#ffb35c'; ctx.shadowColor = '#ffb35c';
+        ctx.beginPath(); ctx.moveTo(-7, -4); ctx.lineTo(-17, 0); ctx.lineTo(-7, 4); ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function updateWorld(dt) {
+      var i, j;
+      rocks.forEach(function (r) { r.x += r.vx * dt; r.y += r.vy * dt; r.rot += r.spin * dt; wrap(r); });
+      for (i = bullets.length - 1; i >= 0; i--) {
+        var b = bullets[i];
+        b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+        wrapTight(b, 2);
+        if (b.life <= 0) { bullets.splice(i, 1); continue; }
+        for (j = rocks.length - 1; j >= 0; j--) {
+          if (hits(b, rocks[j], rocks[j].r)) { bullets.splice(i, 1); breakRock(rocks[j], j); break; }
+        }
+        if (bullets[i] === b && ufo && hits(b, ufo, 18)) {
+          bullets.splice(i, 1);
+          add(500, ufo.x, ufo.y - 16);
+          api.fx.burst(ufo.x, ufo.y, UFO, 30, 200, 0.8);
+          api.audio.arp([1047, 784, 523], 0.05, { type: 'square', vol: 0.18 });
+          ufo = null;
+        }
+      }
+      // saucer
+      if (wave >= 2 && !over) {
+        if (!ufo) {
+          ufoT -= dt;
+          if (ufoT <= 0) {
+            var fromLeft = rng() < 0.5;
+            ufo = { x: fromLeft ? -20 : W + 20, y: 60 + rng() * (H - 120), vx: fromLeft ? 90 : -90, shoot: 1.2, t: 0 };
+          }
+        } else {
+          ufo.t += dt;
+          ufo.x += ufo.vx * dt;
+          ufo.y += Math.sin(ufo.t * 2) * 40 * dt;
+          ufo.shoot -= dt;
+          if (Math.floor(ufo.t * 8) % 4 === 0) api.audio.tone(ufo.t % 0.5 < 0.25 ? 520 : 440, 0.03, { type: 'sine', vol: 0.04 });
+          if (ufo.shoot <= 0 && ship) {
+            ufo.shoot = Math.max(0.8, 1.6 - wave * 0.1);
+            var aim = Math.atan2(ship.y - ufo.y, ship.x - ufo.x) + (rng() - 0.5) * 0.5;
+            ufoShots.push({ x: ufo.x, y: ufo.y, vx: Math.cos(aim) * 230, vy: Math.sin(aim) * 230, life: 2 });
+          }
+          if (ufo.x < -40 || ufo.x > W + 40) { ufo = null; }
+          if (!ufo) ufoT = 14 + rng() * 10;
+        }
+      }
+      for (i = ufoShots.length - 1; i >= 0; i--) {
+        var s = ufoShots[i];
+        s.x += s.vx * dt; s.y += s.vy * dt; s.life -= dt;
+        if (s.life <= 0) { ufoShots.splice(i, 1); continue; }
+        if (ship && ship.inv <= 0 && hits(s, ship, 10)) { ufoShots.splice(i, 1); killShip(); }
+      }
+      if (ship && ship.inv <= 0) {
+        for (j = 0; j < rocks.length; j++) {
+          if (hits(ship, rocks[j], rocks[j].r * 0.85 + 8)) { breakRock(rocks[j], j); killShip(); break; }
+        }
+        if (ship && ufo && hits(ship, ufo, 24)) { ufo = null; ufoT = 12; killShip(); }
+      }
+    }
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#03040c';
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.strokeStyle = ROCK; ctx.shadowColor = ROCK; ctx.shadowBlur = 6; ctx.lineWidth = 1.5;
+    [[0.2, 0.3, 0.12, 0.3], [0.75, 0.25, 0.09, -0.5], [0.65, 0.75, 0.14, 0.2], [0.3, 0.8, 0.06, 0.8]].forEach(function (r, i) {
+      var x = ((r[0] * w + t * 14 * (i % 2 ? -1 : 1)) % w + w) % w, y = r[1] * h, rad = r[2] * h;
+      ctx.beginPath();
+      for (var k = 0; k < 10; k++) {
+        var a = t * r[3] + k / 10 * Math.PI * 2, m = 0.75 + ((k * 7 + i * 3) % 5) / 12;
+        ctx.lineTo(x + Math.cos(a) * rad * m, y + Math.sin(a) * rad * m);
+      }
+      ctx.closePath(); ctx.stroke();
+    });
+    ctx.restore();
+    ctx.save();
+    ctx.translate(w / 2, h / 2); ctx.rotate(t * 0.8);
+    ctx.strokeStyle = ACCENT; ctx.shadowColor = ACCENT; ctx.shadowBlur = 10; ctx.lineWidth = 2;
+    var k2 = h / 300;
+    ctx.beginPath(); ctx.moveTo(14 * k2, 0); ctx.lineTo(-10 * k2, -9 * k2); ctx.lineTo(-6 * k2, 0); ctx.lineTo(-10 * k2, 9 * k2); ctx.closePath(); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    for (var b = 1; b < 4; b++) ctx.fillRect((20 + ((t * 200 + b * 40) % 140)) * k2, -1, 3, 3);
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_rock_drift',
+    order: 7,
+    title: 'Rock Drift',
+    tagline: 'Thrust, turn, split the rocks.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'ship',
+    controls: '←→ turn · ↑ thrust · Space fire (hold to auto-fire)',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-stack-tower.js */
+/*
+ * Xtrata Arcade cartridge #8 — STACK TOWER
+ * A slab slides back and forth over the tower; tap to drop it. Whatever
+ * overhangs is sliced off. Land it perfectly to keep its full width, and
+ * chain perfects to grow the slab back. Miss completely and it's over.
+ * Contract game-id: xa_stack_tower (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-stack-tower');
+  var U = XA.util;
+
+  var W = 400, H = 600;
+  var SLAB_H = 26, DEPTH = 14, BASE_W = 200, BASE_Y = 470, PERFECT = 5;
+  var ACCENT = '#ffd23f';
+
+  function hue(n) { return (200 + n * 9) % 360; }
+  function col(n, l) { return 'hsl(' + hue(n) + ',85%,' + l + '%)'; }
+
+  function slab(ctx, x, y, w, n, alpha) {
+    ctx.save();
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    // top face (slanted back)
+    ctx.fillStyle = col(n, 72);
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + DEPTH, y - DEPTH); ctx.lineTo(x + w + DEPTH, y - DEPTH); ctx.lineTo(x + w, y);
+    ctx.closePath(); ctx.fill();
+    // side face
+    ctx.fillStyle = col(n, 38);
+    ctx.beginPath();
+    ctx.moveTo(x + w, y); ctx.lineTo(x + w + DEPTH, y - DEPTH); ctx.lineTo(x + w + DEPTH, y - DEPTH + SLAB_H); ctx.lineTo(x + w, y + SLAB_H);
+    ctx.closePath(); ctx.fill();
+    // front face
+    ctx.shadowColor = col(n, 60); ctx.shadowBlur = 10;
+    ctx.fillStyle = col(n, 55);
+    ctx.fillRect(x, y, w, SLAB_H);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(x, y, w, 3);
+    ctx.restore();
+  }
+
+  function create(api) {
+    var tower = [{ x: (W - BASE_W) / 2 - DEPTH / 2, w: BASE_W }];   // index 0 = base
+    var cur = null;
+    var debris = [];
+    var cam = 0, camTarget = 0;
+    var perfectRun = 0;
+    var over = false, overT = 0, fallT = 0;
+    var t = 0;
+
+    function yOf(i) { return BASE_Y - i * SLAB_H; }
+    function spawn() {
+      var n = tower.length;
+      var top = tower[n - 1];
+      var speed = Math.min(430, 150 + n * 7);
+      var fromLeft = n % 2 === 0;
+      // Enter from just off the edge so the slab is on screen almost at once.
+      cur = { x: fromLeft ? -top.w * 0.35 : W - top.w * 0.65, w: top.w, dir: fromLeft ? 1 : -1, speed: speed };
+    }
+    spawn();
+
+    function drop() {
+      var n = tower.length;
+      var top = tower[n - 1];
+      var y = yOf(n);
+      var left = Math.max(cur.x, top.x), right = Math.min(cur.x + cur.w, top.x + top.w);
+      var overlap = right - left;
+      if (overlap <= 0) {
+        // clean miss: the whole slab falls
+        debris.push({ x: cur.x, y: y, w: cur.w, n: n, vy: 0, vx: cur.dir * 60, rot: 0, vr: cur.dir * 1.2 });
+        cur = null;
+        over = true;
+        api.shake(10);
+        api.audio.tone(220, 0.5, { type: 'sawtooth', slide: 0.3, vol: 0.28 });
+        return;
+      }
+      var off = cur.x - top.x;
+      if (Math.abs(off) <= PERFECT) {
+        perfectRun++;
+        var w = top.w;
+        if (perfectRun >= 3) w = Math.min(BASE_W, w + 8);
+        var x = top.x - (w - top.w) / 2;
+        tower.push({ x: x, w: w });
+        var bonus = 10 * Math.min(perfectRun, 10);
+        api.addScore(10 + bonus);
+        api.fx.text(x + w / 2, y - 26 + cam, perfectRun > 1 ? 'PERFECT x' + perfectRun : 'PERFECT', '#ffffff', 13);
+        api.fx.burst(x + w / 2, y + cam, col(n, 70), 20, 180, 0.5);
+        api.audio.tone(440 * Math.pow(1.0595, Math.min(perfectRun, 24) * 2), 0.14, { type: 'triangle', vol: 0.2 });
+      } else {
+        perfectRun = 0;
+        tower.push({ x: left, w: overlap });
+        // sliced-off piece
+        var cutX = off > 0 ? right : cur.x;
+        var cutW = cur.w - overlap;
+        debris.push({ x: cutX, y: y, w: cutW, n: n, vy: 0, vx: (off > 0 ? 1 : -1) * 40, rot: 0, vr: (off > 0 ? 1 : -1) * 1.5 });
+        api.addScore(10);
+        api.audio.tone(300 + Math.min(n, 40) * 6, 0.07, { type: 'square', vol: 0.12 });
+        api.shake(2);
+      }
+      camTarget = Math.max(0, (tower.length - 9) * SLAB_H);
+      spawn();
+    }
+
+    return {
+      // Read-only test hook: lets automated tests time a drop.
+      debug: function () { return { cur: cur && { x: cur.x, w: cur.w }, top: tower[tower.length - 1], floors: tower.length - 1, perfectRun: perfectRun }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        cam += (camTarget - cam) * Math.min(1, dt * 6);
+        debris.forEach(function (d) { d.vy += 1300 * dt; d.y += d.vy * dt; d.x += d.vx * dt; d.rot += d.vr * dt; });
+        debris = debris.filter(function (d) { return d.y + cam < H + 200; });
+        if (over) {
+          overT += dt;
+          // Pan down the whole tower before ending.
+          camTarget = 0;
+          fallT += dt;
+          if (overT > 1.8) api.gameOver();
+          return;
+        }
+        cur.x += cur.dir * cur.speed * dt;
+        if (cur.dir > 0 && cur.x + cur.w > W + 20) cur.dir = -1;
+        if (cur.dir < 0 && cur.x < -20) cur.dir = 1;
+        if (inp.hit('a') || inp.hit('hold') || inp.hit('up') || inp.hit('down')) drop();
+        api.setStatus('FLOOR ' + (tower.length - 1) + (perfectRun > 1 ? '  ·  PERFECT x' + perfectRun : ''));
+      },
+
+      render: function (ctx) {
+        var floors = tower.length;
+        var g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, 'hsl(' + hue(floors) + ',45%,10%)');
+        g.addColorStop(1, 'hsl(' + ((hue(floors) + 40) % 360) + ',55%,4%)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        // height markers every 10 floors
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+        ctx.fillStyle = 'rgba(255,255,255,0.35)';
+        ctx.font = '700 10px ui-monospace, Menlo, Consolas, monospace';
+        for (var f = 10; f < floors + 20; f += 10) {
+          var my = yOf(f) + cam;
+          if (my < -10 || my > H) continue;
+          ctx.beginPath(); ctx.moveTo(0, my + 0.5); ctx.lineTo(W, my + 0.5); ctx.stroke();
+          ctx.fillText(f + 'F', 8, my - 4);
+        }
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(0, cam);
+        // ground plinth
+        ctx.fillStyle = '#0a0b18';
+        ctx.fillRect(0, BASE_Y + SLAB_H, W, 400);
+        for (var i = 0; i < tower.length; i++) {
+          var y = yOf(i);
+          if (y + cam > H + 40 || y + cam < -60) continue;
+          slab(ctx, tower[i].x, y, tower[i].w, i);
+        }
+        if (cur) slab(ctx, cur.x, yOf(tower.length), cur.w, tower.length);
+        debris.forEach(function (d) {
+          ctx.save();
+          ctx.translate(d.x + d.w / 2, d.y + SLAB_H / 2);
+          ctx.rotate(d.rot);
+          slab(ctx, -d.w / 2, -SLAB_H / 2, d.w, d.n, 0.9);
+          ctx.restore();
+        });
+        ctx.restore();
+
+        U.glowText(ctx, String(floors - 1), W / 2, 56, 34, ACCENT);
+        if (floors === 1 && !over) {
+          ctx.save();
+          ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.4;
+          U.glowText(ctx, 'TAP / SPACE TO DROP', W / 2, 110, 13, '#fff3c4');
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    var g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#0f1630'); g.addColorStop(1, '#05030c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    var s = h / 300;
+    ctx.save();
+    ctx.scale(s, s);
+    var cw = w / s;
+    var widths = [150, 140, 140, 128, 128, 120, 104, 104, 96];
+    var baseY = 262;
+    for (var i = 0; i < widths.length; i++) {
+      var off = [0, 6, 6, 12, 12, 8, 20, 20, 16][i];
+      slab(ctx, cw / 2 - 75 + off, baseY - i * SLAB_H, widths[i], i);
+    }
+    var n = widths.length;
+    var x = cw / 2 - 60 + Math.sin(t * 2.2) * cw * 0.35;
+    slab(ctx, x, baseY - n * SLAB_H, 96, n);
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_stack_tower',
+    order: 8,
+    title: 'Stack Tower',
+    tagline: 'One tap. Perfect drops. Go higher.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'TAP ANYWHERE ON THE TOWER TO DROP',
+    controls: 'Space / click / tap to drop',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-road-hopper.js */
+/*
+ * Xtrata Arcade cartridge #9 — ROAD HOPPER
+ * Hop forward across roads, rivers and rail lines. Cars squash, water
+ * drowns (ride the logs), trains don't stop. Dawdle and the screen
+ * catches you. One point of progress per new row, plus coins.
+ * Contract game-id: xa_road_hopper (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-road-hopper');
+  var U = XA.util;
+
+  var W = 420, H = 600, C = 42, COLS = 10, HOP = 0.11;
+  var ACCENT = '#39ff88';
+  var CAR_COLORS = ['#ff4d6d', '#3ff0ff', '#ffd23f', '#b04dff', '#ff9f1c', '#4d7bff'];
+
+  function create(api) {
+    var rng = api.rng;
+    var rows = [];
+    var plan = [];            // queued row types
+    var player = { row: 0, x: C * 4.5, face: 'up', hop: 0, fromRow: 0, fromX: C * 4.5 };
+    var queued = null;
+    var camRow = 0, started = false;
+    var maxRow = 0, coins = 0;
+    var dead = false, deadT = 0, deathKind = '';
+    var t = 0;
+
+    function speedScale(r) { return 1 + Math.min(1.4, r / 120); }
+
+    function planRows() {
+      var r = rows.length;
+      var roll = rng();
+      var n, type;
+      if (roll < 0.3) { type = 'grass'; n = 1 + Math.floor(rng() * 2); }
+      else if (roll < 0.64) { type = 'road'; n = 1 + Math.floor(rng() * (r > 40 ? 4 : 3)); }
+      else if (roll < 0.9) { type = 'river'; n = 1 + Math.floor(rng() * (r > 40 ? 3 : 2)); }
+      else { type = 'rail'; n = 1; }
+      for (var k = 0; k < n; k++) plan.push(type);
+      if (type !== 'grass') plan.push('grass');
+    }
+    function makeRow(r) {
+      var type = r < 4 ? 'grass' : (plan.length ? plan.shift() : (planRows(), plan.shift()));
+      var row = { type: type, dir: rng() < 0.5 ? -1 : 1, items: [], trees: {}, coin: -1 };
+      var track = W + 4 * C;
+      var x, w;
+      if (type === 'grass') {
+        if (r > 0) {
+          var nt = r < 4 ? 0 : Math.floor(rng() * 4);
+          for (var k = 0; k < nt; k++) row.trees[Math.floor(rng() * COLS)] = true;
+          if (r >= 4 && rng() < 0.18) { var cc = Math.floor(rng() * COLS); if (!row.trees[cc]) row.coin = cc; }
+        }
+        // start rows: trees on the edges only
+        if (r < 4) { row.trees[0] = r > 0; row.trees[COLS - 1] = r > 0; }
+      } else if (type === 'road') {
+        row.speed = (60 + rng() * 90) * speedScale(r);
+        x = -2 * C;
+        var truck = rng() < 0.3;
+        while (x < W + 2 * C) {
+          w = truck ? C * 2.3 : C * 1.2;
+          row.items.push({ x: x, w: w, c: CAR_COLORS[Math.floor(rng() * CAR_COLORS.length)] });
+          x += w + C * (1.8 + rng() * 3.2);
+        }
+        row.track = track;
+      } else if (type === 'river') {
+        row.speed = (38 + rng() * 70) * Math.min(1.8, speedScale(r));
+        x = -2 * C;
+        while (x < W + 2 * C) {
+          w = C * (2 + Math.floor(rng() * 3));
+          row.items.push({ x: x, w: w });
+          x += w + C * (1.2 + rng() * 1.8);
+        }
+        row.track = track;
+      } else if (type === 'rail') {
+        row.timer = 2 + rng() * 4;
+        row.train = null;
+      }
+      return row;
+    }
+    function row(r) {
+      while (rows.length <= r + 20) rows.push(makeRow(rows.length));
+      return rows[r];
+    }
+    row(0);
+
+    function screenY(r) { return H - (r - camRow + 1) * C - 10; }
+    function colOf(x) { return Math.floor(x / C); }
+    function logUnder(rw, x) {
+      for (var i = 0; i < rw.items.length; i++) {
+        var it = rw.items[i];
+        if (x > it.x + 4 && x < it.x + it.w - 4) return it;
+      }
+      return null;
+    }
+    function die(kind) {
+      if (dead) return;
+      dead = true; deathKind = kind;
+      var y = screenY(player.row) + C / 2;
+      if (kind === 'splash') {
+        api.fx.burst(player.x, y, '#7fd6ff', 30, 160, 0.8);
+        api.audio.noise(0.4, { vol: 0.25, cutoff: 1200 });
+      } else {
+        api.fx.burst(player.x, y, '#ffffff', 28, 200, 0.8);
+        api.fx.burst(player.x, y, ACCENT, 16, 160, 0.6);
+        api.audio.tone(140, 0.3, { type: 'square', slide: 0.4, vol: 0.28 });
+      }
+      api.shake(kind === 'train' ? 16 : 9);
+    }
+
+    function tryMove(d) {
+      if (dead) return;
+      if (player.hop > 0) { queued = d; return; }
+      var nr = player.row, nx = player.x;
+      if (d === 'up' || d === 'tap') nr++;
+      else if (d === 'down') nr--;
+      else if (d === 'left') nx -= C;
+      else if (d === 'right') nx += C;
+      player.face = d === 'tap' ? 'up' : d;
+      if (nr < 0 || nr < Math.floor(camRow)) return;
+      if (nx < C / 2 - 1 || nx > W - C / 2 + 1) return;
+      var target = row(nr);
+      var landX = target.type === 'river' ? nx : (colOf(nx) + 0.5) * C;
+      if (target.type === 'grass' && target.trees[colOf(landX)]) { api.audio.tone(120, 0.04, { type: 'square', vol: 0.06 }); return; }
+      started = true;
+      player.fromRow = player.row; player.fromX = player.x;
+      player.row = nr; player.x = landX;
+      player.hop = HOP;
+      api.audio.tone(d === 'down' ? 360 : 480, 0.045, { type: 'triangle', vol: 0.1 });
+    }
+
+    function land() {
+      var rw = row(player.row);
+      if (player.row > maxRow) {
+        maxRow = player.row;
+        if (maxRow % 50 === 0) {
+          api.fx.text(W / 2, 120, maxRow + ' ROWS', ACCENT, 16);
+          api.audio.arp([523, 659, 784], 0.06, { type: 'triangle', vol: 0.16 });
+        }
+      }
+      if (rw.type === 'river' && !logUnder(rw, player.x)) die('splash');
+      if (rw.type === 'grass' && rw.coin === colOf(player.x)) {
+        rw.coin = -1;
+        coins++;
+        api.fx.burst(player.x, screenY(player.row) + C / 2, '#ffd23f', 14, 120);
+        api.fx.text(player.x, screenY(player.row), '+25', '#ffd23f', 11);
+        api.audio.arp([988, 1319], 0.04, { type: 'square', vol: 0.12 });
+      }
+    }
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        var moves = [];
+        ['up', 'down', 'left', 'right'].forEach(function (d) { if (inp.hit(d)) moves.push(d); });
+        if (inp.hit('a')) moves.push('up');
+        inp.takeSwipes().forEach(function (s) { moves.push(s); });
+        if (!dead) moves.forEach(tryMove);
+
+        // world motion
+        var lo = Math.max(0, Math.floor(camRow) - 1), hi = Math.floor(camRow) + 16;
+        for (var r = lo; r <= hi; r++) {
+          var rw = row(r);
+          if (rw.type === 'road' || rw.type === 'river') {
+            rw.items.forEach(function (it) {
+              it.x += rw.dir * rw.speed * dt;
+              if (rw.dir > 0 && it.x > W + 2 * C) it.x -= rw.track + it.w;
+              if (rw.dir < 0 && it.x + it.w < -2 * C) it.x += rw.track + it.w;
+            });
+          } else if (rw.type === 'rail') {
+            if (!rw.train) {
+              rw.timer -= dt;
+              if (rw.timer <= 0) rw.train = { x: rw.dir > 0 ? -C * 9 : W + C, w: C * 8, speed: 820 * Math.min(1.4, speedScale(r)) };
+              else if (rw.timer < 1 && Math.floor(t * 8) % 2 === 0 && Math.abs(r - player.row) < 8 && rw.timer > 0.95)
+                api.audio.tone(990, 0.08, { type: 'square', vol: 0.06 });
+            } else {
+              rw.train.x += rw.dir * rw.train.speed * dt;
+              if (rw.train.x > W + C * 9 || rw.train.x < -C * 18) { rw.train = null; rw.timer = 3 + rng() * 5; }
+            }
+          }
+        }
+
+        if (dead) { deadT += dt; if (deadT > 1.1) api.gameOver(); return; }
+
+        if (player.hop > 0) {
+          player.hop -= dt;
+          if (player.hop <= 0) { player.hop = 0; land(); if (queued && !dead) { var q = queued; queued = null; tryMove(q); } }
+        }
+        var cur = row(player.row);
+        // carried by logs (only once fully landed)
+        if (player.hop === 0 && cur.type === 'river') {
+          var log = logUnder(cur, player.x);
+          if (!log) die('splash');
+          else {
+            player.x += cur.dir * cur.speed * dt;
+            if (player.x < 4 || player.x > W - 4) die('splash');
+          }
+        }
+        // cars and trains (hitbox narrower than the cell)
+        if (!dead && player.hop < HOP * 0.5) {
+          if (cur.type === 'road') {
+            cur.items.forEach(function (it) { if (player.x + 12 > it.x && player.x - 12 < it.x + it.w) die('squash'); });
+          } else if (cur.type === 'rail' && cur.train) {
+            if (player.x + 12 > cur.train.x && player.x - 12 < cur.train.x + cur.train.w) die('train');
+          }
+        }
+
+        // camera: follow the player, and creep forward once the run starts
+        var target = Math.max(0, player.row - 4);
+        if (target > camRow) camRow += (target - camRow) * Math.min(1, dt * 5);
+        if (started) camRow += Math.min(0.9, 0.16 + maxRow * 0.004) * dt;
+        if (!dead && player.row < camRow - 0.6) { die('squash'); api.fx.text(W / 2, H - 80, 'TOO SLOW!', '#ff4d6d', 16); }
+
+        api.setScore(maxRow * 10 + coins * 25);
+        api.setStatus('ROW ' + maxRow + (coins ? '  ·  COINS ' + coins : ''));
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#0b1a12';
+        ctx.fillRect(0, 0, W, H);
+        var first = Math.max(0, Math.floor(camRow) - 1), last = Math.floor(camRow) + 15;
+        for (var r = first; r <= last; r++) {
+          var rw = row(r), y = screenY(r);
+          if (y > H || y < -C) continue;
+          if (rw.type === 'grass') {
+            ctx.fillStyle = r % 2 ? '#123d25' : '#15472b';
+            ctx.fillRect(0, y, W, C);
+          } else if (rw.type === 'road') {
+            ctx.fillStyle = '#16161f';
+            ctx.fillRect(0, y, W, C);
+            var prev = row(Math.max(0, r - 1));
+            if (prev.type === 'road' && r > 0) {
+              ctx.fillStyle = 'rgba(255,255,255,0.25)';
+              for (var dx = 6; dx < W; dx += 40) ctx.fillRect(dx, y + C - 1, 20, 2);
+            }
+          } else if (rw.type === 'river') {
+            ctx.fillStyle = '#0d3050';
+            ctx.fillRect(0, y, W, C);
+            ctx.strokeStyle = 'rgba(127,214,255,0.18)';
+            ctx.beginPath();
+            for (var wx = -40; wx < W + 40; wx += 40) {
+              var ox = (wx + t * 20 * rw.dir) % 40;
+              ctx.moveTo(wx + ox, y + C * 0.5); ctx.quadraticCurveTo(wx + ox + 10, y + C * 0.4, wx + ox + 20, y + C * 0.5);
+            }
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = '#231d1a';
+            ctx.fillRect(0, y, W, C);
+            ctx.fillStyle = '#3b312b';
+            for (var sx = 4; sx < W; sx += 14) ctx.fillRect(sx, y + 6, 6, C - 12);
+            ctx.fillStyle = '#8b8f9c';
+            ctx.fillRect(0, y + 12, W, 3); ctx.fillRect(0, y + C - 15, W, 3);
+            var warn = !rw.train && rw.timer < 1.2;
+            ctx.save();
+            ctx.fillStyle = warn && Math.floor(t * 8) % 2 ? '#ff4d6d' : '#401820';
+            if (warn) { ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 14; }
+            ctx.beginPath(); ctx.arc(W - 14, y + 10, 5, 0, 7); ctx.fill();
+            ctx.restore();
+          }
+        }
+        for (r = last; r >= first; r--) {
+          rw = row(r); y = screenY(r);
+          if (y > H + C || y < -C * 2) continue;
+          if (rw.type === 'grass') {
+            Object.keys(rw.trees).forEach(function (k) {
+              if (!rw.trees[k]) return;
+              var tx = +k * C;
+              ctx.fillStyle = '#0a2416'; ctx.fillRect(tx + 6, y + 8, C - 12, C - 10);
+              ctx.fillStyle = '#1f7a45'; ctx.fillRect(tx + 6, y - 6, C - 12, C - 10);
+              ctx.fillStyle = '#2ea862'; ctx.fillRect(tx + 6, y - 6, C - 12, 5);
+            });
+            if (rw.coin >= 0) {
+              ctx.save();
+              ctx.shadowColor = '#ffd23f'; ctx.shadowBlur = 12; ctx.fillStyle = '#ffd23f';
+              var cw = 8 * Math.abs(Math.cos(t * 3));
+              ctx.beginPath(); ctx.ellipse(rw.coin * C + C / 2, y + C / 2, Math.max(1.5, cw), 8, 0, 0, 7); ctx.fill();
+              ctx.restore();
+            }
+          } else if (rw.type === 'road') {
+            rw.items.forEach(function (it) {
+              ctx.save();
+              ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(it.x + 3, y + 10, it.w, C - 12);
+              ctx.fillStyle = it.c; ctx.shadowColor = it.c; ctx.shadowBlur = 10;
+              U.roundRect(ctx, it.x, y + 6, it.w, C - 14, 6); ctx.fill();
+              ctx.shadowBlur = 0;
+              ctx.fillStyle = 'rgba(10,12,30,0.75)';
+              var wx0 = rw.dir > 0 ? it.x + it.w - 16 : it.x + 6;
+              ctx.fillRect(wx0, y + 10, 10, C - 22);
+              ctx.fillStyle = '#fff6c2';
+              var hx = rw.dir > 0 ? it.x + it.w - 3 : it.x;
+              ctx.fillRect(hx, y + 9, 3, 4); ctx.fillRect(hx, y + C - 15, 3, 4);
+              ctx.restore();
+            });
+          } else if (rw.type === 'river') {
+            rw.items.forEach(function (it) {
+              ctx.fillStyle = '#6b4424'; U.roundRect(ctx, it.x, y + 7, it.w, C - 14, 8); ctx.fill();
+              ctx.fillStyle = '#8a5a31'; ctx.fillRect(it.x + 6, y + 10, it.w - 12, 4);
+            });
+          } else if (rw.type === 'rail' && rw.train) {
+            ctx.save();
+            ctx.fillStyle = '#c9ced9'; ctx.shadowColor = '#ff4d6d'; ctx.shadowBlur = 12;
+            U.roundRect(ctx, rw.train.x, y + 3, rw.train.w, C - 6, 6); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#ff4d6d'; ctx.fillRect(rw.train.x, y + C / 2 - 3, rw.train.w, 6);
+            ctx.fillStyle = '#1b2240';
+            for (var wn = rw.train.x + 12; wn < rw.train.x + rw.train.w - 16; wn += 26) ctx.fillRect(wn, y + 8, 14, 8);
+            ctx.restore();
+          }
+          if (r === player.row && !dead) drawPlayer(ctx);
+        }
+        if (!started && !dead) {
+          ctx.save();
+          ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.4;
+          U.glowText(ctx, 'HOP FORWARD TO START', W / 2, 90, 14, '#c9ffe0');
+          ctx.restore();
+        }
+      }
+    };
+
+    function drawPlayer(ctx) {
+      var k = player.hop > 0 ? 1 - player.hop / HOP : 1;
+      var row0 = player.fromRow + (player.row - player.fromRow) * k;
+      var x = player.fromX + (player.x - player.fromX) * k;
+      var y = screenY(row0) + C / 2 - Math.sin(k * Math.PI) * (player.hop > 0 ? 10 : 0);
+      if (player.hop === 0) { x = player.x; y = screenY(player.row) + C / 2; }
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(-12, 6, 26, 10);
+      ctx.shadowColor = ACCENT; ctx.shadowBlur = 14;
+      ctx.fillStyle = '#f4fff8';
+      ctx.fillRect(-13, -15, 26, 26);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = ACCENT; ctx.fillRect(-13, -15, 26, 5);
+      ctx.fillStyle = '#ff9f1c';
+      var f = player.face;
+      if (f === 'up') ctx.fillRect(-3, -19, 6, 5);
+      else if (f === 'down') ctx.fillRect(-3, 10, 6, 5);
+      else if (f === 'left') ctx.fillRect(-17, -4, 5, 6);
+      else ctx.fillRect(12, -4, 5, 6);
+      ctx.fillStyle = '#05060f';
+      ctx.fillRect(-7, -7, 3, 3); ctx.fillRect(4, -7, 3, 3);
+      ctx.restore();
+    }
+  }
+
+  function attract(ctx, w, h, t) {
+    var rh = h / 7;
+    var types = ['grass', 'road', 'road', 'grass', 'river', 'river', 'grass'];
+    types.forEach(function (ty, i) {
+      var y = h - (i + 1) * rh;
+      ctx.fillStyle = ty === 'grass' ? (i % 2 ? '#123d25' : '#15472b') : ty === 'road' ? '#16161f' : '#0d3050';
+      ctx.fillRect(0, y, w, rh);
+      if (ty === 'road') {
+        for (var c = 0; c < 3; c++) {
+          var cx = ((c * w * 0.45 + t * 70 * (i % 2 ? 1 : -1.4)) % (w + 60) + w + 60) % (w + 60) - 60;
+          ctx.fillStyle = CAR_COLORS[(c + i) % CAR_COLORS.length];
+          U.roundRect(ctx, cx, y + rh * 0.15, rh * 1.3, rh * 0.7, 4); ctx.fill();
+        }
+      }
+      if (ty === 'river') {
+        for (var l = 0; l < 2; l++) {
+          var lx = ((l * w * 0.6 + t * 40 * (i % 2 ? 1 : -1)) % (w + 100) + w + 100) % (w + 100) - 100;
+          ctx.fillStyle = '#6b4424'; U.roundRect(ctx, lx, y + rh * 0.18, rh * 2.6, rh * 0.64, 5); ctx.fill();
+        }
+      }
+    });
+    var hopRow = Math.floor(t * 1.5) % 7;
+    var k = (t * 1.5) % 1;
+    var py = h - (hopRow + 0.5) * rh - Math.sin(Math.min(1, k * 4) * Math.PI) * rh * 0.3;
+    ctx.save();
+    ctx.shadowColor = ACCENT; ctx.shadowBlur = 10; ctx.fillStyle = '#f4fff8';
+    ctx.fillRect(w / 2 - rh * 0.3, py - rh * 0.3, rh * 0.6, rh * 0.6);
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_road_hopper',
+    order: 9,
+    title: 'Road Hopper',
+    tagline: 'Cross the roads. Ride the logs.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'dpad',
+    controls: 'Arrows / WASD to hop · swipe or tap on mobile',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
 <script>
-window.XA_CONFIG = { subtitle: 'Preview cabinet · six games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
+window.XA_CONFIG = { subtitle: 'Preview cabinet · nine games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
 XARoom.boot(document.getElementById('xa-root'));
 </script>

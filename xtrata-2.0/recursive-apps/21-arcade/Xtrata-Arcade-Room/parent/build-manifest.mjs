@@ -16,16 +16,19 @@ const leaves = [
   ['cave', 'game-cave-diver.js', 'text/javascript'],
   ['merge', 'game-orbit-merge.js', 'text/javascript'],
   ['runner', 'game-block-runner.js', 'text/javascript'],
-  ['bricks', 'game-brick-breaker.js', 'text/javascript']
+  ['bricks', 'game-brick-breaker.js', 'text/javascript'],
+  ['drift', 'game-rock-drift.js', 'text/javascript'],
+  ['stack', 'game-stack-tower.js', 'text/javascript'],
+  ['hopper', 'game-road-hopper.js', 'text/javascript']
 ];
 const manifest = {
   schema: 'xtrata-standalone-inscription-manifest@1',
   appId: 'xtrata_arcade_room',
-  release: 'v1.1-six-cabinets',
+  release: 'v1.2-nine-cabinets',
   createdAt: new Date().toISOString().slice(0, 10),
   contentContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-v3-2-3', network: 'mainnet' },
   scoreContract: { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-arcade-scores-v1-3', network: 'mainnet',
-    gameIds: ['xa_neon_snake', 'xa_block_drop', 'xa_cave_diver', 'xa_orbit_merge', 'xa_block_runner', 'xa_brick_breaker'] },
+    gameIds: ['xa_neon_snake', 'xa_block_drop', 'xa_cave_diver', 'xa_orbit_merge', 'xa_block_runner', 'xa_brick_breaker', 'xa_rock_drift', 'xa_stack_tower', 'xa_road_hopper'] },
   leafModules: leaves.map(([key, file, mimeType], i) => {
     const buf = readFileSync(join(here, '..', 'modules', file));
     return { key, path: 'modules/' + file, mimeType, sizeBytes: buf.length,

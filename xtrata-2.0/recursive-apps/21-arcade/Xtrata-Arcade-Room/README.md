@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v1.1 prototype, six cabinets)
+# Xtrata Arcade Room (v1.2 prototype, nine cabinets)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -14,6 +14,9 @@ parent that lists it.
 | Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift |
 | Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down |
 | Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch, drag + tap |
+| Rock Drift | `modules/game-rock-drift.js` | `xa_rock_drift` | ←→ turn, ↑ thrust, Space fire; 4 touch pads |
+| Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop |
+| Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad |
 
 The `xa_` prefix keeps these boards separate from the older 21-arcade slots.
 
@@ -33,12 +36,12 @@ parent/
   build-preview.mjs                     single-file view-only preview bundle
 tests/
   codec.test.cjs      Clarity / c32 / post-condition codec vs @stacks/transactions
-  smoke.test.cjs      Playwright: parent loader, all 6 games, submit via mock host
+  smoke.test.cjs      Playwright: parent loader, all 9 games, submit via mock host
   mock-host.html      fake xtrata.xyz wallet bridge for the smoke test
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~160 KB for six games (Astro Blaster's leaves are ~590 KB for one).
+Leaves total ~194 KB for nine games (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
@@ -85,8 +88,8 @@ Until then, posting works when the arcade runs inside the `/runtime` page.
 ## Mint order
 
 1. `node parent/build-manifest.mjs` and check sizes/hashes
-2. Inscribe the 10 leaves in manifest order (css, kit, scores, room, snake, blocks, cave, merge, runner, bricks)
-3. `node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id>`
+2. Inscribe the 13 leaves in manifest order (css, kit, scores, room, snake, blocks, cave, merge, runner, bricks, drift, stack, hopper)
+3. `node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> --drift <id> --stack <id> --hopper <id>`
 4. Inscribe `parent/xtrata-arcade-parent.template.html`
 5. `node parent/fill-ids.mjs --parent <id>` for the runtime deep link (only matters for a re-mint)
 
