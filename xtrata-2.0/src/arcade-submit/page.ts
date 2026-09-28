@@ -51,6 +51,7 @@ function render() {
   let rankText = '';
   if (connected && !mainnet) { rankText = 'Switch your wallet to a mainnet account.'; canSubmit = false; }
   else if (connected && payload && !isPilot(payload.replay, session.address!)) { rankText = `This run was flown as ${payload.pilot}. Connect that wallet to submit it.`; canSubmit = false; }
+  else if (verifiedScore != null && !board) { rankText = ''; canSubmit = false; } // the board error is already shown; no rank to report
   else if (periodClosed) { rankText = 'That day\u2019s board has closed. Daily scores must be submitted the same Bitcoin day or the next.'; canSubmit = false; }
   else if (connected && rank === null) { rankText = 'Checking your rank on-chain…'; canSubmit = false; }
   else if (rank && rank.ok && rank.value === 0) { rankText = 'The contract would refuse this score right now: it is not in the Top 10, or you already hold an equal or better entry.'; canSubmit = false; }
