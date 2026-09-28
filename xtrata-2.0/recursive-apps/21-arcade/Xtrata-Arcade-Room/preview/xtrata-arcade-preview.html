@@ -1526,6 +1526,12 @@ button { font: inherit; color: inherit; }
         h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '⟲'), pad('c', '⟳'), pad('d', 'HOLD', 'xa-wide'), pad('a', '⤓')])
       ]);
     }
+    if (kind === 'lander') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '⟲'), pad('right', '⟳')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide')])
+      ]);
+    }
     if (kind === 'shooter') {
       return h('div', { class: 'xa-pads' }, [
         h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '◀'), pad('right', '▶')]),
@@ -6479,7 +6485,819 @@ button { font: inherit; color: inherit; }
   });
 })(window);
 </script>
+<script>/* game-bubble-pop.js */
+/*
+ * Xtrata Arcade cartridge #16 — BUBBLE POP
+ * Aim and fire orbs into the cluster. Three or more of a colour pop, and
+ * anything left hanging drops for a bigger bonus. Miss too often and the
+ * ceiling pushes down. Clear the board for a new one.
+ * Contract game-id: xa_bubble_pop (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-bubble-pop');
+  var U = XA.util;
+
+  var W = 420, H = 600, R = 18, D = R * 2, COLS = 11, ROWH = R * 1.732;
+  var LEFT = (W - COLS * D) / 2, TOP = 40, MAX_ROWS = 14;
+  var SX = W / 2, SY = 548, SPEED = 880;
+  var ACCENT = '#ff8fd8';
+  var PALETTE = ['#ff4d6d', '#ffd23f', '#39ff88', '#3ff0ff', '#b04dff', '#ff9f1c'];
+
+  function create(api) {
+    var rng = api.rng;
+    var grid = [];          // grid[r][c] = colour index or -1
+    var parity = 0;         // which rows are shifted right by R
+    var colours = 4;
+    var board = 1;
+    var aim = -Math.PI / 2, lastMoved = api.pointer().moved;
+    var shot = null, current, next;
+    var misses = 0, missLimit = 6;
+    var over = false, overT = 0, clearT = 0, t = 0;
+    var falling = [];
+
+    function shifted(r) { return (r + parity) % 2 === 1; }
+    function cols(r) { return shifted(r) ? COLS - 1 : COLS; }
+    function cx(r, c) { return LEFT + R + c * D + (shifted(r) ? R : 0); }
+    function cy(r) { return TOP + R + r * ROWH; }
+    function get(r, c) { return r >= 0 && r < grid.length && c >= 0 && c < cols(r) ? grid[r][c] : -1; }
+    function emptyRow(r) { var a = []; for (var c = 0; c < cols(r); c++) a.push(-1); return a; }
+    function ensureRows(n) { while (grid.length < n) grid.push(emptyRow(grid.length)); }
+    function neighbours(r, c) {
+      var s = shifted(r), out = [[r, c - 1], [r, c + 1]];
+      var dcs = s ? [0, 1] : [-1, 0];
+      dcs.forEach(function (d) { out.push([r - 1, c + d]); out.push([r + 1, c + d]); });
+      return out.filter(function (p) { return p[0] >= 0 && p[1] >= 0 && p[1] < cols(p[0]); });
+    }
+    function fillBoard() {
+      grid = []; parity = 0;
+      colours = Math.min(6, 3 + board);
+      var rows = Math.min(8, 4 + board);
+      for (var r = 0; r < rows; r++) {
+        grid.push([]);
+        for (var c = 0; c < cols(r); c++) {
+          // clumpy colours: often copy the neighbour above or to the left
+          var col = Math.floor(rng() * colours);
+          if (c > 0 && rng() < 0.35) col = grid[r][c - 1];
+          else if (r > 0 && rng() < 0.3) col = get(r - 1, Math.min(c, cols(r - 1) - 1));
+          grid[r].push(col);
+        }
+      }
+      ensureRows(MAX_ROWS + 1);
+    }
+    function present() {
+      var set = {};
+      grid.forEach(function (row) { row.forEach(function (v) { if (v >= 0) set[v] = true; }); });
+      var list = Object.keys(set).map(Number);
+      return list.length ? list : [0];
+    }
+    function pick() { var p = present(); return p[Math.floor(rng() * p.length)]; }
+    fillBoard();
+    current = pick(); next = pick();
+
+    function pushCeiling() {
+      grid.unshift(null);
+      parity ^= 1;
+      grid[0] = [];
+      for (var c = 0; c < cols(0); c++) grid[0].push(present()[Math.floor(rng() * present().length)]);
+      grid.length = Math.max(grid.length, MAX_ROWS + 1);
+      // rows keep their own lengths after the parity flip: rebuild widths
+      for (var r = 1; r < grid.length; r++) {
+        if (!grid[r]) grid[r] = emptyRow(r);
+        while (grid[r].length > cols(r)) grid[r].pop();
+        while (grid[r].length < cols(r)) grid[r].push(-1);
+      }
+      api.shake(5);
+      api.audio.tone(90, 0.3, { type: 'square', vol: 0.18 });
+      api.fx.text(W / 2, TOP + 20, 'CEILING DROP', ACCENT, 12);
+    }
+    function lowestRow() {
+      for (var r = grid.length - 1; r >= 0; r--) if (grid[r].some(function (v) { return v >= 0; })) return r;
+      return -1;
+    }
+
+    function snap(x, y) {
+      var r = U.clamp(Math.round((y - TOP - R) / ROWH), 0, grid.length - 1);
+      var best = null, bd = 1e9;
+      for (var rr = Math.max(0, r - 1); rr <= Math.min(grid.length - 1, r + 1); rr++) {
+        for (var c = 0; c < cols(rr); c++) {
+          if (grid[rr][c] >= 0) continue;
+          var ok = rr === 0 || neighbours(rr, c).some(function (p) { return get(p[0], p[1]) >= 0; });
+          if (!ok) continue;
+          var d = Math.hypot(cx(rr, c) - x, cy(rr) - y);
+          if (d < bd) { bd = d; best = [rr, c]; }
+        }
+      }
+      return best;
+    }
+    function settle(r, c, colour) {
+      grid[r][c] = colour;
+      // flood same colour
+      var seen = {}, group = [], stack = [[r, c]];
+      while (stack.length) {
+        var p = stack.pop(), k = p[0] + ',' + p[1];
+        if (seen[k] || get(p[0], p[1]) !== colour) continue;
+        seen[k] = true; group.push(p);
+        neighbours(p[0], p[1]).forEach(function (n) { stack.push(n); });
+      }
+      if (group.length >= 3) {
+        misses = 0;
+        group.forEach(function (p) {
+          grid[p[0]][p[1]] = -1;
+          api.fx.burst(cx(p[0], p[1]), cy(p[0]), PALETTE[colour], 10, 140, 0.45);
+        });
+        var pts = group.length * 10 + Math.max(0, group.length - 3) * 10;
+        api.addScore(pts);
+        api.audio.arp([523, 659, 784].slice(0, Math.min(3, group.length - 1)), 0.04, { type: 'triangle', vol: 0.16 });
+        // drop anything no longer connected to the ceiling
+        var anchored = {}, st = [];
+        for (var c0 = 0; c0 < cols(0); c0++) if (grid[0][c0] >= 0) st.push([0, c0]);
+        while (st.length) {
+          var q = st.pop(), kk = q[0] + ',' + q[1];
+          if (anchored[kk] || get(q[0], q[1]) < 0) continue;
+          anchored[kk] = true;
+          neighbours(q[0], q[1]).forEach(function (n) { st.push(n); });
+        }
+        var dropped = 0;
+        for (var rr = 0; rr < grid.length; rr++) for (var cc = 0; cc < cols(rr); cc++) {
+          if (grid[rr][cc] >= 0 && !anchored[rr + ',' + cc]) {
+            falling.push({ x: cx(rr, cc), y: cy(rr), vy: -60 - rng() * 80, vx: (rng() - 0.5) * 80, c: grid[rr][cc] });
+            grid[rr][cc] = -1;
+            dropped++;
+          }
+        }
+        if (dropped) {
+          var dp = 20 * dropped * Math.min(8, dropped);
+          api.addScore(dp);
+          api.fx.text(W / 2, cy(r) + 30, 'DROP x' + dropped + '  +' + dp, '#ffd23f', 13);
+          api.audio.arp([392, 523, 659, 784, 1047].slice(0, Math.min(5, dropped + 1)), 0.05, { type: 'square', vol: 0.16 });
+        }
+        if (lowestRow() < 0) {
+          var bonus = 1000 * board;
+          api.addScore(bonus);
+          api.fx.text(W / 2, H / 2, 'BOARD CLEAR +' + bonus, '#39ff88', 16);
+          clearT = 1.5;
+        }
+      } else {
+        misses++;
+        api.audio.tone(260, 0.05, { type: 'square', vol: 0.1 });
+        if (misses >= missLimit) { misses = 0; pushCeiling(); }
+      }
+      if (lowestRow() >= MAX_ROWS - 1) {
+        over = true;
+        api.shake(12);
+        api.audio.tone(140, 0.6, { type: 'sawtooth', vol: 0.28, slide: 0.4 });
+      }
+    }
+
+    function fire() {
+      if (shot || over || clearT > 0) return;
+      shot = { x: SX, y: SY, vx: Math.cos(aim) * SPEED, vy: Math.sin(aim) * SPEED, c: current };
+      current = next; next = pick();
+      api.audio.tone(600, 0.05, { type: 'triangle', vol: 0.12, slide: 1.5 });
+    }
+
+    return {
+      // Read-only test hook.
+      debug: function () { var n = 0; grid.forEach(function (row) { row.forEach(function (v) { if (v >= 0) n++; }); }); return { bubbles: n, board: board }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        falling.forEach(function (f) { f.vy += 1400 * dt; f.x += f.vx * dt; f.y += f.vy * dt; });
+        falling = falling.filter(function (f) { return f.y < H + 40; });
+        if (over) { overT += dt; if (overT > 1.3) api.gameOver(); return; }
+        if (clearT > 0) {
+          clearT -= dt;
+          if (clearT <= 0) { board++; fillBoard(); misses = 0; current = pick(); next = pick(); }
+          return;
+        }
+        // aim with the pointer when it moves, or with the keys
+        var p = api.pointer();
+        if (p.moved !== lastMoved) {
+          lastMoved = p.moved;
+          if (p.y < SY - 10) aim = Math.atan2(p.y - SY, p.x - SX);
+        }
+        if (inp.held('left')) aim -= 1.6 * dt;
+        if (inp.held('right')) aim += 1.6 * dt;
+        aim = U.clamp(aim, -Math.PI + 0.16, -0.16);
+        if (inp.hit('release') || inp.hit('a') || inp.hit('up')) fire();
+        if (inp.hit('d') || inp.hit('b')) { var tmp = current; current = next; next = tmp; }
+
+        if (shot) {
+          var steps = 4;
+          for (var s = 0; s < steps && shot; s++) {
+            shot.x += shot.vx * dt / steps; shot.y += shot.vy * dt / steps;
+            if (shot.x < LEFT + R) { shot.x = LEFT + R; shot.vx = Math.abs(shot.vx); }
+            if (shot.x > W - LEFT - R) { shot.x = W - LEFT - R; shot.vx = -Math.abs(shot.vx); }
+            var hit = shot.y <= TOP + R;
+            if (!hit) {
+              for (var r = 0; r < grid.length && !hit; r++) for (var c = 0; c < cols(r); c++) {
+                if (grid[r][c] >= 0 && Math.hypot(cx(r, c) - shot.x, cy(r) - shot.y) < D * 0.86) { hit = true; break; }
+              }
+            }
+            if (hit) {
+              var cell = snap(shot.x, shot.y);
+              var col = shot.c;
+              shot = null;
+              if (cell) settle(cell[0], cell[1], col);
+            }
+          }
+        }
+        var rowsLeft = MAX_ROWS - 1 - lowestRow();
+        api.setStatus('BOARD ' + board + '  ·  CEILING IN ' + (missLimit - misses) + '  ·  ROWS LEFT ' + rowsLeft);
+      },
+
+      render: function (ctx) {
+        var g = ctx.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, '#140a26'); g.addColorStop(1, '#05030e');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+        // frame + danger line
+        ctx.strokeStyle = 'rgba(255,143,216,0.35)'; ctx.lineWidth = 2;
+        ctx.strokeRect(LEFT - 3, TOP - 3, COLS * D + 6, SY - TOP + 20);
+        ctx.save();
+        ctx.setLineDash([6, 6]); ctx.strokeStyle = 'rgba(255,77,109,0.5)';
+        var dl = cy(MAX_ROWS - 1) - R;
+        ctx.beginPath(); ctx.moveTo(LEFT, dl); ctx.lineTo(W - LEFT, dl); ctx.stroke();
+        ctx.restore();
+        // ceiling pressure bar
+        ctx.fillStyle = '#ff4d6d';
+        ctx.fillRect(LEFT, TOP - 12, (COLS * D) * (misses / missLimit), 4);
+
+        function orb(x, y, colour, alpha) {
+          ctx.save();
+          ctx.globalAlpha = alpha == null ? 1 : alpha;
+          var gg = ctx.createRadialGradient(x - R * 0.35, y - R * 0.4, 2, x, y, R);
+          gg.addColorStop(0, '#ffffff'); gg.addColorStop(0.25, PALETTE[colour]); gg.addColorStop(1, 'rgba(0,0,0,0.6)');
+          ctx.fillStyle = gg;
+          ctx.shadowColor = PALETTE[colour]; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(x, y, R - 1, 0, 7); ctx.fill();
+          ctx.restore();
+        }
+        for (var r = 0; r < grid.length; r++) for (var c = 0; c < cols(r); c++) if (grid[r][c] >= 0) orb(cx(r, c), cy(r), grid[r][c]);
+        falling.forEach(function (f) { orb(f.x, f.y, f.c, 0.9); });
+
+        // aim guide with one bounce
+        if (!over) {
+          ctx.save();
+          ctx.setLineDash([2, 8]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
+          var x = SX, y = SY, vx = Math.cos(aim), vy = Math.sin(aim), len = 0;
+          ctx.beginPath(); ctx.moveTo(x, y);
+          while (len < 520 && y > TOP) {
+            x += vx * 6; y += vy * 6; len += 6;
+            if (x < LEFT + R || x > W - LEFT - R) { vx = -vx; ctx.lineTo(x, y); }
+          }
+          ctx.lineTo(x, y); ctx.stroke();
+          ctx.restore();
+        }
+        // launcher
+        ctx.save();
+        ctx.translate(SX, SY); ctx.rotate(aim + Math.PI / 2);
+        ctx.fillStyle = '#2a1f4a'; ctx.strokeStyle = ACCENT; ctx.lineWidth = 2;
+        ctx.fillRect(-8, -34, 16, 34); ctx.strokeRect(-8, -34, 16, 34);
+        ctx.restore();
+        orb(SX, SY, current);
+        ctx.save(); ctx.translate(SX + 62, SY + 16); ctx.scale(0.7, 0.7); orb(0, 0, next); ctx.restore();
+        ctx.fillStyle = 'rgba(255,220,240,0.5)';
+        ctx.font = '700 10px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('NEXT', SX + 62, SY + 44);
+        if (shot) orb(shot.x, shot.y, shot.c);
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#100820';
+    ctx.fillRect(0, 0, w, h);
+    var r = Math.max(5, w / 22);
+    for (var row = 0; row < 5; row++) {
+      var n = Math.floor(w / (r * 2)) - (row % 2);
+      for (var c = 0; c < n; c++) {
+        if ((row * 7 + c * 3 + Math.floor(t)) % 9 === 0 && row > 2) continue;
+        ctx.fillStyle = PALETTE[(row * 3 + c * 5 + (c > 4 ? 1 : 0)) % 5];
+        ctx.beginPath(); ctx.arc(r + c * r * 2 + (row % 2 ? r : 0), r + row * r * 1.73, r - 1, 0, 7); ctx.fill();
+      }
+    }
+    var a = -Math.PI / 2 + Math.sin(t * 1.3) * 0.7;
+    var k = (t * 0.8) % 1;
+    ctx.fillStyle = PALETTE[Math.floor(t * 0.8) % 5];
+    ctx.shadowColor = '#fff'; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(w / 2 + Math.cos(a) * k * h * 0.5, h * 0.92 + Math.sin(a) * k * h * 0.5, r - 1, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  XA.registerGame({
+    id: 'xa_bubble_pop',
+    order: 16,
+    title: 'Bubble Pop',
+    tagline: 'Match three. Drop the rest.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'DRAG TO AIM · LIFT YOUR FINGER TO FIRE',
+    controls: 'Mouse aim + click · or ←→ aim, Space fire, C swap',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-swerve.js */
+/*
+ * Xtrata Arcade cartridge #17 — SWERVE
+ * Steer a light-cycle down a winding neon corridor. Drag (or use ←→) to
+ * weave; thread the gates for points, skim the walls for CLOSE bonuses,
+ * and don't touch anything. The corridor tightens and speeds up.
+ * Contract game-id: xa_swerve (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-swerve');
+  var U = XA.util;
+
+  var W = 400, H = 600, PY = 480, SEGH = 10, PR = 8;
+  var ACCENT = '#3ff0ff', GATE = '#ffd23f', BLOCK = '#ff3fa4';
+
+  function create(api) {
+    var rng = api.rng;
+    var segs = [];            // world rows every SEGH px: { y, l, r }
+    var gates = [], blocks = [];
+    var dist = 0, speed = 240, bonus = 0, streak = 0;
+    var x = W / 2, vx = 0, lastPX = null, lastMoved = api.pointer().moved;
+    var centre = W / 2, drift = 0, width = 210;
+    var phaseA = rng() * 6.28, phaseB = rng() * 6.28;
+    var started = false, dead = false, deadT = 0, closeCd = 0, t = 0;
+    var nextFeature = 500;
+    var trail = [];
+
+    function genTo(y) {
+      while (!segs.length || segs[segs.length - 1].y < y) {
+        var sy = segs.length ? segs[segs.length - 1].y + SEGH : -(H - PY) - 60;
+        var d = sy;
+        width = Math.max(92, 210 - d * 0.006);
+        // Two layered waves (seeded phases) plus a little noise: always swaying,
+        // never stuck against the screen edge.
+        var room = (W - width) / 2 - 14;
+        drift = U.clamp(drift * 0.995 + (rng() - 0.5) * 0.006, -0.25, 0.25);
+        var sway = Math.sin(d * 0.0032 + phaseA) * 0.62 + Math.sin(d * 0.0079 + phaseB) * 0.3 + drift;
+        centre = W / 2 + U.clamp(sway, -1, 1) * room * Math.min(1, 0.35 + d / 3000);
+        segs.push({ y: sy, l: centre - width / 2, r: centre + width / 2 });
+        if (sy > nextFeature) {
+          nextFeature = sy + 260 + rng() * 260 - Math.min(120, d * 0.004);
+          if (rng() < 0.55) {
+            var gw = Math.max(46, width * 0.45);
+            var gx = centre - width / 2 + 10 + rng() * (width - gw - 20);
+            gates.push({ y: sy, l: gx, r: gx + gw, passed: false });
+          } else if (d > 1500) {
+            var bw = Math.min(width * 0.42, 40 + rng() * 50);
+            var side = rng() < 0.5;
+            var bx = side ? centre - width / 2 + 6 + rng() * 20 : centre + width / 2 - bw - 6 - rng() * 20;
+            if (rng() < 0.35) bx = centre - bw / 2;
+            blocks.push({ y: sy, x: bx, w: bw, h: 18 });
+          }
+        }
+      }
+      var tail = dist - (H - PY) - 60;
+      while (segs.length > 2 && segs[1].y < tail) segs.shift();
+      gates = gates.filter(function (g) { return g.y > tail; });
+      blocks = blocks.filter(function (b) { return b.y + b.h > tail; });
+    }
+    // World y grows in the direction of travel; the player sits at world y = dist.
+    function playerWorldY() { return dist; }
+    function segAt(wy) {
+      var i = Math.floor((wy - segs[0].y) / SEGH);
+      return segs[U.clamp(i, 0, segs.length - 1)];
+    }
+    function sy(wy) { return PY - (wy - dist); }   // world → screen: the road ahead is above the player
+    genTo(dist + PY + 200);
+
+    function die() {
+      dead = true;
+      api.fx.burst(x, PY, ACCENT, 36, 240, 0.9);
+      api.fx.burst(x, PY, '#fff', 14, 160, 0.6);
+      api.shake(11);
+      api.audio.tone(170, 0.4, { type: 'sawtooth', slide: 0.3, vol: 0.28 });
+    }
+
+    return {
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        if (dead) { deadT += dt; if (deadT > 1) api.gameOver(); return; }
+        // steering: drag / hover follows the pointer; keys push sideways
+        var p = api.pointer();
+        var target = null;
+        if (p.moved !== lastMoved) { lastMoved = p.moved; lastPX = p.x; }
+        if (lastPX !== null) target = U.clamp(lastPX, 0, W);
+        var keys = (inp.held('right') ? 1 : 0) - (inp.held('left') ? 1 : 0);
+        if (keys) { lastPX = null; vx = U.lerp(vx, keys * 330, Math.min(1, dt * 10)); }
+        else if (target !== null) vx = U.clamp((target - x) * 9, -520, 520);
+        else vx *= Math.pow(0.02, dt);
+        if (!started) {
+          if (keys || p.down || inp.hit('a') || inp.hit('up') || inp.hit('left') || inp.hit('right') || inp.hit('hold')) started = true;
+          else { x = W / 2 + Math.sin(t * 2) * 6; return; }
+        }
+        x += vx * dt;
+        speed = Math.min(620, 240 + dist * 0.011);
+        dist += speed * dt;
+        genTo(dist + PY + 200);
+
+        var wy = playerWorldY();
+        var s = segAt(wy);
+        if (x - PR < s.l || x + PR > s.r) { die(); return; }
+        // close shave
+        closeCd -= dt;
+        if (Math.min(x - PR - s.l, s.r - x - PR) < 5 && closeCd <= 0) {
+          closeCd = 0.9; bonus += 10;
+          api.fx.text(x, PY - 24, 'CLOSE +10', '#bfefff', 10);
+          api.audio.tone(1000, 0.04, { type: 'sine', vol: 0.1 });
+        }
+        for (var i = 0; i < blocks.length; i++) {
+          var b = blocks[i];
+          if (wy > b.y - PR && wy < b.y + b.h + PR && x + PR > b.x && x - PR < b.x + b.w) { die(); return; }
+        }
+        gates.forEach(function (g) {
+          if (!g.passed && wy >= g.y) {
+            g.passed = true;
+            if (x > g.l && x < g.r) {
+              streak++;
+              var pts = 25 * Math.min(streak, 8);
+              bonus += pts;
+              api.fx.text(x, PY - 30, 'GATE +' + pts, GATE, 12);
+              api.fx.burst(x, PY, GATE, 16, 150, 0.5);
+              api.audio.tone(660 + Math.min(streak, 8) * 60, 0.08, { type: 'square', vol: 0.14 });
+            } else if (streak) { streak = 0; api.fx.text(x, PY - 30, 'MISSED', '#8899aa', 10); }
+          }
+        });
+        trail.unshift({ x: x, wy: wy });
+        if (trail.length > 40) trail.pop();
+        api.setScore(Math.floor(dist / 10) + bonus);
+        api.setStatus(Math.floor(dist / 10) + ' m  ·  GATES x' + streak);
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#04030d';
+        ctx.fillRect(0, 0, W, H);
+        // speed lines
+        ctx.fillStyle = 'rgba(63,240,255,0.06)';
+        for (var k = 0; k < 18; k++) {
+          var ly = ((k * 97 + dist * 1.4) % (H + 60)) - 30;
+          ctx.fillRect((k * 53) % W, ly, 2, 30);
+        }
+        // corridor fill + walls
+        ctx.save();
+        ctx.fillStyle = 'rgba(63,240,255,0.05)';
+        ctx.beginPath();
+        segs.forEach(function (s, i) { var y = sy(s.y); if (i) ctx.lineTo(s.l, y); else ctx.moveTo(s.l, y); });
+        for (var i = segs.length - 1; i >= 0; i--) ctx.lineTo(segs[i].r, sy(segs[i].y));
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = ACCENT; ctx.lineWidth = 3; ctx.shadowColor = ACCENT; ctx.shadowBlur = 14;
+        ['l', 'r'].forEach(function (side) {
+          ctx.beginPath();
+          segs.forEach(function (s, i) { var y = sy(s.y); if (i) ctx.lineTo(s[side], y); else ctx.moveTo(s[side], y); });
+          ctx.stroke();
+        });
+        ctx.restore();
+        // gates
+        gates.forEach(function (g) {
+          var y = sy(g.y);
+          if (y < -20 || y > H + 20) return;
+          ctx.save();
+          ctx.strokeStyle = g.passed ? 'rgba(255,210,63,0.25)' : GATE; ctx.lineWidth = 3;
+          ctx.shadowColor = GATE; ctx.shadowBlur = g.passed ? 0 : 12;
+          ctx.beginPath(); ctx.moveTo(g.l, y); ctx.lineTo(g.r, y); ctx.stroke();
+          ctx.fillStyle = GATE;
+          ctx.fillRect(g.l - 3, y - 7, 6, 14); ctx.fillRect(g.r - 3, y - 7, 6, 14);
+          ctx.restore();
+        });
+        // blocks
+        blocks.forEach(function (b) {
+          var y = sy(b.y);
+          if (y < -40 || y > H + 40) return;
+          ctx.save();
+          ctx.fillStyle = BLOCK; ctx.shadowColor = BLOCK; ctx.shadowBlur = 14;
+          ctx.fillRect(b.x, sy(b.y + b.h), b.w, b.h);
+          ctx.restore();
+        });
+        // light trail + cycle
+        if (!dead) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(63,240,255,0.6)'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+          ctx.beginPath();
+          trail.forEach(function (p, i) { var yy = sy(p.wy); if (i) ctx.lineTo(p.x, yy); else ctx.moveTo(p.x, yy); });
+          ctx.stroke();
+          ctx.translate(x, PY);
+          ctx.rotate(U.clamp(vx / 900, -0.5, 0.5));
+          ctx.fillStyle = '#ffffff'; ctx.shadowColor = ACCENT; ctx.shadowBlur = 18;
+          ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(8, 10); ctx.lineTo(0, 5); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill();
+          ctx.restore();
+        }
+        if (!started && !dead) {
+          ctx.save();
+          ctx.globalAlpha = 0.6 + Math.sin(t * 5) * 0.4;
+          U.glowText(ctx, 'DRAG OR ←→ TO GO', W / 2, 200, 14, '#c9f7ff');
+          ctx.restore();
+        }
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#04030d';
+    ctx.fillRect(0, 0, w, h);
+    ctx.save();
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 2; ctx.shadowColor = ACCENT; ctx.shadowBlur = 8;
+    [-1, 1].forEach(function (side) {
+      ctx.beginPath();
+      for (var y = 0; y <= h; y += 6) {
+        var c = w / 2 + Math.sin((y - t * 90) * 0.02) * w * 0.18;
+        var hw = w * 0.2 + Math.sin((y - t * 90) * 0.05) * w * 0.03;
+        if (y) ctx.lineTo(c + side * hw, y); else ctx.moveTo(c + side * hw, y);
+      }
+      ctx.stroke();
+    });
+    ctx.restore();
+    var py = h * 0.8, cx = w / 2 + Math.sin((py - t * 90) * 0.02) * w * 0.18;
+    ctx.fillStyle = '#fff'; ctx.shadowColor = ACCENT; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.moveTo(cx, py - 9); ctx.lineTo(cx + 6, py + 7); ctx.lineTo(cx - 6, py + 7); ctx.fill();
+    ctx.shadowBlur = 0;
+    var gy = ((t * 90) % (h * 0.8));
+    ctx.fillStyle = GATE;
+    var gc = w / 2 + Math.sin((gy - t * 90) * 0.02) * w * 0.18;
+    ctx.fillRect(gc - w * 0.07, gy, w * 0.14, 2);
+  }
+
+  XA.registerGame({
+    id: 'xa_swerve',
+    order: 17,
+    title: 'Swerve',
+    tagline: 'Weave the corridor. Thread the gates.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'hint',
+    touchHint: 'DRAG LEFT AND RIGHT TO STEER',
+    controls: 'Mouse / drag to steer · or ←→',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
+<script>/* game-lunar-lander.js */
+/*
+ * Xtrata Arcade cartridge #18 — LUNAR LANDER
+ * Rotate and burn to set the module down softly on a pad. Narrow pads pay
+ * more (x2 / x3 / x5). Every landing refuels a little and brings a new
+ * surface; three modules, and fuel is shared across the whole run.
+ * Contract game-id: xa_lunar_lander (score mode, higher is better)
+ */
+(function (root) {
+  'use strict';
+  var XA = root.XA;
+  if (!XA) throw new Error('arcade-kit must load before game-lunar-lander');
+  var U = XA.util;
+
+  var W = 600, H = 450, STEP = 20, N = W / STEP + 1;
+  var G = 30, THRUST = 78, TURN = 2.6, BURN = 55;
+  var SAFE_VY = 42, SAFE_VX = 28, SAFE_A = 0.22;
+  var ACCENT = '#c9d4ff', OK = '#39ff88', WARN = '#ffd23f', BAD = '#ff4d6d';
+
+  function create(api) {
+    var rng = api.rng;
+    var ground = [], pads = [];
+    var ship = null, level = 0, ships = 3, fuel = 1000;
+    var landedT = 0, crashT = 0, over = false, overT = 0, t = 0;
+    var stars = [];
+    for (var i = 0; i < 60; i++) stars.push({ x: rng() * W, y: rng() * 260, s: rng() < 0.15 ? 2 : 1 });
+
+    function newSurface() {
+      level++;
+      ground = [];
+      var h = 330 + rng() * 60;
+      for (var i = 0; i < N; i++) {
+        h = U.clamp(h + (rng() - 0.5) * (70 + level * 6), 210, H - 20);
+        ground.push(h);
+      }
+      pads = [];
+      var specs = [{ len: 4, mult: 2 }, { len: 3, mult: 3 }, { len: 2, mult: 5 }];
+      var used = {};
+      specs.forEach(function (sp) {
+        for (var tries = 0; tries < 50; tries++) {
+          var start = 1 + Math.floor(rng() * (N - sp.len - 2));
+          var clash = false;
+          for (var k = start - 1; k <= start + sp.len + 1; k++) if (used[k]) clash = true;
+          if (clash) continue;
+          var y = ground[start];
+          for (k = start; k <= start + sp.len; k++) { ground[k] = y; used[k] = true; }
+          pads.push({ a: start, b: start + sp.len, y: y, mult: sp.mult });
+          break;
+        }
+      });
+      spawn();
+    }
+    function spawn() {
+      ship = { x: 60 + rng() * (W - 120), y: 40, vx: (rng() - 0.5) * 70, vy: 5, a: (rng() - 0.5) * 0.6, burn: false, legs: 0 };
+    }
+    function groundAt(x) {
+      var i = U.clamp(Math.floor(x / STEP), 0, N - 2);
+      var f = (x - i * STEP) / STEP;
+      return ground[i] + (ground[i + 1] - ground[i]) * f;
+    }
+    function padAt(x) {
+      for (var i = 0; i < pads.length; i++) if (x > pads[i].a * STEP + 6 && x < pads[i].b * STEP - 6) return pads[i];
+      return null;
+    }
+    newSurface();
+
+    function crash(reason) {
+      api.fx.burst(ship.x, ship.y, '#ff9f1c', 40, 220, 1);
+      api.fx.burst(ship.x, ship.y, ACCENT, 20, 160, 0.8);
+      api.fx.text(ship.x, ship.y - 30, reason, BAD, 12);
+      api.shake(12);
+      api.audio.noise(0.7, { vol: 0.35, cutoff: 700 });
+      ship = null;
+      ships--;
+      crashT = 1.6;
+    }
+
+    return {
+      // Read-only test hook.
+      debug: function () { return { ships: ships, fuel: fuel, level: level, flying: !!ship }; },
+      update: function (dt) {
+        t += dt;
+        var inp = api.input;
+        inp.takeSwipes();
+        if (over) { overT += dt; if (overT > 1.2) api.gameOver(); return; }
+        if (crashT > 0) {
+          crashT -= dt;
+          if (crashT <= 0) { if (ships <= 0 || fuel <= 0) over = true; else spawn(); }
+          return;
+        }
+        if (landedT > 0) {
+          landedT -= dt;
+          if (landedT <= 0) newSurface();
+          return;
+        }
+        var s = ship;
+        if (inp.held('left')) s.a -= TURN * dt;
+        if (inp.held('right')) s.a += TURN * dt;
+        s.a = U.clamp(s.a, -Math.PI / 2, Math.PI / 2);
+        s.burn = fuel > 0 && (inp.held('up') || inp.held('a') || inp.held('hold'));
+        if (s.burn) {
+          s.vx += Math.sin(s.a) * THRUST * dt;
+          s.vy -= Math.cos(s.a) * THRUST * dt;
+          fuel = Math.max(0, fuel - BURN * dt);
+          if (Math.random() < 0.8) api.fx.trail(s.x - Math.sin(s.a) * 12, s.y + Math.cos(s.a) * 12, '#ffb35c',
+            -Math.sin(s.a) * 90 + (Math.random() - 0.5) * 30, Math.cos(s.a) * 90);
+          if (Math.floor(t * 30) % 3 === 0) api.audio.noise(0.05, { vol: 0.05, cutoff: 500 });
+        }
+        s.vy += G * dt;
+        s.x += s.vx * dt; s.y += s.vy * dt;
+        if (s.x < 0) s.x += W; if (s.x > W) s.x -= W;
+        s.legs = Math.min(1, s.legs + (s.y > 150 ? dt * 3 : -dt * 3));
+
+        var foot = s.y + 10;
+        var gy = Math.min(groundAt(s.x - 8), groundAt(s.x + 8));
+        if (foot >= gy) {
+          var pad = padAt(s.x);
+          var soft = s.vy < SAFE_VY && Math.abs(s.vx) < SAFE_VX && Math.abs(s.a) < SAFE_A;
+          if (pad && soft) {
+            var gentle = Math.round((SAFE_VY - s.vy) + (SAFE_A - Math.abs(s.a)) * 100);
+            s.y = pad.y - 10; s.vy = 0; s.vx = 0;
+            var pts = 50 * pad.mult * level + gentle;
+            api.addScore(pts);
+            fuel = Math.min(1000, fuel + 250);
+            api.fx.text(s.x, s.y - 40, 'LANDED x' + pad.mult + '  +' + pts, OK, 14);
+            api.fx.burst(s.x, pad.y, OK, 20, 120, 0.6);
+            api.audio.arp([523, 659, 784, 1047], 0.08, { type: 'triangle', vol: 0.2 });
+            landedT = 2;
+          } else crash(!pad ? 'MISSED THE PAD' : s.vy >= SAFE_VY ? 'TOO FAST' : Math.abs(s.a) >= SAFE_A ? 'NOT LEVEL' : 'DRIFTING');
+        }
+        if (ship) api.setStatus('LEVEL ' + level + '  ·  MODULES ' + ships + '  ·  FUEL ' + Math.round(fuel));
+      },
+
+      render: function (ctx) {
+        ctx.fillStyle = '#02030a';
+        ctx.fillRect(0, 0, W, H);
+        stars.forEach(function (s) { ctx.fillStyle = 'rgba(220,230,255,' + (0.35 + (s.s - 1) * 0.4) + ')'; ctx.fillRect(s.x, s.y, s.s, s.s); });
+        // Earth in the sky
+        ctx.save();
+        ctx.fillStyle = '#1f4fa8'; ctx.shadowColor = '#3f8cff'; ctx.shadowBlur = 20;
+        ctx.beginPath(); ctx.arc(510, 70, 22, 0, 7); ctx.fill();
+        ctx.fillStyle = '#02030a';
+        ctx.beginPath(); ctx.arc(520, 64, 20, 0, 7); ctx.fill();
+        ctx.restore();
+        // terrain
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(0, H);
+        for (var i = 0; i < N; i++) ctx.lineTo(i * STEP, ground[i]);
+        ctx.lineTo(W, H); ctx.closePath();
+        ctx.fillStyle = '#12131f'; ctx.fill();
+        ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.shadowColor = ACCENT; ctx.shadowBlur = 6;
+        ctx.beginPath();
+        for (i = 0; i < N; i++) { if (i) ctx.lineTo(i * STEP, ground[i]); else ctx.moveTo(0, ground[0]); }
+        ctx.stroke();
+        ctx.restore();
+        pads.forEach(function (p) {
+          ctx.save();
+          var col = p.mult >= 5 ? BAD : p.mult >= 3 ? WARN : OK;
+          ctx.strokeStyle = col; ctx.shadowColor = col; ctx.shadowBlur = 12; ctx.lineWidth = 4;
+          ctx.beginPath(); ctx.moveTo(p.a * STEP, p.y); ctx.lineTo(p.b * STEP, p.y); ctx.stroke();
+          ctx.fillStyle = col;
+          ctx.font = '800 11px ui-monospace, Menlo, Consolas, monospace'; ctx.textAlign = 'center';
+          ctx.fillText('x' + p.mult, (p.a + p.b) / 2 * STEP, p.y + 16);
+          ctx.restore();
+        });
+        // module
+        if (ship) {
+          var s = ship;
+          ctx.save();
+          ctx.translate(s.x, s.y); ctx.rotate(s.a);
+          ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.6; ctx.shadowColor = ACCENT; ctx.shadowBlur = 10;
+          ctx.fillStyle = 'rgba(201,212,255,0.12)';
+          ctx.beginPath(); ctx.arc(0, -4, 7, 0, 7); ctx.fill(); ctx.stroke();
+          ctx.strokeRect(-8, 2, 16, 5);
+          var l = 4 + s.legs * 5;
+          ctx.beginPath();
+          ctx.moveTo(-6, 7); ctx.lineTo(-10, 7 + l * 0.6); ctx.moveTo(6, 7); ctx.lineTo(10, 7 + l * 0.6);
+          ctx.moveTo(-13, 7 + l * 0.6); ctx.lineTo(-7, 7 + l * 0.6); ctx.moveTo(7, 7 + l * 0.6); ctx.lineTo(13, 7 + l * 0.6);
+          ctx.stroke();
+          if (s.burn && Math.floor(t * 30) % 2) {
+            ctx.strokeStyle = '#ffb35c'; ctx.shadowColor = '#ffb35c';
+            ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(0, 20 + Math.random() * 6); ctx.lineTo(4, 8); ctx.stroke();
+          }
+          ctx.restore();
+        }
+        // instruments
+        ctx.save();
+        ctx.font = '700 11px ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign = 'left';
+        if (ship) {
+          var alt = Math.max(0, Math.round(Math.min(groundAt(ship.x - 8), groundAt(ship.x + 8)) - ship.y - 10));
+          var rows = [
+            ['ALT', alt, WARN],
+            ['V↓', Math.round(ship.vy), ship.vy < SAFE_VY ? OK : BAD],
+            ['V→', Math.round(ship.vx), Math.abs(ship.vx) < SAFE_VX ? OK : BAD],
+            ['TILT', Math.round(ship.a * 57.3) + '°', Math.abs(ship.a) < SAFE_A ? OK : BAD]
+          ];
+          rows.forEach(function (r, i) {
+            ctx.fillStyle = 'rgba(200,210,255,0.55)'; ctx.fillText(r[0], 12, 22 + i * 16);
+            ctx.fillStyle = r[2]; ctx.fillText(String(r[1]), 52, 22 + i * 16);
+          });
+        }
+        // fuel gauge
+        ctx.fillStyle = 'rgba(200,210,255,0.55)'; ctx.fillText('FUEL', 12, 96);
+        ctx.strokeStyle = 'rgba(200,210,255,0.4)'; ctx.strokeRect(52, 88, 100, 9);
+        ctx.fillStyle = fuel > 300 ? OK : fuel > 120 ? WARN : BAD;
+        ctx.fillRect(53, 89, 98 * (fuel / 1000), 7);
+        for (var m = 0; m < ships; m++) { ctx.strokeStyle = ACCENT; ctx.beginPath(); ctx.arc(W - 18 - m * 18, 18, 5, 0, 7); ctx.stroke(); }
+        ctx.restore();
+      }
+    };
+  }
+
+  function attract(ctx, w, h, t) {
+    ctx.fillStyle = '#02030a';
+    ctx.fillRect(0, 0, w, h);
+    var base = h * 0.8;
+    ctx.fillStyle = '#12131f';
+    ctx.beginPath(); ctx.moveTo(0, h);
+    var pts = [0.75, 0.62, 0.7, 0.82, 0.82, 0.82, 0.66, 0.58, 0.72, 0.64, 0.78];
+    pts.forEach(function (p, i) { ctx.lineTo(i / (pts.length - 1) * w, p * h); });
+    ctx.lineTo(w, h); ctx.fill();
+    ctx.strokeStyle = OK; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(w * 0.3, h * 0.82); ctx.lineTo(w * 0.5, h * 0.82); ctx.stroke();
+    var k = (t * 0.25) % 1;
+    var sy = h * 0.1 + k * (base - h * 0.15);
+    ctx.save();
+    ctx.translate(w * 0.4, Math.min(sy, h * 0.82 - h * 0.05));
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5;
+    var s = h / 150;
+    ctx.beginPath(); ctx.arc(0, -3 * s, 5 * s, 0, 7); ctx.stroke();
+    ctx.strokeRect(-6 * s, 2 * s, 12 * s, 3 * s);
+    if (k > 0.5 && Math.floor(t * 20) % 2) { ctx.strokeStyle = '#ffb35c'; ctx.beginPath(); ctx.moveTo(-3 * s, 6 * s); ctx.lineTo(0, 14 * s); ctx.lineTo(3 * s, 6 * s); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  XA.registerGame({
+    id: 'xa_lunar_lander',
+    order: 18,
+    title: 'Lunar Lander',
+    tagline: 'Gentle hands. Narrow pads pay more.',
+    color: ACCENT,
+    size: { w: W, h: H },
+    touch: 'lander',
+    controls: '←→ rotate · ↑ / Space thrust',
+    create: create,
+    attract: attract
+  });
+})(window);
+</script>
 <script>
-window.XA_CONFIG = { subtitle: 'Preview cabinet · fifteen games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
+window.XA_CONFIG = { subtitle: 'Preview cabinet · eighteen games, one on-chain leaderboard contract · post scores from xtrata.xyz' };
 XARoom.boot(document.getElementById('xa-root'));
 </script>

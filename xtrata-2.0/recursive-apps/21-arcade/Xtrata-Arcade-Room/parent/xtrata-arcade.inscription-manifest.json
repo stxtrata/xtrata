@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v1.4-fifteen-cabinets",
+  "release": "v1.5-eighteen-cabinets",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -27,7 +27,10 @@
       "xa_block_defence",
       "xa_maze_muncher",
       "xa_invader_wave",
-      "xa_helix_drop"
+      "xa_helix_drop",
+      "xa_bubble_pop",
+      "xa_swerve",
+      "xa_lunar_lander"
     ]
   },
   "leafModules": [
@@ -62,8 +65,8 @@
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 26929,
-      "sha256": "ce672b5a0cd38a80bc471a6f3a0b68bc4ab3b03387ab26fbdf6484d1c5706f2f",
+      "sizeBytes": 27200,
+      "sha256": "01edf179fd9fa04653fc5b6516ad4e8e934d029be02e9f1e769eb281d0642fee",
       "mintOrder": 4,
       "mintedInscriptionId": 0
     },
@@ -201,12 +204,39 @@
       "sha256": "c67efb4fa08f37467c8baa862b7cb8662fa7f661ea077f55702d4df5252e0501",
       "mintOrder": 19,
       "mintedInscriptionId": 0
+    },
+    {
+      "key": "bubbles",
+      "path": "modules/game-bubble-pop.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 13636,
+      "sha256": "db2b7e3ac63b17e005645705a996e8e7525799f0df86bbeaeb382465e03a2d67",
+      "mintOrder": 20,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "swerve",
+      "path": "modules/game-swerve.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 10186,
+      "sha256": "0618446c04132c76b82516306ece74303edd9aa7f89f02dd5565e8d23296dc70",
+      "mintOrder": 21,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "lander",
+      "path": "modules/game-lunar-lander.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 10780,
+      "sha256": "db5b81f237c142d2645213bdf8932d7c74775127c0009fab8f2f510a2c559724",
+      "mintOrder": 22,
+      "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 20,
+    "mintOrder": 23,
     "dependencyOrder": [
       "css",
       "kit",
@@ -226,7 +256,10 @@
       "defence",
       "muncher",
       "invaders",
-      "helix"
+      "helix",
+      "bubbles",
+      "swerve",
+      "lander"
     ]
   }
 }

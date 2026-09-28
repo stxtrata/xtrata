@@ -16,7 +16,8 @@
         --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> \
         --drift <id> --stack <id> --hopper <id> \
         --tiles <id> --merge2048 <id> --defence <id> \
-        --muncher <id> --invaders <id> --helix <id>
+        --muncher <id> --invaders <id> --helix <id> \
+        --bubbles <id> --swerve <id> --lander <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
   -->
@@ -83,7 +84,10 @@
         defence: 0,
         muncher: 0,
         invaders: 0,
-        helix: 0
+        helix: 0,
+        bubbles: 0,
+        swerve: 0,
+        lander: 0
       },
       scoreContract: {
         contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -111,7 +115,10 @@
       { key: 'defence', file: 'game-block-defence.js', type: 'js' },
       { key: 'muncher', file: 'game-maze-muncher.js', type: 'js' },
       { key: 'invaders', file: 'game-invader-wave.js', type: 'js' },
-      { key: 'helix', file: 'game-helix-drop.js', type: 'js' }
+      { key: 'helix', file: 'game-helix-drop.js', type: 'js' },
+      { key: 'bubbles', file: 'game-bubble-pop.js', type: 'js' },
+      { key: 'swerve', file: 'game-swerve.js', type: 'js' },
+      { key: 'lander', file: 'game-lunar-lander.js', type: 'js' }
     ];
 
     var fillEl = document.getElementById('xb-fill');

@@ -293,6 +293,12 @@
         h('div', { class: 'xa-pad-group xa-grid2' }, [pad('b', '⟲'), pad('c', '⟳'), pad('d', 'HOLD', 'xa-wide'), pad('a', '⤓')])
       ]);
     }
+    if (kind === 'lander') {
+      return h('div', { class: 'xa-pads' }, [
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '⟲'), pad('right', '⟳')]),
+        h('div', { class: 'xa-pad-group xa-row' }, [pad('up', 'THRUST', 'xa-wide')])
+      ]);
+    }
     if (kind === 'shooter') {
       return h('div', { class: 'xa-pads' }, [
         h('div', { class: 'xa-pad-group xa-row' }, [pad('left', '◀'), pad('right', '▶')]),
