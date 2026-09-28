@@ -82,7 +82,8 @@ function server() {
       i++;
     }
     const r = await page.evaluate(() => ({ steps: window.__steps, mc: window.__mc, state: window.XARoom._session() && window.XARoom._session().state, score: window.XARoom._session() && window.XARoom._session().score }));
-    const ok = sawPlaying && r.steps > 8 && !errors.length;
+    // A run that random input ends early only needs to have started its soundtrack.
+    const ok = sawPlaying && (r.steps > 8 || (r.state === 'over' && r.steps > 0)) && !errors.length;
     if (!ok) failed++;
     const uniq = (a) => Array.from(new Set(a)).slice(0, 8).join(' ');
     console.log((ok ? 'PASS ' : 'FAIL ') + id.padEnd(18) + ' steps=' + r.steps + ' bpm<=' + Math.round(maxTempo) +

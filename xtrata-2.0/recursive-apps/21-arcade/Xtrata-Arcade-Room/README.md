@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v2.2 prototype, all 21 cabinets, every one scored)
+# Xtrata Arcade Room (v2.3 prototype, 21 cabinets, 8 upgraded to v2)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -9,13 +9,13 @@ parent that lists it.
 | Cabinet     | Leaf                         | game-id          | Controls |
 |-------------|------------------------------|------------------|----------|
 | Neon Snake  | `modules/game-neon-snake.js` | `xa_neon_snake`  | arrows/WASD, swipe, d-pad · stages, portals, power-ups |
-| Block Drop  | `modules/game-block-drop.js` | `xa_block_drop`  | ←→ ↑/X Z Space C, swipes, 7 pads |
+| Block Drop  | `modules/game-block-drop.js` | `xa_block_drop`  | ←→ ↑/X Z Space C, swipes, 7 pads · Marathon + **Sprint 40** (time board), T-spins, 5 themes |
 | Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold · four depth zones |
-| Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift |
-| Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down |
+| Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift · 10 planet tiers, bomb/stardust/tremor, supernova levels |
+| Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down · 4 worlds, shield/magnet/double jump/dash |
 | Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch/laser, drag + tap · 20 levels, 4 bosses |
-| Rock Drift | `modules/game-rock-drift.js` | `xa_rock_drift` | ←→ turn, ↑ thrust, Space fire; 4 touch pads |
-| Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop |
+| Rock Drift | `modules/game-rock-drift.js` | `xa_rock_drift` | ←→ turn, ↑ thrust, Space fire; 4 touch pads · ice/metal/explosive rocks, pickups, boss every 5 waves |
+| Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop · climb to space, gold/wide/ice slabs, perfect repairs |
 | Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad |
 | Tile Tap | `modules/game-tile-tap.js` | `xa_tile_tap` | ← ↓ ↑ → or 1–4, click/tap a lane |
 | Merge 2048 | `modules/game-merge-2048.js` | `xa_merge_2048` | arrows/WASD, swipe, d-pad |
@@ -54,7 +54,7 @@ tests/
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~453 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
+Leaves total ~632 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
@@ -64,7 +64,25 @@ A cartridge never sees the wallet. `create(api)` receives:
 
 `pointer()` returns `{ x, y, down, moved }` in playfield units; `moved` ticks on every move so a game can tell pointer steering from key steering. `input.hit('release')` fires once per touch/click release.
 
-and returns `{ update(dt), render(ctx) }`. The room runs a fixed 60 Hz step,
+and returns `{ update(dt), render(ctx) }`.
+
+### Variants (more than one board per cabinet)
+
+A cartridge can register variants that post under the **same game-id** with a
+different contract mode, e.g. Block Drop's Sprint 40 on the time board:
+
+```js
+XA.registerGame({ id: 'xa_block_drop', modeLabel: 'Marathon',
+  variants: [{ key: 'sprint', label: 'Sprint 40', mode: 'time', tagline: 'Clear 40 lines. Fastest time wins.' }], ... });
+```
+
+The cabinet gets an extra play button and the high-score screen gets mode tabs.
+`create(api)` then sees `api.mode` (`'score'` or `'time'`) and `api.variant`.
+In time mode the score is elapsed centiseconds (lower wins, shown as 1:23.45):
+keep it current with `setScore`, call `api.finish()` on completion, and
+`gameOver()` without `finish()` is a DID NOT FINISH that can't be posted.
+Each variant must use a mode the game doesn't already use, since the contract
+keys boards by (game-id, mode). The room runs a fixed 60 Hz step,
 countdown, pause, shake, particles and the game-over screen.
 
 ## Music engine (`XA.music`)

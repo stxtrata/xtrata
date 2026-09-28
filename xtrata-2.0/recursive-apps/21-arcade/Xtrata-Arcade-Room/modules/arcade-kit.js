@@ -338,6 +338,17 @@
     if (!/^[a-z0-9_]{3,32}$/.test(def.id)) throw new Error('Invalid game id ' + def.id);
     if (games.some(function (g) { return g.id === def.id; })) return;
     def.mode = def.mode === 'time' ? 'time' : 'score';
+    // Variants share the game-id but post to a different contract mode, so a
+    // variant must use a mode no other entry of this game already uses.
+    var usedModes = [def.mode];
+    def.variants = (Array.isArray(def.variants) ? def.variants : []).filter(function (v) {
+      if (!v || !/^[a-z0-9_]{2,16}$/.test(v.key || '')) return false;
+      v.mode = v.mode === 'time' ? 'time' : 'score';
+      if (usedModes.indexOf(v.mode) >= 0) return false;
+      usedModes.push(v.mode);
+      v.label = String(v.label || v.key).slice(0, 16);
+      return true;
+    });
     games.push(def);
     games.sort(function (a, b) { return (a.order || 99) - (b.order || 99); });
     if (typeof root.dispatchEvent === 'function') {

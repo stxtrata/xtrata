@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v2.2-full-soundtrack",
+  "release": "v2.3-five-upgrades",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -41,8 +41,8 @@
       "key": "css",
       "path": "modules/arcade-room.css",
       "mimeType": "text/css",
-      "sizeBytes": 14419,
-      "sha256": "577d04fc6c60bfddee8f2b43e93fd19a7d6cead9a0c0c5e122ea5c96aca221bd",
+      "sizeBytes": 15034,
+      "sha256": "ead949ed482955648a316f3f32f6c4234d7b71c55c1a22d0ad2a8c7ad804585c",
       "mintOrder": 1,
       "mintedInscriptionId": 0
     },
@@ -50,8 +50,8 @@
       "key": "kit",
       "path": "modules/arcade-kit.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13544,
-      "sha256": "6ca9a37179f069deed4c36de531df1e9f3eebfd1c46eb6904f800f94a5fe1ddf",
+      "sizeBytes": 14109,
+      "sha256": "c2642e81391238a99a99a6da78380d82cac01513c90c29f6859b947e1795022c",
       "mintOrder": 2,
       "mintedInscriptionId": 0
     },
@@ -77,8 +77,8 @@
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 27561,
-      "sha256": "7ebf21fc71c941e0ea8f5f824d6e06dceb3c96f606a2a9fd2c2e9f37e0234fd4",
+      "sizeBytes": 31442,
+      "sha256": "06b52c6116a91c0b860b964b905255c23e72d668b60d332beecf1ddacee7bd1b",
       "mintOrder": 5,
       "mintedInscriptionId": 0
     },
@@ -95,8 +95,8 @@
       "key": "blocks",
       "path": "modules/game-block-drop.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 19595,
-      "sha256": "b26c65a0d482f36a93d1aba7f63e4b828035abd63e06dd8eb52d4cc86f3e5ad4",
+      "sizeBytes": 47382,
+      "sha256": "2feee661a06ccd354cd96643b92517c9ec2195cfeeab52f9572c70772597d823",
       "mintOrder": 7,
       "mintedInscriptionId": 0
     },
@@ -113,8 +113,8 @@
       "key": "merge",
       "path": "modules/game-orbit-merge.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 15817,
-      "sha256": "76fea341f94a43b936b44bcc42113ae627af4fefe7a8cc4055758d48783ea4ec",
+      "sizeBytes": 51469,
+      "sha256": "e6cfead1c2178941d7ccad921da95ed0a860a265b70a90e59cfb1638675234cc",
       "mintOrder": 9,
       "mintedInscriptionId": 0
     },
@@ -122,8 +122,8 @@
       "key": "runner",
       "path": "modules/game-block-runner.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 15606,
-      "sha256": "79870ef43a815aae801e2281b1ff463eb2d73e295238f5a1768a82cb3fe545ea",
+      "sizeBytes": 60230,
+      "sha256": "f714dec8ac770d76d3952c3e209329428b12a2499fbfdf460d74d20a24a2fb0a",
       "mintOrder": 10,
       "mintedInscriptionId": 0
     },
@@ -140,8 +140,8 @@
       "key": "drift",
       "path": "modules/game-rock-drift.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 15711,
-      "sha256": "b3abc5f06359ebdf3f80df2876fcd34156615480c39308f939cf1335423a8b34",
+      "sizeBytes": 53399,
+      "sha256": "cea1469ab50f96fd0e9e20e8b13ad8f4734f37ca367af7429893e438c6c4636f",
       "mintOrder": 12,
       "mintedInscriptionId": 0
     },
@@ -149,8 +149,8 @@
       "key": "stack",
       "path": "modules/game-stack-tower.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 10896,
-      "sha256": "6ce791911b50c91efdd12a10b11c794d2a2574c7a22152011c71be5224fbff03",
+      "sizeBytes": 38887,
+      "sha256": "3140ad916809d936ea26aa9f6a3910ca622f587d7f80de089c261f561f1fbc86",
       "mintOrder": 13,
       "mintedInscriptionId": 0
     },

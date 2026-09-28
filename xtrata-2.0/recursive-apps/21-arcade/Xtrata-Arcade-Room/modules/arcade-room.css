@@ -120,6 +120,10 @@ button { font: inherit; color: inherit; }
 .xa-cab-stats b { color: var(--xa-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .xa-cab-stats .xa-right { text-align: right; align-items: flex-end; }
 .xa-cab-actions { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 12px; }
+.xa-cab-actions .xa-btn-variant { grid-column: 1 / -1; font-size: 12px; padding-top: 8px; padding-bottom: 8px; border-color: var(--c, var(--xa-cyan)); color: #fff; background: transparent; }
+.xa-mode-tabs { display: flex; gap: 6px; margin: -6px 0 12px; }
+.xa-mode-tab { flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px dashed var(--xa-line); background: transparent; cursor: pointer; font: 700 12px/1 var(--xa-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--xa-dim); }
+.xa-mode-tab[aria-selected="true"] { color: #fff; border-style: solid; border-color: var(--c, var(--xa-cyan)); }
 
 .xa-btn {
   min-height: 44px; padding: 10px 16px; border-radius: 10px; cursor: pointer;

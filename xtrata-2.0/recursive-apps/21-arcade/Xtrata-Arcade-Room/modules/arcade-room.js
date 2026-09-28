@@ -35,7 +35,42 @@
   var session = null;
   var raf = 0, lastTs = 0;
   var walletStatus = S.status();
-  var boards = {};              // gameId → last board result
+  var boards = {};              // gameId:mode → last board result
+
+  /* A cabinet can host variants (e.g. Block Drop Sprint 40). Each variant posts
+     under the same game-id with its own contract mode, so boards, personal
+     bests and formatting are all keyed by (game, mode). */
+  function bk(g, mode) { return g.id + ':' + (mode || g.mode); }
+  function variantOf(g, key) {
+    return key ? (g.variants || []).filter(function (v) { return v.key === key; })[0] || null : null;
+  }
+  function modeLabel(g, mode) {
+    if (mode === g.mode) return g.modeLabel || (mode === 'time' ? 'Time' : 'Score');
+    var v = (g.variants || []).filter(function (x) { return x.mode === mode; })[0];
+    return v ? v.label : mode;
+  }
+  // Time scores are centiseconds: 8345 → 1:23.45.
+  function fmtVal(mode, v) {
+    if (mode !== 'time') return U.fmt(v);
+    v = Math.max(0, Math.round(Number(v) || 0));
+    var m = Math.floor(v / 6000), sec = Math.floor(v / 100) % 60, cs = v % 100;
+    return (m ? m + ':' + (sec < 10 ? '0' : '') : '') + sec + '.' + (cs < 10 ? '0' : '') + cs + (m ? '' : 's');
+  }
+  function localBest(g, mode) {
+    if (mode !== 'time') return S.localBest(g.id);
+    var v = U.store('pbt:' + g.id);
+    return typeof v === 'number' && v > 0 ? v : 0;
+  }
+  function recordLocal(g, mode, v) {
+    if (mode !== 'time') return S.recordLocal(g.id, v);
+    var best = localBest(g, mode);
+    if (v > 0 && (!best || v < best)) { U.store('pbt:' + g.id, v); return v; }
+    return best;
+  }
+  function fmtBest(g, mode) {
+    var b = localBest(g, mode);
+    return mode === 'time' && !b ? '—' : fmtVal(mode, b);
+  }
 
   /* ------------------------------------------------------ room view */
   function buildRoom() {
@@ -52,19 +87,23 @@
     XA.games.forEach(function (g) {
       var canvas = h('canvas', { width: 320, height: 240, 'aria-hidden': 'true' });
       var stats = h('div', { class: 'xa-cab-stats' }, [
-        h('div', {}, [h('span', { text: 'YOUR BEST' }), h('b', { class: 'xa-pb', text: U.fmt(S.localBest(g.id)) })]),
+        h('div', {}, [h('span', { text: 'YOUR BEST' }), h('b', { class: 'xa-pb', text: fmtBest(g, g.mode) })]),
         h('div', { class: 'xa-right' }, [h('span', { text: 'CHAIN #1' }), h('b', { class: 'xa-top1', text: '…' })])
       ]);
       var cab = h('article', { class: 'xa-cab', style: '--c:' + g.color, 'data-game': g.id }, [
         h('div', { class: 'xa-marquee' }, [h('h2', { text: g.title }), h('p', { text: g.tagline || '' })]),
         h('div', { class: 'xa-screen' }, [canvas, h('div', { class: 'xa-insert', text: 'PRESS PLAY' })]),
         stats,
-        h('div', { class: 'xa-cab-actions' }, [
+        h('div', { class: 'xa-cab-actions' + (g.variants.length ? ' has-variants' : '') }, [
           h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', 'data-play': g.id,
             onclick: function () { startGame(g.id); } }, ['▶ Play']),
           h('button', { class: 'xa-btn', type: 'button', 'aria-label': g.title + ' high scores',
             onclick: function () { openBoards(g.id); } }, ['🏆'])
-        ])
+        ].concat(g.variants.map(function (v) {
+          return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button',
+            'data-play-variant': g.id + ':' + v.key, title: v.tagline || v.label,
+            onclick: function () { startGame(g.id, v.key); } }, [(v.mode === 'time' ? '⏱ ' : '▶ ') + v.label]);
+        })))
       ]);
       grid.appendChild(cab);
       cabinets.push({ game: g, canvas: canvas, ctx: canvas.getContext('2d'), el: cab });
@@ -129,13 +168,13 @@
 
   async function refreshCabinet(cab, force) {
     var g = cab.game;
-    $('.xa-pb', cab.el).textContent = U.fmt(S.localBest(g.id));
+    $('.xa-pb', cab.el).textContent = fmtBest(g, g.mode);
     var board = await S.getTop10(g.id, g.mode, force);
-    boards[g.id] = board;
+    boards[bk(g)] = board;
     var el = $('.xa-top1', cab.el);
     if (!board.ok) { el.textContent = 'offline'; el.title = board.error || ''; return; }
     var top = board.entries[0];
-    el.textContent = top ? U.fmt(top.score) + ' ' + top.name : 'be first';
+    el.textContent = top ? fmtVal(g.mode, top.score) + ' ' + top.name : 'be first';
     el.title = top ? top.name + ' · ' + top.player : 'No scores yet';
   }
 
@@ -160,7 +199,8 @@
       h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
     ]));
   }
-  function boardList(board, game, highlight) {
+  function boardList(board, game, highlight, mode) {
+    mode = mode || (game && game.mode) || 'score';
     if (!board) return h('div', { class: 'xa-empty', text: 'Loading…' });
     if (!board.ok) return h('div', { class: 'xa-error', text: 'Couldn’t reach the leaderboard right now. It isn’t empty — try again in a moment.' });
     if (!board.entries.length) return h('div', { class: 'xa-empty', text: 'No scores yet. The first run that lands here is permanent until someone beats it.' });
@@ -169,57 +209,67 @@
       return h('li', { class: you || (highlight && highlight === e.rank) ? 'is-you' : '' }, [
         h('span', { class: 'xa-rank', text: '#' + e.rank }),
         h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' · you' : '') })]),
-        h('span', { class: 'xa-pts', text: U.fmt(e.score) })
+        h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) })
       ]);
     }));
   }
-  function openBoards(gameId) {
+  function openBoards(gameId, mode) {
     var game = XA.games.filter(function (g) { return g.id === gameId; })[0] || XA.games[0];
-    var body = h('div', {}, [boardList(boards[game.id], game)]);
+    var modes = [game.mode].concat(game.variants.map(function (v) { return v.mode; }));
+    if (modes.indexOf(mode) < 0) mode = game.mode;
+    var key = bk(game, mode);
+    var body = h('div', {}, [boardList(boards[key], game, 0, mode)]);
     var tabs = h('div', { class: 'xa-tabs', role: 'tablist' }, XA.games.map(function (g) {
       return h('button', { class: 'xa-tab', role: 'tab', type: 'button', style: '--c:' + g.color,
         'aria-selected': g.id === game.id ? 'true' : 'false', onclick: function () { openBoards(g.id); } }, [g.title]);
     }));
+    var modeTabs = modes.length > 1 ? h('div', { class: 'xa-mode-tabs', role: 'tablist', 'aria-label': game.title + ' boards' }, modes.map(function (m) {
+      return h('button', { class: 'xa-mode-tab', role: 'tab', type: 'button', 'data-mode': m,
+        'aria-selected': m === mode ? 'true' : 'false', onclick: function () { openBoards(game.id, m); } },
+        [(m === 'time' ? '⏱ ' : '') + modeLabel(game, m)]);
+    })) : null;
     var foot = h('div', { class: 'xa-card-foot' }, [
-      h('span', { text: 'Your best: ' + U.fmt(S.localBest(game.id)) }),
+      h('span', { text: 'Your best: ' + fmtBest(game, mode) }),
       h('span', {}, [
         h('button', { class: 'xa-btn', type: 'button', style: 'margin-right:8px', onclick: async function () {
           body.replaceChildren(boardList(null));
-          boards[game.id] = await S.getTop10(game.id, game.mode, true);
-          body.replaceChildren(boardList(boards[game.id], game));
+          boards[key] = await S.getTop10(game.id, mode, true);
+          body.replaceChildren(boardList(boards[key], game, 0, mode));
         } }, ['↻ Refresh']),
         h('button', { class: 'xa-btn', type: 'button', onclick: closeModal }, ['Close'])
       ])
     ]);
-    modal(h('div', { class: 'xa-card', style: '--c:' + game.color }, [h('h3', { text: 'High scores' }), tabs, body, foot]));
-    if (!boards[game.id]) S.getTop10(game.id, game.mode).then(function (b) {
-      boards[game.id] = b;
-      if (modalEl && body.isConnected) body.replaceChildren(boardList(b, game));
+    modal(h('div', { class: 'xa-card', style: '--c:' + game.color }, [h('h3', { text: 'High scores' }), tabs, modeTabs, body, foot]));
+    if (!boards[key]) S.getTop10(game.id, mode).then(function (b) {
+      boards[key] = b;
+      if (modalEl && body.isConnected) body.replaceChildren(boardList(b, game, 0, mode));
     });
   }
 
   /* ------------------------------------------------------- session */
-  function startGame(id) {
+  function startGame(id, variantKey) {
     XA.audio.unlock();
     closeModal();
     var game = XA.games.filter(function (g) { return g.id === id; })[0];
     if (!game) return;
+    var variant = variantOf(game, variantKey);
+    var mode = variant ? variant.mode : game.mode;
     endSession();
     if (XA.music) { XA.music.stop(0.15); XA.music.clearListeners(); }
 
     var canvas = h('canvas', { 'aria-label': game.title + ' playfield' });
     var stage = h('div', { class: 'xa-stage' }, [canvas]);
     var scoreEl = h('b', { id: 'xa-score', text: '0' });
-    var bestEl = h('b', { text: U.fmt(S.localBest(game.id)) });
+    var bestEl = h('b', { text: fmtBest(game, mode) });
     var hiEl = h('b', { text: '…' });
     var statusEl = h('div', { class: 'xa-status', 'aria-live': 'polite' });
     var pauseBtn = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Pause', text: '❚❚', onclick: function () { togglePause(); } });
     gameEl = h('section', { class: 'xa-game', style: '--c:' + game.color }, [
       h('div', { class: 'xa-hud' }, [
         h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Back to the arcade', text: '◀', onclick: function () { endSession(); } }),
-        h('span', { class: 'xa-title', text: game.title }),
+        h('span', { class: 'xa-title', text: game.title + (variant ? ' · ' + variant.label : '') }),
         h('div', { class: 'xa-hud-stats' }, [
-          h('div', {}, [h('small', { text: 'SCORE' }), scoreEl]),
+          h('div', {}, [h('small', { text: mode === 'time' ? 'TIME' : 'SCORE' }), scoreEl]),
           h('div', {}, [h('small', { text: 'BEST' }), bestEl]),
           h('div', {}, [h('small', { text: 'CHAIN #1' }), hiEl])
         ]),
@@ -237,7 +287,7 @@
     var seed = U.newSeed();
     var fx = XA.createFx();
     session = {
-      game: game, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,
+      game: game, variant: variant, mode: mode, completed: false, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,
       score: 0, shake: 0, state: 'countdown', countdown: 3.0, acc: 0, seed: seed,
       scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()
     };
@@ -251,6 +301,12 @@
       getScore: function () { return s.score; },
       setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },
       gameOver: function () { if (s.state === 'play') finish(); },
+      // Which board this run is for. In 'time' mode the score is the elapsed
+      // time in centiseconds (lower wins): keep it current with setScore and
+      // call finish() on completion. gameOver() without finish() is a DNF.
+      mode: mode,
+      variant: variant ? variant.key : null,
+      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } },
       // Pointer in playfield units. `moved` increments on every move/press, so a
       // game can tell "the pointer is steering" from "the keys are steering".
       pointer: function () {
@@ -261,10 +317,10 @@
     s.instance = game.create(api);
     fit();
     showCountdown();
-    S.getTop10(game.id, game.mode).then(function (b) {
-      boards[game.id] = b;
+    S.getTop10(game.id, mode).then(function (b) {
+      boards[bk(game, mode)] = b;
       if (session !== s) return;
-      hiEl.textContent = b.ok ? (b.entries[0] ? U.fmt(b.entries[0].score) : '—') : 'offline';
+      hiEl.textContent = b.ok ? (b.entries[0] ? fmtVal(mode, b.entries[0].score) : '—') : 'offline';
     });
   }
 
@@ -402,38 +458,43 @@
     s.input.reset();
     // Games may already have stopped their music (e.g. their own death cue).
     if (XA.music && XA.music.isPlaying()) XA.music.tapeStop(1.3);
-    var g = s.game;
+    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
     var score = s.score;
-    var prevBest = S.localBest(g.id);
-    var best = S.recordLocal(g.id, score);
-    var isPb = score > prevBest && score > 0;
+    var dnf = mode === 'time' && !s.completed;
+    if (dnf) score = 0;
+    var prevBest = localBest(g, mode);
+    var best = recordLocal(g, mode, score);
+    var isPb = score > 0 && (mode === 'time' ? (!prevBest || score < prevBest) : score > prevBest);
     XA.audio.arp(isPb ? [523, 659, 784, 1047] : [392, 330, 262], 0.09, { type: 'triangle', vol: 0.2 });
 
     var verdict = h('p', { class: 'xa-verdict', text: 'Checking the on-chain board…' });
     var submitBox = h('div', { class: 'xa-submit xa-hidden' });
-    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id); } }, ['↻ Play again']);
+    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['↻ Play again']);
     setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
-      h('h3', { text: 'GAME OVER' }),
-      h('div', { class: 'xa-final', text: U.fmt(score) }),
-      isPb ? h('span', { class: 'xa-badge', text: '★ NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + U.fmt(best) }),
+      h('h3', { text: dnf ? 'DID NOT FINISH' : mode === 'time' ? 'FINISHED' : 'GAME OVER' }),
+      h('div', { class: 'xa-final', text: dnf ? '—' : fmtVal(mode, score) }),
+      isPb ? h('span', { class: 'xa-badge', text: '★ NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + fmtBest(g, mode) }),
       verdict,
       submitBox,
       h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])])
     ])]));
     again.focus();
 
+    if (dnf) { verdict.textContent = 'Finish the run to set a time for the board.'; return; }
     if (!(score > 0)) { verdict.textContent = 'Score something to get on the board.'; return; }
-    var board = await S.getTop10(g.id, g.mode, true);
+    var board = await S.getTop10(g.id, mode, true);
     if (session !== s) return;
-    boards[g.id] = board;
-    var rank = insertRank(board, score, g.mode);
+    boards[bk(g, mode)] = board;
+    var rank = insertRank(board, score, mode);
     if (!board.ok) {
       verdict.textContent = 'Couldn’t check the leaderboard right now — you can still try to post.';
     } else if (rank) {
       verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');
     } else {
       var tenth = board.entries[9];
-      verdict.textContent = 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';
+      verdict.textContent = mode === 'time'
+        ? 'The top 10 starts at ' + fmtVal(mode, tenth.score) + '. ' + fmtVal(mode, score - tenth.score + 1) + ' faster to get on the board.'
+        : 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';
       return;
     }
     buildSubmit(submitBox, s, score, rank);
@@ -469,7 +530,7 @@
       btn.disabled = true; name.disabled = true;
       msg.className = 'xa-msg'; msg.textContent = 'Check your wallet to confirm…';
       try {
-        var r = await S.submit({ gameId: g.id, mode: g.mode, score: score, name: n });
+        var r = await S.submit({ gameId: g.id, mode: s.mode, score: score, name: n });
         if (r.ok) {
           var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
           msg.className = 'xa-msg is-ok';
@@ -547,7 +608,8 @@
       s.fx.update(dt);
     }
     if (session !== s) return;
-    s.scoreEl.textContent = U.fmt(s.score);
+    var shown = fmtVal(s.mode, s.score);
+    if (s.scoreEl.textContent !== shown) s.scoreEl.textContent = shown;
 
     var ctx = s.ctx, k = s.scale * s.dpr;
     ctx.setTransform(k, 0, 0, k, 0, 0);
@@ -580,7 +642,7 @@
       if (e.key === 'Escape' && modalEl) { closeModal(); return; }
       if (!session) return;
       if (e.key === 'Enter' && session.state === 'over' && doc.activeElement && doc.activeElement.id !== 'xa-name' &&
-          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id);
+          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key);
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && session.state === 'paused') togglePause();
     });
     raf = root.requestAnimationFrame(frame);

@@ -66,6 +66,8 @@ async function mockApi(ctx) {
     if (url.endsWith('/get-top10')) {
       const gid = T.cvToValue(T.hexToCV(args[0]));
       stats.boardReads[gid] = (stats.boardReads[gid] || 0) + 1;
+      const bmode = String(T.cvToValue(T.hexToCV(args[1])));
+      stats.boardReads[gid + ':' + bmode] = (stats.boardReads[gid + ':' + bmode] || 0) + 1;
       if (gid === 'xa_cave_diver') return route.fulfill({ status: 503, headers: cors, body: 'down' });
       return ok(gid === 'xa_neon_snake' ? SNAKE_BOARD : EMPTY_BOARD);
     }
@@ -172,6 +174,33 @@ async function mockApi(ctx) {
   check(true, 'block drop tops out into game over');
   await frame.waitForFunction(() => /top 10/.test(document.querySelector('.xa-verdict').textContent), null, { timeout: 5000 });
   check(true, 'empty board: any score makes the top 10');
+
+  /* ---------- 3b. Block Drop Sprint 40: a cabinet variant on the time board ---------- */
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
+  check(!!(await frame.$('[data-play-variant="xa_block_drop:sprint"]')), 'block drop cabinet offers the Sprint 40 variant');
+  await frame.click('[data-play-variant="xa_block_drop:sprint"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  const sp = await frame.evaluate(() => ({ mode: window.XARoom._session().mode, label: document.querySelector('.xa-hud-stats small').textContent }));
+  check(sp.mode === 'time' && sp.label === 'TIME', 'sprint runs in time mode with a TIME readout');
+  await page.waitForTimeout(600);
+  check(/\d\.\d\ds$/.test(await frame.textContent('#xa-score')), 'sprint HUD shows elapsed time (' + (await frame.textContent('#xa-score')) + ')');
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Space'); await page.waitForTimeout(40); }
+  await frame.waitForSelector('.xa-over', { timeout: 15000 });
+  check((await frame.textContent('.xa-over h3')) === 'DID NOT FINISH', 'topping out a sprint is a DNF');
+  check(!(await frame.$('.xa-submit:not(.xa-hidden)')), 'a DNF cannot be posted');
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
+  await frame.click('[data-game="xa_block_drop"] .xa-cab-actions .xa-btn:not(.xa-btn-play):not(.xa-btn-variant)');
+  await frame.waitForSelector('.xa-mode-tab');
+  check((await frame.$$eval('.xa-mode-tab', (els) => els.map((e) => e.textContent))).join('|') === 'Marathon|⏱ Sprint 40', 'block drop boards have Marathon and Sprint 40 tabs');
+  await frame.click('.xa-mode-tab[data-mode="time"]');
+  await frame.waitForSelector('.xa-mode-tab[data-mode="time"][aria-selected="true"]');
+  await frame.waitForFunction(() => !/Loading/.test(document.querySelector('.xa-card').textContent));
+  check(stats.boardReads['xa_block_drop:1'] > 0, 'sprint tab reads the time board (mode u1)');
+  await frame.press('body', 'Escape');
+  await frame.click('[data-play="xa_block_drop"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  for (let i = 0; i < 40; i++) { await page.keyboard.press('Space'); await page.waitForTimeout(40); }
+  await frame.waitForSelector('.xa-over', { timeout: 15000 });
 
   /* ---------- 4. Cave Diver: hold to swim, crash ---------- */
   await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
