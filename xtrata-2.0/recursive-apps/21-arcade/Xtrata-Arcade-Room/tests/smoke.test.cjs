@@ -15,7 +15,8 @@ const FILES = { 101: 'arcade-room.css', 102: 'arcade-kit.js', 103: 'score-client
   105: 'game-neon-snake.js', 106: 'game-block-drop.js', 107: 'game-cave-diver.js',
   108: 'game-orbit-merge.js', 109: 'game-block-runner.js', 110: 'game-brick-breaker.js',
   111: 'game-rock-drift.js', 112: 'game-stack-tower.js', 113: 'game-road-hopper.js',
-  114: 'game-tile-tap.js', 115: 'game-merge-2048.js', 116: 'game-block-defence.js' };
+  114: 'game-tile-tap.js', 115: 'game-merge-2048.js', 116: 'game-block-defence.js',
+  117: 'game-maze-muncher.js', 118: 'game-invader-wave.js', 119: 'game-helix-drop.js' };
 const CHUNK = 16384;
 const P1 = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', P2 = 'SP000000000000000000002Q6VF78';
 
@@ -26,7 +27,7 @@ function server() {
       if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); return rsp.end(); }
       let body = fs.readFileSync(f);
       if (f.endsWith('xtrata-arcade-parent.template.html')) {
-        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110, drift: 111, stack: 112, hopper: 113, tiles: 114, merge2048: 115, defence: 116 }');
+        body = body.toString().replace(/moduleIds: \{[\s\S]*?\}/, 'moduleIds: { css: 101, kit: 102, scores: 103, room: 104, snake: 105, blocks: 106, cave: 107, merge: 108, runner: 109, bricks: 110, drift: 111, stack: 112, hopper: 113, tiles: 114, merge2048: 115, defence: 116, muncher: 117, invaders: 118, helix: 119 }');
       }
       const type = f.endsWith('.html') ? 'text/html' : f.endsWith('.css') ? 'text/css' : 'text/javascript';
       rsp.writeHead(200, { 'Content-Type': type, 'Access-Control-Allow-Origin': '*' });
@@ -87,7 +88,7 @@ async function mockApi(ctx) {
   await page.goto(base + '/tests/mock-host.html');
   const frame = page.frames().find((f) => f !== page.mainFrame());
   await frame.waitForSelector('.xa-cab', { timeout: 20000 });
-  check((await frame.$$('.xa-cab')).length === 12, 'parent loaded 16 leaves from get-chunk and room shows 12 cabinets');
+  check((await frame.$$('.xa-cab')).length === 15, 'parent loaded 19 leaves from get-chunk and room shows 15 cabinets');
   check(stats.chunkReads >= 14, `modules read via get-chunk (${stats.chunkReads} calls)`);
   await frame.waitForFunction(() => document.querySelector('[data-game="xa_neon_snake"] .xa-top1').textContent !== '…');
   check((await frame.textContent('[data-game="xa_neon_snake"] .xa-top1')).includes('1,000 JIM'), 'snake cabinet shows chain #1 from get-top10');
@@ -288,6 +289,41 @@ async function mockApi(ctx) {
   }
   await page.screenshot({ path: path.join(OUT, '22-defence.png') });
   check((await frame.evaluate(() => window.XARoom._session().score)) > 0, 'block defence: interceptor blasts destroy warheads');
+  await frame.click('.xa-hud .xa-icon');
+
+  /* ---------- 4k. Maze Muncher: eat pellets ---------- */
+  await frame.click('[data-play="xa_maze_muncher"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await page.waitForTimeout(1500);
+  await page.keyboard.press('ArrowLeft'); await page.waitForTimeout(900);
+  await page.keyboard.press('ArrowUp'); await page.waitForTimeout(600);
+  await page.keyboard.press('ArrowRight'); await page.waitForTimeout(900);
+  await page.screenshot({ path: path.join(OUT, '23-muncher.png') });
+  check((await frame.evaluate(() => window.XARoom._session().score)) >= 50, 'maze muncher: moving eats pellets');
+  await frame.click('.xa-hud .xa-icon');
+
+  /* ---------- 4l. Invader Wave: fire into the formation ---------- */
+  await frame.click('[data-play="xa_invader_wave"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  await page.keyboard.down('Space');
+  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(700); await page.keyboard.up('ArrowLeft');
+  await page.keyboard.down('ArrowRight'); await page.waitForTimeout(1400); await page.keyboard.up('ArrowRight');
+  await page.keyboard.up('Space');
+  await page.screenshot({ path: path.join(OUT, '24-invaders.png') });
+  check((await frame.evaluate(() => window.XARoom._session().score)) > 0, 'invader wave: shots destroy invaders');
+  await frame.click('.xa-hud .xa-icon');
+
+  /* ---------- 4m. Helix Drop: spin a gap under the ball ---------- */
+  await frame.click('[data-play="xa_helix_drop"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  for (let i = 0; i < 60; i++) {
+    const d = await frame.evaluate(() => window.XARoom._session().instance.debug());
+    if (d.passed >= 3) break;
+    if (d.kinds[d.seg] === 1) { await page.waitForTimeout(200); continue; }
+    await page.keyboard.down('ArrowRight'); await page.waitForTimeout(40); await page.keyboard.up('ArrowRight');
+  }
+  await page.screenshot({ path: path.join(OUT, '25-helix.png') });
+  check((await frame.evaluate(() => window.XARoom._session().instance.debug().passed)) >= 1, 'helix drop: ball falls through gaps');
   await frame.click('.xa-hud .xa-icon');
 
   /* ---------- 5. Narrow host method path ---------- */

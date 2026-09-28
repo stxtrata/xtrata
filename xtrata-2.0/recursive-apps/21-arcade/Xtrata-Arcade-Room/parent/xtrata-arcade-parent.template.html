@@ -15,7 +15,8 @@
       node parent/fill-ids.mjs --css <id> --kit <id> --scores <id> --room <id> \
         --snake <id> --blocks <id> --cave <id> --merge <id> --runner <id> --bricks <id> \
         --drift <id> --stack <id> --hopper <id> \
-        --tiles <id> --merge2048 <id> --defence <id>
+        --tiles <id> --merge2048 <id> --defence <id> \
+        --muncher <id> --invaders <id> --helix <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
   -->
@@ -79,7 +80,10 @@
         hopper: 0,
         tiles: 0,
         merge2048: 0,
-        defence: 0
+        defence: 0,
+        muncher: 0,
+        invaders: 0,
+        helix: 0
       },
       scoreContract: {
         contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -104,7 +108,10 @@
       { key: 'hopper', file: 'game-road-hopper.js', type: 'js' },
       { key: 'tiles', file: 'game-tile-tap.js', type: 'js' },
       { key: 'merge2048', file: 'game-merge-2048.js', type: 'js' },
-      { key: 'defence', file: 'game-block-defence.js', type: 'js' }
+      { key: 'defence', file: 'game-block-defence.js', type: 'js' },
+      { key: 'muncher', file: 'game-maze-muncher.js', type: 'js' },
+      { key: 'invaders', file: 'game-invader-wave.js', type: 'js' },
+      { key: 'helix', file: 'game-helix-drop.js', type: 'js' }
     ];
 
     var fillEl = document.getElementById('xb-fill');

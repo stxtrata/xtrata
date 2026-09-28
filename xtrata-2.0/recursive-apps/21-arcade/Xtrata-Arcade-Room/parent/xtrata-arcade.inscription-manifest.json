@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v1.3-twelve-cabinets",
+  "release": "v1.4-fifteen-cabinets",
   "createdAt": "2026-09-28",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -24,7 +24,10 @@
       "xa_road_hopper",
       "xa_tile_tap",
       "xa_merge_2048",
-      "xa_block_defence"
+      "xa_block_defence",
+      "xa_maze_muncher",
+      "xa_invader_wave",
+      "xa_helix_drop"
     ]
   },
   "leafModules": [
@@ -59,8 +62,8 @@
       "key": "room",
       "path": "modules/arcade-room.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 26660,
-      "sha256": "2d20a45308067166a7abff5eeaf88fbeae7d51a9adbb007f154316b4a8362d61",
+      "sizeBytes": 26929,
+      "sha256": "ce672b5a0cd38a80bc471a6f3a0b68bc4ab3b03387ab26fbdf6484d1c5706f2f",
       "mintOrder": 4,
       "mintedInscriptionId": 0
     },
@@ -171,12 +174,39 @@
       "sha256": "2544b9198c369e0a8fa68f1be93ab129e33e624321be2b581eedf2fb4c9a8250",
       "mintOrder": 16,
       "mintedInscriptionId": 0
+    },
+    {
+      "key": "muncher",
+      "path": "modules/game-maze-muncher.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 17012,
+      "sha256": "7b22075bc7c4f23d579b76ff9f874aa87576da850eb286d9f61f2432d513882b",
+      "mintOrder": 17,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "invaders",
+      "path": "modules/game-invader-wave.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 13497,
+      "sha256": "4cc34eaec70c45d964b4630609e69591c5c7710022f0d01d62a1d83cffd7d816",
+      "mintOrder": 18,
+      "mintedInscriptionId": 0
+    },
+    {
+      "key": "helix",
+      "path": "modules/game-helix-drop.js",
+      "mimeType": "text/javascript",
+      "sizeBytes": 10288,
+      "sha256": "c67efb4fa08f37467c8baa862b7cb8662fa7f661ea077f55702d4df5252e0501",
+      "mintOrder": 19,
+      "mintedInscriptionId": 0
     }
   ],
   "parent": {
     "path": "parent/xtrata-arcade-parent.template.html",
     "mimeType": "text/html",
-    "mintOrder": 17,
+    "mintOrder": 20,
     "dependencyOrder": [
       "css",
       "kit",
@@ -193,7 +223,10 @@
       "hopper",
       "tiles",
       "merge2048",
-      "defence"
+      "defence",
+      "muncher",
+      "invaders",
+      "helix"
     ]
   }
 }
