@@ -2,20 +2,20 @@
 // `submit-score` transaction. Wallet work goes only through src/lib/wallet
 // (see docs/WALLET-PLAYBOOK.md). The replay is re-played here first and the
 // replayed score is what gets submitted.
-import { cvToHex, cvToValue, hexToCV, Cl, principalCV, type ClarityValue } from '@stacks/transactions';
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
-import { showContractCall, type WalletCallProgress } from '../lib/wallet/connect';
+import { showContractCall } from '../lib/wallet/connect';
 import {
-  ARCADE_CONTRACT, buildSubmitCall, isPilot, parsePayload, PayloadError, SUBMIT_ERRORS, verifyPayload,
+  buildSubmitCall, isPilot, parsePayload, PayloadError, verifyPayload,
   type BoardInfo, type SubmitPayload
 } from './core';
+import { isPeriodClosed, loadBoard, previewRank } from './reads';
+import { signSubmit, submitErrorMessage, SubmitCancelled } from './sign';
 
 const wallet = createStacksWalletAdapter({ appName: 'Xtrata Arcade', appIcon: '/favicon.svg' });
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const setText = (id: string, text: string) => { el(id).textContent = text; };
 const status = (text: string, kind: '' | 'ok' | 'err' = '') => { const s = el('status'); s.textContent = text; s.className = 'status ' + kind; };
 
-const API_BASES = ['/hiro/mainnet', 'https://api.mainnet.hiro.so'];
 const hostId = (() => { const m = /[#&]id=([A-Za-z0-9-]{1,64})/.exec(location.hash); return m ? m[1] : ''; })();
 
 let payload: SubmitPayload | null = null;
@@ -26,64 +26,14 @@ let busy = false;
 let submittedTx = '';
 let periodClosed = false;
 
-const progressText: Record<WalletCallProgress, string> = {
-  'provider-selected': 'Wallet selected. Preparing the request…',
-  'account-read': 'Checking the active wallet account. Nothing has been signed yet…',
-  'account-cached': 'Wallet account confirmed. Preparing the transaction…',
-  'account-read-failed': 'The wallet did not share its account. Trying its connection flow…',
-  'account-reconnect': 'Waiting for your wallet to confirm account access. Check the extension.',
-  'signing-request': 'Approve the transaction in your wallet. Check the network fee before signing.',
-  'legacy-request': 'Wallet popup requested. Check your extension and popup permissions.'
-};
-
-function timeoutSignal(ms: number): AbortSignal | undefined {
-  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
-  if (typeof AbortController === 'undefined') return undefined;
-  const c = new AbortController(); setTimeout(() => c.abort(), ms); return c.signal;
-}
-
-async function readOnly(fn: string, args: ClarityValue[]): Promise<unknown> {
-  const body = JSON.stringify({ sender: ARCADE_CONTRACT.address, arguments: args.map((a) => cvToHex(a)) });
-  let lastError: unknown;
-  for (const base of API_BASES) {
-    try {
-      const r = await fetch(`${base}/v2/contracts/call-read/${ARCADE_CONTRACT.address}/${ARCADE_CONTRACT.name}/${fn}`, {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: timeoutSignal(12000)
-      });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const j = await r.json();
-      if (!j.okay) throw new Error(j.cause || 'read failed');
-      return cvToValue(hexToCV(j.result), true);
-    } catch (e) { lastError = e; }
-  }
-  throw lastError instanceof Error ? lastError : new Error('Could not reach the Stacks API');
-}
-
-async function checkPeriod(p: SubmitPayload) {
-  if (p.board !== 'astro3-daily') return;
-  try {
-    const cur = Number(await readOnly('current-period', []));
-    periodClosed = p.period !== cur && p.period + 1 !== cur;
-  } catch { /* unknown: the contract checks again */ }
-}
-
-async function loadBoard(p: SubmitPayload) {
-  const v = (await readOnly('get-board', [Cl.stringAscii(p.board)])) as { value?: Record<string, { value: string | boolean }> } | null;
-  if (!v || !v.value) throw new Error('This leaderboard does not exist yet.');
-  const b = v.value;
-  board = { fee: BigInt(String(b.fee.value)), enabled: Boolean(b.enabled.value), maxScore: BigInt(String(b['max-score'].value)) };
-}
+async function checkPeriod(p: SubmitPayload) { periodClosed = await isPeriodClosed(p); }
 
 async function loadRank(address: string) {
   if (!payload || verifiedScore == null) return;
   if (!isPilot(payload.replay, address)) { rank = null; render(); return; }
   rank = null; render();
-  try {
-    const v = await readOnly('preview-rank', [Cl.stringAscii(payload.board), Cl.uint(payload.period), Cl.uint(verifiedScore), principalCV(address)]);
-    rank = { ok: true, value: Number(v) };
-  } catch {
-    rank = { ok: false }; // a failed read is not "not in the Top 10"
-  }
+  const v = await previewRank(payload, verifiedScore, address);
+  rank = v === null ? { ok: false } : { ok: true, value: v }; // a failed read is not "not in the Top 10"
   render();
 }
 
@@ -134,7 +84,7 @@ async function start() {
   verifiedScore = v.score;
   setText('rVerified', `${fmt(v.score)} ✓`);
   status('Run verified. Connect your wallet to submit it.', 'ok');
-  try { await loadBoard(p); } catch (e) { status(e instanceof Error ? e.message : 'Could not read the leaderboard.', 'err'); }
+  try { board = await loadBoard(p.board); } catch (e) { status(e instanceof Error ? e.message : 'Could not read the leaderboard.', 'err'); }
   await checkPeriod(p);
   const s = wallet.getSession();
   if (s.isConnected && s.address) await loadRank(s.address);
@@ -165,17 +115,7 @@ el('submit').onclick = async () => {
   const started = Date.now();
   const waiting = setInterval(() => status(`Still waiting for your wallet (${Math.round((Date.now() - started) / 1000)} s). Check the extension. Do not submit twice.`), 30000);
   try {
-    const txId = await new Promise<string>((resolve, reject) => showContractCall({
-      ...call,
-      onProgress: (stage) => status(progressText[stage]),
-      onFinish: (result: { txId?: string; txid?: string }) => {
-        const id = String(result.txId || result.txid || '');
-        if (!/^(0x)?[0-9a-f]{64}$/i.test(id)) { reject(new Error('The wallet did not return a transaction ID. Check your wallet history before trying again.')); return; }
-        resolve(id.startsWith('0x') ? id : '0x' + id);
-      },
-      onCancel: () => reject(Object.assign(new Error('Cancelled. Nothing was sent.'), { cancelled: true })),
-      onError: (e: unknown) => reject(e)
-    }));
+    const txId = await signSubmit(showContractCall, call, (t) => status(t));
     submittedTx = txId;
     const a = document.createElement('a');
     a.href = `https://explorer.hiro.so/txid/${txId}?chain=mainnet`; a.target = '_blank'; a.rel = 'noopener';
@@ -184,11 +124,10 @@ el('submit').onclick = async () => {
     el('status').append(a);
     notifyHost({ txId });
   } catch (e) {
-    const err = e as { message?: string; cancelled?: boolean };
-    const m = /\(err u(\d+)\)/.exec(String(err?.message || ''));
-    const msg = m && SUBMIT_ERRORS[+m[1]] ? SUBMIT_ERRORS[+m[1]] : (err?.message || 'The wallet request failed.');
-    status(msg, err?.cancelled ? '' : 'err');
-    notifyHost(err?.cancelled ? { cancelled: true } : { error: msg });
+    const cancelled = e instanceof SubmitCancelled;
+    const msg = cancelled ? e.message : submitErrorMessage(e);
+    status(msg, cancelled ? '' : 'err');
+    notifyHost(cancelled ? { cancelled: true } : { error: msg });
   } finally {
     clearInterval(waiting);
     busy = false; render();

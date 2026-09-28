@@ -204,7 +204,7 @@
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
-    import { openArcadeSubmit } from '/src/lib/viewer/arcade-submit-host.ts';
+    import { runArcadeSubmit } from '/src/lib/viewer/arcade-submit-host.ts';
     import { resolveInscriptionMimeType } from '/src/lib/mint/mime.ts';
     import {
       mergeDependencySources,
@@ -9899,6 +9899,13 @@ const openCuratedGallery = async (galleryId, options = {}) => {
       }
     };
 
+    const onBridgeSessionChanged = (session) => {
+      // Connecting from a game must not reload the grid or replace its iframe.
+      state.walletSession = session;
+      refreshConnectedWalletMatureMode();
+      updateWalletStatus();
+      updateControls();
+    };
     const publicWalletBridge = installPublicWalletBridge({
       host: window,
       wallet: walletAdapter,
@@ -9918,17 +9925,16 @@ const openCuratedGallery = async (galleryId, options = {}) => {
             onFinish: (value) => finish(resolve, value), onCancel: () => finish(reject, Object.assign(new Error('Save publication cancelled.'), {code:4001})), onError: (error) => finish(reject, error) }); } catch (error) { finish(reject, error); }
         })
       }),
-      // Arcade scores: the host reviews, then opens the top-level /arcade/submit page.
-      arcadeSubmit: (payload, label, id) => openArcadeSubmit(window, payload, label, id),
+      // Arcade scores: the host re-plays the run and signs submit-score in its own
+      // dialog (sandboxed games cannot open tabs); /arcade/submit is the fallback.
+      arcadeSubmit: (payload, label, id) => runArcadeSubmit(window, payload, label, id, {
+        wallet: walletAdapter,
+        showContractCall,
+        sessionChanged: onBridgeSessionChanged
+      }),
       isBusy: () => state.busy,
       pendingChanged: setBusy,
-      sessionChanged: (session) => {
-        // Connecting from a game must not reload the grid or replace its iframe.
-        state.walletSession = session;
-        refreshConnectedWalletMatureMode();
-        updateWalletStatus();
-        updateControls();
-      }
+      sessionChanged: onBridgeSessionChanged
     });
 
     const setExplorerModeFromRequest = () => {

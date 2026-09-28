@@ -1,4 +1,5 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
+import type { ArcadeOutcome } from './arcade-submit-host';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -31,11 +32,12 @@ type Options = {
   isBusy?: () => boolean;
   pendingChanged?: (pending: boolean) => void;
   /**
-   * Arcade score hand-off. The game never signs: the host reviews the request and
-   * opens the top-level /arcade/submit page, which signs through src/lib/wallet.
-   * Resolves with the opened window, or null when the player cancels.
+   * Arcade score hand-off. The game never signs: the host shows its own dialog,
+   * re-plays the run and signs submit-score through src/lib/wallet, or opens the
+   * top-level /arcade/submit page as a fallback. Resolves with the txid, the
+   * opened window, or null when the player cancels.
    */
-  arcadeSubmit?: (payload: Record<string, unknown>, label: string, id: string) => Promise<Window | null>;
+  arcadeSubmit?: (payload: Record<string, unknown>, label: string, id: string) => Promise<ArcadeOutcome>;
 };
 const ARCADE_ID = /^[A-Za-z0-9-]{1,64}$/;
 const ARCADE_MAX_PAYLOAD = 120_000;
@@ -177,9 +179,11 @@ export function installPublicWalletBridge(options: Options) {
     arcadePending.set(p.id, record);
     send({ type: 'xtrata:arcade:submit-opened', id: p.id });
     options.arcadeSubmit(payload as Record<string, unknown>, entry.label, p.id).finally(() => { arcadeDialogOpen = false; }).then(
-      (tab) => {
-        if (tab) record.tab = tab;
-        else { arcadePending.delete(p.id); send({ type: 'xtrata:arcade:submit-result', id: p.id, cancelled: true }); }
+      (outcome) => {
+        if (outcome?.kind === 'tab') { record.tab = outcome.tab; return; }
+        arcadePending.delete(p.id);
+        const txId = outcome?.kind === 'tx' && /^0x[0-9a-f]{64}$/i.test(outcome.txId) ? outcome.txId : undefined;
+        send(txId ? { type: 'xtrata:arcade:submit-result', id: p.id, txId } : { type: 'xtrata:arcade:submit-result', id: p.id, cancelled: true });
       },
       (error) => {
         arcadePending.delete(p.id);

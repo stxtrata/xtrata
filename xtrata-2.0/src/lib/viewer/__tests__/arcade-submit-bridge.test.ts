@@ -28,7 +28,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 describe('arcade submit hand-off', () => {
   it('acknowledges, asks the host, and never touches the wallet', async () => {
     const tab = {} as Window;
-    const arcadeSubmit = vi.fn(async () => tab);
+    const arcadeSubmit = vi.fn(async () => ({ kind: 'tab' as const, tab }));
     const { sent, emit, wallet } = await setup(arcadeSubmit);
     emit({ type: 'xtrata:arcade:submit', id: 'ab3-1', payload });
     await flush();
@@ -42,7 +42,7 @@ describe('arcade submit hand-off', () => {
 
   it('ignores results that do not come from the host origin or the opened tab', async () => {
     const tab = {} as Window;
-    const { sent, emit } = await setup(vi.fn(async () => tab));
+    const { sent, emit } = await setup(vi.fn(async () => ({ kind: 'tab' as const, tab })));
     emit({ type: 'xtrata:arcade:submit', id: 'ab3-2', payload });
     await flush();
     sent.mockClear();
@@ -50,6 +50,15 @@ describe('arcade submit hand-off', () => {
     emit({ type: 'xtrata:arcade:submit-result', id: 'ab3-2', txId: '0x' + 'b'.repeat(64) }, 'https://evil.example', tab);
     emit({ type: 'xtrata:arcade:submit-result', id: 'ab3-2', txId: '0x' + 'b'.repeat(64) }, window.location.origin, {} as Window);
     expect(sent).not.toHaveBeenCalled();
+  });
+
+  it('forwards a transaction signed in the host dialog', async () => {
+    const txId = '0x' + 'c'.repeat(64);
+    const { sent, emit } = await setup(vi.fn(async () => ({ kind: 'tx' as const, txId })));
+    emit({ type: 'xtrata:arcade:submit', id: 'ab3-7', payload });
+    await flush();
+    expect(sent.mock.calls[0][0]).toEqual({ type: 'xtrata:arcade:submit-opened', id: 'ab3-7' });
+    expect(sent.mock.calls.at(-1)![0]).toEqual({ type: 'xtrata:arcade:submit-result', id: 'ab3-7', txId });
   });
 
   it('reports a cancelled review back to the game', async () => {
@@ -93,8 +102,8 @@ describe('arcade submit hand-off', () => {
 
 describe('arcade dialog spam', () => {
   it('keeps one host review open at a time', async () => {
-    let release: (v: Window | null) => void = () => {};
-    const arcadeSubmit = vi.fn(() => new Promise<Window | null>((r) => { release = r; }));
+    let release: (v: null) => void = () => {};
+    const arcadeSubmit = vi.fn(() => new Promise<null>((r) => { release = r; }));
     const { sent, emit } = await setup(arcadeSubmit);
     emit({ type: 'xtrata:arcade:submit', id: 'a1', payload });
     emit({ type: 'xtrata:arcade:submit', id: 'a2', payload });
