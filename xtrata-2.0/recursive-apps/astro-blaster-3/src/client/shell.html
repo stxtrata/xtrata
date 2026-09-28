@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#050a1f">
+<title>Astro Blaster 3</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<canvas id="cv" aria-label="Astro Blaster 3 game field"></canvas>
+
+<div id="hudButtons">
+  <button id="btnPause" class="iconBtn" aria-label="Pause">
+    <svg viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+  </button>
+</div>
+<button id="btnBomb" aria-label="Nova bomb"><span>NOVA</span></button>
+
+<!-- Title -->
+<section id="scrTitle" class="screen">
+  <div class="panel title">
+    <div class="logo">
+      <div class="logoTop">ASTRO</div>
+      <div class="logoMid">BLASTER<span class="three">3</span></div>
+      <div class="tagline">Every top score lives on Bitcoin</div>
+    </div>
+    <div class="menu">
+      <button class="btn primary" id="btnPlay">Play campaign</button>
+      <button class="btn" id="btnDaily">Daily run <small id="dailyLabel">&nbsp;</small></button>
+      <button class="btn" id="btnBoard">Top 10</button>
+      <div class="row2">
+        <button class="btn ghost" id="btnHow">How to play</button>
+        <button class="btn ghost" id="btnSettings">Settings</button>
+      </div>
+    </div>
+    <div class="pilotLine"><span id="pilotLabel">No pilot set</span> <button class="linkBtn" id="btnPilot">Set pilot</button></div>
+    <div class="bestLine" id="bestLine"></div>
+    <div class="footer">v<span id="gameV"></span> · engine v<span id="engineV"></span> · replays verifiable on-chain · Xtrata</div>
+  </div>
+</section>
+
+<!-- Pilot -->
+<section id="scrPilot" class="screen hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>Who's flying?</h2><button class="close" data-back aria-label="Back">&times;</button></div>
+    <p class="fine" style="margin-top:0">Your Stacks address is built into every run you fly, so only that wallet can submit it and nobody can copy your score. It is only read here, never used to sign.</p>
+    <div class="submitBox" style="border-color:var(--line);background:rgba(57,230,255,0.05)">
+      <div class="row"><input type="text" id="pilotInput" placeholder="SP… address" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div class="msg" id="pilotMsg"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="btnPilotSave">Save and play</button>
+        <button class="btn" id="btnPilotWallet">Use my wallet</button>
+      </div>
+      <div class="walletChoices hidden" id="walletChoices" role="group" aria-label="Choose a wallet"></div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="btnPilotSkip">Play without submitting</button></div>
+  </div>
+</section>
+
+<!-- Leaderboard -->
+<section id="scrBoard" class="screen hidden">
+  <div class="panel wide">
+    <div class="panelHead">
+      <h2>Top 10</h2>
+      <button class="close" data-back aria-label="Back">&times;</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-board="campaign" role="tab">Campaign</button>
+      <button class="tab" data-board="daily" role="tab">Daily <span id="dailyTabLabel"></span></button>
+    </div>
+    <div id="boardStatus" class="status"></div>
+    <ol id="boardList" class="board"></ol>
+    <p class="fine">Each entry stores its full run on-chain. <b>Verified</b> means this engine replayed it and reached exactly that score.</p>
+    <div class="actions"><button class="btn ghost" id="btnBoardRefresh">Refresh</button></div>
+  </div>
+</section>
+
+<!-- How to play -->
+<section id="scrHow" class="screen hidden">
+  <div class="panel wide">
+    <div class="panelHead"><h2>How to play</h2><button class="close" data-back aria-label="Back">&times;</button></div>
+    <div class="how">
+      <div class="howCol">
+        <h3>Controls</h3>
+        <p><kbd>Arrows</kbd>/<kbd>WASD</kbd> move · fire is automatic</p>
+        <p><kbd>X</kbd>/<kbd>Shift</kbd>/<kbd>Space</kbd> Nova bomb · <kbd>P</kbd> pause</p>
+        <p><b>Touch:</b> drag anywhere to steer; the ship follows your finger with an offset. Tap NOVA for a bomb.</p>
+        <p><b>Gamepad:</b> stick or d-pad to move, A/B bomb, Start pause.</p>
+      </div>
+      <div class="howCol">
+        <h3>Scoring</h3>
+        <p><b>Chain:</b> keep killing within 1.5 s to raise your multiplier up to x8. A hit resets it.</p>
+        <p><b>Graze:</b> let bullets pass close to your ship for points and Nova charge. Only the white dot is your hitbox.</p>
+        <p><b>Perfect wave</b> and fast boss kills pay bonuses. Each Deep Loop multiplies everything by 1.5.</p>
+      </div>
+      <div class="howCol">
+        <h3>The run</h3>
+        <p>6 sectors of 4 waves plus a boss. Pick 1 of 3 upgrades after each wave, and spend scrap at the Dock after each boss.</p>
+        <p>Beat all six sectors and the Deep Loop begins: harder, faster, richer.</p>
+        <p><b>Daily run:</b> same seed for everyone for one Bitcoin day (144 blocks), with its own board.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Settings -->
+<section id="scrSettings" class="screen hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>Settings</h2><button class="close" data-back aria-label="Back">&times;</button></div>
+    <label class="field">Sound effects <input type="range" id="setSfx" min="0" max="1" step="0.05"></label>
+    <label class="field">Music <input type="range" id="setMusic" min="0" max="1" step="0.05"></label>
+    <label class="toggle"><input type="checkbox" id="setShake"> Screen shake</label>
+    <label class="toggle"><input type="checkbox" id="setFlash"> Bright flashes</label>
+    <label class="toggle"><input type="checkbox" id="setContrast"> High-contrast bullets</label>
+  </div>
+</section>
+
+<!-- Pause -->
+<section id="scrPause" class="screen hidden">
+  <div class="panel narrow">
+    <h2 class="center">Paused</h2>
+    <div class="menu">
+      <button class="btn primary" id="btnResume">Resume</button>
+      <button class="btn" id="btnPauseSettings">Settings</button>
+      <button class="btn ghost" id="btnQuit">Quit run</button>
+    </div>
+  </div>
+</section>
+
+<!-- Upgrade cards -->
+<section id="scrCards" class="screen hidden clear">
+  <div class="cardsWrap">
+    <div class="cardsTitle">Choose an upgrade</div>
+    <div id="cards" class="cards"></div>
+  </div>
+</section>
+
+<!-- Dock -->
+<section id="scrDock" class="screen hidden">
+  <div class="panel">
+    <div class="panelHead"><h2>The Dock</h2><div class="scrap" id="dockScrap"></div></div>
+    <p class="fine">Spend scrap before the next sector. Prices rise with each purchase.</p>
+    <div id="dockItems" class="dockItems"></div>
+    <div class="actions"><button class="btn primary" id="btnDockLeave">Launch <kbd>Enter</kbd></button></div>
+  </div>
+</section>
+
+<!-- Results -->
+<section id="scrResults" class="screen hidden">
+  <div class="panel wide">
+    <div class="panelHead"><h2 id="resTitle">Run over</h2></div>
+    <div class="resScore" id="resScore">0</div>
+    <div class="resStats" id="resStats"></div>
+    <div id="submitBox" class="submitBox"></div>
+    <div class="actions">
+      <button class="btn primary" id="btnAgain">Play again</button>
+      <button class="btn" id="btnWatchMine">Watch replay</button>
+      <button class="btn ghost" id="btnSaveReplay">Save replay file</button>
+      <button class="btn ghost" id="btnMenu">Menu</button>
+    </div>
+  </div>
+</section>
+
+<!-- Watch -->
+<div id="watchBar" class="hidden">
+  <span id="watchLabel"></span>
+  <button class="btn small" data-speed="1">1x</button>
+  <button class="btn small" data-speed="2">2x</button>
+  <button class="btn small" data-speed="4">4x</button>
+  <button class="btn small" data-speed="16">16x</button>
+  <button class="btn small ghost" id="btnWatchExit">Exit</button>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>/*JS*/</script>
+</body>
+</html>
