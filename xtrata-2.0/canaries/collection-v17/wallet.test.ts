@@ -106,6 +106,25 @@ describe('Xverse (X Chess canary rules)', () => {
     expect(calls.filter((c) => c.method === 'stx_callContract')).toHaveLength(1);
   });
 
+  it('STX transfer goes to the dotted StacksProvider with the full shape, never the BitcoinProvider', async () => {
+    const calls = xverse();
+    const dotted: { method: string; params?: any }[] = [];
+    (window as any).XverseProviders.StacksProvider = { request: vi.fn(async (method: string, params?: any) => { dotted.push({ method, params }); return { result: { txid: TXID } }; }) };
+    await wallet.connect('mainnet', choose('XverseProviders.BitcoinProvider'));
+    const tx = await wallet.stxTransfer({ recipient: OTHER, amount: 60_000n, memo: 'canary', network: 'mainnet', stxAddress: ADDR });
+    expect(tx.txId).toBe(TXID);
+    expect(dotted).toEqual([{ method: 'stx_transferStx', params: { recipient: OTHER, amount: '60000', memo: 'canary', network: 'mainnet', address: ADDR, sponsored: false } }]);
+    expect(calls.map((c) => c.method)).not.toContain('stx_transferStx');
+  });
+
+  it('STX transfer fallback: the BitcoinProvider gets only recipient, amount and memo', async () => {
+    const calls = xverse();
+    await wallet.connect('mainnet', choose('XverseProviders.BitcoinProvider'));
+    await wallet.stxTransfer({ recipient: OTHER, amount: 60_000n, memo: 'canary', network: 'mainnet', stxAddress: ADDR });
+    const sent = calls.filter((c) => c.method === 'stx_transferStx');
+    expect(sent).toEqual([{ method: 'stx_transferStx', params: { recipient: OTHER, amount: '60000', memo: 'canary' } }]);
+  });
+
   it('deploy sends Clarity 4 source with the account check', async () => {
     const calls = xverse();
     await wallet.connect('testnet' as any, choose('XverseProviders.BitcoinProvider')).catch(() => null);

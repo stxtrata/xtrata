@@ -530,21 +530,25 @@ export async function stxTransfer(o: TransferOptions): Promise<TxResult> {
   const startedAt = Date.now();
   try {
     if (!isXverse(p)) return needTx(await request(p, 'stx_transferStx', fullTransferParams(o)));
+    // Playbook §1–§2: Xverse STX payments go to the exact dotted StacksProvider
+    // with the full shape first. Sending network/address down the BitcoinProvider
+    // makes Xverse show "Transaction Failed · network mismatch" before our
+    // recovery reconnects and retries, which is the spurious popup seen in canaries.
     const rpc = xverseRpc();
     const dotted = xverseDottedStacks();
-    if (rpc) {
-      try {
-        await ensureXverseAccount(rpc, o.stxAddress, o.onProgress);
-        return needTx(await requestWithRecovery(rpc, 'stx_transferStx',
-          { recipient: o.recipient, amount: o.amount.toString(), ...(o.memo ? { memo: o.memo } : {}), network: o.network, address: o.stxAddress },
-          o.stxAddress, signOnlyFrom(o.buildUnsigned)));
-      } catch (e) {
-        console.warn('[wallet:stx-transfer]', { stage: 'XVERSE_MODERN_FAILED', code: (e as any)?.code, message: (e as any)?.message });
-        if (!(isUnsupported(e) && typeof dotted?.request === 'function')) throw e;
-      }
+    if (rpc) await ensureXverseAccount(rpc, o.stxAddress, o.onProgress);
+    if (typeof dotted?.request === 'function') {
+      console.info('[wallet:stx-transfer]', { stage: 'XVERSE_STACKS_PROVIDER' });
+      report(o.onProgress, 'signing-request');
+      return needTx(await request(dotted, 'stx_transferStx', fullTransferParams(o)));
     }
-    if (typeof dotted?.request === 'function') return needTx(await request(dotted, 'stx_transferStx', fullTransferParams(o)));
-    throw Object.assign(new Error('Xverse payment provider is not available.'), { code: 'XVERSE_RPC_UNAVAILABLE' });
+    if (!rpc) throw Object.assign(new Error('Xverse payment provider is not available.'), { code: 'XVERSE_RPC_UNAVAILABLE' });
+    // Last resort: the BitcoinProvider gets only the three spec fields.
+    console.info('[wallet:stx-transfer]', { stage: 'XVERSE_RPC_MINIMAL' });
+    report(o.onProgress, 'signing-request');
+    return needTx(await requestWithRecovery(rpc, 'stx_transferStx',
+      { recipient: o.recipient, amount: o.amount.toString(), ...(o.memo ? { memo: o.memo } : {}) },
+      o.stxAddress, signOnlyFrom(o.buildUnsigned)));
   } catch (e) {
     if (isUserCancel(e)) throw cancelMessage(e, startedAt);
     throw e;

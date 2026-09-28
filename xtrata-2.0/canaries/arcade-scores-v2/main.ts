@@ -219,7 +219,7 @@ const runTx = async (stepId: string, label: string, send: () => Promise<string>,
   rec.status = tx.tx_status; rec.result = tx.tx_result?.repr ?? ''; rec.block = tx.block_height;
   rec.pass = expect
     ? tx.tx_status === 'abort_by_response' && rec.result === expect
-    : tx.tx_status === 'success' && !rec.result.startsWith('(err'); // a deploy reports (ok true) or just true
+    : tx.tx_status === 'success' && !(rec.result ?? '').startsWith('(err'); // a deploy reports (ok true) or just true
   save();
   if (!rec.pass) {
     log('error', `${label}: ${tx.tx_status} ${rec.result}${expect ? ` (expected a refusal with ${expect})` : ''}`, rec.txid);
