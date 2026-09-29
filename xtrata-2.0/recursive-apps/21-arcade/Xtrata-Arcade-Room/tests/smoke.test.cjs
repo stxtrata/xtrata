@@ -307,6 +307,22 @@ async function mockApi(ctx) {
   await frame.waitForSelector('.xa-over', { timeout: 6000 });
   check(true, 'tile tap: wrong lane ends the song');
 
+  /* ---------- 4h2. Tile Tap Rush 100: tap 100 rows on the time board ---------- */
+  await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
+  await frame.click('[data-play-variant="xa_tile_tap:rush"]');
+  await frame.waitForFunction(() => window.XARoom._session().state === 'play', null, { timeout: 6000 });
+  check((await frame.evaluate(() => window.XARoom._session().mode)) === 'time', 'tile tap rush runs on the time board');
+  const laneKey = ['ArrowLeft', 'ArrowDown', 'ArrowUp', 'ArrowRight'];
+  for (let i = 0; i < 130; i++) {
+    const d = await frame.evaluate(() => { const s = window.XARoom._session(); return s.state === 'play' ? s.instance.debug() : null; });
+    if (!d || d.finished) break;
+    await page.keyboard.press(laneKey[d.nextLane]);
+    await page.waitForTimeout(40); // one press per game frame
+  }
+  await frame.waitForSelector('.xa-over', { timeout: 15000 });
+  check((await frame.textContent('.xa-over h3')) === 'FINISHED' && /\d\.\d\ds$|\d:\d\d\.\d\d/.test(await frame.textContent('.xa-final')),
+    'tile tap rush: 100 correct taps finish with a time (' + (await frame.textContent('.xa-final')) + ')');
+
   /* ---------- 4i. Merge 2048: slide until stuck ---------- */
   await frame.click('.xa-over-actions .xa-btn:not(.xa-btn-play)');
   await frame.click('[data-play="xa_merge_2048"]');

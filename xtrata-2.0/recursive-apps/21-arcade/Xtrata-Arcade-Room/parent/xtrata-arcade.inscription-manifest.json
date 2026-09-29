@@ -1,8 +1,8 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v2.3-five-upgrades",
-  "createdAt": "2026-09-28",
+  "release": "v2.4-batch-two",
+  "createdAt": "2026-09-29",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "name": "xtrata-v3-2-3",
@@ -158,8 +158,8 @@
       "key": "hopper",
       "path": "modules/game-road-hopper.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 19892,
-      "sha256": "60cdfbb63b90a91407364a56d2d1b2b518e1a77885b1c05845e7ec479adec199",
+      "sizeBytes": 106872,
+      "sha256": "5c7fcd9d4c167ca65aca2fd8fe138eca50fb15424ee7d4253946907bbad7028f",
       "mintOrder": 14,
       "mintedInscriptionId": 0
     },
@@ -167,8 +167,8 @@
       "key": "tiles",
       "path": "modules/game-tile-tap.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 11529,
-      "sha256": "2a02986f33715d067eab9382ba10e08b0a1c8284b7ceb89a4949518486f3ffe0",
+      "sizeBytes": 55477,
+      "sha256": "7baf58810b604976eb4a92eeefd059a3bf775ece28b99948ff1fd8f55a89aac4",
       "mintOrder": 15,
       "mintedInscriptionId": 0
     },
@@ -185,8 +185,8 @@
       "key": "defence",
       "path": "modules/game-block-defence.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 17270,
-      "sha256": "5987e287aef86b6eaf6fdbd4b19181c9f118a60c8da5e7f9ea3cc52dae5ecf34",
+      "sizeBytes": 70775,
+      "sha256": "d8f83095b447349afa68a626c2303d260b952c78412eb88a472fe16d71fec55b",
       "mintOrder": 17,
       "mintedInscriptionId": 0
     },
@@ -194,8 +194,8 @@
       "key": "muncher",
       "path": "modules/game-maze-muncher.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 20222,
-      "sha256": "89d4d63b4ccee9f14729230027f3ca8314a50903fafd39cdb5355bd6a50477ec",
+      "sizeBytes": 64986,
+      "sha256": "46eb156a4e2bfd1acc450b6fa9c6703b0760e0d255deaeb40883e3b74c13653c",
       "mintOrder": 18,
       "mintedInscriptionId": 0
     },
@@ -203,8 +203,8 @@
       "key": "invaders",
       "path": "modules/game-invader-wave.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 16536,
-      "sha256": "feac8e29829442faa6b829330a8fedc1e33a951edf37e7d30b69398bf0754f11",
+      "sizeBytes": 85600,
+      "sha256": "942a45692e22013f4e8cbdaf9e16a0e6a321bed2bc0048af44d9ce58a520851c",
       "mintOrder": 19,
       "mintedInscriptionId": 0
     },

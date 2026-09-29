@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v2.3 prototype, 21 cabinets, 8 upgraded to v2)
+# Xtrata Arcade Room (v2.4 prototype, 21 cabinets, 13 upgraded to v2)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -16,12 +16,12 @@ parent that lists it.
 | Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch/laser, drag + tap · 20 levels, 4 bosses |
 | Rock Drift | `modules/game-rock-drift.js` | `xa_rock_drift` | ←→ turn, ↑ thrust, Space fire; 4 touch pads · ice/metal/explosive rocks, pickups, boss every 5 waves |
 | Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop · climb to space, gold/wide/ice slabs, perfect repairs |
-| Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad |
-| Tile Tap | `modules/game-tile-tap.js` | `xa_tile_tap` | ← ↓ ↑ → or 1–4, click/tap a lane |
+| Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad · 5 biomes, trains, sinking logs, crocs, ice, 6 unlockable hoppers |
+| Tile Tap | `modules/game-tile-tap.js` | `xa_tile_tap` | ← ↓ ↑ → or 1–4, click/tap a lane · 3 charted songs, holds + doubles, timing grades + **Rush 100** (time board) |
 | Merge 2048 | `modules/game-merge-2048.js` | `xa_merge_2048` | arrows/WASD, swipe, d-pad |
-| Block Defence | `modules/game-block-defence.js` | `xa_block_defence` | click/tap to fire; arrows + Space, Z X C per silo |
-| Maze Muncher | `modules/game-maze-muncher.js` | `xa_maze_muncher` | arrows/WASD, swipe, d-pad |
-| Invader Wave | `modules/game-invader-wave.js` | `xa_invader_wave` | ←→ + Space (hold to fire); ◀ ▶ FIRE pads |
+| Block Defence | `modules/game-block-defence.js` | `xa_block_defence` | click/tap to fire; arrows + Space, Z X C per silo · splitters, smart bombs, bombers, darts, supply depot between waves, day→night |
+| Maze Muncher | `modules/game-maze-muncher.js` | `xa_maze_muncher` | arrows/WASD, swipe, d-pad · 5 mazes, 4 glitch personalities, warp gates, items, freeze/boost |
+| Invader Wave | `modules/game-invader-wave.js` | `xa_invader_wave` | ←→ + Space (hold to fire); ◀ ▶ FIRE pads · 8 formations, divers/shielded/splitters/bombers, mothership boss, power-ups, crumbling bunkers, CRT look |
 | Helix Drop | `modules/game-helix-drop.js` | `xa_helix_drop` | drag or ←→ to spin |
 | Bubble Pop | `modules/game-bubble-pop.js` | `xa_bubble_pop` | mouse aim + click, or ←→ + Space; C swaps |
 | Swerve | `modules/game-swerve.js` | `xa_swerve` | mouse / drag to steer, or ←→ |
@@ -134,12 +134,12 @@ Every other cabinet has its own score too, each built around its mechanic:
 | Block Runner | C major chiptune, 128 bpm | speed → tempo; jump climbs an arp; duck dips the filter; every 500 m → key up |
 | Rock Drift | E phrygian heartbeat, 64→136 bpm | rock left in the wave → tempo; thrust opens the filter; splits fall in pitch by size |
 | Stack Tower | G major, 100 bpm | each floor plays the next note of a climbing melody; perfects an octave up; every 10 floors → key change |
-| Road Hopper | Bb mixolydian swing, 112 bpm | hops walk the scale up/down; roads bring drums, rivers bring pads |
-| Tile Tap | G major pop, 112 bpm+ | **you play the lead**: each correct tap is the next melody note; tile speed → tempo |
+| Road Hopper | Bb mixolydian swing, 112 bpm | hops walk the scale up/down; roads bring drums, rivers bring pads · 5 biomes, trains, sinking logs, crocs, ice, 6 unlockable hoppers |
+| Tile Tap | G major pop, 112 bpm+ | **you play the lead**: each correct tap is the next melody note; tile speed → tempo · 3 charted songs, holds + doubles, timing grades + **Rush 100** (time board) |
 | Merge 2048 | Eb lo-fi, 80 bpm swing | merges play degree log2(tile); best tile → layers + stinger; full board closes the filter |
-| Block Defence | D harmonic minor, 124 bpm | warheads on screen → layers; near-miss siren; chain kills climb the scale |
-| Maze Muncher | C dorian chiptune, 120 bpm | maze eaten → layers; power core → phrygian, faster, frantic arp |
-| Invader Wave | F minor march, 96→188 bpm | invaders left → march tempo; mystery ship → siren track |
+| Block Defence | D harmonic minor, 124 bpm | warheads on screen → layers; near-miss siren; chain kills climb the scale · splitters, smart bombs, bombers, darts, supply depot between waves, day→night |
+| Maze Muncher | C dorian chiptune, 120 bpm | maze eaten → layers; power core → phrygian, faster, frantic arp · 5 mazes, 4 glitch personalities, warp gates, items, freeze/boost |
+| Invader Wave | F minor march, 96→188 bpm | invaders left → march tempo; mystery ship → siren track · 8 formations, divers/shielded/splitters/bombers, mothership boss, power-ups, crumbling bunkers, CRT look |
 | Helix Drop | C# minor drum & bass, 170 bpm | each gap passed steps a falling run; fireball opens the filter |
 | Bubble Pop | C major pentatonic, 100 bpm | each colour is a note; dropped bubbles cascade; danger adds tension |
 | Swerve | E dorian synthwave, 118 bpm+ | speed → tempo; close shaves → riser + pluck; 500 m → key up |
