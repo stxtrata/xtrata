@@ -1,5 +1,5 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
-import type { ArcadeOutcome } from './arcade-submit-host';
+import { arcadeCallToPayload, type ArcadeOutcome } from './arcade-submit-host';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -266,9 +266,11 @@ export function installPublicWalletBridge(options: Options) {
           network: session.network
         };
       }
+      const arcadeCall = method === 'stx_callContract' && !!options.arcadeSubmit;
       if (
         !connects.has(method) &&
         !transfers.has(method) &&
+        !arcadeCall &&
         !(GAME_SAVE_METHODS.has(method) && options.gameSave)
       )
         throw failure(
@@ -298,6 +300,21 @@ export function installPublicWalletBridge(options: Options) {
         }
         if (!grant!.authorized)
           throw failure('Connect this preview before requesting a payment.', 4100);
+        if (arcadeCall) {
+          // Deployed arcade builds sign score posts with a generic contract call. Only submit-score on the arcade
+          // leaderboard is accepted; it goes through the same host-owned review, replay check and wallet path.
+          const payload = arcadeCallToPayload(p.params);
+          if (arcadeDialogOpen) throw failure('A score submission is already waiting for you.', -32002);
+          arcadeDialogOpen = true;
+          try {
+            const outcome = await options.arcadeSubmit!(payload, entry.label, 'xa-call-' + Date.now().toString(36));
+            if (outcome?.kind === 'tx') return { txid: outcome.txId };
+            if (outcome?.kind === 'tab') throw failure('The submission continued in a new tab. Check your wallet history.', -32002);
+            throw failure('Score submission cancelled.', 4001);
+          } finally {
+            arcadeDialogOpen = false;
+          }
+        }
         if (GAME_SAVE_METHODS.has(method) && options.gameSave) {
           const initial = checkedSession(options.wallet.getSession());
           const guard = () => {

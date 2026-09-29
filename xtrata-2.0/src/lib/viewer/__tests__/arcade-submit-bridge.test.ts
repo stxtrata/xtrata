@@ -94,7 +94,7 @@ describe('arcade submit hand-off', () => {
     const url = arcadeSubmitUrl('https://xtrata.xyz', payload, 'ab3-1');
     expect(url.startsWith('https://xtrata.xyz/arcade/submit#p=')).toBe(true);
     expect(url.endsWith('&id=ab3-1')).toBe(true);
-    expect(describeArcadePayload(payload)).toEqual({ name: 'ACE', score: 12345, board: 'Campaign' });
+    expect(describeArcadePayload(payload)).toMatchObject({ name: 'ACE', score: 12345, board: 'Campaign', scoreText: '12,345' });
     expect(() => describeArcadePayload({ ...payload, name: '<img>' })).toThrow();
     expect(() => describeArcadePayload({ ...payload, game: 'other' })).toThrow();
   });

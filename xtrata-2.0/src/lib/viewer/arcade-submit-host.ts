@@ -8,6 +8,8 @@
 // here is the primary path. Opening the top-level /arcade/submit page stays
 // available as a fallback.
 import type { WalletSession } from '../wallet/types';
+import { hexToCV, cvToValue } from '@stacks/transactions';
+import { ARCADE_BOARDS, ARCADE_GAME, ARCADE_SCORES_CONTRACT_ID, formatArcadeScore, isArcadeBoard } from '../../arcade-submit/arcade-boards';
 
 const NAME_RE = /^[A-Za-z0-9 _.-]{3,12}$/;
 
@@ -22,13 +24,41 @@ export function arcadeSubmitUrl(origin: string, payload: Record<string, unknown>
   return `${origin}/arcade/submit#p=${toBase64Url(JSON.stringify(payload))}&id=${encodeURIComponent(id)}`;
 }
 
+/**
+ * The arcade (inscription #3076) asks its host to sign `submit-score` with a generic contract call. The public viewer
+ * never signs arbitrary calls: this turns exactly that call, for exactly this contract and function, into the reviewed
+ * arcade hand-off payload. Anything else is refused.
+ */
+export function arcadeCallToPayload(params: unknown): Record<string, unknown> {
+  const p = (Array.isArray(params) ? params[0] : params) as Record<string, unknown> | null;
+  if (!p || typeof p !== 'object') throw new Error('Unsupported wallet request.');
+  const contract = p.contract ?? (p.contractAddress && p.contractName ? `${p.contractAddress}.${p.contractName}` : '');
+  if (contract !== ARCADE_SCORES_CONTRACT_ID || p.functionName !== 'submit-score') throw new Error('This viewer only signs arcade score submissions.');
+  const args = (Array.isArray(p.functionArgs) ? p.functionArgs : Array.isArray(p.arguments) ? p.arguments : []) as unknown[];
+  if (args.length !== 5 || !args.every((a) => typeof a === 'string' && /^0x[0-9a-f]+$/i.test(a) && a.length < 140_000))
+    throw new Error('Unsupported score submission.');
+  const v = args.map((a) => cvToValue(hexToCV(a as string)) as unknown);
+  const board = v[0], period = Number(v[1]), score = Number(v[2]), name = v[3];
+  let replay = String(v[4]).replace(/^0x/, '');
+  if (typeof board !== 'string' || !isArcadeBoard(board) || period !== 0 || typeof name !== 'string' || !/^[0-9a-f]{88,}$/i.test(replay) || replay.length % 2)
+    throw new Error('Unsupported score submission.');
+  const bytes = Uint8Array.from(replay.match(/../g)!, (h) => parseInt(h, 16));
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return {
+    v: 1, game: ARCADE_GAME, network: 'mainnet', contract: ARCADE_SCORES_CONTRACT_ID, board, period: 0, score, name,
+    replay: btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  };
+}
+
 export function describeArcadePayload(payload: Record<string, unknown>) {
-  if (payload.game !== 'astro-blaster-3') throw new Error('Unsupported arcade game.');
+  if (payload.game !== 'astro-blaster-3' && payload.game !== ARCADE_GAME) throw new Error('Unsupported arcade game.');
+  const xar = payload.game === ARCADE_GAME;
   const name = typeof payload.name === 'string' && NAME_RE.test(payload.name) ? payload.name : null;
   const score = typeof payload.score === 'number' && Number.isSafeInteger(payload.score) && payload.score > 0 ? payload.score : null;
-  const board = payload.board === 'astro3' ? 'Campaign' : payload.board === 'astro3-daily' ? `Daily run · day ${Number(payload.period)}` : null;
+  const board = xar ? (isArcadeBoard(payload.board) ? ARCADE_BOARDS[payload.board].label : null) : payload.board === 'astro3' ? 'Campaign' : payload.board === 'astro3-daily' ? `Daily run · day ${Number(payload.period)}` : null;
   if (!name || score == null || !board || typeof payload.replay !== 'string') throw new Error('This score could not be read.');
-  return { name, score, board };
+  return { name, score, board, scoreText: xar && isArcadeBoard(payload.board) ? formatArcadeScore(payload.board, score) : fmt(score) };
 }
 
 /** What the host did: signed in place, handed off to a tab, or nothing (cancelled). */
@@ -114,7 +144,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       else setStatus('Your browser blocked the new tab. Allow pop-ups for this site, or submit here.', 'err');
     };
 
-    facts.textContent = `${label}\nBoard: ${info.board}\nName: ${info.name}\nScore: ${fmt(info.score)}`;
+    facts.textContent = `${label}\nBoard: ${info.board}\nName: ${info.name}\nScore: ${info.scoreText}`;
     doc.body.append(dialog);
     dialog.showModal();
     armIdle();
