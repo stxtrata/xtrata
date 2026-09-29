@@ -3651,7 +3651,7 @@
         const isPdf =
           previewMimeType?.trim().toLowerCase() === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts';
+          frame.sandbox = 'allow-scripts allow-pointer-lock';
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (options.htmlDoc && !isPdf) {
@@ -6132,7 +6132,7 @@
         frame.loading = 'lazy';
         const isPdf = fullscreenMimeType === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts';
+          frame.sandbox = 'allow-scripts allow-pointer-lock';
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (htmlDoc && !isPdf) {
@@ -6438,7 +6438,7 @@
         frame.title = 'prepared-inscription-preview';
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
-        frame.sandbox = 'allow-scripts';
+        frame.sandbox = 'allow-scripts allow-pointer-lock';
         frame.allow = INSCRIPTION_FRAME_ALLOW;
         frame.src = url;
         dom.fullscreenStage.append(frame);
