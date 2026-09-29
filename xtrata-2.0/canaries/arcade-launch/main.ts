@@ -614,12 +614,35 @@ const STEPS: Step[] = [
   },
   {
     id: 'fund', title: 'Fund a copycat wallet', who: 'Web wallet',
-    intro: `A throwaway wallet is created in this browser. Your wallet sends it ${stx(FUND_AMOUNT)} so it can pay the fee to try stealing your run. The rest is swept back.`,
+    intro: `A throwaway wallet is created in this browser. Your wallet sends it ${stx(FUND_AMOUNT)} so it can pay the fee to try stealing your run. If your wallet cannot sign a plain transfer from a web page, the step shows the copycat address and waits for you to send the amount from the wallet's own Send screen. The rest is swept back.`,
     action: 'Send test funds',
     run: async () => {
       const hot = hotAddress();
       const have = await chain.balance(hot);
-      if (have < FUND_AMOUNT) await runTx('fund', `fund copycat ${stx(FUND_AMOUNT - have)}`, () => walletTransfer(hot, FUND_AMOUNT - have, 'arcade launch canary'));
+      if (have < FUND_AMOUNT) {
+        let sent = false;
+        try {
+          await runTx('fund', `fund copycat ${stx(FUND_AMOUNT - have)}`, () => walletTransfer(hot, FUND_AMOUNT - have, 'arcade canary'));
+          sent = true;
+        } catch (error) {
+          // Some wallet builds cannot sign a plain STX transfer from a web page (Xverse: "`request` function is not implemented").
+          // A cancelled request is the user's decision; anything else falls back to sending the float by hand.
+          const message = error instanceof Error ? error.message : String(error);
+          if (/cancel/i.test(message) && !/not implemented/i.test(message)) throw error;
+          log('warn', `The wallet could not sign the funding transfer from this page (${message}). Send it by hand instead.`);
+        }
+        if (!sent) {
+          const need = FUND_AMOUNT - have;
+          const deadline = Date.now() + 10 * 60_000;
+          for (;;) {
+            const b = await chain.balance(hot);
+            if (b >= FUND_AMOUNT) break;
+            if (Date.now() > deadline) throw new Error(`Timed out waiting for ${stx(need)} to arrive at ${hot}. Send it from your wallet's own Send screen, then press the button again.`);
+            status(`Send ${stx(need)} (or a little more) from your wallet to ${hot} — waiting for it to arrive (balance ${stx(b)})…`, 'warn');
+            await sleep(5000);
+          }
+        }
+      }
       await eventually('Copycat funding', async () => { const b = await chain.balance(hot); return b >= FUND_AMOUNT ? null : `balance ${stx(b)}`; });
       return `copycat ${hot} holds ${stx(await chain.balance(hot))}`;
     }
