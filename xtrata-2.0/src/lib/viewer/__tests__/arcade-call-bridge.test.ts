@@ -61,7 +61,7 @@ describe('arcadeCallToPayload', () => {
 });
 
 describe('bridge: stx_callContract from the arcade', () => {
-  async function setup(arcadeSubmit: any) {
+  async function setup(arcadeSubmit: any, opts: { loadAfterHello?: boolean } = {}) {
     const session = { isConnected: true, address: ADDR, network: 'mainnet' };
     const wallet = { getSession: () => session, connect: vi.fn(async () => session), disconnect: vi.fn() };
     const bridge = installPublicWalletBridge({ host: window, wallet: wallet as any, review: vi.fn(async () => true), transfer: vi.fn(), sessionChanged: vi.fn(), arcadeSubmit });
@@ -75,6 +75,8 @@ describe('bridge: stx_callContract from the arcade', () => {
     const flush = () => new Promise((r) => setTimeout(r, 5));
     emit({ type: 'xtrata:wallet:hello', nonce: 'n1' }); await flush();
     const token = (sent.mock.calls[0][0] as any).bridgeToken;
+    const load = () => el.dispatchEvent(new Event('load'));
+    if (opts.loadAfterHello) load();
     let n = 0;
     const call = async (method: string, prm: unknown) => {
       sent.mockClear();
@@ -82,8 +84,8 @@ describe('bridge: stx_callContract from the arcade', () => {
       await flush();
       return sent.mock.calls.at(-1)![0] as any;
     };
-    await call('stx_requestAccounts', {});
-    return { call, sent };
+    if (!opts.loadAfterHello) await call('stx_requestAccounts', {});
+    return { call, sent, load };
   }
 
   it('reviews the run in the host and returns the txid', async () => {
@@ -102,6 +104,31 @@ describe('bridge: stx_callContract from the arcade', () => {
     const other = await call('stx_callContract', params({ contract: ADDR + '.xtrata-v3-2-3', functionName: 'transfer' }));
     expect(other.ok).toBe(false);
     expect(arcadeSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps working when the arcade says hello once, before its document finishes loading', async () => {
+    const txId = '0x' + 'e'.repeat(64);
+    const arcadeSubmit = vi.fn(async () => ({ kind: 'tx' as const, txId }));
+    const { call, load } = await setup(arcadeSubmit, { loadAfterHello: true });
+    // the load event that follows the app's first-script handshake must not strand its token
+    expect(await call('wallet_connect', { app: 'Xtrata Arcade' })).toMatchObject({ ok: true });
+    expect(await call('stx_callContract', params())).toMatchObject({ ok: true, result: { txid: txId } });
+    // consent is per document: a later load drops it and the old token stops working
+    load();
+    expect(await call('stx_callContract', params())).toMatchObject({ ok: false });
+  });
+
+  it('renews an expired token only for a connect review or an already-connected score post', async () => {
+    const txId = '0x' + 'f'.repeat(64);
+    const { call } = await setup(vi.fn(async () => ({ kind: 'tx' as const, txId })));
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 11 * 60_000);
+      expect(await call('stx_getAddresses', {})).toMatchObject({ ok: false, error: { code: -32600 } });
+      expect(await call('stx_callContract', params())).toMatchObject({ ok: true, result: { txid: txId } });
+      vi.setSystemTime(Date.now() + 11 * 60_000);
+      expect(await call('wallet_connect', {})).toMatchObject({ ok: true });
+    } finally { vi.useRealTimers(); }
   });
 
   it('is unavailable when the host has no arcade dialog', async () => {
