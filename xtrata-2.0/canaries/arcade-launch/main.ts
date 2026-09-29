@@ -47,6 +47,9 @@ import * as wallet from '../collection-v17/wallet';
 import type { Net, ProviderInfo } from '../collection-v17/wallet';
 
 declare const __BUILD__: string;
+declare const __ARCADE_VERSION__: string;
+declare const __ARCADE_FILE__: string;
+declare const __BUILT_AT__: string;
 declare const __SOURCE_SHA__: string;
 declare const __ARCADE_SHA__: string;
 
@@ -458,7 +461,7 @@ const STEPS: Step[] = [
       const balance = await chain.balance(w.address);
       const funds = balance < need ? ` · WARNING balance ${stx(balance)} is below the ~${stx(need)} this run needs` : ` · balance ${stx(balance)} covers the ~${stx(need)} needed`;
       step('preflight').data = { deployed };
-      return `parent ${parentList()} owned by this wallet · pins ok (contract ${short(PINNED_SHA)}, arcade ${short(arcadeSha)}) · ${(ARCADE.length / 1024).toFixed(0)} KB in ${N} chunks (${Math.ceil(N / BATCH)} upload txs) · core open · inscription fee ${stx(fees.begin + fees.seal)} (begin ${stx(fees.begin)} + seal ${stx(fees.seal)}) · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${adopted}${funds}`;
+      return `Xtrata Arcade ${__ARCADE_VERSION__} (${__ARCADE_FILE__}) · parent ${parentList()} owned by this wallet · pins ok (contract ${short(PINNED_SHA)}, arcade ${short(arcadeSha)}) · ${(ARCADE.length / 1024).toFixed(0)} KB in ${N} chunks (${Math.ceil(N / BATCH)} upload txs) · core open · inscription fee ${stx(fees.begin + fees.seal)} (begin ${stx(fees.begin)} + seal ${stx(fees.seal)}) · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${adopted}${funds}`;
     }
   },
   {
@@ -488,7 +491,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'begin', title: 'Inscribe 1/3: begin the upload', who: 'Web wallet',
-    intro: `Starts the upload on the core contract for the arcade file (${MIME}, ${ARCADE.length.toLocaleString()} bytes, ${N} chunks). Pays the begin fee once; resuming an existing session costs nothing. The post-condition caps what your wallet can spend.`,
+    intro: `Starts the upload on the core contract for Xtrata Arcade ${__ARCADE_VERSION__}, ${__ARCADE_FILE__} (${MIME}, ${ARCADE.length.toLocaleString()} bytes, ${N} chunks). Pays the begin fee once; resuming an existing session costs nothing. The post-condition caps what your wallet can spend.`,
     action: 'Begin inscription',
     run: async () => {
       if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
@@ -542,7 +545,7 @@ const STEPS: Step[] = [
         id = found; return null;
       });
       state.inscriptionId = id; save(); renderHeader();
-      return `sealed as inscription #${id}${PARENT_IDS.length ? `, child of ${parentList()}` : ''}`;
+      return `Xtrata Arcade ${__ARCADE_VERSION__} sealed as inscription #${id}${PARENT_IDS.length ? `, child of ${parentList()}` : ''}`;
     }
   },
   {
@@ -842,7 +845,25 @@ const renderHeader = () => {
   $('#disconnect').toggleAttribute('hidden', !connected);
 };
 
+const renderInscribing = () => {
+  const built = new Date(__BUILT_AT__);
+  const rows: [string, string][] = [
+    ['File', __ARCADE_FILE__],
+    ['Size', `${ARCADE.length.toLocaleString()} bytes · ${N} chunks · ${Math.ceil(N / BATCH)} upload transactions`],
+    ['SHA-256', __ARCADE_SHA__],
+    ['Parent', PARENT_IDS.length ? parentList() : 'none'],
+    ['Canary built', `${built.toLocaleString()} (your time) · ${__BUILT_AT__} UTC`],
+    ['Build stamp', __BUILD__]
+  ];
+  $('#inscribing').replaceChildren(
+    el('div', { class: 'eyebrow' }, 'This canary inscribes'),
+    el('div', { class: 'big' }, `Xtrata Arcade ${__ARCADE_VERSION__}`),
+    el('dl', {}, ...rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])));
+  document.title = `Arcade ${__ARCADE_VERSION__} launch canary · ${__BUILD__}`;
+};
+
 const bind = () => {
+  renderInscribing();
   $('#build').textContent = `${__BUILD__} · contract sha256 ${__SOURCE_SHA__.slice(0, 16)}… · arcade sha256 ${__ARCADE_SHA__.slice(0, 16)}… · ${(ARCADE.length / 1024).toFixed(0)} KB, ${N} chunks`;
   $('#network').addEventListener('change', (e) => {
     network = (e.target as HTMLSelectElement).value as Net;
@@ -863,7 +884,8 @@ const bind = () => {
   });
   $('#disconnect').addEventListener('click', async () => { await wallet.disconnect(); connected = null; step('connect').status = 'todo'; save(); renderHeader(); renderSteps(); log('info', 'Wallet disconnected.'); });
   $('#export').addEventListener('click', () => {
-    const report = { ...state, run: state.run ? { game: state.run.game, score: state.run.score, bytes: unb64(state.run.replay).length } : null, build: __BUILD__, network,
+    const report = { ...state, run: state.run ? { game: state.run.game, score: state.run.score, bytes: unb64(state.run.replay).length } : null, build: __BUILD__, builtAt: __BUILT_AT__,
+      arcadeVersion: __ARCADE_VERSION__, arcadeFile: __ARCADE_FILE__, parents: PARENT_IDS.map(String), network,
       contractSha256: __SOURCE_SHA__, arcadeSha256: __ARCADE_SHA__, arcadeBytes: ARCADE.length, chunks: N, chainHash: toHex(FINAL_HASH),
       leaderboard: state.deployer ? scoresId() : null, copycat: hotAddress() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
