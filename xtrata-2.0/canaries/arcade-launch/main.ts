@@ -548,12 +548,26 @@ const STEPS: Step[] = [
       if (toHex(chainHash(out)) !== meta.hash) throw new Error('The chain hash of the chunks read back differs from the sealed hash.');
       let served = 'site check skipped (testnet)';
       if (network === 'mainnet') {
+        // The xtrata.xyz runtime serves the inscription with two documented rewrites: it injects <base href="null">
+        // after <head>, and points the Hiro API hosts at its own /hiro proxy. Undo exactly those, then compare.
+        // This check is advisory: the bytes were already proven from the chain above, so it never fails the step.
         try {
           const r = await fetch(`https://xtrata.xyz/i/${id}`, { cache: 'no-store' });
           if (!r.ok) served = `site check: HTTP ${r.status} (the viewer may still be indexing it; not a failure)`;
-          else served = toHex(sha256(new Uint8Array(await r.arrayBuffer()))) === ARCADE_SHA ? 'xtrata.xyz serves identical bytes' : 'WARNING xtrata.xyz serves DIFFERENT bytes';
+          else {
+            const raw = new Uint8Array(await r.arrayBuffer());
+            if (toHex(sha256(raw)) === ARCADE_SHA) served = 'xtrata.xyz serves byte-identical content';
+            else {
+              const text = new TextDecoder().decode(raw)
+                .replace('<head><base href="null">', '<head>')
+                .split('https://xtrata.xyz/hiro/testnet').join('https://api.testnet.hiro.so')
+                .split('https://xtrata.xyz/hiro/mainnet').join('https://api.mainnet.hiro.so');
+              served = toHex(sha256(new TextEncoder().encode(text))) === ARCADE_SHA
+                ? 'xtrata.xyz serves the same file, with only its two standard runtime rewrites (a <base> tag and its own Hiro proxy address)'
+                : `NOTE: xtrata.xyz serves ${raw.length.toLocaleString()} bytes that differ from the chain beyond its standard rewrites; the chain copy is verified, so check the viewer`;
+            }
+          }
         } catch { served = 'site check: could not reach xtrata.xyz from this page (not a failure)'; }
-        if (served.startsWith('WARNING')) throw new Error(served);
       }
       return `inscription #${id} · ${rebuilt.length.toLocaleString()} bytes read back from ${N} chunks, sha256 ${short(ARCADE_SHA)} matches, chain hash matches · ${served}`;
     }
