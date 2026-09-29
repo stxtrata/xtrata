@@ -128,8 +128,10 @@ export function installPublicWalletBridge(options: Options) {
     origin: string;
     authorized: boolean;
     seen: Set<string>;
+    /** Created while the document was still loading (before its first load event). */
+    early?: boolean;
   };
-  type Entry = { frame: HTMLIFrameElement; label: string; grant?: Grant; reset: () => void };
+  type Entry = { frame: HTMLIFrameElement; label: string; grant?: Grant; reset: () => void; loaded?: boolean };
   const entries = new Set<Entry>();
   let busy = false;
   const arcadePending = new Map<string, { entry: Entry; send: (data: unknown) => void; tab: Window | null; expires: number }>();
@@ -223,7 +225,8 @@ export function installPublicWalletBridge(options: Options) {
         expires: Date.now() + 10 * 60_000,
         origin: event.origin,
         authorized: entry.grant?.authorized ?? false,
-        seen: new Set()
+        seen: new Set(),
+        early: !entry.loaded
       };
       send({ type: 'xtrata:wallet:hello-ack', nonce: p.nonce, bridgeToken: entry.grant.token });
       return;
@@ -238,6 +241,24 @@ export function installPublicWalletBridge(options: Options) {
         ...(ok ? { result: value } : { error: value })
       });
     const grant = entry.grant;
+    // Some inscribed apps (the arcade) say hello once and keep the token. An expired token from this very
+    // window is renewed only for requests that then need fresh user consent anyway: a connect review, or an
+    // arcade score review for a preview the user had already connected.
+    if (
+      grant &&
+      entry.grant === grant &&
+      grant.origin === event.origin &&
+      p.bridgeToken === grant.token &&
+      grant.expires <= Date.now() &&
+      usable(entry)
+    ) {
+      if (connects.has(p.method)) {
+        grant.expires = Date.now() + 10 * 60_000;
+        grant.authorized = false;
+      } else if (p.method === 'stx_callContract' && options.arcadeSubmit && grant.authorized) {
+        grant.expires = Date.now() + 10 * 60_000;
+      }
+    }
     const alive = () =>
       usable(entry) &&
       entry.grant === grant &&
@@ -388,7 +409,14 @@ export function installPublicWalletBridge(options: Options) {
         frame,
         label: label.slice(0, 200),
         reset: () => {
-          entry.grant = undefined;
+          const early = entry.grant?.early && !entry.loaded;
+          entry.loaded = true;
+          // A handshake made while this document was still loading belongs to it (apps say hello from their
+          // first script, before the load event). Keep the token but drop consent, and use a fresh grant object
+          // so any review already in flight for the old one is abandoned. Anything else is cleared.
+          entry.grant = early
+            ? { ...entry.grant!, authorized: false, seen: new Set(), early: false, expires: Date.now() + 10 * 60_000 }
+            : undefined;
         }
       };
       frame.addEventListener('load', entry.reset);
