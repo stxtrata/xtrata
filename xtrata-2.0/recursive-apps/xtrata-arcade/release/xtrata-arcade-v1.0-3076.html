@@ -681,20 +681,16 @@ body.touch #pprompt .key{display:none}
       listeners.push(function () { target.removeEventListener(type, fn, opts); });
     }
 
-    function typing(e) {
-      var t = e.target;
-      return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || '')));
-    }
     on(root, 'keydown', function (e) {
       var name = KEYMAP[e.code];
-      if (!name || typing(e)) return;
+      if (!name) return;
       e.preventDefault();
       if (e.repeat) return;
       press(name);
     });
     on(root, 'keyup', function (e) {
       var name = KEYMAP[e.code];
-      if (name && !typing(e)) release(name);
+      if (name) release(name);
     });
     on(root, 'blur', function () { held = {}; pointer.down = false; });
 
@@ -1800,9 +1796,6 @@ body.touch #pprompt .key{display:none}
     }
     var x = root.XverseProviders && root.XverseProviders.BitcoinProvider;
     if (x && typeof x.request === 'function') return { kind: 'xverse', p: x };
-    var xs = (root.XverseProviders && root.XverseProviders.StacksProvider) || (root.xverseProviders && root.xverseProviders.StacksProvider);
-    if (xs && typeof xs.request === 'function') return { kind: 'xverse', p: xs };
-    if (root.StacksProvider && typeof root.StacksProvider.request === 'function') return { kind: 'leather', p: root.StacksProvider };
     return null;
   }
   function unwrap(r) {
@@ -1871,7 +1864,7 @@ body.touch #pprompt .key{display:none}
   }
   function runtimeUrl() {
     // Without a minted parent id there is no runtime page to deep-link to yet.
-    if (!(Number(CFG.parentTokenId) > 0)) return CFG.runtimeOrigin.replace(/\/+$/, '') + '/arcade';
+    if (!(Number(CFG.parentTokenId) > 0)) return CFG.runtimeOrigin.replace(/\/+$/, '') + '/';
     var u = CFG.runtimeOrigin.replace(/\/+$/, '') + '/runtime/?contractId=' +
       encodeURIComponent(CFG.contentContractId) + '&network=' + CFG.network;
     if (Number(CFG.parentTokenId) > 0) u += '&tokenId=' + CFG.parentTokenId;
@@ -2476,16 +2469,11 @@ body.touch #pprompt .key{display:none}
       b.title = 'Connect a Stacks wallet to post high scores';
     }
   }
-  function onXtrataTop() {
-    try { return root.top === root && /(^|\.)xtrata\.xyz$/.test(root.location.hostname); } catch (e) { return false; }
-  }
   async function onWalletClick() {
     XA.audio.unlock();
     if (walletStatus.address) { S.disconnect(); return; }
     if (walletStatus.route === 'none') {
-      if (onXtrataTop()) openInfo('No wallet found',
-        'No Stacks wallet extension answered in this browser. Install or unlock Leather or Xverse and reload, or play from the arcade page on Xtrata.', S.runtimeUrl());
-      else openInfo('View-only here',
+      openInfo('View-only here',
         'This copy of the arcade cannot reach a wallet, so you can play and see the boards but not post scores. ' +
         'Open the arcade on Xtrata to post.', S.runtimeUrl());
       return;

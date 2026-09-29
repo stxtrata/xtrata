@@ -10,7 +10,8 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const PINNED_CONTRACT = 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5';
-const PINNED_ARCADE = '0fb9085b47c78a27dc4bb7392a9a5cbba5926f7bc3ee3a680a3f80bd713569e9';
+// v1.1 (typing fix, wallet detection, xtrata.xyz/arcade link). v1.0 was 0fb9085b… = inscription #3076.
+const PINNED_ARCADE = 'c140bb1456ae19ef78e9a04d2adc7f2ef9c92bb1774a5983793c3fea9527e564';
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 
 const contract = readFileSync(resolve(root, 'contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar'), 'utf8');

@@ -107,7 +107,17 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
     const primary = btn('Please wait…', true);
     const tabLink = make('button', 'font:inherit;font-size:13px;background:none;border:0;padding:0;margin-top:14px;color:#39e6ff;text-decoration:underline;cursor:pointer;display:block', 'Open the submit page in a new tab instead');
     tabLink.type = 'button';
-    dialog.append(title, facts, status, note, cancel, primary, tabLink);
+    // The name is not part of the replay, so it can be fixed here (older arcade builds swallowed some keys).
+    const nameLabel = make('label', 'display:block;margin:0 0 12px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8fa3c8', 'Name on the board');
+    const nameInput = make('input', 'display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:10px 12px;border-radius:10px;border:1px solid #3a4a7a;background:#070d24;color:#eaf6ff;font:600 18px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.06em;text-transform:none');
+    nameInput.value = info.name; nameInput.maxLength = 12; nameInput.autocomplete = 'off'; nameInput.spellcheck = false;
+    nameLabel.append(nameInput);
+    const nameOk = () => NAME_RE.test(nameInput.value.trim());
+    nameInput.addEventListener('input', () => {
+      nameInput.value = nameInput.value.replace(/[^A-Za-z0-9 _.-]/g, '').slice(0, 12);
+      nameInput.style.borderColor = nameOk() ? '#3a4a7a' : '#ff8c8c';
+    });
+    dialog.append(title, facts, nameLabel, status, note, cancel, primary, tabLink);
 
     const setStatus = (text: string, tone: '' | 'ok' | 'err' = '') => {
       status.textContent = text;
@@ -144,7 +154,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       else setStatus('Your browser blocked the new tab. Allow pop-ups for this site, or submit here.', 'err');
     };
 
-    facts.textContent = `${label}\nBoard: ${info.board}\nName: ${info.name}\nScore: ${info.scoreText}`;
+    facts.textContent = `${label}\nBoard: ${info.board}\nScore: ${info.scoreText}`;
     doc.body.append(dialog);
     dialog.showModal();
     armIdle();
@@ -203,6 +213,8 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
     const sign = async () => {
       const address = ports.wallet.getSession().address;
       if (!address || signing) return;
+      if (!nameOk()) { setStatus('Names are 3–12 letters, numbers, spaces, dots, dashes or underscores.', 'err'); nameInput.focus(); return; }
+      parsed = { ...parsed, name: nameInput.value.trim() };
       let call;
       try { call = logic.buildSubmitCall(parsed, verified, address, board); }
       catch (e) { setStatus(e instanceof Error ? e.message : String(e), 'err'); return; }
@@ -257,7 +269,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
         setPrimary('Submit', false, null);
         return;
       }
-      setStatus(`Run verified: ${fmt(verified)} points.`, 'ok');
+      setStatus(`Run checked: ${info.scoreText}.`, 'ok');
       if (!settled) await refresh();
     };
     void load();

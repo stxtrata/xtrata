@@ -149,7 +149,8 @@ let state!: State;
 let connected: { address: string; publicKey: string | null; label: string } | null = null;
 let busy = false;
 
-const stateKey = () => `xtrata-arcade-launch:v1:${network}`;
+// Progress is per arcade file, so a new arcade version starts its own gated run.
+const stateKey = () => `xtrata-arcade-launch:v1:${network}${ARCADE_SHA === '0fb9085b47c78a27dc4bb7392a9a5cbba5926f7bc3ee3a680a3f80bd713569e9' ? '' : `:${ARCADE_SHA.slice(0, 12)}`}`;
 const hotKeyName = () => `xtrata-arcade-launch:hot:${network}`;
 const freshState = (): State => ({ version: 1, contractName: DEFAULT_NAME, core: CORE_DEFAULT[network], steps: {}, log: [] });
 const load = () => {
@@ -731,7 +732,7 @@ const STEPS: Step[] = [
         for (const s of srcs) { if (known) break; try { known = /xa_neon_snake/.test(await (await fetch(s, { cache: 'no-store' })).text()); } catch { /* ignore */ } }
         site = known ? 'the submit page already lists the arcade boards' : 'NOTE the xtrata.xyz submit page does not list the arcade boards yet, so scores cannot be posted from the site until it is updated (the arcade signs through the wallet itself)';
       } catch { /* keep default */ }
-      return `all ${PRODUCTION.length} boards match · inscription #${id} sealed · ${site} · Swap the arcade tile on the homepage to #${id}.`;
+      return `all ${PRODUCTION.length} boards match · inscription #${id} sealed · ${site} · Point /arcade (public/_redirects) and the homepage arcade tile at #${id}.`;
     }
   }
 ];
