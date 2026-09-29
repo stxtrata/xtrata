@@ -10,7 +10,7 @@ parent that lists it.
 |-------------|------------------------------|------------------|----------|
 | Neon Snake  | `modules/game-neon-snake.js` | `xa_neon_snake`  | arrows/WASD, swipe, d-pad · stages, portals, power-ups |
 | Block Drop  | `modules/game-block-drop.js` | `xa_block_drop`  | ←→ ↑/X Z Space C, swipes, 7 pads · Marathon + **Sprint 40** (time board), T-spins, 5 themes |
-| Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold · four depth zones |
+| Cave Diver  | `modules/game-cave-diver.js` | `xa_cave_diver`  | hold Space/↑, touch-and-hold · four lit depth zones, submersible, oxygen, jellyfish/eels/falling rocks, air/shield/flare/magnet, treasure pockets |
 | Orbit Merge | `modules/game-orbit-merge.js` | `xa_orbit_merge` | mouse aim + click, ←→ Space, drag + lift · 10 planet tiers, bomb/stardust/tremor, supernova levels |
 | Block Runner | `modules/game-block-runner.js` | `xa_block_runner` | Space/↑ jump (hold = higher), ↓ duck, tap / swipe down · 4 worlds, shield/magnet/double jump/dash |
 | Brick Breaker | `modules/game-brick-breaker.js` | `xa_brick_breaker` | mouse or ←→, Space launch/laser, drag + tap · 20 levels, 4 bosses |

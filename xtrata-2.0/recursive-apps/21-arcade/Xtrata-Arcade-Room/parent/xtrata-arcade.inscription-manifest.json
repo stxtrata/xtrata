@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v3.0-all-upgraded",
+  "release": "v3.1-cave-makeover",
   "createdAt": "2026-09-29",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -104,8 +104,8 @@
       "key": "cave",
       "path": "modules/game-cave-diver.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 24630,
-      "sha256": "f52b8a9be409520dd7742de5d1cb1bed42b5fe0ed0179632c85fb905a862d171",
+      "sizeBytes": 143703,
+      "sha256": "922488e3c6879485792696197d20a5e504fea594e31a97164092bf137124a1f9",
       "mintOrder": 8,
       "mintedInscriptionId": 0
     },
