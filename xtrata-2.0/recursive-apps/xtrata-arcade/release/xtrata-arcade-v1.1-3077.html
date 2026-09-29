@@ -1987,12 +1987,6 @@ body.touch #pprompt .key{display:none}
       if (t) { bridge.token = t.trim(); log('host bridge token from URL'); }
     } catch (e) {}
     hello();
-    var lastRoute = status().route, polls = 0;
-    var watch = setInterval(function () {
-      var r = status().route;
-      if (r !== lastRoute) { lastRoute = r; emit(); }
-      if (++polls >= 40 || r === 'host') clearInterval(watch);
-    }, 500);
   })();
 
   root.XAScores = {
@@ -2319,7 +2313,7 @@ body.touch #pprompt .key{display:none}
   XA.replay = {
     ENGINE: ENGINE, HEADER: HEADER, MAX_BYTES: MAX_BYTES, GAME_IDS: GAME_IDS, BUTTONS: BUTTONS,
     boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, qpt: qpt,
-    record: record, decode: decode, simulate: simulate, verify: verify, playback: playback
+    record: record, decode: decode, simulate: simulate, verify: verify
   };
 })(typeof window !== 'undefined' ? window : globalThis);
 </script>
@@ -2487,7 +2481,6 @@ body.touch #pprompt .key{display:none}
   }
   async function onWalletClick() {
     XA.audio.unlock();
-    walletStatus = S.status(); paintWallet();   // never trust a status read before the extension arrived
     if (walletStatus.address) { S.disconnect(); return; }
     if (walletStatus.route === 'none') {
       if (onXtrataTop()) openInfo('No wallet found',
@@ -2534,7 +2527,7 @@ body.touch #pprompt .key{display:none}
     ]));
   }
   function verifyButton(game, mode, e) {
-    var b = h('button', { class: 'xa-btn', type: 'button', title: 'Fetch the stored replay and run it through this game' }, ['✓?']);
+    var b = h('button', { class: 'xa-btn', type: 'button', style: 'margin-left:8px;padding:2px 8px;font-size:11px', title: 'Fetch the stored replay and run it through this game' }, ['verify']);
     b.addEventListener('click', async function () {
       b.disabled = true; b.textContent = '…';
       try {
@@ -2547,59 +2540,6 @@ body.touch #pprompt .key{display:none}
     });
     return b;
   }
-  var replayCache = {};
-  async function fetchReplay(game, mode, e) {
-    var key = boardOf(game, mode) + ':' + e.player + ':' + e.score;
-    if (!replayCache[key]) replayCache[key] = S.getReplay(boardOf(game, mode), e.player).then(function (b) {
-      if (!b) { delete replayCache[key]; throw new Error('No replay is stored for this entry.'); }
-      return b;
-    }, function (x) { delete replayCache[key]; throw x; });
-    return replayCache[key];
-  }
-  function watchButton(game, mode, e) {
-    return h('button', { class: 'xa-btn', type: 'button', title: 'Watch this run, replayed from the chain', onclick: async function (ev) {
-      var b = ev.currentTarget; b.disabled = true; b.textContent = '…';
-      try { var bytes = await fetchReplay(game, mode, e); closeModal(); watchReplay(bytes, { name: e.name, rank: e.rank }); }
-      catch (x) { b.disabled = false; b.textContent = '▶'; openInfo('Replay unavailable', (x && x.message) || String(x)); }
-    } }, ['▶']);
-  }
-  function saveButton(game, mode, e) {
-    return h('button', { class: 'xa-btn', type: 'button', title: 'Download this replay file', onclick: async function (ev) {
-      var b = ev.currentTarget; b.disabled = true;
-      try { saveReplay(await fetchReplay(game, mode, e), boardOf(game, mode) + '-' + e.name + '-' + e.score); }
-      catch (x) { openInfo('Replay unavailable', (x && x.message) || String(x)); }
-      b.disabled = false;
-    } }, ['⬇']);
-  }
-  function saveReplay(bytes, base) {
-    try {
-      var url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
-      var a = doc.createElement('a');
-      a.href = url; a.download = 'xtrata-arcade-' + String(base).replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar';
-      doc.body.appendChild(a); a.click(); a.remove();
-      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
-    } catch (x) { openInfo('Download blocked', 'This viewer does not allow downloads. Open the arcade on xtrata.xyz to save replays.'); }
-  }
-  function openReplayFile() {
-    var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
-    inp.addEventListener('change', async function () {
-      var f = inp.files && inp.files[0]; inp.remove();
-      if (!f) return;
-      try { watchReplay(new Uint8Array(await f.arrayBuffer()), { name: f.name.replace(/\.xar$/, '') }); }
-      catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }
-    });
-    doc.body.appendChild(inp); inp.click();
-  }
-  // Replays are drawn and heard like a live run, fed from the recorded input instead of the keyboard.
-  async function watchReplay(bytes, info) {
-    var dec;
-    try { dec = await XA.replay.decode(bytes); }
-    catch (x) { openInfo('Could not read that replay', (x && x.message) || String(x)); return; }
-    var game = XA.games.filter(function (g) { return g.id === XA.replay.GAME_IDS[dec.gameIdx]; })[0];
-    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }
-    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;
-    startGame(game.id, variant && variant.key, { watch: dec, bytes: bytes, info: info || {} });
-  }
   function boardList(board, game, highlight, mode) {
     mode = mode || (game && game.mode) || 'score';
     if (!board) return h('div', { class: 'xa-empty', text: 'Loading…' });
@@ -2611,7 +2551,7 @@ body.touch #pprompt .key{display:none}
         h('span', { class: 'xa-rank', text: '#' + e.rank }),
         h('span', { class: 'xa-who' }, [h('b', { text: e.name }), h('small', { text: S.shortAddress(e.player) + (you ? ' · you' : '') })]),
         h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
-        game ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null
+        game ? verifyButton(game, mode, e) : null
       ]);
     }));
   }
@@ -2649,8 +2589,7 @@ body.touch #pprompt .key{display:none}
   }
 
   /* ------------------------------------------------------- session */
-  function startGame(id, variantKey, opts) {
-    opts = opts || {};
+  function startGame(id, variantKey) {
     XA.audio.unlock();
     closeModal();
     var game = XA.games.filter(function (g) { return g.id === id; })[0];
@@ -2681,16 +2620,15 @@ body.touch #pprompt .key{display:none}
       statusEl,
       stage
     ]);
-    var watch = opts.watch || null, pb = watch ? XA.replay.playback(watch.events) : null;
-    var input = watch ? pb.input : XA.createInput(stage);
-    var pads = watch ? null : buildPads(game.touch, input, game);
+    var input = XA.createInput(stage);
+    var pads = buildPads(game.touch, input, game);
     if (pads) gameEl.appendChild(pads);
     rootEl.appendChild(gameEl);
     roomEl.setAttribute('aria-hidden', 'true');
 
-    var pilot = watch ? null : XA.replay.pilotFor(walletStatus.address);      // connected wallet → a ranked, recorded run
+    var pilot = XA.replay.pilotFor(walletStatus.address);      // connected wallet → a ranked, recorded run
     var nonce = U.newSeed();
-    var seed = watch ? XA.replay.seedFor(watch.hash160, watch.nonce, watch.gameIdx) : pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;
+    var seed = pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;
     var fx = XA.createFx();
     session = {
       game: game, variant: variant, mode: mode, completed: false, canvas: canvas, ctx: canvas.getContext('2d'), stage: stage, input: input, fx: fx,
@@ -2698,27 +2636,24 @@ body.touch #pprompt .key{display:none}
       scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()
     };
     var s = session;
-    if (watch) { s.state = 'watch'; s.watch = watch; s.pb = pb; s.steps = 0; s.speed = 1; s.bytes = opts.bytes; s.info = opts.info; }
-    else if (!opts.go) s.state = 'ready';
-    var live = function () { return s.state === 'play' || s.state === 'watch'; };
     var api = {
       W: game.size.w, H: game.size.h, input: input, audio: XA.audio, fx: fx,
       rng: U.rng(seed), seed: seed, ranked: !!pilot,
       shake: function (n) { s.shake = Math.max(s.shake, n); },
-      addScore: function (n) { if (live()) s.score += Math.max(0, Math.floor(n)); },
-      setScore: function (n) { if (live()) s.score = Math.max(0, Math.floor(n)); },
+      addScore: function (n) { if (s.state === 'play') s.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (s.state === 'play') s.score = Math.max(0, Math.floor(n)); },
       getScore: function () { return s.score; },
       setStatus: function (t) { if (s.statusEl.textContent !== t) s.statusEl.textContent = t; },
-      gameOver: function () { if (s.state === 'play') finish(); else if (s.state === 'watch') endWatch(s); },
+      gameOver: function () { if (s.state === 'play') finish(); },
       // Which board this run is for. In 'time' mode the score is the elapsed
       // time in centiseconds (lower wins): keep it current with setScore and
       // call finish() on completion. gameOver() without finish() is a DNF.
       mode: mode,
       variant: variant ? variant.key : null,
-      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } else if (s.state === 'watch') { s.completed = true; endWatch(s); } },
+      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } },
       // Pointer in playfield units. `moved` increments on every move/press, so a
       // game can tell "the pointer is steering" from "the keys are steering".
-      pointer: watch ? pb.pointer : function () {
+      pointer: function () {
         var p = input.pointer, r = canvas.getBoundingClientRect();
         // quarter-unit resolution, so a replay can reproduce exactly what the game saw
         return { x: XA.replay.qpt((p.x - r.left) / s.scale), y: XA.replay.qpt((p.y - r.top) / s.scale), down: p.down, moved: p.moved };
@@ -2729,13 +2664,12 @@ body.touch #pprompt .key{display:none}
       s.rec = XA.replay.record(game, variant, pilot, nonce, input, api.pointer);
     }
     var tag = h('span', { class: 'xa-runtag', style: 'margin-left:8px;font-size:11px;letter-spacing:.08em;white-space:nowrap;color:' + (pilot ? '#7dffb2' : '#9aa3c7'),
-      title: watch ? 'Replay' : pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',
-      text: watch ? '▶ REPLAY' : pilot ? '● RANKED' : 'PRACTICE' });
+      title: pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',
+      text: pilot ? '● RANKED' : 'PRACTICE' });
     var ttl = $('.xa-title', gameEl); if (ttl) ttl.appendChild(tag);
-    if (watch) { var realStore = U.store; U.store = blankStore(s); try { s.instance = game.create(api); } finally { U.store = realStore; } }
-    else s.instance = game.create(api);
+    s.instance = game.create(api);
     fit();
-    if (watch) showWatch(s); else if (s.state === 'ready') showReady(s); else showCountdown();
+    showCountdown();
     S.getTop10(boardOf(game, mode), mode).then(function (b) {
       boards[bk(game, mode)] = b;
       if (session !== s) return;
@@ -2743,78 +2677,6 @@ body.touch #pprompt .key{display:none}
     });
   }
 
-  (function () {
-    var st = doc.createElement('style');
-    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\n.xa-ready-board .xa-board { font-size: 13px; }\n.xa-ready-board .xa-board li { padding: 7px 6px; }\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';
-    (doc.head || doc.documentElement).appendChild(st);
-  })();
-  function blankStore(s) {
-    var mem = {};
-    return function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };
-  }
-  function beginRun(s) {
-    if (!s || session !== s || s.state !== 'ready') return;
-    s.state = 'countdown'; s.countdown = 3.0; s.input.reset();
-    showCountdown();
-  }
-  function showReady(s) {
-    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
-    var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);
-    var start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['▶ START']);
-    var tag = s.pilot
-      ? h('p', { class: 'xa-ready-tag is-ranked', text: '● RANKED · flying as ' + S.shortAddress(s.pilot.address) })
-      : h('p', { class: 'xa-ready-tag' }, ['PRACTICE · ', h('button', { class: 'xa-link', type: 'button', onclick: async function () {
-          await onWalletClick();
-          if (session === s && s.state === 'ready' && walletStatus.address) startGame(g.id, vkey);
-        } }, ['connect a wallet']), ' to rank this run']);
-    var modes = [null].concat(g.variants || []);
-    var switcher = modes.length > 1 ? h('div', { class: 'xa-variants' }, modes.filter(function (v) { return (v ? v.key : null) !== vkey; }).map(function (v) {
-      return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, v ? v.key : null); } },
-        [v ? (v.mode === 'time' ? '⏱ ' : '▶ ') + v.label : '▶ ' + modeLabel(g, g.mode)]);
-    })) : null;
-    setOverlay(h('div', { class: 'xa-overlay xa-ready-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-ready' }, [
-      h('h3', { text: g.title }),
-      s.variant ? h('div', { class: 'xa-ready-variant', text: s.variant.label }) : null,
-      h('p', { class: 'xa-verdict', text: (s.variant && s.variant.tagline) || g.tagline || '' }),
-      g.controls ? h('p', { class: 'xa-note', text: g.controls }) : null,
-      tag,
-      h('div', { class: 'xa-ready-head' }, [h('span', { text: 'ON-CHAIN TOP 10' }), h('span', { text: 'YOUR BEST ' + fmtBest(g, mode) })]),
-      list,
-      h('div', { class: 'xa-over-actions' }, [start, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
-      switcher,
-      h('p', { class: 'xa-note' }, ['Enter or Space to start · Esc to go back · ', h('button', { class: 'xa-link', type: 'button', onclick: openReplayFile }, ['watch a replay file'])])
-    ])]));
-    start.focus();
-    S.getTop10(boardOf(g, mode), mode, true).then(function (b) {
-      boards[bk(g, mode)] = b;
-      if (session === s && s.state === 'ready' && list.isConnected) list.replaceChildren(boardList(b, g, 0, mode));
-    });
-  }
-  function showWatch(s) {
-    var who = s.info && s.info.name ? s.info.name : 'replay';
-    s.statusEl.textContent = 'REPLAY · ' + who + (s.info && s.info.rank ? ' · #' + s.info.rank : '') + ' · target ' + fmtVal(s.mode, s.watch.score);
-    var speed = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Replay speed', text: '1×', onclick: function () {
-      s.speed = s.speed >= 8 ? 1 : s.speed * 2; speed.textContent = s.speed + '×';
-    } });
-    var hud = $('.xa-hud', gameEl); if (hud) hud.insertBefore(speed, hud.lastChild);
-    setOverlay(null);
-  }
-  function endWatch(s) {
-    if (s.state !== 'watch') return;
-    s.state = 'watched';
-    var ok = s.score === s.watch.score;
-    var g = s.game, vkey = s.variant ? s.variant.key : null;
-    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
-      h('h3', { text: 'REPLAY OVER' }),
-      h('div', { class: 'xa-final', text: fmtVal(s.mode, s.score) }),
-      h('p', { class: 'xa-verdict', text: ok ? 'The replay reached exactly the recorded score.' : 'This replay ended at ' + fmtVal(s.mode, s.score) + ', not the recorded ' + fmtVal(s.mode, s.watch.score) + '.' }),
-      h('div', { class: 'xa-over-actions' }, [
-        h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { watchReplay(s.bytes, s.info); } }, ['↻ Watch again']),
-        h('button', { class: 'xa-btn', type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['◀ Back'])
-      ]),
-      h('div', { class: 'xa-replay-row' }, [h('button', { class: 'xa-btn', type: 'button', onclick: function () { saveReplay(s.bytes, boardOf(g, s.mode) + '-' + ((s.info && s.info.name) || 'replay') + '-' + s.watch.score); } }, ['⬇ Save replay'])])
-    ])]));
-  }
   function buildPads(kind, input, game) {
     var coarse = root.matchMedia && root.matchMedia('(pointer: coarse)').matches;
     if (!coarse && !/[?&]pads=1/.test(root.location.search || '')) return null;
@@ -2955,7 +2817,6 @@ body.touch #pprompt .key{display:none}
     var score = s.score;
     var dnf = mode === 'time' && !s.completed;
     if (dnf) score = 0;
-    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);   // ready for Watch / Save on the game-over card
     var prevBest = localBest(g, mode);
     var best = recordLocal(g, mode, score);
     var isPb = score > 0 && (mode === 'time' ? (!prevBest || score < prevBest) : score > prevBest);
@@ -2963,18 +2824,14 @@ body.touch #pprompt .key{display:none}
 
     var verdict = h('p', { class: 'xa-verdict', text: 'Checking the on-chain board…' });
     var submitBox = h('div', { class: 'xa-submit xa-hidden' });
-    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['↻ Play again']);
+    var again = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['↻ Play again']);
     setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
       h('h3', { text: dnf ? 'DID NOT FINISH' : mode === 'time' ? 'FINISHED' : 'GAME OVER' }),
       h('div', { class: 'xa-final', text: dnf ? '—' : fmtVal(mode, score) }),
       isPb ? h('span', { class: 'xa-badge', text: '★ NEW PERSONAL BEST' }) : h('span', { class: 'xa-note', text: 'Best ' + fmtBest(g, mode) }),
       verdict,
       submitBox,
-      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
-      s.replayP ? h('div', { class: 'xa-replay-row' }, [
-        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) watchReplay(b, { name: 'Your run' }); } }, ['▶ Watch my run']),
-        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) saveReplay(b, boardOf(g, mode) + '-' + score); } }, ['⬇ Save replay'])
-      ]) : null
+      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])])
     ])]));
     again.focus();
 
@@ -2995,7 +2852,7 @@ body.touch #pprompt .key{display:none}
         : 'The top 10 starts at ' + U.fmt(tenth.score) + '. ' + U.fmt(tenth.score - score + 1) + ' more to get on the board.';
       return;
     }
-    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);
+    if (s.rec) s.replayP = s.rec.finish(score, s.completed);
     buildSubmit(submitBox, s, score, rank);
   }
 
@@ -3127,26 +2984,7 @@ body.touch #pprompt .key{display:none}
           steps++;
         }
       }
-    } else if (s.state === 'ready') {
-      if (s.input.hit('start') || s.input.hit('a')) beginRun(s);
-      else if (s.input.hit('pause')) { endSession(); return; }
-      s.input.endFrame();
-    } else if (s.state === 'watch') {
-      s.acc += dt * s.speed;
-      var wsteps = 0, realStore = U.store;
-      U.store = s.blank || (s.blank = blankStore(s));
-      try {
-        while (s.acc >= STEP && wsteps < 6 * s.speed && session === s && s.state === 'watch') {
-          if (s.steps >= s.watch.steps) { endWatch(s); break; }
-          s.pb.load(s.steps);
-          s.instance.update(STEP);
-          s.steps++;
-          s.fx.update(STEP);
-          s.acc -= STEP;
-          wsteps++;
-        }
-      } finally { U.store = realStore; }
-    } else if (s.state === 'over' || s.state === 'watched') {
+    } else if (s.state === 'over') {
       s.fx.update(dt);
     }
     if (session !== s) return;
@@ -3161,12 +2999,6 @@ body.touch #pprompt .key{display:none}
     } else s.shake = 0;
     ctx.save();
     ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();
-    if (s.state === 'ready') {
-      s.attractT = (s.attractT || 0) + dt;
-      try { g.attract(ctx, g.size.w, g.size.h, s.attractT); } catch (e) { s.instance.render(ctx); }
-      ctx.restore();
-      return;
-    }
     s.instance.render(ctx);
     s.fx.draw(ctx);
     ctx.restore();
@@ -3190,7 +3022,7 @@ body.touch #pprompt .key{display:none}
       if (e.key === 'Escape' && modalEl) { closeModal(); return; }
       if (!session) return;
       if (e.key === 'Enter' && session.state === 'over' && doc.activeElement && doc.activeElement.id !== 'xa-name' &&
-          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key, { go: true });
+          doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key);
       if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && session.state === 'paused') togglePause();
     });
     raf = root.requestAnimationFrame(frame);

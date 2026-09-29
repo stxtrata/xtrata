@@ -10,8 +10,9 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const PINNED_CONTRACT = 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a2831d0eefd5';
-// v1.1 (typing fix, wallet detection, xtrata.xyz/arcade link). v1.0 was 0fb9085b… = inscription #3076.
-const PINNED_ARCADE = 'c140bb1456ae19ef78e9a04d2adc7f2ef9c92bb1774a5983793c3fea9527e564';
+// v1.3: title screen with the on-chain Top 10 before every run, watch/save/verify replays, late wallet detection.
+// Earlier: v1.1 c140bb14… = #3077, v1.0 0fb9085b… = #3076.
+const PINNED_ARCADE = 'd9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675bd62c';
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 
 const contract = readFileSync(resolve(root, 'contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar'), 'utf8');

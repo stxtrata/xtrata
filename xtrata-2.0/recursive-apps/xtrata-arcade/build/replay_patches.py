@@ -320,4 +320,246 @@ def apply(engine, rep):
   }
   async function onWalletClick() {""", name='onXtrataTop')
 
+    # ------------------------------------------------------------------ v1.2 fixes
+    # Wallet extensions (Xverse, Leather) often inject after this big page's scripts have run. Re-check for a
+    # while and tell listeners when a wallet appears, so the room stops showing "view only" on a top-level page.
+    engine = rep(engine, """    hello();
+  })();
+
+  root.XAScores = {""", """    hello();
+    var lastRoute = status().route, polls = 0;
+    var watch = setInterval(function () {
+      var r = status().route;
+      if (r !== lastRoute) { lastRoute = r; emit(); }
+      if (++polls >= 40 || r === 'host') clearInterval(watch);
+    }, 500);
+  })();
+
+  root.XAScores = {""", name='late wallet')
+    engine = rep(engine, """  async function onWalletClick() {
+    XA.audio.unlock();""", """  async function onWalletClick() {
+    XA.audio.unlock();
+    walletStatus = S.status(); paintWallet();   // never trust a status read before the extension arrived""", name='fresh status on click')
+
+    # ------------------------------------------------------------------ v1.3: title screen, replays
+
+
+    # Replay tools on every board row: watch, download, verify.
+    engine = rep(engine, """        h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
+        game ? verifyButton(game, mode, e) : null""", """        h('span', { class: 'xa-pts', text: fmtVal(mode, e.score) }),
+        game ? h('span', { class: 'xa-tools' }, [watchButton(game, mode, e), saveButton(game, mode, e), verifyButton(game, mode, e)]) : null""", name='row tools')
+    engine = rep(engine, """    var b = h('button', { class: 'xa-btn', type: 'button', style: 'margin-left:8px;padding:2px 8px;font-size:11px', title: 'Fetch the stored replay and run it through this game' }, ['verify']);""",
+                 """    var b = h('button', { class: 'xa-btn', type: 'button', title: 'Fetch the stored replay and run it through this game' }, ['✓?']);""", name='verify compact')
+    engine = rep(engine, "  function boardList(board, game, highlight, mode) {", r"""  var replayCache = {};
+  async function fetchReplay(game, mode, e) {
+    var key = boardOf(game, mode) + ':' + e.player + ':' + e.score;
+    if (!replayCache[key]) replayCache[key] = S.getReplay(boardOf(game, mode), e.player).then(function (b) {
+      if (!b) { delete replayCache[key]; throw new Error('No replay is stored for this entry.'); }
+      return b;
+    }, function (x) { delete replayCache[key]; throw x; });
+    return replayCache[key];
+  }
+  function watchButton(game, mode, e) {
+    return h('button', { class: 'xa-btn', type: 'button', title: 'Watch this run, replayed from the chain', onclick: async function (ev) {
+      var b = ev.currentTarget; b.disabled = true; b.textContent = '…';
+      try { var bytes = await fetchReplay(game, mode, e); closeModal(); watchReplay(bytes, { name: e.name, rank: e.rank }); }
+      catch (x) { b.disabled = false; b.textContent = '▶'; openInfo('Replay unavailable', (x && x.message) || String(x)); }
+    } }, ['▶']);
+  }
+  function saveButton(game, mode, e) {
+    return h('button', { class: 'xa-btn', type: 'button', title: 'Download this replay file', onclick: async function (ev) {
+      var b = ev.currentTarget; b.disabled = true;
+      try { saveReplay(await fetchReplay(game, mode, e), boardOf(game, mode) + '-' + e.name + '-' + e.score); }
+      catch (x) { openInfo('Replay unavailable', (x && x.message) || String(x)); }
+      b.disabled = false;
+    } }, ['⬇']);
+  }
+  function saveReplay(bytes, base) {
+    try {
+      var url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+      var a = doc.createElement('a');
+      a.href = url; a.download = 'xtrata-arcade-' + String(base).replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar';
+      doc.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+    } catch (x) { openInfo('Download blocked', 'This viewer does not allow downloads. Open the arcade on xtrata.xyz to save replays.'); }
+  }
+  function openReplayFile() {
+    var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
+    inp.addEventListener('change', async function () {
+      var f = inp.files && inp.files[0]; inp.remove();
+      if (!f) return;
+      try { watchReplay(new Uint8Array(await f.arrayBuffer()), { name: f.name.replace(/\.xar$/, '') }); }
+      catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }
+    });
+    doc.body.appendChild(inp); inp.click();
+  }
+  // Replays are drawn and heard like a live run, fed from the recorded input instead of the keyboard.
+  async function watchReplay(bytes, info) {
+    var dec;
+    try { dec = await XA.replay.decode(bytes); }
+    catch (x) { openInfo('Could not read that replay', (x && x.message) || String(x)); return; }
+    var game = XA.games.filter(function (g) { return g.id === XA.replay.GAME_IDS[dec.gameIdx]; })[0];
+    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }
+    var variant = dec.variantIdx ? (game.variants || [])[dec.variantIdx - 1] : null;
+    startGame(game.id, variant && variant.key, { watch: dec, bytes: bytes, info: info || {} });
+  }
+  function boardList(board, game, highlight, mode) {""", name='replay helpers')
+
+    # startGame: title screen by default, go:true to skip it, watch:dec to replay.
+    engine = rep(engine, "  function startGame(id, variantKey) {\n    XA.audio.unlock();", "  function startGame(id, variantKey, opts) {\n    opts = opts || {};\n    XA.audio.unlock();", name='startGame opts')
+    engine = rep(engine, "    var input = XA.createInput(stage);\n    var pads = buildPads(game.touch, input, game);",
+                 "    var watch = opts.watch || null, pb = watch ? XA.replay.playback(watch.events) : null;\n"
+                 "    var input = watch ? pb.input : XA.createInput(stage);\n    var pads = watch ? null : buildPads(game.touch, input, game);", name='watch input')
+    engine = rep(engine, "    var pilot = XA.replay.pilotFor(walletStatus.address);      // connected wallet → a ranked, recorded run\n    var nonce = U.newSeed();\n    var seed = pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;",
+                 "    var pilot = watch ? null : XA.replay.pilotFor(walletStatus.address);      // connected wallet → a ranked, recorded run\n    var nonce = U.newSeed();\n    var seed = watch ? XA.replay.seedFor(watch.hash160, watch.nonce, watch.gameIdx) : pilot ? XA.replay.seedFor(pilot.hash160, nonce, XA.replay.gameIndex(game)) : nonce;", name='watch seed')
+    engine = rep(engine, "      scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()\n    };\n    var s = session;",
+                 "      scoreEl: scoreEl, statusEl: statusEl, hiEl: hiEl, scale: 1, overlay: null, startedAt: Date.now()\n    };\n    var s = session;\n"
+                 "    if (watch) { s.state = 'watch'; s.watch = watch; s.pb = pb; s.steps = 0; s.speed = 1; s.bytes = opts.bytes; s.info = opts.info; }\n"
+                 "    else if (!opts.go) s.state = 'ready';\n"
+                 "    var live = function () { return s.state === 'play' || s.state === 'watch'; };", name='session state')
+    engine = rep(engine, """      addScore: function (n) { if (s.state === 'play') s.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (s.state === 'play') s.score = Math.max(0, Math.floor(n)); },""", """      addScore: function (n) { if (live()) s.score += Math.max(0, Math.floor(n)); },
+      setScore: function (n) { if (live()) s.score = Math.max(0, Math.floor(n)); },""", name='live score')
+    engine = rep(engine, "      gameOver: function () { if (s.state === 'play') finish(); },", "      gameOver: function () { if (s.state === 'play') finish(); else if (s.state === 'watch') endWatch(s); },", name='live over')
+    engine = rep(engine, "      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } },", "      finish: function () { if (s.state === 'play') { s.completed = true; finish(); } else if (s.state === 'watch') { s.completed = true; endWatch(s); } },", name='live finish')
+    engine = rep(engine, """      pointer: function () {
+        var p = input.pointer, r = canvas.getBoundingClientRect();""", """      pointer: watch ? pb.pointer : function () {
+        var p = input.pointer, r = canvas.getBoundingClientRect();""", name='watch pointer')
+    engine = rep(engine, "      title: pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',\n      text: pilot ? '● RANKED' : 'PRACTICE' });",
+                 "      title: watch ? 'Replay' : pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',\n      text: watch ? '▶ REPLAY' : pilot ? '● RANKED' : 'PRACTICE' });", name='watch tag')
+    engine = rep(engine, "    s.instance = game.create(api);\n    fit();\n    showCountdown();",
+                 "    if (watch) { var realStore = U.store; U.store = blankStore(s); try { s.instance = game.create(api); } finally { U.store = realStore; } }\n"
+                 "    else s.instance = game.create(api);\n    fit();\n"
+                 "    if (watch) showWatch(s); else if (s.state === 'ready') showReady(s); else showCountdown();", name='start screens')
+    engine = rep(engine, "  function buildPads(kind, input, game) {", r"""  (function () {
+    var st = doc.createElement('style');
+    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\n.xa-ready-board .xa-board { font-size: 13px; }\n.xa-ready-board .xa-board li { padding: 7px 6px; }\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';
+    (doc.head || doc.documentElement).appendChild(st);
+  })();
+  function blankStore(s) {
+    var mem = {};
+    return function (k, v) { if (v === undefined) return k in mem ? mem[k] : null; mem[k] = v; return null; };
+  }
+  function beginRun(s) {
+    if (!s || session !== s || s.state !== 'ready') return;
+    s.state = 'countdown'; s.countdown = 3.0; s.input.reset();
+    showCountdown();
+  }
+  function showReady(s) {
+    var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
+    var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);
+    var start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['▶ START']);
+    var tag = s.pilot
+      ? h('p', { class: 'xa-ready-tag is-ranked', text: '● RANKED · flying as ' + S.shortAddress(s.pilot.address) })
+      : h('p', { class: 'xa-ready-tag' }, ['PRACTICE · ', h('button', { class: 'xa-link', type: 'button', onclick: async function () {
+          await onWalletClick();
+          if (session === s && s.state === 'ready' && walletStatus.address) startGame(g.id, vkey);
+        } }, ['connect a wallet']), ' to rank this run']);
+    var modes = [null].concat(g.variants || []);
+    var switcher = modes.length > 1 ? h('div', { class: 'xa-variants' }, modes.filter(function (v) { return (v ? v.key : null) !== vkey; }).map(function (v) {
+      return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, v ? v.key : null); } },
+        [v ? (v.mode === 'time' ? '⏱ ' : '▶ ') + v.label : '▶ ' + modeLabel(g, g.mode)]);
+    })) : null;
+    setOverlay(h('div', { class: 'xa-overlay xa-ready-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over xa-ready' }, [
+      h('h3', { text: g.title }),
+      s.variant ? h('div', { class: 'xa-ready-variant', text: s.variant.label }) : null,
+      h('p', { class: 'xa-verdict', text: (s.variant && s.variant.tagline) || g.tagline || '' }),
+      g.controls ? h('p', { class: 'xa-note', text: g.controls }) : null,
+      tag,
+      h('div', { class: 'xa-ready-head' }, [h('span', { text: 'ON-CHAIN TOP 10' }), h('span', { text: 'YOUR BEST ' + fmtBest(g, mode) })]),
+      list,
+      h('div', { class: 'xa-over-actions' }, [start, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
+      switcher,
+      h('p', { class: 'xa-note' }, ['Enter or Space to start · Esc to go back · ', h('button', { class: 'xa-link', type: 'button', onclick: openReplayFile }, ['watch a replay file'])])
+    ])]));
+    start.focus();
+    S.getTop10(boardOf(g, mode), mode, true).then(function (b) {
+      boards[bk(g, mode)] = b;
+      if (session === s && s.state === 'ready' && list.isConnected) list.replaceChildren(boardList(b, g, 0, mode));
+    });
+  }
+  function showWatch(s) {
+    var who = s.info && s.info.name ? s.info.name : 'replay';
+    s.statusEl.textContent = 'REPLAY · ' + who + (s.info && s.info.rank ? ' · #' + s.info.rank : '') + ' · target ' + fmtVal(s.mode, s.watch.score);
+    var speed = h('button', { class: 'xa-icon', type: 'button', 'aria-label': 'Replay speed', text: '1×', onclick: function () {
+      s.speed = s.speed >= 8 ? 1 : s.speed * 2; speed.textContent = s.speed + '×';
+    } });
+    var hud = $('.xa-hud', gameEl); if (hud) hud.insertBefore(speed, hud.lastChild);
+    setOverlay(null);
+  }
+  function endWatch(s) {
+    if (s.state !== 'watch') return;
+    s.state = 'watched';
+    var ok = s.score === s.watch.score;
+    var g = s.game, vkey = s.variant ? s.variant.key : null;
+    setOverlay(h('div', { class: 'xa-overlay', 'data-xa-ui': '1' }, [h('div', { class: 'xa-over' }, [
+      h('h3', { text: 'REPLAY OVER' }),
+      h('div', { class: 'xa-final', text: fmtVal(s.mode, s.score) }),
+      h('p', { class: 'xa-verdict', text: ok ? 'The replay reached exactly the recorded score.' : 'This replay ended at ' + fmtVal(s.mode, s.score) + ', not the recorded ' + fmtVal(s.mode, s.watch.score) + '.' }),
+      h('div', { class: 'xa-over-actions' }, [
+        h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { watchReplay(s.bytes, s.info); } }, ['↻ Watch again']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['◀ Back'])
+      ]),
+      h('div', { class: 'xa-replay-row' }, [h('button', { class: 'xa-btn', type: 'button', onclick: function () { saveReplay(s.bytes, boardOf(g, s.mode) + '-' + ((s.info && s.info.name) || 'replay') + '-' + s.watch.score); } }, ['⬇ Save replay'])])
+    ])]));
+  }
+  function buildPads(kind, input, game) {""", name='ready/watch screens')
+
+    # Loop: ready (attract on the playfield), watch (replayed input), watched.
+    engine = rep(engine, """    } else if (s.state === 'over') {
+      s.fx.update(dt);
+    }
+    if (session !== s) return;""", """    } else if (s.state === 'ready') {
+      if (s.input.hit('start') || s.input.hit('a')) beginRun(s);
+      else if (s.input.hit('pause')) { endSession(); return; }
+      s.input.endFrame();
+    } else if (s.state === 'watch') {
+      s.acc += dt * s.speed;
+      var wsteps = 0, realStore = U.store;
+      U.store = s.blank || (s.blank = blankStore(s));
+      try {
+        while (s.acc >= STEP && wsteps < 6 * s.speed && session === s && s.state === 'watch') {
+          if (s.steps >= s.watch.steps) { endWatch(s); break; }
+          s.pb.load(s.steps);
+          s.instance.update(STEP);
+          s.steps++;
+          s.fx.update(STEP);
+          s.acc -= STEP;
+          wsteps++;
+        }
+      } finally { U.store = realStore; }
+    } else if (s.state === 'over' || s.state === 'watched') {
+      s.fx.update(dt);
+    }
+    if (session !== s) return;""", name='loop states')
+    engine = rep(engine, """    ctx.save();
+    ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();
+    s.instance.render(ctx);""", """    ctx.save();
+    ctx.beginPath(); ctx.rect(-20, -20, g.size.w + 40, g.size.h + 40); ctx.clip();
+    if (s.state === 'ready') {
+      s.attractT = (s.attractT || 0) + dt;
+      try { g.attract(ctx, g.size.w, g.size.h, s.attractT); } catch (e) { s.instance.render(ctx); }
+      ctx.restore();
+      return;
+    }
+    s.instance.render(ctx);""", name='ready attract')
+
+    # Play again / Enter on game over skip the title screen; game over gets watch + save.
+    engine = rep(engine, "type: 'button', onclick: function () { startGame(g.id, vkey); } }, ['↻ Play again']);",
+                 "type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['↻ Play again']);", name='again go')
+    engine = rep(engine, "doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key);",
+                 "doc.activeElement.tagName !== 'BUTTON' && doc.activeElement.tagName !== 'A') startGame(session.game.id, session.variant && session.variant.key, { go: true });", name='enter go')
+    engine = rep(engine, """      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])])
+    ])]));
+    again.focus();""", """      h('div', { class: 'xa-over-actions' }, [again, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
+      s.replayP ? h('div', { class: 'xa-replay-row' }, [
+        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) watchReplay(b, { name: 'Your run' }); } }, ['▶ Watch my run']),
+        h('button', { class: 'xa-btn', type: 'button', onclick: async function () { var b = await s.replayP; if (b) saveReplay(b, boardOf(g, mode) + '-' + score); } }, ['⬇ Save replay'])
+      ]) : null
+    ])]));
+    again.focus();""", name='over replay buttons')
+
+    engine = rep(engine, "    if (s.rec) s.replayP = s.rec.finish(score, s.completed);\n", "    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);\n", name='replay once')
+    engine = rep(engine, "    var dnf = mode === 'time' && !s.completed;\n    if (dnf) score = 0;\n", "    var dnf = mode === 'time' && !s.completed;\n    if (dnf) score = 0;\n    if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);   // ready for Watch / Save on the game-over card\n", name='replay early')
+
     return engine
