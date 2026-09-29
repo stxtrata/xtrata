@@ -33,7 +33,29 @@
   var W = 600, H = 400, TAU = Math.PI * 2;
   var COL = 12;                    // world px per cave column
   var PLAYER_X = 150, R = 9;       // submersible screen x and hit radius
-  var START_COLS = 40;             // quiet opening: no hazards, no pickups
+  var START_COLS = 80;             // quiet opening (~5 s): no hazards, no pickups
+
+  /* ------------------------------------------------------------ handling
+     Water, not air: thrust and sinking are gentle, drag bleeds off speed so
+     the sub glides instead of snapping, and top speeds are modest. It starts
+     at its softest and firms up over the first HANDLING_RAMP_M metres so the
+     opening is easy to learn on keys or touch. */
+  var HANDLING_RAMP_M = 1500;
+  var HANDLING = {
+    //          start  full
+    thrust:   [ 560,  900 ],   // px/s^2 upward while holding
+    sink:     [ 430,  700 ],   // px/s^2 downward while released
+    maxRise:  [ 190,  300 ],   // px/s
+    maxSink:  [ 210,  320 ],   // px/s
+    drag:     [ 2.4,  1.4 ]    // per second: velocity decays by e^(-drag*dt)
+  };
+  function handlingAt(metres) {
+    var k = Math.max(0, Math.min(1, metres / HANDLING_RAMP_M));
+    k = k * k * (3 - 2 * k);                                  // smoothstep
+    var out = {};
+    Object.keys(HANDLING).forEach(function (key) { out[key] = HANDLING[key][0] + (HANDLING[key][1] - HANDLING[key][0]) * k; });
+    return out;
+  }
   var SPR = 2;                     // sprites are pre-rendered at 2x for hi-dpi
   var TILE = 256;                  // rock texture tile
   var TW = 900;                    // parallax strip width
@@ -1009,8 +1031,9 @@
     var paths = null, gauge = { cv: null, range: 0 };
 
     /* ---------------------------------------------------- cave generation */
-    function gapFor(d) { return U.lerp(250, 120, U.clamp(d / 16000, 0, 1)); }
-    function speedAt(d) { return Math.min(430, 190 + d * 0.012); }
+    // Wider and slower at the start; the cave tightens and speeds up with depth.
+    function gapFor(d) { return U.lerp(290, 120, U.clamp(d / 18000, 0, 1)); }
+    function speedAt(d) { return Math.min(430, 165 + d * 0.012); }
     // Bulges reshape one wall for a run of columns: pockets and domes widen
     // the cave, eel dens carve a burrow, teeth jut into the gap.
     function bulgeAt(index, side) {
@@ -1046,7 +1069,8 @@
 
     function genCol(index) {
       var d = index * COL, m = d / 10, z = zoneIndex(m);
-      drift += (rng() - 0.5) * 3.2;
+      // The cave winds gently at first and more sharply with depth.
+      drift += (rng() - 0.5) * U.lerp(1.6, 3.2, U.clamp(d / 12000, 0, 1));
       drift *= 0.94;
       center += drift;
       var gap = gapFor(d);
@@ -1269,7 +1293,7 @@
         m.setTrack('o2arp', want ? true : null);
         m.setTrack('o2pulse', want ? true : null);
       }
-      var inten = U.clamp(chain / 10 + (hold ? 0.25 : 0) + (speed - 190) / 600 + (want ? 0.15 : 0), 0, 1);
+      var inten = U.clamp(chain / 10 + (hold ? 0.25 : 0) + (speed - speedAt(0)) / 600 + (want ? 0.15 : 0), 0, 1);
       if (Math.abs(inten - music.intensity) > 0.03) { music.intensity = inten; m.setIntensity(inten); }
     }
 
@@ -1529,7 +1553,7 @@
       } else if (k === 'vent') {
         if (Math.abs(dx) < 16) {
           if (ventActive(o) && y + R > o.floor - o.reach) return hurt(HAZARDS.vent.death);
-          vy -= 900 * dt;                                           // warm updraft
+          vy -= 620 * dt;                                           // warm updraft
         }
       } else if (k === 'rock') {
         if (o.state === 'fall' && Math.hypot(dx, o.y - y) < R + o.r - 2) return hurt(HAZARDS.rock.death);
@@ -1555,18 +1579,20 @@
         y = mid + Math.sin(t * 3) * 8; vy = Math.cos(t * 3) * 24;
         tilt = vy / 900;
         if (hold || inp.hit('a') || inp.hit('up') || inp.hit('hold')) {
-          started = true; vy = -120; squash = 0.5;
+          started = true; vy = -60; squash = 0.5;
           if (M()) M().note('marimba', 4, { gain: 0.8 });
         }
         return;
       }
       /* physics + currents */
-      vy += (hold ? -1450 : 1050) * dt;
-      if (zone === 1) vy += Math.sin(t * 0.9) * 240 * dt;               // kelp sways you
-      vy = U.clamp(vy, -380, 420);
+      var hd = handlingAt(dist / 10);
+      vy += (hold ? -hd.thrust : hd.sink) * dt;
+      if (zone === 1) vy += Math.sin(t * 0.9) * 160 * dt;               // kelp sways you
+      vy *= Math.exp(-hd.drag * dt);                                    // water drag
+      vy = U.clamp(vy, -hd.maxRise, hd.maxSink);
       y += vy * dt;
       tilt += (U.clamp(vy / 800, -0.45, 0.45) - tilt) * Math.min(1, dt * 10);
-      speed = Math.min(430, 190 + dist * 0.012);
+      speed = speedAt(dist);
       dist += speed * dt;
       fill();
       var metres = Math.floor(dist / 10);
