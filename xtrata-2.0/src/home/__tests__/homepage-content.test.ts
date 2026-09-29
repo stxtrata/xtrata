@@ -247,8 +247,8 @@ describe('inscription iframe permissions', () => {
     // so only the frames the user deliberately opened may delegate the feature. Checked
     // against the sandbox sites themselves: "inscription-preview" names both viewers and
     // thumbnails, so it is far too ambiguous to assert on.
-    // Opened viewers may also allow pointer lock (3D inscriptions use mouse-look); thumbnails never do.
-    const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts( allow-pointer-lock)?';/g)];
+    // Opened viewers may also allow pointer lock (3D mouse-look) and downloads (saving replays); thumbnails never do.
+    const sites = [...homeMainSource.matchAll(/frame\.sandbox = 'allow-scripts( allow-pointer-lock allow-downloads)?';/g)];
     expect(sites.filter((m) => m[1]).every((m) =>
       homeMainSource.slice(m.index ?? 0, (m.index ?? 0) + 160).includes('INSCRIPTION_FRAME_ALLOW'))).toBe(true);
     expect(sites.length).toBe(6);

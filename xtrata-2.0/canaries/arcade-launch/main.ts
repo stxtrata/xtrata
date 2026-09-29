@@ -47,6 +47,9 @@ import * as wallet from '../collection-v17/wallet';
 import type { Net, ProviderInfo } from '../collection-v17/wallet';
 
 declare const __BUILD__: string;
+declare const __ARCADE_VERSION__: string;
+declare const __ARCADE_FILE__: string;
+declare const __BUILT_AT__: string;
 declare const __SOURCE_SHA__: string;
 declare const __ARCADE_SHA__: string;
 
@@ -61,6 +64,12 @@ const MIME = 'text/html';
 /** Xtrata's standard token URI (same value the app and SDK use). */
 const TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const CHUNK = 16384;
+/**
+ * Parent inscriptions for the arcade (Xtrata's "child of" relationship). The core only accepts parents the
+ * signing wallet owns at seal time, so preflight checks ownership first. v1.1 is a child of #55.
+ */
+const PARENT_IDS: bigint[] = [55n];
+const parentList = () => PARENT_IDS.map((p) => `#${p}`).join(', ');
 const BATCH = 30; // the app and SDK cap uploads at 30 chunks per transaction
 const CANARY_BOARD = 'arcade-canary';
 const CANARY_MAX = 1_000_000_000n;
@@ -300,6 +309,12 @@ const stagedFees = async () => {
   const cv = await readCore('quote-staged-fee', [uintCV(ARCADE.length), uintCV(CHUNKS.length)]);
   return { begin: BigInt(asText(tupleField(cv, 'begin-fee'))), seal: BigInt(asText(tupleField(cv, 'seal-fee'))) };
 };
+const parentsOf = async (id: string): Promise<string[]> => {
+  const cv: any = inner(await readCore('get-parents', [uintCV(BigInt(id))]));
+  return ((cv.list ?? []) as ClarityValue[]).map((x) => asText(x));
+};
+const sameParents = (have: string[]) =>
+  have.length === PARENT_IDS.length && PARENT_IDS.every((p) => have.includes(p.toString()));
 const findInscription = async () => {
   const cv = await readCore('get-id-by-hash', [bufferCV(FINAL_HASH)]);
   return isNone(cv) ? null : asText(cv);
@@ -402,7 +417,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'preflight', title: 'Preflight: files, core contract, funds', who: 'Reads only',
-    intro: 'Checks the embedded leaderboard contract and arcade file against their pinned SHA-256, hashes the arcade the way the core does, confirms the core contract is open and quotes the inscription fees, flies a real run in the embedded arcade, and looks for anything already done so a re-run resumes instead of repeating.',
+    intro: 'Checks that this wallet owns the parent inscription(s), checks the embedded leaderboard contract and arcade file against their pinned SHA-256, hashes the arcade the way the core does, confirms the core contract is open and quotes the inscription fees, flies a real run in the embedded arcade, and looks for anything already done so a re-run resumes instead of repeating.',
     action: 'Run preflight',
     run: async () => {
       const w = requireWallet();
@@ -415,6 +430,13 @@ const STEPS: Step[] = [
       try { admin = asText(await readCore('get-admin')); } catch { /* optional read */ }
       if (paused !== 'false' && admin !== w.address) throw new Error('The core inscription contract is paused, and this wallet is not its admin.');
       const fees = await stagedFees();
+      // Parents: each must exist and be owned by this wallet, or the seal would be refused (u111 / u100).
+      for (const p of PARENT_IDS) {
+        const ownerCv = await readCore('get-owner', [uintCV(p)]);
+        if (isNone(ownerCv)) throw new Error(`Parent inscription #${p} does not exist on this core.`);
+        const owner = asText(ownerCv);
+        if (owner !== w.address) throw new Error(`Parent inscription #${p} is owned by ${owner}, not this wallet (${w.address}). Connect the wallet that holds #${p}, or move it there first.`);
+      }
       // Scores contract
       const existing = await chain.contractSource(scoresId());
       let deployed: 'free' | 'ours' = 'free';
@@ -427,7 +449,11 @@ const STEPS: Step[] = [
       const prior = await findInscription();
       if (prior) {
         const meta = await inscriptionMeta(prior);
-        if (meta && meta.sealed && meta.creator === w.address && meta.hash === toHex(FINAL_HASH) && meta.size === ARCADE.length) { state.inscriptionId = prior; adopted = ` · already inscribed by you as #${prior}, later inscription steps will skip`; }
+        if (meta && meta.sealed && meta.creator === w.address && meta.hash === toHex(FINAL_HASH) && meta.size === ARCADE.length) {
+          state.inscriptionId = prior;
+          const have = await parentsOf(prior);
+          adopted = ` · already inscribed by you as #${prior}, later inscription steps will skip${sameParents(have) ? '' : ` · WARNING it has parents [${have.map((x) => '#' + x).join(', ') || 'none'}], not ${parentList()}; parents cannot be added after sealing`}`;
+        }
         else adopted = ` · note: hash already inscribed as #${prior} by ${meta ? short(meta.creator) : 'someone else'}; a fresh inscription will be made`;
       }
       if (!state.run) { state.run = await makeRun(w.address); save(); }
@@ -435,7 +461,7 @@ const STEPS: Step[] = [
       const balance = await chain.balance(w.address);
       const funds = balance < need ? ` · WARNING balance ${stx(balance)} is below the ~${stx(need)} this run needs` : ` · balance ${stx(balance)} covers the ~${stx(need)} needed`;
       step('preflight').data = { deployed };
-      return `pins ok (contract ${short(PINNED_SHA)}, arcade ${short(arcadeSha)}) · ${(ARCADE.length / 1024).toFixed(0)} KB in ${N} chunks (${Math.ceil(N / BATCH)} upload txs) · core open · inscription fee ${stx(fees.begin + fees.seal)} (begin ${stx(fees.begin)} + seal ${stx(fees.seal)}) · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${adopted}${funds}`;
+      return `Xtrata Arcade ${__ARCADE_VERSION__} (${__ARCADE_FILE__}) · parent ${parentList()} owned by this wallet · pins ok (contract ${short(PINNED_SHA)}, arcade ${short(arcadeSha)}) · ${(ARCADE.length / 1024).toFixed(0)} KB in ${N} chunks (${Math.ceil(N / BATCH)} upload txs) · core open · inscription fee ${stx(fees.begin + fees.seal)} (begin ${stx(fees.begin)} + seal ${stx(fees.seal)}) · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${adopted}${funds}`;
     }
   },
   {
@@ -465,7 +491,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'begin', title: 'Inscribe 1/3: begin the upload', who: 'Web wallet',
-    intro: `Starts the upload on the core contract for the arcade file (${MIME}, ${ARCADE.length.toLocaleString()} bytes, ${N} chunks). Pays the begin fee once; resuming an existing session costs nothing. The post-condition caps what your wallet can spend.`,
+    intro: `Starts the upload on the core contract for Xtrata Arcade ${__ARCADE_VERSION__}, ${__ARCADE_FILE__} (${MIME}, ${ARCADE.length.toLocaleString()} bytes, ${N} chunks). Pays the begin fee once; resuming an existing session costs nothing. The post-condition caps what your wallet can spend.`,
     action: 'Begin inscription',
     run: async () => {
       if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
@@ -499,7 +525,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'seal', title: 'Inscribe 3/3: seal', who: 'Web wallet',
-    intro: 'Seals the inscription. The core checks its own running hash against the hash of the file you declared; if a single byte differed it would refuse. Pays the seal fee, capped by a post-condition.',
+    intro: `Seals the inscription as a child of ${PARENT_IDS.map((p) => '#' + p).join(', ')} (seal-with-relationships). The core checks its own running hash against the hash of the file you declared; if a single byte differed it would refuse. It also re-checks that this wallet owns the parent. Pays the seal fee, capped by a post-condition.`,
     action: 'Seal inscription',
     run: async () => {
       if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
@@ -507,7 +533,9 @@ const STEPS: Step[] = [
       const idx = await uploadIndex();
       if (idx === null || idx < N) throw new Error(`Only ${idx ?? 0} of ${N} chunks are stored. Finish the upload first.`);
       const fees = await stagedFees();
-      await runTx('seal', 'seal-inscription', () => walletCall(state.core, 'seal-inscription', [bufferCV(FINAL_HASH), stringAsciiCV(TOKEN_URI)], payAtMost(fees.seal)));
+      await runTx('seal', PARENT_IDS.length ? `seal-with-relationships (parent ${parentList()})` : 'seal-inscription', () => PARENT_IDS.length
+        ? walletCall(state.core, 'seal-with-relationships', [bufferCV(FINAL_HASH), stringAsciiCV(TOKEN_URI), listCV([]), listCV(PARENT_IDS.map((p) => uintCV(p)))], payAtMost(fees.seal))
+        : walletCall(state.core, 'seal-inscription', [bufferCV(FINAL_HASH), stringAsciiCV(TOKEN_URI)], payAtMost(fees.seal)));
       let id = '';
       await eventually('New inscription id', async () => {
         const found = await findInscription();
@@ -517,7 +545,7 @@ const STEPS: Step[] = [
         id = found; return null;
       });
       state.inscriptionId = id; save(); renderHeader();
-      return `sealed as inscription #${id}`;
+      return `Xtrata Arcade ${__ARCADE_VERSION__} sealed as inscription #${id}${PARENT_IDS.length ? `, child of ${parentList()}` : ''}`;
     }
   },
   {
@@ -534,6 +562,8 @@ const STEPS: Step[] = [
       if (meta.mime !== MIME) throw new Error(`Inscription MIME is ${meta.mime}, expected ${MIME}.`);
       if (meta.size !== ARCADE.length || meta.chunks !== N) throw new Error(`Inscription is ${meta.size} bytes in ${meta.chunks} chunks; expected ${ARCADE.length} in ${N}.`);
       if (meta.hash !== toHex(FINAL_HASH)) throw new Error('Inscription hash differs from the declared hash.');
+      const parents = await parentsOf(id);
+      if (!sameParents(parents)) throw new Error(`Inscription #${id} has parents [${parents.map((x) => '#' + x).join(', ') || 'none'}], expected ${parentList()}.`);
       const out: Uint8Array[] = [];
       const per = 10;
       for (let i = 0; i < N; i += per) {
@@ -570,7 +600,7 @@ const STEPS: Step[] = [
           }
         } catch { served = 'site check: could not reach xtrata.xyz from this page (not a failure)'; }
       }
-      return `inscription #${id} · ${rebuilt.length.toLocaleString()} bytes read back from ${N} chunks, sha256 ${short(ARCADE_SHA)} matches, chain hash matches · ${served}`;
+      return `inscription #${id} · child of ${parentList()} · ${rebuilt.length.toLocaleString()} bytes read back from ${N} chunks, sha256 ${short(ARCADE_SHA)} matches, chain hash matches · ${served}`;
     }
   },
   {
@@ -815,7 +845,25 @@ const renderHeader = () => {
   $('#disconnect').toggleAttribute('hidden', !connected);
 };
 
+const renderInscribing = () => {
+  const built = new Date(__BUILT_AT__);
+  const rows: [string, string][] = [
+    ['File', __ARCADE_FILE__],
+    ['Size', `${ARCADE.length.toLocaleString()} bytes · ${N} chunks · ${Math.ceil(N / BATCH)} upload transactions`],
+    ['SHA-256', __ARCADE_SHA__],
+    ['Parent', PARENT_IDS.length ? parentList() : 'none'],
+    ['Canary built', `${built.toLocaleString()} (your time) · ${__BUILT_AT__} UTC`],
+    ['Build stamp', __BUILD__]
+  ];
+  $('#inscribing').replaceChildren(
+    el('div', { class: 'eyebrow' }, 'This canary inscribes'),
+    el('div', { class: 'big' }, `Xtrata Arcade ${__ARCADE_VERSION__}`),
+    el('dl', {}, ...rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])));
+  document.title = `Arcade ${__ARCADE_VERSION__} launch canary · ${__BUILD__}`;
+};
+
 const bind = () => {
+  renderInscribing();
   $('#build').textContent = `${__BUILD__} · contract sha256 ${__SOURCE_SHA__.slice(0, 16)}… · arcade sha256 ${__ARCADE_SHA__.slice(0, 16)}… · ${(ARCADE.length / 1024).toFixed(0)} KB, ${N} chunks`;
   $('#network').addEventListener('change', (e) => {
     network = (e.target as HTMLSelectElement).value as Net;
@@ -836,7 +884,8 @@ const bind = () => {
   });
   $('#disconnect').addEventListener('click', async () => { await wallet.disconnect(); connected = null; step('connect').status = 'todo'; save(); renderHeader(); renderSteps(); log('info', 'Wallet disconnected.'); });
   $('#export').addEventListener('click', () => {
-    const report = { ...state, run: state.run ? { game: state.run.game, score: state.run.score, bytes: unb64(state.run.replay).length } : null, build: __BUILD__, network,
+    const report = { ...state, run: state.run ? { game: state.run.game, score: state.run.score, bytes: unb64(state.run.replay).length } : null, build: __BUILD__, builtAt: __BUILT_AT__,
+      arcadeVersion: __ARCADE_VERSION__, arcadeFile: __ARCADE_FILE__, parents: PARENT_IDS.map(String), network,
       contractSha256: __SOURCE_SHA__, arcadeSha256: __ARCADE_SHA__, arcadeBytes: ARCADE.length, chunks: N, chainHash: toHex(FINAL_HASH),
       leaderboard: state.deployer ? scoresId() : null, copycat: hotAddress() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
