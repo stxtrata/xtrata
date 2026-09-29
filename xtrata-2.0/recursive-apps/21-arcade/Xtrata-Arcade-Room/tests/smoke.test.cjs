@@ -457,6 +457,32 @@ async function mockApi(ctx) {
   check((await frame.evaluate(() => window.XARoom._session().instance.debug().rally)) >= 1, 'pong streak: tracking the ball returns it');
   await frame.click('.xa-hud .xa-icon');
 
+  /* ---------- 4t. Time-board variants: Race to 512, Hit 50, Classic ---------- */
+  await frame.evaluate(() => { if (window.XARoom._session()) window.XARoom.back(); });
+  const variants = [['xa_merge_2048', 'race', 'Classic|⏱ Race to 512'], ['xa_reflex_tap', 'hit50', 'Rounds|⏱ Hit 50'], ['xa_mine_sprint', 'classic', 'Sprint|⏱ Classic']];
+  for (const [gid, key, tabs] of variants) {
+    check(!!(await frame.$('[data-play-variant="' + gid + ':' + key + '"]')), gid + ' cabinet offers the ' + key + ' variant');
+    await frame.click('[data-game="' + gid + '"] .xa-cab-actions .xa-btn:not(.xa-btn-play):not(.xa-btn-variant)');
+    await frame.waitForSelector('.xa-mode-tab');
+    check((await frame.$$eval('.xa-mode-tab', (els) => els.map((e) => e.textContent))).join('|') === tabs, gid + ' boards have ' + tabs + ' tabs');
+    await frame.press('body', 'Escape');
+    await frame.click('[data-play-variant="' + gid + ':' + key + '"]');
+    await frame.waitForFunction(() => window.XARoom._session() && window.XARoom._session().state === 'play', null, { timeout: 8000 });
+    const hud = await frame.evaluate(() => ({ mode: window.XARoom._session().mode, label: document.querySelector('.xa-hud-stats small').textContent }));
+    check(hud.mode === 'time' && hud.label === 'TIME', gid + ' ' + key + ' runs on the time board');
+    if (key === 'hit50') {
+      for (let i = 0; i < 120; i++) {
+        const d = await frame.evaluate(() => { const s = window.XARoom._session(); return s && s.state === 'play' ? s.instance.debug() : null; });
+        if (!d || d.done) break;
+        if (d.good && d.good.length) await page.keyboard.press('Digit' + (d.good[0] + 1));
+        await page.waitForTimeout(40);
+      }
+      await frame.waitForSelector('.xa-over', { timeout: 15000 });
+      check((await frame.textContent('.xa-over h3')) === 'FINISHED', 'reflex tap hit 50: 50 hits finish with a time (' + (await frame.textContent('.xa-final')) + ')');
+    }
+    await frame.evaluate(() => window.XARoom.back());
+  }
+
   /* ---------- 5. Narrow host method path ---------- */
   const page2 = await ctx.newPage();
   await page2.goto(base + '/tests/mock-host.html?narrow=1');

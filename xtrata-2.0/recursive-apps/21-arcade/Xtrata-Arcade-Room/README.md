@@ -1,4 +1,4 @@
-# Xtrata Arcade Room (v2.4 prototype, 21 cabinets, 13 upgraded to v2)
+# Xtrata Arcade Room (v3.0 prototype, all 21 cabinets at v2)
 
 One recursive parent that hosts an arcade room of cabinets. Every cabinet is its
 own leaf inscription and posts to the **same** score contract
@@ -18,17 +18,17 @@ parent that lists it.
 | Stack Tower | `modules/game-stack-tower.js` | `xa_stack_tower` | Space / click / tap to drop · climb to space, gold/wide/ice slabs, perfect repairs |
 | Road Hopper | `modules/game-road-hopper.js` | `xa_road_hopper` | arrows/WASD, swipe or tap, d-pad · 5 biomes, trains, sinking logs, crocs, ice, 6 unlockable hoppers |
 | Tile Tap | `modules/game-tile-tap.js` | `xa_tile_tap` | ← ↓ ↑ → or 1–4, click/tap a lane · 3 charted songs, holds + doubles, timing grades + **Rush 100** (time board) |
-| Merge 2048 | `modules/game-merge-2048.js` | `xa_merge_2048` | arrows/WASD, swipe, d-pad |
+| Merge 2048 | `modules/game-merge-2048.js` | `xa_merge_2048` | arrows/WASD, swipe, d-pad · animated slides, 4 skins, earned Undo/Swap/Smash tokens + **Race to 512** (time board) |
 | Block Defence | `modules/game-block-defence.js` | `xa_block_defence` | click/tap to fire; arrows + Space, Z X C per silo · splitters, smart bombs, bombers, darts, supply depot between waves, day→night |
 | Maze Muncher | `modules/game-maze-muncher.js` | `xa_maze_muncher` | arrows/WASD, swipe, d-pad · 5 mazes, 4 glitch personalities, warp gates, items, freeze/boost |
 | Invader Wave | `modules/game-invader-wave.js` | `xa_invader_wave` | ←→ + Space (hold to fire); ◀ ▶ FIRE pads · 8 formations, divers/shielded/splitters/bombers, mothership boss, power-ups, crumbling bunkers, CRT look |
-| Helix Drop | `modules/game-helix-drop.js` | `xa_helix_drop` | drag or ←→ to spin |
-| Bubble Pop | `modules/game-bubble-pop.js` | `xa_bubble_pop` | mouse aim + click, or ←→ + Space; C swaps |
-| Swerve | `modules/game-swerve.js` | `xa_swerve` | mouse / drag to steer, or ←→ |
-| Lunar Lander | `modules/game-lunar-lander.js` | `xa_lunar_lander` | ←→ rotate, ↑ / Space thrust; ⟲ ⟳ THRUST pads |
-| Reflex Tap | `modules/game-reflex-tap.js` | `xa_reflex_tap` | click/tap, or keys 1–9 |
-| Mine Sprint | `modules/game-mine-sprint.js` | `xa_mine_sprint` | click reveal, hold to flag (or flag mode); arrows + Space, F |
-| Pong Streak | `modules/game-pong-streak.js` | `xa_pong_streak` | mouse / drag or ←→ |
+| Helix Drop | `modules/game-helix-drop.js` | `xa_helix_drop` | drag or ←→ to spin · levels with finish platforms, 4 worlds, glass/boost/slider segments, fireball, shield |
+| Bubble Pop | `modules/game-bubble-pop.js` | `xa_bubble_pop` | mouse aim + click, or ←→ + Space; C swaps · 11 designed boards, bomb/rainbow/stone/ice, bounce aim guide, falling orphans |
+| Swerve | `modules/game-swerve.js` | `xa_swerve` | mouse / drag to steer, or ←→ · 4 zones, sliding gates/rotors/chokes/pillars, boost pads, shield, slow-mo, near-miss chains |
+| Lunar Lander | `modules/game-lunar-lander.js` | `xa_lunar_lander` | ←→ rotate, ↑ / Space thrust; ⟲ ⟳ THRUST pads · 5 worlds (wind, ice, thermals, heavy gravity), fuel caches, cargo rescue, ground zoom |
+| Reflex Tap | `modules/game-reflex-tap.js` | `xa_reflex_tap` | click/tap, or keys 1–9 · 8 target kinds, 8 rule rounds + **Hit 50** (time board) |
+| Mine Sprint | `modules/game-mine-sprint.js` | `xa_mine_sprint` | click reveal, hold to flag (or flag mode); arrows + Space, F · no-guess boards (built-in solver), growing board ladder, 4 themes + **Classic** (time board) |
+| Pong Streak | `modules/game-pong-streak.js` | `xa_pong_streak` | mouse / drag or ←→ · 6-machine ladder with a boss, spin and curve, multiball/big/slow/curve power-ups, arenas |
 
 The `xa_` prefix keeps these boards separate from the older 21-arcade slots.
 
@@ -54,7 +54,7 @@ tests/
 index.html            local dev page (not for inscription)
 ```
 
-Leaves total ~632 KB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
+Leaves total ~1.33 MB for all 21 games plus the music engine (Astro Blaster's leaves are ~590 KB for one).
 
 ## Cartridge contract
 
@@ -136,17 +136,17 @@ Every other cabinet has its own score too, each built around its mechanic:
 | Stack Tower | G major, 100 bpm | each floor plays the next note of a climbing melody; perfects an octave up; every 10 floors → key change |
 | Road Hopper | Bb mixolydian swing, 112 bpm | hops walk the scale up/down; roads bring drums, rivers bring pads · 5 biomes, trains, sinking logs, crocs, ice, 6 unlockable hoppers |
 | Tile Tap | G major pop, 112 bpm+ | **you play the lead**: each correct tap is the next melody note; tile speed → tempo · 3 charted songs, holds + doubles, timing grades + **Rush 100** (time board) |
-| Merge 2048 | Eb lo-fi, 80 bpm swing | merges play degree log2(tile); best tile → layers + stinger; full board closes the filter |
+| Merge 2048 | Eb lo-fi, 80 bpm swing | merges play degree log2(tile); best tile → layers + stinger; full board closes the filter · animated slides, 4 skins, earned Undo/Swap/Smash tokens + **Race to 512** (time board) |
 | Block Defence | D harmonic minor, 124 bpm | warheads on screen → layers; near-miss siren; chain kills climb the scale · splitters, smart bombs, bombers, darts, supply depot between waves, day→night |
 | Maze Muncher | C dorian chiptune, 120 bpm | maze eaten → layers; power core → phrygian, faster, frantic arp · 5 mazes, 4 glitch personalities, warp gates, items, freeze/boost |
 | Invader Wave | F minor march, 96→188 bpm | invaders left → march tempo; mystery ship → siren track · 8 formations, divers/shielded/splitters/bombers, mothership boss, power-ups, crumbling bunkers, CRT look |
-| Helix Drop | C# minor drum & bass, 170 bpm | each gap passed steps a falling run; fireball opens the filter |
-| Bubble Pop | C major pentatonic, 100 bpm | each colour is a note; dropped bubbles cascade; danger adds tension |
-| Swerve | E dorian synthwave, 118 bpm+ | speed → tempo; close shaves → riser + pluck; 500 m → key up |
-| Lunar Lander | F lydian ambient, 70 bpm, no drums | thrust opens the filter; altitude bands bring a ticking clock; landing resolves |
-| Reflex Tap | D pentatonic click, 116 bpm+ | each hit plays the next note on the 16th grid; streak → layers |
-| Mine Sprint | B harmonic minor clock, 96 bpm | revealed numbers are notes (only revealed cells, never hidden mines) |
-| Pong Streak | G dorian disco, 108–136 bpm | ball speed → tempo; each hit climbs the chord; rally → layers |
+| Helix Drop | C# minor drum & bass, 170 bpm | each gap passed steps a falling run; fireball opens the filter · levels with finish platforms, 4 worlds, glass/boost/slider segments, fireball, shield |
+| Bubble Pop | C major pentatonic, 100 bpm | each colour is a note; dropped bubbles cascade; danger adds tension · 11 designed boards, bomb/rainbow/stone/ice, bounce aim guide, falling orphans |
+| Swerve | E dorian synthwave, 118 bpm+ | speed → tempo; close shaves → riser + pluck; 500 m → key up · 4 zones, sliding gates/rotors/chokes/pillars, boost pads, shield, slow-mo, near-miss chains |
+| Lunar Lander | F lydian ambient, 70 bpm, no drums | thrust opens the filter; altitude bands bring a ticking clock; landing resolves · 5 worlds (wind, ice, thermals, heavy gravity), fuel caches, cargo rescue, ground zoom |
+| Reflex Tap | D pentatonic click, 116 bpm+ | each hit plays the next note on the 16th grid; streak → layers · 8 target kinds, 8 rule rounds + **Hit 50** (time board) |
+| Mine Sprint | B harmonic minor clock, 96 bpm | revealed numbers are notes (only revealed cells, never hidden mines) · no-guess boards (built-in solver), growing board ladder, 4 themes + **Classic** (time board) |
+| Pong Streak | G dorian disco, 108–136 bpm | ball speed → tempo; each hit climbs the chord; rally → layers · 6-machine ladder with a boss, spin and curve, multiball/big/slow/curve power-ups, arenas |
 
 ## How a score gets posted
 

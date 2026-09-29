@@ -1,7 +1,7 @@
 {
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
-  "release": "v2.4-batch-two",
+  "release": "v3.0-all-upgraded",
   "createdAt": "2026-09-29",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
@@ -176,8 +176,8 @@
       "key": "merge2048",
       "path": "modules/game-merge-2048.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 12815,
-      "sha256": "78b73fac898d0cd35d6c0d3173c17ef60a7fc435dc7b522abd96cba441656670",
+      "sizeBytes": 65914,
+      "sha256": "2209e59a1ee72c94cbde02af480fe7bc8199c60cb03e80b9a33023f9090c18b4",
       "mintOrder": 16,
       "mintedInscriptionId": 0
     },
@@ -212,8 +212,8 @@
       "key": "helix",
       "path": "modules/game-helix-drop.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13283,
-      "sha256": "e6e74f6548a0ee90e1b23b1e39108fd84cb1dc6bd734cd338d876b6688e293bb",
+      "sizeBytes": 59783,
+      "sha256": "d629c923086f4a863429ea2a378d78b7692281ebc723fa5ee63b9f6e8d377a2b",
       "mintOrder": 20,
       "mintedInscriptionId": 0
     },
@@ -221,8 +221,8 @@
       "key": "bubbles",
       "path": "modules/game-bubble-pop.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 16684,
-      "sha256": "412cafe666b538113fd3b411c5264a552ded6e8fb54bb88e9704940094449a3d",
+      "sizeBytes": 65859,
+      "sha256": "ef19e5c28809822ff6d4db1a34667b9e23de4657ab8d0bffe45a10f20afc12ce",
       "mintOrder": 21,
       "mintedInscriptionId": 0
     },
@@ -230,8 +230,8 @@
       "key": "swerve",
       "path": "modules/game-swerve.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 13085,
-      "sha256": "cdecccc126dd2b070be9d379e4dc88d8e59ebad22d6e1e3ab8d22000b6060bbe",
+      "sizeBytes": 67346,
+      "sha256": "097a2857de1e212ea0107b3560acdc4a3b127ecc37619b4f937347e20ccfdc0d",
       "mintOrder": 22,
       "mintedInscriptionId": 0
     },
@@ -239,8 +239,8 @@
       "key": "lander",
       "path": "modules/game-lunar-lander.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 14402,
-      "sha256": "b3b503cc7db27d0212c878b804941df920661c5994ba64abdf7492818366aa2a",
+      "sizeBytes": 67719,
+      "sha256": "464b01bd9d195a84efb0ab848c305ea301032a86488ac71693c053f667c47894",
       "mintOrder": 23,
       "mintedInscriptionId": 0
     },
@@ -248,8 +248,8 @@
       "key": "reflex",
       "path": "modules/game-reflex-tap.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 11167,
-      "sha256": "c26be0f479d21cb987559c13869c0751d33628f3f271f0cfa2e3ef1b418d0324",
+      "sizeBytes": 53333,
+      "sha256": "0876d56a7911a1541b9ba3a194bd540477f7b667bc0497282f0a47c6b0cc9723",
       "mintOrder": 24,
       "mintedInscriptionId": 0
     },
@@ -257,8 +257,8 @@
       "key": "mines",
       "path": "modules/game-mine-sprint.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 14469,
-      "sha256": "4bd72aac5efc60243a731bce7dae768553d9b7a449d86235a70cdf1691f792d2",
+      "sizeBytes": 54873,
+      "sha256": "5827f34fdc6b11c36026b6a32be61eb818cfdc974b56210c093c01d1aca32f9c",
       "mintOrder": 25,
       "mintedInscriptionId": 0
     },
@@ -266,8 +266,8 @@
       "key": "pong",
       "path": "modules/game-pong-streak.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 11424,
-      "sha256": "e6d82b04485d675a799929f576a1caf4cecc059e7719c12a41283b987d34930d",
+      "sizeBytes": 68977,
+      "sha256": "c44af966d1c32b9a8fa29f91921b84acbb8ded88296917be6899af8a144713ec",
       "mintOrder": 26,
       "mintedInscriptionId": 0
     }
