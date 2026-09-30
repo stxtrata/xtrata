@@ -192,6 +192,11 @@ plan:
             path: contracts/xtrata-collection-mint-v1.7.clar
             clarity-version: 4
         - emulated-contract-publish:
+            contract-name: xtrata-collection-mint-v1-9
+            emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
+            path: contracts/xtrata-collection-mint-v1.9.clar
+            clarity-version: 4
+        - emulated-contract-publish:
             contract-name: xtrata-commerce
             emulated-sender: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
             path: contracts/xtrata-commerce.clar
