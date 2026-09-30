@@ -418,6 +418,7 @@ const wallCaption = (item) => {
   if (item.eyebrow) caption.append(element('span', 'home-tile__eyebrow', item.eyebrow));
   caption.append(element('strong', 'home-tile__title', item.title));
   if (item.subtitle) caption.append(element('span', 'home-tile__sub', item.subtitle));
+  if (item.cta && item.kind !== 'chess') caption.append(element('span', 'home-tile__cta home-tile__cta--wall', `${item.cta} →`));
   return caption;
 };
 
