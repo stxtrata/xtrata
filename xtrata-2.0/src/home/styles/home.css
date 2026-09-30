@@ -8311,3 +8311,36 @@
       padding-top: 64px;
       background: linear-gradient(rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.94) 55%);
     }
+
+    /* Living Wall: Xtrata Arcade (#3081) headline tile. */
+    .home-tone--arcade .home-tile__eyebrow { color: #ffc93c; }
+    .home-tile--big.home-tone--arcade {
+      border-color: rgba(255, 201, 60, 0.55);
+      box-shadow: 0 0 0 1px rgba(90, 140, 255, 0.25), 0 0 34px rgba(90, 140, 255, 0.22);
+    }
+    .home-tile--big.home-tone--arcade:hover,
+    .home-tile--big.home-tone--arcade:focus-visible {
+      border-color: #ffc93c;
+      box-shadow: 0 0 0 1px rgba(255, 201, 60, 0.5), 0 0 46px rgba(90, 140, 255, 0.4);
+    }
+    .home-tile--big.home-tone--arcade .home-tile__title {
+      font-size: 30px;
+      letter-spacing: -0.02em;
+      text-shadow: 0 0 18px rgba(120, 170, 255, 0.75);
+    }
+    .home-tile--big.home-tone--arcade .home-tile__sub { font-size: 13.5px; max-width: 34ch; }
+    .home-tile--big.home-tone--arcade .home-tile__caption {
+      gap: 4px;
+      padding-top: 72px;
+      background: linear-gradient(rgba(5, 5, 5, 0), rgba(5, 5, 12, 0.94) 55%);
+    }
+    .home-tile__cta--wall {
+      align-self: flex-start;
+      margin-top: 8px;
+      background: #ffc93c;
+      color: #140f02;
+      box-shadow: 0 3px 0 #b3861a;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .home-tone--arcade .home-tile__badge { background: rgba(255, 201, 60, 0.9); color: #140f02; font-weight: 700; }

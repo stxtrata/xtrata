@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Xtrata Arcade Hall</title>
+<!--
+  Xtrata Arcade Hall - recursive parent
+
+  Assembles the hall from inscribed parts (see build/hall-parts.cjs):
+    CONFIG.parts   a single part replaced by its own inscription (e.g. one game)
+    CONFIG.packs   the five packs: assets, three, engine, games, hall
+    CONFIG.bundleId  a single-file release (e.g. #3078) for any part not given above
+  With every id at 0 it loads ./packs/*.txt next to this file (local testing).
+  Built by: node build/modular.mjs build   (ids from parent/ids.json)
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #05060f; color: #eef1ff; }
+  #xa-load { position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center;
+    font: 700 13px/1.4 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .08em;
+    background: radial-gradient(700px 360px at 50% 30%, rgba(61,134,255,.18), transparent 70%), #05060f; transition: opacity .35s ease; }
+  #xa-load.done { opacity: 0; pointer-events: none; }
+  #xa-load .box { width: min(380px, calc(100% - 32px)); text-align: center; }
+  #xa-load h1 { margin: 0 0 18px; font: 900 28px/1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .1em; color: #fff; }
+  #xa-load h1 span { color: #3d86ff; }
+  #xa-load .bar { height: 8px; border-radius: 4px; background: #151935; overflow: hidden; }
+  #xa-load .fill { height: 100%; width: 0; background: linear-gradient(90deg, #3d86ff, #ff8a2a); transition: width .2s ease; }
+  #xa-load .msg { margin-top: 12px; color: #9aa3c7; min-height: 1.4em; }
+  #xa-load .err { margin-top: 12px; color: #ff4d6d; white-space: pre-wrap; text-align: left; font-size: 12px; }
+  #xa-load .err button { margin-top: 10px; font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #555; background: #151935; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="xa-load" role="status" aria-live="polite">
+  <div class="box">
+    <h1>XTRATA <span>ARCADE</span></h1>
+    <div class="bar"><div class="fill" id="xa-load-fill"></div></div>
+    <div class="msg" id="xa-load-msg">Loading the hall from Stacks…</div>
+    <div class="err" id="xa-load-err" hidden></div>
+  </div>
+</div>
+<script>
+/*@@HALL_PARTS@@*/
+</script>
+<script>
+(function () {
+  'use strict';
+  var CONFIG = /*@@CONFIG@@*/{};
+  var CHAIN = {
+    contractAddress: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    contractName: 'xtrata-v3-2-3',
+    readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
+    network: 'mainnet',
+    maxChunks: 1024,
+    parallel: 6
+  };
+  var P = window.XAHallParts;
+  var fillEl = document.getElementById('xa-load-fill'), msgEl = document.getElementById('xa-load-msg'), errEl = document.getElementById('xa-load-err');
+  var bytesIn = 0, bytesTotal = 0;
+  function progress(text) {
+    if (text) msgEl.textContent = text;
+    if (bytesTotal) fillEl.style.width = Math.min(100, Math.round(bytesIn / bytesTotal * 100)) + '%';
+  }
+
+  /* ---------------------------------------------------- chain reads */
+  function hasRealOrigin() { try { return /^https?:$/.test(location.protocol) && location.origin !== 'null'; } catch (e) { return false; } }
+  function apiBases() {
+    var out = [];
+    if (hasRealOrigin() && /xtrata\.xyz$/.test(location.hostname)) out.push(location.origin + '/hiro/' + CHAIN.network);
+    out.push('https://api.mainnet.hiro.so');
+    return out;
+  }
+  function uintHex(v) { return '0x01' + BigInt(v).toString(16).padStart(32, '0'); }
+  function hexToBytes(hex) {
+    var c = String(hex || '').replace(/^0x/i, ''), out = new Uint8Array(c.length / 2);
+    for (var i = 0; i < out.length; i++) out[i] = parseInt(c.substr(i * 2, 2), 16);
+    return out;
+  }
+  function bufferFromCv(hex) {                     // (ok (some buff)) / (some buff) / none
+    var b = hexToBytes(hex), p = 0;
+    while (p < b.length && (b[p] === 0x07 || b[p] === 0x0a)) p++;
+    if (p >= b.length || b[p] === 0x08 || b[p] === 0x09) return new Uint8Array(0);
+    if (b[p] !== 0x02) throw new Error('Unexpected Clarity type 0x' + b[p].toString(16));
+    var len = ((b[p + 1] << 24) | (b[p + 2] << 16) | (b[p + 3] << 8) | b[p + 4]) >>> 0;
+    return b.slice(p + 5, p + 5 + len);
+  }
+  async function readOnly(fn, args) {
+    var bases = apiBases(), last;
+    for (var i = 0; i < bases.length; i++) {
+      var url = bases[i] + '/v2/contracts/call-read/' + CHAIN.contractAddress + '/' + CHAIN.contractName + '/' + fn;
+      for (var attempt = 0; attempt < 4; attempt++) {
+        try {
+          var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sender: CHAIN.readSender, arguments: args }) });
+          if (res.status === 429) { await new Promise(function (r) { setTimeout(r, 700 * (attempt + 1)); }); continue; }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          var body = await res.json();
+          if (!body.okay) throw new Error(body.cause || 'read failed');
+          return body.result;
+        } catch (e) { last = e; }
+      }
+    }
+    throw last || new Error('read failed');
+  }
+  // Whole inscription as text; chunks read in small parallel windows until the first empty one.
+  async function inscriptionText(id, label) {
+    var parts = [], total = 0, next = 0, ended = false;
+    bytesTotal += 16384 * 8;
+    while (!ended && next < CHAIN.maxChunks) {
+      var batch = [];
+      for (var k = 0; k < CHAIN.parallel && next < CHAIN.maxChunks; k++) {
+        batch.push(readOnly('get-chunk', [uintHex(id), uintHex(next++)]).then(bufferFromCv));
+      }
+      var got = await Promise.all(batch);
+      for (var j = 0; j < got.length; j++) {
+        if (!got[j].length) { ended = true; break; }
+        parts.push(got[j]); total += got[j].length; bytesIn += got[j].length; bytesTotal += got[j].length;
+      }
+      progress('Reading ' + label + ' (#' + id + ') ' + Math.round(total / 1024) + ' KB');
+    }
+    if (!parts.length) throw new Error('Inscription #' + id + ' returned no data');
+    var out = new Uint8Array(total), o = 0;
+    parts.forEach(function (p) { out.set(p, o); o += p.length; });
+    return new TextDecoder('utf-8').decode(out);
+  }
+
+  /* ---------------------------------------------------- part sources */
+  var cache = {};
+  function once(key, fn) { return cache[key] || (cache[key] = fn()); }
+  function packParts(name) {
+    return once('pack:' + name, function () {
+      var id = Number(CONFIG.packs[name] || 0);
+      var text = id > 0 ? inscriptionText(id, name) :
+        fetch('packs/xtrata-arcade-' + name + '.txt', { cache: 'no-store' }).then(function (r) {
+          if (!r.ok) throw new Error('No id for the ' + name + ' pack and no local packs/ copy (HTTP ' + r.status + ')');
+          return r.text();
+        });
+      return text.then(P.parsePack);
+    });
+  }
+  function bundleParts() {
+    return once('bundle', function () {
+      return inscriptionText(Number(CONFIG.bundleId), 'arcade').then(function (html) { return P.splitRelease(html).parts; });
+    });
+  }
+  function partText(name) {
+    var own = Number((CONFIG.parts || {})[name] || 0);
+    if (own > 0) return inscriptionText(own, name);
+    var pack = P.packOf(name);
+    if (Number(CONFIG.packs[pack] || 0) > 0 || !(Number(CONFIG.bundleId) > 0)) {
+      return packParts(pack).then(function (p) {
+        if (typeof p[name] !== 'string') throw new Error('The ' + pack + ' pack has no ' + name);
+        return p[name];
+      });
+    }
+    return bundleParts().then(function (p) {
+      if (typeof p[name] !== 'string') throw new Error('Arcade #' + CONFIG.bundleId + ' has no ' + name);
+      return p[name];
+    });
+  }
+
+  /* ------------------------------------ Leather compatibility shim
+     Leather reads contract-call post-conditions with a strict hex decoder that
+     rejects "0x". Score clients before v1.4 send 0x-prefixed hex on the direct
+     wallet route, so strip it (formatting only; nothing else changes). */
+  function bare(v) { return typeof v === 'string' ? v.replace(/^0x/i, '') : v; }
+  function patchLeather() {
+    var p = window.LeatherProvider;
+    if (!p || typeof p.request !== 'function' || p.__xaBareHex) return;
+    var original = p.request.bind(p);
+    p.request = function (method, params) {
+      if (method === 'stx_callContract' && params && typeof params === 'object') {
+        var f = {};
+        Object.keys(params).forEach(function (k) { f[k] = params[k]; });
+        ['postConditions', 'functionArgs', 'arguments'].forEach(function (k) { if (Array.isArray(f[k])) f[k] = f[k].map(bare); });
+        params = f;
+      }
+      return original(method, params);
+    };
+    p.__xaBareHex = true;
+  }
+  patchLeather();
+  [300, 1500, 4000].forEach(function (ms) { setTimeout(patchLeather, ms); });
+
+  /* ------------------------------------------------------------ boot */
+  async function boot() {
+    var names = P.ORDER.css.concat(P.ORDER.html, P.ORDER.js);
+    var texts = await Promise.all(names.map(partText));
+    var byName = {};
+    names.forEach(function (n, i) { byName[n] = texts[i]; });
+    progress('Starting the hall…');
+    P.ORDER.css.forEach(function (n) {
+      var st = document.createElement('style');
+      st.setAttribute('data-xa-part', n);
+      st.textContent = byName[n];
+      document.head.appendChild(st);
+    });
+    document.body.insertAdjacentHTML('afterbegin', byName['hall-body.html']);
+    window.XA_CONFIG = window.XA_CONFIG || {};
+    if (Number(CONFIG.parentTokenId) > 0) {
+      window.XA_CONFIG.scores = Object.assign({}, window.XA_CONFIG.scores, { parentTokenId: Number(CONFIG.parentTokenId) });
+    }
+    window.XA_BUILD = { version: CONFIG.version, bundleId: CONFIG.bundleId, packs: CONFIG.packs, parts: CONFIG.parts };
+    P.ORDER.js.forEach(function (n) {
+      var s = document.createElement('script');
+      s.setAttribute('data-xa-part', n);
+      s.text = byName[n] + '\n//# sourceURL=xa-' + n;
+      document.body.appendChild(s);          // separate scripts: one failing part cannot stop the rest
+    });
+    patchLeather();
+    var load = document.getElementById('xa-load');
+    load.classList.add('done');
+    setTimeout(function () { load.remove(); }, 450);
+  }
+  boot().catch(function (e) {
+    msgEl.textContent = 'The arcade could not load.';
+    errEl.hidden = false;
+    errEl.textContent = (e && e.message) || String(e);
+    var retry = document.createElement('button');
+    retry.textContent = 'Retry';
+    retry.onclick = function () { location.reload(); };
+    errEl.appendChild(document.createElement('br'));
+    errEl.appendChild(retry);
+    console.error('[xa:parent]', e);
+  });
+})();
+</script>
+</body>
+</html>

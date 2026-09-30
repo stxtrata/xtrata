@@ -51,12 +51,13 @@ describe('homepage content configuration', () => {
     expect(homepageSource).toContain('mount.onmouseenter = () => { paused = true; };');
   });
 
-  it('fills the 4x3 Living Wall exactly on desktop', () => {
+  it('fills the 4x4 Living Wall exactly on desktop', () => {
     const cells = HOMEPAGE_WALL.reduce(
       (sum, tile) => sum + ({ big: 4, wide: 2, tall: 2 }[tile.size] ?? 1),
       0
     );
-    expect(cells).toBe(12);
+    expect(cells).toBe(16);
+    expect(HOMEPAGE_WALL[0]).toMatchObject({ id: 'xtrata-arcade', size: 'big', href: '/i/3081' });
     expect(HOMEPAGE_WALL.find((tile) => tile.kind === 'chess')).toMatchObject({ href: '/i/3072', title: 'On-Chain Chess' });
   });
 

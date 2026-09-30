@@ -1,0 +1,13 @@
+{
+  "version": "v1.4",
+  "bundleId": 3078,
+  "packs": {
+    "assets": 0,
+    "three": 0,
+    "engine": 0,
+    "games": 0,
+    "hall": 0
+  },
+  "parts": {},
+  "parentTokenId": 0
+}

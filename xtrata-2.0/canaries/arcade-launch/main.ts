@@ -1,14 +1,20 @@
 /**
  * Xtrata Arcade launch canary.
  *
- * Walks the whole Xtrata Arcade launch in the only safe order, each step gated on
- * the one before it and re-reading the chain instead of trusting this page:
+ * Walks an Xtrata Arcade release in the only safe order, each step gated on the one
+ * before it and re-reading the chain instead of trusting this page.
  *
- *   deploy leaderboard contract -> verify it -> inscribe the arcade (begin, upload,
- *   seal) -> verify the inscription byte for byte -> open a canary board bound to that
- *   inscription -> submit a real arcade run and re-play it from the chain -> prove a
- *   copied run is refused -> close the canary board -> register the 26 production boards
- *   -> final audit.
+ * From v1.4 the arcade is recursive (recursive-apps/xtrata-arcade/README.md). Only the
+ * packs that changed since the single-file bundle (#3078) are inscribed; then a small
+ * parent is inscribed that loads every part from those packs or from the bundle:
+ *
+ *   leaderboard contract (deploy only if missing) -> verify it -> inscribe each changed
+ *   pack -> inscribe the parent, written with those pack ids, as a recursive child of #55
+ *   that depends on the bundle and the packs -> verify every inscription byte for byte and
+ *   resolve every one of the hall's parts from the chain exactly as the parent does ->
+ *   open a canary board bound to the parent -> submit a real arcade run and re-play it ->
+ *   prove a copied run is refused -> close the canary board -> point the 26 production
+ *   boards at the parent -> final audit.
  *
  * Wallet logic is the shared canary module (`../collection-v17/wallet.ts`, the port of
  * the X Chess v2 canary, docs/WALLET-PLAYBOOK.md). Every call runs in deny mode with an
@@ -40,33 +46,35 @@ import {
   type PostCondition
 } from '@stacks/transactions';
 import contractSource from '../../contracts/arcade-scores-v2/contracts/xtrata-arcade-scores-v2.clar';
-import arcadeHtml from '../../recursive-apps/xtrata-arcade/release/xtrata-arcade.html';
 import BOARDS from '../../recursive-apps/xtrata-arcade/boards.json';
+import HallParts from '../../recursive-apps/xtrata-arcade/build/hall-parts.cjs';
+import ParentRender from '../../recursive-apps/xtrata-arcade/build/parent-render.cjs';
+import RELEASE from 'xa:release';
 import { Chain, toHex } from '../collection-v17/chain';
 import * as wallet from '../collection-v17/wallet';
 import type { Net, ProviderInfo } from '../collection-v17/wallet';
 
 declare const __BUILD__: string;
-declare const __ARCADE_VERSION__: string;
-declare const __ARCADE_FILE__: string;
 declare const __BUILT_AT__: string;
 declare const __SOURCE_SHA__: string;
-declare const __ARCADE_SHA__: string;
+declare const __RELEASE_SHA__: string;
 
 const PINNED_SHA = __SOURCE_SHA__; // leaderboard contract (the build refuses any other)
-const ARCADE_SHA = __ARCADE_SHA__; // the arcade file (the build refuses any other)
+const RELEASE_SHA = __RELEASE_SHA__; // the packs + parent shell + part list (the build refuses any other)
+const VERSION = RELEASE.version;
+const BUNDLE_ID = BigInt(RELEASE.bundle.id);
 const DEFAULT_NAME = 'xtrata-arcade-scores-v2';
 const CORE_DEFAULT: Record<Net, string> = {
   mainnet: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3',
   testnet: ''
 };
-const MIME = 'text/html';
 /** Xtrata's standard token URI (same value the app and SDK use). */
 const TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const CHUNK = 16384;
 /**
- * Parent inscriptions for the arcade (Xtrata's "child of" relationship). The core only accepts parents the
- * signing wallet owns at seal time, so preflight checks ownership first. v1.1 is a child of #55.
+ * Parent inscriptions (Xtrata's "child of" relationship) for everything this canary seals. The core only
+ * accepts parents the signing wallet owns at seal time, so preflight checks ownership first. Every arcade
+ * release is a child of #55.
  */
 const PARENT_IDS: bigint[] = [55n];
 const parentList = () => PARENT_IDS.map((p) => `#${p}`).join(', ');
@@ -77,7 +85,7 @@ const PROOF_GAME = 'xa_swerve';
 const COPY_TX_FEE = 30_000n;
 const SWEEP_TX_FEE = 5_000n;
 const FUND_AMOUNT = 60_000n;
-const SAFETY_BUFFER = 3_000_000n; // network fees for ~8 upload batches, deploy and ~35 small calls
+const SAFETY_BUFFER = 3_000_000n; // network fees for the uploads, seals and ~35 small calls
 
 type Board = { id: string; game: string; mode: number; max: number };
 const PRODUCTION = BOARDS as Board[];
@@ -99,19 +107,43 @@ const el = (tag: string, attrs: Record<string, any> = {}, ...children: Child[]) 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const stx = (micro: bigint | string | number) => `${(Number(micro) / 1e6).toLocaleString(undefined, { maximumFractionDigits: 6 })} STX`;
 const short = (s: string) => (s && s.length > 18 ? `${s.slice(0, 8)}…${s.slice(-6)}` : s);
+const kb = (n: number) => `${(n / 1024).toFixed(1)} KB`;
 const shaHex = (text: string) => toHex(sha256(new TextEncoder().encode(text)));
 const hexBytes = (hex: string) => Uint8Array.from(hex.replace(/^0x/, '').match(/../g)!.map((h) => parseInt(h, 16)));
 const b64 = (b: Uint8Array) => { let s = ''; b.forEach((x) => { s += String.fromCharCode(x); }); return btoa(s); };
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const concat = (a: Uint8Array, b: Uint8Array) => { const o = new Uint8Array(a.length + b.length); o.set(a, 0); o.set(b, a.length); return o; };
+const joinBytes = (list: Uint8Array[]) => { const out = new Uint8Array(list.reduce((n, c) => n + c.length, 0)); let o = 0; for (const c of list) { out.set(c, o); o += c.length; } return out; };
 
-// ---------- the arcade file, chunked the way the core hashes it ----------
-const ARCADE = new TextEncoder().encode(arcadeHtml);
-const CHUNKS: Uint8Array[] = [];
-for (let i = 0; i < ARCADE.length; i += CHUNK) CHUNKS.push(ARCADE.subarray(i, Math.min(i + CHUNK, ARCADE.length)));
+// ---------- what gets inscribed, chunked the way the core hashes it ----------
 /** The core's running hash: h0 = 32 zero bytes, h(i+1) = sha256(h(i) || chunk(i)). The final value is the upload's identity. */
 const chainHash = (chunks: Uint8Array[]) => { let h: Uint8Array = new Uint8Array(32); for (const c of chunks) h = sha256(concat(h, c)); return h; };
-const FINAL_HASH = chainHash(CHUNKS);
+type Upload = { key: string; label: string; mime: string; text: string; bytes: Uint8Array; chunks: Uint8Array[]; hash: Uint8Array; sha: string };
+const makeUpload = (key: string, label: string, mime: string, text: string): Upload => {
+  const bytes = new TextEncoder().encode(text);
+  const chunks: Uint8Array[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK) chunks.push(bytes.subarray(i, Math.min(i + CHUNK, bytes.length)));
+  return { key, label, mime, text, bytes, chunks, hash: chainHash(chunks), sha: toHex(sha256(bytes)) };
+};
+/** The packs that differ from the bundle, in load order. The rest of the hall is read out of the bundle. */
+const PACKS: Upload[] = RELEASE.inscribe.map((name) => makeUpload(name, `${name} pack`, 'text/plain', RELEASE.packs[name]));
+const PART_NAMES = Object.keys(RELEASE.partSha);
+
+/** The parent's CONFIG for the pack ids this run has inscribed (or adopted). Same renderer as `modular.mjs build`. */
+const parentConfig = (packIds: Record<string, string>) =>
+  ParentRender.parentConfig({ ...RELEASE.ids, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, Number(packIds[n] || 0)])) }, RELEASE.packOrder);
+let parentCache: { key: string; upload: Upload } | null = null;
+const parentUpload = (): Upload => {
+  const ids = state.packIds || {};
+  const missing = RELEASE.inscribe.filter((n) => !ids[n]);
+  if (missing.length) throw new Error(`The ${missing.join(' and ')} pack${missing.length > 1 ? 's have' : ' has'} no inscription id yet. Run the pack steps first.`);
+  const key = JSON.stringify(ids);
+  if (parentCache?.key !== key) parentCache = { key, upload: makeUpload('parent', 'parent', 'text/html', ParentRender.fillParent(RELEASE.shell, parentConfig(ids))) };
+  return parentCache.upload;
+};
+/** Size of the parent once real ids are in it (ids are at most 7 digits here), for fee quotes before the packs exist. */
+const parentEstimate = () => new TextEncoder().encode(ParentRender.fillParent(RELEASE.shell, parentConfig(Object.fromEntries(RELEASE.inscribe.map((n) => [n, '9999999']))))).length;
+const parentDeps = (): bigint[] => [BUNDLE_ID, ...RELEASE.inscribe.map((n) => BigInt(state.packIds![n]))];
 
 // ---------- clarity unwrapping ----------
 const inner = (cv: ClarityValue): ClarityValue => {
@@ -146,6 +178,9 @@ type State = {
   contractName: string;
   core: string;
   deployer?: string;
+  /** pack name -> inscription id */
+  packIds?: Record<string, string>;
+  /** the parent: the arcade's engine id on every board */
   inscriptionId?: string;
   run?: { replay: string; score: number; game: string };
   steps: Record<string, StepState>;
@@ -158,10 +193,10 @@ let state!: State;
 let connected: { address: string; publicKey: string | null; label: string } | null = null;
 let busy = false;
 
-// Progress is per arcade file, so a new arcade version starts its own gated run.
-const stateKey = () => `xtrata-arcade-launch:v1:${network}${ARCADE_SHA === '0fb9085b47c78a27dc4bb7392a9a5cbba5926f7bc3ee3a680a3f80bd713569e9' ? '' : `:${ARCADE_SHA.slice(0, 12)}`}`;
+// Progress is per release, so a new arcade version starts its own gated run.
+const stateKey = () => `xtrata-arcade-launch:v2:${network}:${RELEASE_SHA.slice(0, 12)}`;
 const hotKeyName = () => `xtrata-arcade-launch:hot:${network}`;
-const freshState = (): State => ({ version: 1, contractName: DEFAULT_NAME, core: CORE_DEFAULT[network], steps: {}, log: [] });
+const freshState = (): State => ({ version: 1, contractName: DEFAULT_NAME, core: CORE_DEFAULT[network], packIds: {}, steps: {}, log: [] });
 const load = () => {
   try { const raw = localStorage.getItem(stateKey()); state = raw ? { ...freshState(), ...JSON.parse(raw) } : freshState(); } catch { state = freshState(); }
 };
@@ -301,35 +336,92 @@ const inscriptionMeta = async (id: string) => {
     chunks: Number(asText(tupleField(cv, 'total-chunks'))), sealed: asText(tupleField(cv, 'sealed')) === 'true', hash: toHex(bufOf(tupleField(cv, 'final-hash')))
   };
 };
-const uploadIndex = async (): Promise<number | null> => {
-  const cv = await readCore('get-upload-state', [bufferCV(FINAL_HASH), principalCV(state.deployer!)]);
+const uploadIndex = async (f: Upload): Promise<number | null> => {
+  const cv = await readCore('get-upload-state', [bufferCV(f.hash), principalCV(state.deployer!)]);
   return isNone(cv) ? null : Number(asText(tupleField(cv, 'current-index')));
 };
-const stagedFees = async () => {
-  const cv = await readCore('quote-staged-fee', [uintCV(ARCADE.length), uintCV(CHUNKS.length)]);
+const stagedFees = async (size: number, chunks: number) => {
+  const cv = await readCore('quote-staged-fee', [uintCV(size), uintCV(chunks)]);
   return { begin: BigInt(asText(tupleField(cv, 'begin-fee'))), seal: BigInt(asText(tupleField(cv, 'seal-fee'))) };
 };
-const parentsOf = async (id: string): Promise<string[]> => {
-  const cv: any = inner(await readCore('get-parents', [uintCV(BigInt(id))]));
+const idList = async (fn: 'get-parents' | 'get-dependencies', id: string): Promise<string[]> => {
+  const cv: any = inner(await readCore(fn, [uintCV(BigInt(id))]));
   return ((cv.list ?? []) as ClarityValue[]).map((x) => asText(x));
 };
-const sameParents = (have: string[]) =>
-  have.length === PARENT_IDS.length && PARENT_IDS.every((p) => have.includes(p.toString()));
-const findInscription = async () => {
-  const cv = await readCore('get-id-by-hash', [bufferCV(FINAL_HASH)]);
+const sameIds = (have: string[], want: bigint[]) => have.length === want.length && want.every((p) => have.includes(p.toString()));
+const findInscription = async (f: Upload) => {
+  const cv = await readCore('get-id-by-hash', [bufferCV(f.hash)]);
   return isNone(cv) ? null : asText(cv);
+};
+/** An inscription that already holds exactly these bytes, sealed: re-used instead of inscribed again. */
+const findSealed = async (f: Upload) => {
+  const id = await findInscription(f);
+  if (!id) return null;
+  const meta = await inscriptionMeta(id);
+  return meta && meta.sealed && meta.hash === toHex(f.hash) && meta.size === f.bytes.length ? { id, meta } : null;
+};
+/** Every chunk of an inscription, read back from the core in batches. */
+const readChunks = async (id: string, total: number, label: string) => {
+  const out: Uint8Array[] = [];
+  const per = 10;
+  for (let i = 0; i < total; i += per) {
+    status(`Reading ${label} (#${id}) back… ${Math.min(i + per, total)} of ${total} chunks`);
+    const idxs = Array.from({ length: Math.min(per, total - i) }, (_, k) => uintCV(BigInt(i + k)));
+    const cv: any = inner(await readCore('get-chunk-batch', [uintCV(BigInt(id)), listCV(idxs)]));
+    const items = cv.list as ClarityValue[];
+    if (items.length !== idxs.length) throw new Error(`Chunk read of #${id} returned ${items.length} of ${idxs.length} chunks at ${i}.`);
+    for (const it of items) out.push(bufOf(it));
+  }
+  return out;
+};
+
+// ---------- inscribing one file: begin, upload, seal (each resumable from the chain) ----------
+const inscribe = async (sid: string, f: Upload, deps: bigint[]) => {
+  const w = requireWallet();
+  const existing = await findSealed(f);
+  if (existing) {
+    const parents = await idList('get-parents', existing.id);
+    const warn = sameIds(parents, PARENT_IDS) ? '' : ` · note: it has parents [${parents.map((x) => '#' + x).join(', ') || 'none'}], not ${parentList()}`;
+    return { id: existing.id, sent: false, note: `already on chain as #${existing.id}${existing.meta.creator === w.address ? '' : ` (inscribed by ${short(existing.meta.creator)})`}, identical bytes; re-used, nothing sent${warn}` };
+  }
+  const n = f.chunks.length;
+  const fees = await stagedFees(f.bytes.length, n);
+  if ((await uploadIndex(f)) === null) {
+    await runTx(sid, `${f.label}: begin`, () => walletCall(state.core, 'begin-or-get',
+      [bufferCV(f.hash), stringAsciiCV(f.mime), uintCV(f.bytes.length), uintCV(n)], payAtMost(fees.begin)));
+  }
+  await eventually(`${f.label} upload session`, async () => ((await uploadIndex(f)) === null ? 'no session yet' : null));
+  let idx = (await uploadIndex(f))!;
+  while (idx < n) {
+    const from = idx, end = Math.min(idx + BATCH, n);
+    status(`Uploading ${f.label} chunks ${from + 1}–${end} of ${n}…`);
+    await runTx(sid, `${f.label}: chunks ${from}-${end - 1}`, () => walletCall(state.core, 'add-chunk-batch',
+      [bufferCV(f.hash), listCV(f.chunks.slice(from, end).map((c) => bufferCV(c)))]));
+    await eventually(`${f.label} chunk progress`, async () => { const i = await uploadIndex(f); return i !== null && i >= end ? null : `index ${i}`; });
+    idx = (await uploadIndex(f))!;
+  }
+  await runTx(sid, `${f.label}: seal`, () => walletCall(state.core, 'seal-with-relationships',
+    [bufferCV(f.hash), stringAsciiCV(TOKEN_URI), listCV(deps.map((d) => uintCV(d))), listCV(PARENT_IDS.map((p) => uintCV(p)))], payAtMost(fees.seal)));
+  let id = '';
+  await eventually(`${f.label} inscription id`, async () => {
+    const found = await findSealed(f);
+    if (!found) return 'not sealed yet';
+    if (found.meta.creator !== w.address) return `sealed by ${short(found.meta.creator)}`;
+    id = found.id; return null;
+  });
+  return { id, sent: true, note: `sealed as #${id} (${kb(f.bytes.length)}, ${n} chunk${n > 1 ? 's' : ''}), child of ${parentList()}${deps.length ? `, depends on ${deps.map((d) => '#' + d).join(', ')}` : ''}` };
 };
 
 // ---------- the arcade engine, run in a hidden frame from the embedded file ----------
-/** Loads the same arcade file that gets inscribed, headless, so the canary flies and verifies a real arcade run. */
+/** Loads the single-file build of the same parts that get inscribed, headless, so the canary flies and verifies a real arcade run. */
 const withArcade = async <T,>(fn: (win: any) => Promise<T>): Promise<T> => {
   const frame = el('iframe', { style: 'position:fixed;left:-9999px;top:0;width:900px;height:700px;border:0', title: 'arcade engine (hidden)' }) as HTMLIFrameElement;
-  frame.srcdoc = arcadeHtml;
+  frame.srcdoc = RELEASE.single;
   document.body.append(frame);
   try {
     const win: any = frame.contentWindow;
     const t0 = Date.now();
-    while (!(win && win.XA && win.XA.replay && win.XA.games && win.XA.games.length)) {
+    while (!(win && win.XA && win.XA.replay && win.XA.games && win.XA.games.length && win.document.readyState === 'complete')) {   // every inline cartridge has run, not just the first
       if (Date.now() - t0 > 60_000) throw new Error('The embedded arcade did not start in a hidden frame.');
       await sleep(300);
     }
@@ -390,12 +482,23 @@ const makeRun = async (address: string) => withArcade(async (win) => {
 });
 
 type Step = { id: string; title: string; who: string; intro: string; action: string; run: () => Promise<string | void> };
-const N = CHUNKS.length;
+const sigs = (f: { chunks: number }) => 2 + Math.ceil(f.chunks / BATCH);
+
+const packStep = (f: Upload): Step => ({
+  id: `pack-${f.key}`, title: `Inscribe the ${f.label}`, who: `Web wallet · ${sigs({ chunks: f.chunks.length })} signatures`,
+  intro: `Inscribes the ${f.label} (${HallParts.PACKS[f.key].join(', ')}): ${f.bytes.length.toLocaleString()} bytes, ${f.chunks.length} chunk${f.chunks.length > 1 ? 's' : ''}, sha256 ${short(f.sha)}. Begin, upload and seal, each resumed from the chain's own progress after a reload or a rejected signature; the fees are capped by post-conditions. If these exact bytes are already inscribed, that inscription is re-used and nothing is sent.`,
+  action: `Inscribe ${f.label}`,
+  run: async () => {
+    const r = await inscribe(`pack-${f.key}`, f, []);
+    state.packIds = { ...(state.packIds || {}), [f.key]: r.id }; save(); renderHeader();
+    return `${f.label}: ${r.note}`;
+  }
+});
 
 const STEPS: Step[] = [
   {
     id: 'connect', title: 'Connect your web wallet', who: 'Web wallet',
-    intro: 'Opens the wallet chooser, then the wallet\'s own account picker. This account deploys the leaderboard, inscribes the arcade and owns the boards.',
+    intro: 'Opens the wallet chooser, then the wallet\'s own account picker. This account owns the leaderboard and #55, inscribes the release and points the boards at it.',
     action: 'Connect wallet',
     run: async () => {
       const result = await wallet.connect(network, chooseWallet);
@@ -416,21 +519,31 @@ const STEPS: Step[] = [
     }
   },
   {
-    id: 'preflight', title: 'Preflight: files, core contract, funds', who: 'Reads only',
-    intro: 'Checks that this wallet owns the parent inscription(s), checks the embedded leaderboard contract and arcade file against their pinned SHA-256, hashes the arcade the way the core does, confirms the core contract is open and quotes the inscription fees, flies a real run in the embedded arcade, and looks for anything already done so a re-run resumes instead of repeating.',
+    id: 'preflight', title: 'Preflight: release, bundle, core contract, funds', who: 'Reads only',
+    intro: `Checks the embedded packs and parent against their pins, checks on chain that #${RELEASE.bundle.id} holds exactly the bundle the unchanged parts come from, checks this wallet owns ${parentList()}, confirms the core is open and quotes every inscription fee, flies a real run in the ${VERSION} arcade, and looks for anything already done so a re-run resumes instead of repeating.`,
     action: 'Run preflight',
     run: async () => {
       const w = requireWallet();
       if (shaHex(contractSource) !== PINNED_SHA) throw new Error('Embedded leaderboard contract does not match its pin. Rebuild the canary.');
-      const arcadeSha = toHex(sha256(ARCADE));
-      if (arcadeSha !== ARCADE_SHA) throw new Error(`Embedded arcade is ${arcadeSha}, not the pinned ${ARCADE_SHA}. Rebuild the canary.`);
+      for (const f of PACKS) if (f.sha !== RELEASE.packSha[f.key]) throw new Error(`Embedded ${f.label} is ${f.sha}, not the pinned ${RELEASE.packSha[f.key]}. Rebuild the canary.`);
+      if (shaHex(RELEASE.shell) !== RELEASE.shellSha) throw new Error('Embedded parent does not match its pin. Rebuild the canary.');
+      if (shaHex(RELEASE.single) !== RELEASE.singleSha) throw new Error('Embedded single-file arcade does not match its pin. Rebuild the canary.');
+      // Every part the parent will load resolves to the pinned bytes: packs from this page, the rest from the bundle (checked on chain below).
+      for (const f of PACKS) {
+        const got = HallParts.parsePack(f.text);
+        for (const p of HallParts.PACKS[f.key]) if (shaHex(got[p]) !== RELEASE.partSha[p]) throw new Error(`The ${f.label} does not carry the pinned ${p}.`);
+      }
       if (!state.core) throw new Error('Enter the core inscription contract for this network.');
       const paused = asText(await readCore('is-paused'));
       let admin = '';
       try { admin = asText(await readCore('get-admin')); } catch { /* optional read */ }
       if (paused !== 'false' && admin !== w.address) throw new Error('The core inscription contract is paused, and this wallet is not its admin.');
-      const fees = await stagedFees();
-      // Parents: each must exist and be owned by this wallet, or the seal would be refused (u111 / u100).
+      // The bundle every unchanged part is read from.
+      const bundle = await inscriptionMeta(String(BUNDLE_ID));
+      if (!bundle) throw new Error(`Bundle #${BUNDLE_ID} does not exist on this core.`);
+      if (!bundle.sealed || bundle.hash !== RELEASE.bundle.chainHash || bundle.size !== RELEASE.bundle.bytes)
+        throw new Error(`#${BUNDLE_ID} is not the pinned bundle (sealed ${bundle.sealed}, ${bundle.size} bytes, hash ${short(bundle.hash)}; expected ${RELEASE.bundle.bytes} bytes, hash ${short(RELEASE.bundle.chainHash)}).`);
+      // Parents: each must exist and be owned by this wallet, or the seals would be refused (u111 / u100).
       for (const p of PARENT_IDS) {
         const ownerCv = await readCore('get-owner', [uintCV(p)]);
         if (isNone(ownerCv)) throw new Error(`Parent inscription #${p} does not exist on this core.`);
@@ -440,33 +553,48 @@ const STEPS: Step[] = [
       // Scores contract
       const existing = await chain.contractSource(scoresId());
       let deployed: 'free' | 'ours' = 'free';
+      let boardsNow = '';
       if (existing !== null) {
         if (shaHex(existing) !== PINNED_SHA && shaHex(existing.replace(/\r\n/g, '\n')) !== PINNED_SHA) throw new Error(`${scoresId()} already exists with different source. Choose another contract name.`);
         deployed = 'ours';
+        const b = await readBoard(PRODUCTION[0].id);
+        boardsNow = b ? ` · boards currently point at engine #${b.engineId}` : ' · no production boards yet';
       }
-      // Anything already inscribed from this exact file?
-      let adopted = '';
-      const prior = await findInscription();
-      if (prior) {
-        const meta = await inscriptionMeta(prior);
-        if (meta && meta.sealed && meta.creator === w.address && meta.hash === toHex(FINAL_HASH) && meta.size === ARCADE.length) {
-          state.inscriptionId = prior;
-          const have = await parentsOf(prior);
-          adopted = ` · already inscribed by you as #${prior}, later inscription steps will skip${sameParents(have) ? '' : ` · WARNING it has parents [${have.map((x) => '#' + x).join(', ') || 'none'}], not ${parentList()}; parents cannot be added after sealing`}`;
-        }
-        else adopted = ` · note: hash already inscribed as #${prior} by ${meta ? short(meta.creator) : 'someone else'}; a fresh inscription will be made`;
+      // Fees and anything already inscribed.
+      let need = SAFETY_BUFFER;
+      const plan: string[] = [];
+      const known: Record<string, string> = { ...(state.packIds || {}) };
+      for (const f of PACKS) {
+        const found = await findSealed(f);
+        if (found) { known[f.key] = found.id; plan.push(`${f.key} already #${found.id}`); continue; }
+        const fee = await stagedFees(f.bytes.length, f.chunks.length);
+        need += fee.begin + fee.seal;
+        plan.push(`${f.key} ${kb(f.bytes.length)} (${stx(fee.begin + fee.seal)})`);
       }
+      state.packIds = known;
+      let parentNote = '';
+      if (PACKS.every((f) => known[f.key])) {
+        const found = await findSealed(parentUpload());
+        if (found) { state.inscriptionId = found.id; parentNote = `parent already #${found.id}`; }
+      }
+      if (!parentNote) {
+        const size = parentEstimate();
+        const fee = await stagedFees(size, Math.ceil(size / CHUNK));
+        need += fee.begin + fee.seal;
+        parentNote = `parent ~${kb(size)} (${stx(fee.begin + fee.seal)})`;
+      }
+      plan.push(parentNote);
+      save();
       if (!state.run) { state.run = await makeRun(w.address); save(); }
-      const need = (adopted.includes('skip') ? 0n : fees.begin + fees.seal) + SAFETY_BUFFER;
       const balance = await chain.balance(w.address);
       const funds = balance < need ? ` · WARNING balance ${stx(balance)} is below the ~${stx(need)} this run needs` : ` · balance ${stx(balance)} covers the ~${stx(need)} needed`;
       step('preflight').data = { deployed };
-      return `Xtrata Arcade ${__ARCADE_VERSION__} (${__ARCADE_FILE__}) · parent ${parentList()} owned by this wallet · pins ok (contract ${short(PINNED_SHA)}, arcade ${short(arcadeSha)}) · ${(ARCADE.length / 1024).toFixed(0)} KB in ${N} chunks (${Math.ceil(N / BATCH)} upload txs) · core open · inscription fee ${stx(fees.begin + fees.seal)} (begin ${stx(fees.begin)} + seal ${stx(fees.seal)}) · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${adopted}${funds}`;
+      return `Xtrata Arcade ${VERSION} · release ${short(RELEASE_SHA)} · bundle #${BUNDLE_ID} verified on chain (${RELEASE.fromBundle.join(', ')} come from it) · ${parentList()} owned by this wallet · core open · to inscribe: ${plan.join(', ')} · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${boardsNow}${funds}`;
     }
   },
   {
     id: 'deploy', title: 'Deploy the leaderboard contract', who: 'Web wallet',
-    intro: 'Deploys xtrata-arcade-scores-v2 at Clarity 4 if it is not already on chain with the pinned source. Skipped automatically when it is.',
+    intro: 'Deploys xtrata-arcade-scores-v2 at Clarity 4 if it is not already on chain with the pinned source. Skipped automatically when it is (every release after the first).',
     action: 'Deploy contract',
     run: async () => {
       if (step('preflight').data.deployed === 'ours') return 'already deployed with the pinned source; nothing to send';
@@ -489,130 +617,101 @@ const STEPS: Step[] = [
       return `source matches · owner ${short(owner)} · not paused · current Bitcoin day ${asText(await readScores('current-period'))}`;
     }
   },
+  ...PACKS.map(packStep),
   {
-    id: 'begin', title: 'Inscribe 1/3: begin the upload', who: 'Web wallet',
-    intro: `Starts the upload on the core contract for Xtrata Arcade ${__ARCADE_VERSION__}, ${__ARCADE_FILE__} (${MIME}, ${ARCADE.length.toLocaleString()} bytes, ${N} chunks). Pays the begin fee once; resuming an existing session costs nothing. The post-condition caps what your wallet can spend.`,
-    action: 'Begin inscription',
+    id: 'parent', title: 'Inscribe the recursive parent', who: 'Web wallet · 3 signatures',
+    intro: `Writes the pack ids from the steps above into the parent (${VERSION}; ${RELEASE.inscribe.map((n) => `${n} from its pack`).join(', ')}, ${RELEASE.fromBundle.join(', ')} from #${RELEASE.bundle.id}) and inscribes it as text/html, a child of ${parentList()} that depends on #${RELEASE.bundle.id} and the packs. This inscription is the arcade people open, and every board's engine id.`,
+    action: 'Inscribe parent',
     run: async () => {
-      if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
-      const fees = await stagedFees();
-      if ((await uploadIndex()) === null) {
-        await runTx('begin', 'begin-or-get', () => walletCall(state.core, 'begin-or-get',
-          [bufferCV(FINAL_HASH), stringAsciiCV(MIME), uintCV(ARCADE.length), uintCV(N)], payAtMost(fees.begin)));
-      }
-      await eventually('Upload session', async () => { const i = await uploadIndex(); return i === null ? 'no session yet' : null; });
-      return `upload session open for ${short(toHex(FINAL_HASH))} · ${await uploadIndex()} of ${N} chunks stored`;
+      const f = parentUpload();
+      const r = await inscribe('parent', f, parentDeps());
+      state.inscriptionId = r.id; save(); renderHeader();
+      return `Xtrata Arcade ${VERSION} parent: ${r.note} · ${f.bytes.length.toLocaleString()} bytes, sha256 ${short(f.sha)}`;
     }
   },
   {
-    id: 'upload', title: 'Inscribe 2/3: upload the chunks', who: `Web wallet · ${Math.ceil(N / BATCH)} signatures`,
-    intro: `Uploads ${BATCH} chunks per transaction and waits for each. It reads the chain's progress counter before every batch, so a reload or a rejected signature resumes from exactly where the chain is. No STX moves in these calls.`,
-    action: 'Upload chunks',
+    id: 'inscription', title: 'Verify the release, byte for byte and part for part', who: 'Reads only',
+    intro: `Reads every new inscription back from the core and checks its bytes, hash, type, parents and (for the parent) dependencies. Then reads #${RELEASE.bundle.id} and the packs from the chain and resolves all ${PART_NAMES.length} of the hall's parts exactly as the parent does, checking each against the pinned ${VERSION} source. Then, where the browser can reach xtrata.xyz, checks the site serves the parent.`,
+    action: 'Verify release',
     run: async () => {
-      if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
-      let idx = await uploadIndex();
-      if (idx === null) throw new Error('No upload session on the core. Run the begin step first.');
-      while (idx < N) {
-        const end = Math.min(idx + BATCH, N), from = idx;
-        status(`Uploading chunks ${from + 1}–${end} of ${N}…`);
-        await runTx('upload', `upload chunks ${from}-${end - 1}`, () => walletCall(state.core, 'add-chunk-batch',
-          [bufferCV(FINAL_HASH), listCV(CHUNKS.slice(from, end).map((c) => bufferCV(c)))]));
-        await eventually('Chunk progress', async () => { const i = await uploadIndex(); return i !== null && i >= end ? null : `index ${i}`; });
-        idx = (await uploadIndex())!;
-      }
-      return `all ${N} chunks stored on chain`;
-    }
-  },
-  {
-    id: 'seal', title: 'Inscribe 3/3: seal', who: 'Web wallet',
-    intro: `Seals the inscription as a child of ${PARENT_IDS.map((p) => '#' + p).join(', ')} (seal-with-relationships). The core checks its own running hash against the hash of the file you declared; if a single byte differed it would refuse. It also re-checks that this wallet owns the parent. Pays the seal fee, capped by a post-condition.`,
-    action: 'Seal inscription',
-    run: async () => {
-      if (state.inscriptionId) return `already inscribed as #${state.inscriptionId}; nothing to do`;
-      const w = requireWallet();
-      const idx = await uploadIndex();
-      if (idx === null || idx < N) throw new Error(`Only ${idx ?? 0} of ${N} chunks are stored. Finish the upload first.`);
-      const fees = await stagedFees();
-      await runTx('seal', PARENT_IDS.length ? `seal-with-relationships (parent ${parentList()})` : 'seal-inscription', () => PARENT_IDS.length
-        ? walletCall(state.core, 'seal-with-relationships', [bufferCV(FINAL_HASH), stringAsciiCV(TOKEN_URI), listCV([]), listCV(PARENT_IDS.map((p) => uintCV(p)))], payAtMost(fees.seal))
-        : walletCall(state.core, 'seal-inscription', [bufferCV(FINAL_HASH), stringAsciiCV(TOKEN_URI)], payAtMost(fees.seal)));
-      let id = '';
-      await eventually('New inscription id', async () => {
-        const found = await findInscription();
-        if (!found) return 'hash not indexed yet';
-        const meta = await inscriptionMeta(found);
-        if (!meta || !meta.sealed || meta.creator !== w.address) return 'not yet sealed by you';
-        id = found; return null;
-      });
-      state.inscriptionId = id; save(); renderHeader();
-      return `Xtrata Arcade ${__ARCADE_VERSION__} sealed as inscription #${id}${PARENT_IDS.length ? `, child of ${parentList()}` : ''}`;
-    }
-  },
-  {
-    id: 'inscription', title: 'Verify the inscription, byte for byte', who: 'Reads only',
-    intro: 'Reads the sealed record and every chunk back from the core, rebuilds the file, and checks its SHA-256 against the pinned arcade. Then, where the browser can reach xtrata.xyz, checks that the site serves the same bytes at /i/<id>.',
-    action: 'Verify inscription',
-    run: async () => {
+      const parent = parentUpload();
       const id = state.inscriptionId;
-      if (!id) throw new Error('No inscription id yet. Seal first.');
-      const meta = await inscriptionMeta(id);
-      if (!meta) throw new Error(`Inscription #${id} not found on the core.`);
-      if (!meta.sealed) throw new Error('Inscription is not sealed.');
-      if (meta.creator !== state.deployer) throw new Error(`Inscription creator is ${meta.creator}, expected ${state.deployer}.`);
-      if (meta.mime !== MIME) throw new Error(`Inscription MIME is ${meta.mime}, expected ${MIME}.`);
-      if (meta.size !== ARCADE.length || meta.chunks !== N) throw new Error(`Inscription is ${meta.size} bytes in ${meta.chunks} chunks; expected ${ARCADE.length} in ${N}.`);
-      if (meta.hash !== toHex(FINAL_HASH)) throw new Error('Inscription hash differs from the declared hash.');
-      const parents = await parentsOf(id);
-      if (!sameParents(parents)) throw new Error(`Inscription #${id} has parents [${parents.map((x) => '#' + x).join(', ') || 'none'}], expected ${parentList()}.`);
-      const out: Uint8Array[] = [];
-      const per = 10;
-      for (let i = 0; i < N; i += per) {
-        status(`Reading chunks back… ${Math.min(i + per, N)} of ${N}`);
-        const idxs = Array.from({ length: Math.min(per, N - i) }, (_, k) => uintCV(BigInt(i + k)));
-        const cv: any = inner(await readCore('get-chunk-batch', [uintCV(BigInt(id)), listCV(idxs)]));
-        const items = cv.list as ClarityValue[];
-        if (items.length !== idxs.length) throw new Error(`Chunk read returned ${items.length} of ${idxs.length} chunks at ${i}.`);
-        for (const it of items) out.push(bufOf(it));
+      if (!id) throw new Error('No parent inscription id yet. Inscribe the parent first.');
+      const files: { f: Upload; id: string }[] = [...PACKS.map((f) => ({ f, id: state.packIds![f.key] })), { f: parent, id }];
+      const chainText: Record<string, string> = {};
+      const notes: string[] = [];
+      for (const { f, id: fid } of files) {
+        const meta = await inscriptionMeta(fid);
+        if (!meta) throw new Error(`${f.label} #${fid} not found on the core.`);
+        if (!meta.sealed) throw new Error(`${f.label} #${fid} is not sealed.`);
+        if (meta.mime !== f.mime) throw new Error(`${f.label} #${fid} is ${meta.mime}, expected ${f.mime}.`);
+        if (meta.size !== f.bytes.length || meta.chunks !== f.chunks.length) throw new Error(`${f.label} #${fid} is ${meta.size} bytes in ${meta.chunks} chunks; expected ${f.bytes.length} in ${f.chunks.length}.`);
+        if (meta.hash !== toHex(f.hash)) throw new Error(`${f.label} #${fid} hash differs from the declared hash.`);
+        const out = await readChunks(fid, meta.chunks, f.label);
+        const bytes = joinBytes(out);
+        if (toHex(sha256(bytes)) !== f.sha) throw new Error(`The bytes of ${f.label} #${fid} read back from the chain do not match.`);
+        if (toHex(chainHash(out)) !== meta.hash) throw new Error(`The chain hash of ${f.label} #${fid} differs from the sealed hash.`);
+        chainText[fid] = new TextDecoder().decode(bytes);
+        const parents = await idList('get-parents', fid);
+        notes.push(`${f.key} #${fid} ${bytes.length.toLocaleString()} bytes ok${sameIds(parents, PARENT_IDS) ? '' : ` (parents [${parents.join(', ') || 'none'}])`}`);
+        if (f === parent && !sameIds(parents, PARENT_IDS)) throw new Error(`Parent #${fid} has parents [${parents.map((x) => '#' + x).join(', ') || 'none'}], expected ${parentList()}.`);
       }
-      const rebuilt = out.reduce((a, b) => concat(a, b), new Uint8Array(0));
-      if (toHex(sha256(rebuilt)) !== ARCADE_SHA) throw new Error('The bytes read back from the chain do not match the pinned arcade.');
-      if (toHex(chainHash(out)) !== meta.hash) throw new Error('The chain hash of the chunks read back differs from the sealed hash.');
+      const deps = await idList('get-dependencies', id);
+      if (!sameIds(deps, parentDeps())) throw new Error(`Parent #${id} depends on [${deps.map((x) => '#' + x).join(', ') || 'none'}], expected ${parentDeps().map((x) => '#' + x).join(', ')}.`);
+      // Resolve every part the way the parent's partText() does: its pack when the pack has an id, else the bundle.
+      const bundleBytes = joinBytes(await readChunks(String(BUNDLE_ID), RELEASE.bundle.chunks, `bundle`));
+      if (toHex(sha256(bundleBytes)) !== RELEASE.bundle.sha256) throw new Error(`#${BUNDLE_ID} read back from the chain is not the pinned bundle.`);
+      const fromBundle = HallParts.splitRelease(new TextDecoder().decode(bundleBytes)).parts;
+      const config = parentConfig(state.packIds!);
+      const fromPack: Record<string, Record<string, string>> = {};
+      for (const f of PACKS) fromPack[f.key] = HallParts.parsePack(chainText[state.packIds![f.key]]);
+      const bad: string[] = [];
+      const source: Record<string, number> = {};
+      for (const name of PART_NAMES) {
+        const pack = HallParts.packOf(name);
+        const fromId = Number(config.packs[pack] || 0) > 0 ? String(config.packs[pack]) : String(BUNDLE_ID);
+        const text = fromId === String(BUNDLE_ID) ? fromBundle[name] : fromPack[pack]?.[name];
+        if (typeof text !== 'string' || shaHex(text) !== RELEASE.partSha[name]) bad.push(`${name} (from #${fromId})`);
+        source[fromId] = (source[fromId] || 0) + 1;
+      }
+      if (bad.length) throw new Error(`These parts do not resolve to the pinned ${VERSION} source: ${bad.join(', ')}.`);
       let served = 'site check skipped (testnet)';
       if (network === 'mainnet') {
-        // The xtrata.xyz runtime serves the inscription with two documented rewrites: it injects <base href="null">
+        // The xtrata.xyz runtime serves an inscription with two documented rewrites: it injects <base href="null">
         // after <head>, and points the Hiro API hosts at its own /hiro proxy. Undo exactly those, then compare.
-        // This check is advisory: the bytes were already proven from the chain above, so it never fails the step.
+        // Advisory only: the bytes were already proven from the chain above.
         try {
           const r = await fetch(`https://xtrata.xyz/i/${id}`, { cache: 'no-store' });
           if (!r.ok) served = `site check: HTTP ${r.status} (the viewer may still be indexing it; not a failure)`;
           else {
             const raw = new Uint8Array(await r.arrayBuffer());
-            if (toHex(sha256(raw)) === ARCADE_SHA) served = 'xtrata.xyz serves byte-identical content';
+            if (toHex(sha256(raw)) === parent.sha) served = 'xtrata.xyz serves the parent byte-identical';
             else {
               const text = new TextDecoder().decode(raw)
                 .replace('<head><base href="null">', '<head>')
                 .split('https://xtrata.xyz/hiro/testnet').join('https://api.testnet.hiro.so')
                 .split('https://xtrata.xyz/hiro/mainnet').join('https://api.mainnet.hiro.so');
-              served = toHex(sha256(new TextEncoder().encode(text))) === ARCADE_SHA
-                ? 'xtrata.xyz serves the same file, with only its two standard runtime rewrites (a <base> tag and its own Hiro proxy address)'
+              served = shaHex(text) === parent.sha
+                ? 'xtrata.xyz serves the parent, with only its two standard runtime rewrites'
                 : `NOTE: xtrata.xyz serves ${raw.length.toLocaleString()} bytes that differ from the chain beyond its standard rewrites; the chain copy is verified, so check the viewer`;
             }
           }
         } catch { served = 'site check: could not reach xtrata.xyz from this page (not a failure)'; }
       }
-      return `inscription #${id} · child of ${parentList()} · ${rebuilt.length.toLocaleString()} bytes read back from ${N} chunks, sha256 ${short(ARCADE_SHA)} matches, chain hash matches · ${served}`;
+      const where = Object.entries(source).map(([k, v]) => `${v} from #${k}`).join(', ');
+      return `${notes.join(' · ')} · parent child of ${parentList()}, depends on ${deps.map((x) => '#' + x).join(', ')} · all ${PART_NAMES.length} parts resolve to the pinned ${VERSION} source (${where}) · ${served}`;
     }
   },
   {
-    id: 'board', title: 'Open a canary board bound to the inscription', who: 'Web wallet',
-    intro: `Registers "${CANARY_BOARD}" (higher wins, no fee) with the inscription id as its engine id. It is closed again before the real boards open.`,
+    id: 'board', title: 'Open a canary board bound to the parent', who: 'Web wallet',
+    intro: `Registers "${CANARY_BOARD}" (higher wins, no fee) with the parent inscription as its engine id. It is closed again before the production boards move.`,
     action: 'Open canary board',
     run: async () => {
       const id = state.inscriptionId!;
       const want = () => readBoard(CANARY_BOARD);
       const ok = (b: Awaited<ReturnType<typeof want>>) => !!b && b.enabled === 'true' && b.engineId === id;
       if (!ok(await want())) {
-        await runTx('board', `set-board ${CANARY_BOARD}`, () => walletCall(scoresId(), 'set-board',
+        await runTx('board', `set-board ${CANARY_BOARD} → #${id}`, () => walletCall(scoresId(), 'set-board',
           [stringAsciiCV(CANARY_BOARD), uintCV(0), uintCV(CANARY_MAX), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]));
       }
       await eventually('Canary board', async () => { const b = await want(); return ok(b) ? null : `board ${b ? `engine ${b.engineId}, enabled ${b.enabled}` : 'missing'}`; });
@@ -621,26 +720,27 @@ const STEPS: Step[] = [
   },
   {
     id: 'submit', title: 'Submit a real arcade run', who: 'Web wallet',
-    intro: `Submits the ${PROOF_GAME} run the embedded arcade flew for your wallet. Then reads the board and the stored replay back from the chain, checks the on-chain hash, and re-plays the chain's bytes in the arcade engine.`,
+    intro: `Submits the ${PROOF_GAME} run the ${VERSION} arcade flew for your wallet (skipped when your entry from an earlier launch is already as good: the board refuses a worse or equal run). Then reads the board and the stored replay back from the chain, checks the on-chain hash, and re-plays the chain's bytes in the ${VERSION} arcade.`,
     action: 'Submit run',
     run: async () => {
       const run = state.run!;
       const bytes = unb64(run.replay);
       const mine = (await topEntries(CANARY_BOARD)).find((e) => e.player === state.deployer);
-      if (!mine || mine.score < BigInt(run.score)) {
+      const earlier = !!mine && mine.score >= BigInt(run.score);
+      if (!earlier) {
         await runTx('submit', `submit-score ${run.score.toLocaleString()}`, () => walletCall(scoresId(), 'submit-score',
           [stringAsciiCV(CANARY_BOARD), uintCV(0), uintCV(run.score), stringAsciiCV('CANARY'), bufferCV(bytes)]));
       }
       await eventually('Board entry', async () => {
         const e = (await topEntries(CANARY_BOARD)).find((x) => x.player === state.deployer);
-        return e && e.score === BigInt(run.score) ? null : e ? `score ${e.score}` : 'no entry';
+        return e && e.score >= BigInt(run.score) ? null : e ? `score ${e.score}` : 'no entry';
       });
       const chainBytes = bufOf(await readScores('get-replay', [stringAsciiCV(CANARY_BOARD), uintCV(0), principalCV(state.deployer!)]));
       const entry = (await topEntries(CANARY_BOARD)).find((x) => x.player === state.deployer)!;
       if (toHex(sha256(chainBytes)) !== entry.hash) throw new Error('Stored replay does not hash to the recorded replay hash.');
       const v: any = await withArcade<any>((win) => win.XA.replay.verify(new Uint8Array(chainBytes), { address: state.deployer, score: Number(entry.score) }));
-      if (!v.ok) throw new Error(`The replay stored on chain did not verify in the arcade engine: ${v.reason}.`);
-      return `rank #1 · ${run.game} score ${entry.score.toLocaleString()} · ${chainBytes.length}-byte replay stored, hash matches, re-played from chain bytes: Verified`;
+      if (!v.ok) throw new Error(`The replay stored on chain did not verify in the ${VERSION} arcade: ${v.reason}.`);
+      return `${earlier ? 'your entry from an earlier launch stands (nothing sent) · ' : ''}${run.game} score ${entry.score.toLocaleString()} · ${chainBytes.length}-byte replay stored, hash matches, re-played from chain bytes in ${VERSION}: Verified`;
     }
   },
   {
@@ -680,16 +780,17 @@ const STEPS: Step[] = [
   },
   {
     id: 'copy', title: 'Copied run is refused', who: 'Copycat wallet (signed in this page)',
-    intro: 'The copycat submits your exact replay bytes with a higher claimed score. The contract must refuse it with (err u113) because the replay names you as its pilot. A refused transaction still pays its small fee.',
+    intro: 'The copycat submits your stored replay bytes with a higher claimed score. The contract must refuse it with (err u113) because the replay names you as its pilot. A refused transaction still pays its small fee.',
     action: 'Try to steal the run',
     run: async () => {
       const run = state.run!;
       const hot = hotAddress();
       const [address, name] = scoresId().split('.');
+      const stored = bufOf(await readScores('get-replay', [stringAsciiCV(CANARY_BOARD), uintCV(0), principalCV(state.deployer!)]));
       await runTx('copy', 'copycat submit-score', async () => {
         const nonce = await chain.nonce(hot);
         const tx = await makeContractCall({ contractAddress: address, contractName: name, functionName: 'submit-score',
-          functionArgs: [stringAsciiCV(CANARY_BOARD), uintCV(0), uintCV(run.score + 1000), stringAsciiCV('THIEF'), bufferCV(unb64(run.replay))],
+          functionArgs: [stringAsciiCV(CANARY_BOARD), uintCV(0), uintCV(run.score + 1000), stringAsciiCV('THIEF'), bufferCV(stored)],
           senderKey: hotKey(), network: chain.stacks, nonce, fee: COPY_TX_FEE, anchorMode: AnchorMode.Any, postConditionMode: PostConditionMode.Deny, postConditions: [] });
         return chain.broadcast(tx);
       }, '(err u113)');
@@ -716,44 +817,48 @@ const STEPS: Step[] = [
   },
   {
     id: 'close', title: 'Close the canary board', who: 'Web wallet',
-    intro: 'Disables the canary board so nothing more can be submitted to it. The production boards open only after this passes.',
+    intro: 'Disables the canary board so nothing more can be submitted to it. The production boards move only after this passes.',
     action: 'Close board',
     run: async () => {
       const b = await readBoard(CANARY_BOARD);
       if (b && b.enabled === 'true') await runTx('close', `disable ${CANARY_BOARD}`, () => walletCall(scoresId(), 'set-board-enabled', [stringAsciiCV(CANARY_BOARD), boolCV(false)]));
       await eventually('Close', async () => { const x = await readBoard(CANARY_BOARD); return x && x.enabled === 'false' ? null : `enabled ${x?.enabled}`; });
-      return 'canary board closed · the inscription and leaderboard are proven';
+      return `canary board closed · the ${VERSION} release and leaderboard are proven`;
     }
   },
   {
-    id: 'production', title: `Register the ${PRODUCTION.length} production boards`, who: `Web wallet · up to ${PRODUCTION.length} signatures`,
-    intro: `Registers every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) with the inscription id as engine id, no entry fee and enabled. Boards that already match are skipped, so a reload or a rejected signature resumes where it stopped.`,
-    action: 'Register boards',
+    id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: `Web wallet · up to ${PRODUCTION.length} signatures`,
+    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. The contract keeps each board's Top 10 and stored replays when its engine id changes (existing entries keep the engine they were played on). Boards that already match are skipped, so a reload or a rejected signature resumes where it stopped.`,
+    action: 'Update boards',
     run: async () => {
       const id = state.inscriptionId!;
-      let done = 0;
+      let done = 0, sent = 0;
       for (const b of PRODUCTION) {
         done++;
         if (boardMatches(await readBoard(b.id), b)) continue;
-        status(`Registering ${b.id} (${done} of ${PRODUCTION.length})…`);
-        await runTx('production', `set-board ${b.id}`, () => walletCall(scoresId(), 'set-board',
+        status(`Pointing ${b.id} at #${id} (${done} of ${PRODUCTION.length})…`);
+        await runTx('production', `set-board ${b.id} → #${id}`, () => walletCall(scoresId(), 'set-board',
           [stringAsciiCV(b.id), uintCV(b.mode), uintCV(b.max), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]));
         await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
+        sent++;
       }
-      return `${PRODUCTION.length} boards registered · engine inscription #${id}`;
+      return `${PRODUCTION.length} boards on engine inscription #${id}${sent < PRODUCTION.length ? ` (${PRODUCTION.length - sent} already were)` : ''}`;
     }
   },
   {
     id: 'audit', title: 'Final audit', who: 'Reads only',
-    intro: 'Re-reads every board and the inscription one last time, and checks whether the xtrata.xyz submit page already knows the arcade boards.',
+    intro: 'Re-reads every board and every inscription of the release one last time, and checks whether the xtrata.xyz submit page already knows the arcade boards. Ends with what to change in the repo and on the site.',
     action: 'Run audit',
     run: async () => {
       const id = state.inscriptionId!;
       const bad: string[] = [];
       for (const b of PRODUCTION) if (!boardMatches(await readBoard(b.id), b)) bad.push(b.id);
       if (bad.length) throw new Error(`Boards not matching: ${bad.join(', ')}`);
-      const meta = await inscriptionMeta(id);
-      if (!meta || !meta.sealed || meta.hash !== toHex(FINAL_HASH)) throw new Error('The inscription no longer matches.');
+      for (const f of [...PACKS, parentUpload()]) {
+        const fid = f.key === 'parent' ? id : state.packIds![f.key];
+        const meta = await inscriptionMeta(fid);
+        if (!meta || !meta.sealed || meta.hash !== toHex(f.hash)) throw new Error(`${f.label} #${fid} no longer matches.`);
+      }
       let site = 'site allow-list not checked (xtrata.xyz not reachable from this page)';
       try {
         const page = await (await fetch('https://xtrata.xyz/arcade/submit', { cache: 'no-store' })).text();
@@ -762,7 +867,8 @@ const STEPS: Step[] = [
         for (const s of srcs) { if (known) break; try { known = /xa_neon_snake/.test(await (await fetch(s, { cache: 'no-store' })).text()); } catch { /* ignore */ } }
         site = known ? 'the submit page already lists the arcade boards' : 'NOTE the xtrata.xyz submit page does not list the arcade boards yet, so scores cannot be posted from the site until it is updated (the arcade signs through the wallet itself)';
       } catch { /* keep default */ }
-      return `all ${PRODUCTION.length} boards match · inscription #${id} sealed · ${site} · Point /arcade (public/_redirects) and the homepage arcade tile at #${id}.`;
+      const packIds = RELEASE.inscribe.map((n) => `"${n}": ${state.packIds![n]}`).join(', ');
+      return `all ${PRODUCTION.length} boards match · ${VERSION} parent #${id} and packs sealed · ${site} · Next: open https://xtrata.xyz/x/${id} and play one run; set packs {${packIds}} in recursive-apps/xtrata-arcade/parent/ids.json; point /arcade (public/_redirects) and the homepage arcade tile at #${id}; add #${id} to the arcade check in src/lib/viewer/public-wallet-bridge.ts.`;
     }
   }
 ];
@@ -833,6 +939,7 @@ const execute = async (s: Step) => {
 };
 
 const renderHeader = () => {
+  renderInscribing();
   ($('#network') as HTMLSelectElement).value = network;
   const locked = Object.entries(state.steps).some(([id, s]) => id !== 'connect' && id !== 'preflight' && s.status === 'pass');
   const name = $('#contract-name') as HTMLInputElement;
@@ -848,23 +955,24 @@ const renderHeader = () => {
 const renderInscribing = () => {
   const built = new Date(__BUILT_AT__);
   const rows: [string, string][] = [
-    ['File', __ARCADE_FILE__],
-    ['Size', `${ARCADE.length.toLocaleString()} bytes · ${N} chunks · ${Math.ceil(N / BATCH)} upload transactions`],
-    ['SHA-256', __ARCADE_SHA__],
-    ['Parent', PARENT_IDS.length ? parentList() : 'none'],
+    ...PACKS.map((f): [string, string] => [`${f.label[0].toUpperCase()}${f.label.slice(1)}`,
+      `${f.bytes.length.toLocaleString()} bytes · ${f.chunks.length} chunks · sha256 ${f.sha}${state?.packIds?.[f.key] ? ` · #${state.packIds[f.key]}` : ''}`]),
+    ['Parent', `${kb(parentEstimate())} text/html · child of ${parentList()} · depends on #${RELEASE.bundle.id} + the packs${state?.inscriptionId ? ` · #${state.inscriptionId}` : ''}`],
+    [`From #${RELEASE.bundle.id}`, `${RELEASE.fromBundle.join(', ')} (bundle sha256 ${short(RELEASE.bundle.sha256)}, not re-inscribed)`],
+    ['Release', RELEASE_SHA],
     ['Canary built', `${built.toLocaleString()} (your time) · ${__BUILT_AT__} UTC`],
     ['Build stamp', __BUILD__]
   ];
   $('#inscribing').replaceChildren(
     el('div', { class: 'eyebrow' }, 'This canary inscribes'),
-    el('div', { class: 'big' }, `Xtrata Arcade ${__ARCADE_VERSION__}`),
+    el('div', { class: 'big' }, `Xtrata Arcade ${VERSION} · recursive`),
     el('dl', {}, ...rows.flatMap(([k, v]) => [el('dt', {}, k), el('dd', {}, v)])));
-  document.title = `Arcade ${__ARCADE_VERSION__} launch canary · ${__BUILD__}`;
+  document.title = `Arcade ${VERSION} launch canary · ${__BUILD__}`;
 };
 
 const bind = () => {
   renderInscribing();
-  $('#build').textContent = `${__BUILD__} · contract sha256 ${__SOURCE_SHA__.slice(0, 16)}… · arcade sha256 ${__ARCADE_SHA__.slice(0, 16)}… · ${(ARCADE.length / 1024).toFixed(0)} KB, ${N} chunks`;
+  $('#build').textContent = `${__BUILD__} · contract sha256 ${__SOURCE_SHA__.slice(0, 16)}… · release sha256 ${RELEASE_SHA.slice(0, 16)}… · inscribes ${PACKS.map((f) => `${f.key} ${kb(f.bytes.length)}`).join(', ')} + parent`;
   $('#network').addEventListener('change', (e) => {
     network = (e.target as HTMLSelectElement).value as Net;
     try { localStorage.setItem('xtrata-arcade-launch:network', network); } catch { /* ignore */ }
@@ -885,8 +993,11 @@ const bind = () => {
   $('#disconnect').addEventListener('click', async () => { await wallet.disconnect(); connected = null; step('connect').status = 'todo'; save(); renderHeader(); renderSteps(); log('info', 'Wallet disconnected.'); });
   $('#export').addEventListener('click', () => {
     const report = { ...state, run: state.run ? { game: state.run.game, score: state.run.score, bytes: unb64(state.run.replay).length } : null, build: __BUILD__, builtAt: __BUILT_AT__,
-      arcadeVersion: __ARCADE_VERSION__, arcadeFile: __ARCADE_FILE__, parents: PARENT_IDS.map(String), network,
-      contractSha256: __SOURCE_SHA__, arcadeSha256: __ARCADE_SHA__, arcadeBytes: ARCADE.length, chunks: N, chainHash: toHex(FINAL_HASH),
+      arcadeVersion: VERSION, releaseSha256: RELEASE_SHA, parents: PARENT_IDS.map(String), network, contractSha256: __SOURCE_SHA__,
+      bundle: RELEASE.bundle, fromBundle: RELEASE.fromBundle,
+      packs: Object.fromEntries(PACKS.map((f) => [f.key, { id: state.packIds?.[f.key] ?? null, bytes: f.bytes.length, chunks: f.chunks.length, sha256: f.sha, chainHash: toHex(f.hash) }])),
+      parent: (() => { try { const f = parentUpload(); return { id: state.inscriptionId ?? null, bytes: f.bytes.length, sha256: f.sha, chainHash: toHex(f.hash), dependencies: parentDeps().map(String) }; } catch { return null; } })(),
+      idsJson: { version: VERSION, bundleId: RELEASE.bundle.id, packs: parentConfig(state.packIds || {}).packs, parts: {}, parentTokenId: 0 },
       leaderboard: state.deployer ? scoresId() : null, copycat: hotAddress() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
     const a = el('a', { href: URL.createObjectURL(blob), download: `xtrata-arcade-launch-${network}-${Date.now()}.json` }) as HTMLAnchorElement;

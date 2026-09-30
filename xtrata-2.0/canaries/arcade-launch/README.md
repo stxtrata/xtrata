@@ -1,7 +1,6 @@
 # Xtrata Arcade launch canary
 
-One self-contained page that takes the arcade from nothing to live, in the only safe
-order, from your web wallet (Xverse or Leather). Each step unlocks only when the one
+One self-contained page that ships an arcade release in the only safe order, from your web wallet (Xverse or Leather). Each step unlocks only when the one
 before it has passed, and each re-reads the chain rather than trusting the page. A reload
 resumes waiting on a sent transaction, and re-running after "Forget local progress" resumes
 from what the chain already holds (upload progress, inscription, boards).
@@ -11,18 +10,41 @@ the port of the X Chess v2 canary) and follow `docs/WALLET-PLAYBOOK.md`: provide
 the top window, the chooser on every connect, the Xverse preflight order, no `sender` on
 `stx_callContract`, abort on an account mismatch, deny mode, a 90s watchdog.
 
+## What it inscribes (v1.4, recursive)
+
+From v1.4 the arcade is built from parts grouped into five packs
+(`recursive-apps/xtrata-arcade/README.md`). The canary inscribes only what changed since the
+single-file bundle #3078 (v1.3):
+
+| Inscription | Size | Chunks | Relationships |
+|---|---|---|---|
+| `engine` pack (score client, room, …) | 147 KB | 10 | child of #55 |
+| `hall` pack (3D hall) | 189 KB | 12 | child of #55 |
+| parent (text/html, the arcade people open) | 19 KB | 2 | child of #55, depends on #3078 + both packs |
+
+`assets`, `three` and `games` are read out of #3078 by the parent. The parent is written in the
+page with the pack ids the canary has just inscribed, by the same renderer as
+`node build/modular.mjs build` (`build/parent-render.cjs`), so it is exactly what the build would
+produce with those ids in `parent/ids.json`. If identical bytes are already inscribed (a re-run,
+or a later release that re-uses a pack), that inscription is re-used and nothing is sent.
+
 ## Build
 
 ```bash
-# 1. build the arcade for inscription (self-contained: no CDN, no font host, no dev keys)
-#    then copy it to recursive-apps/xtrata-arcade/release/xtrata-arcade.html
-# 2. pin its sha256 as PINNED_ARCADE in scripts/build-arcade-launch-canary.mjs
 npm run build:canary:arcade-launch
 ```
 
-Writes `canaries/build/arcade-launch-canary.html`. The build refuses to run unless both the
-leaderboard contract and the arcade file match their pinned SHA-256, the arcade has no CDN
-references, and `recursive-apps/xtrata-arcade/boards.json` holds 26 valid unique board ids.
+Writes `canaries/build/arcade-launch-canary.html`. The build:
+
+- checks the leaderboard contract against `PINNED_CONTRACT` and `release/xtrata-arcade.html`
+  against the bundle #3078 pin, and computes the bundle's chain hash (the canary checks #3078
+  on chain against it);
+- runs `modular.mjs check` (the parts still rebuild #3078 byte for byte) and `build`;
+- works out which packs differ from #3078, and refuses unless the packs, the parent shell and
+  every part's hash match `PINNED_RELEASE` (it prints the new value for an intended release);
+- refuses if `parent/ids.json` lists single-part overrides, a BOM or a CDN
+  reference in the arcade, or a `boards.json` without 26 valid unique ids;
+- embeds the single-file build of the same parts, which the canary uses to fly and re-play runs.
 
 ## Run
 
@@ -35,33 +57,51 @@ cd canaries/build && python3 -m http.server 8080
 
 | # | Step | Signs | What it proves |
 |---|------|-------|----------------|
-| 1 | Connect | wallet | The account you pick deploys, inscribes and owns the boards |
-| 2 | Preflight | none | Both pins; arcade hashed the way the core hashes it; core open; fees quoted; real arcade run flown; balance; anything already done is detected |
-| 3 | Deploy | wallet | `xtrata-arcade-scores-v2` at Clarity 4 (skipped if already there with the pinned source) |
+| 1 | Connect | wallet | The account that owns the leaderboard and #55 |
+| 2 | Preflight | none | Pins; #3078 on chain is the pinned bundle; #55 owned; core open; every fee quoted; a real run flown in v1.4; anything already inscribed found |
+| 3 | Deploy | wallet | Skipped: `xtrata-arcade-scores-v2` is already on chain with the pinned source |
 | 4 | Verify contract | none | Source matches; you own it; not paused |
-| 5 | Inscribe 1/3 begin | wallet | `begin-or-get` on `xtrata-v3-2-3`, fee capped by a post-condition |
-| 6 | Inscribe 2/3 upload | wallet x ~8 | `add-chunk-batch`, 30 chunks each, resuming from the chain's own counter |
-| 7 | Inscribe 3/3 seal | wallet | `seal-inscription`; the core refuses unless its running hash equals the declared hash |
-| 8 | Verify inscription | none | Sealed, yours, `text/html`, right size; every chunk read back; SHA-256 equals the pin; xtrata.xyz serves the same bytes |
-| 9 | Canary board | wallet | `set-board arcade-canary` with the inscription id as engine id |
-| 10 | Submit | wallet | A real arcade run (Swerve), flown under your address, stored on chain, hash-checked, re-played from the chain bytes |
-| 11-13 | Copycat | wallet, copycat | Same replay from another wallet is refused with `(err u113)`; funds swept back |
-| 14 | Close canary board | wallet | Test board disabled before real boards exist |
-| 15 | Production boards | wallet x 26 | `set-board` for all 26 boards with the inscription id (21 score, 5 time) |
-| 16 | Audit | none | Every board and the inscription re-read; reports whether the xtrata.xyz submit page already lists the arcade boards |
+| 5 | Inscribe engine pack | wallet x 3 | begin, upload, `seal-with-relationships` (child of #55); fees capped by post-conditions |
+| 6 | Inscribe hall pack | wallet x 3 | same |
+| 7 | Inscribe parent | wallet x 3 | Written with the pack ids; child of #55; depends on #3078, engine, hall |
+| 8 | Verify release | none | Every new inscription read back byte for byte (type, size, hash, parents, dependencies); #3078 and the packs read from the chain and all 34 parts resolved as the parent does, each matching the pinned v1.4 source; xtrata.xyz serves the parent |
+| 9 | Canary board | wallet | `set-board arcade-canary` with the parent as engine id |
+| 10 | Submit | wallet | A real run (Swerve) under your address, stored, hash-checked, re-played from the chain bytes in v1.4 (skipped if your entry from an earlier launch is already as good) |
+| 11-13 | Copycat | wallet, copycat | The stored replay from another wallet is refused with `(err u113)`; funds swept back |
+| 14 | Close canary board | wallet | Test board disabled before the production boards move |
+| 15 | Production boards | wallet x 26 | `set-board` for all 26 boards with the parent as engine id; Top 10s and stored replays are kept |
+| 16 | Audit | none | Every board and inscription re-read; lists the repo and site changes to make |
 
-Void and ban are already proven on chain by the `arcade-scores-v2` canary, so they are not
-repeated here.
+Cost on mainnet: three inscriptions at about 0.2 STX each (begin 0.1 plus seal), about 11
+wallet signatures for the inscriptions and 26 for the boards, plus network fees. Keep at least
+4 STX free.
 
-Cost on mainnet (about 3.8 MB, 239 chunks): inscription fee about 0.93 STX (begin 0.1 plus
-seal about 0.83) plus network fees for the deploy, 8 upload transactions and about 35 small
-calls. Keep at least 5 STX free. Uploading is slow and chunky: each batch is about 490 KB.
+## After a launch
+
+The audit step prints the ids. Then, in one commit:
+
+- `recursive-apps/xtrata-arcade/parent/ids.json`: the `engine` and `hall` pack ids, as the
+  record of the launch (the canary ignores pack ids and finds any
+  pack that is already inscribed by its hash);
+- `public/_redirects` (`/arcade`) and the homepage arcade tile: the parent id;
+- `src/lib/viewer/public-wallet-bridge.ts`: add the parent id to the arcade label check.
+
+## Tests
+
+```bash
+NODE_PATH=<playwright + @stacks/transactions v6> CHROME_PATH=<chromium> \
+  node canaries/arcade-launch/mock-chain-test.cjs
+```
+
+Runs every step against an in-memory chain that starts where mainnet is (leaderboard deployed,
+boards on #3078, #3078 holding v1.3, #55 owned) with a stub Leather wallet that refuses `0x`
+post-conditions and `sender`. Then boots the parent it inscribed from that chain (21 games, all
+parts, no errors), and re-runs after "Forget local progress" to prove the release is found on
+chain and nothing is sent twice.
 
 ## What this cannot cover
 
 - Wallet signing was not exercised here (extensions need a real browser session).
 - Step 10 uses a bot pilot, not a human run.
-- The xtrata.xyz `/arcade/submit` page still has to learn the arcade board ids
-  (`ALLOWED_BOARDS` in `src/arcade-submit/core.ts`) and accept a replay for each; step 16 reports
-  whether it does.
-- The homepage tile must be pointed at the new inscription id after step 16.
+- The parent's load speed through the xtrata.xyz Hiro proxy (about 270 chunk reads) is only
+  seen on mainnet: open the parent after the launch and play one run.
