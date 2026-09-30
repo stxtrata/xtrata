@@ -181,6 +181,23 @@ scores never landed for other players. It now answers the narrow
 It goes live with the next xtrata.xyz deploy, after the WALLET-PLAYBOOK §10
 desktop + mobile canary. Until then, posting works inside the `/runtime` page.
 
+## Updating an inscribed arcade without re-inscribing it
+
+The parent can use a single-file arcade inscription (built by
+`parent/build-preview.mjs`, e.g. **#3078**) as its base: it reads the bundle
+on-chain with `get-chunk`, splits it back into modules by their
+`<script>/* file.js */` markers, and uses its own `moduleIds` only for modules
+you have re-inscribed. An update is therefore:
+
+1. Inscribe only the changed module file(s) from `modules/`.
+2. `node parent/fill-ids.mjs --bundle 3078 --scores <new id>` (one flag per changed module).
+3. Inscribe `parent/xtrata-arcade-parent.template.html` (~15 KB).
+
+The parent also rewrites `0x`-prefixed hex to bare hex on Leather
+`stx_callContract` calls, which fixes score posting with Leather for score
+clients inscribed before that fix, even with no module re-inscribed.
+`tests/bundle-patch.test.cjs` checks all of this against a mocked #3078.
+
 ## Mint order
 
 1. `node parent/build-manifest.mjs` and check sizes/hashes
@@ -199,6 +216,7 @@ node tests/codec.test.cjs
 CHROME_PATH=/path/to/chromium node tests/smoke.test.cjs /tmp/arcade-shots
 # per-cabinet soundtrack check (mashes inputs, reports tempo/layers/notes)
 CHROME_PATH=/path/to/chromium node tests/music-check.cjs [xa_game_id ...]
+CHROME_PATH=/path/to/chromium node tests/bundle-patch.test.cjs
 ```
 
 ## Known limits (v1.3 contract)

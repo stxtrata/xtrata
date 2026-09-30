@@ -2,6 +2,7 @@
 // Fill minted inscription ids into the parent template.
 //   node parent/fill-ids.mjs --css 1 --kit 2 --music 26 --scores 3 --room 4 --snake 5 --blocks 6 --cave 7 --merge 8 --runner 9 --bricks 10 --drift 11 --stack 12 --hopper 13 --tiles 14 --merge2048 15 --defence 16 --muncher 17 --invaders 18 --helix 19 --bubbles 20 --swerve 21 --lander 22 --reflex 23 --mines 24 --pong 25
 //   node parent/fill-ids.mjs --parent 8
+//   node parent/fill-ids.mjs --bundle 3078 --scores <id>   (patch an existing single-file bundle)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -21,11 +22,16 @@ for (const k of keys) {
   if (!re.test(html)) throw new Error(`moduleIds.${k} not found in template`);
   html = html.replace(re, `$1${v}`); changed++;
 }
+const bundle = get('bundle');
+if (bundle !== undefined) {
+  if (!/^\d+$/.test(bundle)) throw new Error('--bundle must be an inscription id');
+  html = html.replace(/bundleId: \d+/, `bundleId: ${bundle}`); changed++;
+}
 const parent = get('parent');
 if (parent !== undefined) {
   if (!/^\d+$/.test(parent)) throw new Error('--parent must be an inscription id');
   html = html.replace(/parentTokenId: \d+/, `parentTokenId: ${parent}`); changed++;
 }
-if (!changed) { console.error('Nothing to fill. Pass --css/--kit/--music/--scores/--room/--snake/--blocks/--cave/--merge/--runner/--bricks/--drift/--stack/--hopper/--tiles/--merge2048/--defence/--muncher/--invaders/--helix/--bubbles/--swerve/--lander/--reflex/--mines/--pong and/or --parent.'); process.exit(1); }
+if (!changed) { console.error('Nothing to fill. Pass --css/--kit/--music/--scores/--room/--snake/--blocks/--cave/--merge/--runner/--bricks/--drift/--stack/--hopper/--tiles/--merge2048/--defence/--muncher/--invaders/--helix/--bubbles/--swerve/--lander/--reflex/--mines/--pong and/or --bundle / --parent.'); process.exit(1); }
 writeFileSync(file, html);
 console.log(`Updated ${changed} value(s) in ${file}`);

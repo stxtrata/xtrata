@@ -21,6 +21,14 @@
         --reflex <id> --mines <id> --pong <id>
     While an id is 0 the loader falls back to ../modules/<file> so this exact
     file can be tested over HTTP before anything is minted.
+
+    PATCHING AN EXISTING BUNDLE (no need to re-inscribe everything)
+    Set CONFIG.bundleId to a single-file arcade inscription (built by
+    parent/build-preview.mjs, e.g. #3078). Every module whose moduleIds entry
+    is 0 is then taken from inside that bundle; only modules you give an id
+    are loaded from their own (newer) inscription. So an update is: inscribe
+    the changed module(s), then a new copy of this small parent.
+      node parent/fill-ids.mjs --bundle 3078 --scores <new score-client id>
   -->
   <style>
     html, body { margin: 0; height: 100%; background: #05060f; color: #eef1ff; }
@@ -62,6 +70,10 @@
       readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
       network: 'mainnet',
       maxChunksPerModule: 512,
+      // Chunk reads in flight per inscription (kept low to stay polite to the API).
+      chunkParallel: 6,
+      // Single-file arcade inscription used for every module without its own id.
+      bundleId: 0,
       // Filled after this parent is minted (fill-ids.mjs --parent <id>); used for
       // the "open on xtrata.xyz" secure-runtime link.
       parentTokenId: 0,
@@ -130,6 +142,34 @@
       { key: 'pong', file: 'game-pong-streak.js', type: 'js' }
     ];
 
+    /* ---- Leather compatibility for older score clients ----------------
+       Leather parses stx_callContract post-conditions with a strict hex
+       decoder that rejects a "0x" prefix ("Not a serialized post
+       condition"). Score clients inscribed before the bare-hex fix send
+       0x-prefixed hex on the direct-wallet route, so strip it here. Only
+       formatting changes: the contract, function, arguments and caps are
+       untouched. */
+    function bareHex(v) { return typeof v === 'string' ? v.replace(/^0x/i, '') : v; }
+    function patchLeather() {
+      var p = window.LeatherProvider;
+      if (!p || typeof p.request !== 'function' || p.__xaBareHex) return;
+      var original = p.request.bind(p);
+      p.request = function (method, params) {
+        if (method === 'stx_callContract' && params && typeof params === 'object') {
+          var fixed = {};
+          Object.keys(params).forEach(function (k) { fixed[k] = params[k]; });
+          if (Array.isArray(fixed.postConditions)) fixed.postConditions = fixed.postConditions.map(bareHex);
+          if (Array.isArray(fixed.functionArgs)) fixed.functionArgs = fixed.functionArgs.map(bareHex);
+          if (Array.isArray(fixed.arguments)) fixed.arguments = fixed.arguments.map(bareHex);
+          params = fixed;
+        }
+        return original(method, params);
+      };
+      p.__xaBareHex = true;
+    }
+    patchLeather();
+    [300, 1500, 4000].forEach(function (ms) { setTimeout(patchLeather, ms); });
+
     var fillEl = document.getElementById('xb-fill');
     var msgEl = document.getElementById('xb-msg');
     var errEl = document.getElementById('xb-err');
@@ -182,23 +222,58 @@
       }
       throw last || new Error('read failed');
     }
-    async function loadFromChain(id) {
-      var parts = [], total = 0;
-      for (var i = 0; i < CONFIG.maxChunksPerModule; i++) {
-        var bytes = bufferFromCv(await readOnly('get-chunk', [uintHex(id), uintHex(i)]));
-        if (!bytes.length) break;
-        parts.push(bytes); total += bytes.length;
+    async function readChunk(id, i) {
+      return bufferFromCv(await readOnly('get-chunk', [uintHex(id), uintHex(i)]));
+    }
+    // Reads chunks in small parallel windows until the first empty one.
+    async function loadFromChain(id, onChunk) {
+      var parts = [], total = 0, next = 0, ended = false;
+      while (!ended && next < CONFIG.maxChunksPerModule) {
+        var batch = [];
+        for (var k = 0; k < CONFIG.chunkParallel && next < CONFIG.maxChunksPerModule; k++) batch.push(readChunk(id, next++));
+        var got = await Promise.all(batch);
+        for (var j = 0; j < got.length; j++) {
+          if (!got[j].length) { ended = true; break; }
+          parts.push(got[j]); total += got[j].length;
+          if (onChunk) onChunk(parts.length);
+        }
       }
       if (!parts.length) throw new Error('Inscription #' + id + ' returned no data');
       var out = new Uint8Array(total), o = 0;
       parts.forEach(function (p) { out.set(p, o); o += p.length; });
       return new TextDecoder('utf-8').decode(out);
     }
+    // ---- base bundle: each module sits in its own script tag whose first line is a /* file.js */ marker
+    var bundlePromise = null;
+    function bundleText() {
+      if (!bundlePromise) {
+        bundlePromise = loadFromChain(Number(CONFIG.bundleId), function (n) {
+          msgEl.textContent = 'Reading arcade #' + CONFIG.bundleId + ' (' + n + ' chunks)';
+        });
+      }
+      return bundlePromise;
+    }
+    function extractFromBundle(html, m) {
+      if (m.type === 'css') {
+        var st = /<style>([\s\S]*?)<\/style>/.exec(html);
+        return st ? st[1] : null;
+      }
+      var marker = '<script>/* ' + m.file + ' */\n';
+      var start = html.indexOf(marker);
+      if (start < 0) return null;
+      start += marker.length;
+      var end = html.indexOf('</' + 'script>', start);
+      return end < 0 ? null : html.slice(start, end);
+    }
+
     async function loadModule(m) {
       var id = Number(CONFIG.moduleIds[m.key] || 0);
       var text;
       if (id > 0) text = await loadFromChain(id);
-      else {
+      else if (Number(CONFIG.bundleId) > 0) {
+        text = extractFromBundle(await bundleText(), m);
+        if (text == null) throw new Error('Arcade #' + CONFIG.bundleId + ' has no ' + m.file + '. Inscribe it and set moduleIds.' + m.key + '.');
+      } else {
         // Pre-mint test mode: sibling modules folder over HTTP.
         var res = await fetch('../modules/' + m.file, { cache: 'no-store' });
         if (!res.ok) throw new Error(m.file + ' HTTP ' + res.status + ' (set CONFIG.moduleIds.' + m.key + ')');
@@ -239,6 +314,7 @@
         }
       };
       if (!window.XARoom) throw new Error('Room module did not initialise.');
+      patchLeather();
       window.XARoom.boot(document.getElementById('xa-root'));
       document.getElementById('xa-boot').classList.add('is-done');
       setTimeout(function () { var b = document.getElementById('xa-boot'); if (b) b.remove(); }, 400);
