@@ -37,7 +37,8 @@ import {
 import { useManageWallet } from '../ManageWalletContext';
 import { parseDeployPricingLockSnapshot } from '../../lib/deploy/pricing-lock';
 import InfoTooltip from './InfoTooltip';
-import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar?raw';
+import standardTemplateSource from '../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.9.clar?raw';
+import { compactClaritySource } from '../../lib/deploy/template-fingerprint';
 import preinscribedTemplateSource from '../../../contracts/clarinet/contracts/xtrata-preinscribed-collection-sale-v1.0.clar?raw';
 
 type CollectionDraft = {
@@ -90,7 +91,12 @@ const formatMicroStxInput = (value: bigint) => {
   return `${whole.toString()}.${fractionText}`;
 };
 
-const toDeployHardcodedSplitMetadata = (mintPriceMicroStx: bigint) => {
+const toDeployHardcodedSplitMetadata = (mintPriceMicroStx: bigint, mintType: string = 'standard') => {
+  if (mintType === 'standard') {
+    // v1.9: the platform tier is in the contract (2.5% + 2.5% to Xtrata, only
+    // Xtrata can change it); the artist pool is split by the owner.
+    return { model: 'two-tier', artist: 9500, marketplace: 250, operator: 250, auxiliary: 0 };
+  }
   const splits = resolveArtistDeployPayoutSplits(mintPriceMicroStx);
   return {
     artist: splits.artistBps,
@@ -154,25 +160,10 @@ const extractErrorDebug = (error: unknown): Record<string, unknown> => {
   return details;
 };
 
-const compactClaritySourceForDeploy = (source: string) => {
-  const lines = source.split('\n');
-  const compacted: string[] = [];
-  for (const line of lines) {
-    const withoutIndent = line.replace(/^\s+/, '');
-    if (withoutIndent.startsWith(';;')) {
-      continue;
-    }
-    const trimmedLine = withoutIndent.replace(/\s+$/, '');
-    if (trimmedLine.length === 0) {
-      continue;
-    }
-    compacted.push(trimmedLine);
-  }
-  const result = compacted.join('\n');
-  return result.length > 0 ? result : source;
-};
+// Shared with the server's deployed-code check (src/lib/deploy/template-fingerprint.ts).
+const compactClaritySourceForDeploy = compactClaritySource;
 
-type DeployTemplateMode = 'standard-v1.7';
+type DeployTemplateMode = 'standard-v1.9';
 
 type ContractNameAvailability = {
   exists: boolean;
@@ -388,7 +379,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
   const [deployPending, setDeployPending] = useState(false);
   const [draftPending, setDraftPending] = useState(false);
   const [selectedDraftLoading, setSelectedDraftLoading] = useState(false);
-  const deployTemplateMode: DeployTemplateMode = 'standard-v1.7';
+  const deployTemplateMode: DeployTemplateMode = 'standard-v1.9';
   const [deployAttemptId, setDeployAttemptId] = useState<string | null>(null);
   const [deployDebugLog, setDeployDebugLog] = useState<string[]>([]);
   const reviewCloseButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -945,7 +936,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     if (mintType === 'pre-inscribed') {
       return 'xtrata-preinscribed-collection-sale-v1.0';
     }
-    return 'xtrata-collection-mint-v1.7';
+    return 'xtrata-collection-mint-v1.9';
   }, [mintType]);
   const deploySourceByteLength = useMemo(
     () => new TextEncoder().encode(deployBuild.source).byteLength,
@@ -1092,7 +1083,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const details = {
       debugVersion: DEPLOY_DEBUG_VERSION,
       clarityVersion: DEPLOY_CLARITY_VERSION,
-      defaultDeployTemplateMode: 'standard-v1.7',
+      defaultDeployTemplateMode: 'standard-v1.9',
       sourceCompactionMode: DEPLOY_SOURCE_COMPACTION_MODE,
       debug14Enabled
     };
@@ -1189,7 +1180,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.7';
+        : 'xtrata-collection-mint-v1.9';
 
     const draftMetadata = {
       mintType,
@@ -1209,7 +1200,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       hardcodedDefaults: {
         paused: ARTIST_DEPLOY_DEFAULTS.pausedByDefault,
         royaltyTotalBps: ARTIST_DEPLOY_DEFAULTS.royaltyTotalBps,
-        splits: toDeployHardcodedSplitMetadata(refreshBuild.resolved.mintPriceMicroStx),
+        splits: toDeployHardcodedSplitMetadata(refreshBuild.resolved.mintPriceMicroStx, refreshBuild.resolved.mintType),
         recipients: {
           artist: refreshBuild.resolved.artistAddress,
           marketplace: refreshBuild.resolved.marketplaceAddress,
@@ -1382,7 +1373,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
     const templateVersion =
       mintType === 'pre-inscribed'
         ? 'xtrata-preinscribed-collection-sale-v1.0'
-        : 'xtrata-collection-mint-v1.7';
+        : 'xtrata-collection-mint-v1.9';
     const sourceTemplateLabel = templateVersion;
     let sourceBeforeCompaction = refreshBuild.source;
 
@@ -1404,7 +1395,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       hardcodedDefaults: {
         paused: ARTIST_DEPLOY_DEFAULTS.pausedByDefault,
         royaltyTotalBps: ARTIST_DEPLOY_DEFAULTS.royaltyTotalBps,
-        splits: toDeployHardcodedSplitMetadata(refreshBuild.resolved.mintPriceMicroStx),
+        splits: toDeployHardcodedSplitMetadata(refreshBuild.resolved.mintPriceMicroStx, refreshBuild.resolved.mintType),
         recipients: {
           artist: refreshBuild.resolved.artistAddress,
           marketplace: refreshBuild.resolved.marketplaceAddress,
@@ -1480,7 +1471,8 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
       hardcodedDefaults: {
         ...draftMetadata.hardcodedDefaults,
         splits: toDeployHardcodedSplitMetadata(
-          deploySourceBuild.resolved.mintPriceMicroStx
+          deploySourceBuild.resolved.mintPriceMicroStx,
+          deploySourceBuild.resolved.mintType
         )
       },
       pricing: {
@@ -2064,7 +2056,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         <label className="field field--full field--address">
           <span className="field__label info-label">
             Artist payout address
-            <InfoTooltip text="Wallet receiving the artist share (95%) of primary mint proceeds." />
+            <InfoTooltip text="Your wallet as primary artist: it receives the artist share (95%) of primary mint proceeds. After deploying you can split that share with up to the number of co-artist slots Xtrata gives your collection." />
           </span>
           <input
             className="input input--address-fit"
@@ -2079,6 +2071,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
           <span className="field__hint">Defaults to your connected wallet when available.</span>
         </label>
 
+        {mintType === 'pre-inscribed' && (
         <label className="field field--full field--address">
           <span className="field__label info-label">
             Marketplace payout address
@@ -2112,6 +2105,7 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
               : 'Locked to Xtrata in creator mode. Only the artist payout address is editable here.'}
           </span>
         </label>
+        )}
       </div>
 
       {mintType === 'standard' && parentInscriptions.trim().length > 0 && (
@@ -2162,8 +2156,17 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
         </p>
         <ul>
           <li>Contract code is locked and generated internally by the app.</li>
-          <li>Payout split: the standard is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator). Contracts deploy at 0 STX with no split, so you set it in one click in Mint rules → 3. Payout split. Minting stays locked until it is set.</li>
-          <li>Operator payout address is fixed to Xtrata defaults for this flow.</li>
+          {mintType === 'standard' ? (
+            <>
+              <li>Payout split: 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator). Xtrata's share is written into the contract and only Xtrata can change it; it can never go above 15% or below 2.5%, and it can only go down once minting starts.</li>
+              <li>Your 95% can be shared with co-artists, or with whoever holds a song or artwork inscription, in Mint rules → 3. Payout split.</li>
+            </>
+          ) : (
+            <>
+              <li>Payout split: the standard is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator).</li>
+              <li>Operator payout address is fixed to Xtrata defaults for this flow.</li>
+            </>
+          )}
           <li>Advanced royalty and URI logic is hidden in this beginner flow.</li>
         </ul>
       </div>
@@ -2396,18 +2399,27 @@ export default function DeployWizardPanel(props: DeployWizardPanelProps) {
                       {deployBuild.resolved.artistAddress}
                     </span>
                   </p>
-                  <p>
-                    <strong>
-                      Marketplace recipient
-                      {canEditMarketplaceRecipient ? ' (owner override)' : ' (locked)'}:
-                    </strong>{' '}
-                    <span className="address-value--full">
-                      {deployBuild.resolved.marketplaceAddress}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Operator recipient (locked):</strong> {deployBuild.resolved.operatorAddress}
-                  </p>
+                  {deployBuild.resolved.mintType === 'standard' ? (
+                    <p>
+                      <strong>Xtrata share (set in the contract):</strong> 2.5% marketplace + 2.5% operator.
+                      Only Xtrata can change it, within 2.5%–15%.
+                    </p>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>
+                          Marketplace recipient
+                          {canEditMarketplaceRecipient ? ' (owner override)' : ' (locked)'}:
+                        </strong>{' '}
+                        <span className="address-value--full">
+                          {deployBuild.resolved.marketplaceAddress}
+                        </span>
+                      </p>
+                      <p>
+                        <strong>Operator recipient (locked):</strong> {deployBuild.resolved.operatorAddress}
+                      </p>
+                    </>
+                  )}
 
                   {deployBuild.warnings.length > 0 && (
                     <div className="alert">

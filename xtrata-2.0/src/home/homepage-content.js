@@ -31,9 +31,10 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   }),
   Object.freeze({
     id: 'audionauts', tag: 'Soon', tone: 'teal',
-    title: 'Audionauts mints this week.',
-    line: 'A collection built from songs already on-chain.',
-    cta: 'Get launch alerts', href: 'https://x.com/XtrataLayers', newTab: true
+    title: 'Audionauts mints Thursday, 7pm BST.',
+    line: 'A collection built from songs already on-chain. Play Audionauts on Bitcoin now.',
+    // Ordinal inscription 95768432 (playable now, ahead of the mint).
+    cta: 'Play now', href: 'https://ordinals.com/inscription/95768432', newTab: true
   }),
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',
@@ -84,7 +85,7 @@ export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
     // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
     id: 'audionauts-stream', kind: 'radio', size: 'wide', tone: 'teal',
-    eyebrow: 'Coming this week · press to listen', title: 'Audionauts',
+    eyebrow: 'Mints Thu 1 Oct · 7pm BST', title: 'Audionauts',
     image: '/home/wall/audionauts-3059.webp',
     href: '/radio'
   }),
@@ -123,7 +124,8 @@ export const HOMEPAGE_MUSIC = Object.freeze({
 // Audionauts teaser. Flip status to 'live' and set mintHref on launch day.
 export const HOMEPAGE_AUDIONAUTS = Object.freeze({
   status: 'soon',
-  mintLabel: 'This week',
+  // Mint opens Thursday 1 October 2026 at 19:00 BST.
+  mintLabel: 'Thu 7pm BST',
   editions: 111,
   // #3059 is the (silent) Audionauts logo, so "listen" goes to the radio.
   listenHref: '/radio',
@@ -158,7 +160,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
     { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Coming this week', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Mints Thu 7pm BST', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),

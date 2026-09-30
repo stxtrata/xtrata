@@ -760,7 +760,7 @@ Canonical source: `contracts/live/xtrata-radio-likes-v1.0.clar`. Wallet-paid, ze
 
 Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Explicit core/master paid starts, atomic 50-microSTX holder payment, wallet-scoped 16-byte receipts and totals. No treasury, custody or admin. Source SHA-256 pinned in browser and CLI deployment registries. See `docs/radio/PAID-PLAYS-DEPLOYMENT.md` for ABI, errors, tests and deployment stages.
 
-## Collection mint v1.9 (Core v3.2.3) — built and tested; not yet deployed or wired into the studio
+## Collection mint v1.9 (Core v3.2.3) — current template for new collections (studio + deploy wired; mainnet canary pending)
 
 `contracts/live/xtrata-collection-mint-v1.9.clar` (Clarinet counterpart `contracts/clarinet/contracts/xtrata-collection-mint-v1.9.clar`, SHA-256 `412d7b05025b47febae62d22d0a0e530a2161f29564ae59524b19323e2092564`) is v1.7 with **two-tier payout splits** replacing `set-splits` / `set-recipients` / recipient-editor access.
 
@@ -771,7 +771,11 @@ Clarity 4; canonical source `contracts/live/xtrata-radio-plays-v1.0.clar`. Expli
 
 Tests: `contracts/clarinet/tests/xtrata-collection-mint-v1.9.test.ts` (16: tier permissions, limits, lower-only when live, editors, slot allowance, share validation, holder payments following transfers, contract-holder fallback, finalize) and `xtrata-collection-mint-v1.9-regression.test.ts` (the full v1.7 suite run against v1.9, 31).
 
-## Collection mint v1.7 (Core v3.2.3) — current template for new collections
+**Studio and deploy.** The deploy wizard, the SDK builder and the admin template tool deploy v1.9 (`hasTwoTierSplits` in `src/lib/deploy/artist-deploy.ts` / SDK `deploy.ts`: the only split-related substitution is the primary artist in the initial `artist-splits` line). Collection records carry `templateVersion: xtrata-collection-mint-v1.9`; `isTwoTierSplitCollection` switches the studio to the two-tier controls (guided Mint rules → 3. Payout split shows Xtrata's share and edits the artist split; advanced controls offer `set-artist-splits` to owners and `set-platform-split` / `set-artist-slot-allowance` / `set-platform-editor` to Xtrata). v1.7 collections keep their v1.7 controls.
+
+**Deployed-code check.** `functions/lib/collection-deploy.ts` refuses deploy readiness (uploads, publish, readiness) for collections created on or after `COLLECTION_SOURCE_CHECK_FROM` (default 2026-10-01T00:00Z) unless the deployed source, compacted and with the per-collection value lines masked by strict patterns, fingerprints as an approved template (`src/lib/deploy/template-fingerprint.ts`: v1.9 and the pre-inscribed sale v1.0) and every core reference is the core Xtrata's registry expects. A failed Hiro read reports "could not check", never a rejection. Older collections (e.g. Audionauts on v1.7) are not checked. When a template changes, `template-fingerprint.test.ts` fails with the new fingerprint to paste into `COLLECTION_TEMPLATE_FINGERPRINTS`.
+
+## Collection mint v1.7 (Core v3.2.3) — superseded for new collections by v1.9
 
 `contracts/live/xtrata-collection-mint-v1.7.clar` (Clarinet counterpart `contracts/clarinet/contracts/xtrata-collection-mint-v1.7.clar`, SHA-256 `d76e697e3d26fc828af21f046881b05e518ef456e86d863181672b55e2c16999`) is v1.6 plus a **fixed collector price**: `mint-price` and every phase price are the all-in amount a collector pays in protocol + collection payments, identical for every file. At seal the helper deducts that file's Xtrata fees (begin fee recorded at reservation + staged seal fee read live from the pinned core) and pays the remainder through the splits. Price `u0` is a free mint (collectors pay protocol fees only). New reservations the price cannot cover fail with `u125 ERR-PRICE-BELOW-FEES` before any fee is paid; if fees rise mid-mint the payout is reduced (never below zero) instead of failing. New read-only `get-mint-quote (total-chunks)` and `get-fee-model` (`"fixed-collector-price"`). Every static core call (duplicate guard, fee units, upload state) is pinned on deploy by `buildArtistDeployContractSource` / SDK `deploy.ts`.
 
