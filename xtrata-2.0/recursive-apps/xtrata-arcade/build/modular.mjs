@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const P = require('./hall-parts.cjs');
+const R = require('./parent-render.cjs');
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const SRC = join(root, 'src'), PARTS = join(SRC, 'parts'), DIST = join(root, 'dist');
@@ -85,18 +86,13 @@ function build() {
 
   const tpl = readFileSync(join(root, 'parent', 'parent.template.html'), 'utf8');
   const lib = readFileSync(join(here, 'hall-parts.cjs'), 'utf8');
-  // Inline-script safety: '</script' ends the element early and '<!--' can stop it ending at all.
-  if (/<\/script|<!--/i.test(lib)) throw new Error('hall-parts.cjs must not contain </script or <!-- (use \\x3c)');
-  const config = {
-    version: ids.version,
-    bundleId: ids.bundleId || 0,
-    packs: Object.fromEntries(P.PACK_ORDER.map((n) => [n, ids.packs[n] || 0])),
-    parts: ids.parts || {},
-    parentTokenId: ids.parentTokenId || 0
-  };
-  const parent = tpl.replace('/*@@HALL_PARTS@@*/', () => lib).replace('/*@@CONFIG@@*/{}', () => JSON.stringify(config, null, 2).replace(/\n/g, '\n    '));
+  const shell = R.parentShell(tpl, lib);          // the parent with its CONFIG slot still open
+  writeFileSync(join(DIST, 'xtrata-arcade-parent.shell.html'), shell);
+  const config = R.parentConfig(ids, P.PACK_ORDER);
+  const parent = R.fillParent(shell, config);
   writeFileSync(join(DIST, 'xtrata-arcade-parent.html'), parent);
-  manifest.parent = { file: 'xtrata-arcade-parent.html', bytes: Buffer.byteLength(parent), sha256: sha(parent), config };
+  manifest.parent = { file: 'xtrata-arcade-parent.html', bytes: Buffer.byteLength(parent), sha256: sha(parent), config,
+    shell: { file: 'xtrata-arcade-parent.shell.html', bytes: Buffer.byteLength(shell), sha256: sha(shell) } };
   manifest.single = { file: `xtrata-arcade-${ids.version}.html`, bytes: Buffer.byteLength(single), sha256: sha(single) };
   writeFileSync(join(DIST, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 

@@ -37,6 +37,9 @@ So packs that did not change never need inscribing: they come out of #3078.
 
 ## Releasing
 
+The launch canary does all of this on chain, in order and checked: see
+`canaries/arcade-launch/README.md` (`npm run build:canary:arcade-launch`). By hand:
+
 1. Edit `src/parts/*`.
 2. `node build/modular.mjs build`: it prints which packs changed since #3078.
 3. Inscribe only the changed packs from `dist/packs/` (and/or single parts).
