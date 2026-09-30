@@ -98,6 +98,7 @@ function top10Result(board, filled) {
         window.__leather = [];
         window.LeatherProvider = { request: async (method, params) => {
           window.__leather.push({ method, params });
+          if (method === 'getAddresses') return { result: { addresses: [{ symbol: 'STX', address: 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR' }] } };
           for (const pc of (params && params.postConditions) || []) {
             if (typeof pc === 'string' && !/^([0-9a-fA-F]{2})+$/.test(pc)) throw new Error('Not a serialized post condition');
           }
@@ -164,6 +165,60 @@ function top10Result(board, filled) {
   check(shim.postConditions[0] === '0002160000000000000000000000000000000000000000050000000000007530' && shim.functionArgs[0] === '0100000000000000000000000000000001',
     'Leather shim strips 0x from post-conditions and args');
   check(!r.errors.length, 'no page errors (mixed)');
+  await r.ctx.close();
+
+  /* 4. v1.4 behaviour: Top 10 on idle screens, and connect-before-play. */
+  const boards = { xa_neon_snake: 10, xa_block_drop: 3, xa_block_drop_sprint: 5, xa_cave_diver: -1 };
+  r = await open('/packs.html', { boards, leather: true });
+  await r.page.click('#go');
+  await r.page.waitForFunction(() => window.XAHall && window.XAHall.boards().length >= 3, null, { timeout: 60000 });
+  const seen = {};
+  // Longest cycle is Block Drop: 7 s attract + two 6 s boards = 19 s, so sample for 24 s.
+  for (let i = 0; i < 24; i++) {
+    const sc = await r.page.evaluate(() => window.XAHall.screens());
+    sc.forEach((x) => { const k = x.id; seen[k] = seen[k] || new Set(); seen[k].add(x.phase + (x.board ? ':' + x.board : '')); });
+    await r.page.waitForTimeout(1000);
+  }
+  const has = (id, v) => seen[id] && seen[id].has(v);
+  console.log('    screens seen:', JSON.stringify(Object.fromEntries(Object.entries(seen).slice(0, 4).map(([k, v]) => [k, Array.from(v)]))), JSON.stringify(await r.page.evaluate(() => window.XAHall.boards())));
+  check(has('xa_neon_snake', 'board:xa_neon_snake') && has('xa_neon_snake', 'attract'), 'Snake screen rotates between its attract loop and its Top 10');
+  check(has('xa_block_drop', 'board:xa_block_drop_sprint'), 'Block Drop also shows its Sprint 40 Top 10');
+  check(!Array.from(seen.xa_cave_diver || []).some((v) => v.startsWith('board')), 'a board that failed to load is never shown (Cave Diver offline)');
+  const emptyOnly = ['xa_orbit_merge', 'xa_pong_streak'].every((id) => Array.from(seen[id] || []).every((v) => v === 'attract'));
+  check(emptyOnly, 'machines with empty boards keep their attract loop');
+  if (SHOTS) {
+    // Save a board-phase screen and a leader-strip screen as PNGs.
+    for (let tries = 0; tries < 20; tries++) {
+      const st = await r.page.evaluate(() => window.XAHall.screens()[0]);
+      if (st.phase === 'board') { const png = await r.page.evaluate(() => window.XAHall.screenImage(0));
+        fs.writeFileSync(path.join(SHOTS, '10-screen-top10.png'), Buffer.from(png.split(',')[1], 'base64')); break; }
+      await r.page.waitForTimeout(500);
+    }
+    for (let tries = 0; tries < 30; tries++) {
+      const st = await r.page.evaluate(() => window.XAHall.screens()[0]);
+      if (st.phase === 'attract') { const png = await r.page.evaluate(() => window.XAHall.screenImage(0));
+        fs.writeFileSync(path.join(SHOTS, '11-screen-leader.png'), Buffer.from(png.split(',')[1], 'base64')); break; }
+      await r.page.waitForTimeout(500);
+    }
+    await r.page.screenshot({ path: path.join(SHOTS, '12-hall-walk.png') });
+  }
+  // Ready card while not connected: connecting is the main action, Enter connects, the run comes back ranked.
+  await r.page.evaluate(() => window.XARoom.start('xa_neon_snake'));
+  await r.page.waitForSelector('.xa-btn-connect', { timeout: 10000 });
+  const card = await r.page.evaluate(() => ({ tag: document.querySelector('.xa-ready-tag').textContent,
+    buttons: Array.from(document.querySelectorAll('.xa-ready .xa-over-actions .xa-btn')).map((b) => b.textContent) }));
+  check(/NOT CONNECTED/.test(card.tag) && /CONNECT WALLET/.test(card.buttons[0]) && card.buttons.some((b) => /Practice/.test(b)),
+    'not connected: the ready card leads with Connect wallet, practice is secondary (' + card.buttons.join(' | ') + ')');
+  if (SHOTS) await r.page.screenshot({ path: path.join(SHOTS, '13-ready-connect.png') });
+  await r.page.keyboard.press('Enter');
+  await r.page.waitForSelector('.xa-ready-tag.is-ranked', { timeout: 10000 });
+  check(/RANKED/.test(await r.page.textContent('.xa-ready-tag')), 'Enter connects the wallet and reopens the machine as a ranked run');
+  check(await r.page.evaluate(() => window.__leather.some((c) => c.method === 'getAddresses')), 'the connect went to the wallet');
+  if (SHOTS) await r.page.screenshot({ path: path.join(SHOTS, '14-ready-ranked.png') });
+  // Score client sends bare hex to Leather on the direct route (v1.4 engine pack).
+  const hex = await r.page.evaluate(() => window.XAScores._codec.stxPostConditionHex('SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR', '30000'));
+  check(/^[0-9a-f]+$/.test(hex) && hex.length % 2 === 0, 'score client builds bare-hex post-conditions (' + hex.slice(0, 10) + '...)');
+  check(!r.errors.length, 'no page errors (v1.4 behaviour) ' + r.errors.slice(0, 2).join(' | '));
   await r.ctx.close();
 
   await browser.close();

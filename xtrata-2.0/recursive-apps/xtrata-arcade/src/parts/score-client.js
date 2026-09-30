@@ -223,12 +223,15 @@
   }
 
   /* STX post-condition, wire format (for direct wallet routes).
-     type 0x00 STX | principal 0x02 standard(version,hash160) | code | u64 amount */
+     type 0x00 STX | principal 0x02 standard(version,hash160) | code | u64 amount
+     BARE hex, no 0x: Leather parses post-condition strings with a strict
+     decoder (@noble/hashes hexToBytes) that rejects "0x" and reports it as
+     "Not a serialized post condition". Xverse accepts bare hex too. */
   var CONDITION_LTE = 0x05;
   function stxPostConditionHex(address, amount) {
     var d = c32decodeAddress(address);
     var amt = BigInt(amount).toString(16).padStart(16, '0');
-    return '0x00' + '02' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160) +
+    return '00' + '02' + d.version.toString(16).padStart(2, '0') + bytesToHex(d.hash160) +
       CONDITION_LTE.toString(16).padStart(2, '0') + amt;
   }
 
@@ -591,11 +594,12 @@
 
     // Direct provider (top-level page). Never send `sender` (wallet playbook §2).
     var d = directProvider();
+    var bareArgs = args.map(function (a) { return String(a).replace(/^0x/i, ''); });   // bare hex for wallets
     var params = {
       contract: contract,
       functionName: 'submit-score',
-      functionArgs: args,
-      arguments: args,
+      functionArgs: bareArgs,
+      arguments: bareArgs,
       postConditionMode: 'deny',
       postConditions: [stxPostConditionHex(address, fee.value)]
     };

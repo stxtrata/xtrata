@@ -418,7 +418,7 @@
 
   (function () {
     var st = doc.createElement('style');
-    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\n.xa-ready-board .xa-board { font-size: 13px; }\n.xa-ready-board .xa-board li { padding: 7px 6px; }\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';
+    st.textContent = '.xa-board li { grid-template-columns: 34px 1fr auto auto; }\n.xa-tools { display: flex; gap: 4px; justify-content: flex-end; }\n.xa-tools .xa-btn { margin: 0 !important; padding: 3px 8px !important; font-size: 11px !important; min-height: 0; }\n.xa-ready-overlay { overflow: auto; align-items: start; background: rgba(3, 4, 12, .6); }\n.xa-ready { width: min(520px, 100%); margin: auto; padding: 18px 16px; border-radius: 16px; border: 1px solid var(--xa-line); background: rgba(8, 10, 26, .9); box-shadow: 0 0 40px -12px var(--c); }\n.xa-ready h3 { font-size: 30px; text-shadow: 0 0 14px var(--c), 0 0 34px var(--c); }\n.xa-ready-variant { margin-top: 6px; font: 800 12px/1 var(--xa-mono); letter-spacing: .16em; color: var(--c); text-transform: uppercase; }\n.xa-ready-tag { margin: 12px 0 0; font: 800 12px/1.4 var(--xa-mono); letter-spacing: .1em; color: var(--xa-dim); }\n.xa-ready-tag.is-ranked { color: var(--xa-green); }\n.xa-ready-tag.is-warn { color: #ffc53d; }\n.xa-ready-msg { margin: 6px 0 0; font: 700 12px/1.4 var(--xa-mono); color: var(--xa-dim); min-height: 0; }\n.xa-ready-msg.is-err { color: #ff4d6d; }\n.xa-btn-connect { font-weight: 800; }\n.xa-link { background: none; border: 0; padding: 0; font: inherit; color: var(--xa-cyan); text-decoration: underline; cursor: pointer; }\n.xa-ready-head { display: flex; justify-content: space-between; margin: 16px 0 4px; font: 800 11px/1 var(--xa-mono); letter-spacing: .14em; color: var(--xa-faint); }\n.xa-ready-board { max-height: 38vh; overflow: auto; text-align: left; border-top: 1px solid var(--xa-line); }\n.xa-ready-board .xa-board { font-size: 13px; }\n.xa-ready-board .xa-board li { padding: 7px 6px; }\n.xa-ready .xa-variants { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }\n.xa-replay-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }';
     (doc.head || doc.documentElement).appendChild(st);
   })();
   function blankStore(s) {
@@ -430,16 +430,50 @@
     s.state = 'countdown'; s.countdown = 3.0; s.input.reset();
     showCountdown();
   }
+  // Connect from the ready card, then reopen the same machine as a ranked run.
+  async function connectForRun(s, btn, msg) {
+    if (!s || session !== s || s.state !== 'ready' || s.connecting) return;
+    s.connecting = true;
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Check your wallet\u2026';
+    msg.className = 'xa-ready-msg'; msg.textContent = '';
+    try {
+      await S.connect();
+      walletStatus = S.status(); paintWallet();
+      if (session === s && s.state === 'ready' && walletStatus.address) {
+        startGame(s.game.id, s.variant ? s.variant.key : null);   // same machine, now ranked
+        return;
+      }
+      throw new Error('The wallet did not return an address.');
+    } catch (e) {
+      if (session !== s) return;
+      msg.className = 'xa-ready-msg is-err';
+      msg.textContent = 'Not connected: ' + ((e && e.message) || String(e)) + ' Try again, or play a practice run.';
+      btn.disabled = false; btn.textContent = label;
+    } finally { s.connecting = false; }
+  }
   function showReady(s) {
     var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
     var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);
-    var start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['▶ START']);
-    var tag = s.pilot
-      ? h('p', { class: 'xa-ready-tag is-ranked', text: '● RANKED · flying as ' + S.shortAddress(s.pilot.address) })
-      : h('p', { class: 'xa-ready-tag' }, ['PRACTICE · ', h('button', { class: 'xa-link', type: 'button', onclick: async function () {
-          await onWalletClick();
-          if (session === s && s.state === 'ready' && walletStatus.address) startGame(g.id, vkey);
-        } }, ['connect a wallet']), ' to rank this run']);
+    // A run is bound to the wallet it starts with (the replay is seeded from it),
+    // so a score can only be posted if the wallet is connected BEFORE the run.
+    // Not connected → connecting is the main action; practice is the fallback.
+    walletStatus = S.status(); paintWallet();
+    var canConnect = !s.pilot && walletStatus.route !== 'none';
+    var start, practice = null, tag, msg = h('p', { class: 'xa-ready-msg', 'aria-live': 'polite' });
+    if (s.pilot) {
+      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['▶ START']);
+      tag = h('p', { class: 'xa-ready-tag is-ranked', text: '● RANKED · flying as ' + S.shortAddress(s.pilot.address) });
+    } else if (canConnect) {
+      start = h('button', { class: 'xa-btn xa-btn-play xa-btn-connect', style: '--c:' + g.color, type: 'button', onclick: function () { connectForRun(s, start, msg); } }, ['\uD83D\uDD17 CONNECT WALLET']);
+      practice = h('button', { class: 'xa-btn', type: 'button', title: 'Play without a wallet. The score cannot be posted on-chain.', onclick: function () { beginRun(s); } }, ['▶ Practice']);
+      tag = h('p', { class: 'xa-ready-tag is-warn', text: 'NOT CONNECTED · connect first to post your score on-chain. A practice run cannot be posted afterwards.' });
+    } else {
+      start = h('button', { class: 'xa-btn xa-btn-play', style: '--c:' + g.color, type: 'button', onclick: function () { beginRun(s); } }, ['▶ PRACTICE']);
+      tag = h('p', { class: 'xa-ready-tag is-warn' }, ['VIEW ONLY · no wallet can be reached here, so this score cannot be posted. ',
+        h('a', { href: S.runtimeUrl(), target: '_blank', rel: 'noopener', style: 'color:var(--xa-cyan)', text: 'Play on xtrata.xyz \u2197' })]);
+    }
+    s.primary = canConnect ? function () { connectForRun(s, start, msg); } : function () { beginRun(s); };
     var modes = [null].concat(g.variants || []);
     var switcher = modes.length > 1 ? h('div', { class: 'xa-variants' }, modes.filter(function (v) { return (v ? v.key : null) !== vkey; }).map(function (v) {
       return h('button', { class: 'xa-btn xa-btn-variant', style: '--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, v ? v.key : null); } },
@@ -451,11 +485,12 @@
       h('p', { class: 'xa-verdict', text: (s.variant && s.variant.tagline) || g.tagline || '' }),
       g.controls ? h('p', { class: 'xa-note', text: g.controls }) : null,
       tag,
+      msg,
       h('div', { class: 'xa-ready-head' }, [h('span', { text: 'ON-CHAIN TOP 10' }), h('span', { text: 'YOUR BEST ' + fmtBest(g, mode) })]),
       list,
-      h('div', { class: 'xa-over-actions' }, [start, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
+      h('div', { class: 'xa-over-actions' }, [start, practice, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
       switcher,
-      h('p', { class: 'xa-note' }, ['Enter or Space to start · Esc to go back · ', h('button', { class: 'xa-link', type: 'button', onclick: openReplayFile }, ['watch a replay file'])])
+      h('p', { class: 'xa-note' }, [canConnect ? 'Enter or Space to connect · Esc to go back · ' : 'Enter or Space to start · Esc to go back · ', h('button', { class: 'xa-link', type: 'button', onclick: openReplayFile }, ['watch a replay file'])])
     ])]));
     start.focus();
     S.getTop10(boardOf(g, mode), mode, true).then(function (b) {
@@ -801,7 +836,7 @@
         }
       }
     } else if (s.state === 'ready') {
-      if (s.input.hit('start') || s.input.hit('a')) beginRun(s);
+      if (s.input.hit('start') || s.input.hit('a')) (s.primary || function () { beginRun(s); })();
       else if (s.input.hit('pause')) { endSession(); return; }
       s.input.endFrame();
     } else if (s.state === 'watch') {

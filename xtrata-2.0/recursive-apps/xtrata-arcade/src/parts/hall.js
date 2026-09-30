@@ -1652,6 +1652,83 @@ function placeCabinets(){
   });
 }
 
+/* ---------- idle screens: attract loop, then the on-chain Top 10 over it ----------
+   Every idle cabinet cycles: its game's attract loop, then each of its boards'
+   Top 10 drawn over the still-running attract (so the game stays visible), then
+   the loop again. Neighbouring machines are staggered. The #1 name stays in a
+   strip along the top during the attract loop, so a leader is always on show.
+   Boards with no entries are skipped; a board that failed to load is skipped
+   too (never shown as "empty"). Tune here: */
+const SCREEN_BOARD = {
+  attractSecs: 7,     // attract loop on its own
+  boardSecs: 6,       // each Top 10 (the main board, then any timed variant)
+  veil: 0.62,         // darkness behind the Top 10 (0 = see-through, 1 = solid)
+  leaderStrip: true,  // "#1 NAME SCORE" along the top during the attract loop
+  stagger: 1.7,       // seconds between neighbouring machines' cycles
+  refreshSecs: 180,   // re-read each board this often
+  fetchGapSecs: 1.2   // spacing between board reads (stays polite to the API)
+};
+const TOP = {};                        // board id -> { ok, entries, at }
+let feedStarted = false;
+function boardsFor(g){
+  const R = XA && XA.replay, def = g.def;
+  if(!R || !R.boardFor) return [];
+  const list = [{ board: R.boardFor(def, def.mode), mode: def.mode, label: 'TOP 10' }];
+  (def.variants || []).forEach(v => { if(v.mode !== def.mode) list.push({ board: R.boardFor(def, v.mode), mode: v.mode, label: String(v.label || v.key).toUpperCase() + ' TOP 10' }) });
+  return list;
+}
+function startBoardFeed(){
+  if(feedStarted || !XAScores || !XAScores.getTop10) return; feedStarted = true;
+  const queue = []; GAMES.forEach(g => boardsFor(g).forEach(b => queue.push(b)));
+  let k = 0;
+  const next = () => {
+    const b = queue[k++ % queue.length];
+    XAScores.getTop10(b.board, b.mode).then(r => { if(r && r.ok) TOP[b.board] = { ok: true, entries: r.entries || [], at: Date.now() } }).catch(() => {});
+    const gap = k < queue.length ? SCREEN_BOARD.fetchGapSecs : Math.max(SCREEN_BOARD.fetchGapSecs, SCREEN_BOARD.refreshSecs / queue.length);
+    setTimeout(next, gap * 1000);
+  };
+  if(queue.length) next();
+}
+function fmtBoard(mode, v){
+  v = Math.max(0, Math.round(Number(v) || 0));
+  if(mode !== 'time') return XA && XA.util && XA.util.fmt ? XA.util.fmt(v) : String(v);
+  const mm = Math.floor(v / 6000), ss = Math.floor(v / 100) % 60, cs = v % 100;
+  return (mm ? mm + ':' + (ss < 10 ? '0' : '') : '') + ss + '.' + (cs < 10 ? '0' : '') + cs + (mm ? '' : 's');
+}
+// What a machine's screen shows at time t: { kind:'attract' } or { kind:'board', b, top }.
+function screenPhase(m, t){
+  const shown = boardsFor(m.game).map(b => ({ b, top: TOP[b.board] })).filter(x => x.top && x.top.entries.length);
+  if(!shown.length) return { kind: 'attract', leader: null };
+  const cyc = SCREEN_BOARD.attractSecs + shown.length * SCREEN_BOARD.boardSecs;
+  const u = ((t + m.i * SCREEN_BOARD.stagger) % cyc + cyc) % cyc;
+  const lead = shown[0];
+  if(u < SCREEN_BOARD.attractSecs) return { kind: 'attract', leader: lead };
+  return Object.assign({ kind: 'board' }, shown[Math.min(shown.length - 1, Math.floor((u - SCREEN_BOARD.attractSecs) / SCREEN_BOARD.boardSecs))]);
+}
+function drawLeader(x, W, lead, col){
+  const e = lead.top.entries[0];
+  x.fillStyle = 'rgba(3,2,10,.62)'; x.fillRect(0, 0, W, 20);
+  x.font = '17px VT323, monospace'; x.textBaseline = 'middle';
+  x.textAlign = 'left'; x.fillStyle = col; x.fillText('#1', 6, 11);
+  x.fillStyle = '#fff'; x.fillText(String(e.name).slice(0, 12), 28, 11);
+  x.textAlign = 'right'; x.fillStyle = '#ffc53d'; x.fillText(fmtBoard(lead.b.mode, e.score), W - 6, 11);
+}
+function drawBoard(x, W, H, ph, col){
+  x.fillStyle = 'rgba(3,2,10,' + SCREEN_BOARD.veil + ')'; x.fillRect(0, 0, W, H);
+  x.textBaseline = 'middle'; x.textAlign = 'center';
+  x.font = '21px VT323, monospace'; x.shadowColor = col; x.shadowBlur = 8; x.fillStyle = '#fff';
+  x.fillText(ph.b.label, W / 2, 13); x.shadowBlur = 0;
+  x.fillStyle = col; x.fillRect(W * .18, 25, W * .64, 1);
+  const rows = ph.top.entries.slice(0, 10), top = 32, rh = (H - top - 6) / 10;
+  x.font = '17px VT323, monospace';
+  rows.forEach((e, i) => {
+    const y = top + rh * i + rh / 2;
+    if(i === 0){ x.fillStyle = 'rgba(255,197,61,.14)'; x.fillRect(4, y - rh / 2, W - 8, rh) }
+    x.textAlign = 'right'; x.fillStyle = i === 0 ? '#ffc53d' : col; x.fillText(String(i + 1), 26, y);
+    x.textAlign = 'left'; x.fillStyle = i === 0 ? '#fff' : '#e6e1ff'; x.fillText(String(e.name).slice(0, 12), 34, y);
+    x.textAlign = 'right'; x.fillStyle = i === 0 ? '#ffc53d' : '#bfb8e6'; x.fillText(fmtBoard(ph.b.mode, e.score), W - 8, y);
+  });
+}
 /* ---------- attract mode: each screen runs its own cartridge's attract() ---------- */
 let _scan=null;
 function scanOverlay(){ if(_scan) return _scan; const c=mkCanvas(256,192), x=c.getContext('2d');
@@ -1666,7 +1743,11 @@ function drawAttract(m, t){
   x.restore();
   x.save(); x.setTransform(1,0,0,1,0,0); x.globalAlpha=1; x.shadowBlur=0; x.textAlign='center'; x.textBaseline='middle';
   if(m.fails>=3){ x.font='34px VT323, monospace'; x.shadowColor=col; x.shadowBlur=12; x.fillStyle='#fff'; x.fillText(m.game.title,W/2,80); x.shadowBlur=0 }
-  if(on || Math.floor(t*1.8+m.i*.37)%2===0){
+  // real clock: the rotation keeps time even when frames drop
+  const ph=screenPhase(m,performance.now()/1000); m.phase=ph.kind; m.phaseBoard=ph.kind==='board'?ph.b.board:null;
+  if(ph.kind==='board'){ x.save(); drawBoard(x,W,H,ph,col); x.restore(); x.textAlign='center'; x.textBaseline='middle' }
+  else if(SCREEN_BOARD.leaderStrip && ph.leader){ x.save(); drawLeader(x,W,ph.leader,col); x.restore(); x.textAlign='center'; x.textBaseline='middle' }
+  if(on || (ph.kind!=='board' && Math.floor(t*1.8+m.i*.37)%2===0)){
     x.fillStyle='rgba(3,2,10,.7)'; x.fillRect(0,H-28,W,28);
     x.font='22px VT323, monospace'; x.fillStyle=on?'#ffc53d':'#f3eeff'; x.fillText(on?'▶ PRESS START':'PRESS START',W/2,H-14);
   }
@@ -1677,6 +1758,7 @@ function drawAttract(m, t){
 // budget: focused screen every frame, the 6 nearest ~20fps, everything else a few fps
 let scrOrder=[], scrT=0, scrNear=0, scrFar=0;
 function updateScreens(dt){
+  if(!feedStarted) startBoardFeed();
   if((scrT-=dt)<=0){ scrT=.4; scrOrder=machines.map(m=>({m,d:Math.hypot(m.front.x-player.x,m.front.z-player.z)})).sort((a,b)=>a.d-b.d).map(o=>o.m) }
   const near=scrOrder.slice(0,6), rest=scrOrder.slice(6);
   if(focusIdx>=0) drawAttract(machines[focusIdx],time);
@@ -2006,12 +2088,18 @@ $('tapalt').addEventListener('click', ()=>{ const v=focusIdx>=0 && GAMES[focusId
 /* ================================================================
    HUD
    ================================================================ */
+if(XAScores && XAScores.onChange) XAScores.onChange(()=>{ try{ updateHud() }catch(e){} });   // wallet tag in the START prompt
 function updateHud(){
   const walking = state==='walk';
   $('cross').hidden = !walking;
   $('cross').classList.toggle('on', focusIdx>=0);
   $('prompt').hidden = !(walking && focusIdx>=0);
   if(focusIdx>=0) $('ptitle').textContent = GAMES[focusIdx].title;
+  // Say before you sit down whether this run can be posted (a run is bound to the wallet it starts with).
+  if(focusIdx>=0){ let w=$('pwallet'); if(!w){ w=document.createElement('span'); w.id='pwallet'; w.style.cssText='font-size:14px;letter-spacing:.06em;margin-left:4px'; $('prompt').appendChild(w) }
+    const st=(XAScores && XAScores.status) ? XAScores.status() : {}, on=!!st.address;
+    w.textContent = on ? '\u25CF RANKED' : st.route==='none' ? '\u25CB VIEW ONLY' : '\u25CB PRACTICE \u00B7 connect to post scores';
+    w.style.color = on ? '#7dffb2' : '#ffc53d' }
   $('tapstart').hidden = !(walking && isTouch && focusIdx>=0);
   $('hint').hidden = !walking || isTouch;
   $('lockhint').hidden = !walking || isTouch || locked;
@@ -2023,6 +2111,12 @@ function updateHud(){
   if(posterFocus) $('pptitle').textContent = posterFocus.spec.play.title;
 }
 
+/* Read-only look at the cabinet screens (tests and debugging). */
+window.XAHall = Object.freeze({
+  screens: () => machines.map(m => ({ id: m.game.id, phase: m.phase || null, board: m.phaseBoard || null })),
+  boards: () => Object.keys(TOP).map(k => ({ board: k, entries: TOP[k].entries.length })),
+  screenImage: i => machines[i] && machines[i].sctx ? machines[i].sctx.canvas.toDataURL('image/png') : null
+});
 /* hall toolbar → the engine's scoreboards, wallet and sound */
 function freeMouse(){ if(document.pointerLockElement) document.exitPointerLock() }
 function openScores(){ freeMouse(); initAudio(); const g=GAMES[focusIdx>=0?focusIdx:0]; try{ XARoom.boards(g.id) }catch(e){ console.error(e) } }
