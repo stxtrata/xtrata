@@ -460,6 +460,7 @@ const renderWall = () => {
       const img = image(item.image, item.title, 'home-tile__img', { eager: i < 4, position: item.position });
       if (item.pixelated) img.classList.add('is-pixelated');
       tile.append(img, wallCaption(item));
+      if (item.listen) tile.append(playBadge());
       if (item.badge) tile.append(element('span', 'home-tile__badge', item.badge));
     }
     mount.append(tile);
@@ -551,7 +552,7 @@ const renderAudionauts = () => {
   const stats = element('div', 'home-aud__stats');
   [
     [String(a.editions), 'editions'],
-    ['Now', 'soundtrack on the radio'],
+    ['L1', 'original music streaming now'],
     [live ? 'Now' : a.mintLabel, 'mint opens']
   ].forEach(([value, label]) => {
     const stat = element('div', 'home-aud__stat');
@@ -562,7 +563,8 @@ const renderAudionauts = () => {
   actions.append(
     live
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
-      : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
+      : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
+    actionLink(a.listenHref, 'Listen to the original on L1', 'home-btn home-btn--ghost', 'audionauts:ordinal', { newTab: true })
   );
   copy.append(
     tags,
@@ -571,20 +573,17 @@ const renderAudionauts = () => {
     element(
       'p',
       'home-aud__body',
-      'Each Audionaut carries a real inscribed song, and the soundtrack is already playing on Xtrata Radio.'
+      'Each Audionaut carries a real inscribed song. Listen to the original Audionauts music now, streamed straight from Bitcoin L1.'
     ),
     stats,
     actions
   );
   const media = element('div', 'home-aud__media');
   const cue = element('span', 'home-aud__listen-cue');
-  const cueText = element('span', '', 'Play Xtrata Radio');
-  cueText.dataset.radioLabel = 'Play Xtrata Radio';
-  cue.append(playBadge(), cueText);
-  const listen = radioButton('home-aud__listen', 'Audionauts: play Xtrata Radio', a.listenHref, 'audionauts:radio', [
-    image(a.poster, 'Audionauts', 'home-aud__poster'),
-    cue
-  ]);
+  cue.append(playBadge(), element('span', '', 'Listen to the original music, streamed from L1'));
+  const listen = actionLink(a.listenHref, '', 'home-aud__listen', 'audionauts:ordinal-art', { newTab: true });
+  listen.setAttribute('aria-label', 'Audionauts: listen to the original music on the Bitcoin L1 ordinal');
+  listen.append(image(a.poster, 'Audionauts', 'home-aud__poster'), cue);
   media.append(listen);
   const sound = element('div', 'home-aud__sound');
   const covers = element('div', 'home-aud__covers');
@@ -678,7 +677,7 @@ const renderFresh = async () => {
         }
         thumb.append(element('span', 'home-fresh__kind', kindLabel[item.kind]));
         if (item.pinned) thumb.append(element('span', 'home-fresh__pin', 'Pinned'));
-        if (item.song || item.radio) thumb.append(playBadge());
+        if (item.song || item.radio || item.listen) thumb.append(playBadge());
         const text = element('span', 'home-fresh__text');
         text.append(
           element('strong', 'home-fresh__title', item.title),
