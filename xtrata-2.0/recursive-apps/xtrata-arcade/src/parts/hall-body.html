@@ -1,0 +1,54 @@
+<div id="stage"></div>
+
+<div id="cross" class="hud"></div>
+<div id="hint" class="hud" hidden>WASD walk · mouse look · E start · Q alt mode · T scores · Esc frees mouse</div>
+<div id="lockhint" class="hud" hidden>Click to look around, or drag</div>
+<div id="prompt" class="hud" hidden><span class="key">E</span><span class="t"><b>START</b> <span id="ptitle"></span></span><span class="alt" id="palt" hidden><span class="key">Q</span><b id="pvar"></b></span></div>
+<div id="pprompt" class="hud" hidden><span class="key">E</span><span class="t"><b>PLAY ON-CHAIN</b> <span id="pptitle"></span></span></div>
+<button id="tapstart" class="hud" hidden aria-label="Start game">START</button>
+<button id="tapalt" class="hud" hidden aria-label="Start alternate mode"></button>
+<div id="hallbar" class="hud" hidden>
+  <button id="hscores" type="button" title="High scores (T)">🏆<span class="wide"> SCORES</span></button>
+  <button id="hwallet" type="button"><span class="dot"></span><span class="lbl">WALLET</span></button>
+  <button id="hmute" type="button" aria-label="Toggle sound (M)">🔊</button>
+  <button id="hroom" type="button" aria-label="Toggle room music (R)">♫</button>
+  <button id="hfs" type="button" class="wide" aria-label="Fullscreen">⛶</button>
+</div>
+<div id="stick" class="hud" hidden><div id="knob"></div></div>
+
+<div id="intro">
+  <div class="card">
+    <div id="mark" aria-hidden="true"></div>
+    <h1>Xtrata Arcade</h1>
+    <p><span id="ncab">Twenty-one</span> cabinets, one game engine. Walk up to a machine, press START, and the game takes over the whole screen. Beat the chain and your score lives on-chain.</p>
+    <dl class="keys only-desk">
+      <dt>WASD</dt><dd>walk the hall</dd>
+      <dt>MOUSE</dt><dd>look around</dd>
+      <dt>E / CLICK</dt><dd>press START on the machine you face</dd>
+      <dt>Q</dt><dd>play the alternate mode (sprints, races)</dd>
+      <dt>T / M</dt><dd>high scores / sound</dd>
+      <dt>◀ BACK</dt><dd>leave the game, back to the hall</dd>
+    </dl>
+    <dl class="keys only-touch">
+      <dt>LEFT</dt><dd>thumb walks</dd>
+      <dt>RIGHT</dt><dd>thumb looks</dd>
+      <dt>START</dt><dd>button plays the machine you face</dd>
+    </dl>
+    <button class="go" id="go">Walk in</button>
+    <div class="note">High scores post to one leaderboard contract on Stacks. Connect a wallet from the top-right to sign yours. A fresh batch of posters goes up every Bitcoin day (144 blocks).</div>
+    <div id="err" hidden>The 3D engine didn't load. Check your connection and reload.</div>
+  </div>
+</div>
+
+<div id="flash"></div>
+
+<div id="chainp" hidden role="dialog" aria-label="On-chain player">
+  <div class="cp-box">
+    <div class="cp-bar"><b id="cpt"></b><span id="cpn"></span>
+      <a id="cpo" target="_blank" rel="noopener">OPEN ON XTRATA &#8599;</a><button id="cpx" type="button">&#10005; CLOSE</button></div>
+    <div id="cptracks" hidden></div>
+    <iframe id="cpf" title="On-chain inscription" allow="autoplay; fullscreen; gamepad; clipboard-write" referrerpolicy="no-referrer"
+      sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock allow-modals"></iframe>
+  </div>
+</div>
+<div id="xa-root"></div>
