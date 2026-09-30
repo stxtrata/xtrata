@@ -2,7 +2,7 @@
   "schema": "xtrata-standalone-inscription-manifest@1",
   "appId": "xtrata_arcade_room",
   "release": "v3.1-cave-makeover",
-  "createdAt": "2026-09-29",
+  "createdAt": "2026-09-30",
   "contentContract": {
     "address": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "name": "xtrata-v3-2-3",
@@ -68,8 +68,8 @@
       "key": "scores",
       "path": "modules/score-client.js",
       "mimeType": "text/javascript",
-      "sizeBytes": 26664,
-      "sha256": "c56e751d1e3624201f7fa8e355e5c0d09a1610a1422aac5cdafb15e3aab9da36",
+      "sizeBytes": 27134,
+      "sha256": "4aad14d54cd3337a6299d16edabd13e870d786bc89892ba2f9761551195160e0",
       "mintOrder": 4,
       "mintedInscriptionId": 0
     },

@@ -50,6 +50,8 @@ eq(C.decodeCV(T.cvToHex(T.contractPrincipalCV(addrs[0], 'xtrata-arcade-scores-v1
 for (const [a, amt] of [[addrs[0], 30000], [addrs[2], 1000000]]) {
   const ref = T.makeStandardSTXPostCondition(a, T.FungibleConditionCode.LessEqual, amt);
   const refHex = Buffer.from(T.serializePostCondition(ref)).toString('hex');
-  eq(C.stxPostConditionHex(a, amt), '0x' + refHex, 'post-condition ' + a);
+  eq(C.stxPostConditionHex(a, amt), refHex, 'post-condition ' + a);
+  // Leather parses post-condition strings with a strict hex decoder that rejects "0x".
+  eq(/^[0-9a-f]+$/.test(C.stxPostConditionHex(a, amt)) && C.stxPostConditionHex(a, amt).length % 2 === 0, true, 'post-condition is bare even-length hex for Leather ' + a);
 }
 console.log('codec tests passed:', n);
