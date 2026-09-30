@@ -5,16 +5,26 @@ export type CollectionV15FeeUnits = {
   batch: bigint;
   seal: bigint;
 };
-/** Helpers on core v3.2.3's staged fee model with registered inventory (v1.5–v1.7). */
+/**
+ * Helpers on core v3.2.3's staged fee model with registered inventory
+ * (v1.5–v1.7, v1.9; v1.8 was never deployed).
+ */
 export const isCollectionV15 = (version: string) =>
-  /^xtrata-collection-mint-v1[.-][5-7]$/.test(version.trim());
+  /^xtrata-collection-mint-v1[.-](?:[5-7]|9)$/.test(version.trim());
 
 /**
  * v1.7+: `mint-price` is the fixed all-in amount a collector pays for any file.
  * The helper deducts that file's protocol fees and pays out the rest.
  */
 export const isFixedPriceCollection = (version: string) =>
-  /^xtrata-collection-mint-v1[.-]7$/.test(version.trim());
+  /^xtrata-collection-mint-v1[.-][79]$/.test(version.trim());
+
+/**
+ * v1.9+: two-tier payout splits. Xtrata's platform tier (marketplace, operator,
+ * auxiliary) is only editable by Xtrata; the owner splits the artist pool.
+ */
+export const isTwoTierSplitCollection = (version: string) =>
+  /^xtrata-collection-mint-v1[.-]9$/.test(version.trim());
 
 export const readCollectionV15FeeUnits = async (
   read: (functionName: string) => Promise<bigint | null>

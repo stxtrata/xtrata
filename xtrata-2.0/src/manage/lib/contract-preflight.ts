@@ -1,17 +1,17 @@
 /**
- * Read-only preflights for collection mint helper (v1.5–v1.7) admin calls.
+ * Read-only preflights for collection mint helper (v1.5–v1.7, v1.9) admin calls.
  * Rule: never open the wallet for a transaction the contract will reject.
  * Role table generated from the helper source (assert-owner / assert-config-admin /
  * assert-finance-admin / assert-main-xtrata-admin / recipient-editor checks).
  */
-export type SignerRole = 'owner' | 'config' | 'finance' | 'recipient-editor' | 'core-admin' | 'pending-owner' | 'any';
+export type SignerRole = 'owner' | 'config' | 'finance' | 'recipient-editor' | 'core-admin' | 'platform' | 'pending-owner' | 'any';
 
 const OWNER = new Set([
   'set-operator-admin', 'set-finance-admin', 'initiate-contract-ownership-transfer',
   'cancel-contract-ownership-transfer', 'transfer-contract-ownership', 'set-max-supply',
   'set-artist-recipient', 'finalize'
 ]);
-const FINANCE = new Set(['set-mint-price', 'set-splits']);
+const FINANCE = new Set(['set-mint-price', 'set-splits', 'set-artist-splits']);
 const CONFIG = new Set([
   'set-collection-metadata', 'set-reservation-expiry-blocks', 'set-default-token-uri', 'set-default-dependencies',
   'set-registered-token-uri', 'clear-registered-token-uri', 'set-registered-token-uri-batch', 'set-phase',
@@ -25,7 +25,9 @@ export const requiredSignerRole = (functionName: string): SignerRole => {
   if (FINANCE.has(functionName)) return 'finance';
   if (CONFIG.has(functionName)) return 'config';
   if (functionName === 'set-marketplace-recipient' || functionName === 'set-operator-recipient') return 'recipient-editor';
-  if (functionName === 'set-recipient-editor-access') return 'core-admin';
+  if (functionName === 'set-recipient-editor-access' || functionName === 'set-platform-editor') return 'core-admin';
+  // v1.9 platform tier: the core admin or a platform editor it appointed (checked on-chain).
+  if (functionName === 'set-platform-split' || functionName === 'set-artist-slot-allowance') return 'platform';
   if (functionName === 'accept-contract-ownership') return 'pending-owner';
   // set-recipients: owner for the artist field; editor flags for the others (checked separately).
   if (functionName === 'set-recipients') return 'owner';
@@ -52,7 +54,7 @@ const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-4)
  */
 export function signerPreflight(functionName: string, wallet: string | null, roles: ContractRoles | null): string | null {
   const role = requiredSignerRole(functionName);
-  if (role === 'any' || role === 'recipient-editor' || role === 'core-admin') return null;
+  if (role === 'any' || role === 'recipient-editor' || role === 'core-admin' || role === 'platform') return null;
   if (!wallet) return 'Connect your wallet first.';
   if (!roles || !roles.owner) return 'Could not read who controls this contract. Refresh on-chain status before sending.';
   if (role === 'pending-owner') {

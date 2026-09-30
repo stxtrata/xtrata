@@ -93,7 +93,7 @@ const V323OwnerConsoleScreen = lazy(
   () => import('./screens/V323OwnerConsoleScreen')
 );
 // Newest-only: the admin template deploys the current helper (v1.7, core v3.2.3).
-import collectionMintTemplateSource from '../contracts/live/xtrata-collection-mint-v1.7.clar?raw';
+import collectionMintTemplateSource from '../contracts/live/xtrata-collection-mint-v1.9.clar?raw';
 import {
   buildCollectionMintContractSource,
   COLLECTION_TEMPLATE_FIELD_KEYS,

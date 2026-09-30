@@ -50,12 +50,25 @@ import {
 import {
   isCollectionV15,
   isFixedPriceCollection,
+  isTwoTierSplitCollection,
   quoteCollectionV15Mint,
   readCollectionV15FeeUnits,
   type CollectionV15FeeUnits
 } from '../../../packages/xtrata-sdk/src/collection-v15';
 import { resolveCollectionMintPricingMetadata } from '../../lib/collection-mint/pricing-metadata';
 import InfoTooltip from './InfoTooltip';
+import {
+  artistPayeesFromClarity,
+  artistSplitsFromClarity,
+  artistSplitsToClarity,
+  formatArtistSplits,
+  formatShare,
+  parseArtistSplits,
+  platformSplitsFromClarity,
+  type ArtistPayee,
+  type ArtistSplitsState,
+  type PlatformSplitsState
+} from '../lib/artist-splits';
 
 const ASCII_PATTERN = /^[\x00-\x7F]*$/;
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
@@ -98,6 +111,12 @@ type ContractSummary = {
   reservedCount?: bigint | null;
   splits?: { artist: bigint; marketplace: bigint; operator: bigint } | null;
   recipients?: { artist: string; marketplace: string; operator: string } | null;
+  /** v1.9 two-tier splits; each part null when its read failed. */
+  twoTier?: {
+    platform: PlatformSplitsState | null;
+    artist: ArtistSplitsState | null;
+    payees: ArtistPayee[] | null;
+  } | null;
   activePhase?: ActivePhaseState;
   /** True when the active phase could not be read (not the same as "no phase"). */
   activePhaseUnknown?: boolean;
@@ -131,7 +150,8 @@ type ActionField = {
     | 'hash32'
     | 'uintList'
     | 'allowlistBatch'
-    | 'registeredUriBatch';
+    | 'registeredUriBatch'
+    | 'artistSplits';
   allowZero?: boolean;
   allowEmpty?: boolean;
   maxLength?: number;
@@ -241,6 +261,56 @@ const MUTABLE_ACTIONS: MutableAction[] = [
         allowZero: true
       },
       { key: 'operator', label: 'Operator BPS', type: 'uint', allowZero: true }
+    ]
+  },
+  {
+    key: 'set-artist-splits',
+    label: 'Split the artist share (v1.9)',
+    group: 'Pricing and Payouts',
+    functionName: 'set-artist-splits',
+    description:
+      'Share the artist pool (everything after Xtrata\'s share) between up to the number of artist slots Xtrata allows. One line per recipient: a wallet address or #inscription-id (pays whoever holds it at each sale), then a percentage. Line 1 is the primary artist and must be a wallet. Percentages must add up to 100.',
+    fields: [
+      {
+        key: 'entries',
+        label: 'Artist payout lines',
+        type: 'artistSplits',
+        placeholder: 'SP… 50\nSP… 45\n#3060 5'
+      }
+    ]
+  },
+  {
+    key: 'set-platform-split',
+    label: 'Set Xtrata platform split (v1.9)',
+    group: 'Pricing and Payouts',
+    functionName: 'set-platform-split',
+    description:
+      'Xtrata only: set one platform slot (0 marketplace, 1 operator, 2 auxiliary). The three together must stay between 2.5% and 15%, and once minting has started a slot can only go down.',
+    fields: [
+      { key: 'slot', label: 'Slot (0 marketplace, 1 operator, 2 auxiliary)', type: 'uint', allowZero: true },
+      { key: 'recipient', label: 'Recipient address', type: 'principal' },
+      { key: 'bps', label: 'Share in basis points (100 = 1%)', type: 'uint', allowZero: true }
+    ]
+  },
+  {
+    key: 'set-artist-slot-allowance',
+    label: 'Set artist slots (v1.9)',
+    group: 'Ownership and Roles',
+    functionName: 'set-artist-slot-allowance',
+    description:
+      'Xtrata only: how many artist payout slots this collection may use (1–8). It cannot go below the slots already in use.',
+    fields: [{ key: 'allowance', label: 'Artist slots', type: 'uint' }]
+  },
+  {
+    key: 'set-platform-editor',
+    label: 'Appoint platform editor (v1.9)',
+    group: 'Ownership and Roles',
+    functionName: 'set-platform-editor',
+    description:
+      'Core Xtrata admin only: allow (or stop) another wallet to change this collection\'s platform split and artist slots.',
+    fields: [
+      { key: 'editor', label: 'Editor wallet', type: 'principal' },
+      { key: 'enabled', label: 'Can edit the platform tier', type: 'bool' }
     ]
   },
   {
@@ -692,7 +762,8 @@ const CONFIG_ADMIN_FUNCTIONS = new Set<string>([
 
 const FINANCE_ADMIN_FUNCTIONS = new Set<string>([
   'set-mint-price',
-  'set-splits'
+  'set-splits',
+  'set-artist-splits'
 ]);
 
 const RECIPIENT_EDITOR_FUNCTIONS = new Set<string>([
@@ -700,11 +771,33 @@ const RECIPIENT_EDITOR_FUNCTIONS = new Set<string>([
   'set-operator-recipient'
 ]);
 
-const CORE_ADMIN_FUNCTIONS = new Set<string>(['set-recipient-editor-access']);
+const CORE_ADMIN_FUNCTIONS = new Set<string>(['set-recipient-editor-access', 'set-platform-editor']);
+/** v1.9 platform tier: the core admin or a platform editor it appointed. */
+const PLATFORM_FUNCTIONS = new Set<string>(['set-platform-split', 'set-artist-slot-allowance']);
+/** Functions whose first argument is the pinned core contract (the studio fills it in). */
+const CORE_TRAIT_FUNCTIONS = new Set<string>([...CORE_ADMIN_FUNCTIONS, ...PLATFORM_FUNCTIONS]);
 const XTRATA_OWNER_ONLY_ACTION_KEYS = new Set<string>([
   'set-marketplace-recipient',
   'set-operator-recipient',
-  'set-recipient-editor-access'
+  'set-recipient-editor-access',
+  'set-platform-split',
+  'set-artist-slot-allowance',
+  'set-platform-editor'
+]);
+/** v1.3–v1.7 split and recipient controls; v1.9 replaced them with the two tiers. */
+const LEGACY_SPLIT_ACTION_KEYS = new Set<string>([
+  'set-recipients',
+  'set-artist-recipient',
+  'set-marketplace-recipient',
+  'set-operator-recipient',
+  'set-recipient-editor-access',
+  'set-splits'
+]);
+const TWO_TIER_ACTION_KEYS = new Set<string>([
+  'set-artist-splits',
+  'set-platform-split',
+  'set-artist-slot-allowance',
+  'set-platform-editor'
 ]);
 
 const getActionSignerHint = (action: MutableAction) => {
@@ -722,6 +815,9 @@ const getActionSignerHint = (action: MutableAction) => {
   }
   if (CORE_ADMIN_FUNCTIONS.has(action.functionName)) {
     return 'Signer must be the admin of the linked core Xtrata contract.';
+  }
+  if (PLATFORM_FUNCTIONS.has(action.functionName)) {
+    return 'Signer must be the core Xtrata admin or a platform editor it appointed for this collection.';
   }
   if (action.functionName === 'set-recipients') {
     return 'Artist updates require collection owner signer; marketplace/operator updates require recipient-editor permissions.';
@@ -785,6 +881,9 @@ const getActionFieldTooltip = (action: MutableAction, field: ActionField) => {
   }
   if (field.type === 'allowlistBatch') {
     return 'One line per entry: wallet-address allowance.';
+  }
+  if (field.type === 'artistSplits') {
+    return 'One line per recipient: a wallet address or #inscription-id, then a percentage of the artist share. Line 1 is you (a wallet). Must add up to 100.';
   }
   if (field.type === 'registeredUriBatch') {
     return 'One line per entry: inscription-hash token-uri.';
@@ -1125,12 +1224,17 @@ const getDefaultInputs = (params: {
   artistAddress: string;
   contractAddress: string;
   walletAddress: string;
+  /** v1.9: the artist split currently on-chain, as editable lines. */
+  artistSplitsText?: string;
 }) => {
   const defaults: Record<string, string> = {};
   params.action.fields.forEach((field) => {
     let nextValue = '';
     if (field.type === 'bool') {
       nextValue = 'false';
+    }
+    if (field.type === 'artistSplits') {
+      nextValue = params.artistSplitsText ?? '';
     }
     if (field.key === 'artist' && field.type === 'principal') {
       nextValue = params.artistAddress || params.walletAddress;
@@ -1194,6 +1298,40 @@ type CollectionSettingsPanelProps = {
   launchChecks?: Array<{ label: string; ok: boolean; hint?: string }>;
 };
 
+/** Live check of the artist split lines: errors, or each recipient's share of the pool and of each sale. */
+function ArtistSplitsPreview(props: {
+  text: string;
+  artist: ArtistSplitsState | null;
+  platform: PlatformSplitsState | null;
+}) {
+  if (!props.artist) {
+    return <span className="field__hint">Refresh on-chain status to check these lines against your artist slots.</span>;
+  }
+  const parsed = parseArtistSplits(props.text, { allowance: props.artist.allowance });
+  const poolBps = props.platform ? 10_000n - props.platform.totalBps : null;
+  return (
+    <span className="field__hint">
+      {props.artist.allowance} artist slot{props.artist.allowance === 1 ? '' : 's'} available
+      {props.artist.allowance < props.artist.maxSlots ? ' (ask Xtrata if you need more)' : ''}.
+      {parsed.errors.length > 0 ? (
+        <span className="collection-settings-panel__split-errors"> {parsed.errors.join(' ')}</span>
+      ) : (
+        <ul className="collection-settings-panel__split-preview">
+          {parsed.entries.map((entry, index) => (
+            <li key={`${index}-${entry.recipient}-${String(entry.holderOf)}`}>
+              {index === 0 ? 'Primary artist ' : ''}
+              {entry.holderOf !== null ? `whoever holds #${entry.holderOf.toString()}` : entry.recipient}
+              {': '}
+              {formatShare(entry.shareBps)} of the artist share
+              {poolBps !== null ? ` (${formatShare((entry.shareBps * poolBps) / 10_000n)} of each sale's payout)` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
+  );
+}
+
 export default function CollectionSettingsPanel(props: CollectionSettingsPanelProps) {
   const mode = props.mode ?? 'advanced';
   const guidedMode = mode === 'guided' || mode === 'launch';
@@ -1226,6 +1364,8 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
   }, [props.requestedAction]);
   const [actionInputs, setActionInputs] = useState<Record<string, string>>({});
+  /** Guided v1.9 artist split editor; null = show what is on-chain. */
+  const [guidedArtistSplitsText, setGuidedArtistSplitsText] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState(false);
   const [absorbSealFees, setAbsorbSealFees] = useState(false);
@@ -1236,7 +1376,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   const [guidedFreeMintEnabled, setGuidedFreeMintEnabled] = useState(false);
   const [quickActionMessage, setQuickActionMessage] = useState<string | null>(null);
   const [quickActionPending, setQuickActionPending] = useState<
-    'set-mint-price' | 'set-max-supply' | 'set-splits' | 'pause' | 'unpause' | null
+    'set-mint-price' | 'set-max-supply' | 'set-splits' | 'set-artist-splits' | 'pause' | 'unpause' | null
   >(null);
 
   const { walletSession, walletAdapter, connect } = useManageWallet();
@@ -1264,6 +1404,8 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   const usesV15Fees = isCollectionV15(templateVersion);
   /** v1.7: the on-chain price IS the collector price; fees come out of it. */
   const fixedPrice = isFixedPriceCollection(templateVersion);
+  /** v1.9: Xtrata-only platform tier + owner-split artist pool. */
+  const twoTierSplits = !preInscribedMint && isTwoTierSplitCollection(templateVersion);
   const collectionMintPaymentModel = useMemo(
     () => resolveCollectionMintPaymentModel(templateVersion),
     [templateVersion]
@@ -1353,12 +1495,19 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   }, [metadataCollection]);
   const availableActions = useMemo(
     () =>
-      canManageLockedRecipients
-        ? MUTABLE_ACTIONS
-        : MUTABLE_ACTIONS.filter(
-            (action) => !XTRATA_OWNER_ONLY_ACTION_KEYS.has(action.key)
-          ),
-    [canManageLockedRecipients]
+      MUTABLE_ACTIONS.filter(
+        (action) =>
+          (canManageLockedRecipients || !XTRATA_OWNER_ONLY_ACTION_KEYS.has(action.key)) &&
+          (twoTierSplits
+            ? !LEGACY_SPLIT_ACTION_KEYS.has(action.key)
+            : !TWO_TIER_ACTION_KEYS.has(action.key))
+      ),
+    [canManageLockedRecipients, twoTierSplits]
+  );
+
+  const artistSplitsText = useMemo(
+    () => (summary?.twoTier?.artist ? formatArtistSplits(summary.twoTier.artist.entries) : ''),
+    [summary?.twoTier?.artist]
   );
 
   const selectedAction = useMemo(
@@ -1404,10 +1553,12 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         parentIds: collectionParentIds,
         artistAddress,
         contractAddress,
-        walletAddress: walletSession.address ?? ''
+        walletAddress: walletSession.address ?? '',
+        artistSplitsText
       })
     );
   }, [
+    artistSplitsText,
     selectedAction,
     collectionNameFromMetadata,
     displayName,
@@ -1908,6 +2059,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       let reservedCount: bigint | null = null;
       let splits: ContractSummary['splits'] = null;
       let recipients: ContractSummary['recipients'] = null;
+      let twoTier: ContractSummary['twoTier'] = null;
       let activePhase: ActivePhaseState = null;
       let activePhaseUnknown = false;
       let currentBlock: bigint | null = null;
@@ -1920,6 +2072,18 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
           safe(() => callContractReadOnly('get-active-phase', [], summaryTarget)),
           safe(() => callContractReadOnly('get-recipients', [], summaryTarget))
         ]);
+        if (twoTierSplits) {
+          const [platformCv, artistCv, payeesCv] = await Promise.all([
+            safe(() => callContractReadOnly('get-platform-splits', [], summaryTarget)),
+            safe(() => callContractReadOnly('get-artist-splits', [], summaryTarget)),
+            safe(() => callContractReadOnly('get-artist-payees', [], summaryTarget))
+          ]);
+          twoTier = {
+            platform: platformCv ? platformSplitsFromClarity(platformCv) : null,
+            artist: artistCv ? artistSplitsFromClarity(artistCv) : null,
+            payees: payeesCv ? artistPayeesFromClarity(payeesCv) : null
+          };
+        }
         const recipientsValue = recipientsCv ? toRecord(toPrimitive(recipientsCv)) : null;
         if (recipientsValue) {
           const pick = (v: unknown) => toText(leaf(v)) || null;
@@ -1980,6 +2144,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         reservedCount,
         splits,
         recipients,
+        twoTier,
         activePhase,
         activePhaseUnknown,
         currentBlock
@@ -2256,6 +2421,23 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         continue;
       }
 
+      if (field.type === 'artistSplits') {
+        const allowance = summary?.twoTier?.artist?.allowance ?? null;
+        if (allowance === null) {
+          return {
+            args: [],
+            notices: [],
+            error: 'Could not read how many artist slots this collection has. Refresh on-chain status first.'
+          };
+        }
+        const parsed = parseArtistSplits(rawValue, { allowance });
+        if (parsed.errors.length > 0) {
+          return { args: [], notices: [], error: parsed.errors.join(' ') };
+        }
+        args.push(artistSplitsToClarity(parsed.entries));
+        continue;
+      }
+
       if (field.type === 'allowlistBatch') {
         // Same duplicate/conflict rules as the CSV import.
         const imported = importAllowlist(rawValue);
@@ -2307,7 +2489,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
       notices.push(...fixedRecipients.notices);
     }
 
-    if (action.functionName === 'set-recipient-editor-access') {
+    if (CORE_TRAIT_FUNCTIONS.has(action.functionName)) {
       const coreArgs = resolveCoreContractArgs(coreContractIdForArgs);
       if (coreArgs.error) {
         return coreArgs;
@@ -2330,7 +2512,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
     let coreContractIdOverride: string | null = null;
     if (
-      CORE_ADMIN_FUNCTIONS.has(selectedAction.functionName) ||
+      CORE_TRAIT_FUNCTIONS.has(selectedAction.functionName) ||
       selectedAction.functionName === 'set-recipients'
     ) {
       if (!parseContractPrincipal(summary?.coreContractId ?? '')) {
@@ -2389,7 +2571,7 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
   };
 
   const runQuickAction = async (params: {
-    pendingKey: 'set-mint-price' | 'set-max-supply' | 'set-splits' | 'pause' | 'unpause';
+    pendingKey: 'set-mint-price' | 'set-max-supply' | 'set-splits' | 'set-artist-splits' | 'pause' | 'unpause';
     functionName: string;
     functionArgs: ClarityValue[];
     successLabel: string;
@@ -2694,6 +2876,38 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
     }
   };
 
+  // v1.9: the owner shares the artist pool; Xtrata's platform tier is untouched.
+  const runQuickSetArtistSplits = async () => {
+    const fresh = await loadContractSummary();
+    const artist = fresh?.twoTier?.artist ?? null;
+    if (!artist) {
+      setQuickActionMessage('Could not read your artist slots on-chain. Nothing was sent — try again in a moment.');
+      return;
+    }
+    const text = guidedArtistSplitsText ?? formatArtistSplits(artist.entries);
+    const parsed = parseArtistSplits(text, { allowance: artist.allowance });
+    if (parsed.errors.length > 0) {
+      setQuickActionMessage(`${parsed.errors.join(' ')} Nothing was sent.`);
+      return;
+    }
+    if (formatArtistSplits(parsed.entries) === formatArtistSplits(artist.entries)) {
+      setQuickActionMessage('That artist split is already on-chain. Nothing was sent.');
+      return;
+    }
+    const result = await runQuickAction({
+      pendingKey: 'set-artist-splits',
+      functionName: 'set-artist-splits',
+      functionArgs: [artistSplitsToClarity(parsed.entries)],
+      successLabel: 'Set artist split',
+      awaitOnChainConfirmation: true
+    });
+    if (result?.status === 'confirmed') {
+      setGuidedArtistSplitsText(null);
+      await loadContractSummary();
+      setQuickActionMessage('Artist split confirmed on-chain.');
+    }
+  };
+
   const runQuickPause = async () => {
     await runQuickAction({
       pendingKey: 'pause',
@@ -2893,7 +3107,14 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
         ...(!preInscribedMint && summary?.activePhaseUnknown
           ? [{ label: 'Mint phase checked', ok: false, hint: 'could not read the active phase — refresh on-chain status' }]
           : []),
-        ...(!preInscribedMint ? [payoutSplitCheck(summary?.splits ?? null, summary?.mintPriceMicroStx ?? null, summaryLoading)] : [])
+        ...(!preInscribedMint
+          ? [twoTierSplits
+              // v1.9 always pays a valid split (the contract enforces it); only a failed read blocks.
+              ? summary?.twoTier?.platform && summary.twoTier.artist
+                ? { label: 'Payout split set', ok: true }
+                : { label: 'Payout split set', ok: false, hint: summaryLoading ? 'checking…' : 'could not read the payout split — refresh on-chain status' }
+              : payoutSplitCheck(summary?.splits ?? null, summary?.mintPriceMicroStx ?? null, summaryLoading)]
+          : [])
       ];
       // 0/0/0 is now a blocking check above; the note only covers partial splits.
       const launchSplits = summary?.splits ?? null;
@@ -3202,7 +3423,61 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
               3. Payout split
               <InfoTooltip text="How each mint's payout (the price minus the inscription cost) is shared. The standard split is 95% to you and 5% to Xtrata (2.5% marketplace + 2.5% operator)." />
             </h3>
-            {(() => {
+            {twoTierSplits ? (() => {
+              const tiers = summary?.twoTier ?? null;
+              const platform = tiers?.platform ?? null;
+              const artist = tiers?.artist ?? null;
+              if (!platform || !artist) {
+                return <p className="meta-value">{summaryLoading ? 'Checking the payout split…' : 'Could not read the payout split right now. Refresh on-chain status.'}</p>;
+              }
+              const poolBps = 10_000n - platform.totalBps;
+              const payees = tiers?.payees ?? null;
+              const editorText = guidedArtistSplitsText ?? formatArtistSplits(artist.entries);
+              return (
+                <>
+                  <p className="meta-value">
+                    ✓ Xtrata's share: <strong>{formatBps(platform.totalBps)}</strong> ({formatBps(platform.marketplace.bps)} marketplace + {formatBps(platform.operator.bps)} operator{platform.auxiliary.bps > 0n ? ` + ${formatBps(platform.auxiliary.bps)} auxiliary` : ''}).
+                    It is set in your contract and only Xtrata can change it: never above {formatBps(platform.maxBps)}, and once minting starts it can only go down.
+                  </p>
+                  <p className="meta-value">
+                    Your artist share: <strong>{formatBps(poolBps)}</strong> of each payout.
+                  </p>
+                  <ul className="meta-value collection-settings-panel__split-preview">
+                    {(payees ?? artist.entries.map((entry) => ({ payee: entry.recipient, shareBps: entry.shareBps, holderOf: entry.holderOf }))).map((payee, index) => (
+                      <li key={`${index}-${payee.payee}`}>
+                        {payee.holderOf !== null
+                          ? <>Holder of #{payee.holderOf.toString()} (now {payee.payee})</>
+                          : payee.payee}
+                        {': '}{formatShare(payee.shareBps)} of the artist share
+                      </li>
+                    ))}
+                  </ul>
+                  <details className="collection-settings-panel__split-editor">
+                    <summary>Share it with co-artists or a song holder</summary>
+                    <p className="meta-value">
+                      One line per recipient: a wallet address, or <code>#</code> plus an Xtrata inscription id to pay whoever holds that
+                      inscription at the moment of each sale. Then a percentage of your artist share. Line 1 is you. The percentages must add up to 100.
+                      You have {artist.allowance} slot{artist.allowance === 1 ? '' : 's'}{artist.allowance < artist.maxSlots ? ' — ask Xtrata if you need more' : ''}.
+                    </p>
+                    <label className="field field--full">
+                      <span className="field__label">Artist payout lines</span>
+                      <textarea
+                        className="textarea collection-settings-panel__textarea"
+                        rows={Math.max(3, artist.allowance)}
+                        value={editorText}
+                        onChange={(event) => setGuidedArtistSplitsText(event.target.value)}
+                      />
+                    </label>
+                    <ArtistSplitsPreview text={editorText} artist={artist} platform={platform} />
+                    <div className="mint-actions">
+                      <button className="button" type="button" onClick={() => void runQuickSetArtistSplits()} disabled={!contractReady || quickActionsBusy}>
+                        {quickActionPending === 'set-artist-splits' ? 'Waiting for confirmation…' : 'Save artist split'}
+                      </button>
+                    </div>
+                  </details>
+                </>
+              );
+            })() : (() => {
               const splits = summary?.splits ?? null;
               if (!splits) {
                 return <p className="meta-value">{summaryLoading ? 'Checking the payout split…' : 'Could not read the payout split right now. Refresh on-chain status.'}</p>;
@@ -3473,7 +3748,54 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
               {formatMicroStx(summary?.coreFeeUnitMicroStx ?? null)}
             </span>
           </div>
-          {!preInscribedMint ? (
+          {twoTierSplits ? (
+            <>
+              <div className="collection-settings-panel__summary-item">
+                <span className="meta-label info-label">
+                  Xtrata share
+                  <InfoTooltip text="Platform tier, set in the contract. Only Xtrata (or a platform editor it appoints) can change it: always between 2.5% and 15% in total, and only downwards once minting has started." />
+                </span>
+                <span className="meta-value">
+                  {summary?.twoTier?.platform
+                    ? `${formatBps(summary.twoTier.platform.totalBps)} (${formatBps(summary.twoTier.platform.marketplace.bps)} / ${formatBps(summary.twoTier.platform.operator.bps)} / ${formatBps(summary.twoTier.platform.auxiliary.bps)})`
+                    : 'Unknown'}
+                </span>
+              </div>
+              {([['marketplace', 'Marketplace recipient'], ['operator', 'Operator recipient'], ['auxiliary', 'Auxiliary recipient']] as const).map(([key, label]) => (
+                <div className="collection-settings-panel__summary-item" key={key}>
+                  <span className="meta-label info-label">
+                    {label}
+                    <InfoTooltip text={`Receives the ${key} part of Xtrata's share${summary?.twoTier?.platform ? ` (${formatBps(summary.twoTier.platform[key].bps)} of each payout)` : ''}.`} />
+                  </span>
+                  <span className="meta-value" title={summary?.twoTier?.platform?.[key].recipient ?? undefined}>
+                    {summary?.twoTier?.platform?.[key].recipient ?? 'Unknown'}
+                  </span>
+                </div>
+              ))}
+              <div className="collection-settings-panel__summary-item">
+                <span className="meta-label info-label">
+                  Artist share
+                  <InfoTooltip text="Everything after Xtrata's share, split by the collection owner across the artist slots Xtrata allows." />
+                </span>
+                <span className="meta-value">
+                  {summary?.twoTier?.platform && summary.twoTier.artist
+                    ? `${formatBps(10_000n - summary.twoTier.platform.totalBps)} across ${summary.twoTier.artist.entries.length} of ${summary.twoTier.artist.allowance} slot${summary.twoTier.artist.allowance === 1 ? '' : 's'}`
+                    : 'Unknown'}
+                </span>
+              </div>
+              <div className="collection-settings-panel__summary-item">
+                <span className="meta-label info-label">
+                  Artist payees now
+                  <InfoTooltip text="Who each artist slot would pay if a sale happened now. Holder slots follow the inscription to its current holder; if a contract holds it (e.g. a market listing), that part goes to the primary artist." />
+                </span>
+                <span className="meta-value">
+                  {summary?.twoTier?.payees
+                    ? summary.twoTier.payees.map((payee) => `${payee.holderOf !== null ? `#${payee.holderOf.toString()} → ` : ''}${payee.payee} ${formatShare(payee.shareBps)}`).join(' · ')
+                    : 'Unknown'}
+                </span>
+              </div>
+            </>
+          ) : !preInscribedMint ? (
             <>
               <div className="collection-settings-panel__summary-item">
                 <span className="meta-label info-label">
@@ -3569,7 +3891,8 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
             const isTextArea =
               field.type === 'uintList' ||
               field.type === 'allowlistBatch' ||
-              field.type === 'registeredUriBatch';
+              field.type === 'registeredUriBatch' ||
+              field.type === 'artistSplits';
             return (
               <label className="field field--full" key={field.key}>
                 <span className="field__label info-label">
@@ -3620,6 +3943,13 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                         [field.key]: event.target.value
                       }))
                     }
+                  />
+                )}
+                {field.type === 'artistSplits' && (
+                  <ArtistSplitsPreview
+                    text={value}
+                    artist={summary?.twoTier?.artist ?? null}
+                    platform={summary?.twoTier?.platform ?? null}
                   />
                 )}
                 {field.type === 'allowlistBatch' && <>
@@ -3724,7 +4054,8 @@ export default function CollectionSettingsPanel(props: CollectionSettingsPanelPr
                     parentIds: collectionParentIds,
                     artistAddress,
                     contractAddress,
-                    walletAddress: walletSession.address ?? ''
+                    walletAddress: walletSession.address ?? '',
+                    artistSplitsText
                   })
                 );
                 setActionMessage(null);

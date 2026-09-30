@@ -85,6 +85,10 @@ const isCoreEntry = (entry: ArtistDeployRegistryEntry) =>
 const escapeClarityAscii = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
+/** v1.9+ templates: platform tier (Xtrata-only) + artist tier (owner). */
+export const hasTwoTierSplits = (source: string) =>
+  source.includes('(define-public (set-artist-splits');
+
 const replaceLine = (params: {
   source: string;
   marker: string;
@@ -306,10 +310,13 @@ export const buildArtistDeployContractSource = (params: {
     if (!params.coreContractId.endsWith('.xtrata-v3-2-3')) {
       errors.push('Collection v1.5 requires core v3.2.3.');
     }
-    for (const [role, paidBps] of [['artist', 9500], ['marketplace', 250], ['operator', 250]] as const) {
-      source = replaceLine({ source, marker: `${role}-bps`,
-        pattern: new RegExp(`^\\(define-data-var ${role}-bps uint u\\d+\\)$`, 'm'),
-        replacement: `(define-data-var ${role}-bps uint u${resolved.mintPriceMicroStx === 0n ? 0 : paidBps})`, errors });
+    // v1.9+ has no creator splits to fill in: Xtrata's platform tier is in the contract.
+    if (!hasTwoTierSplits(templateSource)) {
+      for (const [role, paidBps] of [['artist', 9500], ['marketplace', 250], ['operator', 250]] as const) {
+        source = replaceLine({ source, marker: `${role}-bps`,
+          pattern: new RegExp(`^\\(define-data-var ${role}-bps uint u\\d+\\)$`, 'm'),
+          replacement: `(define-data-var ${role}-bps uint u${resolved.mintPriceMicroStx === 0n ? 0 : paidBps})`, errors });
+      }
     }
     // The duplicate guard is a static Clarity call and must follow the pin.
     source = replaceLine({
@@ -385,29 +392,40 @@ export const buildArtistDeployContractSource = (params: {
     errors
   });
 
-  source = replaceLine({
-    source,
-    marker: 'artist-recipient',
-    pattern: /^\(define-data-var artist-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var artist-recipient principal '${resolved.artistAddress})`,
-    errors
-  });
+  if (hasTwoTierSplits(source)) {
+    // v1.9+: the deploy only names the primary artist of the artist tier.
+    source = replaceLine({
+      source,
+      marker: 'initial-artist-split',
+      pattern: /^(\s*)\(list \{ recipient: tx-sender, holder-of: none, share: BASIS-POINTS \}\)$/m,
+      replacement: `$1(list { recipient: '${resolved.artistAddress}, holder-of: none, share: BASIS-POINTS })`,
+      errors
+    });
+  } else {
+    source = replaceLine({
+      source,
+      marker: 'artist-recipient',
+      pattern: /^\(define-data-var artist-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var artist-recipient principal '${resolved.artistAddress})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'marketplace-recipient',
-    pattern: /^\(define-data-var marketplace-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var marketplace-recipient principal '${resolved.marketplaceAddress})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'marketplace-recipient',
+      pattern: /^\(define-data-var marketplace-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var marketplace-recipient principal '${resolved.marketplaceAddress})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'operator-recipient',
-    pattern: /^\(define-data-var operator-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var operator-recipient principal '${resolved.operatorAddress})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'operator-recipient',
+      pattern: /^\(define-data-var operator-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var operator-recipient principal '${resolved.operatorAddress})`,
+      errors
+    });
+  }
 
   const dependenciesLiteral =
     resolved.defaultDependencyIds.length > 0
