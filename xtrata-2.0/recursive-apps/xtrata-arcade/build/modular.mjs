@@ -88,7 +88,12 @@ function build() {
   const lib = readFileSync(join(here, 'hall-parts.cjs'), 'utf8');
   const shell = R.parentShell(tpl, lib);          // the parent with its CONFIG slot still open
   writeFileSync(join(DIST, 'xtrata-arcade-parent.shell.html'), shell);
-  const config = R.parentConfig(ids, P.PACK_ORDER);
+  // Hashes for every inscription the parent loads, so it can take them from the gateway.
+  const hashes = {};
+  if (Number(ids.bundleId) > 0 && existsSync(V13)) hashes[ids.bundleId] = sha(readFileSync(V13));
+  for (const name of P.PACK_ORDER) if (Number(ids.packs?.[name]) > 0) hashes[ids.packs[name]] = manifest.packs[name].sha256;
+  for (const [name, id] of Object.entries(ids.parts || {})) if (Number(id) > 0) hashes[id] = sha(parts[name]);
+  const config = R.parentConfig({ ...ids, hashes }, P.PACK_ORDER);
   const parent = R.fillParent(shell, config);
   writeFileSync(join(DIST, 'xtrata-arcade-parent.html'), parent);
   manifest.parent = { file: 'xtrata-arcade-parent.html', bytes: Buffer.byteLength(parent), sha256: sha(parent), config,

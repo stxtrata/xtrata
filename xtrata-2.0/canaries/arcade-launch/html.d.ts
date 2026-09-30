@@ -16,6 +16,7 @@ declare module "xa:release" {
     partSha: Record<string, string>;
     single: string;
     singleSha: string;
+    equivalentParents: number[];
   };
   export default release;
 }

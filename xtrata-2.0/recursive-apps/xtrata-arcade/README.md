@@ -35,6 +35,12 @@ The parent (~19 KB) takes each part from, in order:
 
 So packs that did not change never need inscribing: they come out of #3078.
 
+Each of those inscriptions is fetched whole from the xtrata.xyz gateway (`/i/<id>?raw=1`,
+served from R2) and used only if its SHA-256 matches `CONFIG.hashes`, which the build writes
+for every id the parent loads. If the gateway is unreachable or a copy does not match, that
+inscription is read chunk by chunk from the chain instead. So the gateway makes loading fast
+(3 requests instead of about 270 chunk reads), but it can never change what runs.
+
 ## Releasing
 
 The launch canary does all of this on chain, in order and checked: see

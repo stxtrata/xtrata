@@ -130,8 +130,12 @@ const PACKS: Upload[] = RELEASE.inscribe.map((name) => makeUpload(name, `${name}
 const PART_NAMES = Object.keys(RELEASE.partSha);
 
 /** The parent's CONFIG for the pack ids this run has inscribed (or adopted). Same renderer as `modular.mjs build`. */
-const parentConfig = (packIds: Record<string, string>) =>
-  ParentRender.parentConfig({ ...RELEASE.ids, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, Number(packIds[n] || 0)])) }, RELEASE.packOrder);
+const parentConfig = (packIds: Record<string, string>) => {
+  // The parent takes an inscription from the gateway (R2) only when its bytes hash to these values.
+  const hashes: Record<string, string> = { [String(RELEASE.bundle.id)]: RELEASE.bundle.sha256 };
+  for (const n of RELEASE.inscribe) if (packIds[n]) hashes[String(packIds[n])] = RELEASE.packSha[n];
+  return ParentRender.parentConfig({ ...RELEASE.ids, packs: Object.fromEntries(RELEASE.inscribe.map((n) => [n, Number(packIds[n] || 0)])), hashes }, RELEASE.packOrder);
+};
 let parentCache: { key: string; upload: Upload } | null = null;
 const parentUpload = (): Upload => {
   const ids = state.packIds || {};
@@ -182,6 +186,8 @@ type State = {
   packIds?: Record<string, string>;
   /** the parent: the arcade's engine id on every board */
   inscriptionId?: string;
+  /** earlier parents proven to load the same parts (boards on them are left alone) */
+  equivalent?: string[];
   run?: { replay: string; score: number; game: string };
   steps: Record<string, StepState>;
   log: { t: string; level: string; msg: string; txid?: string }[];
@@ -326,8 +332,10 @@ const readBoard = async (id: string) => {
   const f = (k: string) => asText(tupleField(cv, k));
   return { mode: f('mode'), maxScore: f('max-score'), fee: f('fee'), engineId: f('engine-id'), daily: f('daily'), enabled: f('enabled') };
 };
+/** Engines a production board may point at: this parent, or an earlier parent proven (in preflight) to load the same parts. */
+const engineOk = (engineId: string) => engineId === state.inscriptionId || (state.equivalent || []).includes(engineId);
 const boardMatches = (b: Awaited<ReturnType<typeof readBoard>>, want: Board) =>
-  !!b && b.mode === String(want.mode) && b.maxScore === String(want.max) && b.fee === '0' && b.engineId === state.inscriptionId && b.daily === 'false' && b.enabled === 'true';
+  !!b && b.mode === String(want.mode) && b.maxScore === String(want.max) && b.fee === '0' && engineOk(b.engineId) && b.daily === 'false' && b.enabled === 'true';
 const inscriptionMeta = async (id: string) => {
   const cv = await readCore('get-inscription-meta', [uintCV(BigInt(id))]);
   if (isNone(cv)) return null;
@@ -359,6 +367,28 @@ const findSealed = async (f: Upload) => {
   if (!id) return null;
   const meta = await inscriptionMeta(id);
   return meta && meta.sealed && meta.hash === toHex(f.hash) && meta.size === f.bytes.length ? { id, meta } : null;
+};
+/**
+ * An earlier parent counts as the same engine when, on chain, it is sealed by this wallet and its CONFIG loads
+ * exactly the same packs over the same bundle with no single-part overrides: then it assembles exactly the same parts.
+ */
+const provenEquivalents = async (owner: string, packIds: Record<string, string>) => {
+  const proven: string[] = [];
+  const notes: string[] = [];
+  for (const raw of RELEASE.equivalentParents || []) {
+    const id = String(raw);
+    try {
+      const meta = await inscriptionMeta(id);
+      if (!meta || !meta.sealed || meta.mime !== 'text/html' || meta.creator !== owner) { notes.push(`#${id} is not a parent sealed by this wallet`); continue; }
+      const text = new TextDecoder().decode(joinBytes(await readChunks(id, meta.chunks, `earlier parent`)));
+      const m = /var CONFIG = (\{[\s\S]*?\n    \});/.exec(text);
+      const cfg = m ? JSON.parse(m[1]) : null;
+      const same = !!cfg && Number(cfg.bundleId) === RELEASE.bundle.id && Object.keys(cfg.parts || {}).length === 0 &&
+        RELEASE.packOrder.every((n) => Number(cfg.packs?.[n] || 0) === (RELEASE.inscribe.includes(n) ? Number(packIds[n] || -1) : 0));
+      if (same) proven.push(id); else notes.push(`#${id} loads different packs`);
+    } catch (error) { notes.push(`#${id} could not be read (${error instanceof Error ? error.message : String(error)})`); }
+  }
+  return { proven, notes };
 };
 /** Every chunk of an inscription, read back from the core in batches. */
 const readChunks = async (id: string, total: number, label: string) => {
@@ -584,12 +614,21 @@ const STEPS: Step[] = [
         parentNote = `parent ~${kb(size)} (${stx(fee.begin + fee.seal)})`;
       }
       plan.push(parentNote);
+      let equivalentNote = '';
+      if (PACKS.every((f) => known[f.key]) && (RELEASE.equivalentParents || []).length) {
+        const eq = await provenEquivalents(w.address, known);
+        state.equivalent = eq.proven;
+        equivalentNote = eq.proven.length
+          ? ` · boards already on ${eq.proven.map((x) => '#' + x).join(', ')} (proven to load the same parts) are left as they are`
+          : '';
+        if (eq.notes.length) equivalentNote += ` · not treated as the same engine: ${eq.notes.join('; ')}`;
+      } else state.equivalent = [];
       save();
       if (!state.run) { state.run = await makeRun(w.address); save(); }
       const balance = await chain.balance(w.address);
       const funds = balance < need ? ` · WARNING balance ${stx(balance)} is below the ~${stx(need)} this run needs` : ` · balance ${stx(balance)} covers the ~${stx(need)} needed`;
       step('preflight').data = { deployed };
-      return `Xtrata Arcade ${VERSION} · release ${short(RELEASE_SHA)} · bundle #${BUNDLE_ID} verified on chain (${RELEASE.fromBundle.join(', ')} come from it) · ${parentList()} owned by this wallet · core open · to inscribe: ${plan.join(', ')} · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${boardsNow}${funds}`;
+      return `Xtrata Arcade ${VERSION} · release ${short(RELEASE_SHA)} · bundle #${BUNDLE_ID} verified on chain (${RELEASE.fromBundle.join(', ')} come from it) · ${parentList()} owned by this wallet · core open · to inscribe: ${plan.join(', ')} · real run flown: ${state.run.game} scored ${state.run.score} and verified · leaderboard ${deployed === 'ours' ? 'already deployed' : 'name is free'}${boardsNow}${equivalentNote}${funds}`;
     }
   },
   {
@@ -828,7 +867,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: `Web wallet · up to ${PRODUCTION.length} signatures`,
-    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. The contract keeps each board's Top 10 and stored replays when its engine id changes (existing entries keep the engine they were played on). Boards that already match are skipped, so a reload or a rejected signature resumes where it stopped.`,
+    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. The contract keeps each board's Top 10 and stored replays when its engine id changes (existing entries keep the engine they were played on). Boards that already match are skipped (including boards on an earlier parent that preflight proved loads the same parts), so a reload or a rejected signature resumes where it stopped.`,
     action: 'Update boards',
     run: async () => {
       const id = state.inscriptionId!;
@@ -842,7 +881,8 @@ const STEPS: Step[] = [
         await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
         sent++;
       }
-      return `${PRODUCTION.length} boards on engine inscription #${id}${sent < PRODUCTION.length ? ` (${PRODUCTION.length - sent} already were)` : ''}`;
+      const kept = (state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : '';
+      return `${PRODUCTION.length} boards on engine inscription #${id}${kept} · ${sent} updated, ${PRODUCTION.length - sent} already matched`;
     }
   },
   {
@@ -868,7 +908,7 @@ const STEPS: Step[] = [
         site = known ? 'the submit page already lists the arcade boards' : 'NOTE the xtrata.xyz submit page does not list the arcade boards yet, so scores cannot be posted from the site until it is updated (the arcade signs through the wallet itself)';
       } catch { /* keep default */ }
       const packIds = RELEASE.inscribe.map((n) => `"${n}": ${state.packIds![n]}`).join(', ');
-      return `all ${PRODUCTION.length} boards match · ${VERSION} parent #${id} and packs sealed · ${site} · Next: open https://xtrata.xyz/x/${id} and play one run; set packs {${packIds}} in recursive-apps/xtrata-arcade/parent/ids.json; point /arcade (public/_redirects) and the homepage arcade tile at #${id}; add #${id} to the arcade check in src/lib/viewer/public-wallet-bridge.ts.`;
+      return `all ${PRODUCTION.length} boards match · ${VERSION} parent #${id} and packs sealed · ${site} · Next: open https://xtrata.xyz/x/${id} and play one run; set packs {${packIds}} in recursive-apps/xtrata-arcade/parent/ids.json; point /arcade (public/_redirects) and the homepage arcade tile at #${id}; add #${id} to ARCADE_INSCRIPTION_IDS in src/arcade-submit/arcade-boards.ts.`;
     }
   }
 ];

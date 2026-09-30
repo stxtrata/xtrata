@@ -5,7 +5,7 @@
  *
  *   parentShell(template, lib)  the template with the parts library inlined;
  *                               the CONFIG slot is left open
- *   parentConfig(ids, packOrder) the CONFIG object for a set of ids
+ *   parentConfig(ids, packOrder) the CONFIG object for a set of ids (and their hashes)
  *   fillParent(shell, config)   the finished parent HTML
  */
 'use strict';
@@ -29,7 +29,10 @@ function parentConfig(ids, packOrder) {
     bundleId: Number(ids.bundleId || 0),
     packs: packs,
     parts: ids.parts || {},
-    parentTokenId: Number(ids.parentTokenId || 0)
+    parentTokenId: Number(ids.parentTokenId || 0),
+    // id -> sha256 of that inscription's bytes: the parent takes an inscription from the
+    // gateway (R2) only when it matches, and reads the chain otherwise.
+    hashes: ids.hashes || {}
   };
 }
 

@@ -38,10 +38,23 @@ function addInscription(id, buf, mime, creator) {
   S.core.meta.set(id, { creator, mime, size: buf.length, n: ch.length, hash: h });
   S.core.chunks.set(id, ch); S.core.byHash.set(h, id); S.core.owner.set(id, creator);
 }
+// Mainnet as of the v1.4 launch: #3078 the v1.3 bundle, #3079 / #3080 the engine and hall packs, #3081 the
+// v1.4 parent (chain-only loader), every board on #3081.
+const XA = path.join(ROOT, 'recursive-apps/xtrata-arcade');
+const HP = require(path.join(XA, 'build/hall-parts.cjs')), PR = require(path.join(XA, 'build/parent-render.cjs'));
+const PARTS = {};
+for (const f of fs.readdirSync(path.join(XA, 'src/parts'))) PARTS[f] = fs.readFileSync(path.join(XA, 'src/parts', f), 'utf8');
+const V14_PARENT = PR.fillParent(PR.parentShell(fs.readFileSync(path.join(XA, 'parent/parent.template.html'), 'utf8'), fs.readFileSync(path.join(XA, 'build/hall-parts.cjs'), 'utf8')),
+  { version: 'v1.4', bundleId: 3078, packs: { assets: 0, three: 0, engine: 3079, games: 0, hall: 3080 }, parts: {}, parentTokenId: 0 });
 addInscription(55, Buffer.from('<p>#55</p>'), 'text/html', DEPLOYER);
 addInscription(3078, BUNDLE, 'text/html', DEPLOYER);
-for (const b of BOARDS) S.sc.boards.set(b.id, { mode: BigInt(b.mode), max: BigInt(b.max), fee: 0n, eid: 3078n, daily: false, en: true });
-S.sc.boards.set('arcade-canary', { mode: 0n, max: 1000000000n, fee: 0n, eid: 3078n, daily: false, en: false });
+addInscription(3079, Buffer.from(HP.makePack('engine', PARTS)), 'text/plain', DEPLOYER);
+addInscription(3080, Buffer.from(HP.makePack('hall', PARTS)), 'text/plain', DEPLOYER);
+addInscription(3081, Buffer.from(V14_PARENT), 'text/html', DEPLOYER);
+for (const id of [3079, 3080, 3081]) S.core.parents.set(id, [55]);
+S.core.deps.set(3081, [3078, 3079, 3080]);
+for (const b of BOARDS) S.sc.boards.set(b.id, { mode: BigInt(b.mode), max: BigInt(b.max), fee: 0n, eid: 3081n, daily: false, en: true });
+S.sc.boards.set('arcade-canary', { mode: 0n, max: 1000000000n, fee: 0n, eid: 3081n, daily: false, en: false });
 
 let txn = 0;
 const newTx = (status, repr) => { const id = '0x' + sha('tx' + (++txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: ++S.blk }); return id; };
@@ -144,7 +157,7 @@ const inscriptionBytes = (id) => Buffer.concat(S.core.chunks.get(id) || []);
 async function route(r) {
   const u = new URL(r.request().url()), p = u.pathname;
   const json = (o, status = 200) => r.fulfill({ status, contentType: 'application/json', body: JSON.stringify(o) });
-  if (/xtrata\.xyz$/.test(u.hostname) && p.startsWith('/i/')) { const id = Number(p.slice(3)); return S.core.meta.has(id) ? r.fulfill({ contentType: 'text/html', body: inscriptionBytes(id) }) : r.fulfill({ status: 404, body: '' }); }
+  if (/xtrata\.xyz$/.test(u.hostname) && p.startsWith('/i/')) { const id = Number(p.slice(3)); S.gateway = (S.gateway || 0) + 1; return S.core.meta.has(id) ? r.fulfill({ contentType: 'text/html', headers: { 'Access-Control-Allow-Origin': '*' }, body: inscriptionBytes(id) }) : r.fulfill({ status: 404, body: '' }); }
   if (/xtrata\.xyz$/.test(u.hostname) && p === '/arcade/submit') return r.fulfill({ contentType: 'text/html', body: '<html><script src="/arcade/submit.js"></script></html>' });
   if (/xtrata\.xyz$/.test(u.hostname) && p === '/arcade/submit.js') return r.fulfill({ contentType: 'text/javascript', body: 'const B=["xa_neon_snake"]' });
   if (!/\/hiro\//.test(p) && !/api\.(mainnet\.)?hiro\.so/.test(u.hostname)) return r.abort();
@@ -233,12 +246,15 @@ async function route(r) {
     const berrs = [];
     boot.on('pageerror', (e) => berrs.push(e.message));
     let reads = 0; boot.on('request', (rq) => { if (/get-chunk/.test(rq.url())) reads++; });
+    const gatewayBefore = S.gateway || 0;
     await boot.goto(`https://xtrata.xyz/i/${pid}`);
     await boot.waitForFunction(() => window.XA && window.XA.games && window.XA.games.length === 21 && window.THREE && !document.getElementById('xa-load'), null, { timeout: 180000 });
     const info = await boot.evaluate(() => ({ build: window.XA_BUILD, parts: document.querySelectorAll('[data-xa-part]').length }));
-    console.log(`booted #${pid} from the chain: 21 games, ${info.parts} parts, ${reads} chunk reads, packs ${JSON.stringify(info.build.packs)}, errors ${JSON.stringify(berrs.slice(0, 3))}`);
-    console.log(`boards on #${pid}: ${BOARDS.length - bad.length}/${BOARDS.length}`);
-    if (bad.length || berrs.length || info.parts !== 33) results.failed = 'parent-boot';
+    const fromGateway = (S.gateway || 0) - gatewayBefore - 1; // minus the page itself
+    console.log(`booted #${pid}: 21 games, ${info.parts} parts, ${fromGateway} inscriptions from the gateway, ${reads} chunk reads, packs ${JSON.stringify(info.build.packs)}, errors ${JSON.stringify(berrs.slice(0, 3))}`);
+    const eq = BOARDS.filter((b) => S.sc.boards.get(b.id).eid === 3081n).length;
+    console.log(`boards: ${BOARDS.length - bad.length} on #${pid}, ${eq} left on the equivalent #3081 (${S.calls.filter((c) => /set-board$/.test(c)).length} set-board calls in all)`);
+    if (bad.length - eq !== 0 || berrs.length || info.parts !== 33 || fromGateway !== 3 || reads !== 0) results.failed = 'parent-boot';
   }
   // A re-run after "Forget local progress" must find the release on chain and send nothing.
   if (!results.failed && only === ids.length) {
