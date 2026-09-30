@@ -4,6 +4,10 @@
 
 // One rotating strip under the nav. Replaces the Collections banner and the
 // three campaign cards that used to sit above the hero.
+// The original Audionauts ordinal (inscription 95768432). Every Audionauts
+// "listen" link on the homepage opens it; its music streams from Bitcoin L1.
+export const AUDIONAUTS_ORDINAL_HREF = 'https://ordinals.com/inscription/95768432';
+
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
@@ -32,9 +36,8 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
     id: 'audionauts', tag: 'Soon', tone: 'teal',
     title: 'Audionauts mints Thursday, 7pm BST.',
-    line: 'A collection built from songs already on-chain. Play Audionauts on Bitcoin now.',
-    // Ordinal inscription 95768432 (playable now, ahead of the mint).
-    cta: 'Play now', href: 'https://ordinals.com/inscription/95768432', newTab: true
+    line: 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
+    cta: 'Listen on L1', href: AUDIONAUTS_ORDINAL_HREF, newTab: true
   }),
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',
@@ -83,11 +86,12 @@ export const HOMEPAGE_WALL = Object.freeze([
     title: 'The Judge Is in the House', subtitle: '3ai3'
   }),
   Object.freeze({
-    // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
-    id: 'audionauts-stream', kind: 'radio', size: 'wide', tone: 'teal',
+    // Opens the original Audionauts ordinal, which streams its music from Bitcoin L1.
+    id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
     eyebrow: 'Mints Thu 1 Oct · 7pm BST', title: 'Audionauts',
+    subtitle: 'Listen to the original music, streamed from L1 →',
     image: '/home/wall/audionauts-3059.webp',
-    href: '/radio'
+    href: AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
   }),
   Object.freeze({
     id: 'forever-twins', kind: 'image', tone: 'orange',
@@ -127,8 +131,8 @@ export const HOMEPAGE_AUDIONAUTS = Object.freeze({
   // Mint opens Thursday 1 October 2026 at 19:00 BST.
   mintLabel: 'Thu 7pm BST',
   editions: 111,
-  // #3059 is the (silent) Audionauts logo, so "listen" goes to the radio.
-  listenHref: '/radio',
+  // The original Audionauts ordinal streams its music from Bitcoin L1.
+  listenHref: AUDIONAUTS_ORDINAL_HREF,
   poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
   mintHref: null,
@@ -160,7 +164,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
     { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Mints Thu 7pm BST', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_ORDINAL_HREF, listen: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),
