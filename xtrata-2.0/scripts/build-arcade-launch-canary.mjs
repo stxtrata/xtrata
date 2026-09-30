@@ -26,9 +26,16 @@ const PINNED_CONTRACT = 'c82a89c5da9d0fd0a3f37f348ef755d833c3149865d9837f86c0a28
 // Earlier: v1.1 c140bb14… = #3077, v1.0 0fb9085b… = #3076.
 const BUNDLE_ID = 3078;
 const BUNDLE_SHA = 'd9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675bd62c';
-// v1.4: Top 10 on idle cabinet screens, connect before play, Leather bare-hex fix; first recursive release.
+// v1.4.1: the parent takes each inscription whole from the xtrata.xyz gateway (R2), checked against its
+// SHA-256, and reads the chain only as a fallback; the score client reads through the same hosts.
+// Same parts and packs as v1.4 (#3079 engine, #3080 hall), so only the parent is new.
+// (v1.4 = parent #3081, release 1608b911….)
 // sha256 over the packs to inscribe, the parent shell and the part list (printed by this script).
-const PINNED_RELEASE = '1608b91178f4a94e66cdb0e17b30790bf983159f65cbb823fef129dc5a01ff59';
+const PINNED_RELEASE = '4d97ef3eff522b67c3469d3d8c82fe1ff21f4c711b6f1591ca22cb01c933c4ba';
+// Earlier parents that assemble exactly the same parts from the same packs and bundle. Boards already on
+// one of them are left alone (the canary proves the equivalence on chain), so a parent-only release
+// does not have to re-sign all 26 boards.
+const EQUIVALENT_PARENTS = [3081];
 const CHUNK = 16384;
 const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 const fail = (msg) => { console.error(msg); process.exit(1); };
@@ -97,9 +104,10 @@ const release = {
   shellSha: sha(shell),
   partSha,
   single: single.toString('utf8'),
-  singleSha: sha(single)
+  singleSha: sha(single),
+  equivalentParents: EQUIVALENT_PARENTS
 };
-const releaseSha = sha(JSON.stringify({ packSha: release.packSha, shellSha: release.shellSha, partSha, bundle: BUNDLE_SHA, ids: release.ids }));
+const releaseSha = sha(JSON.stringify({ packSha: release.packSha, shellSha: release.shellSha, partSha, bundle: BUNDLE_SHA, ids: release.ids, equivalentParents: EQUIVALENT_PARENTS }));
 if (releaseSha !== PINNED_RELEASE) fail(`release sha256 ${releaseSha} is not the pinned ${PINNED_RELEASE}.\nIf this release is intended, set PINNED_RELEASE = '${releaseSha}' in scripts/build-arcade-launch-canary.mjs.`);
 
 // esbuild: `import RELEASE from 'xa:release'` resolves to the checked data above.

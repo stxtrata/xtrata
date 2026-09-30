@@ -11,7 +11,10 @@
     CONFIG.parts   a single part replaced by its own inscription (e.g. one game)
     CONFIG.packs   the five packs: assets, three, engine, games, hall
     CONFIG.bundleId  a single-file release (e.g. #3078) for any part not given above
-  With every id at 0 it loads ./packs/*.txt next to this file (local testing).
+  Each inscription is fetched whole from the xtrata.xyz gateway (/i/<id>?raw=1, served
+  from R2) and accepted only if its SHA-256 matches CONFIG.hashes; otherwise it is read
+  chunk by chunk from the chain. With every id at 0 it loads ./packs/*.txt next to this
+  file (local testing).
   Built by: node build/modular.mjs build   (ids from parent/ids.json)
 -->
 <style>
@@ -52,7 +55,8 @@
     readSender: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
     network: 'mainnet',
     maxChunks: 1024,
-    parallel: 6
+    parallel: 6,
+    gateway: 'https://xtrata.xyz'
   };
   var P = window.XAHallParts;
   var fillEl = document.getElementById('xa-load-fill'), msgEl = document.getElementById('xa-load-msg'), errEl = document.getElementById('xa-load-err');
@@ -102,8 +106,8 @@
     }
     throw last || new Error('read failed');
   }
-  // Whole inscription as text; chunks read in small parallel windows until the first empty one.
-  async function inscriptionText(id, label) {
+  // Whole inscription as text, straight from the chain: small parallel windows of chunks until the first empty one.
+  async function chainText(id, label) {
     var parts = [], total = 0, next = 0, ended = false;
     bytesTotal += 16384 * 8;
     while (!ended && next < CHAIN.maxChunks) {
@@ -116,12 +120,48 @@
         if (!got[j].length) { ended = true; break; }
         parts.push(got[j]); total += got[j].length; bytesIn += got[j].length; bytesTotal += got[j].length;
       }
-      progress('Reading ' + label + ' (#' + id + ') ' + Math.round(total / 1024) + ' KB');
+      progress('Reading ' + label + ' (#' + id + ') from the chain ' + Math.round(total / 1024) + ' KB');
     }
     if (!parts.length) throw new Error('Inscription #' + id + ' returned no data');
     var out = new Uint8Array(total), o = 0;
     parts.forEach(function (p) { out.set(p, o); o += p.length; });
     return new TextDecoder('utf-8').decode(out);
+  }
+
+  /* -------------------------------------------- gateway (R2) fast path
+     The xtrata.xyz gateway serves an inscription's exact bytes at /i/<id>?raw=1 from its
+     R2 cache (CORS *, immutable). The bytes are only used when their SHA-256 equals the
+     hash this parent was inscribed with, so the gateway is a cache, never a source of truth. */
+  function gatewayBase() {
+    return hasRealOrigin() && /(^|\.)xtrata\.xyz$/.test(location.hostname) ? location.origin : CHAIN.gateway;
+  }
+  function hexOf(buf) {
+    var b = new Uint8Array(buf), s = '';
+    for (var i = 0; i < b.length; i++) s += (b[i] < 16 ? '0' : '') + b[i].toString(16);
+    return s;
+  }
+  async function gatewayText(id, label) {
+    var want = String((CONFIG.hashes || {})[id] || '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(want) || !(window.crypto && crypto.subtle) || typeof fetch !== 'function') return null;
+    try {
+      progress('Loading ' + label + ' (#' + id + ')');
+      var res = await fetch(gatewayBase() + '/i/' + id + '?raw=1', { cache: 'force-cache', credentials: 'omit' });
+      if (!res.ok) return null;
+      var buf = await res.arrayBuffer();
+      if (hexOf(await crypto.subtle.digest('SHA-256', buf)) !== want) {
+        console.warn('[xa:parent] #' + id + ' from the gateway does not match its hash; reading the chain');
+        return null;
+      }
+      bytesIn += buf.byteLength; bytesTotal += buf.byteLength; progress();
+      return new TextDecoder('utf-8').decode(buf);
+    } catch (e) {
+      console.warn('[xa:parent] gateway unavailable for #' + id + ' (' + ((e && e.message) || e) + '); reading the chain');
+      return null;
+    }
+  }
+  async function inscriptionText(id, label) {
+    var fast = await gatewayText(id, label);
+    return fast !== null ? fast : chainText(id, label);
   }
 
   /* ---------------------------------------------------- part sources */
@@ -197,9 +237,11 @@
     });
     document.body.insertAdjacentHTML('afterbegin', byName['hall-body.html']);
     window.XA_CONFIG = window.XA_CONFIG || {};
-    if (Number(CONFIG.parentTokenId) > 0) {
-      window.XA_CONFIG.scores = Object.assign({}, window.XA_CONFIG.scores, { parentTokenId: Number(CONFIG.parentTokenId) });
-    }
+    // The score client reads the Top 10 through the same hosts as this parent (in a viewer
+    // those have been pointed at the site's /hiro proxy, which keeps the public limit clear).
+    var scores = { apiBases: apiBases() };
+    if (Number(CONFIG.parentTokenId) > 0) scores.parentTokenId = Number(CONFIG.parentTokenId);
+    window.XA_CONFIG.scores = Object.assign({}, window.XA_CONFIG.scores, scores);
     window.XA_BUILD = { version: CONFIG.version, bundleId: CONFIG.bundleId, packs: CONFIG.packs, parts: CONFIG.parts };
     P.ORDER.js.forEach(function (n) {
       var s = document.createElement('script');

@@ -3,7 +3,9 @@
 //   9001..9005   = dist/packs/*.txt (assets, three, engine, games, hall)
 //   9100         = src/parts/game-cave-diver.js (a single-part override)
 // Scenarios: bundle only; changed packs over the bundle; one part override; Leather shim;
-// idle cabinet screens showing the Top 10.
+// idle cabinet screens showing the Top 10; the gateway (R2) fast path, a tampered gateway,
+// and the parent inside a viewer-style sandboxed srcdoc frame.
+// https://xtrata.xyz/i/<id> is mocked per test (`gateway`): 'serve', 'tamper', or down.
 // Run: NODE_PATH=<playwright + @stacks/transactions> CHROME_PATH=... node tests/hall-parent.test.cjs [shotsDir]
 const { chromium } = require('playwright');
 const T = require('@stacks/transactions');
@@ -23,6 +25,9 @@ const CONTENT = {
   9100: fs.readFileSync(path.join(ROOT, 'src', 'parts', 'game-cave-diver.js'))
 };
 for (const [name, id] of Object.entries(PACK_IDS)) CONTENT[id] = fs.readFileSync(path.join(DIST, manifest.packs[name].file));
+// The released ids (parent/ids.json): engine #3079, hall #3080 over the bundle #3078.
+const RELEASED = manifest.parent.config;
+for (const [name, id] of Object.entries(RELEASED.packs)) if (id > 0) CONTENT[id] = CONTENT[PACK_IDS[name]];
 
 const P1 = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', P2 = 'SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR';
 const NAMES = ['JIM', 'ZED', 'ACE', 'NEO', 'MAX', 'KAI', 'LEO', 'RAY', 'SKY', 'OZZ'];
@@ -106,15 +111,26 @@ function top10Result(board, filled) {
         } };
       });
     }
+    const gw = {};
+    await ctx.route('https://xtrata.xyz/**', async (route) => {
+      const m = /^\/i\/(\d+)$/.exec(new URL(route.request().url()).pathname);
+      const cors = { 'Access-Control-Allow-Origin': '*' };
+      if (!m || !opts.gateway) return route.abort('failed');
+      const id = Number(m[1]);
+      gw[id] = (gw[id] || 0) + 1;
+      if (!CONTENT[id]) return route.fulfill({ status: 404, headers: cors, body: '' });
+      const body = opts.gateway === 'tamper' && id === 3078 ? Buffer.concat([CONTENT[id], Buffer.from('<!-- x -->')]) : CONTENT[id];
+      return route.fulfill({ status: 200, headers: { ...cors, 'Content-Type': 'text/plain' }, body });
+    });
     const page = await ctx.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
-    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|WebGL|GPU|404/.test(m.text())) errors.push(m.text()); });
+    page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|WebGL|GPU|404|ERR_FAILED/.test(m.text())) errors.push(m.text()); });
     await page.goto(base + file);
     await page.waitForFunction(() => !document.getElementById('xa-load') || document.getElementById('xa-load').classList.contains('done') ||
       !document.getElementById('xa-load-err').hidden, null, { timeout: 180000 });
     const loadErr = await page.evaluate(() => { const e = document.getElementById('xa-load-err'); return e && !e.hidden ? e.textContent : ''; });
-    return { page, ctx, errors, reads, loadErr };
+    return { page, ctx, errors, reads, gw, loadErr };
   }
   async function hallState(page) {
     return page.evaluate(() => ({
@@ -130,7 +146,7 @@ function top10Result(board, filled) {
   }
 
   /* 1. Bundle only: the parent rebuilds the hall from #3078 alone. */
-  pages['/bundle-only.html'] = parentWith({ bundleId: 3078, packs: { assets: 0, three: 0, engine: 0, games: 0, hall: 0 }, parts: {} });
+  pages['/bundle-only.html'] = parentWith({ bundleId: 3078, packs: { assets: 0, three: 0, engine: 0, games: 0, hall: 0 }, parts: {}, hashes: {} });
   let r = await open('/bundle-only.html');
   check(!r.loadErr, 'bundle-only parent loads (' + (r.loadErr || 'no error') + ')');
   let s = await hallState(r.page);
@@ -142,7 +158,7 @@ function top10Result(board, filled) {
   await r.ctx.close();
 
   /* 2. Packs: the five packs, nothing from the bundle. */
-  pages['/packs.html'] = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {} });
+  pages['/packs.html'] = parentWith({ bundleId: 3078, packs: PACK_IDS, parts: {}, hashes: {} });
   r = await open('/packs.html');
   s = await hallState(r.page);
   check(!r.loadErr && s.games === 21 && s.three && !s.err, 'hall boots from the five packs');
@@ -151,7 +167,7 @@ function top10Result(board, filled) {
   await r.ctx.close();
 
   /* 3. Mixed: engine + hall packs over the bundle, one game from its own inscription. */
-  pages['/mixed.html'] = parentWith({ bundleId: 3078, packs: { assets: 0, three: 0, engine: 9003, games: 0, hall: 9005 }, parts: { 'game-cave-diver.js': 9100 } });
+  pages['/mixed.html'] = parentWith({ bundleId: 3078, packs: { assets: 0, three: 0, engine: 9003, games: 0, hall: 9005 }, parts: { 'game-cave-diver.js': 9100 }, hashes: {} });
   r = await open('/mixed.html', { leather: true });
   s = await hallState(r.page);
   check(!r.loadErr && s.games === 21 && s.three && !s.err, 'hall boots from engine + hall packs over #3078');
@@ -219,6 +235,52 @@ function top10Result(board, filled) {
   const hex = await r.page.evaluate(() => window.XAScores._codec.stxPostConditionHex('SP2C2YFP12AJZB4MABJBAJ55XECVS7E4PMMZ89YZR', '30000'));
   check(/^[0-9a-f]+$/.test(hex) && hex.length % 2 === 0, 'score client builds bare-hex post-conditions (' + hex.slice(0, 10) + '...)');
   check(!r.errors.length, 'no page errors (v1.4 behaviour) ' + r.errors.slice(0, 2).join(' | '));
+  await r.ctx.close();
+
+  /* 5. The gateway (R2) fast path, as released: every inscription arrives whole from /i/<id>?raw=1. */
+  const chainReads = (x) => Object.values(x.reads).reduce((a, b) => a + b, 0);
+  pages['/released.html'] = fs.readFileSync(path.join(DIST, 'xtrata-arcade-parent.html'), 'utf8');
+  check(Object.keys(RELEASED.hashes).length === 3 && RELEASED.hashes[3078] && RELEASED.hashes[RELEASED.packs.engine] && RELEASED.hashes[RELEASED.packs.hall],
+    'the released parent carries a hash for #3078 and both packs');
+  r = await open('/released.html', { gateway: 'serve' });
+  s = await hallState(r.page);
+  check(!r.loadErr && s.games === 21 && s.three && !s.err, 'released parent boots from the gateway');
+  check(chainReads(r) === 0 && r.gw[3078] === 1 && r.gw[RELEASED.packs.engine] === 1 && r.gw[RELEASED.packs.hall] === 1,
+    'three gateway requests, no chain reads (' + JSON.stringify(r.gw) + ', ' + chainReads(r) + ' chunk reads)');
+  check(!r.errors.length, 'no page errors (gateway) ' + r.errors.slice(0, 2).join(' | '));
+  await r.ctx.close();
+
+  r = await open('/released.html', { gateway: 'tamper' });
+  s = await hallState(r.page);
+  check(!r.loadErr && s.games === 21 && r.reads[3078] > 200 && !r.reads[RELEASED.packs.engine] && !r.reads[RELEASED.packs.hall],
+    'a gateway copy that fails its hash is ignored: #3078 comes from the chain, the packs still from the gateway');
+  await r.ctx.close();
+
+  r = await open('/released.html');
+  s = await hallState(r.page);
+  check(!r.loadErr && s.games === 21 && r.reads[3078] > 200 && r.reads[RELEASED.packs.engine] > 0 && r.reads[RELEASED.packs.hall] > 0,
+    'gateway down: everything is read from the chain (' + chainReads(r) + ' chunk reads)');
+  await r.ctx.close();
+
+  /* 6. Inside a viewer: sandboxed srcdoc frame (opaque origin), as the xtrata.xyz grid and preview run it. */
+  pages['/viewer.html'] = '<!doctype html><body style="margin:0"><iframe id="f" sandbox="allow-scripts allow-pointer-lock allow-downloads" allow="autoplay; fullscreen; encrypted-media" style="width:1200px;height:760px;border:0"></iframe></body>';
+  r = await open('/viewer.html', { gateway: 'serve' });
+  await r.page.$eval('#f', (f, html) => { f.srcdoc = html; }, pages['/released.html']);
+  const inner = () => r.page.frames().find((f) => f !== r.page.mainFrame());
+  let v = null;
+  for (let i = 0; i < 120 && !(v && v.games === 21); i++) {
+    await r.page.waitForTimeout(1000);
+    v = await inner().evaluate(() => ({ games: window.XA && window.XA.games ? window.XA.games.length : 0, origin: String(location.origin),
+      err: (document.getElementById('xa-load-err') || {}).hidden === false, bases: window.XA_CONFIG && window.XA_CONFIG.scores && window.XA_CONFIG.scores.apiBases })).catch(() => null);
+    if (v && v.err) break;
+  }
+  check(v && v.games === 21 && v.origin === 'null' && chainReads(r) === 0, 'boots inside a sandboxed srcdoc frame from the gateway (origin ' + (v && v.origin) + ')');
+  check(v && Array.isArray(v.bases) && v.bases.length === 1 && v.bases[0] === 'https://api.mainnet.hiro.so',
+    'the score client reads through the same hosts as the parent (' + JSON.stringify(v && v.bases) + '); a viewer points those at its /hiro proxy');
+  // The viewer's sandbox withholds clipboard and similar permissions on purpose; Chrome logs those as policy notes.
+  const viewerErrors = r.errors.filter((e) => !/permissions policy/i.test(e));
+  check(!viewerErrors.length, 'no page errors (viewer) ' + viewerErrors.slice(0, 2).join(' | '));
+  if (SHOTS) await r.page.screenshot({ path: path.join(SHOTS, '15-viewer-srcdoc.png') });
   await r.ctx.close();
 
   await browser.close();

@@ -10,6 +10,20 @@ the port of the X Chess v2 canary) and follow `docs/WALLET-PLAYBOOK.md`: provide
 the top window, the chooser on every connect, the Xverse preflight order, no `sender` on
 `stx_callContract`, abort on an account mismatch, deny mode, a 90s watchdog.
 
+## v1.4.1: the parent loads from the gateway
+
+v1.4 (parent #3081, packs #3079 engine and #3080 hall) read every chunk from the chain: about 270
+reads per visit. v1.4.1 is a new parent only. It takes #3078 and both packs whole from the
+xtrata.xyz gateway (`/i/<id>?raw=1`, served from R2) and uses each one only if its SHA-256 equals
+the hash written into the parent; otherwise it reads that inscription from the chain as before.
+The score client reads the Top 10 through the same hosts as the parent.
+
+The packs are unchanged, so the canary finds #3079 and #3080 by hash and sends nothing for them;
+only the parent is inscribed (3 signatures). Boards already on #3081 are left alone:
+`EQUIVALENT_PARENTS` in the build script lists earlier parents, and preflight proves on chain that
+each one loads exactly the same packs over the same bundle before treating it as the same engine.
+A parent-only release therefore needs about 6 signatures, not 35.
+
 ## What it inscribes (v1.4, recursive)
 
 From v1.4 the arcade is built from parts grouped into five packs
@@ -84,7 +98,8 @@ The audit step prints the ids. Then, in one commit:
   record of the launch (the canary ignores pack ids and finds any
   pack that is already inscribed by its hash);
 - `public/_redirects` (`/arcade`) and the homepage arcade tile: the parent id;
-- `src/lib/viewer/public-wallet-bridge.ts`: add the parent id to the arcade label check.
+- `src/arcade-submit/arcade-boards.ts`: add the parent id to `ARCADE_INSCRIPTION_IDS` (the wallet
+  dialog's arcade wording).
 
 ## Tests
 
@@ -103,5 +118,5 @@ chain and nothing is sent twice.
 
 - Wallet signing was not exercised here (extensions need a real browser session).
 - Step 10 uses a bot pilot, not a human run.
-- The parent's load speed through the xtrata.xyz Hiro proxy (about 270 chunk reads) is only
-  seen on mainnet: open the parent after the launch and play one run.
+- Loading from the live gateway is only seen on mainnet: open the parent after the launch, in
+  the grid, the preview and at `/i/<id>`, and play one run.
