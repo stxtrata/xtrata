@@ -1,5 +1,6 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
 import { arcadeCallToPayload, type ArcadeOutcome } from './arcade-submit-host';
+import { isArcadeInscriptionLabel } from '../../arcade-submit/arcade-boards';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -440,7 +441,7 @@ const stx = (value: string) => {
 /** Friendly, host-owned connect prompt. Everything is set with textContent; no inscription HTML reaches it. */
 function reviewConnect(label: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const arcade = /#307[67]\b/.test(label); // Xtrata Arcade v1.0 (#3076) and v1.1 (#3077)
+    const arcade = isArcadeInscriptionLabel(label); // any Xtrata Arcade inscription (ARCADE_INSCRIPTION_IDS)
     const make = <K extends keyof HTMLElementTagNameMap>(tag: K, css = '', text = '') => {
       const node = document.createElement(tag);
       if (css) node.style.cssText = css;

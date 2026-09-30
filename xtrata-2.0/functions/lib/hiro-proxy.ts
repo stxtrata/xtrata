@@ -223,6 +223,92 @@ const cacheProxyResponse = async (params: {
   });
 };
 
+// ---------------------------------------------------------------------------
+// Sealed inscription chunks never change, so a successful `get-chunk` read
+// (`(some buff)`) is kept in the Cloudflare edge cache for a year. Recursive
+// apps (the arcade parent reads ~270 chunks) then load from the edge instead of
+// re-reading the chain on every visit. `none` (past the last chunk, or an id
+// that is not sealed yet) is never stored, so nothing can be cached too early.
+const IMMUTABLE_CALL_READ_FUNCTIONS = new Set(['get-chunk']);
+const IMMUTABLE_CACHE_ORIGIN = 'https://hiro-proxy-cache.xtrata.internal';
+const IMMUTABLE_MAX_AGE_SECONDS = 31_536_000;
+
+type EdgeCache = {
+  match(request: Request): Promise<Response | undefined>;
+  put(request: Request, response: Response): Promise<void>;
+};
+
+const getEdgeCache = (): EdgeCache | null => {
+  const store = (globalThis as { caches?: { default?: EdgeCache } }).caches;
+  return store?.default ?? null;
+};
+
+const isImmutableCallRead = (method: string, path: string) =>
+  method === 'POST' &&
+  IMMUTABLE_CALL_READ_FUNCTIONS.has(extractCallReadFunctionName(path) ?? '');
+
+const buildImmutableCacheRequest = async (params: {
+  network: string;
+  path: string;
+  body?: ArrayBuffer;
+}) => {
+  const digest = await crypto.subtle.digest('SHA-256', params.body ?? new ArrayBuffer(0));
+  const hex = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+  return new Request(
+    `${IMMUTABLE_CACHE_ORIGIN}/${encodeURIComponent(params.network.toLowerCase())}/${normalizePath(params.path)}?body=${hex}`,
+    { method: 'GET' }
+  );
+};
+
+/** `{"okay":true,"result":"0x0a..."}`: an `(some ...)` result, safe to keep forever. */
+const isSomeCallReadResult = (bytes: Uint8Array) => {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as { okay?: unknown; result?: unknown };
+    return parsed.okay === true && typeof parsed.result === 'string' && /^0x0a/i.test(parsed.result);
+  } catch {
+    return false;
+  }
+};
+
+const loadImmutableCallRead = async (params: {
+  network: string;
+  path: string;
+  body?: ArrayBuffer;
+  load: () => Promise<Response>;
+}) => {
+  const cache = getEdgeCache();
+  let cacheRequest: Request | null = null;
+  if (cache) {
+    try {
+      cacheRequest = await buildImmutableCacheRequest(params);
+      const hit = await cache.match(cacheRequest);
+      if (hit) {
+        const headers = new Headers(hit.headers);
+        headers.set('x-xtrata-proxy-cache', 'edge-hit');
+        return new Response(hit.body, { status: hit.status, headers });
+      }
+    } catch {
+      cacheRequest = null;
+    }
+  }
+  const response = await params.load();
+  if (cache && cacheRequest && response.status === 200) {
+    try {
+      const bytes = new Uint8Array(await response.clone().arrayBuffer());
+      if (isSomeCallReadResult(bytes)) {
+        const headers = new Headers({
+          'content-type': response.headers.get('content-type') || 'application/json',
+          'cache-control': `public, max-age=${IMMUTABLE_MAX_AGE_SECONDS}, immutable`
+        });
+        await cache.put(cacheRequest, new Response(bytes, { status: 200, headers }));
+      }
+    } catch {
+      // Caching is best effort; the response itself is already good.
+    }
+  }
+  return response;
+};
+
 const withCorsHeaders = (response: Response) => {
   const responseHeaders = new Headers(response.headers);
   UPSTREAM_CONTEXT_HEADERS.forEach((name) => {
@@ -384,6 +470,11 @@ export const proxyHiroRequest = async (params: {
     }
     const response = await inFlight;
     return withCorsHeaders(response.clone());
+  }
+
+  if (isImmutableCallRead(method, path)) {
+    const response = await loadImmutableCallRead({ network: params.network, path, body, load });
+    return withCorsHeaders(response);
   }
 
   const cachePolicy = getProxyCachePolicy({

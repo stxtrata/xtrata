@@ -201,6 +201,7 @@
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
+    import { rewriteHiroApiBasesForEmbeddedHtml } from '/src/lib/viewer/hiro-api-rewrite.ts';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
@@ -249,6 +250,12 @@
     } from '/src/lib/telemetry/index.ts';
 
     installGlobalTelemetry();
+
+    // Same rewrite as /i/<id> and the workspace viewers: an inscription that calls Hiro
+    // directly goes through the site's /hiro proxy instead. From an opaque srcdoc frame,
+    // direct Hiro reads hit the public per-IP rate limit (a recursive app such as the
+    // arcade parent makes hundreds of them) and fail as "Failed to fetch".
+    const embedHtml = (html) => (html ? rewriteHiroApiBasesForEmbeddedHtml(html).html : html);
 
     /**
      * Make in-page anchors actually land on their target.
@@ -5860,10 +5867,11 @@
         tokenId: token.id
       });
 
-    const prepareRuntimeHtmlForToken = async (token, html, contextLabel = 'preview') => {
-      if (!html) {
-        return html;
+    const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {
+      if (!rawHtml) {
+        return rawHtml;
       }
+      const html = embedHtml(rawHtml);
       const moduleBaseHref = buildRuntimeModuleBaseHref({
         network: state.network,
         contractId: getTokenCacheContractId(token),
@@ -11495,7 +11503,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const bytes = await marketFetchContent(listing, meta);
           const text = new TextDecoder().decode(bytes);
           if (/<script[\s>]/i.test(text)) {
-            media = { kind: 'html-live', html: text };
+            media = { kind: 'html-live', html: embedHtml(text) };
           } else {
             await warmMarketThumbnailCache(listing, bytes, 'image/svg+xml');
             media = {
@@ -11512,7 +11520,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           };
         } else if (kind === 'html' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
-          media = { kind: 'html-live', html: new TextDecoder().decode(bytes) };
+          media = { kind: 'html-live', html: embedHtml(new TextDecoder().decode(bytes)) };
         } else if (kind === 'video' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
           media = {
