@@ -1,3 +1,4 @@
+import { buildCollectionAssetPreviewUrl } from '../../lib/collections/inventory-replacement';
 import {
   useEffect,
   useMemo,
@@ -163,10 +164,8 @@ const sortManagedAssets = (assets: ManagedAsset[], mode: AssetOrderMode) => {
   return sorted;
 };
 
-const buildAssetPreviewUrl = (collectionId: string, assetId: string) =>
-  `/collections/${encodeURIComponent(collectionId)}/asset-preview?assetId=${encodeURIComponent(
-    assetId
-  )}`;
+const buildAssetPreviewUrl = (collectionId: string, assetId: string, version?: string | null) =>
+  buildCollectionAssetPreviewUrl(collectionId, assetId, { version });
 
 const extractPathTraits = (path: string) => {
   const normalized = path.replace(/\\/g, '/');
@@ -676,7 +675,8 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
     }
     return buildAssetPreviewUrl(
       normalizedCollectionId,
-      selectedPreviewAsset.asset_id
+      selectedPreviewAsset.asset_id,
+      selectedPreviewAsset.expected_hash
     );
   }, [selectedPreviewAsset, normalizedCollectionId]);
 
@@ -1739,7 +1739,8 @@ export default function AssetStagingPanel(props: AssetStagingPanelProps) {
                 const gridIndex = pageStartIndex + index + 1;
                 const previewUrl = buildAssetPreviewUrl(
                   normalizedCollectionId,
-                  asset.asset_id
+                  asset.asset_id,
+                  asset.expected_hash
                 );
                 const removeBlockedReason = getAssetRemovalBlockedReason(asset);
                 const removeDisabled = removeBlockedReason !== null;
