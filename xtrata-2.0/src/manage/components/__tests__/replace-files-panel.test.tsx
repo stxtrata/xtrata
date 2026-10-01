@@ -155,3 +155,40 @@ describe('ReplaceFilesPanel automatic mode', () => {
     expect(mocked.write).not.toHaveBeenCalled();
   });
 });
+
+describe('ReplaceFilesPanel with a replacement already open', () => {
+  const twoItems = () => {
+    const base = record();
+    const item = (assetId: string, path: string) => ({ ...base.items[0], assetId, path, replacement: null });
+    return { ...base, items: [item('a84', 'audionauts-v1-recursive/084.html'), item('a90', 'audionauts-v1-recursive/090.html')] };
+  };
+  const stub = (puts: string[]) => vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith('/assets')) return Response.json([]);
+    if (init?.method === 'PUT') { puts.push(url); return Response.json({}); }
+    return Response.json({ record: twoItems(), chain: { paused: true, finalized: false, items: [] }, activeFileCount: 111,
+      plan: { step: 'upload', blockers: [], toRegister: [], toClear: [] } });
+  }));
+
+  it('puts each revised file into the row with the same name', async () => {
+    const puts: string[] = [];
+    stub(puts);
+    render(<ReplaceFilesPanel collectionId="c1" published />);
+    fireEvent.change(await screen.findByLabelText('Revised files for this replacement'), { target: { files: [
+      new File(['b'], '090.html', { type: 'text/html' }), new File(['a'], '084.html', { type: 'text/html' })
+    ] } });
+    await waitFor(() => expect(puts).toHaveLength(2));
+    expect(puts[0]).toContain('assetId=a90');
+    expect(puts[1]).toContain('assetId=a84');
+  });
+
+  it('refuses a file chosen for the wrong row', async () => {
+    const puts: string[] = [];
+    stub(puts);
+    render(<ReplaceFilesPanel collectionId="c1" published />);
+    fireEvent.change(await screen.findByLabelText('New file for audionauts-v1-recursive/084.html'), { target: { files: [
+      new File(['b'], '090.html', { type: 'text/html' })
+    ] } });
+    await screen.findByText(/090\.html is not audionauts-v1-recursive\/084\.html/);
+    expect(puts).toHaveLength(0);
+  });
+});
