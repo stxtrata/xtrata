@@ -622,7 +622,9 @@ const renderAudionauts = () => {
   actions.append(
     live
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
-      : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
+      : a.mintHref
+        ? actionLink(a.mintHref, 'See the collection', 'home-btn home-btn--solid', 'audionauts:collection', { newTab: true })
+        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
     actionLink(a.listenHref, 'Listen to the original on L1', 'home-btn home-btn--ghost', 'audionauts:ordinal', { newTab: true })
   );
   copy.append(
