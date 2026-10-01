@@ -10,10 +10,10 @@ export const AUDIONAUTS_ORDINAL_HREF = 'https://ordinals.com/inscription/9576843
 
 // Audionauts mint opens Thursday 1 October 2026 at 19:00 BST (18:00 UTC).
 export const AUDIONAUTS_LAUNCH_AT = '2026-10-01T18:00:00Z';
-// The Audionauts mint page. It is only shown from the launch time above: before
-// then the homepage keeps the "mints at 7pm" wording and the Ordinal listen link,
-// and from then on it switches itself to "Minting now" with a Mint button.
-// (Set this to null to hold the mint button back, e.g. if the mint is delayed.)
+// The Audionauts collection / mint page. Before the launch time the homepage
+// links to it as "See the collection" (the page itself shows the mint as paused)
+// and keeps the "mints at 7pm" wording; from the launch time it switches itself
+// to "Minting now" with a Mint button. Set this to null to hold the link back.
 export const AUDIONAUTS_MINT_HREF = 'https://xtrata.xyz/collection/audionauts-1-0';
 
 const PAGE_LOADED_AT = Date.now();
@@ -83,8 +83,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     : {
         id: 'audionauts', tag: 'Soon', tone: 'teal',
         title: `Audionauts mints ${AUDIONAUTS_WHEN}.`,
-        line: 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
-        cta: 'Listen on L1', href: AUDIONAUTS_ORDINAL_HREF, newTab: true
+        // Before the mint opens, the banner already opens the (paused) collection page.
+        line: AUDIONAUTS_MINT_HREF
+          ? 'The collection page is up and the mint opens at 7pm BST. Look around now.'
+          : 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
+        cta: AUDIONAUTS_MINT_HREF ? 'See the collection' : 'Listen on L1',
+        href: AUDIONAUTS_MINT_HREF || AUDIONAUTS_ORDINAL_HREF, newTab: true
       }),
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',

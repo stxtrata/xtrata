@@ -69,11 +69,11 @@ describe('homepage content configuration', () => {
     expect(indexHtml).toContain('id="homeBounty"');
   });
 
-  it('never shows a Mint button for Audionauts without a mint link', () => {
+  it('only says Mint for Audionauts once the mint is live', () => {
     if (HOMEPAGE_AUDIONAUTS.status === 'live') {
       expect(HOMEPAGE_AUDIONAUTS.mintHref).toBeTruthy();
     } else {
-      expect(HOMEPAGE_STRIP_SLIDES.find((slide) => slide.id === 'audionauts')?.cta).toBe('Listen on L1');
+      expect(HOMEPAGE_STRIP_SLIDES.find((slide) => slide.id === 'audionauts')?.cta).not.toBe('Mint an Audionaut');
     }
   });
 
