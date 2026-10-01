@@ -6356,7 +6356,7 @@ p {
 .collection-live-page__gallery-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 220px));
 }
 
 .collection-live-page__gallery-stack {
@@ -6419,6 +6419,24 @@ p {
   height: 100%;
   border: 0;
   background: #fff;
+}
+
+.collection-live-page__gallery-frame:has(.collection-live-page__gallery-live-frame) {
+  position: relative;
+  display: block;
+  background: #000;
+}
+
+/* HTML tiles render at 2x and scale down, so the piece lays out like a normal view. */
+.collection-live-page__gallery-frame iframe.collection-live-page__gallery-live-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+  background: #000;
 }
 
 .collection-live-page__gallery-fallback {

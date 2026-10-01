@@ -106,6 +106,8 @@ const walletSessionStore = createWalletSessionStore();
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 const HASH_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const MINT_CHUNK_BATCH_SIZE = 30;
+// The large single-item preview under the gallery is off for now; tiles play inline.
+const SHOW_GALLERY_DETAIL = false;
 const STATUS_REFRESH_ACTIVE_MS = 6_000;
 const STATUS_REFRESH_BACKGROUND_MS = 20_000;
 const STATUS_REFRESH_MINTING_MS = 3_000;
@@ -730,6 +732,19 @@ const CollectionLiveGalleryCardMedia = ({
         previewUrl={previewUrl}
         collectionTitle={collectionTitle}
         contractId={contractId}
+      />
+    );
+  }
+
+  if (mediaKind === 'html' || mediaKind === 'text') {
+    // Runs from its server URL so recursive /i/<id> requests resolve.
+    return (
+      <iframe
+        className="collection-live-page__gallery-live-frame"
+        src={previewUrl}
+        title={asset.filename ?? asset.path}
+        sandbox="allow-scripts"
+        loading="lazy"
       />
     );
   }
@@ -3868,11 +3883,10 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                     const previewUrl = buildCollectionAssetPreviewUrl(resolvedCollectionId, asset.asset_id, {
                       version: asset.expected_hash
                     });
-                    const isSelected = asset.asset_id === selectedGalleryAsset?.asset_id;
                     return (
                       <article
                         key={asset.asset_id}
-                        className={`collection-live-page__gallery-item${isSelected ? ' collection-live-page__gallery-item--selected' : ''}`}
+                        className="collection-live-page__gallery-item"
                         onClick={() => setSelectedGalleryAssetId(asset.asset_id)}
                       >
                         <div className="collection-live-page__gallery-frame">
@@ -3894,20 +3908,23 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                               : `${collectionTitle} #...`}
                           </span>
                           <span className="meta-label">{asset.mime_type}</span>
-                          <button
-                            type="button"
-                            className="button button--ghost button--mini collection-live-page__gallery-select"
-                            onClick={() => setSelectedGalleryAssetId(asset.asset_id)}
-                            aria-pressed={isSelected}
-                          >
-                            {isSelected ? 'Selected' : 'Preview'}
-                          </button>
+                          {tokenId ? (
+                            <a
+                              className="button button--ghost button--mini collection-live-page__gallery-select"
+                              href={`/?viewer-token=${encodeURIComponent(tokenId)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              Open
+                            </a>
+                          ) : null}
                         </div>
                       </article>
                     );
                   })}
                 </div>
-                {selectedGalleryAsset && selectedGalleryPreviewUrl && (
+                {SHOW_GALLERY_DETAIL && selectedGalleryAsset && selectedGalleryPreviewUrl && (
                   <div ref={galleryDetailRef} className="collection-live-page__gallery-detail">
                     <div className="collection-live-page__gallery-detail-header">
                       <div>
