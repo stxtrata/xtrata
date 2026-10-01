@@ -7,6 +7,7 @@ import {
   finishReplacement,
   getReplacementStatus,
   makeReplacementChain,
+  readReplacementPreview,
   recordReplacementTx,
   ReplacementError,
   resolveReplacementTarget,
@@ -20,6 +21,7 @@ const NO_STORE = { 'Cache-Control': 'private, no-store' };
 /**
  * Replace unminted files in a published, paused collection.
  *   GET                         → { record, chain, plan, activeFileCount } (fresh chain read)
+ *   GET  ?preview=assetId       → the uploaded replacement bytes, sandboxed (before it goes live)
  *   POST { action: 'start', assetIds }
  *   PUT  ?assetId=…  (file bytes) → upload one replacement file
  *   POST { action: 'record-tx', kind: 'register' | 'clear', txId }
@@ -36,6 +38,21 @@ export const onRequest: PagesFunction = async ({ request, env, params }) => {
       | undefined;
     if (!collection) return notFound('Collection not found.');
     const chain = (): ReplacementChain => makeReplacementChain(env as Env, resolveReplacementTarget(env as Env, collection));
+
+    const previewAssetId = request.method === 'GET' ? new URL(request.url).searchParams.get('preview')?.trim() : null;
+    if (previewAssetId) {
+      // Same isolation as asset-preview: creator bytes never run with this site's origin.
+      const decision = await authorizeCreator(request, env as Env, { action: 'preview-replacement', collection });
+      if (!decision.allowed) return decision.response!;
+      const preview = await readReplacementPreview(env as Env, collectionId, previewAssetId);
+      return new Response(preview.body, { status: 200, headers: {
+        'Content-Type': preview.mimeType,
+        'Cache-Control': 'private, no-store',
+        'Content-Security-Policy': 'sandbox allow-scripts',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Xtrata-Content-Hash': preview.hash
+      } });
+    }
 
     if (request.method === 'GET') {
       const denied = await denyPrivateRead(request, env as Env, collection);

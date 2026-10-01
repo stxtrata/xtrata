@@ -20,6 +20,13 @@ import { CHUNK_SIZE, db, hashBytes, staging, storageEnabled } from './collection
 import { createUploadIntent, putVerifiedUpload } from './collection-storage/uploads';
 import { isCollectionUploadsLocked, parseCollectionMetadata } from './collections';
 import { queryAll, run, type Env } from './db';
+import {
+  collectInventoryHashes,
+  computeInventoryDigest,
+  INVENTORY_REGISTRATION_METADATA_KEY,
+  isInventoryRegistrationCurrent,
+  parseInventoryRegistrationRecord
+} from '../../src/manage/lib/inventory-registration';
 
 /**
  * Explicit replacement of unminted files in a published (upload-locked)
@@ -158,6 +165,8 @@ export type ReplacementStatus = {
   chain: ReplacementChainState | null;
   plan: ReplacementPlan | null;
   activeFileCount: number;
+  /** Finish only: whether the registration check carried over (else the artist re-checks). */
+  registrationCarried?: boolean;
 };
 
 export async function getReplacementStatus(env: Env, collectionId: string, chain: ReplacementChain): Promise<ReplacementStatus> {
@@ -335,12 +344,53 @@ export async function finishReplacement(params: { env: Env; collectionId: string
   const { metadata } = await loadCollection(params.env, params.collectionId);
   const complete: InventoryReplacementRecord = { ...record, status: 'complete', completedAt: now };
   const history = Array.isArray(metadata[INVENTORY_REPLACEMENT_HISTORY_KEY]) ? metadata[INVENTORY_REPLACEMENT_HISTORY_KEY] as unknown[] : [];
-  // The previous registration check covered the old files: the artist checks again before minting reopens.
+  const registration = await carriedRegistration(metadata, record, assets, now);
   await saveRecord(params.env, params.collectionId, complete, now, {
-    inventoryRegistration: null,
+    [INVENTORY_REGISTRATION_METADATA_KEY]: registration,
     [INVENTORY_REPLACEMENT_HISTORY_KEY]: [...history, { ...complete, updatedAt: now }].slice(-20)
   });
-  return getReplacementStatus(params.env, params.collectionId, params.chain);
+  return { ...(await getReplacementStatus(params.env, params.collectionId, params.chain)), registrationCarried: registration !== null };
+}
+
+/**
+ * The registration check for the rest of the collection still holds after a
+ * replacement: the unchanged files are the ones it verified, and the chain has
+ * just confirmed every new file registered (and not inscribed elsewhere) and
+ * every old one cleared. So the check is carried over to the new file set —
+ * but only if it was current for the old set on this contract. Otherwise the
+ * artist runs "Check registration" again before minting can reopen.
+ */
+async function carriedRegistration(
+  metadata: Record<string, unknown>,
+  record: InventoryReplacementRecord,
+  assets: AssetRow[],
+  now: number
+) {
+  const previous = parseInventoryRegistrationRecord(metadata);
+  const current = collectInventoryHashes(assets);
+  if (!previous || !current) return null;
+  const toOriginal = new Map(record.items.map((item) => [item.replacement!.hash, item.original.hash]));
+  const before = [...new Set(current.map((hash) => toOriginal.get(hash) ?? hash))].sort();
+  const wasCurrent = isInventoryRegistrationCurrent({
+    record: previous, contractId: record.contractId, hashCount: before.length, digest: await computeInventoryDigest(before)
+  });
+  if (!wasCurrent) return null;
+  return { version: 1, contractId: record.contractId, hashCount: current.length, digest: await computeInventoryDigest(current),
+    verifiedAt: new Date(now).toISOString() };
+}
+
+/**
+ * The uploaded replacement bytes for one file, for previewing on the server
+ * before anything is registered on-chain (the live asset still serves the
+ * current file until the replacement finishes).
+ */
+export async function readReplacementPreview(env: Env, collectionId: string, assetId: string) {
+  const { record } = await loadCollection(env, collectionId);
+  const item = record?.status === 'open' ? record.items.find((entry) => entry.assetId === assetId) : null;
+  if (!item?.replacement) throw new ReplacementError(404, 'No uploaded replacement for that file.');
+  const object = await staging(env).get(item.replacement.storageKey);
+  if (!object) throw new ReplacementError(404, 'The uploaded replacement is not in storage. Upload it again.');
+  return { body: object.body, mimeType: item.replacement.mimeType, hash: item.replacement.hash };
 }
 
 /** Only before anything changed on-chain; afterwards the artist finishes (or undoes it on-chain). */
