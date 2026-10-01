@@ -15,7 +15,7 @@ import { toStacksNetwork } from '../../lib/network/stacks';
 import { useManageWallet } from '../ManageWalletContext';
 import { signerPreflight } from '../lib/contract-preflight';
 import { waitForTxConfirmation } from '../lib/tx-confirmation';
-import { buildCollectionAssetPreviewUrl, matchReplacementFiles } from '../../lib/collections/inventory-replacement';
+import { buildCollectionAssetPreviewUrl, matchReplacementFiles, normalizeEditionFileName } from '../../lib/collections/inventory-replacement';
 import type {
   InventoryReplacementRecord,
   ReplacementChainState,
@@ -261,7 +261,28 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
     setStatus(await post<Status>({ action: 'start', assetIds: selected }));
     setSelected([]);
   });
-  const upload = (assetId: string, file: File) => run(`upload:${assetId}`, async () => { await putFile(assetId, file); });
+  /** One file into one row: refused unless its name is that row's file (084.html → 84.html). */
+  const upload = (assetId: string, file: File) => run(`upload:${assetId}`, async () => {
+    const item = record?.items.find((entry) => entry.assetId === assetId);
+    if (item && normalizeEditionFileName(file.name) !== normalizeEditionFileName(item.path)) {
+      throw new Error(`${file.name} is not ${item.path}. Choose the revised file with the same name.`);
+    }
+    await putFile(assetId, file);
+  });
+  /** Several revised files at once: each goes into the row with the same name. */
+  const uploadMatching = (files: File[]) => run('upload:all', async () => {
+    if (!record) return;
+    const matched = matchReplacementFiles(files.map((file) => file.name), record.items.map((item) => ({ asset_id: item.assetId, path: item.path })));
+    if (matched.errors.length > 0 || matched.matches.length === 0) {
+      throw new Error((matched.errors.join(' ') || 'Choose at least one file.') + ` Files being replaced: ${record.items.map((item) => item.path).join(', ')}.`);
+    }
+    for (const match of matched.matches) {
+      setMessage(`Uploading the new ${match.path}…`);
+      await putFile(match.assetId, files[match.fileIndex]);
+    }
+    await reload();
+    setMessage('Uploaded. Open “Preview new file” for each one and check it plays, then press “Continue automatically”.');
+  });
   const register = () => run('register', async () => { const current = await reload(); if (current?.plan?.step === 'register') await doRegister(current); });
   const clearOld = () => run('clear', async () => { const current = await reload(); if (current?.plan?.step === 'clear') await doClear(current); });
   const finish = () => run('finish', doFinish);
@@ -349,6 +370,14 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
                   </li>
                 ))}
               </ul>
+              {(plan.step === 'upload' || plan.step === 'register') && (
+                <label className="field">
+                  <span className="field__label">Choose all the revised files at once</span>
+                  <input type="file" multiple aria-label="Revised files for this replacement" disabled={working}
+                    onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ''; if (files.length) void uploadMatching(files); }} />
+                  <span className="field__hint">Each file goes into the row with the same name (084.html → 84.html). A file with any other name is refused.</span>
+                </label>
+              )}
             </li>
             <li aria-current={plan.step === 'register' ? 'step' : undefined}>
               <strong>Register the new files on your contract.</strong> One wallet approval; it moves no STX.
