@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   HOMEPAGE_AUDIONAUTS,
+  HOMEPAGE_BOUNTY,
   HOMEPAGE_FRESH,
   HOMEPAGE_INTENTS,
   HOMEPAGE_KP_LOOPS,
@@ -59,6 +60,21 @@ describe('homepage content configuration', () => {
     expect(cells).toBe(16);
     expect(HOMEPAGE_WALL[0]).toMatchObject({ id: 'xtrata-arcade', size: 'big', href: '/i/3081' });
     expect(HOMEPAGE_WALL.find((tile) => tile.kind === 'chess')).toMatchObject({ href: '/i/3072', title: 'On-Chain Chess' });
+  });
+
+  it('leads the strip with the live bounty and links its PDFs', () => {
+    expect(HOMEPAGE_STRIP_SLIDES[0]).toMatchObject({ id: 'bounty', href: HOMEPAGE_BOUNTY.guideHref });
+    expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');
+    expect(HOMEPAGE_BOUNTY.rulesHref).toBe('/bounty/xtrata-bounty-full-rules.pdf');
+    expect(indexHtml).toContain('id="homeBounty"');
+  });
+
+  it('never shows a Mint button for Audionauts without a mint link', () => {
+    if (HOMEPAGE_AUDIONAUTS.status === 'live') {
+      expect(HOMEPAGE_AUDIONAUTS.mintHref).toBeTruthy();
+    } else {
+      expect(HOMEPAGE_STRIP_SLIDES.find((slide) => slide.id === 'audionauts')?.cta).toBe('Listen on L1');
+    }
   });
 
   it('draws the chess board locally instead of loading the X Chess inscription', () => {

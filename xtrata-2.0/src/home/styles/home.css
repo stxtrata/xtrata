@@ -8344,3 +8344,75 @@
       text-transform: uppercase;
     }
     .home-tone--arcade .home-tile__badge { background: rgba(255, 201, 60, 0.9); color: #140f02; font-weight: 700; }
+
+    /* Bounty: Create. Inscribe. Share. (500 STX, 1 to 21 October) ---------------- */
+    .home-bounty.home-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+      gap: clamp(24px, 4vw, 48px);
+      border-color: rgba(185, 239, 119, 0.4);
+      background: linear-gradient(135deg, rgba(185, 239, 119, 0.07), rgba(14, 16, 19, 0) 55%);
+      --tone: var(--home-lime);
+    }
+    .home-bounty__copy { display: flex; flex-direction: column; gap: 16px; align-self: center; min-width: 0; }
+    .home-bounty__tags { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .home-bounty__pill {
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: var(--home-lime);
+      color: #0a1004;
+      font: 700 11px var(--home-mono);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+    .home-bounty__kicker { color: var(--home-muted); font: 600 11px var(--home-mono); letter-spacing: 0.14em; text-transform: uppercase; }
+    .home-bounty__title { margin: 0; font-size: clamp(30px, 4.2vw, 52px); font-weight: 900; letter-spacing: -0.035em; line-height: 1.02; }
+    .home-bounty__title em { color: var(--home-lime); font-family: Georgia, 'Times New Roman', serif; font-weight: 500; }
+    .home-bounty__body { margin: 0; color: #c3cbd0; font-size: 16px; line-height: 1.55; max-width: 56ch; }
+    .home-bounty__stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      padding: 14px 0;
+      border-top: 1px solid var(--home-line);
+      border-bottom: 1px solid var(--home-line);
+    }
+    .home-bounty__stat { display: flex; flex-direction: column; gap: 2px; padding-left: 16px; border-left: 1px solid var(--home-line); }
+    .home-bounty__stat:first-child { padding-left: 0; border-left: 0; }
+    .home-bounty__stat strong { font-size: 24px; font-weight: 900; }
+    .home-bounty__stat:first-child strong { color: var(--home-lime); }
+    .home-bounty__stat span { color: var(--home-muted); font-size: 13px; }
+    .home-bounty__actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .home-bounty__side { display: flex; flex-direction: column; justify-content: center; gap: 14px; min-width: 0; }
+    .home-bounty__steps { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .home-bounty__step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--home-line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .home-bounty__num {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--home-lime);
+      color: #0a1004;
+      font: 800 13px var(--home-mono);
+    }
+    .home-bounty__words { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .home-bounty__words strong { font-size: 16px; font-weight: 800; }
+    .home-bounty__words span { color: #c3cbd0; font-size: 14px; line-height: 1.45; }
+    .home-bounty__foot { margin: 0; color: var(--home-muted); font-size: 13px; }
+    @media (max-width: 1060px) {
+      .home-bounty.home-panel { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 600px) {
+      .home-bounty__stats { grid-template-columns: 1fr; gap: 10px; }
+      .home-bounty__stat { padding-left: 0; border-left: 0; }
+      .home-bounty__actions .home-btn { flex: 1 1 100%; justify-content: center; }
+    }
