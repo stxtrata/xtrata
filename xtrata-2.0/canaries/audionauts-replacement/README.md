@@ -22,7 +22,8 @@ Collection files stay out of Git: originals are read from and revisions written 
 From `xtrata-2.0`:
 
 ```bash
-node canaries/audionauts-replacement/make-revisions.mjs   # writes _claude_scratch/audionauts-v1-recursive-revisions/
+node canaries/audionauts-replacement/serve.mjs            # open http://localhost:8787 and try them yourself (live inscriptions via xtrata.xyz)
+node canaries/audionauts-replacement/make-revisions.mjs   # (re)builds _claude_scratch/audionauts-v1-recursive-revisions/
 node canaries/audionauts-replacement/canary.mjs           # renders and plays original + revised 084/090 in headless Chromium
 cd contracts/clarinet && \
   AUDIONAUTS_DIR=../../_claude_scratch/audionauts-v1-recursive \
@@ -37,20 +38,21 @@ runs on synthetic stand-ins when the two variables are unset.
 ## Operator steps (after this code is deployed)
 
 1. Keep the collection **paused**. Sign in to `/manage` as the collection's creator
-   (or an Xtrata admin) and open Audionauts 1.0.
-2. Artwork & metadata → **Replace unminted files**. Find `84` and `90`, tick both,
-   press **Replace 2 files**. (Refused if either is minted or reserved, or minting is open.)
-3. Upload the revised `084.html` for 84 and `090.html` for 90. Check the shown hashes
-   start `0d840ffc…` and `d02edc2b…`.
-4. **Register 2 new files** — one wallet approval, no STX moves. Sign with the
-   contract owner (audionals.btc) or operator admin (xtrata.btc). The panel waits for
-   confirmation.
-5. **Remove 2 old registrations** — one approval per file, each confirmed before the next.
-6. **Finish replacement**. The collection still has 111 files; the originals are kept.
-7. Prepare contract → *Register your files on the contract* → **Check registration**
-   until all 111 show as registered. Open minting stays disabled until this passes.
-8. Open minting yourself when ready. Nothing in this flow unpauses.
+   (or an Xtrata admin), connect the owner (audionals.btc) or operator admin
+   (xtrata.btc) wallet, and open Audionauts 1.0.
+2. Artwork & metadata → **Replace unminted files** → *Replace automatically*: choose
+   the revised `084.html` and `090.html` together. They are matched to 84 and 90 by name.
+3. The studio uploads them and stops. Open **Preview new file** next to each: that is
+   the uploaded file served by the live server, loading #3060 recursively. Open the star
+   and check LIQUIDEZ · Χ₮¡₪¢₮ plays. Nothing is on-chain yet; Cancel is still available.
+4. Press **Continue automatically** and approve the wallet prompts as they appear: one to
+   register the new files, then one per old file to remove its registration. The studio
+   waits for each to confirm. No STX moves.
+5. When it says **Done … all registered on the contract**, the collection still has 111
+   files and the registration check has been carried over, so the launch checks pass.
+   (If the earlier check was out of date, it asks you to press *Check registration* instead.)
+6. Open minting yourself when ready. Nothing in this flow unpauses.
 
-If anything is interrupted, reopen the panel: it re-reads the chain and resumes at
-the right step (a submitted transaction is waited on again). Cancel is only offered
+If anything is interrupted, reopen the panel and press **Continue automatically**: it
+re-reads the chain and resumes at the right step (a submitted transaction is waited on again). Cancel is only offered
 before anything changed on-chain.

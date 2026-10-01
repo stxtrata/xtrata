@@ -222,6 +222,60 @@ describe.skipIf(!sqliteAvailable)('replacing unminted files in a published colle
   });
 });
 
+describe.skipIf(!sqliteAvailable)('registration check after a replacement', () => {
+  it('carries a current check over to the new files, so minting can reopen without a full re-check', async () => {
+    const { computeInventoryDigest } = await import('../../../src/manage/lib/inventory-registration');
+    const t = await setup();
+    const helperId = `${ARTIST}.xtrata-collection-audionauts-1-3c855746`;
+    const hashes = () => (t.DB.sqlite.prepare('SELECT expected_hash FROM assets WHERE collection_id = ?').all(COLLECTION) as any[]).map(r => r.expected_hash).sort();
+    const metadata = t.metadata();
+    metadata.inventoryRegistration = { version: 1, contractId: helperId, hashCount: 111, digest: await computeInventoryDigest(hashes()), verifiedAt: '2026-09-30T00:00:00Z' };
+    t.DB.sqlite.prepare('UPDATE collections SET metadata = ? WHERE id = ?').run(JSON.stringify(metadata), COLLECTION);
+    const base = { env: t.env, collectionId: COLLECTION, chain: t.chain };
+    await startReplacement({ ...base, assetIds: [t.ids[84], t.ids[90]], actor: null });
+    for (const n of [84, 90]) await uploadReplacement({ ...base, assetId: t.ids[n], bytes: revised(n), contentType: 'text/html' });
+    for (const n of [84, 90]) { t.state.registered.set(hashBytes(revised(n)), TOKEN_URI); t.state.registered.delete(hashBytes(edition(n))); }
+    const status = await finishReplacement(base);
+    expect(status.registrationCarried).toBe(true);
+    const record = t.metadata().inventoryRegistration;
+    expect(record).toMatchObject({ contractId: helperId, hashCount: 111, digest: await computeInventoryDigest(hashes()) });
+  });
+
+  it('does not carry over a stale check (e.g. files changed since it ran)', async () => {
+    const t = await setup(); // fixture record is for another digest
+    const base = { env: t.env, collectionId: COLLECTION, chain: t.chain };
+    await startReplacement({ ...base, assetIds: [t.ids[84]], actor: null });
+    await uploadReplacement({ ...base, assetId: t.ids[84], bytes: revised(84), contentType: 'text/html' });
+    t.state.registered.set(hashBytes(revised(84)), TOKEN_URI); t.state.registered.delete(hashBytes(edition(84)));
+    expect((await finishReplacement(base)).registrationCarried).toBe(false);
+    expect(t.metadata().inventoryRegistration).toBeNull();
+  });
+});
+
+describe.skipIf(!sqliteAvailable)('previewing an uploaded replacement on the server', () => {
+  it('serves the uploaded bytes sandboxed before anything goes on-chain; the live asset is unchanged', async () => {
+    const { readReplacementPreview } = await import('../collection-replacement');
+    const t = await setup();
+    const base = { env: t.env, collectionId: COLLECTION, chain: t.chain };
+    await startReplacement({ ...base, assetIds: [t.ids[84]], actor: null });
+    await expectError(readReplacementPreview(t.env, COLLECTION, t.ids[84]), 404, /No uploaded replacement/);
+    await uploadReplacement({ ...base, assetId: t.ids[84], bytes: revised(84), contentType: 'text/html' });
+    const preview = await readReplacementPreview(t.env, COLLECTION, t.ids[84]);
+    expect(new Uint8Array(await new Response(preview.body).arrayBuffer())).toEqual(revised(84));
+    expect(preview.hash).toBe(hashBytes(revised(84)));
+    expect(t.asset(84).expected_hash).toBe(hashBytes(edition(84)));
+
+    const response = await onRequest({
+      request: new Request(`https://xtrata.xyz/collections/${COLLECTION}/replacements?preview=${t.ids[84]}`),
+      env: { ...t.env, CREATOR_AUTH_MODE: 'off' }, params: { collectionId: COLLECTION }
+    } as any);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Security-Policy')).toBe('sandbox allow-scripts');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+    expect(new TextDecoder().decode(await response.arrayBuffer())).toContain('Χ₮¡₪¢₮');
+  });
+});
+
 describe('reading the chain for a replacement', () => {
   it('parses the helper and core reads, and treats a failed read as a failure', async () => {
     const { makeReplacementChain, resolveReplacementTarget } = await import('../collection-replacement');

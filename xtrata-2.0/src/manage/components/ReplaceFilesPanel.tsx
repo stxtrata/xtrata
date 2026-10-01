@@ -15,6 +15,7 @@ import { toStacksNetwork } from '../../lib/network/stacks';
 import { useManageWallet } from '../ManageWalletContext';
 import { signerPreflight } from '../lib/contract-preflight';
 import { waitForTxConfirmation } from '../lib/tx-confirmation';
+import { buildCollectionAssetPreviewUrl, matchReplacementFiles } from '../../lib/collections/inventory-replacement';
 import type {
   InventoryReplacementRecord,
   ReplacementChainState,
@@ -26,6 +27,7 @@ type Status = {
   chain: ReplacementChainState | null;
   plan: ReplacementPlan | null;
   activeFileCount: number;
+  registrationCarried?: boolean;
 };
 type Asset = { asset_id: string; path?: string | null; state?: string | null; expected_hash?: string | null };
 
@@ -171,50 +173,99 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
     }
   }
 
-  const start = () => run('start', async () => {
-    const next = await api<Status>(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'start', assetIds: selected }) });
-    setStatus(next);
-    setSelected([]);
-  });
+  const post = <T,>(body: Record<string, unknown>) =>
+    api<T>(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
-  const upload = (assetId: string, file: File) => run(`upload:${assetId}`, async () => {
+  const putFile = async (assetId: string, file: File) => {
     const next = await api<Status>(`${base}?assetId=${encodeURIComponent(assetId)}`, {
       method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file
     });
     setStatus(next);
-  });
+    return next;
+  };
 
-  const register = () => run('register', async () => {
-    if (!record || !plan) return;
+  /** One wallet approval registering every new file. True once confirmed on-chain. */
+  const doRegister = async (current: Status) => {
+    const { record: open, plan: next } = current;
+    if (!open || !next) return false;
     const problem = await preflightSigner('set-registered-token-uri-batch');
     if (problem) throw new Error(problem);
-    const entries = record.items.filter((item) => item.replacement && plan.toRegister.includes(item.replacement.hash));
+    const entries = open.items.filter((item) => item.replacement && next.toRegister.includes(item.replacement.hash));
+    setMessage('Approve “register new files” in your wallet…');
     const txId = await sendContractCall('set-registered-token-uri-batch', [listCV(entries.map((item) =>
       tupleCV({ hash: toBuffer(item.replacement!.hash), 'token-uri': stringAsciiCV(item.original.tokenUri) })))]);
-    await api(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'record-tx', kind: 'register', txId }) });
+    await post({ action: 'record-tx', kind: 'register', txId });
     resumed.current = txId.startsWith('0x') ? txId : `0x${txId}`;
-    await waitAndSettle(txId, 'register');
-  });
+    return waitAndSettle(txId, 'register');
+  };
 
-  const clearOld = () => run('clear', async () => {
-    if (!plan) return;
+  /** One approval per old file (the contract clears one hash per call), each confirmed before the next. */
+  const doClear = async (current: Status) => {
+    if (!current.plan) return false;
     const problem = await preflightSigner('clear-registered-token-uri');
     if (problem) throw new Error(problem);
-    // The contract clears one hash per call; each waits for confirmation before the next.
-    for (const hash of plan.toClear) {
+    for (const [index, hash] of current.plan.toClear.entries()) {
+      setMessage(`Approve “remove old registration” ${index + 1} of ${current.plan.toClear.length} in your wallet…`);
       const txId = await sendContractCall('clear-registered-token-uri', [toBuffer(hash)]);
-      await api(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'record-tx', kind: 'clear', txId }) });
+      await post({ action: 'record-tx', kind: 'clear', txId });
       resumed.current = txId.startsWith('0x') ? txId : `0x${txId}`;
-      if (!(await waitAndSettle(txId, 'clear'))) return;
+      if (!(await waitAndSettle(txId, 'clear'))) return false;
     }
+    return true;
+  };
+
+  const doFinish = async () => {
+    const next = await post<Status>({ action: 'finish' });
+    setStatus(next);
+    setMessage(next.registrationCarried
+      ? `Done. ${next.activeFileCount} files in the collection, all registered on the contract. Minting is still paused — open it when you're ready.`
+      : `Files replaced. ${next.activeFileCount} files in the collection. Minting stays paused: check registration under “Register your files on the contract”, then open minting when every check passes.`);
+    onReplaced?.();
+  };
+
+  /**
+   * Runs the remaining steps in order, re-reading the chain before each one.
+   * Only the wallet approvals need the artist; it stops (resumable) at any
+   * blocker, failed or unconfirmed transaction.
+   */
+  const continueAll = async () => {
+    for (let round = 0; round < 8; round += 1) {
+      const current = await reload();
+      const step = current?.plan?.step;
+      if (!current || !step) return;
+      if (step === 'register') { if (!(await doRegister(current))) return; continue; }
+      if (step === 'clear') { if (!(await doClear(current))) return; continue; }
+      if (step === 'finish') { await doFinish(); return; }
+      if (step === 'upload') { setMessage('Upload a new file for every file being replaced, then continue.'); return; }
+      if (step === 'blocked') { setMessage(current.plan!.blockers.join(' ')); return; }
+      return;
+    }
+  };
+
+  /** Pick the revised files: they are matched to collection files by name, then everything runs. */
+  const replaceAutomatically = (files: File[]) => run('auto', async () => {
+    const matched = matchReplacementFiles(files.map((file) => file.name), assets);
+    if (matched.errors.length > 0 || matched.matches.length === 0) throw new Error(matched.errors.join(' ') || 'Choose at least one file.');
+    setMessage(`Checking ${matched.matches.map((match) => match.path).join(', ')} on the contract…`);
+    await post<Status>({ action: 'start', assetIds: matched.matches.map((match) => match.assetId) });
+    for (const match of matched.matches) {
+      setMessage(`Uploading the new ${match.path}…`);
+      await putFile(match.assetId, files[match.fileIndex]);
+    }
+    // Nothing is on-chain yet: let the artist open each uploaded file first.
+    await reload();
+    setMessage('Uploaded. Open “Preview new file” for each one and check it plays, then press “Continue automatically”.');
   });
 
-  const finish = () => run('finish', async () => {
-    const next = await api<Status>(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'finish' }) });
-    setStatus(next);
-    setMessage(`Files replaced. ${next.activeFileCount} files in the collection. Minting stays paused: check registration under “Register your files on the contract”, then open minting when every check passes.`);
-    onReplaced?.();
+  const start = () => run('start', async () => {
+    setStatus(await post<Status>({ action: 'start', assetIds: selected }));
+    setSelected([]);
   });
+  const upload = (assetId: string, file: File) => run(`upload:${assetId}`, async () => { await putFile(assetId, file); });
+  const register = () => run('register', async () => { const current = await reload(); if (current?.plan?.step === 'register') await doRegister(current); });
+  const clearOld = () => run('clear', async () => { const current = await reload(); if (current?.plan?.step === 'clear') await doClear(current); });
+  const finish = () => run('finish', doFinish);
+  const continueAutomatically = () => run('auto', continueAll);
 
   const cancel = () => run('cancel', async () => {
     setStatus(await api<Status>(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'cancel' }) }));
@@ -240,6 +291,18 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
 
       {!record && (
         <>
+          <label className="field">
+            <span className="field__label">Replace automatically: choose the revised files</span>
+            <input type="file" multiple aria-label="Revised files" disabled={working}
+              onChange={(event) => { const files = [...(event.target.files ?? [])]; event.target.value = ''; if (files.length) void replaceAutomatically(files); }} />
+            <span className="field__hint">
+              Files are matched to your collection by name (084.html replaces 84.html). The studio checks they can be replaced and
+              uploads them so you can preview them on the server. Then “Continue automatically” asks you to approve the contract
+              updates in your wallet — one to register the new files and one per old file to remove — waiting for each to confirm.
+              Minting stays paused throughout.
+            </span>
+          </label>
+          <p className="meta-value">Or pick the files to replace one step at a time:</p>
           <label className="field">
             <span className="field__label">Find files</span>
             <input className="input" value={filter} placeholder="e.g. 84.html" onChange={(event) => setFilter(event.target.value)} />
@@ -276,7 +339,9 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
               <ul>
                 {record.items.map((item) => (
                   <li key={item.assetId}>
-                    {item.path}: {item.replacement ? <>new file ready (<code>{short(item.replacement.hash)}</code>)</> : 'waiting for the new file'}
+                    {item.path}: {item.replacement ? <>new file ready (<code>{short(item.replacement.hash)}</code>){' '}
+                      <a href={`${base}?preview=${encodeURIComponent(item.assetId)}`} target="_blank" rel="noopener noreferrer">Preview new file</a>{' · '}
+                      <a href={buildCollectionAssetPreviewUrl(collectionId, item.assetId, { version: item.original.hash })} target="_blank" rel="noopener noreferrer">current file</a></> : 'waiting for the new file'}
                     {(plan.step === 'upload' || (plan.step === 'register' && plan.toRegister.includes(item.replacement?.hash ?? ''))) && (
                       <input type="file" aria-label={`New file for ${item.path}`} disabled={working}
                         onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void upload(item.assetId, file); }} />
@@ -317,6 +382,11 @@ export default function ReplaceFilesPanel({ collectionId, published, refreshKey 
             </li>
           </ol>
           <div className="mint-actions">
+            {plan.step !== 'upload' && plan.step !== 'blocked' && (
+              <button type="button" className="button" disabled={working} onClick={() => void continueAutomatically()}>
+                {busy === 'auto' ? 'Working…' : 'Continue automatically'}
+              </button>
+            )}
             <button type="button" className="button button--ghost" disabled={working} onClick={() => void reload()}>Refresh status</button>
             {(plan.step === 'upload' || plan.step === 'register') && plan.toClear.length === record.items.length && (
               <button type="button" className="button button--ghost" disabled={working} onClick={() => void cancel()}>Cancel replacement</button>

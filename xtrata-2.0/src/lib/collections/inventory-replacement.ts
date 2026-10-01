@@ -211,3 +211,30 @@ export function buildCollectionAssetPreviewUrl(
   if (version) query.set('v', version.slice(0, 16));
   return `/collections/${encodeURIComponent(collectionId)}/asset-preview?${query.toString()}`;
 }
+
+/** "084.html", "84.html" and "folder/084.HTML" all name the same edition file. */
+export const normalizeEditionFileName = (value: string) =>
+  (value.split(/[\\/]/).pop() ?? '').trim().toLowerCase().replace(/^0+(?=\d)/, '');
+
+/**
+ * Match revised files picked by the artist to the collection's active files by
+ * name. Every file must match exactly one active file, and no file twice.
+ */
+export function matchReplacementFiles(
+  fileNames: string[],
+  assets: Array<{ asset_id: string; path?: string | null; state?: string | null }>
+): { matches: Array<{ fileIndex: number; assetId: string; path: string }>; errors: string[] } {
+  const active = assets.filter((asset) => !['expired', 'sold-out'].includes(String(asset.state ?? '').toLowerCase()));
+  const errors: string[] = [];
+  const matches: Array<{ fileIndex: number; assetId: string; path: string }> = [];
+  fileNames.forEach((name, fileIndex) => {
+    const key = normalizeEditionFileName(name);
+    const found = active.filter((asset) => normalizeEditionFileName(String(asset.path ?? '')) === key);
+    if (found.length === 0) errors.push(`${name} does not match any unminted file in this collection.`);
+    else if (found.length > 1) errors.push(`${name} matches more than one file in this collection.`);
+    else if (matches.some((match) => match.assetId === found[0].asset_id)) errors.push(`${name} was chosen twice.`);
+    else matches.push({ fileIndex, assetId: found[0].asset_id, path: String(found[0].path ?? found[0].asset_id) });
+  });
+  if (fileNames.length > MAX_REPLACEMENT_FILES) errors.push(`Replace at most ${MAX_REPLACEMENT_FILES} files at a time.`);
+  return { matches, errors };
+}

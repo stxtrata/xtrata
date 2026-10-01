@@ -78,3 +78,23 @@ describe('records and preview URLs', () => {
     expect(buildCollectionAssetPreviewUrl('c1', 'a84', { version: 'not-a-hash', purpose: 'cover' })).toBe('/collections/c1/asset-preview?assetId=a84&purpose=cover');
   });
 });
+
+describe('matching revised files to collection files', () => {
+  const assets = [
+    { asset_id: 'a84', path: '84.html', state: 'draft' },
+    { asset_id: 'a90', path: '90.html', state: 'draft' },
+    { asset_id: 'a91', path: '91.html', state: 'sold-out' }
+  ];
+  it('matches by edition file name, ignoring leading zeros and folders', async () => {
+    const { matchReplacementFiles } = await import('../inventory-replacement');
+    expect(matchReplacementFiles(['084.html', 'revisions/090.HTML'], assets)).toEqual({
+      matches: [{ fileIndex: 0, assetId: 'a84', path: '84.html' }, { fileIndex: 1, assetId: 'a90', path: '90.html' }], errors: []
+    });
+  });
+  it('refuses unknown, minted and repeated files', async () => {
+    const { matchReplacementFiles } = await import('../inventory-replacement');
+    expect(matchReplacementFiles(['085.html'], assets).errors[0]).toContain('does not match');
+    expect(matchReplacementFiles(['091.html'], assets).errors[0]).toContain('does not match');
+    expect(matchReplacementFiles(['084.html', '84.html'], assets).errors[0]).toContain('chosen twice');
+  });
+});
