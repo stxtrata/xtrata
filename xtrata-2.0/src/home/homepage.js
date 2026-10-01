@@ -272,10 +272,19 @@ const renderNowPlaying = () => {
   mount.dataset.state = state;
   mount.replaceChildren();
   if (!track) {
-    mount.append(
-      element('span', 'home-now__kicker', 'Free to play here'),
-      element('span', 'home-now__hint', 'Press any cover to hear it. It plays through Xtrata Radio.')
+    // An empty player slot, not a button: it tells people what to press, and
+    // turns into the real player (below) as soon as a song starts.
+    const row = element('div', 'home-now__row');
+    const ghost = element('span', 'home-now__ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.append(svgIcon('play'));
+    const text = element('div', 'home-now__text');
+    text.append(
+      element('span', 'home-now__kicker', 'Your free player · nothing playing yet'),
+      element('span', 'home-now__hint', 'Press any song cover on this page to play it. This box then becomes your player.')
     );
+    row.append(ghost, text);
+    mount.append(row);
     return;
   }
   const row = element('div', 'home-now__row');
