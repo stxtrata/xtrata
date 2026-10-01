@@ -512,13 +512,17 @@ const CollectionLiveCachedDetailMedia = ({
 }: CollectionLiveCachedDetailMediaProps) => {
   const queryClient = useQueryClient();
   const contentSeededRef = useRef(false);
+  // HTML/text must run from its server URL: a blob: copy cannot resolve the
+  // relative /i/<id> requests recursive inscriptions make ("Player unavailable").
+  const mediaKind = getMediaKind(asset.mime_type);
+  const isDocument = mediaKind === 'html' || mediaKind === 'text';
   const cachedContentKey = useMemo(
     () => ['collection-live', 'detail-content', contractId, tokenId?.toString() ?? 'none'],
     [contractId, tokenId]
   );
   const cachedContentQuery = useQuery({
     queryKey: cachedContentKey,
-    enabled: tokenId !== null,
+    enabled: tokenId !== null && !isDocument,
     staleTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -552,7 +556,7 @@ const CollectionLiveCachedDetailMedia = ({
   }, [previewUrl, tokenId]);
 
   useEffect(() => {
-    if (tokenId === null) {
+    if (tokenId === null || isDocument) {
       return;
     }
     if (cachedContentQuery.data?.data && cachedContentQuery.data.data.length > 0) {
@@ -622,6 +626,7 @@ const CollectionLiveCachedDetailMedia = ({
     cachedContentKey,
     cachedContentQuery.data,
     contractId,
+    isDocument,
     previewUrl,
     queryClient,
     tokenId
@@ -630,7 +635,7 @@ const CollectionLiveCachedDetailMedia = ({
   return (
     <CollectionLiveGalleryMedia
       asset={asset}
-      previewUrl={cachedContentUrl ?? previewUrl}
+      previewUrl={isDocument ? previewUrl : cachedContentUrl ?? previewUrl}
       collectionTitle={collectionTitle}
       loading="eager"
     />
@@ -1020,6 +1025,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const [mintedScanPending, setMintedScanPending] = useState(false);
   const [pendingMintAssetIds, setPendingMintAssetIds] = useState<string[]>([]);
   const [selectedGalleryAssetId, setSelectedGalleryAssetId] = useState<string | null>(null);
+  const [galleryOpen, setGalleryOpen] = useState(false);
   const [resumeAssetId, setResumeAssetId] = useState<string | null>(null);
   const [showMintGuide, setShowMintGuide] = useState(false);
   const [beginState, setBeginState] = useState<StepState>('idle');
@@ -3827,7 +3833,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <h2>Previously inscribed</h2>
               <p>Minted assets from this live collection across all supported file types.</p>
             </div>
+            <button
+              type="button"
+              className="button button--ghost button--mini"
+              aria-expanded={galleryOpen}
+              onClick={() => setGalleryOpen((open) => !open)}
+            >
+              {galleryOpen ? 'Hide' : `Show${mintedGallery.length > 0 ? ` (${mintedGallery.length})` : ''}`}
+            </button>
           </div>
+          {galleryOpen && (
           <div className="panel__body">
             {mintedGallery.length === 0 ? (
               <p className="meta-value">{mintedGalleryEmptyMessage}</p>
@@ -4064,6 +4079,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </div>
             )}
           </div>
+          )}
         </section>
 
         <section className="panel app-section collection-live-page__details">
