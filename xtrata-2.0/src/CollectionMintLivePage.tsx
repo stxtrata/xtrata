@@ -1,4 +1,5 @@
 import { isCollectionV15, isFixedPriceCollection, readCollectionV15FeeUnits, quoteCollectionV15Mint, type CollectionV15FeeUnits } from '../packages/xtrata-sdk/src/collection-v15';
+import { buildCollectionAssetPreviewUrl } from './lib/collections/inventory-replacement';
 import { startJourney, event } from './lib/telemetry/client';
 import { classify } from './lib/telemetry/classify';
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
@@ -1262,9 +1263,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (!selectedGalleryAsset || !resolvedCollectionId) {
       return null;
     }
-    return `/collections/${encodeURIComponent(
-      resolvedCollectionId
-    )}/asset-preview?assetId=${encodeURIComponent(selectedGalleryAsset.asset_id)}`;
+    return buildCollectionAssetPreviewUrl(resolvedCollectionId, selectedGalleryAsset.asset_id, {
+      version: selectedGalleryAsset.expected_hash
+    });
   }, [resolvedCollectionId, selectedGalleryAsset]);
 
   const selectedGalleryDetailsQuery = useQuery({
@@ -1706,11 +1707,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   );
 
   const fetchAssetBytes = useCallback(
-    async (assetId: string) => {
+    // `version` (the file's content hash) keys every cache layer, so a file
+    // replaced while the collection was paused is never served from a stale copy.
+    async (assetId: string, version?: string | null) => {
       if (!resolvedCollectionId) {
         throw new Error('Collection id missing.');
       }
-      const cacheKey = `${resolvedCollectionId}:${assetId}`;
+      const cacheKey = `${resolvedCollectionId}:${assetId}:${version ?? ''}`;
       const cached = readTimedCache(
         collectionAssetBytesCache,
         cacheKey,
@@ -1725,9 +1728,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       }
       const loadPromise = (async () => {
         const response = await fetch(
-          `/collections/${encodeURIComponent(
-            resolvedCollectionId
-          )}/asset-preview?assetId=${encodeURIComponent(assetId)}`,
+          buildCollectionAssetPreviewUrl(resolvedCollectionId, assetId, { version }),
           { cache: 'default' }
         );
         if (!response.ok) {
@@ -2089,7 +2090,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             }
 
             try {
-              const rawBytes = await fetchAssetBytes(asset.asset_id);
+              const rawBytes = await fetchAssetBytes(asset.asset_id, asset.expected_hash);
               const computedHash = computeExpectedHash(chunkBytes(rawBytes));
               const computedHex = bytesToHex(computedHash);
               const rawShaHex = bytesToHex(sha256(rawBytes));
@@ -2314,7 +2315,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           batchSize: RESERVATION_SCAN_COMPUTE_BATCH_SIZE,
           predicate: async (candidate) => {
             try {
-              const rawBytes = await fetchAssetBytes(candidate.asset_id);
+              const rawBytes = await fetchAssetBytes(candidate.asset_id, candidate.expected_hash);
               const computedHash = computeExpectedHash(chunkBytes(rawBytes));
               const computedHex = bytesToHex(computedHash);
               const rawShaHex = bytesToHex(sha256(rawBytes));
@@ -2430,7 +2431,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         return quoteCollectionV15Mint(latest.v15Fees, chunks, price, { fixedPrice });
       };
       try {
-        const rawBytes = await fetchAssetBytes(asset.asset_id);
+        const rawBytes = await fetchAssetBytes(asset.asset_id, asset.expected_hash);
         const chunks = chunkBytes(rawBytes);
         const computedHash = computeExpectedHash(chunks);
         const computedHex = bytesToHex(computedHash);
@@ -3849,9 +3850,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                       tokenId && tokenId.length > 0
                         ? collectionTokenNumberByGlobalId[tokenId]
                         : undefined;
-                    const previewUrl = `/collections/${encodeURIComponent(
-                      resolvedCollectionId
-                    )}/asset-preview?assetId=${encodeURIComponent(asset.asset_id)}`;
+                    const previewUrl = buildCollectionAssetPreviewUrl(resolvedCollectionId, asset.asset_id, {
+                      version: asset.expected_hash
+                    });
                     const isSelected = asset.asset_id === selectedGalleryAsset?.asset_id;
                     return (
                       <article
