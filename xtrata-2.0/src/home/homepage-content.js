@@ -8,7 +8,47 @@
 // "listen" link on the homepage opens it; its music streams from Bitcoin L1.
 export const AUDIONAUTS_ORDINAL_HREF = 'https://ordinals.com/inscription/95768432';
 
+// Audionauts mint opens Thursday 1 October 2026 at 19:00 BST (18:00 UTC).
+export const AUDIONAUTS_LAUNCH_AT = '2026-10-01T18:00:00Z';
+// The Audionauts mint page. It is only shown from the launch time above: before
+// then the homepage keeps the "mints at 7pm" wording and the Ordinal listen link,
+// and from then on it switches itself to "Minting now" with a Mint button.
+// (Set this to null to hold the mint button back, e.g. if the mint is delayed.)
+export const AUDIONAUTS_MINT_HREF = 'https://xtrata.xyz/collection/audionauts-1-0';
+
+const PAGE_LOADED_AT = Date.now();
+const AUDIONAUTS_MS_TO_LAUNCH = Date.parse(AUDIONAUTS_LAUNCH_AT) - PAGE_LOADED_AT;
+const AUDIONAUTS_LIVE = Boolean(AUDIONAUTS_MINT_HREF) && AUDIONAUTS_MS_TO_LAUNCH <= 0;
+const AUDIONAUTS_TONIGHT = AUDIONAUTS_MS_TO_LAUNCH > 0 && AUDIONAUTS_MS_TO_LAUNCH < 24 * 60 * 60 * 1000;
+const AUDIONAUTS_WHEN = AUDIONAUTS_TONIGHT ? 'tonight, 7pm BST' : 'Thu 1 Oct, 7pm BST';
+
+// The Create. Inscribe. Share. bounty, 1 to 21 October 2026. PDFs live in public/bounty/.
+export const HOMEPAGE_BOUNTY = Object.freeze({
+  tag: '#XtrataBounty',
+  guideHref: '/bounty/xtrata-bounty-at-a-glance.pdf',
+  rulesHref: '/bounty/xtrata-bounty-full-rules.pdf',
+  telegramHref: 'https://t.me/+DSYbDCWx869hOWY0',
+  stats: Object.freeze([
+    Object.freeze(['500 STX', 'in prizes']),
+    Object.freeze(['19', 'prizes to win']),
+    Object.freeze(['Wed 28 Oct', 'winners announced'])
+  ]),
+  steps: Object.freeze([
+    Object.freeze(['Announce', 'Post your wallet on X with #XtrataBounty.']),
+    Object.freeze(['Inscribe', 'Make something new on Xtrata. That is your first raffle ticket.']),
+    Object.freeze(['Use Xtrata', 'Play, collect, claim and list. Each different action adds a ticket.']),
+    Object.freeze(['Share', 'Post your work on X and submit it by 21 October.'])
+  ]),
+  funding: 'Co-funded 50/50 by Xtrata and Zero Authority DAO.'
+});
+
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
+  Object.freeze({
+    id: 'bounty', tag: 'Live', tone: 'lime',
+    title: '500 STX bounty: Create. Inscribe. Share.',
+    line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
+    cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
+  }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
     title: 'Xtrata Music is out for Mac and Windows.',
@@ -33,12 +73,19 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     line: "Signature drum loops from The Prodigy's former live drummer. Play them now.",
     cta: 'Enter the loop station', href: '/kp-loops/#kp-loops'
   }),
-  Object.freeze({
-    id: 'audionauts', tag: 'Soon', tone: 'teal',
-    title: 'Audionauts mints Thursday, 7pm BST.',
-    line: 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
-    cta: 'Listen on L1', href: AUDIONAUTS_ORDINAL_HREF, newTab: true
-  }),
+  Object.freeze(AUDIONAUTS_LIVE
+    ? {
+        id: 'audionauts', tag: 'Live', tone: 'teal',
+        title: 'Audionauts is live.',
+        line: '111 helmets, each hiding a star song. Mint yours now.',
+        cta: 'Mint an Audionaut', href: AUDIONAUTS_MINT_HREF, newTab: true
+      }
+    : {
+        id: 'audionauts', tag: 'Soon', tone: 'teal',
+        title: `Audionauts mints ${AUDIONAUTS_WHEN}.`,
+        line: 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
+        cta: 'Listen on L1', href: AUDIONAUTS_ORDINAL_HREF, newTab: true
+      }),
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',
     title: 'Xtrata Radio.',
@@ -88,7 +135,7 @@ export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
     // Opens the original Audionauts ordinal, which streams its music from Bitcoin L1.
     id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
-    eyebrow: 'Mints Thu 1 Oct · 7pm BST', title: 'Audionauts',
+    eyebrow: AUDIONAUTS_LIVE ? 'Minting now' : `Mints ${AUDIONAUTS_WHEN}`, title: 'Audionauts',
     subtitle: 'Listen to the original music, streamed from L1 →',
     image: '/home/wall/audionauts-3059.webp',
     href: AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
@@ -127,15 +174,15 @@ export const HOMEPAGE_MUSIC = Object.freeze({
 
 // Audionauts teaser. Flip status to 'live' and set mintHref on launch day.
 export const HOMEPAGE_AUDIONAUTS = Object.freeze({
-  status: 'soon',
+  status: AUDIONAUTS_LIVE ? 'live' : 'soon',
   // Mint opens Thursday 1 October 2026 at 19:00 BST.
-  mintLabel: 'Thu 7pm BST',
+  mintLabel: AUDIONAUTS_TONIGHT ? 'Tonight 7pm' : 'Thu 7pm BST',
   editions: 111,
   // The original Audionauts ordinal streams its music from Bitcoin L1.
   listenHref: AUDIONAUTS_ORDINAL_HREF,
   poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
-  mintHref: null,
+  mintHref: AUDIONAUTS_MINT_HREF,
   soundtrackIds: Object.freeze([3062, 3061, 3058, 2910, 2892, 3036]),
   soundtrackCredit: 'Audionals · 3ai3 · BotCupid'
 });
@@ -164,7 +211,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
     { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_ORDINAL_HREF, listen: true },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_ORDINAL_HREF, listen: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),
@@ -295,6 +342,11 @@ export const validateHomepageContent = () => {
     }
     if ((item.kind === 'image' || item.kind === 'radio') && !item.image) {
       errors.push(`Homepage wall tile ${item.id} needs an image.`);
+    }
+  });
+  [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref].forEach((href) => {
+    if (!isNavigableHref(href)) {
+      errors.push('Homepage bounty links must be navigable.');
     }
   });
   HOMEPAGE_FRESH.pinned.forEach((item) => {

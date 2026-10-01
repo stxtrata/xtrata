@@ -1,5 +1,6 @@
 import {
   HOMEPAGE_AUDIONAUTS,
+  HOMEPAGE_BOUNTY,
   HOMEPAGE_CHESS,
   HOMEPAGE_FRESH,
   HOMEPAGE_INTENTS,
@@ -19,6 +20,7 @@ const HOME_MOUNT_IDS = [
   'homeNowPlaying',
   'homeMusicTabs',
   'homeMusicShelf',
+  'homeBounty',
   'homeAudionauts',
   'homeKpLoops',
   'homeFreshFilters',
@@ -270,10 +272,19 @@ const renderNowPlaying = () => {
   mount.dataset.state = state;
   mount.replaceChildren();
   if (!track) {
-    mount.append(
-      element('span', 'home-now__kicker', 'Free to play here'),
-      element('span', 'home-now__hint', 'Press any cover to hear it. It plays through Xtrata Radio.')
+    // An empty player slot, not a button: it tells people what to press, and
+    // turns into the real player (below) as soon as a song starts.
+    const row = element('div', 'home-now__row');
+    const ghost = element('span', 'home-now__ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.append(svgIcon('play'));
+    const text = element('div', 'home-now__text');
+    text.append(
+      element('span', 'home-now__kicker', 'Your free player · nothing playing yet'),
+      element('span', 'home-now__hint', 'Press any song cover on this page to play it. This box then becomes your player.')
     );
+    row.append(ghost, text);
+    mount.append(row);
     return;
   }
   const row = element('div', 'home-now__row');
@@ -532,6 +543,54 @@ const renderMusic = async () => {
 };
 
 // ---------------------------------------------------------------------------
+// Bounty
+const renderBounty = () => {
+  const mount = document.getElementById('homeBounty');
+  if (!mount) {
+    return;
+  }
+  const b = HOMEPAGE_BOUNTY;
+  mount.replaceChildren();
+  const copy = element('div', 'home-bounty__copy');
+  const tags = element('div', 'home-bounty__tags');
+  tags.append(
+    element('span', 'home-bounty__pill', 'Live now · 1 to 21 Oct'),
+    element('span', 'home-bounty__kicker', 'The Xtrata bounty')
+  );
+  const title = element('h2', 'home-bounty__title');
+  title.append(document.createTextNode('Create. Inscribe. Share. '), element('em', '', 'Win a share of 500 STX.'));
+  const body = element(
+    'p',
+    'home-bounty__body',
+    'Inscribe something original on Xtrata and share it on X. Five main prizes, four special awards and ten raffle prizes, with a raffle ticket for every extra thing you do.'
+  );
+  const stats = element('div', 'home-bounty__stats');
+  b.stats.forEach(([value, label]) => {
+    const stat = element('div', 'home-bounty__stat');
+    stat.append(element('strong', '', value), element('span', '', label));
+    stats.append(stat);
+  });
+  const actions = element('div', 'home-bounty__actions');
+  actions.append(
+    actionLink(b.guideHref, 'See how to enter', 'home-btn home-btn--solid', 'bounty:guide', { newTab: true }),
+    actionLink(b.rulesHref, 'Full rules', 'home-btn home-btn--ghost', 'bounty:rules', { newTab: true }),
+    actionLink(b.telegramHref, 'Join the Telegram', 'home-btn home-btn--ghost', 'bounty:telegram', { newTab: true })
+  );
+  copy.append(tags, title, body, stats, actions);
+  const steps = element('ol', 'home-bounty__steps');
+  b.steps.forEach(([name, text], i) => {
+    const step = element('li', 'home-bounty__step');
+    const num = element('span', 'home-bounty__num', String(i + 1));
+    const words = element('span', 'home-bounty__words');
+    words.append(element('strong', '', name), element('span', '', text));
+    step.append(num, words);
+    steps.append(step);
+  });
+  const side = element('div', 'home-bounty__side');
+  side.append(steps, element('p', 'home-bounty__foot', `${b.funding} Tag ${b.tag}.`));
+  mount.append(copy, side);
+};
+
 // Audionauts
 const renderAudionauts = () => {
   const mount = document.getElementById('homeAudionauts');
@@ -877,6 +936,7 @@ export const initHomepage = () => {
   renderWall();
   renderNowPlaying();
   void renderMusic();
+  renderBounty();
   renderAudionauts();
   renderKpLoops();
   void renderFresh();
