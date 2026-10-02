@@ -137,12 +137,13 @@ export const HOMEPAGE_WALL = Object.freeze([
     title: 'The Judge Is in the House', subtitle: '3ai3'
   }),
   Object.freeze({
-    // Opens the original Audionauts ordinal, which streams its music from Bitcoin L1.
+    // Live: opens the collection page. Before the mint: the original Audionauts ordinal.
     id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
     eyebrow: AUDIONAUTS_LIVE ? 'Minting now' : `Mints ${AUDIONAUTS_WHEN}`, title: 'Audionauts',
-    subtitle: 'Listen to the original music, streamed from L1 →',
+    subtitle: AUDIONAUTS_LIVE ? 'Mint yours now →' : 'Listen to the original music, streamed from L1 →',
     image: '/home/wall/audionauts-3059.webp',
-    href: AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
+    // Once the mint is live every tile and banner goes to the collection page.
+    href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
   }),
   Object.freeze({
     id: 'forever-twins', kind: 'image', tone: 'orange',
@@ -184,6 +185,9 @@ export const HOMEPAGE_AUDIONAUTS = Object.freeze({
   editions: 111,
   // The original Audionauts ordinal streams its music from Bitcoin L1.
   listenHref: AUDIONAUTS_ORDINAL_HREF,
+  // The poster goes to the collection once the mint is live.
+  posterHref: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF,
+  posterCue: AUDIONAUTS_LIVE ? 'Mint an Audionaut' : 'Listen to the original music, streamed from L1',
   poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
   mintHref: AUDIONAUTS_MINT_HREF,
@@ -215,7 +219,7 @@ export const HOMEPAGE_FRESH = Object.freeze({
     { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_ORDINAL_HREF, listen: true },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, listen: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),

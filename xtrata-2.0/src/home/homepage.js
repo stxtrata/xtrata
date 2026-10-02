@@ -624,26 +624,32 @@ const renderAudionauts = () => {
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
       : a.mintHref
         ? actionLink(a.mintHref, 'See the collection', 'home-btn home-btn--solid', 'audionauts:collection', { newTab: true })
-        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
-    actionLink(a.listenHref, 'Listen to the original on L1', 'home-btn home-btn--ghost', 'audionauts:ordinal', { newTab: true })
+        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
   );
   copy.append(
     tags,
     element('h2', 'home-aud__title', 'AUDIONAUTS'),
     lead,
-    element(
-      'p',
-      'home-aud__body',
-      'Each Audionaut carries a real inscribed song. Listen to the original Audionauts music now, streamed straight from Bitcoin L1.'
-    ),
+    (() => {
+      const body = element('p', 'home-aud__body');
+      const original = actionLink(
+        a.listenHref,
+        'Listen to the original music, streamed straight from Bitcoin L1',
+        'home-aud__inline',
+        'audionauts:ordinal',
+        { newTab: true }
+      );
+      body.append(document.createTextNode('Each Audionaut carries a real inscribed song. '), original, document.createTextNode('.'));
+      return body;
+    })(),
     stats,
     actions
   );
   const media = element('div', 'home-aud__media');
   const cue = element('span', 'home-aud__listen-cue');
-  cue.append(playBadge(), element('span', '', 'Listen to the original music, streamed from L1'));
-  const listen = actionLink(a.listenHref, '', 'home-aud__listen', 'audionauts:ordinal-art', { newTab: true });
-  listen.setAttribute('aria-label', 'Audionauts: listen to the original music on the Bitcoin L1 ordinal');
+  cue.append(playBadge(), element('span', '', a.posterCue));
+  const listen = actionLink(a.posterHref, '', 'home-aud__listen', 'audionauts:poster', { newTab: true });
+  listen.setAttribute('aria-label', live ? 'Audionauts: open the collection page to mint' : 'Audionauts: listen to the original music on the Bitcoin L1 ordinal');
   listen.append(image(a.poster, 'Audionauts', 'home-aud__poster'), cue);
   media.append(listen);
   const sound = element('div', 'home-aud__sound');

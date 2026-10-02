@@ -8430,3 +8430,6 @@
       color: rgba(185, 239, 119, 0.6);
     }
     .home-now__ghost svg { width: 14px; height: 14px; }
+
+    .home-aud__inline { color: var(--home-teal); text-decoration: underline; text-underline-offset: 3px; }
+    .home-aud__inline:hover { color: #a8f0dc; }
