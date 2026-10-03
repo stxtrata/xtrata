@@ -7,7 +7,7 @@
     "build:canary:collection-v17": "node scripts/build-collection-v17-canary.mjs",
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",
-    "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet && npm run build:music-profile && npm run build:arcade-submit",
+    "prebuild": "npm run build:music-support && npm run arcade:games:manifest && npm run xboard:versions:manifest && npm run build:agent-one-wallet && npm run build:agent-one && npm run build:radio && npm run build:forever-twins-wallet && npm run build:radio-likes && npm run build:radio-wallet && npm run build:radio-test-wallet && npm run build:music-profile && npm run build:arcade-submit && npm run build:audionaut",
     "build:radio-test-wallet": "vite build -c vite.radio-test-wallet.config.ts",
     "build": "vite build",
     "build:forever-twins-wallet": "vite build -c vite.forever-twins.config.ts",
@@ -92,6 +92,7 @@
     "music:desktop:build": "npm --prefix desktop/music run dist:mac",
     "music:desktop:test": "node scripts/music-support/desktop-smoke.mjs",
     "build:music-profile": "vite build -c vite.music-profile.config.ts",
+    "build:audionaut": "vite build -c vite.audionaut.config.ts",
     "build:canary:arcade-scores-v2": "node scripts/build-arcade-scores-v2-canary.mjs",
     "build:canary:arcade-launch": "node scripts/build-arcade-launch-canary.mjs"
   },

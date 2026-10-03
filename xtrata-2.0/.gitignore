@@ -68,6 +68,7 @@ scripts/wizard/.collection-v15/
 
 /public/radio/music-profile-wallet-v2.js
 public/radio/music-profile-wallet-v3.js
+public/audionaut/audionaut-gate.js
 
 # Audionauts V1 recursive item files (staged for upload via the collection studio, not source)
 _claude_scratch/audionauts-v1-recursive*
