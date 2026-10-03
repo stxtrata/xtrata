@@ -1,5 +1,6 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { findAudionaut } from './core';
+import { fetchEdition } from './edition';
 
 // Where the sequencer lives. Empty = the unlocked state shows a "coming soon" card.
 // Set to the sequencer inscription / hosted file (e.g. '/audionaut/daw.html').
@@ -20,8 +21,22 @@ function show(state: State) {
 }
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-5);
 
+// Top bar: the Audionaut number (1 to 111) comes first; the Xtrata token id is the second
+// label. The number is read from the inscription, so it appears a moment after unlocking.
+function whoLabel(address: string, tokenId: number | undefined, edition?: number | null) {
+  if (tokenId === undefined) return short(address);
+  const xtrata = `Xtrata ID #${tokenId}`;
+  return `${short(address)} · ${edition ? `Audionaut #${edition} · ${xtrata}` : xtrata}`;
+}
+
 function unlock(tokenId: number | undefined, address: string) {
-  $('granted-who').textContent = `${short(address)}${tokenId !== undefined ? ` · Audionaut #${tokenId}` : ''}`;
+  const who = $('granted-who');
+  who.textContent = whoLabel(address, tokenId);
+  if (tokenId !== undefined) {
+    void fetchEdition(tokenId).then((edition) => {
+      if (edition && document.body.dataset.state === 'granted') who.textContent = whoLabel(address, tokenId, edition);
+    });
+  }
   const frame = $('daw') as HTMLIFrameElement;
   const soon = $('daw-soon');
   if (DAW_SRC) {
