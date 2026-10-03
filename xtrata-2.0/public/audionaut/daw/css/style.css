@@ -1,4 +1,21 @@
 /* The Audionaut — dark hardware-inspired theme */
+/* Wordmark face: Orbitron (SIL OFL 1.1), subset to capitals and digits, embedded so the
+   logo renders identically offline and inside the host page with no font request. */
+@font-face {
+  font-family: "Audionaut Wordmark";
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+  src: url(data:font/woff2;base64,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) format("woff2");
+}
+@font-face {
+  font-family: "Audionaut Wordmark";
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+  src: url(data:font/woff2;base64,d09GMgABAAAAAAg4ABAAAAAAE4gAAAfbAAIAQgAAAAAAAAAAAAAAAAAAAAAAAAAAGkYbgmAcKgZgP1NUQVQqAFgRCAqYFJEfATYCJAOBJAtUAAQgBYQKByAMBxunDlFUcs4n+XGQk52aB5pTKfOwU4RCdf4uPC7ErIt8CKf7d0ludNEZ4t0gmVpbdI75xIG2G66DNrhoP2b2eT7+Pj3zJtsCmGAIEtAuK5Var5a/WsEKWLLbJie6zP+ae7N5ZZbARoJQFY6MCW1/NluizRaI88vsUuGqWALB3Xg2itUJd76/VINJNs3CqqwHP0L27tiHa98JAhABAEAQFRCIqaCJSDRAqbfzqovCXFMbtYL8VdirC2QcAN8xeZ/WHnKqwYByGIGQSMLgz+uljQIdDDICs7AEm7AHp1zzwCs/yo14kDKkEggvBPPt9QHcCUQKD168lVFWOeVVwDC73LbPW/cyOdXyFo6UTx7fTQe8ViFPa6S8orjrOXyi4IXhg6fmhgncz/uCrSIoTVDqchmD5DlDXmKVSRgIY0m6J/d1uFwUvKjNzJYh0MfK+hqWnGcMP9TA3+NI3lLyjXd+GeNrQs9bCCZPkAT7isDyEsfUBNiWG3S9mRtDmH2gwExMBoCGdH3yhqjKgYtdAhDiv2o+EItgPHuznyNBUJwQpmOujAtgnJb8qjHAh7SvhPm2F/XKJU71ZMbsg8QAFk5mVXpOMkBkeA31RmHMss7ek2htFCpCgmDOAP+/zqH/bnJ4V6pRHSYQUQIE3gi0AJiA/QXuAu9kQJjuV2OQEzDARkVSWUSOqazFxfDc+nh4lBE9RD5I5MoobpSX8mQPt5pCN9/T4l7WIHvyQulSpQxhFpELqirJvp6efjKlVKDDjl4UpLHnD4PbEBH8s0SGzeDFMdMAYa6k3oGSWT6rNwMlh87xcro0diaBjEqmZ0uthDEXjhDWtqcCeVoF5mc1Q2YqU0Ztu7ZmOUZID4RMIlLw1GElD4/DYJXULeOJZHmoQAVGYgWOZ0WGE05dQASggpgYjhGyBbT/AP/EH9IVkHSrXV1C29s4bl9MF3fg2h91z8W0BZYtwEzsrELSIZCttl3JElpDLjh0SigpNY80QxYw2ZlJhIpEgTgpAypw89JblEgHobijUEQzMrPvJxfxWRkCIXYbEVqnz1iru1YSYW0Z6e2Z7U/3lImCbkcI04VrI+SuMDGd7DwKiN1cKNqKzxY4AR06tsn8BIThmI4rKhjz7IgevT3RmP4REYldYATwbCUQs7VlVoG8VJPFV30FiDmD3vfCXpMIZYQg6A3XOGxhxTkLXpTOpw+XR0nIev205EMzE9msWEV5dVGFxceG7HsRIiC9iFT7VgosNy3vqbZb+5onRf908pPT0fvkadqHbqA2elqNvwDtaZ42Xopv4JZQfq6W93UGyROdG5DkiZgyMUbkgqfQNnQ4T8Gm2XD0QXVP8SuTdH8PX88SDz8Pfx0WV3JX6p5S2jbnxiBEnoIN24AfmKl7LVozYs0iL70hVS2IBlpg0qPal6PS51i6VA+QbHUwu5zqDdVJWiPI5XBhYoGCFs5G+Zl19DEL4WBdXf21+iRNSpATtMmserUK83/hoEY6TK7JXBwbNwVq5eGR7JmkNBbvlmSdNO2RFRzuUeoeRrbNihwtbAymi6O96YiW/8VBfBMGbqC96a4sgf7lVvTqMrma1Eafa7hLfW4w6/feVS8UVg+5unhnJLUtqzK62Z5uy2xaK1JGJN12+wmwoKGmu3S14SgNUpx1Zu3APTiGRRfnJIQnhs+m3RAIenHc+ls3ZdjmwnW3xtOLRfu7+y/CoMqJ7kJ14vX/r2aSqiQqCdqka/9Wz9YMcsPD8z5FvI9Y2OiIhGhMkvcouuvyEBzVbqgJ6lb/vGvadu1aXlvVJuXG86NjRmMgtVHLkbNGpLBH4zm8TSnrbzCTXTDDxz/3iraJ2ujMCGu1SEdcs3679qRxS9QmTzNg6HEWBw75X80V7NDyaR86ydMDjiUCHulgIg13xBTw85/lf+XTTRFNFi+/CnO03KvadpzF9uMDv3DgTKvTun2gCT9djmpXc4U7glpXp3RTsvS0w0KxM7TbpD1pYr6BlK/uGxo97zh1SnEglgsyuOFFYGqPnQupDdeR6LRTjvPTSEoroJvvta2kZJv3hOmd4jvfkbdSTarrP/8pBb1ANJ3zE73t3IRDJnB2HPKdMqZ9jTXorTb5X80zd7zttmtXcttXqmIpds7fc5OLEQfHNQ+Wp3Vutl3sEy7d5D5/AQYSN50mcMOar9T8amDZFwCcaSkSAO6eWk79P+X/CrQcewPhhlHKf8HS6Dtg9/eHAQj/2MD6wqeTYem6qNFxMHUiLONf5C6nd23p8pYwuyaoRXBdGeYWXMAimLpuTU3EdVkKvcDc1oLY8Z1Pqvq1arO5VYsOQVhrev9YRHeirkaCdG2YcXaLG28dA/OYBhYR/P8W67G4QVFjHBNXUQAIIFBLVE3cNAgj3eauBxaZuQP4BjyE8PAthGEotxBWRMkhnApVG6h1BrghW44UiDXOEc7qY5N01U1/PRSzK9KLUZQIkUyMWolgxU0R3BbCvSjtqosnzRjuAJB2Opqgt4Mi2kNPiQTY0V66BWoRfmN2xVBNb22FKeu66ixcpFadIi70tDdrCmzTde20Y6AQRn1tqFEL+LqerHrow6o9o9StOJyaJgp1ToBler/hG/sJCziR6DtpL0qYiAWoqaGJpsE4RQ2XGqoZNmlrZG1YFyO5OJjMR2uI0z16JRjWNaH/5yFK613kf30TNx4AAA==) format("woff2");
+}
+
 :root {
   color-scheme: dark;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -85,27 +102,68 @@ input[type="range"] {
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 11px;
   white-space: nowrap;
   flex-shrink: 0;
 }
-.brand .logo {
-  color: var(--accent);
-  font-size: 20px;
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  filter: drop-shadow(0 0 7px rgba(46, 219, 132, 0.4));
+}
+.wordmark {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  line-height: 1;
 }
 .brand h1 {
-  font-family: var(--font-display);
-  font-size: 15px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   margin: 0;
-  letter-spacing: 2px;
+  font-family: "Audionaut Wordmark", "Orbitron", var(--font-display);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  filter: drop-shadow(0 0 9px rgba(46, 219, 132, 0.28));
 }
-.brand h1 span {
+.brand h1 .the {
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.32em;
+  color: var(--dim);
+}
+.brand h1 .name {
+  background: linear-gradient(180deg, #f4fff9 0%, #b6f7d8 42%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: var(--accent);
 }
-.brand h1 .version {
+.brand .tagline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--accent-2);
+}
+.brand .tagline::before {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+.brand .version {
   color: #ff9f43;
-  font-size: 10px;
-  letter-spacing: 0.5px;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
   white-space: nowrap;
 }
 
