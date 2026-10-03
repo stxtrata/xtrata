@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Audionaut Sequencer · Xtrata</title>
+<title>Audional Sequencer · Xtrata</title>
 <style>
 :root{--bg:#05080d;--ink:#e6f1f2;--muted:#7f949b;--teal:#3fe0cf;--teal-dim:rgba(63,224,207,.14);--edge:#12202a;--danger:#ff8f7a}
 *{box-sizing:border-box}
@@ -50,7 +50,7 @@ body[data-state="granted"]{display:flex;flex-direction:column;height:100vh;heigh
     <p class="kicker"><b>Xtrata</b> · Audionauts only</p>
     <div class="helmet"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 22a13 13 0 0 1 26 0v6a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z"/><path d="M12 21h16v6a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/></svg></div>
     <h1>The signal is sealed.</h1>
-    <p class="sub">Only those who carry a helmet can tune in. Connect your wallet to enter the Audionaut sequencer.</p>
+    <p class="sub">Only those who carry a helmet can tune in. Connect your wallet to enter the Audional Sequencer.</p>
     <div class="row"><button id="connect" type="button">Connect wallet to enter</button></div>
   </section>
   <!-- WORKING -->
@@ -80,8 +80,8 @@ body[data-state="granted"]{display:flex;flex-direction:column;height:100vh;heigh
 </main>
 <!-- GRANTED -->
 <section id="state-granted" hidden>
-  <div class="bar"><b>Audionaut sequencer</b><span class="who" id="granted-who"></span><button id="leave" class="ghost" type="button">Disconnect</button></div>
-  <iframe id="daw" title="Audionaut sequencer" hidden allow="autoplay; midi; microphone; fullscreen"></iframe>
+  <div class="bar"><b>Audional Sequencer</b><span class="who" id="granted-who"></span><button id="leave" class="ghost" type="button">Disconnect</button></div>
+  <iframe id="daw" title="Audional Sequencer" hidden allow="autoplay; midi; microphone; fullscreen"></iframe>
   <div id="daw-soon" hidden><div class="helmet"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M7 22a13 13 0 0 1 26 0v6a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z"/><path d="M12 21h16v6a2 2 0 0 1-2 2h-12a2 2 0 0 1-2-2z"/></svg></div><h1>Helmet verified.</h1><p class="sub">You’re in. The sequencer is being tuned and will appear here.</p></div>
 </section>
 <script type="module" src="/audionaut/audionaut-gate.js"></script>
