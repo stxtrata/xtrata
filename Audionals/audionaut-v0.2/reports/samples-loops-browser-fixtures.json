@@ -1,0 +1,54 @@
+{
+  "scope": "generated WAV fixtures in the real workstation",
+  "humanListeningReview": false,
+  "checks": [
+    "No inscription audio fetch at workstation startup",
+    "First 22 draft candidates visible without audio downloads",
+    "Actual decoder/preview route leaves project unchanged",
+    "Selected region loads into channel 2 and produces audio through the actual running sequencer",
+    "Explicit loop bounds/rate reach the actual sampler; preview/stop leaves the running transport active",
+    "Catalogue refresh retains personal clips and does not alter the saved snapshot",
+    "Pinned project reopens while the catalogue file and stored library are unavailable",
+    "Close/reopen reloads the pinned inscription, exact region, hashes and playback settings",
+    "Missing catalogue/offline audio retains unresolved source and production settings",
+    "Inscription HTML and metadata never execute; recursive audio fails explicitly",
+    "Touch controls and mobile layout at 390 × 844"
+  ],
+  "sources": [
+    {
+      "id": "5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "gateway": "https://ordinals.com/content/",
+      "decoded": {
+        "duration": 2,
+        "sampleRate": 48000,
+        "frames": 96000,
+        "channels": 2
+      },
+      "sourceHash": "f5035d00ec861cb5d6a712a49dacefe310cc6763fc299cef9f51605fd6f655e0",
+      "payloadHash": "f5035d00ec861cb5d6a712a49dacefe310cc6763fc299cef9f51605fd6f655e0",
+      "sequencerRms": 0.1470913425216279,
+      "region": {
+        "start": 0.1,
+        "end": 0.6,
+        "loop": null,
+        "mode": "one-shot",
+        "gateSteps": 0,
+        "rate": 1.25,
+        "reverse": false,
+        "frameBasis": {
+          "sampleRate": 48000,
+          "startFrame": 4800,
+          "endFrame": 28800,
+          "endExclusive": true
+        },
+        "endChoice": "selected",
+        "frameBasisChanged": false
+      }
+    }
+  ],
+  "failures": [],
+  "browser": "143.0.7499.4",
+  "device": "macOS Chromium desktop + 390 × 844 emulation",
+  "completedAt": "2026-10-02T18:45:10.608Z",
+  "passed": true
+}
