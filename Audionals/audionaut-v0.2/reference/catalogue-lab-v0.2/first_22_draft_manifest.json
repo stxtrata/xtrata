@@ -1,0 +1,2227 @@
+{
+  "schema": "audionaut-clip-library-proposal",
+  "version": "0.2.0",
+  "status": "draft",
+  "created_at": "2026-10-02",
+  "compatibility": "Proposed adapter format; not verified against the live workstation.",
+  "sources": [
+    {
+      "id": "btc:ord:5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "inscription_number": 44667,
+      "content_path": "/content/5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.116,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - short drum loop - 113 BPM",
+        "raw_markdown": "\\#44667 - (0:01 - short drum loop - 113 BPM)  - [https://ordinals.com/inscription/5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0](https://ordinals.com/inscription/5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 187,
+        "line_end": 187,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 113.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "inscription_number": 44779,
+      "content_path": "/content/0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.404,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 90 BPM",
+        "raw_markdown": "\\#44779 - (0:01 - drum loop - 90 BPM) -  [https://ordinals.com/inscription/0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0](https://ordinals.com/inscription/0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 189,
+        "line_end": 189,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 90.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "inscription_number": 44972,
+      "content_path": "/content/418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.044,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 120 BPM",
+        "raw_markdown": "\\#44972 - (0:01 - drum loop - 120 BPM) -  [https://ordinals.com/inscription/418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0](https://ordinals.com/inscription/418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 191,
+        "line_end": 191,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 120.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0",
+      "inscription_number": 54462,
+      "content_path": "/content/0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.123,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 113 BPM",
+        "raw_markdown": "\\#54462 - (0:01 - drum loop - 113 BPM) -  [https://ordinals.com/inscription/0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0](https://ordinals.com/inscription/0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 199,
+        "line_end": 199,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 113.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0",
+      "inscription_number": 54494,
+      "content_path": "/content/1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.62,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - slow drum loop - 75 BPM",
+        "raw_markdown": "\\#54494 - (0:01 - slow drum loop - 75 BPM) -  [https://ordinals.com/inscription/1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0](https://ordinals.com/inscription/1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 203,
+        "line_end": 203,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 75.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0",
+      "inscription_number": 54503,
+      "content_path": "/content/5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.44,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 85 BPM",
+        "raw_markdown": "\\#54503 - (0:01 - drum loop - 85 BPM) -  [https://ordinals.com/inscription/5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0](https://ordinals.com/inscription/5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 207,
+        "line_end": 207,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 85.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0",
+      "inscription_number": 54504,
+      "content_path": "/content/0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.08,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 113 BPM",
+        "raw_markdown": "\\#54504 - (0:01 - drum loop - 113 BPM) -  [https://ordinals.com/inscription/0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0](https://ordinals.com/inscription/0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 211,
+        "line_end": 211,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 113.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0",
+      "inscription_number": 54520,
+      "content_path": "/content/8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.368,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 90 BPM",
+        "raw_markdown": "\\#54520 - (0:01 - drum loop - 90 BPM) -  [https://ordinals.com/inscription/8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0](https://ordinals.com/inscription/8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 215,
+        "line_end": 215,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 90.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0",
+      "inscription_number": 54528,
+      "content_path": "/content/0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 1.584,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:01 - drum loop - 75 BPM",
+        "raw_markdown": "\\#54528 - (0:01 - drum loop - 75 BPM) -  [https://ordinals.com/inscription/0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0](https://ordinals.com/inscription/0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 219,
+        "line_end": 219,
+        "duration_seconds_reported": 1.0,
+        "bpm_reported": 75.0
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0",
+      "inscription_number": 67129,
+      "content_path": "/content/292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 14.262,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:14 - nice arp synth",
+        "raw_markdown": "\\#67129 - (0:14 - nice arp synth) - [https://ordinals.com/inscription/292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0](https://ordinals.com/inscription/292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 239,
+        "line_end": 239,
+        "duration_seconds_reported": 14.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0",
+      "inscription_number": 98669,
+      "content_path": "/content/1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 14.915,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:14 - more synth arp",
+        "raw_markdown": "\\#98669 - (0:14 - more synth arp) -  [https://ordinals.com/inscription/1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0](https://ordinals.com/inscription/1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 249,
+        "line_end": 249,
+        "duration_seconds_reported": 14.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0",
+      "inscription_number": 104232,
+      "content_path": "/content/f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 7.608,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:07 - piano beat loop",
+        "raw_markdown": "\\#104232 - (0:07 - piano beat loop) -  [https://ordinals.com/inscription/f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0](https://ordinals.com/inscription/f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0)",
+        "section": "MUSIC LOOPS:",
+        "group_note": null,
+        "line_start": 257,
+        "line_end": 257,
+        "duration_seconds_reported": 7.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0",
+      "inscription_number": 140935,
+      "content_path": "/content/e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 13.78,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:13 - trippy synth",
+        "raw_markdown": "\\#140935 - (0:13 - trippy synth) -  [https://ordinals.com/inscription/e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0](https://ordinals.com/inscription/e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0)",
+        "section": "MORE HISTORICAL RECORDINGS",
+        "group_note": null,
+        "line_start": 339,
+        "line_end": 339,
+        "duration_seconds_reported": 13.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0",
+      "inscription_number": 145762,
+      "content_path": "/content/e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 3.239,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:03 - nice arpy loop",
+        "raw_markdown": "\\#145762 - (0:03 - nice arpy loop) -  [https://ordinals.com/inscription/e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0](https://ordinals.com/inscription/e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0)",
+        "section": "MORE HISTORICAL RECORDINGS",
+        "group_note": null,
+        "line_start": 359,
+        "line_end": 359,
+        "duration_seconds_reported": 3.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0",
+      "inscription_number": 158460,
+      "content_path": "/content/3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 15.333,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:15 - Rave loop",
+        "raw_markdown": "\\#158460 - (0:15 - Rave loop) - [https://ordinals.com/inscription/3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0](https://ordinals.com/inscription/3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0)",
+        "section": "MORE HISTORICAL RECORDINGS",
+        "group_note": null,
+        "line_start": 419,
+        "line_end": 419,
+        "duration_seconds_reported": 15.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0",
+      "inscription_number": 319454,
+      "content_path": "/content/885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 4.257,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:04 - nice guitar lick",
+        "raw_markdown": "\\#319454 - (0:04 - nice guitar lick) - [https://ordinals.com/inscription/885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0](https://ordinals.com/inscription/885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 538,
+        "line_end": 538,
+        "duration_seconds_reported": 4.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0",
+      "inscription_number": 340483,
+      "content_path": "/content/493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 19.476,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:19 - Japanese Strings",
+        "raw_markdown": "\\#340483 - (0:19 - Japanese Strings) - [https://ordinals.com/inscription/493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0](https://ordinals.com/inscription/493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 554,
+        "line_end": 554,
+        "duration_seconds_reported": 19.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0",
+      "inscription_number": 640728,
+      "content_path": "/content/37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 19.058,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:19 - Japanese Strings",
+        "raw_markdown": "\\#640728 - (0:19 - Japanese Strings) - [https://ordinals.com/inscription/37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0](https://ordinals.com/inscription/37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 582,
+        "line_end": 582,
+        "duration_seconds_reported": 19.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0",
+      "inscription_number": 669263,
+      "content_path": "/content/5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 4.071,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "0:04 - Dance loop",
+        "raw_markdown": "\\#669263 - (0:04 - Dance loop) - [https://ordinals.com/inscription/5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0](https://ordinals.com/inscription/5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 590,
+        "line_end": 590,
+        "duration_seconds_reported": 4.0,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0",
+      "inscription_number": 1097368,
+      "content_path": "/content/3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 19.152,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "Japanese Strings",
+        "raw_markdown": "Inscription 1097368 - Japanese Strings - [https://ordinals.com/inscription/3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0](https://ordinals.com/inscription/3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 646,
+        "line_end": 646,
+        "duration_seconds_reported": null,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:38c7b18107e019e953221416e69da0e6777f205213c7d55d9669b238cccd0c0ei0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "38c7b18107e019e953221416e69da0e6777f205213c7d55d9669b238cccd0c0ei0",
+      "inscription_number": 15950046,
+      "content_path": "/content/38c7b18107e019e953221416e69da0e6777f205213c7d55d9669b238cccd0c0ei0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 3.16,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "AND EITHER SIDE - Lots of piano notes",
+        "raw_markdown": "Inscription #15950046 - AND EITHER SIDE - Lots of piano notes - [https://ordinals.hiro.so/inscriptions?f=audio&nf=15000000&nt=16000000](https://ordinals.hiro.so/inscriptions?f=audio\\&nf=15000000\\&nt=16000000)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 706,
+        "line_end": 706,
+        "duration_seconds_reported": null,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    },
+    {
+      "id": "btc:ord:2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0",
+      "chain": "bitcoin",
+      "protocol": "ordinals",
+      "inscription_id": "2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0",
+      "inscription_number": 16548738,
+      "content_path": "/content/2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0",
+      "source_content_sha256": null,
+      "audio_payload_sha256": null,
+      "decoded_audio": {
+        "duration_seconds": null,
+        "sample_rate": null,
+        "frames": null,
+        "channels": null,
+        "method": null
+      },
+      "reported_duration_seconds": 2.064,
+      "source_note": {
+        "author": "Jim Crane",
+        "text": "Distorted Loop",
+        "raw_markdown": "Inscription #16548738 - Distorted Loop -&#xA0;**&#x20;**[https://ordinals.hiro.so/inscription/2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0](https://ordinals.hiro.so/inscription/2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0)",
+        "section": "I LOVE YOU IN MULTIPLE LANGUAGES:",
+        "group_note": null,
+        "line_start": 712,
+        "line_end": 712,
+        "duration_seconds_reported": null,
+        "bpm_reported": null
+      },
+      "verification_scope": "not_measured"
+    }
+  ],
+  "clips": [
+    {
+      "id": "btc:ord:5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0:clip:001",
+      "source_id": "btc:ord:5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "title": "short drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "short drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          187,
+          187
+        ],
+        "reported_bpm": 113.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 113.0,
+          "duration_seconds": 1.0619469026548674,
+          "reported_source_duration_seconds": 1.116,
+          "reported_minus_hypothesis_ms": 54.053097345132755,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0:clip:001",
+      "source_id": "btc:ord:0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          189,
+          189
+        ],
+        "reported_bpm": 90.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 90.0,
+          "duration_seconds": 1.3333333333333333,
+          "reported_source_duration_seconds": 1.404,
+          "reported_minus_hypothesis_ms": 70.66666666666674,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0:clip:001",
+      "source_id": "btc:ord:418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          191,
+          191
+        ],
+        "reported_bpm": 120.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 120.0,
+          "duration_seconds": 1.0,
+          "reported_source_duration_seconds": 1.044,
+          "reported_minus_hypothesis_ms": 44.0,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0:clip:001",
+      "source_id": "btc:ord:0cc0c8c14a8a03f3c3a0af2f41f671378949f901a671d7ab80d99921394e5270i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          199,
+          199
+        ],
+        "reported_bpm": 113.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 113.0,
+          "duration_seconds": 1.0619469026548674,
+          "reported_source_duration_seconds": 1.123,
+          "reported_minus_hypothesis_ms": 61.053097345132755,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0:clip:001",
+      "source_id": "btc:ord:1469f9c15a9be39dec9e678f425b0d3e4ce80bda7a289aa47ca164c5dd831badi0",
+      "title": "slow drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "slow drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          203,
+          203
+        ],
+        "reported_bpm": 75.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 75.0,
+          "duration_seconds": 1.6,
+          "reported_source_duration_seconds": 1.62,
+          "reported_minus_hypothesis_ms": 20.0,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0:clip:001",
+      "source_id": "btc:ord:5b6561ff964fa51cf645948b8c93ba71877e2638ab9de5b9eec183caf961afc0i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          207,
+          207
+        ],
+        "reported_bpm": 85.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 85.0,
+          "duration_seconds": 1.411764705882353,
+          "reported_source_duration_seconds": 1.44,
+          "reported_minus_hypothesis_ms": 28.235294117647072,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0:clip:001",
+      "source_id": "btc:ord:0f3f7608f6c7fa0540bd1437f72e3528ee4e621f34c1cd06b5ca882ba6e521c1i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          211,
+          211
+        ],
+        "reported_bpm": 113.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 113.0,
+          "duration_seconds": 1.0619469026548674,
+          "reported_source_duration_seconds": 1.08,
+          "reported_minus_hypothesis_ms": 18.053097345132755,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0:clip:001",
+      "source_id": "btc:ord:8cb47d82500c31e54e45c07097e06db1057a4b27a7e9320da907015614c6e4d6i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          215,
+          215
+        ],
+        "reported_bpm": 90.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 90.0,
+          "duration_seconds": 1.3333333333333333,
+          "reported_source_duration_seconds": 1.368,
+          "reported_minus_hypothesis_ms": 34.66666666666674,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0:clip:001",
+      "source_id": "btc:ord:0d2915c48661796a870ab293df0df36704b125f21354d1b4c019723e1c0522e2i0",
+      "title": "drum loop",
+      "usage_type": "loop",
+      "sound_category": "drums",
+      "tags": [
+        "drums",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "drum loop",
+        "usage_type": "loop",
+        "sound_category": "drums",
+        "tags": [
+          "drums",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          219,
+          219
+        ],
+        "reported_bpm": 75.0,
+        "loop_hypothesis": {
+          "quarter_note_beats": 2,
+          "bpm_from_note": 75.0,
+          "duration_seconds": 1.6,
+          "reported_source_duration_seconds": 1.584,
+          "reported_minus_hypothesis_ms": -16.0,
+          "status": "arithmetic_test_only_not_detected_beat_count",
+          "warning": "Two beats is only a hypothesis to audition. Difference is not a measured padding or silence value. Do not trim automatically."
+        },
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0:clip:001",
+      "source_id": "btc:ord:292f7760c81274f995b9e19b5dd63e0ac5387dd5f7394e642737e8092debdaa3i0",
+      "title": "nice arp synth",
+      "usage_type": "phrase",
+      "sound_category": "synth",
+      "tags": [
+        "synth"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "nice arp synth",
+        "usage_type": "phrase",
+        "sound_category": "synth",
+        "tags": [
+          "synth"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          239,
+          239
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0:clip:001",
+      "source_id": "btc:ord:1d5f082efcd11a9758b26e3618b7881d36ebeaa284a7e93165959112fccfc3c3i0",
+      "title": "more synth arp",
+      "usage_type": "phrase",
+      "sound_category": "synth",
+      "tags": [
+        "synth"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "more synth arp",
+        "usage_type": "phrase",
+        "sound_category": "synth",
+        "tags": [
+          "synth"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          249,
+          249
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0:clip:001",
+      "source_id": "btc:ord:f909b547dbb08bc7fe4ed0b3642517afd2f04ac441e1e5bd3e8d0ac79615260ai0",
+      "title": "piano beat loop",
+      "usage_type": "loop",
+      "sound_category": "keys",
+      "tags": [
+        "piano",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "piano beat loop",
+        "usage_type": "loop",
+        "sound_category": "keys",
+        "tags": [
+          "piano",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          257,
+          257
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0:clip:001",
+      "source_id": "btc:ord:e9d47bb4ff978b732f79f990e439918f69d133599dc6c1e55e127fcb995dca6ei0",
+      "title": "trippy synth",
+      "usage_type": "phrase",
+      "sound_category": "synth",
+      "tags": [
+        "synth"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "trippy synth",
+        "usage_type": "phrase",
+        "sound_category": "synth",
+        "tags": [
+          "synth"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          339,
+          339
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0:clip:001",
+      "source_id": "btc:ord:e7d3088352da0db9c9a8c46095a05697b69355c9e07aeede75651fd54b419b7ei0",
+      "title": "nice arpy loop",
+      "usage_type": "loop",
+      "sound_category": "synth",
+      "tags": [
+        "synth",
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "nice arpy loop",
+        "usage_type": "loop",
+        "sound_category": "synth",
+        "tags": [
+          "synth",
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          359,
+          359
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0:clip:001",
+      "source_id": "btc:ord:3815321390f419e3ef9a2c4247a5edcc126dd7fb44e99b5223722b93af1f3063i0",
+      "title": "Rave loop",
+      "usage_type": "loop",
+      "sound_category": "unknown",
+      "tags": [
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Rave loop",
+        "usage_type": "loop",
+        "sound_category": "unknown",
+        "tags": [
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          419,
+          419
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0:clip:001",
+      "source_id": "btc:ord:885632914001ebd7e2fab17cbebd7f35190014ce9d4dc51e855beea6b8ccea29i0",
+      "title": "nice guitar lick",
+      "usage_type": "phrase",
+      "sound_category": "guitar",
+      "tags": [
+        "guitar"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "nice guitar lick",
+        "usage_type": "phrase",
+        "sound_category": "guitar",
+        "tags": [
+          "guitar"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          538,
+          538
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0:clip:001",
+      "source_id": "btc:ord:493fa06b8704a47000499dd07190dc45f64bc965215e575e4460841922aed401i0",
+      "title": "Japanese Strings",
+      "usage_type": "phrase",
+      "sound_category": "strings",
+      "tags": [
+        "strings"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Japanese Strings",
+        "usage_type": "phrase",
+        "sound_category": "strings",
+        "tags": [
+          "strings"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          554,
+          554
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0:clip:001",
+      "source_id": "btc:ord:37d2bd116fd04d5d8cd1912099ae4ba62e88e89c8447f9a14f2aa1329977040fi0",
+      "title": "Japanese Strings",
+      "usage_type": "phrase",
+      "sound_category": "strings",
+      "tags": [
+        "strings"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Japanese Strings",
+        "usage_type": "phrase",
+        "sound_category": "strings",
+        "tags": [
+          "strings"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          582,
+          582
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0:clip:001",
+      "source_id": "btc:ord:5781fb32ee21487767b44a966c696580f1cb2a186b90d39d36e7fe780551ef6bi0",
+      "title": "Dance loop",
+      "usage_type": "loop",
+      "sound_category": "unknown",
+      "tags": [
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Dance loop",
+        "usage_type": "loop",
+        "sound_category": "unknown",
+        "tags": [
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          590,
+          590
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0:clip:001",
+      "source_id": "btc:ord:3519d2c9c88fe03174185222f5093a3dff4ff525a3c0ed1a79f3a09c3414b372i0",
+      "title": "Japanese Strings",
+      "usage_type": "phrase",
+      "sound_category": "strings",
+      "tags": [
+        "strings"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Japanese Strings",
+        "usage_type": "phrase",
+        "sound_category": "strings",
+        "tags": [
+          "strings"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          646,
+          646
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:38c7b18107e019e953221416e69da0e6777f205213c7d55d9669b238cccd0c0ei0:clip:001",
+      "source_id": "btc:ord:38c7b18107e019e953221416e69da0e6777f205213c7d55d9669b238cccd0c0ei0",
+      "title": "AND EITHER SIDE - Lots of piano notes",
+      "usage_type": "phrase",
+      "sound_category": "keys",
+      "tags": [
+        "piano"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": null,
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "AND EITHER SIDE - Lots of piano notes",
+        "usage_type": "phrase",
+        "sound_category": "keys",
+        "tags": [
+          "piano"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          706,
+          706
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    },
+    {
+      "id": "btc:ord:2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0:clip:001",
+      "source_id": "btc:ord:2569ad369163a3e3398761ea8e5f8bdfd363fdfd751177f6b6e06f21724c11b6i0",
+      "title": "Distorted Loop",
+      "usage_type": "loop",
+      "sound_category": "unknown",
+      "tags": [
+        "loop"
+      ],
+      "instrument": null,
+      "region": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "start_frame": null,
+        "end_frame": null,
+        "frame_rate": null,
+        "end_is_exclusive": true
+      },
+      "loop": {
+        "start_seconds": 0,
+        "end_seconds": null,
+        "beats": null,
+        "bpm": null,
+        "seam_verified": false,
+        "tempo_verified": false
+      },
+      "tuning": {
+        "key": null,
+        "root_note": null,
+        "verified": false
+      },
+      "time_signature": null,
+      "review": {
+        "status": "unreviewed",
+        "auditioned": false,
+        "reviewer": null,
+        "reviewed_at": null
+      },
+      "proposal": {
+        "status": "draft_not_newly_auditioned",
+        "proposed_title": "Distorted Loop",
+        "usage_type": "loop",
+        "sound_category": "unknown",
+        "tags": [
+          "loop"
+        ],
+        "basis": "Jim Crane’s supplied description; classification not independently confirmed",
+        "source_note_lines": [
+          712,
+          712
+        ],
+        "reported_bpm": null,
+        "loop_hypothesis": null,
+        "next_checks": [
+          "Listen to the complete source",
+          "Confirm instrument and use type",
+          "Choose trim or loop boundaries",
+          "Check tempo and beat count where applicable",
+          "Record attribution and reuse evidence separately"
+        ]
+      },
+      "rights": {
+        "status": "unknown",
+        "license": null,
+        "creator": null,
+        "evidence_url": null,
+        "notes": ""
+      }
+    }
+  ]
+}

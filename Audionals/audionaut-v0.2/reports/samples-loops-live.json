@@ -1,0 +1,75 @@
+{
+  "scope": "real inscription retrieval and automated engine playback",
+  "humanListeningReview": false,
+  "checks": [
+    "No inscription audio fetch at workstation startup",
+    "First 22 draft candidates visible without audio downloads",
+    "Actual decoder/preview route leaves project unchanged",
+    "Selected region loads into channel 2 and produces audio through the actual running sequencer",
+    "Explicit loop bounds/rate reach the actual sampler; preview/stop leaves the running transport active",
+    "Catalogue refresh retains personal clips and does not alter the saved snapshot",
+    "Close/reopen reloads the pinned inscription, exact region, hashes and playback settings",
+    "Touch controls and mobile layout at 390 × 844"
+  ],
+  "sources": [
+    {
+      "id": "5b6ede57a5a4afa88212c0b52c53245396c8b5f9f421c1f20027d67b3afb3338i0",
+      "gateway": "https://ordinals.com/content/",
+      "decoded": {
+        "duration": 1.075625,
+        "sampleRate": 48000,
+        "frames": 51630,
+        "channels": 1
+      },
+      "sourceHash": "1d6c4185a8c049a180f8fdd68c6e28e026f054404e7e832daf83ece9049f3b74",
+      "payloadHash": "1d6c4185a8c049a180f8fdd68c6e28e026f054404e7e832daf83ece9049f3b74",
+      "sequencerRms": 0.016485612827264053,
+      "region": {
+        "start": 0.1,
+        "end": 0.6,
+        "loop": null,
+        "mode": "one-shot",
+        "gateSteps": 0,
+        "rate": 1.25,
+        "reverse": false,
+        "frameBasis": {
+          "sampleRate": 48000,
+          "startFrame": 4800,
+          "endFrame": 28800,
+          "endExclusive": true
+        },
+        "endChoice": "selected",
+        "frameBasisChanged": false
+      }
+    },
+    {
+      "id": "0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "gateway": "https://ordinals.com/content/0a2fc435404ebe3151ef051fadbc40e37eff22e111ce01ac8d46d3db46c19a03i0",
+      "decoded": {
+        "duration": 1.364,
+        "sampleRate": 48000,
+        "frames": 65472,
+        "channels": 1
+      },
+      "payloadHash": "6e12c5b15e941f6908b54c6c63255dc569128309df50701fcd68e188055456f3",
+      "success": true
+    },
+    {
+      "id": "418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "gateway": "https://ordinals.com/content/418db69313f79c9161ca455961361bdf4c6f05a44862b7d99eac9e0efc9093a0i0",
+      "decoded": {
+        "duration": 0.9838333333333333,
+        "sampleRate": 48000,
+        "frames": 47224,
+        "channels": 1
+      },
+      "payloadHash": "be233a89989d5215889991f91d6bd87d40c905cbf6545111f13d260aae9a8dfb",
+      "success": true
+    }
+  ],
+  "failures": [],
+  "browser": "143.0.7499.4",
+  "device": "macOS Chromium desktop + 390 × 844 emulation",
+  "completedAt": "2026-10-02T18:45:10.608Z",
+  "passed": true
+}

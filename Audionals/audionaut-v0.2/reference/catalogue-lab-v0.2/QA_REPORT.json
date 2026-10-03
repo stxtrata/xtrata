@@ -1,0 +1,186 @@
+{
+  "suite": "Audionaut Catalogue Lab 0.2",
+  "fixture": "Generated 2-second 220 Hz mono WAV; not an inscription recording",
+  "browser_test_scope": "Browser admin policy blocks URL navigation. UI injected in memory; fetch and storage mocked; digest delegated to Python hashlib. Actual Chromium decoder used. Python loopback API and disk cache tested separately with generated WAV.",
+  "live_audio_auditioned": 0,
+  "live_audio_measured": 0,
+  "external_network_test": "Direct ordinals.com request failed DNS resolution; web retrieval unavailable. External integration not verified.",
+  "tests": [
+    {
+      "test": "local_server_fetch_and_cache",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "no_second_upstream_fetch_for_cached_source",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "reject_/api/content/https://example.com",
+      "passed": true,
+      "details": {
+        "status": 400
+      }
+    },
+    {
+      "test": "reject_/.audio-cache/a",
+      "passed": true,
+      "details": {
+        "status": 403
+      }
+    },
+    {
+      "test": "reject_/api/anything",
+      "passed": true,
+      "details": {
+        "status": 404
+      }
+    },
+    {
+      "test": "host_guard",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "initial_no_javascript_errors",
+      "passed": true,
+      "details": []
+    },
+    {
+      "test": "initial_22_batch",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "no_automatic_audio_download",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "local_source_route_selection",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "real_decoder_on_generated_fixture",
+      "passed": true,
+      "details": {
+        "seconds": 1.9999773242630385,
+        "frames": 88199,
+        "rate": 44100,
+        "analysis": {
+          "method": "All-channel PCM statistics, no perceptual or AI classifier",
+          "frame_rate": 44100,
+          "channels": 1,
+          "frames": 88199,
+          "peak_linear": 0.49997228384017944,
+          "peak_dbfs": -6.021081405635651,
+          "rms_linear": 0.35352258418596644,
+          "rms_dbfs": -9.031656736405445,
+          "dc_offset": 5.037336029690011e-06,
+          "near_full_scale_fraction": 0,
+          "near_full_scale_threshold": 0.999,
+          "activity_threshold_db_relative_to_peak": -50,
+          "activity_start_seconds": 2.2675736961451248e-05,
+          "activity_end_seconds": 1.9999773242630385,
+          "activity_is_trim_suggestion_only": true,
+          "semantic_classification_performed": false,
+          "measured_at": "2026-10-02T16:51:19.834Z"
+        },
+        "heard": false
+      }
+    },
+    {
+      "test": "measurement_does_not_mark_listened",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "signal_peak_expected",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "apply_note_proposal",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "independent_clip_regions",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "second_clip_preserved",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "two_clips_pass_consistent_fixture_gate",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "multi_clip_library_one_source",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "exclusive_frame_regions",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "editing_tempo_clears_checks",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "bad_tempo_rejected",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "reload_multi_clip_data",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "identical_payload_reported_separate_identity",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "22_batch_decodes",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "batch_not_automatic_audition",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "source_hash_mismatch_rejected",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "html_payload_not_executed",
+      "passed": true,
+      "details": null
+    },
+    {
+      "test": "no_javascript_errors_after_workflow",
+      "passed": true,
+      "details": []
+    },
+    {
+      "test": "mobile_no_horizontal_overflow",
+      "passed": true,
+      "details": null
+    }
+  ],
+  "all_passed": true
+}
