@@ -55,10 +55,19 @@ export function makeSequence(numChannels = NUM_CHANNELS) {
   };
 }
 
+// A fresh project gives each synth channel its own character voice (see synths.js).
+const DEFAULT_SYNTHS = [
+  ["jims10", "jiMS10"],
+  ["fm4", "jiFM4"],
+  ["vox", "jiVOX"],
+  ["pluck", "jiPLUCK"],
+];
+
 export function makeInstrument(i) {
+  const [synthId, name] = DEFAULT_SYNTHS[i] || DEFAULT_SYNTHS[0];
   return {
-    name: `Synth ${i + 1}`,
-    synthId: "jims10",
+    name,
+    synthId,
     params: null, // null = use synth defaults; object = overrides
     volume: 0.8,
     mute: false,
