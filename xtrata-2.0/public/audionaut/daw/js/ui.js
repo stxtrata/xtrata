@@ -335,6 +335,19 @@ export function buildInstruments() {
     panelBtn.hidden = instr.synthId !== "jims10";
     panelBtn.addEventListener("click", () => openSynthPanel(i));
 
+    const fxBtn = el("button", "ch-btn fx", "FX");
+    fxBtn.title = "Synth FX: filter, drive, delay, reverb";
+    fxBtn.addEventListener("click", () => openFx(i, true));
+
+    const insBtn = el("button", "ch-btn fx ins", "INS");
+    insBtn.title =
+      "Insert plugins: EQ, compressor, gate, distortion, chorus, flanger, phaser, tremolo, bitcrusher";
+    insBtn.classList.toggle(
+      "has-inserts",
+      (instr.inserts || []).some((x) => x?.enabled),
+    );
+    insBtn.addEventListener("click", () => openInserts(i, true));
+
     const previewBtn = el("button", "ch-btn", "▹");
     previewBtn.title = "Preview (C3)";
     previewBtn.addEventListener("click", () =>
@@ -395,6 +408,8 @@ export function buildInstruments() {
       rollBtn,
       panelBtn,
       previewBtn,
+      fxBtn,
+      insBtn,
       muteBtn,
       soloBtn,
       vol,
@@ -486,6 +501,10 @@ export function refreshInstrumentRow(i) {
   row.style.setProperty("--ch-color", synth.color);
   row.querySelector(".ch-name").value = instr.name;
   row.querySelector(".inst-synth-label").textContent = synth.name;
+  row.querySelector(".ins")?.classList.toggle(
+    "has-inserts",
+    (instr.inserts || []).some((x) => x?.enabled),
+  );
   const pb = row.querySelector(".panel-open");
   if (pb) pb.hidden = instr.synthId !== "jims10";
   drawInstStrip(i);
@@ -1351,11 +1370,19 @@ export function initTrimModal() {
 
 // --- insert plugins modal ---
 let insertsChannel = 0;
+let insertsIsInst = false; // true when editing a synth instrument's chain
+
+// Channel- or instrument-aware accessors shared by the FX and INS modals.
+const ownerOf = (isInst, i) => (isInst ? store.instrument(i) : store.channel(i));
+const setOwnerProp = (isInst, i, prop, v) =>
+  isInst ? store.setInstrumentProp(i, prop, v) : store.setChannelProp(i, prop, v);
+const refreshOwnerRow = (isInst, i) =>
+  isInst ? refreshInstrumentRow(i) : refreshChannelRow(i);
 
 function renderInsertSlots() {
   const root = $("#inserts-slots");
   root.innerHTML = "";
-  const c = store.channel(insertsChannel);
+  const c = ownerOf(insertsIsInst, insertsChannel);
   c.inserts = c.inserts || [];
   for (let slot = 0; slot < MAX_INSERTS; slot++) {
     const def = c.inserts[slot] || null;
@@ -1375,12 +1402,12 @@ function renderInsertSlots() {
     });
     sel.value = def?.type || "";
     sel.addEventListener("change", () => {
-      const arr = [...(store.channel(insertsChannel).inserts || [])];
+      const arr = [...(ownerOf(insertsIsInst, insertsChannel).inserts || [])];
       arr[slot] = sel.value ? makeInsert(sel.value) : null;
-      store.setChannelProp(insertsChannel, "inserts", arr);
-      engine.rebuildInserts(insertsChannel);
+      setOwnerProp(insertsIsInst, insertsChannel, "inserts", arr);
+      engine.rebuildInserts(insertsChannel, insertsIsInst);
       renderInsertSlots();
-      refreshChannelRow(insertsChannel);
+      refreshOwnerRow(insertsIsInst, insertsChannel);
     });
 
     head.append(el("span", "insert-slot-num", `${slot + 1}`), sel);
@@ -1394,12 +1421,13 @@ function renderInsertSlots() {
       enable.title = "Bypass toggle";
       enable.addEventListener("click", () => {
         def.enabled = !def.enabled;
-        store.setChannelProp(
+        setOwnerProp(
+          insertsIsInst,
           insertsChannel,
           "inserts",
-          store.channel(insertsChannel).inserts,
+          ownerOf(insertsIsInst, insertsChannel).inserts,
         );
-        engine.rebuildInserts(insertsChannel);
+        engine.rebuildInserts(insertsChannel, insertsIsInst);
         renderInsertSlots();
       });
       head.appendChild(enable);
@@ -1424,7 +1452,7 @@ function renderInsertSlots() {
           def.params = { ...P, ...def.params, [ps.key]: +input.value };
           P[ps.key] = +input.value;
           val.textContent = input.value;
-          engine.updateInsertParams(insertsChannel, slot);
+          engine.updateInsertParams(insertsChannel, slot, insertsIsInst);
           store.emit("dirty");
         });
         wrap.append(lab, input, val);
@@ -1436,10 +1464,11 @@ function renderInsertSlots() {
   }
 }
 
-function openInserts(ch) {
+function openInserts(ch, isInst = false) {
   insertsChannel = ch;
+  insertsIsInst = isInst;
   engine.ensureContext();
-  $("#inserts-channel-label").textContent = `— ${store.channel(ch).name}`;
+  $("#inserts-channel-label").textContent = `— ${ownerOf(isInst, ch).name}`;
   $("#modal-inserts").classList.remove("hidden");
   renderInsertSlots();
 }
@@ -1447,18 +1476,23 @@ function openInserts(ch) {
 export function initInsertsModal() {
   $("#inserts-close").addEventListener("click", () => {
     $("#modal-inserts").classList.add("hidden");
-    refreshChannelRow(insertsChannel);
+    refreshOwnerRow(insertsIsInst, insertsChannel);
   });
+  document.addEventListener("open-inst-inserts", (e) =>
+    openInserts(e.detail, true),
+  );
 }
 
 // --- FX modal ---
 let fxChannel = 0;
+let fxIsInst = false;
 
-function openFx(ch) {
+function openFx(ch, isInst = false) {
   fxChannel = ch;
+  fxIsInst = isInst;
   engine.ensureContext();
-  const fx = store.channel(ch).fx || {};
-  $("#fx-channel-label").textContent = `— ${store.channel(ch).name}`;
+  const fx = ownerOf(isInst, ch).fx || {};
+  $("#fx-channel-label").textContent = `— ${ownerOf(isInst, ch).name}`;
   $("#fx-filter").value = fx.filter || "off";
   $("#fx-cutoff").value = fx.cutoff || 8000;
   $("#fx-cutoff-val").textContent = `${fx.cutoff || 8000} Hz`;
@@ -1477,24 +1511,29 @@ export function initFxModal() {
       delay: +$("#fx-delay").value,
       reverb: +$("#fx-reverb").value,
     };
-    store.setChannelProp(fxChannel, "fx", fx);
-    engine.applyFx(fxChannel);
+    setOwnerProp(fxIsInst, fxChannel, "fx", fx);
+    engine.applyFx(fxChannel, fxIsInst);
     $("#fx-cutoff-val").textContent = `${fx.cutoff} Hz`;
   };
   ["#fx-filter", "#fx-cutoff", "#fx-drive", "#fx-delay", "#fx-reverb"].forEach(
     (sel) => $(sel).addEventListener("input", apply),
   );
-  $("#fx-preview").addEventListener("click", () => engine.trigger(fxChannel));
+  $("#fx-preview").addEventListener("click", () =>
+    fxIsInst
+      ? engine.triggerNote(fxChannel, 48, 1, 0, 0.4)
+      : engine.trigger(fxChannel),
+  );
+  document.addEventListener("open-inst-fx", (e) => openFx(e.detail, true));
   $("#fx-reset").addEventListener("click", () => {
-    store.setChannelProp(fxChannel, "fx", {
+    setOwnerProp(fxIsInst, fxChannel, "fx", {
       filter: "off",
       cutoff: 8000,
       drive: 0,
       delay: 0,
       reverb: 0,
     });
-    engine.applyFx(fxChannel);
-    openFx(fxChannel);
+    engine.applyFx(fxChannel, fxIsInst);
+    openFx(fxChannel, fxIsInst);
   });
   $("#fx-close").addEventListener("click", () =>
     $("#modal-fx").classList.add("hidden"),

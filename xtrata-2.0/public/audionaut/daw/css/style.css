@@ -1956,3 +1956,8 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+#modal-fx,
+#modal-inserts {
+  z-index: 70; /* above the jiMS10 panel and the MIDI roll */
+}

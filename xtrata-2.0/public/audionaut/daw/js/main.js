@@ -1,6 +1,6 @@
 // main.js — bootstrap and wiring between store, engine, UI, and persistence.
 
-import { store, makeProject } from "./state.js";
+import { store, makeProject, NUM_INSTRUMENTS } from "./state.js";
 import { engine } from "./engine.js";
 import { reloadAllSamples } from "./loader.js";
 import * as ui from "./ui.js";
@@ -214,6 +214,11 @@ function initSubscriptions() {
     engine.clampPlayingSequence();
     if (engine.ctx)
       for (let i = 0; i < store.numChannels; i++) engine.rebuildInserts(i);
+    if (engine.ctx)
+      for (let i = 0; i < NUM_INSTRUMENTS; i++) {
+        engine.applyFx(i, true);
+        engine.rebuildInserts(i, true);
+      }
     syncArrangeControls();
     syncHeaderFromProject();
     ui.buildChannels();

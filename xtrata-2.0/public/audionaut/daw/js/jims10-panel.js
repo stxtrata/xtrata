@@ -307,6 +307,8 @@ function build() {
       <div class="js-head-btns">
         <button id="js-midi" class="js-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
         <button id="js-learn" class="js-btn" title="MIDI learn: click a control, then move a knob/fader on your controller"><i class="led"></i>LEARN</button>
+        <button id="js-fx" class="js-btn" title="Filter / drive / delay / reverb for this synth">FX</button>
+        <button id="js-ins" class="js-btn" title="Insert plugins: EQ, compressor, chorus, phaser…">INSERTS</button>
         <button id="js-rand" class="js-btn" title="Randomise the sound">RANDOM</button>
         <button id="js-init" class="js-btn" title="Reset every control to its default">INIT</button>
         <button id="js-close" class="js-btn primary">DONE</button>
@@ -382,6 +384,12 @@ function build() {
   });
   $("#js-rand").addEventListener("click", randomise);
   $("#js-midi").addEventListener("click", toggleMidi);
+  $("#js-fx").addEventListener("click", () =>
+    document.dispatchEvent(new CustomEvent("open-inst-fx", { detail: inst })),
+  );
+  $("#js-ins").addEventListener("click", () =>
+    document.dispatchEvent(new CustomEvent("open-inst-inserts", { detail: inst })),
+  );
   $("#js-learn").addEventListener("click", () => {
     learn = !learn;
     learnTarget = null;

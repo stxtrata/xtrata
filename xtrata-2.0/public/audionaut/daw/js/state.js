@@ -63,6 +63,8 @@ export function makeInstrument(i) {
     volume: 0.8,
     mute: false,
     solo: false,
+    fx: { filter: "off", cutoff: 8000, drive: 0, delay: 0, reverb: 0 },
+    inserts: [], // same insert slots as sample channels: [{ type, enabled, params }]
   };
 }
 

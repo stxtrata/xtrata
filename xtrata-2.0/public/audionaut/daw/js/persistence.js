@@ -5,6 +5,7 @@ import {
   makeProject,
   makeSequence,
   makeChannel,
+  makeInstrument,
   NUM_CHANNELS,
   MAX_CHANNELS,
   NUM_STEPS,
@@ -182,6 +183,13 @@ function normalizeNative(data) {
       if (!SYNTH_BANK[p.instruments[i].synthId])
         p.instruments[i].synthId = "jims10";
       p.instruments[i].volume = finite(p.instruments[i].volume, 0.8, 0, 1.5);
+      p.instruments[i].fx = {
+        ...makeInstrument(i).fx,
+        ...(inst && typeof inst.fx === "object" ? inst.fx : {}),
+      };
+      p.instruments[i].inserts = Array.isArray(inst?.inserts)
+        ? inst.inserts.slice(0, 4)
+        : [];
     });
   }
   if (Array.isArray(data.sequences) && data.sequences.length) {
