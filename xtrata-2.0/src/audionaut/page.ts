@@ -1,7 +1,7 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { findAudionaut } from './core';
 import { fetchEdition, lowestHeldAudionaut } from './edition';
-import { fetchHelmet } from './helmet';
+import { fetchHelmet, helmetStyle } from './helmet';
 
 // Where the sequencer lives. Empty = the unlocked state shows a "coming soon" card.
 // Set to the sequencer inscription / hosted file (e.g. '/audionaut/daw.html').
@@ -40,6 +40,7 @@ function clearIdentity() {
   const thumb = $('granted-thumb');
   thumb.replaceChildren();
   thumb.hidden = true;
+  $('granted-name').textContent = '';
 }
 
 async function resolveIdentity(address: string, gateTokenId: number | undefined) {
@@ -48,7 +49,9 @@ async function resolveIdentity(address: string, gateTokenId: number | undefined)
   const who = $('granted-who');
   const thumb = $('granted-thumb');
   const current = () => run === identityRun && document.body.dataset.state === 'granted';
+  const callsign = $('granted-name');
   who.textContent = short(address);
+  callsign.textContent = '';
   thumb.replaceChildren();
   thumb.hidden = true;
 
@@ -57,6 +60,7 @@ async function resolveIdentity(address: string, gateTokenId: number | undefined)
   if (!current() || !pick) return;
   who.textContent = whoLabel(address, pick.tokenId, pick.edition);
   if (!pick.edition) return;
+  callsign.textContent = helmetStyle(pick.edition)?.name ?? ''; // e.g. "Callisto"
 
   thumb.hidden = false; // hold the space while the picture loads
   const look = await fetchHelmet(pick.edition);
