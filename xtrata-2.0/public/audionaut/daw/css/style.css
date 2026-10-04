@@ -1999,3 +1999,11 @@ button:disabled {
   color: #04120a;
   box-shadow: 0 0 8px var(--j-green);
 }
+
+/* rows silenced because something else is soloed */
+.channel.solo-dim {
+  opacity: 0.55;
+}
+.channel.solo-dim:hover {
+  opacity: 0.85;
+}
