@@ -6,6 +6,7 @@ import {
   HOMEPAGE_FRESH,
   HOMEPAGE_INTENTS,
   HOMEPAGE_KP_LOOPS,
+  HOMEPAGE_MUSIC,
   HOMEPAGE_PLAY,
   HOMEPAGE_PROGRAMMES,
   HOMEPAGE_STRIP_SLIDES,
@@ -67,6 +68,20 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');
     expect(HOMEPAGE_BOUNTY.rulesHref).toBe('/bounty/xtrata-bounty-full-rules.pdf');
     expect(indexHtml).toContain('id="homeBounty"');
+  });
+
+  it('teases the gated sequencer in the strip and the Audionauts panel', () => {
+    const slide = HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'audionaut-sequencer');
+    expect(slide).toMatchObject({ href: '/audionaut/' });
+    expect(HOMEPAGE_STRIP_SLIDES[0].id).toBe('bounty');
+    expect(HOMEPAGE_AUDIONAUTS.sequencerHref).toBe('/audionaut/');
+  });
+
+  it('keeps the First Light test tone out of homepage song lists', () => {
+    expect(HOMEPAGE_MUSIC.hiddenIds).toContain(2830);
+    expect(HOMEPAGE_MUSIC.hiddenSongs).toContain('first light|xtrata demo');
+    expect(HOMEPAGE_MUSIC.fallback.some((song) => HOMEPAGE_MUSIC.hiddenIds.includes(song.id))).toBe(false);
+    expect(homepageSource).toContain('!isHiddenSong(row)');
   });
 
   it('only says Mint for Audionauts once the mint is live', () => {

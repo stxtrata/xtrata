@@ -306,6 +306,10 @@ const renderNowPlaying = () => {
 // ---------------------------------------------------------------------------
 // Live song catalogue, shared by the shelf and the fresh feed. A failed read
 // is reported as failed (curated fallback + a note), never as "no songs".
+// Songs that never appear in homepage lists (test tones, demos), by id or title + artist.
+const isHiddenSong = (row) =>
+  HOMEPAGE_MUSIC.hiddenIds.includes(Number(row.id)) ||
+  HOMEPAGE_MUSIC.hiddenSongs.includes(`${String(row.title || '').trim().toLowerCase()}|${String(row.artist || '').trim().toLowerCase()}`);
 let catalogue = null;
 const loadCatalogue = () => {
   if (!catalogue) {
@@ -314,6 +318,7 @@ const loadCatalogue = () => {
       .then((data) => {
         const tracks = (Array.isArray(data?.tracks) ? data.tracks : [])
           .filter((row) => Number.isInteger(Number(row.id)) && row.title && !/^Inscription #\d+$/.test(row.title))
+          .filter((row) => !isHiddenSong(row))
           .map((row) => ({
             id: Number(row.id),
             title: row.title,
@@ -341,7 +346,7 @@ const loadCatalogue = () => {
 };
 
 const fallbackTracks = () =>
-  HOMEPAGE_MUSIC.fallback.map((song) => ({
+  HOMEPAGE_MUSIC.fallback.filter((song) => !isHiddenSong(song)).map((song) => ({
     ...song,
     plays: null,
     duration: 0,
@@ -624,7 +629,8 @@ const renderAudionauts = () => {
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
       : a.mintHref
         ? actionLink(a.mintHref, 'See the collection', 'home-btn home-btn--solid', 'audionauts:collection', { newTab: true })
-        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
+        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
+    actionLink(a.sequencerHref, 'Holders: the signal is sealed', 'home-btn home-btn--seal', 'audionauts:sequencer')
   );
   copy.append(
     tags,
