@@ -5937,7 +5937,7 @@ p {
 
 .collection-live-page__title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(240px, 320px);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px 16px;
 }
@@ -9695,4 +9695,96 @@ p {
 .collection-settings-panel__split-editor > summary {
   cursor: pointer;
   font-weight: 600;
+}
+
+/* Collection page layout pass: byline, clamped description, progress, holdings, tiles */
+.collection-live-page__byline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.collection-live-page__byline .meta-label {
+  margin: 0;
+}
+
+.collection-live-page__description--clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.collection-live-page__read-more {
+  justify-self: start;
+  margin: -6px 0 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--accent, #e05a2a);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collection-live-page__progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.collection-live-page__progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #e05a2a);
+}
+
+.collection-live-page__hero-actions .button:first-child {
+  padding: 11px 24px;
+  font-size: 0.95rem;
+}
+
+.collection-live-page__holdings {
+  border-color: rgba(224, 90, 42, 0.45);
+}
+
+.collection-live-page__gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.collection-live-page__gallery-frame {
+  position: relative;
+}
+
+.collection-live-page__gallery-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collection-live-page__gallery-meta .collection-live-page__gallery-select {
+  margin-top: 0;
+}
+
+.collection-live-page__gallery-item--mine {
+  border-color: var(--accent, #e05a2a);
+  box-shadow: 0 0 0 2px rgba(224, 90, 42, 0.35);
+}
+
+.collection-live-page__gallery-owned-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent, #e05a2a);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
