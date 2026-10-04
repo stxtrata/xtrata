@@ -179,30 +179,6 @@ class Store {
   }
 
   // Merge per-step property overrides; creates/upgrades the step to object form.
-  // Move a trigger to a fractional position (in steps). The whole part picks the step
-  // slot, the remainder is stored as `off` (0..<1 of a step) on the step object, so
-  // old songs and plain 0/1/2 steps are untouched. Returns the step it ended up on.
-  moveStep(ch, from, pos) {
-    const row = this.seq.steps[ch];
-    const raw = row[from];
-    if (!stepVal(raw)) return from;
-    pos = Math.round(Math.max(0, Math.min(NUM_STEPS - 0.001, pos)) * 1000) / 1000;
-    const to = Math.floor(pos);
-    if (to !== from && stepVal(row[to])) return from; // slot taken
-    const off = Math.round((pos - to) * 1000) / 1000;
-    const next = typeof raw === "object" && raw ? { ...raw } : { v: raw };
-    if (off > 0) next.off = off;
-    else delete next.off;
-    const val = Object.keys(next).length === 1 ? next.v : next;
-    if (to !== from) {
-      row[from] = 0;
-      this.emit("step", { ch, step: from, val: 0 });
-    }
-    row[to] = val;
-    this.emit("step", { ch, step: to, val });
-    return to;
-  }
-
   setStepProps(ch, step, props) {
     const cur = this.seq.steps[ch][step];
     const base = typeof cur === "object" && cur ? cur : { v: cur || 1 };
@@ -300,6 +276,14 @@ class Store {
 // Helpers for mixed int/object step values.
 export const stepVal = (s) => (s && typeof s === "object" ? s.v || 1 : s || 0);
 export const stepObj = (s) => (s && typeof s === "object" ? s : null);
+// Same step value with its fractional offset set (0 clears it). Plain 0/1/2 steps stay
+// plain when no other per-step settings are present.
+export function withStepOff(raw, off) {
+  const next = typeof raw === "object" && raw ? { ...raw } : { v: raw || 1 };
+  if (off > 0) next.off = off;
+  else delete next.off;
+  return Object.keys(next).length === 1 ? next.v : next;
+}
 // Fractional start offset inside a step: 0 (on the grid) .. just under 1 step.
 export const stepOff = (s) =>
   s && typeof s === "object" && Number.isFinite(s.off) && s.off > 0
