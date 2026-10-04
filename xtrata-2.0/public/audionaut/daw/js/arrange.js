@@ -5,7 +5,8 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // crossfades (xfade, ms) blend a region into the next one — drag the boundary to set.
 // Drag region edges to trim, drag a region's body to move it. Regions sit at their true
 // position (step + fractional offset); the Snap menu picks the move grid (Step … 1/16 of a
-// step, or Off) and Alt bypasses it. Zoom widens the steps so fine moves are visible.
+// step, or Off) and Alt bypasses it; hold Ctrl while dragging for an instant 1/16-step
+// grid. Zoom widens the steps so fine moves are visible.
 // Drag on empty space to marquee-select regions (Shift adds); drag a selected region to
 // move the whole group, which stops at regions that are not selected. Arrow keys nudge the
 // group by the snap amount (Shift = 4x), Delete removes it, Esc clears the selection.
@@ -32,6 +33,8 @@ const XF_PX = 6; // crossfade-handle zone around a cutting boundary
 let arrangeMode = false;
 let zoom = 1; // 1, 2, 4, 8 — canvas pixels per step = CELL_W * zoom
 let snap = 1; // move grid in steps: 1, .5, .25, .125, .0625 — 0 = free
+const FINE_SNAP = 1 / 16; // grid while Ctrl is held
+let lastCtrlDown = 0; // Ctrl+click is a right-click on macOS: don't treat it as one
 const cw = () => CELL_W * zoom;
 let playheadStep = -1;
 let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'maybeClick'|'pending'|'move'|'marquee', ch, ... }
@@ -294,6 +297,7 @@ function hitTest(ch, x) {
 }
 
 function onStripDown(ch, cv, e) {
+  if (e.ctrlKey) lastCtrlDown = performance.now();
   if (e.button === 2) return;
   const x = stripXY(cv, e);
   const h = hitTest(ch, x);
@@ -497,7 +501,8 @@ function onGlobalMove(e) {
   const dx = e.clientX - d.startClientX,
     dy = e.clientY - d.startClientY;
   if (!d.moved) {
-    if (Math.hypot(dx, dy) <= 3) return;
+    // Ctrl = fine tuning, so it starts moving after a single pixel instead of three
+    if (Math.hypot(dx, dy) <= (e.ctrlKey ? 1 : 3)) return;
     d.moved = true;
     if (d.kind === "pending") {
       const key = selKey(d.ch, d.region.step);
@@ -520,9 +525,9 @@ function onGlobalMove(e) {
     }
   }
   if (d.kind === "move") {
-    // snap the grabbed region's own position to the grid (Alt = free), the rest of the
-    // group keeps its spacing
-    d.grid = e.altKey ? 0 : snap;
+    // snap the grabbed region's own position to the grid (Alt = free, Ctrl = 1/16), the
+    // rest of the group keeps its spacing
+    d.grid = e.altKey ? 0 : e.ctrlKey ? FINE_SNAP : snap;
     const want = d.region.pos + (dx * d.scale) / cw();
     const snapped = d.grid > 0 ? Math.round(want / d.grid) * d.grid : want;
     const delta = walkDelta(d, r3(snapped - d.region.pos));
@@ -745,6 +750,9 @@ export function attachStrips() {
     });
     cv.addEventListener("contextmenu", (e) => {
       e.preventDefault();
+      // Ctrl+click on a Mac sends a contextmenu event; that is the fine-snap drag, not
+      // a request to reverse the region
+      if (performance.now() - lastCtrlDown < 800) return;
       const x = stripXY(cv, e);
       const h = hitTest(ch, x);
       if (h.kind !== "empty" && h.region) {
