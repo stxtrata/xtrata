@@ -3639,10 +3639,17 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     const previewUrl = buildCollectionAssetPreviewUrl(resolvedCollectionId, asset.asset_id, {
       version: asset.expected_hash
     });
-    const tileLabel =
-      typeof localTokenNumber === 'number'
-        ? `${collectionTitle} #${localTokenNumber}`
-        : `${collectionTitle} #...`;
+    // The file's own edition number (e.g. 029.html -> "029") is the piece's identity
+    // inside the collection; the mint-order number is only a fallback.
+    const editionMatch = /^(\d+)\.[a-z0-9]+$/i.exec(
+      String(asset.path ?? asset.filename ?? '').split(/[\\/]/).pop() ?? ''
+    );
+    const pieceNumber = editionMatch
+      ? editionMatch[1]
+      : typeof localTokenNumber === 'number'
+        ? String(localTokenNumber)
+        : '...';
+    const tileLabel = `${collectionTitle} #${pieceNumber}`;
     return (
       <article
         key={asset.asset_id}
@@ -3665,9 +3672,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           {isMine && <span className="collection-live-page__gallery-owned-badge">You own</span>}
         </div>
         <div className="collection-live-page__gallery-meta">
-          <span className="meta-value">
-            {typeof localTokenNumber === 'number' ? `#${localTokenNumber}` : '#...'}
-          </span>
+          <span className="meta-value">#{pieceNumber}</span>
           {tokenId ? (
             <a
               className="button button--ghost button--mini collection-live-page__gallery-select"
