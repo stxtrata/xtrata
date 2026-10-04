@@ -230,6 +230,8 @@ function initSubscriptions() {
     syncHeaderFromProject();
     ui.buildChannels();
     ui.buildInstruments();
+    ui.refreshSoloDim();
+    if (engine.ctx) engine.applySolo();
     ui.renderSequenceBar();
     const project = store.project;
     if (keepAudio) {
@@ -248,16 +250,22 @@ function initSubscriptions() {
     });
   });
   store.on("channel", ({ ch }) => ui.refreshChannelRow(ch));
-  store.on("channel", ({ ch }) => {
+  store.on("channel", ({ ch, prop }) => {
     if (engine.ctx) {
       engine.setChannelVolume(ch, store.channel(ch).volume);
       engine.applyFx(ch);
+      if (prop === "solo" || prop === "mute") engine.applySolo({ cut: prop === "solo" });
     }
+    if (prop === "solo" || prop === "mute") ui.refreshSoloDim();
   });
   store.on("notes", (i) => ui.drawInstStrip(i));
-  store.on("instrument", ({ i }) => {
+  store.on("instrument", ({ i, prop }) => {
     ui.refreshInstrumentRow(i);
     if (engine.ctx) engine.setInstrumentVolume(i, store.instrument(i).volume);
+    if (prop === "solo" || prop === "mute") {
+      engine.applySolo({ cut: prop === "solo" }); // solo spans samples and synths
+      ui.refreshSoloDim();
+    }
   });
   document.addEventListener("instrument-renamed", (e) =>
     ui.refreshInstrumentRow(e.detail),
