@@ -9,6 +9,9 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // Drag on empty space to marquee-select regions (Shift adds); drag a selected region to
 // move the whole group, which stops at regions that are not selected. Arrow keys nudge the
 // group by the snap amount (Shift = 4x), Delete removes it, Esc clears the selection.
+// Dragging a region's left edge trims it in place: the audio stays where it is on the
+// timeline and the region start moves right (or left) as a fractional offset, exactly
+// like the right edge trims from the end.
 // Click = edit, right-click = reverse, click empty = add.
 
 import {
@@ -295,6 +298,15 @@ function onStripDown(ch, cv, e) {
   const x = stripXY(cv, e);
   const h = hitTest(ch, x);
   if (h.kind === "trimL" || h.kind === "trimR" || h.kind === "xfade") {
+    // the left edge may slide between the neighbouring triggers' step slots
+    const row = store.seq.steps[ch];
+    let lo = 0,
+      hi = NUM_STEPS - 0.001;
+    for (let t = 0; t < NUM_STEPS; t++) {
+      if (t === h.region.step || !stepVal(row[t])) continue;
+      if (t < h.region.step) lo = Math.max(lo, t + 1);
+      else hi = Math.min(hi, t - 0.001);
+    }
     drag = {
       kind: h.kind,
       ch,
@@ -303,6 +315,10 @@ function onStripDown(ch, cv, e) {
       moved: false,
       trimStart0: h.region.trimStart,
       trimEnd0: h.region.trimEnd,
+      at: h.region.step,
+      pos0: h.region.pos,
+      lo,
+      hi,
     };
     e.preventDefault();
   } else {
@@ -327,6 +343,21 @@ function onStripDown(ch, cv, e) {
 
 // ------------------------------------------------- selection, marquee, group move
 const r3 = (n) => Math.round(n * 1000) / 1000;
+
+// Put the trigger at step `from` at the fractional position `pos` (step slot + offset).
+// Returns the step slot it ends up in.
+function relocate(ch, from, pos) {
+  const row = store.seq.steps[ch];
+  const to = Math.floor(pos);
+  const val = withStepOff(row[from], r3(pos - to));
+  if (to !== from) {
+    row[from] = 0;
+    store.emit("step", { ch, step: from, val: 0 });
+  }
+  row[to] = val;
+  store.emit("step", { ch, step: to, val });
+  return to;
+}
 
 function selectedItems() {
   const items = [];
@@ -597,28 +628,57 @@ function onStripMove(ch, cv, e) {
   const sd = stepDurSec();
 
   if (drag.kind === "trimR" && buffer) {
-    // new audible length (sec) from pixel width → new trimEnd
+    // new audible length (sec) from pixel width; a reversed region plays its trimmed
+    // range backwards, so its right edge is the start of the range
     const newSteps = Math.max(0.1, r.naturalSteps + dx / cw());
-    const newRegionSec = newSteps * sd * 1; // audible sec
-    const newTrimEnd = Math.min(
-      1,
-      drag.trimStart0 + (newRegionSec * r.pitch) / buffer.duration,
+    const frac = (newSteps * sd * r.pitch) / buffer.duration;
+    store.setStepProps(
+      ch,
+      r.step,
+      r.rev
+        ? {
+            trimStart: Math.max(0, drag.trimEnd0 - frac),
+            trimEnd: drag.trimEnd0,
+          }
+        : {
+            trimStart: drag.trimStart0,
+            trimEnd: Math.max(drag.trimStart0 + 1e-7, Math.min(1, drag.trimStart0 + frac)),
+          },
     );
-    store.setStepProps(ch, r.step, {
-      trimStart: drag.trimStart0,
-      trimEnd: Math.max(drag.trimStart0 + 1e-7, newTrimEnd),
-    });
     renderArrange();
   } else if (drag.kind === "trimL" && buffer) {
-    const dSec = (dx / cw()) * sd * r.pitch;
-    const newTrimStart = Math.min(
-      drag.trimEnd0 - 1e-7,
-      Math.max(0, drag.trimStart0 + dSec / buffer.duration),
-    );
-    store.setStepProps(ch, r.step, {
-      trimStart: newTrimStart,
-      trimEnd: drag.trimEnd0,
-    });
+    const k = (sd * r.pitch) / buffer.duration; // share of the sample per step
+    if (r.loop) {
+      // sustained loops keep their own start; only the sample start moves
+      const newTrimStart = Math.min(
+        drag.trimEnd0 - 1e-7,
+        Math.max(0, drag.trimStart0 + (dx / cw()) * k),
+      );
+      store.setStepProps(ch, r.step, {
+        trimStart: newTrimStart,
+        trimEnd: drag.trimEnd0,
+      });
+    } else {
+      // Trim from the left along the timeline: the audio that is left keeps playing at
+      // the same moment, so the start moves by exactly what was trimmed (the offset).
+      // A reversed region plays its range backwards, so its left edge is the range end.
+      const span = (drag.trimEnd0 - drag.trimStart0 - 1e-7) / k;
+      const room = r.rev ? (1 - drag.trimEnd0) / k : drag.trimStart0 / k;
+      const lo = Math.max(-room, drag.lo - drag.pos0);
+      const hi = Math.min(span, drag.hi - drag.pos0);
+      const pos = r3(drag.pos0 + Math.max(lo, Math.min(hi, dx / cw())));
+      const dS = pos - drag.pos0;
+      const key = selKey(ch, drag.at);
+      drag.at = relocate(ch, drag.at, pos);
+      if (selection.delete(key)) selection.add(selKey(ch, drag.at));
+      store.setStepProps(
+        ch,
+        drag.at,
+        r.rev
+          ? { trimStart: drag.trimStart0, trimEnd: drag.trimEnd0 - dS * k }
+          : { trimStart: drag.trimStart0 + dS * k, trimEnd: drag.trimEnd0 },
+      );
+    }
     renderArrange();
   } else if (drag.kind === "xfade") {
     // drag right of the boundary to lengthen the crossfade; left to shorten/remove
@@ -657,7 +717,12 @@ function onStripUp(ch, cv, e) {
         ? `Crossfade set: ${o.xfade} ms into step ${d.region.next + 1}.`
         : "Crossfade removed.",
     );
-  } else if ((d.kind === "trimL" || d.kind === "trimR") && d.moved) {
+  } else if (d.kind === "trimL" && d.moved) {
+    const o = stepOff(store.seq.steps[ch][d.at]);
+    setStatus(
+      `Step ${d.at + 1} trimmed from the left, audio stays in place (start at step ${d.at + 1}${o ? ` + ${o.toFixed(3)}` : ""}).`,
+    );
+  } else if (d.kind === "trimR" && d.moved) {
     setStatus(`Step ${d.region.step + 1} trimmed (per-step override).`);
   }
 }
