@@ -416,6 +416,16 @@ function renderSynthPanel() {
   const head = document.createElement("div");
   head.className = "synth-head";
   head.innerHTML = `<span class="synth-name">${synth.name}</span><span class="synth-tag">${synth.tagline}</span>`;
+  if (instr.synthId === "jims10") {
+    const open = document.createElement("button");
+    open.className = "synth-open-panel";
+    open.textContent = "🎛 Open synth panel";
+    open.title = "Hardware-style pots & faders";
+    open.addEventListener("click", () =>
+      document.dispatchEvent(new CustomEvent("open-synth-panel", { detail: inst })),
+    );
+    head.appendChild(open);
+  }
   panel.appendChild(head);
 
   const params = { ...synthDefaults(instr.synthId), ...(instr.params || {}) };

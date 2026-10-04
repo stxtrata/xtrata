@@ -41,6 +41,7 @@ import { record as recordHistory } from "./history.js";
 import { NUM_INSTRUMENTS } from "./state.js";
 import { SYNTH_BANK } from "./synths.js";
 import { openRoll } from "./pianoroll.js";
+import { openSynthPanel } from "./jims10-panel.js";
 import {
   PLUGIN_TYPES,
   MAX_INSERTS,
@@ -329,6 +330,11 @@ export function buildInstruments() {
     rollBtn.title = "Open MIDI roll & synth editor";
     rollBtn.addEventListener("click", () => openRoll(i));
 
+    const panelBtn = el("button", "ch-btn panel-open", "🎛");
+    panelBtn.title = "Open the jiMS10 synth panel (pots & faders)";
+    panelBtn.hidden = instr.synthId !== "jims10";
+    panelBtn.addEventListener("click", () => openSynthPanel(i));
+
     const previewBtn = el("button", "ch-btn", "▹");
     previewBtn.title = "Preview (C3)";
     previewBtn.addEventListener("click", () =>
@@ -387,6 +393,7 @@ export function buildInstruments() {
     ctrl.append(
       nameInput,
       rollBtn,
+      panelBtn,
       previewBtn,
       muteBtn,
       soloBtn,
@@ -479,6 +486,8 @@ export function refreshInstrumentRow(i) {
   row.style.setProperty("--ch-color", synth.color);
   row.querySelector(".ch-name").value = instr.name;
   row.querySelector(".inst-synth-label").textContent = synth.name;
+  const pb = row.querySelector(".panel-open");
+  if (pb) pb.hidden = instr.synthId !== "jims10";
   drawInstStrip(i);
 }
 
