@@ -1238,6 +1238,50 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     () => walletSession.address ?? coreContract.address,
     [walletSession.address, coreContract.address]
   );
+  // How many of this collection's minted tokens the connected wallet owns.
+  // A failed owner read is "could not check", never "you own none".
+  const mintedGlobalTokenIds = useMemo(
+    () =>
+      Array.from(new Set(Object.values(mintedTokenIds).filter((id) => /^\d+$/.test(id)))).sort(
+        (left, right) => Number(left) - Number(right)
+      ),
+    [mintedTokenIds]
+  );
+  const myHoldingsQuery = useQuery({
+    queryKey: [
+      'collection-live',
+      'my-holdings',
+      coreContractId,
+      walletSession.address ?? 'none',
+      mintedGlobalTokenIds.join(',')
+    ],
+    enabled: Boolean(walletSession.address) && mintedGlobalTokenIds.length > 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const wallet = walletSession.address ?? '';
+      const owned: string[] = [];
+      let failed = 0;
+      const queue = [...mintedGlobalTokenIds];
+      const worker = async () => {
+        while (queue.length > 0) {
+          const id = queue.shift()!;
+          try {
+            const owner = await coreClient.getOwner(BigInt(id), wallet);
+            if (owner && owner === wallet) owned.push(id);
+          } catch {
+            failed += 1;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+      return { owned, failed };
+    }
+  });
+  const myHoldingsCount = myHoldingsQuery.data?.owned.length ?? 0;
+  const myHoldingsUnknown =
+    Boolean(walletSession.address) &&
+    (myHoldingsQuery.isError || ((myHoldingsQuery.data?.failed ?? 0) > 0 && myHoldingsCount === 0));
 
   const selectedGalleryAsset = useMemo(() => {
     if (mintedGallery.length === 0) {
@@ -3647,6 +3691,17 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 {showMintGuide ? 'Hide mint guide' : 'How minting works'}
               </button>
             </div>
+            {walletSession.address && myHoldingsCount > 0 && (
+              <p className="collection-live-page__my-holdings">
+                You own {myHoldingsCount} from {collectionTitle} ·{' '}
+                <a href="/my-wallet">View in My wallet</a>
+              </p>
+            )}
+            {myHoldingsUnknown && (
+              <p className="collection-live-page__my-holdings collection-live-page__my-holdings--muted">
+                Couldn't check your holdings right now. <a href="/my-wallet">Open My wallet</a>
+              </p>
+            )}
             {showMintGuide && (
               <div id="live-mint-guide" className="collection-live-page__mint-guide">
                 <p className="collection-live-page__mint-guide-title">
