@@ -57,3 +57,34 @@ describe('fetchEdition', () => {
     ).toBeNull();
   });
 });
+
+import { lowestHeldAudionaut } from '../edition';
+import { COLLECTION_CONTRACT_ID } from '../core';
+
+describe('lowestHeldAudionaut', () => {
+  const ADDR = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7';
+  // wallet holds Xtrata ids 10 (not an Audionaut), 3100 (#84) and 3082 (#29)
+  const editions: Record<number, string> = { 3100: '<title>Audionaut 084</title>', 3082: '<title>Audionaut 029</title>' };
+  const fetchImpl = (async (url: string, init?: RequestInit) => {
+    const u = String(url);
+    if (u.includes('/nft/holdings')) {
+      const mk = (id: number) => ({ value: { repr: `u${id}` } });
+      return { ok: true, json: async () => ({ total: 3, results: [mk(10), mk(3100), mk(3082)] }) } as unknown as Response;
+    }
+    if (u.includes('get-token-mint-context')) {
+      const id = Number(BigInt('0x' + JSON.parse(String(init?.body)).arguments[0].slice(4)));
+      return { ok: true, json: async () => ({ okay: true, result: id in editions ? '0x0a00' : '0x09' }) } as unknown as Response;
+    }
+    const m = /\/i\/(\d+)/.exec(u);
+    return page(editions[Number(m?.[1])] ?? '', true);
+  }) as unknown as typeof fetch;
+
+  it('returns the lowest edition number, not the lowest token id or the first found', async () => {
+    expect(COLLECTION_CONTRACT_ID).toContain('audionauts');
+    expect(await lowestHeldAudionaut(ADDR, { fetchImpl })).toEqual({ tokenId: 3082, edition: 29 });
+  });
+  it('returns null when nothing is held or lookups fail', async () => {
+    const failing = (async () => ({ ok: false, status: 500 })) as unknown as typeof fetch;
+    expect(await lowestHeldAudionaut(ADDR, { fetchImpl: failing })).toBeNull();
+  });
+});

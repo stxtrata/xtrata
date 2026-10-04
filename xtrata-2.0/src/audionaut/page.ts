@@ -1,6 +1,7 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { findAudionaut } from './core';
-import { fetchEdition } from './edition';
+import { fetchEdition, lowestHeldAudionaut } from './edition';
+import { fetchHelmet } from './helmet';
 
 // Where the sequencer lives. Empty = the unlocked state shows a "coming soon" card.
 // Set to the sequencer inscription / hosted file (e.g. '/audionaut/daw.html').
@@ -21,22 +22,61 @@ function show(state: State) {
 }
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-5);
 
-// Top bar: the Audionaut number (1 to 111) comes first; the Xtrata token id is the second
-// label. The number is read from the inscription, so it appears a moment after unlocking.
+// Top bar: a small still of the Audionaut's helmet, then its number (1 to 111) and Xtrata
+// token id. Only one Audionaut is shown, the lowest-numbered one the wallet holds. The helmet
+// is a plain image: no player, no audio, and nothing in it can be clicked.
 function whoLabel(address: string, tokenId: number | undefined, edition?: number | null) {
   if (tokenId === undefined) return short(address);
   const xtrata = `Xtrata ID #${tokenId}`;
   return `${short(address)} · ${edition ? `Audionaut #${edition} · ${xtrata}` : xtrata}`;
 }
 
-function unlock(tokenId: number | undefined, address: string) {
+let shownFor: string | undefined;
+let identityRun = 0;
+
+function clearIdentity() {
+  identityRun++;
+  shownFor = undefined;
+  const thumb = $('granted-thumb');
+  thumb.replaceChildren();
+  thumb.hidden = true;
+}
+
+async function resolveIdentity(address: string, gateTokenId: number | undefined) {
+  const run = ++identityRun;
+  shownFor = address;
   const who = $('granted-who');
-  who.textContent = whoLabel(address, tokenId);
-  if (tokenId !== undefined) {
-    void fetchEdition(tokenId).then((edition) => {
-      if (edition && document.body.dataset.state === 'granted') who.textContent = whoLabel(address, tokenId, edition);
-    });
+  const thumb = $('granted-thumb');
+  const current = () => run === identityRun && document.body.dataset.state === 'granted';
+  who.textContent = short(address);
+  thumb.replaceChildren();
+  thumb.hidden = true;
+
+  let pick = await lowestHeldAudionaut(address);
+  if (!pick && gateTokenId !== undefined) pick = { tokenId: gateTokenId, edition: await fetchEdition(gateTokenId) };
+  if (!current() || !pick) return;
+  who.textContent = whoLabel(address, pick.tokenId, pick.edition);
+  if (!pick.edition) return;
+
+  thumb.hidden = false; // hold the space while the picture loads
+  const look = await fetchHelmet(pick.edition);
+  if (!current()) return;
+  if (!look) {
+    thumb.hidden = true;
+    return;
   }
+  const img = document.createElement('img');
+  img.src = look.src;
+  img.alt = '';
+  img.draggable = false;
+  img.style.filter = look.filter;
+  if (look.clipPath) img.style.clipPath = look.clipPath;
+  if (look.pixel) img.style.imageRendering = 'pixelated';
+  thumb.replaceChildren(img);
+}
+
+function unlock(tokenId: number | undefined, address: string, rescan = true) {
+  if (rescan || shownFor !== address) void resolveIdentity(address, tokenId);
   const frame = $('daw') as HTMLIFrameElement;
   const soon = $('daw-soon');
   if (DAW_SRC) {
@@ -63,10 +103,11 @@ async function verify(address: string, quiet = false) {
   try {
     const result = await findAudionaut(address);
     if (result.holds) {
-      unlock(result.tokenId, address);
+      unlock(result.tokenId, address, !quiet);
       if (!recheck) recheck = setInterval(() => void verifySilently(), RECHECK_MS);
     } else {
       relock();
+      clearIdentity();
       clearInterval(recheck);
       recheck = undefined;
       $('denied-who').textContent = short(address);
@@ -117,6 +158,7 @@ async function leave() {
   clearInterval(recheck);
   recheck = undefined;
   relock();
+  clearIdentity();
   show('locked');
 }
 
