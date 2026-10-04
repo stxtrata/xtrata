@@ -1991,3 +1991,11 @@ button:disabled {
     padding-bottom: 3px;
   }
 }
+.js-key.on {
+  box-shadow: 0 0 10px var(--j-green), inset 0 -6px 10px rgba(0, 0, 0, 0.18);
+}
+.js-oct .js-btn.lit {
+  background: var(--j-green);
+  color: #04120a;
+  box-shadow: 0 0 8px var(--j-green);
+}

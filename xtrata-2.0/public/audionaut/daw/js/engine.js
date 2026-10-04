@@ -334,16 +334,24 @@ class Engine {
     const synth = SYNTH_BANK[inst.synthId];
     if (!synth) return;
     const params = { ...synthDefaults(inst.synthId), ...(inst.params || {}) };
+    const when = time || this.ctx.currentTime;
     try {
       synth.voice(
         this.ctx,
         this.instrumentGains[i],
-        { pitch, vel, time: time || this.ctx.currentTime, dur: durSec },
+        { pitch, vel, time: when, dur: durSec },
         params,
       );
     } catch (e) {
       console.warn("voice error", e);
     }
+    // light the key from the note's start until its end (also covers playback)
+    const wait = Math.max(0, (when - this.ctx.currentTime) * 1000);
+    setTimeout(() => emitNoteVisual(i, pitch, true), wait);
+    setTimeout(
+      () => emitNoteVisual(i, pitch, false),
+      wait + Math.max(90, durSec * 1000),
+    );
   }
 
   setMasterVolume(v) {
@@ -661,6 +669,15 @@ class Engine {
     const dur = Math.max(0.001, (endFrac - startFrac) * buffer.duration);
     src.start(this.ctx.currentTime, start, dur);
   }
+}
+
+// Keyboard visuals: the piano roll and the jiMS10 panel light keys from these
+// events, so sequencer playback, typed keys, MIDI and mouse all show the same way.
+export function emitNoteVisual(i, pitch, on) {
+  if (typeof document === "undefined") return;
+  document.dispatchEvent(
+    new CustomEvent("synth-note", { detail: { i, pitch, on } }),
+  );
 }
 
 export const engine = new Engine();

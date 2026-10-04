@@ -6,7 +6,7 @@
 // controlled/learned too.
 
 import { store } from "./state.js";
-import { engine } from "./engine.js";
+import { engine, emitNoteVisual } from "./engine.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 
 const $ = (s) => document.querySelector(s);
@@ -48,6 +48,8 @@ let learnTarget = null;
 let ccMap = loadCcMap();
 let midiAccess = null;
 let selfWrite = false;
+const lit = new Map(); // pitch -> count of sources currently sounding it
+const heldTyped = new Map(); // typed key -> pitch
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -363,14 +365,21 @@ function build() {
     k.className = `js-key${BLACK.has(i % 12) ? " blk" : ""}`;
     k.dataset.i = i;
     k.tabIndex = -1;
+    let down = null;
     k.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      k.classList.add("on");
-      play(baseOctave * 12 + 12 + i, 1);
+      down = baseOctave * 12 + 12 + i;
+      play(down, 1);
+      emitNoteVisual(inst, down, true); // lit while the mouse is held
     });
-    const up = () => k.classList.remove("on");
+    const up = () => {
+      if (down == null) return;
+      emitNoteVisual(inst, down, false);
+      down = null;
+    };
     k.addEventListener("pointerup", up);
     k.addEventListener("pointerleave", up);
+    k.addEventListener("pointercancel", up);
     keys.appendChild(k);
   }
   // black keys sit between whites: lay out with grid-style offsets
@@ -465,18 +474,32 @@ function randomise() {
 function play(pitch, vel = 1) {
   engine.ensureContext();
   engine.triggerNote(inst, pitch, vel, 0, NOTE_LEN);
-  flashKey(pitch);
 }
-function flashKey(pitch) {
-  const i = pitch - (baseOctave * 12 + 12);
-  const k = $("#js-keys")?.children[i];
-  if (!k) return;
-  k.classList.add("on");
-  setTimeout(() => k.classList.remove("on"), 140);
+// Light every key that is sounding: held (typed / mouse / MIDI) or playing back.
+function paintKeys() {
+  const keys = $("#js-keys")?.children;
+  if (!keys) return;
+  const lo = baseOctave * 12 + 12;
+  for (let i = 0; i < keys.length; i++) keys[i].classList.toggle("on", lit.has(lo + i));
+  // a lit note outside the visible range lights the octave arrows instead
+  let below = false, above = false;
+  for (const p of lit.keys()) {
+    if (p < lo) below = true;
+    else if (p >= lo + keys.length) above = true;
+  }
+  $("#js-oct-dn")?.classList.toggle("lit", below);
+  $("#js-oct-up")?.classList.toggle("lit", above);
+}
+function setLit(pitch, on) {
+  const c = (lit.get(pitch) || 0) + (on ? 1 : -1);
+  if (c > 0) lit.set(pitch, c);
+  else lit.delete(pitch);
+  paintKeys();
 }
 function shiftOctave(d) {
   baseOctave = clamp(baseOctave + d, 0, 6);
   $("#js-oct-lbl").textContent = `C${baseOctave}`;
+  paintKeys();
 }
 function setStatus(msg) {
   const s = $("#js-status");
@@ -502,8 +525,17 @@ function onKey(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
     if (e.repeat) return;
-    play(baseOctave * 12 + 12 + KEYMAP[k], 1);
+    const pitch = baseOctave * 12 + 12 + KEYMAP[k];
+    play(pitch, 1);
+    heldTyped.set(k, pitch);
+    emitNoteVisual(inst, pitch, true); // held until key-up
   }
+}
+function onKeyUp(e) {
+  const k = e.key.toLowerCase();
+  if (!heldTyped.has(k)) return;
+  emitNoteVisual(inst, heldTyped.get(k), false);
+  heldTyped.delete(k);
 }
 
 // ------------------------------------------------------------ MIDI
@@ -540,6 +572,10 @@ function onMidi({ data }) {
     // the roll has its own MIDI handler — don't double-trigger when it's also visible
     if (!$("#modal-roll").classList.contains("hidden")) return;
     play(d1, d2 / 127);
+    emitNoteVisual(inst, d1, true); // held until note-off
+  } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
+    if (isOpen() && $("#modal-roll").classList.contains("hidden"))
+      emitNoteVisual(inst, d1, false);
   }
 }
 async function toggleMidi() {
@@ -582,7 +618,9 @@ export function openSynthPanel(i) {
   if (instr.synthId !== SYNTH_ID) return;
   inst = i;
   engine.ensureContext();
+  lit.clear();
   syncAll();
+  paintKeys();
   root.closest(".modal").classList.remove("hidden");
   root.querySelector(".fader, .knob")?.focus({ preventScroll: true });
   setStatus(
@@ -602,6 +640,15 @@ export function initSynthPanel() {
   if (!root) return;
   build();
   window.addEventListener("keydown", onKey, true);
+  window.addEventListener("keyup", onKeyUp, true);
+  window.addEventListener("blur", () => {
+    for (const p of heldTyped.values()) emitNoteVisual(inst, p, false);
+    heldTyped.clear();
+  });
+  // everything that sounds on this synth (sequencer, roll, MIDI, mouse) lights the keys
+  document.addEventListener("synth-note", (e) => {
+    if (e.detail.i === inst) setLit(e.detail.pitch, e.detail.on);
+  });
   $("#modal-synth").addEventListener("pointerdown", (e) => {
     if (e.target.id === "modal-synth") closeSynthPanel();
   });

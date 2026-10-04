@@ -5,7 +5,7 @@
 // live recording.
 
 import { store, NUM_STEPS } from "./state.js";
-import { engine } from "./engine.js";
+import { engine, emitNoteVisual } from "./engine.js";
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 
 const $ = (s) => document.querySelector(s);
@@ -53,6 +53,21 @@ function commit() {
 }
 
 // --------------------------------------------------------------- drawing
+// keys currently sounding for the open instrument (typed, MIDI, mouse or playback)
+const lit = new Map();
+const heldTyped = new Map(); // typed key -> pitch, so key-up releases the right note
+let litRaf = 0;
+function setLit(pitch, on) {
+  const c = (lit.get(pitch) || 0) + (on ? 1 : -1);
+  if (c > 0) lit.set(pitch, c);
+  else lit.delete(pitch);
+  if (!litRaf)
+    litRaf = requestAnimationFrame(() => {
+      litRaf = 0;
+      drawRoll();
+    });
+}
+
 export function drawRoll(playStep = lastPlayStep) {
   lastPlayStep = playStep;
   if (!canvas || $("#modal-roll").classList.contains("hidden")) return;
@@ -64,7 +79,8 @@ export function drawRoll(playStep = lastPlayStep) {
   for (let r = 0; r < ROWS; r++) {
     const midi = HIGH - r;
     const y = r * CELL_H;
-    ctx2d.fillStyle = isBlack(midi) ? "#1a222d" : "#d7e0ea";
+    const on = lit.has(midi);
+    ctx2d.fillStyle = on ? synth.color : isBlack(midi) ? "#1a222d" : "#d7e0ea";
     ctx2d.fillRect(0, y, KEY_W, CELL_H - 1);
     if (midi % 12 === 0) {
       ctx2d.fillStyle = isBlack(midi) ? "#7b8794" : "#26303d";
@@ -73,6 +89,12 @@ export function drawRoll(playStep = lastPlayStep) {
     }
     ctx2d.fillStyle = isBlack(midi) ? "#0d1319" : "#121820";
     ctx2d.fillRect(KEY_W, y, NUM_STEPS * CELL_W, CELL_H - 1);
+    if (on) {
+      ctx2d.globalAlpha = 0.22;
+      ctx2d.fillStyle = synth.color;
+      ctx2d.fillRect(KEY_W, y, NUM_STEPS * CELL_W, CELL_H - 1);
+      ctx2d.globalAlpha = 1;
+    }
   }
   for (let s = 0; s <= NUM_STEPS; s++) {
     const x = KEY_W + s * CELL_W;
@@ -556,6 +578,8 @@ function onKeyDown(e) {
   const pitch = (baseOctave + 1) * 12 + KEYMAP[k];
   if (pitch < LOW || pitch > HIGH) return;
   engine.triggerNote(inst, pitch, 1, 0, noteDur * engine.stepDuration());
+  heldTyped.set(k, pitch);
+  emitNoteVisual(inst, pitch, true); // held until the key is released
   if (recArmed && engine.isPlaying) {
     const step = engine.currentStep % NUM_STEPS;
     store.addNote(inst, { step, dur: noteDur, pitch, vel: 1 });
@@ -577,6 +601,7 @@ export function handleMidiMessage({ data }) {
   if (type === 0x90 && velocity > 0 && pitch >= LOW && pitch <= HIGH) {
     const vel = velocity / 127;
     engine.triggerNote(inst, pitch, vel, 0, noteDur * engine.stepDuration());
+    emitNoteVisual(inst, pitch, true); // held until note-off
     if (recArmed && engine.isPlaying) {
       const step = Math.max(0, lastPlayStep) % NUM_STEPS,
         note = { step, dur: Math.min(noteDur, NUM_STEPS - step), pitch, vel };
@@ -594,6 +619,7 @@ export function handleMidiMessage({ data }) {
       drawRoll();
     }
   } else if (type === 0x80 || (type === 0x90 && velocity === 0)) {
+    emitNoteVisual(inst, pitch, false);
     const held = heldMidi.get(key);
     heldMidi.delete(key);
     if (
@@ -647,6 +673,7 @@ async function toggleMidi() {
 // --------------------------------------------------------------- modal lifecycle
 export function openRoll(i) {
   inst = i;
+  lit.clear();
   selection.clear();
   engine.ensureContext();
   $("#roll-title").textContent = `${store.instrument(i).name} — MIDI Roll`;
@@ -731,6 +758,20 @@ export function initPianoRoll() {
   $("#roll-midi").addEventListener("click", toggleMidi);
 
   document.addEventListener("keydown", onKeyDown);
+  document.addEventListener("keyup", (e) => {
+    const k = e.key.toLowerCase();
+    if (heldTyped.has(k)) {
+      emitNoteVisual(inst, heldTyped.get(k), false);
+      heldTyped.delete(k);
+    }
+  });
+  window.addEventListener("blur", () => {
+    for (const p of heldTyped.values()) emitNoteVisual(inst, p, false);
+    heldTyped.clear();
+  });
+  document.addEventListener("synth-note", (e) => {
+    if (e.detail.i === inst) setLit(e.detail.pitch, e.detail.on);
+  });
   store.on("sequence", () => {
     selection.clear();
     drawRoll();

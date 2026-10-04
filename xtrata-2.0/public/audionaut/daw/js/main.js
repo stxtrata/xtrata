@@ -197,6 +197,13 @@ function sameAudioSources(a, b) {
 
 function initSubscriptions() {
   store.on("step", ({ ch, step, val }) => ui.updateStep(ch, step, val));
+  // Playback follows the display: choosing another sequence while the transport is
+  // running plays that sequence straight away (same step position, so it stays in
+  // time). The engine's own chain-to-next-sequence sets this first, so it's a no-op there.
+  store.on("sequence", () => {
+    if (engine.isPlaying)
+      engine.playingSequence = store.project.currentSequence;
+  });
   store.on("sequence", () => {
     ui.renderPattern();
     ui.renderSequenceBar();
