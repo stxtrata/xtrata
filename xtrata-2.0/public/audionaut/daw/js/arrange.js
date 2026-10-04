@@ -3,7 +3,8 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // arrange.js — Logic-style arrange view: the step grid flips to waveform regions.
 // Regions render their real audible length; choke cuts at the next trigger; per-step
 // crossfades (xfade, ms) blend a region into the next one — drag the boundary to set.
-// Drag region edges to trim. Click = edit, right-click = reverse, click empty = add.
+// Drag region edges to trim, drag a region's body to move it (snaps to steps, stops at
+// its neighbours). Click = edit, right-click = reverse, click empty = add.
 
 import { store, NUM_STEPS, stepVal, stepObj } from "./state.js";
 import { engine } from "./engine.js";
@@ -15,7 +16,7 @@ const EDGE_PX = 5; // trim-handle zone at region edges
 const XF_PX = 6; // crossfade-handle zone around a cutting boundary
 let arrangeMode = false;
 let playheadStep = -1;
-let drag = null; // { kind:'trimL'|'trimR'|'xfade', ch, step, ... }
+let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'move', ch, step, ... }
 
 export function isArrangeMode() {
   return arrangeMode;
@@ -264,6 +265,30 @@ function onStripDown(ch, cv, e) {
       trimEnd0: h.region.trimEnd,
     };
     e.preventDefault();
+  } else if (h.kind === "body") {
+    // Body: click opens the editor, drag moves the region. It can slide between its
+    // neighbouring triggers but not jump over them.
+    const row = store.seq.steps[ch];
+    const from = h.region.step;
+    let lo = 0,
+      hi = NUM_STEPS - 1;
+    for (let t = 0; t < NUM_STEPS; t++) {
+      if (t === from || !stepVal(row[t])) continue;
+      if (t < from) lo = Math.max(lo, t + 1);
+      else hi = Math.min(hi, t - 1);
+    }
+    drag = {
+      kind: "move",
+      ch,
+      region: h.region,
+      startX: x,
+      moved: false,
+      from,
+      at: from,
+      lo,
+      hi,
+    };
+    e.preventDefault();
   } else {
     drag = { kind: "maybeClick", ch, startX: x, moved: false };
   }
@@ -280,7 +305,7 @@ function onStripMove(ch, cv, e) {
         : h.kind === "xfade"
           ? "col-resize"
           : h.kind === "body"
-            ? "pointer"
+            ? "grab"
             : "cell";
     return;
   }
@@ -292,7 +317,21 @@ function onStripMove(ch, cv, e) {
   const r = drag.region;
   const sd = stepDurSec();
 
-  if (drag.kind === "trimR" && buffer) {
+  if (drag.kind === "move") {
+    cv.style.cursor = "grabbing";
+    const to = Math.max(
+      drag.lo,
+      Math.min(drag.hi, drag.from + Math.round(dx / CELL_W)),
+    );
+    if (to !== drag.at) {
+      const row = store.seq.steps[ch];
+      const val = row[drag.at];
+      store.setStep(ch, drag.at, 0);
+      store.setStep(ch, to, typeof val === "object" && val ? { ...val } : val);
+      drag.at = to;
+      renderArrange();
+    }
+  } else if (drag.kind === "trimR" && buffer) {
     // new audible length (sec) from pixel width → new trimEnd
     const newSteps = Math.max(0.1, r.naturalSteps + dx / CELL_W);
     const newRegionSec = newSteps * sd * 1; // audible sec
@@ -335,7 +374,14 @@ function onStripUp(ch, cv, e) {
   const d = drag;
   drag = null;
   const x = stripXY(cv, e);
-  if (d.kind === "maybeClick" && !d.moved) {
+  if (d.kind === "move") {
+    if (!d.moved || d.at === d.from) {
+      if (!d.moved) openStepEditor(ch, d.from);
+    } else {
+      setStatus(`Moved from step ${d.from + 1} to step ${d.at + 1}.`);
+    }
+    cv.style.cursor = "grab";
+  } else if (d.kind === "maybeClick" && !d.moved) {
     const h = hitTest(ch, x);
     if (h.kind === "body") openStepEditor(ch, h.region.step);
     else if (h.kind === "empty") {
