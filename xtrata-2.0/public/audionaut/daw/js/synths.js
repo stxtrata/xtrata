@@ -123,6 +123,62 @@ export const SYNTH_BANK = {
         step: 0.01,
         def: 0.15,
       },
+      // Added with the hardware-style panel. Defaults reproduce the original
+      // sound exactly (decay/sustain were hard-coded; the rest are neutral).
+      {
+        key: "decay",
+        label: "Decay",
+        type: "range",
+        min: 0.01,
+        max: 1.5,
+        step: 0.01,
+        def: 0.08,
+      },
+      {
+        key: "sustain",
+        label: "Sustain",
+        type: "range",
+        min: 0,
+        max: 1,
+        step: 0.01,
+        def: 0.7,
+      },
+      {
+        key: "fenv",
+        label: "Filter EG Amount",
+        type: "range",
+        min: 0,
+        max: 8000,
+        step: 10,
+        def: 0,
+      },
+      {
+        key: "fdecay",
+        label: "Filter EG Decay",
+        type: "range",
+        min: 0.02,
+        max: 1.5,
+        step: 0.01,
+        def: 0.25,
+      },
+      {
+        key: "tune",
+        label: "Tune (cents)",
+        type: "range",
+        min: -100,
+        max: 100,
+        step: 1,
+        def: 0,
+      },
+      {
+        key: "level",
+        label: "Output Level",
+        type: "range",
+        min: 0,
+        max: 1.5,
+        step: 0.01,
+        def: 1,
+      },
     ],
     voice(ctx, dest, { pitch, vel, time, dur }, P) {
       const o = ctx.createOscillator();
@@ -131,19 +187,32 @@ export const SYNTH_BANK = {
       const so = ctx.createOscillator();
       so.type = "square";
       so.frequency.value = midiToFreq(pitch - 12);
+      if (P.tune) {
+        o.detune.value = P.tune;
+        so.detune.value = P.tune;
+      }
       const sg = ctx.createGain();
       sg.gain.value = P.sub;
       const f = ctx.createBiquadFilter();
       f.type = "lowpass";
       f.frequency.value = P.cutoff;
       f.Q.value = P.reso;
+      if (P.fenv > 0) {
+        // Filter envelope: opens to cutoff + amount, then decays back to cutoff.
+        const top = Math.min(20000, P.cutoff + P.fenv);
+        f.frequency.setValueAtTime(top, time);
+        f.frequency.exponentialRampToValueAtTime(
+          P.cutoff,
+          time + Math.max(0.02, P.fdecay),
+        );
+      }
       const { g, stopAt } = adsrGain(
         ctx,
         time,
-        vel * 0.5,
+        vel * 0.5 * P.level,
         P.attack,
-        0.08,
-        0.7,
+        P.decay,
+        P.sustain,
         P.release,
         dur,
       );
