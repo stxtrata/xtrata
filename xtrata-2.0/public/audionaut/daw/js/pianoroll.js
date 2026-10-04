@@ -6,6 +6,7 @@
 
 import { store, NUM_STEPS } from "./state.js";
 import { engine, emitNoteVisual } from "./engine.js";
+import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
 
 const $ = (s) => document.querySelector(s);
@@ -438,7 +439,7 @@ function renderSynthPanel() {
   const head = document.createElement("div");
   head.className = "synth-head";
   head.innerHTML = `<span class="synth-name">${synth.name}</span><span class="synth-tag">${synth.tagline}</span>`;
-  if (instr.synthId === "jims10") {
+  if (synth.ui) {
     const open = document.createElement("button");
     open.className = "synth-open-panel";
     open.textContent = "🎛 Open synth panel";
@@ -591,7 +592,6 @@ function setRollStatus(msg) {
   $("#roll-status").textContent = msg;
 }
 
-let midiAccess = null;
 const heldMidi = new Map();
 export function handleMidiMessage({ data }) {
   if ($("#modal-roll").classList.contains("hidden")) return;
@@ -640,39 +640,28 @@ export function handleMidiMessage({ data }) {
   }
 }
 
-async function toggleMidi() {
+function paintMidi() {
+  const { on, names, error } = midiStatus();
   const b = $("#roll-midi");
-  if (midiAccess) {
-    for (const input of midiAccess.inputs.values()) input.onmidimessage = null;
-    midiAccess.onstatechange = null;
-    midiAccess = null;
-    heldMidi.clear();
-    b.textContent = "Enable MIDI input";
-    return setRollStatus("MIDI input disabled.");
-  }
-  try {
-    if (!navigator.requestMIDIAccess)
-      throw new Error("MIDI input is unavailable in this browser.");
-    midiAccess = await navigator.requestMIDIAccess({ sysex: false });
-    const connect = () => {
-      for (const input of midiAccess.inputs.values())
-        input.onmidimessage = handleMidiMessage;
-      setRollStatus(
-        `${midiAccess.inputs.size} MIDI input device(s) connected. Open a roll and arm REC to capture notes.`,
-      );
-    };
-    midiAccess.onstatechange = connect;
-    connect();
-    b.textContent = "Disable MIDI input";
-  } catch (e) {
-    midiAccess = null;
-    setRollStatus(e.message);
-  }
+  if (b) b.textContent = on ? "MIDI input: on" : "Enable MIDI input";
+  b?.classList.toggle("on", on);
+  if (!on) heldMidi.clear();
+  if ($("#modal-roll").classList.contains("hidden")) return;
+  setRollStatus(
+    error ||
+      (!on
+        ? "MIDI input disabled."
+        : names.length
+          ? `MIDI in: ${names.join(", ")}. Arm REC and play to capture notes.`
+          : "MIDI is on, but no controller was found — plug one in and it connects automatically."),
+  );
 }
 
 // --------------------------------------------------------------- modal lifecycle
 export function openRoll(i) {
   inst = i;
+  setMidiTarget(i);
+  ensureMidi();
   lit.clear();
   selection.clear();
   engine.ensureContext();
@@ -708,6 +697,7 @@ export function initPianoRoll() {
     sel.appendChild(o);
   });
   sel.addEventListener("change", () => {
+    ensureMidi();
     store.setInstrumentProp(inst, "synthId", sel.value);
     store.setInstrumentProp(inst, "params", null);
     const label = SYNTH_BANK[sel.value].name;
@@ -755,7 +745,10 @@ export function initPianoRoll() {
   $("#roll-close").addEventListener("click", () =>
     $("#modal-roll").classList.add("hidden"),
   );
-  $("#roll-midi").addEventListener("click", toggleMidi);
+  $("#roll-midi").addEventListener("click", () => setMidiEnabled(!isMidiOn()));
+  addMidiListener(handleMidiMessage);
+  document.addEventListener("midi-status", paintMidi);
+  paintMidi();
 
   document.addEventListener("keydown", onKeyDown);
   document.addEventListener("keyup", (e) => {

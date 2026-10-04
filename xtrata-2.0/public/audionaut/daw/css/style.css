@@ -1565,7 +1565,7 @@ button:disabled {
   }
 }
 
-/* ------------------------------------------------ jiMS10 hardware panel */
+/* ------------------------------------------------ synth front panels (jiMS10 · jiFM4 · jiVOX · jiPLUCK) */
 .ch-btn.panel-open {
   font-size: 12px;
 }
@@ -1585,28 +1585,31 @@ button:disabled {
 #modal-synth {
   z-index: 60; /* above the MIDI roll */
 }
-.jims10 {
-  --j-green: #2edb84;
-  --j-lcd: #43ffa4;
-  --j-wk: 30px; /* white key width */
+.sfp {
+  --sfp-accent: #2edb84;
+  --sfp-lcd: #43ffa4;
+  --sfp-lcd-bg: #06130c;
+  --sfp-edge: #2a3340;
+  --sfp-bg: #1b222c;
+  --sfp-wk: 30px; /* white key width */
   width: 980px;
   max-width: 96vw;
   max-height: 96vh;
   overflow: auto;
   padding: 14px 18px 12px;
   border-radius: 12px;
-  border: 1px solid #3b4654;
+  border: 1px solid var(--sfp-edge);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 40%),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.015) 0 2px, transparent 2px 4px),
-    #1b222c;
+    var(--sfp-bg);
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.7),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   user-select: none;
   -webkit-user-select: none;
 }
-.js-head {
+.sfp-head {
   display: flex;
   align-items: center;
   gap: 16px;
@@ -1614,31 +1617,31 @@ button:disabled {
   border-bottom: 2px solid #0b0f14;
   flex-wrap: wrap;
 }
-.js-logo {
+.sfp-logo {
   font-family: var(--font-display);
   font-size: 26px;
   color: #e8eef5;
   letter-spacing: 1px;
 }
-.js-logo b {
-  color: var(--j-green);
+.sfp-logo b {
+  color: var(--sfp-accent);
 }
-.js-sub {
+.sfp-sub {
   font-size: 10px;
   letter-spacing: 2px;
   color: var(--dim);
 }
-.js-sub span {
-  color: var(--j-green);
+.sfp-sub span {
+  color: var(--sfp-accent);
   letter-spacing: 1px;
 }
-.js-head-btns {
+.sfp-head-btns {
   margin-left: auto;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
 }
-.js-btn {
+.sfp-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1651,13 +1654,13 @@ button:disabled {
   padding: 6px 9px;
   cursor: pointer;
 }
-.js-btn:hover {
-  border-color: var(--j-green);
+.sfp-btn:hover {
+  border-color: var(--sfp-accent);
 }
-.js-btn.primary {
-  background: var(--j-green);
+.sfp-btn.primary {
+  background: var(--sfp-accent);
   color: #04120a;
-  border-color: var(--j-green);
+  border-color: var(--sfp-accent);
 }
 .led {
   display: inline-block;
@@ -1667,25 +1670,25 @@ button:disabled {
   background: #263a2f;
   box-shadow: inset 0 0 2px #000;
 }
-.js-btn.on .led,
-.js-wave.on .led {
-  background: var(--j-lcd);
-  box-shadow: 0 0 6px var(--j-lcd);
+.sfp-btn.on .led,
+.sfp-opt.on .led {
+  background: var(--sfp-lcd);
+  box-shadow: 0 0 6px var(--sfp-lcd);
 }
-.js-body {
+.sfp-body {
   display: grid;
   grid-template-columns: 1fr 1.7fr 1.5fr 0.5fr;
   gap: 10px;
   margin-top: 12px;
 }
-.js-sec {
+.sfp-sec {
   background: rgba(0, 0, 0, 0.22);
   border: 1px solid #2a3340;
   border-radius: 8px;
   padding: 8px 10px 10px;
   min-width: 0;
 }
-.js-sec h3 {
+.sfp-sec h3 {
   margin: 0 0 8px;
   font: 700 9px/1 var(--font-mono);
   letter-spacing: 2px;
@@ -1693,18 +1696,18 @@ button:disabled {
   border-bottom: 1px solid #2a3340;
   padding-bottom: 6px;
 }
-.js-row {
+.sfp-row {
   display: flex;
   gap: 10px;
   justify-content: space-around;
   align-items: flex-end;
 }
-.js-waves {
+.sfp-radio {
   display: flex;
   gap: 4px;
   margin-bottom: 10px;
 }
-.js-wave {
+.sfp-opt {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -1718,7 +1721,7 @@ button:disabled {
   padding: 5px 2px;
   cursor: pointer;
 }
-.js-wave svg {
+.sfp-opt svg {
   width: 26px;
   height: 18px;
   fill: none;
@@ -1726,9 +1729,9 @@ button:disabled {
   stroke-width: 2;
   stroke-linejoin: round;
 }
-.js-wave.on {
-  color: var(--j-lcd);
-  border-color: var(--j-green);
+.sfp-opt.on {
+  color: var(--sfp-lcd);
+  border-color: var(--sfp-accent);
 }
 /* knobs */
 .knob-wrap,
@@ -1763,7 +1766,7 @@ button:disabled {
 }
 .k-fill {
   fill: none;
-  stroke: var(--j-green);
+  stroke: var(--sfp-accent);
   stroke-width: 4;
   stroke-linecap: round;
   filter: drop-shadow(0 0 3px rgba(46, 219, 132, 0.6));
@@ -1784,7 +1787,7 @@ button:disabled {
 }
 .knob:focus-visible,
 .fader:focus-visible {
-  box-shadow: 0 0 0 2px var(--j-green);
+  box-shadow: 0 0 0 2px var(--sfp-accent);
 }
 .knob-label {
   font: 700 9px var(--font-mono);
@@ -1793,8 +1796,8 @@ button:disabled {
 }
 .knob-read {
   font: 10px var(--font-mono);
-  color: var(--j-lcd);
-  background: var(--lcd-bg);
+  color: var(--sfp-lcd);
+  background: var(--sfp-lcd-bg);
   border: 1px solid #0b0f14;
   border-radius: 3px;
   padding: 1px 5px;
@@ -1842,7 +1845,7 @@ button:disabled {
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--j-green);
+  background: var(--sfp-accent);
   border-radius: 3px;
   opacity: 0.8;
 }
@@ -1870,7 +1873,7 @@ button:disabled {
 .fader.drag .fader-thumb {
   background: linear-gradient(180deg, #fff, #aab6c3);
 }
-.js-scope {
+.sfp-scope {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -1881,34 +1884,34 @@ button:disabled {
   letter-spacing: 2px;
   color: var(--dim);
 }
-#js-env {
+#sfp-scope-cv {
   width: 100%;
   height: 74px;
   border: 1px solid #0b0f14;
   border-radius: 4px;
 }
 /* keyboard */
-.js-keys-bar {
+.sfp-keys-bar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 12px;
 }
-.js-oct {
+.sfp-oct {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   font: 700 11px var(--font-mono);
-  color: var(--j-lcd);
+  color: var(--sfp-lcd);
 }
-.js-keys {
+.sfp-keys {
   position: relative;
   height: 74px;
-  flex: 0 0 calc(15 * var(--j-wk));
-  --wk: var(--j-wk);
+  flex: 0 0 calc(15 * var(--sfp-wk));
+  --wk: var(--sfp-wk);
 }
-.js-key {
+.sfp-key {
   position: absolute;
   top: 0;
   width: var(--wk);
@@ -1919,40 +1922,40 @@ button:disabled {
   padding: 0;
   cursor: pointer;
 }
-.js-key.blk {
+.sfp-key.blk {
   width: calc(var(--wk) * 0.6);
   height: 62%;
   background: linear-gradient(180deg, #2c3644, #0b0f14);
   z-index: 2;
 }
-.js-key.on {
-  background: var(--j-green);
+.sfp-key.on {
+  background: var(--sfp-accent);
 }
-.js-key.blk.on {
+.sfp-key.blk.on {
   background: #1a9a5c;
 }
-.js-status {
+.sfp-status {
   min-height: 14px;
   margin-top: 8px;
   font: 10px var(--font-mono);
   color: var(--dim);
 }
-.jims10.learning .knob,
-.jims10.learning .fader {
+.sfp.learning .knob,
+.sfp.learning .fader {
   outline: 1px dashed var(--accent-2);
   outline-offset: 2px;
 }
-.jims10 .armed {
+.sfp .armed {
   outline: 2px solid var(--accent-2);
-  animation: js-blink 0.7s infinite alternate;
+  animation: sfp-blink 0.7s infinite alternate;
 }
-@keyframes js-blink {
+@keyframes sfp-blink {
   to {
     outline-color: transparent;
   }
 }
 @media (max-width: 820px) {
-  .js-body {
+  .sfp-body {
     grid-template-columns: 1fr 1fr;
   }
 }
@@ -1960,6 +1963,322 @@ button:disabled {
 #modal-fx,
 #modal-inserts {
   z-index: 70; /* above the jiMS10 panel and the MIDI roll */
+}
+
+/* shared bits for every synth panel */
+.sfp-preset {
+  background: #11161d;
+  color: var(--text);
+  border: 1px solid var(--sfp-edge);
+  border-radius: 4px;
+  font: 600 10px/1 var(--font-mono);
+  letter-spacing: 1px;
+  padding: 6px 8px;
+  max-width: 170px;
+}
+.sfp-sec {
+  border-color: var(--sfp-edge);
+}
+.sfp-sec h3 {
+  border-bottom-color: var(--sfp-edge);
+  display: flex;
+  justify-content: space-between;
+}
+.sfp-tag {
+  color: var(--sfp-accent);
+  letter-spacing: 1px;
+}
+.sfp-sec-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.sfp-sec-body > .knob-wrap,
+.sfp-sec-body > .fader-wrap {
+  align-self: center;
+}
+.sfp-viz {
+  width: 100%;
+  height: 74px;
+  display: block;
+  border: 1px solid #0b0f14;
+  border-radius: 4px;
+}
+.sfp-opt .led {
+  flex: none;
+}
+.sfp-radio.algo-btns,
+.sfp-radio.vowel-btns {
+  margin-bottom: 0;
+}
+.sfp-opt text {
+  fill: currentColor;
+  stroke: none;
+  font: 700 6px var(--font-mono);
+}
+.sfp-opt rect,
+.sfp-opt path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+.sfp-opt rect {
+  stroke-width: 1.2;
+}
+/* XY pad */
+.sfp-xy-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.sfp-xy {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.45;
+  border: 1px solid #0b0f14;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--sfp-accent) 22%, transparent), transparent 70%),
+    var(--sfp-lcd-bg);
+  cursor: crosshair;
+  touch-action: none;
+  overflow: hidden;
+  outline: none;
+}
+.sfp-xy:focus-visible {
+  box-shadow: 0 0 0 2px var(--sfp-accent);
+}
+.xy-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--sfp-accent) 18%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--sfp-accent) 18%, transparent) 1px, transparent 1px);
+  background-size: 25% 25%;
+}
+.xy-puck {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border-radius: 50%;
+  background: var(--sfp-accent);
+  border: 2px solid #fff;
+  box-shadow: 0 0 14px var(--sfp-accent), 0 0 3px #000;
+  pointer-events: none;
+}
+.sfp-xy.drag .xy-puck {
+  transform: scale(1.25);
+}
+.xy-ticks {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  display: flex;
+  justify-content: space-around;
+  font: 700 10px var(--font-mono);
+  color: color-mix(in srgb, var(--sfp-lcd) 70%, transparent);
+  pointer-events: none;
+}
+.xy-read {
+  font: 10px var(--font-mono);
+  color: var(--sfp-lcd);
+  background: var(--sfp-lcd-bg);
+  border-radius: 3px;
+  padding: 2px 6px;
+  text-align: center;
+}
+.sfp-row .knob-wrap,
+.sfp-row .fader-wrap {
+  flex: 1;
+}
+
+/* ---- jiMS10: green hardware mono-synth (default grid above) ---- */
+
+/* ---- jiFM4: cyan operator rack ---- */
+.sfp-fm4 {
+  width: 1040px;
+}
+.sfp-fm4 .sfp-body {
+  grid-template-columns: repeat(5, 1fr);
+}
+.sfp-fm4 .fm-algo {
+  grid-column: 1 / -1;
+}
+.sfp-fm4 .fm-algo .sfp-sec-body {
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+}
+.sfp-fm4 .algo-btns {
+  gap: 6px;
+}
+.sfp-fm4 .algo-btns .sfp-opt {
+  width: 74px;
+}
+.sfp-fm4 .algo-btns .sfp-opt svg {
+  width: 56px;
+  height: 36px;
+  stroke-linecap: round;
+}
+.sfp-fm4 .viz-route {
+  flex: 1;
+  height: 92px;
+  min-width: 0;
+}
+.sfp-fm4 .fm-op {
+  position: relative;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.07), rgba(0, 0, 0, 0.25));
+}
+.sfp-fm4 .fm-op::before {
+  content: attr(data-op);
+  position: absolute;
+  right: 8px;
+  top: 4px;
+  font: 700 26px var(--font-display);
+  color: rgba(34, 211, 238, 0.12);
+}
+.sfp-fm4 .fm-op.is-carrier {
+  border-color: var(--sfp-accent);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.25);
+}
+.sfp-fm4 .fm-op.is-mod .sfp-tag {
+  color: #a78bfa;
+}
+.sfp-fm4 .fm-op .sfp-row {
+  align-items: flex-end;
+}
+.sfp-fm4 .fm-out .sfp-row {
+  gap: 4px;
+}
+.sfp-fm4 .fader {
+  height: 96px;
+  width: 30px;
+}
+.sfp-fm4 .k-cap {
+  fill: #1d3640;
+}
+.sfp-fm4 .fm-algo .knob-wrap {
+  min-width: 70px;
+}
+
+/* ---- jiVOX: pink vowel lab ---- */
+.sfp-vox {
+  width: 1040px;
+}
+.sfp-vox .sfp-body {
+  grid-template-columns: 1.15fr 1.25fr 1fr;
+  grid-template-areas:
+    "pad formants morph"
+    "pad formants voice"
+    "env env env";
+}
+.sfp-vox .vox-pad {
+  grid-area: pad;
+}
+.sfp-vox .vox-formants {
+  grid-area: formants;
+}
+.sfp-vox .vox-morph {
+  grid-area: morph;
+}
+.sfp-vox .vox-voice {
+  grid-area: voice;
+}
+.sfp-vox .vox-env {
+  grid-area: env;
+}
+.sfp-vox .vowel-xy .sfp-xy {
+  aspect-ratio: 1.15;
+  border-radius: 50% / 38%;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(244, 114, 182, 0.28), transparent 72%),
+    var(--sfp-lcd-bg);
+}
+.sfp-vox .vowel-xy .xy-ticks {
+  top: 6px;
+  bottom: auto;
+  justify-content: space-between;
+  padding: 0 14%;
+  font-size: 16px;
+}
+.sfp-vox .vowel-btns {
+  justify-content: space-between;
+}
+.sfp-vox .vowel-btns .sfp-opt {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 2px;
+}
+.sfp-vox .viz-formants {
+  height: 150px;
+}
+.sfp-vox .vox-env .sfp-row {
+  justify-content: center;
+  gap: 60px;
+}
+.sfp-vox .vox-env .fader {
+  height: 70px;
+}
+.sfp-vox .vox-env .sfp-sec-body {
+  align-items: center;
+}
+.sfp-vox .k-cap {
+  fill: #4a2038;
+}
+.sfp-vox .sfp-sec {
+  background: rgba(40, 8, 26, 0.45);
+}
+
+/* ---- jiPLUCK: amber wooden string board ---- */
+.sfp-pluck {
+  width: 1020px;
+  background:
+    repeating-linear-gradient(92deg, rgba(0, 0, 0, 0.11) 0 2px, transparent 2px 7px),
+    linear-gradient(180deg, rgba(255, 220, 140, 0.08), transparent 45%),
+    var(--sfp-bg);
+}
+.sfp-pluck .sfp-body {
+  grid-template-columns: 1.9fr 1fr 1fr 0.45fr;
+}
+.sfp-pluck .sfp-sec {
+  background: rgba(30, 18, 4, 0.55);
+}
+.sfp-pluck .viz-string {
+  height: 118px;
+  border-color: #2c1d06;
+}
+.sfp-pluck .k-cap {
+  fill: #6b4e1a;
+  stroke: #1a1204;
+}
+.sfp-pluck .k-ptr {
+  stroke: #ffe8b0;
+}
+.sfp-pluck .pick-xy .sfp-xy {
+  aspect-ratio: 1.2;
+  border-radius: 4px;
+  background:
+    repeating-linear-gradient(0deg, rgba(251, 191, 36, 0.35) 0 1px, transparent 1px 25%),
+    var(--sfp-lcd-bg);
+}
+.sfp-pluck .pl-body .sfp-row {
+  align-items: flex-end;
+}
+.sfp-pluck .pl-out .sfp-sec-body {
+  align-items: center;
+}
+@media (max-width: 900px) {
+  .sfp-fm4 .sfp-body,
+  .sfp-pluck .sfp-body {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sfp-vox .sfp-body {
+    grid-template-columns: 1fr;
+    grid-template-areas: "pad" "formants" "morph" "voice" "env";
+  }
 }
 
 /* Transport, sources and sequence bar stay pinned while the channels scroll. */
@@ -1990,14 +2309,6 @@ button:disabled {
     padding-top: 3px;
     padding-bottom: 3px;
   }
-}
-.js-key.on {
-  box-shadow: 0 0 10px var(--j-green), inset 0 -6px 10px rgba(0, 0, 0, 0.18);
-}
-.js-oct .js-btn.lit {
-  background: var(--j-green);
-  color: #04120a;
-  box-shadow: 0 0 8px var(--j-green);
 }
 
 /* rows silenced because something else is soloed */

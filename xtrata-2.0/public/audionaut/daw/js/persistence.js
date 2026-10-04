@@ -190,6 +190,24 @@ function normalizeNative(data) {
       p.instruments[i].inserts = Array.isArray(inst?.inserts)
         ? inst.inserts.slice(0, 4)
         : [];
+      // Projects saved before the jiFM4 / jiVOX / jiPLUCK synths had every slot on
+      // jiMS10. Move slots that were never touched (stock name, no tweaks, no notes
+      // in any sequence) onto the new default synth for that slot.
+      const cur = p.instruments[i];
+      const hasNotes = (data.sequences || []).some(
+        (s) => Array.isArray(s?.notes?.[i]) && s.notes[i].length,
+      );
+      if (
+        i > 0 &&
+        cur.synthId === "jims10" &&
+        !cur.params &&
+        /^Synth \d+$/.test(String(cur.name || "")) &&
+        !hasNotes
+      ) {
+        const fresh = makeInstrument(i);
+        cur.synthId = fresh.synthId;
+        cur.name = fresh.name;
+      }
     });
   }
   if (Array.isArray(data.sequences) && data.sequences.length) {

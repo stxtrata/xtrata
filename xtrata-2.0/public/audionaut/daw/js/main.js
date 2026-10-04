@@ -6,7 +6,8 @@ import { reloadAllSamples } from "./loader.js";
 import * as ui from "./ui.js";
 import * as persist from "./persistence.js";
 import { initPianoRoll, rollPlayhead } from "./pianoroll.js";
-import { initSynthPanel } from "./jims10-panel.js";
+import { initSynthPanel } from "./synth-panel.js";
+import { initMidi } from "./midi-input.js";
 import {
   initArrange,
   arrangePlayhead,
@@ -310,6 +311,7 @@ function boot() {
   ui.initBeatsModal();
   initPianoRoll();
   initSynthPanel();
+  initMidi();
   initArrange();
   initSourceBrowser();
   initSamplesLoops();
