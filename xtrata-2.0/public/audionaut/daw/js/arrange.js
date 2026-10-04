@@ -6,9 +6,19 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // Drag region edges to trim, drag a region's body to move it. Regions sit at their true
 // position (step + fractional offset); the Snap menu picks the move grid (Step … 1/16 of a
 // step, or Off) and Alt bypasses it. Zoom widens the steps so fine moves are visible.
-// A region stops at its neighbours. Click = edit, right-click = reverse, click empty = add.
+// Drag on empty space to marquee-select regions (Shift adds); drag a selected region to
+// move the whole group, which stops at regions that are not selected. Arrow keys nudge the
+// group by the snap amount (Shift = 4x), Delete removes it, Esc clears the selection.
+// Click = edit, right-click = reverse, click empty = add.
 
-import { store, NUM_STEPS, stepVal, stepObj, stepOff } from "./state.js";
+import {
+  store,
+  NUM_STEPS,
+  stepVal,
+  stepObj,
+  stepOff,
+  withStepOff,
+} from "./state.js";
 import { engine } from "./engine.js";
 import { openStepEditor, setStatus } from "./ui.js";
 
@@ -21,7 +31,11 @@ let zoom = 1; // 1, 2, 4, 8 — canvas pixels per step = CELL_W * zoom
 let snap = 1; // move grid in steps: 1, .5, .25, .125, .0625 — 0 = free
 const cw = () => CELL_W * zoom;
 let playheadStep = -1;
-let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'move', ch, step, ... }
+let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'maybeClick'|'pending'|'move'|'marquee', ch, ... }
+let selection = new Set(); // "ch:step" keys of selected regions
+const selKey = (ch, step) => `${ch}:${step}`;
+const stripFor = (ch) =>
+  document.querySelector(`#channels .channel[data-ch="${ch}"] .arrange-strip`);
 
 export function isArrangeMode() {
   return arrangeMode;
@@ -135,6 +149,14 @@ function drawStrip(ch) {
     g.fillRect(x, 1, w, H - 2);
     g.strokeStyle = r.cut ? "#ff9f43" : c.color;
     g.strokeRect(x + 0.5, 1.5, w - 1, H - 3);
+    if (selection.has(selKey(ch, r.step))) {
+      g.fillStyle = "rgba(67,255,164,0.16)";
+      g.fillRect(x, 1, w, H - 2);
+      g.strokeStyle = "#43ffa4";
+      g.lineWidth = 2;
+      g.strokeRect(x + 1, 2, w - 2, H - 4);
+      g.lineWidth = 1;
+    }
 
     if (data) {
       const startFrac = r.rev ? 1 - r.trimEnd : r.trimStart;
@@ -268,14 +290,6 @@ function hitTest(ch, x) {
   return { kind: "empty" };
 }
 
-// Round a position (in steps) to the move grid, then keep it inside [lo, hi].
-function fitPos(pos, lo, hi, grid) {
-  let p = grid > 0 ? Math.round(pos / grid) * grid : pos;
-  if (p < lo) p = grid > 0 ? Math.ceil(lo / grid - 1e-9) * grid : lo;
-  if (p > hi) p = grid > 0 ? Math.floor(hi / grid + 1e-9) * grid : hi;
-  return Math.round(p * 1000) / 1000;
-}
-
 function onStripDown(ch, cv, e) {
   if (e.button === 2) return;
   const x = stripXY(cv, e);
@@ -291,39 +305,275 @@ function onStripDown(ch, cv, e) {
       trimEnd0: h.region.trimEnd,
     };
     e.preventDefault();
-  } else if (h.kind === "body") {
-    // Body: click opens the editor, drag moves the region. It can slide between its
-    // neighbouring triggers but not jump over them.
-    const row = store.seq.steps[ch];
-    const from = h.region.step;
-    // the region keeps its own step slot between its neighbours' slots
-    let lo = 0,
-      hi = NUM_STEPS - 0.001;
-    for (let t = 0; t < NUM_STEPS; t++) {
-      if (t === from || !stepVal(row[t])) continue;
-      if (t < from) lo = Math.max(lo, t + 1);
-      else hi = Math.min(hi, t - 0.001);
-    }
+  } else {
+    // Body or empty space: handled on the window so the drag can leave the strip.
+    // Body = click edits / drag moves; empty = click adds / drag draws a marquee.
     drag = {
-      kind: "move",
+      kind: h.kind === "body" ? "pending" : "maybeClick",
       ch,
       region: h.region,
       startX: x,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      shift: e.shiftKey,
       moved: false,
-      from,
-      at: from,
-      pos: h.region.pos,
-      pos0: h.region.pos,
-      lo,
-      hi,
+      global: true,
     };
     e.preventDefault();
+    window.addEventListener("mousemove", onGlobalMove);
+    window.addEventListener("mouseup", onGlobalUp);
+  }
+}
+
+// ------------------------------------------------- selection, marquee, group move
+const r3 = (n) => Math.round(n * 1000) / 1000;
+
+function selectedItems() {
+  const items = [];
+  for (const k of selection) {
+    const [ch, step] = k.split(":").map(Number);
+    const val = store.seq.steps[ch]?.[step];
+    if (stepVal(val)) items.push({ ch, step, val, pos: step + stepOff(val) });
+  }
+  return items;
+}
+
+function origRows(items) {
+  const orig = new Map();
+  for (const it of items)
+    if (!orig.has(it.ch)) orig.set(it.ch, store.seq.steps[it.ch].slice());
+  return orig;
+}
+
+// Can the whole group sit `delta` steps from where it started? It must stay on the
+// timeline and may not land in a step slot held by a region that is not selected
+// (or by another member of the group).
+function groupFits(items, orig, delta) {
+  const moving = new Set(items.map((it) => selKey(it.ch, it.step)));
+  const used = new Set();
+  for (const it of items) {
+    const p = r3(it.pos + delta);
+    if (p < 0 || p > NUM_STEPS - 0.001) return false;
+    const to = Math.floor(p);
+    const key = selKey(it.ch, to);
+    if (used.has(key)) return false;
+    used.add(key);
+    if (stepVal(orig.get(it.ch)[to]) && !moving.has(key)) return false;
+  }
+  return true;
+}
+
+// Rebuild the touched rows from their originals with the group shifted by `delta`.
+// Returns the moved items (new step, new value) for selection and change events.
+function applyMove(items, orig, delta) {
+  const rows = new Map([...orig].map(([ch, row]) => [ch, row.slice()]));
+  for (const it of items) rows.get(it.ch)[it.step] = 0;
+  const moved = items.map((it) => {
+    const p = r3(it.pos + delta);
+    const step = Math.floor(p);
+    const val = withStepOff(it.val, r3(p - step));
+    rows.get(it.ch)[step] = val;
+    return { ch: it.ch, step, val, pos: p };
+  });
+  for (const [ch, row] of rows) store.seq.steps[ch] = row;
+  return moved;
+}
+
+// Walk the delta toward `target` in snap-sized steps and stop at the first position
+// where the group no longer fits, so a drag can never jump over another region.
+function walkDelta(d, target) {
+  const inc = d.grid > 0 ? d.grid : 1 / 32;
+  let cur = d.delta;
+  while (Math.abs(target - cur) > 1e-9) {
+    const next = r3(cur + Math.sign(target - cur) * Math.min(inc, Math.abs(target - cur)));
+    if (!groupFits(d.items, d.orig, next)) break;
+    cur = next;
+  }
+  return cur;
+}
+
+// Tell the rest of the app (step grid, history) once the move has settled.
+function commitMove(items, moved) {
+  const cells = new Set();
+  for (const it of items) cells.add(selKey(it.ch, it.step));
+  for (const it of moved) cells.add(selKey(it.ch, it.step));
+  for (const k of cells) {
+    const [ch, step] = k.split(":").map(Number);
+    store.emit("step", { ch, step, val: store.seq.steps[ch][step] });
+  }
+}
+
+const plural = (n) => `${n} region${n === 1 ? "" : "s"}`;
+const stepsLabel = (n) => `${r3(Math.abs(n))} step${Math.abs(n) === 1 ? "" : "s"}`;
+
+function nudgeSelection(dir, big) {
+  const items = selectedItems();
+  if (!items.length) return;
+  const unit = snap > 0 ? snap : 1 / 16;
+  const orig = origRows(items);
+  const d = { items, orig, grid: unit, delta: 0 };
+  const delta = walkDelta(d, dir * unit * (big ? 4 : 1));
+  if (!delta) return;
+  const moved = applyMove(items, orig, delta);
+  selection = new Set(moved.map((it) => selKey(it.ch, it.step)));
+  commitMove(items, moved);
+  renderArrange();
+  setStatus(`Moved ${plural(items.length)} ${delta > 0 ? "right" : "left"} ${stepsLabel(delta)}.`);
+}
+
+function deleteSelection() {
+  const items = selectedItems();
+  if (!items.length) return;
+  for (const it of items) store.seq.steps[it.ch][it.step] = 0;
+  selection.clear();
+  for (const it of items) store.emit("step", { ch: it.ch, step: it.step, val: 0 });
+  renderArrange();
+  setStatus(`Deleted ${plural(items.length)}.`);
+}
+
+function ensureMarquee() {
+  let el = document.getElementById("arrange-marquee");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "arrange-marquee";
+    el.style.cssText =
+      "position:fixed;z-index:9999;pointer-events:none;border:1px dashed #43ffa4;background:rgba(67,255,164,0.12);display:none";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function marqueeHits(r) {
+  const hits = [];
+  for (let ch = 0; ch < store.numChannels; ch++) {
+    const cv = stripFor(ch);
+    if (!cv) continue;
+    const box = cv.getBoundingClientRect();
+    if (box.bottom < r.top || box.top > r.bottom) continue;
+    const k = box.width / cv.width;
+    for (const reg of channelRegions(ch)) {
+      const x0 = box.left + reg.pos * cw() * k;
+      const x1 = x0 + Math.max(3, reg.widthSteps * cw()) * k;
+      if (x1 >= r.left && x0 <= r.right) hits.push(selKey(ch, reg.step));
+    }
+  }
+  return hits;
+}
+
+function onGlobalMove(e) {
+  const d = drag;
+  if (!d?.global) return;
+  const dx = e.clientX - d.startClientX,
+    dy = e.clientY - d.startClientY;
+  if (!d.moved) {
+    if (Math.hypot(dx, dy) <= 3) return;
+    d.moved = true;
+    if (d.kind === "pending") {
+      const key = selKey(d.ch, d.region.step);
+      if (!selection.has(key)) {
+        if (!d.shift) selection.clear();
+        selection.add(key);
+      }
+      d.kind = "move";
+      d.items = selectedItems();
+      d.orig = origRows(d.items);
+      d.delta = 0;
+      const cv = stripFor(d.ch);
+      d.scale = cv.width / cv.getBoundingClientRect().width;
+      document.body.style.cursor = "grabbing";
+      cv.style.cursor = "grabbing";
+    } else {
+      d.kind = "marquee";
+      if (!d.shift) selection.clear();
+      d.base = new Set(selection);
+    }
+  }
+  if (d.kind === "move") {
+    // snap the grabbed region's own position to the grid (Alt = free), the rest of the
+    // group keeps its spacing
+    d.grid = e.altKey ? 0 : snap;
+    const want = d.region.pos + (dx * d.scale) / cw();
+    const snapped = d.grid > 0 ? Math.round(want / d.grid) * d.grid : want;
+    const delta = walkDelta(d, r3(snapped - d.region.pos));
+    if (delta === d.delta && d.movedItems) return;
+    d.delta = delta;
+    d.movedItems = applyMove(d.items, d.orig, delta);
+    selection = new Set(d.movedItems.map((it) => selKey(it.ch, it.step)));
+    renderArrange();
+  } else if (d.kind === "marquee") {
+    const r = {
+      left: Math.min(d.startClientX, e.clientX),
+      right: Math.max(d.startClientX, e.clientX),
+      top: Math.min(d.startClientY, e.clientY),
+      bottom: Math.max(d.startClientY, e.clientY),
+    };
+    const el = ensureMarquee();
+    el.style.display = "block";
+    el.style.left = r.left + "px";
+    el.style.top = r.top + "px";
+    el.style.width = r.right - r.left + "px";
+    el.style.height = r.bottom - r.top + "px";
+    selection = new Set([...d.base, ...marqueeHits(r)]);
+    renderArrange();
+  }
+}
+
+function onGlobalUp(e) {
+  window.removeEventListener("mousemove", onGlobalMove);
+  window.removeEventListener("mouseup", onGlobalUp);
+  const d = drag;
+  drag = null;
+  document.body.style.cursor = "";
+  const el = document.getElementById("arrange-marquee");
+  if (el) el.style.display = "none";
+  if (!d?.global) return;
+  if (d.kind === "move") {
+    const cv = stripFor(d.ch);
+    if (cv) cv.style.cursor = "grab";
+    if (d.delta && d.movedItems) {
+      commitMove(d.items, d.movedItems);
+      setStatus(
+        `Moved ${plural(d.items.length)} ${d.delta > 0 ? "right" : "left"} ${stepsLabel(d.delta)}.`,
+      );
+    }
+    renderArrange();
+    return;
+  }
+  if (d.kind === "marquee") {
+    setStatus(
+      selection.size
+        ? `${plural(selection.size)} selected. Drag one to move the group, Delete removes.`
+        : "No regions selected.",
+    );
+    renderArrange();
+    return;
+  }
+  // plain click
+  if (d.kind === "pending") {
+    const key = selKey(d.ch, d.region.step);
+    if (d.shift) {
+      if (selection.has(key)) selection.delete(key);
+      else selection.add(key);
+      renderArrange();
+      return;
+    }
+    if (!selection.has(key)) selection.clear();
+    renderArrange();
+    openStepEditor(d.ch, d.region.step);
   } else {
-    drag = { kind: "maybeClick", ch, startX: x, moved: false };
+    const cv = stripFor(d.ch);
+    const hadSelection = selection.size > 0;
+    if (!d.shift) selection.clear();
+    if (cv && !(hadSelection && !d.shift)) {
+      const s = Math.floor(stripXY(cv, e) / cw());
+      if (s >= 0 && s < NUM_STEPS) store.cycleStep(d.ch, s);
+    }
+    renderArrange();
   }
 }
 
 function onStripMove(ch, cv, e) {
+  if (drag?.global) return;
   const x = stripXY(cv, e);
   if (!drag || drag.ch !== ch) {
     // hover cursor
@@ -346,16 +596,7 @@ function onStripMove(ch, cv, e) {
   const r = drag.region;
   const sd = stepDurSec();
 
-  if (drag.kind === "move") {
-    cv.style.cursor = "grabbing";
-    const grid = e.altKey ? 0 : snap; // Alt = free move
-    const to = fitPos(drag.pos0 + dx / cw(), drag.lo, drag.hi, grid);
-    if (to !== drag.pos) {
-      drag.at = store.moveStep(ch, drag.at, to);
-      drag.pos = to;
-      renderArrange();
-    }
-  } else if (drag.kind === "trimR" && buffer) {
+  if (drag.kind === "trimR" && buffer) {
     // new audible length (sec) from pixel width → new trimEnd
     const newSteps = Math.max(0.1, r.naturalSteps + dx / cw());
     const newRegionSec = newSteps * sd * 1; // audible sec
@@ -391,6 +632,7 @@ function onStripMove(ch, cv, e) {
 }
 
 function onStripUp(ch, cv, e) {
+  if (drag?.global) return;
   if (!drag || drag.ch !== ch) {
     drag = null;
     return;
@@ -398,16 +640,7 @@ function onStripUp(ch, cv, e) {
   const d = drag;
   drag = null;
   const x = stripXY(cv, e);
-  if (d.kind === "move") {
-    if (!d.moved) openStepEditor(ch, d.from);
-    else if (d.pos !== d.pos0) {
-      const o = stepOff(store.seq.steps[ch][d.at]);
-      setStatus(
-        `Moved from step ${d.from + 1} to step ${d.at + 1}${o ? ` + ${o.toFixed(3)} step` : ""}.`,
-      );
-    }
-    cv.style.cursor = "grab";
-  } else if (d.kind === "maybeClick" && !d.moved) {
+  if (d.kind === "maybeClick" && !d.moved) {
     const h = hitTest(ch, x);
     if (h.kind === "body") openStepEditor(ch, h.region.step);
     else if (h.kind === "empty") {
@@ -442,7 +675,8 @@ export function attachStrips() {
     cv.addEventListener("mousemove", (e) => onStripMove(ch, cv, e));
     cv.addEventListener("mouseup", (e) => onStripUp(ch, cv, e));
     cv.addEventListener("mouseleave", () => {
-      if (drag?.ch === ch && drag.kind !== "maybeClick") drag = null;
+      if (drag?.ch === ch && !drag.global && drag.kind !== "maybeClick")
+        drag = null;
     });
     cv.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -501,6 +735,40 @@ export function initArrange() {
       Math.max(1, Math.min(500, +fade.value || 15)),
     );
   });
+
+  ["sequence", "channels", "load"].forEach((ev) =>
+    store.on(ev, () => {
+      selection.clear();
+    }),
+  );
+  // Capture phase + stopImmediatePropagation: with regions selected, the arrows nudge
+  // them instead of switching sequence (main.js) and Delete removes them.
+  document.addEventListener(
+    "keydown",
+    (e) => {
+      if (!arrangeMode || !selection.size) return;
+      const t = e.target;
+      if (
+        t &&
+        (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))
+      )
+        return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "Escape") {
+        selection.clear();
+        renderArrange();
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        deleteSelection();
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        nudgeSelection(e.key === "ArrowRight" ? 1 : -1, e.shiftKey);
+      }
+    },
+    true,
+  );
 
   ["step", "sequence", "channel", "channels", "load", "project"].forEach((ev) =>
     store.on(ev, () => {
