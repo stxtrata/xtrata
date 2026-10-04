@@ -6285,6 +6285,21 @@ p {
   margin-top: 4px;
 }
 
+.collection-live-page__my-holdings {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.collection-live-page__my-holdings a {
+  color: var(--accent, #e05a2a);
+}
+
+.collection-live-page__my-holdings--muted {
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .collection-live-page__hero-actions .button {
   padding: 7px 14px;
   font-size: 0.79rem;
