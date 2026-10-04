@@ -92,6 +92,7 @@ import { createImageThumbnail, THUMBNAIL_SIZE } from './lib/viewer/thumbnail';
 import { getTokenThumbnailKey, useTokenSummaries } from './lib/viewer/queries';
 import { createObjectUrl } from './lib/utils/blob';
 import { bytesToHex } from './lib/utils/encoding';
+import { resolveMintedAssetsFast, runWithConcurrency } from './lib/collection-mint/minted-assets';
 import { formatBytes } from './lib/utils/format';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
 import { createWalletSessionStore } from './lib/wallet/session';
@@ -2023,6 +2024,43 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     return owner ? String(cvToValue(owner)) : null;
   }, [collectionContract]);
 
+  // Minted indexes are append-only, so entries and token hashes are cached for the page's life.
+  const mintedIndexCacheRef = useRef<{ key: string; ids: Map<number, string> }>({ key: '', ids: new Map() });
+  const tokenHashCacheRef = useRef<Map<string, string>>(new Map());
+  const mintedScanSeqRef = useRef(0);
+  const canonicalHashRef = useRef<Record<string, string>>({});
+  canonicalHashRef.current = canonicalHashHexByAssetId;
+
+  const readMintedTokenIdsRange = useCallback(
+    async (from: number, to: number, senderAddress: string): Promise<Array<string | null>> => {
+      if (!collectionContract) throw new Error('Collection contract is missing.');
+      const key = `${collectionContract.address}.${collectionContract.contractName}`;
+      if (mintedIndexCacheRef.current.key !== key) {
+        mintedIndexCacheRef.current = { key, ids: new Map() };
+      }
+      const cache = mintedIndexCacheRef.current.ids;
+      const missing: number[] = [];
+      for (let index = from; index < to; index += 1) {
+        if (!cache.has(index)) missing.push(index);
+      }
+      const network = toStacksNetwork(collectionContract.network);
+      await runWithConcurrency(missing, 6, async (index) => {
+        const entryCv = await callReadOnlyFunction({
+          contractAddress: collectionContract.address,
+          contractName: collectionContract.contractName,
+          functionName: 'get-minted-id',
+          functionArgs: [uintCV(BigInt(index))],
+          senderAddress,
+          network
+        });
+        const tokenId = parseMintedIndexTokenId(entryCv);
+        if (tokenId !== null) cache.set(index, tokenId.toString());
+      });
+      return Array.from({ length: Math.max(0, to - from) }, (_, offset) => cache.get(from + offset) ?? null);
+    },
+    [collectionContract]
+  );
+
   const syncCollectionTokenNumbers = useCallback(
     async (options?: { forceFull?: boolean; mintedCount?: bigint | null }) => {
       if (!collectionContract) {
@@ -2060,22 +2098,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       setCollectionIndexSyncMessage(null);
       try {
         const senderAddress = walletSession.address ?? collectionContract.address;
-        const network = toStacksNetwork(collectionContract.network);
         const nextEntries: Record<string, number> = {};
-        for (let index = startIndex; index < targetCount; index += 1) {
-          const entryCv = await callReadOnlyFunction({
-            contractAddress: collectionContract.address,
-            contractName: collectionContract.contractName,
-            functionName: 'get-minted-id',
-            functionArgs: [uintCV(BigInt(index))],
-            senderAddress,
-            network
-          });
-          const tokenId = parseMintedIndexTokenId(entryCv);
-          if (tokenId !== null) {
-            nextEntries[tokenId.toString()] = index + 1;
-          }
-        }
+        const rangeIds = await readMintedTokenIdsRange(startIndex, targetCount, senderAddress);
+        rangeIds.forEach((tokenId, offset) => {
+          if (tokenId !== null) nextEntries[tokenId] = startIndex + offset + 1;
+        });
 
         const nextMap =
           needsFullSync || startIndex === 0
@@ -2097,6 +2124,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       collectionIndexCount,
       collectionTokenNumberByGlobalId,
       contractStatus?.mintedCount,
+      readMintedTokenIdsRange,
       walletSession.address
     ]
   );
@@ -2122,10 +2150,36 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       return;
     }
     setMintedScanPending(true);
+    const scanSeq = (mintedScanSeqRef.current += 1);
     const senderAddress = walletSession.address ?? coreContract.address;
     const next: Record<string, string> = {};
     const hashCorrections: Record<string, string> = {};
     try {
+      // Fast path: the contract's own minted list + each token's final hash (~2 reads per
+      // MINTED token). Anything uncertain falls through to the thorough per-file scan below.
+      const fast = await resolveMintedAssetsFast({
+        mintedCount:
+          contractStatus?.mintedCount === null || contractStatus?.mintedCount === undefined
+            ? Number.NaN
+            : Number(contractStatus.mintedCount),
+        assets: mintableAssets,
+        canonicalHashHexByAssetId: canonicalHashRef.current,
+        readTokenIds: (count) => readMintedTokenIdsRange(0, count, senderAddress),
+        readTokenHash: async (tokenId) => {
+          const cached = tokenHashCacheRef.current.get(tokenId);
+          if (cached) return cached;
+          const meta = await coreClient.getInscriptionMeta(BigInt(tokenId), senderAddress);
+          if (!meta) return null;
+          const hex = bytesToHex(meta.finalHash);
+          tokenHashCacheRef.current.set(tokenId, hex);
+          return hex;
+        }
+      });
+      if (fast.status === 'ok') {
+        if (scanSeq === mintedScanSeqRef.current) setMintedTokenIds(fast.mintedTokenIds);
+        return;
+      }
+
       const lookupTokenId = async (hashHex: string) => {
         const hashBytes = hashHexToBytes(hashHex);
         if (!hashBytes) {
@@ -2145,7 +2199,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         const settled = await Promise.all(
           batch.map(async (asset) => {
             const knownHashHex =
-              normalizeHashHex(canonicalHashHexByAssetId[asset.asset_id]) ??
+              normalizeHashHex(canonicalHashRef.current[asset.asset_id]) ??
               normalizeHashHex(asset.expected_hash ?? '');
             if (knownHashHex) {
               const tokenId = await lookupTokenId(knownHashHex);
@@ -2190,7 +2244,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           next[entry.assetId] = entry.tokenId;
         });
       }
-      setMintedTokenIds(next);
+      if (scanSeq === mintedScanSeqRef.current) setMintedTokenIds(next);
       if (Object.keys(hashCorrections).length > 0) {
         setCanonicalHashHexByAssetId((current) => ({
           ...current,
@@ -2198,12 +2252,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }));
       }
     } finally {
-      setMintedScanPending(false);
+      if (scanSeq === mintedScanSeqRef.current) setMintedScanPending(false);
     }
   }, [
-    canonicalHashHexByAssetId,
     contractStatus?.mintedCount,
-    coreClient, usesV15, readCollectionMintOwner,
+    coreClient, usesV15, readCollectionMintOwner, readMintedTokenIdsRange,
     coreContract.address,
     fetchAssetBytes,
     mintableAssets,
