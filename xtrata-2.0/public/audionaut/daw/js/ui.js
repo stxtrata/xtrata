@@ -11,7 +11,7 @@ import {
 import { engine } from "./engine.js";
 import { loadSample, fetchAndDecode } from "./loader.js";
 import { SAMPLE_LIBRARY } from "./library.js";
-import { renderOrdinalReferences } from "./ordinal-links.js";
+import { renderOrdinalChip, renderOrdinalReferences } from "./ordinal-links.js";
 import { playPlaylist, stopPlaylist, isPlaylistActive } from "./playlist.js";
 import { LANDMARKS } from "./song-format.js";
 import {
@@ -190,6 +190,13 @@ export function buildChannels() {
     mk("⟳", "Shift pattern right", () => store.shiftChannelPattern(ch, 1));
     mk("✕", "Clear channel pattern", () => store.clearChannelPattern(ch));
 
+    // Inscription link: a small ORD button in the control row (no line of its own).
+    // The slot always exists so the sliders line up whether or not a sample has a source.
+    const sourceLinks = el("span", "channel-source-links ord-wrap");
+    renderOrdinalChip(sourceLinks, [
+      { source: c.source, label: "Sample inscription" },
+    ]);
+
     ctrl.append(
       nameInput,
       loadBtn,
@@ -199,6 +206,7 @@ export function buildChannels() {
       trimBtn,
       fxBtn,
       insBtn,
+      sourceLinks,
       vol,
       pitch,
       tools,
@@ -250,11 +258,7 @@ export function buildChannels() {
     });
 
     const controlStack = el("div", "channel-control-stack");
-    const sourceLinks = el("div", "channel-source-links");
-    renderOrdinalReferences(sourceLinks, [
-      { source: c.source, label: "Sample inscription" },
-    ]);
-    controlStack.append(ctrl, sourceLinks);
+    controlStack.append(ctrl);
     row.append(controlStack, grid);
     root.appendChild(row);
   }
@@ -481,7 +485,7 @@ export function refreshChannelRow(ch) {
   const row = $(`#channels .channel[data-ch="${ch}"]`);
   if (!row) return;
   const c = store.channel(ch);
-  renderOrdinalReferences(row.querySelector(".channel-source-links"), [
+  renderOrdinalChip(row.querySelector(".channel-source-links"), [
     { source: c.source, label: "Sample inscription" },
   ]);
   row.querySelector(".ch-name").value = c.name;

@@ -58,3 +58,45 @@ export function renderOrdinalReferences(container, references = []) {
   }
   container.hidden = !container.childElementCount;
 }
+
+// Compact form for crowded rows (the channel list): one small button that keeps the row
+// at its normal height. Hovering or focusing it floats a card with the inscription id and
+// both links, so the provenance stays one step away without taking a line of its own.
+export function renderOrdinalChip(container, references = []) {
+  container.replaceChildren();
+  const ref = references
+    .map((r) => ordinalReference(r.source ?? r.id, r.label))
+    .find(Boolean);
+  container.classList.toggle("empty", !ref);
+  if (!ref) return;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "ch-btn ord";
+  button.textContent = "ORD";
+  button.setAttribute("aria-label", `${ref.label}: show ordinal links`);
+  const card = document.createElement("div");
+  card.className = "ord-card";
+  const box = document.createElement("div");
+  box.className = "ord-card-box";
+  const label = document.createElement("span");
+  label.className = "ordinal-label";
+  label.textContent = ref.label;
+  const id = document.createElement("a");
+  id.className = "ordinal-id";
+  id.textContent = ref.id;
+  id.href = ref.inscriptionUrl;
+  id.title = "Open original ordinal inscription";
+  id.dataset.ordinalId = ref.id;
+  const content = document.createElement("a");
+  content.className = "ordinal-content";
+  content.textContent = "Content";
+  content.href = ref.contentUrl;
+  content.title = "Open original inscription content";
+  for (const link of [id, content]) {
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+  }
+  box.append(label, id, content);
+  card.append(box);
+  container.append(button, card);
+}
