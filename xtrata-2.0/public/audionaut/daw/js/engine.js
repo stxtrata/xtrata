@@ -318,10 +318,37 @@ class Engine {
       this.channelGains[ch].gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);
   }
 
+  // Solo is global: if ANY sample channel or synth is soloed, only soloed ones
+  // (of either kind) are audible. Mute always wins.
+  anySolo() {
+    return (
+      store.project.channels.some((c) => c.solo) ||
+      store.project.instruments.some((s) => s.solo)
+    );
+  }
+  channelAudible(ch) {
+    const c = store.channel(ch);
+    return !c.mute && (!this.anySolo() || !!c.solo);
+  }
+  instrumentAudible(i) {
+    const s = store.instrument(i);
+    return !s.mute && (!this.anySolo() || !!s.solo);
+  }
+
+  // Re-apply mute/solo to everything already sounding (call after a solo/mute change).
+  applySolo({ cut = false } = {}) {
+    if (!this.ctx) return;
+    for (let i = 0; i < NUM_INSTRUMENTS; i++)
+      this.setInstrumentVolume(i, store.instrument(i).volume);
+    if (cut)
+      for (let ch = 0; ch < store.numChannels; ch++)
+        if (!this.channelAudible(ch)) this.silenceChannel(ch);
+  }
+
   setInstrumentVolume(i, v) {
     if (this.instrumentGains?.[i])
       this.instrumentGains[i].gain.setTargetAtTime(
-        store.instrument(i).mute ? 0 : v,
+        this.instrumentAudible(i) ? v : 0,
         this.ctx.currentTime,
         0.01,
       );
@@ -432,7 +459,6 @@ class Engine {
 
   _scheduleStep(step, time) {
     const seq = store.project.sequences[this.playingSequence];
-    const anySolo = store.project.channels.some((c) => c.solo);
     const stepDur = this.stepDuration();
     // A step's offset spans the real gap to the next step (swing included), so a
     // late hit can never overtake the next step's trigger.
@@ -443,7 +469,7 @@ class Engine {
       const v = stepVal(raw);
       if (!v) continue;
       const c = store.channel(ch);
-      if (c.mute || (anySolo && !c.solo)) continue;
+      if (!this.channelAudible(ch)) continue;
       this.trigger(
         ch,
         time + stepOff(raw) * gap,
@@ -452,10 +478,8 @@ class Engine {
       );
     }
     // instrument notes starting on this step
-    const anyInstSolo = store.project.instruments.some((s2) => s2.solo);
     for (let i = 0; i < NUM_INSTRUMENTS; i++) {
-      const inst = store.instrument(i);
-      if (inst.mute || (anyInstSolo && !inst.solo)) continue;
+      if (!this.instrumentAudible(i)) continue;
       for (const n of seq.notes?.[i] || []) {
         if (n.step === step)
           this.triggerNote(i, n.pitch, n.vel, time, n.dur * stepDur);

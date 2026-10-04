@@ -493,6 +493,19 @@ export function drawInstStrip(i) {
   }
 }
 
+// Dim every row that solo is currently silencing (samples and synths alike).
+export function refreshSoloDim() {
+  const any = engine.anySolo();
+  document.querySelectorAll("#channels .channel").forEach((row) => {
+    const c = store.channel(+row.dataset.ch);
+    row.classList.toggle("solo-dim", !!c && any && !c.solo);
+  });
+  document.querySelectorAll(".channel.instrument").forEach((row) => {
+    const s = store.instrument(+row.dataset.inst);
+    row.classList.toggle("solo-dim", !!s && any && !s.solo);
+  });
+}
+
 export function refreshInstrumentRow(i) {
   const row = document.querySelector(`.channel.instrument[data-inst="${i}"]`);
   if (!row) return;
@@ -552,6 +565,7 @@ export function refreshChannelRow(ch) {
 
 export function refreshAllChannels() {
   for (let ch = 0; ch < store.numChannels; ch++) refreshChannelRow(ch);
+  refreshSoloDim();
 }
 
 // ---------------------------------------------------------------- pattern
