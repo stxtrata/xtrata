@@ -1336,7 +1336,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (!selectedGalleryTokenIdLabel) {
       return '/';
     }
-    return `/?viewer-token=${encodeURIComponent(selectedGalleryTokenIdLabel)}`;
+    return `/x/${encodeURIComponent(selectedGalleryTokenIdLabel)}`;
   }, [selectedGalleryTokenIdLabel]);
   const selectedGalleryCreatorViewerHref = useMemo(() => {
     if (!selectedGalleryCreatorAddress) {
@@ -3911,7 +3911,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                           {tokenId ? (
                             <a
                               className="button button--ghost button--mini collection-live-page__gallery-select"
-                              href={`/?viewer-token=${encodeURIComponent(tokenId)}`}
+                              href={`/x/${encodeURIComponent(tokenId)}`}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(event) => event.stopPropagation()}
