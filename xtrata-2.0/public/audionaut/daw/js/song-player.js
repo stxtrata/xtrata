@@ -171,14 +171,17 @@ export async function auditionSong(id, status = () => {}, onEnded = null) {
               source.disconnect();
               gain.disconnect();
             };
+            const late = Math.min(0.999, Math.max(0, +active.off || 0)) * dt;
             source.start(
-              time,
+              time + late,
               (reverse ? 1 - c.trimEnd : c.trimStart) * buffer.duration,
               (c.trimEnd - c.trimStart) * buffer.duration,
             );
             endTime = Math.max(
               endTime,
-              time + ((c.trimEnd - c.trimStart) * buffer.duration) / c.pitch,
+              time +
+                late +
+                ((c.trimEnd - c.trimStart) * buffer.duration) / c.pitch,
             );
           });
           step++;

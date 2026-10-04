@@ -197,6 +197,10 @@ function normalizeNative(data) {
               ...(v.trimEnd != null && { trimEnd: +v.trimEnd }),
               ...(v.pitch != null && { pitch: +v.pitch }),
               ...(v.xfade != null && { xfade: +v.xfade }),
+              ...(v.off != null &&
+                finite(v.off, 0, 0, 0.999) > 0 && {
+                  off: finite(v.off, 0, 0, 0.999),
+                }),
               ...(v.gateSteps != null && {
                 gateSteps: finite(v.gateSteps, 0, 0, 64),
               }),

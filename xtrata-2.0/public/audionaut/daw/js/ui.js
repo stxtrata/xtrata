@@ -7,6 +7,7 @@ import {
   MAX_SEQUENCES,
   stepVal,
   stepObj,
+  stepOff,
 } from "./state.js";
 import { engine } from "./engine.js";
 import { loadSample, fetchAndDecode } from "./loader.js";
@@ -537,14 +538,27 @@ function paintStep(b, raw) {
     "edited",
     !!o && (o.trimStart != null || o.trimEnd != null || o.pitch != null),
   );
+  // offset marker: a tick inside the step showing where in the step the hit lands
+  const off = stepOff(raw);
+  const offKey = off > 0 ? off.toFixed(3) : "";
+  if (b._off !== offKey) {
+    b._off = offKey;
+    b.classList.toggle("offs", off > 0);
+    if (off > 0) b.style.setProperty("--off", offKey);
+    else b.style.removeProperty("--off");
+  }
+  const offText =
+    off > 0
+      ? ` · offset +${off.toFixed(2)} step (${Math.round((off * 15000) / store.project.bpm)} ms)`
+      : "";
   const title =
-    o?.sampleMidi != null
+    (o?.sampleMidi != null
       ? `${midiName(o.sampleMidi)}${o.gateSteps ? ` · sustain ${o.gateSteps} steps` : ""} · Alt-click to edit`
       : o?.wordSelection?.text
         ? `${o.wordSelection.text} · ${o.wordSelection.start.toFixed(3)}–${o.wordSelection.end.toFixed(3)}s · Alt-click to edit`
         : o?.rev
           ? "Reversed step (right-click to toggle, alt-click to edit)"
-          : STEP_HINT;
+          : STEP_HINT) + offText;
   if (b.title !== title) b.title = title; // avoid 1,000+ redundant DOM writes per repaint
 }
 

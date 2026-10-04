@@ -8,6 +8,7 @@ import {
   NUM_INSTRUMENTS,
   stepVal,
   stepObj,
+  stepOff,
 } from "./state.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { PLUGIN_TYPES, pluginDefaults } from "./plugins.js";
@@ -384,17 +385,26 @@ class Engine {
   _scheduleStep(step, time) {
     const seq = store.project.sequences[this.playingSequence];
     const anySolo = store.project.channels.some((c) => c.solo);
+    const stepDur = this.stepDuration();
+    // A step's offset spans the real gap to the next step (swing included), so a
+    // late hit can never overtake the next step's trigger.
+    const swing = store.project.swing / 100;
+    const gap = stepDur + (step % 2 === 0 ? stepDur * swing : -stepDur * swing);
     for (let ch = 0; ch < store.numChannels; ch++) {
       const raw = seq.steps[ch]?.[step];
       const v = stepVal(raw);
       if (!v) continue;
       const c = store.channel(ch);
       if (c.mute || (anySolo && !c.solo)) continue;
-      this.trigger(ch, time, v === 2 ? 1.25 : 1, stepObj(raw));
+      this.trigger(
+        ch,
+        time + stepOff(raw) * gap,
+        v === 2 ? 1.25 : 1,
+        stepObj(raw),
+      );
     }
     // instrument notes starting on this step
     const anyInstSolo = store.project.instruments.some((s2) => s2.solo);
-    const stepDur = this.stepDuration();
     for (let i = 0; i < NUM_INSTRUMENTS; i++) {
       const inst = store.instrument(i);
       if (inst.mute || (anyInstSolo && !inst.solo)) continue;

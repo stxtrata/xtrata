@@ -66,6 +66,7 @@ export async function importSelection(
       const old = sequence.steps[ch][step];
       sequence.steps[ch][step] = {
         v: stepVal(old) || 1,
+        ...(old && typeof old === "object" && old.off ? { off: old.off } : {}),
         ...region,
         pitch: 1,
         rev: false,

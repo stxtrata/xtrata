@@ -3,18 +3,23 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // arrange.js — Logic-style arrange view: the step grid flips to waveform regions.
 // Regions render their real audible length; choke cuts at the next trigger; per-step
 // crossfades (xfade, ms) blend a region into the next one — drag the boundary to set.
-// Drag region edges to trim, drag a region's body to move it (snaps to steps, stops at
-// its neighbours). Click = edit, right-click = reverse, click empty = add.
+// Drag region edges to trim, drag a region's body to move it. Regions sit at their true
+// position (step + fractional offset); the Snap menu picks the move grid (Step … 1/16 of a
+// step, or Off) and Alt bypasses it. Zoom widens the steps so fine moves are visible.
+// A region stops at its neighbours. Click = edit, right-click = reverse, click empty = add.
 
-import { store, NUM_STEPS, stepVal, stepObj } from "./state.js";
+import { store, NUM_STEPS, stepVal, stepObj, stepOff } from "./state.js";
 import { engine } from "./engine.js";
 import { openStepEditor, setStatus } from "./ui.js";
 
-const CELL_W = 14,
+const CELL_W = 14, // px per step at 1x zoom
   STRIP_H = 40;
 const EDGE_PX = 5; // trim-handle zone at region edges
 const XF_PX = 6; // crossfade-handle zone around a cutting boundary
 let arrangeMode = false;
+let zoom = 1; // 1, 2, 4, 8 — canvas pixels per step = CELL_W * zoom
+let snap = 1; // move grid in steps: 1, .5, .25, .125, .0625 — 0 = free
+const cw = () => CELL_W * zoom;
 let playheadStep = -1;
 let drag = null; // { kind:'trimL'|'trimR'|'xfade'|'move', ch, step, ... }
 
@@ -34,6 +39,8 @@ function channelRegions(ch) {
   for (let s = 0; s < NUM_STEPS; s++) if (stepVal(row[s])) triggers.push(s);
   return triggers.map((s, i) => {
     const o = stepObj(row[s]);
+    const off = stepOff(row[s]);
+    const pos = s + off;
     const trimStart = o?.trimStart ?? c.trimStart;
     const trimEnd = o?.trimEnd ?? c.trimEnd;
     const pitch = o?.pitch ?? c.pitch;
@@ -44,24 +51,28 @@ function channelRegions(ch) {
       : sd;
     const naturalSteps = regionSec / sd;
     const next = triggers[i + 1] ?? null;
+    const nextPos = next != null ? next + stepOff(row[next]) : null;
     const nextObj = next != null ? stepObj(row[next]) : null;
     const nextXfadeSteps = nextObj?.xfade ? nextObj.xfade / 1000 / sd : 0;
 
     let widthSteps = naturalSteps;
     let cut = false,
       xfaded = false;
-    if (next != null && s + naturalSteps > next) {
+    if (next != null && pos + naturalSteps > nextPos) {
       if (nextXfadeSteps > 0) {
-        widthSteps = Math.min(naturalSteps, next - s + nextXfadeSteps);
+        widthSteps = Math.min(naturalSteps, nextPos - pos + nextXfadeSteps);
         xfaded = true;
       } else if (store.project.choke) {
-        widthSteps = next - s;
+        widthSteps = nextPos - pos;
         cut = true;
       }
     }
-    widthSteps = Math.min(widthSteps, NUM_STEPS - s);
+    widthSteps = Math.min(widthSteps, NUM_STEPS - pos);
     return {
       step: s,
+      off,
+      pos,
+      nextPos,
       widthSteps,
       naturalSteps,
       cut,
@@ -100,17 +111,24 @@ function drawStrip(ch) {
   g.clearRect(0, 0, W, H);
   g.fillStyle = "#0d1319";
   g.fillRect(0, 0, W, H);
-  for (let s = 0; s <= NUM_STEPS; s += 4) {
-    g.fillStyle = s % 16 === 0 ? "#39424e" : "#1e2732";
-    g.fillRect(s * CELL_W, 0, 1, H);
+  // grid: bars/beats always; every step from 2x zoom; the snap divisions from 4x
+  const sub = snap > 0 && snap < 1 && zoom >= 4 ? snap : 0;
+  if (sub) {
+    g.fillStyle = "#151d26";
+    for (let s = 0; s < NUM_STEPS; s += sub)
+      if (s % 1) g.fillRect(Math.round(s * cw()), 0, 1, H);
+  }
+  for (let s = 0; s <= NUM_STEPS; s += zoom >= 2 ? 1 : 4) {
+    g.fillStyle = s % 16 === 0 ? "#39424e" : s % 4 === 0 ? "#2a3541" : "#1e2732";
+    g.fillRect(s * cw(), 0, 1, H);
   }
 
   const buffer = engine.buffers?.[ch];
   const data = buffer?.getChannelData(0);
 
   for (const r of channelRegions(ch)) {
-    const x = r.step * CELL_W;
-    const w = Math.max(3, r.widthSteps * CELL_W);
+    const x = r.pos * cw();
+    const w = Math.max(3, r.widthSteps * cw());
     g.fillStyle = r.accent
       ? "rgba(255,255,255,0.16)"
       : "rgba(255,255,255,0.07)";
@@ -190,8 +208,8 @@ function drawStrip(ch) {
 
     // crossfade wedge: diagonal out/in lines over the fade span before the boundary
     if (r.xfaded && r.next != null && r.nextXfadeSteps > 0) {
-      const bx = r.next * CELL_W;
-      const fx = r.nextXfadeSteps * CELL_W;
+      const bx = r.nextPos * cw();
+      const fx = r.nextXfadeSteps * cw();
       g.strokeStyle = "#22d3ee";
       g.lineWidth = 1.5;
       g.beginPath();
@@ -206,7 +224,7 @@ function drawStrip(ch) {
 
   if (playheadStep >= 0) {
     g.fillStyle = "rgba(67,255,164,0.25)";
-    g.fillRect(playheadStep * CELL_W, 0, CELL_W, H);
+    g.fillRect(playheadStep * cw(), 0, cw(), H);
   }
 }
 
@@ -231,23 +249,31 @@ function hitTest(ch, x) {
   // crossfade handle: near a boundary where the previous region reaches the next trigger
   for (const r of regions) {
     if (r.next == null) continue;
-    const overlaps = r.step + r.naturalSteps > r.next;
+    const overlaps = r.pos + r.naturalSteps > r.nextPos;
     if (!overlaps) continue;
-    const bx = r.next * CELL_W;
-    const fxEnd = bx + Math.max(XF_PX, r.nextXfadeSteps * CELL_W);
+    const bx = r.nextPos * cw();
+    const fxEnd = bx + Math.max(XF_PX, r.nextXfadeSteps * cw());
     if (x >= bx - XF_PX && x <= fxEnd + XF_PX) {
       return { kind: "xfade", region: r };
     }
   }
   for (const r of regions) {
-    const x0 = r.step * CELL_W,
-      x1 = x0 + Math.max(3, r.widthSteps * CELL_W);
+    const x0 = r.pos * cw(),
+      x1 = x0 + Math.max(3, r.widthSteps * cw());
     if (x < x0 || x > x1) continue;
     if (x - x0 <= EDGE_PX) return { kind: "trimL", region: r };
     if (x1 - x <= EDGE_PX) return { kind: "trimR", region: r };
     return { kind: "body", region: r };
   }
   return { kind: "empty" };
+}
+
+// Round a position (in steps) to the move grid, then keep it inside [lo, hi].
+function fitPos(pos, lo, hi, grid) {
+  let p = grid > 0 ? Math.round(pos / grid) * grid : pos;
+  if (p < lo) p = grid > 0 ? Math.ceil(lo / grid - 1e-9) * grid : lo;
+  if (p > hi) p = grid > 0 ? Math.floor(hi / grid + 1e-9) * grid : hi;
+  return Math.round(p * 1000) / 1000;
 }
 
 function onStripDown(ch, cv, e) {
@@ -270,12 +296,13 @@ function onStripDown(ch, cv, e) {
     // neighbouring triggers but not jump over them.
     const row = store.seq.steps[ch];
     const from = h.region.step;
+    // the region keeps its own step slot between its neighbours' slots
     let lo = 0,
-      hi = NUM_STEPS - 1;
+      hi = NUM_STEPS - 0.001;
     for (let t = 0; t < NUM_STEPS; t++) {
       if (t === from || !stepVal(row[t])) continue;
       if (t < from) lo = Math.max(lo, t + 1);
-      else hi = Math.min(hi, t - 1);
+      else hi = Math.min(hi, t - 0.001);
     }
     drag = {
       kind: "move",
@@ -285,6 +312,8 @@ function onStripDown(ch, cv, e) {
       moved: false,
       from,
       at: from,
+      pos: h.region.pos,
+      pos0: h.region.pos,
       lo,
       hi,
     };
@@ -319,21 +348,16 @@ function onStripMove(ch, cv, e) {
 
   if (drag.kind === "move") {
     cv.style.cursor = "grabbing";
-    const to = Math.max(
-      drag.lo,
-      Math.min(drag.hi, drag.from + Math.round(dx / CELL_W)),
-    );
-    if (to !== drag.at) {
-      const row = store.seq.steps[ch];
-      const val = row[drag.at];
-      store.setStep(ch, drag.at, 0);
-      store.setStep(ch, to, typeof val === "object" && val ? { ...val } : val);
-      drag.at = to;
+    const grid = e.altKey ? 0 : snap; // Alt = free move
+    const to = fitPos(drag.pos0 + dx / cw(), drag.lo, drag.hi, grid);
+    if (to !== drag.pos) {
+      drag.at = store.moveStep(ch, drag.at, to);
+      drag.pos = to;
       renderArrange();
     }
   } else if (drag.kind === "trimR" && buffer) {
     // new audible length (sec) from pixel width → new trimEnd
-    const newSteps = Math.max(0.1, r.naturalSteps + dx / CELL_W);
+    const newSteps = Math.max(0.1, r.naturalSteps + dx / cw());
     const newRegionSec = newSteps * sd * 1; // audible sec
     const newTrimEnd = Math.min(
       1,
@@ -345,7 +369,7 @@ function onStripMove(ch, cv, e) {
     });
     renderArrange();
   } else if (drag.kind === "trimL" && buffer) {
-    const dSec = (dx / CELL_W) * sd * r.pitch;
+    const dSec = (dx / cw()) * sd * r.pitch;
     const newTrimStart = Math.min(
       drag.trimEnd0 - 1e-7,
       Math.max(0, drag.trimStart0 + dSec / buffer.duration),
@@ -357,9 +381,9 @@ function onStripMove(ch, cv, e) {
     renderArrange();
   } else if (drag.kind === "xfade") {
     // drag right of the boundary to lengthen the crossfade; left to shorten/remove
-    const bx = r.next * CELL_W;
-    const spanSteps = Math.max(0, (x - bx) / CELL_W);
-    const maxSteps = Math.max(0, r.step + r.naturalSteps - r.next);
+    const bx = r.nextPos * cw();
+    const spanSteps = Math.max(0, (x - bx) / cw());
+    const maxSteps = Math.max(0, r.pos + r.naturalSteps - r.nextPos);
     const ms = Math.round(Math.min(spanSteps, maxSteps) * sd * 1000);
     store.setStepProps(ch, r.next, ms > 5 ? { xfade: ms } : { xfade: 0 });
     renderArrange();
@@ -375,17 +399,19 @@ function onStripUp(ch, cv, e) {
   drag = null;
   const x = stripXY(cv, e);
   if (d.kind === "move") {
-    if (!d.moved || d.at === d.from) {
-      if (!d.moved) openStepEditor(ch, d.from);
-    } else {
-      setStatus(`Moved from step ${d.from + 1} to step ${d.at + 1}.`);
+    if (!d.moved) openStepEditor(ch, d.from);
+    else if (d.pos !== d.pos0) {
+      const o = stepOff(store.seq.steps[ch][d.at]);
+      setStatus(
+        `Moved from step ${d.from + 1} to step ${d.at + 1}${o ? ` + ${o.toFixed(3)} step` : ""}.`,
+      );
     }
     cv.style.cursor = "grab";
   } else if (d.kind === "maybeClick" && !d.moved) {
     const h = hitTest(ch, x);
     if (h.kind === "body") openStepEditor(ch, h.region.step);
     else if (h.kind === "empty") {
-      const s = Math.floor(x / CELL_W);
+      const s = Math.floor(x / cw());
       if (s >= 0 && s < NUM_STEPS) {
         store.cycleStep(ch, s);
         renderArrange();
@@ -410,7 +436,7 @@ export function attachStrips() {
     const ch = +row.dataset.ch;
     const cv = document.createElement("canvas");
     cv.className = "arrange-strip";
-    cv.width = NUM_STEPS * CELL_W;
+    cv.width = NUM_STEPS * cw();
     cv.height = STRIP_H;
     cv.addEventListener("mousedown", (e) => onStripDown(ch, cv, e));
     cv.addEventListener("mousemove", (e) => onStripMove(ch, cv, e));
@@ -443,6 +469,22 @@ export function initArrange() {
       attachStrips();
       renderArrange();
     }
+  });
+
+  const snapSel = document.querySelector("#arrange-snap");
+  const zoomSel = document.querySelector("#arrange-zoom");
+  snapSel?.addEventListener("change", () => {
+    snap = Math.max(0, +snapSel.value || 0);
+    renderArrange();
+  });
+  zoomSel?.addEventListener("change", () => {
+    zoom = [1, 2, 4, 8].includes(+zoomSel.value) ? +zoomSel.value : 1;
+    document.body.style.setProperty("--az", String(zoom));
+    document.body.classList.toggle("arrange-zoomed", zoom > 1);
+    document.querySelectorAll(".arrange-strip").forEach((cv) => {
+      cv.width = NUM_STEPS * cw();
+    });
+    renderArrange();
   });
 
   const choke = document.querySelector("#chk-choke");

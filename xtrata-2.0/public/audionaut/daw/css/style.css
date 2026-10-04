@@ -399,6 +399,23 @@ body.midi-dragging {
 .step.edited {
   box-shadow: inset 0 -3px 0 #22d3ee;
 }
+/* offset step: a tick inside the step shows where in the step the hit lands */
+.step.offs {
+  position: relative;
+}
+.step.offs::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: calc(var(--off, 0) * 100%);
+  width: 3px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #0b0f14;
+  box-shadow: 0 0 0 1px #fff;
+  pointer-events: none;
+}
 .transport-btn.small {
   width: 30px;
   height: 28px;
@@ -592,6 +609,34 @@ body.arrange-mode #channels .steps {
 }
 body.arrange-mode #channels .arrange-strip {
   display: block;
+}
+.arrange-only {
+  display: none;
+}
+body.arrange-mode .arrange-only {
+  display: flex;
+}
+.fade-input.arrange-select {
+  width: auto;
+}
+/* zoomed: the strip widens (rows scroll sideways) and the controls stay put */
+.arrange-strip {
+  min-width: calc(var(--grid-min) * var(--az, 1));
+}
+body.arrange-mode.arrange-zoomed #channels .channel {
+  width: max-content;
+  min-width: 100%;
+}
+body.arrange-mode.arrange-zoomed #channels .channel-control-stack {
+  position: sticky;
+  left: 14px;
+  z-index: 3;
+  background: var(--panel);
+}
+body.arrange-mode.arrange-zoomed
+  #channels
+  .channel-control-stack:has(.ord-wrap.open) {
+  z-index: 30;
 }
 #btn-view.active {
   background: var(--accent-2);
