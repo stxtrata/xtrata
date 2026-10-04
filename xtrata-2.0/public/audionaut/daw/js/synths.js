@@ -3,6 +3,8 @@
 // Successor to the original iframe-based jiMS10 / Synth-Modules approach — everything
 // runs in-process, sample-accurately scheduled by the engine.
 
+import { NEW_SYNTHS } from "./synths-voices.js";
+
 export function midiToFreq(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
 }
@@ -245,6 +247,7 @@ export const SYNTH_BANK = {
     ],
   },
 
+  ...NEW_SYNTHS, // jiFM4 · jiVOX · jiPLUCK — see synths-voices.js
   acidals: {
     name: "Acidals 303",
     tagline: "Resonant acid bass with filter envelope + accent/slide feel",
@@ -730,6 +733,72 @@ export const SYNTH_BANK = {
 };
 
 export const DEFAULT_SYNTH = "jims10";
+
+// Front-panel layout + presets for the original jiMS10 (read by synth-panel.js).
+SYNTH_BANK.jims10.presets = [
+  { name: "Init Saw Lead", params: {} },
+  { name: "Acid Pluck", params: { wave: "sawtooth", cutoff: 700, reso: 14, sub: 0.2, fenv: 4500, fdecay: 0.18, attack: 0.003, decay: 0.15, sustain: 0.25, release: 0.1 } },
+  { name: "Fat Sub Bass", params: { wave: "square", cutoff: 520, reso: 3, sub: 0.9, fenv: 600, fdecay: 0.3, attack: 0.005, decay: 0.2, sustain: 0.8, release: 0.12 } },
+  { name: "Soft Triangle", params: { wave: "triangle", cutoff: 3600, reso: 1, sub: 0.3, fenv: 0, attack: 0.06, decay: 0.3, sustain: 0.8, release: 0.45 } },
+  { name: "Resonant Zap", params: { wave: "sawtooth", cutoff: 400, reso: 18, sub: 0, fenv: 7000, fdecay: 0.12, attack: 0.002, decay: 0.1, sustain: 0.1, release: 0.08 } },
+];
+SYNTH_BANK.jims10.ui = {
+  theme: { accent: "#2edb84", lcd: "#43ffa4", lcdBg: "#06130c", edge: "#2a3340", bg: "#1b222c" },
+  logo: ["ji", "MS10"],
+  sub: "MONOPHONIC SYNTHESIZER",
+  cc: { 74: "cutoff", 71: "reso", 73: "attack", 72: "release", 75: "decay", 76: "sub", 77: "fenv", 7: "level" },
+  sections: [
+    {
+      title: "OSCILLATOR",
+      cls: "ms-osc",
+      items: [
+        {
+          type: "radio",
+          key: "wave",
+          cls: "wave-btns",
+          options: [
+            ["sawtooth", "SAW", '<path d="M2 18 L12 6 L12 18 L22 6 L22 18"/>', "0 0 24 24"],
+            ["square", "SQR", '<path d="M2 18 L2 6 L12 6 L12 18 L22 18 L22 6"/>', "0 0 24 24"],
+            ["triangle", "TRI", '<path d="M2 18 L8 6 L16 18 L22 8"/>', "0 0 24 24"],
+          ],
+        },
+        { type: "row", items: [{ type: "knob", key: "sub", label: "SUB", fmt: "pct" }, { type: "knob", key: "tune", label: "TUNE", fmt: "cents", center: true }] },
+      ],
+    },
+    {
+      title: "FILTER",
+      cls: "ms-filter",
+      items: [
+        {
+          type: "row",
+          items: [
+            { type: "knob", key: "cutoff", label: "CUTOFF", curve: "log", fmt: "hz", big: true },
+            { type: "knob", key: "reso", label: "RESO", fmt: "num1", big: true },
+            { type: "knob", key: "fenv", label: "EG INT", fmt: "hz" },
+            { type: "knob", key: "fdecay", label: "EG DEC", fmt: "ms" },
+          ],
+        },
+      ],
+    },
+    {
+      title: "AMP ENVELOPE",
+      cls: "ms-env",
+      items: [
+        {
+          type: "row",
+          items: [
+            { type: "fader", key: "attack", label: "A", fmt: "ms" },
+            { type: "fader", key: "decay", label: "D", fmt: "ms" },
+            { type: "fader", key: "sustain", label: "S", fmt: "pct" },
+            { type: "fader", key: "release", label: "R", fmt: "ms" },
+          ],
+        },
+      ],
+    },
+    { title: "OUTPUT", cls: "ms-out", items: [{ type: "fader", key: "level", label: "LEVEL", fmt: "pct", rand: false }] },
+  ],
+  adsr: { a: "attack", d: "decay", s: "sustain", r: "release" },
+};
 
 export function synthDefaults(synthId) {
   const out = {};

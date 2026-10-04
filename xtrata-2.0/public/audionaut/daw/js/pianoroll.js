@@ -438,7 +438,7 @@ function renderSynthPanel() {
   const head = document.createElement("div");
   head.className = "synth-head";
   head.innerHTML = `<span class="synth-name">${synth.name}</span><span class="synth-tag">${synth.tagline}</span>`;
-  if (instr.synthId === "jims10") {
+  if (synth.ui) {
     const open = document.createElement("button");
     open.className = "synth-open-panel";
     open.textContent = "🎛 Open synth panel";
