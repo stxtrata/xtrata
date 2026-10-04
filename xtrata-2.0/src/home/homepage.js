@@ -624,7 +624,8 @@ const renderAudionauts = () => {
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
       : a.mintHref
         ? actionLink(a.mintHref, 'See the collection', 'home-btn home-btn--solid', 'audionauts:collection', { newTab: true })
-        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
+        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true }),
+    actionLink(a.sequencerHref, 'Holders: the signal is sealed', 'home-btn home-btn--seal', 'audionauts:sequencer')
   );
   copy.append(
     tags,

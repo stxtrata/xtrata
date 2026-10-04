@@ -1161,11 +1161,13 @@ body.arrange-mode #channels .arrange-strip {
   z-index: 60;
   left: -6px;
   top: 100%;
-  padding-top: 6px; /* bridges the gap so hover holds while moving onto the links */
+  padding-top: 6px;
 }
-.ord-wrap:hover .ord-card,
-.ord-wrap:focus-within .ord-card {
+.ord-wrap.open .ord-card {
   display: block;
+}
+.ch-btn.ord[aria-expanded="true"] {
+  border-color: #74b7ec;
 }
 .ord-card-box {
   box-sizing: border-box;

@@ -60,10 +60,31 @@ export function renderOrdinalReferences(container, references = []) {
 }
 
 // Compact form for crowded rows (the channel list): one small button that keeps the row
-// at its normal height. Hovering or focusing it floats a card with the inscription id and
-// both links, so the provenance stays one step away without taking a line of its own.
+// at its normal height. Clicking it opens a card with the inscription id and both links;
+// clicking it again, clicking elsewhere or pressing Escape closes it. Nothing opens on hover.
+let chipListeners = false;
+function closeChips(except = null) {
+  for (const open of document.querySelectorAll(".ord-wrap.open")) {
+    if (open === except) continue;
+    open.classList.remove("open");
+    open.querySelector(".ord")?.setAttribute("aria-expanded", "false");
+  }
+}
+function listenForChipDismiss() {
+  if (chipListeners) return;
+  chipListeners = true;
+  document.addEventListener("click", (e) => {
+    if (!(e.target instanceof Element) || !e.target.closest(".ord-wrap"))
+      closeChips();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeChips();
+  });
+}
 export function renderOrdinalChip(container, references = []) {
   container.replaceChildren();
+  container.classList.remove("open");
+  listenForChipDismiss();
   const ref = references
     .map((r) => ordinalReference(r.source ?? r.id, r.label))
     .find(Boolean);
@@ -73,7 +94,15 @@ export function renderOrdinalChip(container, references = []) {
   button.type = "button";
   button.className = "ch-btn ord";
   button.textContent = "ORD";
-  button.setAttribute("aria-label", `${ref.label}: show ordinal links`);
+  button.title = `${ref.label} · click for links`;
+  button.setAttribute("aria-label", `${ref.label}: inscription links`);
+  button.setAttribute("aria-expanded", "false");
+  button.addEventListener("click", () => {
+    const opening = !container.classList.contains("open");
+    closeChips(container);
+    container.classList.toggle("open", opening);
+    button.setAttribute("aria-expanded", String(opening));
+  });
   const card = document.createElement("div");
   card.className = "ord-card";
   const box = document.createElement("div");
@@ -85,13 +114,11 @@ export function renderOrdinalChip(container, references = []) {
   id.className = "ordinal-id";
   id.textContent = ref.id;
   id.href = ref.inscriptionUrl;
-  id.title = "Open original ordinal inscription";
   id.dataset.ordinalId = ref.id;
   const content = document.createElement("a");
   content.className = "ordinal-content";
   content.textContent = "Content";
   content.href = ref.contentUrl;
-  content.title = "Open original inscription content";
   for (const link of [id, content]) {
     link.target = "_blank";
     link.rel = "noopener noreferrer";

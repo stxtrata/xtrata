@@ -69,6 +69,13 @@ describe('homepage content configuration', () => {
     expect(indexHtml).toContain('id="homeBounty"');
   });
 
+  it('teases the gated sequencer in the strip and the Audionauts panel', () => {
+    const slide = HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'audionaut-sequencer');
+    expect(slide).toMatchObject({ href: '/audionaut/' });
+    expect(HOMEPAGE_STRIP_SLIDES[0].id).toBe('bounty');
+    expect(HOMEPAGE_AUDIONAUTS.sequencerHref).toBe('/audionaut/');
+  });
+
   it('only says Mint for Audionauts once the mint is live', () => {
     if (HOMEPAGE_AUDIONAUTS.status === 'live') {
       expect(HOMEPAGE_AUDIONAUTS.mintHref).toBeTruthy();

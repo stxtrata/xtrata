@@ -42,12 +42,20 @@ export const HOMEPAGE_BOUNTY = Object.freeze({
   funding: 'Co-funded 50/50 by Xtrata and Zero Authority DAO.'
 });
 
+export const AUDIONAUT_SEQUENCER_HREF = '/audionaut/';
+
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   Object.freeze({
     id: 'bounty', tag: 'Live', tone: 'lime',
     title: '500 STX bounty: Create. Inscribe. Share.',
     line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
     cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
+  }),
+  Object.freeze({
+    id: 'audionaut-sequencer', tag: 'Sealed', tone: 'teal',
+    title: 'Get your Audionaut ready.',
+    line: 'A blockchain audio workstation opens only for helmet holders. Connect your wallet to find out if you are in.',
+    cta: 'Try to enter', href: AUDIONAUT_SEQUENCER_HREF
   }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
@@ -191,6 +199,7 @@ export const HOMEPAGE_AUDIONAUTS = Object.freeze({
   poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
   mintHref: AUDIONAUTS_MINT_HREF,
+  sequencerHref: AUDIONAUT_SEQUENCER_HREF,
   soundtrackIds: Object.freeze([3062, 3061, 3058, 2910, 2892, 3036]),
   soundtrackCredit: 'Audionals · 3ai3 · BotCupid'
 });
