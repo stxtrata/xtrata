@@ -1,6 +1,6 @@
 // main.js — bootstrap and wiring between store, engine, UI, and persistence.
 
-import { store, makeProject } from "./state.js";
+import { store, makeProject, NUM_INSTRUMENTS } from "./state.js";
 import { engine } from "./engine.js";
 import { reloadAllSamples } from "./loader.js";
 import * as ui from "./ui.js";
@@ -197,6 +197,13 @@ function sameAudioSources(a, b) {
 
 function initSubscriptions() {
   store.on("step", ({ ch, step, val }) => ui.updateStep(ch, step, val));
+  // Playback follows the display: choosing another sequence while the transport is
+  // running plays that sequence straight away (same step position, so it stays in
+  // time). The engine's own chain-to-next-sequence sets this first, so it's a no-op there.
+  store.on("sequence", () => {
+    if (engine.isPlaying)
+      engine.playingSequence = store.project.currentSequence;
+  });
   store.on("sequence", () => {
     ui.renderPattern();
     ui.renderSequenceBar();
@@ -214,6 +221,11 @@ function initSubscriptions() {
     engine.clampPlayingSequence();
     if (engine.ctx)
       for (let i = 0; i < store.numChannels; i++) engine.rebuildInserts(i);
+    if (engine.ctx)
+      for (let i = 0; i < NUM_INSTRUMENTS; i++) {
+        engine.applyFx(i, true);
+        engine.rebuildInserts(i, true);
+      }
     syncArrangeControls();
     syncHeaderFromProject();
     ui.buildChannels();

@@ -1956,3 +1956,46 @@ button:disabled {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+#modal-fx,
+#modal-inserts {
+  z-index: 70; /* above the jiMS10 panel and the MIDI roll */
+}
+
+/* Transport, sources and sequence bar stay pinned while the channels scroll. */
+@media (min-width: 761px) {
+  /* (on phones the block would eat half the screen, so it scrolls normally) */
+  #sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  }
+}
+@media (max-height: 860px) {
+  /* short windows: slim the pinned block so the grid keeps room */
+  #sticky-top .lockup {
+    width: 124px;
+    height: auto;
+  }
+  #sticky-top #top-bar {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  #sticky-top #source-bar {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+  #sticky-top #sequence-bar {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
+.js-key.on {
+  box-shadow: 0 0 10px var(--j-green), inset 0 -6px 10px rgba(0, 0, 0, 0.18);
+}
+.js-oct .js-btn.lit {
+  background: var(--j-green);
+  color: #04120a;
+  box-shadow: 0 0 8px var(--j-green);
+}
