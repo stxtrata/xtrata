@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All collections · Forever Twins</title>
+<meta name="description" content="Every collection in the Forever Twins registry, grouped by community.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs">All collections</span>
+</div></header>
+<main class="wrap">
+  <h1>All collections</h1>
+  <p class="sub">Read from the public <a href="/forever-twins/data/registry.v2.json">registry</a>. A collection is only offered for twins and swaps once its helper is live; planned ones are shown so the pipeline is visible.</p>
+  <div id="out"><p class="mute">Loading…</p></div>
+</main>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
+<script type="module">
+import { loadRegistry, collectionsOf, independentCollections, STATUS, COMMUNITY_STATUS, collectionUrl, communityUrl } from '/forever-twins/assets/ft-registry.js';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const tile = (c) => {
+  const s = STATUS[c.status];
+  const logo = c.theme && c.theme.logo ? `<img src="${esc(c.theme.logo)}" alt="">` : '';
+  return `<article class="tile ${c.status === 'live' ? '' : 'soon'}">
+    <div class="top">${logo}<div><h3>${esc(c.name)} <span class="pill ${s.tone}">${esc(s.label)}</span></h3>
+    <div class="meta">${esc(c.group)} · helper ${esc(c.interface)}</div></div></div>
+    <p class="sub" style="margin:0">${esc(c.blurb || '')}</p>
+    <div class="links">
+      <a class="btn" href="${collectionUrl(c.key)}">Details</a>
+      ${c.legacyPage ? `<a class="btn ghost" href="${esc(c.legacyPage)}">Original page</a>` : ''}
+    </div></article>`;
+};
+try {
+  const reg = await loadRegistry();
+  const comms = [...(reg.communities || [])].sort((a, b) => (a.status === 'live' ? 0 : 1) - (b.status === 'live' ? 0 : 1));
+  let html = '';
+  for (const m of comms) {
+    const cols = collectionsOf(reg, m.slug);
+    html += `<section class="card"><h2><a href="${communityUrl(m.slug)}">${esc(m.name)}</a> <span class="pill ${m.status === 'live' ? 'ok' : 'mute'}">${esc(COMMUNITY_STATUS[m.status].label)}</span></h2>
+      <p class="sub" style="margin:0">${esc(m.blurb || '')}</p><div class="grid">${cols.map(tile).join('')}</div></section>`;
+  }
+  const ind = independentCollections(reg);
+  if (ind.length) html += `<section class="card"><h2>Collections without a community page yet</h2><div class="grid">${ind.map(tile).join('')}</div></section>`;
+  document.getElementById('out').innerHTML = html;
+} catch (e) {
+  document.getElementById('out').innerHTML = `<div class="msg bad">${esc(e.message)}</div>`;
+}
+</script>
+</body>
+</html>

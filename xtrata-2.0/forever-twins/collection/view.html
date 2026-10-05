@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Twins collection</title>
+<meta name="description" content="Forever Twins: a permanent on-chain counterpart for an existing Stacks NFT collection.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs" id="crumbs"><a href="/forever-twins/collections/">All collections</a></span>
+  <span class="grow"></span>
+  <button id="connectBtn" class="ghost" type="button">Connect wallet</button>
+</div></header>
+
+<main class="wrap">
+  <div id="banner" class="banner hidden"></div>
+
+  <section id="notfound" class="card hidden">
+    <h1>Collection not found</h1>
+    <p class="sub" id="nfText">This address is not in the Forever Twins registry.</p>
+    <p><a class="btn" href="/forever-twins/collections/">See all collections</a></p>
+  </section>
+
+  <div id="page" class="hidden">
+    <div class="hero">
+      <img id="logo" alt="" class="hidden">
+      <div>
+        <h1><span id="name"></span><span id="statusPill" class="pill"></span></h1>
+        <p class="sub" id="blurb"></p>
+      </div>
+    </div>
+
+    <section class="card" id="progressCard">
+      <h2>Where this collection is</h2>
+      <ol class="steps" id="steps"></ol>
+    </section>
+
+    <section class="card">
+      <h2>Coverage</h2>
+      <p class="sub tight">Four separate numbers. Having a helper does not mean the collection is fully on-chain.</p>
+      <div class="stats" id="stats"></div>
+      <div id="stateMsg"></div>
+    </section>
+
+    <section class="card">
+      <h2>Contracts</h2>
+      <dl class="facts" id="facts"></dl>
+    </section>
+
+    <section class="card" id="lookupCard">
+      <h2>Look up a token</h2>
+      <div class="row">
+        <input id="tokenId" type="number" min="0" step="1" placeholder="Token number" aria-label="Token number">
+        <button id="lookupBtn" type="button">Look up</button>
+      </div>
+      <div id="lookupOut"></div>
+    </section>
+
+    <section class="card hidden" id="actionCard">
+      <h2>Inscribe or swap</h2>
+      <div id="actionOut"></div>
+    </section>
+
+    <section class="card" id="warnCard">
+      <h2>Before you sign anything</h2>
+      <ul class="plain">
+        <li>Never send an NFT straight to the helper contract. Use the swap button on this page or the original page. A direct transfer can strand the token.</li>
+        <li id="g2Warn" class="hidden">This collection's source has its own marketplace. Unlist an original before swapping it in; a listed original is refused.</li>
+        <li>Forever Twins create a permanent on-chain counterpart. They do not repair the original collection's off-chain art or pointer. Not financial advice. Always verify contract addresses before signing.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer><div class="wrap">
+  <a href="/forever-twins/">Forever Twins</a> ·
+  <a href="/forever-twins/collections/">All collections</a> ·
+  <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a>
+  <span id="footLegacy"></span>
+</div></footer>
+
+<script type="module">
+import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js';
+import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js';
+import { fetchArt } from '/forever-twins/assets/ft-media.js';
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const short = (a) => (!a ? '' : a.length <= 16 ? a : `${a.slice(0, 7)}…${a.slice(-5)}`);
+const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString());
+const stx = (u) => (u == null ? '—' : `${Number(u) / 1e6} STX`);
+
+let network = null;
+let reg, coll, chain = null, adapter = null, wallet = null, helperSt = null, view = null, prepared = null;
+
+// ---- Clarity result -> plain JS (same decoding rules as the original pages) ----
+const toHex = (v) => Array.from(v, (b) => b.toString(16).padStart(2, '0')).join('');
+function plainCV(cv) {
+  if (!cv) return null;
+  const type = String(cv.type || '').toLowerCase();
+  if (/^\d+$/.test(type)) { try { return plainCV(chain.cvToJSON(cv)); } catch {} }
+  if (type.includes('response') && typeof cv.success === 'boolean') return cv.success ? { ok: plainCV(cv.value) } : { err: plainCV(cv.value) };
+  if (type === 'ok' || type.includes('responseok')) return { ok: plainCV(cv.value) };
+  if (type === 'err' || type.includes('responseerr')) return { err: plainCV(cv.value) };
+  if (type === 'some' || type.includes('optional')) return cv.value === undefined || cv.value === null ? null : { some: plainCV(cv.value) };
+  if (type === 'none') return null;
+  if (type.includes('tuple') && cv.value && typeof cv.value === 'object' && !Array.isArray(cv.value)) { const o = {}; for (const [k, v] of Object.entries(cv.value)) o[k] = plainCV(v); return o; }
+  if (Array.isArray(cv.value)) return cv.value.map(plainCV);
+  if (type === 'uint' || type === 'int') return cv.value?.toString?.() ?? String(cv.value);
+  if (type === 'buffer' || type.startsWith('(buff')) { const v = cv.value; if (typeof v === 'string') return '0x' + v.replace(/^0x/i, '').toLowerCase(); return '0x' + toHex(v); }
+  if (type.includes('string-ascii') || type.includes('string-utf8') || type === 'string') return cv.value;
+  if (type === 'principal' || type.includes('principal standard') || type.includes('principal contract')) return cv.value || cv.address || String(cv);
+  if (type === 'booltrue' || type === 'true') return true;
+  if (type === 'boolfalse' || type === 'false') return false;
+  if (typeof cv.value === 'boolean') return cv.value;
+  if (cv.value && typeof cv.value === 'object') { const o = {}; for (const [k, v] of Object.entries(cv.value)) o[k] = plainCV(v); return o; }
+  try { return chain.cvToValue(cv); } catch {}
+  try { return chain.cvToJSON(cv); } catch {}
+  return cv;
+}
+async function read(contractId, functionName, functionArgs = []) {
+  const [contractAddress, contractName] = contractId.split('.');
+  // Same-origin Hiro proxy (Pages Functions attach the API key server-side). The SDK's network
+  // methods are bound to the instance that created them, so build a fresh network rather than
+  // overriding coreApiUrl on a derived object (that would silently keep calling api.hiro.so).
+  network = network || new chain.STACKS_MAINNET.constructor({ url: `${location.origin}/hiro/mainnet` });
+  const res = await chain.fetchCallReadOnlyFunction({ contractAddress, contractName, functionName, functionArgs, senderAddress: wallet || 'SP000000000000000000002Q6VF78', network });
+  return plainCV(res);
+}
+
+// ---- rendering ----
+function renderSteps(c) {
+  if (c.interface === 'v1' && c.helper) {
+    // The original helpers predate the manifest/finalise process: no published manifest, and
+    // they work while the record is unfinalised. Only claim what is true of them.
+    const fin = helperSt && helperSt.finalized;
+    $('steps').innerHTML = [
+      ['Helper deployed', 'Built with Fak.fun before the grant. Its contract is linked below.'],
+      ['Open for twins and swaps', 'Anyone can fund a twin. Holders swap whenever they like, on the original page.'],
+      [fin ? 'Record finalised' : 'Record not finalised', fin ? 'The canonical record is locked.' : 'The original helper does not need finalising to work, so twins can still be made.']
+    ].map(([t, d], i) => `<li class="${i < 2 || fin ? 'done' : ''}"><b>${i < 2 || fin ? '✓' : '–'}</b><span><strong>${esc(t)}</strong> — ${esc(d)}</span></li>`).join('');
+    return;
+  }
+  const stages = [
+    ['Screened', 'Source contract checked and its custody group confirmed.'],
+    ['Manifest published', 'Every token’s art fingerprinted. Public before finalisation so the community can check it.'],
+    ['Helper deployed and seeded', 'The helper holds the canonical record.'],
+    ['Record finalised', 'Locked for good. Nothing can be inscribed before this.'],
+    ['Open for twins and swaps', 'Anyone can fund a twin. Holders swap whenever they like.']
+  ];
+  // index of the stage currently in progress; stages before it are done
+  let cur = { planned: 0, screening: 0, 'manifest-review': 1, deploying: 2, live: 5 }[c.status] ?? 0;
+  if (c.status === 'live' && helperSt && helperSt.interface === 'v3' && helperSt.finalized === false) cur = 3;
+  $('steps').innerHTML = stages.map(([t, d], i) => {
+    const cls = i < cur ? 'done' : i === cur ? 'now' : '';
+    return `<li class="${cls}"><b>${i < cur ? '✓' : i + 1}</b><span><strong>${esc(t)}</strong> — ${esc(d)}</span></li>`;
+  }).join('');
+}
+function renderStats() {
+  const total = helperSt ? helperSt.sourceTotal : null;
+  const of = total ? `of ${fmt(total)} in the source` : '';
+  const seeded = !coll.helper ? '—' : helperSt ? (helperSt.canonicalCount != null ? fmt(helperSt.canonicalCount) : 'n/a') : '—';
+  const insc = helperSt && helperSt.inscribedCount != null ? fmt(helperSt.inscribedCount) : '—';
+  const swap = helperSt && helperSt.inscribedCount != null ? (helperSt.swapsEnabled ? fmt(helperSt.inscribedCount) : '0') : '—';
+  const cov = coll.coverage;
+  const rec = cov && cov.recovered != null ? fmt(cov.recovered) : '—';
+  $('stats').innerHTML = [
+    ['Recovered', rec, cov && cov.asOf ? `snapshot ${esc(cov.asOf)}` : 'art fetched and verified (snapshot)'],
+    ['Seeded on-chain', seeded, helperSt && helperSt.interface === 'v1' ? 'not exposed by the original helper' : of],
+    ['Inscribed twins', insc, of],
+    ['Swap-ready', swap, 'twins whose swap is open']
+  ].map(([k, v, n]) => `<div class="stat"><div class="v">${v}</div><div class="k">${esc(k)}</div><div class="n">${n}</div></div>`).join('');
+}
+function renderFacts() {
+  const rows = [['Source collection', coll.source, coll.source], ['Source asset', coll.sourceAsset, null]];
+  rows.push(['Helper', coll.helper || null, coll.helper]);
+  rows.push(['Helper interface', `${coll.interface}${helperSt && helperSt.version ? ` (on-chain v${helperSt.version})` : ''} · ${coll.group}`, null]);
+  rows.push(['Xtrata core', reg.core.contract, reg.core.contract]);
+  if (helperSt && coll.helper) {
+    rows.push(['Fee per inscription', stx(helperSt.fee) + (helperSt.interface === 'v3' ? ' (split 50/50 between two payees)' : ''), null]);
+    rows.push(['Record finalised', helperSt.finalized ? 'Yes' : 'Not yet', null]);
+    if (helperSt.manifestHash) rows.push(['Manifest hash', helperSt.manifestHash, null]);
+    if (helperSt.interface === 'v3') rows.push(['Large files not yet bound', fmt(helperSt.largeUnbound), null]);
+  }
+  if (coll.manifest && coll.manifest.url) rows.push(['Manifest', `<a href="${esc(coll.manifest.url)}">${esc(coll.manifest.url)}</a>${coll.manifest.sha256 ? ' · sha256 ' + esc(coll.manifest.sha256) : ''}`, 'raw']);
+  if (coll.twinTokenUri) rows.push(['Twin token URI', coll.twinTokenUri, null]);
+  $('facts').innerHTML = rows.map(([k, v, link]) => {
+    let val;
+    if (link === 'raw') val = v;
+    else if (v == null) val = '<span class="mute">Not deployed yet</span>';
+    else if (link) val = `<a class="mono" href="${esc(contractExplorer(link))}" target="_blank" rel="noopener">${esc(v)}</a>`;
+    else val = `<span class="mono">${esc(v)}</span>`;
+    return `<dt>${esc(k)}</dt><dd>${val}</dd>`;
+  }).join('');
+}
+function renderStateMsg() {
+  const el = $('stateMsg'); el.innerHTML = '';
+  const add = (cls, html) => el.insertAdjacentHTML('beforeend', `<div class="msg ${cls}">${html}</div>`);
+  if (!coll.helper) add('warn', 'No helper contract is deployed for this collection yet. Nothing can be inscribed or swapped, and this page does not link to a tool.');
+  if (helperSt && helperSt.mismatches && helperSt.mismatches.length) add('bad', `The deployed helper does not match the registry (${esc(helperSt.mismatches.join('; '))}). Actions are disabled until this is resolved.`);
+  if (helperSt && coll.helper && helperSt.interface === 'v3' && helperSt.finalized === false) add('warn', 'The record is not finalised yet, so nothing can be inscribed or swapped.');
+}
+
+// ---- token lookup ----
+async function lookup() {
+  const out = $('lookupOut');
+  const id = $('tokenId').value.trim();
+  if (!/^\d+$/.test(id)) { out.innerHTML = '<div class="msg warn">Enter a token number.</div>'; return; }
+  if (!adapter) { out.innerHTML = '<div class="msg bad">Chain reads are unavailable right now. Try again shortly.</div>'; return; }
+  out.innerHTML = '<div class="msg">Checking chain…</div>'; prepared = null;
+  try { view = await adapter.tokenView(coll, id); }
+  catch (e) { out.innerHTML = `<div class="msg bad">Read failed: ${esc(e.message)}</div>`; return; }
+  const rows = [['Original owner', view.sourceOwner ? `<span class="mono">${esc(view.sourceOwner)}</span>` : (view.sourceOwnerError ? `<span class="bad">${esc(view.sourceOwnerError)}</span>` : '<span class="mute">None returned</span>')]];
+  if (coll.helper) {
+    rows.push(['Seeded in record', view.canonical ? `<span class="ok">Yes</span>${view.canonical.totalSize != null ? ` · ${fmt(view.canonical.totalSize)} bytes` : ''}${view.canonical.mime ? ' · ' + esc(view.canonical.mime) : ''}` : '<span class="warn">No</span>']);
+    if (view.binding) {
+      rows.push(['Twin', `Xtrata <a href="https://xtrata.xyz/inscription/${esc(view.binding.xtrataId)}" target="_blank" rel="noopener">#${esc(view.binding.xtrataId)}</a>`]);
+      rows.push(['Liquid side', view.side === 'original-liquid' ? 'Original NFT is with its holder; the twin is held by the helper' : 'Twin is with its holder; the original is held by the helper']);
+      rows.push(['Holder', view.liquidOwner ? `<span class="mono">${esc(view.liquidOwner)}</span>` : '<span class="mute">Unknown</span>']);
+      rows.push(['Custody check', view.custody.stranded ? '<span class="bad">Both tokens are in the helper (stranded)</span>' : view.custody.consistent ? '<span class="ok">Consistent with real ownership</span>' : '<span class="bad">Does not match the stored flag</span>']);
+    } else rows.push(['Twin', 'Not inscribed yet']);
+    if (view.listed != null) rows.push(['Listed on source market', view.listed ? '<span class="warn">Yes — unlist before swapping</span>' : 'No']);
+  }
+  out.innerHTML = `<dl class="facts spaced">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join('')}</dl>`;
+  renderActions();
+}
+
+// ---- actions (v3 only; v1 hands off to its original page) ----
+function renderActions() {
+  const card = $('actionCard'), out = $('actionOut');
+  if (!coll.helper) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  if (coll.interface !== 'v3') {
+    out.innerHTML = `<p>This collection runs on the original helper, so inscribing and swapping stay on its original page.</p>${coll.legacyPage ? `<p><a class="btn" href="${esc(coll.legacyPage)}">Open the original ${esc(coll.name)} page</a></p>` : ''}`;
+    return;
+  }
+  const block = adapter && adapter.writeBlock(coll, helperSt, view);
+  if (!adapter) { out.innerHTML = '<div class="msg warn">Chain access has not loaded.</div>'; return; }
+  if (block) { out.innerHTML = `<div class="msg warn">${esc(block)}</div>`; return; }
+  if (!view) { out.innerHTML = '<p class="mute">Look up a token to see what you can do with it.</p>'; return; }
+  const parts = [];
+  if (!view.binding) {
+    if (!view.canonical) parts.push('<div class="msg warn">This token is not in the finalised record, so it cannot be twinned.</div>');
+    else if (isLargeTotal(view.canonical.totalSize)) parts.push('<div class="msg warn">This token’s art is over 512 KB. It is inscribed by the collection owner before launch and cannot be inscribed from this page.</div>');
+    else parts.push(`<p>No twin yet. Anyone can fund this twin; funding gives no claim on the original.</p>
+      <div class="row"><button id="prepBtn" type="button">Fetch and verify the art</button>
+      <label class="mute small">or choose the file <input id="artFile" type="file"></label></div>
+      <div id="prepOut"></div>
+      <div class="row spaced"><button id="inscribeBtn" type="button" disabled>Inscribe twin</button><span id="feeOut" class="mute"></span></div>`);
+  } else {
+    const dir = adapter.validSwap(view);
+    const mine = !!wallet && view.liquidOwner === wallet;
+    const listed = dir === 'original-to-twin' && view.listed === true;
+    parts.push(`<p>${dir === 'original-to-twin' ? 'Swap the original NFT for the permanent twin.' : 'Swap the permanent twin back for the original NFT.'}</p>
+      <div class="row"><button id="swapBtn" type="button" ${mine && !listed && view.custody.consistent ? '' : 'disabled'}>${dir === 'original-to-twin' ? 'Swap original for twin' : 'Swap twin for original'}</button></div>`);
+    if (!wallet) parts.push('<p class="mute">Connect the wallet that holds the liquid side.</p>');
+    else if (!mine) parts.push('<p class="mute">The connected wallet does not hold the liquid side of this twin.</p>');
+    if (listed) parts.push('<div class="msg warn">The original is listed on its marketplace. Unlist it first.</div>');
+    if (!view.custody.consistent) parts.push('<div class="msg bad">Custody does not match the stored flag, so swapping is disabled.</div>');
+  }
+  out.innerHTML = parts.join('');
+  $('prepBtn')?.addEventListener('click', prepareArt);
+  $('artFile')?.addEventListener('change', (e) => e.target.files[0] && prepareFromFile(e.target.files[0]));
+  $('inscribeBtn')?.addEventListener('click', doInscribe);
+  $('swapBtn')?.addEventListener('click', doSwap);
+}
+async function checkBytes(bytes) {
+  const c = view.canonical;
+  if (bytes.length !== c.totalSize) throw new Error(`Size is ${bytes.length} bytes; the record expects ${c.totalSize}. Not the canonical art.`);
+  const chunks = chunkBytes(bytes);
+  const hash = await rollingHash(chunks);
+  if (!sameHash(hash, c.hash)) throw new Error('The art does not match the finalised record (hash differs). Nothing will be sent.');
+  prepared = { chunks, size: bytes.length };
+  $('prepOut').innerHTML = `<div class="msg ok">Verified: ${fmt(bytes.length)} bytes in ${chunks.length} chunk${chunks.length === 1 ? '' : 's'} match the record.</div>`;
+  await refreshInscribeButton();
+}
+async function prepareArt() {
+  $('prepOut').innerHTML = '<div class="msg">Fetching the original art…</div>';
+  try {
+    const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(view.tokenId))]));
+    if (!uri) throw new Error('The source contract returned no token URI');
+    const art = await fetchArt(uri, view.tokenId);
+    await checkBytes(art.bytes);
+  } catch (e) { prepared = null; $('prepOut').innerHTML = `<div class="msg bad">${esc(e.message)} You can choose the file yourself instead.</div>`; }
+}
+async function prepareFromFile(file) {
+  try { await checkBytes(new Uint8Array(await file.arrayBuffer())); }
+  catch (e) { prepared = null; $('prepOut').innerHTML = `<div class="msg bad">${esc(e.message)}</div>`; }
+}
+async function refreshInscribeButton() {
+  const btn = $('inscribeBtn'); if (!btn) return;
+  if (!prepared) { btn.disabled = true; return; }
+  if (!wallet) { $('feeOut').textContent = 'Connect a wallet to see the fee.'; btn.disabled = true; return; }
+  try {
+    const q = await adapter.quoteInscribeFee(coll, wallet, prepared.size, prepared.chunks.length);
+    prepared.quote = q;
+    $('feeOut').textContent = `Total ${Number(q.total) / 1e6} STX (helper ${Number(q.app) / 1e6} + Xtrata ${Number(q.master) / 1e6})`;
+    btn.disabled = false;
+  } catch (e) { $('feeOut').textContent = `Fee quote failed: ${e.message}`; btn.disabled = true; }
+}
+function callHelper({ contract, fn, args }, postConditions) {
+  const [contractAddress, contractName] = contract.split('.');
+  return new Promise((resolve, reject) => {
+    chain.openContractCall({ contractAddress, contractName, functionName: fn, functionArgs: args, network: 'mainnet',
+      postConditions, postConditionMode: chain.PostConditionMode.Allow,
+      onFinish: (d) => resolve(d), onCancel: () => reject(new Error('Cancelled in the wallet')) });
+  });
+}
+const submitted = (txId) => $('actionOut').insertAdjacentHTML('beforeend', `<div class="msg ok">Submitted. <a href="https://explorer.hiro.so/txid/${esc(txId)}?chain=mainnet" target="_blank" rel="noopener">View transaction</a>. It can take a few minutes to confirm; look the token up again afterwards.</div>`);
+const failed = (e) => $('actionOut').insertAdjacentHTML('beforeend', `<div class="msg bad">${esc(e.message)}</div>`);
+async function doInscribe() {
+  try {
+    if (!prepared) return;
+    await refreshInscribeButton();
+    if (!prepared.quote) return;
+    const call = adapter.buildInscribe(coll, view.tokenId, prepared.chunks);
+    const r = await callHelper(call, [chain.Pc.principal(wallet).willSendLte(prepared.quote.total).ustx()]);
+    submitted(r.txId || r.txid);
+  } catch (e) { failed(e); }
+}
+async function doSwap() {
+  try {
+    const dir = adapter.validSwap(view);
+    const call = adapter.buildSwap(coll, view.tokenId, dir);
+    const nft = dir === 'original-to-twin'
+      ? chain.Pc.principal(wallet).willSendAsset().nft(`${coll.source}::${coll.sourceAsset}`, chain.Cl.uint(BigInt(view.tokenId)))
+      : chain.Pc.principal(wallet).willSendAsset().nft(`${reg.core.contract}::${reg.core.assetName}`, chain.Cl.uint(BigInt(view.binding.xtrataId)));
+    const r = await callHelper(call, [nft]);
+    submitted(r.txId || r.txid);
+  } catch (e) { failed(e); }
+}
+
+// ---- wallet ----
+async function connect() {
+  const b = $('connectBtn');
+  try {
+    if (!chain) throw new Error('Wallet support did not load');
+    b.disabled = true; b.textContent = 'Connecting…';
+    const s = await chain.connectForeverTwinsWallet();
+    setWallet(s && s.address);
+  } catch (e) { b.disabled = false; b.textContent = 'Connect wallet'; if (!/cancel|reject|denied|closed/i.test(e.message)) $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">${esc(e.message)}</div>`); }
+}
+function setWallet(addr) {
+  wallet = addr || null;
+  const b = $('connectBtn');
+  b.textContent = wallet ? short(wallet) : 'Connect wallet'; b.disabled = !!wallet;
+  if (view) renderActions();
+  refreshInscribeButton();
+}
+
+// ---- boot ----
+async function refreshState() {
+  if (!adapter) return;
+  try {
+    const st = coll.helper ? await adapter.helperState(coll) : null;
+    const total = await adapter.sourceTotal(coll);
+    helperSt = st ? Object.assign(st, { sourceTotal: total }) : (total != null ? { sourceTotal: total, inscribedCount: null, interface: coll.interface } : null);
+  } catch (e) { $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">Live read failed: ${esc(e.message)}. Registry data is shown instead.</div>`); }
+  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderActions();
+}
+async function boot() {
+  const key = routeKey(location.pathname, location.search, 'collection');
+  try { reg = await loadRegistry(); }
+  catch (e) { $('nfText').textContent = `The registry could not be loaded: ${e.message}`; $('notfound').classList.remove('hidden'); return; }
+  coll = key ? getCollection(reg, key) : null;
+  if (!coll) {
+    document.title = 'Collection not found · Forever Twins';
+    const m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex'; document.head.appendChild(m);
+    $('nfText').textContent = key ? `"${key}" is not in the Forever Twins registry.` : 'No collection was given.';
+    $('notfound').classList.remove('hidden'); return;
+  }
+  document.title = `${coll.name} · Forever Twins`;
+  document.documentElement.style.setProperty('--accent', (coll.theme && coll.theme.accent) || '#1f5fe0');
+  $('name').textContent = coll.name; $('blurb').textContent = coll.blurb || '';
+  if (coll.theme && coll.theme.logo) { const i = $('logo'); i.src = coll.theme.logo; i.alt = `${coll.name} logo`; i.classList.remove('hidden'); }
+  const s = STATUS[coll.status] || STATUS.planned;
+  $('statusPill').textContent = s.label; $('statusPill').className = `pill ${s.tone}`;
+  const comm = coll.community ? getCommunity(reg, coll.community) : null;
+  $('crumbs').innerHTML = `<a href="/forever-twins/collections/">All collections</a>${comm ? ` › <a href="${communityUrl(comm.slug)}">${esc(comm.name)}</a>` : ''} › ${esc(coll.name)}`;
+  if (coll.legacyPage) {
+    $('banner').innerHTML = `This is the shared collection page (preview). The original ${esc(coll.name)} page is still live and is where you inscribe and swap: <a href="${esc(coll.legacyPage)}">open the original page</a>.`;
+    $('banner').classList.remove('hidden');
+    $('footLegacy').innerHTML = ` · <a href="${esc(coll.legacyPage)}">Original ${esc(coll.name)} page</a>`;
+  }
+  if (coll.group === 'G2') $('g2Warn').classList.remove('hidden');
+  if (!coll.helper) $('warnCard').classList.add('hidden');
+  $('page').classList.remove('hidden');
+  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderActions();
+
+  $('lookupBtn').addEventListener('click', lookup);
+  $('tokenId').addEventListener('keydown', (e) => e.key === 'Enter' && lookup());
+  $('connectBtn').addEventListener('click', connect);
+
+  try {
+    chain = await import('/forever-twins/assets/xtrata-forever-twins.js');
+    adapter = createAdapter({ read, core: { contract: reg.core.contract, assetName: reg.core.assetName },
+      cl: { uint: (n) => chain.Cl.uint(BigInt(n)), principal: (p) => chain.Cl.principal(p), buffer: (b) => chain.Cl.buffer(b), list: (l) => chain.Cl.list(l) } });
+    try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
+    await refreshState();
+    setInterval(refreshState, 60000);
+    const q = new URLSearchParams(location.search).get('token');
+    if (q && /^\d+$/.test(q)) { $('tokenId').value = q; lookup(); }
+  } catch (e) {
+    $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">Live chain reads and wallet support could not load (${esc(e.message)}). The registry details above still apply.</div>`);
+  }
+}
+boot();
+</script>
+</body>
+</html>

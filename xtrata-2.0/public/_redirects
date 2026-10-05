@@ -3,6 +3,8 @@
 /arcade/ /x/3081 302
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
+# Forever Twins: registry-driven pages. Each key is read from /forever-twins/data/registry.v2.json
+# /forever-twins/collection/<key> and /forever-twins/community/<slug> are served by functions/forever-twins/ (a rewrite here loses the key).
 /kp-loops /kp-loops/index.html 200
 /homepage / 302
 /homepage/ / 302
