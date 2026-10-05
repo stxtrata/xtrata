@@ -19,6 +19,15 @@
   .gcard .gs b{color:inherit;font-weight:700}
   .gcard button{width:100%;margin-top:auto}
   .gcard .msg{margin-top:0;font-size:12px}
+  .gcard .pic{position:relative}
+  .gcard .ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--mute);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+  .gcard .tag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 8px;border-radius:999px;background:var(--panel);border:1px solid currentColor}
+  .gcard.done{border:2px solid var(--ok)} .gcard.done .tag{color:var(--ok)}
+  .gcard.todo{border:2px solid var(--warn)} .gcard.todo .tag{color:var(--warn)}
+  .gcard.wait{border:2px dashed var(--line)} .gcard.wait .tag{color:var(--mute)}
+  .gcard .cost{font-size:12px;color:var(--mute)}
+  .sumrow{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 2px;font-size:14px}
+  .sumrow b{font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -57,6 +66,11 @@
       <p class="sub tight">Four separate numbers. Having a helper does not mean the collection is fully on-chain.</p>
       <div class="stats" id="stats"></div>
       <div id="stateMsg"></div>
+    </section>
+
+    <section class="card hidden" id="mineCard">
+      <h2>Your NFTs in this collection <span id="mineCount" class="mute small"></span></h2>
+      <div id="mineOut"></div>
     </section>
 
     <section class="card">
@@ -105,7 +119,7 @@
 <script type="module">
 import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js';
 import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js';
-import { fetchArt } from '/forever-twins/assets/ft-media.js';
+import { fetchArt, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -429,10 +443,164 @@ function showMoreTwins() {
   Promise.all([pump(), pump(), pump()]); // three reads in flight at a time
   $('galMore').classList.toggle('hidden', galleryShown >= twins.length);
 }
+
+// ---- "Your NFTs": what the connected wallet holds in this collection, twinned or not ----
+const mineCards = new Map(); // tokenId -> { el, view, kind }
+let mineFor = null; // wallet the list was built for
+// Hiro lists a wallet's NFTs of one asset; read it through the same-origin proxy.
+async function heldIds(principal, assetId, wantOnly) {
+  const ids = new Set(); let offset = 0;
+  for (let guard = 0; guard < 30; guard++) {
+    const r = await fetch(`${location.origin}/hiro/mainnet/extended/v1/tokens/nft/holdings?principal=${encodeURIComponent(principal)}&asset_identifiers=${encodeURIComponent(assetId)}&limit=200&offset=${offset}`);
+    if (!r.ok) throw new Error(`holdings unavailable (HTTP ${r.status})`);
+    const j = await r.json(); const rows = j.results || [];
+    for (const h of rows) { const m = /^u(\d+)$/.exec((h.value && h.value.repr) || ''); if (m && (!wantOnly || wantOnly.has(m[1]))) ids.add(m[1]); }
+    offset += rows.length;
+    if (rows.length < 200 || (j.total != null && offset >= j.total)) break;
+  }
+  return ids;
+}
+async function twinToken(v, out) {
+  try {
+    out.innerHTML = '<div class="msg">Fetching the original art…</div>';
+    const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(v.tokenId))]));
+    if (!uri) throw new Error('The source contract returned no token URI');
+    const art = await fetchArt(uri, v.tokenId);
+    const c = v.canonical;
+    if (art.bytes.length !== c.totalSize) throw new Error(`The art is ${art.bytes.length} bytes; the record expects ${c.totalSize}. Not the canonical art, nothing was sent.`);
+    const chunks = chunkBytes(art.bytes);
+    if (!sameHash(await rollingHash(chunks), c.hash)) throw new Error('The art does not match the finalised record (hash differs). Nothing was sent.');
+    out.innerHTML = '<div class="msg">Art verified against the record. Confirm in your wallet…</div>';
+    const q = await adapter.quoteInscribeFee(coll, wallet, art.bytes.length, chunks.length);
+    const call = adapter.buildInscribe(coll, v.tokenId, chunks);
+    const r = await callHelper(call, [chain.Pc.principal(wallet).willSendLte(q.total).ustx()]);
+    out.innerHTML = ''; submitted(r.txId || r.txid, out);
+    return true;
+  } catch (e) { out.innerHTML = ''; failed(e, out); return false; }
+}
+// Show the original art on a card that has no twin yet: token URI -> metadata -> image, trying each gateway.
+async function previewOriginal(t, c) {
+  try {
+    const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(t))]));
+    if (!uri) return;
+    let meta = null;
+    for (const u of uriCandidates(uri, t)) {
+      try { const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000); const r = await fetch(u, { signal: ctl.signal }); clearTimeout(to); if (r.ok) { meta = JSON.parse(await r.text()); break; } } catch {}
+    }
+    const image = meta && imageFrom(meta); if (!image) return;
+    const urls = uriCandidates(image, t); if (!urls.length) return;
+    const img = new Image(); img.alt = `${coll.itemNoun} #${t}`; let i = 0;
+    img.onerror = () => { i += 1; if (i < urls.length) img.src = urls[i]; };
+    img.onload = () => { const ph = c.el.querySelector('.ph'); if (ph) ph.replaceWith(img); };
+    img.src = urls[0];
+  } catch {}
+}
+function summariseMine() {
+  let done = 0, todo = 0;
+  for (const c of mineCards.values()) { if (!c.view) continue; if (c.view.binding) done += 1; else if (c.view.canonical && !isLargeTotal(c.view.canonical.totalSize)) todo += 1; }
+  const n = mineCards.size;
+  $('mineCount').textContent = n ? `(${fmt(n)})` : '';
+  const el = $('mineSummary'); if (el) el.innerHTML = `<span><b>${fmt(todo)}</b> ready to twin</span><span><b>${fmt(done)}</b> already twinned</span>`;
+}
+async function paintMine(t) {
+  const c = mineCards.get(t); if (!c || !c.view) return;
+  const v = c.view, el = c.el, body = el.querySelector('.gb');
+  const idHtml = `<h3><span>#${t}</span>${v.binding ? `<a href="/inscription/${esc(v.binding.xtrataId)}" target="_blank" rel="noopener">Xtrata #${esc(v.binding.xtrataId)}</a>` : ''}</h3>`;
+  if (v.binding) {
+    el.className = 'gcard done';
+    const dir = adapter.validSwap(v);
+    const why = v.custody.unreadable ? 'Ownership could not be read. Reload to retry.' : !v.custody.consistent ? 'Custody check failed, swapping is disabled.' : (dir === 'original-to-twin' && v.listed === true) ? 'Listed on its marketplace. Unlist it first.' : '';
+    el.querySelector('.pic').innerHTML = `<img alt="${esc(coll.itemNoun)} #${t} twin" src="${esc(twinImg(v.binding.xtrataId))}"><span class="tag">✓ TWINNED</span>`;
+    body.innerHTML = `${idHtml}<div class="gs">${v.side === 'original-liquid' ? 'You hold the <b>original NFT</b>. Its permanent twin is in escrow.' : 'You hold the <b>twin</b>. The original NFT is in escrow.'}</div>
+      <button type="button" class="ghost" ${why ? 'disabled' : ''}>${dir === 'original-to-twin' ? 'Swap for the twin' : 'Swap back to the original'}</button>${why ? `<div class="gs">${esc(why)}</div>` : ''}<div class="gm"></div>`;
+    body.querySelector('button').addEventListener('click', async (ev) => {
+      const b = ev.currentTarget; b.disabled = true;
+      const ok = await doSwap(v, body.querySelector('.gm'));
+      if (ok) setTimeout(() => reloadMine(t), 90000); else b.disabled = false;
+    });
+  } else {
+    el.className = 'gcard todo';
+    const ph = el.querySelector('.ph');
+    if (!el.querySelector('.pic .tag')) el.querySelector('.pic').insertAdjacentHTML('beforeend', '<span class="tag">NOT TWINNED</span>');
+    let action;
+    if (!v.canonical) action = '<div class="gs">This token is not in the finalised record, so it cannot be twinned.</div>';
+    else if (isLargeTotal(v.canonical.totalSize)) action = '<div class="gs">The art is over 512 KB. The collection owner inscribes files this size, so it cannot be twinned from here.</div>';
+    else action = `<div class="cost">Making a twin…</div><button type="button">Twin it</button><div class="gm"></div>`;
+    body.innerHTML = `${idHtml}<div class="gs">No permanent twin yet. Anyone can fund one, and it gives no claim on the original.</div>${action}`;
+    const btn = body.querySelector('button');
+    if (btn) {
+      try {
+        const q = await adapter.quoteInscribeFee(coll, wallet, v.canonical.totalSize, Math.ceil(v.canonical.totalSize / 16384));
+        body.querySelector('.cost').textContent = `Cost about ${(Number(q.total) / 1e6).toFixed(3)} STX (helper ${Number(q.app) / 1e6} + Xtrata ${(Number(q.master) / 1e6).toFixed(3)}) plus the network fee`;
+      } catch { body.querySelector('.cost').textContent = 'The exact cost is shown in your wallet.'; }
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        const ok = await twinToken(v, body.querySelector('.gm'));
+        if (ok) setTimeout(() => reloadMine(t), 90000); else btn.disabled = false;
+      });
+    }
+    if (ph && !c.previewed) { c.previewed = true; previewOriginal(t, c); }
+  }
+  summariseMine();
+}
+async function reloadMine(t) {
+  const c = mineCards.get(t); if (!c) return;
+  try { c.view = await adapter.tokenView(coll, t); paintMine(t); } catch {}
+}
+async function loadMineCard(t) {
+  const c = mineCards.get(t); if (!c) return;
+  try { c.view = await adapter.tokenView(coll, t); await paintMine(t); }
+  catch (e) {
+    c.el.querySelector('.gs').innerHTML = `Could not read this token. <a href="#" class="retry">Retry</a>`;
+    c.el.querySelector('.retry').addEventListener('click', (ev) => { ev.preventDefault(); c.el.querySelector('.gs').textContent = 'Reading the chain…'; loadMineCard(t); });
+  }
+}
+async function initMine() {
+  if (!coll.helper || coll.interface !== 'v3' || coll.status !== 'live' || !adapter) return;
+  const card = $('mineCard'), out = $('mineOut');
+  card.classList.remove('hidden');
+  if (!wallet) {
+    mineFor = null; mineCards.clear(); $('mineCount').textContent = '';
+    out.innerHTML = `<p class="sub tight">Connect your wallet to see which ${esc(coll.itemNoun)}s you hold, which already have a permanent twin, and twin the rest with one click.</p><div class="row"><button id="mineConnect" type="button">Connect wallet</button></div>`;
+    $('mineConnect').addEventListener('click', connect);
+    return;
+  }
+  if (mineFor === wallet) return;
+  mineFor = wallet; const me = wallet;
+  out.innerHTML = '<p class="mute">Looking up what you hold…</p>'; mineCards.clear();
+  try {
+    const tw = await getTwins();
+    const byX = new Map(tw.map((t) => [String(t.xtrataId), t.tokenId]));
+    const [orig, heldTwins] = await Promise.all([
+      heldIds(me, `${coll.source}::${coll.sourceAsset}`),
+      tw.length ? heldIds(me, `${reg.core.contract}::${reg.core.assetName}`, new Set(byX.keys())) : Promise.resolve(new Set())
+    ]);
+    if (wallet !== me) return; // switched wallet while loading
+    const ids = new Set([...orig].map(Number)); for (const x of heldTwins) ids.add(byX.get(x));
+    const list = [...ids].sort((a, b) => a - b);
+    if (!list.length) { out.innerHTML = `<p class="sub tight">The connected wallet (${esc(short(me))}) holds no ${esc(coll.itemNoun)}s.</p><p class="mute small">NFTs listed on a marketplace are held by that marketplace and do not appear here. Look one up by number below.</p>`; return; }
+    out.innerHTML = '<div class="sumrow" id="mineSummary"></div><div class="gal" id="mineGal"></div><p class="mute small">NFTs listed on a marketplace are held by that marketplace and do not appear here. Look one up by number below.</p>';
+    const grid = $('mineGal');
+    for (const t of list) {
+      const el = document.createElement('article'); el.className = 'gcard wait';
+      el.innerHTML = `<div class="pic"><div class="ph">#${t}</div></div><div class="gb"><h3><span>#${t}</span></h3><div class="gs">Reading the chain…</div></div>`;
+      mineCards.set(t, { el, view: null }); grid.appendChild(el);
+    }
+    summariseMine();
+    let i = 0; const pump = async () => { while (i < list.length) await loadMineCard(list[i++]); };
+    Promise.all([pump(), pump(), pump()]);
+  } catch (e) {
+    mineFor = null;
+    out.innerHTML = `<div class="msg warn">Could not load your NFTs: ${esc(e.message)}. Reload to try again.</div>`;
+  }
+}
+
+let twinsPromise = null;
+const getTwins = () => (twinsPromise = twinsPromise || loadTwinList());
 async function initGallery() {
   if (!coll.helper || coll.interface !== 'v3' || coll.status !== 'live' || !adapter) return;
   $('galleryCard').classList.remove('hidden');
-  try { twins = await loadTwinList(); }
+  try { twins = await getTwins(); }
   catch (e) { $('galleryOut').innerHTML = `<div class="msg warn">Could not load the list of twins: ${esc(e.message)}. Reload to try again.</div>`; return; }
   $('galleryCount').textContent = twins.length ? `(${fmt(twins.length)} of ${helperSt && helperSt.sourceTotal ? fmt(helperSt.sourceTotal) : '—'})` : '';
   if (!twins.length) { $('galleryOut').innerHTML = '<p class="mute">No twins have been made yet. The first one will appear here.</p>'; return; }
@@ -458,6 +626,7 @@ function setWallet(addr) {
   if (view) renderActions();
   refreshInscribeButton();
   for (const t of twins || []) paintCard(t);
+  if (adapter) initMine();
 }
 
 // ---- boot ----
@@ -510,6 +679,7 @@ async function boot() {
     try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
     await refreshState();
     setInterval(refreshState, 60000);
+    initMine();
     initGallery();
     const q = new URLSearchParams(location.search).get('token');
     if (q && /^\d+$/.test(q)) { $('tokenId').value = q; lookup(); }
