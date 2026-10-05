@@ -38,13 +38,13 @@ await check('rejects duplicate key', bad((r) => { r.collections.push(clone(r.col
 await check('rejects a second helper for the same source', bad((r) => { const c = clone(r.collections[0]); c.key = 'dup-source'; c.helper = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.other-helper'; r.collections.push(c); }, 'one helper per source'));
 await check('rejects a helper reused by two collections', bad((r) => { r.collections[1].helper = r.collections[0].helper; }, 'helper already used'));
 await check('rejects live without helper', bad((r) => { r.collections[0].helper = null; }, 'needs a helper'));
-await check('rejects planned with a helper', bad((r) => { r.collections.find((c) => c.key === 'nyc-degens').helper = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.nyc-x'; }, 'status is "planned"'));
+await check('rejects planned with a helper', bad((r) => { r.collections.find((c) => c.key === 'megapont-ape-club').helper = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.mega-x'; }, 'status is "planned"'));
 await check('rejects live v1 without legacyPage', bad((r) => { r.collections[0].legacyPage = null; }, 'legacyPage'));
 await check('rejects unknown status', bad((r) => { r.collections[0].status = 'launched'; }, 'unknown status'));
 await check('rejects bad principal', bad((r) => { r.collections[0].source = 'not-a-principal'; }, 'valid principal'));
 await check('rejects unknown community', bad((r) => { r.collections[0].community = 'nope'; }, 'unknown community'));
 await check('rejects community/collection disagreement', bad((r) => { r.communities[0].collections.pop(); }, 'not in its list'));
-await check('rejects live community with no live collection', bad((r) => { r.communities[1].status = 'live'; }, 'no live collection'));
+await check('rejects live community with no live collection', bad((r) => { const n = r.collections.find((c) => c.key === 'nyc-degens'); n.status = 'planned'; n.helper = null; r.communities[1].status = 'live'; }, 'no live collection'));
 await check('rejects v3 twinTokenUri without {id}', bad((r) => { r.collections.find((c) => c.key === 'nyc-degens').twinTokenUri = 'https://xtrata.xyz/ft/x.json'; }, '{id}'));
 
 // ---------------------------------------------------------------- B. routes
@@ -125,7 +125,7 @@ await check('v1 helperState uses the original getters', async () => {
   const st = await a.helperState(c); assert.equal(st.interface, 'v1'); assert.equal(st.inscribedCount, 7); assert.equal(st.fee, 3000000n); assert.equal(st.freeThreshold, 87); assert.equal(st.canonicalCount, null);
 });
 await check('no helper -> no state, source-only token view', async () => {
-  const c = R.getCollection(reg, 'nyc-degens'); const s = baseState(c, 'x.y'); const f = fakeChain('x.y', s); const a = A.createAdapter({ ...f, cl, core: CORE });
+  const c = R.getCollection(reg, 'megapont-ape-club'); const s = baseState(c, 'x.y'); const f = fakeChain('x.y', s); const a = A.createAdapter({ ...f, cl, core: CORE });
   assert.equal(await a.helperState(c), null); const v = await a.tokenView(c, 1); assert.equal(v.sourceOwner, ME); assert.equal(v.binding, null);
   assert.ok(f.calls.every(([ct]) => ct === c.source), 'must only read the source');
 });
@@ -163,11 +163,11 @@ await check('inscribe: v3 takes only token id + chunks; v1 and bad chunk counts 
   assert.equal(call.fn, 'inscribe'); assert.equal(call.args.length, 2);
   assert.throws(() => a.buildInscribe(R.getCollection(reg, 'leo-cats'), 1, [new Uint8Array(1)]), /v3 helper/);
   assert.throws(() => a.buildInscribe(v3(), 1, []), /Chunk count/); assert.throws(() => a.buildInscribe(v3(), 1, Array(33).fill(new Uint8Array(1))), /Chunk count/);
-  assert.throws(() => a.buildInscribe(R.getCollection(reg, 'nyc-degens'), 1, [new Uint8Array(1)]), /no helper/);
+  assert.throws(() => a.buildInscribe(R.getCollection(reg, 'megapont-ape-club'), 1, [new Uint8Array(1)]), /no helper/);
 });
 await check('writeBlock: not live / v1 / unfinalised / planned', async () => {
   const a = A.createAdapter({ read: async () => null, cl, core: CORE });
-  assert.match(a.writeBlock(R.getCollection(reg, 'nyc-degens'), null, null), /No helper/);
+  assert.match(a.writeBlock(R.getCollection(reg, 'megapont-ape-club'), null, null), /No helper/);
   assert.match(a.writeBlock(R.getCollection(reg, 'leo-cats'), { mismatches: [] }, null), /original page/);
   assert.match(a.writeBlock(v3({ status: 'deploying' }), { mismatches: [], finalized: true }, null), /not live/);
   assert.match(a.writeBlock(v3(), { mismatches: [], finalized: false }, null), /not finalised/);

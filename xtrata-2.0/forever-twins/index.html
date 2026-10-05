@@ -305,6 +305,7 @@
   .intro p.lede{font-size:17.5px;color:var(--muted);max-width:640px;margin:0 0 18px}
   .collections{grid-template-columns:repeat(3,1fr)}
   .col-banner{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;border-bottom:1px solid var(--line);background:var(--panel-2)}
+  .col-banner--text{display:flex;align-items:center;justify-content:center;font-weight:900;font-size:30px;letter-spacing:.04em;color:#fff;background:linear-gradient(135deg,#1f5fe0,#0b2a6b)}
   .col-card--hero .col-top{padding:16px 18px 0}
   .col-card--hero .col-body{padding:10px 18px 0;font-size:13.5px}
   .col-card--hero .col-metrics{padding:12px 18px 0;gap:18px}
@@ -347,7 +348,7 @@
   <section class="intro">
     <span class="eyebrow">Xtrata satellite · Collection permanence</span>
     <h1>Make any NFT collection <span class="ink-gold">permanent.</span></h1>
-    <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT, bound 1:1 to the original. No re-mint. No migration. Three collections are live now.</p>
+    <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT, bound 1:1 to the original. No re-mint. No migration. Four collections are live now.</p>
     <div class="trust">First public collection: <b>Bitcoin Pepes</b> · <span id="trust-count">live on Stacks</span></div>
     <div class="hero-migration">Live migration: <strong id="hero-migration-summary">Loading on-chain counts…</strong></div>
   </section>
@@ -356,7 +357,7 @@
     <div class="collections">
 
       <!-- ACTIVE: Bitcoin Pepes -->
-      <a id="c-card" class="col-card col-card--hero active" href="./bitcoin-pepes/index.html" style="color:inherit">
+      <a id="c-card" class="col-card col-card--hero active" href="/forever-twins/collection/bitcoin-pepes" style="color:inherit">
         <img class="col-banner" src="./assets/bitcoin-pepe-maxi.png" alt="Bitcoin Pepes" />
         <div class="col-top">
           <div class="col-head">
@@ -374,7 +375,7 @@
       </a>
 
       <!-- ACTIVE: LEO Cats -->
-      <a id="l-card" class="col-card col-card--hero active" href="./leo-cats/index.html" style="color:inherit">
+      <a id="l-card" class="col-card col-card--hero active" href="/forever-twins/collection/leo-cats" style="color:inherit">
         <img class="col-banner" src="./assets/leo-cat-forever-twin-logo-1.jpg" alt="LEO Cats Forever Twins" />
         <div class="col-top">
           <div class="col-head">
@@ -392,7 +393,7 @@
       </a>
 
       <!-- ACTIVE: Miami Degens -->
-      <a id="m-card" class="col-card col-card--hero active" href="./miami-degens/index.html" style="color:inherit">
+      <a id="m-card" class="col-card col-card--hero active" href="/forever-twins/collection/miami-degens" style="color:inherit">
         <img class="col-banner" src="./assets/miami-degens-forever-twin-logo.jpg" alt="Miami Degens Forever Twins" />
         <div class="col-top">
           <div class="col-head">
@@ -407,6 +408,24 @@
           <div class="col-metric"><div class="v" id="m-status">—</div><div class="k">Migration status</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View Miami Degens →</span></div>
+      </a>
+
+      <!-- ACTIVE: NYC Degens (first collection on the Forever Twins helper v3) -->
+      <a id="n-card" class="col-card col-card--hero active" href="/forever-twins/collection/nyc-degens" style="color:inherit">
+        <div class="col-banner col-banner--text" role="img" aria-label="NYC Degens Forever Twins">NYC DEGENS</div>
+        <div class="col-top">
+          <div class="col-head">
+            <span class="col-badge live">● Live</span><span id="n-stamp" class="forevered-stamp">Forevered</span>
+            <h3>NYC Degens</h3>
+            <div class="chain">Stacks · nyc-degens → forever-twin-nyc-degens</div>
+          </div>
+        </div>
+        <div class="col-body">NYC Degens holders can give their Degen a permanent on-chain twin, or swap which side stays liquid. Built on the new Forever Twins helper.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="n-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="n-status">—</div><div class="k">Migration status</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View NYC Degens →</span></div>
       </a>
 
     </div>
@@ -544,6 +563,17 @@ const COLLECTIONS = [
     statusEl: "m-status",
     cardEl: "m-card",
     stampEl: "m-stamp"
+  },
+  {
+    // Count + source total for NYC Degens (Forever Twins helper v3).
+    addr: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    name: "forever-twin-nyc-degens",
+    sourceAddr: "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ",
+    sourceName: "nyc-degens",
+    countEl: "n-inscribed",
+    statusEl: "n-status",
+    cardEl: "n-card",
+    stampEl: "n-stamp"
   }
 ];
 const API = "https://api.hiro.so";

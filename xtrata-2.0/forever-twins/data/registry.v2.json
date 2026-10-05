@@ -21,18 +21,27 @@
       "blurb": "The first three Forever Twins collections, built together with Fak.fun.",
       "accent": "#f7931a",
       "links": [
-        { "label": "Fak.fun", "url": "https://fak.fun" }
+        {
+          "label": "Fak.fun",
+          "url": "https://fak.fun"
+        }
       ],
-      "collections": ["bitcoin-pepes", "leo-cats", "miami-degens"]
+      "collections": [
+        "bitcoin-pepes",
+        "leo-cats",
+        "miami-degens"
+      ]
     },
     {
       "slug": "nyc-dgens",
       "name": "NYC DGENs",
-      "status": "coming-soon",
-      "blurb": "The NYC DGENs community page for the NYC Degens collection. The helper is not deployed yet, so there is nothing to inscribe or swap until it is finalised.",
+      "status": "live",
+      "blurb": "The NYC DGENs community page for the NYC Degens collection. The record is finalised: anyone can fund a twin, and holders can swap whenever they like.",
       "accent": "#1f5fe0",
       "links": [],
-      "collections": ["nyc-degens"]
+      "collections": [
+        "nyc-degens"
+      ]
     }
   ],
   "collections": [
@@ -49,7 +58,10 @@
       "sourceAsset": "bitcoin-pepe",
       "legacyPage": "/forever-twins/bitcoin-pepes/",
       "claimUrl": "https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
-      "theme": { "logo": "/forever-twins/assets/bitcoin-pepe-maxi.png", "accent": "#2f9e44" },
+      "theme": {
+        "logo": "/forever-twins/assets/bitcoin-pepe-maxi.png",
+        "accent": "#2f9e44"
+      },
       "blurb": "The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.",
       "manifest": null,
       "coverage": null
@@ -66,7 +78,10 @@
       "source": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
       "sourceAsset": "leo-cats",
       "legacyPage": "/forever-twins/leo-cats/",
-      "theme": { "logo": "/forever-twins/assets/leo-cat-forever-twin-logo-1.jpg", "accent": "#12b5a6" },
+      "theme": {
+        "logo": "/forever-twins/assets/leo-cat-forever-twin-logo-1.jpg",
+        "accent": "#12b5a6"
+      },
       "blurb": "LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata.",
       "manifest": null,
       "coverage": null
@@ -83,7 +98,10 @@
       "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
       "sourceAsset": "miami-degens",
       "legacyPage": "/forever-twins/miami-degens/",
-      "theme": { "logo": "/forever-twins/assets/miami-degens-forever-twin-logo.jpg", "accent": "#e8590c" },
+      "theme": {
+        "logo": "/forever-twins/assets/miami-degens-forever-twin-logo.jpg",
+        "accent": "#e8590c"
+      },
       "blurb": "Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid.",
       "manifest": null,
       "coverage": null
@@ -93,17 +111,24 @@
       "name": "NYC Degens",
       "itemNoun": "NYC Degen",
       "community": "nyc-dgens",
-      "status": "planned",
+      "status": "live",
       "interface": "v3",
       "group": "G1",
-      "helper": null,
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
       "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
       "sourceAsset": "nyc-degens",
       "legacyPage": null,
-      "theme": { "logo": null, "accent": "#1f5fe0" },
-      "blurb": "Cohort 1 for Milestone 1. Helper not yet deployed.",
+      "theme": {
+        "logo": null,
+        "accent": "#1f5fe0"
+      },
+      "blurb": "NYC Degens holders can give their Degen a permanent on-chain twin, or swap which side stays liquid. The first collection built with the Forever Twins helper, deployed and finalised from the Xtrata wallet.",
       "twinTokenUri": "https://xtrata.xyz/ft/nyc-degens/{id}.json",
-      "manifest": null,
+      "manifest": {
+        "url": "/ft/data/nyc-degens.manifest.json",
+        "sha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+        "count": 420
+      },
       "coverage": null
     },
     {
@@ -118,7 +143,10 @@
       "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
       "sourceAsset": "Megapont-Ape-Club",
       "legacyPage": null,
-      "theme": { "logo": null, "accent": "#7048e8" },
+      "theme": {
+        "logo": null,
+        "accent": "#7048e8"
+      },
       "blurb": "Cohort 2 for Milestone 1. Helper not yet deployed.",
       "twinTokenUri": "https://xtrata.xyz/ft/megapont-ape-club/{id}.json",
       "manifest": null,
@@ -136,7 +164,10 @@
       "source": "SP3M05ETW09E98NNFMFHT1WND3ZRX9DV31TFC6DFW.see-yourself-out",
       "sourceAsset": "see-yourself-out",
       "legacyPage": null,
-      "theme": { "logo": null, "accent": "#c2255c" },
+      "theme": {
+        "logo": null,
+        "accent": "#c2255c"
+      },
       "blurb": "Cohort 3 for Milestone 1. Helper not yet deployed.",
       "twinTokenUri": "https://xtrata.xyz/ft/see-yourself-out/{id}.json",
       "manifest": null,
