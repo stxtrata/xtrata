@@ -1,0 +1,13 @@
+{
+ "collectionKey": "nyc-degens",
+ "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+ "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+ "sourceAsset": "nyc-degens",
+ "group": "G1",
+ "payees": ["SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7", "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"],
+ "initialFeeUstx": 100000,
+ "maxFeeUstx": 5000000,
+ "rescueEnabled": true,
+ "rescueDelayBurnBlocks": 432,
+ "profileTier": "S"
+}
