@@ -11,6 +11,15 @@
       "manifestSha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
       "manifestStatus": "final",
       "_note": "Helper deployed and seeded 5 Oct 2026 via the launch canary; finalised only after production serves this exact manifest."
+    },
+    "megapont-ape-club": {
+      "label": "Megapont Ape Club",
+      "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+      "helper": null,
+      "manifestPath": "/ft/data/megapont-ape-club.manifest.json",
+      "manifestSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+      "manifestStatus": "draft",
+      "_note": "Helper not deployed yet. Set helper and manifestStatus final after the launch canary deploys and seeds it; finalise only after production serves this exact manifest."
     }
   }
 }
