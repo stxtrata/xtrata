@@ -6,11 +6,11 @@
     "nyc-degens": {
       "label": "NYC Degens",
       "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
-      "helper": null,
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
       "manifestPath": "/ft/data/nyc-degens.manifest.json",
       "manifestSha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
-      "manifestStatus": "draft",
-      "_note": "Set helper to the deployed helper contract id, and manifestStatus to final with the published manifest sha256, before finalising the helper."
+      "manifestStatus": "final",
+      "_note": "Helper deployed and seeded 5 Oct 2026 via the launch canary; finalised only after production serves this exact manifest."
     }
   }
 }
