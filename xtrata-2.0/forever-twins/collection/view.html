@@ -20,7 +20,8 @@
   .gcard button{width:100%;margin-top:auto}
   .gcard .msg{margin-top:0;font-size:12px}
   .gcard .pic{position:relative}
-  .gcard .ph{width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--mute);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
+  .gcard .ph small{display:block;font-size:11px;font-weight:500;margin-top:6px;padding:0 10px;text-align:center}
+  .gcard .ph{flex-direction:column;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--mute);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
   .gcard .tag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 8px;border-radius:999px;background:var(--panel);border:1px solid currentColor}
   .gcard.done{border:2px solid var(--ok)} .gcard.done .tag{color:var(--ok)}
   .gcard.todo{border:2px solid var(--warn)} .gcard.todo .tag{color:var(--warn)}
@@ -119,7 +120,7 @@
 <script type="module">
 import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js';
 import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js';
-import { fetchArt, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js';
+import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -480,20 +481,31 @@ async function twinToken(v, out) {
 }
 // Show the original art on a card that has no twin yet: token URI -> metadata -> image, trying each gateway.
 async function previewOriginal(t, c) {
+  const ph = () => c.el.querySelector('.ph');
+  const miss = (why) => { const p = ph(); if (p) p.innerHTML = `#${t}<small>${esc(why)}</small>`; };
   try {
     const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(t))]));
-    if (!uri) return;
-    let meta = null;
-    for (const u of uriCandidates(uri, t)) {
-      try { const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 8000); const r = await fetch(u, { signal: ctl.signal }); clearTimeout(to); if (r.ok) { meta = JSON.parse(await r.text()); break; } } catch {}
-    }
-    const image = meta && imageFrom(meta); if (!image) return;
-    const urls = uriCandidates(image, t); if (!urls.length) return;
-    const img = new Image(); img.alt = `${coll.itemNoun} #${t}`; let i = 0;
-    img.onerror = () => { i += 1; if (i < urls.length) img.src = urls[i]; };
-    img.onload = () => { const ph = c.el.querySelector('.ph'); if (ph) ph.replaceWith(img); };
-    img.src = urls[0];
-  } catch {}
+    if (!uri) return miss('No token URI');
+    let image = null;
+    try { image = imageFrom((await firstOk(uriCandidates(uri, t), 'json', fetch)).json); } catch {}
+    if (!image) return miss('Original art not reachable right now');
+    const urls = uriCandidates(image, t); if (!urls.length) return miss('Original art not reachable right now');
+    // load every gateway at once as an <img> and keep whichever answers first
+    const img = await new Promise((resolve) => {
+      let left = urls.length; const tries = [];
+      const done = (el) => { for (const x of tries) if (x !== el) x.src = ''; resolve(el); };
+      for (const u of urls) {
+        const im = new Image(); tries.push(im);
+        im.onload = () => done(im);
+        im.onerror = () => { if (--left === 0) resolve(null); };
+        im.src = u;
+      }
+      setTimeout(() => resolve(null), 15000);
+    });
+    if (!img) return miss('Original art not reachable right now');
+    img.alt = `${coll.itemNoun} #${t}`; img.onload = img.onerror = null;
+    const p = ph(); if (p) p.replaceWith(img);
+  } catch { miss('Original art not reachable right now'); }
 }
 function summariseMine() {
   let done = 0, todo = 0;
