@@ -8408,6 +8408,8 @@
     .home-bounty__words strong { font-size: 16px; font-weight: 800; }
     .home-bounty__words span { color: #c3cbd0; font-size: 14px; line-height: 1.45; }
     .home-bounty__foot { margin: 0; color: var(--home-muted); font-size: 13px; }
+    .home-btn--tickets { flex-direction: column; gap: 2px; padding-top: 6px; padding-bottom: 6px; }
+    .home-btn--tickets small { color: var(--home-muted); font: 500 11px var(--home-mono); letter-spacing: 0.04em; }
     @media (max-width: 1060px) {
       .home-bounty.home-panel { grid-template-columns: 1fr; }
     }

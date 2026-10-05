@@ -22,12 +22,39 @@ const AUDIONAUTS_LIVE = Boolean(AUDIONAUTS_MINT_HREF) && AUDIONAUTS_MS_TO_LAUNCH
 const AUDIONAUTS_TONIGHT = AUDIONAUTS_MS_TO_LAUNCH > 0 && AUDIONAUTS_MS_TO_LAUNCH < 24 * 60 * 60 * 1000;
 const AUDIONAUTS_WHEN = AUDIONAUTS_TONIGHT ? 'tonight, 7pm BST' : 'Thu 1 Oct, 7pm BST';
 
+// Ticket tracker for the Zero Authority DAO x Xtrata bounty: a static page in
+// public/bounty/zdao/tracker/1/ that reads ticket-earning contract calls live from the chain.
+// It opens in the same tab. When the bounty closes the same link reads as the final results;
+// it is never removed.
+export const BOUNTY_TRACKER_HREF = '/bounty/zdao/tracker/1/';
+// The bounty closes at the end of 21 October 2026, UK time (BST). Change this one value to
+// move the moment the tracker link switches to "See the final results".
+export const BOUNTY_ENDS_AT = '2026-10-21T23:00:00Z';
+
+export function bountyTrackerLink(now = Date.now()) {
+  const final = now >= Date.parse(BOUNTY_ENDS_AT);
+  return Object.freeze(
+    final
+      ? {
+          href: BOUNTY_TRACKER_HREF, final: true, tag: 'Results',
+          label: 'See the final results', title: 'The bounty has closed.',
+          line: 'Final raffle tickets for #XtrataBounty'
+        }
+      : {
+          href: BOUNTY_TRACKER_HREF, final: false, tag: 'Live',
+          label: 'Check your tickets', title: 'Check your raffle tickets.',
+          line: 'Live raffle tickets for #XtrataBounty'
+        }
+  );
+}
+
 // The Create. Inscribe. Share. bounty, 1 to 21 October 2026. PDFs live in public/bounty/.
 export const HOMEPAGE_BOUNTY = Object.freeze({
   tag: '#XtrataBounty',
   guideHref: '/bounty/xtrata-bounty-at-a-glance.pdf',
   rulesHref: '/bounty/xtrata-bounty-full-rules.pdf',
   telegramHref: 'https://t.me/+DSYbDCWx869hOWY0',
+  tracker: bountyTrackerLink(PAGE_LOADED_AT),
   stats: Object.freeze([
     Object.freeze(['500 STX', 'in prizes']),
     Object.freeze(['19', 'prizes to win']),
@@ -48,6 +75,12 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     title: '500 STX bounty: Create. Inscribe. Share.',
     line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
     cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
+  }),
+  // Same-tab link to the live ticket tracker (no newTab). Reads as the final results after 21 Oct.
+  Object.freeze({
+    id: 'bounty-tickets', tag: HOMEPAGE_BOUNTY.tracker.tag, tone: 'lime',
+    title: HOMEPAGE_BOUNTY.tracker.title, line: HOMEPAGE_BOUNTY.tracker.line,
+    cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
   }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
@@ -352,7 +385,7 @@ export const validateHomepageContent = () => {
       errors.push(`Homepage wall tile ${item.id} needs an image.`);
     }
   });
-  [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref].forEach((href) => {
+  [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref, HOMEPAGE_BOUNTY.tracker.href].forEach((href) => {
     if (!isNavigableHref(href)) {
       errors.push('Homepage bounty links must be navigable.');
     }

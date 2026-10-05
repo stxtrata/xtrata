@@ -570,11 +570,15 @@ const renderBounty = () => {
     stat.append(element('strong', '', value), element('span', '', label));
     stats.append(stat);
   });
+  // Live ticket tracker: same tab, label and line come from the content config.
+  const ticketsLink = actionLink(b.tracker.href, b.tracker.label, 'home-btn home-btn--ghost home-btn--tickets', 'bounty:tickets');
+  ticketsLink.replaceChildren(element('span', '', b.tracker.label), element('small', '', b.tracker.line));
   const actions = element('div', 'home-bounty__actions');
   actions.append(
     actionLink(b.guideHref, 'See how to enter', 'home-btn home-btn--solid', 'bounty:guide', { newTab: true }),
     actionLink(b.rulesHref, 'Full rules', 'home-btn home-btn--ghost', 'bounty:rules', { newTab: true }),
-    actionLink(b.telegramHref, 'Join the Telegram', 'home-btn home-btn--ghost', 'bounty:telegram', { newTab: true })
+    actionLink(b.telegramHref, 'Join the Telegram', 'home-btn home-btn--ghost', 'bounty:telegram', { newTab: true }),
+    ticketsLink // last, so the three original buttons keep their row and this one sits beneath them
   );
   copy.append(tags, title, body, stats, actions);
   const steps = element('ol', 'home-bounty__steps');
