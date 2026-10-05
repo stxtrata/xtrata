@@ -2,9 +2,10 @@
 // This is the token URI recorded in each helper's canonical record (permanent once finalised).
 // It returns SIP-16 style metadata for the twin of original token <id>: the preserved on-chain bytes
 // (via the Xtrata inscription route) plus provenance (original contract and id, hashes, manifest, snapshot).
-// Read-only: GETs the manifest asset and one Hiro read-only call (helper get-binding). No keys, no writes.
+// Read-only: GETs the manifest asset and one Hiro read-only call (helper get-binding). No writes.
 import { cvToHex, cvToJSON, hexToCV, uintCV } from '@stacks/transactions';
 import resolverConfig from '../collections.json';
+import { getHiroApiKeys } from '../lib/hiro-keys';
 import {
   buildTwinMetadata,
   cacheControlFor,
@@ -16,7 +17,7 @@ import {
 } from '../lib';
 
 type Fetcher = { fetch: (request: Request) => Promise<Response> };
-type Env = { ASSETS: Fetcher; HIRO_API_KEY?: string };
+type Env = Record<string, unknown> & { ASSETS: Fetcher };
 
 const config = resolverConfig as unknown as ResolverConfig;
 const HIRO = 'https://api.hiro.so';
@@ -31,17 +32,30 @@ const json = (body: unknown, status: number, cache: string) =>
     }
   });
 
-const readBinding = async (helper: string, id: number, apiKey?: string): Promise<TwinState> => {
+const readBinding = async (helper: string, id: number, env: Env): Promise<TwinState> => {
   const [address, name] = helper.split('.');
-  const res = await fetch(`${HIRO}/v2/contracts/call-read/${address}/${name}/get-binding`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) },
-    body: JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(id))] })
-  });
-  if (!res.ok) throw new Error(`Hiro ${res.status}`);
-  const body = (await res.json()) as { okay?: boolean; result?: string };
-  if (!body.okay || !body.result) throw new Error('read-only call failed');
-  const parsed = cvToJSON(hexToCV(body.result)) as { value?: { value?: Record<string, { value?: string }> } | null };
+  const url = `${HIRO}/v2/contracts/call-read/${address}/${name}/get-binding`;
+  const body = JSON.stringify({ sender: address, arguments: [cvToHex(uintCV(id))] });
+  // Try each configured key (a list may be newline/comma separated), rotating on 401/403/429, then keyless.
+  const attempts: Array<string | null> = [...getHiroApiKeys(env), null];
+  let res: Response | undefined;
+  for (const key of attempts) {
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(key ? { 'x-api-key': key } : {}) },
+        body
+      });
+    } catch {
+      res = undefined;
+      continue;
+    }
+    if (![401, 403, 429].includes(res.status)) break;
+  }
+  if (!res || !res.ok) throw new Error(`Hiro ${res ? res.status : 'unreachable'}`);
+  const reply = (await res.json()) as { okay?: boolean; result?: string };
+  if (!reply.okay || !reply.result) throw new Error('read-only call failed');
+  const parsed = cvToJSON(hexToCV(reply.result)) as { value?: { value?: Record<string, { value?: string }> } | null };
   const tuple = parsed.value && (parsed.value as { value?: Record<string, { value?: string }> }).value;
   const xtrata = tuple?.['xtrata-id']?.value;
   return xtrata ? { status: 'inscribed', xtrataId: BigInt(xtrata) } : { status: 'not-inscribed' };
@@ -79,10 +93,10 @@ export const onRequest = async ({
     state = { status: 'helper-not-deployed' };
   } else {
     try {
-      state = await readBinding(collection.helper, id, env.HIRO_API_KEY);
-    } catch {
+      state = await readBinding(collection.helper, id, env);
+    } catch (err) {
       // Never cache a guess: if the chain read fails, say so.
-      return json({ error: 'could not read the helper contract right now' }, 503, 'no-store');
+      return json({ error: 'could not read the helper contract right now', detail: err instanceof Error ? err.message : 'unknown' }, 503, 'no-store');
     }
   }
 
