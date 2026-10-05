@@ -119,9 +119,9 @@
 </div></footer>
 
 <script type="module">
-import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js';
-import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js';
-import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js';
+import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261005b';
+import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261005b';
+import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261005b';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -293,11 +293,14 @@ function renderActions() {
   if (!view.binding) {
     if (!view.canonical) parts.push(`<div class="msg warn">${coll.interface === 'v1' ? 'This token has not been added to the helper’s record yet, so it cannot be twinned.' : 'This token is not in the finalised record, so it cannot be twinned.'}</div>`);
     else if (isLargeTotal(view.canonical.totalSize)) parts.push('<div class="msg warn">This token’s art is over 512 KB. It is inscribed by the collection owner before launch and cannot be inscribed from this page.</div>');
-    else parts.push(`<p>No twin yet. Anyone can fund this twin; funding gives no claim on the original.</p>
-      <div class="row"><button id="prepBtn" type="button">Fetch and verify the art</button>
+    else parts.push(`<p>No twin yet. Anyone can fund this twin, whoever holds the original; funding gives no claim on it.</p>
+      <div class="row"><button id="twinBtn" type="button">Twin this ${esc(coll.itemNoun)}</button></div>
+      <div class="gs" id="twinCost">Working out the cost…</div><div id="twinOut"></div>
+      <details class="spaced"><summary class="mute small">Advanced: check the art yourself or choose the file</summary>
+      <div class="row"><button id="prepBtn" type="button" class="ghost">Fetch and verify the art</button>
       <label class="mute small">or choose the file <input id="artFile" type="file"></label></div>
       <div id="prepOut"></div>
-      <div class="row spaced"><button id="inscribeBtn" type="button" disabled>Inscribe twin</button><span id="feeOut" class="mute"></span></div>`);
+      <div class="row spaced"><button id="inscribeBtn" type="button" disabled>Inscribe twin</button><span id="feeOut" class="mute"></span></div></details>`);
   } else {
     const dir = adapter.validSwap(view);
     const mine = !!wallet && view.liquidOwner === wallet;
@@ -311,6 +314,11 @@ function renderActions() {
     else if (!view.custody.consistent) parts.push('<div class="msg bad">Custody does not match the stored flag, so swapping is disabled.</div>');
   }
   out.innerHTML = parts.join('');
+  if ($('twinBtn')) {
+    const v0 = view;
+    costText(v0).then((t) => { if ($('twinCost') && view === v0) $('twinCost').textContent = t; });
+    $('twinBtn').addEventListener('click', async (ev) => { const b = ev.currentTarget; b.disabled = true; if (!(await twinToken(v0, $('twinOut')))) b.disabled = false; });
+  }
   $('prepBtn')?.addEventListener('click', prepareArt);
   $('artFile')?.addEventListener('change', (e) => e.target.files[0] && prepareFromFile(e.target.files[0]));
   $('inscribeBtn')?.addEventListener('click', doInscribe);
@@ -495,8 +503,20 @@ async function heldIds(principal, assetId, wantOnly) {
   }
   return ids;
 }
+// What it costs to twin this token, in words. v3 records hold the file size; v1 helpers do not.
+async function costText(v) {
+  try {
+    if (v.canonical.totalSize != null) {
+      const q = await adapter.quoteInscribeFee(coll, wallet || 'SP000000000000000000002Q6VF78', v.canonical.totalSize, Math.ceil(v.canonical.totalSize / 16384));
+      return `Cost about ${(Number(q.total) / 1e6).toFixed(3)} STX (helper ${Number(q.app) / 1e6} + Xtrata ${(Number(q.master) / 1e6).toFixed(3)}) plus the network fee`;
+    }
+    const q = await adapter.quoteInscribeFee(coll, wallet || 'SP000000000000000000002Q6VF78', 0, 0);
+    return `Helper fee ${q.app === 0n ? 'free' : Number(q.app) / 1e6 + ' STX'}, plus Xtrata’s storage fee and the network fee. The exact total is shown in your wallet.`;
+  } catch { return 'The exact cost is shown in your wallet.'; }
+}
 async function twinToken(v, out) {
   try {
+    if (!wallet) throw new Error('Connect a wallet first. Anyone can fund a twin; it gives no claim on the original.');
     const pb = payeeBlock(); if (pb) throw new Error(pb);
     out.innerHTML = '<div class="msg">Fetching the original art…</div>';
     const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(v.tokenId))]));
@@ -577,16 +597,7 @@ async function paintMine(t) {
     body.innerHTML = `${idHtml}<div class="gs">No permanent twin yet. Anyone can fund one, and it gives no claim on the original.</div>${action}`;
     const btn = body.querySelector('button');
     if (btn) {
-      try {
-        if (v.canonical.totalSize != null) {
-          const q = await adapter.quoteInscribeFee(coll, wallet, v.canonical.totalSize, Math.ceil(v.canonical.totalSize / 16384));
-          body.querySelector('.cost').textContent = `Cost about ${(Number(q.total) / 1e6).toFixed(3)} STX (helper ${Number(q.app) / 1e6} + Xtrata ${(Number(q.master) / 1e6).toFixed(3)}) plus the network fee`;
-        } else {
-          // Original helpers do not store the file size, so only the helper's own fee is known before the art is fetched.
-          const q = await adapter.quoteInscribeFee(coll, wallet, 0, 0);
-          body.querySelector('.cost').textContent = `Helper fee ${q.app === 0n ? 'free' : Number(q.app) / 1e6 + ' STX'}, plus Xtrata’s storage fee and the network fee. The exact total is shown in your wallet.`;
-        }
-      } catch { body.querySelector('.cost').textContent = 'The exact cost is shown in your wallet.'; }
+      body.querySelector('.cost').textContent = await costText(v);
       btn.addEventListener('click', async () => {
         btn.disabled = true;
         const ok = await twinToken(v, body.querySelector('.gm'));
@@ -728,7 +739,7 @@ async function boot() {
   $('connectBtn').addEventListener('click', connect);
 
   try {
-    chain = await import('/forever-twins/assets/xtrata-forever-twins.js');
+    chain = await import('/forever-twins/assets/xtrata-forever-twins.js?v=20261005b');
     adapter = createAdapter({ read, core: { contract: reg.core.contract, assetName: reg.core.assetName },
       cl: { uint: (n) => chain.Cl.uint(BigInt(n)), principal: (p) => chain.Cl.principal(p), buffer: (b) => chain.Cl.buffer(b), list: (l) => chain.Cl.list(l), ascii: (t) => chain.Cl.stringAscii(t) } });
     try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
