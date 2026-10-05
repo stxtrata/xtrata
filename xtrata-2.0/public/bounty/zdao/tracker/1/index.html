@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Xtrata Bounty Ticket Tracker</title>
+<meta name="description" content="Check your #XtrataBounty raffle tickets by wallet or X handle, see how to make them valid and follow the three draws.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one dark editorial sheet like the bounty PDFs. Hero with the pool total, a wallet checker, the route to a valid ticket, ways to earn, the draw calendar and a full leaderboard. */
+:root {
+  --bg: #0a0c0f; --panel: #11151a; --panel2: #151a20; --line: #232a31; --line2: #2f3841;
+  --fg: #f2f5f3; --mute: #9aa6a1; --dim: #66726d;
+  --lime: #bdf26d; --lime-ink: #10200a; --teal: #5fe0be; --lav: #aa9cf6; --amber: #f5a54a; --red: #f26f62;
+  --lime-soft: #1a2410; --amber-soft: #2a1e0e; --red-soft: #2a1412; --teal-soft: #0f2420; --lav-soft: #1b1830;
+  --display: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--display); font-size: 15px; line-height: 1.5; }
+.sheet { max-width: 1040px; margin: 0 auto; padding-inline: 20px; padding-block: 24px 40px; display: flex; flex-direction: column; gap: 28px; }
+a { color: inherit; }
+.mono { font-family: var(--mono); }
+.label { font: 500 11px/1.3 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--mute); }
+.label.lime { color: var(--lime); } .label.teal { color: var(--teal); } .label.lav { color: var(--lav); } .label.amber { color: var(--amber); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-weight: 800; font-size: clamp(22px, 3.4vw, 28px); letter-spacing: -.01em; }
+.serif { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--lime); }
+
+/* top bar */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 12px/1 var(--mono); letter-spacing: .16em; }
+.brand .x { opacity: .5; }
+.brand .dao { border: 1.5px solid var(--fg); border-radius: 4px; padding: 6px 9px; }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 32px; align-items: end; }
+.hero h1 { font-weight: 800; font-size: clamp(40px, 8.4vw, 76px); line-height: .95; letter-spacing: -.035em; }
+.hero .tag { font-family: var(--serif); font-style: italic; font-size: clamp(20px, 3vw, 28px); color: var(--lime); margin: 12px 0 0; }
+.big { text-align: right; }
+.big b { display: block; font: 800 clamp(56px, 10vw, 96px)/.9 var(--display); color: var(--lime); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.big span { font: 500 11px/1.3 var(--mono); letter-spacing: .14em; color: var(--mute); text-transform: uppercase; }
+.fresh { display: flex; align-items: center; gap: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 4px var(--lime-soft); }
+
+/* stat strip */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow: hidden; }
+.stat { padding: 16px 18px; border-right: 1px solid var(--line); min-width: 0; }
+.stat:last-child { border-right: 0; }
+.stat b { display: block; font: 700 clamp(26px, 4vw, 36px)/1.05 var(--display); font-variant-numeric: tabular-nums; }
+.stat span { color: var(--mute); font-size: 13px; }
+
+/* checker */
+.checker { background: var(--panel); border: 1px solid var(--line2); border-radius: 14px; padding: clamp(16px, 3vw, 26px); display: flex; flex-direction: column; gap: 16px; }
+.checker h2 { margin-top: 4px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.row input { flex: 1 1 260px; min-width: 0; background: var(--bg); color: var(--fg); border: 1.5px solid var(--line2); border-radius: 10px; padding: 13px 14px; font: 500 15px var(--mono); }
+.row input::placeholder { color: var(--dim); }
+.row input:focus { outline: none; border-color: var(--lime); }
+button { font: inherit; cursor: pointer; }
+.btn { background: var(--lime); color: var(--lime-ink); border: 0; border-radius: 10px; padding: 13px 20px; font-weight: 700; }
+.btn:hover { filter: brightness(1.08); }
+.ghost { background: transparent; color: var(--mute); border: 1px solid var(--line2); border-radius: 999px; padding: 6px 12px; font: 500 12px var(--mono); }
+.ghost:hover { color: var(--fg); border-color: var(--mute); }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+.hint { color: var(--mute); font-size: 13px; }
+
+.result { display: flex; flex-direction: column; gap: 14px; }
+.who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; justify-content: space-between; }
+.who .addr { font: 600 15px var(--mono); overflow-wrap: anywhere; }
+.pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 11px; font: 600 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; border: 1px solid transparent; white-space: nowrap; }
+.pill.ok { background: var(--lime-soft); color: var(--lime); border-color: #3a5018; }
+.pill.wait { background: var(--amber-soft); color: var(--amber); border-color: #5a3d14; }
+.pill.win { background: var(--lav-soft); color: var(--lav); border-color: #3d3670; }
+.score { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 20px; align-items: center; }
+.score b { font: 800 clamp(54px, 9vw, 80px)/.9 var(--display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.score b.ok { color: var(--lime); } .score b.wait { color: var(--amber); }
+.score p { margin: 0; color: var(--mute); }
+.kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.kind { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--panel2); display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kind .k { font-size: 14px; font-weight: 600; }
+.kind .v { font: 500 12px var(--mono); color: var(--mute); }
+.kind .t { font: 700 12px var(--mono); color: var(--lime); letter-spacing: .06em; }
+.kind.off { background: transparent; border-style: dashed; }
+.kind.off .k { color: var(--mute); font-weight: 500; }
+.kind.off .t { color: var(--dim); }
+.kind.held .t { color: var(--amber); }
+.next { border-radius: 12px; padding: 14px 16px; border: 1px solid; display: flex; flex-direction: column; gap: 6px; }
+.next.wait { background: var(--amber-soft); border-color: #5a3d14; }
+.next.ok { background: var(--lime-soft); border-color: #3a5018; }
+.next b { font-size: 16px; }
+.next p { margin: 0; color: #d3dad6; }
+.next a { color: var(--lime); text-underline-offset: 3px; }
+.note { font-size: 13px; color: var(--mute); }
+.matches { display: flex; flex-direction: column; gap: 6px; }
+.matches button { text-align: left; background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font: 500 13px var(--mono); }
+.matches button:hover { border-color: var(--lime); }
+
+/* sections */
+section { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.head { display: flex; flex-direction: column; gap: 4px; }
+.head p { margin: 0; color: var(--mute); max-width: 62ch; }
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.card .n { font: 800 26px/1 var(--mono); color: var(--lime); }
+.card h3 { font-size: 16px; font-weight: 700; }
+.card p { margin: 0; color: var(--mute); font-size: 14px; }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.box { border-radius: 12px; padding: 16px 18px; border: 1px solid; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.box.yes { background: var(--lime-soft); border-color: #3a5018; }
+.box.no { background: var(--red-soft); border-color: #5a2520; }
+.box ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.box li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; font-size: 14px; color: #dfe6e2; }
+.box.yes li::before { content: "✓"; color: var(--lime); font-weight: 700; }
+.box.no li::before { content: "✕"; color: var(--red); font-weight: 700; }
+
+.ways { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.way { border: 1.5px dashed var(--line2); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; background: var(--panel); min-width: 0; text-decoration: none; }
+a.way:hover { border-color: var(--lime); }
+.way.first { border-style: solid; border-color: #3a5018; background: var(--lime-soft); }
+.way b { font-size: 15px; }
+.way .plus { font: 600 11px var(--mono); letter-spacing: .1em; color: var(--lime); }
+.way .live { font: 500 11px var(--mono); color: var(--mute); margin-top: auto; }
+.way .live.on { color: var(--teal); }
+.example { background: var(--teal-soft); border: 1px solid #1d4a40; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.bar { display: flex; gap: 4px; }
+.bar i { height: 10px; flex: 1; border-radius: 3px; background: var(--line2); }
+.bar i.f { background: var(--lime); }
+.bar i.f2 { background: var(--teal); }
+
+.weeks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.week { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--teal); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.week.w2 { border-top-color: var(--lav); } .week.w3 { border-top-color: var(--amber); }
+.week b { font-size: 17px; }
+.week p { margin: 0; color: var(--mute); font-size: 14px; }
+.week .draw { font: 600 12px var(--mono); letter-spacing: .06em; }
+.week.past { opacity: .6; }
+
+.board { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 640px; }
+th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--mute); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.tk { font: 700 16px var(--mono); }
+td.tk.ok { color: var(--lime); } td.tk.wait { color: var(--dim); }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--panel2); }
+tr:last-child td { border-bottom: 0; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font: 500 11px var(--mono); border: 1px solid var(--line2); border-radius: 6px; padding: 2px 7px; color: var(--mute); }
+.more { align-self: flex-start; }
+.empty { padding: 28px 16px; color: var(--mute); text-align: center; }
+
+.foot { border: 1px solid var(--line2); border-radius: 12px; padding: 18px 20px; display: flex; flex-wrap: wrap; gap: 14px 28px; justify-content: space-between; align-items: center; background: var(--panel); }
+.foot .l { display: flex; flex-direction: column; gap: 4px; font: 500 12px/1.5 var(--mono); color: var(--mute); }
+.foot .l a { color: var(--fg); }
+.foot .r { text-align: right; font-size: 14px; color: var(--mute); }
+.foot .r b { color: var(--fg); display: block; }
+
+@media (max-width: 860px) {
+  .steps, .ways { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .weeks { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .hero { grid-template-columns: 1fr; } .big { text-align: left; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat:nth-child(2) { border-right: 0; } .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .steps, .ways, .two { grid-template-columns: 1fr; }
+  .foot .r { text-align: left; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+
+.stps { display: grid; gap: 8px; }
+.stp { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); }
+.stp .mark { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 13px var(--mono); border: 1.5px solid var(--line2); color: var(--dim); }
+.stp b { font-size: 15px; } .stp p { margin: 2px 0 0; color: var(--mute); font-size: 14px; }
+.stp.done { border-color: #3a5018; } .stp.done .mark { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.stp.todo { border-color: #5a3d14; background: var(--amber-soft); } .stp.todo .mark { border-color: var(--amber); color: var(--amber); }
+.stp.next .mark { border-color: var(--teal); color: var(--teal); }
+.stp.wait { opacity: .65; }
+.heldtag { font: 500 11px var(--mono); color: var(--amber); }
+.faq { display: flex; flex-direction: column; gap: 8px; }
+.faq details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq p { margin: 8px 0 0; color: var(--mute); max-width: 70ch; }
+.fresh .ghost { padding: 3px 10px; }
+</style>
+
+</head>
+<body>
+<main class="sheet">
+  <header class="top">
+    <div class="brand"><span>XTRATA</span><span class="x">×</span><span class="dao">ZERO AUTHORITY DAO</span></div>
+    <div class="label">Ticket tracker</div>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div class="label lime fresh"><span class="dot"></span><span id="fresh">Reading the chain…</span><button class="ghost" id="refresh" type="button" style="margin-left:8px">Refresh</button></div>
+      <h1 style="margin-top:12px">Check your tickets.</h1>
+      <p class="tag">One inscription gets you in. Everything else improves your odds.</p>
+    </div>
+    <div class="big"><b id="bigN">0</b><span>tickets in the draw</span></div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <section class="checker" aria-labelledby="chk-h">
+    <div class="head">
+      <div class="label lime">Your wallet</div>
+      <h2 id="chk-h">See where you stand</h2>
+    </div>
+    <form class="row" id="form" autocomplete="off">
+      <input id="q" type="text" inputmode="text" spellcheck="false" placeholder="Wallet address (SP…) or X handle" aria-label="Wallet address or X handle">
+      <button class="btn" type="submit">Check tickets</button>
+    </form>
+    <div class="row" style="align-items:center">
+      <span class="hint">No wallet to hand?</span>
+      <button class="ghost" type="button" id="example">See an example</button>
+    </div>
+    <div id="result" class="result" aria-live="polite"></div>
+  </section>
+
+  <section id="how">
+    <div class="head">
+      <div class="label teal">Make your tickets count</div>
+      <h2>One X account. One wallet. Used for everything.</h2>
+      <p>Every ticket is counted straight from the blockchain, so the team needs to know which wallet is yours. Pick one wallet and use it for every step.</p>
+    </div>
+    <div class="steps">
+      <div class="card"><div class="n">1</div><h3>Announce your wallet</h3><p>Post from X: "I'm entering #XtrataBounty with wallet SP…" and tag @XtrataLayers.</p></div>
+      <div class="card"><div class="n">2</div><h3>Inscribe first</h3><p>Inscribe something new through Xtrata with that wallet on or after 1 October. That is ticket 1 and it unlocks the rest.</p></div>
+      <div class="card"><div class="n">3</div><h3>Keep using it</h3><p>Play, collect, post scores and trade from the same wallet. Each different action adds a ticket.</p></div>
+      <div class="card"><div class="n">4</div><h3>Submit by 21 Oct</h3><p>Send your X handle, wallet and inscription IDs in the Xtrata Telegram.</p></div>
+    </div>
+    <div class="two">
+      <div class="box yes">
+        <div class="label lime">Your tickets count when all three are true</div>
+        <ul>
+          <li>The wallet is announced from your X account.</li>
+          <li>That wallet has made an Xtrata inscription, or collected an Audionaut, on or after 1 October.</li>
+          <li>Each action was done by that same wallet during the challenge.</li>
+        </ul>
+      </div>
+      <div class="box no">
+        <div class="label" style="color:var(--red)">These will not count</div>
+        <ul>
+          <li>Anything done with a different wallet, or before your wallet has inscribed.</li>
+          <li>Anything from before 1 October.</li>
+          <li>A second wallet on the same X account, or one wallet announced by two accounts.</li>
+          <li>Switching wallets halfway through.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="earn">
+    <div class="head">
+      <div class="label teal">Ways to earn</div>
+      <h2>Use Xtrata. Earn raffle tickets.</h2>
+      <p>Your inscription is your first ticket and puts you in the draw. Each other different action adds one more, so more actions mean better odds.</p>
+    </div>
+    <div class="ways" id="ways"></div>
+    <div class="example">
+      <div class="label teal">Example</div>
+      <div>Inscribe a song and you are in the draw with 1 ticket. Play some tracks in the Lounge and post a high score and you have 3.</div>
+      <div class="bar" aria-hidden="true"><i class="f"></i><i class="f2"></i><i class="f2"></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="label">3 of 8 tickets · in the draw from ticket 1</div>
+    </div>
+  </section>
+
+  <section id="draws">
+    <div class="head">
+      <div class="label lav">The draws</div>
+      <h2>Three weeks, three draws</h2>
+      <p>Tickets carry forward. A ticket stays in the pool for every draw until its wallet is picked. Winners are announced in the Telegram and the main prizes on Wednesday 28 October.</p>
+    </div>
+    <div class="weeks" id="weeks"></div>
+  </section>
+
+  <section id="board">
+    <div class="head">
+      <div class="label lime">Leaderboard</div>
+      <h2>Every wallet on the board</h2>
+      <p id="boardNote"></p>
+    </div>
+    <div class="board"><table>
+      <thead><tr><th class="num">#</th><th>Wallet</th><th>X handle</th><th>Status</th><th class="num">Tickets</th><th>Activity</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <button class="ghost more" id="more" type="button" hidden></button>
+  </section>
+
+  <section id="faq">
+    <div class="head">
+      <div class="label amber">Questions</div>
+      <h2>Why does my wallet show…</h2>
+    </div>
+    <div class="faq">
+      <details><summary>I inscribed but I have no tickets</summary><p>Tickets only count for the wallet that made the inscription. Check that you inscribed through Xtrata on or after 1 October with the same wallet you are searching, then press Refresh. New actions appear a few minutes after they confirm on chain.</p></details>
+      <details><summary>My wallet is not listed</summary><p>The board lists every wallet that has made an inscription, collected an Audionaut or used a ticket action since 1 October. If you have done none of these with that wallet yet, it will not appear. A wallet that has not inscribed has no tickets in the draw.</p></details>
+      <details><summary>Why are my tickets "held"?</summary><p>An inscription or an Audionaut is ticket 1 and it unlocks the rest. Until your wallet has one, other actions are counted but not entered. They switch on the moment you inscribe or collect.</p></details>
+      <details><summary>Do repeat actions add more tickets?</summary><p>Each different action adds one ticket, so playing ten songs is one ticket. Every high score you commit on-chain is its own ticket.</p></details>
+      <details><summary>I use more than one wallet</summary><p>Only one wallet per X account counts, and it must be the one you announced. Do everything with that wallet.</p></details>
+      <details><summary>Where do winners get announced?</summary><p>Weekly raffle winners are announced in the Xtrata Telegram. Main prizes and special awards are announced on Wednesday 28 October.</p></details>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <div class="l">
+      <span>xtrata.xyz · #XtrataBounty</span>
+      <span>TELEGRAM + SUBMIT: <a href="https://t.me/+DSYbDCWx869hOWY0" target="_blank" rel="noopener">t.me/+DSYbDCWx869hOWY0</a></span>
+      <span>FOLLOW @XtrataLayers @jimdotbtc @zeroauthdao</span>
+    </div>
+    <div class="r"><b>500 STX co-funded 50/50 by</b>Xtrata and Zero Authority DAO</div>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var SNAP = {"at":"2026-10-05T21:26:19Z","addrs":[{"a":"SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ","n":{"ins":2,"sc":2}},{"a":"SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7","n":{"aud":1,"sc":1},"h":"@jimdotbtc"},{"a":"SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q","n":{"aud":1}},{"a":"SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC","n":{"aud":1,"sc":3}},{"a":"SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB","n":{"ins":2}},{"a":"SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G","n":{"ins":2}},{"a":"SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9","n":{"aud":1,"sc":8}},{"a":"SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR","n":{"ins":1}},{"a":"SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0","n":{"sc":6}},{"a":"SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW","n":{"mu":6}},{"a":"SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY","n":{"aud":1}},{"a":"SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B","n":{"sc":1}},{"a":"SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA","n":{"sc":2}},{"a":"SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP","n":{"aud":3}},{"a":"SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K","n":{"mu":651}},{"a":"SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8","n":{"aud":1}}]};
+  var CUTOFF = '2026-10-01T00:00:00Z';
+  var DRAWS = ['2026-10-07T22:59:59Z', '2026-10-14T22:59:59Z', '2026-10-21T22:59:59Z'];
+  var DEP = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
+  var AUD = 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746';
+  function $(i) { return document.getElementById(i); }
+  function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+  function short(a) { return a.length > 16 ? a.slice(0, 7) + '…' + a.slice(-6) : a; }
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function when(v, withTime) {
+    try { return new Date(v).toLocaleString('en-GB', Object.assign({ timeZone: 'Europe/London', weekday: 'short', day: 'numeric', month: 'short' }, withTime ? { hour: '2-digit', minute: '2-digit' } : {})) + (withTime ? ' BST' : ''); } catch (e) { return ''; }
+  }
+
+  // ---- Ticket kinds. To add a new ticket, add a KINDS row, a ways row and a SOURCES row. ----
+  // per: 'one' = one ticket for the kind, 'each' = one ticket for every action.
+  var KINDS = [
+    { k: 'ins', name: 'Inscription', unit: 'inscription', per: 'one', hint: 'Inscribe something new through Xtrata' },
+    { k: 'aud', name: 'Audionaut', unit: 'Audionaut', per: 'one', hint: 'Collect an Audionaut' },
+    { k: 'sc', name: 'High score on-chain', unit: 'score', per: 'each', hint: 'Commit a high score in Astro Blaster 3 or the Arcade' },
+    { k: 'ch', name: 'On-Chain Chess', unit: 'game', per: 'one', hint: 'Play a game of On-Chain Chess' },
+    { k: 'mu', name: 'Music plays', unit: 'play', per: 'one', hint: 'Play songs in the Xtrata Music app or Lounge' },
+    { k: 'dr', name: 'Sponsored drop', unit: 'claim', per: 'one', hint: 'Claim a sponsored drop' },
+    { k: 'lk', name: 'On-chain like', unit: 'like', per: 'one', hint: 'Like a song on-chain' },
+    { k: 'mk', name: 'Market', unit: 'trade', per: 'one', hint: 'List or buy something on the Market' }
+  ];
+  var MARKETS = ['xtrata-market-v1-0', 'xtrata-market-v1-1', 'xtrata-market-v1-2', 'xtrata-market-stx-v1-0', 'xtrata-market-sbtc-v1-0', 'xtrata-market-usdc-v1-0',
+    'xtrata-market-sponsored-stx-v1-0', 'xtrata-market-sponsored-stx-v1-1', 'xtrata-market-sponsored-sbtc-v1-0', 'xtrata-market-sponsored-sbtc-v1-1',
+    'xtrata-market-sponsored-usdcx-v1-0', 'xtrata-market-sponsored-usdcx-v1-1'];
+  var SOURCES = [
+    { kind: 'ins', id: DEP + '.xtrata-v3-2-3', fns: ['seal-inscription', 'seal-inscription-batch', 'seal-recursive', 'seal-with-relationships', 'mint-single-tx', 'mint-single-tx-recursive', 'mint-single-tx-with-relationships'] },
+    { kind: 'aud', id: AUD, fns: ['mint-seal', 'mint-seal-batch', 'mint-small-single-tx', 'mint-small-single-tx-recursive'] },
+    { kind: 'sc', id: DEP + '.xtrata-arcade-scores-v1-3', fns: ['submit-score'], opt: 1 },
+    { kind: 'sc', id: DEP + '.xtrata-arcade-scores-v2', fns: ['submit-score'], opt: 1 },
+    { kind: 'ch', id: DEP + '.xtrata-chess-log-v3', fns: ['submit-move'], opt: 1 },
+    { kind: 'ch', id: DEP + '.xtrata-chess-log-v2', fns: ['submit-move'], opt: 1 },
+    { kind: 'mu', id: DEP + '.xtrata-radio-plays-v1-0', fns: ['play'] },
+    { kind: 'dr', id: DEP + '.xtrata-drops-v1-0', fns: ['claim', 'claim-campaign'], opt: 1 },
+    { kind: 'dr', id: DEP + '.xtrata-drops-v1-1', fns: ['claim', 'claim-campaign'], opt: 1 },
+    { kind: 'dr', id: DEP + '.xtrata-drops-v1-2', fns: ['claim', 'claim-campaign'], opt: 1 },
+    { kind: 'lk', id: DEP + '.xtrata-radio-likes-v1-0', fns: ['set-liked', 'set-likes'], opt: 1 }
+  ].concat(MARKETS.map(function (m) { return { kind: 'mk', id: DEP + '.' + m, fns: ['list-token', 'buy'], opt: 1 }; }));
+
+  // ---- Read the chain (read-only GETs through the site's own Hiro proxy) ----
+  var API = location.origin + '/hiro/mainnet';
+  async function get(u) {
+    for (var i = 0; i < 5; i++) {
+      try { var r = await fetch(u); if (r.ok) return r.json(); if (r.status === 404) { var e = new Error('404'); e.nf = 1; throw e; } } catch (e) { if (e.nf) throw e; }
+      await sleep(500 * (i + 1));
+    }
+    throw new Error('unreachable');
+  }
+  async function pull(src) {
+    var out = [], off = 0, cut = Date.parse(CUTOFF), done = false, pages = 0;
+    while (!done && pages < 120) {
+      var j = await get(API + '/extended/v1/address/' + src.id + '/transactions?limit=50&offset=' + off);
+      var rows = (j && j.results) || []; if (!rows.length) break;
+      rows.forEach(function (t) {
+        var ms = (t.burn_block_time || 0) * 1000; if (!ms) return;
+        if (ms < cut) { done = true; return; }
+        if (t.tx_type !== 'contract_call' || t.tx_status !== 'success') return;
+        var cc = t.contract_call || {};
+        if (cc.contract_id !== src.id || src.fns.indexOf(cc.function_name) < 0) return;
+        var args = cc.function_args || [];
+        if (src.kind === 'lk' && cc.function_name === 'set-liked' && args[1] && String(args[1].repr) !== 'true') return; // an unlike is not a ticket
+        var game = null;
+        if (src.kind === 'ch' && args[0]) game = src.id.split('.')[1] + '#' + String(args[0].repr || '').replace(/^u/, '');
+        out.push({ a: t.sender_address, g: game, tx: t.tx_id });
+      });
+      off += 50; pages++; if (rows.length < 50) break; await sleep(100);
+    }
+    return out;
+  }
+  async function readChain(onProgress) {
+    var by = {}, status = [], finished = 0;
+    function add(a, k, e) {
+      var r = by[a] || (by[a] = { a: a, n: {}, g: {} });
+      if (k === 'ch') { r.g[e.g == null ? e.tx : e.g] = 1; return; }
+      r.n[k] = (r.n[k] || 0) + 1;
+    }
+    var queue = SOURCES.slice(), failed = 0;
+    async function worker() {
+      while (queue.length) {
+        var s = queue.shift();
+        try { var ev = await pull(s); ev.forEach(function (e) { if (e.a) add(e.a, s.kind, e); }); status.push({ id: s.id, kind: s.kind, ok: true, n: ev.length }); }
+        catch (e) { if (e.nf && s.opt) status.push({ id: s.id, kind: s.kind, ok: true, n: 0 }); else { failed++; status.push({ id: s.id, kind: s.kind, ok: false }); } }
+        finished++; if (onProgress) onProgress(finished, SOURCES.length);
+      }
+    }
+    await Promise.all([worker(), worker(), worker()]);
+    if (failed) throw new Error('some sources failed');
+    return Object.keys(by).map(function (k) { var r = by[k], g = Object.keys(r.g).length; if (g) r.n.ch = g; return { a: r.a, n: r.n }; });
+  }
+
+  // ---- Tickets ----
+  function earned(kind, n) { return n > 0 ? (kind.per === 'each' ? n : 1) : 0; }
+  function calc(a) {
+    var n = a.n || {}, valid = ((n.ins || 0) + (n.aud || 0)) > 0, total = 0;
+    KINDS.forEach(function (x) { total += earned(x, n[x.k] || 0); });
+    return { valid: valid, total: total, tickets: valid ? total : 0 };
+  }
+  var HANDLES = {}, WINNERS = {}, DATA = SNAP.addrs || [], AT = SNAP.at, rows = [], live = false;
+  function rebuild() {
+    rows = DATA.map(function (a) { var c = calc(a); return { a: a, valid: c.valid, held: c.total, tickets: c.tickets, handle: HANDLES[a.a] || '', won: WINNERS[a.a] }; });
+    rows.sort(function (x, y) { return (y.tickets - x.tickets) || (y.held - x.held) || (x.a.a < y.a.a ? -1 : 1); });
+  }
+
+  // ---- Header numbers ----
+  function paintTop() {
+    var pool = 0, inDraw = 0, waiting = 0;
+    rows.forEach(function (r) { if (r.valid) { inDraw++; pool += r.tickets; } else if (r.held > 0) waiting++; });
+    $('bigN').textContent = pool;
+    $('fresh').textContent = (live ? 'Live from the chain' : 'Last saved copy') + (AT ? ' · read ' + when(AT, true) : '');
+    var draws = DRAWS.map(Date.parse), now = Date.now(), nextI = -1;
+    draws.forEach(function (d, i) { if (nextI < 0 && d > now) nextI = i; });
+    var nextTxt = '—', nextSub = 'All draws done';
+    if (nextI >= 0) { var ms = draws[nextI] - now, days = Math.floor(ms / 864e5), hrs = Math.floor(ms % 864e5 / 36e5); nextTxt = days > 0 ? days + 'd ' + hrs + 'h' : hrs + 'h'; nextSub = 'Until draw ' + (nextI + 1) + ' closes'; }
+    var st = $('stats'); st.textContent = '';
+    [[inDraw, 'Wallets in the draw'], [pool, 'Tickets in the pool'], [waiting, 'Waiting for a first inscription'], [nextTxt, nextSub]].forEach(function (s) {
+      var d = el('div', 'stat'); d.appendChild(el('b', '', String(s[0]))); d.appendChild(el('span', '', s[1])); st.appendChild(d);
+    });
+    $('boardNote').textContent = rows.length + ' wallets have used Xtrata since 1 October. Wallets without an inscription or an Audionaut are waiting: their tickets switch on the moment they inscribe or collect.';
+  }
+
+  // ---- Static sections ----
+  var ways = [
+    { t: 'Inscribe your work through Xtrata', tag: 'Ticket 1 · unlocks the rest', first: 1, href: 'https://xtrata.xyz' },
+    { t: 'Play songs in the Xtrata Music app or Lounge', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
+    { t: 'Play a game of On-Chain Chess', tag: '+1 ticket', href: 'https://xtrata.xyz/i/3072' },
+    { t: 'Claim a sponsored drop (no STX needed)', tag: '+1 ticket', href: 'https://xtrata.xyz' },
+    { t: 'Like a song on-chain', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
+    { t: 'Collect an Audionaut', tag: '+1 ticket · also unlocks the rest', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
+    { t: 'Commit a high score on-chain in Astro Blaster 3 (#3075)', tag: '+1 ticket per score', href: 'https://xtrata.xyz/i/3075' },
+    { t: 'List or buy something on the Market', tag: '+1 ticket', href: 'https://xtrata.xyz/market' }
+  ];
+  ways.forEach(function (w) {
+    var c = el('a', 'way' + (w.first ? ' first' : '')); c.href = w.href; c.target = '_blank'; c.rel = 'noopener';
+    c.appendChild(el('span', 'plus', w.tag)); c.appendChild(el('b', '', w.t)); c.appendChild(el('span', 'live on', 'Counted on this page'));
+    $('ways').appendChild(c);
+  });
+  var prizes = ['3 × 10 STX', '3 × 10 STX', '4 × 10 STX'], names = ['Week 1 · 1–7 Oct · Explore', 'Week 2 · 8–14 Oct · Create', 'Week 3 · 15–21 Oct · Share'];
+  var blurbs = ['Learn the platform, make your first inscription, start collecting tickets.', 'Build your main piece. We spotlight entries on xtrata.xyz and on X as they land.', 'Share your finished work on X and submit it. Judging opens when the week ends.'];
+  [0, 1, 2].forEach(function (i) {
+    var d = Date.parse(DRAWS[i]), w = el('div', 'week w' + (i + 1) + (d < Date.now() ? ' past' : ''));
+    w.appendChild(el('div', 'label', names[i])); w.appendChild(el('b', '', 'Draw ' + (i + 1) + ' · ' + when(d))); w.appendChild(el('p', '', blurbs[i]));
+    w.appendChild(el('div', 'draw', 'DRAW: ' + prizes[i])); $('weeks').appendChild(w);
+  });
+
+  // ---- Leaderboard ----
+  var SHOW = 15, showAll = false;
+  function chipsFor(a) {
+    var box = el('div', 'chips');
+    KINDS.forEach(function (x) { var n = (a.n || {})[x.k] || 0; if (n) box.appendChild(el('span', 'chip', x.name.split(' ')[0] + ' ' + n)); });
+    return box;
+  }
+  function pickRow(r) { $('q').value = r.a.a; check(); $('form').scrollIntoView({ block: 'center' }); }
+  function drawBoard() {
+    var tb = $('rows'); tb.textContent = '';
+    if (!rows.length) { var tr0 = el('tr'), td0 = el('td', 'empty', 'No wallets yet. The board fills as people inscribe.'); td0.colSpan = 6; tr0.appendChild(td0); tb.appendChild(tr0); }
+    rows.slice(0, showAll ? rows.length : SHOW).forEach(function (r, i) {
+      var tr = el('tr', 'click'); tr.tabIndex = 0;
+      tr.appendChild(el('td', 'num mono', String(i + 1)));
+      tr.appendChild(el('td', 'mono', short(r.a.a)));
+      tr.appendChild(el('td', '', r.handle || '—'));
+      var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.won ? 'Winner' : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
+      var tk = el('td', 'num tk ' + (r.valid ? 'ok' : 'wait'), String(r.tickets));
+      if (!r.valid && r.held) { var sm = el('small', 'heldtag', ' +' + r.held + ' held'); tk.appendChild(sm); }
+      tr.appendChild(tk);
+      var ac = el('td'); ac.appendChild(chipsFor(r.a)); tr.appendChild(ac);
+      tr.addEventListener('click', function () { pickRow(r); });
+      tr.addEventListener('keydown', function (e) { if (e.key === 'Enter') pickRow(r); });
+      tb.appendChild(tr);
+    });
+    var more = $('more');
+    if (rows.length > SHOW) { more.hidden = false; more.textContent = showAll ? 'Show fewer' : 'Show all ' + rows.length + ' wallets'; } else more.hidden = true;
+  }
+  $('more').addEventListener('click', function () { showAll = !showAll; drawBoard(); });
+
+  // ---- Checker ----
+  function find(q) {
+    q = q.trim(); if (!q) return [];
+    var lo = q.toLowerCase().replace(/^@/, '');
+    var exact = rows.filter(function (r) { return r.a.a.toLowerCase() === lo; });
+    if (exact.length) return exact;
+    return rows.filter(function (r) {
+      var h = r.handle.toLowerCase().replace(/^@/, '');
+      return (h && h === lo) || (lo.length >= 5 && (r.a.a.toLowerCase().indexOf(lo) === 0 || r.a.a.toLowerCase().slice(-lo.length) === lo));
+    });
+  }
+  function link(text, href) { var a = el('a', '', text); a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; }
+  function stepRow(state, title, body) {
+    var s = el('div', 'stp ' + state);
+    s.appendChild(el('span', 'mark', state === 'done' ? '✓' : state === 'todo' ? '!' : '·'));
+    var t = el('div'); t.appendChild(el('b', '', title)); t.appendChild(el('p', '', body)); s.appendChild(t); return s;
+  }
+  function show(r, addr) {
+    var out = $('result'); out.textContent = '';
+    var a = r ? r.a : { a: addr, n: {} }, c = r || { valid: false, held: 0, tickets: 0, handle: '', won: null };
+    var who = el('div', 'who');
+    var l = el('div'); l.appendChild(el('div', 'addr', a.a)); if (c.handle) l.appendChild(el('div', 'hint', c.handle)); who.appendChild(l);
+    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.won ? 'Winner of draw ' + c.won.draw : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
+    out.appendChild(who);
+    var sc = el('div', 'score'); sc.appendChild(el('b', c.valid ? 'ok' : 'wait', String(c.tickets)));
+    sc.appendChild(el('p', '', c.valid ? 'tickets in every draw from week 1. They carry forward until this wallet is picked.' : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
+    out.appendChild(sc);
+
+    // where you stand: three things that must be true
+    var steps = el('div', 'stps');
+    steps.appendChild(stepRow(c.handle ? 'done' : 'todo', c.handle ? 'Linked to ' + c.handle : 'Announce this wallet',
+      c.handle ? 'The team has matched this wallet to your X account.' : 'Post from your X account: "I\'m entering #XtrataBounty with wallet ' + short(a.a) + '" and tag @XtrataLayers, then send your handle and wallet in the Telegram. The team links it here.'));
+    steps.appendChild(stepRow(c.valid ? 'done' : 'todo', c.valid ? 'Valid: inscription or Audionaut found' : 'Make your first ticket',
+      c.valid ? 'This wallet has made an Xtrata inscription or collected an Audionaut on or after 1 October.' : 'Inscribe something new through Xtrata, or collect an Audionaut, with this same wallet. Nothing else counts until you do.'));
+    var open = KINDS.filter(function (x) { return !((a.n || {})[x.k]) && x.k !== 'ins' && x.k !== 'aud'; }).length;
+    steps.appendChild(stepRow(c.valid ? (open ? 'next' : 'done') : 'wait', 'Add more tickets', c.valid ? (open ? open + ' more kinds of action are still open for this wallet. Each different action adds a ticket.' : 'Every kind of action is done. Each new high score is still another ticket.') : 'Once you are valid, every different action adds one more ticket.'));
+    out.appendChild(steps);
+
+    var grid = el('div', 'kinds');
+    KINDS.forEach(function (x) {
+      var n = (a.n || {})[x.k] || 0, t = earned(x, n);
+      var k = el('div', 'kind' + (n ? '' : ' off') + (n && !c.valid ? ' held' : ''));
+      k.appendChild(el('span', 'k', x.name));
+      k.appendChild(el('span', 'v', n ? n + ' ' + x.unit + (n === 1 ? '' : 's') : x.hint));
+      k.appendChild(el('span', 't', n ? '+' + t + (c.valid ? (t === 1 ? ' TICKET' : ' TICKETS') : ' HELD') : 'NOT YET'));
+      grid.appendChild(k);
+    });
+    out.appendChild(grid);
+    var nx = el('div', 'next ' + (c.valid ? 'ok' : 'wait')), p = el('p');
+    if (!c.valid) {
+      nx.appendChild(el('b', '', 'Do this next'));
+      p.appendChild(link('Inscribe at xtrata.xyz', 'https://xtrata.xyz')); p.appendChild(document.createTextNode(' or ')); p.appendChild(link('collect an Audionaut', 'https://xtrata.xyz/collection/audionauts-1-0')); p.appendChild(document.createTextNode(', using the wallet you announced. Then come back and press Refresh.'));
+    } else {
+      nx.appendChild(el('b', '', 'Keep going'));
+      p.appendChild(document.createTextNode('Use the same wallet for everything. Quick wins: '));
+      var q = KINDS.filter(function (x) { return !((a.n || {})[x.k]) && x.k !== 'ins' && x.k !== 'aud'; }).slice(0, 3);
+      if (!q.length) p.appendChild(document.createTextNode('commit another high score.')); else q.forEach(function (x, i) { p.appendChild(document.createTextNode((i ? ', ' : '') + x.hint.charAt(0).toLowerCase() + x.hint.slice(1))); });
+      if (q.length) p.appendChild(document.createTextNode('.'));
+    }
+    nx.appendChild(p); out.appendChild(nx);
+    out.appendChild(el('p', 'note', 'Counted from public contract calls' + (AT ? ', last read ' + when(AT, true) : '') + '. New actions show here a few minutes after they confirm. Your tickets are official once this wallet is announced from your X account and submitted in the Telegram.'));
+  }
+  function check() {
+    var q = $('q').value, out = $('result'); out.textContent = '';
+    if (!q.trim()) { out.appendChild(el('p', 'hint', 'Paste your wallet address or your X handle to see your tickets.')); return; }
+    var m = find(q);
+    if (m.length === 1) return show(m[0]);
+    if (m.length > 1) {
+      var box = el('div', 'matches'); out.appendChild(el('p', 'hint', m.length + ' wallets match. Pick yours:'));
+      m.forEach(function (r) { var b = el('button', '', r.a.a + (r.handle ? '  ' + r.handle : '')); b.type = 'button'; b.addEventListener('click', function () { show(r); }); box.appendChild(b); });
+      out.appendChild(box); return;
+    }
+    if (/^S[PM][0-9A-Z]{20,}$/i.test(q.trim())) return show(null, q.trim().toUpperCase());
+    out.appendChild(el('p', 'hint', 'No wallet matches that. Paste the full address (it starts with SP) or the X handle you submitted.'));
+  }
+  $('form').addEventListener('submit', function (e) { e.preventDefault(); check(); });
+  $('example').addEventListener('click', function () { if (rows[0]) { $('q').value = rows[0].a.a; check(); } });
+
+  // ---- Load: show the saved copy at once, then read the chain ----
+  function repaint() { rebuild(); paintTop(); drawBoard(); if ($('q').value.trim()) check(); }
+  var busy = false;
+  async function refresh(force) {
+    if (busy) return; busy = true;
+    var btn = $('refresh'); btn.disabled = true; btn.textContent = 'Reading the chain…';
+    try {
+      var cached = null;
+      try { cached = JSON.parse(localStorage.getItem('xt-bounty-tracker-1') || 'null'); } catch (e) {}
+      if (!force && cached && Date.now() - cached.t < 5 * 60e3) { DATA = cached.d; AT = cached.t; live = true; }
+      else {
+        var d = await readChain(function (n, tot) { btn.textContent = 'Reading the chain… ' + n + '/' + tot; });
+        DATA = d; AT = Date.now(); live = true;
+        try { localStorage.setItem('xt-bounty-tracker-1', JSON.stringify({ t: AT, d: d })); } catch (e) {}
+      }
+    } catch (e) { live = false; $('fresh').textContent = 'Could not reach the chain just now. Showing the last saved copy' + (SNAP.at ? ' from ' + when(SNAP.at, true) : '') + '.'; }
+    repaint(); btn.disabled = false; btn.textContent = 'Refresh'; busy = false;
+  }
+  $('refresh').addEventListener('click', function () { refresh(true); });
+  fetch('/bounty/zdao/tracker/1/handles.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { HANDLES = j.handles || {}; WINNERS = j.winners || {}; repaint(); }).catch(function () {});
+  repaint(); check();
+  refresh(false);
+})();
+</script>
+
+</body>
+</html>
