@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  BOUNTY_ENDS_AT,
+  BOUNTY_TRACKER_HREF,
   HOMEPAGE_AUDIONAUTS,
   HOMEPAGE_BOUNTY,
   HOMEPAGE_FRESH,
@@ -10,6 +12,7 @@ import {
   HOMEPAGE_PROGRAMMES,
   HOMEPAGE_STRIP_SLIDES,
   HOMEPAGE_WALL,
+  bountyTrackerLink,
   validateHomepageContent
 } from '../homepage-content.js';
 
@@ -67,6 +70,43 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');
     expect(HOMEPAGE_BOUNTY.rulesHref).toBe('/bounty/xtrata-bounty-full-rules.pdf');
     expect(indexHtml).toContain('id="homeBounty"');
+  });
+
+  it('links the live bounty ticket tracker from the strip and the bounty panel, in the same tab', () => {
+    expect(BOUNTY_TRACKER_HREF).toBe('/bounty/zdao/tracker/1/');
+    const link = bountyTrackerLink(Date.parse('2026-10-05T12:00:00Z'));
+    expect(link).toMatchObject({
+      href: '/bounty/zdao/tracker/1/',
+      final: false,
+      label: 'Check your tickets',
+      line: 'Live raffle tickets for #XtrataBounty'
+    });
+    // The bounty slide keeps the lead; the tracker slide sits right after it and opens in the same tab.
+    expect(HOMEPAGE_STRIP_SLIDES[0].id).toBe('bounty');
+    const slide = HOMEPAGE_STRIP_SLIDES[1];
+    expect(slide).toMatchObject({ id: 'bounty-tickets', href: HOMEPAGE_BOUNTY.tracker.href, cta: HOMEPAGE_BOUNTY.tracker.label });
+    expect(slide.newTab).toBeFalsy();
+    expect(HOMEPAGE_BOUNTY.tracker.href.endsWith('/')).toBe(true);
+    // The bounty panel renders it through the shared action helper, without newTab, from the config.
+    expect(homepageSource).toContain("'bounty:tickets'");
+    expect(homepageSource).toContain('b.tracker.href');
+    expect(homepageSource).not.toMatch(/b\.tracker\.href[^)]*newTab/);
+    expect(homeStyles).toContain('.home-btn--tickets');
+  });
+
+  it('keeps the tracker link after the bounty ends and switches it to the final results', () => {
+    const justBefore = bountyTrackerLink(Date.parse(BOUNTY_ENDS_AT) - 1);
+    const atEnd = bountyTrackerLink(Date.parse(BOUNTY_ENDS_AT));
+    const later = bountyTrackerLink(Date.parse('2026-10-28T12:00:00Z'));
+    expect(justBefore.final).toBe(false);
+    expect(justBefore.label).toBe('Check your tickets');
+    for (const link of [atEnd, later]) {
+      expect(link).toMatchObject({ final: true, href: '/bounty/zdao/tracker/1/', label: 'See the final results' });
+      expect(link.line).toContain('#XtrataBounty');
+    }
+    // 21 Oct itself is still live; the bounty closes at the end of that day, UK time.
+    expect(bountyTrackerLink(Date.parse('2026-10-21T12:00:00Z')).final).toBe(false);
+    expect(bountyTrackerLink(Date.parse('2026-10-22T00:30:00Z')).final).toBe(true);
   });
 
   it('only says Mint for Audionauts once the mint is live', () => {
