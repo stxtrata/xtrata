@@ -1,0 +1,123 @@
+{
+  "collectionKey": "see-yourself-out",
+  "requested": 100,
+  "built": 100,
+  "partial": false,
+  "failures": [],
+  "oversize": [],
+  "maxSingleTxBytes": 524288,
+  "maxRecordBytes": 33554432,
+  "largest": {
+    "id": 82,
+    "bytes": 5724376
+  },
+  "mimes": {
+    "image/gif": 53,
+    "image/png": 47
+  },
+  "mediaHosts": {
+    "ipfs": 100
+  },
+  "preinscribed": [
+    {
+      "id": 1,
+      "bytes": 5631531,
+      "chunks": 344,
+      "batches": 11,
+      "transactions": 13,
+      "ustx": 1232000
+    },
+    {
+      "id": 9,
+      "bytes": 539502,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 12,
+      "bytes": 676292,
+      "chunks": 42,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 14,
+      "bytes": 691980,
+      "chunks": 43,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 24,
+      "bytes": 582128,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 42,
+      "bytes": 744917,
+      "chunks": 46,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 60,
+      "bytes": 575404,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 68,
+      "bytes": 584604,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 75,
+      "bytes": 2765549,
+      "chunks": 169,
+      "batches": 6,
+      "transactions": 8,
+      "ustx": 732000
+    },
+    {
+      "id": 81,
+      "bytes": 670932,
+      "chunks": 41,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 82,
+      "bytes": 5724376,
+      "chunks": 350,
+      "batches": 11,
+      "transactions": 13,
+      "ustx": 1232000
+    },
+    {
+      "id": 89,
+      "bytes": 3113247,
+      "chunks": 191,
+      "batches": 6,
+      "transactions": 8,
+      "ustx": 732000
+    }
+  ],
+  "preinscribedCoreFeeUstx": 6584000,
+  "identicalContent": [],
+  "seedingCalls": 1,
+  "seconds": 205
+}
