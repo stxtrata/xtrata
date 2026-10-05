@@ -1,0 +1,26 @@
+{
+  "collectionKey": "megapont-ape-club",
+  "requested": 2500,
+  "built": 2500,
+  "partial": false,
+  "failures": [],
+  "oversize": [],
+  "maxSingleTxBytes": 524288,
+  "maxRecordBytes": 33554432,
+  "largest": {
+    "id": 1153,
+    "bytes": 480034
+  },
+  "mimes": {
+    "image/png": 2489,
+    "image/gif": 11
+  },
+  "mediaHosts": {
+    "ipfs": 2500
+  },
+  "preinscribed": [],
+  "preinscribedCoreFeeUstx": 0,
+  "identicalContent": [],
+  "seedingCalls": 25,
+  "seconds": 3434
+}
