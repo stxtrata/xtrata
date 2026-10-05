@@ -7,6 +7,19 @@
 <meta name="description" content="Forever Twins: a permanent on-chain counterpart for an existing Stacks NFT collection.">
 <link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
 <link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+<style>
+  .gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:12px}
+  .gcard{border:1px solid var(--line);border-radius:12px;background:var(--panel);overflow:hidden;display:flex;flex-direction:column}
+  .gcard.mine{border-color:var(--accent)}
+  .gcard img{width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--soft);display:block}
+  .gcard .gb{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;font-size:13px;flex:1}
+  .gcard h3{margin:0;font-size:15px;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .gcard h3 a{font-size:12px;font-weight:600}
+  .gcard .gs{color:var(--mute);font-size:12px;line-height:1.4}
+  .gcard .gs b{color:inherit;font-weight:700}
+  .gcard button{width:100%;margin-top:auto}
+  .gcard .msg{margin-top:0;font-size:12px}
+</style>
 </head>
 <body>
 <header class="top"><div class="wrap">
@@ -63,6 +76,12 @@
     <section class="card hidden" id="actionCard">
       <h2>Inscribe or swap</h2>
       <div id="actionOut"></div>
+    </section>
+
+    <section class="card hidden" id="galleryCard">
+      <h2>Twins <span id="galleryCount" class="mute small"></span></h2>
+      <p class="sub tight">Every twin made so far. Each token has two sides, the original NFT and its permanent twin. One side is with its holder; the other is held in escrow by the helper. The holder can swap sides whenever they like.</p>
+      <div id="galleryOut"><p class="mute">Loading twins…</p></div>
     </section>
 
     <section class="card" id="warnCard">
@@ -131,7 +150,10 @@ async function read(contractId, functionName, functionArgs = []) {
   // methods are bound to the instance that created them, so build a fresh network rather than
   // overriding coreApiUrl on a derived object (that would silently keep calling api.hiro.so).
   network = network || new chain.STACKS_MAINNET.constructor({ url: `${location.origin}/hiro/mainnet` });
-  const res = await chain.fetchCallReadOnlyFunction({ contractAddress, contractName, functionName, functionArgs, senderAddress: wallet || 'SP000000000000000000002Q6VF78', network });
+  const args = { contractAddress, contractName, functionName, functionArgs, senderAddress: wallet || 'SP000000000000000000002Q6VF78', network };
+  let res;
+  try { res = await chain.fetchCallReadOnlyFunction(args); }
+  catch (e) { await new Promise((r) => setTimeout(r, 500)); res = await chain.fetchCallReadOnlyFunction(args); } // the proxy can fail once under load
   return plainCV(res);
 }
 
@@ -224,7 +246,7 @@ async function lookup() {
       rows.push(['Twin', `Xtrata <a href="https://xtrata.xyz/inscription/${esc(view.binding.xtrataId)}" target="_blank" rel="noopener">#${esc(view.binding.xtrataId)}</a>`]);
       rows.push(['Liquid side', view.side === 'original-liquid' ? 'Original NFT is with its holder; the twin is held by the helper' : 'Twin is with its holder; the original is held by the helper']);
       rows.push(['Holder', view.liquidOwner ? `<span class="mono">${esc(view.liquidOwner)}</span>` : '<span class="mute">Unknown</span>']);
-      rows.push(['Custody check', view.custody.stranded ? '<span class="bad">Both tokens are in the helper (stranded)</span>' : view.custody.consistent ? '<span class="ok">Consistent with real ownership</span>' : '<span class="bad">Does not match the stored flag</span>']);
+      rows.push(['Custody check', view.custody.unreadable ? '<span class="warn">Could not read ownership right now. Look up again.</span>' : view.custody.stranded ? '<span class="bad">Both tokens are in the helper (stranded)</span>' : view.custody.consistent ? '<span class="ok">Consistent with real ownership</span>' : '<span class="bad">Does not match the stored flag</span>']);
     } else rows.push(['Twin', 'Not inscribed yet']);
     if (view.listed != null) rows.push(['Listed on source market', view.listed ? '<span class="warn">Yes — unlist before swapping</span>' : 'No']);
   }
@@ -263,7 +285,8 @@ function renderActions() {
     if (!wallet) parts.push('<p class="mute">Connect the wallet that holds the liquid side.</p>');
     else if (!mine) parts.push('<p class="mute">The connected wallet does not hold the liquid side of this twin.</p>');
     if (listed) parts.push('<div class="msg warn">The original is listed on its marketplace. Unlist it first.</div>');
-    if (!view.custody.consistent) parts.push('<div class="msg bad">Custody does not match the stored flag, so swapping is disabled.</div>');
+    if (view.custody.unreadable) parts.push('<div class="msg warn">Ownership could not be read right now, so swapping is disabled. Look the token up again.</div>');
+    else if (!view.custody.consistent) parts.push('<div class="msg bad">Custody does not match the stored flag, so swapping is disabled.</div>');
   }
   out.innerHTML = parts.join('');
   $('prepBtn')?.addEventListener('click', prepareArt);
@@ -313,8 +336,8 @@ function callHelper({ contract, fn, args }, postConditions) {
       onFinish: (d) => resolve(d), onCancel: () => reject(new Error('Cancelled in the wallet')) });
   });
 }
-const submitted = (txId) => $('actionOut').insertAdjacentHTML('beforeend', `<div class="msg ok">Submitted. <a href="https://explorer.hiro.so/txid/${esc(txId)}?chain=mainnet" target="_blank" rel="noopener">View transaction</a>. It can take a few minutes to confirm; look the token up again afterwards.</div>`);
-const failed = (e) => $('actionOut').insertAdjacentHTML('beforeend', `<div class="msg bad">${esc(e.message)}</div>`);
+const submitted = (txId, out = $('actionOut')) => out.insertAdjacentHTML('beforeend', `<div class="msg ok">Submitted. <a href="https://explorer.hiro.so/txid/${esc(txId)}?chain=mainnet" target="_blank" rel="noopener">View transaction</a>. It can take a few minutes to confirm; look the token up again afterwards.</div>`);
+const failed = (e, out = $('actionOut')) => out.insertAdjacentHTML('beforeend', `<div class="msg bad">${esc(e.message)}</div>`);
 async function doInscribe() {
   try {
     if (!prepared) return;
@@ -325,16 +348,97 @@ async function doInscribe() {
     submitted(r.txId || r.txid);
   } catch (e) { failed(e); }
 }
-async function doSwap() {
+async function doSwap(v = view, out = $('actionOut')) {
   try {
-    const dir = adapter.validSwap(view);
-    const call = adapter.buildSwap(coll, view.tokenId, dir);
+    const dir = adapter.validSwap(v);
+    const call = adapter.buildSwap(coll, v.tokenId, dir);
     const nft = dir === 'original-to-twin'
-      ? chain.Pc.principal(wallet).willSendAsset().nft(`${coll.source}::${coll.sourceAsset}`, chain.Cl.uint(BigInt(view.tokenId)))
-      : chain.Pc.principal(wallet).willSendAsset().nft(`${reg.core.contract}::${reg.core.assetName}`, chain.Cl.uint(BigInt(view.binding.xtrataId)));
+      ? chain.Pc.principal(wallet).willSendAsset().nft(`${coll.source}::${coll.sourceAsset}`, chain.Cl.uint(BigInt(v.tokenId)))
+      : chain.Pc.principal(wallet).willSendAsset().nft(`${reg.core.contract}::${reg.core.assetName}`, chain.Cl.uint(BigInt(v.binding.xtrataId)));
     const r = await callHelper(call, [nft]);
-    submitted(r.txId || r.txid);
-  } catch (e) { failed(e); }
+    submitted(r.txId || r.txid, out);
+    return true;
+  } catch (e) { failed(e, out); return false; }
+}
+
+// ---- gallery: every twin made so far, with swap controls ----
+const GAL_PAGE = 24;
+let twins = null, galleryShown = 0;
+const galleryCards = new Map(); // tokenId -> { el, view, paint }
+const twinImg = (xid) => { const [a, n] = reg.core.contract.split('.'); return `/inscription/mainnet/${a}/${n}/${xid}`; };
+// The helper prints one event per inscription, with the token id and the Xtrata id. Read them through the
+// same-origin Hiro proxy, then confirm each twin's real state from the helper before showing it.
+async function loadTwinList() {
+  const found = new Map(); let offset = 0;
+  for (let guard = 0; guard < 40; guard++) {
+    const r = await fetch(`${location.origin}/hiro/mainnet/extended/v1/contract/${coll.helper}/events?limit=50&offset=${offset}`);
+    if (!r.ok) throw new Error(`event list unavailable (HTTP ${r.status})`);
+    const rows = (await r.json()).results || [];
+    for (const e of rows) {
+      const repr = (e.contract_log && e.contract_log.value && e.contract_log.value.repr) || '';
+      const t = /\(token-id u(\d+)\)/.exec(repr), x = /\(xtrata-id u(\d+)\)/.exec(repr);
+      if (t && x) found.set(Number(t[1]), x[1]);
+    }
+    offset += rows.length;
+    if (rows.length < 50) break;
+  }
+  return [...found].sort((a, b) => a[0] - b[0]).map(([tokenId, xtrataId]) => ({ tokenId, xtrataId }));
+}
+function galleryCard(t) {
+  const el = document.createElement('article'); el.className = 'gcard';
+  el.innerHTML = `<img loading="lazy" alt="${esc(coll.itemNoun)} #${t.tokenId} twin" src="${esc(twinImg(t.xtrataId))}">
+    <div class="gb"><h3><span>#${t.tokenId}</span><a href="/inscription/${esc(t.xtrataId)}" target="_blank" rel="noopener">Xtrata #${esc(t.xtrataId)}</a></h3>
+    <div class="gs">Reading the chain…</div><div class="gc"></div></div>`;
+  return el;
+}
+function paintCard(t) {
+  const c = galleryCards.get(t.tokenId); if (!c || !c.view) return;
+  const v = c.view, el = c.el, gs = el.querySelector('.gs'), gc = el.querySelector('.gc');
+  const mine = !!wallet && v.liquidOwner === wallet;
+  el.classList.toggle('mine', mine);
+  const who = v.liquidOwner ? (mine ? '<b>you</b>' : `<span class="mono" title="${esc(v.liquidOwner)}">${esc(short(v.liquidOwner))}</span>`) : 'unknown';
+  gs.innerHTML = v.side === 'original-liquid'
+    ? `Holder: ${who}<br>Original NFT is with its holder. The twin is in escrow.`
+    : `Holder: ${who}<br>Twin is with its holder. The original NFT is in escrow.`;
+  const dir = adapter.validSwap(v);
+  const label = dir === 'original-to-twin' ? 'Swap for the twin' : 'Swap back to the original';
+  const why = !wallet ? 'Connect a wallet to swap.' : !mine ? 'Only the holder can swap.' : v.custody.unreadable ? 'Ownership could not be read. Reload to retry.' : !v.custody.consistent ? 'Custody check failed, swapping is disabled.' : (dir === 'original-to-twin' && v.listed === true) ? 'Listed on its marketplace. Unlist it first.' : '';
+  gc.innerHTML = `<button type="button" ${why ? 'disabled' : ''}>${label}</button>${why ? `<div class="gs">${esc(why)}</div>` : ''}<div class="gm"></div>`;
+  gc.querySelector('button').addEventListener('click', async (ev) => {
+    const b = ev.currentTarget; b.disabled = true;
+    const ok = await doSwap(v, gc.querySelector('.gm'));
+    if (ok) setTimeout(() => loadCard(t), 90000); else b.disabled = false;
+  });
+}
+async function loadCard(t) {
+  const c = galleryCards.get(t.tokenId); if (!c) return;
+  try {
+    const v = await adapter.tokenView(coll, t.tokenId);
+    if (!v.binding) { c.el.remove(); galleryCards.delete(t.tokenId); return; }
+    c.view = v; paintCard(t);
+  } catch (e) {
+    c.el.querySelector('.gs').innerHTML = `Could not read this twin. <a href="#" class="retry">Retry</a>`;
+    c.el.querySelector('.retry').addEventListener('click', (ev) => { ev.preventDefault(); c.el.querySelector('.gs').textContent = 'Reading the chain…'; loadCard(t); });
+  }
+}
+function showMoreTwins() {
+  const next = twins.slice(galleryShown, galleryShown + GAL_PAGE); galleryShown += next.length;
+  const grid = $('gal'); let i = 0;
+  const pump = async () => { while (i < next.length) { const t = next[i++]; await loadCard(t); } };
+  for (const t of next) { const el = galleryCard(t); galleryCards.set(t.tokenId, { el, view: null }); grid.appendChild(el); }
+  Promise.all([pump(), pump(), pump()]); // three reads in flight at a time
+  $('galMore').classList.toggle('hidden', galleryShown >= twins.length);
+}
+async function initGallery() {
+  if (!coll.helper || coll.interface !== 'v3' || coll.status !== 'live' || !adapter) return;
+  $('galleryCard').classList.remove('hidden');
+  try { twins = await loadTwinList(); }
+  catch (e) { $('galleryOut').innerHTML = `<div class="msg warn">Could not load the list of twins: ${esc(e.message)}. Reload to try again.</div>`; return; }
+  $('galleryCount').textContent = twins.length ? `(${fmt(twins.length)} of ${helperSt && helperSt.sourceTotal ? fmt(helperSt.sourceTotal) : '—'})` : '';
+  if (!twins.length) { $('galleryOut').innerHTML = '<p class="mute">No twins have been made yet. The first one will appear here.</p>'; return; }
+  $('galleryOut').innerHTML = '<div class="gal" id="gal"></div><div class="row spaced"><button id="galMore" class="ghost hidden" type="button">Show more</button></div>';
+  $('galMore').addEventListener('click', showMoreTwins);
+  showMoreTwins();
 }
 
 // ---- wallet ----
@@ -353,6 +457,7 @@ function setWallet(addr) {
   b.textContent = wallet ? short(wallet) : 'Connect wallet'; b.disabled = !!wallet;
   if (view) renderActions();
   refreshInscribeButton();
+  for (const t of twins || []) paintCard(t);
 }
 
 // ---- boot ----
@@ -405,6 +510,7 @@ async function boot() {
     try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
     await refreshState();
     setInterval(refreshState, 60000);
+    initGallery();
     const q = new URLSearchParams(location.search).get('token');
     if (q && /^\d+$/.test(q)) { $('tokenId').value = q; lookup(); }
   } catch (e) {
