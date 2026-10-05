@@ -39,7 +39,7 @@ export function uriCandidates(uri, tokenId) {
   if (/^https?:\/\//i.test(resolved)) out.push(resolved);
   if (/^ar:\/\//i.test(resolved)) out.push(`https://arweave.net/${resolved.replace(/^ar:\/\//i, '')}`);
   const p = ipfsPath(resolved);
-  if (p) out.push(`https://dweb.link/ipfs/${p}`, `https://ipfs.io/ipfs/${p}`, `https://w3s.link/ipfs/${p}`);
+  if (p) out.push(`https://gateway.pinata.cloud/ipfs/${p}`, `https://ipfs.filebase.io/ipfs/${p}`, `https://dweb.link/ipfs/${p}`, `https://ipfs.io/ipfs/${p}`, `https://w3s.link/ipfs/${p}`);
   return [...new Set(out.filter(Boolean).map((c) => encodeURI(c)))];
 }
 
@@ -51,20 +51,24 @@ export function imageFrom(meta) {
   return c.find((v) => typeof v === 'string' && v.trim()) || null;
 }
 
-async function firstOk(candidates, mode, fetchFn, timeoutMs = 10000) {
-  let last = null;
-  for (const url of candidates) {
+// Ask every candidate URL at once and take the first good answer (public IPFS gateways are often down
+// or blocked, so trying them one after another can take a minute). The losers are cancelled.
+export async function firstOk(candidates, mode, fetchFn, timeoutMs = 12000) {
+  if (!candidates.length) throw new Error('No usable gateway URL');
+  const ctls = [];
+  const attempt = async (url) => {
+    const ctl = new AbortController(); ctls.push(ctl);
+    const t = setTimeout(() => ctl.abort(), timeoutMs);
     try {
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), timeoutMs);
       const res = await fetchFn(url, { cache: 'no-store', signal: ctl.signal });
-      clearTimeout(t);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       if (mode === 'bytes') return { url, bytes: new Uint8Array(await res.arrayBuffer()), contentType: res.headers.get('content-type') || '' };
       return { url, json: JSON.parse(await res.text()) };
-    } catch (e) { last = e; }
-  }
-  throw last || new Error('No usable gateway URL');
+    } finally { clearTimeout(t); }
+  };
+  try { return await Promise.any(candidates.map(attempt)); }
+  catch (e) { throw (e && e.errors && e.errors[0]) || e; }
+  finally { for (const c of ctls) { try { c.abort(); } catch { /* already done */ } } }
 }
 
 /** token URI -> metadata JSON -> image -> bytes. Returns { bytes, imageUrl, metaUrl, contentType }. */

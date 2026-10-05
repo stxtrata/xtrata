@@ -203,7 +203,7 @@ await check('token URI placeholders resolve', () => {
   assert.equal(M.resolveUriTemplate('ipfs://ipfs/Qm/{id}', 7), 'ipfs://Qm/7');
 });
 await check('ipfs URIs become gateway candidates; http stays first', () => {
-  const c = M.uriCandidates('ipfs://ipfs/QmAbc/json/5.json', 5); assert.ok(c[0].includes('/ipfs/QmAbc/json/5.json')); assert.equal(c.length, 3);
+  const c = M.uriCandidates('ipfs://ipfs/QmAbc/json/5.json', 5); assert.ok(c[0].includes('/ipfs/QmAbc/json/5.json')); assert.equal(c.length, 5);
   assert.equal(M.uriCandidates('https://a.b/5.json', 5)[0], 'https://a.b/5.json');
 });
 await check('image field is found under common names', () => { assert.equal(M.imageFrom({ image: 'a' }), 'a'); assert.equal(M.imageFrom({ properties: { files: [{ uri: 'b' }] } }), 'b'); assert.equal(M.imageFrom({}), null); });
