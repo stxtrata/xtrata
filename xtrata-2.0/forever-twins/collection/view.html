@@ -20,6 +20,7 @@
   .gcard button{width:100%;margin-top:auto}
   .gcard .msg{margin-top:0;font-size:12px}
   .gcard .pic{position:relative}
+  .gcard .inf{position:absolute;right:8px;top:8px;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;line-height:1;font-weight:800;background:var(--panel);color:var(--ok);border:1px solid var(--ok);box-shadow:0 1px 6px rgba(0,0,0,.35)}
   .gcard .ph small{display:block;font-size:11px;font-weight:500;margin-top:6px;padding:0 10px;text-align:center}
   .gcard .ph{flex-direction:column;width:100%;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--soft);color:var(--mute);font-size:30px;font-weight:800;font-variant-numeric:tabular-nums}
   .gcard .tag{position:absolute;left:8px;top:8px;font-size:11px;font-weight:800;letter-spacing:.04em;padding:3px 8px;border-radius:999px;background:var(--panel);border:1px solid currentColor}
@@ -399,9 +400,16 @@ async function loadTwinList() {
   }
   return [...found].sort((a, b) => a[0] - b[0]).map(([tokenId, xtrataId]) => ({ tokenId, xtrataId }));
 }
+// ∞ badge: the permanent twin is live (out of escrow, with its holder) and the original NFT is held in escrow.
+function setInfinity(el, on) {
+  const pic = el.querySelector('.pic'); if (!pic) return;
+  let b = pic.querySelector('.inf');
+  if (!on) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('span'); b.className = 'inf'; b.textContent = '∞'; b.title = 'Permanent twin is live. The original NFT is held in escrow.'; b.setAttribute('aria-label', b.title); pic.appendChild(b); }
+}
 function galleryCard(t) {
   const el = document.createElement('article'); el.className = 'gcard';
-  el.innerHTML = `<img loading="lazy" alt="${esc(coll.itemNoun)} #${t.tokenId} twin" src="${esc(twinImg(t.xtrataId))}">
+  el.innerHTML = `<div class="pic"><img loading="lazy" alt="${esc(coll.itemNoun)} #${t.tokenId} twin" src="${esc(twinImg(t.xtrataId))}"></div>
     <div class="gb"><h3><span>#${t.tokenId}</span><a href="/inscription/${esc(t.xtrataId)}" target="_blank" rel="noopener">Xtrata #${esc(t.xtrataId)}</a></h3>
     <div class="gs">Reading the chain…</div><div class="gc"></div></div>`;
   return el;
@@ -415,6 +423,7 @@ function paintCard(t) {
   gs.innerHTML = v.side === 'original-liquid'
     ? `Holder: ${who}<br>Original NFT is with its holder. The twin is in escrow.`
     : `Holder: ${who}<br>Twin is with its holder. The original NFT is in escrow.`;
+  setInfinity(el, v.side === 'twin-liquid');
   const dir = adapter.validSwap(v);
   const label = dir === 'original-to-twin' ? 'Swap for the twin' : 'Swap back to the original';
   const why = !wallet ? 'Connect a wallet to swap.' : !mine ? 'Only the holder can swap.' : v.custody.unreadable ? 'Ownership could not be read. Reload to retry.' : !v.custody.consistent ? 'Custody check failed, swapping is disabled.' : (dir === 'original-to-twin' && v.listed === true) ? 'Listed on its marketplace. Unlist it first.' : '';
@@ -523,6 +532,7 @@ async function paintMine(t) {
     const dir = adapter.validSwap(v);
     const why = v.custody.unreadable ? 'Ownership could not be read. Reload to retry.' : !v.custody.consistent ? 'Custody check failed, swapping is disabled.' : (dir === 'original-to-twin' && v.listed === true) ? 'Listed on its marketplace. Unlist it first.' : '';
     el.querySelector('.pic').innerHTML = `<img alt="${esc(coll.itemNoun)} #${t} twin" src="${esc(twinImg(v.binding.xtrataId))}"><span class="tag">✓ TWINNED</span>`;
+    setInfinity(el, v.side === 'twin-liquid');
     body.innerHTML = `${idHtml}<div class="gs">${v.side === 'original-liquid' ? 'You hold the <b>original NFT</b>. Its permanent twin is in escrow.' : 'You hold the <b>twin</b>. The original NFT is in escrow.'}</div>
       <button type="button" class="ghost" ${why ? 'disabled' : ''}>${dir === 'original-to-twin' ? 'Swap for the twin' : 'Swap back to the original'}</button>${why ? `<div class="gs">${esc(why)}</div>` : ''}<div class="gm"></div>`;
     body.querySelector('button').addEventListener('click', async (ev) => {
