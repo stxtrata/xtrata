@@ -61,7 +61,7 @@ await check('community route', () => { assert.equal(R.routeKey('/forever-twins/c
 // ---------------------------------------------------------------- C. adapter
 section('C. adapter against a fake chain');
 const CORE = { contract: reg.core.contract, assetName: reg.core.assetName };
-const cl = { uint: (n) => ({ t: 'uint', v: String(n) }), principal: (p) => ({ t: 'p', v: p }), buffer: (b) => ({ t: 'buf', v: b }), list: (l) => ({ t: 'list', v: l }) };
+const cl = { uint: (n) => ({ t: 'uint', v: String(n) }), principal: (p) => ({ t: 'p', v: p }), buffer: (b) => ({ t: 'buf', v: b }), ascii: (t) => ({ t: 'ascii', v: t }), list: (l) => ({ t: 'list', v: l }) };
 const v3 = (over = {}) => ({ ...R.getCollection(reg, 'nyc-degens'), helper: 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.ft3-nyc-degens', status: 'live', ...over });
 const ME = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const OTHER = 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
@@ -161,14 +161,18 @@ await check('swap function names per interface', () => {
 await check('inscribe: v3 takes only token id + chunks; v1 and bad chunk counts are refused', () => {
   const a = A.createAdapter({ read: async () => null, cl, core: CORE }); const call = a.buildInscribe(v3(), 2, [new Uint8Array(3)]);
   assert.equal(call.fn, 'inscribe'); assert.equal(call.args.length, 2);
-  assert.throws(() => a.buildInscribe(R.getCollection(reg, 'leo-cats'), 1, [new Uint8Array(1)]), /v3 helper/);
+  const leo = R.getCollection(reg, 'leo-cats');
+  assert.throws(() => a.buildInscribe(leo, 1, [new Uint8Array(1)]), /file hash, type, size and token URI/);
+  const c1 = a.buildInscribe(leo, 7, [new Uint8Array(3)], { hash: '0x' + 'ab'.repeat(32), mime: 'image/png', totalSize: 3, tokenUri: 'ipfs://Qm/7.json' });
+  assert.equal(c1.fn, 'inscribe'); assert.equal(c1.args.length, 6); assert.equal(c1.args[1].v.length, 32); assert.equal(c1.args[1].v[0], 0xab); assert.equal(c1.args[2].v, 'image/png'); assert.equal(c1.args[5].v, 'ipfs://Qm/7.json');
+  assert.throws(() => a.buildInscribe(leo, 7, [new Uint8Array(3)], { hash: '0xab', mime: 'image/png', totalSize: 3, tokenUri: 'x'.repeat(257) }), /256/);
   assert.throws(() => a.buildInscribe(v3(), 1, []), /Chunk count/); assert.throws(() => a.buildInscribe(v3(), 1, Array(33).fill(new Uint8Array(1))), /Chunk count/);
   assert.throws(() => a.buildInscribe(R.getCollection(reg, 'megapont-ape-club'), 1, [new Uint8Array(1)]), /no helper/);
 });
 await check('writeBlock: not live / v1 / unfinalised / planned', async () => {
   const a = A.createAdapter({ read: async () => null, cl, core: CORE });
   assert.match(a.writeBlock(R.getCollection(reg, 'megapont-ape-club'), null, null), /No helper/);
-  assert.match(a.writeBlock(R.getCollection(reg, 'leo-cats'), { mismatches: [] }, null), /original page/);
+  assert.equal(a.writeBlock(R.getCollection(reg, 'leo-cats'), { mismatches: [] }, null), null); // v1 works without a finalised record
   assert.match(a.writeBlock(v3({ status: 'deploying' }), { mismatches: [], finalized: true }, null), /not live/);
   assert.match(a.writeBlock(v3(), { mismatches: [], finalized: false }, null), /not finalised/);
   assert.equal(a.writeBlock(v3(), { mismatches: [], finalized: true }, null), null);

@@ -2,7 +2,7 @@
 // Pure ES module. All chain access goes through injected functions so it can be tested in Node:
 //   read(contractId, functionName, args) -> plain JS value (uints as strings, tuples as objects,
 //                                           {ok}/{err} responses, {some} optionals decoded by unwrap*)
-//   cl = { uint(n), principal(p), buffer(bytes), list(items) }  (Clarity value builders)
+//   cl = { uint(n), principal(p), buffer(bytes), list(items), ascii(text) }  (Clarity value builders)
 
 export const CHUNK_SIZE = 16384;
 export const MAX_CHUNKS = 32;
@@ -170,22 +170,33 @@ export function createAdapter({ read, cl, core }) {
     return { contract: coll.helper, fn, args: [cl.uint(tokenId)] };
   }
 
-  /** v3 only: a sponsor supplies the token id and the chunks; the record fixes everything else. */
-  function buildInscribe(coll, tokenId, chunks) {
+  const hexBytes = (h) => { const x = String(h || '').replace(/^0x/i, ''); const out = new Uint8Array(x.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(x.slice(i * 2, i * 2 + 2), 16); return out; };
+
+  /**
+   * Inscribe call. v3: the record fixes everything, so only the token id and the chunks are sent.
+   * v1 (original Fak.fun helpers): the caller also passes the file's hash, mime type, size and the token URI,
+   * and the helper checks the hash against its stored canonical hash.
+   */
+  function buildInscribe(coll, tokenId, chunks, extra) {
     needHelper(coll);
-    if (coll.interface !== 'v3') throw new Error('Inscribing from the shared page needs a v3 helper; use the original page for this collection.');
     if (!chunks.length || chunks.length > MAX_CHUNKS) throw new Error(`Chunk count must be 1 to ${MAX_CHUNKS}`);
-    return { contract: coll.helper, fn: 'inscribe', args: [cl.uint(tokenId), cl.list(chunks.map((c) => cl.buffer(c)))] };
+    const list = cl.list(chunks.map((c) => cl.buffer(c)));
+    if (coll.interface === 'v3') return { contract: coll.helper, fn: 'inscribe', args: [cl.uint(tokenId), list] };
+    const { hash, mime, totalSize, tokenUri } = extra || {};
+    if (!hash || !mime || !totalSize || !tokenUri) throw new Error('This helper needs the file hash, type, size and token URI to inscribe.');
+    if (!/^[\x20-\x7e]{1,64}$/.test(mime)) throw new Error('The file type is not plain ASCII, so it cannot be passed to Xtrata.');
+    if (!/^[\x20-\x7e]{1,256}$/.test(tokenUri)) throw new Error('The source token URI is longer than 256 characters or not plain ASCII, so it cannot be passed to Xtrata from this page.');
+    return { contract: coll.helper, fn: 'inscribe', args: [cl.uint(tokenId), cl.buffer(hexBytes(hash)), cl.ascii(mime), cl.uint(totalSize), list, cl.ascii(tokenUri)] };
   }
 
   /** Why a write is not allowed right now; null means it may proceed. */
   function writeBlock(coll, st, view) {
     if (!coll.helper) return 'No helper contract is deployed for this collection yet.';
     if (coll.status !== 'live') return `This collection is "${coll.status}", not live.`;
-    if (coll.interface !== 'v3') return 'This collection runs on the original helper. Use its original page to inscribe or swap.';
     if (!st) return 'Helper state could not be read.';
     if (st.mismatches && st.mismatches.length) return `The deployed helper does not match the registry: ${st.mismatches[0]}.`;
-    if (!st.finalized) return 'The record is not finalised yet, so nothing can be inscribed or swapped.';
+    // The original (v1) helpers work without a finalised record; only v3 needs it.
+    if (coll.interface === 'v3' && !st.finalized) return 'The record is not finalised yet, so nothing can be inscribed or swapped.';
     return null;
   }
 
