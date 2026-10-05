@@ -5,7 +5,7 @@
 // Read-only: GETs the manifest asset and one Hiro read-only call (helper get-binding). No writes.
 import { cvToHex, cvToJSON, hexToCV, uintCV } from '@stacks/transactions';
 import resolverConfig from '../collections.json';
-import { getHiroApiKeys } from '../lib/hiro-keys';
+import { getHiroApiKeys } from '../../lib/hiro-keys';
 import {
   buildTwinMetadata,
   cacheControlFor,
