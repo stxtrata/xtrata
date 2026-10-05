@@ -3,59 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Community · Forever Twins</title>
-<meta name="description" content="A community's Forever Twins collections.">
-<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
-<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
-</head>
-<body>
-<header class="top"><div class="wrap">
-  <a class="brand" href="/forever-twins/">Forever Twins</a>
-  <span class="crumbs" id="crumbs"><a href="/forever-twins/collections/">All collections</a></span>
-</div></header>
-<main class="wrap">
-  <section id="notfound" class="card hidden">
-    <h1>Community not found</h1>
-    <p class="sub" id="nfText"></p>
-    <p><a class="btn" href="/forever-twins/collections/">See all collections</a></p>
-  </section>
-  <div id="page" class="hidden">
-    <h1><span id="name"></span><span id="pill" class="pill"></span></h1>
-    <p class="sub" id="blurb"></p>
-    <div id="soon" class="banner hidden"><strong>Coming soon.</strong> This community's collection has no helper contract yet, so there is nothing to inscribe or swap. The details below show where it is in the process.</div>
-    <div class="row spaced" id="links"></div>
-    <section class="card"><h2>Collections</h2><div class="grid" id="grid"></div></section>
-  </div>
-</main>
-<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
-<script type="module">
-import { loadRegistry, getCommunity, collectionsOf, routeKey, STATUS, COMMUNITY_STATUS, collectionUrl } from '/forever-twins/assets/ft-registry.js';
-const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const missing = (msg) => { document.title = 'Community not found · Forever Twins'; const m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex'; document.head.appendChild(m); $('nfText').textContent = msg; $('notfound').classList.remove('hidden'); };
-try {
-  const reg = await loadRegistry();
-  const slug = routeKey(location.pathname, location.search, 'community');
-  const m = slug ? getCommunity(reg, slug) : null;
-  if (!m) missing(slug ? `"${slug}" is not in the Forever Twins registry.` : 'No community was given.');
-  else {
-    document.title = `${m.name} · Forever Twins`;
-    document.documentElement.style.setProperty('--accent', m.accent || '#1f5fe0');
-    $('name').textContent = m.name; $('blurb').textContent = m.blurb || '';
-    $('pill').textContent = COMMUNITY_STATUS[m.status].label; $('pill').className = `pill ${m.status === 'live' ? 'ok' : 'mute'}`;
-    $('crumbs').innerHTML = `<a href="/forever-twins/collections/">All collections</a> › ${esc(m.name)}`;
-    if (m.status === 'coming-soon') $('soon').classList.remove('hidden');
-    $('links').innerHTML = (m.links || []).map((l) => `<a class="btn ghost" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.label)}</a>`).join('');
-    $('grid').innerHTML = collectionsOf(reg, m.slug).map((c) => {
-      const s = STATUS[c.status];
-      const logo = c.theme && c.theme.logo ? `<img src="${esc(c.theme.logo)}" alt="">` : '';
-      return `<article class="tile ${c.status === 'live' ? '' : 'soon'}"><div class="top">${logo}<div><h3>${esc(c.name)} <span class="pill ${s.tone}">${esc(s.label)}</span></h3><div class="meta">${esc(c.group)} · helper ${esc(c.interface)}</div></div></div>
-        <p class="sub" style="margin:0">${esc(c.blurb || '')}</p>
-        <div class="links"><a class="btn" href="${collectionUrl(c.key)}">Details</a>${c.legacyPage ? `<a class="btn ghost" href="${esc(c.legacyPage)}">Original page</a>` : ''}</div></article>`;
-    }).join('');
-    $('page').classList.remove('hidden');
-  }
-} catch (e) { missing(`The registry could not be loaded: ${e.message}`); }
+<title>Forever Twins community</title>
+<meta name="robots" content="noindex">
+<script>
+// The community page is served at /forever-twins/community/<slug> (see public/_redirects).
+// This folder index only forwards ?c= links to that route.
+(function () {
+  var k = new URLSearchParams(location.search).get('c');
+  location.replace(k && /^[a-z0-9-]+$/.test(k) ? '/forever-twins/community/' + k : '/forever-twins/collections/');
+})();
 </script>
-</body>
+</head>
+<body><p><a href="/forever-twins/collections/">All Forever Twins collections</a></p></body>
 </html>

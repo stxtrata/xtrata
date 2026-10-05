@@ -106,7 +106,7 @@ export const toolEnabled = (c) => !!(c && c.helper && STATUS[c.status] && STATUS
 export function routeKey(pathname, search, segment = 'collection') {
   const parts = String(pathname || '').split('/').filter(Boolean);
   const i = parts.lastIndexOf(segment);
-  const fromPath = i >= 0 && parts[i + 1] && parts[i + 1] !== 'index.html' ? parts[i + 1] : null;
+  const fromPath = i >= 0 && parts[i + 1] && !['index.html', 'view.html', 'view'].includes(parts[i + 1]) ? parts[i + 1] : null;
   const q = new URLSearchParams(search || '');
   const raw = fromPath || q.get(segment === 'collection' ? 'key' : 'c') || q.get('key') || q.get('c');
   return raw && KEY_RE.test(raw) ? raw : null;

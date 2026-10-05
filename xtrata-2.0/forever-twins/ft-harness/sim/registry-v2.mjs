@@ -51,7 +51,8 @@ await check('rejects v3 twinTokenUri without {id}', bad((r) => { r.collections.f
 section('B. routes');
 await check('path key', () => assert.equal(R.routeKey('/forever-twins/collection/nyc-degens', ''), 'nyc-degens'));
 await check('path key, trailing slash', () => assert.equal(R.routeKey('/forever-twins/collection/nyc-degens/', ''), 'nyc-degens'));
-await check('?key= fallback on the static file', () => assert.equal(R.routeKey('/forever-twins/collection/index.html', '?key=leo-cats'), 'leo-cats'));
+await check('?key= fallback on the static file', () => assert.equal(R.routeKey('/forever-twins/collection/view.html', '?key=leo-cats'), 'leo-cats'));
+await check('view page name is never read as a key', () => { assert.equal(R.routeKey('/forever-twins/collection/view', ''), null); assert.equal(R.routeKey('/forever-twins/community/view.html', '', 'community'), null); });
 await check('?key= on bare folder', () => assert.equal(R.routeKey('/forever-twins/collection/', '?key=leo-cats'), 'leo-cats'));
 await check('no key -> null', () => assert.equal(R.routeKey('/forever-twins/collection/', ''), null));
 await check('rejects path traversal / odd keys', () => { assert.equal(R.routeKey('/forever-twins/collection/..%2Fx', ''), null); assert.equal(R.routeKey('/x', '?key=A_B'), null); });
@@ -274,7 +275,7 @@ await check('manifest configs for planned v3 collections agree with v2 (source, 
   }
 });
 await check('page files the registry-driven pages depend on exist', () => {
-  for (const f of ['collection/index.html', 'collections/index.html', 'community/index.html', 'assets/ft-registry.js', 'assets/ft-adapter.js', 'assets/ft-media.js', 'assets/ft-shared.css', 'assets/xtrata-forever-twins.js']) assert.ok(existsSync(resolve(FT, f)), `${f} missing`);
+  for (const f of ['collection/view.html', 'collection/index.html', 'collections/index.html', 'community/view.html', 'community/index.html', 'assets/ft-registry.js', 'assets/ft-adapter.js', 'assets/ft-media.js', 'assets/ft-shared.css', 'assets/xtrata-forever-twins.js']) assert.ok(existsSync(resolve(FT, f)), `${f} missing`);
 });
 
 console.log(out.join('\n'));
