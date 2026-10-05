@@ -278,6 +278,23 @@ await check('page files the registry-driven pages depend on exist', () => {
   for (const f of ['collection/view.html', 'collection/index.html', 'collections/index.html', 'community/view.html', 'community/index.html', 'assets/ft-registry.js', 'assets/ft-adapter.js', 'assets/ft-media.js', 'assets/ft-shared.css', 'assets/xtrata-forever-twins.js']) assert.ok(existsSync(resolve(FT, f)), `${f} missing`);
 });
 
+
+// ---------------------------------------------------------------- F. page decoder (collection/view.html plainCV)
+// Regression: a tuple whose type string mentions "(optional none)" (get-twin-interface has pending-owner) was
+// decoded as an optional, so every field read as missing and the page said "not finalised".
+await check('view.html decodes the real get-twin-interface tuple (optional field inside a tuple)', async () => {
+  const T = await import('@stacks/transactions');
+  const html = read(resolve(FT, 'collection/view.html'));
+  const a = html.indexOf('const toHex'), b = html.indexOf('async function read(');
+  assert.ok(a > 0 && b > a, 'could not find plainCV in view.html');
+  const plainCV = new Function('chain', html.slice(a, b) + '; return plainCV;')(T);
+  const t = plainCV(T.hexToCV('0c000000150f63616e6f6e6963616c2d636f756e7401000000000000000000000000000001a41363616e6f6e6963616c2d66696e616c697a6564030e636f6c6c656374696f6e2d6b65790d0000000a6e79632d646567656e730366656501000000000000000000000000000186a00567726f75700d0000000247310f696e736372696265642d636f756e74010000000000000000000000000000000111696e746572666163652d76657273696f6e01000000000000000000000000000000030d6c617267652d756e626f756e6401000000000000000000000000000000000d6d616e69666573742d68617368020000002030dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b066d61737465720616e55cbbaafd88b6e63b036a3a2303b029e039cbbd0d7874726174612d76332d322d33076d61782d66656501000000000000000000000000004c4b40056f776e65720516e55cbbaafd88b6e63b036a3a2303b029e039cbbd0770617965652d61051641c139d4394e910afadb7ff2b32ee14b273eb5180770617965652d6205163699883a5bd5324eb8975e56bec8a9f843409b4e0d70656e64696e672d6f776e6572090c7265736375652d64656c617901000000000000000000000000000001b00e7265736375652d656e61626c65640305726f7574650d000000087374616e6461726406736f75726365061672c775c6b5216530cb254b6151b3ea36483d376b0a6e79632d646567656e730c736f757263652d61737365740d0000000a6e79632d646567656e730d73776170732d656e61626c656403'));
+  assert.equal(t['canonical-finalized'], true); assert.equal(t.fee, '100000'); assert.equal(t['canonical-count'], '420');
+  assert.equal(t['pending-owner'], null); assert.equal(t['collection-key'], 'nyc-degens');
+  assert.deepEqual(plainCV(T.responseOkCV(T.someCV(T.uintCV(5)))), { ok: { some: '5' } });
+  assert.deepEqual(plainCV(T.responseErrorCV(T.uintCV(206))), { err: '206' });
+});
+
 console.log(out.join('\n'));
 console.log(`\nregistry-v2: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
