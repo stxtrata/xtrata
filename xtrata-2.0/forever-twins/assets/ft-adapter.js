@@ -131,7 +131,9 @@ export function createAdapter({ read, cl, core }) {
       const consistent = escrowed
         ? view.twinOwner === me && view.sourceOwner !== me && view.sourceOwner != null
         : view.sourceOwner === me && view.twinOwner !== me && view.twinOwner != null;
-      view.custody = { consistent, stranded: view.sourceOwner === me && view.twinOwner === me };
+      // A failed owner read says nothing about custody: report it as unreadable, never as a mismatch.
+      const unreadable = !!view.sourceOwnerError || !!(xo && xo.__error);
+      view.custody = { consistent: unreadable ? false : consistent, stranded: !unreadable && view.sourceOwner === me && view.twinOwner === me, unreadable };
       view.side = escrowed ? 'original-liquid' : 'twin-liquid';
       view.liquidOwner = escrowed ? view.sourceOwner : view.twinOwner;
     }
