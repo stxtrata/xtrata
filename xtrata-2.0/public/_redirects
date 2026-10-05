@@ -4,9 +4,7 @@
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
 # Forever Twins: registry-driven pages. Each key is read from /forever-twins/data/registry.v2.json
-# The pages live in view.html (not index.html) so Pages does not redirect the rewrite to the folder URL and drop the key.
-/forever-twins/collection/:key /forever-twins/collection/view.html 200
-/forever-twins/community/:slug /forever-twins/community/view.html 200
+# /forever-twins/collection/<key> and /forever-twins/community/<slug> are served by functions/forever-twins/ (a rewrite here loses the key).
 /kp-loops /kp-loops/index.html 200
 /homepage / 302
 /homepage/ / 302
