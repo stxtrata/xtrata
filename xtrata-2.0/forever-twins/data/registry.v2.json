@@ -1,0 +1,146 @@
+{
+  "registry": "forever-twins",
+  "version": 2,
+  "network": "mainnet",
+  "core": {
+    "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "assetName": "xtrata-inscription"
+  },
+  "rules": [
+    "One helper per source collection. A second helper for the same collection is never listed.",
+    "interface 'v3' entries are read through get-twin-interface. interface 'v1' entries are the three helpers live before the grant (built with Rapha / Fak.fun) and are read through their own getters.",
+    "A collection with no helper has status 'planned', 'screening' or 'manifest-review'. It is shown, but no action buttons are offered and no tool is linked.",
+    "legacyPage, when present, is the original hand-built page. It keeps working and stays linked from the shared page.",
+    "Counts and coverage are read live from the helper. The 'coverage' block holds only dated snapshots for evidence and must never be presented as live."
+  ],
+  "communities": [
+    {
+      "slug": "fakfun",
+      "name": "Fak.fun collections",
+      "status": "live",
+      "blurb": "The first three Forever Twins collections, built together with Fak.fun.",
+      "accent": "#f7931a",
+      "links": [
+        { "label": "Fak.fun", "url": "https://fak.fun" }
+      ],
+      "collections": ["bitcoin-pepes", "leo-cats", "miami-degens"]
+    },
+    {
+      "slug": "nyc-dgens",
+      "name": "NYC DGENs",
+      "status": "coming-soon",
+      "blurb": "The NYC DGENs community page for the NYC Degens collection. The helper is not deployed yet, so there is nothing to inscribe or swap until it is finalised.",
+      "accent": "#1f5fe0",
+      "links": [],
+      "collections": ["nyc-degens"]
+    }
+  ],
+  "collections": [
+    {
+      "key": "bitcoin-pepes",
+      "name": "Bitcoin Pepes",
+      "itemNoun": "Bitcoin Pepe",
+      "community": "fakfun",
+      "status": "live",
+      "interface": "v1",
+      "group": "G2",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "source": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
+      "sourceAsset": "bitcoin-pepe",
+      "legacyPage": "/forever-twins/bitcoin-pepes/",
+      "claimUrl": "https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "theme": { "logo": "/forever-twins/assets/bitcoin-pepe-maxi.png", "accent": "#2f9e44" },
+      "blurb": "The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.",
+      "manifest": null,
+      "coverage": null
+    },
+    {
+      "key": "leo-cats",
+      "name": "LEO Cats",
+      "itemNoun": "LEO Cat",
+      "community": "fakfun",
+      "status": "live",
+      "interface": "v1",
+      "group": "G2",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+      "source": "SP2N959SER36FZ5QT1CX9BR63W3E8X35WQCMBYYWC.leo-cats",
+      "sourceAsset": "leo-cats",
+      "legacyPage": "/forever-twins/leo-cats/",
+      "theme": { "logo": "/forever-twins/assets/leo-cat-forever-twin-logo-1.jpg", "accent": "#12b5a6" },
+      "blurb": "LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata.",
+      "manifest": null,
+      "coverage": null
+    },
+    {
+      "key": "miami-degens",
+      "name": "Miami Degens",
+      "itemNoun": "Miami Degen",
+      "community": "fakfun",
+      "status": "live",
+      "interface": "v1",
+      "group": "G1",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+      "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.miami-degens",
+      "sourceAsset": "miami-degens",
+      "legacyPage": "/forever-twins/miami-degens/",
+      "theme": { "logo": "/forever-twins/assets/miami-degens-forever-twin-logo.jpg", "accent": "#e8590c" },
+      "blurb": "Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid.",
+      "manifest": null,
+      "coverage": null
+    },
+    {
+      "key": "nyc-degens",
+      "name": "NYC Degens",
+      "itemNoun": "NYC Degen",
+      "community": "nyc-dgens",
+      "status": "planned",
+      "interface": "v3",
+      "group": "G1",
+      "helper": null,
+      "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+      "sourceAsset": "nyc-degens",
+      "legacyPage": null,
+      "theme": { "logo": null, "accent": "#1f5fe0" },
+      "blurb": "Cohort 1 for Milestone 1. Helper not yet deployed.",
+      "twinTokenUri": "https://xtrata.xyz/ft/nyc-degens/{id}.json",
+      "manifest": null,
+      "coverage": null
+    },
+    {
+      "key": "megapont-ape-club",
+      "name": "Megapont Ape Club",
+      "itemNoun": "Megapont Ape",
+      "community": null,
+      "status": "planned",
+      "interface": "v3",
+      "group": "G2",
+      "helper": null,
+      "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+      "sourceAsset": "Megapont-Ape-Club",
+      "legacyPage": null,
+      "theme": { "logo": null, "accent": "#7048e8" },
+      "blurb": "Cohort 2 for Milestone 1. Helper not yet deployed.",
+      "twinTokenUri": "https://xtrata.xyz/ft/megapont-ape-club/{id}.json",
+      "manifest": null,
+      "coverage": null
+    },
+    {
+      "key": "see-yourself-out",
+      "name": "See Yourself Out",
+      "itemNoun": "See Yourself Out token",
+      "community": null,
+      "status": "planned",
+      "interface": "v3",
+      "group": "G2",
+      "helper": null,
+      "source": "SP3M05ETW09E98NNFMFHT1WND3ZRX9DV31TFC6DFW.see-yourself-out",
+      "sourceAsset": "see-yourself-out",
+      "legacyPage": null,
+      "theme": { "logo": null, "accent": "#c2255c" },
+      "blurb": "Cohort 3 for Milestone 1. Helper not yet deployed.",
+      "twinTokenUri": "https://xtrata.xyz/ft/see-yourself-out/{id}.json",
+      "manifest": null,
+      "coverage": null
+    }
+  ]
+}
