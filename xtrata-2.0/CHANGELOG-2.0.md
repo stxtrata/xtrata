@@ -2,6 +2,11 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: sticky wallet bar for the connected user (2026-10-06)
+- `public/bounty/zdao/tracker/1/index.html`: the connect control moved from the leaderboard (bottom of the page) to a bar pinned to the top. Signed out it says what connecting gives you; connected it shows your short address, standing (In the draw / Waiting / Winner, or "Not on the board yet"), tickets with any held count, and your X handle with **Add X handle** or **Edit** (inline input, Enter saves, Escape cancels). Team-confirmed handles show "confirmed by the team" with no edit. A wallet that is not on the board yet can still link a handle.
+- The "See where you stand" checker fills itself with the connected wallet (and clears on disconnect, unless you were looking up someone else); it is now labelled "Look up any wallet". The leaderboard is read-only apart from your highlighted row. On narrow screens the bar wraps to three short lines (about 110 px) and the page never scrolls sideways. No wallet code changed: the page still uses `XtrataBountyWallet`.
+- **Verified:** `npx vitest run src/bounty-tracker functions/bounty` (17 tests) and a browser run with a simulated disposable wallet at desktop and 390 px (signed out, sticky while scrolling, connect, add, edit, disconnect, off-board wallet, chain down).
+
 ## Bounty tracker: remembers what it read, and wallets can link their X handle (2026-10-06)
 
 - **Why:** the first tracker re-read every contract from the cutoff on every visit (about 20 s), and handles could only be added by hand in `handles.json`.

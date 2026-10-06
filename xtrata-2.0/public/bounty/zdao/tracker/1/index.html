@@ -69,14 +69,33 @@ button { font: inherit; cursor: pointer; }
 .ghost:hover { color: var(--fg); border-color: var(--mute); }
 button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
 .hint { color: var(--mute); font-size: 13px; }
-.walletbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 8px; }
 .btn.small { padding: 9px 16px; font-size: 14px; }
-.wmsg { margin: 0 0 10px; min-height: 1.2em; } .wmsg.bad { color: var(--amber); }
 tr.me td { background: var(--lime-soft); }
 .youtag, .selftag { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
-.hcell { white-space: nowrap; } .hcell .ghost { margin-left: 8px; padding: 3px 10px; }
-.hcell .hin { width: 150px; max-width: 40vw; background: var(--bg); color: var(--fg); border: 1.5px solid var(--lime); border-radius: 8px; padding: 6px 9px; font: 500 14px var(--mono); }
-.hcell .go { color: var(--lime); border-color: #3a5018; }
+
+/* sticky wallet bar: connect, who you are, where you stand, your X handle */
+html { scroll-padding-top: 120px; }
+.mebar { position: sticky; top: 0; z-index: 20; background: rgba(10,12,15,.95); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line2); }
+.mebar-in { max-width: 1040px; margin: 0 auto; padding: 10px 20px; display: flex; flex-direction: column; gap: 4px; }
+.me-main { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-height: 38px; }
+.me-id { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; min-width: 0; }
+.me-addr { font: 600 14px var(--mono); }
+.me-tk { font: 700 14px var(--mono); color: var(--lime); } .me-tk.wait { color: var(--amber); }
+.me-handle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.me-handle .h { font: 600 14px var(--mono); } .me-handle .none { color: var(--mute); font-size: 14px; }
+.me-handle .hin { width: 170px; max-width: 46vw; background: var(--bg); color: var(--fg); border: 1.5px solid var(--lime); border-radius: 8px; padding: 6px 9px; font: 500 14px var(--mono); }
+.me-handle .go, .me-end .go { color: var(--lime); border-color: #3a5018; }
+.me-end { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.me-end a { color: var(--lime); font: 500 12px var(--mono); text-underline-offset: 3px; }
+.me-note { flex-basis: 100%; margin: 0; }
+.me-pitch { color: var(--mute); font-size: 14px; flex: 1 1 240px; min-width: 0; }
+.wmsg { margin: 0; } .wmsg.bad { color: var(--amber); } .wmsg:empty { display: none; }
+@media (max-width: 620px) {
+  .mebar-in { padding: 8px 14px; }
+  .me-main { gap: 6px 12px; }
+  .me-end { margin-left: 0; }
+  html { scroll-padding-top: 150px; }
+}
 
 .result { display: flex; flex-direction: column; gap: 14px; }
 .who { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; justify-content: space-between; }
@@ -210,6 +229,12 @@ tr:last-child td { border-bottom: 0; }
 
 </head>
 <body>
+<div class="mebar" id="mebar" role="region" aria-label="Your wallet">
+  <div class="mebar-in">
+    <div class="me-main" id="meMain"></div>
+    <p class="hint wmsg" id="wmsg" role="status" aria-live="polite"></p>
+  </div>
+</div>
 <main class="sheet">
   <header class="top">
     <div class="brand"><span>XTRATA</span><span class="x">×</span><span class="dao">ZERO AUTHORITY DAO</span></div>
@@ -230,7 +255,7 @@ tr:last-child td { border-bottom: 0; }
 
   <section class="checker" aria-labelledby="chk-h">
     <div class="head">
-      <div class="label lime">Your wallet</div>
+      <div class="label lime">Look up any wallet</div>
       <h2 id="chk-h">See where you stand</h2>
     </div>
     <form class="row" id="form" autocomplete="off">
@@ -315,8 +340,6 @@ tr:last-child td { border-bottom: 0; }
       <h2>Every wallet on the board</h2>
       <p id="boardNote"></p>
     </div>
-    <div class="walletbar"><button class="btn small" id="wcon" type="button">Connect wallet</button><button class="ghost" id="wdis" type="button" hidden>Disconnect</button><span class="hint" id="wstat"></span></div>
-    <p class="hint wmsg" id="wmsg" role="status" aria-live="polite"></p>
     <div class="board"><table>
       <thead><tr><th class="num">#</th><th>Wallet</th><th>X handle</th><th>Status</th><th class="num">Tickets</th><th>Activity</th></tr></thead>
       <tbody id="rows"></tbody>
@@ -496,26 +519,8 @@ tr:last-child td { border-bottom: 0; }
       var tr = el('tr', 'click' + (own ? ' me' : '')); tr.tabIndex = 0;
       tr.appendChild(el('td', 'num mono', String(i + 1)));
       var wt = el('td', 'mono', short(r.a.a)); if (own) wt.appendChild(el('small', 'youtag', ' you')); tr.appendChild(wt);
-      var hc = el('td', 'hcell');
-      if (own && editing) {
-        var inp = el('input', 'hin'); inp.type = 'text'; inp.value = r.handle; inp.placeholder = '@yourhandle'; inp.maxLength = 40; inp.spellcheck = false; inp.setAttribute('aria-label', 'Your X handle');
-        var sv = el('button', 'ghost go', 'Save'), cn = el('button', 'ghost', 'Cancel');
-        sv.type = 'button'; cn.type = 'button';
-        sv.addEventListener('click', function (e) { e.stopPropagation(); saveHandle(inp.value); });
-        cn.addEventListener('click', function (e) { e.stopPropagation(); editing = false; say(''); drawBoard(); });
-        inp.addEventListener('click', function (e) { e.stopPropagation(); });
-        inp.addEventListener('keydown', function (e) { e.stopPropagation(); if (e.key === 'Enter') saveHandle(inp.value); if (e.key === 'Escape') { editing = false; drawBoard(); } });
-        hc.appendChild(inp); hc.appendChild(sv); hc.appendChild(cn);
-        setTimeout(function () { inp.focus(); inp.select(); }, 0);
-      } else {
-        hc.appendChild(document.createTextNode(r.handle || '—'));
-        if (r.handle && r.self) hc.appendChild(el('small', 'selftag', ' self-linked'));
-        if (own && HANDLING && !team(r)) {
-          var ed = el('button', 'ghost edit', r.handle ? 'Edit' : 'Add handle'); ed.type = 'button';
-          ed.addEventListener('click', function (e) { e.stopPropagation(); editing = true; say(''); drawBoard(); });
-          hc.appendChild(ed);
-        } else if (own && team(r)) hc.appendChild(el('small', 'selftag', ' confirmed by the team'));
-      }
+      var hc = el('td', '', r.handle || '—');
+      if (r.handle && r.self) hc.appendChild(el('small', 'selftag', ' self-linked'));
       tr.appendChild(hc);
       var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.won ? 'Winner' : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
       var tk = el('td', 'num tk ' + (r.valid ? 'ok' : 'wait'), String(r.tickets));
@@ -610,7 +615,7 @@ tr:last-child td { border-bottom: 0; }
   $('example').addEventListener('click', function () { if (rows[0]) { $('q').value = rows[0].a.a; check(); } });
 
   // ---- Load: show the saved copy at once, then add whatever is new ----
-  function repaint() { rebuild(); paintTop(); drawBoard(); if ($('q').value.trim()) check(); }
+  function repaint() { rebuild(); paintTop(); drawBoard(); paintWallet(); if ($('q').value.trim()) check(); }
   var busy = false;
   async function refresh(force) {
     if (busy) return; busy = true;
@@ -646,27 +651,76 @@ tr:last-child td { border-bottom: 0; }
     });
     return walletP;
   }
-  function say(msg, bad) { var m = $('wmsg'); m.textContent = msg || ''; m.className = 'hint' + (bad ? ' bad' : ''); }
+  function say(msg, bad) { var m = $('wmsg'); m.textContent = msg || ''; m.className = 'hint wmsg' + (bad ? ' bad' : ''); }
+  function btn(text, cls, fn) { var b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; }
+  var barKey = '';
+  // The sticky bar: connect when signed out; address, standing, tickets and X handle when connected.
   function paintWallet() {
-    var con = !!ME, mine = con && rows.filter(function (r) { return r.a.a === ME; })[0];
-    $('wcon').textContent = wbusy ? 'Please wait…' : con ? 'Switch wallet' : 'Connect wallet'; $('wcon').disabled = wbusy;
-    $('wdis').hidden = !con;
-    $('wstat').textContent = !con ? 'Connect your wallet to add your X handle to your row.'
-      : mine ? 'Connected as ' + short(ME) + '. Edit the handle on your row below.'
-      : 'Connected as ' + short(ME) + '. This wallet is not on the board yet: it shows up once it has used Xtrata since 1 October.';
+    var con = !!ME, mine = con ? (rows.filter(function (r) { return r.a.a === ME; })[0] || null) : null;
+    var key = JSON.stringify([ME, editing, wbusy, HANDLING, mine ? [mine.valid, mine.held, mine.tickets, mine.handle, mine.self, !!mine.won] : 0]);
+    if (key === barKey) return; barKey = key;
+    var m = $('meMain'); m.textContent = '';
+    if (!con) {
+      var pitch = el('div', 'me-pitch'); pitch.appendChild(el('b', '', 'Your wallet. ')); pitch.appendChild(document.createTextNode('Connect to see your tickets and link your X handle. It is free and sends no transaction.'));
+      m.appendChild(pitch);
+      var cb = btn(wbusy ? 'Please wait…' : 'Connect wallet', 'btn small', connectClick); cb.id = 'wcon'; cb.disabled = wbusy; m.appendChild(cb);
+      return;
+    }
+    var id = el('div', 'me-id');
+    id.appendChild(el('span', 'label lime', 'You'));
+    var ad = el('span', 'me-addr', short(ME)); ad.title = ME; id.appendChild(ad);
+    if (mine) {
+      id.appendChild(el('span', 'pill ' + (mine.won ? 'win' : mine.valid ? 'ok' : 'wait'), mine.won ? 'Winner' : mine.valid ? 'In the draw' : 'Waiting'));
+      id.appendChild(el('span', 'me-tk' + (mine.valid ? '' : ' wait'), mine.valid ? mine.tickets + (mine.tickets === 1 ? ' ticket' : ' tickets') : '0 tickets' + (mine.held ? ' · ' + mine.held + ' held' : '')));
+    } else {
+      id.appendChild(el('span', 'pill wait', 'Not on the board yet'));
+    }
+    m.appendChild(id);
+
+    var hd = el('div', 'me-handle');
+    var team = mine && !!HANDLES[ME], cur = mine ? mine.handle : (LINKED[ME] ? LINKED[ME].h : '');
+    if (editing) {
+      var inp = el('input', 'hin'); inp.type = 'text'; inp.value = cur; inp.placeholder = '@yourhandle'; inp.maxLength = 40; inp.spellcheck = false; inp.setAttribute('aria-label', 'Your X handle'); inp.autocapitalize = 'off';
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') saveHandle(inp.value); if (e.key === 'Escape') { editing = false; say(''); paintWallet(); } });
+      hd.appendChild(inp); hd.appendChild(btn('Save', 'ghost go', function () { saveHandle(inp.value); })); hd.appendChild(btn('Cancel', 'ghost', function () { editing = false; say(''); paintWallet(); }));
+      setTimeout(function () { inp.focus(); inp.select(); }, 0);
+    } else if (cur) {
+      hd.appendChild(el('span', 'label', 'X')); hd.appendChild(el('span', 'h', cur));
+      if (team) hd.appendChild(el('small', 'selftag', 'confirmed by the team'));
+      else {
+        hd.appendChild(el('small', 'selftag', 'self-linked'));
+        if (HANDLING) hd.appendChild(btn('Edit', 'ghost', function () { editing = true; say(''); paintWallet(); }));
+      }
+    } else {
+      hd.appendChild(el('span', 'label', 'X')); hd.appendChild(el('span', 'none', 'No handle yet'));
+      if (HANDLING) hd.appendChild(btn('Add X handle', 'btn small', function () { editing = true; say(''); paintWallet(); }));
+    }
+    m.appendChild(hd);
+
+    var en = el('div', 'me-end');
+    if (mine) { var lk = el('a', '', 'My tickets ↓'); lk.href = '#chk-h'; en.appendChild(lk); }
+    var sw = btn(wbusy ? 'Please wait…' : 'Switch', 'ghost', connectClick); sw.id = 'wcon'; sw.disabled = wbusy; en.appendChild(sw);
+    var dc = btn('Disconnect', 'ghost', disconnectClick); dc.id = 'wdis'; dc.disabled = wbusy; en.appendChild(dc);
+    m.appendChild(en);
+    if (!mine) { var nt = el('p', 'hint me-note', 'This wallet has not used Xtrata since 1 October, so it is not on the board yet. You can link your handle now. Inscribe or collect an Audionaut with it to get in.'); m.appendChild(nt); }
   }
-  function walletChanged() { ME = window.XtrataBountyWallet ? window.XtrataBountyWallet.address() : ''; editing = false; paintWallet(); drawBoard(); }
+  // Show your own wallet in the checker as soon as you are connected (unless you were checking someone else).
+  function syncChecker(prev) {
+    var q = $('q'); if (!ME) { if (prev && q.value.trim() === prev) { q.value = ''; check(); } return; }
+    if (!q.value.trim() || q.value.trim() === prev) { q.value = ME; check(); }
+  }
+  function walletChanged() { var prev = ME; ME = window.XtrataBountyWallet ? window.XtrataBountyWallet.address() : ''; editing = false; say(''); barKey = ''; paintWallet(); drawBoard(); syncChecker(prev); }
   window.addEventListener('xtrata:wallet-changed', walletChanged);
-  $('wcon').addEventListener('click', async function () {
-    if (wbusy) return; wbusy = true; say(''); paintWallet();
+  async function connectClick() {
+    if (wbusy) return; var prev = ME; wbusy = true; say(''); paintWallet();
     try { var w = await loadWallet(); await w.connect(); ME = w.address(); } catch (e) { say(e && e.message ? e.message : 'Wallet connection failed.', true); }
-    wbusy = false; editing = false; paintWallet(); drawBoard();
-  });
-  $('wdis').addEventListener('click', async function () {
-    if (wbusy) return; wbusy = true; paintWallet();
+    wbusy = false; editing = false; barKey = ''; paintWallet(); drawBoard(); syncChecker(prev);
+  }
+  async function disconnectClick() {
+    if (wbusy) return; var prev = ME; wbusy = true; paintWallet();
     try { await (await loadWallet()).disconnect(); } catch (e) { say(e && e.message ? e.message : 'Could not disconnect.', true); }
-    ME = window.XtrataBountyWallet ? window.XtrataBountyWallet.address() : ''; wbusy = false; editing = false; paintWallet(); drawBoard();
-  });
+    ME = window.XtrataBountyWallet ? window.XtrataBountyWallet.address() : ''; wbusy = false; editing = false; barKey = ''; say(''); paintWallet(); drawBoard(); syncChecker(prev);
+  }
   async function saveHandle(value) {
     if (wbusy) return; wbusy = true; say('Approve the message in your wallet. It is free and sends no transaction.'); paintWallet();
     try {
@@ -677,10 +731,10 @@ tr:last-child td { border-bottom: 0; }
       if (j.handle) LINKED[claim.address] = { h: j.handle, t: claim.issued }; else delete LINKED[claim.address];
       editing = false; say(j.handle ? j.handle + ' is linked to ' + short(claim.address) + '. It shows as self-linked until the team confirms it.' : 'Your handle link was removed.');
     } catch (e) { say(e && e.message ? e.message : 'Cancelled. Nothing changed.', true); }
-    wbusy = false; paintWallet(); repaint();
+    wbusy = false; barKey = ''; paintWallet(); repaint();
   }
   // Restore a previous connection quietly: only load the wallet code if this browser already has a session.
-  try { if (/"isConnected":true/.test(localStorage.getItem('xtrata.v15.1.wallet.session') || '')) loadWallet().then(function (w) { ME = w.address(); paintWallet(); drawBoard(); }).catch(function () {}); } catch (e) {}
+  try { if (/"isConnected":true/.test(localStorage.getItem('xtrata.v15.1.wallet.session') || '')) loadWallet().then(function (w) { ME = w.address(); barKey = ''; paintWallet(); drawBoard(); syncChecker(''); }).catch(function () {}); } catch (e) {}
 
   repaint(); check(); paintWallet(); loadHandles();
   refresh(false);
