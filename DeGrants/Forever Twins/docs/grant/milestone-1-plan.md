@@ -1,7 +1,8 @@
 # Milestone 1 plan
 
-Working plan from 25 September 2026. Target: **Friday 2 October**, pending confirmation of the
-due date (see [milestones.md](milestones.md)).
+Working plan from 25 September 2026, updated 6 October. The due date is **Tuesday 13 October 2026**;
+the plan is to submit on Monday 12 October (see [milestones.md](milestones.md)). The original
+target of Friday 2 October is superseded.
 
 The critical path is: tests in the real harness -> choose collections -> manifest and seeding
 script -> mainnet-fork runs -> deploy. Docs, the registry page and the open-source release run

@@ -27,7 +27,8 @@
     "test:lod": "npm run render && node sim/large-on-demand-v3.mjs",
     "test:wizard": "node sim/large-wizard-engine.mjs",
     "test:fuzz": "node sim/lod-fuzz-v3.mjs",
-    "audit:lod": "node scripts/audit-lod.mjs --config scripts/configs/mainnet-bitcoin-monkeys.v3.json --manifest manifest/out/bitcoin-monkeys.manifest.json"
+    "audit:lod": "node scripts/audit-lod.mjs --config scripts/configs/mainnet-bitcoin-monkeys.v3.json --manifest manifest/out/bitcoin-monkeys.manifest.json",
+    "evidence": "node scripts/evidence-snapshot.mjs"
   },
   "dependencies": {
     "@stacks/clarinet-sdk": "3.24.0",

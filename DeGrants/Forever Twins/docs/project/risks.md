@@ -5,7 +5,7 @@
 | Risk | Impact | Mitigation | Owner |
 |---|---|---|---|
 | Contracts unaudited; only simnet-tested | Holder NFTs in custody at risk from an undiscovered bug; swaps can't be paused | Real-harness run, mainnet-fork runs, start with small collections, clear "unaudited" labelling | Jim |
-| Milestone 1 deadline (Q3 ends 30 Sep) | Late milestone | Confirm due date; aim for 2 Oct; buffer day | Jim |
+| Milestone 1 deadline (13 Oct 2026) | Late milestone | Submit Mon 12 Oct; Tue 13 Oct is slack | Jim |
 | Manifest built from the wrong art | Twins permanently wrong for that collection | Build from original sources, publish, check before finalising; redeploy is cheap before finalising | Jim |
 | Art already lost for a candidate | Can't preserve it | Check resolvability first; record findings for the recap | Jim |
 | Token art over 512 KB | Sponsors can't inscribe it | Owner pre-inscribes and binds it before finalising (D14); owner pays those core fees. Over 32 MiB can't be preserved by the core at all | Jim |
