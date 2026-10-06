@@ -2325,7 +2325,12 @@ button:disabled {
 .sfp-lantern .sfp-body,
 .sfp-prism .sfp-body,
 .sfp-tidalglass .sfp-body,
-.sfp-tidelace .sfp-body {
+.sfp-tidelace .sfp-body,
+.sfp-ensemble .sfp-body,
+.sfp-tine .sfp-body,
+.sfp-kit .sfp-body,
+.sfp-tonewheel .sfp-body,
+.sfp-modal .sfp-body {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 .sfp-jibass,
@@ -2338,14 +2343,24 @@ button:disabled {
 .sfp-lantern,
 .sfp-prism,
 .sfp-tidalglass,
-.sfp-tidelace {
+.sfp-tidelace,
+.sfp-ensemble,
+.sfp-tine,
+.sfp-kit,
+.sfp-tonewheel,
+.sfp-modal {
   width: 1140px;
 }
 .sfp-jibass .sfp-radio,
 .sfp-kiln .sfp-radio,
 .sfp-lantern .sfp-radio,
 .sfp-prism .sfp-radio,
-.sfp-tidelace .sfp-radio {
+.sfp-tidelace .sfp-radio,
+.sfp-ensemble .sfp-radio,
+.sfp-tine .sfp-radio,
+.sfp-kit .sfp-radio,
+.sfp-tonewheel .sfp-radio,
+.sfp-modal .sfp-radio {
   flex-wrap: wrap;
 }
 .sfp-kiln .sfp-opt,
@@ -2356,6 +2371,35 @@ button:disabled {
 .sfp-faultglass .fg-env,
 .sfp-morrowglass .mg-env {
   grid-column: span 2;
+}
+
+/* section spans + tighter rows for the five folder synths (pad / keys / drums / organ / mallet) */
+.sfp-tonewheel .tw-bars,
+.sfp-tonewheel .tw-mod,
+.sfp-kit .kt-kick,
+.sfp-kit .kt-snare,
+.sfp-kit .kt-metal,
+.sfp-tine .tn-model,
+.sfp-tine .tn-char,
+.sfp-modal .md-body,
+.sfp-modal .md-res,
+.sfp-ensemble .en-filter {
+  grid-column: span 2;
+}
+.sfp-tonewheel .tw-bars .sfp-row {
+  gap: 2px;
+  justify-content: space-between;
+}
+.sfp-tonewheel .tw-bars .fader-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sfp-ensemble .sfp-opt,
+.sfp-tonewheel .sfp-opt,
+.sfp-modal .sfp-opt,
+.sfp-tine .sfp-opt,
+.sfp-kit .sfp-opt {
+  flex: 1 1 56px;
 }
 
 /* ---- folder-style synth picker (synth-picker.js) ---- */

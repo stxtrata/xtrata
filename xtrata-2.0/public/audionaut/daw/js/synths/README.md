@@ -5,21 +5,21 @@ pickers show as the tree, so putting a module in `synths/<folder>/` files it the
 
 | Folder | Picker label | What belongs here | Contents |
 |---|---|---|---|
-| `bass/` | Bass | sub, acid, analog and growl bass | jiBASS (+ Acid ALS, Sub Zero in synths.js) |
-| `lead/` | Leads | mono and poly lead voices, supersaws | jims10, Stacker (synths.js) |
-| `pad/` | Pads & String Machines | warm sustained pads, ensembles, string machines | **empty** |
-| `keys/` | Pianos & Electric Pianos | piano, Rhodes/Wurli-style, clav | **empty** |
-| `organ/` | Organs | drawbar / tonewheel / combo / church | **empty** |
-| `fm/` | FM Keys & Bells | DX-style FM keys, bells and basses | jiFM4 (synths-voices.js), FMonad (synths.js) |
-| `pluck/` | Plucked & Struck Strings | Karplus-Strong strings: nylon, harp, koto | jiPLUCK (synths-voices.js) |
-| `mallet/` | Mallets & Modal Percussion | marimba, kalimba, vibes, bowls, gongs | **empty** |
+| `bass/` | Bass | sub, acid, analog and growl bass | jiBASS (`bass/jibass.js`); Acidals 303, SubZero (in `synths.js`) |
+| `lead/` | Leads | mono and poly lead voices, supersaws | jiMS10, Stacker (in `synths.js`) |
+| `pad/` | Pads & String Machines | warm sustained pads, ensembles, string machines | jiENSEMBLE (`pad/ensemble.js`) — string machine / pad / choir |
+| `keys/` | Pianos & Electric Pianos | piano, Rhodes/Wurli-style, clav | jiTINE (`keys/tine.js`) — Rhodes / Wurli / piano / clav models |
+| `organ/` | Organs | drawbar / tonewheel / combo / church | jiTONEWHEEL (`organ/tonewheel.js`) — drawbar organ with rotary |
+| `fm/` | FM Keys & Bells | DX-style FM keys, bells and basses | jiFM4 (`synths-voices.js`), FMonad (`synths.js`) |
+| `pluck/` | Plucked & Struck Strings | Karplus-Strong strings: nylon, harp, koto | jiPLUCK (`synths-voices.js`) |
+| `mallet/` | Mallets & Modal Percussion | marimba, kalimba, vibes, bowls, gongs | jiMODAL (`mallet/modal.js`) — marimba, xylophone, vibes, glock, kalimba, bell, bowl, pan, wood |
 | `reed/` | Brass, Winds & Bowed | brass stabs, flute/reed, bowed strings | **empty** |
-| `voice/` | Voice & Choir | formant vowels, choirs, vocoder-style | jiVOX (synths-voices.js) |
-| `chip/` | Chip & Retro | PWM, NES/Game Boy-style, 8-bit | Chip8 (synths.js) |
+| `voice/` | Voice & Choir | formant vowels, choirs, vocoder-style | jiVOX (`synths-voices.js`) |
+| `chip/` | Chip & Retro | PWM, NES/Game Boy-style, 8-bit | Chip-8 (`synths.js`) |
 | `wave/` | Wavetable, Phase & West-Coast | wavetable morph, CZ phase distortion, wavefolder | **empty** |
-| `drums/` | Drum Voices | synthesised kick, snare, hat, clap, tom voices played as notes | **empty** |
+| `drums/` | Drum Voices | synthesised kick, snare, hat, clap, tom voices played as notes | jiKIT (`drums/kit.js`) — 808 / 909 / lo-fi kit on a GM note map |
 | `fx/` | Noise, Textures & FX | granular, risers, drones, sci-fi, noise | **empty** |
-| `glass/` | Glass & Crystal | inharmonic partials that settle into pitch: bells, shards, bloom | 11 synths: KILN, ANNEAL, PALINODE, FAULTGLASS, Morrowglass, VITREOUS, jiLANTERN, jiPRISM, TIDAL GLASS, TIDELACE |
+| `glass/` | Glass & Crystal | inharmonic partials that settle into pitch: bells, shards, bloom | KILN, ANNEAL, PALINODE, FAULTGLASS, Morrowglass, VITREOUS, jiLANTERN, jiPRISM, TIDAL GLASS, TIDELACE (`glass/*.js`) |
 
 ## Adding a synth
 1. Drop `<id>.js` into the right folder (self-contained ES module, no imports, exports `<ID>_SYNTHS`;
@@ -34,3 +34,6 @@ The original nine synths (`jims10`, `acidals`, `fmonad`, `stacker`, `chip8`, `su
 `fm4`, `vox`, `pluck` in `../synths-voices.js`) are still defined where they were, because they share
 helpers and the voices module is imported by `synth-panel.js`. They are filed into the correct folders in the
 pickers via `SYNTH_CATEGORY`; splitting them into files is a mechanical follow-up.
+
+## Notes on the drum kit
+`drums/kit.js` follows the General-MIDI drum map (C1 kick, D2 snare, D#2 clap, F#2 closed hat, A#2 open hat, F2/A2/C3 toms, C#3 crash, D#3 ride, G#3 cowbell...), notes outside 35-59 fold onto the same drums by pitch class.

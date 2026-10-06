@@ -7,6 +7,11 @@
 // folders re-files it in the picker. Each module is self-contained (no imports) and exports `<ID>_SYNTHS`; list it here and
 // synths.js spreads EXTRA_SYNTHS into SYNTH_BANK, so it shows up in every channel's picker.
 
+import { ENSEMBLE_SYNTHS } from "./pad/ensemble.js";
+import { TINE_SYNTHS } from "./keys/tine.js";
+import { KIT_SYNTHS } from "./drums/kit.js";
+import { TONEWHEEL_SYNTHS } from "./organ/tonewheel.js";
+import { MODAL_SYNTHS } from "./mallet/modal.js";
 import { JIBASS_SYNTHS } from "./bass/jibass.js";
 import { KILN_SYNTHS } from "./glass/kiln.js";
 import { ANNEAL_SYNTHS } from "./glass/anneal.js";
@@ -24,6 +29,11 @@ const inFolder = (category, mods) =>
   Object.fromEntries(Object.entries(mods).map(([id, def]) => [id, { ...def, category }]));
 
 export const EXTRA_SYNTHS = {
+  ...inFolder("pad", ENSEMBLE_SYNTHS),
+  ...inFolder("keys", TINE_SYNTHS),
+  ...inFolder("drums", KIT_SYNTHS),
+  ...inFolder("organ", TONEWHEEL_SYNTHS),
+  ...inFolder("mallet", MODAL_SYNTHS),
   ...inFolder("bass", JIBASS_SYNTHS),
   ...inFolder("glass", KILN_SYNTHS),
   ...inFolder("glass", ANNEAL_SYNTHS),
