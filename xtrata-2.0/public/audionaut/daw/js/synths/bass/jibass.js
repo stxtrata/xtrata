@@ -1,4 +1,4 @@
-// synths-jibass.js — jiBASS: analog bass synth (module for the Audionaut synth bank).
+// synths/bass/jibass.js — jiBASS: analog bass synth (module for the Audionaut synth bank).
 //
 // Ported from the standalone jiBASS page. What makes it different from the host's
 // jiMS10 / Acidals / SubZero:

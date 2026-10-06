@@ -1,4 +1,4 @@
-// synths-morrowglass.js — Morrowglass, "an instrument of changing matter".
+// synths/glass/morrowglass.js — Morrowglass, "an instrument of changing matter".
 // Port of the standalone MorrowEngine voice: eight sine resonances that begin
 // on an inharmonic "glass" series and MIGRATE toward a tuned harmonic series at
 // staggered speeds after the strike, while BLOOM grows the upper modes in,

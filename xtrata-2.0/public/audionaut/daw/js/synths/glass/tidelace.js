@@ -1,4 +1,4 @@
-// synths-tidelace.js — TIDELACE · harmonic current synthesizer (Audionaut synth-bank module)
+// synths/glass/tidelace.js — TIDELACE · harmonic current synthesizer (Audionaut synth-bank module)
 // Ported from the standalone tidelace.html. Six sine "threads" at material-dependent ratios
 // (copper = near-harmonic, glass = bell ratios, reed = odd harmonics), each with its own
 // near-unison FM partner (ratio 1.003 + tension) that makes the shimmering current, slow

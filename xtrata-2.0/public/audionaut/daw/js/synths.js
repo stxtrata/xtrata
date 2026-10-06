@@ -4,7 +4,7 @@
 // runs in-process, sample-accurately scheduled by the engine.
 
 import { NEW_SYNTHS } from "./synths-voices.js";
-import { EXTRA_SYNTHS } from "./synths-extra.js";
+import { EXTRA_SYNTHS } from "./synths/index.js";
 
 export function midiToFreq(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
@@ -732,7 +732,7 @@ export const SYNTH_BANK = {
     ],
   },
 
-  ...EXTRA_SYNTHS, // jiBASS · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · jiLANTERN · jiPRISM · TIDAL GLASS · TIDELACE — see synths-extra.js
+  ...EXTRA_SYNTHS, // jiBASS · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · jiLANTERN · jiPRISM · TIDAL GLASS · TIDELACE — see synths/index.js
 };
 
 

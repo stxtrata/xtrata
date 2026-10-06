@@ -1,4 +1,4 @@
-// synths-tidalglass.js — TIDAL GLASS · Harmonic Observatory (Audionaut synth-bank module)
+// synths/glass/tidalglass.js — TIDAL GLASS · Harmonic Observatory (Audionaut synth-bank module)
 // Ported from the standalone tidal-glass.html. A six-mode "glass" spectrum that morphs from
 // harmonic to inharmonic (Fracture), excited by one shared FM modulator (Tide), with the upper
 // modes brought forward (Bow), slow per-mode drift, a wide stereo scatter and two fading

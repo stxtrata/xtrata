@@ -24,16 +24,15 @@ export const CATEGORIES = [
   { id: "other", label: "Other", blurb: "synths not filed yet" },
 ];
 
-// existing synths → folder (new synths can simply declare `category: "<id>"` instead)
+// original synths still defined in synths.js / synths-voices.js → folder.
+// Modules under synths/<folder>/ are filed by their folder (see synths/index.js) and are not listed here.
 export const SYNTH_CATEGORY = {
-  jibass: "bass", acidals: "bass", subzero: "bass",
+  acidals: "bass", subzero: "bass",
   jims10: "lead", stacker: "lead",
   fm4: "fm", fmonad: "fm",
   pluck: "pluck",
   vox: "voice",
   chip8: "chip",
-  kiln: "glass", anneal: "glass", palinode: "glass", faultglass: "glass", morrowglass: "glass",
-  vitreous: "glass", lantern: "glass", prism: "glass", tidalglass: "glass", tidelace: "glass",
 };
 
 export function categoryOf(id, def) {

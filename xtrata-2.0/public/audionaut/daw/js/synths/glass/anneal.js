@@ -1,4 +1,4 @@
-// synths-anneal.js — ANNEAL, the crystallising synthesiser, ported for the Audionaut synth bank.
+// synths/glass/anneal.js — ANNEAL, the crystallising synthesiser, ported for the Audionaut synth bank.
 //
 // The idea (from the standalone ANNEAL page): every note is a steady fundamental plus twelve upper
 // modes. The upper modes are born *displaced* from the harmonic lattice (Grain x strike velocity,

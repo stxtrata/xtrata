@@ -1,4 +1,4 @@
-// synths-palinode.js — PALINODE, a "memory-metal" additive synthesiser, ported from the
+// synths/glass/palinode.js — PALINODE, a "memory-metal" additive synthesiser, ported from the
 // standalone palinode.html for the Audionaut synth bank.
 //
 // Idea: a strike creates twelve partials in a deformed, non-harmonic arrangement. While the

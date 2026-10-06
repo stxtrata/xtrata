@@ -1,4 +1,4 @@
-// synths-faultglass.js — FAULTGLASS, "a fracture instrument" (port of the standalone GlassEngine).
+// synths/glass/faultglass.js — FAULTGLASS, "a fracture instrument" (port of the standalone GlassEngine).
 //
 // Seven sine "modes" (harmonics 1 2 3 4 6 8 10) share one FM modulator. A note starts as a
 // clear, nearly pure core; over `bloom` seconds the upper modes fade up out of near-silence,

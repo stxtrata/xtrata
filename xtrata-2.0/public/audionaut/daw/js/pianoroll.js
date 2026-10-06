@@ -8,7 +8,7 @@ import { store, NUM_STEPS } from "./state.js";
 import { engine, emitNoteVisual } from "./engine.js";
 import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults, parseLine } from "./synths.js";
-import { fillSynthSelect } from "./synth-categories.js";
+import { createSynthPicker } from "./synth-picker.js";
 
 const $ = (s) => document.querySelector(s);
 
@@ -691,7 +691,7 @@ export function initPianoRoll() {
   canvas.addEventListener("wheel", onWheel, { passive: false });
 
   const sel = $("#roll-synth-select");
-  fillSynthSelect(sel, SYNTH_BANK);
+  createSynthPicker(sel, SYNTH_BANK, { cls: "roll-picker" }); // folder tree, wraps the select
   sel.addEventListener("change", () => {
     ensureMidi();
     store.setInstrumentProp(inst, "synthId", sel.value);

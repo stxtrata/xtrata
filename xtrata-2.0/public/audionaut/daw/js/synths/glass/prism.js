@@ -1,4 +1,4 @@
-// synths-prism.js — jiPRISM, "Spectral Bloom Instrument".
+// synths/glass/prism.js — jiPRISM, "Spectral Bloom Instrument".
 // One tuned fundamental plus six refracting partials. Each partial blooms in
 // after the strike (staggered onset + attack), glides from a "refracted"
 // (inharmonic) ratio toward the pure harmonic series ("gravity"), decays faster

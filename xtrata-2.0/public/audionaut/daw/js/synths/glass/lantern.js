@@ -1,4 +1,4 @@
-// synths-lantern.js — jiLANTERN, the "Harmonic Bloom" synthesizer, as a SYNTH_BANK module.
+// synths/glass/lantern.js — jiLANTERN, the "Harmonic Bloom" synthesizer, as a SYNTH_BANK module.
 // A struck, slightly detuned spectrum retunes into pure integer harmonics (the "bloom")
 // while a second, slowly swelling layer of the same partials (the "halo") fades in beneath
 // it. Ported from the standalone jiLANTERN page: the note is rendered sample-by-sample into

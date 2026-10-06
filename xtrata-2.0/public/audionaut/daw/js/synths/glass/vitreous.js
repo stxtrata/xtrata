@@ -1,4 +1,4 @@
-// synths-vitreous.js — VITREOUS, "a crystallising instrument" (phase-change synthesis).
+// synths/glass/vitreous.js — VITREOUS, "a crystallising instrument" (phase-change synthesis).
 //
 // Ported from the standalone vitreous.html. Six sine modes share one pitched
 // fundamental. On arrival the upper modes are dispersed (pulled away from their lattice

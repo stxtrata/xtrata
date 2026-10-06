@@ -1,4 +1,4 @@
-// synths-kiln.js — KILN, "a synthesiser that cools" (port of KILN.html's DSP engine).
+// synths/glass/kiln.js — KILN, "a synthesiser that cools" (port of KILN.html's DSP engine).
 //
 // Every note is a crystal that cools. A voice is an additive bank of up to 24 partials
 // (rotating phasors). At the strike the partials sit on a *lattice* (bell, bar, plate,
