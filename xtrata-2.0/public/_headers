@@ -89,6 +89,13 @@
 /radio/wallet.js
   Cache-Control: no-cache
 
+/bounty/zdao/tracker/1/wallet.js
+  Cache-Control: no-cache
+/bounty/zdao/tracker/1/ledger-reader.js
+  Cache-Control: no-cache
+/bounty/zdao/tracker/1/handles.json
+  Cache-Control: no-cache
+
 /radio/test-wallet*
   Cache-Control: no-store
   Referrer-Policy: no-referrer
