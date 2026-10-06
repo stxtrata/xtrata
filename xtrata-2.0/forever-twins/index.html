@@ -349,7 +349,7 @@
   <section class="intro">
     <span class="eyebrow">Xtrata satellite · Collection permanence</span>
     <h1>Make any NFT collection <span class="ink-gold">permanent.</span></h1>
-    <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT, bound 1:1 to the original. No re-mint. No migration. Four collections are live now.</p>
+    <p class="lede">A <strong>Forever Twin</strong> is a permanent, on-chain counterpart for an existing NFT, bound 1:1 to the original. No re-mint. No migration. Six collections are live now.</p>
     <div class="trust">First public collection: <b>Bitcoin Pepes</b> · <span id="trust-count">live on Stacks</span></div>
     <div class="hero-migration">Live migration: <strong id="hero-migration-summary">Loading on-chain counts…</strong></div>
   </section>
@@ -445,6 +445,24 @@
           <div class="col-metric"><div class="v" id="mp-status">—</div><div class="k">Migration status</div></div>
         </div>
         <div class="col-foot"><span class="btn sm">View Megapont Ape Club →</span></div>
+      </a>
+
+      <!-- ACTIVE: Bitcoin Monkeys (third collection on the Forever Twins helper v3; large files twinned through the wizard) -->
+      <a id="bm-card" class="col-card col-card--hero active" href="/forever-twins/collection/bitcoin-monkeys" style="color:inherit">
+        <img class="col-banner col-banner--twin" src="/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3113" alt="Bitcoin Monkeys Forever Twins: first inscribed twin" onerror="var d=document.createElement('div');d.className='col-banner col-banner--text';d.setAttribute('role','img');d.setAttribute('aria-label','Bitcoin Monkeys Forever Twins');d.textContent='BITCOIN MONKEYS';this.replaceWith(d)" />
+        <div class="col-top">
+          <div class="col-head">
+            <span class="col-badge live">● Live</span><span id="bm-stamp" class="forevered-stamp">Forevered</span>
+            <h3>Bitcoin Monkeys</h3>
+            <div class="chain">Stacks · bitcoin-monkeys → forever-twin-bitcoin-monkeys</div>
+          </div>
+        </div>
+        <div class="col-body">Bitcoin Monkeys holders can give their Monkey a permanent on-chain twin, or swap which side stays liquid. Larger files are handled by a built-in large-file wizard.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="bm-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="bm-status">—</div><div class="k">Migration status</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View Bitcoin Monkeys →</span></div>
       </a>
 
     </div>
@@ -604,6 +622,17 @@ const COLLECTIONS = [
     statusEl: "mp-status",
     cardEl: "mp-card",
     stampEl: "mp-stamp"
+  },
+  {
+    // Count + source total for Bitcoin Monkeys (Forever Twins helper v3, large-on-demand).
+    addr: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    name: "forever-twin-bitcoin-monkeys",
+    sourceAddr: "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C",
+    sourceName: "bitcoin-monkeys",
+    countEl: "bm-inscribed",
+    statusEl: "bm-status",
+    cardEl: "bm-card",
+    stampEl: "bm-stamp"
   }
 ];
 const API = "https://api.hiro.so";

@@ -75,21 +75,24 @@ textarea { width:100%; min-height:150px; padding:10px; border-radius:9px; border
     <label>Helper contract name<input id="contract-name" autocomplete="off" spellcheck="false" /></label>
     <label>Required deployer / owner<input id="deployer" disabled /></label>
     <label>Seed batch size<select id="seed-batch"><option value="100">100 (largest)</option><option value="50">50</option><option value="25">25</option></select></label>
-    <label>Test token id (step 8)<input id="test-token" type="number" min="1" step="1" /></label>
+    <label>Test token id (test inscription step)<input id="test-token" type="number" min="1" step="1" /></label>
     <label>Local IPFS gateway<input id="gateway" autocomplete="off" spellcheck="false" /></label>
   </div>
   <div class="walletbar">Wallet: <strong id="wallet"></strong> <button class="button ghost" id="disconnect" type="button" hidden>Disconnect</button></div>
+  <div class="walletbar">Temporary seeding wallet: <code id="hot"></code></div>
   <p id="status" role="status" aria-live="polite">Ready.</p>
   <div class="steps" id="steps"></div>
   <section class="panel">
     <h2>Activity</h2>
     <div class="actions" style="margin-bottom:10px">
       <button class="button ghost" id="export" type="button">Export report</button>
+      <button class="button ghost" id="handback" type="button">Return ownership to my wallet</button>
+      <button class="button ghost" id="hotkey" type="button">Save the temporary wallet key again</button>
       <button class="button ghost" id="forget" type="button">Forget local progress</button>
     </div>
     <div id="log"></div>
   </section>
-  <p class="build">Nothing is signed by this page: every transaction goes through your web wallet. Wallet stages log to the console under <code>[wallet:connect]</code> and <code>[wallet:xverse-preflight]</code>; include those lines when reporting a wallet problem.</p>
+  <p class="build">Every transaction goes through your web wallet except the seed batches, which are signed by the temporary wallet this page creates (its key is saved to a file and kept in this browser). Wallet stages log to the console under <code>[wallet:connect]</code> and <code>[wallet:xverse-preflight]</code>; include those lines when reporting a wallet problem.</p>
 </main>
 <script>/*BUNDLE*/</script>
 </body>

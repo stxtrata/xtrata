@@ -43,24 +43,44 @@ The Xtrata core (`SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3`) has 
 - Check who inscribed it. If another address sealed identical bytes, say so; do not claim it.
 - Every step reports `pass` / `fail` with a plain sentence the owner can paste back to us.
 
-## Many owner-only calls (for example 26 boards)
+## Many owner-only calls (26 boards, 25 seed batches, anything over about 4 signatures)
 
-A wallet prompt per call does not scale, and a throwaway wallet cannot sign owner-only calls. If a launch needs
-many calls from the contract owner:
+**Default to this method whenever a launch needs more than a handful of calls that only the contract owner can make.**
+A wallet prompt per call does not scale (the arcade boards needed 26; seeding a 2,500-token Forever Twins helper needs
+25 batches of 100). Worked examples: `arcade-launch` (`propose-owner` / `accept-owner`) and `forever-twins-launch`
+(`propose-ownership` / `accept-ownership`, steps `tempwallet`, `handover`, `seed`, `handback`).
 
-- Use the canary's temporary wallet and hand ownership over for the run: owner `propose-owner` to it, it
-  `accept-owner`, it signs everything, then it proposes back and the owner accepts. The owner signs 3 times
-  (fund, propose, accept back) however many calls there are. Check that the contract has a two-step owner
-  transfer before relying on this (the arcade scores contract does: `propose-owner` / `accept-owner`).
+A throwaway wallet cannot sign owner-only calls, so hand it ownership for the run:
+
+- The canary creates a temporary wallet in the browser. The owner `propose-owner`s it, it `accept-owner`s, it signs
+  everything, then it proposes back and the owner accepts. The owner signs about 4 times (fund, propose, accept back,
+  plus any one-way step such as finalise) however many calls there are. Check that the contract has a two-step owner
+  transfer before relying on this, and which function names it uses.
+- Keep the one-way or high-stakes calls (finalise, anything irreversible) with the owner's own wallet, after hand-back.
 - Save the temporary key to a file and ask for confirmation before the hand-over. If a contract has no other
-  admin, losing that key loses the contract.
-- Read progress from the chain (`get-owner`, `get-pending-owner`, the board itself), never from page state alone,
-  so every phase can resume. Give the owner a recovery button that hands ownership back from any point.
-- After the last call, clear any pending hand-over to the temporary wallet and sweep its balance.
+  admin, losing that key loses the contract. Say in the step text what the key could do while it owns the contract
+  (for the helper: seed, set the fee up to its ceiling, propose a rescue that the owner can cancel).
+- Read progress from the chain (`get-owner`, `get-pending-owner`, the records or boards themselves), never from page
+  state alone, so every phase can resume. Give the owner a recovery button that hands ownership back from any point,
+  and a button that saves the key file again.
+- **Resume from whatever is on chain, whoever put it there.** Work out what is still missing from the chain, then batch
+  only that, in the chosen batch size. Do not assume earlier batches used the same size or even the same wallet. For
+  ordered data, three reads (first present, last-expected present, next missing) prove "the first N are done"; anything
+  else falls back to reading every item.
+- A failed transaction still costs its fee. After a stop the float is usually short, so the hand-over step must top it
+  up (ask the owner for exactly the shortfall), not refuse.
+- After the last call, clear any pending hand-over to the temporary wallet and sweep its balance. The hand-back step
+  must also succeed when ownership is already back (send nothing).
 - Send the calls one after another and wait for each to confirm. Stacks allows about 25 unconfirmed
   transactions per sender, so do not pipeline a long list without batching.
-- Size the fee float: calls x fee + hand-back + sweep + margin. Ask the owner wallet for exactly the shortfall.
-- Test it in the mock with an interrupt halfway and a resume.
+- Price each temporary-wallet transaction from its real serialised size (a 100-record seed is about 20 KB; use at
+  least twice the size in micro-STX, with a floor of 0.02 STX) and size the float as calls x fee + hand-over + hand-back +
+  sweep + margin.
+- Xverse cannot sign a plain STX transfer from a page: fall back to showing the address and amount, and wait for the
+  balance to arrive.
+- Test it in the mock: raw transaction broadcast from the temporary key, an interrupt halfway (a forced on-chain
+  failure), recovery with the hand-back button, a resume that sends only what is missing, a start from pre-seeded
+  state with a different batch size, and a second run from empty progress that sends nothing.
 
 ## Wallet and transactions
 

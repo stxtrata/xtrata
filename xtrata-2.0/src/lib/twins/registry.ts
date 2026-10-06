@@ -117,6 +117,17 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
       'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club',
     sourceContractId: 'SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft',
     sourceAssetName: 'Megapont-Ape-Club'
+  },
+  {
+    key: 'bitcoin-monkeys',
+    name: 'Bitcoin Monkeys',
+    itemNoun: 'Bitcoin Monkey',
+    network: 'mainnet',
+    masterContractId: XTRATA_MASTER,
+    helperContractId:
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys',
+    sourceContractId: 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys',
+    sourceAssetName: 'bitcoin-monkeys'
   }
 ];
 

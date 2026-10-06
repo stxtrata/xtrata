@@ -1,7 +1,8 @@
 # Forever Twins launch canary
 
 One self-contained page that launches a Forever Twins helper for one collection from the Xtrata web wallet
-(Xverse or Leather), in the only safe order. It holds no key: every transaction is signed in the wallet. Each step
+(Xverse or Leather), in the only safe order. Every transaction is signed in the wallet except the seed batches (see
+"Seeding by a temporary wallet" below). Each step
 unlocks only when the one before it passed, and each re-reads the chain rather than trusting the page, so a reload or
 "Forget local progress" resumes from what the chain already holds and nothing is sent twice.
 
@@ -27,7 +28,28 @@ Re-pin only if a change is intended.
 
 Optional helper-config fields the canary reads: `testToken` (the token used for the test inscription; default is the first
 manifest token, so pick an unlisted one for a G2 collection) and `listingReadFn` (G2; default `get-listing-in-ustx`).
-Seeding takes at most 100 records per signature, so a 2,500-token collection needs 25.
+Seeding takes at most 100 records per transaction, so a 2,500-token collection needs 25.
+
+## Seeding by a temporary wallet
+
+Only the helper's owner can seed, so seeding 25 batches would mean 25 wallet approvals. Instead (the same pattern as the
+arcade launch canary) the page creates a temporary wallet in the browser:
+
+1. **Prepare the temporary seeding wallet**: saves its key to a file, then asks your wallet to send it the network fees for
+   every batch plus the hand-over and hand-back (about 1 STX for 25 batches; Xverse cannot sign a plain transfer from a
+   page, so the amount is shown to send by hand and the step waits for it).
+2. **Make the temporary wallet the helper owner**: your wallet signs `propose-ownership`, the temporary wallet accepts.
+3. **Seed**: the temporary wallet signs every batch with no prompts, each confirmed and re-read before the next.
+4. **Hand ownership back and sweep**: the temporary wallet proposes your wallet, your wallet accepts, leftover STX is swept
+   to you, and a never-accepted proposal is cleared.
+
+Finalising (one-way) and the test inscription stay with your wallet. If a run stops while the temporary wallet owns the
+helper, press the step again (it tops up the float and continues, sending nothing twice) or use "Return ownership to my
+wallet". The key stays in this browser (and in the saved file) until you are done; while the temporary wallet owns the
+helper it could seed, set the fee (never above the deploy-time ceiling) or propose a rescue (which has a 432-block delay
+and can be cancelled by the owner), so keep the window short and keep the key file until ownership is back. If every
+record is already on chain these steps send nothing. Seeding resumes from whatever is on chain, including records an
+earlier session wrote with a different batch size or from another wallet: only the missing records are batched.
 
 ## Run
 
