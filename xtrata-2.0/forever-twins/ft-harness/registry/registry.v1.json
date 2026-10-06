@@ -64,6 +64,18 @@
       "status": "live",
       "expectedSourceSha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
       "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-06; canonical record finalised (2500 records, manifest 0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552); live-check 2026-10-06: deployed source sha256 equals the rendered template for mainnet-megapont-ape-club.v3.json"
+    },
+    {
+      "key": "bitcoin-monkeys",
+      "name": "Bitcoin Monkeys",
+      "source": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
+      "interface": "v3",
+      "group": "G1",
+      "status": "live",
+      "largeOnDemand": true,
+      "expectedSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+      "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-06; canonical record finalised (2500 records, manifest b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c); audit-lod cleared the rendered source before deploy (10 stages incl. mainnet fork simulation); test inscription #2 -> Xtrata #3113"
     }
   ]
 }

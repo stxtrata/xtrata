@@ -283,7 +283,7 @@ await check('heroImage: logo wins, else the first inscribed twin route, else nul
 });
 await check('hub twin banners use the same twin ids as registry heroTwin', () => {
   const hub = read(resolve(FT, 'index.html'));
-  for (const k of ['nyc-degens', 'megapont-ape-club']) { const c = R.getCollection(reg, k); assert.ok(hub.includes(`xtrata-v3-2-3/${c.theme.heroTwin.xtrataId}"`), `${k}: hub banner does not use heroTwin ${c.theme.heroTwin.xtrataId}`); }
+  for (const k of ['nyc-degens', 'megapont-ape-club', 'bitcoin-monkeys']) { const c = R.getCollection(reg, k); assert.ok(hub.includes(`xtrata-v3-2-3/${c.theme.heroTwin.xtrataId}"`), `${k}: hub banner does not use heroTwin ${c.theme.heroTwin.xtrataId}`); }
 });
 await check('manifest configs for planned v3 collections agree with v2 (source, asset, token URI)', () => {
   for (const c of reg.collections.filter((x) => x.interface === 'v3')) {

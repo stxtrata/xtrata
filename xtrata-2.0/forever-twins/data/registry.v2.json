@@ -57,8 +57,8 @@
     {
       "slug": "bitcoin-monkeys",
       "name": "Bitcoin Monkeys",
-      "status": "coming-soon",
-      "blurb": "The Bitcoin Monkeys community page. The Forever Twins helper is not deployed yet, so there is nothing to inscribe or swap until its record is finalised. Many Bitcoin Monkeys files are larger than a single transaction, so this collection will use the large-file route.",
+      "status": "live",
+      "blurb": "The Bitcoin Monkeys community page. The record is finalised: anyone can fund a twin, and holders can swap whenever they like. Larger files use the large-file route.",
       "accent": "#d9a300",
       "links": [],
       "collections": [
@@ -191,21 +191,30 @@
       "name": "Bitcoin Monkeys",
       "itemNoun": "Bitcoin Monkey",
       "community": "bitcoin-monkeys",
-      "status": "planned",
+      "status": "live",
       "interface": "v3",
       "group": "G1",
-      "helper": null,
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
       "source": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
       "sourceAsset": "bitcoin-monkeys",
       "legacyPage": null,
       "theme": {
         "logo": null,
-        "accent": "#d9a300"
+        "accent": "#d9a300",
+        "heroTwin": {
+          "tokenId": 2,
+          "xtrataId": 3113
+        }
       },
-      "blurb": "2,500 Bitcoin Monkeys. Helper not yet deployed. About one in nine files is larger than one transaction, so those twins will be created with the large-file route.",
+      "blurb": "Bitcoin Monkeys holders can give their Monkey a permanent on-chain twin, or swap which side stays liquid. Deployed and finalised from the Xtrata wallet: all 2,500 canonical records are sealed on-chain. Files under 512 KB are twinned in one step; the 283 larger ones use the large-file route, which uploads the file in several transactions from a temporary wallet.",
       "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-monkeys/{id}.json",
-      "manifest": null,
-      "coverage": null
+      "manifest": {
+        "url": "/ft/data/bitcoin-monkeys.manifest.json",
+        "sha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "count": 2500
+      },
+      "coverage": null,
+      "largeOnDemand": true
     },
     {
       "key": "see-yourself-out",

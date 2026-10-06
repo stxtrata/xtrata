@@ -27,8 +27,8 @@
       "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
       "manifestPath": "/ft/data/bitcoin-monkeys.manifest.json",
       "manifestSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
-      "manifestStatus": "draft",
-      "_note": "Helper not deployed yet (audit cleared sha256 de53ff3f…8c0f, 6 Oct 2026). Flip to final only after the helper is finalised and production serves this exact manifest. 283 of 2,500 tokens are large-on-demand; the resolver treats them like any other."
+      "manifestStatus": "final",
+      "_note": "Helper deployed, seeded and finalised 6 Oct 2026 via the launch canary (2,500 records, manifest b1522c24…); production serves this exact manifest. 283 tokens are over 512 KB and are twinned by visitors through the large-file wizard."
     }
   }
 }
