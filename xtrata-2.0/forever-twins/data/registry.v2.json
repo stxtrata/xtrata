@@ -155,7 +155,11 @@
         "sha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
         "count": 420
       },
-      "coverage": null
+      "coverage": {
+        "recovered": 420,
+        "of": 420,
+        "asOf": "block 9,127,020, 5 Oct 2026"
+      }
     },
     {
       "key": "megapont-ape-club",
@@ -184,7 +188,11 @@
         "sha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
         "count": 2500
       },
-      "coverage": null
+      "coverage": {
+        "recovered": 2500,
+        "of": 2500,
+        "asOf": "block 9,127,306, 5 Oct 2026"
+      }
     },
     {
       "key": "bitcoin-monkeys",
@@ -213,7 +221,11 @@
         "sha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
         "count": 2500
       },
-      "coverage": null,
+      "coverage": {
+        "recovered": 2500,
+        "of": 2500,
+        "asOf": "block 9,133,680, 6 Oct 2026"
+      },
       "largeOnDemand": true
     },
     {

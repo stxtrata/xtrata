@@ -209,7 +209,7 @@ function renderStats() {
   const swap = helperSt && helperSt.inscribedCount != null ? (helperSt.swapsEnabled ? fmt(helperSt.inscribedCount) : '0') : '—';
   const cov = coll.coverage;
   const tiles = [];
-  if (cov && cov.recovered != null) tiles.push(['Recovered', fmt(cov.recovered), cov.asOf ? `snapshot ${esc(cov.asOf)}` : 'art fetched and verified (snapshot)']);
+  if (cov && cov.recovered != null) tiles.push(['Recovered', fmt(cov.recovered), `${cov.of != null ? `of ${fmt(cov.of)} · ` : ''}art fetched and hashed${cov.asOf ? `, snapshot ${esc(cov.asOf)}` : ''}`]);
   if (v1) {
     // The original helpers do not expose a seeded count; their free allowance is the number that matters to a minter.
     const th = helperSt && helperSt.freeThreshold, n = helperSt && helperSt.inscribedCount;
