@@ -215,22 +215,25 @@ async function route(r) {
   b = await runStep('verify'); check(passes(b), 'verify matches config (payees, fee, ceiling, owner)');
   await page.selectOption('#seed-batch', '25');
   // seeding by a temporary wallet: fund it, hand it ownership, seed (forced failure on batch 2), recover, resume, hand back
+  // an earlier session (wallet-signed, other batch size) already seeded the first 10 records: pick up from there
+  // (G2 runs seed out of order instead, to cover the full scan: tokens 1-5 and 21-25)
+  for (const t of (GROUP === 'G2' ? [...MANIFEST.tokens.slice(0, 5), ...MANIFEST.tokens.slice(20, 25)] : MANIFEST.tokens.slice(0, 10))) S.H.canon.set(t.id, { hash: Buffer.from(t.twin.contentHash.replace(/^0x/, ''), 'hex'), mime: t.twin.mime, size: BigInt(t.twin.totalSize), uri: t.twin.tokenUri });
   S.manualFund = GROUP === 'G2';   // G1 funds with a wallet transfer; G2 takes the "send by hand" path
   S.failSeedAt = 2;
   b = await runStep('tempwallet'); check(passes(b) && /funded/.test(b), 'temporary wallet created and funded (' + (S.manualFund ? 'by hand' : 'by wallet transfer') + ')');
   const hotAddr = await page.$eval('#hot', (e) => e.textContent.split(' ')[0]);
   check(/^SP[0-9A-Z]{30,}$/.test(hotAddr) && hotAddr !== DEPLOYER, 'temporary wallet address is shown');
-  check((S.bal.get(hotAddr) ?? 0n) >= 150000n && (S.bal.get(hotAddr) ?? 0n) < 3_000_000n, 'float is small: ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX');
+  check((S.bal.get(hotAddr) ?? 0n) >= 100000n && (S.bal.get(hotAddr) ?? 0n) < 3_000_000n, 'float is small: ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX');
   b = await runStep('handover'); check(passes(b) && S.H.owner === hotAddr && S.H.pending === null, 'wallet proposed, temporary wallet accepted: it owns the helper');
-  b = await runStep('seed'); check(b.startsWith('fail') && /temporary wallet/.test(b) && S.H.canon.size === 25 && S.H.owner === hotAddr, 'forced failure on batch 2 stops the run, 25 records on chain, helper still with the temporary wallet');
+  b = await runStep('seed'); check(b.startsWith('fail') && /temporary wallet/.test(b) && S.H.canon.size === 35 && S.H.owner === hotAddr, 'forced failure on the second batch stops the run: 10 earlier + 25 = 35 records on chain, helper still with the temporary wallet');
   await page.click('#handback'); await page.waitForTimeout(1500);
   for (let i = 0; i < 60 && S.H.owner !== DEPLOYER; i++) await page.waitForTimeout(500);
   check(S.H.owner === DEPLOYER && S.H.pending === null, '"Return ownership to my wallet" gives the helper back mid-run');
   S.failSeedAt = 0;
   b = await runStep('handover'); check(passes(b) && S.H.owner === hotAddr, 'ownership handed over again for the resume');
   const seedsBefore = S.seedCalls;
-  b = await runStep('seed'); check(passes(b) && S.H.canon.size === 60 && S.seedCalls - seedsBefore === 2, 'resume writes only the 2 missing batches (' + (S.seedCalls - seedsBefore) + ' sent)');
-  check(S.seedSenders.length >= 4 && S.seedSenders.every((a) => a === hotAddr), 'every seed batch was signed by the temporary wallet, none by the Xtrata wallet (' + S.seedSenders.length + ' calls)');
+  b = await runStep('seed'); check(passes(b) && S.H.canon.size === 60 && S.seedCalls - seedsBefore === 1, 'resume writes only what is missing, in one batch (' + (S.seedCalls - seedsBefore) + ' sent)');
+  check(S.seedSenders.length >= 3 && S.seedSenders.every((a) => a === hotAddr), 'every seed batch was signed by the temporary wallet, none by the Xtrata wallet (' + S.seedSenders.length + ' calls)');
   b = await runStep('handback'); check(passes(b) && S.H.owner === DEPLOYER && S.H.pending === null, 'ownership handed back to the Xtrata wallet');
   check((S.bal.get(hotAddr) ?? 0n) <= 10000n, 'temporary wallet swept (left ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX)');
   check(S.xfers.some((x) => x.from === hotAddr && x.to === DEPLOYER), 'the sweep went back to the Xtrata wallet');

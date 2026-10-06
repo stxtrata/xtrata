@@ -305,11 +305,28 @@ const sweepHot = async (stepId: string) => {
   return chain.balance(hot);
 };
 const principalOrNull = (v: string) => (v === 'none' ? null : v.replace(/^"|"$/g, ''));
+/**
+ * Which tokens still have no canonical record. Seeding goes in manifest order, so normally the first `count` tokens are present and
+ * the rest are missing: three reads confirm that. Anything else (records out of order) is found by reading every token.
+ */
+const missingTokens = async (count: number): Promise<Tok[]> => {
+  if (count <= 0) return tokens.slice();
+  if (count >= tokens.length) return [];
+  const has = async (i: number) => !!(await canonRead(tokens[i].id));
+  if ((await has(0)) && (await has(count - 1)) && !(await has(count))) return tokens.slice(count);
+  const present = new Set<number>();
+  let done = 0;
+  await pool(tokens, 6, async (t) => { if (await canonRead(t.id)) present.add(t.id); if (++done % 100 === 0) status(`Checking which records are on chain: ${done}/${tokens.length}…`); });
+  return tokens.filter((t) => !present.has(t.id));
+};
 /** Who owns the helper, who (if anyone) has been proposed, and which seed batches are still missing: all read from the chain. */
 const seedPlan = async () => {
   const g = await iface();
+  const count = Number(g('canonical-count'));
+  const missing = await missingTokens(count);
+  // chunk what is missing into batches of the chosen size: an earlier session may have seeded with a different batch size
   const todo: Tok[][] = [];
-  for (const b of batches()) if (!(await canonRead(b[0].id))) todo.push(b);
+  for (let i = 0; i < missing.length; i += state.seedBatch) todo.push(missing.slice(i, i + state.seedBatch));
   return { todo, owner: g('owner').replace(/^"|"$/g, ''), pending: principalOrNull(g('pending-owner')), count: Number(g('canonical-count')), finalised: g('canonical-finalized') === 'true' };
 };
 /**

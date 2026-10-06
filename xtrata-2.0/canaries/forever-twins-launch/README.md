@@ -48,7 +48,8 @@ helper, press the step again (it tops up the float and continues, sending nothin
 wallet". The key stays in this browser (and in the saved file) until you are done; while the temporary wallet owns the
 helper it could seed, set the fee (never above the deploy-time ceiling) or propose a rescue (which has a 432-block delay
 and can be cancelled by the owner), so keep the window short and keep the key file until ownership is back. If every
-record is already on chain these steps send nothing.
+record is already on chain these steps send nothing. Seeding resumes from whatever is on chain, including records an
+earlier session wrote with a different batch size or from another wallet: only the missing records are batched.
 
 ## Run
 
