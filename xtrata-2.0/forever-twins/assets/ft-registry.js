@@ -40,6 +40,8 @@ export function validateRegistry(reg) {
     if (keys.has(c.key)) err(`${id}: duplicate key`);
     keys.add(c.key);
     if (!c.name) err(`${id}: name missing`);
+    const ht = c.theme && c.theme.heroTwin;
+    if (ht && !(Number.isInteger(ht.tokenId) && ht.tokenId > 0 && Number.isInteger(ht.xtrataId) && ht.xtrataId > 0)) err(`${id}: theme.heroTwin needs positive integer tokenId and xtrataId`);
     if (!STATUS[c.status]) err(`${id}: unknown status "${c.status}"`);
     if (!['v1', 'v3'].includes(c.interface)) err(`${id}: interface must be v1 or v3`);
     if (!['G1', 'G2'].includes(c.group)) err(`${id}: group must be G1 or G2`);
@@ -97,6 +99,19 @@ export const getCollection = (reg, key) => reg.collections.find((c) => c.key ===
 export const getCommunity = (reg, slug) => (reg.communities || []).find((m) => m.slug === slug) || null;
 export const collectionsOf = (reg, slug) => reg.collections.filter((c) => c.community === slug);
 export const independentCollections = (reg) => reg.collections.filter((c) => !c.community);
+/**
+ * Image for a collection's card, tile and page header. A hand-made logo wins; otherwise the first twin that was
+ * inscribed (theme.heroTwin, a permanent fact recorded in the registry); otherwise null (callers show text).
+ */
+export function heroImage(reg, c) {
+  if (!c || !c.theme) return null;
+  if (c.theme.logo) return c.theme.logo;
+  const h = c.theme.heroTwin;
+  if (!h || !reg || !reg.core || !reg.core.contract) return null;
+  const [addr, name] = reg.core.contract.split('.');
+  return `/inscription/mainnet/${addr}/${name}/${h.xtrataId}`;
+}
+
 export const toolEnabled = (c) => !!(c && c.helper && STATUS[c.status] && STATUS[c.status].tool);
 
 /**

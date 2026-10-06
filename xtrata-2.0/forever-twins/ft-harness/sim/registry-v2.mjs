@@ -272,6 +272,19 @@ await check('core contract matches registry.v1.json and registry.ts', () => { as
 await check('every logo referenced by the registry exists', () => {
   for (const c of reg.collections) if (c.theme && c.theme.logo) assert.ok(existsSync(resolve(FT, c.theme.logo.replace('/forever-twins/', ''))), `${c.key} logo ${c.theme.logo} missing`);
 });
+await check('heroImage: logo wins, else the first inscribed twin route, else null; bad heroTwin is rejected', () => {
+  const nyc = R.getCollection(reg, 'nyc-degens'), mp = R.getCollection(reg, 'megapont-ape-club');
+  assert.match(R.heroImage(reg, nyc), /^\/inscription\/mainnet\/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X\/xtrata-v3-2-3\/\d+$/);
+  assert.equal(R.heroImage(reg, { theme: { logo: '/x.png', heroTwin: { tokenId: 1, xtrataId: 2 } } }), '/x.png');
+  assert.equal(R.heroImage(reg, R.getCollection(reg, 'see-yourself-out')), null); assert.equal(R.heroImage(reg, null), null);
+  assert.ok(nyc.theme.heroTwin.xtrataId > 0 && mp.theme.heroTwin.xtrataId > 0);
+  const r = clone(reg); r.collections.find((c) => c.key === 'nyc-degens').theme.heroTwin = { tokenId: 1, xtrataId: 'x' };
+  assert.ok(R.validateRegistry(r).some((m) => m.includes('heroTwin')));
+});
+await check('hub twin banners use the same twin ids as registry heroTwin', () => {
+  const hub = read(resolve(FT, 'index.html'));
+  for (const k of ['nyc-degens', 'megapont-ape-club']) { const c = R.getCollection(reg, k); assert.ok(hub.includes(`xtrata-v3-2-3/${c.theme.heroTwin.xtrataId}"`), `${k}: hub banner does not use heroTwin ${c.theme.heroTwin.xtrataId}`); }
+});
 await check('manifest configs for planned v3 collections agree with v2 (source, asset, token URI)', () => {
   for (const c of reg.collections.filter((x) => x.interface === 'v3')) {
     const p = resolve(FT, 'ft-harness/manifest/configs', `${c.key}.json`); if (!existsSync(p)) continue;

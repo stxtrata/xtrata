@@ -119,7 +119,7 @@
 </div></footer>
 
 <script type="module">
-import { loadRegistry, getCollection, getCommunity, routeKey, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261005b';
+import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261006a';
 import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261005b';
 import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261005b';
 
@@ -719,7 +719,7 @@ async function boot() {
   document.title = `${coll.name} · Forever Twins`;
   document.documentElement.style.setProperty('--accent', (coll.theme && coll.theme.accent) || '#1f5fe0');
   $('name').textContent = coll.name; $('blurb').textContent = coll.blurb || '';
-  if (coll.theme && coll.theme.logo) { const i = $('logo'); i.src = coll.theme.logo; i.alt = `${coll.name} logo`; i.classList.remove('hidden'); }
+  { const img = heroImage(reg, coll); if (img) { const i = $('logo'); i.onerror = () => i.classList.add('hidden'); i.src = img; i.alt = coll.theme && coll.theme.logo ? `${coll.name} logo` : `${coll.name}: first inscribed twin`; i.classList.remove('hidden'); } }
   const s = STATUS[coll.status] || STATUS.planned;
   $('statusPill').textContent = s.label; $('statusPill').className = `pill ${s.tone}`;
   const comm = coll.community ? getCommunity(reg, coll.community) : null;
