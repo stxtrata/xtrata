@@ -39,7 +39,8 @@ import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combi
 import { loadBeatPreset } from "./l1-beat-loader.js";
 import { record as recordHistory } from "./history.js";
 import { NUM_INSTRUMENTS } from "./state.js";
-import { SYNTH_BANK, EXTRA_SYNTH_IDS } from "./synths.js";
+import { SYNTH_BANK } from "./synths.js";
+import { fillSynthSelect } from "./synth-categories.js";
 import { openRoll } from "./pianoroll.js";
 import { openSynthPanel } from "./synth-panel.js";
 import {
@@ -386,17 +387,7 @@ export function buildInstruments() {
     const synthSel = el("select", "inst-synth-select");
     synthSel.title = "Synth loaded on this instrument channel — pick any synth (resets its sound to that synth's default patch)";
     synthSel.setAttribute("aria-label", `Instrument ${i + 1} synth`);
-    const grpMain = el("optgroup");
-    grpMain.label = "Synths";
-    const grpNew = el("optgroup");
-    grpNew.label = "New synths";
-    Object.entries(SYNTH_BANK).forEach(([id, s]) => {
-      const o = document.createElement("option");
-      o.value = id;
-      o.textContent = s.name;
-      (EXTRA_SYNTH_IDS.includes(id) ? grpNew : grpMain).appendChild(o);
-    });
-    synthSel.append(grpMain, grpNew);
+    fillSynthSelect(synthSel, SYNTH_BANK); // grouped into folders (Bass, Leads, Glass & Crystal, …)
     synthSel.value = instr.synthId in SYNTH_BANK ? instr.synthId : "jims10";
     synthSel.addEventListener("change", () => {
       const id = synthSel.value;

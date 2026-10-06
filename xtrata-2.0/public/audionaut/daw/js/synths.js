@@ -735,8 +735,6 @@ export const SYNTH_BANK = {
   ...EXTRA_SYNTHS, // jiBASS · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · jiLANTERN · jiPRISM · TIDAL GLASS · TIDELACE — see synths-extra.js
 };
 
-// ids added by synths-extra.js (the synth picker groups them separately)
-export const EXTRA_SYNTH_IDS = Object.keys(EXTRA_SYNTHS);
 
 export const DEFAULT_SYNTH = "jims10";
 
