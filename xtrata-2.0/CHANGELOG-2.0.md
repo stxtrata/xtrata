@@ -2,6 +2,9 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: Arcade link follows the v1.5.0 parent (2026-10-06)
+- `public/bounty/zdao/tracker/1/index.html`: the "Play the Arcade" button and the "(#3081)" label now point at parent #3111, matching the homepage tile and `/arcade` redirect. Checked the rest of the repo: no other live link still uses #3081. The remaining mentions are historical (launch canary notes and tests, the `3081` entry kept in `ARCADE_INSCRIPTION_IDS` so old boards stay valid, and the `xtrata-arcade-3081.webp` image filename).
+
 ## Bounty tracker: sticky wallet bar for the connected user (2026-10-06)
 - `public/bounty/zdao/tracker/1/index.html`: the connect control moved from the leaderboard (bottom of the page) to a bar pinned to the top. Signed out it says what connecting gives you; connected it shows your short address, standing (In the draw / Waiting / Winner, or "Not on the board yet"), tickets with any held count, and your X handle with **Add X handle** or **Edit** (inline input, Enter saves, Escape cancels). Team-confirmed handles show "confirmed by the team" with no edit. A wallet that is not on the board yet can still link a handle.
 - The "See where you stand" checker fills itself with the connected wallet (and clears on disconnect, unless you were looking up someone else); it is now labelled "Look up any wallet". The leaderboard is read-only apart from your highlighted row. On narrow screens the bar wraps to three short lines (about 110 px) and the page never scrolls sideways. No wallet code changed: the page still uses `XtrataBountyWallet`.

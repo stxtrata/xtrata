@@ -460,11 +460,6 @@ body.midi-dragging {
   cursor: pointer;
   border: 1px solid var(--border);
 }
-.inst-synth-label {
-  color: var(--ch-color, var(--accent));
-  font-size: 10px;
-  min-width: 64px;
-}
 .ch-btn.roll-open {
   color: var(--ch-color, var(--accent));
   font-size: 13px;
@@ -2318,3 +2313,228 @@ button:disabled {
 .channel.solo-dim:hover {
   opacity: 0.85;
 }
+
+/* ---- new synths (synths/index.js): panels are laid out as auto-fitting section tiles ---- */
+.sfp-jibass .sfp-body,
+.sfp-kiln .sfp-body,
+.sfp-anneal .sfp-body,
+.sfp-palinode .sfp-body,
+.sfp-faultglass .sfp-body,
+.sfp-morrowglass .sfp-body,
+.sfp-vitreous .sfp-body,
+.sfp-lantern .sfp-body,
+.sfp-prism .sfp-body,
+.sfp-tidalglass .sfp-body,
+.sfp-tidelace .sfp-body,
+.sfp-ensemble .sfp-body,
+.sfp-tine .sfp-body,
+.sfp-kit .sfp-body,
+.sfp-tonewheel .sfp-body,
+.sfp-modal .sfp-body,
+.sfp-winds .sfp-body,
+.sfp-morph .sfp-body,
+.sfp-texture .sfp-body {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.sfp-jibass,
+.sfp-kiln,
+.sfp-anneal,
+.sfp-palinode,
+.sfp-faultglass,
+.sfp-morrowglass,
+.sfp-vitreous,
+.sfp-lantern,
+.sfp-prism,
+.sfp-tidalglass,
+.sfp-tidelace,
+.sfp-ensemble,
+.sfp-tine,
+.sfp-kit,
+.sfp-tonewheel,
+.sfp-modal,
+.sfp-winds,
+.sfp-morph,
+.sfp-texture {
+  width: 1140px;
+}
+.sfp-jibass .sfp-radio,
+.sfp-kiln .sfp-radio,
+.sfp-lantern .sfp-radio,
+.sfp-prism .sfp-radio,
+.sfp-tidelace .sfp-radio,
+.sfp-ensemble .sfp-radio,
+.sfp-tine .sfp-radio,
+.sfp-kit .sfp-radio,
+.sfp-tonewheel .sfp-radio,
+.sfp-modal .sfp-radio,
+.sfp-winds .sfp-radio,
+.sfp-morph .sfp-radio,
+.sfp-texture .sfp-radio {
+  flex-wrap: wrap;
+}
+.sfp-kiln .sfp-opt,
+.sfp-jibass .sfp-opt {
+  flex: 1 1 56px;
+}
+.sfp-jibass .jb-filter,
+.sfp-faultglass .fg-env,
+.sfp-morrowglass .mg-env {
+  grid-column: span 2;
+}
+
+/* section spans + tighter rows for the five folder synths (pad / keys / drums / organ / mallet) */
+.sfp-tonewheel .tw-bars,
+.sfp-tonewheel .tw-mod,
+.sfp-kit .kt-kick,
+.sfp-kit .kt-snare,
+.sfp-kit .kt-metal,
+.sfp-tine .tn-model,
+.sfp-tine .tn-char,
+.sfp-modal .md-body,
+.sfp-modal .md-res,
+.sfp-ensemble .en-filter,
+.sfp-winds .wd-model,
+.sfp-morph .mp-ta,
+.sfp-morph .mp-tb,
+.sfp-morph .mp-env,
+.sfp-morph .mp-morph,
+.sfp-morph .mp-fold,
+.sfp-texture .tx-filter,
+.sfp-texture .tx-grain {
+  grid-column: span 2;
+}
+.sfp-tonewheel .tw-bars .sfp-row {
+  gap: 2px;
+  justify-content: space-between;
+}
+.sfp-tonewheel .tw-bars .fader-wrap {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sfp-ensemble .sfp-opt,
+.sfp-tonewheel .sfp-opt,
+.sfp-modal .sfp-opt,
+.sfp-tine .sfp-opt,
+.sfp-kit .sfp-opt,
+.sfp-winds .sfp-opt,
+.sfp-morph .sfp-opt,
+.sfp-texture .sfp-opt {
+  flex: 1 1 56px;
+}
+
+/* ---- folder-style synth picker (synth-picker.js) ---- */
+.synth-picker {
+  display: inline-flex;
+  position: relative;
+  min-width: 0;
+}
+.synth-picker-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 150px;
+  max-width: 230px;
+  padding: 3px 8px;
+  border: 1px solid var(--ch-color, var(--border));
+  border-radius: 4px;
+  background: var(--panel-2, #1a222d);
+  color: var(--ch-color, var(--text));
+  font: 600 11px/1.2 var(--font-mono, monospace);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+.synth-picker-btn:hover { background: #222c3a; }
+.synth-picker-btn:focus-visible { outline: 2px solid var(--ch-color, var(--accent)); outline-offset: 1px; }
+.synth-picker-btn .sp-name { overflow: hidden; text-overflow: ellipsis; }
+.synth-picker-btn .sp-folder {
+  margin-left: auto;
+  color: var(--dim);
+  font-weight: 400;
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.synth-picker-btn .sp-caret { color: var(--dim); font-size: 10px; }
+.roll-picker .synth-picker-btn {
+  color: var(--text);
+  border-color: var(--border);
+  min-width: 190px;
+}
+.synth-pop {
+  position: fixed;
+  z-index: 9999;
+  overflow-y: auto;
+  padding: 4px;
+  background: #121820;
+  border: 1px solid #3b4654;
+  border-radius: 8px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.6);
+  font: 11px/1.3 var(--font-mono, monospace);
+  color: var(--text, #dfe6ee);
+}
+.synth-pop .sp-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: 700 11px/1.2 var(--font-mono, monospace);
+  letter-spacing: 0.04em;
+  text-align: left;
+  cursor: pointer;
+}
+.synth-pop .sp-head:hover,
+.synth-pop .sp-head:focus-visible,
+.synth-pop .sp-item:hover,
+.synth-pop .sp-item:focus-visible { background: #1f2a38; outline: none; }
+.synth-pop .sp-head:focus-visible,
+.synth-pop .sp-item:focus-visible { box-shadow: inset 0 0 0 1px var(--accent, #2edb84); }
+.synth-pop .sp-twist { width: 10px; color: var(--dim); }
+.synth-pop .sp-ftitle { flex: 1; }
+.synth-pop .sp-count {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: #1f2a38;
+  color: var(--dim);
+  font-size: 9px;
+  text-align: center;
+}
+.synth-pop .sp-fold.empty .sp-head { color: var(--dim); font-weight: 600; }
+.synth-pop .sp-fold.empty .sp-count { background: transparent; border: 1px dashed #3b4654; }
+.synth-pop .sp-list { padding: 0 0 4px 18px; }
+.synth-pop .sp-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: 11px/1.2 var(--font-mono, monospace);
+}
+.synth-pop .sp-item i { flex: none; width: 8px; height: 8px; border-radius: 50%; }
+.synth-pop .sp-item b { flex: none; font-weight: 700; }
+.synth-pop .sp-item small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim);
+  font-size: 9px;
+}
+.synth-pop .sp-item.sel { background: #16301f; }
+.synth-pop .sp-empty { padding: 4px 8px 6px; color: var(--dim); font-size: 10px; font-style: italic; }
+
+/* instrument rows: compact picker so all four rows align (folder shown in tooltip + popover) */
+.channel.instrument .synth-picker-btn { min-width: 112px; max-width: 150px; }
+.channel.instrument .synth-picker-btn .sp-folder { display: none; }
