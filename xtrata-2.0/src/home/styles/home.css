@@ -7673,6 +7673,38 @@
       object-fit: cover;
     }
     .is-pixelated { image-rendering: pixelated; }
+    /* Forever Twins tile: three twins stacked above a caption band (side by side on phones). */
+    .home-tile--twins { display: flex; flex-direction: column; }
+    .home-tile__twins {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+      gap: 2px;
+      background: #111316;
+    }
+    .home-tile__twin { position: relative; display: block; min-width: 0; overflow: hidden; }
+    /* Absolute, like .home-tile__img, so the art never stretches the wall's grid rows. */
+    .home-tile__twin-img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+    .home-tile__twin-name {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      max-width: calc(100% - 12px);
+      padding: 2px 6px;
+      overflow: hidden;
+      border-radius: 4px;
+      background: rgba(5, 5, 5, 0.72);
+      color: #ffd2a1;
+      font: 700 9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: 0.06em;
+      text-overflow: ellipsis;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .home-tile--twins { border-color: rgba(255, 179, 102, 0.4); }
+    .home-tile--twins .home-tile__caption { position: static; flex: none; padding: 8px 10px 9px; background: #0d0d0f; }
     .home-tile__caption {
       position: absolute;
       right: 0;
@@ -8191,6 +8223,9 @@
       .home-tile--wide { grid-column: span 2; }
       .home-tile--big { grid-row: auto; }
       .home-tile--wide { grid-row: auto; }
+      .home-tile--twins { grid-column: span 2; grid-row: auto; }
+      .home-tile__twins { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+      .home-tile__twin-name { white-space: normal; font-size: 8px; line-height: 1.2; letter-spacing: 0.03em; }
       .home-tile--chess { padding: 12px; }
       .home-chess--wall { max-width: 100%; }
       .home-shelf { grid-template-columns: repeat(2, minmax(0, 1fr)); }
