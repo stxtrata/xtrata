@@ -1,11 +1,15 @@
 // Forever Twins launch canary. Ships one collection's helper in the only safe order, from a web wallet
 // (Xverse or Leather): deploy -> verify -> seed the canonical record -> audit it -> finalise (one-way, gated)
 // -> one test inscription -> hand-off for the sponsor script and the registry. Mainnet only.
-// Every transaction is signed in the wallet; this page holds no key. Each step re-reads the chain.
+// Every transaction is signed in the wallet, with ONE exception: seeding. Only the owner can seed and the owner would have to
+// approve every batch by hand, so the page uses a temporary wallet it creates in this browser: the Xtrata wallet proposes it as
+// owner, it accepts, seeds every batch by itself, then proposes the Xtrata wallet back and the Xtrata wallet accepts. The
+// one-way finalise, the test inscription and everything else stay with the Xtrata wallet. Each step re-reads the chain.
 import { sha256 } from '@noble/hashes/sha256';
 import {
-  AnchorMode, bufferCV, ClarityType, cvToString, FungibleConditionCode, listCV, makeStandardSTXPostCondition, makeUnsignedContractCall,
-  PostConditionMode, standardPrincipalCV, stringAsciiCV, tupleCV, uintCV, type ClarityValue, type PostCondition
+  AnchorMode, bufferCV, ClarityType, cvToString, FungibleConditionCode, getAddressFromPrivateKey, listCV, makeContractCall, makeRandomPrivKey,
+  makeSTXTokenTransfer, makeStandardSTXPostCondition, makeUnsignedContractCall, makeUnsignedSTXTokenTransfer, PostConditionMode, principalCV,
+  privateKeyToString, standardPrincipalCV, stringAsciiCV, TransactionVersion, tupleCV, uintCV, type ClarityValue, type PostCondition
 } from '@stacks/transactions';
 import { Chain, toHex } from '../collection-v17/chain';
 import * as wallet from '../collection-v17/wallet';
@@ -206,6 +210,129 @@ const chunkBytes = (bytes: Uint8Array) => { const out: Uint8Array[] = []; for (l
 const rolling = (chunks: Uint8Array[]) => { let h: Uint8Array = new Uint8Array(32); for (const c of chunks) { const b = new Uint8Array(h.length + c.length); b.set(h); b.set(c, h.length); h = sha256(b); } return toHex(h); };
 const gatewayUrl = (uri: string) => uri.startsWith('ipfs://') ? `${state.gateway.replace(/\/$/, '')}/ipfs/${uri.slice(7)}` : uri;
 
+// ---------- the temporary wallet: signs the seed batches ----------
+const TEMP_TX_FEE = 20_000n;
+const SWEEP_TX_FEE = 5_000n;
+const hotKeyName = () => `xtrata-ft-launch:hot:${CFG.key}`;
+const hotExists = () => { try { return !!localStorage.getItem(hotKeyName()); } catch { return false; } };
+/** The temporary wallet's key lives in this browser (and in a file saved before it is ever given ownership). */
+const hotKey = () => {
+  let key: string | null = null;
+  try { key = localStorage.getItem(hotKeyName()); } catch { /* ignore */ }
+  if (!key) {
+    key = privateKeyToString(makeRandomPrivKey());
+    if (key.length === 64) key += '01';
+    try { localStorage.setItem(hotKeyName(), key); } catch { throw new Error('This browser cannot store the temporary wallet key, so the automatic seeding cannot be used here.'); }
+  }
+  return key;
+};
+const hotAddress = () => getAddressFromPrivateKey(hotKey(), TransactionVersion.Mainnet);
+/** A label that stays the same while a transaction is pending (so a reload resumes) and changes once it has passed (so a later run sends again). */
+const uniq = (stepId: string, base: string) => `${base} (${step(stepId).txs.filter((t) => t.pass && t.label.startsWith(`${base} (`)).length + 1})`;
+const downloadHotKey = () => {
+  const blob = new Blob([JSON.stringify({ purpose: `Xtrata Forever Twins launch canary temporary wallet (${CFG.key})`, network: NET, address: hotAddress(), privateKey: hotKey(), helper: helperId(),
+    note: 'Keep this file until the canary reports that contract ownership is back with your wallet. Anyone holding it can act as the helper owner (seed, set the fee up to its ceiling, propose a rescue) while ownership is with this wallet.' }, null, 2)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `xtrata-ft-temp-wallet-${CFG.key}-${hotAddress().slice(0, 8)}.json` }) as HTMLAnchorElement;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+/** Priced from the real size of the signed transaction (a 100-record seed is about 20 KB), with room to spare. */
+const hotContractTx = async (fn: string, args: ClarityValue[]) => {
+  const [address, name] = helperId().split('.');
+  const nonce = await chain.nonce(hotAddress());
+  const build = (fee: bigint) => makeContractCall({ contractAddress: address, contractName: name, functionName: fn, functionArgs: args, senderKey: hotKey(), network: chain.stacks,
+    nonce, fee, anchorMode: AnchorMode.Any, postConditionMode: PostConditionMode.Deny, postConditions: [] });
+  const size = (await build(TEMP_TX_FEE)).serialize().length;
+  const fee = BigInt(Math.max(Number(TEMP_TX_FEE), size * 2));
+  return { tx: await build(fee), fee };
+};
+const hotCall = (stepId: string, label: string, fn: string, args: ClarityValue[]) =>
+  runTx(stepId, uniq(stepId, label), async () => chain.broadcast((await hotContractTx(fn, args)).tx));
+const walletTransfer = async (recipient: string, amount: bigint, memo: string) => {
+  const w = requireWallet();
+  const result = await wallet.stxTransfer({ recipient, amount, memo, network: NET, stxAddress: w.address, onProgress: progress,
+    buildUnsigned: w.publicKey ? async () => {
+      const nonce = await chain.nonce(w.address);
+      return toHex((await makeUnsignedSTXTokenTransfer({ recipient, amount, memo, publicKey: w.publicKey!, network: chain.stacks, nonce, fee: 5_000n, anchorMode: AnchorMode.Any })).serialize());
+    } : undefined });
+  return settle(result);
+};
+/** What the temporary wallet needs: the seed batches, the calls around them, the final sweep, and a margin. */
+const hotFloat = async (todo: Tok[][], o: { accept: boolean; propose: boolean }) => {
+  let seeds = 0n;
+  if (todo.length) { const { fee } = await hotContractTx('seed-canonical', [listCV(todo[0].map(entryCV))]); seeds = (fee * BigInt(todo.length) * 11n) / 10n; }
+  return seeds + TEMP_TX_FEE * BigInt((o.accept ? 1 : 0) + (o.propose ? 1 : 0)) + SWEEP_TX_FEE + 40_000n;
+};
+/** Makes sure the temporary wallet holds at least `target`: the connected wallet is asked to send the difference; if it cannot sign a plain transfer from a page (Xverse), the amount is shown to send by hand. */
+const ensureHotFunds = async (stepId: string, target: bigint, what: string) => {
+  const hot = hotAddress();
+  const have = await chain.balance(hot);
+  if (have < target) {
+    const need = target - have;
+    let sent = false;
+    try {
+      await runTx(stepId, uniq(stepId, `${what}: send ${stx(need)} to the temporary wallet`), () => walletTransfer(hot, need, 'ft launch canary'));
+      sent = true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/cancel/i.test(message) && !/not implemented/i.test(message)) throw error;
+      log('warn', `The wallet could not sign the funding transfer from this page (${message}). Send it by hand instead.`);
+    }
+    if (!sent) {
+      const deadline = Date.now() + 10 * 60_000;
+      for (;;) {
+        const b = await chain.balance(hot);
+        if (b >= target) break;
+        if (Date.now() > deadline) throw new Error(`Timed out waiting for ${stx(target - b)} to arrive at ${hot}. Send it from your wallet's own Send screen, then press the button again.`);
+        status(`Send ${stx(target - b)} (or a little more) from your wallet to ${hot} — waiting for it to arrive (balance ${stx(b)})…`, 'warn');
+        await sleep(5000);
+      }
+    }
+  }
+  await eventually('Temporary wallet funding', async () => { const b = await chain.balance(hot); return b >= target ? null : `balance ${stx(b)}`; });
+  return chain.balance(hot);
+};
+/** Everything the temporary wallet still holds goes back to the deployer. */
+const sweepHot = async (stepId: string) => {
+  if (!hotExists()) return 0n;
+  const hot = hotAddress();
+  const balance = await chain.balance(hot);
+  if (balance <= SWEEP_TX_FEE) return balance;
+  await runTx(stepId, uniq(stepId, `sweep ${stx(balance - SWEEP_TX_FEE)}`), async () => {
+    const nonce = await chain.nonce(hot);
+    const tx = await makeSTXTokenTransfer({ recipient: CFG.deployer, amount: balance - SWEEP_TX_FEE, senderKey: hotKey(), network: chain.stacks, nonce, fee: SWEEP_TX_FEE, memo: 'ft launch canary sweep', anchorMode: AnchorMode.Any });
+    return chain.broadcast(tx);
+  });
+  return chain.balance(hot);
+};
+const principalOrNull = (v: string) => (v === 'none' ? null : v.replace(/^"|"$/g, ''));
+/** Who owns the helper, who (if anyone) has been proposed, and which seed batches are still missing: all read from the chain. */
+const seedPlan = async () => {
+  const g = await iface();
+  const todo: Tok[][] = [];
+  for (const b of batches()) if (!(await canonRead(b[0].id))) todo.push(b);
+  return { todo, owner: g('owner').replace(/^"|"$/g, ''), pending: principalOrNull(g('pending-owner')), count: Number(g('canonical-count')), finalised: g('canonical-finalized') === 'true' };
+};
+/**
+ * Gives helper ownership back to the deployer if the temporary wallet holds it: the temporary wallet proposes, the connected
+ * wallet accepts. Safe to call at any point; does nothing when ownership is already back.
+ */
+const handBack = async () => {
+  const me = CFG.deployer;
+  const { owner, pending } = await seedPlan();
+  if (owner === me) return false;
+  const hot = hotExists() ? hotAddress() : null;
+  if (!hot || owner !== hot) throw new Error(`The helper is owned by ${owner}, which is neither your wallet nor the temporary wallet.`);
+  await ensureHotFunds('handback', TEMP_TX_FEE + SWEEP_TX_FEE + 20_000n, 'handing ownership back');
+  if (pending !== me) {
+    await hotCall('handback', 'temporary wallet hands ownership back (propose)', 'propose-ownership', [principalCV(me)]);
+    await eventually('Pending owner', async () => ((await seedPlan()).pending === me ? null : 'not proposed yet'));
+  }
+  await runTx('handback', uniq('handback', 'your wallet accepts ownership back'), () => walletCall('accept-ownership', []));
+  await eventually('Owner', async () => ((await seedPlan()).owner === me ? null : 'not accepted yet'));
+  log('ok', `Helper ownership is back with ${short(me)}.`);
+  return true;
+};
+
 // ---------- source checks ----------
 // A source collection can change after the manifest snapshot (for example an owner who can still set a new base URI).
 // Compare what the source reports now with what the manifest recorded, for a spread of tokens. Run at preflight and
@@ -332,28 +459,91 @@ const STEPS: Step[] = [
     }
   },
   {
-    id: 'seed', title: 'Seed the canonical record', who: 'Web wallet',
-    intro: "Writes every token's content hash, mime, size and token-uri into the helper, in batches (one signature each). A batch already on chain exactly as the manifest says is skipped; a partial or different batch stops the run.",
+    id: 'tempwallet', title: 'Prepare the temporary seeding wallet', who: 'Web wallet · 1 transfer',
+    intro: `Only the helper's owner can seed, and the owner would otherwise approve every batch by hand. So the canary creates a temporary wallet in this browser, saves its key to a file, and asks your wallet to send it just enough STX for the network fees of every seed batch plus the hand-over and hand-back (the rest is swept back to you at the end). Xverse cannot sign a plain transfer from a page: the address and amount are shown and the step waits for the funds to arrive. If every record is already on chain, nothing is created or sent.`,
+    action: 'Create and fund the temporary wallet',
+    run: async () => {
+      const { todo, owner } = await seedPlan();
+      if (!todo.length && owner === CFG.deployer) return `all ${tokens.length} records are already on chain: no temporary wallet needed, nothing sent`;
+      const hot = hotAddress();
+      if (owner !== CFG.deployer && owner !== hot) throw new Error(`The helper is owned by ${owner}, which is neither your wallet nor this canary's temporary wallet ${hot}. Nothing was sent.`);
+      requireWallet();
+      const target = await hotFloat(todo, { accept: owner !== hot, propose: true });
+      if (!step('tempwallet').data.keySaved) {
+        const msg = `${todo.length} seed batch(es) are still to write.\n\nThe temporary wallet ${hot} will sign them. Its key is about to be saved to a file in your downloads: keep that file until the canary says ownership is back with your wallet.\n\nNext your wallet sends it about ${stx(target)} for network fees (what is unspent is swept back). Continue?`;
+        if (!window.confirm(msg)) throw new Error('Not confirmed; nothing was sent.');
+        downloadHotKey();
+        step('tempwallet').data.keySaved = true; save();
+      }
+      const have = await ensureHotFunds('tempwallet', target, 'seeding float');
+      return `temporary wallet ${hot} created, key saved to a file, and funded: it holds ${stx(have)} for ${todo.length} seed batch(es)`;
+    }
+  },
+  {
+    id: 'handover', title: 'Make the temporary wallet the helper owner', who: 'Web wallet · 1 signature',
+    intro: 'Your wallet proposes the temporary wallet as owner (propose-ownership) and the temporary wallet accepts (accept-ownership, signed in this page). It stays the owner only for the next step; the step after that hands ownership back to your wallet. If anything stops in between, press the next step\'s button again, or "Return ownership to my wallet" below, to finish the hand-back.',
+    action: 'Hand over ownership',
+    run: async () => {
+      const { todo, owner, pending } = await seedPlan();
+      if (!todo.length && owner === CFG.deployer) return 'nothing to seed: ownership stays with your wallet, nothing sent';
+      const hot = hotAddress();
+      if (owner === hot) return `the temporary wallet ${short(hot)} already owns the helper (nothing sent)`;
+      if (owner !== CFG.deployer) throw new Error(`The helper is owned by ${owner}, which is neither your wallet nor the temporary wallet. Nothing was sent.`);
+      requireWallet();
+      const need = await hotFloat(todo, { accept: true, propose: true });
+      // a stopped run has already spent fees (a failed batch still costs one), so top the float up rather than refuse
+      if ((await chain.balance(hot)) < need) await ensureHotFunds('handover', need, 'topping up the seeding float');
+      if (pending !== hot) {
+        await runTx('handover', uniq('handover', `make ${short(hot)} the helper owner (propose)`), () => walletCall('propose-ownership', [principalCV(hot)]));
+        await eventually('Pending owner', async () => ((await seedPlan()).pending === hot ? null : 'not proposed yet'));
+      }
+      await hotCall('handover', 'temporary wallet accepts ownership', 'accept-ownership', []);
+      await eventually('Owner', async () => ((await seedPlan()).owner === hot ? null : 'not accepted yet'));
+      return `the temporary wallet ${short(hot)} now owns the helper (the next step hands it back) · ${todo.length} seed batch(es) to write`;
+    }
+  },
+  {
+    id: 'seed', title: 'Seed the canonical record', who: 'Temporary wallet · automatic',
+    intro: "Writes every token's content hash, mime, size and token-uri into the helper, in batches, signed by the temporary wallet with no prompts. Each batch is confirmed and re-read before the next is sent. A batch already on chain is skipped; a rerun after a stop continues where it left off and sends nothing twice.",
     action: 'Seed',
     run: async () => {
-      const list = batches();
-      let sent = 0, skipped = 0;
-      for (let i = 0; i < list.length; i++) {
-        const b = list[i];
-        const first = await canonRead(b[0].id);
-        if (first) {
-          const bad: string[] = [];
-          await pool(b, 6, async (t) => { const d = canonDiff(t, await canonRead(t.id)); if (d.length) bad.push(`#${t.id}:${d.join('+')}`); });
-          if (bad.length) throw new Error(`Batch ${i + 1} (#${b[0].id}-#${b[b.length - 1].id}) is partly or wrongly seeded: ${bad.slice(0, 6).join(', ')}. Resolve it before continuing.`);
-          skipped++; continue;
+      const { todo, owner, count } = await seedPlan();
+      if (!todo.length) return `all ${tokens.length} records are already on chain (canonical-count ${count}/${tokens.length}); nothing sent`;
+      const hot = hotAddress();
+      if (owner !== hot) throw new Error(`Seeding is signed by the temporary wallet, but the helper is owned by ${owner}. Run the hand-over step again.`);
+      let sent = 0, expected = count;
+      try {
+        for (const b of todo) {
+          const label = `seed-canonical #${b[0].id}-#${b[b.length - 1].id}`;
+          status(`Seeding batch ${sent + 1} of ${todo.length} (#${b[0].id}-#${b[b.length - 1].id})…`);
+          await hotCall('seed', label, 'seed-canonical', [listCV(b.map(entryCV))]);
+          expected += b.length;
+          await eventually(`Seed batch ${sent + 1}`, async () => { const c = Number((await iface())('canonical-count')); return c === expected ? null : `canonical-count ${c}, expected ${expected}`; });
+          sent++;
         }
-        const label = `seed-canonical #${b[0].id}-#${b[b.length - 1].id}`;
-        await runTx('seed', label, () => walletCall('seed-canonical', [listCV(b.map(entryCV))]));
-        const target = Math.min((i + 1) * state.seedBatch, tokens.length);
-        await eventually(`Seed batch ${i + 1}`, async () => { const c = Number((await iface())('canonical-count')); return c === target ? null : `canonical-count ${c}, expected ${target}`; });
-        sent++;
+      } catch (error) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)} — The helper stays owned by the temporary wallet ${hot} until it is handed back. Press this step's button again to continue, or "Return ownership to my wallet" to give it back now. Its key was saved to a file (and stays in this browser).`);
       }
-      return `${list.length} batch(es): ${sent} sent, ${skipped} already on chain · canonical-count ${(await iface())('canonical-count')}/${tokens.length}`;
+      return `${todo.length} batch(es) written by the temporary wallet · canonical-count ${(await iface())('canonical-count')}/${tokens.length}`;
+    }
+  },
+  {
+    id: 'handback', title: 'Hand ownership back and sweep the temporary wallet', who: 'Web wallet · 1 signature',
+    intro: 'The temporary wallet proposes your wallet as owner again and your wallet accepts (accept-ownership). Then anything left in the temporary wallet is swept back to you. The step also clears a hand-over that was proposed but never accepted, so the temporary key can never take ownership later.',
+    action: 'Hand back and sweep',
+    run: async () => {
+      requireWallet();
+      const moved = await handBack();
+      const { owner, pending, count } = await seedPlan();
+      if (owner !== CFG.deployer) throw new Error(`The helper is owned by ${owner}, not your wallet.`);
+      const hot = hotExists() ? hotAddress() : null;
+      if (hot && pending === hot) {
+        await runTx('handback', uniq('handback', 'cancel the pending hand-over'), () => walletCall('cancel-ownership-proposal', []));
+        await eventually('Pending owner', async () => ((await seedPlan()).pending === hot ? 'still the temporary wallet' : null));
+      }
+      if (count !== tokens.length) throw new Error(`Ownership is back with your wallet, but only ${count} of ${tokens.length} records are on chain. Run the hand-over and seed steps again.`);
+      const left = await sweepHot('handback');
+      return `${moved ? 'ownership handed back to your wallet' : 'your wallet already owns the helper (nothing to hand back)'} · all ${tokens.length} records on chain${hot ? ` · temporary wallet holds ${stx(left)}` : ''}`;
     }
   },
   {
@@ -384,6 +574,7 @@ const STEPS: Step[] = [
         return `already finalised with the pinned manifest ${short(PINS.manifestSha)}`;
       }
       if (step('audit').status !== 'pass') throw new Error('Run the audit first.');
+      if (g0('owner').replace(/^"|"$/g, '') !== CFG.deployer) throw new Error(`The helper is owned by ${g0('owner')}, not your wallet. Hand ownership back first.`);
       const origin = new URL(tokens[0].twin.tokenUri).origin;
       const mres = await fetch(`${origin}${CFG.manifestPath}`, { cache: 'no-store' });
       if (mres.status !== 200) throw new Error(`The resolver does not serve ${origin}${CFG.manifestPath} (HTTP ${mres.status}). Deploy it to production before finalising.`);
@@ -560,13 +751,14 @@ const renderHeader = () => {
   const batch = $('#seed-batch') as HTMLSelectElement; batch.value = String(state.seedBatch); batch.disabled = step('seed').txs.length > 0 || step('seed').status === 'pass';
   const tt = $('#test-token') as HTMLInputElement; tt.value = String(state.testToken); tt.disabled = step('inscribe').txs.length > 0;
   ($('#gateway') as HTMLInputElement).value = state.gateway;
+  $('#hot').textContent = hotExists() ? `${hotAddress()} (key kept in this browser, and in the file saved when it was created)` : 'not created yet';
   $('#wallet').textContent = connected ? `${connected.label} · ${short(connected.address)}` : 'not connected';
   $('#disconnect').toggleAttribute('hidden', !connected);
 };
 
 const bind = () => {
   $('#build').textContent = `${__BUILD__} · helper ${PINS.helperSha.slice(0, 12)}… · manifest ${PINS.manifestSha.slice(0, 12)}…`;
-  $('#intro').textContent = `Ships the ${CFG.name} Forever Twins helper from the Xtrata wallet in the only safe order: deploy, verify, seed ${tokens.length} canonical records, audit them, finalise (one-way, gated on the live resolver) and inscribe one test twin. Each step unlocks only when the one before it has passed and re-reads the chain rather than trusting this page's memory. The sponsored inscription of the rest is done afterwards with the sponsor script.`;
+  $('#intro').textContent = `Ships the ${CFG.name} Forever Twins helper from the Xtrata wallet in the only safe order: deploy, verify, seed ${tokens.length} canonical records (signed by a temporary wallet the page creates, so you approve about four transactions instead of one per batch), audit them, finalise (one-way, gated on the live resolver) and inscribe one test twin. Each step unlocks only when the one before it has passed and re-reads the chain rather than trusting this page's memory. The sponsored inscription of the rest is done afterwards with the sponsor script.`;
   $('#contract-name').addEventListener('change', (e) => {
     const v = (e.target as HTMLInputElement).value.trim();
     if (!/^[a-zA-Z][a-zA-Z0-9-]{0,39}$/.test(v)) { status('Contract names start with a letter and use letters, digits and dashes (max 40).', 'error'); renderHeader(); return; }
@@ -586,8 +778,20 @@ const bind = () => {
     const a = el('a', { href: URL.createObjectURL(blob), download: `ft-launch-${CFG.key}-${Date.now()}.json` }) as HTMLAnchorElement;
     a.click(); URL.revokeObjectURL(a.href);
   });
+  $('#handback').addEventListener('click', async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const moved = await handBack();
+      status(moved ? 'Ownership is back with your wallet.' : 'Your wallet already owns the helper; nothing to hand back.', 'ok');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      log('error', `Return ownership: ${msg}`); status(msg, 'error');
+    } finally { busy = false; renderHeader(); renderSteps(); }
+  });
+  $('#hotkey').addEventListener('click', () => { if (!hotExists()) { status('No temporary wallet has been created yet.', 'warn'); return; } downloadHotKey(); });
   $('#forget').addEventListener('click', () => {
-    if (!confirm('Forget local progress? Nothing on chain changes; the canary re-reads the chain and resumes from what is already there.')) return;
+    if (!confirm('Forget local progress? Nothing on chain changes; the canary re-reads the chain and resumes from what is already there. The temporary wallet key is kept in this browser either way, so you can still hand ownership back or sweep it.')) return;
     try { localStorage.removeItem(stateKey()); } catch { /* ignore */ }
     load(); restoreLog(); renderHeader(); renderSteps(); status('Local progress cleared.', 'ok');
   });

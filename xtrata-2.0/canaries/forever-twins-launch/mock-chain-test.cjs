@@ -9,7 +9,9 @@
 // wallet is a stub Leather provider that applies calls to the mock (no keys, nothing leaves this machine).
 // Cases: wrong wallet refused; finalise blocked until the resolver serves the exact manifest; tampered file
 // refused before signing; non-payee test inscription pays both payees half; re-run after "Forget progress"
-// resumes from the chain and sends nothing twice.
+// resumes from the chain and sends nothing twice. Seeding is signed by a temporary wallet the page creates: the Xtrata wallet
+// hands it ownership, it seeds every batch with its own key (raw transactions broadcast to the mock), a forced mid-run failure
+// is recovered with "Return ownership to my wallet" and resumed, then ownership is handed back and the wallet swept.
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const T = require('@stacks/transactions');
 const { chromium } = require('playwright');
@@ -28,6 +30,7 @@ const JIM = 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7', RAPHA = 'SPV9K21TBFAK4K
 const CORE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 const SOURCE = 'SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.testcol';
 const HELPER = DEPLOYER + '.forever-twin-testcol';
+const { c32address } = require('c32check');
 const sha = (b) => crypto.createHash('sha256').update(b).digest();
 const hex = (b) => Buffer.from(b).toString('hex');
 const num = (cv) => BigInt(cv.value);
@@ -35,8 +38,8 @@ const failures = [];
 const check = (ok, what) => { console.log(`${ok ? '  ok  ' : '  FAIL'} ${what}`); if (!ok) failures.push(what); };
 
 // ---------- mock chain ----------
-const S = { walletAddr: OTHER, blk: 900000, nonce: 100, txs: new Map(), contracts: new Map(), bal: new Map(), resolver: false, tamper: false, drift: false, writes: [],
-  H: { canon: new Map(), finalized: false, mhash: Buffer.alloc(32), bindings: new Map(), nextXid: 5000, xowner: new Map() } };
+const S = { failSeedAt: 0, seedCalls: 0, manualFund: false, seedSenders: [], xfers: [], lowFee: [], hotFees: [], walletAddr: OTHER, blk: 900000, nonce: 100, txs: new Map(), contracts: new Map(), bal: new Map(), resolver: false, tamper: false, drift: false, writes: [],
+  H: { owner: DEPLOYER, pending: null, canon: new Map(), finalized: false, mhash: Buffer.alloc(32), bindings: new Map(), nextXid: 5000, xowner: new Map() } };
 S.contracts.set(SOURCE, '(mock source collection)');
 const half = 50000n, FEE = 100000n;
 const feeFor = (payer) => (payer === JIM ? 0n : half) + (payer === RAPHA ? 0n : half);
@@ -49,7 +52,7 @@ function callRead(contract, fn, args) {
     if (fn === 'get-twin-interface') return tupleCV({ 'interface-version': uintCV(3), 'collection-key': stringAsciiCV('testcol'), master: principalCV(CORE), source: principalCV(SOURCE),
       'source-asset': stringAsciiCV('testcol'), route: stringAsciiCV('standard'), group: stringAsciiCV(GROUP), 'canonical-finalized': boolCV(H.finalized), 'canonical-count': uintCV(H.canon.size),
       'manifest-hash': bufferCV(H.mhash), 'inscribed-count': uintCV(H.bindings.size), 'swaps-enabled': boolCV(true), 'large-unbound': uintCV(0), fee: uintCV(FEE), 'max-fee': uintCV(5000000),
-      'payee-a': principalCV(JIM), 'payee-b': principalCV(RAPHA), 'rescue-enabled': boolCV(true), 'rescue-delay': uintCV(432), owner: principalCV(DEPLOYER), 'pending-owner': noneCV() });
+      'payee-a': principalCV(JIM), 'payee-b': principalCV(RAPHA), 'rescue-enabled': boolCV(true), 'rescue-delay': uintCV(432), owner: principalCV(H.owner), 'pending-owner': H.pending ? someCV(principalCV(H.pending)) : noneCV() });
     if (fn === 'get-canonical') { const c = H.canon.get(Number(num(args[0]))); return c ? someCV(tupleCV({ 'content-hash': bufferCV(c.hash), mime: stringAsciiCV(c.mime), 'total-size': uintCV(c.size), 'token-uri': stringAsciiCV(c.uri) })) : noneCV(); }
     if (fn === 'get-binding') { const b = H.bindings.get(Number(num(args[0]))); return b ? someCV(tupleCV({ 'xtrata-id': uintCV(b.xid), 'content-hash': bufferCV(b.hash), inscriber: principalCV(b.by), 'xtrata-escrowed': boolCV(true), at: uintCV(S.blk) })) : noneCV(); }
     if (fn === 'fee-for') return uintCV(feeFor(principalStr(args[0])));
@@ -71,8 +74,13 @@ function callWrite(contract, fn, args, sender, params) {
   const H = S.H;
   if (contract !== HELPER) throw new Error('mock write to unknown contract ' + contract);
   S.writes.push(fn);
-  if (['seed-canonical', 'finalize-canonical'].includes(fn) && sender !== DEPLOYER) return ['abort_by_response', '(err u204)'];
+  if (['seed-canonical', 'finalize-canonical', 'propose-ownership', 'cancel-ownership-proposal'].includes(fn) && sender !== H.owner) return ['abort_by_response', '(err u204)'];
+  if (fn === 'propose-ownership') { H.pending = principalStr(args[0]); return ['success', '(ok true)']; }
+  if (fn === 'cancel-ownership-proposal') { if (!H.pending) return ['abort_by_response', '(err u205)']; H.pending = null; return ['success', '(ok true)']; }
+  if (fn === 'accept-ownership') { if (!H.pending) return ['abort_by_response', '(err u205)']; if (sender !== H.pending) return ['abort_by_response', '(err u204)']; H.owner = H.pending; H.pending = null; return ['success', '(ok true)']; }
   if (fn === 'seed-canonical') {
+    S.seedCalls++; S.seedSenders.push(sender);
+    if (S.failSeedAt && S.seedCalls === S.failSeedAt) return ['abort_by_response', '(err u999)'];
     if (H.finalized) return ['abort_by_response', '(err u202)'];
     for (const e of args[0].list) { const d = e.data; const id = Number(num(d.id)); if (!H.canon.has(id)) H.canon.set(id, { hash: d['content-hash'].buffer, mime: d.mime.data, size: num(d['total-size']), uri: d['token-uri'].data }); }
     return ['success', `(ok u${H.canon.size})`];
@@ -125,8 +133,27 @@ async function route(r) {
     try { return json({ okay: true, result: cvToHex(callRead(m[1] + '.' + m[2], m[3], args)) }); } catch (e) { return json({ okay: false, cause: String(e.message) }); }
   }
   if ((m = q.match(/^\/v2\/contracts\/source\/([^/]+)\/([^/]+)/))) { const s = S.contracts.get(m[1] + '.' + m[2]); return s ? json({ source: s }) : r.fulfill({ status: 404, headers: cors, body: '{}' }); }
-  if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/stx$/))) return json({ balance: String(S.bal.get(m[1]) ?? 100_000_000n) });
+  if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/stx$/))) return json({ balance: String(S.bal.get(m[1]) ?? ([DEPLOYER, OTHER].includes(m[1]) ? 100_000_000n : 0n)) });
   if ((m = q.match(/^\/extended\/v1\/address\/([^/]+)\/nonces$/))) return json({ possible_next_nonce: S.nonce++ });
+  if (q === '/v2/transactions' && r.request().method() === 'POST') {
+    const raw = r.request().postDataBuffer();
+    const tx = T.deserializeTransaction(raw);
+    const sc = tx.auth.spendingCondition, from = c32address(22, sc.signer), fee = BigInt(sc.fee);
+    const bal = S.bal.get(from) ?? 0n;
+    if (bal < fee) return r.fulfill({ status: 400, headers: cors, contentType: 'application/json', body: JSON.stringify({ error: 'transaction rejected', reason: 'NotEnoughFunds' }) });
+    S.bal.set(from, bal - fee); S.hotFees.push({ from, fee, size: raw.length }); if (fee < BigInt(raw.length)) S.lowFee.push(from);
+    const txid = '0x' + tx.txid();
+    const pl = tx.payload;
+    if (pl.payloadType === T.PayloadType.ContractCall) {
+      const res = callWrite(T.addressToString(pl.contractAddress) + '.' + pl.contractName.content, pl.functionName.content, pl.functionArgs, from, { postConditions: [], postConditionMode: 'deny' });
+      S.txs.set(txid, { tx_status: res[0], tx_result: { repr: res[1] }, block_height: ++S.blk, events: res[2] || [] });
+    } else if (pl.payloadType === T.PayloadType.TokenTransfer) {
+      const to = cvToString(pl.recipient), amt = BigInt(pl.amount); const b2 = S.bal.get(from) ?? 0n;
+      if (b2 < amt) { S.txs.set(txid, { tx_status: 'abort_by_response', tx_result: { repr: '(err u1)' }, block_height: ++S.blk, events: [] }); }
+      else { S.bal.set(from, b2 - amt); S.bal.set(to, (S.bal.get(to) ?? 0n) + amt); S.xfers.push({ from, to, amt }); S.txs.set(txid, { tx_status: 'success', tx_result: { repr: '(ok true)' }, block_height: ++S.blk, events: [] }); }
+    } else throw new Error('mock broadcast: unsupported payload ' + pl.payloadType);
+    return json(txid.slice(2));
+  }
   if ((m = q.match(/^\/extended\/v1\/tx\/(0x[0-9a-f]+)$/))) { const t = S.txs.get(m[1]); return t ? json(t) : r.fulfill({ status: 404, headers: cors, body: '{}' }); }
   return r.fulfill({ status: 404, headers: cors, body: '{}' });
 }
@@ -146,6 +173,11 @@ async function route(r) {
       if ('sender' in params) throw new Error('stx_callContract must not carry sender');
       const res = callWrite(params.contract, params.functionName, params.functionArgs.map(hexToCV), S.walletAddr, params);
       return { result: { txid: newTx(res[0], res[1], res[2]) } };
+    }
+    if (method === 'stx_transferStx') {
+      const amt = BigInt(params.amount); S.bal.set(DEPLOYER, (S.bal.get(DEPLOYER) ?? 100_000_000n) - amt); S.bal.set(params.recipient, (S.bal.get(params.recipient) ?? 0n) + amt); S.xfers.push({ from: DEPLOYER, to: params.recipient, amt });
+      if (S.manualFund) throw Object.assign(new Error('unsupported stx_transferStx (Xverse-style: send by hand)'), { code: -32601 });
+      return { result: { txid: newTx('success', '(ok true)') } };
     }
     throw Object.assign(new Error('unsupported ' + method), { code: -32601 });
   });
@@ -182,7 +214,27 @@ async function route(r) {
   b = await runStep('deploy'); check(passes(b) && S.contracts.has(HELPER), 'deploy sends the helper');
   b = await runStep('verify'); check(passes(b), 'verify matches config (payees, fee, ceiling, owner)');
   await page.selectOption('#seed-batch', '25');
-  b = await runStep('seed'); check(passes(b) && S.H.canon.size === 60 && /3 batch/.test(b), 'seed writes 60 records in 3 batches');
+  // seeding by a temporary wallet: fund it, hand it ownership, seed (forced failure on batch 2), recover, resume, hand back
+  S.manualFund = GROUP === 'G2';   // G1 funds with a wallet transfer; G2 takes the "send by hand" path
+  S.failSeedAt = 2;
+  b = await runStep('tempwallet'); check(passes(b) && /funded/.test(b), 'temporary wallet created and funded (' + (S.manualFund ? 'by hand' : 'by wallet transfer') + ')');
+  const hotAddr = await page.$eval('#hot', (e) => e.textContent.split(' ')[0]);
+  check(/^SP[0-9A-Z]{30,}$/.test(hotAddr) && hotAddr !== DEPLOYER, 'temporary wallet address is shown');
+  check((S.bal.get(hotAddr) ?? 0n) >= 150000n && (S.bal.get(hotAddr) ?? 0n) < 3_000_000n, 'float is small: ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX');
+  b = await runStep('handover'); check(passes(b) && S.H.owner === hotAddr && S.H.pending === null, 'wallet proposed, temporary wallet accepted: it owns the helper');
+  b = await runStep('seed'); check(b.startsWith('fail') && /temporary wallet/.test(b) && S.H.canon.size === 25 && S.H.owner === hotAddr, 'forced failure on batch 2 stops the run, 25 records on chain, helper still with the temporary wallet');
+  await page.click('#handback'); await page.waitForTimeout(1500);
+  for (let i = 0; i < 60 && S.H.owner !== DEPLOYER; i++) await page.waitForTimeout(500);
+  check(S.H.owner === DEPLOYER && S.H.pending === null, '"Return ownership to my wallet" gives the helper back mid-run');
+  S.failSeedAt = 0;
+  b = await runStep('handover'); check(passes(b) && S.H.owner === hotAddr, 'ownership handed over again for the resume');
+  const seedsBefore = S.seedCalls;
+  b = await runStep('seed'); check(passes(b) && S.H.canon.size === 60 && S.seedCalls - seedsBefore === 2, 'resume writes only the 2 missing batches (' + (S.seedCalls - seedsBefore) + ' sent)');
+  check(S.seedSenders.length >= 4 && S.seedSenders.every((a) => a === hotAddr), 'every seed batch was signed by the temporary wallet, none by the Xtrata wallet (' + S.seedSenders.length + ' calls)');
+  b = await runStep('handback'); check(passes(b) && S.H.owner === DEPLOYER && S.H.pending === null, 'ownership handed back to the Xtrata wallet');
+  check((S.bal.get(hotAddr) ?? 0n) <= 10000n, 'temporary wallet swept (left ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX)');
+  check(S.xfers.some((x) => x.from === hotAddr && x.to === DEPLOYER), 'the sweep went back to the Xtrata wallet');
+  check(S.lowFee.length === 0, 'every temporary-wallet transaction paid at least 1 µSTX per byte (' + S.hotFees.map((f) => f.size + 'B/' + f.fee).join(', ') + ')');
   b = await runStep('audit'); check(passes(b), 'audit reads back all 60 records');
 
   // 2. finalise is blocked until the resolver serves the exact manifest, then needs the typed key
@@ -213,8 +265,12 @@ async function route(r) {
   b = await runStep('preflight'); check(passes(b) && /already deployed/.test(b), 'preflight finds the deployed helper');
   b = await runStep('deploy'); check(passes(b) && /nothing to send/.test(b), 'deploy sends nothing the second time');
   b = await runStep('verify'); check(passes(b), 'verify passes on a finalised helper');
-  await page.selectOption('#seed-batch', '25');
-  b = await runStep('seed'); check(passes(b) && /3 already on chain/.test(b), 'seed skips all batches already on chain');
+  const xfersBefore = S.xfers.length;
+  b = await runStep('tempwallet'); check(passes(b) && /no temporary wallet needed/.test(b), 'temporary wallet step sends nothing when everything is seeded');
+  b = await runStep('handover'); check(passes(b) && /nothing to seed/.test(b), 'hand-over step sends nothing when everything is seeded');
+  b = await runStep('seed'); check(passes(b) && /already on chain/.test(b), 'seed skips when every record is on chain');
+  b = await runStep('handback'); check(passes(b) && /already owns/.test(b), 'hand-back recognises the wallet already owns the helper');
+  check(S.xfers.length === xfersBefore, 'no transfers during the re-run');
   b = await runStep('audit'); check(passes(b), 'audit passes again');
   b = await runStep('finalise'); check(passes(b) && /already finalised/.test(b), 'finalise recognises the finalised helper');
   b = await runStep('inscribe'); check(b.startsWith('fail') && /already inscribed/.test(b), 'test inscription refuses a token that is already inscribed');
