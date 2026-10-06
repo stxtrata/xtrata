@@ -109,6 +109,13 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 - `functions/collections/health.ts` provides the `/collections/health` check used by the diagnostics panel to confirm D1 connectivity, table counts, storage bindings, and runtime inscription cache budget warnings.
 - `src/lib/telemetry/*`, `functions/log.ts`, and `functions/migrations/009_telemetry.sql` provide privacy-scrubbed journey/error telemetry with bounded retention and idempotent D1 issue rollups. `functions/debug.ts` and `functions/debug/data.ts` expose the fail-closed, `DEBUG_VIEW_KEY`-protected health dashboard; `TELEMETRY-AND-ISSUE-LOGGING-PLAN.md` records its deployment prerequisites.
 
+## Bounty ticket tracker (Zero Authority DAO bounty)
+
+- `public/bounty/zdao/tracker/1/index.html` is the public, read-only ticket tracker. It reads public contract calls through `/hiro/mainnet`, so there is no server state for tickets. `ledger-reader.js` is the incremental reader (also used by the Bounty Ticket Ledger artifact): it remembers the newest transactions per contract and only fetches what is new. `scripts/bounty-tracker-bake.mjs` bakes the latest saved state into the page.
+- Ticket kinds live in the page's `KINDS` and `SOURCES` tables. Add a kind there and in `ledger-reader.js` (`DEFAULT_CFG.sources`) together.
+- `handles.json` holds team-confirmed X handles and winners. Wallet-signed handles live in D1 (`bounty_handles`, migration 020) behind `functions/bounty/handles.ts`; `functions/lib/bounty-handle.ts` is shared by the page bundle (`src/bounty-tracker/wallet.ts`, built to `wallet.js` by `npm run build:bounty-tracker`) and the function. A signature proves wallet control only, so self-linked handles are labelled as such. Wallet work follows `docs/WALLET-PLAYBOOK.md`.
+- Tests: `src/bounty-tracker/__tests__/reader.test.ts`, `functions/bounty/__tests__/handles.test.ts`.
+
 ## Contracts, network, and wallet plumbing
 
 - `src/data/contract-registry.json` stores the named contract list used by the selector.
