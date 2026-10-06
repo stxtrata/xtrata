@@ -1,4 +1,4 @@
-;; forever-twin-helper-v3 :: {{COLLECTION_KEY}} :: group {{GROUP}}
+;; forever-twin-helper-v3 :: bitcoin-monkeys :: group G1
 ;; ---------------------------------------------------------------------------
 ;; STATUS: REFERENCE PROTOTYPE. Supersedes forever-twin-helper-v2 for new
 ;; deployments. Passes sim/family-suite-v3.mjs on simnet. NOT audited.
@@ -62,30 +62,27 @@
 (define-constant ERR-FEE-CAP (err u214))
 (define-constant ERR-BAD-CANONICAL (err u215))
 (define-constant ERR-RESCUE-DISABLED (err u216))
-;;@G2-BEGIN
-(define-constant ERR-LISTED (err u217))
-;;@G2-END
 (define-constant ERR-FEE-ODD (err u218))
 (define-constant ERR-NO-PENDING-OWNER (err u219))
 (define-constant ERR-PREBIND-MISMATCH (err u220))
 (define-constant ERR-PREBIND-PENDING (err u221))
 
 (define-constant INTERFACE-VERSION u3)
-(define-constant COLLECTION-KEY "{{COLLECTION_KEY}}")
-(define-constant MASTER {{MASTER}})
-(define-constant SOURCE {{SOURCE}})
-(define-constant PAYEE-A {{PAYEE_A}})
-(define-constant PAYEE-B {{PAYEE_B}})
-(define-constant MAX-FEE {{MAX_FEE_USTX}})
-(define-constant RESCUE-ENABLED {{RESCUE_ENABLED}})
-(define-constant RESCUE-DELAY {{RESCUE_DELAY_BURN_BLOCKS}})
+(define-constant COLLECTION-KEY "bitcoin-monkeys")
+(define-constant MASTER 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3)
+(define-constant SOURCE 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys)
+(define-constant PAYEE-A 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7)
+(define-constant PAYEE-B 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22)
+(define-constant MAX-FEE u5000000)
+(define-constant RESCUE-ENABLED true)
+(define-constant RESCUE-DELAY u432)
 (define-constant MAX-SINGLE-TX-BYTES u524288)
 (define-constant MAX-RECORD-BYTES u33554432) ;; core cap: 2048 chunks x 16,384 bytes
 
 ;; --- owner and fee -------------------------------------------------------------
 (define-data-var contract-owner principal tx-sender)
 (define-data-var pending-owner (optional principal) none)
-(define-data-var inscribe-fee uint {{INITIAL_FEE_USTX}})
+(define-data-var inscribe-fee uint u1000000)
 
 ;; --- canonical record ----------------------------------------------------------
 (define-data-var canonical-finalized bool false)
@@ -122,23 +119,17 @@
 ;; read-only checker cannot resolve a constant-bound contract-call? target and
 ;; would reject get-custody-state / stray-side as "writing". Verified in simnet.
 (define-private (source-owner (token-id uint))
-  (unwrap-panic (contract-call? {{SOURCE}} get-owner token-id)))
+  (unwrap-panic (contract-call? 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys get-owner token-id)))
 
 (define-private (twin-owner (xtrata-id uint))
-  (unwrap-panic (contract-call? {{MASTER}} get-owner xtrata-id)))
-;;@G2-BEGIN
-
-;; G2: the source's own listing record for this token, whatever its tuple shape.
-(define-private (source-listed (token-id uint))
-  (is-some (contract-call? {{SOURCE}} {{LISTING_READ_FN}} token-id)))
-;;@G2-END
+  (unwrap-panic (contract-call? 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3 get-owner xtrata-id)))
 
 (define-private (release-twin-to (id uint) (recipient principal))
   (as-contract? ((with-nft MASTER "xtrata-inscription" (list id)))
     (try! (contract-call? MASTER transfer id current-contract recipient))))
 
 (define-private (release-original-to (id uint) (recipient principal))
-  (as-contract? ((with-nft SOURCE "{{SOURCE_ASSET}}" (list id)))
+  (as-contract? ((with-nft SOURCE "bitcoin-monkeys" (list id)))
     (try! (contract-call? SOURCE transfer id current-contract recipient))))
 
 ;; Each payee receives exactly half of the fee. A payee who inscribes pays only
@@ -205,9 +196,6 @@
     (try! (assert-owner))
     (asserts! (not (var-get canonical-finalized)) ERR-FINALIZED)
     (asserts! (is-eq expected-count (var-get canonical-count)) ERR-COUNT-MISMATCH)
-;;@NOLOD-BEGIN
-    (asserts! (is-eq (var-get large-unbound) u0) ERR-PREBIND-PENDING)
-;;@NOLOD-END
     (var-set manifest-hash manifest)
     (var-set canonical-finalized true)
     (print { event: "canonical-finalized", collection: COLLECTION-KEY, manifest-hash: manifest, canonical-count: expected-count })
@@ -256,7 +244,6 @@
              fee: u0, route: "preinscribed" })
     (ok xtrata-id)))
 
-;;@LOD-BEGIN
 ;; =============================================================================
 ;; large-on-demand (this helper only): anyone may twin a large token after
 ;; finalisation. `finalize-canonical` does not wait for large entries; each one
@@ -308,7 +295,6 @@
              fee: (var-get inscribe-fee), route: "large-on-demand" })
     (ok xtrata-id)))
 
-;;@LOD-END
 ;; =============================================================================
 ;; inscribe: anyone may fund; the canonical record fixes everything but the chunks
 ;; =============================================================================
@@ -350,14 +336,8 @@
         (x-id (get xtrata-id b)))
     (asserts! (get xtrata-escrowed b) ERR-WRONG-STATE)
     (asserts! (is-eq (twin-owner x-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
-    (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (contract-call? SOURCE transfer token-id tx-sender current-contract))
     (asserts! (is-eq (source-owner token-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
-    (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (release-twin-to x-id tx-sender))
     (map-set Bindings token-id (merge b { xtrata-escrowed: false }))
     (print { event: "swap-original-for-twin", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: x-id, holder: tx-sender })
@@ -464,12 +444,7 @@
 ;; =============================================================================
 (define-read-only (get-twin-interface)
   { interface-version: INTERFACE-VERSION, collection-key: COLLECTION-KEY, master: MASTER, source: SOURCE,
-;;@G1-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G1",
-;;@G1-END
-;;@G2-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G2",
-;;@G2-END
+    source-asset: "bitcoin-monkeys", route: "standard", group: "G1",
     canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
     inscribed-count: (var-get inscribed-count), swaps-enabled: true, large-unbound: (var-get large-unbound),
@@ -481,9 +456,6 @@
 (define-read-only (get-canonical (token-id uint)) (map-get? Canonical token-id))
 (define-read-only (get-original-by-twin (xtrata-id uint)) (map-get? TwinToOriginal xtrata-id))
 (define-read-only (get-rescue (token-id uint)) (map-get? Rescues token-id))
-;;@G2-BEGIN
-(define-read-only (is-source-listed (token-id uint)) (source-listed token-id))
-;;@G2-END
 (define-read-only (fee-for (payer principal)) (fee-for-internal payer))
 (define-read-only (get-fee) (ok (var-get inscribe-fee)))
 (define-read-only (get-payees) { payee-a: PAYEE-A, payee-b: PAYEE-B, per-payee: (half) })

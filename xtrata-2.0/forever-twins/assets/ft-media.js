@@ -72,12 +72,12 @@ export async function firstOk(candidates, mode, fetchFn, timeoutMs = 12000) {
 }
 
 /** token URI -> metadata JSON -> image -> bytes. Returns { bytes, imageUrl, metaUrl, contentType }. */
-export async function fetchArt(tokenUri, tokenId, fetchFn = globalThis.fetch) {
+export async function fetchArt(tokenUri, tokenId, fetchFn = globalThis.fetch, opts = {}) {
   const direct = uriCandidates(tokenUri, tokenId);
   if (!direct.length) throw new Error('The source returned a token URI this page cannot open');
   const meta = await firstOk(direct, 'json', fetchFn);
   const image = imageFrom(meta.json);
   if (!image) throw new Error('The token metadata has no image field');
-  const img = await firstOk(uriCandidates(image, tokenId), 'bytes', fetchFn);
+  const img = await firstOk(uriCandidates(image, tokenId), 'bytes', fetchFn, opts.bytesTimeoutMs || 12000);
   return { bytes: img.bytes, imageUrl: img.url, metaUrl: meta.url, contentType: img.contentType };
 }

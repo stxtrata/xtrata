@@ -73,7 +73,8 @@ const page = {
   key, name, master: cfg.master, source: cfg.source, group: cfg.group, payees: cfg.payees,
   initialFeeUstx: cfg.initialFeeUstx, maxFeeUstx: cfg.maxFeeUstx, deployer: pins.deployer,
   contractName: `forever-twin-${key}`.slice(0, 40), gateway: 'http://127.0.0.1:8080', manifestPath: `/ft/data/${key}.manifest.json`,
-  listingReadFn: cfg.listingReadFn || undefined, testToken: cfg.testToken || undefined
+  listingReadFn: cfg.listingReadFn || undefined, testToken: cfg.testToken || undefined,
+  largeOnDemand: cfg.largeOnDemand === true ? true : undefined
 };
 
 const dir = resolve(root, 'canaries/forever-twins-launch');

@@ -18,6 +18,9 @@
 //   rescueEnabled      true | false  (spec decision D2)
 //   rescueDelayBurnBlocks  e.g. 432 (~3 days of Bitcoin blocks)
 //   profileTier        must be "S" (standard). Adapters are separate contracts.
+//   largeOnDemand      optional boolean, default false. true: finalisation does not wait for large
+//                      (over 512 KB) entries, and anyone may twin one later with inscribe-large.
+//                      false renders exactly the original helper (no new code).
 //
 // The renderer refuses unknown placeholders, never guesses a value, and refuses any
 // payee that is not a valid principal. With --example, a payee written as
@@ -66,6 +69,8 @@ export function render(cfg, { example = false } = {}) {
   if (cfg.initialFeeUstx % 2 !== 0) throw new Error('initialFeeUstx must be even so both payees receive exactly half');
   if (cfg.initialFeeUstx > cfg.maxFeeUstx) throw new Error('initialFeeUstx must not exceed maxFeeUstx');
   if (typeof cfg.rescueEnabled !== 'boolean') throw new Error('rescueEnabled must be boolean');
+  if (cfg.largeOnDemand !== undefined && typeof cfg.largeOnDemand !== 'boolean') throw new Error('largeOnDemand must be boolean');
+  const lod = cfg.largeOnDemand === true;
 
   const master = principal(cfg.master, 'master', { contract: 'yes' });
   const source = principal(cfg.source, 'source', { contract: 'yes' });
@@ -97,10 +102,15 @@ export function render(cfg, { example = false } = {}) {
   };
   // keep only the blocks for this group; markers themselves are removed
   const drop = cfg.group === 'G1' ? 'G2' : 'G1';
-  const tmpl = readFileSync(TEMPLATE, 'utf8')
+  const tmpl0 = readFileSync(TEMPLATE, 'utf8')
     .replace(new RegExp(`;;@${drop}-BEGIN\\n[\\s\\S]*?;;@${drop}-END\\n`, 'g'), '')
     .replace(new RegExp(`;;@${cfg.group}-(BEGIN|END)\\n`, 'g'), '');
-  if (/;;@G[12]-/.test(tmpl)) throw new Error('unbalanced group markers in template');
+  // large-on-demand: keep the LOD blocks or the NOLOD blocks, never both
+  const dropLod = lod ? 'NOLOD' : 'LOD', keepLod = lod ? 'LOD' : 'NOLOD';
+  const tmpl = tmpl0
+    .replace(new RegExp(`;;@${dropLod}-BEGIN\\n[\\s\\S]*?;;@${dropLod}-END\\n`, 'g'), '')
+    .replace(new RegExp(`;;@${keepLod}-(BEGIN|END)\\n`, 'g'), '');
+  if (/;;@(G[12]|LOD|NOLOD)-/.test(tmpl)) throw new Error('unbalanced markers in template');
   const out = tmpl.replace(/\{\{([A-Z_]+)\}\}/g, (_, k) => {
     if (!(k in values)) throw new Error(`unknown placeholder ${k}`);
     return values[k];

@@ -1,0 +1,75 @@
+{
+  "suite": "lod-fuzz-v3",
+  "ranAt": "2026-10-06T15:41:21.695Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 9,
+  "fail": 1,
+  "results": [
+    {
+      "id": "FZ-0",
+      "title": "setup: seed 6 records, finalise, pre-seal a pool of inscriptions (seed 20261006)",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "seed ok",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise ok",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "FZ-1",
+      "title": "300 random calls with every invariant checked after each",
+      "specRef": "",
+      "checks": [
+        {
+          "label": "I1 helper never held STX",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I2 bindings unique and counters exact",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I3 custody consistent for every bound token",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I4 every refused call changed nothing",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I5 inscribe-large exactly when valid, fee exactly half/half",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I6 owner-only functions and the fee rules",
+          "pass": false,
+          "detail": "op 4 [I6] set-fee(500000) by someone else SUCCEEDED for a non-owner"
+        },
+        {
+          "label": "I7 canonical record unchanged",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "I8 the run was not vacuous: valid binds, refusals, swaps both ways, fee changes",
+          "pass": true,
+          "detail": "{\"il_ok\":3,\"il_refused\":118,\"inscribe_ok\":3,\"swap_out_ok\":18,\"swap_in_ok\":17,\"refused\":221,\"setfee_ok\":12,\"setfee_refused\":8,\"xfer_ok\":12,\"ops\":300}"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

@@ -1,0 +1,247 @@
+{
+  "verdict": "CLEARED",
+  "helperSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+  "helperFile": "contracts/rendered/forever-twin-bitcoin-monkeys.v3.clar",
+  "helperBytes": 27196,
+  "configFile": "scripts/configs/mainnet-bitcoin-monkeys.v3.json",
+  "configSha256": "57668a697916780bbe45f49dcbf3de1ea37a0341f553624e713fc61f60616fa9",
+  "manifestFile": "manifest/out/bitcoin-monkeys.manifest.json",
+  "manifestSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+  "ranAt": "2026-10-06T15:41:38.979Z",
+  "node": "v22.20.0",
+  "seconds": 221,
+  "suites": [
+    {
+      "label": "large-on-demand (real core, G1 + G2)",
+      "pass": 94,
+      "fail": 0,
+      "exit": 0
+    },
+    {
+      "label": "family suite v3",
+      "pass": 537,
+      "fail": 0,
+      "exit": 0
+    },
+    {
+      "label": "prebind v3",
+      "pass": 62,
+      "fail": 0,
+      "exit": 0
+    },
+    {
+      "label": "manifest pipeline",
+      "pass": 30,
+      "fail": 0,
+      "exit": 0
+    },
+    {
+      "label": "registry v2",
+      "pass": 63,
+      "fail": 0,
+      "exit": 0
+    },
+    {
+      "label": "large-file wizard engine (simulated chain)",
+      "pass": 139,
+      "fail": 0,
+      "exit": 0
+    }
+  ],
+  "stages": [
+    {
+      "id": 1,
+      "title": "render deterministically; parameters match the agreed deal",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ two renders are byte-identical, sha256 de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+        "✓ config has largeOnDemand: true",
+        "✓ master is the mainnet core xtrata-v3-2-3",
+        "✓ payees are exactly Jim and Rapha",
+        "✓ fee is 1 STX",
+        "✓ fee cap 5000000 µSTX",
+        "✓ rescue enabled (decision D2)",
+        "wrote contracts/rendered/forever-twin-bitcoin-monkeys.v3.clar (27196 bytes)"
+      ]
+    },
+    {
+      "id": 2,
+      "title": "the manifest is sound and belongs to this config",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ collection key, source and asset match the config",
+        "✓ count 2500 equals the token list",
+        "✓ token ids are unique",
+        "✓ every record has a 32-byte hash, ASCII token-uri, a mime and a size up to 32 MiB (0 bad)",
+        "✓ matches the .sha256 file next to it",
+        "283 of 2500 records are over 512 KB; largest 1585346 B; manifest sha256 b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "✓ there are large records (otherwise this route is not needed)",
+        "✓ the build report lists 0 failures"
+      ]
+    },
+    {
+      "id": 3,
+      "title": "shipped helpers are untouched by the template change",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ mainnet-megapont-ape-club.v3.json does not enable large-on-demand",
+        "✓ mainnet-megapont-ape-club.v3.json re-renders to a registry-pinned sha256 (d092d883666f…)",
+        "✓ mainnet-nyc-degens.v3.json does not enable large-on-demand",
+        "✓ mainnet-nyc-degens.v3.json re-renders to a registry-pinned sha256 (cfa6b98191f5…)",
+        "✓ the Ordinal Pepe helper does not use the new code path"
+      ]
+    },
+    {
+      "id": 4,
+      "title": "code delta: only inscribe-large is added, nothing else changes",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "31 lines added, 1 lines removed versus the flag-off helper",
+        "✓ the only removed line is the \"all large tokens bound before finalising\" check",
+        "✓ exactly one new public function, inscribe-large",
+        "✓ define-public: inscribe-large added, none removed",
+        "✓ define-private: unchanged",
+        "✓ define-read-only: unchanged",
+        "✓ no new define-map",
+        "✓ no new define-data-var",
+        "✓ no new define-constant",
+        "✓ no new define-non-fungible-token",
+        "✓ no new define-fungible-token",
+        "✓ no new define-trait",
+        "✓ the new code never uses as-contract",
+        "✓ the new code never uses stx-transfer?",
+        "✓ the new code never uses stx-burn?",
+        "✓ the new code never uses unwrap-panic",
+        "✓ the new code never uses unwrap-err-panic",
+        "✓ the new code never uses map-delete",
+        "✓ the new code never uses ft-transfer?",
+        "✓ the new code never uses nft-transfer?",
+        "✓ the new code never uses nft-burn?",
+        "✓ the new code never uses set-contract-owner",
+        "✓ the new code never uses var-set contract-owner",
+        "✓ the new code never uses var-set inscribe-fee",
+        "✓ the new code never uses map-set Canonical",
+        "✓ the new code never uses map-insert Canonical",
+        "✓ external calls are only the core's get-inscription-meta, get-token-uri-raw, transfer (MASTER.get-inscription-meta, MASTER.get-token-uri-raw, MASTER.transfer)",
+        "✓ inscribe-large is permissionless on purpose (no owner gate)",
+        "✓ inscribe-large contains: (var-get canonical-finalized)",
+        "✓ inscribe-large contains: is-large (get total-size c)",
+        "✓ inscribe-large contains: map-get? Bindings token-id",
+        "✓ inscribe-large contains: (get sealed m)",
+        "✓ inscribe-large contains: (get final-hash m) (get content-hash c)",
+        "✓ inscribe-large contains: (get total-size m) (get total-size c)",
+        "✓ inscribe-large contains: (get mime-type m) (get mime c)",
+        "✓ inscribe-large contains: uri (get token-uri c)",
+        "✓ inscribe-large contains: (twin-owner xtrata-id) (some tx-sender)",
+        "✓ inscribe-large contains: map-insert TwinToOriginal",
+        "✓ inscribe-large contains: charge-fee tx-sender",
+        "✓ inscribe-large contains: MASTER transfer xtrata-id tx-sender current-contract",
+        "✓ inscribe-large contains: twin-owner xtrata-id) (some current-contract)",
+        "✓ checks, then fee, then custody transfer"
+      ]
+    },
+    {
+      "id": 5,
+      "title": "static lint of the whole helper source",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ external calls only to the core and the source (MASTER, SOURCE)",
+        "✓ unwrap-panic: no more uses than the shipped helper (3)",
+        "✓ unwrap-err-panic: no more uses than the shipped helper (0)",
+        "✓ stx-burn?: no more uses than the shipped helper (0)",
+        "✓ ft-burn?: no more uses than the shipped helper (0)",
+        "✓ nft-burn?: no more uses than the shipped helper (0)",
+        "✓ at-block: no more uses than the shipped helper (0)",
+        "✓ use-trait: no more uses than the shipped helper (0)",
+        "✓ impl-trait: no more uses than the shipped helper (0)",
+        "✓ as-contract uses unchanged (0)",
+        "owner-gated public functions: bind-preinscribed, cancel-ownership-proposal, cancel-rescue, execute-rescue, finalize-canonical, propose-ownership, propose-rescue, seed-canonical, set-fee",
+        "✓ seeding, finalising, set-fee and ownership transfer are owner-only",
+        "✓ swaps are never owner-gated or pausable",
+        "✓ set-fee is capped by the deploy-time maximum"
+      ]
+    },
+    {
+      "id": 6,
+      "title": "the code tested in simnet is the code that goes to mainnet",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ simnet helper rendered",
+        "✓ inscribe-large is character-identical in the simnet and mainnet renders (1943 chars)",
+        "6 differing lines, all configuration constants: true",
+        "✓ the simnet and mainnet helpers differ only in configuration constants"
+      ]
+    },
+    {
+      "id": 7,
+      "title": "every test suite passes",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ large-on-demand (real core, G1 + G2): 94 checks passed, 0 failed (exit 0)",
+        "✓ family suite v3: 537 checks passed, 0 failed (exit 0)",
+        "✓ prebind v3: 62 checks passed, 0 failed (exit 0)",
+        "✓ manifest pipeline: 30 checks passed, 0 failed (exit 0)",
+        "✓ registry v2: 63 checks passed, 0 failed (exit 0)",
+        "✓ large-file wizard engine (simulated chain): 139 checks passed, 0 failed (exit 0)"
+      ]
+    },
+    {
+      "id": 8,
+      "title": "randomised invariant fuzzing (seeded, reproducible)",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "✓ seed 20261006, 400 random calls: 10 checks passed, 0 failed · {\"il_ok\":3,\"il_refused\":161,\"inscribe_ok\":3,\"swap_out_ok\":22,\"swap_in_ok\":22,\"refused\":312,\"setfee_ok\":8,\"setfee_refused\":21,\"xfer_ok\":13,\"ops\":400}",
+        "✓ seed 20268925, 400 random calls: 10 checks passed, 0 failed · {\"il_ok\":3,\"il_refused\":150,\"inscribe_ok\":3,\"swap_out_ok\":21,\"swap_in_ok\":18,\"refused\":315,\"setfee_ok\":12,\"setfee_refused\":15,\"xfer_ok\":17,\"ops\":400}",
+        "✓ seed 20276844, 400 random calls: 10 checks passed, 0 failed · {\"il_ok\":3,\"il_refused\":175,\"inscribe_ok\":3,\"swap_out_ok\":21,\"swap_in_ok\":18,\"refused\":311,\"setfee_ok\":8,\"setfee_refused\":9,\"xfer_ok\":27,\"ops\":400}"
+      ]
+    },
+    {
+      "id": 9,
+      "title": "mutation testing: every deliberate bug must be caught",
+      "pass": true,
+      "skipped": false,
+      "simulation": "https://stxer.xyz/simulations/mainnet/299101c6142140d6be8d77e628463346",
+      "detail": [
+        "✓ mutant \"no fee charged\": caught by the large-on-demand suite (1 checks failed)",
+        "✓ mutant \"caller need not hold the inscription\": caught by the large-on-demand suite (1 checks failed)",
+        "✓ mutant \"token can be bound twice\": caught by the large-on-demand suite (4 checks failed)",
+        "✓ mutant \"works before finalisation\": caught by the large-on-demand suite (10 checks failed)",
+        "✓ mutant \"token-uri not checked\": caught by the large-on-demand suite (6 checks failed)",
+        "✓ mutant \"content hash not checked\": caught by the large-on-demand suite (7 checks failed)",
+        "✓ mutant \"small tokens accepted\": caught by the large-on-demand suite (4 checks failed)",
+        "✓ mutant \"large-unbound counter not decremented\": caught by the large-on-demand suite (2 checks failed)",
+        "✓ mutant \"twin can be reused for another token\": caught by the large-on-demand suite (1 checks failed)",
+        "✓ mutant \"set-fee open to everyone\": caught by the fuzzer (1 invariants failed)",
+        "✓ the simnet helper was restored exactly after mutation testing"
+      ]
+    },
+    {
+      "id": 10,
+      "title": "mainnet fork simulation (stxer), results read back and checked",
+      "pass": true,
+      "skipped": false,
+      "detail": [
+        "predicted inscription ids: F1 seals #1 as 3113; F2 seals the same bytes as 3114; F2 seals #13 as 3115",
+        "✓ fork script ran and produced a simulation https://stxer.xyz/simulations/mainnet/299101c6142140d6be8d77e628463346",
+        "✓ simulation results fetched back from stxer",
+        "✓ 53 transactions simulated",
+        "✓ no transaction failed at engine level",
+        "✓ no VM error and no post-condition abort anywhere",
+        "refused calls (expected by design): 201, 201, 220, 207, 204",
+        "✓ exactly the designed refusals happened (5)",
+        "✓ refusal codes are 201 (already bound), 220 (route/mismatch), 207 (prebind after finalise), 204 (not owner): 201, 201, 220, 207, 204",
+        "✓ every other transaction succeeded",
+        "✓ final large-unbound read is 281 (283 large records, 2 bound in the simulation): (ok \"281\")",
+        "full simulation: https://stxer.xyz/simulations/mainnet/299101c6142140d6be8d77e628463346"
+      ]
+    }
+  ]
+}

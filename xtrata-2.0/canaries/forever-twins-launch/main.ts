@@ -20,7 +20,7 @@ declare const __PINS__: string;
 type Cfg = {
   key: string; name: string; master: string; source: string; group: string; payees: [string, string];
   initialFeeUstx: number; maxFeeUstx: number; deployer: string; contractName: string; gateway: string; manifestPath: string;
-  listingReadFn?: string; testToken?: number;
+  listingReadFn?: string; testToken?: number; largeOnDemand?: boolean;
 };
 type Tok = { id: number; original: { mediaUris: string[]; metadataUri?: string }; twin: { contentHash: string; sha256: string; mime: string; totalSize: number; tokenUri: string; route?: string } };
 const CFG: Cfg = JSON.parse(__CFG__);
@@ -89,7 +89,7 @@ let connected: { address: string; publicKey: string | null; label: string } | nu
 let busy = false;
 
 const stateKey = () => `xtrata-ft-launch:v1:${CFG.key}`;
-const freshState = (): State => ({ version: 1, contractName: CFG.contractName, seedBatch: 100, testToken: CFG.testToken ?? MANIFEST.tokens[0].id, gateway: CFG.gateway, steps: {}, log: [] });
+const freshState = (): State => ({ version: 1, contractName: CFG.contractName, seedBatch: 100, testToken: CFG.testToken ?? (MANIFEST.tokens.find((t) => t.twin.route !== 'preinscribed' && t.twin.totalSize <= MAX_SINGLE_TX) ?? MANIFEST.tokens[0]).id, gateway: CFG.gateway, steps: {}, log: [] });
 const load = () => { try { const raw = localStorage.getItem(stateKey()); state = raw ? { ...freshState(), ...JSON.parse(raw) } : freshState(); } catch { state = freshState(); } };
 const save = () => { try { localStorage.setItem(stateKey(), JSON.stringify(state)); } catch { /* storage unavailable */ } };
 const step = (id: string): StepState => (state.steps[id] ??= { status: 'todo', data: {}, txs: [] });
@@ -259,7 +259,7 @@ const STEPS: Step[] = [
   },
   {
     id: 'preflight', title: 'Preflight: pins, manifest, core, name', who: 'Reads only',
-    intro: 'Checks the embedded helper source and manifest against the build pins, the manifest against the contract rules (no large files), that the core is open, the source collection is live, the contract name is free (or already holds this exact source), the balance, and whether the resolver is already serving this manifest.',
+    intro: 'Checks the embedded helper source and manifest against the build pins, the manifest against the contract rules (files over 512 KB only for a large-on-demand helper), that the core is open, the source collection is live, the contract name is free (or already holds this exact source), the balance, and whether the resolver is already serving this manifest.',
     action: 'Run preflight',
     run: async () => {
       const helperSha = shaText(__HELPER__);
@@ -269,7 +269,8 @@ const STEPS: Step[] = [
       if (tokens.length !== MANIFEST.count) throw new Error(`Manifest count ${MANIFEST.count} ≠ ${tokens.length} tokens.`);
       if (new Set(tokens.map((t) => t.id)).size !== tokens.length) throw new Error('Manifest has duplicate token ids.');
       const big = tokens.filter((t) => t.twin.route === 'preinscribed' || t.twin.totalSize > MAX_SINGLE_TX);
-      if (big.length) throw new Error(`${big.length} file(s) are over 512 KB (pre-inscribe route). This canary only handles single-transaction files; use the harness for large ones.`);
+      if (big.length && !CFG.largeOnDemand) throw new Error(`${big.length} file(s) are over 512 KB (pre-inscribe route). This canary only handles single-transaction files; use the harness for large ones.`);
+      if (big.length && !/define-public \(inscribe-large /.test(__HELPER__)) throw new Error(`${big.length} file(s) are over 512 KB but the embedded helper has no inscribe-large (large-on-demand route). Refusing.`);
       const badUri = tokens.find((t) => !/^https:\/\//.test(t.twin.tokenUri) || t.twin.tokenUri.length > 256);
       if (badUri) throw new Error(`Token ${badUri.id} has an invalid token-uri.`);
       if (asText(await coreRead('is-paused')) === 'true') throw new Error(`${CFG.master} is paused.`);
@@ -411,6 +412,7 @@ const STEPS: Step[] = [
     run: async () => {
       const t = tokenById(state.testToken);
       if (!t) throw new Error(`Token ${state.testToken} is not in the manifest.`);
+      if (t.twin.totalSize > MAX_SINGLE_TX) throw new Error(`Token ${t.id} is ${t.twin.totalSize} bytes: over 512 KB, so it cannot be the test token (it is twinned through the large-file wizard). Pick a smaller token id.`);
       const bound = await read('get-binding', [uintCV(t.id)]);
       if (!isNone(bound) && !step('inscribe').txs.some((x) => x.pass)) throw new Error(`Token ${t.id} is already inscribed (not by this run). Pick another test token id.`);
       const w = requireWallet();
@@ -459,7 +461,7 @@ const STEPS: Step[] = [
       if (g('canonical-finalized') !== 'true') throw new Error('The helper is not finalised.');
       const inscribed = g('inscribed-count');
       const id = helperId();
-      const reg = { key: CFG.key, name: CFG.name, source: CFG.source, helper: id, interface: 'v3', group: CFG.group, status: 'live',
+      const reg = { key: CFG.key, name: CFG.name, source: CFG.source, helper: id, interface: 'v3', group: CFG.group, status: 'live', ...(CFG.largeOnDemand ? { largeOnDemand: true } : {}),
         expectedSourceSha256: PINS.helperSha, evidence: `Forever Twins launch canary ${__BUILD__}: deployed, ${tokens.length} records seeded and audited, finalised with manifest ${PINS.manifestSha}, test inscription #${state.testToken} verified (${new Date().toISOString().slice(0, 10)})` };
       const out = [
         `HELPER           ${id}`,
@@ -475,6 +477,7 @@ const STEPS: Step[] = [
         `   node manifest/sponsor-inscribe.mjs --manifest manifest/out/${CFG.key}.manifest.json --helper ${id} --execute --confirm ${id} --batch 20`,
         '   (needs SPONSOR_PRIVATE_KEY in the environment for the sponsoring wallet; a payee wallet pays only the other payee\'s half of the fee)',
         '',
+        ...(CFG.largeOnDemand ? ['   NOTE: files over 512 KB are not sponsored by this script; visitors twin them through the large-file wizard (collection page, register the collection with "largeOnDemand": true).', ''] : []),
         '3) Registry entry (forever-twins/ft-harness/registry/registry.v1.json, helpers[]), then npm run registry:verify:',
         JSON.stringify(reg, null, 2)
       ].join('\n');

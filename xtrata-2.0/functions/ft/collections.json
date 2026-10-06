@@ -20,6 +20,15 @@
       "manifestSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
       "manifestStatus": "final",
       "_note": "Helper deployed, seeded and finalised 5-6 Oct 2026 via the launch canary; production serves this exact manifest."
+    },
+    "bitcoin-monkeys": {
+      "label": "Bitcoin Monkeys",
+      "source": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
+      "manifestPath": "/ft/data/bitcoin-monkeys.manifest.json",
+      "manifestSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+      "manifestStatus": "draft",
+      "_note": "Helper not deployed yet (audit cleared sha256 de53ff3f…8c0f, 6 Oct 2026). Flip to final only after the helper is finalised and production serves this exact manifest. 283 of 2,500 tokens are large-on-demand; the resolver treats them like any other."
     }
   }
 }
