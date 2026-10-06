@@ -10,5 +10,11 @@
     "manifestSha": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
     "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "pinnedAt": "2026-10-05"
+  },
+  "bitcoin-monkeys": {
+    "helperSha": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+    "manifestSha": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "pinnedAt": "2026-10-06"
   }
 }

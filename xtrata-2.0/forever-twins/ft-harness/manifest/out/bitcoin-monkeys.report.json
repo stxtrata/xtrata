@@ -1,0 +1,2290 @@
+{
+  "collectionKey": "bitcoin-monkeys",
+  "requested": 2500,
+  "built": 2500,
+  "partial": false,
+  "failures": [],
+  "oversize": [],
+  "maxSingleTxBytes": 524288,
+  "maxRecordBytes": 33554432,
+  "largest": {
+    "id": 977,
+    "bytes": 1585346
+  },
+  "mimes": {
+    "image/png": 2500
+  },
+  "mediaHosts": {
+    "ipfs": 2500
+  },
+  "preinscribed": [
+    {
+      "id": 1,
+      "bytes": 1411407,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 13,
+      "bytes": 1393316,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 33,
+      "bytes": 1399736,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 60,
+      "bytes": 1340414,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 76,
+      "bytes": 1340786,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 84,
+      "bytes": 1359726,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 88,
+      "bytes": 1288435,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 101,
+      "bytes": 1365663,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 104,
+      "bytes": 614784,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 116,
+      "bytes": 1292285,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 118,
+      "bytes": 616288,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 120,
+      "bytes": 543372,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 122,
+      "bytes": 525728,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 125,
+      "bytes": 1352822,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 127,
+      "bytes": 1387594,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 128,
+      "bytes": 1381767,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 138,
+      "bytes": 552162,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 145,
+      "bytes": 534250,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 155,
+      "bytes": 1350134,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 158,
+      "bytes": 568950,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 176,
+      "bytes": 1336359,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 179,
+      "bytes": 543647,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 184,
+      "bytes": 565327,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 192,
+      "bytes": 538524,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 197,
+      "bytes": 1432911,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 203,
+      "bytes": 1362919,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 204,
+      "bytes": 1385552,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 214,
+      "bytes": 684903,
+      "chunks": 42,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 219,
+      "bytes": 644334,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 225,
+      "bytes": 1385956,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 265,
+      "bytes": 1382293,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 278,
+      "bytes": 1204087,
+      "chunks": 74,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 279,
+      "bytes": 1317155,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 285,
+      "bytes": 1393750,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 287,
+      "bytes": 1362460,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 293,
+      "bytes": 649804,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 296,
+      "bytes": 1282643,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 305,
+      "bytes": 1214009,
+      "chunks": 75,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 309,
+      "bytes": 629691,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 319,
+      "bytes": 1348893,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 326,
+      "bytes": 555697,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 364,
+      "bytes": 1210463,
+      "chunks": 74,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 366,
+      "bytes": 1472857,
+      "chunks": 90,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 378,
+      "bytes": 524804,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 381,
+      "bytes": 1483195,
+      "chunks": 91,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 388,
+      "bytes": 1274776,
+      "chunks": 78,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 391,
+      "bytes": 1311421,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 394,
+      "bytes": 1369055,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 407,
+      "bytes": 1314172,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 444,
+      "bytes": 1391392,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 447,
+      "bytes": 551668,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 449,
+      "bytes": 1344320,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 451,
+      "bytes": 1408210,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 452,
+      "bytes": 1299049,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 462,
+      "bytes": 540077,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 477,
+      "bytes": 1258413,
+      "chunks": 77,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 479,
+      "bytes": 1400738,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 480,
+      "bytes": 1310889,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 481,
+      "bytes": 1220904,
+      "chunks": 75,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 484,
+      "bytes": 1466476,
+      "chunks": 90,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 486,
+      "bytes": 583374,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 491,
+      "bytes": 1437119,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 517,
+      "bytes": 1396485,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 529,
+      "bytes": 1360260,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 536,
+      "bytes": 1375904,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 539,
+      "bytes": 1411538,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 544,
+      "bytes": 566943,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 545,
+      "bytes": 1425611,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 560,
+      "bytes": 1368735,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 578,
+      "bytes": 538124,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 583,
+      "bytes": 532083,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 602,
+      "bytes": 1340121,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 607,
+      "bytes": 565004,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 631,
+      "bytes": 1411651,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 638,
+      "bytes": 643496,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 669,
+      "bytes": 545025,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 672,
+      "bytes": 525378,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 675,
+      "bytes": 624771,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 676,
+      "bytes": 1309889,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 682,
+      "bytes": 1328703,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 684,
+      "bytes": 1316881,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 688,
+      "bytes": 1349711,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 702,
+      "bytes": 1356448,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 703,
+      "bytes": 1394087,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 720,
+      "bytes": 1358065,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 723,
+      "bytes": 1414005,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 724,
+      "bytes": 1375167,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 730,
+      "bytes": 1330373,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 735,
+      "bytes": 533500,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 744,
+      "bytes": 1338389,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 749,
+      "bytes": 1441670,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 756,
+      "bytes": 1298960,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 757,
+      "bytes": 1378123,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 760,
+      "bytes": 1358539,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 768,
+      "bytes": 1299673,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 792,
+      "bytes": 1427778,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 793,
+      "bytes": 1369129,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 801,
+      "bytes": 1477306,
+      "chunks": 91,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 825,
+      "bytes": 1427713,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 828,
+      "bytes": 575387,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 844,
+      "bytes": 1332093,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 855,
+      "bytes": 1303041,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 858,
+      "bytes": 621810,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 865,
+      "bytes": 1313748,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 868,
+      "bytes": 1359931,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 876,
+      "bytes": 610471,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 881,
+      "bytes": 1315768,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 887,
+      "bytes": 1371406,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 892,
+      "bytes": 1411640,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 905,
+      "bytes": 1355540,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 917,
+      "bytes": 586278,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 919,
+      "bytes": 1446371,
+      "chunks": 89,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 938,
+      "bytes": 1383914,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 939,
+      "bytes": 1333573,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 940,
+      "bytes": 534076,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 946,
+      "bytes": 1331656,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 970,
+      "bytes": 1403091,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 977,
+      "bytes": 1585346,
+      "chunks": 97,
+      "batches": 4,
+      "transactions": 6,
+      "ustx": 532000
+    },
+    {
+      "id": 990,
+      "bytes": 1221515,
+      "chunks": 75,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 991,
+      "bytes": 530525,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1004,
+      "bytes": 599469,
+      "chunks": 37,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1023,
+      "bytes": 1373827,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1026,
+      "bytes": 582744,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1029,
+      "bytes": 1368741,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1031,
+      "bytes": 1313460,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1034,
+      "bytes": 1454581,
+      "chunks": 89,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1069,
+      "bytes": 1439405,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1080,
+      "bytes": 546666,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1090,
+      "bytes": 530082,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1095,
+      "bytes": 1406541,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1098,
+      "bytes": 1299502,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1114,
+      "bytes": 1372134,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1115,
+      "bytes": 550746,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1116,
+      "bytes": 540139,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1122,
+      "bytes": 1338540,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1125,
+      "bytes": 1357384,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1154,
+      "bytes": 549306,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1159,
+      "bytes": 1338241,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1168,
+      "bytes": 544437,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1170,
+      "bytes": 1304377,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1181,
+      "bytes": 1344286,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1191,
+      "bytes": 533641,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1209,
+      "bytes": 1444251,
+      "chunks": 89,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1225,
+      "bytes": 1330570,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1231,
+      "bytes": 1316253,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1232,
+      "bytes": 1412407,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1233,
+      "bytes": 1357544,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1236,
+      "bytes": 535438,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1252,
+      "bytes": 1373607,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1254,
+      "bytes": 633230,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1277,
+      "bytes": 533551,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1309,
+      "bytes": 1354422,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1316,
+      "bytes": 1276531,
+      "chunks": 78,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1328,
+      "bytes": 1300329,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1330,
+      "bytes": 1347469,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1331,
+      "bytes": 535652,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1337,
+      "bytes": 1302037,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1346,
+      "bytes": 1314428,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1361,
+      "bytes": 1310791,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1362,
+      "bytes": 1337847,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1364,
+      "bytes": 1417286,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1376,
+      "bytes": 540916,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1379,
+      "bytes": 1358375,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1380,
+      "bytes": 1288295,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1390,
+      "bytes": 1341234,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1400,
+      "bytes": 1376378,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1409,
+      "bytes": 1318089,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1410,
+      "bytes": 1419815,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1422,
+      "bytes": 1324560,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1432,
+      "bytes": 1370329,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1443,
+      "bytes": 1295336,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1455,
+      "bytes": 1405962,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1463,
+      "bytes": 1312782,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1464,
+      "bytes": 1386259,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1466,
+      "bytes": 1429714,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1467,
+      "bytes": 1319165,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1469,
+      "bytes": 1321545,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1498,
+      "bytes": 1257390,
+      "chunks": 77,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1507,
+      "bytes": 1387944,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1509,
+      "bytes": 528781,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1544,
+      "bytes": 600404,
+      "chunks": 37,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1546,
+      "bytes": 1211212,
+      "chunks": 74,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1557,
+      "bytes": 560681,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1588,
+      "bytes": 566920,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1591,
+      "bytes": 1502901,
+      "chunks": 92,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1595,
+      "bytes": 1370723,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1598,
+      "bytes": 1329031,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1602,
+      "bytes": 612675,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1610,
+      "bytes": 610153,
+      "chunks": 38,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1633,
+      "bytes": 526444,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1649,
+      "bytes": 1425686,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1650,
+      "bytes": 542208,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1658,
+      "bytes": 1351548,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1699,
+      "bytes": 1320461,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1700,
+      "bytes": 560119,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1713,
+      "bytes": 1293941,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1714,
+      "bytes": 1343844,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1719,
+      "bytes": 604140,
+      "chunks": 37,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1722,
+      "bytes": 1424702,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1723,
+      "bytes": 1369450,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1729,
+      "bytes": 627901,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1730,
+      "bytes": 1370219,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1749,
+      "bytes": 1411315,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1752,
+      "bytes": 1318787,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1778,
+      "bytes": 1312104,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1780,
+      "bytes": 1256305,
+      "chunks": 77,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1785,
+      "bytes": 642183,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1791,
+      "bytes": 1422663,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1794,
+      "bytes": 1269029,
+      "chunks": 78,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1842,
+      "bytes": 1404313,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1844,
+      "bytes": 1441307,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1857,
+      "bytes": 646626,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1858,
+      "bytes": 597971,
+      "chunks": 37,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1869,
+      "bytes": 1321144,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1872,
+      "bytes": 1361067,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1873,
+      "bytes": 1299103,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1879,
+      "bytes": 1368159,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1901,
+      "bytes": 527198,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1906,
+      "bytes": 1351680,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1909,
+      "bytes": 533724,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1913,
+      "bytes": 556190,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1919,
+      "bytes": 1396752,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1939,
+      "bytes": 590914,
+      "chunks": 37,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 1944,
+      "bytes": 1354738,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1948,
+      "bytes": 1299572,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1949,
+      "bytes": 1305586,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1982,
+      "bytes": 1410594,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 1996,
+      "bytes": 1304162,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2007,
+      "bytes": 1409248,
+      "chunks": 87,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2018,
+      "bytes": 576430,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2028,
+      "bytes": 1319026,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2037,
+      "bytes": 555340,
+      "chunks": 34,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2045,
+      "bytes": 1357512,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2050,
+      "bytes": 1271005,
+      "chunks": 78,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2069,
+      "bytes": 1384907,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2072,
+      "bytes": 568153,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2078,
+      "bytes": 1396242,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2081,
+      "bytes": 633691,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2105,
+      "bytes": 1284380,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2113,
+      "bytes": 660995,
+      "chunks": 41,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2134,
+      "bytes": 1326371,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2156,
+      "bytes": 1372137,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2166,
+      "bytes": 1315516,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2173,
+      "bytes": 628045,
+      "chunks": 39,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2174,
+      "bytes": 1440827,
+      "chunks": 88,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2191,
+      "bytes": 1348954,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2193,
+      "bytes": 578635,
+      "chunks": 36,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2195,
+      "bytes": 1353939,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2206,
+      "bytes": 530175,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2212,
+      "bytes": 1323022,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2216,
+      "bytes": 1296187,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2217,
+      "bytes": 1469794,
+      "chunks": 90,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2228,
+      "bytes": 569054,
+      "chunks": 35,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2236,
+      "bytes": 1353558,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2237,
+      "bytes": 533283,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2239,
+      "bytes": 1352660,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2261,
+      "bytes": 1302076,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2270,
+      "bytes": 1343340,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2271,
+      "bytes": 1384096,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2283,
+      "bytes": 1329956,
+      "chunks": 82,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2285,
+      "bytes": 1349856,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2306,
+      "bytes": 1248748,
+      "chunks": 77,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2311,
+      "bytes": 1477874,
+      "chunks": 91,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2313,
+      "bytes": 1345440,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2322,
+      "bytes": 1306877,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2325,
+      "bytes": 650418,
+      "chunks": 40,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2329,
+      "bytes": 1390491,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2332,
+      "bytes": 1246292,
+      "chunks": 77,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2350,
+      "bytes": 1407742,
+      "chunks": 86,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2395,
+      "bytes": 529541,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2404,
+      "bytes": 1295517,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2408,
+      "bytes": 1447607,
+      "chunks": 89,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2416,
+      "bytes": 1345685,
+      "chunks": 83,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2421,
+      "bytes": 1391928,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2436,
+      "bytes": 1374022,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2439,
+      "bytes": 1389066,
+      "chunks": 85,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2441,
+      "bytes": 1360631,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2444,
+      "bytes": 527005,
+      "chunks": 33,
+      "batches": 2,
+      "transactions": 4,
+      "ustx": 332000
+    },
+    {
+      "id": 2473,
+      "bytes": 1296519,
+      "chunks": 80,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2485,
+      "bytes": 1315672,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2490,
+      "bytes": 1325085,
+      "chunks": 81,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2498,
+      "bytes": 1281911,
+      "chunks": 79,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    },
+    {
+      "id": 2500,
+      "bytes": 1371727,
+      "chunks": 84,
+      "batches": 3,
+      "transactions": 5,
+      "ustx": 432000
+    }
+  ],
+  "preinscribedCoreFeeUstx": 114456000,
+  "identicalContent": [],
+  "seedingCalls": 25,
+  "seconds": 2161
+}

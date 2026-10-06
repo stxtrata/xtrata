@@ -31,7 +31,7 @@ export const V3_ERRORS = {
   208: 'The record is not finalised yet, so nothing can be inscribed.',
   210: 'The original is not where it should be. Do not send tokens directly to the helper.',
   217: 'The original is listed on its marketplace. Unlist it first, then swap.',
-  220: 'This token’s art is over 512 KB and was inscribed by the collection owner before launch.'
+  220: 'This token’s art is over 512 KB, so it is twinned through the large-file route, not the one-click button.'
 };
 export const explainError = (code) => V3_ERRORS[Number(code)] || `Contract error u${code}`;
 

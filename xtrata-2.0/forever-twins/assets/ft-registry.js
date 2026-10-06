@@ -52,6 +52,7 @@ export function validateRegistry(reg) {
     if (c.helper !== null && c.status === 'planned') err(`${id}: has a helper but status is "planned"`);
     if (c.interface === 'v1' && c.status === 'live' && !c.legacyPage) err(`${id}: live v1 helpers must keep a legacyPage (the only write path for v1)`);
     if (c.legacyPage != null && !/^\/forever-twins\/[a-z0-9-]+\/$/.test(c.legacyPage)) err(`${id}: legacyPage must look like /forever-twins/<name>/`);
+    if (c.largeOnDemand != null && (typeof c.largeOnDemand !== 'boolean' || c.interface !== 'v3' || !c.helper)) err(`${id}: largeOnDemand must be a boolean on a v3 collection with a helper`);
     if (c.interface === 'v3' && c.twinTokenUri != null && !String(c.twinTokenUri).includes('{id}')) err(`${id}: twinTokenUri must contain {id}`);
     if (c.helper) {
       if (helpers.has(c.helper)) err(`${id}: helper already used by "${helpers.get(c.helper)}"`);

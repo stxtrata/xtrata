@@ -1,0 +1,639 @@
+{
+  "suite": "large-on-demand-v3",
+  "ranAt": "2026-10-06T15:40:51.717Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 94,
+  "fail": 0,
+  "results": [
+    {
+      "id": "bitcoin-monkeys:L-1",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] finalise does not wait for large entries",
+      "specRef": "L-1",
+      "checks": [
+        {
+          "label": "4 entries seed (3 large, 1 small)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 3",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the ordinary (flag off) helper still refuses to finalise (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the ordinary helper has no inscribe-large",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-2",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] route gated by finalisation",
+      "specRef": "L-2",
+      "checks": [
+        {
+          "label": "inscribe-large before finalisation refused (u208)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise ok with 3 large entries unbound",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "interface: finalised, large-unbound still 3",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bind-preinscribed after finalisation refused (u207)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-3",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] wrong route refused",
+      "specRef": "L-3",
+      "checks": [
+        {
+          "label": "small entry via inscribe-large refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "large entry via inscribe refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "small entry still inscribes the normal way",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-4",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] refusals",
+      "specRef": "L-4",
+      "checks": [
+        {
+          "label": "different bytes refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "right bytes, wrong token-uri refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no such inscription refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a twin made for another token refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "matching twin held by someone else refused (u210), nothing taken",
+          "pass": true,
+          "detail": "210"
+        },
+        {
+          "label": "token not in the record refused (u206)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-5",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] any wallet twins a large token",
+      "specRef": "L-5",
+      "checks": [
+        {
+          "label": "inscribe-large ok, returns the xtrata id",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "twin held by the helper; original untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "binding: xtrata id, content hash, escrowed, inscriber = funder",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin-to-original recorded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "each payee got exactly half the fee",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 2, inscribed-count = 2 (one small, one large)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "event says route large-on-demand",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bound token cannot be bound again (u201)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-6",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] same content hash from two wallets",
+      "specRef": "L-6",
+      "checks": [
+        {
+          "label": "the core lets two wallets begin the same hash",
+          "pass": true,
+          "detail": "ok/ok"
+        },
+        {
+          "label": "both seal; two different inscription ids, each held by its own wallet",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "first wallet binds",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "second wallet refused (u201); its twin stays with it",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the first wallet's binding is intact",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the loser's inscription binds to no other token (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the loser still owns a valid sealed inscription it may transfer",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-7",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] interleaved uploads of the same hash",
+      "specRef": "L-7",
+      "checks": [
+        {
+          "label": "interleaving does not disturb the first uploader",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "first uploader binds B",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the other uploader's session is still its own and can seal",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-8",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] upload expiry (core behaviour)",
+      "specRef": "L-8",
+      "checks": [
+        {
+          "label": "begin ok",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "after UPLOAD-EXPIRY-BLOCKS the core refuses further chunks",
+          "pass": true,
+          "detail": "112"
+        },
+        {
+          "label": "the same wallet cannot restart an expired session (a disposable wallet is always fresh)",
+          "pass": true,
+          "detail": "112"
+        },
+        {
+          "label": "a fresh wallet can begin the same hash at once",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the helper is unaffected by an expired session",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-9",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] swaps on an on-demand twin",
+      "specRef": "L-9",
+      "checks": [
+        {
+          "label": "custody consistent before swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps in: original to helper, twin to holder",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after swap in",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps back",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "bitcoin-monkeys:L-10",
+      "title": "bitcoin-monkeys [v3 G1 large-on-demand] record immutable after finalisation",
+      "specRef": "L-10",
+      "checks": [
+        {
+          "label": "seed-canonical refused after finalisation (u207)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "all three large entries are now bound; counter is exact (0)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-1",
+      "title": "see-yourself-out [v3 G2 large-on-demand] finalise does not wait for large entries",
+      "specRef": "L-1",
+      "checks": [
+        {
+          "label": "4 entries seed (3 large, 1 small)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 3",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the ordinary (flag off) helper still refuses to finalise (u221)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the ordinary helper has no inscribe-large",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-2",
+      "title": "see-yourself-out [v3 G2 large-on-demand] route gated by finalisation",
+      "specRef": "L-2",
+      "checks": [
+        {
+          "label": "inscribe-large before finalisation refused (u208)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "finalise ok with 3 large entries unbound",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "interface: finalised, large-unbound still 3",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bind-preinscribed after finalisation refused (u207)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-3",
+      "title": "see-yourself-out [v3 G2 large-on-demand] wrong route refused",
+      "specRef": "L-3",
+      "checks": [
+        {
+          "label": "small entry via inscribe-large refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "large entry via inscribe refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "small entry still inscribes the normal way",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-4",
+      "title": "see-yourself-out [v3 G2 large-on-demand] refusals",
+      "specRef": "L-4",
+      "checks": [
+        {
+          "label": "different bytes refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "right bytes, wrong token-uri refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "no such inscription refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "a twin made for another token refused (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "matching twin held by someone else refused (u210), nothing taken",
+          "pass": true,
+          "detail": "210"
+        },
+        {
+          "label": "token not in the record refused (u206)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-5",
+      "title": "see-yourself-out [v3 G2 large-on-demand] any wallet twins a large token",
+      "specRef": "L-5",
+      "checks": [
+        {
+          "label": "inscribe-large ok, returns the xtrata id",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "twin held by the helper; original untouched",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "binding: xtrata id, content hash, escrowed, inscriber = funder",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "twin-to-original recorded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "each payee got exactly half the fee",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "interface: large-unbound = 2, inscribed-count = 2 (one small, one large)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "event says route large-on-demand",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "custody consistent",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "bound token cannot be bound again (u201)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-6",
+      "title": "see-yourself-out [v3 G2 large-on-demand] same content hash from two wallets",
+      "specRef": "L-6",
+      "checks": [
+        {
+          "label": "the core lets two wallets begin the same hash",
+          "pass": true,
+          "detail": "ok/ok"
+        },
+        {
+          "label": "both seal; two different inscription ids, each held by its own wallet",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "first wallet binds",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "second wallet refused (u201); its twin stays with it",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the first wallet's binding is intact",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the loser's inscription binds to no other token (u220)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the loser still owns a valid sealed inscription it may transfer",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-7",
+      "title": "see-yourself-out [v3 G2 large-on-demand] interleaved uploads of the same hash",
+      "specRef": "L-7",
+      "checks": [
+        {
+          "label": "interleaving does not disturb the first uploader",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "first uploader binds B",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the other uploader's session is still its own and can seal",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-8",
+      "title": "see-yourself-out [v3 G2 large-on-demand] upload expiry (core behaviour)",
+      "specRef": "L-8",
+      "checks": [
+        {
+          "label": "begin ok",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "after UPLOAD-EXPIRY-BLOCKS the core refuses further chunks",
+          "pass": true,
+          "detail": "112"
+        },
+        {
+          "label": "the same wallet cannot restart an expired session (a disposable wallet is always fresh)",
+          "pass": true,
+          "detail": "112"
+        },
+        {
+          "label": "a fresh wallet can begin the same hash at once",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "the helper is unaffected by an expired session",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-9",
+      "title": "see-yourself-out [v3 G2 large-on-demand] swaps on an on-demand twin",
+      "specRef": "L-9",
+      "checks": [
+        {
+          "label": "custody consistent before swap",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps in: original to helper, twin to holder",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "custody consistent after swap in",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "holder swaps back",
+          "pass": true,
+          "detail": "ok"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "see-yourself-out:L-10",
+      "title": "see-yourself-out [v3 G2 large-on-demand] record immutable after finalisation",
+      "specRef": "L-10",
+      "checks": [
+        {
+          "label": "seed-canonical refused after finalisation (u207)",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "all three large entries are now bound; counter is exact (0)",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    }
+  ]
+}

@@ -27,5 +27,9 @@ for (const [f, name] of [['simnet-zombie-wabbits', 'ft3-zombie-wabbits'], ['simn
 }
 for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources)
   out(`ft3-${s.name}`, { collectionKey: s.name, source: `.${s.name}`, sourceAsset: s.asset, group: s.group });
+// large-on-demand variants (sim/large-on-demand-v3.mjs): finalise without waiting for large files
+for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources)
+  if (['bitcoin-monkeys', 'see-yourself-out'].includes(s.name))
+    out(`ft3lod-${s.name}`, { collectionKey: s.name, source: `.${s.name}`, sourceAsset: s.asset, group: s.group, largeOnDemand: true });
 out('ft3-leaky-g1', { collectionKey: 'leaky-g1', source: '.mock-leaky-market', sourceAsset: 'leaky', group: 'G1' });
 out('ft3-leaky-g2', { collectionKey: 'leaky-g2', source: '.mock-leaky-market', sourceAsset: 'leaky', group: 'G2' });

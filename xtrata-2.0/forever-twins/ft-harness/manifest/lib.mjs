@@ -120,7 +120,7 @@ export async function buildAll(cfg, ids, fetcher, { concurrency = 4, onProgress 
         try { tokens.push(await buildToken(cfg, id, fetcher)); break; }
         catch (e) {
           if (attempt >= (cfg.retries ?? 3)) { failures.push({ id, error: String(e.message || e) }); break; }
-          await new Promise((r) => setTimeout(r, 1500 * attempt));
+          await new Promise((r) => setTimeout(r, Math.min(15000, 1500 * attempt * attempt)));
         }
       }
       done++; if (onProgress) onProgress(done, ids.length);

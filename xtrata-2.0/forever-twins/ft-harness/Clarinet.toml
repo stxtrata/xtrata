@@ -295,3 +295,11 @@ epoch = "latest"
 path = "contracts/rendered/ft3-bitcoin-monkeys.clar"
 clarity_version = 4
 epoch = "latest"
+[contracts.ft3lod-bitcoin-monkeys]
+path = "contracts/rendered/ft3lod-bitcoin-monkeys.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3lod-see-yourself-out]
+path = "contracts/rendered/ft3lod-see-yourself-out.clar"
+clarity_version = 4
+epoch = "latest"

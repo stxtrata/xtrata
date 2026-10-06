@@ -119,9 +119,9 @@
 </div></footer>
 
 <script type="module">
-import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261006a';
-import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261005b';
-import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261005b';
+import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261006b';
+import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261006b';
+import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261006b';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -282,6 +282,7 @@ async function lookup() {
 
 // ---- actions (v3 only; v1 hands off to its original page) ----
 function renderActions() {
+  if (largeMounted && largeMounted.el.isConnected && view && largeMounted.tokenId === view.tokenId) return;
   const card = $('actionCard'), out = $('actionOut');
   if (!coll.helper) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
@@ -292,7 +293,7 @@ function renderActions() {
   const parts = [];
   if (!view.binding) {
     if (!view.canonical) parts.push(`<div class="msg warn">${coll.interface === 'v1' ? 'This token has not been added to the helper’s record yet, so it cannot be twinned.' : 'This token is not in the finalised record, so it cannot be twinned.'}</div>`);
-    else if (isLargeTotal(view.canonical.totalSize)) parts.push('<div class="msg warn">This token’s art is over 512 KB. It is inscribed by the collection owner before launch and cannot be inscribed from this page.</div>');
+    else if (isLargeTotal(view.canonical.totalSize)) parts.push(coll.largeOnDemand ? '<div id="largeSlot" class="spaced"></div>' : '<div class="msg warn">This token’s art is over 512 KB. It is inscribed by the collection owner before launch and cannot be inscribed from this page.</div>');
     else parts.push(`<p>No twin yet. Anyone can fund this twin, whoever holds the original; funding gives no claim on it.</p>
       <div class="row"><button id="twinBtn" type="button">Twin this ${esc(coll.itemNoun)}</button></div>
       <div class="gs" id="twinCost">Working out the cost…</div><div id="twinOut"></div>
@@ -313,7 +314,9 @@ function renderActions() {
     if (view.custody.unreadable) parts.push('<div class="msg warn">Ownership could not be read right now, so swapping is disabled. Look the token up again.</div>');
     else if (!view.custody.consistent) parts.push('<div class="msg bad">Custody does not match the stored flag, so swapping is disabled.</div>');
   }
+  if (view.binding && coll.largeOnDemand && view.canonical && isLargeTotal(view.canonical.totalSize) && liveLargeJob(view.tokenId)) parts.unshift('<div id="largeSlot" class="spaced"></div>');
   out.innerHTML = parts.join('');
+  if ($('largeSlot')) mountLargeFor(view);
   if ($('twinBtn')) {
     const v0 = view;
     costText(v0).then((t) => { if ($('twinCost') && view === v0) $('twinCost').textContent = t; });
@@ -385,6 +388,48 @@ function callHelper({ contract, fn, args }, postConditions) {
 }
 const submitted = (txId, out = $('actionOut')) => out.insertAdjacentHTML('beforeend', `<div class="msg ok">Submitted. <a href="https://explorer.hiro.so/txid/${esc(txId)}?chain=mainnet" target="_blank" rel="noopener">View transaction</a>. It can take a few minutes to confirm; look the token up again afterwards.</div>`);
 const failed = (e, out = $('actionOut')) => out.insertAdjacentHTML('beforeend', `<div class="msg bad">${esc(e.message)}</div>`);
+// ---- large-file route (collections with largeOnDemand): a one-use wallet funded by the visitor, see src/forever-twins/large ----
+let largeWiz = null, largeMounted = null;
+const LARGE_JOB_PREFIX = 'xtrata.ftlarge.job.';
+function liveLargeJob(tokenId) {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i); if (!k || !k.startsWith(LARGE_JOB_PREFIX)) continue;
+      const j = JSON.parse(localStorage.getItem(k));
+      if (j && j.helper === coll.helper && String(j.token) === String(tokenId) && j.status !== 'COMPLETE' && !(j.status === 'STOPPED' && !j.keepKey)) return j;
+    }
+  } catch { /* storage unavailable */ }
+  return null;
+}
+async function fetchOriginalBytes(tokenId, onProgress) {
+  if (onProgress) onProgress('Reading the token URI from the source contract…');
+  const uri = unwrapOptional(await read(coll.source, 'get-token-uri', [chain.Cl.uint(BigInt(tokenId))]));
+  if (!uri) throw new Error('The source contract returned no token URI');
+  let last;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      if (onProgress) onProgress(`Fetching the original art (large files can take a minute)${attempt > 1 ? `, attempt ${attempt}` : ''}…`);
+      return (await fetchArt(uri, tokenId, globalThis.fetch, { bytesTimeoutMs: 90000 })).bytes;
+    } catch (e) { last = e; await new Promise((r) => setTimeout(r, 1500)); }
+  }
+  throw last;
+}
+async function getLargeWizard() {
+  if (largeWiz) return largeWiz;
+  const m = await import('/forever-twins/assets/xtrata-ft-large.js?v=20261006b');
+  largeWiz = m.createLargeWizard({ coll, reg, mismatch: () => (helperSt && helperSt.mismatches && helperSt.mismatches[0]) || null, fetchBytes: fetchOriginalBytes });
+  return largeWiz;
+}
+async function mountLargeFor(v) {
+  const slot = $('largeSlot'); if (!slot) return;
+  slot.innerHTML = '<p class="mute">Loading the large-file route…</p>';
+  try {
+    const w = await getLargeWizard();
+    if (!slot.isConnected || view !== v) return;
+    slot.innerHTML = ''; largeMounted = { tokenId: v.tokenId, el: slot };
+    w.mount(slot, { tokenId: v.tokenId, canonical: v.canonical, wallet: () => wallet, onTwinned: () => setTimeout(() => { if (view && view.tokenId === v.tokenId) lookup(); }, 20000) });
+  } catch (e) { slot.innerHTML = `<div class="msg warn">The large-file route could not load (${esc(e.message)}). Reload the page to try again.</div>`; }
+}
 async function doInscribe() {
   try {
     if (!prepared) return;
@@ -592,10 +637,11 @@ async function paintMine(t) {
     if (!el.querySelector('.pic .tag')) el.querySelector('.pic').insertAdjacentHTML('beforeend', '<span class="tag">NOT TWINNED</span>');
     let action;
     if (!v.canonical) action = `<div class="gs">${coll.interface === 'v1' ? 'This token has not been added to the helper’s record yet, so it cannot be twinned.' : 'This token is not in the finalised record, so it cannot be twinned.'}</div>`;
-    else if (isLargeTotal(v.canonical.totalSize)) action = '<div class="gs">The art is over 512 KB. The collection owner inscribes files this size, so it cannot be twinned from here.</div>';
+    else if (isLargeTotal(v.canonical.totalSize)) action = coll.largeOnDemand ? `<div class="gs">The art is ${(v.canonical.totalSize / 1048576).toFixed(2)} MB, so it uses the large-file route (about 10 minutes, one funding payment).</div><button type="button" class="large-open">Twin it (large file)</button>` : '<div class="gs">The art is over 512 KB. The collection owner inscribes files this size, so it cannot be twinned from here.</div>';
     else action = `<div class="cost">Making a twin…</div><button type="button">Twin it</button><div class="gm"></div>`;
     body.innerHTML = `${idHtml}<div class="gs">No permanent twin yet. Anyone can fund one, and it gives no claim on the original.</div>${action}`;
-    const btn = body.querySelector('button');
+    body.querySelector('.large-open')?.addEventListener('click', () => { $('tokenId').value = t; lookup(); $('actionCard').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+    const btn = body.querySelector('button:not(.large-open)');
     if (btn) {
       body.querySelector('.cost').textContent = await costText(v);
       btn.addEventListener('click', async () => {
@@ -743,6 +789,7 @@ async function boot() {
     adapter = createAdapter({ read, core: { contract: reg.core.contract, assetName: reg.core.assetName },
       cl: { uint: (n) => chain.Cl.uint(BigInt(n)), principal: (p) => chain.Cl.principal(p), buffer: (b) => chain.Cl.buffer(b), list: (l) => chain.Cl.list(l), ascii: (t) => chain.Cl.stringAscii(t) } });
     try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
+    if (coll.largeOnDemand) { try { const toks = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(LARGE_JOB_PREFIX)) { const j = JSON.parse(localStorage.getItem(k)); if (j && j.helper === coll.helper && j.status !== 'COMPLETE' && !(j.status === 'STOPPED' && !j.keepKey)) toks.push(j.token); } } if (toks.length) $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">You have an unfinished large-file twin in this browser: ${toks.map((t) => `<a href="?token=${esc(t)}">token #${esc(t)}</a>`).join(', ')}. Open it to let it continue or to see where it stands.</div>`); } catch { /* storage unavailable */ } }
     await refreshState();
     setInterval(refreshState, 60000);
     initMine();

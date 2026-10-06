@@ -4,6 +4,9 @@
 //   node manifest/build-manifest.mjs manifest/configs/<key>.json [--out manifest/out]
 //        [--ids 1-50 | --ids 3,7,9] [--concurrency 4] [--snapshot-api https://api.hiro.so]
 //        [--api https://api.hiro.so]   (used when the config's metadataUri is "chain")
+//        [--gateway http://127.0.0.1:8080]  (overrides the config's IPFS gateway, e.g. a local node)
+//        [--retries 8]  (attempts per token, with growing back-off; default 3)
+//        [--uri-delay-ms 150]  (pause between chain token-URI reads; default 1100, or 150 with HIRO_API_KEY)
 //
 // For every token id: fetch the original metadata (if the config has metadataUri),
 // then the media; record sha256, the Xtrata rolling hash, mime (from magic bytes),
@@ -35,6 +38,8 @@ const ids = idsArg
   ? (idsArg.includes('-') ? idsFrom({ from: +idsArg.split('-')[0], to: +idsArg.split('-')[1] }) : idsArg.split(',').map(Number))
   : idsFrom(cfg.ids);
 const partial = Boolean(idsArg);
+if (opt('gateway')) cfg.gateway = opt('gateway');
+if (opt('retries')) cfg.retries = Number(opt('retries'));
 
 // metadataUri "chain": read each token's URI from the source's get-token-uri (read-only call-read).
 if (cfg.metadataUri === 'chain') {
@@ -47,7 +52,7 @@ if (cfg.metadataUri === 'chain') {
     const turn = gate; let release; gate = new Promise((r) => (release = r)); await turn;
     try {
       for (let a = 0; a < 6; a++) {
-        await new Promise((r) => setTimeout(r, KEY ? 150 : 1100));
+        await new Promise((r) => setTimeout(r, Number(opt('uri-delay-ms', KEY ? 150 : 1100))));
         const res = await fetch(`${API}/v2/contracts/call-read/${addr}/${name}/get-token-uri`, {
           method: 'POST', headers: { 'content-type': 'application/json', ...(KEY ? { 'x-api-key': KEY } : {}) },
           body: JSON.stringify({ sender: addr, arguments: [cvToHex(Cl.uint(id))] }) });
