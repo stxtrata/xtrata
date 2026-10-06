@@ -2,6 +2,7 @@
 import { Cl, Pc, PostConditionMode, addressFromVersionHash, addressToString, createAddress, validateStacksAddress } from '@stacks/transactions';
 import './ab3-engine.js';
 import { ARCADE_BOARDS, ARCADE_GAME, isArcadeBoard } from './arcade-boards';
+import { chunkBytes, computeExpectedHash } from '../lib/chunking/hash';
 
 export const ARCADE_CONTRACT = {
   address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X',
@@ -10,8 +11,18 @@ export const ARCADE_CONTRACT = {
 export const ARCADE_CONTRACT_ID = `${ARCADE_CONTRACT.address}.${ARCADE_CONTRACT.name}`;
 export const ALLOWED_BOARDS = ['astro3', 'astro3-daily'] as const;
 export { ARCADE_BOARDS, ARCADE_GAME, isArcadeBoard } from './arcade-boards';
-const XAR_HEADER = 44, XAR_MAX_STEPS = 108000;
+const XAR_HEADER = 44, XAR_MAX_STEPS = 60 * 60 * 60 * 4;   // 4 hours (arcade v1.5)
+/** Largest replay a score entry can hold (the contract's limit). */
 export const MAX_REPLAY_BYTES = 65536;
+/**
+ * Arcade replays above INLINE_MAX are stored as their own Xtrata inscription (one mint-single-tx, at most 32 chunks)
+ * and the score entry holds a small pointer to it (same layout as XA.replay.makePointer in the arcade engine).
+ */
+export const INLINE_MAX = 60000;
+export const MAX_LONG_REPLAY_BYTES = 32 * 16384;
+export const CORE_CONTRACT = { address: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', name: 'xtrata-v3-2-3' } as const;
+const REPLAY_MIME = 'application/octet-stream';
+const TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
 const NAME_RE = /^[A-Za-z0-9 _.-]{3,12}$/;
 
 type Engine = {
@@ -84,7 +95,8 @@ export function parsePayload(input: string | Record<string, unknown>): SubmitPay
   if (typeof name !== 'string' || !NAME_RE.test(name)) throw new PayloadError('Names are 3–12 letters, numbers, spaces, dots, dashes or underscores.');
   if (typeof replay !== 'string' || !replay) throw new PayloadError('The replay is missing.');
   const bytes = b64urlToBytes(replay);
-  if (bytes.length === 0 || bytes.length > MAX_REPLAY_BYTES) throw new PayloadError(`The replay must be 1–${MAX_REPLAY_BYTES} bytes.`);
+  const maxBytes = isArcade ? MAX_LONG_REPLAY_BYTES : MAX_REPLAY_BYTES;
+  if (bytes.length === 0 || bytes.length > maxBytes) throw new PayloadError(`The replay must be 1–${maxBytes} bytes.`);
   if ((isArcade || board === 'astro3') && period !== 0) throw new PayloadError('Invalid board period.');
   if (isArcade !== isXar(bytes)) throw new PayloadError('The replay does not belong to this game.');
   let pilot: string;
@@ -121,7 +133,10 @@ export async function verifyPayload(p: SubmitPayload): Promise<Verification> {
 async function verifyArcade(p: SubmitPayload): Promise<Verification> {
   const b = p.replay, info = ARCADE_BOARDS[p.board];
   if (!info || !isXar(b)) return { ok: false, reason: 'The replay is not an Xtrata Arcade run.' };
-  if ((b[3] & 127) !== 1) return { ok: false, reason: `Unsupported replay format ${b[3] & 127}.` };
+  const fmt = b[3] & 127;
+  if (fmt !== 1 && fmt !== 2 && fmt !== 3) return { ok: false, reason: `Unsupported replay format ${fmt}.` };
+  // Format 3 is a pointer or a seal; the site only accepts a seal here (a pointer is built by postRun, never submitted as-is).
+  if (fmt === 3 && !isReplaySeal(b)) return { ok: false, reason: 'This replay pointer is not valid.' };
   const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
   const time = !!(b[25] & 1), steps = dv.getUint32(32, true), score = dv.getUint32(36, true), gameIdx = b[40], variantIdx = b[41];
   if (gameIdx !== info.gameIdx || variantIdx !== info.variantIdx || time !== info.time) return { ok: false, reason: 'The run does not match the chosen board.' };
@@ -140,18 +155,63 @@ async function verifyArcade(p: SubmitPayload): Promise<Verification> {
 
 export type BoardInfo = { fee: bigint; enabled: boolean; maxScore: bigint };
 
-/** Contract-call options for showContractCall. Deny mode; the only STX that may move is the board's entry fee. */
-export function buildSubmitCall(p: SubmitPayload, score: number, address: string, board: BoardInfo) {
+/** A seal is the run's header plus its fingerprints: 0x02 · chain hash(32) · sha256(32) · varint(length). The player keeps the file. */
+export function isReplaySeal(b: Uint8Array): boolean {
+  if (b.length < XAR_HEADER + 66 || b.length > XAR_HEADER + 66 + 5 || (b[3] & 127) !== 3 || b[XAR_HEADER] !== 2) return false;
+  let i = XAR_HEADER + 65, n = 0, mul = 1;
+  for (; i < b.length; i++) { n += (b[i] & 127) * mul; mul *= 128; if (!(b[i] & 128)) break; }
+  return i === b.length - 1 && n > 0;
+}
+
+/** True when this arcade run is too big for a score entry and is posted as an inscription plus a pointer. */
+export const isLongReplay = (p: SubmitPayload) => p.kind === 'xar' && p.replay.length > INLINE_MAX;
+/** The Xtrata core's content hash of a file (sha256 chained over 16 KB chunks). */
+export const replayChainHash = (bytes: Uint8Array) => computeExpectedHash(chunkBytes(bytes));
+function putVar(out: number[], v: number) { while (v >= 128) { out.push((v % 128) | 128); v = Math.floor(v / 128); } out.push(v); }
+/** Format-3 pointer: the run's 44-byte header (format byte 3) · 0x01 · varint(id) · 32-byte chain hash · varint(length). */
+export function makeReplayPointer(full: Uint8Array, id: number, hash: Uint8Array) {
+  if (!isXar(full)) throw new Error('Not an Xtrata Arcade replay.');
+  const body: number[] = [1];
+  putVar(body, id); body.push(...hash); putVar(body, full.length);
+  const out = new Uint8Array(XAR_HEADER + body.length);
+  out.set(full.subarray(0, XAR_HEADER), 0);
+  out[3] = 3 | 128;
+  out.set(body, XAR_HEADER);
+  return out;
+}
+/** mint-single-tx on the Xtrata core for a long replay. Deny mode; at most `fee` micro-STX may move (the core's fee). */
+export function buildReplayMintCall(p: SubmitPayload, address: string, fee: bigint) {
+  if (!isLongReplay(p)) throw new Error('This replay fits in a score entry.');
+  if (p.replay.length > MAX_LONG_REPLAY_BYTES) throw new Error('This replay is larger than one inscription can hold.');
+  if (!isPilot(p.replay, address)) throw new Error(`This run was flown as ${p.pilot}. Connect that wallet to submit it.`);
+  const chunks = chunkBytes(p.replay);
+  return {
+    contractAddress: CORE_CONTRACT.address,
+    contractName: CORE_CONTRACT.name,
+    functionName: 'mint-single-tx',
+    functionArgs: [Cl.buffer(replayChainHash(p.replay)), Cl.stringAscii(REPLAY_MIME), Cl.uint(p.replay.length), Cl.list(chunks.map((c) => Cl.buffer(c))), Cl.stringAscii(TOKEN_URI)],
+    network: 'mainnet' as const,
+    stxAddress: address,
+    sponsored: false,
+    postConditionMode: PostConditionMode.Deny,
+    postConditions: [Pc.principal(address).willSendLte(fee).ustx()]
+  };
+}
+
+/** Contract-call options for showContractCall. Deny mode; the only STX that may move is the board's entry fee.
+ *  `stored` is what goes into the score entry: the replay itself, or the pointer for a long replay. */
+export function buildSubmitCall(p: SubmitPayload, score: number, address: string, board: BoardInfo, stored: Uint8Array = p.replay) {
   if (!validateStacksAddress(address) || !address.startsWith('SP') && !address.startsWith('SM')) throw new Error('Connect a mainnet wallet.');
   if (!isPilot(p.replay, address)) throw new Error(`This run was flown as ${p.pilot}. Connect that wallet to submit it.`);
   if (!board.enabled) throw new Error('This leaderboard is closed.');
+  if (stored.length > MAX_REPLAY_BYTES) throw new Error('This replay is too big for a score entry: store it as an inscription first.');
   if (BigInt(score) > board.maxScore) throw new Error('This score is above the leaderboard limit.');
   const postConditions = board.fee > 0n ? [Pc.principal(address).willSendEq(board.fee).ustx()] : [];
   return {
     contractAddress: ARCADE_CONTRACT.address,
     contractName: ARCADE_CONTRACT.name,
     functionName: 'submit-score',
-    functionArgs: [Cl.stringAscii(p.board), Cl.uint(p.period), Cl.uint(score), Cl.stringAscii(p.name), Cl.buffer(p.replay)],
+    functionArgs: [Cl.stringAscii(p.board), Cl.uint(p.period), Cl.uint(score), Cl.stringAscii(p.name), Cl.buffer(stored)],
     network: 'mainnet' as const,
     stxAddress: address,
     sponsored: false,

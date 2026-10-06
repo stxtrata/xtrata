@@ -213,7 +213,8 @@
       try {
         var bytes = await S.getReplay(boardOf(game, mode), e.player);
         if (!bytes) throw new Error('no replay stored');
-        var r = await XA.replay.verify(bytes, { address: e.player, score: e.score, board: boardOf(game, mode) });
+        var r = await XA.replay.verify(bytes, { address: e.player, score: e.score, board: boardOf(game, mode), file: sealedCopy(bytes) });
+        if (r.sealed) { b.disabled = false; b.textContent = '🔒 sealed'; b.style.color = 'var(--xa-gold)'; b.onclick = function () { sealedInfo(game, mode, e, bytes); }; return; }
         b.textContent = r.ok ? '✓ verified' : '✗ ' + r.reason;
         b.style.color = r.ok ? '#7dffb2' : '#ff8c8c';
       } catch (x) { b.textContent = '✗ ' + ((x && x.message) || 'failed'); b.style.color = '#ff8c8c'; }
@@ -225,22 +226,23 @@
     var key = boardOf(game, mode) + ':' + e.player + ':' + e.score;
     if (!replayCache[key]) replayCache[key] = S.getReplay(boardOf(game, mode), e.player).then(function (b) {
       if (!b) { delete replayCache[key]; throw new Error('No replay is stored for this entry.'); }
-      return b;
-    }, function (x) { delete replayCache[key]; throw x; });
+      // a long run's entry points at its replay inscription; a sealed one is matched to a copy kept here or on chain
+      return XA.replay.resolve(b, null, { file: sealedCopy(b) }).catch(function (x) { if (x && x.sealed) x.stored = b; throw x; });
+    }).catch(function (x) { delete replayCache[key]; throw x; });
     return replayCache[key];
   }
   function watchButton(game, mode, e) {
     return h('button', { class: 'xa-btn', type: 'button', title: 'Watch this run, replayed from the chain', onclick: async function (ev) {
       var b = ev.currentTarget; b.disabled = true; b.textContent = '…';
       try { var bytes = await fetchReplay(game, mode, e); closeModal(); watchReplay(bytes, { name: e.name, rank: e.rank }); }
-      catch (x) { b.disabled = false; b.textContent = '▶'; openInfo('Replay unavailable', (x && x.message) || String(x)); }
+      catch (x) { b.disabled = false; b.textContent = '▶'; if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }
     } }, ['▶']);
   }
   function saveButton(game, mode, e) {
     return h('button', { class: 'xa-btn', type: 'button', title: 'Download this replay file', onclick: async function (ev) {
       var b = ev.currentTarget; b.disabled = true;
       try { saveReplay(await fetchReplay(game, mode, e), boardOf(game, mode) + '-' + e.name + '-' + e.score); }
-      catch (x) { openInfo('Replay unavailable', (x && x.message) || String(x)); }
+      catch (x) { if (x && x.sealed) sealedInfo(game, mode, e, x.stored); else openInfo('Replay unavailable', (x && x.message) || String(x)); }
       b.disabled = false;
     } }, ['⬇']);
   }
@@ -253,15 +255,125 @@
       setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
     } catch (x) { openInfo('Download blocked', 'This viewer does not allow downloads. Open the arcade on xtrata.xyz to save replays.'); }
   }
-  function openReplayFile() {
+  /* ------------------------ sealed runs: the board holds the replay's fingerprint, the player holds the file */
+  function hex(b) { return S._codec.bytesToHex(b); }
+  function runKey(bytes) { return b64(bytes.subarray(4, 44)); }          // the run itself, whatever form it is stored in
+  function sealedCopies() { var v = U.store('sealed'); return Array.isArray(v) ? v : []; }
+  function keepSealed(bytes) {
+    try {
+      var k = runKey(bytes), list = sealedCopies().filter(function (u) { return u.k !== k; });
+      list.unshift({ k: k, at: Date.now(), b: b64(bytes) });
+      list = list.slice(0, UNPOSTED_MAX);
+      while (list.length && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();
+      U.store('sealed', list);
+    } catch (e) { /* storage blocked or full: the downloaded file is the copy */ }
+  }
+  // A copy of a sealed run's replay held in this browser (the player's own, or one checked here), if any.
+  function sealedCopy(stored) {
+    try {
+      if (!XA.replay.isSeal(stored)) return null;
+      var k = runKey(stored), hit = sealedCopies().concat(unposted()).filter(function (u) { return (u.k || (u.b && runKey(unb64(u.b)))) === k; });
+      for (var i = 0; i < hit.length; i++) { var full = unb64(hit[i].b); if (!XA.replay.mismatch(stored, full)) return full; }
+    } catch (e) {}
+    return null;
+  }
+  function sealedInfo(game, mode, e, stored) {
+    var R = XA.replay, p = R.readPointer(stored), kb = Math.max(1, Math.round(p.length / 1024));
+    var out = h('p', { class: 'xa-msg', 'aria-live': 'polite' });
+    var pick = h('button', { class: 'xa-btn xa-btn-primary', type: 'button', text: 'Check a replay file' });
+    pick.addEventListener('click', function () {
+      var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
+      inp.addEventListener('change', async function () {
+        var f = inp.files && inp.files[0]; inp.remove();
+        if (!f) return;
+        var full = new Uint8Array(await f.arrayBuffer()), why = R.mismatch(stored, full);
+        if (why) { out.className = 'xa-msg is-err'; out.textContent = '✗ ' + why + '.'; return; }
+        out.className = 'xa-msg'; out.textContent = 'Fingerprint matches ✓ Re-playing the run…';
+        var r = await R.verify(stored, { address: e.player, score: e.score, board: boardOf(game, mode), file: full });
+        if (!out.isConnected) return;
+        if (!r.ok) { out.className = 'xa-msg is-err'; out.textContent = '✗ Fingerprint matches but the run does not check out: ' + r.reason; return; }
+        keepSealed(full);
+        delete replayCache[boardOf(game, mode) + ':' + e.player + ':' + e.score];
+        out.className = 'xa-msg is-ok';
+        out.replaceChildren('✓ Verified: this file is the sealed run and it scores ' + fmtVal(mode, r.score) + '. ',
+          h('button', { class: 'xa-link', type: 'button', text: 'Watch it', onclick: function () { closeModal(); watchReplay(full, { name: e.name, rank: e.rank }); } }));
+      });
+      doc.body.appendChild(inp); inp.click();
+    });
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: '🔒 Sealed run' }),
+      h('p', { class: 'xa-verdict', text: e.name + ' · ' + fmtVal(mode, e.score) + ' · ' + kb + ' KB replay' }),
+      h('p', { class: 'xa-note', text: 'The player posted this score with a fingerprint of the replay instead of the replay itself, and kept the file. ' +
+        'Whoever has the file can check it here: it must match the fingerprint exactly and re-play to this score. If the file is ever inscribed on Xtrata, it is found and played from the chain automatically.' }),
+      h('p', { class: 'xa-note', style: 'word-break:break-all;font-size:11px;opacity:.8', text: 'sha256 ' + hex(p.sha256) }),
+      out,
+      h('div', { class: 'xa-card-foot' }, [pick, h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+  }
+
+  function openReplayFile(post) {
     var inp = h('input', { type: 'file', accept: '.xar,application/octet-stream', style: 'display:none' });
     inp.addEventListener('change', async function () {
       var f = inp.files && inp.files[0]; inp.remove();
       if (!f) return;
-      try { watchReplay(new Uint8Array(await f.arrayBuffer()), { name: f.name.replace(/\.xar$/, '') }); }
-      catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }
+      try {
+        var bytes = await XA.replay.resolve(new Uint8Array(await f.arrayBuffer()));
+        if (post === true) postSavedRun(bytes); else watchReplay(bytes, { name: f.name.replace(/\.xar$/, '') });
+      } catch (x) { openInfo('Could not open that replay', (x && x.message) || String(x)); }
     });
     doc.body.appendChild(inp); inp.click();
+  }
+
+  /* --------------------------- unposted runs: a great run is never lost
+     Every ranked run that would make a Top 10 is kept in this browser (when storage is allowed) until it is
+     posted, and can always be saved as a file. Either can be posted later from the machine's title screen. */
+  var UNPOSTED_MAX = 3, UNPOSTED_BYTES = 1500000;
+  function b64(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function unb64(t) { var bin = atob(t), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function unposted() { var v = U.store('unposted'); return Array.isArray(v) ? v : []; }
+  function keepUnposted(board, score, mode, bytes) {
+    try {
+      var list = unposted().filter(function (u) { return u.r !== b64(bytes.subarray(0, 44)); });
+      list.unshift({ board: board, score: score, mode: mode, at: Date.now(), r: b64(bytes.subarray(0, 44)), b: b64(bytes) });
+      list = list.slice(0, UNPOSTED_MAX);
+      while (list.length > 1 && JSON.stringify(list).length > UNPOSTED_BYTES) list.pop();
+      U.store('unposted', list);
+    } catch (e) { /* storage blocked: Save replay still works */ }
+  }
+  function dropUnposted(bytes) {
+    try { var k = b64(bytes.subarray(0, 44)); U.store('unposted', unposted().filter(function (u) { return u.r !== k; })); } catch (e) {}
+  }
+  // A saved or kept run: re-played here first, then posted like a fresh one.
+  async function postSavedRun(bytes) {
+    var R = XA.replay, hd;
+    try { hd = R.readHeader(bytes); } catch (x) { openInfo('Not a replay', 'That file is not an Xtrata Arcade replay.'); return; }
+    var game = XA.games.filter(function (g) { return g.id === R.GAME_IDS[hd.gameIdx]; })[0];
+    if (!game) { openInfo('Unknown game', 'This replay is for a game that is not in this arcade.'); return; }
+    var variant = hd.variantIdx ? (game.variants || [])[hd.variantIdx - 1] : null;
+    var mode = variant ? variant.mode : game.mode, board = R.boardFor(game, mode);
+    var pilotAddr = S._codec.c32address(hd.version || 22, hd.hash160);
+    var body = h('div', {});
+    modal(h('div', { class: 'xa-card' }, [
+      h('h3', { text: 'Post a saved run' }),
+      h('p', { class: 'xa-verdict', text: game.title + (variant ? ' · ' + variant.label : '') + ' · ' + fmtVal(mode, hd.score) + ' · flown by ' + S.shortAddress(pilotAddr) }),
+      body,
+      h('div', { class: 'xa-card-foot' }, [h('span'), h('button', { class: 'xa-btn', type: 'button', onclick: closeModal, text: 'Close' })])
+    ]));
+    body.replaceChildren(h('p', { class: 'xa-note', text: 'Re-playing the run to check it…' }));
+    var chk = await R.verify(bytes, { score: hd.score, board: board });
+    if (!body.isConnected) return;
+    if (!chk.ok) { body.replaceChildren(h('p', { class: 'xa-msg is-err', text: 'This run does not check out (' + chk.reason + '), so it cannot be posted.' })); return; }
+    var top = await S.getTop10(board, mode, true);
+    if (!body.isConnected) return;
+    var rank = insertRank(top, hd.score, mode);
+    if (top.ok && !rank) { body.replaceChildren(h('p', { class: 'xa-note', text: 'Replay checked ✓ but the Top 10 has moved on: this score no longer makes the board.' })); return; }
+    var box = h('div', { class: 'xa-submit' });
+    body.replaceChildren(h('p', { class: 'xa-note', text: rank ? 'Replay checked ✓ It would be #' + rank + ' on the board.' : 'Replay checked ✓' }), box);
+    postCard(box, { game: game, mode: mode, score: hd.score, bytes: bytes, pilot: { address: pilotAddr, hash160: hd.hash160 }, checked: true });
   }
   // Replays are drawn and heard like a live run, fed from the recorded input instead of the keyboard.
   async function watchReplay(bytes, info) {
@@ -401,7 +513,7 @@
       s.pilot = pilot;
       s.rec = XA.replay.record(game, variant, pilot, nonce, input, api.pointer);
     }
-    var tag = h('span', { class: 'xa-runtag', style: 'margin-left:8px;font-size:11px;letter-spacing:.08em;white-space:nowrap;color:' + (pilot ? '#7dffb2' : '#9aa3c7'),
+    var tag = s.tagEl = h('span', { class: 'xa-runtag', style: 'margin-left:8px;font-size:11px;letter-spacing:.08em;white-space:nowrap;color:' + (pilot ? '#7dffb2' : '#9aa3c7'),
       title: watch ? 'Replay' : pilot ? 'Ranked: this run is recorded and can be posted on-chain.' : 'Practice: connect a wallet before you start to rank a run.',
       text: watch ? '▶ REPLAY' : pilot ? '● RANKED' : 'PRACTICE' });
     var ttl = $('.xa-title', gameEl); if (ttl) ttl.appendChild(tag);
@@ -452,6 +564,22 @@
       btn.disabled = false; btn.textContent = label;
     } finally { s.connecting = false; }
   }
+  // "You have an unposted run" on a machine's title screen.
+  function unpostedRow(g, mode) {
+    var mine = unposted().filter(function (u) { return u.board === boardOf(g, mode); });
+    if (!mine.length) return null;
+    return h('div', { class: 'xa-note', style: 'margin-top:10px;padding:10px;border-radius:10px;border:1px solid var(--xa-gold);text-align:left' },
+      [h('b', { style: 'color:var(--xa-gold)', text: 'Unposted run' + (mine.length > 1 ? 's' : '') + ' kept in this browser' })].concat(mine.map(function (u) {
+        var bytes = unb64(u.b);
+        return h('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:6px' }, [
+          h('span', { text: fmtVal(u.mode, u.score) + ' · ' + new Date(u.at).toLocaleString() }),
+          h('span', { style: 'display:flex;gap:6px' }, [
+            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { postSavedRun(bytes); } }, ['Post']),
+            h('button', { class: 'xa-btn', type: 'button', style: 'padding:4px 10px;font-size:11px', onclick: function () { saveReplay(bytes, u.board + '-' + u.score); } }, ['⬇ Save'])
+          ])
+        ]);
+      })));
+  }
   function showReady(s) {
     var g = s.game, mode = s.mode, vkey = s.variant ? s.variant.key : null;
     var list = h('div', { class: 'xa-ready-board' }, [boardList(boards[bk(g, mode)], g, 0, mode)]);
@@ -490,7 +618,10 @@
       list,
       h('div', { class: 'xa-over-actions' }, [start, practice, h('button', { class: 'xa-btn', type: 'button', onclick: endSession }, ['◀ Arcade'])]),
       switcher,
-      h('p', { class: 'xa-note' }, [canConnect ? 'Enter or Space to connect · Esc to go back · ' : 'Enter or Space to start · Esc to go back · ', h('button', { class: 'xa-link', type: 'button', onclick: openReplayFile }, ['watch a replay file'])])
+      unpostedRow(g, mode),
+      h('p', { class: 'xa-note' }, [canConnect ? 'Enter or Space to connect · Esc to go back · ' : 'Enter or Space to start · Esc to go back · ',
+        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(false); } }, ['watch a replay file']), ' · ',
+        h('button', { class: 'xa-link', type: 'button', onclick: function () { openReplayFile(true); } }, ['post a saved run'])])
     ])]));
     start.focus();
     S.getTop10(boardOf(g, mode), mode, true).then(function (b) {
@@ -695,7 +826,9 @@
     if (!board.ok) {
       verdict.textContent = 'Couldn’t check the leaderboard right now — you can still try to post.';
     } else if (rank) {
-      verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');
+      if (s.rec) verdict.replaceChildren('That run makes the top 10 at ', h('b', { text: '#' + rank }), '. Post it on-chain to keep it until someone beats it.');
+      // A practice run is not bound to a wallet, so it can never be posted: say so up front, not after a connect.
+      else verdict.replaceChildren('That would have been ', h('b', { text: '#' + rank }), ' on the board, but practice runs can\u2019t be posted.');
     } else {
       var tenth = board.entries[9];
       verdict.textContent = mode === 'time'
@@ -704,20 +837,59 @@
       return;
     }
     if (s.rec && !s.replayP) s.replayP = s.rec.finish(score, s.completed);
+    // A Top 10 run is kept in this browser until it is posted, so closing the tab or a failed post never loses it.
+    if (s.rec && s.replayP) s.replayP.then(function (b) { if (b) keepUnposted(boardOf(g, mode), score, mode, b); });
     buildSubmit(submitBox, s, score, rank);
   }
 
+  // Game over after a practice run. A run is locked to the wallet it started with (its replay is seeded
+  // from it), so this score can't be posted even if the player connects now. Say that plainly, let them
+  // connect here, show the result as soon as the wallet answers, and offer a ranked run straight away.
+  function practiceBox(box, s) {
+    var g = s.game, vkey = s.variant ? s.variant.key : null;
+    function render() {
+      if (session !== s || !box.isConnected) return;
+      var st = S.status();
+      if (st.address) {
+        box.replaceChildren(
+          h('p', { class: 'xa-note', style: 'margin:0;color:var(--xa-green)', text: '\u2713 Connected as ' + S.shortAddress(st.address) + '. Your next run is ranked and can be posted.' }),
+          h('p', { class: 'xa-note', text: 'This practice run stays unposted: a run is locked to the wallet it starts with, so nobody can claim a score they didn\u2019t play.' }),
+          h('button', { class: 'xa-btn xa-btn-play', style: 'margin-top:10px;--c:' + g.color, type: 'button', onclick: function () { startGame(g.id, vkey, { go: true }); } }, ['\u25B6 Play a ranked run'])
+        );
+        return;
+      }
+      var msg = h('p', { class: 'xa-msg' });
+      var btn = h('button', { class: 'xa-btn', type: 'button', style: 'margin-top:10px', onclick: async function () {
+        if (btn.disabled) return;
+        walletStatus = S.status(); paintWallet();
+        if (walletStatus.route === 'none') { onWalletClick(); return; }
+        btn.disabled = true; btn.textContent = 'Check your wallet\u2026'; msg.className = 'xa-msg'; msg.textContent = '';
+        try {
+          await S.connect();
+          walletStatus = S.status(); paintWallet();
+          if (!walletStatus.address) throw new Error('The wallet did not return an address.');
+          render();
+        } catch (e) {
+          if (session !== s || !box.isConnected) return;
+          btn.disabled = false; btn.textContent = 'Connect wallet';
+          msg.className = 'xa-msg is-err'; msg.textContent = 'Not connected: ' + ((e && e.message) || String(e));
+        }
+      } }, ['Connect wallet']);
+      box.replaceChildren(
+        h('p', { class: 'xa-note', style: 'margin:0', text: 'Practice run: this score can\u2019t be posted, even if you connect now. A run is locked to the wallet it starts with.' }),
+        h('p', { class: 'xa-note', text: 'Connect, then play again: every run after that is ranked and can be posted on-chain.' }),
+        btn, msg
+      );
+    }
+    render();
+    // The wallet may connect from elsewhere (the hall's button, a slow extension): keep this box in step.
+    S.onChange(function () { render(); });
+  }
   function buildSubmit(box, s, score, rank) {
     var g = s.game;
     var st = S.status();
     box.classList.remove('xa-hidden');
-    if (!s.rec) {
-      box.replaceChildren(
-        h('p', { class: 'xa-note', style: 'margin:0', text: 'Practice run. Connect your wallet before you start a run to rank it: ranked runs are recorded so anyone can check them.' }),
-        h('button', { class: 'xa-btn', type: 'button', style: 'margin-top:10px', onclick: function () { onWalletClick(); } }, ['Connect wallet'])
-      );
-      return;
-    }
+    if (!s.rec) { practiceBox(box, s); return; }
     if (st.route === 'none') {
       box.replaceChildren(
         h('p', { class: 'xa-note', style: 'margin:0', text: 'This copy of the arcade can’t reach a wallet, so this score can’t be posted from here. Open the arcade on Xtrata to post your runs.' }),
@@ -725,6 +897,13 @@
       );
       return;
     }
+    postCard(box, { game: g, mode: s.mode, score: score, bytesP: s.replayP, pilot: s.pilot });
+  }
+  // The name / cost / post box for a ranked run: at game over, or later from a saved replay.
+  // opts: { game, mode, score, pilot:{address, hash160}, bytes | bytesP, checked }
+  function postCard(box, opts) {
+    var g = opts.game, mode = opts.mode, score = opts.score;
+    var s = { pilot: opts.pilot };
     var name = h('input', { class: 'xa-name', id: 'xa-name', maxlength: '12', autocomplete: 'off', spellcheck: 'false',
       value: U.store('name') || '', placeholder: 'AAA', 'aria-describedby': 'xa-name-note' });
     name.addEventListener('input', function () {
@@ -734,7 +913,16 @@
     var msg = h('p', { class: 'xa-msg', 'aria-live': 'polite' });
     var btn = h('button', { class: 'xa-btn xa-btn-primary', type: 'button' }, ['Post score on-chain']);
     var feeNote = h('p', { class: 'xa-note', id: 'xa-name-note', text: '3–12 letters or numbers. Your wallet will ask you to confirm.' });
-    var boardId = boardOf(g, s.mode), replayBytes = null;
+    var boardId = boardOf(g, mode), replayBytes = null;
+    var longNote = h('div', { class: 'xa-note xa-long', style: 'display:none;color:var(--xa-gold)' });
+    var how = 'inline';     // inline | inscribe | seal
+    function choice(val, title, text, on) {
+      var r = h('input', { type: 'radio', name: 'xa-how', value: val });
+      r.checked = !!on;
+      r.addEventListener('change', function () { if (r.checked) { how = val; btn.textContent = val === 'seal' ? 'Save replay & post sealed score' : 'Post score on-chain'; } });
+      return h('label', { class: 'xa-how', style: 'display:flex;gap:8px;align-items:flex-start;margin:6px 0;cursor:pointer;color:var(--xa-ink,#e8eef7)' },
+        [r, h('span', {}, [h('b', { text: title }), h('br'), h('span', { style: 'opacity:.85', text: text })])]);
+    }
     btn.disabled = true;
     msg.textContent = 'Checking your replay…';
     S.getFee(boardId).then(function (f) {
@@ -743,12 +931,38 @@
       feeNote.textContent = '3–12 letters or numbers. Fee ' + (Number(f.value) / 1e6) + ' STX plus network fee, capped by a post-condition.';
     });
     (async function () {
-      replayBytes = await s.replayP;
-      if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is too long to store on-chain.'; return; }
-      // Re-run our own replay first: never let anyone pay to post a run that will not check out.
-      var chk = await XA.replay.verify(replayBytes, { address: s.pilot.address, score: score, board: boardId });
-      if (!msg.isConnected) return;
-      if (!chk.ok) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run could not be verified, so it can’t be posted (' + chk.reason + ').'; return; }
+      replayBytes = opts.bytes || await opts.bytesP;
+      if (!replayBytes) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run is longer than 4 hours and cannot be recorded.'; return; }
+      var long = S.needsInscription(replayBytes), kb = Math.max(1, Math.round(replayBytes.length / 1024));
+      if (long) {
+        how = 'inscribe';
+        longNote.style.display = '';
+        longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Working out the cost…' }));
+        var tooBig = Math.ceil(replayBytes.length / XA.replay.CHUNK) > XA.replay.MAX_INSCRIBE_CHUNKS;
+        var sealText = 'Board fee plus a normal network fee, one approval. Your replay file is saved to your device now and the board keeps its fingerprint. ' +
+          'Anyone you give the file to can check it matches, and you can inscribe it later. Keep the file safe: without it nobody can watch the run.';
+        var render = function (q) {
+          if (!longNote.isConnected) return;
+          if (tooBig) {
+            how = 'seal'; btn.textContent = 'Save replay & post sealed score';
+            longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than the 512 KB one inscription holds, so this score is posted sealed.' }),
+              choice('seal', 'Seal it', sealText, true));
+            return;
+          }
+          longNote.replaceChildren(h('p', { text: 'Long run: the replay is ' + kb + ' KB, more than a score entry holds. Choose how to post it:' }),
+            choice('inscribe', 'Inscribe the replay', (q && q.ok ? 'Inscription fee ' + (Number(q.fee) / 1e6) + ' STX' : 'A small inscription fee') +
+              ' plus network fees (higher for a bigger replay), two approvals. The replay lives on chain and anyone can watch it.', how === 'inscribe'),
+            choice('seal', 'Seal it (cheaper)', sealText, how === 'seal'));
+        };
+        S.quoteReplay(replayBytes.length).then(render, function () { render(null); });
+      }
+      if (!opts.checked) {
+        msg.textContent = long ? 'Checking your replay (a long run takes a moment)…' : 'Checking your replay…';
+        // Re-run our own replay first: never let anyone pay to post a run that will not check out.
+        var chk = await XA.replay.verify(replayBytes, { address: s.pilot.address, score: score, board: boardId });
+        if (!msg.isConnected) return;
+        if (!chk.ok) { msg.className = 'xa-msg is-err'; msg.textContent = 'This run could not be verified, so it can’t be posted (' + chk.reason + ').'; return; }
+      }
       msg.className = 'xa-msg is-ok'; msg.textContent = 'Replay checked ✓ Ready to post.';
       btn.disabled = false;
     })();
@@ -756,29 +970,38 @@
       var n = S.cleanName(name.value).toUpperCase();
       if (n.length < 3) { msg.className = 'xa-msg is-err'; msg.textContent = 'Name needs at least 3 characters.'; name.focus(); return; }
       U.store('name', n);
+      var sealIt = how === 'seal';
       btn.disabled = true; name.disabled = true;
+      longNote.querySelectorAll('input').forEach(function (r) { r.disabled = true; });
       msg.className = 'xa-msg'; msg.textContent = 'Check your wallet to confirm…';
+      if (sealIt) { keepSealed(replayBytes); saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); }
       try {
-        var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, pilotHash: S._codec.bytesToHex(s.pilot.hash160) });
+        var r = await S.submit({ board: boardId, score: score, name: n, replay: replayBytes, seal: sealIt, pilotHash: S._codec.bytesToHex(s.pilot.hash160),
+          onProgress: function (t) { if (msg.isConnected) { msg.className = 'xa-msg'; msg.textContent = t; } } });
         if (r.ok) {
+          dropUnposted(replayBytes);
           var tx = r.txid ? (/^0x/.test(r.txid) ? r.txid : '0x' + r.txid) : '';
           msg.className = 'xa-msg is-ok';
           msg.replaceChildren('Submitted! It shows on the board once the transaction confirms. ',
             tx ? h('a', { href: 'https://explorer.hiro.so/txid/' + tx + '?chain=' + S.config().network, target: '_blank', rel: 'noopener', text: 'View transaction ↗' }) : '');
-          btn.textContent = 'Posted ✓';
+          btn.textContent = sealIt ? 'Posted sealed ✓' : 'Posted ✓';
+          if (sealIt) msg.append(h('br'), 'Your replay file was saved as xtrata-arcade-' + (boardId + '-' + n + '-' + score + '-sealed').replace(/[^A-Za-z0-9_.-]+/g, '_') + '.xar. Keep it: it is the proof of this run. ',
+            h('button', { class: 'xa-link', type: 'button', text: 'Save it again', onclick: function () { saveReplay(replayBytes, boardId + '-' + n + '-' + score + '-sealed'); } }));
           XA.audio.arp([784, 988, 1175, 1568], 0.07, { type: 'square', vol: 0.18 });
         } else if (r.needsRuntime) {
           msg.className = 'xa-msg is-err';
           msg.replaceChildren(r.reason + ' ', h('a', { href: r.runtimeUrl, target: '_blank', rel: 'noopener', text: 'Open the secure runtime ↗' }));
           btn.disabled = false; name.disabled = false;
+          longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
         }
       } catch (e) {
         msg.className = 'xa-msg is-err';
         msg.textContent = (e && e.message) || 'The wallet did not sign.';
         btn.disabled = false; name.disabled = false;
+        longNote.querySelectorAll('input').forEach(function (r) { r.disabled = false; });
       }
     });
-    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, btn, msg);
+    box.replaceChildren(h('label', { for: 'xa-name', text: 'NAME ON THE BOARD' }), name, feeNote, longNote, btn, msg);
   }
 
   /* ---------------------------------------------------------- loop */
@@ -833,6 +1056,13 @@
           s.fx.update(STEP);
           s.acc -= STEP;
           steps++;
+        }
+        // Long-run hint: once the replay outgrows a score entry, say so (posting will store it as an inscription).
+        if (s.rec && !s.longHint && s.rec.step % 120 === 0 && s.rec.estimate() > (S.config().inlineMax || S.INLINE_MAX) && s.tagEl) {
+          s.longHint = true;
+          s.tagEl.textContent = '\u25CF RANKED \u00B7 LONG RUN';
+          s.tagEl.style.color = '#ffcf5a';
+          s.tagEl.title = 'This replay is now bigger than a score entry holds. You can still post it: it will be stored as its own Xtrata inscription (a small extra fee and one more wallet approval).';
         }
       }
     } else if (s.state === 'ready') {

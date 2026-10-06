@@ -14,8 +14,16 @@
  *    32-35 steps (updates)     36-39 score (time runs: centiseconds)
  *    40   game index           41 variant index (0 = base)     42-43 reserved
  *  then deflate-raw of the event stream:
- *    varint(step delta) · flags · fields
+ *    format 1: varint(step delta) · flags · fields, one event after another
  *    flags: 1 held  2 hit  4 pointer  8 pointer-button changed  16 button is down  32 pointer moved  64 swipes
+ *    format 2 (v1.5+): the same events, column by column (every step delta, then every flag byte, held, hit,
+ *      pointer x, pointer y, swipes), each column a run of varints, the columns' byte lengths first. Pointer
+ *      moves are stored as the change from the previous move (smooth mouse motion becomes small numbers).
+ *      Same events, same game, about a fifth smaller after deflate.
+ *    format 3: a POINTER to a replay too big for a score entry. Same 44-byte header (so the contract's wallet
+ *      check still applies), then, uncompressed: 0x01 · varint(inscription id) · 32-byte Xtrata chain hash of the
+ *      full replay · varint(full length). The full replay is an Xtrata inscription; resolve() fetches it and
+ *      accepts it only if its chain hash matches and its header equals this one.
  */
 (function (root) {
   'use strict';
@@ -23,9 +31,10 @@
   if (!XA || !S) throw new Error('arcade-kit and score-client must load before arcade-replay');
   var U = XA.util, C = S._codec;
 
-  var ENGINE = 1, FORMAT = 1, HEADER = 44;
-  var MAX_BYTES = 60000;                 // the contract allows 65,536; keep headroom
-  var MAX_STEPS = 60 * 60 * 30;          // 30 minutes
+  var ENGINE = 1, FORMAT = 2, F_EVENTS = 1, F_COLUMNS = 2, F_POINTER = 3, HEADER = 44;
+  var MAX_BYTES = 60000;                 // largest replay posted inline: the contract allows 65,536; keep headroom
+  var MAX_STEPS = 60 * 60 * 60 * 4;      // 4 hours: longer replays are stored as their own inscription
+  var CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;   // one-transaction inscription on the Xtrata core (512 KB)
   var STEP = 1 / 60, QN = 4;             // pointer positions are kept to a quarter of a playfield unit
 
   // Fixed order: an index in the header names the game. Never reorder; only append.
@@ -146,11 +155,12 @@
     }
     this.step++;
   };
-  // → Uint8Array, or null when the run is too long to store on-chain.
+  // → Uint8Array (format 2), or null only for an empty run or one longer than MAX_STEPS.
+  // Runs larger than MAX_BYTES are still returned: they are posted as an inscription plus a pointer.
   Recorder.prototype.finish = async function (score, completed) {
     var m = this.meta;
     if (this.step < 1 || this.step > MAX_STEPS) return null;
-    var packed = await pack(new Uint8Array(this.body));
+    var packed = await pack(encodeColumns(eventsFromBody(new Uint8Array(this.body))));
     var out = new Uint8Array(HEADER + packed.data.length), dv = new DataView(out.buffer);
     out[0] = 88; out[1] = 65; out[2] = 82;                       // "XAR"
     out[3] = FORMAT | (packed.raw ? 128 : 0);
@@ -160,8 +170,176 @@
     dv.setUint32(32, this.step, true); dv.setUint32(36, Math.max(0, Math.floor(score)) >>> 0, true);
     out[40] = m.gameIdx; out[41] = m.variantIdx;
     out.set(packed.data, HEADER);
-    return out.length <= MAX_BYTES ? out : null;
+    return out;
   };
+  // Rough size of the replay so far (bytes after packing), for the in-game "long run" hint.
+  Recorder.prototype.estimate = function () { return HEADER + Math.round(this.body.length * 0.4); };
+
+  /* ------------------------------------------- event body, formats 1 and 2 */
+  function eventsFromBody(body) {
+    var r = new Reader(body), at = 0, out = [];
+    while (r.i < body.length) {
+      at += r.varint();
+      var f = r.byte(), e = { at: at, f: f };
+      if (f & 1) e.held = r.varint();
+      if (f & 2) e.hit = r.varint();
+      if (f & 4) { e.dx = unzz(r.varint()); e.dy = unzz(r.varint()); }
+      if (f & 64) { var n = r.byte(); e.sw = []; for (var i = 0; i < n; i++) e.sw.push(r.byte()); }
+      out.push(e);
+    }
+    return out;
+  }
+  function encodeColumns(events) {
+    var d = [], fl = [], held = [], hit = [], px = [], py = [], sw = [], last = -1, pdx = 0, pdy = 0;
+    for (var i = 0; i < events.length; i++) {
+      var e = events[i], f = e.f;
+      putVar(d, e.at - last - 1); last = e.at; fl.push(f);
+      if (f & 1) putVar(held, e.held);
+      if (f & 2) putVar(hit, e.hit);
+      if (f & 4) { putVar(px, zz(e.dx - pdx)); putVar(py, zz(e.dy - pdy)); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }
+      if (f & 64) { sw.push(e.sw.length); for (var k = 0; k < e.sw.length; k++) sw.push(e.sw[k]); }
+    }
+    var cols = [d, fl, held, hit, px, py, sw], head = [];
+    putVar(head, events.length);
+    cols.forEach(function (c) { putVar(head, c.length); });
+    var out = new Uint8Array(head.length + cols.reduce(function (n, c) { return n + c.length; }, 0)), o = 0;
+    out.set(head, 0); o = head.length;
+    cols.forEach(function (c) { out.set(c, o); o += c.length; });
+    return out;
+  }
+  function eventsFromColumns(body) {
+    var r = new Reader(body), n = r.varint(), lens = [];
+    for (var c = 0; c < 7; c++) lens.push(r.varint());
+    var readers = [], o = r.i;
+    for (c = 0; c < 7; c++) { readers.push(new Reader(body.subarray(o, o + lens[c]))); o += lens[c]; }
+    if (o !== body.length) throw new Error('Replay columns do not add up');
+    var D = readers[0], F = readers[1], H = readers[2], T = readers[3], X = readers[4], Y = readers[5], W = readers[6];
+    var out = [], last = -1, pdx = 0, pdy = 0;
+    for (var i = 0; i < n; i++) {
+      var at = last + 1 + D.varint(), f = F.byte(), e = { at: at, f: f };
+      last = at;
+      if (f & 1) e.held = H.varint();
+      if (f & 2) e.hit = T.varint();
+      if (f & 4) { e.dx = pdx + unzz(X.varint()); e.dy = pdy + unzz(Y.varint()); pdx = e.dx; pdy = e.dy; } else { pdx = 0; pdy = 0; }
+      if (f & 64) { var k = W.byte(); e.sw = []; for (var j = 0; j < k; j++) e.sw.push(W.byte()); }
+      out.push(e);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------- big replays: inscription + pointer */
+  function readHeader(bytes) {
+    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    return { hash160: bytes.slice(4, 24), version: bytes[24], time: !!(bytes[25] & 1), completed: !!(bytes[25] & 2),
+      engine: dv.getUint16(26, true), nonce: dv.getUint32(28, true), steps: dv.getUint32(32, true), score: dv.getUint32(36, true),
+      gameIdx: bytes[40], variantIdx: bytes[41] };
+  }
+  function checkMagic(bytes) {
+    if (!(bytes instanceof Uint8Array)) throw new Error('Not an Xtrata Arcade replay');
+    if (bytes.length < HEADER) throw new Error('Replay too short');
+    if (bytes[0] !== 88 || bytes[1] !== 65 || bytes[2] !== 82) throw new Error('Not an Xtrata Arcade replay');
+  }
+  function isPointer(bytes) {
+    try { checkMagic(bytes); return (bytes[3] & 127) === F_POINTER; } catch (e) { return false; }
+  }
+  // The Xtrata core's content hash: sha256(previous ‖ chunk) over 16 KB chunks, starting from 32 zero bytes.
+  function chunksOf(bytes) {
+    var out = [];
+    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));
+    return out;
+  }
+  function chainHash(bytes) {
+    var h = new Uint8Array(32);
+    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = C.sha256(m); });
+    return h;
+  }
+  function makePointer(full, id, hash) {
+    checkMagic(full);
+    var b = [1];
+    putVar(b, Number(id)); for (var i = 0; i < 32; i++) b.push(hash[i]); putVar(b, full.length);
+    var out = new Uint8Array(HEADER + b.length);
+    out.set(full.subarray(0, HEADER), 0);
+    out[3] = F_POINTER | 128;
+    out.set(b, HEADER);
+    return out;
+  }
+  // A seal: the score entry holds only the run's header and the replay's fingerprints (Xtrata chain hash, sha256, length).
+  // The player keeps the file. Anyone holding it can prove it is this run; if it is ever inscribed on Xtrata as these
+  // exact bytes, the chain hash finds it.
+  function makeSeal(full) {
+    checkMagic(full);
+    if (isPointer(full)) throw new Error('Cannot seal a pointer');
+    var b = [2], ch = chainHash(full), sh = C.sha256(full);
+    for (var i = 0; i < 32; i++) b.push(ch[i]);
+    for (i = 0; i < 32; i++) b.push(sh[i]);
+    putVar(b, full.length);
+    var out = new Uint8Array(HEADER + b.length);
+    out.set(full.subarray(0, HEADER), 0);
+    out[3] = F_POINTER | 128;
+    out.set(b, HEADER);
+    return out;
+  }
+  function readPointer(bytes) {
+    checkMagic(bytes);
+    if ((bytes[3] & 127) !== F_POINTER) throw new Error('Not a replay pointer');
+    var r = new Reader(bytes.subarray(HEADER)), kind = r.byte(), i, hash = new Uint8Array(32);
+    if (kind === 1) {
+      var id = r.varint();
+      for (i = 0; i < 32; i++) hash[i] = r.byte();
+      return { kind: 'inscription', id: id, hash: hash, length: r.varint() };
+    }
+    if (kind === 2) {
+      var sha = new Uint8Array(32);
+      for (i = 0; i < 32; i++) hash[i] = r.byte();
+      for (i = 0; i < 32; i++) sha[i] = r.byte();
+      return { kind: 'seal', id: null, hash: hash, sha256: sha, length: r.varint() };
+    }
+    throw new Error('Unknown replay pointer');
+  }
+  function isSeal(bytes) { try { return isPointer(bytes) && readPointer(bytes).kind === 'seal'; } catch (e) { return false; } }
+  // Does this file belong to this stored entry (pointer or seal)? Returns null when it does, or the reason it does not.
+  function mismatch(stored, full) {
+    var p = readPointer(stored);
+    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);
+    try { checkMagic(full); } catch (e) { return e.message; }
+    if (isPointer(full)) return 'That file is a pointer, not a replay';
+    if (full.length !== p.length) return 'That replay is a different size from the one on the board';
+    if (C.bytesToHex(chainHash(full)) !== C.bytesToHex(p.hash)) return 'That replay does not match the fingerprint on the board';
+    if (p.sha256 && C.bytesToHex(C.sha256(full)) !== C.bytesToHex(p.sha256)) return 'That replay does not match the fingerprint on the board';
+    for (var i = 4; i < HEADER; i++) if (full[i] !== stored[i]) return 'That replay is for a different run';
+    return null;
+  }
+  function sealedError() {
+    var e = new Error('Sealed run: the player kept this replay and it has not been published yet');
+    e.sealed = true;
+    return e;
+  }
+  // A full replay for any stored entry: inline bytes as they are; a pointer resolved through `fetchInscription`
+  // (id, chainHash) → bytes; a seal through `opts.file` (a copy the viewer supplies) or, failing that, an Xtrata
+  // inscription of the same bytes found by its chain hash. Whatever comes back must match the stored fingerprints.
+  async function resolve(bytes, fetchInscription, opts) {
+    opts = opts || {};
+    if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
+    if (!isPointer(bytes)) return bytes;
+    var p = readPointer(bytes), full, why;
+    if (opts.file) {
+      full = opts.file instanceof Uint8Array ? opts.file : new Uint8Array(opts.file);
+      if ((why = mismatch(bytes, full))) throw new Error(why);
+      return full;
+    }
+    var get = fetchInscription || (S.getInscription && function (id, hash) { return S.getInscription(id, hash); });
+    var id = p.id;
+    if (p.kind === 'seal') {
+      var find = opts.findByHash || (S.inscriptionIdByHash && function (h) { return S.inscriptionIdByHash(h); });
+      if (find) { try { id = await find(p.hash); } catch (e) { id = null; } }
+      if (id == null || !get) throw sealedError();
+    }
+    if (!get) throw new Error('This replay is stored as inscription #' + id + ' and cannot be fetched here');
+    full = await get(id, p.hash);
+    if (!(full instanceof Uint8Array)) full = new Uint8Array(full);
+    if ((why = mismatch(bytes, full))) throw new Error('Replay inscription #' + id + ': ' + why.replace(/^That /, 'the '));
+    return full;
+  }
   function record(game, variant, pilot, nonce, input, pointer) {
     var mode = variant ? variant.mode : game.mode;
     return new Recorder({ hash160: pilot.hash160, version: pilot.version, nonce: nonce, gameIdx: gameIndex(game),
@@ -171,25 +349,15 @@
   /* ------------------------------------------------------ decoding */
   async function decode(bytes) {
     if (!(bytes instanceof Uint8Array)) bytes = new Uint8Array(bytes);
-    if (bytes.length < HEADER) throw new Error('Replay too short');
-    if (bytes[0] !== 88 || bytes[1] !== 65 || bytes[2] !== 82) throw new Error('Not an Xtrata Arcade replay');
-    if ((bytes[3] & 127) !== FORMAT) throw new Error('Unsupported replay format ' + (bytes[3] & 127));
-    var dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    var h = { hash160: bytes.slice(4, 24), version: bytes[24], time: !!(bytes[25] & 1), completed: !!(bytes[25] & 2),
-      engine: dv.getUint16(26, true), nonce: dv.getUint32(28, true), steps: dv.getUint32(32, true), score: dv.getUint32(36, true),
-      gameIdx: bytes[40], variantIdx: bytes[41], events: [] };
+    checkMagic(bytes);
+    var fmt = bytes[3] & 127;
+    if (fmt === F_POINTER) throw new Error('This replay is stored as an inscription: resolve it first');
+    if (fmt !== F_EVENTS && fmt !== F_COLUMNS) throw new Error('Unsupported replay format ' + fmt);
+    var h = readHeader(bytes);
     if (h.steps < 1 || h.steps > MAX_STEPS) throw new Error('Run length out of range');
     var body = await unpack(bytes.subarray(HEADER), !!(bytes[3] & 128));
-    var r = new Reader(body), at = 0;
-    while (r.i < body.length) {
-      at += r.varint();
-      var f = r.byte(), e = { at: at, f: f };
-      if (f & 1) e.held = r.varint();
-      if (f & 2) e.hit = r.varint();
-      if (f & 4) { e.dx = unzz(r.varint()); e.dy = unzz(r.varint()); }
-      if (f & 64) { var n = r.byte(); e.sw = []; for (var i = 0; i < n; i++) e.sw.push(SWIPES[r.byte()] || 'tap'); }
-      h.events.push(e);
-    }
+    h.events = (fmt === F_COLUMNS ? eventsFromColumns : eventsFromBody)(body);
+    h.events.forEach(function (e) { if (e.sw) e.sw = e.sw.map(function (k) { return SWIPES[k] || 'tap'; }); });
     return h;
   }
 
@@ -268,6 +436,7 @@
   async function verify(bytes, expect) {
     expect = expect || {};
     try {
+      bytes = await resolve(bytes, expect.fetchInscription, { file: expect.file, findByHash: expect.findByHash });
       var dec = await decode(bytes);
       if (expect.address) {
         var p = pilotFor(expect.address);
@@ -284,13 +453,16 @@
       if (r.completed !== dec.completed) return { ok: false, reason: 'Replay finishes differently' };
       return { ok: true, score: r.score, steps: r.steps, game: game.id };
     } catch (e) {
-      return { ok: false, reason: (e && e.message) || String(e) };
+      return { ok: false, sealed: !!(e && e.sealed), reason: (e && e.message) || String(e) };
     }
   }
 
   XA.replay = {
     ENGINE: ENGINE, HEADER: HEADER, MAX_BYTES: MAX_BYTES, GAME_IDS: GAME_IDS, BUTTONS: BUTTONS,
     boardFor: boardFor, pilotFor: pilotFor, seedFor: seedFor, gameIndex: gameIndex, qpt: qpt,
-    record: record, decode: decode, simulate: simulate, verify: verify, playback: playback
+    record: record, decode: decode, simulate: simulate, verify: verify, playback: playback,
+    MAX_STEPS: MAX_STEPS, CHUNK: CHUNK, MAX_INSCRIBE_CHUNKS: MAX_INSCRIBE_CHUNKS, readHeader: readHeader,
+    isPointer: isPointer, isSeal: isSeal, makeSeal: makeSeal, mismatch: mismatch, makePointer: makePointer, readPointer: readPointer, resolve: resolve,
+    chainHash: chainHash, chunksOf: chunksOf, encodeColumns: encodeColumns, eventsFromColumns: eventsFromColumns, eventsFromBody: eventsFromBody
   };
 })(typeof window !== 'undefined' ? window : globalThis);

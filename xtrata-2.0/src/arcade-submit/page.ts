@@ -5,11 +5,12 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { showContractCall } from '../lib/wallet/connect';
 import {
-  ARCADE_BOARDS, buildSubmitCall, isPilot, parsePayload, PayloadError, verifyPayload,
+  ARCADE_BOARDS, buildSubmitCall, isLongReplay, isPilot, parsePayload, PayloadError, verifyPayload,
   type BoardInfo, type SubmitPayload
 } from './core';
 import { formatArcadeScore } from './arcade-boards';
-import { isPeriodClosed, loadBoard, previewRank } from './reads';
+import { isPeriodClosed, loadBoard, previewRank, quoteReplayFee } from './reads';
+import { postRun } from './long';
 import { signSubmit, submitErrorMessage, SubmitCancelled } from './sign';
 
 const wallet = createStacksWalletAdapter({ appName: 'Xtrata Arcade', appIcon: '/favicon.svg' });
@@ -26,6 +27,7 @@ let rank: { ok: true; value: number } | { ok: false } | null = null;
 let busy = false;
 let submittedTx = '';
 let periodClosed = false;
+let longNote = '';
 
 async function checkPeriod(p: SubmitPayload) { periodClosed = await isPeriodClosed(p); }
 
@@ -60,7 +62,7 @@ function render() {
   else if (rank && rank.ok) rankText = `This run takes rank #${rank.value}.`;
   else if (rank && !rank.ok) rankText = 'Could not check your rank right now. You can still submit; the contract checks again before anything is charged.';
   setText('rank', rankText);
-  if (board) setText('fee', board.fee > 0n ? `Entry fee: ${stx(board.fee)} STX plus the network fee.` : 'No entry fee. You pay only the network fee shown by your wallet.');
+  if (board) setText('fee', (board.fee > 0n ? `Entry fee: ${stx(board.fee)} STX plus the network fee.` : 'No entry fee. You pay only the network fee shown by your wallet.') + longNote);
   el<HTMLButtonElement>('submit').disabled = !canSubmit;
 }
 
@@ -87,6 +89,10 @@ async function start() {
   verifiedScore = v.score;
   setText('rVerified', `${shown(p, v.score)} ✓`);
   status(p.kind === 'xar' ? 'Run checked. The replay is stored on-chain with your score. Connect your wallet to submit it.' : 'Run verified. Connect your wallet to submit it.', 'ok');
+  if (isLongReplay(p)) {
+    longNote = ` Long run: the ${Math.round(p.replay.length / 1024)} KB replay is too big for a score entry, so it is stored as its own Xtrata inscription first (two wallet approvals; an inscription fee plus network fees, higher for a bigger replay).`;
+    quoteReplayFee(p.replay.length).then((f) => { longNote = longNote.replace('an inscription fee', `an inscription fee of ${stx(f)} STX`); render(); }).catch(() => {});
+  }
   try { board = await loadBoard(p.board); } catch (e) { status(e instanceof Error ? e.message : 'Could not read the leaderboard.', 'err'); }
   await checkPeriod(p);
   const s = wallet.getSession();
@@ -110,15 +116,15 @@ el('submit').onclick = async () => {
   if (!payload || verifiedScore == null || !board || busy || submittedTx) return;
   const session = wallet.getSession();
   if (!session.address) return;
-  let call;
-  try { call = buildSubmitCall(payload, verifiedScore, session.address, board); }
+  try { if (!isLongReplay(payload)) buildSubmitCall(payload, verifiedScore, session.address, board); }
   catch (e) { status(e instanceof Error ? e.message : String(e), 'err'); return; }
   busy = true; render();
   status('Opening your wallet…');
   const started = Date.now();
   const waiting = setInterval(() => status(`Still waiting for your wallet (${Math.round((Date.now() - started) / 1000)} s). Check the extension. Do not submit twice.`), 30000);
   try {
-    const txId = await signSubmit(showContractCall, call, (t) => status(t));
+    const { txId } = await postRun({ p: payload, score: verifiedScore, address: session.address, board,
+      sign: (c, onStatus) => signSubmit(showContractCall, c, onStatus), onStatus: (t) => status(t) });
     submittedTx = txId;
     const a = document.createElement('a');
     a.href = `https://explorer.hiro.so/txid/${txId}?chain=mainnet`; a.target = '_blank'; a.rel = 'noopener';

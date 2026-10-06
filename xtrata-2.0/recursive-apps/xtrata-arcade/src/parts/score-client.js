@@ -31,7 +31,8 @@
     parentTokenId: 0,
     boardTtlMs: 45000,
     bridgeTimeoutMs: 170000,
-    appName: 'xtrata-arcade'
+    appName: 'xtrata-arcade',
+    inlineMax: 60000              // replays larger than this are stored as their own inscription
   };
 
   var HEX = '0123456789abcdef';
@@ -249,12 +250,13 @@
     out.push(CFG.network === 'testnet' ? 'https://api.testnet.hiro.so' : 'https://api.mainnet.hiro.so');
     return out;
   }
-  async function callRead(fn, args) {
+  async function callRead(fn, args, contractId) {
     var bases = apiBases();
     var last = null;
+    var target = contractId ? String(contractId).split('.') : [CFG.contractAddress, CFG.contractName];
     for (var i = 0; i < bases.length; i++) {
       var url = bases[i].replace(/\/+$/, '') + '/v2/contracts/call-read/' +
-        CFG.contractAddress + '/' + CFG.contractName + '/' + fn;
+        target[0] + '/' + target[1] + '/' + fn;
       try {
         var res = await fetch(url, {
           method: 'POST',
@@ -352,6 +354,143 @@
     return s ? s.value : null;
   }
 
+  /* ------------------------------------------- long replays as Xtrata inscriptions
+     A replay larger than INLINE_MAX does not fit in a score entry. It is inscribed on the Xtrata core in one
+     transaction (mint-single-tx, up to 32 chunks = 512 KB; the player pays the core fee and the network fee),
+     and the score entry stores a small pointer to it (XA.replay.makePointer). */
+  var INLINE_MAX = 60000, CHUNK = 16384, MAX_INSCRIBE_CHUNKS = 32;
+  var REPLAY_MIME = 'application/octet-stream';
+  var TOKEN_URI = 'https://xvgh3sbdkivby4blejmripeiyjuvji3d4tycym6hgaxalescegjq.arweave.net/vUx9yCNSKhxwKyJZFDyIwmlUo2Pk8CwzxzAuBZJCIZM';
+  function cvList(items) {
+    return '0x0b' + items.length.toString(16).padStart(8, '0') + items.map(function (x) { return String(x).replace(/^0x/i, ''); }).join('');
+  }
+  function chunksOf(bytes) {
+    var out = [];
+    for (var i = 0; i < bytes.length; i += CHUNK) out.push(bytes.subarray(i, Math.min(bytes.length, i + CHUNK)));
+    return out;
+  }
+  function chainHash(bytes) {
+    var h = new Uint8Array(32);
+    chunksOf(bytes).forEach(function (c) { var m = new Uint8Array(32 + c.length); m.set(h, 0); m.set(c, 32); h = sha256(m); });
+    return h;
+  }
+  function needsInscription(bytes) { return bytes.length > (Number(CFG.inlineMax) || INLINE_MAX); }
+  // What storing a long replay costs: { ok, chunks, fee (micro-STX string), tooBig } — fee excludes the network fee.
+  async function quoteReplay(size) {
+    var n = Math.ceil(size / CHUNK);
+    if (n > MAX_INSCRIBE_CHUNKS) return { ok: true, chunks: n, tooBig: true, fee: '0' };
+    try {
+      var cv = await callRead('quote-single-tx-fee', [cvUint(size), cvUint(n)], CFG.contentContractId);
+      var t = cv && cv.type === 'ok' ? cv.value : cv;
+      return { ok: true, chunks: n, tooBig: false, fee: String(t.value['total-fee'].value) };
+    } catch (e) { return { ok: false, chunks: n, tooBig: false, error: (e && e.message) || String(e) }; }
+  }
+  async function inscriptionIdByHash(hash) {
+    var cv = await callRead('get-id-by-hash', [cvBuff(hash)], CFG.contentContractId);
+    var v = cv && cv.type === 'ok' ? cv.value : cv;
+    v = some(v);
+    return v ? Number(v.value) : null;
+  }
+  async function inscriptionMeta(id) {
+    var cv = await callRead('get-inscription-meta', [cvUint(id)], CFG.contentContractId);
+    var v = cv && cv.type === 'ok' ? cv.value : cv;
+    v = some(v);
+    if (!v) return null;
+    var t = v.value;
+    return { chunks: Number(t['total-chunks'].value), size: Number(t['total-size'].value), sealed: !!(t.sealed && t.sealed.value),
+      creator: t.creator ? t.creator.value : '', hash: t['final-hash'] ? bytesToHex(t['final-hash'].value) : '' };
+  }
+  // Bytes of inscription `id`, checked against the expected chain hash: the xtrata.xyz gateway first, the chain as fallback.
+  var inscriptionCache = {};
+  async function getInscription(id, hash) {
+    var want = bytesToHex(hash);
+    var key = id + ':' + want;
+    if (inscriptionCache[key]) return inscriptionCache[key];
+    var p = (async function () {
+      try {
+        var res = await fetch(CFG.runtimeOrigin.replace(/\/+$/, '') + '/i/' + id + '?raw=1', { cache: 'force-cache' });
+        if (res.ok) {
+          var b = new Uint8Array(await res.arrayBuffer());
+          if (bytesToHex(chainHash(b)) === want) return b;
+        }
+      } catch (e) { /* gateway unreachable: read the chain */ }
+      var meta = await inscriptionMeta(id);
+      if (!meta || !meta.sealed) throw err('Replay inscription #' + id + ' is not on chain yet.');
+      var parts = [], got = 0;
+      for (var i = 0; i < meta.chunks; i += 8) {
+        var idx = [];
+        for (var k = i; k < Math.min(meta.chunks, i + 8); k++) idx.push(cvUint(k));
+        var cv = await callRead('get-chunk-batch', [cvUint(id), cvList(idx)], CFG.contentContractId);
+        var list = (cv && cv.type === 'ok' ? cv.value : cv).value;
+        list.forEach(function (it) { var v = it.type === 'some' ? it.value : it; parts.push(v.value); got += v.value.length; });
+      }
+      var out = new Uint8Array(got), o = 0;
+      parts.forEach(function (c) { out.set(c, o); o += c.length; });
+      if (bytesToHex(chainHash(out)) !== want) throw err('Replay inscription #' + id + ' does not match its hash.');
+      return out;
+    })();
+    inscriptionCache[key] = p;
+    p.catch(function () { delete inscriptionCache[key]; });
+    return p;
+  }
+  // Waits until a broadcast transaction is confirmed; throws if it failed.
+  async function waitTx(txid, onTick) {
+    var id = /^0x/.test(txid) ? txid : '0x' + txid;
+    var started = Date.now();
+    while (Date.now() - started < 20 * 60000) {
+      var bases = apiBases();
+      for (var i = 0; i < bases.length; i++) {
+        try {
+          var res = await fetch(bases[i].replace(/\/+$/, '') + '/extended/v1/tx/' + id, { cache: 'no-store' });
+          if (res.status === 404) break;
+          if (!res.ok) continue;
+          var tx = await res.json();
+          if (tx.tx_status === 'success') return tx;
+          if (/^abort|^dropped/.test(String(tx.tx_status))) {
+            throw err('The transaction failed on chain (' + tx.tx_status + (tx.tx_result && tx.tx_result.repr ? ': ' + tx.tx_result.repr : '') + ').');
+          }
+          break;
+        } catch (e) { if (e && /failed on chain/.test(e.message)) throw e; }
+      }
+      if (onTick) try { onTick(Math.round((Date.now() - started) / 1000)); } catch (e) {}
+      await new Promise(function (res) { setTimeout(res, 4000); });
+    }
+    throw err('Still waiting for transaction ' + id.slice(0, 12) + '… Check your wallet history, then post again: nothing is paid twice.');
+  }
+  function base64url(bytes) {
+    var bin = '';
+    for (var i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  // Inside the xtrata.xyz viewer the site signs: hand it the whole run; it stores the replay and posts the score.
+  function hostSubmitLong(input) {
+    var targets = bridgeTargets();
+    if (!targets.length) return Promise.reject(err('No host window.', -32001));
+    var id = 'xa-long-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    var payload = { v: 1, game: 'xtrata-arcade', network: CFG.network, contract: CFG.contractAddress + '.' + CFG.contractName,
+      board: input.board, period: 0, score: input.score, name: input.name, replay: base64url(input.replay) };
+    return new Promise(function (resolve, reject) {
+      var opened = false;
+      var t0 = setTimeout(function () {
+        if (opened) return;
+        root.removeEventListener('message', onMsg);
+        reject(err('This viewer cannot store long replays yet. Open the arcade at xtrata.xyz/arcade to post this run, or save the replay and post it later.', -32601));
+      }, 5000);
+      function onMsg(ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== 'object' || d.id !== id) return;
+        if (d.type === 'xtrata:arcade:submit-opened') { opened = true; clearTimeout(t0); if (input.onProgress) input.onProgress('Confirm in the xtrata.xyz dialog…'); return; }
+        if (d.type !== 'xtrata:arcade:submit-result') return;
+        root.removeEventListener('message', onMsg); clearTimeout(t0);
+        if (d.txId) resolve({ ok: true, txid: d.txId, route: 'host:long' });
+        else if (d.cancelled) reject(err('Cancelled. Nothing was posted.', 4001));
+        else reject(err(String(d.error || 'The score was not posted.')));
+      }
+      root.addEventListener('message', onMsg);
+      targets.forEach(function (t) { try { t.postMessage({ type: 'xtrata:arcade:submit', id: id, payload: payload }, '*'); } catch (e) {} });
+    });
+  }
+
   /* --------------------------------------------------- host bridge */
   var bridge = { token: '', hostOrigin: '', nonce: '', tries: 0, seq: 0, pending: {}, listening: false };
   function bridgeTargets() {
@@ -432,17 +571,59 @@
   function isTopLevel() {
     try { return root.top === root; } catch (e) { return false; }
   }
+  // Every Stacks wallet this top-level page can reach, one entry per wallet (Leather, Xverse).
+  function directProviders() {
+    if (!isTopLevel()) return [];
+    var out = [];
+    var ok = function (p) { return p && typeof p.request === 'function'; };
+    if (ok(root.LeatherProvider)) out.push({ kind: 'leather', name: 'Leather', p: root.LeatherProvider });
+    var xv = root.XverseProviders || root.xverseProviders;
+    if (xv && ok(xv.BitcoinProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.BitcoinProvider });
+    else if (xv && ok(xv.StacksProvider)) out.push({ kind: 'xverse', name: 'Xverse', p: xv.StacksProvider });
+    // A bare window.StacksProvider belongs to whichever wallet claimed it last: only use it when nothing else answered.
+    if (!out.length && ok(root.StacksProvider)) out.push({ kind: 'leather', name: 'Stacks wallet', p: root.StacksProvider });
+    return out;
+  }
+  // The wallet the player picked when connecting; before that, any reachable one (for "can this page sign?").
   function directProvider() {
-    if (!isTopLevel()) return null;
-    if (root.LeatherProvider && typeof root.LeatherProvider.request === 'function') {
-      return { kind: 'leather', p: root.LeatherProvider };
-    }
-    var x = root.XverseProviders && root.XverseProviders.BitcoinProvider;
-    if (x && typeof x.request === 'function') return { kind: 'xverse', p: x };
-    var xs = (root.XverseProviders && root.XverseProviders.StacksProvider) || (root.xverseProviders && root.xverseProviders.StacksProvider);
-    if (xs && typeof xs.request === 'function') return { kind: 'xverse', p: xs };
-    if (root.StacksProvider && typeof root.StacksProvider.request === 'function') return { kind: 'leather', p: root.StacksProvider };
-    return null;
+    var all = directProviders();
+    if (!all.length) return null;
+    return all.filter(function (d) { return d.kind === state.via; })[0] || all[0];
+  }
+  // Several wallets installed: ask which one, every time a wallet is connected (never pick one silently).
+  function chooseProvider(all) {
+    if (all.length < 2) return Promise.resolve(all[0] || null);
+    return new Promise(function (resolve) {
+      var doc = root.document;
+      var wrap = doc.createElement('div');
+      wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-modal', 'true'); wrap.setAttribute('aria-label', 'Choose a wallet');
+      wrap.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:rgba(3,4,12,.72);font:15px/1.4 system-ui,sans-serif';
+      var card = doc.createElement('div');
+      card.style.cssText = 'width:min(340px,calc(100% - 32px));padding:20px;border-radius:16px;border:1px solid rgba(120,140,255,.45);background:#0c1230;color:#eef4ff;box-shadow:0 20px 60px rgba(0,0,0,.6)';
+      var h = doc.createElement('div');
+      h.textContent = 'Connect with which wallet?';
+      h.style.cssText = 'font-weight:800;font-size:18px;margin-bottom:12px';
+      card.appendChild(h);
+      function done(v) { root.removeEventListener('keydown', onKey, true); wrap.remove(); resolve(v); }
+      function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(null); } }
+      all.forEach(function (d, i) {
+        var b = doc.createElement('button');
+        b.type = 'button'; b.textContent = d.name;
+        b.style.cssText = 'display:block;width:100%;margin:0 0 8px;padding:12px 14px;border-radius:10px;border:1px solid rgba(57,230,255,.5);background:rgba(57,230,255,.08);color:#eef4ff;font:700 15px system-ui,sans-serif;cursor:pointer;text-align:left';
+        b.onclick = function () { done(d); };
+        card.appendChild(b);
+        if (i === 0) setTimeout(function () { try { b.focus(); } catch (e) {} }, 0);
+      });
+      var c = doc.createElement('button');
+      c.type = 'button'; c.textContent = 'Cancel';
+      c.style.cssText = 'display:block;width:100%;margin-top:4px;padding:10px;border-radius:10px;border:0;background:transparent;color:#9fb0d8;font:600 14px system-ui,sans-serif;cursor:pointer';
+      c.onclick = function () { done(null); };
+      card.appendChild(c);
+      wrap.addEventListener('click', function (e) { if (e.target === wrap) done(null); });
+      wrap.appendChild(card);
+      (doc.body || doc.documentElement).appendChild(wrap);
+      root.addEventListener('keydown', onKey, true);
+    });
   }
   function unwrap(r) {
     if (r && r.error) throw err(r.error.message || 'Wallet error', r.error.code);
@@ -486,7 +667,8 @@
       result = await bridgeRequest('wallet_connect', { app: CFG.appName }, 120000);
       state.via = 'host';
     } else if (s.route === 'direct') {
-      var d = directProvider();
+      var d = await chooseProvider(directProviders());
+      if (!d) throw err('Wallet connection cancelled.', 4001);
       if (d.kind === 'leather') result = unwrap(await d.p.request('getAddresses'));
       else result = unwrap(await d.p.request('wallet_connect', {
         addresses: ['stacks'], message: 'Connect to Xtrata Arcade to post high scores.' }));
@@ -549,7 +731,13 @@
     if (!/^[a-z0-9_-]{3,24}$/.test(board)) throw err('Invalid board id.');
     if (!(score > 0) || score > Number.MAX_SAFE_INTEGER) throw err('Score must be a positive whole number.');
     if (name.length < 3) throw err('Name needs 3–12 letters or numbers.');
-    if (!(replay instanceof Uint8Array) || !replay.length || replay.length > 65536) throw err('This run has no replay to post.');
+    if (!(replay instanceof Uint8Array) || !replay.length) throw err('This run has no replay to post.');
+    var progress = typeof input.onProgress === 'function' ? input.onProgress : function () {};
+    var seal = !!input.seal;            // keep the replay, post only its fingerprint (any size, one approval)
+    var long = !seal && needsInscription(replay);
+    if (long && Math.ceil(replay.length / CHUNK) > MAX_INSCRIBE_CHUNKS) {
+      throw err('This replay is ' + Math.round(replay.length / 1024) + ' KB, more than the 512 KB a single inscription can hold. Save the replay so the run is kept.');
+    }
 
     var s = status();
     if (s.route === 'none') {
@@ -568,8 +756,46 @@
     if (!fee.enabled) throw err('This board is closed.');
 
     var contract = CFG.contractAddress + '.' + CFG.contractName;
-    var args = [cvAscii(board), cvUint(0), cvUint(score), cvAscii(name), cvBuff(replay)];
     var r;
+
+    if (long && s.route === 'host') return hostSubmitLong({ board: board, score: score, name: name, replay: replay, onProgress: progress });
+
+    var stored = replay, replayId = null, minted = false;
+    if (seal) {
+      stored = root.XA.replay.makeSeal(replay);
+      progress('Approve in your wallet: post your score with your replay\'s fingerprint.');
+    }
+    if (long) {
+      // 1. The full replay as its own inscription (re-used if these exact bytes are already on chain).
+      var d0 = directProvider();
+      var hash = chainHash(replay);
+      replayId = await inscriptionIdByHash(hash).catch(function () { return null; });
+      if (replayId === null) {
+        var q = await quoteReplay(replay.length);
+        if (!q.ok) throw err('Could not read the inscription fee right now. Try again in a moment.');
+        progress('Approve 1 of 2 in your wallet: store your ' + Math.round(replay.length / 1024) + ' KB replay as an inscription.');
+        var chunkArgs = chunksOf(replay).map(function (c) { return cvBuff(c); });
+        var margs = [cvBuff(hash), cvAscii(REPLAY_MIME), cvUint(replay.length), cvList(chunkArgs), cvAscii(TOKEN_URI)]
+          .map(function (a) { return String(a).replace(/^0x/i, ''); });
+        var core = CFG.contentContractId;
+        var mp = { contract: core, functionName: 'mint-single-tx', functionArgs: margs, arguments: margs,
+          postConditionMode: 'deny', postConditions: [stxPostConditionHex(address, q.fee)] };
+        if (d0.kind === 'leather') mp.network = CFG.network;
+        var mr = unwrap(await d0.p.request('stx_callContract', mp));
+        var mtx = txidOf(mr); minted = true;
+        if (!mtx) throw err('The wallet did not return a transaction id for the replay.');
+        progress('Storing your replay on chain… (this takes a block or two)');
+        await waitTx(mtx, function (sec) { progress('Storing your replay on chain… ' + sec + ' s'); });
+        for (var tries = 0; tries < 20 && replayId === null; tries++) {
+          replayId = await inscriptionIdByHash(hash).catch(function () { return null; });
+          if (replayId === null) await new Promise(function (res) { setTimeout(res, 3000); });
+        }
+        if (replayId === null) throw err('The replay was stored but its inscription id is not visible yet. Post again in a minute: it will not be stored twice.');
+      }
+      stored = root.XA.replay.makePointer(replay, replayId, hash);
+      progress((minted ? 'Approve 2 of 2' : 'Your replay is already stored as #' + replayId + '. Approve') + ' in your wallet: post your score.');
+    }
+    var args = [cvAscii(board), cvUint(0), cvUint(score), cvAscii(name), cvBuff(stored)];
 
     if (s.route === 'host') {
       // Generic contract call (the secure /runtime page supports this).
@@ -605,7 +831,7 @@
     };
     if (d.kind === 'leather') params.network = CFG.network;
     r = unwrap(await d.p.request('stx_callContract', params));
-    return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind };
+    return { ok: true, txid: txidOf(r), route: 'direct:' + d.kind, replayId: replayId, sealed: seal };
   }
 
   /* ------------------------------------------------------ local PBs */
@@ -647,6 +873,11 @@
     getFee: getFee,
     getBoardInfo: getBoardInfo,
     getReplay: getReplay,
+    getInscription: getInscription,
+    inscriptionIdByHash: inscriptionIdByHash,
+    quoteReplay: quoteReplay,
+    needsInscription: needsInscription,
+    INLINE_MAX: INLINE_MAX,
     status: status,
     onChange: function (fn) { subs.push(fn); fn(status()); },
     connect: connect,

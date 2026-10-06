@@ -56,7 +56,7 @@ describe('arcade boards', () => {
     const timeAsBase = xar('xa_block_drop_sprint', 900);
     expect((await verifyPayload(parsePayload(link(payload('xa_block_drop', timeAsBase, 900))))).ok).toBe(false);  // time run on score board
     expect((await verifyPayload(parsePayload(link(payload('xa_block_drop_sprint', xar('xa_block_drop_sprint', 900, { done: false }), 900))))).ok).toBe(false);
-    expect((await verifyPayload(parsePayload(link(payload('xa_neon_snake', xar('xa_neon_snake', 5, { steps: 200000 }), 5))))).ok).toBe(false);
+    expect((await verifyPayload(parsePayload(link(payload('xa_neon_snake', xar('xa_neon_snake', 5, { steps: 900000 }), 5))))).ok).toBe(false);
   });
 
   it('accepts a deflate-compressed body and refuses a damaged one', async () => {

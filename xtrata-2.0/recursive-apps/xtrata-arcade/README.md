@@ -72,6 +72,34 @@ The launch canary does all of this on chain, in order and checked: see
 
 This release inscribes only `engine` (~150 KB) + `hall` (~190 KB) + the parent.
 
+## v1.4.2
+
+- **No false hope after a practice run.** A practice run can never be posted (its replay is not
+  bound to a wallet). Game over used to say "That run makes the top 10 at #N. Post it on-chain…"
+  and offer Connect wallet; connecting then changed nothing on screen. Now it says the run would
+  have been #N but practice runs can't be posted, connects in place ("Check your wallet…"), shows
+  "✓ Connected as …" as soon as the wallet answers (also if it connects from the hall's button),
+  and offers **▶ Play a ranked run**.
+- **Wallet choice.** On a top-level page (`/i/<id>`) the arcade used to take Leather whenever it was
+  installed, without asking. With more than one wallet present, Connect now asks "Connect with which
+  wallet?" (Leather / Xverse) every time, and later signing uses the wallet picked.
+
+Engine pack only (`arcade-room.js`, `score-client.js`).
+
+## v1.5.0
+
+Any score can be posted, however long the run.
+
+- **Smaller replays.** Format 2 stores events in columns (step gaps, buttons, pointer moves as deltas) before deflate: about 18% smaller than format 1 on the 52 mainnet replays. Formats 1 and 2 both verify.
+- **Four-hour runs.** `MAX_STEPS` is 864,000 (was 30 minutes).
+- **Long runs, option 1: inscribe.** A replay over 60,000 bytes is inscribed on the Xtrata core with `mint-single-tx` (up to 512 KB, one transaction). The score entry stores a small format-3 pointer (`0x01`, inscription id, chain hash, length). The pointer keeps the run's header, so the contract's pilot check still passes. Two wallet approvals; the cost (inscription fee plus network fee) is shown first. An existing inscription of the same bytes is re-used.
+- **Long runs, option 2: seal.** The score entry stores the header plus fingerprints (`0x02`, Xtrata chain hash, sha256, length). The replay file is saved to the player's device and a copy kept in the browser. One approval, no inscription. Anyone holding the file can check it against the board ("🔒 sealed" on the entry); if the same bytes are ever inscribed on Xtrata, the chain hash finds them and the run plays from the chain. Runs over 512 KB can only be sealed.
+- **Nothing is lost.** Every Top 10 run is kept locally until posted; "post a saved run" posts it later from a file.
+- **No contract change.** `xtrata-arcade-scores-v2` is unchanged. `resolve()` checks size, chain hash and header bytes 4..44 before trusting any replay it fetched.
+
+Site: `src/arcade-submit/long.ts` (`postRun`), bridge payload limit 800 KB, seals accepted by `verifyArcade`.
+Engine pack changed (`arcade-replay.js`, `score-client.js`, `arcade-room.js`) plus `hall.js`. Test: `tests/long-replay.test.cjs` (20 checks on a mock chain).
+
 ## Tests
 
 ```bash

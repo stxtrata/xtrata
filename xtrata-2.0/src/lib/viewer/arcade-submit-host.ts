@@ -189,7 +189,14 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       note.textContent = 'Checking your rank on-chain…';
       const rank = await logic.previewRank(parsed, verified, address);
       if (settled) return;
-      const fee = board.fee > 0n ? `Entry fee ${stx(board.fee)} STX plus the network fee.` : 'No entry fee: you pay only the network fee your wallet shows.';
+      let fee = board.fee > 0n ? `Entry fee ${stx(board.fee)} STX plus the network fee.` : 'No entry fee: you pay only the network fee your wallet shows.';
+      if (logic.isLongReplay(parsed)) {
+        // Long run: the replay is stored as its own Xtrata inscription first, then the score points at it.
+        let core = 'a small inscription fee';
+        try { core = `an inscription fee of ${stx(await logic.quoteReplayFee(parsed.replay.length))} STX`; } catch { /* keep the generic wording */ }
+        if (settled) return;
+        fee = `Long run: the ${Math.round(parsed.replay.length / 1024)} KB replay is too big for a score entry, so it is stored as its own Xtrata inscription first (${core} plus network fees, higher for a bigger replay). Two wallet approvals: store the replay, then post the score.` + (board.fee > 0n ? ` Entry fee ${stx(board.fee)} STX.` : '');
+      }
       if (rank === 0) {
         note.textContent = 'The contract would refuse this score right now: it is not in the Top 10, or you already hold an equal or better entry.';
         setPrimary('Submit', false, null);
@@ -215,8 +222,7 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       if (!address || signing) return;
       if (!nameOk()) { setStatus('Names are 3–12 letters, numbers, spaces, dots, dashes or underscores.', 'err'); nameInput.focus(); return; }
       parsed = { ...parsed, name: nameInput.value.trim() };
-      let call;
-      try { call = logic.buildSubmitCall(parsed, verified, address, board); }
+      try { if (!logic.isLongReplay(parsed)) logic.buildSubmitCall(parsed, verified, address, board); }
       catch (e) { setStatus(e instanceof Error ? e.message : String(e), 'err'); return; }
       signing = true;
       clearTimeout(idle);
@@ -224,7 +230,8 @@ export function runArcadeSubmit(host: Window, payload: Record<string, unknown>, 
       setPrimary('Waiting for wallet…', false, null);
       setStatus('Opening your wallet…');
       try {
-        const txId = await logic.signSubmit(ports.showContractCall, call, (t) => setStatus(t));
+        const { txId } = await logic.postRun({ p: parsed, score: verified, address, board,
+          sign: (c, onStatus) => logic.signSubmit(ports.showContractCall, c, onStatus), onStatus: (t) => setStatus(t) });
         signing = false;
         settle({ kind: 'tx', txId });
         setStatus(`Submitted. Your score appears on the board once transaction ${txId.slice(0, 12)}… confirms (usually a few minutes).`, 'ok');
