@@ -2330,7 +2330,10 @@ button:disabled {
 .sfp-tine .sfp-body,
 .sfp-kit .sfp-body,
 .sfp-tonewheel .sfp-body,
-.sfp-modal .sfp-body {
+.sfp-modal .sfp-body,
+.sfp-winds .sfp-body,
+.sfp-morph .sfp-body,
+.sfp-texture .sfp-body {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 .sfp-jibass,
@@ -2348,7 +2351,10 @@ button:disabled {
 .sfp-tine,
 .sfp-kit,
 .sfp-tonewheel,
-.sfp-modal {
+.sfp-modal,
+.sfp-winds,
+.sfp-morph,
+.sfp-texture {
   width: 1140px;
 }
 .sfp-jibass .sfp-radio,
@@ -2360,7 +2366,10 @@ button:disabled {
 .sfp-tine .sfp-radio,
 .sfp-kit .sfp-radio,
 .sfp-tonewheel .sfp-radio,
-.sfp-modal .sfp-radio {
+.sfp-modal .sfp-radio,
+.sfp-winds .sfp-radio,
+.sfp-morph .sfp-radio,
+.sfp-texture .sfp-radio {
   flex-wrap: wrap;
 }
 .sfp-kiln .sfp-opt,
@@ -2383,7 +2392,15 @@ button:disabled {
 .sfp-tine .tn-char,
 .sfp-modal .md-body,
 .sfp-modal .md-res,
-.sfp-ensemble .en-filter {
+.sfp-ensemble .en-filter,
+.sfp-winds .wd-model,
+.sfp-morph .mp-ta,
+.sfp-morph .mp-tb,
+.sfp-morph .mp-env,
+.sfp-morph .mp-morph,
+.sfp-morph .mp-fold,
+.sfp-texture .tx-filter,
+.sfp-texture .tx-grain {
   grid-column: span 2;
 }
 .sfp-tonewheel .tw-bars .sfp-row {
@@ -2398,7 +2415,10 @@ button:disabled {
 .sfp-tonewheel .sfp-opt,
 .sfp-modal .sfp-opt,
 .sfp-tine .sfp-opt,
-.sfp-kit .sfp-opt {
+.sfp-kit .sfp-opt,
+.sfp-winds .sfp-opt,
+.sfp-morph .sfp-opt,
+.sfp-texture .sfp-opt {
   flex: 1 1 56px;
 }
 
