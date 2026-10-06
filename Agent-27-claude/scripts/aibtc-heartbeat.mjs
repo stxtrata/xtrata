@@ -14,7 +14,7 @@ const { HDKey } = require('@scure/bip32');
 const { hashSha256Sync } = require(`${MCP}/@stacks/encryption`);
 const btc = await import(`${MCP}/@scure/btc-signer/index.js`);
 
-const MNEMONIC = 'capital process seat brief true sketch error desk arena salt maple three grape endless vessel science feel such electric turn angle cat right boring';
+const MNEMONIC = process.env.AGENT27_MNEMONIC;
 const BTC_ADDRESS = 'bc1qj5uxfxkukjvh9d3s8acuh0x9yfnppea7ufm938';
 
 // BTC key derivation: m/84'/0'/0'/0/0

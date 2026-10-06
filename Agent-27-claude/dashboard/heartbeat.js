@@ -5,7 +5,7 @@
 const crypto = require('crypto');
 
 const BTC_ADDRESS = 'bc1qj5uxfxkukjvh9d3s8acuh0x9yfnppea7ufm938';
-const MNEMONIC = 'capital process seat brief true sketch error desk arena salt maple three grape endless vessel science feel such electric turn angle cat right boring';
+const MNEMONIC = process.env.AGENT27_MNEMONIC;
 const HEARTBEAT_URL = 'https://aibtc.com/api/heartbeat';
 const POLL_INTERVAL = 5 * 60 * 1000; // 5 minutes
 
