@@ -9,9 +9,10 @@ import {
   HOMEPAGE_PLAY,
   HOMEPAGE_PROGRAMMES,
   HOMEPAGE_STRIP_SLIDES,
-  HOMEPAGE_WALL,
+  HOMEPAGE_WALL_ROTATION,
   validateHomepageContent
 } from './homepage-content.js';
+import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
 const HOME_MOUNT_IDS = [
@@ -433,61 +434,191 @@ const wallCaption = (item) => {
   return caption;
 };
 
+const WALL_STORE_KEY = 'xtrata:home:wall:v1';
+let wallState = null;
+let wallTimer = null;
+let wallBusy = false;
+let wallSongPool = [];
+
+const fallbackSongPool = () =>
+  HOMEPAGE_MUSIC.fallback.map(({ id, title, artist }) => ({ id, title, artist }));
+
+const readWallRecent = () => {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(WALL_STORE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeWallRecent = (slots) => {
+  try {
+    const bigs = ['big-a', 'big-b'].map((name) => slots[name]).filter((tile) => tile && tile.id !== HOMEPAGE_WALL_ROTATION.pinned.id);
+    window.localStorage.setItem(
+      WALL_STORE_KEY,
+      JSON.stringify({
+        big: bigs[0]?.id || null,
+        tall: slots.tall?.id || null,
+        wide: slots.wide?.id || null,
+        songs: ['song-1', 'song-2'].map((name) => slots[name]?.tokenId).filter(Boolean)
+      })
+    );
+  } catch {
+    // Private mode or blocked storage: the wall just will not remember the last visit.
+  }
+};
+
+const buildWallTile = (item, i = 99) => {
+  const classes = `home-tile home-tile--${item.kind} home-tile--${item.size || 'one'} home-tone--${item.tone || 'plain'}${item.scrim ? ' home-tile--scrim' : ''}`;
+  let node;
+  if (item.kind === 'song') {
+    const song = { id: item.tokenId, title: item.title, artist: item.subtitle };
+    node = songButton(song, classes, [
+      image(HOMEPAGE_MUSIC.artworkUrl(item.tokenId), '', 'home-tile__img', { eager: i < 4 }),
+      playBadge(),
+      wallCaption(item)
+    ]);
+  } else if (item.kind === 'radio') {
+    node = radioButton(classes, `${item.title}: play Xtrata Radio`, item.href, `wall:${item.id}`, [
+      image(item.image, item.title, 'home-tile__img', { eager: i < 4 }),
+      playBadge(),
+      wallCaption(item)
+    ]);
+  } else {
+    node = actionLink(item.href, '', classes, `wall:${item.id}`, { newTab: item.newTab });
+    if (item.kind === 'chess') {
+      const foot = element('span', 'home-tile__chess-foot');
+      foot.append(wallCaption(item), element('span', 'home-tile__cta', `${item.cta} →`));
+      node.append(createChessBoard('home-chess--wall'), foot);
+    } else if (item.kind === 'twins') {
+      // One twin from each new Forever Twins collection, under a single link.
+      const strip = element('span', 'home-tile__twins');
+      item.twins.forEach((twin) => {
+        const cell = element('span', 'home-tile__twin');
+        cell.append(
+          image(twin.image, `${twin.name} Forever Twin #${twin.tokenId}`, 'home-tile__twin-img', { eager: i < 4 }),
+          element('span', 'home-tile__twin-name', twin.name)
+        );
+        strip.append(cell);
+      });
+      node.append(strip, wallCaption(item));
+    } else {
+      const img = image(item.image, item.title, 'home-tile__img', { eager: i < 4, position: item.position });
+      if (item.pixelated) img.classList.add('is-pixelated');
+      node.append(img, wallCaption(item));
+      if (item.listen) node.append(playBadge());
+      if (item.badge) node.append(element('span', 'home-tile__badge', item.badge));
+    }
+  }
+  node.dataset.wallSlot = item.slot || '';
+  node.dataset.wallId = item.id;
+  return node;
+};
+
+const wallTileImages = (item) => {
+  if (item.kind === 'song') return [HOMEPAGE_MUSIC.artworkUrl(item.tokenId)];
+  if (item.kind === 'twins') return item.twins.map((twin) => twin.image);
+  return item.image ? [item.image] : [];
+};
+
+// Load a tile's art before it fades in, so a swap never shows an empty box. Gives up after 2.5s.
+const preloadWallTile = (item) =>
+  Promise.race([
+    Promise.all(
+      wallTileImages(item).map(
+        (src) =>
+          new Promise((resolve) => {
+            const probe = new Image();
+            probe.onload = resolve;
+            probe.onerror = resolve;
+            probe.src = src;
+          })
+      )
+    ),
+    new Promise((resolve) => window.setTimeout(resolve, 2500))
+  ]);
+
+const wallMotionAllowed = () => !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+const scheduleWallSwap = () => {
+  window.clearTimeout(wallTimer);
+  wallTimer = null;
+  if (!wallState || !wallMotionAllowed()) return;
+  const [min, max] = HOMEPAGE_WALL_ROTATION.intervalMs;
+  wallTimer = window.setTimeout(runWallSwap, min + Math.random() * (max - min));
+};
+
+const wallOnScreen = (mount) => {
+  if (document.hidden) return false;
+  const box = mount.getBoundingClientRect();
+  return box.bottom > 0 && box.top < window.innerHeight;
+};
+
+// One tile at a time fades to something new. It leaves a tile alone while the visitor is hovering
+// over it, has it focused, or it is a song that is playing, and does nothing in a hidden tab.
+const runWallSwap = async () => {
+  const mount = document.getElementById('featuredObjectStage');
+  if (!mount || !wallState || wallBusy) {
+    scheduleWallSwap();
+    return;
+  }
+  if (wallOnScreen(mount)) {
+    const blocked = [...mount.children]
+      .filter((node) => node.classList.contains('is-playing') || node.matches(':hover') || node.contains(document.activeElement))
+      .map((node) => node.dataset.wallSlot);
+    const swap = pickWallSwap({
+      rotation: HOMEPAGE_WALL_ROTATION,
+      slots: wallState.slots,
+      songs: wallSongPool,
+      lastSlot: wallState.lastSlot,
+      blocked
+    });
+    const current = swap && mount.querySelector(`[data-wall-slot="${swap.slot}"]`);
+    if (swap && current) {
+      wallBusy = true;
+      await preloadWallTile(swap.tile);
+      // The visitor may have reached for the tile while its replacement was loading.
+      if (wallState && current.isConnected && !current.matches(':hover') && !current.classList.contains('is-playing')) {
+        const incoming = buildWallTile(swap.tile);
+        incoming.classList.add('is-entering');
+        current.classList.add('is-leaving');
+        await new Promise((resolve) => window.setTimeout(resolve, HOMEPAGE_WALL_ROTATION.fadeMs));
+        if (wallState && current.isConnected) {
+          current.replaceWith(incoming);
+          wallState.slots[swap.slot] = swap.tile;
+          wallState.lastSlot = swap.slot;
+          window.requestAnimationFrame(() => window.requestAnimationFrame(() => incoming.classList.remove('is-entering')));
+          syncSongButtons();
+        }
+      }
+      wallBusy = false;
+    }
+  }
+  scheduleWallSwap();
+};
+
 const renderWall = () => {
   const mount = document.getElementById('featuredObjectStage');
   if (!mount) {
     return;
   }
-  mount.replaceChildren();
-  HOMEPAGE_WALL.forEach((item, i) => {
-    const classes = `home-tile home-tile--${item.kind} home-tile--${item.size || 'one'} home-tone--${item.tone || 'plain'}`;
-    if (item.kind === 'song') {
-      const song = { id: item.tokenId, title: item.title, artist: item.subtitle };
-      mount.append(
-        songButton(song, classes, [
-          image(HOMEPAGE_MUSIC.artworkUrl(item.tokenId), '', 'home-tile__img', { eager: i < 4 }),
-          playBadge(),
-          wallCaption(item)
-        ])
-      );
-      return;
+  window.clearTimeout(wallTimer);
+  wallBusy = false;
+  wallSongPool = fallbackSongPool();
+  // A fresh mix on every load. The arcade always holds one of the two big slots.
+  const { slots, order } = pickWall({ rotation: HOMEPAGE_WALL_ROTATION, songs: wallSongPool, recent: readWallRecent() });
+  wallState = { slots, lastSlot: null };
+  mount.replaceChildren(...order.map((item, i) => buildWallTile(item, i)));
+  writeWallRecent(slots);
+  // Later swaps can draw songs from the whole live catalogue, not just the curated eight.
+  void loadCatalogue().then(({ ok, tracks }) => {
+    const withArt = tracks.filter((track) => track.hasArt);
+    if (ok && wallState && withArt.length >= 8) {
+      wallSongPool = withArt.slice(0, 60).map(({ id, title, artist }) => ({ id, title, artist }));
     }
-    if (item.kind === 'radio') {
-      mount.append(
-        radioButton(classes, `${item.title}: play Xtrata Radio`, item.href, `wall:${item.id}`, [
-          image(item.image, item.title, 'home-tile__img', { eager: i < 4 }),
-          playBadge(),
-          wallCaption(item)
-        ])
-      );
-      return;
-    }
-    const tile = actionLink(item.href, '', classes, `wall:${item.id}`, { newTab: item.newTab });
-    if (item.kind === 'chess') {
-      const foot = element('span', 'home-tile__chess-foot');
-      foot.append(wallCaption(item), element('span', 'home-tile__cta', `${item.cta} →`));
-      tile.append(createChessBoard('home-chess--wall'), foot);
-    } else if (item.kind === 'twins') {
-      // One twin from each new Forever Twins collection, side by side under a single link.
-      const strip = element('span', 'home-tile__twins');
-      item.twins.forEach((twin) => {
-        const cell = element('span', 'home-tile__twin');
-        cell.append(
-          image(twin.image, `${twin.name} Forever Twin #${twin.tokenId}`, 'home-tile__twin-img', { eager: true }),
-          element('span', 'home-tile__twin-name', twin.name)
-        );
-        strip.append(cell);
-      });
-      tile.append(strip, wallCaption(item));
-    } else {
-      const img = image(item.image, item.title, 'home-tile__img', { eager: i < 4, position: item.position });
-      if (item.pixelated) img.classList.add('is-pixelated');
-      tile.append(img, wallCaption(item));
-      if (item.listen) tile.append(playBadge());
-      if (item.badge) tile.append(element('span', 'home-tile__badge', item.badge));
-    }
-    mount.append(tile);
   });
+  scheduleWallSwap();
 };
 
 // ---------------------------------------------------------------------------
@@ -931,6 +1062,9 @@ const installActionTracking = () => {
 const clearHomepage = () => {
   window.clearInterval(stripTimer);
   stripTimer = null;
+  window.clearTimeout(wallTimer);
+  wallTimer = null;
+  wallState = null;
   HOME_MOUNT_IDS.forEach((id) => {
     const node = document.getElementById(id);
     if (node) {

@@ -149,30 +149,66 @@ export const HOMEPAGE_FOREVER_TWINS = Object.freeze([
   foreverTwin('bitcoin-monkeys', 'Bitcoin Monkeys', 2, 3113)
 ]);
 
-// The Living Wall beside the hero headline. Order matters: the grid is
-// 4 columns x 4 rows on desktop (16 cells) and the spans below fill it exactly.
-//   arcade + astro blaster: 2x2 each   chess: 1x2   two songs: 1x1
-//   audionauts: 2x1   Forever Twins: 1x2 (three new twins stacked). Timeloop lives in the Play row.
+// The Living Wall beside the hero headline. Every tile is written once here, without a size.
+// wall-rotation.js drops them into the wall's slots when the page loads (and swaps some while
+// the visitor is there). The grid is 4 columns x 4 rows on desktop (16 cells) and the slots fill
+// it exactly: two big 2x2, chess 1x2, a tall 1x2, a wide 2x1 and two songs 1x1.
+const WALL_ARCADE = Object.freeze({
+  // Newest headline: the whole 3D arcade hall. Opens full screen in a new tab. Pinned to a big slot.
+  id: 'xtrata-arcade', kind: 'image', tone: 'arcade',
+  eyebrow: 'Brand new · 21 games', title: 'Xtrata Arcade',
+  subtitle: 'Walk a neon 3D hall of cabinets, press START, and put your high score on Bitcoin.',
+  image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', badge: '#3111', cta: 'Walk in',
+  href: '/i/3111', newTab: true
+});
+const WALL_ASTRO = Object.freeze({
+  id: 'astro-blaster', kind: 'image', tone: 'cyan',
+  eyebrow: 'New · play', title: 'Astro Blaster 3', subtitle: 'Every top score lives on Bitcoin.',
+  image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
+  href: '/i/3075', newTab: true
+});
+const WALL_TIMELOOP = Object.freeze({
+  id: 'timeloop', kind: 'image', tone: 'paper',
+  eyebrow: 'Play · mystery', title: 'Timeloop Detective', subtitle: 'Solve the Meridian heist.',
+  image: '/home/wall/timeloop-3047.webp', position: 'top', badge: '#3047',
+  href: '/i/3047', newTab: true
+});
+const WALL_KP_LOOPS = Object.freeze({
+  id: 'kp-loops', kind: 'image', tone: 'pink',
+  eyebrow: 'Play · no wallet', title: 'KP Loops', subtitle: "Kieron Pepper's drum loops. Layer them and play.",
+  // The poster has its own small print, so the caption gets a stronger scrim over it.
+  image: '/home/kp-loops.webp', position: 'left center', scrim: true,
+  href: '/kp-loops/#kp-loops'
+});
+const WALL_AUDIONAUTS = Object.freeze({
+  // Live: opens the collection page. Before the mint: the original Audionauts ordinal.
+  id: 'audionauts-stream', kind: 'image', tone: 'teal',
+  eyebrow: AUDIONAUTS_LIVE ? 'Minting now' : `Mints ${AUDIONAUTS_WHEN}`, title: 'Audionauts',
+  subtitle: AUDIONAUTS_LIVE ? 'Mint yours now →' : 'Listen to the original music, streamed from L1 →',
+  image: '/home/wall/audionauts-3059.webp',
+  // Once the mint is live every tile and banner goes to the collection page.
+  href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
+});
+const WALL_FOREVER_TWINS = Object.freeze({
+  // The Forever Twins campaign: one twin from each of the three newest collections.
+  id: 'forever-twins', kind: 'twins', tone: 'orange',
+  eyebrow: 'New · Forever Twins', title: 'Three new twins',
+  subtitle: 'Preserve yours',
+  twins: HOMEPAGE_FOREVER_TWINS,
+  href: '/forever-twins/'
+});
+const WALL_CHESS = Object.freeze({
+  id: 'chess', kind: 'chess', size: 'tall', tone: 'amber',
+  eyebrow: 'Play', title: 'On-Chain Chess', cta: 'Play free',
+  href: '/i/3072', newTab: true, tokenId: 3072
+});
+
+// The default wall: the same tiles in a fixed order. It is the content contract (tests, validation)
+// and what a visitor would see with no rotation. Order matters: the grid flows densely.
 export const HOMEPAGE_WALL = Object.freeze([
-  Object.freeze({
-    // Newest headline: the whole 3D arcade hall. Opens full screen in a new tab.
-    id: 'xtrata-arcade', kind: 'image', size: 'big', tone: 'arcade',
-    eyebrow: 'Brand new · 21 games', title: 'Xtrata Arcade',
-    subtitle: 'Walk a neon 3D hall of cabinets, press START, and put your high score on Bitcoin.',
-    image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', badge: '#3111', cta: 'Walk in',
-    href: '/i/3111', newTab: true
-  }),
-  Object.freeze({
-    id: 'astro-blaster', kind: 'image', size: 'big', tone: 'cyan',
-    eyebrow: 'New · play', title: 'Astro Blaster 3', subtitle: 'Every top score lives on Bitcoin.',
-    image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
-    href: '/i/3075', newTab: true
-  }),
-  Object.freeze({
-    id: 'chess', kind: 'chess', size: 'tall', tone: 'amber',
-    eyebrow: 'Play', title: 'On-Chain Chess', cta: 'Play free',
-    href: '/i/3072', newTab: true, tokenId: 3072
-  }),
+  Object.freeze({ ...WALL_ARCADE, size: 'big' }),
+  Object.freeze({ ...WALL_ASTRO, size: 'big' }),
+  WALL_CHESS,
   Object.freeze({
     id: 'song-3062', kind: 'song', tokenId: 3062,
     title: 'Neon Portal Bloom', subtitle: 'BotCupid'
@@ -181,24 +217,38 @@ export const HOMEPAGE_WALL = Object.freeze([
     id: 'song-3058', kind: 'song', tokenId: 3058,
     title: 'The Judge Is in the House', subtitle: '3ai3'
   }),
-  Object.freeze({
-    // Live: opens the collection page. Before the mint: the original Audionauts ordinal.
-    id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
-    eyebrow: AUDIONAUTS_LIVE ? 'Minting now' : `Mints ${AUDIONAUTS_WHEN}`, title: 'Audionauts',
-    subtitle: AUDIONAUTS_LIVE ? 'Mint yours now →' : 'Listen to the original music, streamed from L1 →',
-    image: '/home/wall/audionauts-3059.webp',
-    // Once the mint is live every tile and banner goes to the collection page.
-    href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
-  }),
-  Object.freeze({
-    // The Forever Twins campaign: one twin from each of the three newest collections.
-    id: 'forever-twins', kind: 'twins', size: 'tall', tone: 'orange',
-    eyebrow: 'New · Forever Twins', title: 'Three new twins',
-    subtitle: 'Preserve yours',
-    twins: HOMEPAGE_FOREVER_TWINS,
-    href: '/forever-twins/'
-  })
+  Object.freeze({ ...WALL_AUDIONAUTS, size: 'wide' }),
+  Object.freeze({ ...WALL_FOREVER_TWINS, size: 'tall' })
 ]);
+
+// How the wall changes. The arcade is pinned: it is always on screen in one of the two big slots
+// (which one is random). Everything in `pool` can take the other big slot sometimes, and also the
+// tall and wide slots, in proportion to its weight for that slot (no weight = never there).
+// `campaign` tiles are guaranteed a slot on every load. Chess keeps its place; the two small
+// slots are songs. While the page is open one tile at a time crossfades to something that is not
+// already on the wall, every few seconds.
+export const HOMEPAGE_WALL_ROTATION = Object.freeze({
+  pinned: WALL_ARCADE,
+  chess: WALL_CHESS,
+  campaign: Object.freeze(['forever-twins']),
+  // Where a campaign tile lands, by weight.
+  campaignSlots: Object.freeze([
+    Object.freeze({ slot: 'tall', weight: 3 }),
+    Object.freeze({ slot: 'wide', weight: 2 }),
+    Object.freeze({ slot: 'big', weight: 2 })
+  ]),
+  pool: Object.freeze([
+    // Weights only list slots where the art crops well: Astro Blaster and the KP Loops poster are big or tall only.
+    Object.freeze({ tile: WALL_ASTRO, weights: Object.freeze({ big: 3 }) }),
+    Object.freeze({ tile: WALL_TIMELOOP, weights: Object.freeze({ big: 2, tall: 2, wide: 2 }) }),
+    Object.freeze({ tile: WALL_KP_LOOPS, weights: Object.freeze({ big: 2, tall: 2 }) }),
+    Object.freeze({ tile: WALL_AUDIONAUTS, weights: Object.freeze({ big: 2, wide: 3 }) }),
+    Object.freeze({ tile: WALL_FOREVER_TWINS, weights: Object.freeze({ big: 3, tall: 3, wide: 2 }) })
+  ]),
+  // Milliseconds between swaps (random in this range) and how long a crossfade takes.
+  intervalMs: Object.freeze([7000, 11000]),
+  fadeMs: 420
+});
 
 // Music shelf. Live data comes from the radio catalogue; the fallback list is
 // what shows if that read fails (it is shown as-is, never as "no songs").
@@ -395,6 +445,35 @@ export const validateHomepageContent = () => {
     }
     if (item.kind === 'twins' && !(item.twins && item.twins.length && item.twins.every((twin) => twin.name && twin.image))) {
       errors.push(`Homepage wall tile ${item.id} needs twins with a name and image.`);
+    }
+  });
+  const rotation = HOMEPAGE_WALL_ROTATION;
+  const poolIds = rotation.pool.map((entry) => entry.tile.id);
+  if (new Set([rotation.pinned.id, rotation.chess.id, ...poolIds]).size !== poolIds.length + 2) {
+    errors.push('Homepage wall rotation tile ids must be unique.');
+  }
+  rotation.pool.forEach(({ tile, weights }) => {
+    if (!isNavigableHref(tile.href) || !tile.title) {
+      errors.push(`Homepage wall rotation tile ${tile.id} needs a title and a navigable href.`);
+    }
+    if (tile.kind === 'image' && !tile.image) {
+      errors.push(`Homepage wall rotation tile ${tile.id} needs an image.`);
+    }
+    if (tile.kind === 'twins' && !(tile.twins && tile.twins.length)) {
+      errors.push(`Homepage wall rotation tile ${tile.id} needs twins.`);
+    }
+    if (!Object.keys(weights).length || Object.entries(weights).some(([slot, w]) => !['big', 'tall', 'wide'].includes(slot) || !(w > 0))) {
+      errors.push(`Homepage wall rotation tile ${tile.id} needs positive weights for big, tall or wide.`);
+    }
+  });
+  ['big', 'tall', 'wide'].forEach((slot) => {
+    if (rotation.pool.filter((entry) => entry.weights[slot] > 0).length < 2) {
+      errors.push(`Homepage wall rotation needs at least two tiles for the ${slot} slot.`);
+    }
+  });
+  rotation.campaign.forEach((id) => {
+    if (!poolIds.includes(id)) {
+      errors.push(`Homepage wall campaign ${id} is not in the rotation pool.`);
     }
   });
   [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref, HOMEPAGE_BOUNTY.tracker.href].forEach((href) => {

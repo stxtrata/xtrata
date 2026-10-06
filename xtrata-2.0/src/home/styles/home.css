@@ -7658,8 +7658,11 @@
       text-align: left;
       text-decoration: none;
       cursor: pointer;
-      transition: transform 0.18s ease, border-color 0.18s ease;
+      transition: transform 0.18s ease, border-color 0.18s ease, opacity 0.42s ease;
     }
+    /* The wall swaps one tile at a time: the old one fades out, the new one fades in. */
+    .home-tile.is-leaving,
+    .home-tile.is-entering { opacity: 0; }
     .home-tile:hover,
     .home-tile:focus-visible { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.34); }
     .home-tile--big { grid-column: span 2; grid-row: span 2; }
@@ -7704,6 +7707,13 @@
       white-space: nowrap;
     }
     .home-tile--twins { border-color: rgba(255, 179, 102, 0.4); }
+    /* Big and wide Forever Twins tiles lay the three twins side by side; the tall one stacks them. */
+    .home-tile--twins.home-tile--big .home-tile__twins,
+    .home-tile--twins.home-tile--wide .home-tile__twins { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
+    .home-tile--twins.home-tile--big .home-tile__twin-name,
+    .home-tile--twins.home-tile--wide .home-tile__twin-name { white-space: normal; font-size: 8px; line-height: 1.2; letter-spacing: 0.03em; }
+    .home-tile--twins.home-tile--big .home-tile__title { font-size: 22px; }
+    .home-tile--twins.home-tile--big .home-tile__caption { padding: 10px 14px 12px; }
     .home-tile--twins .home-tile__caption { position: static; flex: none; padding: 8px 10px 9px; background: #0d0d0f; }
     .home-tile__caption {
       position: absolute;
@@ -7722,6 +7732,10 @@
       text-transform: uppercase;
     }
     .home-tile__title { font-size: 15px; font-weight: 900; line-height: 1.15; }
+    .home-tile--big .home-tile__title { font-size: 22px; }
+    /* Art that carries its own small print (the KP Loops poster): a deeper fade under the caption. */
+    .home-tile--scrim .home-tile__caption { padding-top: 120px; background: linear-gradient(rgba(5, 5, 5, 0), rgba(5, 5, 5, 0.9) 55%); }
+    .home-tile--big .home-tile__sub { font-size: 13px; }
     .home-tile__sub { color: rgba(238, 243, 249, 0.78); font-size: 12px; }
     .home-tile__badge {
       position: absolute;
@@ -8223,7 +8237,8 @@
       .home-tile--wide { grid-column: span 2; }
       .home-tile--big { grid-row: auto; }
       .home-tile--wide { grid-row: auto; }
-      .home-tile--twins { grid-column: span 2; grid-row: auto; }
+      .home-tile--twins,
+      .home-tile--tall:not(.home-tile--chess) { grid-column: span 2; grid-row: auto; }
       .home-tile__twins { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
       .home-tile__twin-name { white-space: normal; font-size: 8px; line-height: 1.2; letter-spacing: 0.03em; }
       .home-tile--chess { padding: 12px; }
