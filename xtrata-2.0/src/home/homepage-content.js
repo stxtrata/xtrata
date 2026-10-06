@@ -130,10 +130,10 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: 'Open the Lounge', href: '/music/lounge', newTab: true
   }),
   Object.freeze({
-    id: 'forever-twins', tag: 'Live', tone: 'orange',
-    title: 'Forever Twins.',
-    line: 'Give an existing collection a fully on-chain twin.',
-    cta: 'Preserve yours', href: '/forever-twins/'
+    id: 'forever-twins', tag: 'New', tone: 'orange',
+    title: 'Forever Twins: NYC Degens and Megapont Ape Club.',
+    line: 'Two more collections now have a fully on-chain twin. Holders can claim theirs.',
+    cta: 'See the new twins', href: '/forever-twins/'
   })
 ]);
 
@@ -278,8 +278,8 @@ export const HOMEPAGE_PROGRAMMES = Object.freeze([
     actions: [{ label: 'Download', href: '/music/lounge', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
-  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · live', title: 'Forever Twins', copy: 'Give an existing collection a self-contained, fully on-chain twin. Holders keep the link.',
-    actions: [{ label: 'Preserve yours', href: '/forever-twins/', primary: true }] },
+  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens and Megapont Ape Club now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
+    actions: [{ label: 'See the twins', href: '/forever-twins/', primary: true }] },
   { id: 'collections', tone: 'lime', art: 'soon', tag: 'Coming soon', title: 'Xtrata Collections', copy: 'Upload a whole collection, set a price, and let collectors mint each piece.',
     actions: [{ label: 'Follow for launch news', href: 'https://x.com/XtrataLayers' }] }
 ]);
