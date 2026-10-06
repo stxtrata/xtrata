@@ -131,7 +131,11 @@
       "legacyPage": null,
       "theme": {
         "logo": null,
-        "accent": "#1f5fe0"
+        "accent": "#1f5fe0",
+        "heroTwin": {
+          "tokenId": 1,
+          "xtrataId": 3095
+        }
       },
       "blurb": "NYC Degens holders can give their Degen a permanent on-chain twin, or swap which side stays liquid. The first collection built with the Forever Twins helper, deployed and finalised from the Xtrata wallet.",
       "twinTokenUri": "https://xtrata.xyz/ft/nyc-degens/{id}.json",
@@ -156,7 +160,11 @@
       "legacyPage": null,
       "theme": {
         "logo": null,
-        "accent": "#7048e8"
+        "accent": "#7048e8",
+        "heroTwin": {
+          "tokenId": 3,
+          "xtrataId": 3104
+        }
       },
       "blurb": "Megapont Ape Club holders can give their Ape a permanent on-chain twin, or swap which side stays liquid. Deployed and finalised from the Xtrata wallet: all 2,500 canonical records are sealed on-chain, and anyone can fund a twin.",
       "twinTokenUri": "https://xtrata.xyz/ft/megapont-ape-club/{id}.json",

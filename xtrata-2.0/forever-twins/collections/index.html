@@ -20,11 +20,13 @@
 </main>
 <footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
 <script type="module">
-import { loadRegistry, collectionsOf, independentCollections, STATUS, COMMUNITY_STATUS, collectionUrl, communityUrl } from '/forever-twins/assets/ft-registry.js';
+import { loadRegistry, collectionsOf, independentCollections, heroImage, STATUS, COMMUNITY_STATUS, collectionUrl, communityUrl } from '/forever-twins/assets/ft-registry.js?v=20261006a';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let REG = null;
 const tile = (c) => {
   const s = STATUS[c.status];
-  const logo = c.theme && c.theme.logo ? `<img src="${esc(c.theme.logo)}" alt="">` : '';
+  const img = heroImage(REG, c);
+  const logo = img ? `<img src="${esc(img)}" alt="" loading="lazy" onerror="this.remove()">` : '';
   return `<article class="tile ${c.status === 'live' ? '' : 'soon'}">
     <div class="top">${logo}<div><h3>${esc(c.name)} <span class="pill ${s.tone}">${esc(s.label)}</span></h3>
     <div class="meta">${esc(c.group)} · helper ${esc(c.interface)}</div></div></div>
@@ -36,6 +38,7 @@ const tile = (c) => {
 };
 try {
   const reg = await loadRegistry();
+  REG = reg;
   const comms = [...(reg.communities || [])].sort((a, b) => (a.status === 'live' ? 0 : 1) - (b.status === 'live' ? 0 : 1));
   let html = '';
   for (const m of comms) {
