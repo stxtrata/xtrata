@@ -15,11 +15,11 @@
     "megapont-ape-club": {
       "label": "Megapont Ape Club",
       "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
-      "helper": null,
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club",
       "manifestPath": "/ft/data/megapont-ape-club.manifest.json",
       "manifestSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
-      "manifestStatus": "draft",
-      "_note": "Helper not deployed yet. Set helper and manifestStatus final after the launch canary deploys and seeds it; finalise only after production serves this exact manifest."
+      "manifestStatus": "final",
+      "_note": "Helper deployed, seeded and finalised 5-6 Oct 2026 via the launch canary; production serves this exact manifest."
     }
   }
 }

@@ -53,6 +53,17 @@
       "status": "live",
       "expectedSourceSha256": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951",
       "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-05; canonical record finalised (420 records, manifest 30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b); live-check 2026-10-05: deployed source sha256 equals the rendered template for mainnet-nyc-degens.v3.json"
+    },
+    {
+      "key": "megapont-ape-club",
+      "name": "Megapont Ape Club",
+      "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club",
+      "interface": "v3",
+      "group": "G2",
+      "status": "live",
+      "expectedSourceSha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
+      "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-06; canonical record finalised (2500 records, manifest 0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552); live-check 2026-10-06: deployed source sha256 equals the rendered template for mainnet-megapont-ape-club.v3.json"
     }
   ]
 }
