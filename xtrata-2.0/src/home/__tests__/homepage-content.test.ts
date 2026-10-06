@@ -65,6 +65,33 @@ describe('homepage content configuration', () => {
     expect(HOMEPAGE_WALL.find((tile) => tile.kind === 'chess')).toMatchObject({ href: '/i/3072', title: 'On-Chain Chess' });
   });
 
+  it('shows one twin from each new Forever Twins collection in the hero, in step with the registry', () => {
+    const registry = JSON.parse(
+      readFileSync(new URL('../../../forever-twins/data/registry.v2.json', import.meta.url), 'utf8')
+    );
+    const tile = HOMEPAGE_WALL.find((item) => item.kind === 'twins');
+    expect(tile).toMatchObject({ id: 'forever-twins', size: 'tall', href: '/forever-twins/' });
+    expect(tile.twins.map((twin) => twin.key)).toEqual(['nyc-degens', 'megapont-ape-club', 'bitcoin-monkeys']);
+    for (const twin of tile.twins) {
+      const entry = registry.collections.find((c) => c.key === twin.key);
+      expect(entry.status).toBe('live');
+      expect(entry.theme.heroTwin).toEqual({ tokenId: twin.tokenId, xtrataId: twin.xtrataId });
+      expect(twin.image).toBe(`/inscription/mainnet/${registry.core.contract.replace('.', '/')}/${twin.xtrataId}`);
+    }
+    // The strip banner and programme card name all three collections and open the campaign page.
+    for (const text of [
+      HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'forever-twins'),
+      HOMEPAGE_PROGRAMMES.find((p) => p.id === 'forever-twins')
+    ]) {
+      const copy = JSON.stringify(text);
+      expect(copy).toContain('NYC Degens');
+      expect(copy).toContain('Megapont Ape Club');
+      expect(copy).toContain('Bitcoin Monkeys');
+      expect(copy).toContain('/forever-twins/');
+    }
+    expect(validateHomepageContent()).toEqual([]);
+  });
+
   it('leads the strip with the live bounty and links its PDFs', () => {
     expect(HOMEPAGE_STRIP_SLIDES[0]).toMatchObject({ id: 'bounty', href: HOMEPAGE_BOUNTY.guideHref });
     expect(HOMEPAGE_BOUNTY.guideHref).toBe('/bounty/xtrata-bounty-at-a-glance.pdf');

@@ -131,16 +131,28 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
   }),
   Object.freeze({
     id: 'forever-twins', tag: 'New', tone: 'orange',
-    title: 'Forever Twins: NYC Degens and Megapont Ape Club.',
-    line: 'Two more collections now have a fully on-chain twin. Holders can claim theirs.',
+    title: 'Forever Twins: three new collections.',
+    line: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have a fully on-chain twin.',
     cta: 'See the new twins', href: '/forever-twins/'
   })
 ]);
 
+// First inscribed twin of each newest Forever Twins collection. Ids come from theme.heroTwin in
+// forever-twins/data/registry.v2.json (a test keeps them in step); art is served by the core contract.
+const FOREVER_TWINS_CORE = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3';
+const foreverTwin = (key, name, tokenId, xtrataId) => Object.freeze({
+  key, name, tokenId, xtrataId, image: `/inscription/mainnet/${FOREVER_TWINS_CORE}/${xtrataId}`
+});
+export const HOMEPAGE_FOREVER_TWINS = Object.freeze([
+  foreverTwin('nyc-degens', 'NYC Degens', 1, 3095),
+  foreverTwin('megapont-ape-club', 'Megapont Ape Club', 3, 3104),
+  foreverTwin('bitcoin-monkeys', 'Bitcoin Monkeys', 2, 3113)
+]);
+
 // The Living Wall beside the hero headline. Order matters: the grid is
-// 4 columns x 3 rows on desktop and the spans below fill it exactly.
-//   astro blaster: 2x2 (top billing)   chess: 1x2   two songs: 1x1
-//   audionauts: 2x1   twins + DYLE: 1x1. Timeloop lives in the Play row.
+// 4 columns x 4 rows on desktop (16 cells) and the spans below fill it exactly.
+//   arcade + astro blaster: 2x2 each   chess: 1x2   two songs: 1x1
+//   audionauts: 2x1   Forever Twins: 1x2 (three new twins stacked). Timeloop lives in the Play row.
 export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
     // Newest headline: the whole 3D arcade hall. Opens full screen in a new tab.
@@ -179,15 +191,12 @@ export const HOMEPAGE_WALL = Object.freeze([
     href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
   }),
   Object.freeze({
-    id: 'forever-twins', kind: 'image', tone: 'orange',
-    eyebrow: 'Preserve', title: 'Forever Twins',
-    image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp',
+    // The Forever Twins campaign: one twin from each of the three newest collections.
+    id: 'forever-twins', kind: 'twins', size: 'tall', tone: 'orange',
+    eyebrow: 'New · Forever Twins', title: 'Three new twins',
+    subtitle: 'Preserve yours',
+    twins: HOMEPAGE_FOREVER_TWINS,
     href: '/forever-twins/'
-  }),
-  Object.freeze({
-    id: 'dyle-296', kind: 'image', tone: 'pink', pixelated: true,
-    eyebrow: 'Collect', title: 'Art by DYLE',
-    image: '/i/296', href: '/xplorer?wallet=dyle.btc&sel=296'
   })
 ]);
 
@@ -278,7 +287,7 @@ export const HOMEPAGE_PROGRAMMES = Object.freeze([
     actions: [{ label: 'Download', href: '/music/lounge', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
-  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens and Megapont Ape Club now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
+  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens, Megapont Ape Club and Bitcoin Monkeys now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
     actions: [{ label: 'See the twins', href: '/forever-twins/', primary: true }] },
   { id: 'collections', tone: 'lime', art: 'soon', tag: 'Coming soon', title: 'Xtrata Collections', copy: 'Upload a whole collection, set a price, and let collectors mint each piece.',
     actions: [{ label: 'Follow for launch news', href: 'https://x.com/XtrataLayers' }] }
@@ -383,6 +392,9 @@ export const validateHomepageContent = () => {
     }
     if ((item.kind === 'image' || item.kind === 'radio') && !item.image) {
       errors.push(`Homepage wall tile ${item.id} needs an image.`);
+    }
+    if (item.kind === 'twins' && !(item.twins && item.twins.length && item.twins.every((twin) => twin.name && twin.image))) {
+      errors.push(`Homepage wall tile ${item.id} needs twins with a name and image.`);
     }
   });
   [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref, HOMEPAGE_BOUNTY.tracker.href].forEach((href) => {

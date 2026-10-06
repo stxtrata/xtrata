@@ -467,6 +467,18 @@ const renderWall = () => {
       const foot = element('span', 'home-tile__chess-foot');
       foot.append(wallCaption(item), element('span', 'home-tile__cta', `${item.cta} →`));
       tile.append(createChessBoard('home-chess--wall'), foot);
+    } else if (item.kind === 'twins') {
+      // One twin from each new Forever Twins collection, side by side under a single link.
+      const strip = element('span', 'home-tile__twins');
+      item.twins.forEach((twin) => {
+        const cell = element('span', 'home-tile__twin');
+        cell.append(
+          image(twin.image, `${twin.name} Forever Twin #${twin.tokenId}`, 'home-tile__twin-img', { eager: true }),
+          element('span', 'home-tile__twin-name', twin.name)
+        );
+        strip.append(cell);
+      });
+      tile.append(strip, wallCaption(item));
     } else {
       const img = image(item.image, item.title, 'home-tile__img', { eager: i < 4, position: item.position });
       if (item.pixelated) img.classList.add('is-pixelated');
