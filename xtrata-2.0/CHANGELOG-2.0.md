@@ -2,6 +2,19 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: sticky wallet bar for the connected user (2026-10-06)
+- `public/bounty/zdao/tracker/1/index.html`: the connect control moved from the leaderboard (bottom of the page) to a bar pinned to the top. Signed out it says what connecting gives you; connected it shows your short address, standing (In the draw / Waiting / Winner, or "Not on the board yet"), tickets with any held count, and your X handle with **Add X handle** or **Edit** (inline input, Enter saves, Escape cancels). Team-confirmed handles show "confirmed by the team" with no edit. A wallet that is not on the board yet can still link a handle.
+- The "See where you stand" checker fills itself with the connected wallet (and clears on disconnect, unless you were looking up someone else); it is now labelled "Look up any wallet". The leaderboard is read-only apart from your highlighted row. On narrow screens the bar wraps to three short lines (about 110 px) and the page never scrolls sideways. No wallet code changed: the page still uses `XtrataBountyWallet`.
+- **Verified:** `npx vitest run src/bounty-tracker functions/bounty` (17 tests) and a browser run with a simulated disposable wallet at desktop and 390 px (signed out, sticky while scrolling, connect, add, edit, disconnect, off-board wallet, chain down).
+
+## Bounty tracker: remembers what it read, and wallets can link their X handle (2026-10-06)
+
+- **Why:** the first tracker re-read every contract from the cutoff on every visit (about 20 s), and handles could only be added by hand in `handles.json`.
+- **Faster reads:** `public/bounty/zdao/tracker/1/ledger-reader.js` (one script shared with the Bounty Ticket Ledger) keeps the newest three transaction ids per contract and per-wallet counts. A refresh pages down only to a transaction it has already seen: a full read of 23 contracts took 19 s, the next one 4 s. It falls back to a full read when a remembered transaction has vanished (reorg), when the saved state is older than three days, or for a different cutoff, and a failed source keeps its previous state. The page bakes the latest state in (`scripts/bounty-tracker-bake.mjs`), so first paint is instant and the first visit only fetches what is new.
+- **Handles:** "Connect wallet" uses the same connect flow as the rest of the site (`src/bounty-tracker/wallet.ts` over `createStacksWalletAdapter`, built by `npm run build:bounty-tracker`; it loads only when needed). The connected wallet's own row gets an editable handle. Saving asks for one free SIP-018 message signature (no transaction, no fee). `functions/bounty/handles.ts` (`/bounty/handles`, D1 table from `functions/migrations/020_bounty_handles.sql`) verifies it with `functions/lib/bounty-handle.ts`, rejects replays and older signatures, enforces one wallet per handle, and rate limits by hashed IP. Self-linked handles show a "self-linked" tag; handles in `handles.json` are team-confirmed and win.
+- **Needs:** apply migration 020 to the D1 database before the handle field works; until then the board reads and shows handles from `handles.json` only and saving says it is not switched on.
+- **Verified:** `npx vitest run src/bounty-tracker functions/bounty` (17 tests: mock-chain full vs incremental equality, reorg and stale fallbacks, failing source, signature, replay, duplicate handle, wrong wallet, expiry), and a browser run with a simulated disposable wallet (connect, save, reload, chain down).
+
 ## Astro Blaster 3.0.2: sign scores in the game on top-level pages (2026-09-28)
 
 - **Why:** on `/i/<id>` (and preview hosts) Submit opened `https://xtrata.xyz/arcade/submit`, which production does not serve until this branch ships, so players landed on the homepage. X Chess signs from the page itself.
