@@ -1,0 +1,158 @@
+[
+ {
+  "id": "xa_neon_snake",
+  "game": "SnakeByte Taproot",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_block_drop",
+  "game": "Chainfall",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_cave_diver",
+  "game": "Deep Node Diver",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_orbit_merge",
+  "game": "Sat Galaxy",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_block_runner",
+  "game": "Neon Nonce",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_brick_breaker",
+  "game": "Block Breaker",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_rock_drift",
+  "game": "Nakamoto Drift",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_stack_tower",
+  "game": "Block Height",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_road_hopper",
+  "game": "Crosschain Hopper",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_tile_tap",
+  "game": "BlockBeat",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_merge_2048",
+  "game": "Merkle Match",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_block_defence",
+  "game": "Chain Sentinel",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_maze_muncher",
+  "game": "Sat Hunter",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_invader_wave",
+  "game": "Hashstorm",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_helix_drop",
+  "game": "Hash Helix",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_bubble_pop",
+  "game": "Fee Bubble",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_swerve",
+  "game": "Mempool Velocity",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_lunar_lander",
+  "game": "Satoshi One",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_reflex_tap",
+  "game": "Hash at High Noon",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_mine_sprint",
+  "game": "Proof of Ore",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_pong_streak",
+  "game": "Bit Pong",
+  "mode": 0,
+  "max": 999999999
+ },
+ {
+  "id": "xa_block_drop_sprint",
+  "game": "Chainfall \u00b7 Sprint 40",
+  "mode": 1,
+  "max": 360000
+ },
+ {
+  "id": "xa_merge_2048_race",
+  "game": "Merkle Match \u00b7 Race to 512",
+  "mode": 1,
+  "max": 360000
+ },
+ {
+  "id": "xa_mine_sprint_classic",
+  "game": "Proof of Ore \u00b7 Classic",
+  "mode": 1,
+  "max": 360000
+ },
+ {
+  "id": "xa_reflex_tap_hit50",
+  "game": "Hash at High Noon \u00b7 Hit 50",
+  "mode": 1,
+  "max": 360000
+ },
+ {
+  "id": "xa_tile_tap_rush",
+  "game": "BlockBeat \u00b7 Rush 100",
+  "mode": 1,
+  "max": 360000
+ }
+]

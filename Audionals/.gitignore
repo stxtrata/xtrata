@@ -1,0 +1,7 @@
+# Generated sound assets and downloadable release snapshots stay local.
+/audional-sequencer-l1xl2-v1/media/
+/audionaut-v0.2/media/
+/downloads/
+
+# Supplied reference screenshots stay local with the handoff package.
+/audionaut-v0.2/reference/catalogue-lab-v0.2/preview_*.png

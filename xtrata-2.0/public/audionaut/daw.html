@@ -1,0 +1,681 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Audionaut v0.2 · Audional Sequencer</title>
+    <meta name="theme-color" content="#0b0f14" />
+    <meta name="color-scheme" content="dark" />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2040%2040'%3E%3Cellipse%20cx='20'%20cy='20'%20rx='6.6'%20ry='16.5'%20transform='rotate(18%2020%2020)'%20fill='none'%20stroke='%232f8cff'%20stroke-width='2.8'/%3E%3Cpath%20fill-rule='evenodd'%20fill='%23f58a14'%20d='M30%2020a10%2010%200%201%200-20%200a10%2010%200%201%200%2020%200ZM24.4%2020a4.4%204.4%200%201%201-8.8%200a4.4%204.4%200%201%201%208.8%200Z'/%3E%3Cpath%20d='M20%203.5A6.6%2016.5%200%200%200%2020%2036.5'%20transform='rotate(18%2020%2020)'%20fill='none'%20stroke='%232f8cff'%20stroke-width='2.8'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="daw/css/style.css?v=20261004i" />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="sticky-top">
+      <header id="top-bar">
+        <div class="brand" title="Blockchain Audional Work(space)Station">
+          <h1>
+          <svg class="lockup" width="176" height="64" viewBox="-6.0 -161.0 926.8 336.9" role="img" aria-label="The Audionaut: Audional Sequencer">
+            <title>The Audionaut: Audional Sequencer. Blockchain Audional Work(space)Station</title>
+            <defs>
+    <linearGradient id="au-cream" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop offset="0" stop-color="#fbf8f1"/><stop offset="1" stop-color="#d6d0c4"/></linearGradient>
+    <linearGradient id="au-orange" x1="0" y1="-1" x2="0" y2="1"><stop offset="0" stop-color="#ffb23c"/><stop offset="1" stop-color="#ef7410"/></linearGradient>
+    <linearGradient id="au-blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5db4ff"/><stop offset="1" stop-color="#1f7be8"/></linearGradient>
+  </defs>
+  <g fill="url(#au-cream)">
+    <g transform="translate(397.12 -124.96)"><path d="M23.74 -28V-23.13H15.3V0H9.09V-23.13H0.69V-28Z"/><path d="M55.8 -28V-17.25H65.74V-28H71.95V0H65.74V-12.58H55.8V0H49.59V-28Z"/><path d="M105.67 -28.12Q107.94 -28.12 110.26 -28.1Q112.57 -28.08 114.8 -28Q117.03 -27.92 118.98 -27.72L118.7 -23.21H107.94Q106.93 -23.21 106.42 -22.68Q105.91 -22.16 105.91 -21.14V-16.76H117.19V-12.38H105.91V-6.86Q105.91 -5.84 106.42 -5.32Q106.93 -4.79 107.94 -4.79H118.7L118.98 -0.28Q117.03 -0.12 114.8 -0.02Q112.57 0.08 110.26 0.1Q107.94 0.12 105.67 0.12Q102.99 0.12 101.35 -1.44Q99.7 -3 99.7 -5.52V-22.48Q99.7 -25.04 101.35 -26.58Q102.99 -28.12 105.67 -28.12Z"/></g>
+    <g><path d="M70.8 -16.22H35.54L30.18 0H1.13L37.38 -99.44H69.25L105.36 0H76.16ZM63.89 -37.38 53.17 -69.53 42.6 -37.38Z"/><path d="M147.81 -99.44V-41.75Q147.81 -33.71 151.55 -29.34Q155.29 -24.96 162.91 -24.96Q170.52 -24.96 174.4 -29.41Q178.28 -33.85 178.28 -41.75V-99.44H205.92V-41.75Q205.92 -28.07 200.14 -18.41Q194.36 -8.74 184.41 -3.88Q174.47 0.99 162.34 0.99Q150.21 0.99 140.69 -3.88Q131.17 -8.74 125.74 -18.34Q120.31 -27.93 120.31 -41.75V-99.44Z"/><path d="M318.76 -49.79Q318.76 -35.4 312.34 -24.12Q305.92 -12.83 294.15 -6.42Q282.37 0 266.85 0H227.5V-99.44H266.85Q282.51 -99.44 294.29 -93.16Q306.06 -86.88 312.41 -75.6Q318.76 -64.32 318.76 -49.79ZM290.69 -49.79Q290.69 -62.06 283.78 -68.76Q276.87 -75.46 264.74 -75.46H255.15V-24.4H264.74Q276.87 -24.4 283.78 -31.03Q290.69 -37.66 290.69 -49.79Z"/><path d="M365.16 -99.44V0H337.52V-99.44Z"/><path d="M595.75 0H568.11L531.3 -55.57V0H503.65V-99.44H531.3L568.11 -43.16V-99.44H595.75Z"/><path d="M680.8 -16.22H645.54L640.18 0H611.13L647.38 -99.44H679.25L715.36 0H686.16ZM673.89 -37.38 663.17 -69.53 652.6 -37.38Z"/><path d="M757.81 -99.44V-41.75Q757.81 -33.71 761.55 -29.34Q765.29 -24.96 772.91 -24.96Q780.52 -24.96 784.4 -29.41Q788.28 -33.85 788.28 -41.75V-99.44H815.92V-41.75Q815.92 -28.07 810.14 -18.41Q804.36 -8.74 794.41 -3.88Q784.47 0.99 772.34 0.99Q760.21 0.99 750.69 -3.88Q741.17 -8.74 735.74 -18.34Q730.31 -27.93 730.31 -41.75V-99.44Z"/><path d="M912.4 -99.44V-77.43H885.88V0H858.24V-77.43H832V-99.44Z"/></g>
+    <g transform="translate(73.18 158.96)"><path d="M-0.23 0 14.57 -32.9H20.59L35.44 0H29.05L25.76 -7.61H9.31L6.06 0ZM23.73 -12.41 17.53 -26.79 11.37 -12.41Z"/><path d="M65.97 0.33Q62.78 0.33 60.33 -0.87Q57.89 -2.07 56.53 -4.54Q55.16 -7 55.16 -10.76V-25.1H61.04V-11.56Q61.04 -8.18 62.57 -6.51Q64.09 -4.84 66.91 -4.84Q68.98 -4.84 70.51 -5.69Q72.04 -6.53 72.91 -8.22Q73.77 -9.92 73.77 -12.41V-25.1H79.65V0H74.06V-3.2Q72.98 -1.83 71.33 -0.99Q68.89 0.33 65.97 0.33Z"/><path d="M114.27 0.33Q110.65 0.33 107.76 -1.29Q104.87 -2.91 103.23 -5.78Q101.58 -8.65 101.58 -12.55Q101.58 -16.45 103.23 -19.32Q104.87 -22.18 107.76 -23.78Q110.65 -25.38 114.27 -25.38Q117.42 -25.38 119.91 -24.02Q121.28 -23.22 122.36 -22V-34.87H128.19V0H122.59V-3.29Q121.51 -1.93 120.01 -1.08Q117.52 0.33 114.27 0.33ZM114.98 -4.7Q117.09 -4.7 118.76 -5.64Q120.43 -6.58 121.44 -8.37Q122.45 -10.15 122.45 -12.55Q122.45 -14.99 121.44 -16.76Q120.43 -18.52 118.76 -19.46Q117.09 -20.4 114.98 -20.4Q112.86 -20.4 111.2 -19.46Q109.53 -18.52 108.52 -16.76Q107.51 -14.99 107.51 -12.55Q107.51 -10.15 108.52 -8.37Q109.53 -6.58 111.2 -5.64Q112.86 -4.7 114.98 -4.7Z"/><path d="M152.23 0V-25.1H158.11V0ZM155.2 -29.23Q153.55 -29.23 152.49 -30.27Q151.44 -31.3 151.44 -32.76Q151.44 -34.26 152.49 -35.27Q153.55 -36.28 155.2 -36.28Q156.84 -36.28 157.9 -35.32Q158.96 -34.36 158.96 -32.9Q158.96 -31.35 157.92 -30.29Q156.89 -29.23 155.2 -29.23Z"/><path d="M193.39 0.33Q189.54 0.33 186.53 -1.34Q183.52 -3.01 181.78 -5.92Q180.04 -8.84 180.04 -12.55Q180.04 -16.31 181.78 -19.2Q183.52 -22.09 186.53 -23.73Q189.54 -25.38 193.39 -25.38Q197.29 -25.38 200.32 -23.73Q203.36 -22.09 205.07 -19.22Q206.79 -16.36 206.79 -12.55Q206.79 -8.84 205.07 -5.92Q203.36 -3.01 200.32 -1.34Q197.29 0.33 193.39 0.33ZM193.39 -4.7Q195.55 -4.7 197.25 -5.64Q198.94 -6.58 199.9 -8.37Q200.86 -10.15 200.86 -12.55Q200.86 -14.99 199.9 -16.76Q198.94 -18.52 197.25 -19.46Q195.55 -20.4 193.44 -20.4Q191.28 -20.4 189.61 -19.46Q187.94 -18.52 186.95 -16.76Q185.97 -14.99 185.97 -12.55Q185.97 -10.15 186.95 -8.37Q187.94 -6.58 189.61 -5.64Q191.28 -4.7 193.39 -4.7Z"/><path d="M228.72 0V-25.1H234.31V-21.86Q235.44 -23.22 237.18 -24.11Q239.67 -25.38 242.96 -25.38Q245.97 -25.38 248.34 -24.2Q250.72 -23.03 252.08 -20.61Q253.44 -18.19 253.44 -14.38V0H247.57V-13.63Q247.57 -16.97 245.99 -18.61Q244.42 -20.26 241.6 -20.26Q239.53 -20.26 237.93 -19.41Q236.33 -18.57 235.46 -16.9Q234.6 -15.23 234.6 -12.69V0Z"/><path d="M292.67 0V-3.06Q291.78 -1.74 290.32 -0.89Q288.11 0.33 284.78 0.33Q281.96 0.33 279.84 -0.63Q277.73 -1.6 276.57 -3.31Q275.42 -5.03 275.42 -7.19Q275.42 -9.31 276.43 -11Q277.44 -12.69 279.75 -13.68Q282.05 -14.66 285.86 -14.66H292.34V-15.04Q292.34 -17.62 290.79 -19.06Q289.24 -20.49 286.09 -20.49Q283.98 -20.49 281.93 -19.83Q279.89 -19.18 278.48 -18L276.18 -22.28Q278.2 -23.83 280.99 -24.6Q283.79 -25.38 286.8 -25.38Q292.25 -25.38 295.23 -22.77Q298.22 -20.16 298.22 -14.71V0ZM292.34 -10.76H286.28Q283.27 -10.76 282.24 -9.8Q281.2 -8.84 281.2 -7.43Q281.2 -5.83 282.47 -4.89Q283.74 -3.95 286 -3.95Q288.16 -3.95 289.88 -4.93Q291.59 -5.92 292.34 -7.85Z"/><path d="M322.03 0V-34.87H327.91V0Z"/><path d=""/><path d="M391.94 0.47Q388.08 0.47 384.56 -0.63Q381.03 -1.74 378.97 -3.48L381.08 -8.22Q383.06 -6.67 385.97 -5.64Q388.88 -4.61 391.94 -4.61Q394.52 -4.61 396.12 -5.17Q397.72 -5.73 398.47 -6.7Q399.22 -7.66 399.22 -8.88Q399.22 -10.39 398.14 -11.3Q397.06 -12.22 395.35 -12.76Q393.63 -13.3 391.54 -13.77Q389.45 -14.24 387.36 -14.88Q385.26 -15.51 383.55 -16.52Q381.83 -17.53 380.75 -19.22Q379.67 -20.91 379.67 -23.55Q379.67 -26.23 381.1 -28.46Q382.54 -30.69 385.48 -32.03Q388.41 -33.37 392.93 -33.37Q395.89 -33.37 398.8 -32.62Q401.71 -31.87 403.88 -30.46L401.95 -25.71Q399.74 -27.02 397.39 -27.66Q395.04 -28.29 392.88 -28.29Q390.34 -28.29 388.77 -27.68Q387.19 -27.07 386.46 -26.09Q385.73 -25.1 385.73 -23.83Q385.73 -22.32 386.79 -21.41Q387.85 -20.49 389.56 -19.98Q391.28 -19.46 393.4 -18.96Q395.51 -18.47 397.6 -17.86Q399.69 -17.25 401.41 -16.26Q403.12 -15.28 404.18 -13.58Q405.24 -11.89 405.24 -9.31Q405.24 -6.67 403.81 -4.44Q402.37 -2.21 399.41 -0.87Q396.45 0.47 391.94 0.47Z"/><path d="M438.83 0.33Q434.65 0.33 431.52 -1.34Q428.39 -3.01 426.68 -5.92Q424.96 -8.84 424.96 -12.55Q424.96 -16.31 426.63 -19.2Q428.3 -22.09 431.24 -23.73Q434.18 -25.38 437.94 -25.38Q441.6 -25.38 444.47 -23.78Q447.34 -22.18 448.98 -19.27Q450.63 -16.36 450.63 -12.41Q450.63 -12.03 450.6 -11.56Q450.58 -11.09 450.53 -10.67H430.84Q431.07 -9.35 431.73 -8.27Q432.77 -6.53 434.65 -5.59Q436.53 -4.65 438.97 -4.65Q441.08 -4.65 442.78 -5.31Q444.47 -5.97 445.78 -7.38L448.93 -3.76Q447.24 -1.79 444.68 -0.73Q442.12 0.33 438.83 0.33ZM430.79 -14.57H445.08Q444.89 -15.98 444.23 -17.16Q443.29 -18.8 441.67 -19.74Q440.05 -20.68 437.94 -20.68Q435.77 -20.68 434.15 -19.74Q432.53 -18.8 431.64 -17.16Q430.98 -15.98 430.79 -14.57Z"/><path d="M483.18 0.33Q479.56 0.33 476.67 -1.27Q473.78 -2.87 472.14 -5.76Q470.49 -8.65 470.49 -12.55Q470.49 -16.45 472.14 -19.32Q473.78 -22.18 476.67 -23.78Q479.56 -25.38 483.18 -25.38Q486.42 -25.38 488.92 -24.02Q490.37 -23.17 491.5 -21.81V-25.1H497.09V9.12H491.22V-3.06Q490.14 -1.88 488.77 -1.08Q486.28 0.33 483.18 0.33ZM483.84 -4.7Q485.95 -4.7 487.65 -5.64Q489.34 -6.58 490.33 -8.37Q491.31 -10.15 491.31 -12.55Q491.31 -14.99 490.33 -16.76Q489.34 -18.52 487.65 -19.46Q485.95 -20.4 483.84 -20.4Q481.72 -20.4 480.06 -19.46Q478.39 -18.52 477.4 -16.76Q476.41 -14.99 476.41 -12.55Q476.41 -10.15 477.4 -8.37Q478.39 -6.58 480.06 -5.64Q481.72 -4.7 483.84 -4.7Z"/><path d="M531.72 0.33Q528.52 0.33 526.08 -0.87Q523.63 -2.07 522.27 -4.54Q520.91 -7 520.91 -10.76V-25.1H526.78V-11.56Q526.78 -8.18 528.31 -6.51Q529.84 -4.84 532.66 -4.84Q534.73 -4.84 536.25 -5.69Q537.78 -6.53 538.65 -8.22Q539.52 -9.92 539.52 -12.41V-25.1H545.39V0H539.8V-3.2Q538.72 -1.83 537.08 -0.99Q534.63 0.33 531.72 0.33Z"/><path d="M581.19 0.33Q577.01 0.33 573.89 -1.34Q570.76 -3.01 569.04 -5.92Q567.33 -8.84 567.33 -12.55Q567.33 -16.31 569 -19.2Q570.67 -22.09 573.6 -23.73Q576.54 -25.38 580.3 -25.38Q583.97 -25.38 586.83 -23.78Q589.7 -22.18 591.35 -19.27Q592.99 -16.36 592.99 -12.41Q592.99 -12.03 592.97 -11.56Q592.94 -11.09 592.9 -10.67H573.2Q573.44 -9.35 574.1 -8.27Q575.13 -6.53 577.01 -5.59Q578.89 -4.65 581.33 -4.65Q583.45 -4.65 585.14 -5.31Q586.83 -5.97 588.15 -7.38L591.3 -3.76Q589.61 -1.79 587.05 -0.73Q584.48 0.33 581.19 0.33ZM573.16 -14.57H587.44Q587.26 -15.98 586.6 -17.16Q585.66 -18.8 584.04 -19.74Q582.42 -20.68 580.3 -20.68Q578.14 -20.68 576.52 -19.74Q574.9 -18.8 574 -17.16Q573.34 -15.98 573.16 -14.57Z"/><path d="M614.92 0V-25.1H620.52V-21.86Q621.65 -23.22 623.38 -24.11Q625.88 -25.38 629.17 -25.38Q632.17 -25.38 634.55 -24.2Q636.92 -23.03 638.28 -20.61Q639.65 -18.19 639.65 -14.38V0H633.77V-13.63Q633.77 -16.97 632.2 -18.61Q630.62 -20.26 627.8 -20.26Q625.73 -20.26 624.14 -19.41Q622.54 -18.57 621.67 -16.9Q620.8 -15.23 620.8 -12.69V0Z"/><path d="M674.93 0.33Q670.98 0.33 667.9 -1.34Q664.82 -3.01 663.08 -5.92Q661.35 -8.84 661.35 -12.55Q661.35 -16.31 663.08 -19.2Q664.82 -22.09 667.9 -23.73Q670.98 -25.38 674.93 -25.38Q678.59 -25.38 681.39 -23.9Q684.19 -22.42 685.64 -19.55L681.13 -16.92Q680 -18.71 678.38 -19.55Q676.76 -20.4 674.88 -20.4Q672.72 -20.4 670.98 -19.46Q669.24 -18.52 668.25 -16.76Q667.27 -14.99 667.27 -12.55Q667.27 -10.11 668.25 -8.34Q669.24 -6.58 670.98 -5.64Q672.72 -4.7 674.88 -4.7Q676.76 -4.7 678.38 -5.55Q680 -6.39 681.13 -8.18L685.64 -5.55Q684.19 -2.73 681.39 -1.2Q678.59 0.33 674.93 0.33Z"/><path d="M718.81 0.33Q714.63 0.33 711.5 -1.34Q708.38 -3.01 706.66 -5.92Q704.95 -8.84 704.95 -12.55Q704.95 -16.31 706.61 -19.2Q708.28 -22.09 711.22 -23.73Q714.16 -25.38 717.92 -25.38Q721.58 -25.38 724.45 -23.78Q727.32 -22.18 728.96 -19.27Q730.61 -16.36 730.61 -12.41Q730.61 -12.03 730.58 -11.56Q730.56 -11.09 730.51 -10.67H710.82Q711.06 -9.35 711.71 -8.27Q712.75 -6.53 714.63 -5.59Q716.51 -4.65 718.95 -4.65Q721.07 -4.65 722.76 -5.31Q724.45 -5.97 725.77 -7.38L728.92 -3.76Q727.22 -1.79 724.66 -0.73Q722.1 0.33 718.81 0.33ZM710.77 -14.57H725.06Q724.87 -15.98 724.22 -17.16Q723.28 -18.8 721.65 -19.74Q720.03 -20.68 717.92 -20.68Q715.76 -20.68 714.13 -19.74Q712.51 -18.8 711.62 -17.16Q710.96 -15.98 710.77 -14.57Z"/><path d="M752.54 0V-25.1H758.14V-21.43Q759.22 -23.08 761.05 -24.06Q763.45 -25.38 767.07 -25.38V-19.79Q766.69 -19.88 766.36 -19.9Q766.03 -19.93 765.7 -19.93Q762.37 -19.93 760.39 -17.98Q758.42 -16.03 758.42 -12.17V0Z"/></g>
+  </g>
+  <g transform="translate(434.41 -50.00)">
+    <ellipse rx="30.00" ry="72.00" transform="rotate(16)" fill="none" stroke="url(#au-blue)" stroke-width="7.50"/>
+    <path fill-rule="evenodd" fill="url(#au-orange)" d="M50.00 0A50.00 50.00 0 1 0 -50.00 0A50.00 50.00 0 1 0 50.00 0ZM23.00 0A23.00 23.00 0 1 1 -23.00 0A23.00 23.00 0 1 1 23.00 0Z"/>
+    <path d="M0 -72.00A30.00 72.00 0 0 0 0 72.00" transform="rotate(16)" fill="none" stroke="url(#au-blue)" stroke-width="7.50"/>
+  </g>
+          </svg>
+          </h1>
+          <small class="version">v0.2</small>
+        </div>
+        <div class="project-meta">
+          <input
+            id="project-name"
+            type="text"
+            placeholder="Project name"
+            aria-label="Project name"
+            spellcheck="false"
+          />
+          <input
+            id="artist-name"
+            type="text"
+            placeholder="Artist"
+            aria-label="Artist name"
+            spellcheck="false"
+          />
+        </div>
+        <div class="transport">
+          <button
+            id="btn-play"
+            class="transport-btn"
+            title="Play / Pause (Space)"
+          >
+            ▶
+          </button>
+          <button id="btn-stop" class="transport-btn" title="Stop">■</button>
+          <div class="lcd">
+            <div class="lcd-row">
+              <label>BPM</label>
+              <input
+                id="bpm"
+                aria-label="Tempo in beats per minute"
+                type="number"
+                min="20"
+                max="420"
+                step="0.5"
+                value="120"
+              />
+            </div>
+            <div class="lcd-row">
+              <label>SWING</label>
+              <input id="swing" type="range" min="0" max="60" value="0" aria-label="Swing" />
+              <span id="swing-val">0%</span>
+            </div>
+          </div>
+          <div class="lcd">
+            <div class="lcd-row">
+              <label>SEQ</label><span id="lcd-seq">01</span>
+            </div>
+            <div class="lcd-row">
+              <label>POS</label><span id="lcd-pos">1.1</span>
+            </div>
+          </div>
+          <div class="master-vol">
+            <label>MASTER</label>
+            <input
+              id="master-volume"
+              aria-label="Master volume"
+              type="range"
+              min="0"
+              max="1.5"
+              step="0.01"
+              value="0.9"
+            />
+          </div>
+        </div>
+        <div class="file-ops">
+          <button id="btn-undo" title="Undo (⌘/Ctrl+Z)" disabled>↶</button>
+          <button id="btn-redo" title="Redo (⌘/Ctrl+Shift+Z)" disabled>
+            ↷
+          </button>
+          <button
+            id="btn-beats"
+            title="Browse original, L1-only and combined beat collections"
+          >
+            Beats
+          </button>
+          <button id="btn-save" title="Export project JSON">Save</button>
+          <button
+            id="btn-load"
+            title="Load project JSON (new or legacy Audional format)"
+          >
+            Load
+          </button>
+          <button id="btn-new" title="New project">New</button>
+          <button id="btn-settings" title="Settings">⚙</button>
+          <input
+            id="file-input"
+            type="file"
+            accept=".json,application/json"
+            hidden
+          />
+        </div>
+      </header>
+
+      <section id="source-bar" aria-label="Audio sources and tools">
+        <span class="source-badge">BITCOIN L1 × XTRATA L2</span>
+        <button id="btn-l1-audio">L1 audio library</button>
+        <button id="btn-samples-loops">Samples &amp; Loops</button>
+        <button id="btn-l1-words">Find words</button>
+        <button id="btn-audio-tools">Audio tools</button>
+        <button id="btn-record-mix">Record mix</button>
+        <span class="dim-note"
+          >Waveform arrangement · step sequencing · spoken sections</span
+        >
+      </section>
+      <nav id="sequence-bar">
+        <button id="seq-prev" title="Previous sequence (←)">‹</button>
+        <div id="seq-slots"></div>
+        <button id="seq-next" title="Next sequence (→)">›</button>
+        <div class="seq-tools">
+          <button
+            id="btn-view"
+            title="Toggle between step-sequencer and arrange (waveform) view"
+          >
+            Arrange
+          </button>
+          <label
+            class="chk arrange-only"
+            title="Grid for moving regions in Arrange view. Hold Alt while dragging to move freely, or Ctrl for 1/16-step precision."
+            >Snap
+            <select id="arrange-snap" class="fade-input arrange-select">
+              <option value="1" selected>Step</option>
+              <option value="0.5">½</option>
+              <option value="0.25">¼</option>
+              <option value="0.125">⅛</option>
+              <option value="0.0625">1/16</option>
+              <option value="0">Off</option>
+            </select></label
+          >
+          <label
+            class="chk arrange-only"
+            title="Zoom the Arrange view so fine moves are easier to see"
+            >Zoom
+            <select id="arrange-zoom" class="fade-input arrange-select">
+              <option value="1" selected>1×</option>
+              <option value="2">2×</option>
+              <option value="4">4×</option>
+              <option value="8">8×</option>
+            </select></label
+          >
+          <label
+            class="chk"
+            title="New trigger cuts off the previous sample on the same channel"
+            ><input id="chk-choke" type="checkbox" /> Choke</label
+          >
+          <label class="chk" title="Crossfade length when choking (ms)"
+            >Fade
+            <input
+              id="fade-ms"
+              type="number"
+              min="1"
+              max="500"
+              value="15"
+              class="fade-input"
+            />ms</label
+          >
+          <label class="chk"
+            ><input id="chk-continuous" type="checkbox" checked /> Chain</label
+          >
+          <button id="btn-copy-seq" title="Copy current sequence">Copy</button>
+          <button id="btn-paste-seq" title="Paste into current sequence">
+            Paste
+          </button>
+          <button id="btn-clear-seq" title="Clear current sequence">
+            Clear
+          </button>
+        </div>
+      </nav>
+      </div>
+      <div
+        id="project-ordinal-links"
+        class="ordinal-links project-ordinal-links"
+        hidden
+      ></div>
+
+      <main id="channels"></main>
+
+      <section id="instruments-wrap">
+        <h3 class="section-label">
+          INSTRUMENTS
+          <span class="dim-note">— synth channels with MIDI rolls</span>
+        </h3>
+        <div id="instruments"></div>
+      </section>
+
+      <footer id="status-bar">
+        <span id="status-text"
+          >Ready — load samples via the ⊕ button on each channel.</span
+        >
+      </footer>
+    </div>
+
+    <!-- Sample loader modal -->
+    <div id="modal-loader" class="modal hidden">
+      <div class="modal-box">
+        <h2>Load Sample <span id="loader-channel-label"></span></h2>
+        <div class="tabs">
+          <button class="tab active" data-tab="library">Library</button>
+          <button class="tab" data-tab="ordinal">Ordinals ID</button>
+          <button class="tab" data-tab="xtrata">Stacks / Xtrata</button>
+          <button class="tab" data-tab="url">URL</button>
+          <button class="tab" data-tab="file">File</button>
+        </div>
+        <div class="tab-pane" data-pane="library">
+          <p>
+            144 onboard sounds plus curated L1 samples and songs. Onboard audio
+            is local today; its embedded banks are ready for future L2
+            publication.
+          </p>
+          <select id="library-category" class="lib-select"></select>
+          <input
+            id="library-search"
+            type="search"
+            class="lib-select"
+            placeholder="Filter sounds by name or tag…"
+            aria-label="Filter library sounds"
+          />
+          <select id="library-sample" class="lib-select" size="8"></select>
+          <div id="library-onboard" hidden>
+            <div class="trim-controls">
+              <label
+                >Recorded root
+                <select id="library-root"></select></label
+              ><label
+                >Layer
+                <select id="library-velocity"></select
+              ></label>
+            </div>
+            <p id="library-sound-meta" class="dim-note"></p>
+            <div class="lib-actions">
+              <a id="library-pack" download>Download family bank</a
+              ><a href="media/onboard-v2/manifest.json" download
+                >Download source manifest</a
+              ><button
+                id="library-l2-migrate"
+                title="Verify every mapped inscription before replacing matching onboard channels"
+              >
+                Import L2 replacement manifest</button
+              ><input
+                id="library-l2-file"
+                type="file"
+                accept=".json,application/json"
+                hidden
+              />
+            </div>
+          </div>
+          <div id="library-ordinal-links" class="ordinal-links" hidden></div>
+          <details id="library-song-sources" hidden>
+            <summary>Referenced sample inscriptions</summary>
+            <button id="library-show-song-sources">Show song sample IDs</button>
+            <div id="library-song-ordinal-links" class="ordinal-links"></div>
+          </details>
+          <div class="lib-actions">
+            <button
+              id="library-audition"
+              title="Play an audio sample or the selected on-chain song"
+            >
+              ▶ Audition
+            </button>
+            <button id="library-stop" title="Stop audition">■</button>
+            <button
+              id="library-play-all"
+              aria-pressed="false"
+              title="Play the whole category in order; click again to stop"
+            >
+              ▶ Play all
+            </button>
+            <button
+              id="library-export-song"
+              hidden
+              title="Save the song as an editable L1xL2 project without replacing this session"
+            >
+              Export song session
+            </button>
+            <button
+              id="library-test"
+              title="Check sample decoding and song instructions; historic applications use their original player"
+            >
+              Test category
+            </button>
+          </div>
+          <div id="library-status" class="lib-status"></div>
+        </div>
+        <div class="tab-pane hidden" data-pane="ordinal">
+          <p>
+            Bitcoin Ordinals inscription ID (audio, audional JSON, or
+            HTML-embedded audio).
+          </p>
+          <input
+            id="input-ordinal"
+            type="text"
+            placeholder="e.g. 83407a1c…21ba1i3"
+            spellcheck="false"
+          />
+          <div id="input-ordinal-links" class="ordinal-links" hidden></div>
+        </div>
+        <div class="tab-pane hidden" data-pane="xtrata">
+          <p>
+            Stacks / Xtrata inscription ID. Gateway template is configurable in
+            Settings.
+          </p>
+          <input
+            id="input-xtrata"
+            type="text"
+            placeholder="Xtrata inscription ID"
+            spellcheck="false"
+          />
+        </div>
+        <div class="tab-pane hidden" data-pane="url">
+          <p>Direct URL to an audio file or audional JSON.</p>
+          <input
+            id="input-url"
+            type="text"
+            placeholder="https://…"
+            spellcheck="false"
+          />
+          <div id="input-url-ordinal-links" class="ordinal-links" hidden></div>
+        </div>
+        <div class="tab-pane hidden" data-pane="file">
+          <p>
+            Load a local audio file (WAV, MP3, OGG, FLAC…). Also supports drag
+            &amp; drop onto a channel.
+          </p>
+          <input id="input-file" type="file" accept="audio/*" />
+        </div>
+        <div class="modal-actions">
+          <button id="loader-cancel">Cancel</button>
+          <button id="loader-load" class="primary">Load</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample / step editor modal (trim + transport + per-step overrides) -->
+    <div id="modal-trim" class="modal hidden">
+      <div class="modal-box wide">
+        <h2 id="trim-title">
+          Sample Editor <span id="trim-channel-label"></span>
+        </h2>
+        <canvas id="trim-canvas" width="760" height="180"></canvas>
+        <div id="trim-ordinal-links" class="ordinal-links" hidden></div>
+        <div class="trim-controls">
+          <button
+            id="trim-play"
+            class="transport-btn small"
+            title="Play trimmed region"
+          >
+            ▶
+          </button>
+          <button id="trim-stop" class="transport-btn small" title="Stop">
+            ■
+          </button>
+          <label
+            >Start
+            <input id="trim-start" type="range" min="0" max="1000" value="0"
+          /></label>
+          <label
+            >End
+            <input id="trim-end" type="range" min="0" max="1000" value="1000"
+          /></label>
+        </div>
+        <div class="trim-controls">
+          <label class="chk"
+            ><input id="trim-reverse" type="checkbox" /> Reverse</label
+          >
+          <label
+            >Pitch
+            <input
+              id="trim-pitch"
+              type="number"
+              min="0.1"
+              max="4"
+              step="0.05"
+              value="1"
+              class="ch-pitch"
+          /></label>
+          <label id="trim-note-wrap" hidden
+            >Note
+            <select id="trim-note" aria-label="Sample note"></select
+          ></label>
+          <label id="trim-gate-wrap" hidden
+            >Sustain
+            <select id="trim-gate">
+              <option value="0">One-shot</option>
+              <option value="1">1 step</option>
+              <option value="2">2 steps</option>
+              <option value="4">4 steps</option>
+              <option value="8">8 steps</option>
+              <option value="16">16 steps</option>
+              <option value="32">32 steps</option>
+              <option value="64">64 steps</option>
+            </select></label
+          >
+          <span id="trim-note-meta" class="dim-note"></span>
+          <label id="trim-xfade-wrap"
+            >Crossfade in
+            <input
+              id="trim-xfade"
+              type="number"
+              min="0"
+              max="2000"
+              step="5"
+              value="0"
+              class="fade-input"
+            />
+            ms</label
+          >
+          <span id="trim-scope" class="dim-note"></span>
+          <button
+            id="trim-reset-step"
+            title="Remove per-step overrides (revert to channel settings)"
+          >
+            Reset to channel
+          </button>
+        </div>
+        <div class="trim-controls">
+          <label
+            >Start (s)
+            <input id="trim-start-seconds" type="number" min="0" step="0.001"
+          /></label>
+          <label
+            >End (s)
+            <input id="trim-end-seconds" type="number" min="0" step="0.001"
+          /></label>
+          <button id="trim-words">Find words for this section</button>
+          <button id="trim-tools">Analyse / export WAV</button>
+        </div>
+        <div class="modal-actions">
+          <button id="trim-close" class="primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Piano roll / synth editor modal -->
+    <div id="modal-roll" class="modal hidden">
+      <div class="modal-box xwide">
+        <h2 id="roll-title">MIDI Roll</h2>
+        <div class="roll-toolbar">
+          <select id="roll-synth-select" title="Synth engine"></select>
+          <select
+            id="roll-lines"
+            title="Pre-programmed lines for this synth"
+          ></select>
+          <label class="roll-dur-label"
+            >Note
+            <select id="roll-dur">
+              <option value="1">1/16</option>
+              <option value="2" selected>1/8</option>
+              <option value="4">1/4</option>
+              <option value="8">1/2</option>
+              <option value="16">1 bar</option>
+            </select>
+          </label>
+          <button id="roll-copy" title="Copy selected notes (⌘/Ctrl+C)">
+            Copy
+          </button>
+          <button id="roll-paste" title="Paste notes (⌘/Ctrl+V)">Paste</button>
+          <button
+            id="roll-rec"
+            title="Arm recording — play keys A–L while the sequencer runs"
+          >
+            ● REC
+          </button>
+          <button id="roll-midi">Enable MIDI input</button>
+          <button id="roll-clear" title="Clear all notes in this sequence">
+            Clear
+          </button>
+          <button id="roll-close" class="primary">Done</button>
+        </div>
+        <div id="roll-synth-panel"></div>
+        <div class="roll-scroll">
+          <canvas id="roll-canvas"></canvas>
+        </div>
+        <div id="roll-status" class="lib-status"></div>
+      </div>
+    </div>
+
+    <!-- jiMS10 hardware-style synth panel -->
+    <div id="modal-synth" class="modal hidden">
+      <div id="synth-front" class="sfp" role="dialog" aria-label="Synth panel"></div>
+    </div>
+
+    <!-- Beat presets modal -->
+    <div id="modal-beats" class="modal hidden">
+      <div class="modal-box wide">
+        <h2>
+          <span id="beats-title">Beat Presets</span>
+          <span class="dim-note"
+            >— loads kit + pattern into the current sequence</span
+          >
+        </h2>
+        <div class="beats-filter">
+          <select id="beats-collection" aria-label="Beat collection">
+            <optgroup label="Drum beats · drums only">
+              <option value="drums-studio">Studio kit drums · 139</option>
+              <option value="drums-l1">Bitcoin L1 drums · 139</option>
+            </optgroup>
+            <optgroup label="Beats with bass &amp; melody">
+              <option value="original">Original beats · 96</option>
+              <option value="tonal">Onboard tonal beats · 32</option>
+              <option value="l1">L1 beats · 96</option>
+              <option value="combined">Combined beats · 128</option>
+            </optgroup>
+          </select>
+          <select id="beats-type" aria-label="Beat filter">
+            <option value="">All drum beats</option>
+            <option value="start">★ Start here</option>
+            <option value="bass">With a bass hit</option>
+          </select>
+          <select id="beats-genre" aria-label="Beat genre">
+            <option value="">All genres</option>
+          </select>
+          <input
+            id="beats-search"
+            type="search"
+            placeholder="Find a style, beat or sample…"
+            aria-label="Search beats"
+          />
+        </div>
+        <p id="beats-summary" class="beat-meta"></p>
+        <div class="beats-audition" aria-label="Beat audition controls">
+          <button id="beats-play" class="primary">▶ Play</button>
+          <button id="beats-stop">■ Stop</button>
+          <button id="beats-prev">← Previous</button>
+          <button id="beats-next">Next →</button>
+          <span class="beat-meta"
+            >Keep playing while you browse and load beats.</span
+          >
+        </div>
+        <div id="beats-list"></div>
+        <p id="beats-status" class="lib-status" role="status"></p>
+        <div class="modal-actions">
+          <button id="beats-cancel" hidden>Cancel load</button>
+          <button id="beats-close" class="primary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Channel FX modal -->
+    <div id="modal-fx" class="modal hidden">
+      <div class="modal-box">
+        <h2>Channel FX <span id="fx-channel-label"></span></h2>
+        <label class="fx-field"
+          >Filter
+          <select id="fx-filter">
+            <option value="off">Off</option>
+            <option value="lp">Low-pass</option>
+            <option value="hp">High-pass</option>
+          </select>
+          <input
+            id="fx-cutoff"
+            type="range"
+            min="40"
+            max="12000"
+            step="10"
+            value="8000"
+          />
+          <span id="fx-cutoff-val">8000 Hz</span>
+        </label>
+        <label class="fx-field"
+          >Drive
+          <input
+            id="fx-drive"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0"
+          />
+        </label>
+        <label class="fx-field"
+          >Delay send <span class="dim-note">(BPM-synced dotted 8th)</span>
+          <input
+            id="fx-delay"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0"
+          />
+        </label>
+        <label class="fx-field"
+          >Reverb send
+          <input
+            id="fx-reverb"
+            type="range"
+            min="0"
+            max="1"
+            step="0.01"
+            value="0"
+          />
+        </label>
+        <div class="modal-actions">
+          <button id="fx-preview">Preview hit</button>
+          <button id="fx-reset">Reset</button>
+          <button id="fx-close" class="primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insert plugins modal -->
+    <div id="modal-inserts" class="modal hidden">
+      <div class="modal-box wide">
+        <h2>Insert Plugins <span id="inserts-channel-label"></span></h2>
+        <p class="dim-note">
+          Serial chain after channel FX: slot 1 → 2 → 3 → 4 → output. Set a slot
+          to "— empty —" to remove.
+        </p>
+        <div id="inserts-slots"></div>
+        <div class="modal-actions">
+          <button id="inserts-close" class="primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div id="modal-settings" class="modal hidden">
+      <div class="modal-box">
+        <h2>Settings</h2>
+        <label class="settings-field"
+          >Ordinals gateway
+          <input id="set-ordinals-gateway" type="text" spellcheck="false" />
+        </label>
+        <label class="settings-field"
+          >Xtrata / Stacks gateway (<code>{id}</code> = inscription ID)
+          <input id="set-xtrata-gateway" type="text" spellcheck="false" />
+        </label>
+        <label class="chk"
+          ><input id="set-autosave" type="checkbox" checked /> Autosave to
+          browser storage</label
+        >
+        <div class="modal-actions">
+          <button id="settings-close" class="primary">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="daw/js/main.js"></script>
+  </body>
+</html>

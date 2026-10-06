@@ -135,6 +135,15 @@ a.way:hover { border-color: var(--lime); }
 .way .plus { font: 600 11px var(--mono); letter-spacing: .1em; color: var(--lime); }
 .way .live { font: 500 11px var(--mono); color: var(--mute); margin-top: auto; }
 .way .live.on { color: var(--teal); }
+.tip { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; align-items: center; background: var(--amber-soft); border: 1.5px solid #5a3d14; border-radius: 14px; padding: clamp(16px, 3vw, 22px); }
+.tip h3 { margin: 6px 0 4px; font: 800 clamp(20px, 3vw, 26px)/1.15 var(--display); letter-spacing: -.01em; }
+.tip p { margin: 0; color: var(--mute); max-width: 60ch; }
+.tip p b { color: var(--fg); }
+.tip .btn { display: inline-block; text-decoration: none; text-align: center; white-space: nowrap; background: var(--amber); color: #2a1a05; }
+.tip .btn:hover { filter: brightness(1.08); }
+@media (max-width: 620px) { .tip { grid-template-columns: minmax(0, 1fr); } .tip .btn { width: 100%; } }
+.fast { font-size: 14px; color: var(--mute); margin: 10px 0 0; }
+.fast a { color: var(--amber); text-underline-offset: 3px; font-weight: 600; }
 .example { background: var(--teal-soft); border: 1px solid #1d4a40; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
 .bar { display: flex; gap: 4px; }
 .bar i { height: 10px; flex: 1; border-radius: 3px; background: var(--line2); }
@@ -212,6 +221,7 @@ tr:last-child td { border-bottom: 0; }
       <div class="label lime fresh"><span class="dot"></span><span id="fresh">Reading the chain…</span><button class="ghost" id="refresh" type="button" style="margin-left:8px">Refresh</button></div>
       <h1 style="margin-top:12px">Check your tickets.</h1>
       <p class="tag">One inscription gets you in. Everything else improves your odds.</p>
+      <p class="fast">Easiest ticket: <a href="#arcade-tip">get a Top 10 score in the Arcade</a>.</p>
     </div>
     <div class="big"><b id="bigN">0</b><span>tickets in the draw</span></div>
   </div>
@@ -242,7 +252,7 @@ tr:last-child td { border-bottom: 0; }
     </div>
     <div class="steps">
       <div class="card"><div class="n">1</div><h3>Announce your wallet</h3><p>Post from X: "I'm entering #XtrataBounty with wallet SP…" and tag @XtrataLayers.</p></div>
-      <div class="card"><div class="n">2</div><h3>Inscribe first</h3><p>Inscribe something new through Xtrata with that wallet on or after 1 October. That is ticket 1 and it unlocks the rest.</p></div>
+      <div class="card"><div class="n">2</div><h3>Make an inscription</h3><p>Inscribe something new through Xtrata with that wallet on or after 1 October. You can do it before or after your other tickets. It is ticket 1, and any tickets you have already earned switch on as soon as you do.</p></div>
       <div class="card"><div class="n">3</div><h3>Keep using it</h3><p>Play, collect, post scores and trade from the same wallet. Each different action adds a ticket.</p></div>
       <div class="card"><div class="n">4</div><h3>Submit by 21 Oct</h3><p>Send your X handle, wallet and inscription IDs in the Xtrata Telegram.</p></div>
     </div>
@@ -251,14 +261,14 @@ tr:last-child td { border-bottom: 0; }
         <div class="label lime">Your tickets count when all three are true</div>
         <ul>
           <li>The wallet is announced from your X account.</li>
-          <li>That wallet has made an Xtrata inscription, or collected an Audionaut, on or after 1 October.</li>
+          <li>That wallet has made an Xtrata inscription, or collected an Audionaut, on or after 1 October. The order does not matter: tickets you earn first switch on as soon as you inscribe.</li>
           <li>Each action was done by that same wallet during the challenge.</li>
         </ul>
       </div>
       <div class="box no">
         <div class="label" style="color:var(--red)">These will not count</div>
         <ul>
-          <li>Anything done with a different wallet, or before your wallet has inscribed.</li>
+          <li>Anything done with a different wallet.</li>
           <li>Anything from before 1 October.</li>
           <li>A second wallet on the same X account, or one wallet announced by two accounts.</li>
           <li>Switching wallets halfway through.</li>
@@ -272,6 +282,14 @@ tr:last-child td { border-bottom: 0; }
       <div class="label teal">Ways to earn</div>
       <h2>Use Xtrata. Earn raffle tickets.</h2>
       <p>Your inscription is your first ticket and puts you in the draw. Each other different action adds one more, so more actions mean better odds.</p>
+    </div>
+    <div class="tip" id="arcade-tip">
+      <div>
+        <div class="label amber">Easiest ticket to win</div>
+        <h3>Get a Top 10 score in the Xtrata Arcade</h3>
+        <p>The Arcade (<b>#3081</b>) has <b>21 arcade machines</b>, and each one has its own Top 10 board. A Top 10 score on any machine is worth <b>1 ticket</b>. Pick a machine, play, and climb the board.</p>
+      </div>
+      <a class="btn" href="https://xtrata.xyz/x/3081" target="_blank" rel="noopener">Play the Arcade</a>
     </div>
     <div class="ways" id="ways"></div>
     <div class="example">
@@ -436,12 +454,12 @@ tr:last-child td { border-bottom: 0; }
 
   // ---- Static sections ----
   var ways = [
-    { t: 'Inscribe your work through Xtrata', tag: 'Ticket 1 · unlocks the rest', first: 1, href: 'https://xtrata.xyz' },
+    { t: 'Inscribe your work through Xtrata', tag: 'Ticket 1 · puts you in the draw', first: 1, href: 'https://xtrata.xyz' },
     { t: 'Play songs in the Xtrata Music app or Lounge', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
     { t: 'Play a game of On-Chain Chess', tag: '+1 ticket', href: 'https://xtrata.xyz/i/3072' },
     { t: 'Claim a sponsored drop (no STX needed)', tag: '+1 ticket', href: 'https://xtrata.xyz' },
     { t: 'Like a song on-chain', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
-    { t: 'Collect an Audionaut', tag: '+1 ticket · also unlocks the rest', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
+    { t: 'Collect an Audionaut', tag: '+1 ticket · also puts you in the draw', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
     { t: 'Commit a high score on-chain in Astro Blaster 3 (#3075)', tag: '+1 ticket per score', href: 'https://xtrata.xyz/i/3075' },
     { t: 'List or buy something on the Market', tag: '+1 ticket', href: 'https://xtrata.xyz/market' }
   ];

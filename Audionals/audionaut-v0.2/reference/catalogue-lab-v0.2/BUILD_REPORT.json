@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "date": "2026-10-02",
+  "source_count": 195,
+  "source_ids_preserved_from_v01": true,
+  "original_notes_preserved": true,
+  "original_file_sha256": "af86c9ed35eb8d4745fd43f5244fb0764f27441d0a52437c61108f52d6f46ee5",
+  "under_20_reported_count": 79,
+  "first_batch_draft_sources": 22,
+  "first_batch_draft_clips": 22,
+  "draft_category_counts": {
+    "drums": 9,
+    "synth": 4,
+    "keys": 2,
+    "unknown": 3,
+    "guitar": 1,
+    "strings": 3
+  },
+  "drum_two_beat_hypotheses": 9,
+  "new_live_audio_auditions": 0,
+  "new_live_audio_measurements": 0,
+  "approved_clips": 0,
+  "full_public_catalogue_imported": false,
+  "complete_bitcoin_census": false,
+  "network_status": "Direct audio request failed DNS resolution; alternate web retrieval unavailable.",
+  "source_retrieval_attempts_not_equivalent_to_all_22_failed": true,
+  "readme": "README.md",
+  "qa": "QA_REPORT.json",
+  "integration_contract": "SCHEMA_AND_INTEGRATION.md"
+}

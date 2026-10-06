@@ -1,5 +1,11 @@
 import { queryAll, type Env } from './db';
 import { applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey } from './hiro-keys';
+import {
+  verifyCollectionSource,
+  type ApprovedCollectionTemplate,
+  type CollectionSourceVerdict
+} from '../../src/lib/deploy/template-fingerprint';
+import { resolveArtistDeployCoreTarget } from '../../src/lib/deploy/artist-deploy';
 
 type CollectionRow = Record<string, unknown>;
 
@@ -237,6 +243,94 @@ const fetchWithHiroKeyFallback = async (params: {
   return new Response('Hiro request failed.', { status: 502 });
 };
 
+/**
+ * Collections created from this moment on must be deployed from an approved
+ * template (see src/lib/deploy/template-fingerprint.ts). Older collections were
+ * created before the check existed and are left as they are. Override with the
+ * COLLECTION_SOURCE_CHECK_FROM env var (ISO date or epoch ms).
+ */
+export const DEFAULT_SOURCE_CHECK_FROM = '2026-10-01T00:00:00Z';
+
+const resolveSourceCheckFrom = (env: Env) => {
+  const raw = toNullableString(env.COLLECTION_SOURCE_CHECK_FROM) ?? DEFAULT_SOURCE_CHECK_FROM;
+  const asNumber = /^\d+$/.test(raw) ? Number(raw) : Date.parse(raw);
+  return Number.isFinite(asNumber) ? asNumber : Date.parse(DEFAULT_SOURCE_CHECK_FROM);
+};
+
+const requiresSourceCheck = (env: Env, collection: CollectionRow) => {
+  const createdAt = Number(collection.created_at);
+  return Number.isFinite(createdAt) && createdAt > 0 && createdAt >= resolveSourceCheckFrom(env);
+};
+
+/** The core each approved template must pin, from Xtrata's own registry. */
+const expectedCoreFor = (network: 'mainnet' | 'testnet') => (template: ApprovedCollectionTemplate) =>
+  resolveArtistDeployCoreTarget(
+    network,
+    undefined,
+    template === 'xtrata-preinscribed-collection-sale-v1.0' ? 'legacy' : '3.2.3'
+  )?.contractId ?? null;
+
+// Deployed code never changes, so a verdict on a contract id holds for the
+// life of this isolate.
+const sourceVerdictCache = new Map<string, CollectionSourceVerdict>();
+
+export const clearCollectionSourceVerdictCache = () => sourceVerdictCache.clear();
+
+type SourceCheck = { ok: true } | { ok: false; reason: string };
+
+const checkDeployedSource = async (params: {
+  env: Env;
+  collection: CollectionRow;
+  metadata: Record<string, unknown> | null;
+  contractAddress: string;
+  network: 'mainnet' | 'testnet';
+  fetcher: typeof fetch;
+  apiKeys: string[];
+  /** Source already fetched for this contract (no-txid path). */
+  source?: string | null;
+  target?: ContractLookupTarget | null;
+}): Promise<SourceCheck> => {
+  if (!requiresSourceCheck(params.env, params.collection)) {
+    return { ok: true };
+  }
+  const target =
+    params.target ??
+    resolveContractLookupTarget({
+      collection: params.collection,
+      contractAddress: params.contractAddress,
+      metadata: params.metadata
+    });
+  if (!target) {
+    return { ok: false, reason: 'Could not work out which contract this collection uses, so its code cannot be checked.' };
+  }
+  const cached = sourceVerdictCache.get(target.contractId);
+  if (cached) {
+    return cached.ok ? { ok: true } : { ok: false, reason: cached.reason };
+  }
+  let source = params.source ?? null;
+  if (!source) {
+    const response = await fetchWithHiroKeyFallback({
+      fetcher: params.fetcher,
+      url: `${hiroBaseByNetwork(params.network)}/v2/contracts/source/${target.address}/${target.contractName}`,
+      apiKeys: params.apiKeys
+    });
+    if (!response.ok) {
+      // A failed read is "could not check", never "the code is wrong".
+      return {
+        ok: false,
+        reason: `Could not check the contract code right now (Hiro ${response.status}). Try again shortly.`
+      };
+    }
+    source = toNullableString(((await response.json()) as HiroContractSourceResponse).source);
+    if (!source) {
+      return { ok: false, reason: 'Could not check the contract code right now (empty response). Try again shortly.' };
+    }
+  }
+  const verdict = await verifyCollectionSource({ source, expectedCoreFor: expectedCoreFor(params.network) });
+  sourceVerdictCache.set(target.contractId, verdict);
+  return verdict.ok ? { ok: true } : { ok: false, reason: verdict.reason };
+};
+
 export async function getCollectionDeployReadiness(
   params: ReadinessParams
 ): Promise<CollectionDeployReadiness> {
@@ -353,6 +447,28 @@ export async function getCollectionDeployReadiness(
         };
       }
 
+      const sourceCheck = await checkDeployedSource({
+        env: params.env,
+        collection,
+        metadata,
+        contractAddress,
+        network,
+        fetcher,
+        apiKeys,
+        source: toNullableString(payload.source),
+        target: contractTarget
+      });
+      if (!sourceCheck.ok) {
+        return {
+          ready: false,
+          reason: sourceCheck.reason,
+          collection,
+          metadata,
+          deployTxId: null,
+          deployTxStatus: 'success',
+          network
+        };
+      }
       return {
         ready: true,
         reason: `Deployment confirmed from contract source (${contractTarget.contractId}).`,
@@ -416,6 +532,26 @@ export async function getCollectionDeployReadiness(
     }
 
     if (txStatus === 'success') {
+      const sourceCheck = await checkDeployedSource({
+        env: params.env,
+        collection,
+        metadata,
+        contractAddress,
+        network,
+        fetcher,
+        apiKeys
+      });
+      if (!sourceCheck.ok) {
+        return {
+          ready: false,
+          reason: sourceCheck.reason,
+          collection,
+          metadata,
+          deployTxId: txId,
+          deployTxStatus: txStatus,
+          network
+        };
+      }
       return {
         ready: true,
         reason: 'Deployment confirmed.',

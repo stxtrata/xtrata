@@ -25,6 +25,8 @@ import OwnerOversightPanel from './components/OwnerOversightPanel';
 import DeployWizardPanel from './components/DeployWizardPanel';
 import CollectionSettingsPanel from './components/CollectionSettingsPanel';
 import AssetStagingPanel from './components/AssetStagingPanel';
+import ReplaceFilesPanel from './components/ReplaceFilesPanel';
+import { isReplacementOpen, parseReplacementRecord } from '../lib/collections/inventory-replacement';
 import PublishOpsPanel from './components/PublishOpsPanel';
 import DiagnosticsPanel from './components/DiagnosticsPanel';
 import SdkToolkitPanel from './components/SdkToolkitPanel';
@@ -115,6 +117,8 @@ type JourneySnapshot = {
   inventoryRegistered: boolean | null;
   chainReadFailed: boolean;
   stagedFileCount: number;
+  /** A file replacement is in progress: minting must stay paused until it finishes. */
+  replacementOpen: boolean;
 };
 
 /** A <details> that mounts its (heavy) content only once opened. */
@@ -158,7 +162,8 @@ const INITIAL_JOURNEY_SNAPSHOT: JourneySnapshot = {
   deployReadinessReason: null,
   inventoryRegistered: null,
   chainReadFailed: false,
-  stagedFileCount: 0
+  stagedFileCount: 0,
+  replacementOpen: false
 };
 
 const isActiveAssetState = (value: unknown) => {
@@ -571,7 +576,8 @@ export default function CollectionManagerApp() {
           deployReady ? null : toText(readiness.reason) || null,
         inventoryRegistered,
         chainReadFailed,
-        stagedFileCount: inventoryHashes?.length ?? activeAssetCount
+        stagedFileCount: inventoryHashes?.length ?? activeAssetCount,
+        replacementOpen: isReplacementOpen(parseReplacementRecord(metadata))
       });
     } catch (error) {
       setJourneySnapshot((current) => ({
@@ -888,7 +894,10 @@ export default function CollectionManagerApp() {
       ...(standardMintForChecks
         ? [{ label: 'Max supply set', ok: journeySignals.launchMaxSupplyConfigured, hint: 'set it in Mint rules' }]
         : []),
-      { label: 'Price set', ok: journeySignals.launchMintPriceConfigured, hint: 'set it in Mint rules' }
+      { label: 'Price set', ok: journeySignals.launchMintPriceConfigured, hint: 'set it in Mint rules' },
+      ...(journeySnapshot.replacementOpen
+        ? [{ label: 'No file replacement in progress', ok: false, hint: 'finish or cancel “Replace unminted files” in Artwork & metadata' }]
+        : [])
     ];
   if (experienceMode === 'guided') {
     const launchChecks = advancedLaunchChecks;
@@ -901,7 +910,8 @@ export default function CollectionManagerApp() {
       wallet={<><WalletTopBar walletSession={walletSession} walletPending={walletPending} onConnect={handleConnectWallet} onDisconnect={handleDisconnectWallet} showAddressWhenNamed /><CreatorSessionBadge /></>}
       picker={<CollectionListPanel activeCollectionId={activeCollectionId} preferredCollectionId={storedActiveCollectionId} refreshKey={journeyRefreshKey} onSelectCollection={handleSelectCollection} />}
       deploy={(stage) => <DeployWizardPanel stage={stage} activeCollectionId={activeCollectionId} createNewToken={createNewCollectionToken} isXtrataOwner={isXtrataOwner} onDraftReady={handleDraftReady} onJourneyRefreshRequested={requestJourneyRefresh} journeyRefreshToken={journeyRefreshKey} />}
-      artwork={<><FileRetentionNotice collectionId={activeCollectionId} refreshKey={journeyRefreshKey} /><AssetStagingPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} highlightLockAction /></>}
+      artwork={<><FileRetentionNotice collectionId={activeCollectionId} refreshKey={journeyRefreshKey} /><AssetStagingPanel activeCollectionId={activeCollectionId} onJourneyRefreshRequested={requestJourneyRefresh} highlightLockAction />
+        {activeCollectionId ? <ReplaceFilesPanel collectionId={activeCollectionId} published={journeySnapshot.collectionState === 'published'} refreshKey={journeyRefreshKey} onReplaced={requestJourneyRefresh} /> : null}</>}
       retention={<FileRetentionNotice collectionId={activeCollectionId} refreshKey={journeyRefreshKey} compact />}
       inventory={<CollectionInventoryPanel key={activeCollectionId} collectionId={activeCollectionId} refreshKey={journeyRefreshKey} onVerified={requestJourneyRefresh} />}
       rules={<><CollectionSettingsPanel mode="guided" activeCollectionId={activeCollectionId} isXtrataOwner={isXtrataOwner} stagedFileCount={journeySnapshot.stagedFileCount} onJourneyRefreshRequested={requestJourneyRefresh} />
@@ -1252,6 +1262,7 @@ export default function CollectionManagerApp() {
               onJourneyRefreshRequested={requestJourneyRefresh}
               highlightLockAction={lockStepFocused}
             />
+            {activeCollectionId ? <ReplaceFilesPanel collectionId={activeCollectionId} published={journeySnapshot.collectionState === 'published'} refreshKey={journeyRefreshKey} onReplaced={requestJourneyRefresh} /> : null}
           </div>
         </section>
 

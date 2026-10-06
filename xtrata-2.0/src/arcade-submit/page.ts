@@ -5,9 +5,10 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { showContractCall } from '../lib/wallet/connect';
 import {
-  buildSubmitCall, isPilot, parsePayload, PayloadError, verifyPayload,
+  ARCADE_BOARDS, buildSubmitCall, isPilot, parsePayload, PayloadError, verifyPayload,
   type BoardInfo, type SubmitPayload
 } from './core';
+import { formatArcadeScore } from './arcade-boards';
 import { isPeriodClosed, loadBoard, previewRank } from './reads';
 import { signSubmit, submitErrorMessage, SubmitCancelled } from './sign';
 
@@ -37,6 +38,7 @@ async function loadRank(address: string) {
   render();
 }
 
+const shown = (p: SubmitPayload, n: number) => (p.kind === 'xar' ? formatArcadeScore(p.board, n) : fmt(n));
 function fmt(n: number | bigint) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
 function stx(u: bigint) { return `${u / 1_000_000n}.${(u % 1_000_000n).toString().padStart(6, '0')}`; }
 
@@ -71,20 +73,20 @@ async function start() {
     return;
   }
   const p = payload;
-  setText('rBoard', p.board === 'astro3-daily' ? `Daily run · day ${p.period}` : 'Campaign');
+  setText('rBoard', p.kind === 'xar' ? ARCADE_BOARDS[p.board].label : p.board === 'astro3-daily' ? `Daily run · day ${p.period}` : 'Campaign');
   setText('rName', p.name);
   setText('rPilot', p.pilot);
-  setText('rClaimed', fmt(p.claimedScore));
+  setText('rClaimed', shown(p, p.claimedScore));
   setText('rBytes', `${fmt(p.replay.length)} bytes`);
-  status('Replaying your run to confirm the score…');
+  status(p.kind === 'xar' ? 'Checking your run…' : 'Replaying your run to confirm the score…');
   render();
   // let the page paint before the replay runs
   await new Promise((r) => setTimeout(r, 30));
   const v = await verifyPayload(p);
   if (!v.ok) { status(v.reason + ' This run cannot be submitted.', 'err'); render(); return; }
   verifiedScore = v.score;
-  setText('rVerified', `${fmt(v.score)} ✓`);
-  status('Run verified. Connect your wallet to submit it.', 'ok');
+  setText('rVerified', `${shown(p, v.score)} ✓`);
+  status(p.kind === 'xar' ? 'Run checked. The replay is stored on-chain with your score. Connect your wallet to submit it.' : 'Run verified. Connect your wallet to submit it.', 'ok');
   try { board = await loadBoard(p.board); } catch (e) { status(e instanceof Error ? e.message : 'Could not read the leaderboard.', 'err'); }
   await checkPeriod(p);
   const s = wallet.getSession();

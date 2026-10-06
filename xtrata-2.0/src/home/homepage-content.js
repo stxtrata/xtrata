@@ -4,7 +4,84 @@
 
 // One rotating strip under the nav. Replaces the Collections banner and the
 // three campaign cards that used to sit above the hero.
+// The original Audionauts ordinal (inscription 95768432). Every Audionauts
+// "listen" link on the homepage opens it; its music streams from Bitcoin L1.
+export const AUDIONAUTS_ORDINAL_HREF = 'https://ordinals.com/inscription/95768432';
+
+// Audionauts mint opens Thursday 1 October 2026 at 19:00 BST (18:00 UTC).
+export const AUDIONAUTS_LAUNCH_AT = '2026-10-01T18:00:00Z';
+// The Audionauts collection / mint page. Before the launch time the homepage
+// links to it as "See the collection" (the page itself shows the mint as paused)
+// and keeps the "mints at 7pm" wording; from the launch time it switches itself
+// to "Minting now" with a Mint button. Set this to null to hold the link back.
+export const AUDIONAUTS_MINT_HREF = 'https://xtrata.xyz/collection/audionauts-1-0';
+
+const PAGE_LOADED_AT = Date.now();
+const AUDIONAUTS_MS_TO_LAUNCH = Date.parse(AUDIONAUTS_LAUNCH_AT) - PAGE_LOADED_AT;
+const AUDIONAUTS_LIVE = Boolean(AUDIONAUTS_MINT_HREF) && AUDIONAUTS_MS_TO_LAUNCH <= 0;
+const AUDIONAUTS_TONIGHT = AUDIONAUTS_MS_TO_LAUNCH > 0 && AUDIONAUTS_MS_TO_LAUNCH < 24 * 60 * 60 * 1000;
+const AUDIONAUTS_WHEN = AUDIONAUTS_TONIGHT ? 'tonight, 7pm BST' : 'Thu 1 Oct, 7pm BST';
+
+// Ticket tracker for the Zero Authority DAO x Xtrata bounty: a static page in
+// public/bounty/zdao/tracker/1/ that reads ticket-earning contract calls live from the chain.
+// It opens in the same tab. When the bounty closes the same link reads as the final results;
+// it is never removed.
+export const BOUNTY_TRACKER_HREF = '/bounty/zdao/tracker/1/';
+// The bounty closes at the end of 21 October 2026, UK time (BST). Change this one value to
+// move the moment the tracker link switches to "See the final results".
+export const BOUNTY_ENDS_AT = '2026-10-21T23:00:00Z';
+
+export function bountyTrackerLink(now = Date.now()) {
+  const final = now >= Date.parse(BOUNTY_ENDS_AT);
+  return Object.freeze(
+    final
+      ? {
+          href: BOUNTY_TRACKER_HREF, final: true, tag: 'Results',
+          label: 'See the final results', title: 'The bounty has closed.',
+          line: 'Final raffle tickets for #XtrataBounty'
+        }
+      : {
+          href: BOUNTY_TRACKER_HREF, final: false, tag: 'Live',
+          label: 'Check your tickets', title: 'Check your raffle tickets.',
+          line: 'Live raffle tickets for #XtrataBounty'
+        }
+  );
+}
+
+// The Create. Inscribe. Share. bounty, 1 to 21 October 2026. PDFs live in public/bounty/.
+export const HOMEPAGE_BOUNTY = Object.freeze({
+  tag: '#XtrataBounty',
+  guideHref: '/bounty/xtrata-bounty-at-a-glance.pdf',
+  rulesHref: '/bounty/xtrata-bounty-full-rules.pdf',
+  telegramHref: 'https://t.me/+DSYbDCWx869hOWY0',
+  tracker: bountyTrackerLink(PAGE_LOADED_AT),
+  stats: Object.freeze([
+    Object.freeze(['500 STX', 'in prizes']),
+    Object.freeze(['19', 'prizes to win']),
+    Object.freeze(['Wed 28 Oct', 'winners announced'])
+  ]),
+  steps: Object.freeze([
+    Object.freeze(['Announce', 'Post your wallet on X with #XtrataBounty.']),
+    Object.freeze(['Inscribe', 'Make something new on Xtrata. That is your first raffle ticket.']),
+    Object.freeze(['Use Xtrata', 'Play, collect, claim and list. Each different action adds a ticket.']),
+    Object.freeze(['Share', 'Post your work on X and submit it by 21 October.'])
+  ]),
+  funding: 'Co-funded 50/50 by Xtrata and Zero Authority DAO.'
+});
+
 export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
+  Object.freeze({
+    id: 'bounty', tag: 'Live', tone: 'lime',
+    title: '500 STX bounty: Create. Inscribe. Share.',
+    line: 'Open 1 to 21 October. Inscribe something new and share it on X.',
+    cta: 'See how to enter', href: '/bounty/xtrata-bounty-at-a-glance.pdf', newTab: true
+  }),
+  // Same-tab link to the live ticket tracker (no newTab). Reads as the final results after 21 Oct.
+  Object.freeze({
+    id: 'bounty-tickets', tag: HOMEPAGE_BOUNTY.tracker.tag, tone: 'lime',
+    title: HOMEPAGE_BOUNTY.tracker.title, line: HOMEPAGE_BOUNTY.tracker.line,
+    cta: HOMEPAGE_BOUNTY.tracker.label, href: HOMEPAGE_BOUNTY.tracker.href
+  }),
   Object.freeze({
     id: 'music-app', tag: 'New', tone: 'violet',
     title: 'Xtrata Music is out for Mac and Windows.',
@@ -29,12 +106,23 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     line: "Signature drum loops from The Prodigy's former live drummer. Play them now.",
     cta: 'Enter the loop station', href: '/kp-loops/#kp-loops'
   }),
-  Object.freeze({
-    id: 'audionauts', tag: 'Soon', tone: 'teal',
-    title: 'Audionauts mints this week.',
-    line: 'A collection built from songs already on-chain.',
-    cta: 'Get launch alerts', href: 'https://x.com/XtrataLayers', newTab: true
-  }),
+  Object.freeze(AUDIONAUTS_LIVE
+    ? {
+        id: 'audionauts', tag: 'Live', tone: 'teal',
+        title: 'Audionauts is live.',
+        line: '111 helmets, each hiding a star song. Mint yours now.',
+        cta: 'Mint an Audionaut', href: AUDIONAUTS_MINT_HREF, newTab: true
+      }
+    : {
+        id: 'audionauts', tag: 'Soon', tone: 'teal',
+        title: `Audionauts mints ${AUDIONAUTS_WHEN}.`,
+        // Before the mint opens, the banner already opens the (paused) collection page.
+        line: AUDIONAUTS_MINT_HREF
+          ? 'The collection page is up and the mint opens at 7pm BST. Look around now.'
+          : 'Listen to the original Audionauts music, streamed straight from Bitcoin L1.',
+        cta: AUDIONAUTS_MINT_HREF ? 'See the collection' : 'Listen on L1',
+        href: AUDIONAUTS_MINT_HREF || AUDIONAUTS_ORDINAL_HREF, newTab: true
+      }),
   Object.freeze({
     id: 'radio', tag: 'Live', tone: 'lime',
     title: 'Xtrata Radio.',
@@ -42,38 +130,53 @@ export const HOMEPAGE_STRIP_SLIDES = Object.freeze([
     cta: 'Open the Lounge', href: '/music/lounge', newTab: true
   }),
   Object.freeze({
-    id: 'forever-twins', tag: 'Live', tone: 'orange',
-    title: 'Forever Twins.',
-    line: 'Give an existing collection a fully on-chain twin.',
-    cta: 'Preserve yours', href: '/forever-twins/'
+    id: 'forever-twins', tag: 'New', tone: 'orange',
+    title: 'Forever Twins: NYC Degens and Megapont Ape Club.',
+    line: 'Two more collections now have a fully on-chain twin. Holders can claim theirs.',
+    cta: 'See the new twins', href: '/forever-twins/'
   })
 ]);
 
 // The Living Wall beside the hero headline. Order matters: the grid is
 // 4 columns x 3 rows on desktop and the spans below fill it exactly.
-//   chess: 2x2   audionauts: 2x1   timeloop: 1x2   then four 1x1 tiles.
+//   astro blaster: 2x2 (top billing)   chess: 1x2   two songs: 1x1
+//   audionauts: 2x1   twins + DYLE: 1x1. Timeloop lives in the Play row.
 export const HOMEPAGE_WALL = Object.freeze([
   Object.freeze({
-    id: 'chess', kind: 'chess', size: 'big', tone: 'amber',
+    // Newest headline: the whole 3D arcade hall. Opens full screen in a new tab.
+    id: 'xtrata-arcade', kind: 'image', size: 'big', tone: 'arcade',
+    eyebrow: 'Brand new · 21 games', title: 'Xtrata Arcade',
+    subtitle: 'Walk a neon 3D hall of cabinets, press START, and put your high score on Bitcoin.',
+    image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', badge: '#3081', cta: 'Walk in',
+    href: '/i/3081', newTab: true
+  }),
+  Object.freeze({
+    id: 'astro-blaster', kind: 'image', size: 'big', tone: 'cyan',
+    eyebrow: 'New · play', title: 'Astro Blaster 3', subtitle: 'Every top score lives on Bitcoin.',
+    image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', badge: '#3075',
+    href: '/i/3075', newTab: true
+  }),
+  Object.freeze({
+    id: 'chess', kind: 'chess', size: 'tall', tone: 'amber',
     eyebrow: 'Play', title: 'On-Chain Chess', cta: 'Play free',
     href: '/i/3072', newTab: true, tokenId: 3072
   }),
   Object.freeze({
-    // Pressing it plays Xtrata Radio in place (the #3059 logo itself is silent).
-    id: 'audionauts-stream', kind: 'radio', size: 'wide', tone: 'teal',
-    eyebrow: 'Coming this week · press to listen', title: 'Audionauts',
-    image: '/home/wall/audionauts-3059.webp',
-    href: '/radio'
-  }),
-  Object.freeze({
-    id: 'timeloop', kind: 'image', size: 'tall', tone: 'paper',
-    eyebrow: 'Play · mystery', title: 'Timeloop Detective', subtitle: 'One day. One heist. Rewind.',
-    image: '/home/wall/timeloop-3047.webp', position: 'top',
-    href: '/i/3047', newTab: true
-  }),
-  Object.freeze({
     id: 'song-3062', kind: 'song', tokenId: 3062,
     title: 'Neon Portal Bloom', subtitle: 'BotCupid'
+  }),
+  Object.freeze({
+    id: 'song-3058', kind: 'song', tokenId: 3058,
+    title: 'The Judge Is in the House', subtitle: '3ai3'
+  }),
+  Object.freeze({
+    // Live: opens the collection page. Before the mint: the original Audionauts ordinal.
+    id: 'audionauts-stream', kind: 'image', size: 'wide', tone: 'teal',
+    eyebrow: AUDIONAUTS_LIVE ? 'Minting now' : `Mints ${AUDIONAUTS_WHEN}`, title: 'Audionauts',
+    subtitle: AUDIONAUTS_LIVE ? 'Mint yours now →' : 'Listen to the original music, streamed from L1 →',
+    image: '/home/wall/audionauts-3059.webp',
+    // Once the mint is live every tile and banner goes to the collection page.
+    href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, newTab: true, listen: true
   }),
   Object.freeze({
     id: 'forever-twins', kind: 'image', tone: 'orange',
@@ -85,10 +188,6 @@ export const HOMEPAGE_WALL = Object.freeze([
     id: 'dyle-296', kind: 'image', tone: 'pink', pixelated: true,
     eyebrow: 'Collect', title: 'Art by DYLE',
     image: '/i/296', href: '/xplorer?wallet=dyle.btc&sel=296'
-  }),
-  Object.freeze({
-    id: 'song-3058', kind: 'song', tokenId: 3058,
-    title: 'The Judge Is in the House', subtitle: '3ai3'
   })
 ]);
 
@@ -113,14 +212,18 @@ export const HOMEPAGE_MUSIC = Object.freeze({
 
 // Audionauts teaser. Flip status to 'live' and set mintHref on launch day.
 export const HOMEPAGE_AUDIONAUTS = Object.freeze({
-  status: 'soon',
-  mintLabel: 'This week',
+  status: AUDIONAUTS_LIVE ? 'live' : 'soon',
+  // Mint opens Thursday 1 October 2026 at 19:00 BST.
+  mintLabel: AUDIONAUTS_TONIGHT ? 'Tonight 7pm' : 'Thu 7pm BST',
   editions: 111,
-  // #3059 is the (silent) Audionauts logo, so "listen" goes to the radio.
-  listenHref: '/radio',
+  // The original Audionauts ordinal streams its music from Bitcoin L1.
+  listenHref: AUDIONAUTS_ORDINAL_HREF,
+  // The poster goes to the collection once the mint is live.
+  posterHref: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF,
+  posterCue: AUDIONAUTS_LIVE ? 'Mint an Audionaut' : 'Listen to the original music, streamed from L1',
   poster: '/home/wall/audionauts-3059.webp',
   alertsHref: 'https://x.com/XtrataLayers',
-  mintHref: null,
+  mintHref: AUDIONAUTS_MINT_HREF,
   soundtrackIds: Object.freeze([3062, 3061, 3058, 2910, 2892, 3036]),
   soundtrackCredit: 'Audionals · 3ai3 · BotCupid'
 });
@@ -146,9 +249,10 @@ export const HOMEPAGE_KP_LOOPS = Object.freeze({
 export const HOMEPAGE_FRESH = Object.freeze({
   size: 12,
   pinned: Object.freeze([
+    { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
-    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: 'Coming this week', image: '/home/wall/audionauts-3059.webp', href: '/radio', radio: true },
+    { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, listen: true },
     { id: 3047, kind: 'game', title: 'Timeloop Detective · Meridian', by: 'HTML game', image: '/home/wall/timeloop-3047.webp', position: 'top', href: '/i/3047' },
     { id: 1107, kind: 'code', title: 'VST late night', by: 'HTML + audio', image: '/home/wall/vst-1107.webp', href: '/xplorer?gallery=jim-music&sel=1107' }
   ]),
@@ -165,7 +269,8 @@ export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'chess', kind: 'chess', tag: '#3072 · Chess', title: 'Challenge anyone', copy: 'Play a person on-chain, or the computer for practice. Casual games are free.', href: '/i/3072', tone: 'amber' },
   { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
   { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
-  { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' }
+  { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' },
+  { id: 'xtrata-arcade', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', tag: '#3081 · Arcade', title: 'Xtrata Arcade', copy: 'Walk a 3D hall of 21 cabinets. Every run is recorded and the Top 10 lives on Bitcoin.', href: '/i/3081', tone: 'violet' }
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([
@@ -173,8 +278,8 @@ export const HOMEPAGE_PROGRAMMES = Object.freeze([
     actions: [{ label: 'Download', href: '/music/lounge', primary: true }, { label: 'Put your music on', href: '/music/' }] },
   { id: 'radio', tone: 'amber', image: '/radio-face.jpg', tag: 'Radio · in your browser', title: 'Xtrata Radio', copy: "Press play and hear what's on-chain. Embed it on your own site too.",
     actions: [{ label: 'Tune in', radio: true, primary: true }, { label: 'Embed', href: '/radio/share' }] },
-  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · live', title: 'Forever Twins', copy: 'Give an existing collection a self-contained, fully on-chain twin. Holders keep the link.',
-    actions: [{ label: 'Preserve yours', href: '/forever-twins/', primary: true }] },
+  { id: 'forever-twins', tone: 'orange', image: '/forever-twins/bitcoin-pepes/pepe-forever-twin.webp', tag: 'Preserve · new contracts', title: 'Forever Twins', copy: 'NYC Degens and Megapont Ape Club now have Forever Twin contracts. Holders can give their piece a self-contained, fully on-chain twin.',
+    actions: [{ label: 'See the twins', href: '/forever-twins/', primary: true }] },
   { id: 'collections', tone: 'lime', art: 'soon', tag: 'Coming soon', title: 'Xtrata Collections', copy: 'Upload a whole collection, set a price, and let collectors mint each piece.',
     actions: [{ label: 'Follow for launch news', href: 'https://x.com/XtrataLayers' }] }
 ]);
@@ -278,6 +383,11 @@ export const validateHomepageContent = () => {
     }
     if ((item.kind === 'image' || item.kind === 'radio') && !item.image) {
       errors.push(`Homepage wall tile ${item.id} needs an image.`);
+    }
+  });
+  [HOMEPAGE_BOUNTY.guideHref, HOMEPAGE_BOUNTY.rulesHref, HOMEPAGE_BOUNTY.telegramHref, HOMEPAGE_BOUNTY.tracker.href].forEach((href) => {
+    if (!isNavigableHref(href)) {
+      errors.push('Homepage bounty links must be navigable.');
     }
   });
   HOMEPAGE_FRESH.pinned.forEach((item) => {

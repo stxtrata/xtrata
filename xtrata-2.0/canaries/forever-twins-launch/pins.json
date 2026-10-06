@@ -1,0 +1,14 @@
+{
+  "nyc-degens": {
+    "helperSha": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951",
+    "manifestSha": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "pinnedAt": "2026-10-05"
+  },
+  "megapont-ape-club": {
+    "helperSha": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
+    "manifestSha": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "pinnedAt": "2026-10-05"
+  }
+}

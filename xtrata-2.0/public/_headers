@@ -125,3 +125,16 @@
 
 /radio/music-profile-wallet-v3.js
   Cache-Control: no-cache
+
+# The Audionaut studio (/audionaut). Stable filenames, so force revalidation:
+# otherwise Pages' 4-hour default lets a stale stylesheet or script shadow a
+# redeploy (a new daw.html met an old style.css and the logo vanished).
+# Trailing splats only; the sound packs and catalogues keep the default cache.
+/audionaut/audionaut-gate.js
+  Cache-Control: no-cache
+/audionaut/daw.html
+  Cache-Control: no-cache
+/audionaut/daw/css/*
+  Cache-Control: no-cache
+/audionaut/daw/js/*
+  Cache-Control: no-cache

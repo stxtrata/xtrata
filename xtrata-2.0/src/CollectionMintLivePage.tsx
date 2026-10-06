@@ -1,4 +1,5 @@
 import { isCollectionV15, isFixedPriceCollection, readCollectionV15FeeUnits, quoteCollectionV15Mint, type CollectionV15FeeUnits } from '../packages/xtrata-sdk/src/collection-v15';
+import { buildCollectionAssetPreviewUrl } from './lib/collections/inventory-replacement';
 import { startJourney, event } from './lib/telemetry/client';
 import { classify } from './lib/telemetry/classify';
 import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
@@ -91,6 +92,7 @@ import { createImageThumbnail, THUMBNAIL_SIZE } from './lib/viewer/thumbnail';
 import { getTokenThumbnailKey, useTokenSummaries } from './lib/viewer/queries';
 import { createObjectUrl } from './lib/utils/blob';
 import { bytesToHex } from './lib/utils/encoding';
+import { resolveMintedAssetsFast, runWithConcurrency } from './lib/collection-mint/minted-assets';
 import { formatBytes } from './lib/utils/format';
 import { createStacksWalletAdapter } from './lib/wallet/adapter';
 import { createWalletSessionStore } from './lib/wallet/session';
@@ -105,6 +107,8 @@ const walletSessionStore = createWalletSessionStore();
 const CONTRACT_NAME_PATTERN = /^[a-zA-Z][a-zA-Z0-9-_]{0,127}$/;
 const HASH_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const MINT_CHUNK_BATCH_SIZE = 30;
+// The large single-item preview under the gallery is off for now; tiles play inline.
+const SHOW_GALLERY_DETAIL = false;
 const STATUS_REFRESH_ACTIVE_MS = 6_000;
 const STATUS_REFRESH_BACKGROUND_MS = 20_000;
 const STATUS_REFRESH_MINTING_MS = 3_000;
@@ -511,13 +515,17 @@ const CollectionLiveCachedDetailMedia = ({
 }: CollectionLiveCachedDetailMediaProps) => {
   const queryClient = useQueryClient();
   const contentSeededRef = useRef(false);
+  // HTML/text must run from its server URL: a blob: copy cannot resolve the
+  // relative /i/<id> requests recursive inscriptions make ("Player unavailable").
+  const mediaKind = getMediaKind(asset.mime_type);
+  const isDocument = mediaKind === 'html' || mediaKind === 'text';
   const cachedContentKey = useMemo(
     () => ['collection-live', 'detail-content', contractId, tokenId?.toString() ?? 'none'],
     [contractId, tokenId]
   );
   const cachedContentQuery = useQuery({
     queryKey: cachedContentKey,
-    enabled: tokenId !== null,
+    enabled: tokenId !== null && !isDocument,
     staleTime: Infinity,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
@@ -551,7 +559,7 @@ const CollectionLiveCachedDetailMedia = ({
   }, [previewUrl, tokenId]);
 
   useEffect(() => {
-    if (tokenId === null) {
+    if (tokenId === null || isDocument) {
       return;
     }
     if (cachedContentQuery.data?.data && cachedContentQuery.data.data.length > 0) {
@@ -621,6 +629,7 @@ const CollectionLiveCachedDetailMedia = ({
     cachedContentKey,
     cachedContentQuery.data,
     contractId,
+    isDocument,
     previewUrl,
     queryClient,
     tokenId
@@ -629,7 +638,7 @@ const CollectionLiveCachedDetailMedia = ({
   return (
     <CollectionLiveGalleryMedia
       asset={asset}
-      previewUrl={cachedContentUrl ?? previewUrl}
+      previewUrl={isDocument ? previewUrl : cachedContentUrl ?? previewUrl}
       collectionTitle={collectionTitle}
       loading="eager"
     />
@@ -724,6 +733,19 @@ const CollectionLiveGalleryCardMedia = ({
         previewUrl={previewUrl}
         collectionTitle={collectionTitle}
         contractId={contractId}
+      />
+    );
+  }
+
+  if (mediaKind === 'html' || mediaKind === 'text') {
+    // Runs from its server URL so recursive /i/<id> requests resolve.
+    return (
+      <iframe
+        className="collection-live-page__gallery-live-frame"
+        src={previewUrl}
+        title={asset.filename ?? asset.path}
+        sandbox="allow-scripts"
+        loading="lazy"
       />
     );
   }
@@ -1019,6 +1041,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const [mintedScanPending, setMintedScanPending] = useState(false);
   const [pendingMintAssetIds, setPendingMintAssetIds] = useState<string[]>([]);
   const [selectedGalleryAssetId, setSelectedGalleryAssetId] = useState<string | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [resumeAssetId, setResumeAssetId] = useState<string | null>(null);
   const [showMintGuide, setShowMintGuide] = useState(false);
   const [beginState, setBeginState] = useState<StepState>('idle');
@@ -1216,6 +1241,54 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     () => walletSession.address ?? coreContract.address,
     [walletSession.address, coreContract.address]
   );
+  // How many of this collection's minted tokens the connected wallet owns.
+  // A failed owner read is "could not check", never "you own none".
+  const mintedGlobalTokenIds = useMemo(
+    () =>
+      Array.from(new Set(Object.values(mintedTokenIds).filter((id) => /^\d+$/.test(id)))).sort(
+        (left, right) => Number(left) - Number(right)
+      ),
+    [mintedTokenIds]
+  );
+  const myHoldingsQuery = useQuery({
+    queryKey: [
+      'collection-live',
+      'my-holdings',
+      coreContractId,
+      walletSession.address ?? 'none',
+      mintedGlobalTokenIds.join(',')
+    ],
+    enabled: Boolean(walletSession.address) && mintedGlobalTokenIds.length > 0,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const wallet = walletSession.address ?? '';
+      const owned: string[] = [];
+      let failed = 0;
+      const queue = [...mintedGlobalTokenIds];
+      const worker = async () => {
+        while (queue.length > 0) {
+          const id = queue.shift()!;
+          try {
+            const owner = await coreClient.getOwner(BigInt(id), wallet);
+            if (owner && owner === wallet) owned.push(id);
+          } catch {
+            failed += 1;
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, queue.length) }, worker));
+      return { owned, failed };
+    }
+  });
+  const myHoldingsCount = myHoldingsQuery.data?.owned.length ?? 0;
+  const myOwnedTokenIds = useMemo(
+    () => new Set(myHoldingsQuery.data?.owned ?? []),
+    [myHoldingsQuery.data]
+  );
+  const myHoldingsUnknown =
+    Boolean(walletSession.address) &&
+    (myHoldingsQuery.isError || ((myHoldingsQuery.data?.failed ?? 0) > 0 && myHoldingsCount === 0));
 
   const selectedGalleryAsset = useMemo(() => {
     if (mintedGallery.length === 0) {
@@ -1262,9 +1335,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (!selectedGalleryAsset || !resolvedCollectionId) {
       return null;
     }
-    return `/collections/${encodeURIComponent(
-      resolvedCollectionId
-    )}/asset-preview?assetId=${encodeURIComponent(selectedGalleryAsset.asset_id)}`;
+    return buildCollectionAssetPreviewUrl(resolvedCollectionId, selectedGalleryAsset.asset_id, {
+      version: selectedGalleryAsset.expected_hash
+    });
   }, [resolvedCollectionId, selectedGalleryAsset]);
 
   const selectedGalleryDetailsQuery = useQuery({
@@ -1314,7 +1387,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     if (!selectedGalleryTokenIdLabel) {
       return '/';
     }
-    return `/?viewer-token=${encodeURIComponent(selectedGalleryTokenIdLabel)}`;
+    return `/x/${encodeURIComponent(selectedGalleryTokenIdLabel)}`;
   }, [selectedGalleryTokenIdLabel]);
   const selectedGalleryCreatorViewerHref = useMemo(() => {
     if (!selectedGalleryCreatorAddress) {
@@ -1706,11 +1779,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   );
 
   const fetchAssetBytes = useCallback(
-    async (assetId: string) => {
+    // `version` (the file's content hash) keys every cache layer, so a file
+    // replaced while the collection was paused is never served from a stale copy.
+    async (assetId: string, version?: string | null) => {
       if (!resolvedCollectionId) {
         throw new Error('Collection id missing.');
       }
-      const cacheKey = `${resolvedCollectionId}:${assetId}`;
+      const cacheKey = `${resolvedCollectionId}:${assetId}:${version ?? ''}`;
       const cached = readTimedCache(
         collectionAssetBytesCache,
         cacheKey,
@@ -1725,9 +1800,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       }
       const loadPromise = (async () => {
         const response = await fetch(
-          `/collections/${encodeURIComponent(
-            resolvedCollectionId
-          )}/asset-preview?assetId=${encodeURIComponent(assetId)}`,
+          buildCollectionAssetPreviewUrl(resolvedCollectionId, assetId, { version }),
           { cache: 'default' }
         );
         if (!response.ok) {
@@ -1957,6 +2030,43 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     return owner ? String(cvToValue(owner)) : null;
   }, [collectionContract]);
 
+  // Minted indexes are append-only, so entries and token hashes are cached for the page's life.
+  const mintedIndexCacheRef = useRef<{ key: string; ids: Map<number, string> }>({ key: '', ids: new Map() });
+  const tokenHashCacheRef = useRef<Map<string, string>>(new Map());
+  const mintedScanSeqRef = useRef(0);
+  const canonicalHashRef = useRef<Record<string, string>>({});
+  canonicalHashRef.current = canonicalHashHexByAssetId;
+
+  const readMintedTokenIdsRange = useCallback(
+    async (from: number, to: number, senderAddress: string): Promise<Array<string | null>> => {
+      if (!collectionContract) throw new Error('Collection contract is missing.');
+      const key = `${collectionContract.address}.${collectionContract.contractName}`;
+      if (mintedIndexCacheRef.current.key !== key) {
+        mintedIndexCacheRef.current = { key, ids: new Map() };
+      }
+      const cache = mintedIndexCacheRef.current.ids;
+      const missing: number[] = [];
+      for (let index = from; index < to; index += 1) {
+        if (!cache.has(index)) missing.push(index);
+      }
+      const network = toStacksNetwork(collectionContract.network);
+      await runWithConcurrency(missing, 6, async (index) => {
+        const entryCv = await callReadOnlyFunction({
+          contractAddress: collectionContract.address,
+          contractName: collectionContract.contractName,
+          functionName: 'get-minted-id',
+          functionArgs: [uintCV(BigInt(index))],
+          senderAddress,
+          network
+        });
+        const tokenId = parseMintedIndexTokenId(entryCv);
+        if (tokenId !== null) cache.set(index, tokenId.toString());
+      });
+      return Array.from({ length: Math.max(0, to - from) }, (_, offset) => cache.get(from + offset) ?? null);
+    },
+    [collectionContract]
+  );
+
   const syncCollectionTokenNumbers = useCallback(
     async (options?: { forceFull?: boolean; mintedCount?: bigint | null }) => {
       if (!collectionContract) {
@@ -1994,22 +2104,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       setCollectionIndexSyncMessage(null);
       try {
         const senderAddress = walletSession.address ?? collectionContract.address;
-        const network = toStacksNetwork(collectionContract.network);
         const nextEntries: Record<string, number> = {};
-        for (let index = startIndex; index < targetCount; index += 1) {
-          const entryCv = await callReadOnlyFunction({
-            contractAddress: collectionContract.address,
-            contractName: collectionContract.contractName,
-            functionName: 'get-minted-id',
-            functionArgs: [uintCV(BigInt(index))],
-            senderAddress,
-            network
-          });
-          const tokenId = parseMintedIndexTokenId(entryCv);
-          if (tokenId !== null) {
-            nextEntries[tokenId.toString()] = index + 1;
-          }
-        }
+        const rangeIds = await readMintedTokenIdsRange(startIndex, targetCount, senderAddress);
+        rangeIds.forEach((tokenId, offset) => {
+          if (tokenId !== null) nextEntries[tokenId] = startIndex + offset + 1;
+        });
 
         const nextMap =
           needsFullSync || startIndex === 0
@@ -2031,6 +2130,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       collectionIndexCount,
       collectionTokenNumberByGlobalId,
       contractStatus?.mintedCount,
+      readMintedTokenIdsRange,
       walletSession.address
     ]
   );
@@ -2056,10 +2156,36 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       return;
     }
     setMintedScanPending(true);
+    const scanSeq = (mintedScanSeqRef.current += 1);
     const senderAddress = walletSession.address ?? coreContract.address;
     const next: Record<string, string> = {};
     const hashCorrections: Record<string, string> = {};
     try {
+      // Fast path: the contract's own minted list + each token's final hash (~2 reads per
+      // MINTED token). Anything uncertain falls through to the thorough per-file scan below.
+      const fast = await resolveMintedAssetsFast({
+        mintedCount:
+          contractStatus?.mintedCount === null || contractStatus?.mintedCount === undefined
+            ? Number.NaN
+            : Number(contractStatus.mintedCount),
+        assets: mintableAssets,
+        canonicalHashHexByAssetId: canonicalHashRef.current,
+        readTokenIds: (count) => readMintedTokenIdsRange(0, count, senderAddress),
+        readTokenHash: async (tokenId) => {
+          const cached = tokenHashCacheRef.current.get(tokenId);
+          if (cached) return cached;
+          const meta = await coreClient.getInscriptionMeta(BigInt(tokenId), senderAddress);
+          if (!meta) return null;
+          const hex = bytesToHex(meta.finalHash);
+          tokenHashCacheRef.current.set(tokenId, hex);
+          return hex;
+        }
+      });
+      if (fast.status === 'ok') {
+        if (scanSeq === mintedScanSeqRef.current) setMintedTokenIds(fast.mintedTokenIds);
+        return;
+      }
+
       const lookupTokenId = async (hashHex: string) => {
         const hashBytes = hashHexToBytes(hashHex);
         if (!hashBytes) {
@@ -2079,7 +2205,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         const settled = await Promise.all(
           batch.map(async (asset) => {
             const knownHashHex =
-              normalizeHashHex(canonicalHashHexByAssetId[asset.asset_id]) ??
+              normalizeHashHex(canonicalHashRef.current[asset.asset_id]) ??
               normalizeHashHex(asset.expected_hash ?? '');
             if (knownHashHex) {
               const tokenId = await lookupTokenId(knownHashHex);
@@ -2089,7 +2215,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             }
 
             try {
-              const rawBytes = await fetchAssetBytes(asset.asset_id);
+              const rawBytes = await fetchAssetBytes(asset.asset_id, asset.expected_hash);
               const computedHash = computeExpectedHash(chunkBytes(rawBytes));
               const computedHex = bytesToHex(computedHash);
               const rawShaHex = bytesToHex(sha256(rawBytes));
@@ -2124,7 +2250,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           next[entry.assetId] = entry.tokenId;
         });
       }
-      setMintedTokenIds(next);
+      if (scanSeq === mintedScanSeqRef.current) setMintedTokenIds(next);
       if (Object.keys(hashCorrections).length > 0) {
         setCanonicalHashHexByAssetId((current) => ({
           ...current,
@@ -2132,12 +2258,11 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         }));
       }
     } finally {
-      setMintedScanPending(false);
+      if (scanSeq === mintedScanSeqRef.current) setMintedScanPending(false);
     }
   }, [
-    canonicalHashHexByAssetId,
     contractStatus?.mintedCount,
-    coreClient, usesV15, readCollectionMintOwner,
+    coreClient, usesV15, readCollectionMintOwner, readMintedTokenIdsRange,
     coreContract.address,
     fetchAssetBytes,
     mintableAssets,
@@ -2314,7 +2439,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
           batchSize: RESERVATION_SCAN_COMPUTE_BATCH_SIZE,
           predicate: async (candidate) => {
             try {
-              const rawBytes = await fetchAssetBytes(candidate.asset_id);
+              const rawBytes = await fetchAssetBytes(candidate.asset_id, candidate.expected_hash);
               const computedHash = computeExpectedHash(chunkBytes(rawBytes));
               const computedHex = bytesToHex(computedHash);
               const rawShaHex = bytesToHex(sha256(rawBytes));
@@ -2430,7 +2555,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
         return quoteCollectionV15Mint(latest.v15Fees, chunks, price, { fixedPrice });
       };
       try {
-        const rawBytes = await fetchAssetBytes(asset.asset_id);
+        const rawBytes = await fetchAssetBytes(asset.asset_id, asset.expected_hash);
         const chunks = chunkBytes(rawBytes);
         const computedHash = computeExpectedHash(chunks);
         const computedHex = bytesToHex(computedHash);
@@ -3480,6 +3605,94 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
   const formattedTxDelay =
     txDelaySeconds === null ? null : txDelaySeconds.toString().padStart(2, '0');
 
+  const mintProgressPercent = (() => {
+    const minted = Number(contractStatus?.mintedCount ?? NaN);
+    const max = Number(contractStatus?.maxSupply ?? NaN);
+    if (!Number.isFinite(minted) || !Number.isFinite(max) || max <= 0) {
+      return null;
+    }
+    return Math.max(0, Math.min(100, (minted / max) * 100));
+  })();
+  const showMintStatusPanel =
+    mintPending ||
+    Boolean(mintMessage) ||
+    Boolean(resumeTargetAsset) ||
+    mintRoute === 'staged' ||
+    [beginState, uploadState, sealState].some((state) => state !== 'idle');
+  const descriptionIsLong = collectionDescription.length > 260;
+
+  const renderGalleryTile = (asset: (typeof mintedGallery)[number]) => {
+    const tokenId = mintedTokenIds[asset.asset_id] ?? null;
+    const tileTokenId = (() => {
+      if (!tokenId || tokenId.length === 0) {
+        return null;
+      }
+      try {
+        return BigInt(tokenId);
+      } catch {
+        return null;
+      }
+    })();
+    const localTokenNumber =
+      tokenId && tokenId.length > 0 ? collectionTokenNumberByGlobalId[tokenId] : undefined;
+    const isMine = Boolean(tokenId && myOwnedTokenIds.has(tokenId));
+    const previewUrl = buildCollectionAssetPreviewUrl(resolvedCollectionId, asset.asset_id, {
+      version: asset.expected_hash
+    });
+    // The file's own edition number (e.g. 029.html -> "029") is the piece's identity
+    // inside the collection; the mint-order number is only a fallback.
+    const editionMatch = /^(\d+)\.[a-z0-9]+$/i.exec(
+      String(asset.path ?? asset.filename ?? '').split(/[\\/]/).pop() ?? ''
+    );
+    const pieceNumber = editionMatch
+      ? editionMatch[1]
+      : typeof localTokenNumber === 'number'
+        ? String(localTokenNumber)
+        : '...';
+    const tileLabel = `${collectionTitle} #${pieceNumber}`;
+    return (
+      <article
+        key={asset.asset_id}
+        className={`collection-live-page__gallery-item${
+          isMine ? ' collection-live-page__gallery-item--mine' : ''
+        }`}
+        aria-label={tileLabel}
+        onClick={() => setSelectedGalleryAssetId(asset.asset_id)}
+      >
+        <div className="collection-live-page__gallery-frame">
+          <CollectionLiveGalleryCardMedia
+            asset={asset}
+            tokenId={tileTokenId}
+            previewUrl={previewUrl}
+            collectionTitle={collectionTitle}
+            senderAddress={galleryReadSenderAddress}
+            client={coreClient}
+            contractId={coreContractId}
+          />
+          {isMine && <span className="collection-live-page__gallery-owned-badge">You own</span>}
+        </div>
+        <div className="collection-live-page__gallery-meta">
+          <span className="meta-value">#{pieceNumber}</span>
+          {tokenId ? (
+            <a
+              className="button button--ghost button--mini collection-live-page__gallery-select"
+              href={`/x/${encodeURIComponent(tokenId)}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(event) => event.stopPropagation()}
+            >
+              Open
+            </a>
+          ) : null}
+        </div>
+      </article>
+    );
+  };
+  const myGalleryTiles = mintedGallery.filter((asset) => {
+    const tokenId = mintedTokenIds[asset.asset_id];
+    return Boolean(tokenId && myOwnedTokenIds.has(tokenId));
+  });
+
   return (
     <div className="app collection-live-page">
       <header className="app__header collection-live-page__header">
@@ -3557,6 +3770,15 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <div className="collection-live-page__title-block">
                 <p className="collection-live-page__eyebrow">Live collection mint</p>
                 <h1>{collectionTitle}</h1>
+                <p className="collection-live-page__byline">
+                  <span className="meta-label">by</span>
+                  <AddressLabel
+                    className="collection-live-page__artist-label"
+                    address={artistAddress || null}
+                    network={artistNetwork}
+                    fallback="Artist address unavailable"
+                  />
+                </p>
               </div>
               {heroStatusLabel && (
                 <div className="collection-live-page__hero-badge-slot">
@@ -3571,19 +3793,26 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   </span>
                 </div>
               )}
-              <div className="collection-live-page__artist-card">
-                <span className="meta-label">Artist address</span>
-                <AddressLabel
-                  className="collection-live-page__artist-label"
-                  address={artistAddress || null}
-                  network={artistNetwork}
-                  fallback="Artist address unavailable"
-                />
-              </div>
             </div>
-            <p className="collection-live-page__description">
+            <p
+              className={`collection-live-page__description${
+                descriptionIsLong && !descriptionExpanded
+                  ? ' collection-live-page__description--clamped'
+                  : ''
+              }`}
+            >
               <LinkifiedText text={collectionDescription} />
             </p>
+            {descriptionIsLong && (
+              <button
+                type="button"
+                className="collection-live-page__read-more"
+                aria-expanded={descriptionExpanded}
+                onClick={() => setDescriptionExpanded((open) => !open)}
+              >
+                {descriptionExpanded ? 'Show less' : 'Read more'}
+              </button>
+            )}
             <div className="collection-live-page__hero-stats">
               <article className="collection-live-page__hero-stat">
                 <span className="meta-label">Minted / max</span>
@@ -3600,6 +3829,18 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 <strong>{remainingLabel}</strong>
               </article>
             </div>
+            {mintProgressPercent !== null && (
+              <div
+                className="collection-live-page__progress"
+                role="progressbar"
+                aria-label="Collection minted"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(mintProgressPercent)}
+              >
+                <span style={{ width: `${Math.max(mintProgressPercent, 1.5)}%` }} />
+              </div>
+            )}
             <div className="collection-live-page__hero-actions">
               <button
                 className="button"
@@ -3625,6 +3866,17 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                 {showMintGuide ? 'Hide mint guide' : 'How minting works'}
               </button>
             </div>
+            {walletSession.address && myHoldingsCount > 0 && (
+              <p className="collection-live-page__my-holdings">
+                You own {myHoldingsCount} from {collectionTitle} ·{' '}
+                <a href="/my-wallet">View in My wallet</a>
+              </p>
+            )}
+            {myHoldingsUnknown && (
+              <p className="collection-live-page__my-holdings collection-live-page__my-holdings--muted">
+                Couldn't check your holdings right now. <a href="/my-wallet">Open My wallet</a>
+              </p>
+            )}
             {showMintGuide && (
               <div id="live-mint-guide" className="collection-live-page__mint-guide">
                 <p className="collection-live-page__mint-guide-title">
@@ -3807,6 +4059,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
       </header>
 
       <main className="app__main collection-live-page__main">
+        {showMintStatusPanel && (
         <section className="panel app-section" aria-labelledby="collection-mint-progress">
           <div className="panel__header"><div><h2 id="collection-mint-progress">Mint progress</h2>
             <p>{mintRoute === 'single' ? 'One wallet transaction — your file is uploaded and minted together.' : mintRoute === 'staged' ? 'Continuing the upload and mint process. Confirm each wallet request when prompted.' : supportsSingleTxRoute ? `Fresh files of ${collectionSingleTxChunkLimit(templateVersion)} chunks or fewer mint in one wallet transaction. Larger files and unfinished uploads use the resumable path.` : 'Follow the wallet prompts to complete your mint.'}</p>
@@ -3819,12 +4072,44 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             {resumeTargetAsset && !mintPending && <p>Your unfinished mint will continue from its last confirmed step.</p>}
           </div>
         </section>
+        )}
+
+        {(!walletSession.address || myGalleryTiles.length > 0 || myHoldingsQuery.isLoading) && (
+          <section className="panel app-section collection-live-page__holdings" aria-labelledby="collection-my-audionauts">
+            <div className="panel__header">
+              <div>
+                <h2 id="collection-my-audionauts">Your {collectionTitle} pieces</h2>
+                <p>
+                  {!walletSession.address
+                    ? 'Connect your wallet to see the pieces you own from this collection.'
+                    : myHoldingsQuery.isLoading
+                      ? 'Checking your wallet…'
+                      : `You own ${myHoldingsCount} from this collection.`}
+                </p>
+              </div>
+              {walletSession.address && (
+                <a className="button button--ghost button--mini" href="/my-wallet">
+                  View in My wallet
+                </a>
+              )}
+            </div>
+            {myGalleryTiles.length > 0 && (
+              <div className="panel__body">
+                <div className="collection-live-page__gallery-grid">
+                  {myGalleryTiles.map((asset) => renderGalleryTile(asset))}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="panel app-section collection-live-page__gallery">
           <div className="panel__header">
             <div>
-              <h2>Previously inscribed</h2>
-              <p>Minted assets from this live collection across all supported file types.</p>
+              <h2>Minted so far</h2>
+              <p>
+                {mintedCountLabel} of {maxSupplyLabel} minted — every inscribed piece, playing live.
+              </p>
             </div>
           </div>
           <div className="panel__body">
@@ -3833,65 +4118,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             ) : (
               <div className="collection-live-page__gallery-stack">
                 <div className="collection-live-page__gallery-grid">
-                  {mintedGallery.map((asset) => {
-                    const tokenId = mintedTokenIds[asset.asset_id] ?? null;
-                    const tileTokenId = (() => {
-                      if (!tokenId || tokenId.length === 0) {
-                        return null;
-                      }
-                      try {
-                        return BigInt(tokenId);
-                      } catch {
-                        return null;
-                      }
-                    })();
-                    const localTokenNumber =
-                      tokenId && tokenId.length > 0
-                        ? collectionTokenNumberByGlobalId[tokenId]
-                        : undefined;
-                    const previewUrl = `/collections/${encodeURIComponent(
-                      resolvedCollectionId
-                    )}/asset-preview?assetId=${encodeURIComponent(asset.asset_id)}`;
-                    const isSelected = asset.asset_id === selectedGalleryAsset?.asset_id;
-                    return (
-                      <article
-                        key={asset.asset_id}
-                        className={`collection-live-page__gallery-item${isSelected ? ' collection-live-page__gallery-item--selected' : ''}`}
-                        onClick={() => setSelectedGalleryAssetId(asset.asset_id)}
-                      >
-                        <div className="collection-live-page__gallery-frame">
-                          <CollectionLiveGalleryCardMedia
-                            asset={asset}
-                            tokenId={tileTokenId}
-                            previewUrl={previewUrl}
-                            collectionTitle={collectionTitle}
-                            senderAddress={galleryReadSenderAddress}
-                            client={coreClient}
-                            contractId={coreContractId}
-                          />
-                        </div>
-                        <div className="collection-live-page__gallery-meta">
-                          <span className="meta-value">{collectionTitle}</span>
-                          <span className="meta-label">
-                            {typeof localTokenNumber === 'number'
-                              ? `${collectionTitle} #${localTokenNumber}`
-                              : `${collectionTitle} #...`}
-                          </span>
-                          <span className="meta-label">{asset.mime_type}</span>
-                          <button
-                            type="button"
-                            className="button button--ghost button--mini collection-live-page__gallery-select"
-                            onClick={() => setSelectedGalleryAssetId(asset.asset_id)}
-                            aria-pressed={isSelected}
-                          >
-                            {isSelected ? 'Selected' : 'Preview'}
-                          </button>
-                        </div>
-                      </article>
-                    );
-                  })}
+                  {mintedGallery.map((asset) => renderGalleryTile(asset))}
                 </div>
-                {selectedGalleryAsset && selectedGalleryPreviewUrl && (
+                {SHOW_GALLERY_DETAIL && selectedGalleryAsset && selectedGalleryPreviewUrl && (
                   <div ref={galleryDetailRef} className="collection-live-page__gallery-detail">
                     <div className="collection-live-page__gallery-detail-header">
                       <div>
@@ -4072,6 +4301,14 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <p>{statusRefreshNote}</p>
             </div>
             <div className="panel__actions">
+              <button
+                type="button"
+                className="button button--ghost button--mini"
+                aria-expanded={detailsOpen}
+                onClick={() => setDetailsOpen((open) => !open)}
+              >
+                {detailsOpen ? 'Hide' : 'Show'}
+              </button>
               <label className="theme-select" htmlFor="live-theme-select">
                 <span className="theme-select__label">Theme</span>
                 <select
@@ -4090,6 +4327,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </label>
             </div>
           </div>
+          {detailsOpen && (
           <div className="panel__body">
             <div className="meta-grid">
               <div>
@@ -4174,6 +4412,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <div className="alert">{collectionIndexSyncMessage}</div>
             )}
           </div>
+          )}
         </section>
 
         <section className="panel app-section collection-live-page__activity">
@@ -4182,7 +4421,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               <h2>Activity logs</h2>
               <p>Begin, upload, and seal events from this page session.</p>
             </div>
+            <button
+              type="button"
+              className="button button--ghost button--mini"
+              aria-expanded={activityOpen}
+              onClick={() => setActivityOpen((open) => !open)}
+            >
+              {activityOpen ? 'Hide' : 'Show'}
+            </button>
           </div>
+          {activityOpen && (
           <div className="panel__body">
             {mintLog.length === 0 ? (
               <p className="meta-value">No mint activity yet.</p>
@@ -4196,6 +4444,7 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </div>
             )}
           </div>
+          )}
         </section>
       </main>
     </div>

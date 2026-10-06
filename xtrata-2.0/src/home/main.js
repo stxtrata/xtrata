@@ -201,6 +201,8 @@
       hasRuntimeContentUrls,
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
+    import { rewriteHiroApiBasesForEmbeddedHtml } from '/src/lib/viewer/hiro-api-rewrite.ts';
+    import { createLiveHtmlFrameManager } from '/src/home/live-frame-manager.js';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
@@ -249,6 +251,12 @@
     } from '/src/lib/telemetry/index.ts';
 
     installGlobalTelemetry();
+
+    // Same rewrite as /i/<id> and the workspace viewers: an inscription that calls Hiro
+    // directly goes through the site's /hiro proxy instead. From an opaque srcdoc frame,
+    // direct Hiro reads hit the public per-IP rate limit (a recursive app such as the
+    // arcade parent makes hundreds of them) and fail as "Failed to fetch".
+    const embedHtml = (html) => (html ? rewriteHiroApiBasesForEmbeddedHtml(html).html : html);
 
     /**
      * Make in-page anchors actually land on their target.
@@ -3651,7 +3659,7 @@
         const isPdf =
           previewMimeType?.trim().toLowerCase() === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts';
+          frame.sandbox = 'allow-scripts allow-pointer-lock allow-downloads';
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (options.htmlDoc && !isPdf) {
@@ -5860,10 +5868,11 @@
         tokenId: token.id
       });
 
-    const prepareRuntimeHtmlForToken = async (token, html, contextLabel = 'preview') => {
-      if (!html) {
-        return html;
+    const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {
+      if (!rawHtml) {
+        return rawHtml;
       }
+      const html = embedHtml(rawHtml);
       const moduleBaseHref = buildRuntimeModuleBaseHref({
         network: state.network,
         contractId: getTokenCacheContractId(token),
@@ -6132,7 +6141,7 @@
         frame.loading = 'lazy';
         const isPdf = fullscreenMimeType === 'application/pdf';
         if (!isPdf) {
-          frame.sandbox = 'allow-scripts';
+          frame.sandbox = 'allow-scripts allow-pointer-lock allow-downloads';
           frame.allow = INSCRIPTION_FRAME_ALLOW;
         }
         if (htmlDoc && !isPdf) {
@@ -6438,7 +6447,7 @@
         frame.title = 'prepared-inscription-preview';
         frame.referrerPolicy = 'no-referrer';
         frame.loading = 'lazy';
-        frame.sandbox = 'allow-scripts';
+        frame.sandbox = 'allow-scripts allow-pointer-lock allow-downloads';
         frame.allow = INSCRIPTION_FRAME_ALLOW;
         frame.src = url;
         dom.fullscreenStage.append(frame);
@@ -6463,6 +6472,25 @@
       dom.fullscreenStage.append(link);
     };
 
+    // Nothing behind the fullscreen viewer keeps running: grid tiles pause, and the
+    // selected preview's HTML frame is emptied and restored (from the same document)
+    // on close.
+    let pausedPreviewDoc = null;
+    const pauseBehindFullscreen = (paused, options = {}) => {
+      liveHtmlFrameManager.setSuspended(paused);
+      const frame = dom.tokenPreviewMedia?.querySelector('iframe');
+      if (paused) {
+        if (options.replace) pausedPreviewDoc = null; // a new preview replaced the paused one
+        if (frame && frame.srcdoc && pausedPreviewDoc === null) {
+          pausedPreviewDoc = frame.srcdoc;
+          frame.srcdoc = '';
+        }
+        return;
+      }
+      if (frame && pausedPreviewDoc !== null && !frame.srcdoc) frame.srcdoc = pausedPreviewDoc;
+      pausedPreviewDoc = null;
+    };
+
     const openFullscreenViewer = async () => {
       const token = getSelectedToken();
       if (!token) {
@@ -6473,6 +6501,7 @@
       dom.fullscreenViewer.hidden = false;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
       document.body.classList.add('fullscreen-viewer-open');
+      pauseBehindFullscreen(true);
       updateFullscreenControls();
       await renderFullscreenSelectedToken();
       dom.fullscreenCloseButton.focus({ preventScroll: true });
@@ -6487,6 +6516,7 @@
       dom.fullscreenViewer.hidden = false;
       dom.fullscreenViewer.setAttribute('aria-hidden', 'false');
       document.body.classList.add('fullscreen-viewer-open');
+      pauseBehindFullscreen(true);
       updateFullscreenControls();
       renderFullscreenPreparedPayload();
       dom.fullscreenCloseButton.focus({ preventScroll: true });
@@ -6503,6 +6533,7 @@
       dom.fullscreenViewer.setAttribute('aria-hidden', 'true');
       document.body.classList.remove('fullscreen-viewer-open');
       revokeFullscreenPreview();
+      pauseBehindFullscreen(false);
       dom.fullscreenStage.textContent = 'No selection';
       updateFullscreenControls();
     };
@@ -6972,224 +7003,11 @@
       return true;
     };
 
-    // ------------------------------------------------------------------
-    // Live HTML-frame manager (phase one: execution gate + budget + poster)
-    //
-    // HTML inscriptions (e.g. embedded X-Board apps) are expensive: each one
-    // runs its own scripts, network fetches and ~hundreds of slot renders. The
-    // byte-hydration queue throttles *fetching*; this manager throttles
-    // *executing*. A tile's iframe srcdoc is only set when the tile is in the
-    // viewport AND within MAX_LIVE_HTML_FRAMES. Everything else shows a static
-    // poster the user can click to force-render.
-    //
-    // Trusted lane (phase two): a board that completes the embed handshake is
-    // marked trusted and exempted from the budget, because it self-throttles
-    // internally. Trusted status persists for the session so scroll-back is
-    // cheap. See docs/grid-embed-contract.md.
-    // ------------------------------------------------------------------
-    const liveHtmlFrameManager = (() => {
-      const tiles = new Map(); // thumbElement -> record
-      let observer = null;
-
-      const now = () =>
-        typeof performance !== 'undefined' && performance.now
-          ? performance.now()
-          : Date.now();
-
-      const liveCount = () => {
-        let n = 0;
-        tiles.forEach((r) => {
-          if (r.active && !r.trusted) n += 1;
-        });
-        return n;
-      };
-
-      const activate = (record) => {
-        if (record.active || !record.frame.isConnected) return;
-        record.frame.srcdoc = injectGridThumbnailHtml(record.html);
-        record.active = true;
-        record.activatedAt = now();
-        if (record.poster) record.poster.hidden = true;
-      };
-
-      const deactivate = (record) => {
-        if (!record.active) return;
-        record.frame.srcdoc = '';
-        record.active = false;
-        // NB: record.trusted persists for the session so a known-good board is
-        // not budget-blocked when scrolled back into view.
-        if (record.poster) record.poster.hidden = false;
-      };
-
-      // Oldest active, non-trusted tile to evict so a visible tile can run.
-      const pickEvictable = (exclude, allowIntersecting) => {
-        let victim = null;
-        tiles.forEach((r) => {
-          if (r === exclude || !r.active || r.trusted) return;
-          if (!allowIntersecting && r.intersecting) return;
-          if (!victim || r.activatedAt < victim.activatedAt) victim = r;
-        });
-        return victim;
-      };
-
-      const requestActivation = (record) => {
-        if (record.active) return;
-        // Gated tiles (e.g. relationship pair/child thumbs) never auto-activate;
-        // they stay as a poster until the user clicks (forceActivate).
-        if (record.gated) return;
-        // Grid tiles render eagerly: every on-screen HTML inscription runs, no
-        // per-tile clicking. Off-screen tiles are still deactivated by the
-        // IntersectionObserver, so concurrency stays bounded to what's visible.
-        activate(record);
-      };
-
-      const fillFreeSlots = () => {
-        tiles.forEach((r) => {
-          if (r.active || !r.intersecting || r.gated) return;
-          activate(r);
-        });
-      };
-
-      const forceActivate = (record) => {
-        if (record.active) return;
-        if (!record.trusted && liveCount() >= MAX_LIVE_HTML_FRAMES) {
-          const victim = pickEvictable(record, true);
-          if (victim) deactivate(victim);
-        }
-        activate(record);
-      };
-
-      const ensureObserver = () => {
-        if (observer || typeof IntersectionObserver !== 'function') {
-          return observer;
-        }
-        observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              const record = tiles.get(entry.target);
-              if (!record) continue;
-              record.intersecting = entry.isIntersecting;
-              if (entry.isIntersecting) {
-                requestActivation(record);
-              } else {
-                deactivate(record);
-              }
-            }
-            fillFreeSlots();
-          },
-          { root: null, rootMargin: '300px', threshold: 0 }
-        );
-        return observer;
-      };
-
-      // Phase-two receiver: a cooperating board posts {type:'xtrata:embed:hello'}
-      // once its script runs. We mark that frame trusted (exempt from budget)
-      // and ack so it can switch into lite/embedded rendering.
-      if (typeof window !== 'undefined' && window.addEventListener) {
-        window.addEventListener('message', (event) => {
-          const data = event && event.data;
-          if (!data || data.type !== 'xtrata:embed:hello') return;
-          tiles.forEach((record) => {
-            if (
-              record.frame.contentWindow &&
-              record.frame.contentWindow === event.source
-            ) {
-              record.trusted = true;
-              if (record.poster) record.poster.hidden = true;
-              if (event.source && typeof event.source.postMessage === 'function') {
-                event.source.postMessage(
-                  {
-                    type: 'xtrata:embed:ack',
-                    mode: 'grid-thumbnail',
-                    budget: 'trusted'
-                  },
-                  '*'
-                );
-              }
-            }
-          });
-        });
-      }
-
-      const register = (thumbElement, media, options = {}) => {
-        const existing = tiles.get(thumbElement);
-        if (existing) {
-          if (observer) observer.unobserve(thumbElement);
-          tiles.delete(thumbElement);
-        }
-
-        const frame = document.createElement('iframe');
-        frame.title = 'inscription-preview';
-        frame.sandbox = 'allow-scripts';
-        frame.referrerPolicy = 'no-referrer';
-        frame.loading = 'lazy';
-
-        const poster = document.createElement('div');
-        poster.className = 'token-thumb-gate';
-        const label = document.createElement('div');
-        label.className = 'token-thumb-gate__label';
-        label.textContent = getGridMimeLabel(media.mimeType ?? null) || 'HTML';
-        const hint = document.createElement('div');
-        hint.className = 'token-thumb-gate__hint';
-        hint.textContent = 'Tap to load';
-        poster.append(label, hint);
-
-        const record = {
-          frame,
-          poster,
-          html: media.html,
-          active: false,
-          intersecting: false,
-          trusted: false,
-          gated: !!options.gated,
-          activatedAt: 0
-        };
-
-        poster.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          forceActivate(record);
-        });
-
-        tiles.set(thumbElement, record);
-        thumbElement.append(frame, poster);
-
-        const obs = ensureObserver();
-        if (obs) {
-          obs.observe(thumbElement);
-        } else {
-          // No IntersectionObserver: activate now, still bounded by budget.
-          record.intersecting = true;
-          requestActivation(record);
-        }
-      };
-
-      // A tab that was hidden while the grid rendered gets NO IntersectionObserver
-      // callbacks at all, so every tile stays on its poster with nothing to nudge it.
-      // Re-observing on the way back delivers fresh entries for whatever is on screen.
-      if (typeof document !== 'undefined' && document.addEventListener) {
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState !== 'visible' || !observer) return;
-          tiles.forEach((_record, element) => {
-            observer.unobserve(element);
-            observer.observe(element);
-          });
-        });
-      }
-
-      const reset = () => {
-        if (observer) {
-          observer.disconnect();
-          observer = null;
-        }
-        tiles.forEach((record) => {
-          record.frame.srcdoc = '';
-        });
-        tiles.clear();
-      };
-
-      return { register, reset };
-    })();
+    const liveHtmlFrameManager = createLiveHtmlFrameManager({
+      injectHtml: injectGridThumbnailHtml,
+      maxLiveFrames: MAX_LIVE_HTML_FRAMES,
+      mimeLabel: getGridMimeLabel
+    });
 
     const renderGridLiveMedia = (token, thumbElement, media, options = {}) => {
       const cacheKey = getThumbnailKey(token);
@@ -7283,7 +7101,9 @@
         // from running at once. See liveHtmlFrameManager above. Relationship
         // thumbs pass { gated: true } so they stay click-to-load.
         liveHtmlFrameManager.register(thumbElement, media, {
-          gated: !!options.gated
+          gated: !!options.gated,
+          key: getThumbnailKey(token),
+          byteLength: Number(token.meta?.totalSize ?? 0)
         });
         return true;
       }
@@ -7855,6 +7675,14 @@
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
+      // The selected inscription gets the machine: its grid tile stops (it runs here)
+      // and the grid holds back while an HTML preview loads.
+      liveHtmlFrameManager.focusPreview(
+        getThumbnailKey(token),
+        htmlDoc ? dom.tokenPreviewMedia.querySelector('iframe') : null
+      );
+      // Selection moved while the fullscreen viewer is open: the new preview waits too.
+      if (state.fullscreenOpen) pauseBehindFullscreen(true, { replace: true });
       void warmThumbnailCacheFromBytes(token, bytes, mimeType);
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),
@@ -11495,7 +11323,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           const bytes = await marketFetchContent(listing, meta);
           const text = new TextDecoder().decode(bytes);
           if (/<script[\s>]/i.test(text)) {
-            media = { kind: 'html-live', html: text };
+            media = { kind: 'html-live', html: embedHtml(text) };
           } else {
             await warmMarketThumbnailCache(listing, bytes, 'image/svg+xml');
             media = {
@@ -11512,7 +11340,7 @@ const openCuratedGallery = async (galleryId, options = {}) => {
           };
         } else if (kind === 'html' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
-          media = { kind: 'html-live', html: new TextDecoder().decode(bytes) };
+          media = { kind: 'html-live', html: embedHtml(new TextDecoder().decode(bytes)) };
         } else if (kind === 'video' && fetchable) {
           const bytes = await marketFetchContent(listing, meta);
           media = {

@@ -5937,7 +5937,7 @@ p {
 
 .collection-live-page__title-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(240px, 320px);
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 10px 16px;
 }
@@ -6285,6 +6285,21 @@ p {
   margin-top: 4px;
 }
 
+.collection-live-page__my-holdings {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.collection-live-page__my-holdings a {
+  color: var(--accent, #e05a2a);
+}
+
+.collection-live-page__my-holdings--muted {
+  font-weight: 400;
+  color: var(--muted);
+}
+
 .collection-live-page__hero-actions .button {
   padding: 7px 14px;
   font-size: 0.79rem;
@@ -6356,7 +6371,7 @@ p {
 .collection-live-page__gallery-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 220px));
 }
 
 .collection-live-page__gallery-stack {
@@ -6419,6 +6434,24 @@ p {
   height: 100%;
   border: 0;
   background: #fff;
+}
+
+.collection-live-page__gallery-frame:has(.collection-live-page__gallery-live-frame) {
+  position: relative;
+  display: block;
+  background: #000;
+}
+
+/* HTML tiles render at 2x and scale down, so the piece lays out like a normal view. */
+.collection-live-page__gallery-frame iframe.collection-live-page__gallery-live-frame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  transform: scale(0.5);
+  transform-origin: 0 0;
+  background: #000;
 }
 
 .collection-live-page__gallery-fallback {
@@ -9639,3 +9672,119 @@ p {
 .creator-builder__cover img { width:100%; height:100%; object-fit:contain; }
 .creator-builder__cover iframe { width:100%; height:100%; border:0; display:block; background:#000; }
 .creator-builder__cover-note { padding:12px; }
+
+/* v1.9 artist split editor (Mint rules → 3. Payout split, and advanced controls). */
+.collection-settings-panel__split-preview {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+}
+
+.collection-settings-panel__split-preview li + li {
+  margin-top: 2px;
+}
+
+.collection-settings-panel__split-errors {
+  color: var(--danger, #d14343);
+}
+
+.collection-settings-panel__split-editor {
+  margin-top: 10px;
+}
+
+.collection-settings-panel__split-editor > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Collection page layout pass: byline, clamped description, progress, holdings, tiles */
+.collection-live-page__byline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.collection-live-page__byline .meta-label {
+  margin: 0;
+}
+
+.collection-live-page__description--clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.collection-live-page__read-more {
+  justify-self: start;
+  margin: -6px 0 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--accent, #e05a2a);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collection-live-page__progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.collection-live-page__progress span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, #e05a2a);
+}
+
+.collection-live-page__hero-actions .button:first-child {
+  padding: 11px 24px;
+  font-size: 0.95rem;
+}
+
+.collection-live-page__holdings {
+  border-color: rgba(224, 90, 42, 0.45);
+}
+
+.collection-live-page__gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.collection-live-page__gallery-frame {
+  position: relative;
+}
+
+.collection-live-page__gallery-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.collection-live-page__gallery-meta .collection-live-page__gallery-select {
+  margin-top: 0;
+}
+
+.collection-live-page__gallery-item--mine {
+  border-color: var(--accent, #e05a2a);
+  box-shadow: 0 0 0 2px rgba(224, 90, 42, 0.35);
+}
+
+.collection-live-page__gallery-owned-badge {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent, #e05a2a);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}

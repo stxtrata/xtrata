@@ -1,0 +1,2844 @@
+{
+  "generatedAt": "2026-10-02T15:57:00.388Z",
+  "original": {
+    "presets": 96,
+    "namedSoundsUsed": 144,
+    "recordedAssetsUsed": 184,
+    "distinctRhythms": 96,
+    "missingSounds": [],
+    "families": {
+      "kit": {
+        "label": "Studio kit",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 196,
+        "minUses": 4,
+        "maxUses": 12
+      },
+      "bass": {
+        "label": "Bass",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 80,
+        "minUses": 5,
+        "maxUses": 5
+      },
+      "plucks": {
+        "label": "Plucks",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 50,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "keys": {
+        "label": "Keys",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 62,
+        "minUses": 3,
+        "maxUses": 6
+      },
+      "bells": {
+        "label": "Bells & mallets",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 38,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "leads": {
+        "label": "Leads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 42,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "pads": {
+        "label": "Pads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 48,
+        "minUses": 4,
+        "maxUses": 4
+      },
+      "chords": {
+        "label": "Chord stabs",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 48,
+        "minUses": 4,
+        "maxUses": 4
+      },
+      "percussion": {
+        "label": "New percussion",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 204,
+        "minUses": 7,
+        "maxUses": 12
+      }
+    },
+    "sounds": [
+      {
+        "soundId": "kick-808",
+        "label": "Kick — 808 Deep",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-punch",
+        "label": "Kick — Punchy",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-hard",
+        "label": "Kick — Hard Techno",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-sub",
+        "label": "Kick — Sub Boom",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "snare-tight",
+        "label": "Snare — Tight",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-fat",
+        "label": "Snare — Fat",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-rock",
+        "label": "Snare — Rock Crack",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "clap-909",
+        "label": "Clap — 909 Style",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "hat-closed",
+        "label": "Hat — Closed",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-tight",
+        "label": "Hat — Tight Tick",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-open",
+        "label": "Hat — Open",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "ride",
+        "label": "Ride Cymbal",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "crash",
+        "label": "Crash Cymbal",
+        "family": "kit",
+        "uses": 7
+      },
+      {
+        "soundId": "tom-lo",
+        "label": "Tom — Low",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-mid",
+        "label": "Tom — Mid",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-hi",
+        "label": "Tom — High",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "cowbell-808",
+        "label": "Cowbell — 808",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "rimshot",
+        "label": "Rimshot",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "shaker",
+        "label": "Shaker",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "bass-808-e",
+        "label": "808 Bass — E1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-g",
+        "label": "808 Bass — G1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-a",
+        "label": "808 Bass — A1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-dist",
+        "label": "808 Bass — E1 Distorted",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "zap",
+        "label": "Zap / Laser",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "bass-pure-sub",
+        "label": "Pure Sub",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-rounded-triangle",
+        "label": "Rounded Triangle",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-rubber-mono",
+        "label": "Rubber Mono",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-warm-ladder",
+        "label": "Warm Ladder",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-short-acid",
+        "label": "Short Acid",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-square-acid",
+        "label": "Square Acid",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-fm-growl",
+        "label": "FM Growl",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-hollow-fm",
+        "label": "Hollow FM",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-muted-string-bass",
+        "label": "Muted String Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-woody-bass",
+        "label": "Woody Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-reese-narrow",
+        "label": "Reese Narrow",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-saw-foundation",
+        "label": "Saw Foundation",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-chip-octave",
+        "label": "Chip Octave",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-pulse-bass",
+        "label": "Pulse Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-saturated-sub",
+        "label": "Saturated Sub",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-digital-bite",
+        "label": "Digital Bite",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-sine-droplet",
+        "label": "Sine Droplet",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-glass-pin",
+        "label": "Glass Pin",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-copper-fm",
+        "label": "Copper FM",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-digital-harp",
+        "label": "Digital Harp",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-muted-nylon",
+        "label": "Muted Nylon",
+        "family": "plucks",
+        "uses": 4
+      },
+      {
+        "soundId": "plucks-wood-string",
+        "label": "Wood String",
+        "family": "plucks",
+        "uses": 4
+      },
+      {
+        "soundId": "plucks-bright-steel",
+        "label": "Bright Steel",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-low-kalimba",
+        "label": "Low Kalimba",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-soft-triangle",
+        "label": "Soft Triangle",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-filter-ping",
+        "label": "Filter Ping",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-acid-pluck",
+        "label": "Acid Pluck",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-square-pizzicato",
+        "label": "Square Pizzicato",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-chip-spark",
+        "label": "Chip Spark",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-octave-pick",
+        "label": "Octave Pick",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-hollow-wood",
+        "label": "Hollow Wood",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-resonant-wire",
+        "label": "Resonant Wire",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-soft-electric",
+        "label": "Soft Electric",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-bright-tine",
+        "label": "Bright Tine",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-dusty-reed",
+        "label": "Dusty Reed",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-crystal-ep",
+        "label": "Crystal EP",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-warm-drawbar",
+        "label": "Warm Drawbar",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-jazz-organ",
+        "label": "Jazz Organ",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-percussive-organ",
+        "label": "Percussive Organ",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-hollow-organ",
+        "label": "Hollow Organ",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-felt-piano-like",
+        "label": "Felt Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-bright-piano-like",
+        "label": "Bright Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-toy-piano-like",
+        "label": "Toy Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-digital-piano-like",
+        "label": "Digital Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-soft-digital",
+        "label": "Soft Digital",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-round-triangle-keys",
+        "label": "Round Triangle Keys",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-square-clav",
+        "label": "Square Clav",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-fm-clav",
+        "label": "FM Clav",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-round-bell",
+        "label": "Round Bell",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-glass-bell",
+        "label": "Glass Bell",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-church-metal",
+        "label": "Church Metal",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tiny-glock-like",
+        "label": "Tiny Glock-like",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-wood-marimba-like",
+        "label": "Wood Marimba-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-soft-vibraphone-like",
+        "label": "Soft Vibraphone-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-copper-bowl",
+        "label": "Copper Bowl",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-gamelan-inspired",
+        "label": "Gamelan-inspired",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-celeste-like",
+        "label": "Celeste-like",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tubular-chime",
+        "label": "Tubular Chime",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-low-metallophone",
+        "label": "Low Metallophone",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-ice-mallet",
+        "label": "Ice Mallet",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-rounded-mono",
+        "label": "Rounded Mono",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-open-saw",
+        "label": "Open Saw",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-narrow-pulse",
+        "label": "Narrow Pulse",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-chip-square",
+        "label": "Chip Square",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-octave-chip",
+        "label": "Octave Chip",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-acid-ribbon",
+        "label": "Acid Ribbon",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-resonant-square",
+        "label": "Resonant Square",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-fm-whistle",
+        "label": "FM Whistle",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-glass-lead",
+        "label": "Glass Lead",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-triangle-solo",
+        "label": "Triangle Solo",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-vowel-like",
+        "label": "Vowel-like",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-detuned-mono",
+        "label": "Detuned Mono",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "pads-warm-horizon",
+        "label": "Warm Horizon",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-dark-velvet",
+        "label": "Dark Velvet",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-glass-cloud",
+        "label": "Glass Cloud",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-air-harmonics",
+        "label": "Air Harmonics",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-wide-dawn",
+        "label": "Wide Dawn",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-slow-brass",
+        "label": "Slow Brass",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-hollow-drift",
+        "label": "Hollow Drift",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-fifth-mist",
+        "label": "Fifth Mist",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-soft-choir-like",
+        "label": "Soft Choir-like",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-night-organ",
+        "label": "Night Organ",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-silver-haze",
+        "label": "Silver Haze",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-deep-aurora",
+        "label": "Deep Aurora",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-house",
+        "label": "Major House",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-house",
+        "label": "Minor House",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-sus2-glass",
+        "label": "Sus2 Glass",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-sus4-warm",
+        "label": "Sus4 Warm",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-seventh",
+        "label": "Major Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-seventh",
+        "label": "Minor Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-dominant-seventh",
+        "label": "Dominant Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-open-fifth",
+        "label": "Open Fifth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-ninth",
+        "label": "Minor Ninth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-ninth",
+        "label": "Major Ninth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-diminished-spark",
+        "label": "Diminished Spark",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-quartal-air",
+        "label": "Quartal Air",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "percussion-kick-modern",
+        "label": "Kick Modern",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-soft",
+        "label": "Kick Soft",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-click",
+        "label": "Kick Click",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-broken",
+        "label": "Kick Broken",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-snare-modern",
+        "label": "Snare Modern",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-brush",
+        "label": "Snare Brush",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-wood",
+        "label": "Snare Wood",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-metallic",
+        "label": "Snare Metallic",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-dry",
+        "label": "Clap Dry",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-wide",
+        "label": "Clap Wide",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-dust",
+        "label": "Clap Dust",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-hat-silk",
+        "label": "Hat Silk",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-hat-grain",
+        "label": "Hat Grain",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-hat-metal",
+        "label": "Hat Metal",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-wood-knock-c3",
+        "label": "Wood Knock C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-metal-hit-c4",
+        "label": "Metal Hit C4",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-tuned-bongo-c3",
+        "label": "Tuned Bongo C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-low-ceramic-c3",
+        "label": "Low Ceramic C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-shaker-fine",
+        "label": "Shaker Fine",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-noise-shuffle",
+        "label": "Noise Shuffle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-sand-rattle",
+        "label": "Sand Rattle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-impact-sub",
+        "label": "Impact Sub",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-reverse-spark",
+        "label": "Reverse Spark",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-digital-fill",
+        "label": "Digital Fill",
+        "family": "percussion",
+        "uses": 7
+      }
+    ]
+  },
+  "combinedCore": {
+    "presets": 96,
+    "namedSoundsUsed": 144,
+    "recordedAssetsUsed": 184,
+    "distinctRhythms": 96,
+    "missingSounds": [],
+    "families": {
+      "kit": {
+        "label": "Studio kit",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 196,
+        "minUses": 4,
+        "maxUses": 12
+      },
+      "bass": {
+        "label": "Bass",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 80,
+        "minUses": 5,
+        "maxUses": 5
+      },
+      "plucks": {
+        "label": "Plucks",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 50,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "keys": {
+        "label": "Keys",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 62,
+        "minUses": 3,
+        "maxUses": 6
+      },
+      "bells": {
+        "label": "Bells & mallets",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 38,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "leads": {
+        "label": "Leads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 42,
+        "minUses": 3,
+        "maxUses": 4
+      },
+      "pads": {
+        "label": "Pads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 48,
+        "minUses": 4,
+        "maxUses": 4
+      },
+      "chords": {
+        "label": "Chord stabs",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 48,
+        "minUses": 4,
+        "maxUses": 4
+      },
+      "percussion": {
+        "label": "New percussion",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 204,
+        "minUses": 7,
+        "maxUses": 12
+      }
+    },
+    "sounds": [
+      {
+        "soundId": "kick-808",
+        "label": "Kick — 808 Deep",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-punch",
+        "label": "Kick — Punchy",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-hard",
+        "label": "Kick — Hard Techno",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-sub",
+        "label": "Kick — Sub Boom",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "snare-tight",
+        "label": "Snare — Tight",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-fat",
+        "label": "Snare — Fat",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-rock",
+        "label": "Snare — Rock Crack",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "clap-909",
+        "label": "Clap — 909 Style",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "hat-closed",
+        "label": "Hat — Closed",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-tight",
+        "label": "Hat — Tight Tick",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-open",
+        "label": "Hat — Open",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "ride",
+        "label": "Ride Cymbal",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "crash",
+        "label": "Crash Cymbal",
+        "family": "kit",
+        "uses": 7
+      },
+      {
+        "soundId": "tom-lo",
+        "label": "Tom — Low",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-mid",
+        "label": "Tom — Mid",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-hi",
+        "label": "Tom — High",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "cowbell-808",
+        "label": "Cowbell — 808",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "rimshot",
+        "label": "Rimshot",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "shaker",
+        "label": "Shaker",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "bass-808-e",
+        "label": "808 Bass — E1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-g",
+        "label": "808 Bass — G1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-a",
+        "label": "808 Bass — A1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-dist",
+        "label": "808 Bass — E1 Distorted",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "zap",
+        "label": "Zap / Laser",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "bass-pure-sub",
+        "label": "Pure Sub",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-rounded-triangle",
+        "label": "Rounded Triangle",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-rubber-mono",
+        "label": "Rubber Mono",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-warm-ladder",
+        "label": "Warm Ladder",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-short-acid",
+        "label": "Short Acid",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-square-acid",
+        "label": "Square Acid",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-fm-growl",
+        "label": "FM Growl",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-hollow-fm",
+        "label": "Hollow FM",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-muted-string-bass",
+        "label": "Muted String Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-woody-bass",
+        "label": "Woody Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-reese-narrow",
+        "label": "Reese Narrow",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-saw-foundation",
+        "label": "Saw Foundation",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-chip-octave",
+        "label": "Chip Octave",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-pulse-bass",
+        "label": "Pulse Bass",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-saturated-sub",
+        "label": "Saturated Sub",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "bass-digital-bite",
+        "label": "Digital Bite",
+        "family": "bass",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-sine-droplet",
+        "label": "Sine Droplet",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-glass-pin",
+        "label": "Glass Pin",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-copper-fm",
+        "label": "Copper FM",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-digital-harp",
+        "label": "Digital Harp",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-muted-nylon",
+        "label": "Muted Nylon",
+        "family": "plucks",
+        "uses": 4
+      },
+      {
+        "soundId": "plucks-wood-string",
+        "label": "Wood String",
+        "family": "plucks",
+        "uses": 4
+      },
+      {
+        "soundId": "plucks-bright-steel",
+        "label": "Bright Steel",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-low-kalimba",
+        "label": "Low Kalimba",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-soft-triangle",
+        "label": "Soft Triangle",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-filter-ping",
+        "label": "Filter Ping",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-acid-pluck",
+        "label": "Acid Pluck",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-square-pizzicato",
+        "label": "Square Pizzicato",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-chip-spark",
+        "label": "Chip Spark",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-octave-pick",
+        "label": "Octave Pick",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-hollow-wood",
+        "label": "Hollow Wood",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "plucks-resonant-wire",
+        "label": "Resonant Wire",
+        "family": "plucks",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-soft-electric",
+        "label": "Soft Electric",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-bright-tine",
+        "label": "Bright Tine",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-dusty-reed",
+        "label": "Dusty Reed",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-crystal-ep",
+        "label": "Crystal EP",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-warm-drawbar",
+        "label": "Warm Drawbar",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-jazz-organ",
+        "label": "Jazz Organ",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-percussive-organ",
+        "label": "Percussive Organ",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-hollow-organ",
+        "label": "Hollow Organ",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-felt-piano-like",
+        "label": "Felt Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-bright-piano-like",
+        "label": "Bright Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-toy-piano-like",
+        "label": "Toy Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-digital-piano-like",
+        "label": "Digital Piano-like",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-soft-digital",
+        "label": "Soft Digital",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-round-triangle-keys",
+        "label": "Round Triangle Keys",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-square-clav",
+        "label": "Square Clav",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "keys-fm-clav",
+        "label": "FM Clav",
+        "family": "keys",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-round-bell",
+        "label": "Round Bell",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-glass-bell",
+        "label": "Glass Bell",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-church-metal",
+        "label": "Church Metal",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tiny-glock-like",
+        "label": "Tiny Glock-like",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-wood-marimba-like",
+        "label": "Wood Marimba-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-soft-vibraphone-like",
+        "label": "Soft Vibraphone-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-copper-bowl",
+        "label": "Copper Bowl",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-gamelan-inspired",
+        "label": "Gamelan-inspired",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-celeste-like",
+        "label": "Celeste-like",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tubular-chime",
+        "label": "Tubular Chime",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-low-metallophone",
+        "label": "Low Metallophone",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-ice-mallet",
+        "label": "Ice Mallet",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-rounded-mono",
+        "label": "Rounded Mono",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-open-saw",
+        "label": "Open Saw",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-narrow-pulse",
+        "label": "Narrow Pulse",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-chip-square",
+        "label": "Chip Square",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-octave-chip",
+        "label": "Octave Chip",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-acid-ribbon",
+        "label": "Acid Ribbon",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-resonant-square",
+        "label": "Resonant Square",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-fm-whistle",
+        "label": "FM Whistle",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-glass-lead",
+        "label": "Glass Lead",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-triangle-solo",
+        "label": "Triangle Solo",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-vowel-like",
+        "label": "Vowel-like",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-detuned-mono",
+        "label": "Detuned Mono",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "pads-warm-horizon",
+        "label": "Warm Horizon",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-dark-velvet",
+        "label": "Dark Velvet",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-glass-cloud",
+        "label": "Glass Cloud",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-air-harmonics",
+        "label": "Air Harmonics",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-wide-dawn",
+        "label": "Wide Dawn",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-slow-brass",
+        "label": "Slow Brass",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-hollow-drift",
+        "label": "Hollow Drift",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-fifth-mist",
+        "label": "Fifth Mist",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-soft-choir-like",
+        "label": "Soft Choir-like",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-night-organ",
+        "label": "Night Organ",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-silver-haze",
+        "label": "Silver Haze",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "pads-deep-aurora",
+        "label": "Deep Aurora",
+        "family": "pads",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-house",
+        "label": "Major House",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-house",
+        "label": "Minor House",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-sus2-glass",
+        "label": "Sus2 Glass",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-sus4-warm",
+        "label": "Sus4 Warm",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-seventh",
+        "label": "Major Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-seventh",
+        "label": "Minor Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-dominant-seventh",
+        "label": "Dominant Seventh",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-open-fifth",
+        "label": "Open Fifth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-ninth",
+        "label": "Minor Ninth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-ninth",
+        "label": "Major Ninth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-diminished-spark",
+        "label": "Diminished Spark",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-quartal-air",
+        "label": "Quartal Air",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "percussion-kick-modern",
+        "label": "Kick Modern",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-soft",
+        "label": "Kick Soft",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-click",
+        "label": "Kick Click",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-kick-broken",
+        "label": "Kick Broken",
+        "family": "percussion",
+        "uses": 12
+      },
+      {
+        "soundId": "percussion-snare-modern",
+        "label": "Snare Modern",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-brush",
+        "label": "Snare Brush",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-wood",
+        "label": "Snare Wood",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-snare-metallic",
+        "label": "Snare Metallic",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-dry",
+        "label": "Clap Dry",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-wide",
+        "label": "Clap Wide",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-dust",
+        "label": "Clap Dust",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-hat-silk",
+        "label": "Hat Silk",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-hat-grain",
+        "label": "Hat Grain",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-hat-metal",
+        "label": "Hat Metal",
+        "family": "percussion",
+        "uses": 9
+      },
+      {
+        "soundId": "percussion-wood-knock-c3",
+        "label": "Wood Knock C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-metal-hit-c4",
+        "label": "Metal Hit C4",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-tuned-bongo-c3",
+        "label": "Tuned Bongo C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-low-ceramic-c3",
+        "label": "Low Ceramic C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-shaker-fine",
+        "label": "Shaker Fine",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-noise-shuffle",
+        "label": "Noise Shuffle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-sand-rattle",
+        "label": "Sand Rattle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-impact-sub",
+        "label": "Impact Sub",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-reverse-spark",
+        "label": "Reverse Spark",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-digital-fill",
+        "label": "Digital Fill",
+        "family": "percussion",
+        "uses": 7
+      }
+    ]
+  },
+  "combinedFull": {
+    "presets": 128,
+    "namedSoundsUsed": 144,
+    "recordedAssetsUsed": 184,
+    "distinctRhythms": 98,
+    "missingSounds": [],
+    "families": {
+      "kit": {
+        "label": "Studio kit",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 196,
+        "minUses": 4,
+        "maxUses": 12
+      },
+      "bass": {
+        "label": "Bass",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 112,
+        "minUses": 7,
+        "maxUses": 7
+      },
+      "plucks": {
+        "label": "Plucks",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 82,
+        "minUses": 5,
+        "maxUses": 6
+      },
+      "keys": {
+        "label": "Keys",
+        "patches": 16,
+        "used": 16,
+        "channelUses": 83,
+        "minUses": 4,
+        "maxUses": 8
+      },
+      "bells": {
+        "label": "Bells & mallets",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 49,
+        "minUses": 3,
+        "maxUses": 6
+      },
+      "leads": {
+        "label": "Leads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 50,
+        "minUses": 3,
+        "maxUses": 7
+      },
+      "pads": {
+        "label": "Pads",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 80,
+        "minUses": 6,
+        "maxUses": 7
+      },
+      "chords": {
+        "label": "Chord stabs",
+        "patches": 12,
+        "used": 12,
+        "channelUses": 72,
+        "minUses": 4,
+        "maxUses": 7
+      },
+      "percussion": {
+        "label": "New percussion",
+        "patches": 24,
+        "used": 24,
+        "channelUses": 300,
+        "minUses": 7,
+        "maxUses": 20
+      }
+    },
+    "sounds": [
+      {
+        "soundId": "kick-808",
+        "label": "Kick — 808 Deep",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-punch",
+        "label": "Kick — Punchy",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-hard",
+        "label": "Kick — Hard Techno",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "kick-sub",
+        "label": "Kick — Sub Boom",
+        "family": "kit",
+        "uses": 12
+      },
+      {
+        "soundId": "snare-tight",
+        "label": "Snare — Tight",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-fat",
+        "label": "Snare — Fat",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "snare-rock",
+        "label": "Snare — Rock Crack",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "clap-909",
+        "label": "Clap — 909 Style",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "hat-closed",
+        "label": "Hat — Closed",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-tight",
+        "label": "Hat — Tight Tick",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "hat-open",
+        "label": "Hat — Open",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "ride",
+        "label": "Ride Cymbal",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "crash",
+        "label": "Crash Cymbal",
+        "family": "kit",
+        "uses": 7
+      },
+      {
+        "soundId": "tom-lo",
+        "label": "Tom — Low",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-mid",
+        "label": "Tom — Mid",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "tom-hi",
+        "label": "Tom — High",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "cowbell-808",
+        "label": "Cowbell — 808",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "rimshot",
+        "label": "Rimshot",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "shaker",
+        "label": "Shaker",
+        "family": "kit",
+        "uses": 9
+      },
+      {
+        "soundId": "bass-808-e",
+        "label": "808 Bass — E1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-g",
+        "label": "808 Bass — G1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-a",
+        "label": "808 Bass — A1",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "bass-808-dist",
+        "label": "808 Bass — E1 Distorted",
+        "family": "kit",
+        "uses": 4
+      },
+      {
+        "soundId": "zap",
+        "label": "Zap / Laser",
+        "family": "kit",
+        "uses": 8
+      },
+      {
+        "soundId": "bass-pure-sub",
+        "label": "Pure Sub",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-rounded-triangle",
+        "label": "Rounded Triangle",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-rubber-mono",
+        "label": "Rubber Mono",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-warm-ladder",
+        "label": "Warm Ladder",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-short-acid",
+        "label": "Short Acid",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-square-acid",
+        "label": "Square Acid",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-fm-growl",
+        "label": "FM Growl",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-hollow-fm",
+        "label": "Hollow FM",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-muted-string-bass",
+        "label": "Muted String Bass",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-woody-bass",
+        "label": "Woody Bass",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-reese-narrow",
+        "label": "Reese Narrow",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-saw-foundation",
+        "label": "Saw Foundation",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-chip-octave",
+        "label": "Chip Octave",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-pulse-bass",
+        "label": "Pulse Bass",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-saturated-sub",
+        "label": "Saturated Sub",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "bass-digital-bite",
+        "label": "Digital Bite",
+        "family": "bass",
+        "uses": 7
+      },
+      {
+        "soundId": "plucks-sine-droplet",
+        "label": "Sine Droplet",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-glass-pin",
+        "label": "Glass Pin",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-copper-fm",
+        "label": "Copper FM",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-digital-harp",
+        "label": "Digital Harp",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-muted-nylon",
+        "label": "Muted Nylon",
+        "family": "plucks",
+        "uses": 6
+      },
+      {
+        "soundId": "plucks-wood-string",
+        "label": "Wood String",
+        "family": "plucks",
+        "uses": 6
+      },
+      {
+        "soundId": "plucks-bright-steel",
+        "label": "Bright Steel",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-low-kalimba",
+        "label": "Low Kalimba",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-soft-triangle",
+        "label": "Soft Triangle",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-filter-ping",
+        "label": "Filter Ping",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-acid-pluck",
+        "label": "Acid Pluck",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-square-pizzicato",
+        "label": "Square Pizzicato",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-chip-spark",
+        "label": "Chip Spark",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-octave-pick",
+        "label": "Octave Pick",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-hollow-wood",
+        "label": "Hollow Wood",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "plucks-resonant-wire",
+        "label": "Resonant Wire",
+        "family": "plucks",
+        "uses": 5
+      },
+      {
+        "soundId": "keys-soft-electric",
+        "label": "Soft Electric",
+        "family": "keys",
+        "uses": 7
+      },
+      {
+        "soundId": "keys-bright-tine",
+        "label": "Bright Tine",
+        "family": "keys",
+        "uses": 8
+      },
+      {
+        "soundId": "keys-dusty-reed",
+        "label": "Dusty Reed",
+        "family": "keys",
+        "uses": 7
+      },
+      {
+        "soundId": "keys-crystal-ep",
+        "label": "Crystal EP",
+        "family": "keys",
+        "uses": 7
+      },
+      {
+        "soundId": "keys-warm-drawbar",
+        "label": "Warm Drawbar",
+        "family": "keys",
+        "uses": 6
+      },
+      {
+        "soundId": "keys-jazz-organ",
+        "label": "Jazz Organ",
+        "family": "keys",
+        "uses": 5
+      },
+      {
+        "soundId": "keys-percussive-organ",
+        "label": "Percussive Organ",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-hollow-organ",
+        "label": "Hollow Organ",
+        "family": "keys",
+        "uses": 5
+      },
+      {
+        "soundId": "keys-felt-piano-like",
+        "label": "Felt Piano-like",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-bright-piano-like",
+        "label": "Bright Piano-like",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-toy-piano-like",
+        "label": "Toy Piano-like",
+        "family": "keys",
+        "uses": 5
+      },
+      {
+        "soundId": "keys-digital-piano-like",
+        "label": "Digital Piano-like",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-soft-digital",
+        "label": "Soft Digital",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-round-triangle-keys",
+        "label": "Round Triangle Keys",
+        "family": "keys",
+        "uses": 5
+      },
+      {
+        "soundId": "keys-square-clav",
+        "label": "Square Clav",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "keys-fm-clav",
+        "label": "FM Clav",
+        "family": "keys",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-round-bell",
+        "label": "Round Bell",
+        "family": "bells",
+        "uses": 6
+      },
+      {
+        "soundId": "bells-glass-bell",
+        "label": "Glass Bell",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-church-metal",
+        "label": "Church Metal",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tiny-glock-like",
+        "label": "Tiny Glock-like",
+        "family": "bells",
+        "uses": 6
+      },
+      {
+        "soundId": "bells-wood-marimba-like",
+        "label": "Wood Marimba-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-soft-vibraphone-like",
+        "label": "Soft Vibraphone-like",
+        "family": "bells",
+        "uses": 4
+      },
+      {
+        "soundId": "bells-copper-bowl",
+        "label": "Copper Bowl",
+        "family": "bells",
+        "uses": 6
+      },
+      {
+        "soundId": "bells-gamelan-inspired",
+        "label": "Gamelan-inspired",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-celeste-like",
+        "label": "Celeste-like",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-tubular-chime",
+        "label": "Tubular Chime",
+        "family": "bells",
+        "uses": 5
+      },
+      {
+        "soundId": "bells-low-metallophone",
+        "label": "Low Metallophone",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "bells-ice-mallet",
+        "label": "Ice Mallet",
+        "family": "bells",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-rounded-mono",
+        "label": "Rounded Mono",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-open-saw",
+        "label": "Open Saw",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-narrow-pulse",
+        "label": "Narrow Pulse",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-chip-square",
+        "label": "Chip Square",
+        "family": "leads",
+        "uses": 7
+      },
+      {
+        "soundId": "leads-octave-chip",
+        "label": "Octave Chip",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-acid-ribbon",
+        "label": "Acid Ribbon",
+        "family": "leads",
+        "uses": 4
+      },
+      {
+        "soundId": "leads-resonant-square",
+        "label": "Resonant Square",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-fm-whistle",
+        "label": "FM Whistle",
+        "family": "leads",
+        "uses": 6
+      },
+      {
+        "soundId": "leads-glass-lead",
+        "label": "Glass Lead",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-triangle-solo",
+        "label": "Triangle Solo",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-vowel-like",
+        "label": "Vowel-like",
+        "family": "leads",
+        "uses": 3
+      },
+      {
+        "soundId": "leads-detuned-mono",
+        "label": "Detuned Mono",
+        "family": "leads",
+        "uses": 5
+      },
+      {
+        "soundId": "pads-warm-horizon",
+        "label": "Warm Horizon",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-dark-velvet",
+        "label": "Dark Velvet",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-glass-cloud",
+        "label": "Glass Cloud",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-air-harmonics",
+        "label": "Air Harmonics",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-wide-dawn",
+        "label": "Wide Dawn",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-slow-brass",
+        "label": "Slow Brass",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-hollow-drift",
+        "label": "Hollow Drift",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-fifth-mist",
+        "label": "Fifth Mist",
+        "family": "pads",
+        "uses": 7
+      },
+      {
+        "soundId": "pads-soft-choir-like",
+        "label": "Soft Choir-like",
+        "family": "pads",
+        "uses": 6
+      },
+      {
+        "soundId": "pads-night-organ",
+        "label": "Night Organ",
+        "family": "pads",
+        "uses": 6
+      },
+      {
+        "soundId": "pads-silver-haze",
+        "label": "Silver Haze",
+        "family": "pads",
+        "uses": 6
+      },
+      {
+        "soundId": "pads-deep-aurora",
+        "label": "Deep Aurora",
+        "family": "pads",
+        "uses": 6
+      },
+      {
+        "soundId": "chords-major-house",
+        "label": "Major House",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-minor-house",
+        "label": "Minor House",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-sus2-glass",
+        "label": "Sus2 Glass",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-sus4-warm",
+        "label": "Sus4 Warm",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-major-seventh",
+        "label": "Major Seventh",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-minor-seventh",
+        "label": "Minor Seventh",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-dominant-seventh",
+        "label": "Dominant Seventh",
+        "family": "chords",
+        "uses": 7
+      },
+      {
+        "soundId": "chords-open-fifth",
+        "label": "Open Fifth",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "chords-minor-ninth",
+        "label": "Minor Ninth",
+        "family": "chords",
+        "uses": 6
+      },
+      {
+        "soundId": "chords-major-ninth",
+        "label": "Major Ninth",
+        "family": "chords",
+        "uses": 6
+      },
+      {
+        "soundId": "chords-diminished-spark",
+        "label": "Diminished Spark",
+        "family": "chords",
+        "uses": 6
+      },
+      {
+        "soundId": "chords-quartal-air",
+        "label": "Quartal Air",
+        "family": "chords",
+        "uses": 4
+      },
+      {
+        "soundId": "percussion-kick-modern",
+        "label": "Kick Modern",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-kick-soft",
+        "label": "Kick Soft",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-kick-click",
+        "label": "Kick Click",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-kick-broken",
+        "label": "Kick Broken",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-snare-modern",
+        "label": "Snare Modern",
+        "family": "percussion",
+        "uses": 16
+      },
+      {
+        "soundId": "percussion-snare-brush",
+        "label": "Snare Brush",
+        "family": "percussion",
+        "uses": 16
+      },
+      {
+        "soundId": "percussion-snare-wood",
+        "label": "Snare Wood",
+        "family": "percussion",
+        "uses": 16
+      },
+      {
+        "soundId": "percussion-snare-metallic",
+        "label": "Snare Metallic",
+        "family": "percussion",
+        "uses": 16
+      },
+      {
+        "soundId": "percussion-clap-dry",
+        "label": "Clap Dry",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-wide",
+        "label": "Clap Wide",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-clap-dust",
+        "label": "Clap Dust",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-hat-silk",
+        "label": "Hat Silk",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-hat-grain",
+        "label": "Hat Grain",
+        "family": "percussion",
+        "uses": 20
+      },
+      {
+        "soundId": "percussion-hat-metal",
+        "label": "Hat Metal",
+        "family": "percussion",
+        "uses": 19
+      },
+      {
+        "soundId": "percussion-wood-knock-c3",
+        "label": "Wood Knock C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-metal-hit-c4",
+        "label": "Metal Hit C4",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-tuned-bongo-c3",
+        "label": "Tuned Bongo C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-low-ceramic-c3",
+        "label": "Low Ceramic C3",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-shaker-fine",
+        "label": "Shaker Fine",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-noise-shuffle",
+        "label": "Noise Shuffle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-sand-rattle",
+        "label": "Sand Rattle",
+        "family": "percussion",
+        "uses": 8
+      },
+      {
+        "soundId": "percussion-impact-sub",
+        "label": "Impact Sub",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-reverse-spark",
+        "label": "Reverse Spark",
+        "family": "percussion",
+        "uses": 7
+      },
+      {
+        "soundId": "percussion-digital-fill",
+        "label": "Digital Fill",
+        "family": "percussion",
+        "uses": 7
+      }
+    ]
+  }
+}

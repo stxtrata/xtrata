@@ -70,3 +70,17 @@ describe('payout split launch gate', () => {
     expect(isStandardCreatorSplit({ artist: 10000n, marketplace: 0n, operator: 0n })).toBe(false);
   });
 });
+
+describe('v1.9 signer roles', () => {
+  it('lets the owner or finance admin split the artist pool; the platform tier is checked on-chain', async () => {
+    const { requiredSignerRole, signerPreflight } = await import('../contract-preflight');
+    const roles = { owner: 'SPOWNER', pendingOwner: null, operatorAdmin: 'SPOWNER', financeAdmin: 'SPFIN' };
+    expect(requiredSignerRole('set-artist-splits')).toBe('finance');
+    expect(signerPreflight('set-artist-splits', 'SPFIN', roles)).toBeNull();
+    expect(signerPreflight('set-artist-splits', 'SPOTHER', roles)).toContain("can't make this change");
+    expect(requiredSignerRole('set-platform-split')).toBe('platform');
+    expect(requiredSignerRole('set-artist-slot-allowance')).toBe('platform');
+    expect(requiredSignerRole('set-platform-editor')).toBe('core-admin');
+    expect(signerPreflight('set-platform-split', 'SPOTHER', roles)).toBeNull();
+  });
+});

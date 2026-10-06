@@ -1,0 +1,25 @@
+{
+  "collectionKey": "nyc-degens",
+  "requested": 420,
+  "built": 420,
+  "partial": false,
+  "failures": [],
+  "oversize": [],
+  "maxSingleTxBytes": 524288,
+  "maxRecordBytes": 33554432,
+  "largest": {
+    "id": 309,
+    "bytes": 130308
+  },
+  "mimes": {
+    "image/png": 420
+  },
+  "mediaHosts": {
+    "ipfs": 420
+  },
+  "preinscribed": [],
+  "preinscribedCoreFeeUstx": 0,
+  "identicalContent": [],
+  "seedingCalls": 5,
+  "seconds": 602
+}

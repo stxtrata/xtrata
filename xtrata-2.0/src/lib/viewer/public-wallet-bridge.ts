@@ -1,5 +1,6 @@
 import { GAME_SAVE_METHODS, type SaveReview } from './game-save';
-import type { ArcadeOutcome } from './arcade-submit-host';
+import { arcadeCallToPayload, type ArcadeOutcome } from './arcade-submit-host';
+import { isArcadeInscriptionLabel } from '../../arcade-submit/arcade-boards';
 import { validateStacksAddress } from '@stacks/transactions';
 import type { WalletAdapter, WalletSession } from '../wallet/types';
 import type { showStxTransfer } from '../wallet/connect';
@@ -128,8 +129,10 @@ export function installPublicWalletBridge(options: Options) {
     origin: string;
     authorized: boolean;
     seen: Set<string>;
+    /** Created while the document was still loading (before its first load event). */
+    early?: boolean;
   };
-  type Entry = { frame: HTMLIFrameElement; label: string; grant?: Grant; reset: () => void };
+  type Entry = { frame: HTMLIFrameElement; label: string; grant?: Grant; reset: () => void; loaded?: boolean };
   const entries = new Set<Entry>();
   let busy = false;
   const arcadePending = new Map<string, { entry: Entry; send: (data: unknown) => void; tab: Window | null; expires: number }>();
@@ -223,7 +226,8 @@ export function installPublicWalletBridge(options: Options) {
         expires: Date.now() + 10 * 60_000,
         origin: event.origin,
         authorized: entry.grant?.authorized ?? false,
-        seen: new Set()
+        seen: new Set(),
+        early: !entry.loaded
       };
       send({ type: 'xtrata:wallet:hello-ack', nonce: p.nonce, bridgeToken: entry.grant.token });
       return;
@@ -238,6 +242,24 @@ export function installPublicWalletBridge(options: Options) {
         ...(ok ? { result: value } : { error: value })
       });
     const grant = entry.grant;
+    // Some inscribed apps (the arcade) say hello once and keep the token. An expired token from this very
+    // window is renewed only for requests that then need fresh user consent anyway: a connect review, or an
+    // arcade score review for a preview the user had already connected.
+    if (
+      grant &&
+      entry.grant === grant &&
+      grant.origin === event.origin &&
+      p.bridgeToken === grant.token &&
+      grant.expires <= Date.now() &&
+      usable(entry)
+    ) {
+      if (connects.has(p.method)) {
+        grant.expires = Date.now() + 10 * 60_000;
+        grant.authorized = false;
+      } else if (p.method === 'stx_callContract' && options.arcadeSubmit && grant.authorized) {
+        grant.expires = Date.now() + 10 * 60_000;
+      }
+    }
     const alive = () =>
       usable(entry) &&
       entry.grant === grant &&
@@ -266,9 +288,11 @@ export function installPublicWalletBridge(options: Options) {
           network: session.network
         };
       }
+      const arcadeCall = method === 'stx_callContract' && !!options.arcadeSubmit;
       if (
         !connects.has(method) &&
         !transfers.has(method) &&
+        !arcadeCall &&
         !(GAME_SAVE_METHODS.has(method) && options.gameSave)
       )
         throw failure(
@@ -298,6 +322,21 @@ export function installPublicWalletBridge(options: Options) {
         }
         if (!grant!.authorized)
           throw failure('Connect this preview before requesting a payment.', 4100);
+        if (arcadeCall) {
+          // Deployed arcade builds sign score posts with a generic contract call. Only submit-score on the arcade
+          // leaderboard is accepted; it goes through the same host-owned review, replay check and wallet path.
+          const payload = arcadeCallToPayload(p.params);
+          if (arcadeDialogOpen) throw failure('A score submission is already waiting for you.', -32002);
+          arcadeDialogOpen = true;
+          try {
+            const outcome = await options.arcadeSubmit!(payload, entry.label, 'xa-call-' + Date.now().toString(36));
+            if (outcome?.kind === 'tx') return { txid: outcome.txId };
+            if (outcome?.kind === 'tab') throw failure('The submission continued in a new tab. Check your wallet history.', -32002);
+            throw failure('Score submission cancelled.', 4001);
+          } finally {
+            arcadeDialogOpen = false;
+          }
+        }
         if (GAME_SAVE_METHODS.has(method) && options.gameSave) {
           const initial = checkedSession(options.wallet.getSession());
           const guard = () => {
@@ -371,7 +410,14 @@ export function installPublicWalletBridge(options: Options) {
         frame,
         label: label.slice(0, 200),
         reset: () => {
-          entry.grant = undefined;
+          const early = entry.grant?.early && !entry.loaded;
+          entry.loaded = true;
+          // A handshake made while this document was still loading belongs to it (apps say hello from their
+          // first script, before the load event). Keep the token but drop consent, and use a fresh grant object
+          // so any review already in flight for the old one is abandoned. Anything else is cleared.
+          entry.grant = early
+            ? { ...entry.grant!, authorized: false, seen: new Set(), early: false, expires: Date.now() + 10 * 60_000 }
+            : undefined;
         }
       };
       frame.addEventListener('load', entry.reset);
@@ -392,7 +438,70 @@ const stx = (value: string) => {
 };
 
 /** Host-owned review; no inscription HTML is inserted into this dialog. */
+/** Friendly, host-owned connect prompt. Everything is set with textContent; no inscription HTML reaches it. */
+function reviewConnect(label: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const arcade = isArcadeInscriptionLabel(label); // any Xtrata Arcade inscription (ARCADE_INSCRIPTION_IDS)
+    const make = <K extends keyof HTMLElementTagNameMap>(tag: K, css = '', text = '') => {
+      const node = document.createElement(tag);
+      if (css) node.style.cssText = css;
+      if (text) node.textContent = text;
+      return node;
+    };
+    const dialog = make('dialog', 'max-width:460px;width:calc(100% - 32px);box-sizing:border-box;padding:0;border:1px solid rgba(120,140,255,.45);border-radius:22px;background:radial-gradient(120% 90% at 50% 0%,#1d2a66 0%,#0d1230 55%,#080b1f 100%);color:#eef4ff;font:16px/1.5 system-ui,-apple-system,sans-serif;overflow:hidden;box-shadow:0 0 0 1px rgba(57,230,255,.12),0 24px 80px rgba(20,10,80,.7),0 0 60px rgba(120,90,255,.35)');
+    dialog.setAttribute('aria-label', 'Connect your wallet');
+    const glow = make('div', 'height:4px;background:linear-gradient(90deg,#39e6ff,#8a7dff,#ff6ad5,#ffb347)');
+    const body = make('div', 'padding:26px 26px 22px;text-align:center');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 64 64'); svg.setAttribute('width', '64'); svg.setAttribute('height', '64'); svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'display:block;margin:0 auto 10px;filter:drop-shadow(0 0 14px rgba(57,230,255,.55))';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    for (const [k, v] of Object.entries({ x: '8', y: '16', width: '48', height: '34', rx: '9', fill: 'none', stroke: '#39e6ff', 'stroke-width': '3' })) rect.setAttribute(k, v);
+    const clasp = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    for (const [k, v] of Object.entries({ x: '38', y: '27', width: '18', height: '12', rx: '6', fill: '#8a7dff' })) clasp.setAttribute(k, v);
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    for (const [k, v] of Object.entries({ cx: '46', cy: '33', r: '2.4', fill: '#eef4ff' })) dot.setAttribute(k, v);
+    svg.append(rect, clasp, dot);
+    const kicker = make('div', 'font:700 11px/1 ui-monospace,Menlo,monospace;letter-spacing:.22em;text-transform:uppercase;color:#39e6ff;margin-bottom:8px', arcade ? 'Xtrata Arcade' : 'Wallet');
+    const title = make('h2', 'margin:0 0 8px;font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.01em', arcade ? 'Ready to climb the Top 10?' : 'Connect your wallet');
+    const lead = make('p', 'margin:0 0 16px;color:#b9c6ee', arcade
+      ? 'Connect and every run you play is recorded and tied to you. Post a great one and it lives on Bitcoin, and nobody can copy it.'
+      : `${label} would like to know which wallet you are using.`);
+    const list = make('ul', 'list-style:none;margin:0 0 20px;padding:0;text-align:left;display:grid;gap:8px');
+    for (const line of ['Only your public address is shared', 'Nothing is signed or charged right now', 'Every payment or score post asks you again first']) {
+      const li = make('li', 'display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.07);font-size:14px;color:#dbe4ff');
+      li.append(make('span', 'color:#7dffb2;font-weight:800', '\u2713'), make('span', '', line));
+      list.append(li);
+    }
+    const row = make('div', 'display:flex;gap:10px;justify-content:center;flex-wrap:wrap');
+    const cancel = make('button', 'font:inherit;font-weight:600;padding:12px 20px;border-radius:12px;cursor:pointer;background:transparent;color:#b9c6ee;border:1px solid rgba(255,255,255,.18)', 'Not now');
+    const approve = make('button', 'font:inherit;font-weight:800;padding:12px 26px;border-radius:12px;cursor:pointer;border:0;color:#061022;background:linear-gradient(90deg,#39e6ff,#8a7dff);box-shadow:0 6px 24px rgba(90,120,255,.5)', 'Connect wallet');
+    cancel.type = 'button'; approve.type = 'button';
+    row.append(cancel, approve);
+    body.append(svg, kicker, title, lead, list, row);
+    dialog.append(glow, body);
+    let settled = false;
+    const finish = (allowed: boolean) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      dialog.close();
+      dialog.remove();
+      resolve(allowed);
+    };
+    // Stay inside the game's 120-second response window before wallet approval.
+    const timer = setTimeout(() => finish(false), 60_000);
+    cancel.onclick = () => finish(false);
+    approve.onclick = () => finish(true);
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); });
+    document.body.append(dialog);
+    dialog.showModal();
+    approve.focus();
+  });
+}
+
 export function reviewPublicWalletRequest(request: WalletReview): Promise<boolean> {
+  if (request.kind === 'connect') return reviewConnect(request.label);
   return new Promise((resolve) => {
     const dialog = document.createElement('dialog');
     dialog.setAttribute('aria-label', 'Xtrata wallet request');

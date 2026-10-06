@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forever Twins community</title>
+<meta name="robots" content="noindex">
+<script>
+// The community page is served at /forever-twins/community/<slug> (see public/_redirects).
+// This folder index only forwards ?c= links to that route.
+(function () {
+  var k = new URLSearchParams(location.search).get('c');
+  location.replace(k && /^[a-z0-9-]+$/.test(k) ? '/forever-twins/community/' + k : '/forever-twins/collections/');
+})();
+</script>
+</head>
+<body><p><a href="/forever-twins/collections/">All Forever Twins collections</a></p></body>
+</html>

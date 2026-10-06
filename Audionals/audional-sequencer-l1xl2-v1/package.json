@@ -1,0 +1,18 @@
+{
+  "name": "audional-sequencer-l1xl2",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser-smoke.cjs",
+    "test:songs": "node tests/browser-song.cjs",
+    "serve": "python3 -m http.server 8080",
+    "test:onboard": "node tests/browser-onboard.cjs",
+    "sounds:build": "node scripts/build-onboard.cjs",
+    "sounds:audit": "node scripts/audit-onboard.cjs",
+    "sounds:package": "node scripts/package-onboard.cjs",
+    "test:beats": "node tests/browser-expanded-beats.cjs",
+    "beats:audit": "node scripts/audit-beats.js"
+  }
+}

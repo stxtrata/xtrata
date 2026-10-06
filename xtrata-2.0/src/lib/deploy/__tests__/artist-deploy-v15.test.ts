@@ -31,3 +31,17 @@ describe('v1.7 template pinning', () => {
     expect(result.source.split(`(contract-call? '${params.coreContractId} `).length - 1).toBe(8);
   });
 });
+describe('v1.9 two-tier template', () => {
+  const v19 = readFileSync(new URL('../../../../contracts/clarinet/contracts/xtrata-collection-mint-v1.9.clar', import.meta.url), 'utf8');
+  const artist = 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX';
+  it.each([buildArtistDeployContractSource, sdkBuild])('names the primary artist and leaves the platform tier to the contract', build => {
+    const result = build({ ...params, input: { ...params.input, artistAddress: artist }, templateSources: { standardSource: v19, preinscribedSource: '' } });
+    expect(result.errors).toEqual([]);
+    expect(result.source).toContain(`(list { recipient: '${artist}, holder-of: none, share: BASIS-POINTS })`);
+    expect(result.source).not.toContain('recipient: tx-sender');
+    expect(result.source).toContain('(define-constant PLATFORM-MIN-BPS u250)');
+    expect(result.source).toContain('(define-data-var marketplace-split { recipient: principal, bps: uint } { recipient: XTRATA-TREASURY, bps: u250 })');
+    expect(result.source).not.toMatch(/\(contract-call\? \.xtrata-v3-2-3/);
+    expect(result.source).toContain(`(define-constant ALLOWED-XTRATA-CONTRACT '${params.coreContractId})`);
+  });
+});

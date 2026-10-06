@@ -1,0 +1,2 @@
+# Keep the catalogue handoff byte-for-byte, including CSV line endings.
+/audionaut-v0.2/reference/catalogue-lab-v0.2/** -text whitespace=cr-at-eol,-blank-at-eof

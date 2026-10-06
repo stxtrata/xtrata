@@ -117,6 +117,10 @@ const isCoreEntry = (entry: ContractRegistryEntry) =>
 const escapeClarityAscii = (value: string) =>
   value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 
+/** v1.9+ templates: platform tier (Xtrata-only) + artist tier (owner). */
+export const hasTwoTierSplits = (source: string) =>
+  source.includes('(define-public (set-artist-splits');
+
 const replaceLine = (params: {
   source: string;
   marker: string;
@@ -400,53 +404,65 @@ export const buildArtistDeployContractSource = (params: {
     errors
   });
 
-  source = replaceLine({
-    source,
-    marker: 'artist-recipient',
-    pattern: /^\(define-data-var artist-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var artist-recipient principal '${resolved.artistAddress})`,
-    errors
-  });
+  if (hasTwoTierSplits(source)) {
+    // v1.9+: Xtrata's platform tier is set in the contract and only Xtrata can
+    // change it. The deploy only names the primary artist of the artist tier.
+    source = replaceLine({
+      source,
+      marker: 'initial-artist-split',
+      pattern: /^(\s*)\(list \{ recipient: tx-sender, holder-of: none, share: BASIS-POINTS \}\)$/m,
+      replacement: `$1(list { recipient: '${resolved.artistAddress}, holder-of: none, share: BASIS-POINTS })`,
+      errors
+    });
+  } else {
+    source = replaceLine({
+      source,
+      marker: 'artist-recipient',
+      pattern: /^\(define-data-var artist-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var artist-recipient principal '${resolved.artistAddress})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'marketplace-recipient',
-    pattern: /^\(define-data-var marketplace-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var marketplace-recipient principal '${resolved.marketplaceAddress})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'marketplace-recipient',
+      pattern: /^\(define-data-var marketplace-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var marketplace-recipient principal '${resolved.marketplaceAddress})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'operator-recipient',
-    pattern: /^\(define-data-var operator-recipient principal [^)]+\)$/m,
-    replacement: `(define-data-var operator-recipient principal '${resolved.operatorAddress})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'operator-recipient',
+      pattern: /^\(define-data-var operator-recipient principal [^)]+\)$/m,
+      replacement: `(define-data-var operator-recipient principal '${resolved.operatorAddress})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'artist-bps',
-    pattern: /^\(define-data-var artist-bps uint u\d+\)$/m,
-    replacement: `(define-data-var artist-bps uint u${payoutSplits.artistBps.toString()})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'artist-bps',
+      pattern: /^\(define-data-var artist-bps uint u\d+\)$/m,
+      replacement: `(define-data-var artist-bps uint u${payoutSplits.artistBps.toString()})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'marketplace-bps',
-    pattern: /^\(define-data-var marketplace-bps uint u\d+\)$/m,
-    replacement: `(define-data-var marketplace-bps uint u${payoutSplits.marketplaceBps.toString()})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'marketplace-bps',
+      pattern: /^\(define-data-var marketplace-bps uint u\d+\)$/m,
+      replacement: `(define-data-var marketplace-bps uint u${payoutSplits.marketplaceBps.toString()})`,
+      errors
+    });
 
-  source = replaceLine({
-    source,
-    marker: 'operator-bps',
-    pattern: /^\(define-data-var operator-bps uint u\d+\)$/m,
-    replacement: `(define-data-var operator-bps uint u${payoutSplits.operatorBps.toString()})`,
-    errors
-  });
+    source = replaceLine({
+      source,
+      marker: 'operator-bps',
+      pattern: /^\(define-data-var operator-bps uint u\d+\)$/m,
+      replacement: `(define-data-var operator-bps uint u${payoutSplits.operatorBps.toString()})`,
+      errors
+    });
+  }
 
   if (mintType === 'standard') {
     source = replaceLine({

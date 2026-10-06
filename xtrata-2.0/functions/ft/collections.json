@@ -1,0 +1,25 @@
+{
+  "publicBase": "https://xtrata.xyz",
+  "network": "mainnet",
+  "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+  "collections": {
+    "nyc-degens": {
+      "label": "NYC Degens",
+      "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+      "manifestPath": "/ft/data/nyc-degens.manifest.json",
+      "manifestSha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+      "manifestStatus": "final",
+      "_note": "Helper deployed and seeded 5 Oct 2026 via the launch canary; finalised only after production serves this exact manifest."
+    },
+    "megapont-ape-club": {
+      "label": "Megapont Ape Club",
+      "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club",
+      "manifestPath": "/ft/data/megapont-ape-club.manifest.json",
+      "manifestSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+      "manifestStatus": "final",
+      "_note": "Helper deployed, seeded and finalised 5-6 Oct 2026 via the launch canary; production serves this exact manifest."
+    }
+  }
+}

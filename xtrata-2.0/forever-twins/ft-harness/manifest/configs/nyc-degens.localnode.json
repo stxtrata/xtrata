@@ -1,0 +1,17 @@
+{
+  "collectionKey": "nyc-degens",
+  "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+  "sourceAsset": "nyc-degens",
+  "ids": {
+    "from": 1,
+    "to": 420
+  },
+  "metadataUri": "chain",
+  "gateway": "http://127.0.0.1:8080",
+  "scope": "minted-at-snapshot",
+  "reviewer": null,
+  "concurrency": 2,
+  "retries": 5,
+  "_twinTokenUri_note": "D3 (spec 7.9) is still Jim's call. This uses the spec's recommended resolver URL; change before building the final manifest if D3 lands differently.",
+  "twinTokenUri": "https://xtrata.xyz/ft/nyc-degens/{id}.json"
+}

@@ -1,5 +1,6 @@
 import {
   HOMEPAGE_AUDIONAUTS,
+  HOMEPAGE_BOUNTY,
   HOMEPAGE_CHESS,
   HOMEPAGE_FRESH,
   HOMEPAGE_INTENTS,
@@ -19,6 +20,7 @@ const HOME_MOUNT_IDS = [
   'homeNowPlaying',
   'homeMusicTabs',
   'homeMusicShelf',
+  'homeBounty',
   'homeAudionauts',
   'homeKpLoops',
   'homeFreshFilters',
@@ -270,10 +272,19 @@ const renderNowPlaying = () => {
   mount.dataset.state = state;
   mount.replaceChildren();
   if (!track) {
-    mount.append(
-      element('span', 'home-now__kicker', 'Free to play here'),
-      element('span', 'home-now__hint', 'Press any cover to hear it. It plays through Xtrata Radio.')
+    // An empty player slot, not a button: it tells people what to press, and
+    // turns into the real player (below) as soon as a song starts.
+    const row = element('div', 'home-now__row');
+    const ghost = element('span', 'home-now__ghost');
+    ghost.setAttribute('aria-hidden', 'true');
+    ghost.append(svgIcon('play'));
+    const text = element('div', 'home-now__text');
+    text.append(
+      element('span', 'home-now__kicker', 'Your free player · nothing playing yet'),
+      element('span', 'home-now__hint', 'Press any song cover on this page to play it. This box then becomes your player.')
     );
+    row.append(ghost, text);
+    mount.append(row);
     return;
   }
   const row = element('div', 'home-now__row');
@@ -418,6 +429,7 @@ const wallCaption = (item) => {
   if (item.eyebrow) caption.append(element('span', 'home-tile__eyebrow', item.eyebrow));
   caption.append(element('strong', 'home-tile__title', item.title));
   if (item.subtitle) caption.append(element('span', 'home-tile__sub', item.subtitle));
+  if (item.cta && item.kind !== 'chess') caption.append(element('span', 'home-tile__cta home-tile__cta--wall', `${item.cta} →`));
   return caption;
 };
 
@@ -459,6 +471,7 @@ const renderWall = () => {
       const img = image(item.image, item.title, 'home-tile__img', { eager: i < 4, position: item.position });
       if (item.pixelated) img.classList.add('is-pixelated');
       tile.append(img, wallCaption(item));
+      if (item.listen) tile.append(playBadge());
       if (item.badge) tile.append(element('span', 'home-tile__badge', item.badge));
     }
     mount.append(tile);
@@ -530,6 +543,58 @@ const renderMusic = async () => {
 };
 
 // ---------------------------------------------------------------------------
+// Bounty
+const renderBounty = () => {
+  const mount = document.getElementById('homeBounty');
+  if (!mount) {
+    return;
+  }
+  const b = HOMEPAGE_BOUNTY;
+  mount.replaceChildren();
+  const copy = element('div', 'home-bounty__copy');
+  const tags = element('div', 'home-bounty__tags');
+  tags.append(
+    element('span', 'home-bounty__pill', 'Live now · 1 to 21 Oct'),
+    element('span', 'home-bounty__kicker', 'The Xtrata bounty')
+  );
+  const title = element('h2', 'home-bounty__title');
+  title.append(document.createTextNode('Create. Inscribe. Share. '), element('em', '', 'Win a share of 500 STX.'));
+  const body = element(
+    'p',
+    'home-bounty__body',
+    'Inscribe something original on Xtrata and share it on X. Five main prizes, four special awards and ten raffle prizes, with a raffle ticket for every extra thing you do.'
+  );
+  const stats = element('div', 'home-bounty__stats');
+  b.stats.forEach(([value, label]) => {
+    const stat = element('div', 'home-bounty__stat');
+    stat.append(element('strong', '', value), element('span', '', label));
+    stats.append(stat);
+  });
+  // Live ticket tracker: same tab, label and line come from the content config.
+  const ticketsLink = actionLink(b.tracker.href, b.tracker.label, 'home-btn home-btn--ghost home-btn--tickets', 'bounty:tickets');
+  ticketsLink.replaceChildren(element('span', '', b.tracker.label), element('small', '', b.tracker.line));
+  const actions = element('div', 'home-bounty__actions');
+  actions.append(
+    actionLink(b.guideHref, 'See how to enter', 'home-btn home-btn--solid', 'bounty:guide', { newTab: true }),
+    actionLink(b.rulesHref, 'Full rules', 'home-btn home-btn--ghost', 'bounty:rules', { newTab: true }),
+    actionLink(b.telegramHref, 'Join the Telegram', 'home-btn home-btn--ghost', 'bounty:telegram', { newTab: true }),
+    ticketsLink // last, so the three original buttons keep their row and this one sits beneath them
+  );
+  copy.append(tags, title, body, stats, actions);
+  const steps = element('ol', 'home-bounty__steps');
+  b.steps.forEach(([name, text], i) => {
+    const step = element('li', 'home-bounty__step');
+    const num = element('span', 'home-bounty__num', String(i + 1));
+    const words = element('span', 'home-bounty__words');
+    words.append(element('strong', '', name), element('span', '', text));
+    step.append(num, words);
+    steps.append(step);
+  });
+  const side = element('div', 'home-bounty__side');
+  side.append(steps, element('p', 'home-bounty__foot', `${b.funding} Tag ${b.tag}.`));
+  mount.append(copy, side);
+};
+
 // Audionauts
 const renderAudionauts = () => {
   const mount = document.getElementById('homeAudionauts');
@@ -550,7 +615,7 @@ const renderAudionauts = () => {
   const stats = element('div', 'home-aud__stats');
   [
     [String(a.editions), 'editions'],
-    ['Now', 'soundtrack on the radio'],
+    ['L1', 'original music streaming now'],
     [live ? 'Now' : a.mintLabel, 'mint opens']
   ].forEach(([value, label]) => {
     const stat = element('div', 'home-aud__stat');
@@ -561,29 +626,35 @@ const renderAudionauts = () => {
   actions.append(
     live
       ? actionLink(a.mintHref, 'Mint an Audionaut', 'home-btn home-btn--solid', 'audionauts:mint')
-      : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
+      : a.mintHref
+        ? actionLink(a.mintHref, 'See the collection', 'home-btn home-btn--solid', 'audionauts:collection', { newTab: true })
+        : actionLink(a.alertsHref, 'Get launch alerts', 'home-btn home-btn--solid', 'audionauts:alerts', { newTab: true })
   );
   copy.append(
     tags,
     element('h2', 'home-aud__title', 'AUDIONAUTS'),
     lead,
-    element(
-      'p',
-      'home-aud__body',
-      'Each Audionaut carries a real inscribed song, and the soundtrack is already playing on Xtrata Radio.'
-    ),
+    (() => {
+      const body = element('p', 'home-aud__body');
+      const original = actionLink(
+        a.listenHref,
+        'Listen to the original music, streamed straight from Bitcoin L1',
+        'home-aud__inline',
+        'audionauts:ordinal',
+        { newTab: true }
+      );
+      body.append(document.createTextNode('Each Audionaut carries a real inscribed song. '), original, document.createTextNode('.'));
+      return body;
+    })(),
     stats,
     actions
   );
   const media = element('div', 'home-aud__media');
   const cue = element('span', 'home-aud__listen-cue');
-  const cueText = element('span', '', 'Play Xtrata Radio');
-  cueText.dataset.radioLabel = 'Play Xtrata Radio';
-  cue.append(playBadge(), cueText);
-  const listen = radioButton('home-aud__listen', 'Audionauts: play Xtrata Radio', a.listenHref, 'audionauts:radio', [
-    image(a.poster, 'Audionauts', 'home-aud__poster'),
-    cue
-  ]);
+  cue.append(playBadge(), element('span', '', a.posterCue));
+  const listen = actionLink(a.posterHref, '', 'home-aud__listen', 'audionauts:poster', { newTab: true });
+  listen.setAttribute('aria-label', live ? 'Audionauts: open the collection page to mint' : 'Audionauts: listen to the original music on the Bitcoin L1 ordinal');
+  listen.append(image(a.poster, 'Audionauts', 'home-aud__poster'), cue);
   media.append(listen);
   const sound = element('div', 'home-aud__sound');
   const covers = element('div', 'home-aud__covers');
@@ -677,7 +748,7 @@ const renderFresh = async () => {
         }
         thumb.append(element('span', 'home-fresh__kind', kindLabel[item.kind]));
         if (item.pinned) thumb.append(element('span', 'home-fresh__pin', 'Pinned'));
-        if (item.song || item.radio) thumb.append(playBadge());
+        if (item.song || item.radio || item.listen) thumb.append(playBadge());
         const text = element('span', 'home-fresh__text');
         text.append(
           element('strong', 'home-fresh__title', item.title),
@@ -877,6 +948,7 @@ export const initHomepage = () => {
   renderWall();
   renderNowPlaying();
   void renderMusic();
+  renderBounty();
   renderAudionauts();
   renderKpLoops();
   void renderFresh();
