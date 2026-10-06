@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What is Forever Twins? · Forever Twins</title>
+<meta name="description" content="A plain-language explanation of Forever Twins: permanent on-chain twins for NFTs whose art lives off-chain.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs"><a href="/forever-twins/guides/">Guides</a> › What is Forever Twins?</span>
+</div></header>
+<main class="wrap">
+<article class="card prose">
+
+<h1>What is Forever Twins?</h1>
+<p class="updated">Updated 6 October 2026</p>
+
+<h2>The problem</h2>
+<p>When you own most NFTs, the blockchain records a token number and a link. The artwork itself usually sits somewhere else: on IPFS, on a company&rsquo;s server, in a cloud bucket. If the pinning lapses, the team moves on or the server shuts down, the token still exists but the link points at nothing. The art is gone and there is no undo.</p>
+
+<h2>The idea</h2>
+<p>Forever Twins creates a <strong>twin</strong> of an NFT: a new token whose artwork is stored in full on the Stacks blockchain through <a href="https://xtrata.xyz">Xtrata</a>, byte for byte. Nothing about the twin depends on a server staying online. The original NFT is <strong>never changed</strong>. The twin sits next to it.</p>
+
+<h2>How it works</h2>
+<ol>
+  <li><strong>Each collection gets its own helper contract.</strong> Before anyone can use it, the helper holds a record for every token: the fingerprint (hash) of the art, its file type and size, and the token&rsquo;s metadata link. The record is then locked for good, so the helper can only ever create faithful twins of that collection&rsquo;s art. The full list of fingerprints (the <em>manifest</em>) is public, and its own fingerprint is stored in the contract.</li>
+  <li><strong>Anyone can create a twin.</strong> They pay the helper&rsquo;s fee plus the cost of storing the art on-chain. The helper checks the art against the locked record before it accepts it. The new twin is held by the helper.</li>
+  <li><strong>A holder swaps their original for its twin.</strong> The helper takes the original into safe keeping and the holder receives the twin. Swapping is free apart from the network fee.</li>
+  <li><strong>Whoever holds the twin can swap back.</strong> They return the twin and receive the original. One side of every pair is always in the helper: if the twin is in your wallet, the original is in the helper, and the other way round. Nobody can pause or block a swap.</li>
+</ol>
+<p>Paying for a twin gives no right to the original. It only puts the art on-chain.</p>
+
+<h2>What keeps it honest</h2>
+<ul>
+  <li>The art in a twin must match the locked fingerprint for that token. The contract refuses anything else.</li>
+  <li>Swaps check real ownership in both contracts, before and after each move.</li>
+  <li>The helper&rsquo;s owner cannot pause swaps, change the record, move a paired token, or change who is paid. After the record is finalised the owner can only set the fee (within a ceiling fixed at deployment), rescue a token that was sent to the helper by mistake (announced on-chain first, with a delay of about three days), and hand ownership to a new address in two steps.</li>
+  <li>Anyone can check all of this without trusting us. See <a href="/forever-twins/guides/verify-it-yourself">Verify it yourself</a>.</li>
+</ul>
+
+<h2>Reading the numbers on a collection page</h2>
+<p>A helper being live does <strong>not</strong> mean every token in the collection has a twin. Twins are made token by token, so each collection page shows four separate numbers:</p>
+<table>
+  <tr><th>Recovered</th><td>Tokens whose art was fetched and fingerprinted when the manifest was built.</td></tr>
+  <tr><th>Seeded on-chain</th><td>Records written into the helper.</td></tr>
+  <tr><th>Inscribed twins</th><td>Tokens that now have a twin on-chain.</td></tr>
+  <tr><th>Swap-ready</th><td>Twins whose swap is open.</td></tr>
+</table>
+
+<h2>What it costs</h2>
+<ul>
+  <li>A flat fee per twin, set by the helper&rsquo;s owner and shown on the collection page and in the contract (<code>get-fee</code>). It is split equally between two payee addresses fixed at deployment. It is currently 1 STX on Megapont Ape Club and Bitcoin Monkeys and 0.1 STX on NYC Degens. The three older helpers have their own fees, shown on their pages.</li>
+  <li>The Xtrata cost of storing the art, which depends on file size. The page quotes it before you confirm.</li>
+  <li>Swaps in either direction are free.</li>
+</ul>
+<p>Files over 512 KB cannot be inscribed in one transaction. For collections set up for it, the page offers a guided route using a temporary wallet: it shows the amount to send, runs the uploads, creates the twin and returns what is left. A 10% processing fee goes to Xtrata, and only if the twin is actually made.</p>
+
+<h2>What Forever Twins does not do</h2>
+<ul>
+  <li>It does not fix or repoint the original NFT&rsquo;s links, and it does not say a collection is broken.</li>
+  <li>It does not preserve more than the manifest covers: art at the time the manifest was built, not later changes to the collection.</li>
+  <li>The contracts are an unaudited prototype. Read the code and the tests before relying on them.</li>
+</ul>
+
+<div class="msg warn"><strong>One important warning.</strong> Always use a collection page (or call the helper&rsquo;s swap functions yourself). <strong>Never send your NFT directly to a helper&rsquo;s address.</strong> The contract cannot tell who sent it, so it cannot simply give it back. A slow, public rescue exists for these mistakes, but it cannot be guaranteed forever.</div>
+
+<p class="row spaced"><a class="btn" href="/forever-twins/collections/">See the collections</a> <a class="btn ghost" href="/forever-twins/guides/preserve-your-collection">Preserve your collection</a></p>
+
+</article>
+</main>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a> · <a href="https://github.com/stxtrata/xtrata/tree/main/xtrata-2.0/forever-twins/ft-harness">Source</a></div></footer>
+
+</body>
+</html>

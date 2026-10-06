@@ -6,7 +6,7 @@
 //  C. the v1/v3 adapter against a fake chain (shapes taken from the helper templates)
 //  D. hashing/chunking agrees with the manifest builder, token-URI resolution
 //  E. drift check: registry.v2.json vs every other place the collections are listed
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import assert from 'node:assert/strict';
@@ -37,6 +37,25 @@ const bad = (mut, expect) => () => { const r = clone(reg); mut(r); const e = R.v
 await check('rejects coverage above the manifest count', bad((r) => { const c = r.collections.find((x) => x.key === 'nyc-degens'); c.coverage = { recovered: c.manifest.count + 1 }; }, 'exceeds the manifest count'));
 await check('rejects non-integer coverage', bad((r) => { r.collections.find((x) => x.key === 'nyc-degens').coverage = { recovered: 'lots' }; }, 'whole number'));
 await check('registry coverage matches the manifest reports', () => { for (const c of reg.collections.filter((x) => x.coverage)) { const rep = JSON.parse(readFileSync(resolve(FT, 'ft-harness/manifest/out', c.key + '.report.json'), 'utf8')); assert.equal(c.coverage.recovered, rep.built, c.key); assert.equal(c.coverage.of, rep.requested, c.key); } });
+await check('rejects a live v3 helper without a source hash', bad((r) => { delete r.collections.find((x) => x.key === 'nyc-degens').helperSourceSha256; }, 'helperSourceSha256'));
+await check('helper source hashes equal the pinned hashes in registry.v1.json', () => { const v1 = JSON.parse(readFileSync(resolve(FT, 'ft-harness/registry/registry.v1.json'), 'utf8')); for (const c of reg.collections.filter((x) => x.helperSourceSha256)) { const e = v1.helpers.find((x) => x.helper === c.helper); assert.ok(e, c.key); assert.equal(e.expectedSourceSha256, c.helperSourceSha256, c.key); } });
+await check('guide pages exist, have no placeholders, and every internal link resolves', () => {
+  const dir = resolve(FT, 'guides');
+  const files = readdirSync(dir).filter((f) => f.endsWith('.html'));
+  for (const need of ['index.html', 'what-is-forever-twins.html', 'preserve-your-collection.html', 'onboarding.html', 'verify-it-yourself.html']) assert.ok(files.includes(need), `${need} missing`);
+  const keys = new Set(reg.collections.map((c) => c.key));
+  for (const f of files) {
+    const t = readFileSync(resolve(dir, f), 'utf8');
+    assert.ok(!/TBD|TODO|lorem|XXX/i.test(t), `${f} has a placeholder`);
+    for (const m of t.matchAll(/href="(\/forever-twins\/[^"#?]*)"/g)) {
+      const p = m[1].replace(/^\/forever-twins\//, '');
+      if (p === '' || p === 'guides/' || p.includes('${')) continue;
+      const mc = /^collection\/([^/]+)$/.exec(p); if (mc) { assert.ok(keys.has(mc[1]), `${f}: ${p}`); continue; }
+      const ok = existsSync(resolve(FT, p)) || existsSync(resolve(FT, p + '.html')) || existsSync(resolve(FT, p, 'index.html'));
+      assert.ok(ok, `${f}: link ${m[1]} does not resolve`);
+    }
+  }
+});
 await check('rejects duplicate key', bad((r) => { r.collections.push(clone(r.collections[0])); }, 'duplicate key'));
 await check('rejects a second helper for the same source', bad((r) => { const c = clone(r.collections[0]); c.key = 'dup-source'; c.helper = 'SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.other-helper'; r.collections.push(c); }, 'one helper per source'));
 await check('rejects a helper reused by two collections', bad((r) => { r.collections[1].helper = r.collections[0].helper; }, 'helper already used'));

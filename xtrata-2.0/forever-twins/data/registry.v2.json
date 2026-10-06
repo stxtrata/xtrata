@@ -86,7 +86,8 @@
       },
       "blurb": "The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.",
       "manifest": null,
-      "coverage": null
+      "coverage": null,
+      "helperSourceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff"
     },
     {
       "key": "leo-cats",
@@ -106,7 +107,8 @@
       },
       "blurb": "LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata.",
       "manifest": null,
-      "coverage": null
+      "coverage": null,
+      "helperSourceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b"
     },
     {
       "key": "miami-degens",
@@ -126,7 +128,8 @@
       },
       "blurb": "Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid.",
       "manifest": null,
-      "coverage": null
+      "coverage": null,
+      "helperSourceSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513"
     },
     {
       "key": "nyc-degens",
@@ -159,7 +162,8 @@
         "recovered": 420,
         "of": 420,
         "asOf": "block 9,127,020, 5 Oct 2026"
-      }
+      },
+      "helperSourceSha256": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951"
     },
     {
       "key": "megapont-ape-club",
@@ -192,7 +196,8 @@
         "recovered": 2500,
         "of": 2500,
         "asOf": "block 9,127,306, 5 Oct 2026"
-      }
+      },
+      "helperSourceSha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90"
     },
     {
       "key": "bitcoin-monkeys",
@@ -226,7 +231,8 @@
         "of": 2500,
         "asOf": "block 9,133,680, 6 Oct 2026"
       },
-      "largeOnDemand": true
+      "largeOnDemand": true,
+      "helperSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f"
     },
     {
       "key": "see-yourself-out",
