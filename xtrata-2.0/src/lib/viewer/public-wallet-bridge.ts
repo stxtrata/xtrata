@@ -41,7 +41,8 @@ type Options = {
   arcadeSubmit?: (payload: Record<string, unknown>, label: string, id: string) => Promise<ArcadeOutcome>;
 };
 const ARCADE_ID = /^[A-Za-z0-9-]{1,64}$/;
-const ARCADE_MAX_PAYLOAD = 120_000;
+// A long arcade run carries its whole replay (up to 512 KB, base64) so the host can store it as an inscription.
+const ARCADE_MAX_PAYLOAD = 800_000;
 const failure = (message: string, code = -32602) => Object.assign(new Error(message), { code });
 const connects = new Set([
   'stx_requestAccounts',

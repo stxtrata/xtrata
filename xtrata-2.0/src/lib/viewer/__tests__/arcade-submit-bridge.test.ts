@@ -84,7 +84,7 @@ describe('arcade submit hand-off', () => {
   it('refuses oversized payloads', async () => {
     const arcadeSubmit = vi.fn(async () => null);
     const { sent, emit } = await setup(arcadeSubmit);
-    emit({ type: 'xtrata:arcade:submit', id: 'big', payload: { ...payload, replay: 'A'.repeat(130_000) } });
+    emit({ type: 'xtrata:arcade:submit', id: 'big', payload: { ...payload, replay: 'A'.repeat(900_000) } });
     await flush();
     expect(arcadeSubmit).not.toHaveBeenCalled();
     expect(sent.mock.calls[0][0]).toMatchObject({ type: 'xtrata:arcade:submit-result', id: 'big', error: expect.stringContaining('too large') });

@@ -31,7 +31,13 @@ const BUNDLE_SHA = 'd9fa6b2085d64c1e5cb63682bbc278e1fe83a335d8dda914d657d9ba675b
 // Same parts and packs as v1.4 (#3079 engine, #3080 hall), so only the parent is new.
 // (v1.4 = parent #3081, release 1608b911….)
 // sha256 over the packs to inscribe, the parent shell and the part list (printed by this script).
-const PINNED_RELEASE = '4d97ef3eff522b67c3469d3d8c82fe1ff21f4c711b6f1591ca22cb01c933c4ba';
+// v1.5.0: long runs. Replays too big for a score entry are stored as their own Xtrata inscription (one
+// mint-single-tx, up to 512 KB, paid by the player) and the score entry holds a pointer; replays are ~18% smaller
+// (format 2); runs up to 4 hours; Top 10 runs are kept locally until posted and can be posted from a saved file.
+// Also v1.4.2: honest practice-run game over; asks which wallet when several are installed.
+// Engine pack only (score-client.js, arcade-room.js, arcade-replay.js). Hall pack #3080 unchanged.
+// (v1.4.1 release 4d97ef3e….)
+const PINNED_RELEASE = '1b2556dbb2fe9f6fd9ffbb7476aedfa79f3a93da5538007a87b294a2d08fd873';
 // Earlier parents that assemble exactly the same parts from the same packs and bundle. Boards already on
 // one of them are left alone (the canary proves the equivalence on chain), so a parent-only release
 // does not have to re-sign all 26 boards.
