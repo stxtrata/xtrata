@@ -1,6 +1,6 @@
 # Xtrata Arcade: one stable link to the current arcade inscription (update when a new version is inscribed).
-/arcade /x/3081 302
-/arcade/ /x/3081 302
+/arcade /x/3111 302
+/arcade/ /x/3111 302
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
 # Forever Twins: registry-driven pages. Each key is read from /forever-twins/data/registry.v2.json

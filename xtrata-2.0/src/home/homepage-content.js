@@ -147,8 +147,8 @@ export const HOMEPAGE_WALL = Object.freeze([
     id: 'xtrata-arcade', kind: 'image', size: 'big', tone: 'arcade',
     eyebrow: 'Brand new · 21 games', title: 'Xtrata Arcade',
     subtitle: 'Walk a neon 3D hall of cabinets, press START, and put your high score on Bitcoin.',
-    image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', badge: '#3081', cta: 'Walk in',
-    href: '/i/3081', newTab: true
+    image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', badge: '#3111', cta: 'Walk in',
+    href: '/i/3111', newTab: true
   }),
   Object.freeze({
     id: 'astro-blaster', kind: 'image', size: 'big', tone: 'cyan',
@@ -249,7 +249,7 @@ export const HOMEPAGE_KP_LOOPS = Object.freeze({
 export const HOMEPAGE_FRESH = Object.freeze({
   size: 12,
   pinned: Object.freeze([
-    { id: 3081, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3081' },
+    { id: 3111, kind: 'game', title: 'Xtrata Arcade', by: '21 games · on-chain scores', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', href: '/i/3111' },
     { id: 3072, kind: 'game', title: 'X Chess', by: 'HTML game', chess: true, href: '/i/3072' },
     { id: 3075, kind: 'game', title: 'Astro Blaster 3', by: 'On-chain high scores', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', href: '/i/3075' },
     { id: 3059, kind: 'code', title: 'AUDIONAUTS', by: AUDIONAUTS_LIVE ? 'Minting now' : 'Original music from L1', image: '/home/wall/audionauts-3059.webp', href: AUDIONAUTS_LIVE ? AUDIONAUTS_MINT_HREF : AUDIONAUTS_ORDINAL_HREF, listen: true },
@@ -270,7 +270,7 @@ export const HOMEPAGE_PLAY = Object.freeze([
   { id: 'timeloop', image: '/home/wall/timeloop-3047.webp', position: 'top', tag: '#3047 · Mystery', title: 'Solve the Meridian heist', copy: 'One day, fifty million missing, and only you remember. Rewind until you prove it.', href: '/i/3047', tone: 'paper' },
   { id: 'kp-loops', image: '/home/kp-loops.webp', position: 'left center', tag: 'KP Loops · loop station', title: 'Play the KP loop station', copy: "Kieron Pepper's drum loops to layer and play. No wallet needed.", href: '/kp-loops/#kp-loops', tone: 'pink' },
   { id: 'astro-blaster', image: '/home/wall/astro-blaster-3075.webp', position: 'center 30%', tag: '#3075 · Arcade', title: 'Astro Blaster 3', copy: 'Every top score lives on Bitcoin. Set your pilot, beat the Top 10 and post your run on-chain.', href: '/i/3075', tone: 'cyan' },
-  { id: 'xtrata-arcade', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', tag: '#3081 · Arcade', title: 'Xtrata Arcade', copy: 'Walk a 3D hall of 21 cabinets. Every run is recorded and the Top 10 lives on Bitcoin.', href: '/i/3081', tone: 'violet' }
+  { id: 'xtrata-arcade', image: '/home/wall/xtrata-arcade-3081.webp', position: 'center 35%', tag: '#3111 · Arcade', title: 'Xtrata Arcade', copy: 'Walk a 3D hall of 21 cabinets. Every run is recorded and the Top 10 lives on Bitcoin.', href: '/i/3111', tone: 'violet' }
 ]);
 
 export const HOMEPAGE_PROGRAMMES = Object.freeze([
