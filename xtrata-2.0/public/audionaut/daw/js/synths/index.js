@@ -12,6 +12,9 @@ import { TINE_SYNTHS } from "./keys/tine.js";
 import { KIT_SYNTHS } from "./drums/kit.js";
 import { TONEWHEEL_SYNTHS } from "./organ/tonewheel.js";
 import { MODAL_SYNTHS } from "./mallet/modal.js";
+import { WINDS_SYNTHS } from "./reed/winds.js";
+import { MORPH_SYNTHS } from "./wave/morph.js";
+import { TEXTURE_SYNTHS } from "./fx/texture.js";
 import { JIBASS_SYNTHS } from "./bass/jibass.js";
 import { KILN_SYNTHS } from "./glass/kiln.js";
 import { ANNEAL_SYNTHS } from "./glass/anneal.js";
@@ -34,6 +37,9 @@ export const EXTRA_SYNTHS = {
   ...inFolder("drums", KIT_SYNTHS),
   ...inFolder("organ", TONEWHEEL_SYNTHS),
   ...inFolder("mallet", MODAL_SYNTHS),
+  ...inFolder("reed", WINDS_SYNTHS),
+  ...inFolder("wave", MORPH_SYNTHS),
+  ...inFolder("fx", TEXTURE_SYNTHS),
   ...inFolder("bass", JIBASS_SYNTHS),
   ...inFolder("glass", KILN_SYNTHS),
   ...inFolder("glass", ANNEAL_SYNTHS),
