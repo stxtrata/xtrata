@@ -428,6 +428,24 @@
         <div class="col-foot"><span class="btn sm">View NYC Degens →</span></div>
       </a>
 
+      <!-- ACTIVE: Megapont Ape Club (second collection on the Forever Twins helper v3) -->
+      <a id="mp-card" class="col-card col-card--hero active" href="/forever-twins/collection/megapont-ape-club" style="color:inherit">
+        <div class="col-banner col-banner--text" role="img" aria-label="Megapont Ape Club Forever Twins">MEGAPONT</div>
+        <div class="col-top">
+          <div class="col-head">
+            <span class="col-badge live">● Live</span><span id="mp-stamp" class="forevered-stamp">Forevered</span>
+            <h3>Megapont Ape Club</h3>
+            <div class="chain">Stacks · megapont-ape-club-nft → forever-twin-megapont-ape-club</div>
+          </div>
+        </div>
+        <div class="col-body">Megapont Ape Club holders can give their Ape a permanent on-chain twin, or swap which side stays liquid. Built on the Forever Twins helper.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="mp-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="mp-status">—</div><div class="k">Migration status</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View Megapont Ape Club →</span></div>
+      </a>
+
     </div>
 
     <div class="cta-strip">
@@ -574,6 +592,17 @@ const COLLECTIONS = [
     statusEl: "n-status",
     cardEl: "n-card",
     stampEl: "n-stamp"
+  },
+  {
+    // Count + source total for Megapont Ape Club (Forever Twins helper v3).
+    addr: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    name: "forever-twin-megapont-ape-club",
+    sourceAddr: "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335",
+    sourceName: "megapont-ape-club-nft",
+    countEl: "mp-inscribed",
+    statusEl: "mp-status",
+    cardEl: "mp-card",
+    stampEl: "mp-stamp"
   }
 ];
 const API = "https://api.hiro.so";

@@ -106,6 +106,17 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
       'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens',
     sourceContractId: 'SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens',
     sourceAssetName: 'nyc-degens'
+  },
+  {
+    key: 'megapont-ape-club',
+    name: 'Megapont Ape Club',
+    itemNoun: 'Megapont Ape',
+    network: 'mainnet',
+    masterContractId: XTRATA_MASTER,
+    helperContractId:
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club',
+    sourceContractId: 'SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft',
+    sourceAssetName: 'Megapont-Ape-Club'
   }
 ];
 
