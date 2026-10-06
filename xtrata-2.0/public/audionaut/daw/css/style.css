@@ -460,10 +460,19 @@ body.midi-dragging {
   cursor: pointer;
   border: 1px solid var(--border);
 }
-.inst-synth-label {
+.inst-synth-select {
   color: var(--ch-color, var(--accent));
-  font-size: 10px;
-  min-width: 64px;
+  background: var(--panel-2, #14181f);
+  border: 1px solid var(--ch-color, var(--border));
+  border-radius: 4px;
+  font-size: 11px;
+  min-width: 112px;
+  max-width: 150px;
+  padding: 3px 4px;
+  cursor: pointer;
+}
+.inst-synth-select:focus-visible {
+  outline: 2px solid var(--ch-color, var(--accent));
 }
 .ch-btn.roll-open {
   color: var(--ch-color, var(--accent));
@@ -2317,4 +2326,48 @@ button:disabled {
 }
 .channel.solo-dim:hover {
   opacity: 0.85;
+}
+
+/* ---- new synths (synths-extra.js): panels are laid out as auto-fitting section tiles ---- */
+.sfp-jibass .sfp-body,
+.sfp-kiln .sfp-body,
+.sfp-anneal .sfp-body,
+.sfp-palinode .sfp-body,
+.sfp-faultglass .sfp-body,
+.sfp-morrowglass .sfp-body,
+.sfp-vitreous .sfp-body,
+.sfp-lantern .sfp-body,
+.sfp-prism .sfp-body,
+.sfp-tidalglass .sfp-body,
+.sfp-tidelace .sfp-body {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.sfp-jibass,
+.sfp-kiln,
+.sfp-anneal,
+.sfp-palinode,
+.sfp-faultglass,
+.sfp-morrowglass,
+.sfp-vitreous,
+.sfp-lantern,
+.sfp-prism,
+.sfp-tidalglass,
+.sfp-tidelace {
+  width: 1140px;
+}
+.sfp-jibass .sfp-radio,
+.sfp-kiln .sfp-radio,
+.sfp-lantern .sfp-radio,
+.sfp-prism .sfp-radio,
+.sfp-tidelace .sfp-radio {
+  flex-wrap: wrap;
+}
+.sfp-kiln .sfp-opt,
+.sfp-jibass .sfp-opt {
+  flex: 1 1 56px;
+}
+.sfp-jibass .jb-filter,
+.sfp-faultglass .fg-env,
+.sfp-morrowglass .mg-env {
+  grid-column: span 2;
 }
