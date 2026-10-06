@@ -85,6 +85,8 @@ const PROOF_GAME = 'xa_swerve';
 const COPY_TX_FEE = 30_000n;
 const SWEEP_TX_FEE = 5_000n;
 const FUND_AMOUNT = 60_000n;
+/** Network fee the temporary wallet pays per call it signs (what is not spent is swept back). */
+const TEMP_TX_FEE = 20_000n;
 const SAFETY_BUFFER = 3_000_000n; // network fees for the uploads, seals and ~35 small calls
 
 type Board = { id: string; game: string; mode: number; max: number };
@@ -305,6 +307,92 @@ const runTx = async (stepId: string, label: string, send: () => Promise<string>,
   return { ...rec, tx };
 };
 
+// ---------- the temporary wallet: pays for, and signs, a long run of owner calls ----------
+/** A label that stays the same while a transaction is pending (so a reload resumes) and changes once it has passed (so a later run sends again). */
+const uniq = (stepId: string, base: string) => `${base} (${step(stepId).txs.filter((t) => t.pass && t.label.startsWith(`${base} (`)).length + 1})`;
+/** The temporary wallet signs a call on the leaderboard contract with its own key. */
+const hotCall = (stepId: string, label: string, fn: string, args: ClarityValue[]) =>
+  runTx(stepId, uniq(stepId, label), async () => {
+    const hot = hotAddress();
+    const [address, name] = scoresId().split('.');
+    const nonce = await chain.nonce(hot);
+    const tx = await makeContractCall({ contractAddress: address, contractName: name, functionName: fn, functionArgs: args,
+      senderKey: hotKey(), network: chain.stacks, nonce, fee: TEMP_TX_FEE, anchorMode: AnchorMode.Any, postConditionMode: PostConditionMode.Deny, postConditions: [] });
+    return chain.broadcast(tx);
+  });
+/**
+ * Makes sure the temporary wallet holds at least `target`. Asks the connected wallet for exactly the difference; a wallet that
+ * cannot sign a plain transfer from a web page (Xverse) gets the address and an amount to send by hand, and the canary waits
+ * for it to arrive.
+ */
+const ensureHotFunds = async (stepId: string, target: bigint, what: string) => {
+  const hot = hotAddress();
+  const have = await chain.balance(hot);
+  if (have < target) {
+    const need = target - have;
+    let sent = false;
+    try {
+      await runTx(stepId, uniq(stepId, `${what}: send ${stx(need)} to the temporary wallet`), () => walletTransfer(hot, need, 'arcade canary'));
+      sent = true;
+    } catch (error) {
+      // A cancelled request is the user's decision; anything else falls back to sending the float by hand.
+      const message = error instanceof Error ? error.message : String(error);
+      if (/cancel/i.test(message) && !/not implemented/i.test(message)) throw error;
+      log('warn', `The wallet could not sign the funding transfer from this page (${message}). Send it by hand instead.`);
+    }
+    if (!sent) {
+      const deadline = Date.now() + 10 * 60_000;
+      for (;;) {
+        const b = await chain.balance(hot);
+        if (b >= target) break;
+        if (Date.now() > deadline) throw new Error(`Timed out waiting for ${stx(target - b)} to arrive at ${hot}. Send it from your wallet's own Send screen, then press the button again.`);
+        status(`Send ${stx(target - b)} (or a little more) from your wallet to ${hot} — waiting for it to arrive (balance ${stx(b)})…`, 'warn');
+        await sleep(5000);
+      }
+    }
+  }
+  await eventually('Temporary wallet funding', async () => { const b = await chain.balance(hot); return b >= target ? null : `balance ${stx(b)}`; });
+  return chain.balance(hot);
+};
+/** Everything the temporary wallet still holds goes back to the deployer. */
+const sweepHot = async (stepId: string) => {
+  const hot = hotAddress();
+  const balance = await chain.balance(hot);
+  if (balance <= SWEEP_TX_FEE) return balance;
+  await runTx(stepId, uniq(stepId, `sweep ${stx(balance - SWEEP_TX_FEE)}`), async () => {
+    const nonce = await chain.nonce(hot);
+    const tx = await makeSTXTokenTransfer({ recipient: state.deployer!, amount: balance - SWEEP_TX_FEE, senderKey: hotKey(), network: chain.stacks, nonce, fee: SWEEP_TX_FEE, memo: 'arcade launch canary sweep', anchorMode: AnchorMode.Any });
+    return chain.broadcast(tx);
+  });
+  return chain.balance(hot);
+};
+/**
+ * Gives contract ownership back to the deployer if the temporary wallet holds it: the temporary wallet proposes, the connected
+ * wallet accepts. Safe to call at any point; does nothing when ownership is already back.
+ */
+const handBack = async () => {
+  const me = state.deployer!, hot = hotAddress();
+  let owner = await ownerOf();
+  if (owner === me) return false;
+  if (owner !== hot) throw new Error(`The leaderboard is owned by ${owner}, which is neither your wallet nor the temporary wallet.`);
+  await ensureHotFunds('production', TEMP_TX_FEE + SWEEP_TX_FEE + 20_000n, 'handing ownership back');
+  if ((await pendingOwnerOf()) !== me) {
+    await hotCall('production', 'temporary wallet hands ownership back (propose)', 'propose-owner', [principalCV(me)]);
+    await eventually('Pending owner', async () => ((await pendingOwnerOf()) === me ? null : 'not proposed yet'));
+  }
+  await runTx('production', uniq('production', 'your wallet accepts ownership back'), () => walletCall(scoresId(), 'accept-owner', []));
+  await eventually('Owner', async () => ((await ownerOf()) === me ? null : 'not accepted yet'));
+  log('ok', `Leaderboard ownership is back with ${short(me)}.`);
+  return true;
+};
+/** A backup copy of the temporary wallet's key, saved to disk before it is ever given ownership. */
+const downloadHotKey = () => {
+  const blob = new Blob([JSON.stringify({ purpose: 'Xtrata arcade launch canary temporary wallet', network, address: hotAddress(), privateKey: hotKey(),
+    note: 'Keep this file until the canary reports that contract ownership is back with your wallet. Anyone holding it can act as the leaderboard owner while ownership is with this wallet.' }, null, 2)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `xtrata-arcade-temp-wallet-${hotAddress().slice(0, 8)}.json` }) as HTMLAnchorElement;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+
 // ---------- reads ----------
 const eventually = async (what: string, check: () => Promise<string | null>, attempts = 23) => {
   let seen: string | null = null;
@@ -332,8 +420,12 @@ const readBoard = async (id: string) => {
   const f = (k: string) => asText(tupleField(cv, k));
   return { mode: f('mode'), maxScore: f('max-score'), fee: f('fee'), engineId: f('engine-id'), daily: f('daily'), enabled: f('enabled') };
 };
+const ownerOf = async () => cvToString(inner(await readScores('get-owner')));
+const pendingOwnerOf = async () => { const cv = await readScores('get-pending-owner'); return isNone(cv) ? null : cvToString(inner(cv)); };
 /** Engines a production board may point at: this parent, or an earlier parent proven (in preflight) to load the same parts. */
 const engineOk = (engineId: string) => engineId === state.inscriptionId || (state.equivalent || []).includes(engineId);
+/** The canary board is closed and bound to this parent: the board, submit, copy and close steps all ran in an earlier session. */
+const canaryDone = async () => { const b = await readBoard(CANARY_BOARD); return !!b && b.enabled === 'false' && b.engineId === state.inscriptionId; };
 const boardMatches = (b: Awaited<ReturnType<typeof readBoard>>, want: Board) =>
   !!b && b.mode === String(want.mode) && b.maxScore === String(want.max) && b.fee === '0' && engineOk(b.engineId) && b.daily === 'false' && b.enabled === 'true';
 const inscriptionMeta = async (id: string) => {
@@ -351,6 +443,18 @@ const uploadIndex = async (f: Upload): Promise<number | null> => {
 const stagedFees = async (size: number, chunks: number) => {
   const cv = await readCore('quote-staged-fee', [uintCV(size), uintCV(chunks)]);
   return { begin: BigInt(asText(tupleField(cv, 'begin-fee'))), seal: BigInt(asText(tupleField(cv, 'seal-fee'))) };
+};
+/** One-transaction inscription (up to 32 chunks, 512 KB): the whole cost, begin + upload + seal together. */
+const SINGLE_MAX_CHUNKS = 32;
+const singleFee = async (size: number, chunks: number) => {
+  const cv = await readCore('quote-single-tx-fee', [uintCV(size), uintCV(chunks)]);
+  return BigInt(asText(tupleField(cv, 'total-fee')));
+};
+/** What inscribing this file will cost the wallet: one transaction when it fits, otherwise begin + seal (plus uploads). */
+const inscribeFee = async (size: number, chunks: number) => {
+  if (chunks <= SINGLE_MAX_CHUNKS) return singleFee(size, chunks);
+  const st = await stagedFees(size, chunks);
+  return st.begin + st.seal;
 };
 const idList = async (fn: 'get-parents' | 'get-dependencies', id: string): Promise<string[]> => {
   const cv: any = inner(await readCore(fn, [uintCV(BigInt(id))]));
@@ -415,6 +519,22 @@ const inscribe = async (sid: string, f: Upload, deps: bigint[]) => {
     return { id: existing.id, sent: false, note: `already on chain as #${existing.id}${existing.meta.creator === w.address ? '' : ` (inscribed by ${short(existing.meta.creator)})`}, identical bytes; re-used, nothing sent${warn}` };
   }
   const n = f.chunks.length;
+  // A file that fits in one transaction is inscribed in one signature. A half-finished staged upload (or a file over
+  // 32 chunks) goes through the staged route below, which resumes from the chain.
+  let id = '';
+  if (n <= SINGLE_MAX_CHUNKS && (await uploadIndex(f)) === null) {
+    const fee = await singleFee(f.bytes.length, n);
+    await runTx(sid, `${f.label}: inscribe (one transaction)`, () => walletCall(state.core, 'mint-single-tx-with-relationships',
+      [bufferCV(f.hash), stringAsciiCV(f.mime), uintCV(f.bytes.length), listCV(f.chunks.map((c) => bufferCV(c))), stringAsciiCV(TOKEN_URI),
+        listCV(deps.map((d) => uintCV(d))), listCV(PARENT_IDS.map((p) => uintCV(p)))], payAtMost(fee)));
+    await eventually(`${f.label} inscription id`, async () => {
+      const found = await findSealed(f);
+      if (!found) return 'not sealed yet';
+      if (found.meta.creator !== w.address) return `sealed by ${short(found.meta.creator)}`;
+      id = found.id; return null;
+    });
+    return { id, sent: true, note: `inscribed in one transaction as #${id} (${kb(f.bytes.length)}, ${n} chunk${n > 1 ? 's' : ''}), child of ${parentList()}${deps.length ? `, depends on ${deps.map((d) => '#' + d).join(', ')}` : ''}` };
+  }
   const fees = await stagedFees(f.bytes.length, n);
   if ((await uploadIndex(f)) === null) {
     await runTx(sid, `${f.label}: begin`, () => walletCall(state.core, 'begin-or-get',
@@ -432,7 +552,6 @@ const inscribe = async (sid: string, f: Upload, deps: bigint[]) => {
   }
   await runTx(sid, `${f.label}: seal`, () => walletCall(state.core, 'seal-with-relationships',
     [bufferCV(f.hash), stringAsciiCV(TOKEN_URI), listCV(deps.map((d) => uintCV(d))), listCV(PARENT_IDS.map((p) => uintCV(p)))], payAtMost(fees.seal)));
-  let id = '';
   await eventually(`${f.label} inscription id`, async () => {
     const found = await findSealed(f);
     if (!found) return 'not sealed yet';
@@ -512,10 +631,10 @@ const makeRun = async (address: string) => withArcade(async (win) => {
 });
 
 type Step = { id: string; title: string; who: string; intro: string; action: string; run: () => Promise<string | void> };
-const sigs = (f: { chunks: number }) => 2 + Math.ceil(f.chunks / BATCH);
+const sigs = (f: { chunks: number }) => (f.chunks <= SINGLE_MAX_CHUNKS ? 1 : 2 + Math.ceil(f.chunks / BATCH));
 
 const packStep = (f: Upload): Step => ({
-  id: `pack-${f.key}`, title: `Inscribe the ${f.label}`, who: `Web wallet · ${sigs({ chunks: f.chunks.length })} signatures`,
+  id: `pack-${f.key}`, title: `Inscribe the ${f.label}`, who: `Web wallet · ${sigs({ chunks: f.chunks.length })} signature${sigs({ chunks: f.chunks.length }) === 1 ? '' : 's'}`,
   intro: `Inscribes the ${f.label} (${HallParts.PACKS[f.key].join(', ')}): ${f.bytes.length.toLocaleString()} bytes, ${f.chunks.length} chunk${f.chunks.length > 1 ? 's' : ''}, sha256 ${short(f.sha)}. Begin, upload and seal, each resumed from the chain's own progress after a reload or a rejected signature; the fees are capped by post-conditions. If these exact bytes are already inscribed, that inscription is re-used and nothing is sent.`,
   action: `Inscribe ${f.label}`,
   run: async () => {
@@ -597,9 +716,9 @@ const STEPS: Step[] = [
       for (const f of PACKS) {
         const found = await findSealed(f);
         if (found) { known[f.key] = found.id; plan.push(`${f.key} already #${found.id}`); continue; }
-        const fee = await stagedFees(f.bytes.length, f.chunks.length);
-        need += fee.begin + fee.seal;
-        plan.push(`${f.key} ${kb(f.bytes.length)} (${stx(fee.begin + fee.seal)})`);
+        const fee = await inscribeFee(f.bytes.length, f.chunks.length);
+        need += fee;
+        plan.push(`${f.key} ${kb(f.bytes.length)} (${stx(fee)})`);
       }
       state.packIds = known;
       let parentNote = '';
@@ -609,9 +728,9 @@ const STEPS: Step[] = [
       }
       if (!parentNote) {
         const size = parentEstimate();
-        const fee = await stagedFees(size, Math.ceil(size / CHUNK));
-        need += fee.begin + fee.seal;
-        parentNote = `parent ~${kb(size)} (${stx(fee.begin + fee.seal)})`;
+        const fee = await inscribeFee(size, Math.ceil(size / CHUNK));
+        need += fee;
+        parentNote = `parent ~${kb(size)} (${stx(fee)})`;
       }
       plan.push(parentNote);
       let equivalentNote = '';
@@ -658,7 +777,7 @@ const STEPS: Step[] = [
   },
   ...PACKS.map(packStep),
   {
-    id: 'parent', title: 'Inscribe the recursive parent', who: 'Web wallet · 3 signatures',
+    id: 'parent', title: 'Inscribe the recursive parent', who: 'Web wallet · 1 signature',
     intro: `Writes the pack ids from the steps above into the parent (${VERSION}; ${RELEASE.inscribe.map((n) => `${n} from its pack`).join(', ')}, ${RELEASE.fromBundle.join(', ')} from #${RELEASE.bundle.id}) and inscribes it as text/html, a child of ${parentList()} that depends on #${RELEASE.bundle.id} and the packs. This inscription is the arcade people open, and every board's engine id.`,
     action: 'Inscribe parent',
     run: async () => {
@@ -747,6 +866,7 @@ const STEPS: Step[] = [
     action: 'Open canary board',
     run: async () => {
       const id = state.inscriptionId!;
+      if (await canaryDone()) return `canary board "${CANARY_BOARD}" is already closed on parent #${id}: this step ran in an earlier session (nothing sent)`;
       const want = () => readBoard(CANARY_BOARD);
       const ok = (b: Awaited<ReturnType<typeof want>>) => !!b && b.enabled === 'true' && b.engineId === id;
       if (!ok(await want())) {
@@ -788,32 +908,8 @@ const STEPS: Step[] = [
     action: 'Send test funds',
     run: async () => {
       const hot = hotAddress();
-      const have = await chain.balance(hot);
-      if (have < FUND_AMOUNT) {
-        let sent = false;
-        try {
-          await runTx('fund', `fund copycat ${stx(FUND_AMOUNT - have)}`, () => walletTransfer(hot, FUND_AMOUNT - have, 'arcade canary'));
-          sent = true;
-        } catch (error) {
-          // Some wallet builds cannot sign a plain STX transfer from a web page (Xverse: "`request` function is not implemented").
-          // A cancelled request is the user's decision; anything else falls back to sending the float by hand.
-          const message = error instanceof Error ? error.message : String(error);
-          if (/cancel/i.test(message) && !/not implemented/i.test(message)) throw error;
-          log('warn', `The wallet could not sign the funding transfer from this page (${message}). Send it by hand instead.`);
-        }
-        if (!sent) {
-          const need = FUND_AMOUNT - have;
-          const deadline = Date.now() + 10 * 60_000;
-          for (;;) {
-            const b = await chain.balance(hot);
-            if (b >= FUND_AMOUNT) break;
-            if (Date.now() > deadline) throw new Error(`Timed out waiting for ${stx(need)} to arrive at ${hot}. Send it from your wallet's own Send screen, then press the button again.`);
-            status(`Send ${stx(need)} (or a little more) from your wallet to ${hot} — waiting for it to arrive (balance ${stx(b)})…`, 'warn');
-            await sleep(5000);
-          }
-        }
-      }
-      await eventually('Copycat funding', async () => { const b = await chain.balance(hot); return b >= FUND_AMOUNT ? null : `balance ${stx(b)}`; });
+      if (await canaryDone()) return `the copycat test already ran for parent #${state.inscriptionId} (canary board closed): nothing sent · temporary wallet holds ${stx(await chain.balance(hot))}`;
+      await ensureHotFunds('fund', FUND_AMOUNT, 'copycat test');
       return `copycat ${hot} holds ${stx(await chain.balance(hot))}`;
     }
   },
@@ -824,6 +920,7 @@ const STEPS: Step[] = [
     run: async () => {
       const run = state.run!;
       const hot = hotAddress();
+      if (await canaryDone()) return 'the copycat was already refused on chain in an earlier session (canary board closed on this parent): nothing sent';
       const [address, name] = scoresId().split('.');
       const stored = bufOf(await readScores('get-replay', [stringAsciiCV(CANARY_BOARD), uintCV(0), principalCV(state.deployer!)]));
       await runTx('copy', 'copycat submit-score', async () => {
@@ -842,16 +939,8 @@ const STEPS: Step[] = [
     intro: 'Returns what is left in the throwaway wallet to your wallet.',
     action: 'Sweep back',
     run: async () => {
-      const hot = hotAddress();
-      const balance = await chain.balance(hot);
-      if (balance > SWEEP_TX_FEE) {
-        await runTx('sweep', `sweep ${stx(balance - SWEEP_TX_FEE)}`, async () => {
-          const nonce = await chain.nonce(hot);
-          const tx = await makeSTXTokenTransfer({ recipient: state.deployer!, amount: balance - SWEEP_TX_FEE, senderKey: hotKey(), network: chain.stacks, nonce, fee: SWEEP_TX_FEE, memo: 'arcade launch canary sweep', anchorMode: AnchorMode.Any });
-          return chain.broadcast(tx);
-        });
-      }
-      return `copycat balance now ${stx(await chain.balance(hot))}`;
+      const left = await sweepHot('sweep');
+      return `copycat balance now ${stx(left)}`;
     }
   },
   {
@@ -866,23 +955,71 @@ const STEPS: Step[] = [
     }
   },
   {
-    id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: `Web wallet · up to ${PRODUCTION.length} signatures`,
-    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. The contract keeps each board's Top 10 and stored replays when its engine id changes (existing entries keep the engine they were played on). Boards that already match are skipped (including boards on an earlier parent that preflight proved loads the same parts), so a reload or a rejected signature resumes where it stopped.`,
-    action: 'Update boards',
+    id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: 'Web wallet · 3 signatures, then automatic',
+    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. Only the leaderboard owner can do this, so the canary signs all of them automatically with its temporary wallet: your wallet (1) sends the temporary wallet enough for the network fees, (2) makes it the contract owner, and (3) accepts ownership back when the last board is done. Unspent funds are swept back. The temporary key is saved to a file before the hand-over, and this step resumes from the chain if it is interrupted, including handing ownership back. Boards that already match (including boards on an earlier parent proven to load the same parts) are skipped; if none need updating, nothing is sent.`,
+    action: 'Update boards automatically',
     run: async () => {
       const id = state.inscriptionId!;
-      let done = 0, sent = 0;
-      for (const b of PRODUCTION) {
-        done++;
-        if (boardMatches(await readBoard(b.id), b)) continue;
-        status(`Pointing ${b.id} at #${id} (${done} of ${PRODUCTION.length})…`);
-        await runTx('production', `set-board ${b.id} → #${id}`, () => walletCall(scoresId(), 'set-board',
-          [stringAsciiCV(b.id), uintCV(b.mode), uintCV(b.max), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]));
-        await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
-        sent++;
+      const me = state.deployer!, hot = hotAddress();
+      const todo: Board[] = [];
+      for (const b of PRODUCTION) if (!boardMatches(await readBoard(b.id), b)) todo.push(b);
+      let owner = await ownerOf(), pending = await pendingOwnerOf();
+      if (owner !== me && owner !== hot) throw new Error(`The leaderboard is owned by ${owner}, which is neither your wallet nor the canary's temporary wallet ${hot}. Nothing was sent.`);
+
+      // Nothing to change: just make sure the temporary wallet cannot take ownership later.
+      if (!todo.length && owner === me) {
+        if (pending === hot) {
+          await runTx('production', uniq('production', 'cancel the pending hand-over'), () => walletCall(scoresId(), 'propose-owner', [principalCV(me)]));
+          await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? 'still the temporary wallet' : null));
+        }
+        const left = await sweepHot('production');
+        return `${PRODUCTION.length} boards already on engine inscription #${id}${(state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : ''} · nothing sent · temporary wallet holds ${stx(left)}`;
       }
+
+      const need = (n: number, handback: boolean, accept: boolean) => TEMP_TX_FEE * BigInt(n + (handback ? 1 : 0) + (accept ? 1 : 0)) + SWEEP_TX_FEE + 20_000n;
+      const holdsOwnership = () => `The leaderboard is owned by the canary's temporary wallet ${hot} until it is handed back. Press the step's button again, or "Return ownership to my wallet", to finish. Its key was saved to a file (and stays in this browser).`;
+      let updated = 0;
+      try {
+        // 1 + 2. Fund the temporary wallet, then make it the owner.
+        if (owner === me) {
+          if (pending !== hot) {
+            downloadHotKey();
+            const msg = `${todo.length} boards need updating. Only the contract owner can do that, so the canary will:\n\n1. ask your wallet to send the temporary wallet about ${stx(need(todo.length, true, true))} (fees; the unspent rest is swept back)\n2. ask your wallet to make ${short(hot)} the contract owner\n3. sign all ${todo.length} board updates itself\n4. hand ownership back (your wallet signs once more) and sweep the leftovers.\n\nThe temporary key has just been saved to a file in your downloads. Keep it until ownership is back with your wallet. Continue?`;
+            if (!confirm(msg)) throw new Error('Cancelled before anything was sent.');
+          }
+          await ensureHotFunds('production', need(todo.length, true, true), 'boards');
+          if (pending !== hot) {
+            await runTx('production', uniq('production', `make ${short(hot)} the contract owner (propose)`), () => walletCall(scoresId(), 'propose-owner', [principalCV(hot)]));
+            await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? null : 'not proposed yet'));
+          }
+          await hotCall('production', 'temporary wallet accepts ownership', 'accept-owner', []);
+          await eventually('Owner', async () => ((await ownerOf()) === hot ? null : 'not accepted yet'));
+          owner = hot;
+        } else {
+          // Resuming with the temporary wallet already the owner: make sure it can pay for what is left.
+          await ensureHotFunds('production', need(todo.length, pending !== me, false), 'boards');
+        }
+
+        // 3. All the board updates, signed by the temporary wallet.
+        let n = 0;
+        for (const b of todo) {
+          n++;
+          status(`Pointing ${b.id} at #${id} (${n} of ${todo.length})…`);
+          await hotCall('production', `set-board ${b.id} → #${id}`, 'set-board',
+            [stringAsciiCV(b.id), uintCV(b.mode), uintCV(b.max), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]);
+          await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
+          updated++;
+        }
+      } catch (error) {
+        let held = false;
+        try { held = (await ownerOf()) === hot; } catch { /* ignore */ }
+        if (held) throw new Error(`${error instanceof Error ? error.message : String(error)} — ${holdsOwnership()}`);
+        throw error;
+      }
+      await handBack();
+      const left = await sweepHot('production');
       const kept = (state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : '';
-      return `${PRODUCTION.length} boards on engine inscription #${id}${kept} · ${sent} updated, ${PRODUCTION.length - sent} already matched`;
+      return `${PRODUCTION.length} boards on engine inscription #${id}${kept} · ${updated} updated automatically · ownership is back with ${short(me)} · temporary wallet holds ${stx(left)}`;
     }
   },
   {
@@ -1048,14 +1185,21 @@ const bind = () => {
     if (!state.deployer) { status('Connect first so the canary knows where to sweep.', 'error'); return; }
     busy = true;
     try {
-      const hot = hotAddress();
-      const balance = await chain.balance(hot);
-      if (balance <= SWEEP_TX_FEE) { status(`Copycat holds ${stx(balance)}; nothing to sweep.`, 'ok'); return; }
-      const nonce = await chain.nonce(hot);
-      const tx = await makeSTXTokenTransfer({ recipient: state.deployer, amount: balance - SWEEP_TX_FEE, senderKey: hotKey(), network: chain.stacks, nonce, fee: SWEEP_TX_FEE, memo: 'arcade launch canary sweep', anchorMode: AnchorMode.Any });
-      log('info', `Recovery sweep of ${stx(balance - SWEEP_TX_FEE)} to ${short(state.deployer)}`, await chain.broadcast(tx));
-      status('Recovery sweep broadcast.', 'ok');
+      const left = await sweepHot('production');
+      status(`Temporary wallet holds ${stx(left)}.`, 'ok');
     } catch (error) { status(`Recovery sweep failed: ${error instanceof Error ? error.message : String(error)}`, 'error'); }
+    finally { busy = false; }
+  });
+  $('#handback').addEventListener('click', async () => {
+    if (busy) return;
+    if (!state.deployer) { status('Connect first so the canary knows which wallet to hand ownership back to.', 'error'); return; }
+    try { requireWallet(); } catch (error) { status(error instanceof Error ? error.message : String(error), 'error'); return; }
+    busy = true;
+    try {
+      const moved = await handBack();
+      const left = await sweepHot('production');
+      status(moved ? `Ownership is back with your wallet. Temporary wallet holds ${stx(left)}.` : `Your wallet already owns the leaderboard. Temporary wallet holds ${stx(left)}.`, 'ok');
+    } catch (error) { status(`Returning ownership failed: ${error instanceof Error ? error.message : String(error)}`, 'error'); }
     finally { busy = false; }
   });
   $('#forget').addEventListener('click', async () => {

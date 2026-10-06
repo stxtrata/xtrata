@@ -19,10 +19,10 @@ the hash written into the parent; otherwise it reads that inscription from the c
 The score client reads the Top 10 through the same hosts as the parent.
 
 The packs are unchanged, so the canary finds #3079 and #3080 by hash and sends nothing for them;
-only the parent is inscribed (3 signatures). Boards already on #3081 are left alone:
+only the parent is inscribed (1 signature). Boards already on #3081 are left alone:
 `EQUIVALENT_PARENTS` in the build script lists earlier parents, and preflight proves on chain that
 each one loads exactly the same packs over the same bundle before treating it as the same engine.
-A parent-only release therefore needs about 6 signatures, not 35.
+A parent-only release therefore needs about 4 signatures, not 35.
 
 ## What it inscribes (v1.4, recursive)
 
@@ -83,12 +83,16 @@ cd canaries/build && python3 -m http.server 8080
 | 10 | Submit | wallet | A real run (Swerve) under your address, stored, hash-checked, re-played from the chain bytes in v1.4 (skipped if your entry from an earlier launch is already as good) |
 | 11-13 | Copycat | wallet, copycat | The stored replay from another wallet is refused with `(err u113)`; funds swept back |
 | 14 | Close canary board | wallet | Test board disabled before the production boards move |
-| 15 | Production boards | wallet x 26 | `set-board` for all 26 boards with the parent as engine id; Top 10s and stored replays are kept |
+| 15 | Production boards | wallet x 3, then automatic | The temporary wallet is funded (about 0.6 STX), made contract owner, signs `set-board` for all 26 boards with the parent as engine id, hands ownership back and is swept. Top 10s and stored replays are kept |
 | 16 | Audit | none | Every board and inscription re-read; lists the repo and site changes to make |
 
-Cost on mainnet: three inscriptions at about 0.2 STX each (begin 0.1 plus seal), about 11
-wallet signatures for the inscriptions and 26 for the boards, plus network fees. Keep at least
-4 STX free.
+Cost on mainnet: three inscriptions, each in one transaction (`mint-single-tx-with-relationships`,
+0.01 STX plus 0.001 STX per chunk, so about 0.02 STX each), so 3 wallet signatures for the
+inscriptions and 3 for the boards (fund, hand ownership over, accept it back; the 26 board updates are signed
+automatically), plus about 0.6 STX of network fees that is mostly spent on the board updates. Files over 32 chunks or a half-done
+upload fall back to the staged route (begin, chunks, seal). Keep at least 4 STX free.
+
+See `../CANARY-NOTES.md` for notes on writing canaries.
 
 ## After a launch
 
@@ -120,3 +124,26 @@ chain and nothing is sent twice.
 - Step 10 uses a bot pilot, not a human run.
 - Loading from the live gateway is only seen on mainnet: open the parent after the launch, in
   the grid, the preview and at `/i/<id>`, and play one run.
+
+## Updating the production boards automatically
+
+`set-board` only works for the leaderboard contract's owner, so a funded temporary wallet cannot sign it on
+its own. Step 15 therefore does a short, resumable hand-over:
+
+1. It saves the temporary wallet's key to a file and asks you to confirm.
+2. Your wallet sends the temporary wallet enough for the fees (Xverse cannot sign a plain transfer from a
+   page: the canary shows the address and amount, and waits for it to arrive).
+3. Your wallet calls `propose-owner` for the temporary wallet, which calls `accept-owner`.
+4. The temporary wallet signs every `set-board` itself, one after another, each confirmed before the next.
+5. The temporary wallet calls `propose-owner` back to you; your wallet calls `accept-owner`.
+6. Leftover funds are swept to your wallet.
+
+Where it stands is read from the chain (`get-owner`, `get-pending-owner`), not from this page, so a reload,
+a crash or a rejected signature resumes at the right place. If it stops while the temporary wallet owns the
+contract, the step says so; press the step's button again or **Return ownership to my wallet**. Keep the
+saved key file until the step reports ownership is back with you: v2 has no other admin.
+
+## Catching up after an earlier session
+
+A re-run recognises finished work from the chain: inscriptions are found by hash and re-used, and once the
+canary board is closed on this parent the board, fund and copycat steps pass without sending anything.

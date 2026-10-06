@@ -61,7 +61,7 @@ describe('homepage content configuration', () => {
       0
     );
     expect(cells).toBe(16);
-    expect(HOMEPAGE_WALL[0]).toMatchObject({ id: 'xtrata-arcade', size: 'big', href: '/i/3081' });
+    expect(HOMEPAGE_WALL[0]).toMatchObject({ id: 'xtrata-arcade', size: 'big', href: '/i/3111' });
     expect(HOMEPAGE_WALL.find((tile) => tile.kind === 'chess')).toMatchObject({ href: '/i/3072', title: 'On-Chain Chess' });
   });
 

@@ -30,7 +30,8 @@ const runHash = (chunks) => chunks.reduce((h, c) => sha(Buffer.concat([h, c])), 
 // ---------- mock state ----------
 const S = {
   core: { uploads: new Map(), chunks: new Map(), meta: new Map(), byHash: new Map(), deps: new Map(), parents: new Map(), owner: new Map(), next: 3100, fees: [] },
-  sc: { src: SOURCE, boards: new Map(), slots: new Map(), replays: new Map() },
+  sc: { src: SOURCE, owner: DEPLOYER, pending: null, boards: new Map(), slots: new Map(), replays: new Map() },
+  sent: [], walletCalls: 0, failAt: process.env.HANDOVER_FAIL ? 10 : 0, hotBoards: 0,
   tx: new Map(), bal: new Map(), nonce: 5, blk: 1000, calls: []
 };
 function addInscription(id, buf, mime, creator) {
@@ -53,8 +54,10 @@ addInscription(3080, Buffer.from(HP.makePack('hall', PARTS)), 'text/plain', DEPL
 addInscription(3081, Buffer.from(V14_PARENT), 'text/html', DEPLOYER);
 for (const id of [3079, 3080, 3081]) S.core.parents.set(id, [55]);
 S.core.deps.set(3081, [3078, 3079, 3080]);
-for (const b of BOARDS) S.sc.boards.set(b.id, { mode: BigInt(b.mode), max: BigInt(b.max), fee: 0n, eid: 3081n, daily: false, en: true });
-S.sc.boards.set('arcade-canary', { mode: 0n, max: 1000000000n, fee: 0n, eid: 3081n, daily: false, en: false });
+// HANDOVER=1: every board is on an old engine that is NOT an equivalent parent, so all of them need updating by the temporary wallet.
+const OLD = !!process.env.HANDOVER;
+for (const b of BOARDS) S.sc.boards.set(b.id, { mode: BigInt(b.mode), max: BigInt(b.max), fee: 0n, eid: OLD ? 3050n : 3081n, daily: false, en: true });
+if (!OLD) S.sc.boards.set('arcade-canary', { mode: 0n, max: 1000000000n, fee: 0n, eid: 3081n, daily: false, en: false });
 
 let txn = 0;
 const newTx = (status, repr) => { const id = '0x' + sha('tx' + (++txn)).toString('hex'); S.tx.set(id, { tx_status: status, tx_result: { repr }, block_height: ++S.blk }); return id; };
@@ -84,6 +87,24 @@ function callWrite(contract, fn, args, sender) {
       }
       return ['success', '(ok true)'];
     }
+    if (fn === 'mint-single-tx-with-relationships') {
+      const h = hex(buf(args[0])), items = args[3].list;
+      if (C.byHash.has(h)) return ['abort_by_response', '(err u109)'];
+      if (items.length > 32) return ['abort_by_response', '(err u102)'];
+      let run = Buffer.alloc(32); const chunks = [];
+      for (const it of items) { const d = buf(it); run = sha(Buffer.concat([run, d])); chunks.push(d); }
+      if (hex(run) !== h) return ['abort_by_response', '(err u103)'];
+      if (chunks.reduce((n, c) => n + c.length, 0) !== Number(num(args[2]))) return ['abort_by_response', '(err u102)'];
+      if (!args[4].data.length) return ['abort_by_response', '(err u107)'];
+      const deps = args[5].list.map((x) => Number(num(x))), parents = args[6].list.map((x) => Number(num(x)));
+      if (deps.some((d) => !C.meta.has(d))) return ['abort_by_response', '(err u111)'];
+      if (parents.some((p) => C.owner.get(p) !== sender)) return ['abort_by_response', '(err u100)'];
+      const id = C.next++;
+      C.meta.set(id, { creator: sender, mime: args[1].data, size: Number(num(args[2])), n: chunks.length, hash: h });
+      C.chunks.set(id, chunks); C.byHash.set(h, id); C.owner.set(id, sender); C.deps.set(id, deps); C.parents.set(id, parents);
+      C.fees.push('single');
+      return ['success', `(ok u${id})`];
+    }
     if (fn === 'seal-with-relationships' || fn === 'seal-inscription') {
       const h = hex(buf(args[0])), k = sender + h, u = C.uploads.get(k);
       if (!u) return ['abort_by_response', '(err u101)'];
@@ -102,7 +123,15 @@ function callWrite(contract, fn, args, sender) {
     }
   } else if (contract === SCORES) {
     const B = S.sc, name = (x) => x.data;
-    if (sender !== DEPLOYER && fn !== 'submit-score') return ['abort_by_response', '(err u100)'];
+    S.sent.push({ sender, fn });
+    if (fn === 'accept-owner') {
+      if (!B.pending) return ['abort_by_response', '(err u112)'];
+      if (sender !== B.pending) return ['abort_by_response', '(err u100)'];
+      B.owner = B.pending; B.pending = null; return ['success', '(ok true)'];
+    }
+    if (sender !== B.owner && fn !== 'submit-score') return ['abort_by_response', '(err u100)'];
+    if (fn === 'set-board' && sender !== DEPLOYER && S.failAt && ++S.hotBoards === S.failAt) { S.failAt = 0; return ['abort_by_response', '(err u999)']; }
+    if (fn === 'propose-owner') { B.pending = cvToString(args[0]); return ['success', '(ok true)']; }
     if (fn === 'set-board') {
       const id = name(args[0]), old = B.boards.get(id);
       if (old && old.mode !== num(args[1])) return ['abort_by_response', '(err u110)'];
@@ -132,6 +161,7 @@ function callRead(contract, fn, args) {
     const C = S.core;
     if (fn === 'is-paused') return responseOkCV(boolCV(false));
     if (fn === 'get-admin') return responseOkCV(principalCV(DEPLOYER));
+    if (fn === 'quote-single-tx-fee') { const n = Number(num(args[1])); return responseOkCV(tupleCV({ 'total-fee': uintCV(10000 + 1000 * n), 'single-tx-fee': uintCV(10000 + 1000 * n) })); }
     if (fn === 'quote-staged-fee') { const n = Number(num(args[1])); return responseOkCV(tupleCV({ 'begin-fee': uintCV(100000), 'seal-fee': uintCV(100000 + Math.min(n, 32) * 1000 + Math.ceil(Math.max(n - 32, 0) / 32) * 100000) })); }
     if (fn === 'get-id-by-hash') { const id = C.byHash.get(hex(buf(args[0]))); return id ? someCV(uintCV(id)) : noneCV(); }
     if (fn === 'get-upload-state') { const u = C.uploads.get(cvToString(args[1]) + hex(buf(args[0]))); return u ? someCV(tupleCV({ 'current-index': uintCV(u.idx) })) : noneCV(); }
@@ -143,7 +173,8 @@ function callRead(contract, fn, args) {
     if (fn === 'get-dependencies') return listCV((C.deps.get(Number(num(args[0]))) || []).map((x) => uintCV(x)));
   } else if (contract === SCORES) {
     const B = S.sc;
-    if (fn === 'get-owner') return principalCV(DEPLOYER);
+    if (fn === 'get-owner') return principalCV(B.owner);
+    if (fn === 'get-pending-owner') return B.pending ? someCV(principalCV(B.pending)) : noneCV();
     if (fn === 'is-paused') return boolCV(false);
     if (fn === 'current-period') return uintCV(1234);
     if (fn === 'get-board') { const b = B.boards.get(args[0].data); return b ? someCV(tupleCV({ mode: uintCV(b.mode), 'max-score': uintCV(b.max), fee: uintCV(b.fee), 'engine-id': uintCV(b.eid), daily: boolCV(b.daily), enabled: boolCV(b.en) })) : noneCV(); }
@@ -196,11 +227,13 @@ async function route(r) {
   const page = await ctx.newPage();
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
+  page.on('dialog', (d) => d.accept());
   page.on('response', (res) => { if (res.status() >= 400) console.log('  http', res.status(), res.url().slice(0, 120)); });
   page.on('console', (m) => { if (m.type() === 'error' && !/ERR_FAILED|permissions policy|WebGL|GPU|AudioContext/i.test(m.text())) errs.push('console: ' + m.text().slice(0, 160)); });
   await page.exposeFunction('__wallet', async (method, params) => {
     if (method === 'getAddresses') return { result: { addresses: [{ symbol: 'STX', address: DEPLOYER }] } };
     if (method === 'stx_callContract') {
+      S.walletCalls++;
       if ('sender' in params) throw new Error('stx_callContract must not carry sender');
       for (const pc of params.postConditions || []) if (/^0x/i.test(pc)) throw new Error('Not a serialized post condition'); // what Leather says about 0x
       const res = callWrite(params.contract, params.functionName, params.functionArgs.map(hexToCV), DEPLOYER);
@@ -232,6 +265,13 @@ async function route(r) {
     return null;
   };
   let failed = await runSteps(ids.slice(0, only));
+  if (process.env.HANDOVER_FAIL && failed === 'production') {
+    // Interrupted while the temporary wallet owns the contract: the message says so, and running the step again finishes the job.
+    const msg = await page.evaluate(() => document.querySelector('[data-step="production"]').closest('section').querySelector('.note').textContent);
+    console.log('interrupted:', S.sc.owner === DEPLOYER ? 'owner is you?!' : 'owner is the temporary wallet', '·', /temporary wallet/.test(msg) && /until it is handed back/.test(msg) ? 'message explains how to recover' : 'NO RECOVERY MESSAGE: ' + msg.slice(0, 200));
+    if (S.sc.owner === DEPLOYER || !/until it is handed back/.test(msg)) failed = 'interrupt-message';
+    else failed = await runSteps(ids.slice(ids.indexOf('production')));
+  }
   const parentId = await page.evaluate(() => { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^xtrata-arcade-launch:v2:/.test(k)) return JSON.parse(localStorage.getItem(k)).inscriptionId || null; } return null; });
   console.log('core fees', S.core.fees.join(','), '· calls', S.calls.length, '· canary errors', errs.slice(0, 4));
   const results = { failed, parentId, errs };
@@ -256,13 +296,26 @@ async function route(r) {
     console.log(`boards: ${BOARDS.length - bad.length} on #${pid}, ${eq} left on the equivalent #3081 (${S.calls.filter((c) => /set-board$/.test(c)).length} set-board calls in all)`);
     if (bad.length - eq !== 0 || berrs.length || info.parts !== 33 || fromGateway !== 3 || reads !== 0) results.failed = 'parent-boot';
   }
+  // HANDOVER: the temporary wallet signed every board update; your wallet signed only a handful of calls and owns the contract again.
+  if (!results.failed && only === ids.length && OLD) {
+    const hot = S.sent.filter((x) => x.fn === 'set-board' && x.sender !== DEPLOYER);
+    const mine = S.sent.filter((x) => x.sender === DEPLOYER).map((x) => x.fn);
+    const hotBal = S.bal.get([...new Set(S.sent.map((x) => x.sender))].find((x) => x !== DEPLOYER)) ?? 0n;
+    console.log(`handover: ${hot.length} set-board by the temporary wallet · your wallet signed ${S.walletCalls} calls (${mine.join(', ')}) · owner ${S.sc.owner === DEPLOYER ? 'back with you' : 'STILL ' + S.sc.owner} · pending ${S.sc.pending} · temporary wallet left with ${hotBal}`);
+    const owners = mine.filter((f) => f === 'propose-owner' || f === 'accept-owner');
+    if (hot.length !== BOARDS.length + (process.env.HANDOVER_FAIL ? 1 : 0) || S.sc.owner !== DEPLOYER || S.sc.pending !== null || owners.join() !== 'propose-owner,accept-owner' || mine.filter((f) => f === 'set-board').length > 1 || hotBal > 6000n) results.failed = 'handover';
+  }
   // A re-run after "Forget local progress" must find the release on chain and send nothing.
   if (!results.failed && only === ids.length) {
     const before = S.core.fees.length, calls = S.calls.length;
     await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (/^xtrata-arcade-launch:v2:/.test(k)) localStorage.removeItem(k); });
     await page.reload(); await page.waitForTimeout(1000);
     console.log('-- re-run after forgetting local progress');
-    const f = await runSteps(['connect', 'preflight', 'deploy', 'verify', ...ids.filter((i) => /^pack-|^parent$/.test(i)), 'inscription']);
+    const wc = S.walletCalls, sent = S.sent.length;
+    const f = await runSteps(['connect', 'preflight', 'deploy', 'verify', ...ids.filter((i) => /^pack-|^parent$/.test(i)), 'inscription', 'board', 'submit', 'fund', 'copy', 'sweep', 'close', 'production']);
+    const caught = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /already closed on parent|already ran for parent|already refused on chain|nothing sent/.test(n.textContent)).length);
+    console.log(`catch-up: ${caught} steps recognised as already done · wallet calls ${S.walletCalls - wc} · contract calls ${S.sent.length - sent}`);
+    if (S.walletCalls !== wc || S.sent.length !== sent || caught < 7) results.failed = 'catch-up';
     const reused = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /re-used, nothing sent/.test(n.textContent)).length);
     console.log(`re-run: ${reused} inscriptions re-used, ${S.core.fees.length - before} fees paid, ${S.calls.length - calls} calls sent`);
     if (f || reused !== 3 || S.core.fees.length !== before || S.calls.length !== calls) results.failed = 'resume';

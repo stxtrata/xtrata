@@ -48,8 +48,8 @@ export const ARCADE_SCORES_CONTRACT_ID = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX7
 
 /**
  * Inscriptions that are the Xtrata Arcade itself: v1.0 #3076, v1.1 #3077, v1.3 #3078 (single files) and the
- * recursive v1.4 parent #3081. Add each new parent here when the launch canary seals it.
+ * recursive parents v1.4 #3081 and v1.5.0 #3111. Add each new parent here when the launch canary seals it.
  */
-export const ARCADE_INSCRIPTION_IDS: readonly number[] = [3076, 3077, 3078, 3081];
+export const ARCADE_INSCRIPTION_IDS: readonly number[] = [3076, 3077, 3078, 3081, 3111];
 export const isArcadeInscriptionLabel = (label: string) =>
   [...String(label).matchAll(/#(\d+)\b/g)].some((m) => ARCADE_INSCRIPTION_IDS.includes(Number(m[1])));
