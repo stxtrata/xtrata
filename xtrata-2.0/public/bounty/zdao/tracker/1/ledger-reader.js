@@ -119,13 +119,13 @@
   async function run(userCfg, fetchFn, prevState, opts) {
     var cfg = Object.assign({}, DEFAULT_CFG, userCfg || {}); cfg.sources = (userCfg && userCfg.sources ? userCfg.sources : DEFAULT_CFG.sources).map(function (x) { return Object.assign({}, x); });
     var get = fetchFn || async function (u) { var r = await fetch(u); if (!r.ok) throw new Error(u + ' -> ' + r.status); return r.json(); };
-    var now = Date.now(), mode = 'incremental', prev = prevState && prevState.v === 2 && prevState.cutoff === cfg.cutoff ? prevState : null;
+    var now = Date.now(), mode = 'incremental', prev = prevState && prevState.v === 2 && prevState.cutoff === cfg.cutoff && JSON.stringify(prevState.draws || []) === JSON.stringify(cfg.draws || []) ? prevState : null;   // another cutoff or draw list means the saved counts no longer fit
     if (prev && ((opts && opts.full) || now - Date.parse(prev.full) > cfg.fullEveryMs)) prev = null;
     var res = prev ? await scan(cfg, get, JSON.parse(JSON.stringify(prev))) : null;
     if (!res || res.needFull) { mode = 'full'; res = await scan(cfg, get, null); }
     var list = Object.keys(res.by).map(function (k) { var a = res.by[k]; return { addr: a.addr, first: a.first, last: a.last, n: a.n, w: a.w, tx: a.tx }; });
     list.sort(function (x, y) { return y.last - x.last; });
-    var state = { v: 2, cutoff: cfg.cutoff, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, addrs: res.by };
+    var state = { v: 2, cutoff: cfg.cutoff, draws: cfg.draws, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, addrs: res.by };
     var changed = mode === 'full' ? list.map(function (a) { return a.addr; }) : Object.keys(res.touched);
     return { at: new Date(now).toISOString(), mode: mode, cutoff: cfg.cutoff, draws: cfg.draws, status: res.status, failed: res.failed, addresses: list, changed: changed, state: res.failed ? (prevState || null) : state };
   }

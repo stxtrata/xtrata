@@ -14,7 +14,7 @@ export function slimState(state) {
     const slim = { addr, first: rec.first, last: rec.last, n: rec.n, w: [], tx: {}, g: rec.g || {} };
     addrs[addr] = slim;
   }
-  return { v: 2, cutoff: state.cutoff, at: state.at, full: state.full, heads: state.heads, top: state.top, calls: state.calls, addrs };
+  return { v: 2, cutoff: state.cutoff, draws: [], at: state.at, full: state.full, heads: state.heads, top: state.top, calls: state.calls, addrs };
 }
 export function bake(html, state) {
   const line = '  var SNAP = ' + JSON.stringify(slimState(state)) + '; /*SNAP*/';

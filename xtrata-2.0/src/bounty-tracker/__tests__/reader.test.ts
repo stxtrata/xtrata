@@ -102,6 +102,7 @@ describe('incremental ledger reader', () => {
     const old = JSON.parse(JSON.stringify(a.state)); old.full = '2020-01-01T00:00:00Z';
     expect((await L.run(cfg, w.get, old)).mode).toBe('full');
     expect((await L.run({ ...cfg, cutoff: '2026-10-02T00:00:00Z' }, w.get, a.state)).mode).toBe('full');
+    expect((await L.run({ ...cfg, draws: ['2026-10-07T22:59:59Z'] }, w.get, a.state)).mode).toBe('full'); // per-draw counts would be stale
   });
 
   it('keeps the old state when a source fails, and never loses counts', async () => {
