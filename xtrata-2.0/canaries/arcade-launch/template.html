@@ -91,12 +91,13 @@ label.inline { display:flex; align-items:center; gap:8px; }
     <h2>Activity</h2>
     <div class="actions" style="margin-bottom:10px">
       <button class="button ghost" id="export" type="button">Export report</button>
-      <button class="button ghost" id="rescue" type="button">Sweep copycat wallet now</button>
+      <button class="button ghost" id="rescue" type="button">Sweep temporary wallet now</button>
+      <button class="button ghost" id="handback" type="button">Return ownership to my wallet</button>
       <button class="button ghost" id="forget" type="button">Forget local progress</button>
     </div>
     <div id="log"></div>
   </section>
-  <p class="build">The copycat key lives only in this browser's storage and never holds more than 0.06 STX, which is swept back to you after its one refused call. Wallet stages log to the console under <code>[wallet:connect]</code> and <code>[wallet:xverse-preflight]</code>; include those lines when reporting a wallet problem.</p>
+  <p class="build">The temporary wallet's key lives only in this browser's storage. It holds 0.06 STX for the copycat test, and for the board update about 0.6 STX in fees plus contract ownership until it hands it back; unspent funds are swept back to you. Its key is saved to a file before any hand-over. Wallet stages log to the console under <code>[wallet:connect]</code> and <code>[wallet:xverse-preflight]</code>; include those lines when reporting a wallet problem.</p>
 </main>
 <script>/*BUNDLE*/</script>
 </body>
