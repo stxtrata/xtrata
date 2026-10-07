@@ -23,10 +23,25 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
 
 1. Apply the migration to the production D1 database (binding `DB`, `xtrata-manage`):
    `npx wrangler d1 execute xtrata-manage --remote --file=functions/migrations/022_music_paid_plays.sql`
-2. Nothing else is required. `HIRO_API_KEY` is used when present and is recommended.
+2. The server reads the chain with the same Hiro keys and base URL as the `/hiro` proxy
+   (`HIRO_API_KEY_1…`, `HIRO_API_KEYS`, `HIRO_API_KEY`, in that order, then a keyless attempt),
+   rotating to the next key on 401, 403 or 429. Keyless requests from Cloudflare are often refused,
+   so make sure at least one key is set for the Pages environment you are deploying.
 3. History fills in over the first few requests (up to 2,400 events per refresh). While it is
    incomplete, `complete` is `false` and the page says it is still counting, so partial totals are
    never presented as final.
+
+## Diagnosing a count that stays at zero
+
+`curl -s https://xtrata.xyz/api/music-stats` includes `syncError`:
+
+- `null`: the last chain read worked. If `plays` is 0 and `complete` is `false`, the first batch is
+  still being copied; call again after 20 seconds.
+- `403`, `401` or `429`: Hiro refused the request. Check the Hiro key variables above.
+- `-1`: the request did not reach Hiro (network error or timeout).
+
+The page treats "nothing counted yet" as warming up, or unavailable when `syncError` is set. It never
+shows it as zero.
 
 Until the migration is applied the endpoint answers 503 and the page hides the banner and shows
 a dash in the hero. It never shows zero for a failed read.

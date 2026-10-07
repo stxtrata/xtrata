@@ -59,7 +59,8 @@ export const parseStats = (data) => {
     microStx: data.microStx,
     latest,
     complete: data.complete === true,
-    checkedAt: Number.isFinite(data.checkedAt) && data.checkedAt > 0 ? data.checkedAt : null
+    checkedAt: Number.isFinite(data.checkedAt) && data.checkedAt > 0 ? data.checkedAt : null,
+    syncError: Number.isInteger(data.syncError) ? data.syncError : null
   };
 };
 
@@ -84,6 +85,7 @@ const statusText = () => {
     return ago ? `Live · checked ${ago}` : 'Live';
   }
   if (state === 'syncing') return 'Still counting the full history · totals are rising';
+  if (state === 'warming') return 'Counting the first batch from the chain… this can take a minute';
   if (state === 'stale') return `Can’t reach the server · last updated ${formatAgo(lastOk) || 'earlier'}`;
   if (state === 'unavailable') return 'Totals are unavailable right now. Try again soon.';
   return 'Checking the chain…';
@@ -225,6 +227,13 @@ const load = async () => {
     const parsed = parseStats(await response.json());
     if (mount !== generation) return; // The page was left or remounted while this read was in flight.
     if (!parsed) throw new Error('Unexpected response');
+    if (parsed.plays === 0 && !parsed.complete) {
+      // Nothing has been counted yet. That is "not known", never "zero": keep any remembered
+      // totals, otherwise show a warming-up state, or unavailable if the server cannot read the chain.
+      state = snapshot ? 'stale' : parsed.syncError ? 'unavailable' : 'warming';
+      render();
+      return;
+    }
     const grew = {plays: !!snapshot && parsed.plays > snapshot.plays, supporters: !!snapshot && parsed.supporters > snapshot.supporters};
     snapshot = parsed;
     lastOk = Date.now();

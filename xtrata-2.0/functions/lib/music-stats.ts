@@ -1,5 +1,6 @@
 // @ts-ignore Plain JS module shared with the browser readers; it ships no declarations.
 import {PAID_PLAYS_CONTRACT, parsePaidPlayEvent} from '../../public/radio/paid-play-event.mjs';
+import {applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey} from './hiro-keys';
 
 /**
  * Tally of paid plays for the homepage banner and hero.
@@ -13,10 +14,11 @@ import {PAID_PLAYS_CONTRACT, parsePaidPlayEvent} from '../../public/radio/paid-p
 export const PAGE_SIZE = 20;
 export const MAX_PAGES_PER_REFRESH = 120;
 export const MIN_REFRESH_MS = 20_000;
-const HIRO = 'https://api.mainnet.hiro.so';
+// The first visitor waits for this much history; the rest is copied by later refreshes.
+export const FIRST_VISIT_PAGES = 15;
 
 type Db = {prepare(query: string): any; batch(statements: any[]): Promise<any[]>};
-export type StatsEnv = {DB?: Db; HIRO_API_KEY?: string};
+export type StatsEnv = {DB?: Db} & Record<string, unknown>;
 type Transport = typeof fetch;
 type LogPage = {total: number; results: any[]};
 
@@ -28,12 +30,35 @@ export type MusicStats = {
   latest: Array<{txid: string; song: number; core: number; payer: string; recipient: string; at: number | null}>;
   complete: boolean;
   checkedAt: number | null;
+  /** HTTP status of the last failed chain read (-1 for a network error), or null when the last read worked. */
+  syncError: number | null;
   contract: string;
 };
 
+// Same base-URL rules as the /hiro proxy (functions/lib/hiro-proxy.ts).
+const hiroBase = (env: StatsEnv) =>
+  String(env.ARCADE_HIRO_API_BASE_MAINNET || env.HIRO_API_BASE_MAINNET || env.VITE_STACKS_API_MAINNET || 'https://api.mainnet.hiro.so')
+    .trim().replace(/\/+$/, '');
+
+// Same key rotation as the /hiro proxy: each configured key in turn, then no key.
+async function hiroFetch(env: StatsEnv, transport: Transport, url: string): Promise<Response> {
+  const attempts: Array<string | null> = [...getHiroApiKeys(env), null];
+  let lastError: unknown;
+  for (let index = 0; index < attempts.length; index++) {
+    const headers = new Headers({accept: 'application/json'});
+    applyHiroApiKey(headers, attempts[index]);
+    try {
+      const response = await transport(url, {headers, signal: AbortSignal.timeout(8000)});
+      if (index < attempts.length - 1 && shouldRetryWithNextHiroKey(response.status)) continue;
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : Error('Hiro request failed');
+}
+
 async function hiroPage(env: StatsEnv, transport: Transport, offset: number, limit: number): Promise<LogPage> {
-  const headers: Record<string, string> = {};
-  if (env.HIRO_API_KEY) headers['x-api-key'] = env.HIRO_API_KEY;
   const id = encodeURIComponent(PAID_PLAYS_CONTRACT);
   let last: unknown;
   for (const path of [
@@ -41,9 +66,9 @@ async function hiroPage(env: StatsEnv, transport: Transport, offset: number, lim
     `/extended/v1/contract/${id}/events?limit=${limit}&offset=${offset}`
   ]) {
     try {
-      const response = await transport(HIRO + path, {headers, signal: AbortSignal.timeout(8000)});
+      const response = await hiroFetch(env, transport, hiroBase(env) + path);
       if (response.status === 429) throw Object.assign(Error('Hiro rate limit'), {status: 429});
-      if (!response.ok) throw Error(`Hiro HTTP ${response.status}`);
+      if (!response.ok) throw Object.assign(Error(`Hiro HTTP ${response.status}`), {status: response.status});
       const data: any = await response.json();
       if (!Array.isArray(data.results) || !Number.isSafeInteger(data.total) || data.total < 0) throw Error('Invalid contract log response');
       return {total: data.total, results: data.results};
@@ -55,10 +80,10 @@ async function hiroPage(env: StatsEnv, transport: Transport, offset: number, lim
   throw last instanceof Error ? last : Error('Contract activity is unavailable');
 }
 
-async function readState(db: Db): Promise<{cursor: number; total: number; checkedAt: number}> {
+async function readState(db: Db): Promise<{cursor: number; total: number; checkedAt: number; lastStatus: number}> {
   const rows = (await db.prepare('SELECT key, value FROM music_stats_state').all()).results as Array<{key: string; value: number}>;
   const get = (key: string) => Number(rows.find(row => row.key === key)?.value ?? 0);
-  return {cursor: get('cursor'), total: get('total'), checkedAt: get('checked_at')};
+  return {cursor: get('cursor'), total: get('total'), checkedAt: get('checked_at'), lastStatus: get('last_status')};
 }
 
 const upsertState = (db: Db, key: string, value: number, keepHighest = false) =>
@@ -69,7 +94,12 @@ const upsertState = (db: Db, key: string, value: number, keepHighest = false) =>
 
 export type RefreshResult = {ok: boolean; skipped?: boolean; copied: number; cursor: number; total: number; error?: string};
 
-export async function refreshMusicStats(env: StatsEnv, transport: Transport = fetch, now = Date.now()): Promise<RefreshResult> {
+export async function refreshMusicStats(
+  env: StatsEnv,
+  transport: Transport = fetch,
+  now = Date.now(),
+  maxPages = MAX_PAGES_PER_REFRESH
+): Promise<RefreshResult> {
   const db = env.DB;
   if (!db) throw Error('Missing D1 binding');
   const state = await readState(db);
@@ -78,7 +108,7 @@ export async function refreshMusicStats(env: StatsEnv, transport: Transport = fe
   await upsertState(db, 'checked_at', now).run();
   let cursor = state.cursor, total: number | null = null, pages = 0, copied = 0;
   try {
-    while (pages < MAX_PAGES_PER_REFRESH) {
+    while (pages < maxPages) {
       if (total === null) total = (await hiroPage(env, transport, 0, 1)).total;
       if (cursor >= total) break;
       const start = cursor + 1;
@@ -108,8 +138,11 @@ export async function refreshMusicStats(env: StatsEnv, transport: Transport = fe
       cursor = high;
     }
     if (total !== null) await upsertState(db, 'total', total).run();
+    await upsertState(db, 'last_status', 0).run();
     return {ok: true, copied, cursor, total: total ?? state.total};
   } catch (error: any) {
+    const status = Number.isInteger(error?.status) ? error.status : -1;
+    try { await upsertState(db, 'last_status', status).run(); } catch { /* Diagnostics only. */ }
     return {ok: false, copied, cursor, total: total ?? state.total, error: String(error?.message || error).slice(0, 200)};
   }
 }
@@ -134,6 +167,7 @@ export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
     })),
     complete: state.total > 0 && state.cursor >= state.total,
     checkedAt: state.checkedAt || null,
+    syncError: state.lastStatus === 0 ? null : state.lastStatus,
     contract: PAID_PLAYS_CONTRACT
   };
 }
@@ -155,13 +189,16 @@ export async function handleMusicStats(
     let stats = await readMusicStats(env);
     const state = await readState(env.DB);
     if (now - state.checkedAt >= MIN_REFRESH_MS) {
-      const refresh = refreshMusicStats(env, transport, now);
       if (stats.plays === 0 && state.cursor === 0) {
-        // First ever visit: wait, so the first reader gets real numbers.
-        await refresh;
+        // First ever visit: wait for a first batch so the reader gets real numbers, but not
+        // for the whole history. Later refreshes copy the rest.
+        await refreshMusicStats(env, transport, now, FIRST_VISIT_PAGES);
         stats = await readMusicStats(env);
-      } else if (waitUntil) waitUntil(refresh);
-      else await refresh;
+      } else {
+        const refresh = refreshMusicStats(env, transport, now);
+        if (waitUntil) waitUntil(refresh);
+        else await refresh;
+      }
     }
     return reply(stats, 200, 'public, max-age=15');
   } catch {
