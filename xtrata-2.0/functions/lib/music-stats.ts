@@ -13,12 +13,17 @@ import {applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey} from './hir
  */
 // Hiro caps `limit` at 50 on both log endpoints.
 export const PAGE_SIZE = 50;
-// Each page can cost two chain reads (see hiroPage), and a Pages Function may make only a limited
-// number of outbound requests per call, so one refresh stays well inside 50.
-export const MAX_PAGES_PER_REFRESH = 20;
+// Pages are read WAVE_PAGES at a time, in parallel, then confirmed with one total read. A Pages
+// Function may make only a limited number of outbound requests per call (50 on the free plan), so
+// one refresh stays inside it: 4 waves of 8 pages is 4 x 9 + 1 = 37 reads.
+export const WAVE_PAGES = 8;
+export const MAX_PAGES_PER_REFRESH = 32;
+// How often the chain is read once the tally is complete and healthy.
 export const MIN_REFRESH_MS = 20_000;
-// The first visitor waits for this much history; the rest is copied by later refreshes.
-export const FIRST_VISIT_PAGES = 5;
+// While history is still being copied the next batch may start almost at once.
+export const CATCHUP_REFRESH_MS = 3_000;
+// The first visitor waits for this much history; the rest is copied by the next requests.
+export const FIRST_VISIT_PAGES = 16;
 
 type Db = {prepare(query: string): any; batch(statements: any[]): Promise<any[]>};
 export type StatsEnv = {DB?: Db} & Record<string, unknown>;
@@ -98,7 +103,7 @@ async function currentTotal(env: StatsEnv, transport: Transport): Promise<number
   return total;
 }
 
-async function readState(db: Db): Promise<{cursor: number; total: number; checkedAt: number; lastStatus: number}> {
+async function readState(db: Db): Promise<SyncState> {
   const rows = (await db.prepare('SELECT key, value FROM music_stats_state').all()).results as Array<{key: string; value: number}>;
   const get = (key: string) => Number(rows.find(row => row.key === key)?.value ?? 0);
   return {cursor: get('cursor'), total: get('total'), checkedAt: get('checked_at'), lastStatus: get('last_status')};
@@ -109,6 +114,11 @@ const upsertState = (db: Db, key: string, value: number, keepHighest = false) =>
     `INSERT INTO music_stats_state(key, value) VALUES(?, ?)
      ON CONFLICT(key) DO UPDATE SET value = ${keepHighest ? 'MAX(value, excluded.value)' : 'excluded.value'}`
   ).bind(key, value);
+
+type SyncState = {cursor: number; total: number; checkedAt: number; lastStatus: number};
+/** Minimum gap before the next chain read: short while catching up, long when complete or failing. */
+export const refreshInterval = (state: SyncState) =>
+  state.lastStatus === 0 && state.total > 0 && state.cursor < state.total ? CATCHUP_REFRESH_MS : MIN_REFRESH_MS;
 
 export type RefreshResult = {ok: boolean; skipped?: boolean; copied: number; cursor: number; total: number; error?: string};
 
@@ -121,7 +131,7 @@ export async function refreshMusicStats(
   const db = env.DB;
   if (!db) throw Error('Missing D1 binding');
   const state = await readState(db);
-  if (now - state.checkedAt < MIN_REFRESH_MS) return {ok: true, skipped: true, copied: 0, cursor: state.cursor, total: state.total};
+  if (now - state.checkedAt < refreshInterval(state)) return {ok: true, skipped: true, copied: 0, cursor: state.cursor, total: state.total};
   // Claim the slot first so simultaneous visitors do not all read the chain.
   await upsertState(db, 'checked_at', now).run();
   let cursor = state.cursor, total: number | null = null, pages = 0, copied = 0;
@@ -129,33 +139,43 @@ export async function refreshMusicStats(
     while (pages < maxPages) {
       if (total === null) total = await currentTotal(env, transport);
       if (cursor >= total) break;
-      const start = cursor + 1;
-      const end = Math.min(start + PAGE_SIZE - 1, total);
-      const offset = total - end;
-      const page = await hiroPage(env, transport, offset, end - start + 1);
-      pages++;
-      // The v1 endpoint reports no total. Ask again after the page: if it still equals the total
-      // the offset was computed from, no event arrived while reading, so the page is aligned.
-      total = page.total ?? await currentTotal(env, transport);
-      if (!page.results.length) break;
-      // Results are newest first; absolute position of result j is high - j.
-      const high = total - offset;
-      const low = high - page.results.length + 1;
-      if (low > cursor + 1) continue; // New events slid this page newer; re-aim with the new total.
-      const writes: any[] = [];
-      page.results.forEach((event, j) => {
-        const pos = high - j;
-        if (pos <= cursor) return;
-        const play = parsePaidPlayEvent(event);
-        if (!play) return; // Not a valid paid play; still consumes a log position.
-        writes.push(db.prepare(
-          'INSERT OR IGNORE INTO music_paid_plays(txid, pos, payer, recipient, core, song_id, block_time) VALUES(?, ?, ?, ?, ?, ?, ?)'
-        ).bind(play.txid, pos, play.payer, play.recipient, play.core, play.id, play.timestamp ?? null));
-      });
-      writes.push(upsertState(db, 'cursor', high, true), upsertState(db, 'total', total));
-      await db.batch(writes);
-      copied += writes.length - 2;
-      cursor = high;
+      // Plan a wave of contiguous pages, oldest first. Positions are absolute (1 = oldest play);
+      // Hiro counts offsets from the newest event.
+      const plan: Array<{end: number; offset: number; size: number}> = [];
+      for (let start = cursor + 1; start <= total && plan.length < Math.min(WAVE_PAGES, maxPages - pages); start += PAGE_SIZE) {
+        const end = Math.min(start + PAGE_SIZE - 1, total);
+        plan.push({end, offset: total - end, size: end - start + 1});
+      }
+      pages += plan.length;
+      const settled = await Promise.allSettled(plan.map(item => hiroPage(env, transport, item.offset, item.size)));
+      // Offsets were computed from `total`. If a play arrived while reading, every page may have
+      // slid newer and a gap could hide at the old end, so confirm and, if it moved, re-aim.
+      const latest = await currentTotal(env, transport);
+      if (latest !== total) { total = latest; continue; }
+      let failure: unknown = null;
+      for (let i = 0; i < plan.length; i++) {
+        const outcome = settled[i];
+        if (outcome.status === 'rejected') { failure = outcome.reason; break; }
+        const {end, size} = plan[i];
+        const results = outcome.value.results;
+        if (results.length !== size) { failure = Object.assign(Error('Invalid contract log response'), {status: INVALID_RESPONSE}); break; }
+        const writes: any[] = [];
+        // Results are newest first; absolute position of result j is end - j.
+        results.forEach((event, j) => {
+          const pos = end - j;
+          const play = parsePaidPlayEvent(event);
+          if (!play) return; // Not a valid paid play; still consumes a log position.
+          writes.push(db.prepare(
+            'INSERT OR IGNORE INTO music_paid_plays(txid, pos, payer, recipient, core, song_id, block_time) VALUES(?, ?, ?, ?, ?, ?, ?)'
+          ).bind(play.txid, pos, play.payer, play.recipient, play.core, play.id, play.timestamp ?? null));
+        });
+        writes.push(upsertState(db, 'cursor', end, true), upsertState(db, 'total', total));
+        await db.batch(writes);
+        copied += writes.length - 2;
+        cursor = end;
+      }
+      // Pages before a failed one are kept; the failure is recorded and the next refresh resumes there.
+      if (failure) throw failure;
     }
     if (total !== null) await upsertState(db, 'total', total).run();
     await upsertState(db, 'last_status', 0).run();
@@ -208,7 +228,7 @@ export async function handleMusicStats(
   try {
     let stats = await readMusicStats(env);
     const state = await readState(env.DB);
-    if (now - state.checkedAt >= MIN_REFRESH_MS) {
+    if (now - state.checkedAt >= refreshInterval(state)) {
       if (stats.plays === 0 && state.cursor === 0) {
         // First ever visit: wait for a first batch so the reader gets real numbers, but not
         // for the whole history. Later refreshes copy the rest.

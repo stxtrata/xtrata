@@ -5,6 +5,8 @@
 const ENDPOINT = '/api/music-stats';
 const CACHE_KEY = 'xtrata-music-supporters-v1';
 const POLL_MS = 30000;
+// While the server is still copying history, ask again quickly so the count climbs.
+const CATCHUP_POLL_MS = 4000;
 const LABEL_MS = 10000;
 const EXPLORER = 'https://explorer.hiro.so/txid/';
 const TX = /^0x[0-9a-f]{64}$/;
@@ -71,6 +73,7 @@ let started = false;
 let inflight = false;
 let generation = 0;
 let pollTimer = null;
+let pollWanted = false;
 let labelTimer = null;
 let onVisible = null;
 let knownTx = new Set();
@@ -217,6 +220,13 @@ const restore = () => {
   } catch { /* Ignore unreadable cache. */ }
 };
 
+const nextPollDelay = () => (state === 'syncing' || state === 'warming' ? CATCHUP_POLL_MS : POLL_MS);
+const schedulePoll = () => {
+  window.clearTimeout(pollTimer);
+  if (!pollWanted) return;
+  pollTimer = window.setTimeout(() => { if (!document.hidden) void load(); schedulePoll(); }, nextPollDelay());
+};
+
 const load = async () => {
   if (inflight) return;
   inflight = true;
@@ -245,7 +255,7 @@ const load = async () => {
     state = snapshot ? 'stale' : 'unavailable';
     render();
   } finally {
-    if (mount === generation) inflight = false;
+    if (mount === generation) { inflight = false; schedulePoll(); }
   }
 };
 
@@ -260,7 +270,8 @@ export const initMusicSupporters = () => {
   restore();
   render();
   void load();
-  pollTimer = window.setInterval(() => { if (!document.hidden) void load(); }, POLL_MS);
+  pollWanted = true;
+  schedulePoll();
   labelTimer = window.setInterval(() => { if (!document.hidden && snapshot) renderLabels(); }, LABEL_MS);
   onVisible = () => { if (!document.hidden) void load(); };
   document.addEventListener('visibilitychange', onVisible);
@@ -270,7 +281,8 @@ export const stopMusicSupporters = () => {
   if (!started) return;
   started = false;
   generation++;
-  window.clearInterval(pollTimer);
+  pollWanted = false;
+  window.clearTimeout(pollTimer);
   window.clearInterval(labelTimer);
   pollTimer = null;
   labelTimer = null;

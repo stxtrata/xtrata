@@ -13,9 +13,9 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
   (through `chain-activity.js`), so both count the same events the same way: one play per
   transaction, amount exactly 50 microSTX, a valid core and a valid payer.
 - Sync is oldest-first by log position with one contiguous cursor (`music_stats_state.cursor`).
-  A failed or shifted page never advances the cursor past a gap, and re-reading a page is harmless.
+  A failed or shifted wave never advances the cursor past a gap, and re-reading a page is harmless.
 - Supporters are `COUNT(DISTINCT payer)`. An address is a wallet, not necessarily a different person.
-- `GET /api/music-stats` answers from D1. When the last chain read is more than 20 seconds old it
+- `GET /api/music-stats` answers from D1. When the last chain read is more than 20 seconds old (3 seconds while history is still being copied) it
   starts a refresh in the background. An idle refresh is one Hiro request. The very first request
   waits for the first batch so the first visitor sees real numbers.
 
@@ -27,10 +27,13 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
    (`HIRO_API_KEY_1…`, `HIRO_API_KEYS`, `HIRO_API_KEY`, in that order, then a keyless attempt),
    rotating to the next key on 401, 403 or 429. Keyless requests from Cloudflare are often refused,
    so make sure at least one key is set for the Pages environment you are deploying.
-3. History fills in over the first few requests (up to 1,000 events per refresh, so roughly a minute
-   for ~5,000 plays). While it is
-   incomplete, `complete` is `false` and the page says it is still counting, so partial totals are
-   never presented as final.
+3. History fills in within a few seconds. Pages of 50 events are read 8 at a time in parallel,
+   then one total read confirms nothing arrived meanwhile (otherwise the wave is re-aimed). One
+   refresh copies up to 1,600 events in about 37 chain reads, which stays inside the 50 outbound
+   requests a Pages Function may make. While history is incomplete the next batch may start after
+   3 seconds and the page asks every 4 seconds, so ~4,700 plays are counted in roughly 10-15 seconds.
+   Once complete, chain reads are 20 seconds apart. While it is incomplete, `complete` is `false`
+   and the page says it is still counting, so partial totals are never presented as final.
 
 ## Diagnosing a count that stays at zero
 
@@ -43,7 +46,7 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
 - `-2`: Hiro answered, but not with a contract log page (unexpected body).
 
 Hiro's v2 logs endpoint rejects offsets above 1000 (HTTP 400) and its v1 events endpoint reports no
-total, so old history is read through v1 and each v1 page is followed by a one-event v2 read to
+total, so old history is read through v1 and each wave is followed by a one-event v2 read to
 confirm no new play arrived while reading. Both endpoints cap `limit` at 50.
 
 The page treats "nothing counted yet" as warming up, or unavailable when `syncError` is set. It never

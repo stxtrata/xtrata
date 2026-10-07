@@ -2,7 +2,7 @@
 import {describe, it, expect} from 'vitest';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
-import {handleMusicStats, readMusicStats, refreshMusicStats, MIN_REFRESH_MS, MAX_PAGES_PER_REFRESH, PAGE_SIZE, FIRST_VISIT_PAGES} from '../../lib/music-stats';
+import {handleMusicStats, readMusicStats, refreshMusicStats, CATCHUP_REFRESH_MS, WAVE_PAGES, MIN_REFRESH_MS, MAX_PAGES_PER_REFRESH, PAGE_SIZE, FIRST_VISIT_PAGES} from '../../lib/music-stats';
 import {parsePaidPlayEvent} from '../../../public/radio/paid-play-event.mjs';
 import {aggregateHeroes} from '../../../public/radio/music-heroes.mjs';
 const {DatabaseSync} = createRequire(import.meta.url)('node:sqlite');
@@ -182,6 +182,47 @@ describe('Music supporter statistics', () => {
     const odd = (async () => Response.json({unexpected: true})) as unknown as typeof fetch;
     await refreshMusicStats({DB: db as any}, odd, T0);
     expect((await readMusicStats({DB: db as any})).syncError).toBe(-2);
+  });
+
+  it('copies the real-sized history in three quick refreshes, each within the request budget', async () => {
+    const log = Array.from({length: 4700}, (_, i) => event(i + 1, 1 + (i % 4)));
+    const db = database(), h = hiro(log);
+    let now = T0, previous = 0;
+    for (let round = 0; round < 3; round++) {
+      await refreshMusicStats({DB: db as any}, h.transport, now);
+      expect(h.calls() - previous).toBeLessThanOrEqual(45);
+      previous = h.calls();
+      now += CATCHUP_REFRESH_MS;
+    }
+    expect(await readMusicStats({DB: db as any})).toMatchObject({plays: 4700, supporters: 4, complete: true, syncError: null});
+  });
+
+  it('reads the pages of a wave in parallel', async () => {
+    const log = Array.from({length: WAVE_PAGES * PAGE_SIZE}, (_, i) => event(i + 1, 1));
+    let inFlight = 0, peak = 0;
+    const inner = hiro(log).transport;
+    const transport = (async (url: any, init: any) => {
+      inFlight++; peak = Math.max(peak, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      try { return await inner(url, init); } finally { inFlight--; }
+    }) as unknown as typeof fetch;
+    await refreshMusicStats({DB: database() as any}, transport, T0);
+    expect(peak).toBeGreaterThanOrEqual(WAVE_PAGES);
+  });
+
+  it('re-reads sooner while catching up, but throttles once complete or failing', async () => {
+    const log = Array.from({length: 3 * WAVE_PAGES * PAGE_SIZE}, (_, i) => event(i + 1, 1 + (i % 9)));
+    const db = database(), h = hiro(log);
+    await refreshMusicStats({DB: db as any}, h.transport, T0, WAVE_PAGES); // one wave only: incomplete
+    expect(await refreshMusicStats({DB: db as any}, h.transport, T0 + 1000)).toMatchObject({skipped: true});
+    const catchUp = await refreshMusicStats({DB: db as any}, h.transport, T0 + CATCHUP_REFRESH_MS);
+    expect(catchUp.skipped).toBeUndefined();
+    expect((await readMusicStats({DB: db as any})).complete).toBe(true);
+    expect(await refreshMusicStats({DB: db as any}, h.transport, T0 + 2 * CATCHUP_REFRESH_MS)).toMatchObject({skipped: true});
+    // A failing chain is not hammered at the catch-up rate.
+    const failing = database();
+    await refreshMusicStats({DB: failing as any}, (async () => { throw Error('offline'); }) as unknown as typeof fetch, T0);
+    expect(await refreshMusicStats({DB: failing as any}, h.transport, T0 + CATCHUP_REFRESH_MS)).toMatchObject({skipped: true});
   });
 
   it('ignores other contracts, wrong amounts and repeated transactions, but still advances', async () => {

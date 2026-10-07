@@ -205,6 +205,29 @@ describe('banner and hero', () => {
     expect(fetchMock.mock.calls.length).toBe(calls);
   });
 
+  it('asks again every few seconds while the server is still counting, then slows down', async () => {
+    const counting = (plays: number, complete = false) => new Response(JSON.stringify(payload({plays, complete})));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(counting(800))
+      .mockResolvedValueOnce(counting(2400))
+      .mockResolvedValueOnce(counting(4674, true))
+      .mockImplementation(async () => counting(4674, true));
+    vi.stubGlobal('fetch', fetchMock);
+    initMusicSupporters();
+    await settle();
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('800');
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('2,400');
+    await vi.advanceTimersByTimeAsync(4_000);
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('4,674');
+    expect(document.getElementById('musicBanner')!.dataset.state).toBe('live');
+    const calls = fetchMock.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(fetchMock.mock.calls.length).toBe(calls); // complete: back to the 30 second rhythm
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock.mock.calls.length).toBe(calls + 1);
+  });
+
   it('does nothing on pages without the banner or hero', async () => {
     document.body.innerHTML = '<main></main>';
     const fetchMock = vi.fn();
