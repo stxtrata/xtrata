@@ -1,0 +1,15 @@
+{
+ "pack": "orchestral",
+ "tier": "core",
+ "count": 110,
+ "container": {
+  "file": "orchestral.audpack",
+  "bytes": 4683053,
+  "sha256": "dbcf99157d31be7907b2db0f209124a6a4dd44c0ca16f7fa4503ca595f5cc560",
+  "chunks16384": 286,
+  "indexBytes": 174220,
+  "indexGzipBytes": 25481,
+  "payloadBytes": 4657560
+ },
+ "wavBytes": 9883344
+}

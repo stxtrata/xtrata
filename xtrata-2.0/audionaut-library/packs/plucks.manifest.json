@@ -1,0 +1,15 @@
+{
+ "pack": "plucks",
+ "tier": "core",
+ "count": 130,
+ "container": {
+  "file": "plucks.audpack",
+  "bytes": 4476575,
+  "sha256": "bbb8bc0773e9d4361abfa644c6da83f14e6704f7b8985f726176cdc63784ea03",
+  "chunks16384": 274,
+  "indexBytes": 195610,
+  "indexGzipBytes": 30406,
+  "payloadBytes": 4446157
+ },
+ "wavBytes": 12095280
+}
