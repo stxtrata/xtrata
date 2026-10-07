@@ -16,3 +16,8 @@ name = "xtrata"
   [[r2_buckets]]
   binding = "RUNTIME_CONTENT_CACHE"
   bucket_name = "xtrata-runtime-content-cache"
+
+  # Explorer grid thumbnails (see the root wrangler.toml for why it is separate).
+  [[r2_buckets]]
+  binding = "THUMBNAILS"
+  bucket_name = "xtrata-thumbnails"

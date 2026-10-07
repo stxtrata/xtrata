@@ -91,6 +91,9 @@ export type TokenSummaryCacheValue = {
   } | null;
   svgDataUri: string | null;
   sourceContractId?: string;
+  thumbVersion?: string | null;
+  thumbTitle?: string | null;
+  thumbArtist?: string | null;
 };
 
 type TokenSummaryRecord = {
