@@ -1,0 +1,15 @@
+{
+ "pack": "keyboards",
+ "tier": "core",
+ "count": 78,
+ "container": {
+  "file": "keyboards.audpack",
+  "bytes": 4891790,
+  "sha256": "29a92bbabf250e140aab77119dd26b79a2630571ad4c5d7a6ca5cbbb3e2247db",
+  "chunks16384": 299,
+  "indexBytes": 127804,
+  "indexGzipBytes": 19215,
+  "payloadBytes": 4872563
+ },
+ "wavBytes": 11233832
+}

@@ -1,0 +1,15 @@
+{
+ "pack": "brass",
+ "tier": "core",
+ "count": 167,
+ "container": {
+  "file": "brass.audpack",
+  "bytes": 6635298,
+  "sha256": "8c4992d7ac5f067d7dd2c390017bc0e3419d13c8a98dcab4415c01ef8a63c96b",
+  "chunks16384": 405,
+  "indexBytes": 262580,
+  "indexGzipBytes": 36229,
+  "payloadBytes": 6599057
+ },
+ "wavBytes": 15453792
+}

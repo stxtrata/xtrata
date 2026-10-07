@@ -1,0 +1,4 @@
+/*! audionaut codec-flac 1.0.0 (codecApi 1)
+ * Dependency-free FLAC decoder (pure JavaScript, no WebAssembly). Original code written for the
+ * Audionaut project; it contains no third-party code. FLAC format: https://xiph.org/flac/format.html
+ * Licence: see the extension manifest. */

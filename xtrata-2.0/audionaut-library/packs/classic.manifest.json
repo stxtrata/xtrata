@@ -1,0 +1,15 @@
+{
+ "pack": "classic",
+ "tier": "unverified",
+ "count": 400,
+ "container": {
+  "file": "classic.audpack",
+  "bytes": 6909159,
+  "sha256": "a27d839aabd21fca06c871eb5cd0aedb75b1bbde7e6f07e4f72bc26bfb84e770",
+  "chunks16384": 422,
+  "indexBytes": 766317,
+  "indexGzipBytes": 83251,
+  "payloadBytes": 6825896
+ },
+ "wavBytes": 13407214
+}

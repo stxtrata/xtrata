@@ -1,0 +1,15 @@
+{
+ "pack": "byextras",
+ "tier": "attribution",
+ "count": 60,
+ "container": {
+  "file": "byextras.audpack",
+  "bytes": 4072875,
+  "sha256": "caab4e07876e37d79aadc58c8003d0cd06b402bcf2179d65d2eb2506084f5158",
+  "chunks16384": 249,
+  "indexBytes": 106869,
+  "indexGzipBytes": 20192,
+  "payloadBytes": 4052671
+ },
+ "wavBytes": 11006022
+}

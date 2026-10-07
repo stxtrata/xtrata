@@ -1,0 +1,15 @@
+{
+ "pack": "piano",
+ "tier": "core",
+ "count": 71,
+ "container": {
+  "file": "piano.audpack",
+  "bytes": 3037532,
+  "sha256": "46d473e2afd2941891dc3e271cc408a171e7a3fa5815982b65f9895c03530759",
+  "chunks16384": 186,
+  "indexBytes": 111930,
+  "indexGzipBytes": 18073,
+  "payloadBytes": 3019447
+ },
+ "wavBytes": 10984732
+}

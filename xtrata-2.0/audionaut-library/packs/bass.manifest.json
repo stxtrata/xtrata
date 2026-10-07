@@ -1,0 +1,15 @@
+{
+ "pack": "bass",
+ "tier": "core",
+ "count": 113,
+ "container": {
+  "file": "bass.audpack",
+  "bytes": 3347930,
+  "sha256": "445b53f5de0b011e8975692985dc782ea2431d2c45c5a881bcc0da6e907dc0f0",
+  "chunks16384": 205,
+  "indexBytes": 167548,
+  "indexGzipBytes": 26215,
+  "payloadBytes": 3321703
+ },
+ "wavBytes": 10918212
+}

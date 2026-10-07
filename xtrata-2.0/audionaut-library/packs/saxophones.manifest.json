@@ -1,0 +1,15 @@
+{
+ "pack": "saxophones",
+ "tier": "core",
+ "count": 48,
+ "container": {
+  "file": "saxophones.audpack",
+  "bytes": 2719180,
+  "sha256": "bebc14332c160a94d1e11e70dd5e3e7ae082979577390ac9a77068efba42f5b3",
+  "chunks16384": 166,
+  "indexBytes": 79552,
+  "indexGzipBytes": 13534,
+  "payloadBytes": 2705634
+ },
+ "wavBytes": 4763226
+}
