@@ -32,9 +32,27 @@
 
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
+  // ---- Inscription size tickets ----
+  // An inscription earns 1 ticket up to 1 MB (1,048,576 bytes), then one more for every further MB, capped at 5:
+  // up to 1 MB = 1, 1-2 MB = 2, 2-3 MB = 3, 3-4 MB = 4, over 4 MB = 5.
+  var MB = 1048576, BEGIN_FNS = ['begin-inscription', 'begin-or-get'], SINGLE_TX = ['mint-single-tx', 'mint-single-tx-recursive', 'mint-single-tx-with-relationships'];
+  function sizePoints(bytes) { return Math.min(5, Math.max(1, Math.ceil(bytes / MB))); }
+  function uintOf(arg) { var m = /^u(\d+)$/.exec(String((arg && arg.repr) || '')); return m ? parseInt(m[1], 10) : null; }
+  function hashOf(arg) { var m = /^0x([0-9a-f]{64})$/i.exec(String((arg && arg.repr) || '')); return m ? m[1].toLowerCase() : null; }
+  // The inscriptions one call sealed, each with the size we could read for it. size null = not seen (begun before the window).
+  function itemsOf(fn, args) {
+    if (SINGLE_TX.indexOf(fn) >= 0) return [{ size: uintOf(args[2]) }];
+    if (fn === 'seal-inscription-batch') {
+      var hs = [], re = /hash 0x([0-9a-f]{64})/gi, m, txt = String((args[0] && args[0].repr) || '');
+      while ((m = re.exec(txt))) hs.push({ hash: m[1].toLowerCase() });
+      return hs.length ? hs : [{}];
+    }
+    return [{ hash: hashOf(args[0]) }];
+  }
+
   // Pull one source newest first. Stops at a transaction it has already seen (`known`) or at the cutoff.
   async function pullSource(src, cfg, get, known) {
-    var out = [], heads = [], top = 0, off = 0, limit = 50, cutMs = Date.parse(cfg.cutoff), pages = 0, stop = false, sawKnown = false;
+    var sizes = {}, out = [], heads = [], top = 0, off = 0, limit = 50, cutMs = Date.parse(cfg.cutoff), pages = 0, stop = false, sawKnown = false;
     while (!stop && pages < 400) {
       var j = await get(cfg.api + '/extended/v1/address/' + src.id + '/transactions?limit=' + limit + '&offset=' + off);
       var rows = (j && j.results) || [];
@@ -48,18 +66,32 @@
         if (ms < cutMs) { stop = true; break; }
         if (t.tx_type !== 'contract_call' || t.tx_status !== 'success') continue;
         var cc = t.contract_call || {};
-        if (cc.contract_id !== src.id || src.fns.indexOf(cc.function_name) < 0) continue;
+        if (cc.contract_id !== src.id) continue;
         var args = cc.function_args || [];
+        if (src.kind === 'ins' && BEGIN_FNS.indexOf(cc.function_name) >= 0) {      // a begin carries the size a later seal needs
+          var bh = hashOf(args[0]), bs = uintOf(args[2]);
+          if (bh && bs != null) sizes[bh] = bs;
+          continue;
+        }
+        if (src.fns.indexOf(cc.function_name) < 0) continue;
         if (src.kind === 'lk' && cc.function_name === 'set-liked' && args[1] && String(args[1].repr) !== 'true') continue;   // an unlike is not a ticket
         var game = null;
         if (src.kind === 'ch' && args[0]) game = src.id.split('.')[1] + '#' + String(args[0].repr || '').replace(/^u/, '');
-        out.push({ addr: t.sender_address, ms: ms, tx: t.tx_id, game: game });
+        var ev = { addr: t.sender_address, ms: ms, tx: t.tx_id, game: game };
+        if (src.kind === 'ins') ev.items = itemsOf(cc.function_name, args);
+        out.push(ev);
       }
       off += limit; pages++;
       if (rows.length < limit) break;
       await sleep(100);
     }
-    return { out: out, heads: heads, top: top, sawKnown: sawKnown, pages: pages };
+    if (src.kind === 'ins') out.forEach(function (ev) {                             // sizes are all in by now, newest-first paging saw the seals first
+      ev.items = ev.items.map(function (it) {
+        var size = it.size != null ? it.size : (it.hash && (sizes[it.hash] != null ? sizes[it.hash] : (src.priorSizes || {})[it.hash]));
+        return size != null ? { p: sizePoints(size) } : { p: 1, u: 1 };            // unseen size: 1 ticket, flagged
+      });
+    });
+    return { out: out, heads: heads, top: top, sawKnown: sawKnown, pages: pages, sizes: sizes };
   }
 
   function blank(a, ms, nDraws) { return { addr: a, first: ms, last: ms, n: {}, w: Array.apply(null, Array(nDraws)).map(function () { return {}; }), tx: {}, g: {} }; }
@@ -70,6 +102,13 @@
     touched[ev.addr] = 1;
     a.first = Math.min(a.first, ev.ms); a.last = Math.max(a.last, ev.ms);
     if (kind === 'ch') { var g = ev.game == null ? ev.tx : ev.game; a.g[g] = a.g[g] ? Math.min(a.g[g], ev.ms) : ev.ms; return; }
+    if (kind === 'ins' && ev.items) {                                           // one count per inscription, plus its size tickets in inp
+      var cnt = ev.items.length, pts = ev.items.reduce(function (t, it) { return t + it.p; }, 0), unk = ev.items.reduce(function (t, it) { return t + (it.u || 0); }, 0);
+      var add = function (o) { o.ins = (o.ins || 0) + cnt; o.inp = (o.inp || 0) + pts; if (unk) o.inu = (o.inu || 0) + unk; };
+      add(a.n); drawMs.forEach(function (d, i) { if (ev.ms <= d) add(a.w[i]); });
+      if (!a.tx.ins) a.tx.ins = ev.tx;
+      return;
+    }
     a.n[kind] = (a.n[kind] || 0) + 1;
     drawMs.forEach(function (d, i) { if (ev.ms <= d) a.w[i][kind] = (a.w[i][kind] || 0) + 1; });
     if (!a.tx[kind]) a.tx[kind] = ev.tx;
@@ -83,7 +122,8 @@
 
   async function scan(cfg, get, prev) {
     var drawMs = cfg.draws.map(Date.parse), by = prev ? prev.addrs : {}, touched = {}, status = [], heads = {}, top = {}, calls = {}, needFull = false;
-    var queue = cfg.sources.slice(), results = [];
+    var queue = cfg.sources.slice(), results = [], sizes = Object.assign({}, prev && prev.sizes);
+    cfg.sources.forEach(function (s) { s.priorSizes = sizes; });
     async function worker() {
       while (queue.length) {
         var s = queue.shift();
@@ -104,16 +144,17 @@
     cfg.sources.forEach(function (s) {
       var x = results.filter(function (z) { return z.s === s; })[0];
       if (!x || x.err) { status.push({ kind: s.kind, label: s.label, ok: false, note: x ? x.err : 'not read' }); if (prev && prev.heads && prev.heads[s.id]) { heads[s.id] = prev.heads[s.id]; top[s.id] = prev.top[s.id]; calls[s.id] = (prev.calls || {})[s.id] || 0; } return; }
+      if (x.r.sizes) Object.assign(sizes, x.r.sizes);
       x.r.out.slice().reverse().forEach(function (ev) { if (ev.addr) apply(by, s.kind, ev, drawMs, touched); });   // oldest first
       var had = prev && prev.heads && prev.heads[s.id];
       heads[s.id] = x.r.out.length || !had ? x.r.heads : prev.heads[s.id];
       top[s.id] = x.r.out.length || !had ? x.r.top : prev.top[s.id];
-      calls[s.id] = ((prev && prev.calls && prev.calls[s.id]) || 0) + x.r.out.length;
+      calls[s.id] = ((prev && prev.calls && prev.calls[s.id]) || 0) + x.r.out.reduce(function (t, ev) { return t + (ev.items ? ev.items.length : 1); }, 0);   // an inscription batch counts each item
       var st = { kind: s.kind, label: s.label, ok: true, calls: calls[s.id] }; if (x.nf) st.note = 'not deployed'; status.push(st);
     });
     var failed = status.some(function (s) { return !s.ok; });
     Object.keys(touched).forEach(function (k) { finishChess(by[k], drawMs); });
-    return { by: by, touched: touched, status: status, heads: heads, top: top, calls: calls, failed: failed };
+    return { by: by, touched: touched, status: status, heads: heads, top: top, calls: calls, failed: failed, sizes: sizes };
   }
 
   async function run(userCfg, fetchFn, prevState, opts) {
@@ -125,11 +166,11 @@
     if (!res || res.needFull) { mode = 'full'; res = await scan(cfg, get, null); }
     var list = Object.keys(res.by).map(function (k) { var a = res.by[k]; return { addr: a.addr, first: a.first, last: a.last, n: a.n, w: a.w, tx: a.tx }; });
     list.sort(function (x, y) { return y.last - x.last; });
-    var state = { v: 2, cutoff: cfg.cutoff, draws: cfg.draws, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, addrs: res.by };
+    var state = { v: 2, cutoff: cfg.cutoff, draws: cfg.draws, at: new Date(now).toISOString(), full: mode === 'full' ? new Date(now).toISOString() : prev.full, heads: res.heads, top: res.top, calls: res.calls, sizes: res.sizes, addrs: res.by };
     var changed = mode === 'full' ? list.map(function (a) { return a.addr; }) : Object.keys(res.touched);
     return { at: new Date(now).toISOString(), mode: mode, cutoff: cfg.cutoff, draws: cfg.draws, status: res.status, failed: res.failed, addresses: list, changed: changed, state: res.failed ? (prevState || null) : state };
   }
 
-  var api = { run: run, pullSource: pullSource, DEFAULT_CFG: DEFAULT_CFG };
+  var api = { run: run, pullSource: pullSource, DEFAULT_CFG: DEFAULT_CFG, sizePoints: sizePoints };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.XtrataLedger = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -53,7 +53,7 @@ describe('incremental ledger reader', () => {
     expect(a.mode).toBe('full');
     expect(a.failed).toBe(false);
     const by = Object.fromEntries(a.addresses.map((x: any) => [x.addr, x.n]));
-    expect(by.SPA).toEqual({ ins: 2, sc: 1, lk: 1 });
+    expect(by.SPA).toEqual({ ins: 2, inp: 2, inu: 2, sc: 1, lk: 1 });   // no begin visible: 1 ticket each, flagged
     expect(by.SPB).toEqual({ sc: 1 });
     expect(by.SPMUSIC).toEqual({ mu: 120 });
   });
@@ -148,8 +148,63 @@ describe('tracker page snapshot', () => {
     const line = html.split('\n').find((l) => l.endsWith('/*SNAP*/'))!;
     const snap = JSON.parse(line.replace(/^ {2}var SNAP = /, '').replace(/; \/\*SNAP\*\/$/, ''));
     expect(snap.v).toBe(2);
-    const events = Object.values<any>(snap.addrs).reduce((t, a) => t + Object.entries<number>(a.n).reduce((x, [k, v]) => x + (k === 'ch' ? 0 : v), 0), 0);
+    const events = Object.values<any>(snap.addrs).reduce((t, a) => t + Object.entries<number>(a.n).reduce((x, [k, v]) => x + (k === 'ch' || k === 'inp' || k === 'inu' ? 0 : v), 0), 0);   // inp/inu are ticket points and a flag, not events
     const calls = Object.values<number>(snap.calls).reduce((x, y) => x + y, 0);
     expect(events).toBe(calls);
+  });
+});
+
+describe('size-weighted inscription tickets', () => {
+  const MB = 1048576;
+  const H = (n: number) => '0x' + n.toString(16).padStart(64, '0');
+  const arg = (name: string, repr: string) => ({ name, repr });
+  const begin = (w: ReturnType<typeof world>, who: string, hash: string, size: number, off: number) =>
+    w.add(C('xtrata-v3-2-3'), 'begin-or-get', who, off, { contract_call: { contract_id: C('xtrata-v3-2-3'), function_name: 'begin-or-get', function_args: [arg('expected-hash', hash), arg('mime', '"audio/mpeg"'), arg('total-size', 'u' + size), arg('total-chunks', 'u1')] } });
+  const seal = (w: ReturnType<typeof world>, who: string, hash: string, off: number) =>
+    w.add(C('xtrata-v3-2-3'), 'seal-inscription', who, off, { contract_call: { contract_id: C('xtrata-v3-2-3'), function_name: 'seal-inscription', function_args: [arg('expected-hash', hash), arg('token-uri-string', '"x"')] } });
+  const single = (w: ReturnType<typeof world>, who: string, size: number, off: number) =>
+    w.add(C('xtrata-v3-2-3'), 'mint-single-tx', who, off, { contract_call: { contract_id: C('xtrata-v3-2-3'), function_name: 'mint-single-tx', function_args: [arg('expected-hash', H(off)), arg('mime', '"image/png"'), arg('total-size', 'u' + size), arg('chunks', '(list)'), arg('token-uri-string', '"x"')] } });
+  const run = async (w: ReturnType<typeof world>, prev: any = null) => L.run({ api: 'x', cutoff: '2026-10-01T00:00:00Z', draws: [] }, w.get, prev);
+  const ofAddr = (out: any, a: string) => out.addresses.find((x: any) => x.addr === a);
+
+  it('maps file size to 1-5 tickets with the boundaries on the exact megabyte', () => {
+    const f = scope.XtrataLedger.sizePoints;
+    expect([0, 1, MB - 1, MB, MB + 1, 2 * MB, 2 * MB + 1, 3 * MB, 3 * MB + 1, 4 * MB, 4 * MB + 1, 5 * MB, 50 * MB].map(f)).toEqual([1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 5]);
+  });
+
+  it('scores a begin then seal by the size declared at begin, and a single-tx mint by its own size', async () => {
+    const w = world();
+    begin(w, 'SPA', H(1), Math.round(3.4 * MB), 10); seal(w, 'SPA', H(1), 11);
+    single(w, 'SPA', 600 * 1024, 20);
+    single(w, 'SPB', 9 * MB, 21);
+    const out = await run(w);
+    expect(ofAddr(out, 'SPA').n).toMatchObject({ ins: 2, inp: 4 + 1 });
+    expect(ofAddr(out, 'SPB').n).toMatchObject({ ins: 1, inp: 5 });
+    expect(ofAddr(out, 'SPA').n.inu).toBeUndefined();
+  });
+
+  it('counts every item in a batch seal on its own size', async () => {
+    const w = world();
+    begin(w, 'SPA', H(1), 2 * MB, 10); begin(w, 'SPA', H(2), 100, 11);
+    w.add(C('xtrata-v3-2-3'), 'seal-inscription-batch', 'SPA', 12, { contract_call: { contract_id: C('xtrata-v3-2-3'), function_name: 'seal-inscription-batch', function_args: [arg('items', `(list (tuple (hash ${H(1)}) (token-uri-string "a")) (tuple (hash ${H(2)}) (token-uri-string "b")))`)] } });
+    const n = ofAddr(await run(w), 'SPA').n;
+    expect(n).toMatchObject({ ins: 2, inp: 2 + 1 });
+  });
+
+  it('remembers sizes between runs, so a seal in a later run still finds its begin', async () => {
+    const w = world();
+    begin(w, 'SPA', H(1), 4.5 * MB, 10);
+    const first = await run(w);
+    seal(w, 'SPA', H(1), 30);
+    const second = await run(w, first.state);
+    expect(ofAddr(second, 'SPA').n).toMatchObject({ ins: 1, inp: 5 });
+    const scratch = await run(w);
+    expect(ofAddr(scratch, 'SPA').n).toEqual(ofAddr(second, 'SPA').n);
+  });
+
+  it('gives a seal with no visible begin 1 ticket and flags it', async () => {
+    const w = world();
+    seal(w, 'SPA', H(9), 10);
+    expect(ofAddr(await run(w), 'SPA').n).toMatchObject({ ins: 1, inp: 1, inu: 1 });
   });
 });
