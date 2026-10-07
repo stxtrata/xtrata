@@ -1,0 +1,15 @@
+{
+ "pack": "strings",
+ "tier": "core",
+ "count": 110,
+ "container": {
+  "file": "strings.audpack",
+  "bytes": 6508363,
+  "sha256": "77aea748c0458b15a8228cd6ce9f1a7b56643d48205966dff68ad7288b0711bd",
+  "chunks16384": 398,
+  "indexBytes": 173607,
+  "indexGzipBytes": 25407,
+  "payloadBytes": 6482944
+ },
+ "wavBytes": 13132072
+}
