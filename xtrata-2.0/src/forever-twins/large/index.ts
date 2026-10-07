@@ -17,7 +17,7 @@ export function createLargeWizard(o: LargeWizardOptions) {
     core: o.reg.core.contract, assetName: o.reg.core.assetName, helper: o.coll.helper, mismatch: o.mismatch,
     refetchBytes: async (job: any) => { try { return await o.fetchBytes(String(job.token)); } catch { return null; } }
   });
-  // The 10% processing fee goes to the same address Agent One pays: the Xtrata deployer (xtrata.btc).
+  // The 5% processing fee goes to the same address Agent One pays: the Xtrata deployer (xtrata.btc).
   const engine = createEngine({ io, store: jobStore, agentFeeAddress: o.coll.largeOnDemandFeeAddress || o.reg.core.contract.split('.')[0] });
   return {
     engine,

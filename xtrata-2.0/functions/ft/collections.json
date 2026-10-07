@@ -29,6 +29,15 @@
       "manifestSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
       "manifestStatus": "final",
       "_note": "Helper deployed, seeded and finalised 6 Oct 2026 via the launch canary (2,500 records, manifest b1522c24…); production serves this exact manifest. 283 tokens are over 512 KB and are twinned by visitors through the large-file wizard."
+    },
+    "ordinal-pepe": {
+      "label": "Ordinal Pepe",
+      "source": "SP2ZY7ETKYAN1M7R4HWQ77Q4CVDVH8PVQ41XS0N0S.ordinal-pepe",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-ordinal-pepe",
+      "manifestPath": "/ft/data/ordinal-pepe.manifest.json",
+      "manifestSha256": "a6d742297081353aaaa64c536e7ea30587d7e341f12d5b491b38cd885b6e54a4",
+      "manifestStatus": "draft",
+      "_note": "Draft: helper not yet deployed. Flip to final only after the helper is seeded and finalised and production serves this exact manifest."
     }
   }
 }

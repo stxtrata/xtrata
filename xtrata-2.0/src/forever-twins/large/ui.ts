@@ -59,7 +59,7 @@ export function mountPanel(el: HTMLElement, ctx: PanelCtx) {
       <ol class="mute small">
         <li>A one-use wallet is made in your browser. You send it the quoted amount from your own wallet.</li>
         <li>This page uploads the art in about ${Math.ceil(size / 524288)} steps, seals it, and puts the twin into the helper’s custody.</li>
-        <li>The moment the twin is confirmed, 10% of everything you sent goes to Xtrata as the processing fee and all the change goes back to the address that paid, in the same block.</li>
+        <li>The moment the twin is confirmed, 5% of everything you sent goes to Xtrata as the processing fee and all the change goes back to the address that paid, in the same block.</li>
       </ol>
       <p class="mute small">Keep this tab open while it runs. If you close it, reopen this page on this device and it picks up where it left off; nothing is lost. The twin gives no claim on the original.</p>`;
   }
