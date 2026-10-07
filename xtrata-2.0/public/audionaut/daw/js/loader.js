@@ -10,6 +10,7 @@ import {
   audioHash,
   validateSoundMetadata,
 } from "./onboard-library.js";
+import { loadPackAudio } from "./pack-library.js";
 import { LANDMARKS } from "./song-format.js";
 import { fetchCatalogueAudio } from "./catalogue-retrieval.js";
 import { base64ToBytes } from "./audio-utils.js";
@@ -240,8 +241,10 @@ export async function fetchAndDecode(
     source.type === "synth"
       ? "synth:" +
         (SOUND_BY_KEY[source.value] ? onboardVariant(source).id : source.value)
-      : resolveSource(source) +
-        (source.audioSha256 ? "#" + source.audioSha256 : "");
+      : source.type === "pack"
+        ? "pack:" + source.value + (source.audioSha256 ? "#" + source.audioSha256 : "")
+        : resolveSource(source) +
+          (source.audioSha256 ? "#" + source.audioSha256 : "");
   if (cache.has(key)) {
     const value = cache.get(key);
     keep(key, value);
@@ -250,7 +253,9 @@ export async function fetchAndDecode(
   if (!signal && pending.has(key)) return pending.get(key);
   const request = (async () => {
     let result;
-    if (source.type === "synth" && SOUND_BY_KEY[source.value])
+    if (source.type === "pack")
+      result = await loadPackAudio(source, context, { signal });
+    else if (source.type === "synth" && SOUND_BY_KEY[source.value])
       result = await loadOnboardAudio(source, context, { signal });
     else if (source.type === "synth")
       result = {
@@ -325,7 +330,8 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
   channel.soundMetadata = result.soundMetadata || null;
   if (reset) {
     channel.gateSteps = result.soundMetadata?.loop ? 8 : 0;
-    channel.sampleMidi = result.soundMetadata?.rootMidi ?? null;
+    channel.sampleMidi =
+      result.rootMidi ?? result.soundMetadata?.rootMidi ?? null;
   }
   if (reset) {
     channel.trimStart = 0;

@@ -35,6 +35,7 @@ import {
 } from "./onboard-catalog.js";
 import { ONBOARD_MANIFEST } from "./onboard-manifest.js";
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
+import { packSoundRow, packSoundNotice } from "./pack-library.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
 import { record as recordHistory } from "./history.js";
@@ -733,7 +734,7 @@ function populateLibrarySamples() {
   cat.items.forEach((item, i) => {
     if (
       query &&
-      !`${item.label} ${SOUND_BY_KEY[item.id]?.tags.join(" ") || ""}`
+      !`${item.label} ${item.folder || ""} ${SOUND_BY_KEY[item.id]?.tags.join(" ") || ""}`
         .toLowerCase()
         .includes(query)
     )
@@ -753,6 +754,7 @@ function syncLibrarySelection() {
   libraryAuditionTicket++;
   engine.stopPreview();
   const sound = SOUND_BY_KEY[currentLibrarySelection()?.item.id];
+  updatePackInfo(currentLibrarySelection()?.item);
   $("#library-onboard").hidden = !sound;
   if (sound) {
     $("#library-root").replaceChildren(
@@ -810,6 +812,24 @@ function librarySource(item) {
       velocityLayer: +$("#library-velocity").value,
     }),
   };
+}
+// Licence, credit and root note for a FLAC pack sound. Attribution and the unverified
+// warning are shown every time, because the audio carries them but the UI should too.
+function updatePackInfo(item) {
+  const box = $("#library-pack-info");
+  if (!box) return;
+  box.hidden = item?.type !== "pack";
+  if (box.hidden) return;
+  try {
+    const row = packSoundRow(item.id);
+    $("#library-pack-meta").textContent =
+      `${row.rootMidi == null ? "Unpitched" : midiName(row.rootMidi)} · ${row.folder} · ${row.duration.toFixed(2)}s · mono 44.1 kHz FLAC (lossless)`;
+    $("#library-pack-licence").textContent = packSoundNotice(item.id);
+    box.classList.toggle("warn", row.pack.tier === "unverified");
+  } catch (e) {
+    $("#library-pack-meta").textContent = e.message;
+    $("#library-pack-licence").textContent = "";
+  }
 }
 function updateSoundInfo() {
   const sound = SOUND_BY_KEY[currentLibrarySelection()?.item.id];

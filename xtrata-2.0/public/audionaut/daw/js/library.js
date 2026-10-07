@@ -3,6 +3,7 @@
 
 import { ONBOARD_SOUNDS, FAMILY_LABELS } from "./onboard-catalog.js";
 import { SYNTH_KIT, SYNTH_KIT_PLUS } from "./synthdrums.js";
+import { PACKS, TIER_LABEL } from "./pack-library.js";
 
 export const SAMPLE_LIBRARY = [
   {
@@ -295,6 +296,17 @@ export const SAMPLE_LIBRARY = [
       id: s.key,
       label: s.label,
       type: "synth",
+    })),
+  })),
+  // FLAC sample packs: real recordings served as static web samples until they are inscribed.
+  ...PACKS.map((p) => ({
+    category: `Packs · ${p.title} (${p.sounds.length}) · ${TIER_LABEL[p.tier]}`,
+    pack: p.id,
+    items: p.sounds.map((s) => ({
+      id: `${p.id}/${s[0]}`,
+      label: s[1],
+      folder: s[3],
+      type: "pack",
     })),
   })),
 ];
