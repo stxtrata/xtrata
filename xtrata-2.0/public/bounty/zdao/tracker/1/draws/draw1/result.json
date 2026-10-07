@@ -1,0 +1,49 @@
+{
+ "draw": 1,
+ "dryRun": false,
+ "cutoff": "2026-10-07T22:59:59Z",
+ "csvSha256": "0e897ca200b5ea315f0b6cca8907ba40d81e298ab205791e9b4e321c4486121b",
+ "seed": {
+  "height": 970404,
+  "hash": "0x0000000000000000000141e6be4189208cd48e16c8d4e7c59ac5a2a6bb47c269",
+  "time": "2026-10-07T23:17:27.000Z",
+  "stacksHeight": 9142879
+ },
+ "picks": [
+  {
+   "place": "Winner 1",
+   "wallet": "SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY",
+   "tickets": 5,
+   "chance": 3.8,
+   "handle": "no handle linked"
+  },
+  {
+   "place": "Winner 2",
+   "wallet": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+   "tickets": 27,
+   "chance": 21.1,
+   "handle": "no handle linked"
+  },
+  {
+   "place": "Winner 3",
+   "wallet": "SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP",
+   "tickets": 5,
+   "chance": 5,
+   "handle": "no handle linked"
+  },
+  {
+   "place": "Reserve 1",
+   "wallet": "SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ",
+   "tickets": 20,
+   "chance": 20.8,
+   "handle": "@moofv_ (self-linked)"
+  },
+  {
+   "place": "Reserve 2",
+   "wallet": "SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q",
+   "tickets": 5,
+   "chance": 6.6,
+   "handle": "no handle linked"
+  }
+ ]
+}

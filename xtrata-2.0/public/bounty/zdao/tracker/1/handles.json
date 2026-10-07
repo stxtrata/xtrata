@@ -2,5 +2,15 @@
   "handles": {
     "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7": "@jimdotbtc"
   },
-  "winners": {}
+  "winners": {
+    "SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY": {
+      "draw": 1
+    },
+    "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9": {
+      "draw": 1
+    },
+    "SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP": {
+      "draw": 1
+    }
+  }
 }

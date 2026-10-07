@@ -2,6 +2,11 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: Draw 1 result published (2026-10-08)
+- `public/bounty/zdao/tracker/1/draws/draw1/` holds the official Draw 1 files: `frozen.csv` (wallet,tickets, 19 wallets / 133 tickets, SHA-256 `0e897ca2...121b`), `meta.json` (seed = Bitcoin block 970404 `0x00000000000000000001...c269`, mined 2026-10-08 00:17 BST; exclusions; weights) and `result.json` (3 winners, 2 reserves). The Live draw section compares its own result with `result.json` and shows "Matches the official result".
+- `handles.json`: the three Draw 1 winners are recorded under `winners` so they show as Winner on the leaderboard.
+- **Verified:** the page (in a headless browser against the live site) and `freeze.mjs`/`draw.mjs` produced the same list hash and the same 3 winners and 2 reserves.
+
 ## Bounty tracker: Live draw, Audionaut 5, chess 2, team wallets excluded (2026-10-07)
 - `public/bounty/zdao/tracker/1/index.html`: new **Live draw** section under the stats. Before a cut-off it shows a countdown and the wallets and tickets currently in line. After the Draw 1 cut-off (23:59:59 BST) it waits for the first Bitcoin block mined after it (the ledger dates every transaction by its Bitcoin block, so the pool is only final then), uses that block's hash as the seed, re-reads the chain, freezes the ticket list (wallet,tickets sorted by wallet, SHA-256 shown) and draws 3 winners and 2 reserves with a step-by-step reveal. Pick k is SHA-256 of `seed|drawN|pickK` modulo the remaining tickets, winners removed one at a time, so every visitor's browser gets the same result. It offers a CSV download of the frozen list, a "Verify this draw yourself" panel and a replay, and compares with `/bounty/zdao/tracker/1/draws/drawN/result.json` if the team publishes one ("Matches the official result"). Draws 2 and 3 only show a countdown, then the published result. Only Draw 1 is computed in the page for now.
 - Ticket rules: an Audionaut is worth 5 tickets (once per wallet) and On-Chain Chess 2 (`KINDS[].w`); the two Xtrata team wallets (`TEAM`) show on the board as "Team" and are left out of every count and draw. Copy on the page matches (ways to earn, example, draws text).
