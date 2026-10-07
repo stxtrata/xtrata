@@ -5896,32 +5896,59 @@
     // (/runtime/content), so a 5 MB / 350-chunk inscription arrives in seconds
     // instead of the browser reading every chunk from the chain. Size-checked;
     // returns null on any problem so callers fall back to on-chain reads.
-    const fetchRuntimeContentBytes = async (token) => {
-      try {
-        const url = getTokenRuntimeContentUrl(token);
-        const expected = Number(token.meta?.totalSize ?? 0n);
-        if (!url || !(expected > 0)) return null;
-        const began = performance.now();
-        perfMark('runtime-fetch:start', { url });
-        const response = await fetch(url, { credentials: 'omit' });
-        perfMark('runtime-fetch:headers', {
-          status: response.status,
-          cache: response.headers.get('cf-cache-status'),
-          ms: Math.round(performance.now() - began)
-        });
-        if (!response.ok) return null;
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        perfMark('runtime-fetch:done', {
-          bytes: bytes.length,
-          expected,
-          match: bytes.length === expected,
-          ms: Math.round(performance.now() - began)
-        });
-        return bytes.length === expected ? bytes : null;
-      } catch (error) {
-        perfMark('runtime-fetch:error', { error: String(error?.message ?? error) });
-        return null;
-      }
+    // The server prepends a <base href> to HTML (a few bytes), so the raw length
+    // is slightly larger than the on-chain size. We remove exactly that tag and
+    // then require the byte count to equal the on-chain size; otherwise null.
+    const stripServerBaseTag = (bytes, expected) => {
+      if (bytes.length === expected) return bytes;
+      const extra = bytes.length - expected;
+      if (extra <= 0 || extra > 2048) return null;
+      const head = new TextDecoder('latin1').decode(bytes.subarray(0, 4096));
+      const match = /<base href="[^"]*">/i.exec(head);
+      if (!match || match[0].length !== extra) return null;
+      const out = new Uint8Array(expected);
+      out.set(bytes.subarray(0, match.index), 0);
+      out.set(bytes.subarray(match.index + extra), match.index);
+      return out;
+    };
+
+    const runtimeFetchInflight = new Map();
+    const fetchRuntimeContentBytes = (token) => {
+      const key = `${getTokenCacheContractId(token)}:${token.id}`;
+      const existing = runtimeFetchInflight.get(key);
+      if (existing) return existing;
+      const promise = (async () => {
+        try {
+          const url = getTokenRuntimeContentUrl(token);
+          const expected = Number(token.meta?.totalSize ?? 0n);
+          if (!url || !(expected > 0)) return null;
+          const began = performance.now();
+          perfMark('runtime-fetch:start', { url });
+          const response = await fetch(url, { credentials: 'omit' });
+          perfMark('runtime-fetch:headers', {
+            status: response.status,
+            cache: response.headers.get('x-xtrata-runtime-cache'),
+            ms: Math.round(performance.now() - began)
+          });
+          if (!response.ok) return null;
+          const raw = new Uint8Array(await response.arrayBuffer());
+          const bytes = stripServerBaseTag(raw, expected);
+          perfMark('runtime-fetch:done', {
+            bytes: raw.length,
+            expected,
+            match: !!bytes,
+            ms: Math.round(performance.now() - began)
+          });
+          return bytes;
+        } catch (error) {
+          perfMark('runtime-fetch:error', { error: String(error?.message ?? error) });
+          return null;
+        } finally {
+          runtimeFetchInflight.delete(key);
+        }
+      })();
+      runtimeFetchInflight.set(key, promise);
+      return promise;
     };
 
     const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {

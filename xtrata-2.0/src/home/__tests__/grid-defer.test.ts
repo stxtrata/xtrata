@@ -27,7 +27,8 @@ describe('selected preview uses the server-assembled content first', () => {
   it('tries /runtime/content before reading chunks from chain', () => {
     expect(main).toContain('const fetchRuntimeContentBytes');
     expect(main).toMatch(/\(await fetchRuntimeContentBytes\(token\)\) \?\? await fetchOnChainContent/);
-    expect(main).toContain('bytes.length === expected');
+    expect(main).toContain('stripServerBaseTag');
+    expect(main).toContain('runtimeFetchInflight');
   });
 });
 
