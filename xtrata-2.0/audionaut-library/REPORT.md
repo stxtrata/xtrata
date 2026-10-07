@@ -15,7 +15,7 @@ STX uses the plan's own rate (0.978 STX per MB) plus about 0.1 STX begin fee per
 ## Per pack
 | Pack | Tier | Sounds | WAV MB | Pack MB | % | Chunks |
 |---|---|---|---|---|---|---|
-| realkit | core | 213 | 17.54 | 7.91 | 45.1% | 484 |
+| analogkit | core | 213 | 17.54 | 7.91 | 45.1% | 484 |
 | bass | core | 113 | 10.92 | 3.35 | 30.7% | 205 |
 | plucks | core | 130 | 12.10 | 4.48 | 37.0% | 274 |
 | strings | core | 110 | 13.13 | 6.51 | 49.6% | 398 |
@@ -63,9 +63,10 @@ ffmpeg 6.1.1-3ubuntu5, `-compression_level 12 -exact_rice_parameters 1 -flags +b
 - Approve the new hashes.
 
 ## Things to know
+- **Analog Kit (renamed 7 Oct 2026).** The pack formerly called the Real Kit is now the Analog Kit: pack id `analogkit` (was `realkit`), file `analogkit.audpack`, sound ids and keys `analogkit-...` / `onboard:v2:analogkit-...`, category and tag `analogkit`, labels and filenames "Analog Kit — ...". Audio, `pcmSha256` and every sound's stored-byte `sha256` are unchanged (the FLAC tags never contained the old name); only the container index changed, so the pack's container sha256 is new. `packs/analogkit.renamed-from-realkit.json` maps every old sound id and key to the new one so saved songs can be migrated. The old WAV files in the listening pages still carry "Real Kit" in their own INFO text; they are the approved originals and were left untouched.
 - Overall 40.3% of WAV, not the 35% projected from the 96-sound test: the real packs have more sustained instruments (strings 50%, winds 58%, saxophones 57%) and per-sound headers add about 2%.
 - Classic Machines (51.5%) did not compress better than the rest: it is many short sounds, so the header share is larger, and normalisation to PCM16 removes low-bit-depth structure.
 - The legacy WAV SHA-256 is kept as `wavSha256`. The new identity of a sound is `pcmSha256` (stable, because FLAC decoding is exact); the transport check is `sha256` of the stored bytes. The old WAV bytes are not reproduced byte-for-byte.
-- Pack parts: with FLAC every pack is far below the 32 MB limit, so each family is one inscription (the Real Kit is one pack, not three).
+- Pack parts: with FLAC every pack is far below the 32 MB limit, so each family is one inscription (the Analog Kit is one pack, not three).
 - Opus decoder licence: upstream ships no LICENSE file; MIT comes from package.json and README. libopus BSD-3 text is verbatim from xiph/opus.
 - Not done: nothing is inscribed or broadcast; no browser test (Node only), including whether the xtrata.xyz page allows WebAssembly; nothing auditioned (lossless, so the sound is unchanged).

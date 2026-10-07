@@ -1,0 +1,15 @@
+{
+ "pack": "analogkit",
+ "tier": "core",
+ "count": 213,
+ "container": {
+  "file": "analogkit.audpack",
+  "bytes": 7913572,
+  "sha256": "4495b63f43aa1df6df1b693a073b95a7fe85a431535211679ec0eb725d366a0f",
+  "chunks16384": 484,
+  "indexBytes": 342962,
+  "indexGzipBytes": 49842,
+  "payloadBytes": 7863718
+ },
+ "wavBytes": 17539028
+}
