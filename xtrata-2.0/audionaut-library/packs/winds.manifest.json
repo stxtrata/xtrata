@@ -1,0 +1,15 @@
+{
+ "pack": "winds",
+ "tier": "core",
+ "count": 95,
+ "container": {
+  "file": "winds.audpack",
+  "bytes": 6362281,
+  "sha256": "2fe73dc6a1218e2f7b0d502adc06389406e486c870ddf64389b89b820e351f06",
+  "chunks16384": 389,
+  "indexBytes": 152530,
+  "indexGzipBytes": 22649,
+  "payloadBytes": 6339620
+ },
+ "wavBytes": 10984786
+}

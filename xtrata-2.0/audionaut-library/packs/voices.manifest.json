@@ -1,0 +1,15 @@
+{
+ "pack": "voices",
+ "tier": "attribution",
+ "count": 48,
+ "container": {
+  "file": "voices.audpack",
+  "bytes": 5759641,
+  "sha256": "2708d4ec020b44d3cfe0ebb341f86ec1c95457aa0082c8ef67d5f63429b0b62c",
+  "chunks16384": 352,
+  "indexBytes": 87296,
+  "indexGzipBytes": 17288,
+  "payloadBytes": 5742341
+ },
+ "wavBytes": 11011836
+}

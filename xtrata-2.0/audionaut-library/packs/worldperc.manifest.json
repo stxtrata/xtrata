@@ -1,0 +1,15 @@
+{
+ "pack": "worldperc",
+ "tier": "core",
+ "count": 208,
+ "container": {
+  "file": "worldperc.audpack",
+  "bytes": 5864477,
+  "sha256": "0ccf0c9c13404f0f2b89ea098704196136c2d6ada55457ea86ffbc8771598cc3",
+  "chunks16384": 358,
+  "indexBytes": 328151,
+  "indexGzipBytes": 45535,
+  "payloadBytes": 5818930
+ },
+ "wavBytes": 13766230
+}
