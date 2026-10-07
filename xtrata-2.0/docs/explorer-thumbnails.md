@@ -99,3 +99,23 @@ each run takes up to N tokens that are in `inscription_index` but have no `inscr
 thumbnail, writes R2 and D1, and records `failed` with a retry time. Pages Functions cannot run cron, which is why it
 is a Worker. Open decision: resize with the Cloudflare Images binding inside the Worker, or keep running these scripts
 from a machine on a schedule.
+
+### Animated pictures (migration 022)
+
+A still thumbnail would freeze a GIF, an animated WebP or an APNG. So `inscription_thumbnails.animated`
+(NULL = not checked, 0 = still, 1 = animated) decides whether the grid may use a picture's thumbnail:
+
+- `/index/page` only returns a `thumb` version for a picture file when `animated = 0`. Animated and unchecked
+  pictures return no version, so the grid keeps loading the original and it keeps playing.
+- Songs and other non-picture tokens are not affected: they use their cover whatever the flag says.
+- `backfill-all-thumbnails.mjs` sets the flag for every new thumbnail (GIF/WebP frame count, APNG `acTL` chunk).
+- Thumbnails made before the flag existed are checked with
+  `node scripts/backfill-all-thumbnails.mjs --recheck-animated` (downloads each original to inspect it, uploads nothing).
+
+Order for rolling this out: apply migration 022, deploy, then run `--recheck-animated`. Deploying before the
+migration is safe (the endpoint falls back to the old query); running either script before it is not.
+
+```
+npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/022_thumbnail_animated.sql
+node scripts/backfill-all-thumbnails.mjs --recheck-animated --concurrency 5
+```

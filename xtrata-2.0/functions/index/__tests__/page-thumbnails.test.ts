@@ -66,3 +66,55 @@ describe('/index/page thumbnail fields', () => {
     expect(body.tokens.every((t) => t.thumb === null)).toBe(true);
   });
 });
+
+describe('/index/page thumbnails for picture files', () => {
+  const picture = (id: number) => ({ ...indexRow(id), mime: 'image/png' });
+  const envWith = (thumbRows: unknown[], failAnimatedColumn = false) => ({
+    DB: {
+      prepare: vi.fn((query: string) => {
+        const all = vi.fn(async () => {
+          if (query.includes('FROM inscription_thumbnails')) {
+            if (failAnimatedColumn && query.includes('animated')) throw new Error('no such column: animated');
+            return { results: thumbRows };
+          }
+          if (query.includes('FROM inscription_index_state')) return { results: [] };
+          return { results: [picture(1), picture(2), picture(3)] };
+        });
+        return { all, bind: vi.fn(() => ({ all })) };
+      })
+    }
+  });
+  const rows = [
+    { contract_id: CONTRACT, token_id: 1, status: 'ready', etag: 'aaaaaaaaaaaaaaaa', title: '', artist: '', animated: 0 },
+    { contract_id: CONTRACT, token_id: 2, status: 'ready', etag: 'bbbbbbbbbbbbbbbb', title: '', artist: '', animated: 1 },
+    { contract_id: CONTRACT, token_id: 3, status: 'ready', etag: 'cccccccccccccccc', title: '', artist: '', animated: null }
+  ];
+
+  it('offers a picture file its thumbnail only when it is known to be still', async () => {
+    const body = await get(envWith(rows));
+    const byId = new Map(body.tokens.map((t) => [t.id, t]));
+    expect(byId.get(1)?.thumb).toBe('aaaaaaaaaaaaaaaa');
+    expect(byId.get(2)?.thumb).toBeNull(); // animated keeps playing
+    expect(byId.get(3)?.thumb).toBeNull(); // not checked yet
+  });
+
+  it('still serves song covers before migration 022 is applied', async () => {
+    const songRows = [{ contract_id: CONTRACT, token_id: 1, status: 'ready', etag: 'dddddddddddddddd', title: 'T', artist: 'A' }];
+    const env = envWith(songRows, true);
+    // Make token 1 a song rather than a picture.
+    (env.DB.prepare as any).mockImplementation((query: string) => {
+      const all = vi.fn(async () => {
+        if (query.includes('FROM inscription_thumbnails')) {
+          if (query.includes('animated')) throw new Error('no such column: animated');
+          return { results: songRows };
+        }
+        if (query.includes('FROM inscription_index_state')) return { results: [] };
+        return { results: [indexRow(1)] };
+      });
+      return { all, bind: vi.fn(() => ({ all })) };
+    });
+    const body = await get(env);
+    expect(body.tokens[0]).toMatchObject({ thumb: 'dddddddddddddddd', title: 'T', artist: 'A' });
+  });
+});
+

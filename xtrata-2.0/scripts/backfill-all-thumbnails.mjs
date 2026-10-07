@@ -69,6 +69,34 @@ export const isSafeSvg = (text) => {
 };
 
 /**
+ * True when a PNG is an animated PNG. The animation control chunk (acTL) always
+ * comes before the first image data chunk, so only the start of the file is read.
+ */
+export const isAnimatedPng = (bytes) => {
+  const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (data.length < 12 || signature.some((value, i) => data[i] !== value)) return false;
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let offset = 8;
+  while (offset + 8 <= data.length) {
+    const length = view.getUint32(offset);
+    const type = String.fromCharCode(data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]);
+    if (type === 'acTL') return true;
+    if (type === 'IDAT' || type === 'IEND') return false;
+    offset += 12 + length;
+  }
+  return false;
+};
+
+/** True when a picture has more than one frame (GIF, animated WebP, APNG, animated AVIF). */
+export const detectAnimated = async (input, sharp) => {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (isAnimatedPng(bytes)) return true;
+  const meta = await sharp(bytes, { limitInputPixels: 80_000_000, pages: -1 }).metadata();
+  return (meta.pages ?? 1) > 1;
+};
+
+/**
  * Picture in, small WebP out. Fits inside 256x256 without cropping or stretching.
  * Anything that already fits is kept at its own size and encoded losslessly with
  * nearest-neighbour scaling, so pixel art stays pixel art. Re-encoding also drops
@@ -77,6 +105,7 @@ export const isSafeSvg = (text) => {
 export const makeImageThumbnail = async (input, sharp, { svg = false } = {}) => {
   const options = { limitInputPixels: 80_000_000, failOn: 'error', pages: 1 };
   if (svg) options.density = 144;
+  const animated = svg ? null : await detectAnimated(input, sharp);
   const meta = await sharp(input, options).metadata();
   const small = (meta.width ?? 0) <= THUMBNAIL_SIZE && (meta.height ?? 0) <= THUMBNAIL_SIZE && !svg;
   const result = await sharp(input, options)
@@ -94,6 +123,7 @@ export const makeImageThumbnail = async (input, sharp, { svg = false } = {}) => 
     bytes: result.data,
     width: result.info.width,
     height: result.info.height,
+    animated,
     etag: createHash('sha256').update(result.data).digest('hex').slice(0, 16)
   };
 };
@@ -168,6 +198,31 @@ export const formatCoverage = (summary) => {
 
 const CONTRACT_FILTER = /^S[A-Z0-9]{30,50}\.[A-Za-z][A-Za-z0-9_-]{0,127}$/;
 
+/** Ready picture thumbnails whose original has not been checked for animation yet. */
+export const buildUncheckedSql = ({ contract = null } = {}) => {
+  const where = ["t.status = 'ready'", 't.animated IS NULL', "i.mime LIKE 'image/%'", "i.mime NOT LIKE 'image/svg%'"];
+  if (contract) {
+    if (!CONTRACT_FILTER.test(contract)) throw new Error(`Invalid contract id: ${contract}`);
+    where.push(`i.contract = ${sqlString(contract)}`);
+  }
+  return (
+    'SELECT i.contract AS contract, i.token_id AS token_id, i.mime AS mime, i.total_size AS total_size ' +
+    'FROM inscription_thumbnails t JOIN inscription_index i ' +
+    'ON t.contract_id = i.contract AND t.token_id = i.token_id ' +
+    `WHERE ${where.join(' AND ')} ORDER BY i.contract, i.token_id`
+  );
+};
+
+export const buildAnimatedUpdateSql = ({ contractId, tokenId, animated }) => {
+  if (!CONTRACT_FILTER.test(contractId)) throw new Error(`Invalid contract id: ${contractId}`);
+  if (!Number.isSafeInteger(tokenId) || tokenId < 0) throw new Error(`Invalid token id: ${tokenId}`);
+  if (animated !== 0 && animated !== 1) throw new Error(`Invalid animated flag: ${animated}`);
+  return (
+    `UPDATE inscription_thumbnails SET animated = ${animated} ` +
+    `WHERE contract_id = ${sqlString(contractId)} AND token_id = ${tokenId} AND status = 'ready';`
+  );
+};
+
 export const buildMissingSql = ({ contract = null, token = null, force = false } = {}) => {
   const where = [];
   if (!force) where.push("(t.status IS NULL OR t.status = 'failed')");
@@ -191,6 +246,7 @@ export const buildMissingSql = ({ contract = null, token = null, force = false }
 export const parseArgs = (argv) => {
   const options = {
     plan: false,
+    recheckAnimated: false,
     dryRun: false,
     force: false,
     limit: Infinity,
@@ -211,6 +267,7 @@ export const parseArgs = (argv) => {
       return argv[i];
     };
     if (arg === '--plan') options.plan = true;
+    else if (arg === '--recheck-animated') options.recheckAnimated = true;
     else if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--force') options.force = true;
     else if (arg === '--limit') options.limit = Number(next());
@@ -264,6 +321,63 @@ const loadSharp = async () => {
   }
 };
 
+/**
+ * Looks at the original of every stored picture thumbnail that has not been
+ * checked for animation, and records the answer. Nothing is uploaded: only the
+ * `animated` column changes. Until a picture is checked the grid keeps loading
+ * the original, so this is what lets still pictures start using their thumbnail.
+ */
+const recheckAnimated = async (options, sharp) => {
+  const tmp = mkdtempSync(join(tmpdir(), 'xtrata-thumbs-check-'));
+  try {
+    let todo = await d1Rows(options.db, buildUncheckedSql(options));
+    if (options.limit !== Infinity) todo = todo.slice(0, options.limit);
+    console.log(`\n${todo.length} pictures to check for animation` + (options.dryRun ? ' (dry run: nothing will be saved)' : ''));
+    const statements = [];
+    const totals = { still: 0, animated: 0, failed: 0 };
+    const flush = async () => {
+      if (options.dryRun || statements.length === 0) return;
+      const file = join(tmp, `rows-${Date.now()}.sql`);
+      writeFileSync(file, `${statements.join('\n')}\n`);
+      statements.length = 0;
+      await wrangler(['d1', 'execute', options.db, '--remote', '--file', file]);
+    };
+    const handle = async (row) => {
+      const tokenId = Number(row.token_id);
+      const label = `${row.contract.split('.').pop()} #${tokenId}`;
+      try {
+        if (Number(row.total_size) > options.maxBytes) {
+          console.log(`  ${label}: skipped, over --max-bytes`);
+          return;
+        }
+        const bytes = await fetchContent(options.origin, row.contract, tokenId, options.maxBytes);
+        const animated = await detectAnimated(bytes, sharp);
+        statements.push(buildAnimatedUpdateSql({ contractId: row.contract, tokenId, animated: animated ? 1 : 0 }));
+        animated ? (totals.animated += 1) : (totals.still += 1);
+        if (animated) console.log(`  ${label}: animated`);
+      } catch (error) {
+        totals.failed += 1;
+        console.warn(`  ${label}: FAILED (${error instanceof Error ? error.message : error})`);
+      }
+      if (statements.length >= 50) await flush();
+    };
+    const queue = [...todo];
+    try {
+      await Promise.all(
+        Array.from({ length: Math.min(options.concurrency, queue.length || 1) }, async () => {
+          while (queue.length > 0) await handle(queue.shift());
+        })
+      );
+    } finally {
+      await flush();
+    }
+    console.log(`Done. ${totals.still} still, ${totals.animated} animated, ${totals.failed} failed (failed ones stay unchecked and are retried next run)`);
+    if (totals.failed > 0) process.exitCode = 1;
+  } finally {
+    rmSync(tmp, { recursive: true, force: true });
+  }
+};
+
 const main = async () => {
   const options = parseArgs(process.argv.slice(2));
 
@@ -282,6 +396,10 @@ const main = async () => {
   }
 
   const sharp = await loadSharp();
+  if (options.recheckAnimated) {
+    await recheckAnimated(options, sharp);
+    return;
+  }
   const tmp = mkdtempSync(join(tmpdir(), 'xtrata-thumbs-all-'));
   try {
     let todo = (await d1Rows(options.db, buildMissingSql(options))).filter((row) =>
@@ -337,13 +455,17 @@ const main = async () => {
               width: thumb.width,
               height: thumb.height,
               bytes: thumb.bytes.length,
-              source: 'render'
+              source: 'render',
+              animated: thumb.animated === null ? null : thumb.animated ? 1 : 0
             })
           );
         }
         totals.ready += 1;
         totals.bytes += thumb.bytes.length;
-        console.log(`  ${label}: ${thumb.width}x${thumb.height}, ${(thumb.bytes.length / 1024).toFixed(1)} KB`);
+        console.log(
+          `  ${label}: ${thumb.width}x${thumb.height}, ${(thumb.bytes.length / 1024).toFixed(1)} KB` +
+            (thumb.animated ? ' (animated: the grid keeps playing the original)' : '')
+        );
       } catch (error) {
         totals.failed += 1;
         console.warn(`  ${label}: FAILED (${error instanceof Error ? error.message : error})`);

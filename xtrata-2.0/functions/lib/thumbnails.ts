@@ -65,6 +65,25 @@ export type ThumbnailInfo = {
   version: string | null;
   title: string;
   artist: string;
+  /** 1 = the original is animated, 0 = still, null = not checked. */
+  animated: number | null;
+};
+
+/**
+ * The thumbnail version the grid may use for a token. A picture file is only
+ * replaced by its still thumbnail once it is known to be still: an animated or
+ * unchecked picture gets no version, so it keeps loading (and playing) as before.
+ * Everything else (a song's cover, for example) always gets its version.
+ */
+export const thumbnailVersionFor = (
+  info: ThumbnailInfo | undefined,
+  mime: string | null | undefined
+): string | null => {
+  if (!info?.version) return null;
+  if (info.animated === 1) return null;
+  const isPicture = typeof mime === 'string' && mime.toLowerCase().startsWith('image/');
+  if (isPicture && info.animated !== 0) return null;
+  return info.version;
 };
 
 /**
@@ -79,16 +98,25 @@ export const loadThumbnailInfo = async (
 ): Promise<Map<string, ThumbnailInfo>> => {
   const out = new Map<string, ThumbnailInfo>();
   if (contracts.length === 0 || ids.length === 0) return out;
-  try {
-    const result = await queryAll(
+  const select = (withAnimated: boolean) =>
+    queryAll(
       env,
-      `SELECT contract_id, token_id, status, etag, title, artist
+      `SELECT contract_id, token_id, status, etag, title, artist${withAnimated ? ', animated' : ''}
          FROM inscription_thumbnails
         WHERE contract_id IN (${contracts.map(() => '?').join(',')})
           AND token_id IN (${ids.map(() => '?').join(',')})
           AND status IN ('ready', 'none')`,
       [...contracts, ...ids]
     );
+  try {
+    let result;
+    try {
+      result = await select(true);
+    } catch {
+      // Migration 022 (the animated column) is not applied yet: songs keep their
+      // covers, and picture files simply stay on their normal path.
+      result = await select(false);
+    }
     for (const row of (result.results ?? []) as Array<{
       contract_id: string;
       token_id: number;
@@ -96,11 +124,13 @@ export const loadThumbnailInfo = async (
       etag: string | null;
       title: string | null;
       artist: string | null;
+      animated?: number | null;
     }>) {
       out.set(`${row.contract_id}:${row.token_id}`, {
         version: row.status === 'ready' && isThumbnailVersion(row.etag) ? row.etag : null,
         title: cleanThumbnailText(row.title),
-        artist: cleanThumbnailText(row.artist)
+        artist: cleanThumbnailText(row.artist),
+        animated: row.animated === 0 || row.animated === 1 ? row.animated : null
       });
     }
   } catch {

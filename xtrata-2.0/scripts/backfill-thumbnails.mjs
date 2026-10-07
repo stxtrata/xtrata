@@ -76,12 +76,14 @@ export const buildUpsertSql = ({
   title = '',
   artist = '',
   source = 'cover',
+  animated = null,
   now = Date.now()
 }) => {
   if (!CONTRACT_PATTERN.test(contractId)) throw new Error(`Invalid contract id: ${contractId}`);
   if (!Number.isSafeInteger(tokenId) || tokenId < 0) throw new Error(`Invalid token id: ${tokenId}`);
   if (!['ready', 'none', 'failed'].includes(status)) throw new Error(`Invalid status: ${status}`);
   if (!['cover', 'render'].includes(source)) throw new Error(`Invalid source: ${source}`);
+  if (![null, 0, 1].includes(animated)) throw new Error(`Invalid animated flag: ${animated}`);
   if (status === 'ready' && (!key || !/^[0-9a-f]{16}$/.test(etag ?? ''))) {
     throw new Error('A ready thumbnail needs a key and an etag');
   }
@@ -97,18 +99,21 @@ export const buildUpsertSql = ({
     sqlString(cleanText(title)),
     sqlString(cleanText(artist)),
     sqlString(source),
+    animated === null ? 'NULL' : String(animated),
     sqlInt(now)
   ].join(', ');
   // A failure must never replace a thumbnail that is already stored.
   const guard = status === 'failed' ? " WHERE inscription_thumbnails.status <> 'ready'" : '';
   return (
     'INSERT INTO inscription_thumbnails ' +
-    '(contract_id, token_id, status, thumb_key, etag, width, height, bytes, title, artist, source, updated_at) ' +
+    '(contract_id, token_id, status, thumb_key, etag, width, height, bytes, title, artist, source, animated, updated_at) ' +
     `VALUES (${values}) ` +
     'ON CONFLICT(contract_id, token_id) DO UPDATE SET ' +
     'status = excluded.status, thumb_key = excluded.thumb_key, etag = excluded.etag, ' +
     'width = excluded.width, height = excluded.height, bytes = excluded.bytes, ' +
     'title = excluded.title, artist = excluded.artist, source = excluded.source, ' +
+    // A song cover re-run must not wipe what the picture check learned.
+    'animated = COALESCE(excluded.animated, inscription_thumbnails.animated), ' +
     `updated_at = excluded.updated_at${guard};`
   );
 };
