@@ -21,7 +21,9 @@ import readline from 'node:readline';
 import { execFileSync } from 'node:child_process';
 import { mnemonicToSeedSync } from '@scure/bip39';
 import { HDKey } from '@scure/bip32';
+import { readFileSync, existsSync } from 'node:fs';
 import { StacksMainnet } from '@stacks/network';
+import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
 import {
   AnchorMode, PostConditionMode, NonFungibleConditionCode, TransactionVersion,
   broadcastTransaction, getAddressFromPrivateKey, makeContractCall,
@@ -42,12 +44,23 @@ const SKIP_IDENTITY = !flag('--include-identity');
 const PATH = "m/44'/5757'/0'/0/0";
 const ADDR = /^SP[0-9A-Z]{38,40}$/;
 
+// Hiro API key: HIRO_API_KEY from the environment, else the HIRO_API_KEY line in xtrata-2.0/.env.local. Never printed.
+const loadApiKey = () => {
+  if (process.env.HIRO_API_KEY?.trim()) return process.env.HIRO_API_KEY.trim();
+  const f = new URL('../.env.local', import.meta.url);
+  if (existsSync(f)) {
+    const m = /^\s*HIRO_API_KEY\s*=\s*["']?([^"'\s#]+)/m.exec(readFileSync(f, 'utf8'));
+    if (m) return m[1];
+  }
+  return '';
+};
+const API_KEY = API.startsWith('https://api.hiro.so') ? loadApiKey() : ''; // the key is only ever sent to Hiro
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const getJson = async (path) => {
   const url = API + path;
-  if (USE_CURL) return JSON.parse(execFileSync('curl', ['-sS', '-m', '60', url], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
-  const r = await fetch(url);
+  if (USE_CURL) return JSON.parse(execFileSync('curl', ['-sS', '-m', '60', ...(API_KEY ? ['-H', `x-api-key: ${API_KEY}`] : []), url], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
+  const r = await fetch(url, API_KEY ? { headers: { 'x-api-key': API_KEY } } : undefined);
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.json();
 };
@@ -98,7 +111,7 @@ async function main() {
   if (from !== EXPECT) throw new Error(`this phrase controls ${from}, not ${EXPECT}. Stopping; nothing was signed.`);
   if (from === TO) throw new Error('--to is the same as the wallet');
 
-  console.log(`From : ${from}\nTo   : ${TO}\nMode : ${SEND ? 'SEND' : 'dry run (add --send to broadcast)'}\n`);
+  console.log(`From : ${from}\nTo   : ${TO}\nMode : ${SEND ? 'SEND' : 'dry run (add --send to broadcast)'}\nHiro API key: ${API_KEY ? 'loaded' : 'none (public rate limits apply)'}\n`);
   let items = await holdings(from);
   const identity = items.filter((t) => t.contract.includes('identity-registry'));
   if (SKIP_IDENTITY) items = items.filter((t) => !t.contract.includes('identity-registry'));
@@ -116,7 +129,7 @@ async function main() {
 
   const n = await getJson(`/extended/v1/address/${from}/nonces`);
   let nonce = BigInt(n.possible_next_nonce);
-  const network = new StacksMainnet({ url: API });
+  const network = new StacksMainnet({ url: API, ...(API_KEY ? { fetchFn: createFetchFn(createApiKeyMiddleware({ apiKey: API_KEY })) } : {}) });
   let ok = 0;
   for (const t of batch) {
     const [addr, name] = t.contract.split('.');
