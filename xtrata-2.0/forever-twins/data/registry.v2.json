@@ -235,6 +235,27 @@
       "helperSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f"
     },
     {
+      "key": "ordinal-pepe",
+      "name": "Ordinal Pepe",
+      "itemNoun": "Ordinal Pepe",
+      "community": null,
+      "status": "planned",
+      "interface": "v3",
+      "group": "G2",
+      "helper": null,
+      "source": "SP2ZY7ETKYAN1M7R4HWQ77Q4CVDVH8PVQ41XS0N0S.ordinal-pepe",
+      "sourceAsset": "ordinal-pepe",
+      "legacyPage": null,
+      "theme": {
+        "logo": null,
+        "accent": "#2f9e44"
+      },
+      "blurb": "Second complete Forever Twins collection: 100 of 100 files are small enough for a single transaction. Helper not yet deployed.",
+      "twinTokenUri": "https://xtrata.xyz/ft/ordinal-pepe/{id}.json",
+      "manifest": null,
+      "coverage": null
+    },
+    {
       "key": "see-yourself-out",
       "name": "See Yourself Out",
       "itemNoun": "See Yourself Out token",

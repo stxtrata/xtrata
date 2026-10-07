@@ -16,5 +16,11 @@
     "manifestSha": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
     "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "pinnedAt": "2026-10-06"
+  },
+  "ordinal-pepe": {
+    "helperSha": "d471c400483206176d41ec96c82e5d45bcb54c43db70118195ba7e84a4f6dc30",
+    "manifestSha": "a6d742297081353aaaa64c536e7ea30587d7e341f12d5b491b38cd885b6e54a4",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "pinnedAt": "2026-10-07"
   }
 }

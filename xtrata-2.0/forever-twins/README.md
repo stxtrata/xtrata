@@ -71,7 +71,9 @@ Mainnet-fork rehearsals (stxer) were run before each deployment, for example [Me
 
 ## Licence and third-party code
 
-No licence has been chosen yet. Until a `LICENSE` file is added, the code is published for reading and verification only. `contracts-reference/` and `ft-harness/screener/sources/` contain contract sources written by other teams, copied from the chain for testing; their rights stay with their authors.
+The Forever Twins code, templates, tests and documentation in this folder are released under the [MIT licence](LICENSE).
+
+The exceptions are contract sources written by other teams, copied from the chain for testing: `contracts-reference/`, `ft-harness/screener/sources/` and `ft-harness/contracts/legacy/`. They are not covered by this licence and their rights stay with their authors.
 
 ## Internal notes
 
