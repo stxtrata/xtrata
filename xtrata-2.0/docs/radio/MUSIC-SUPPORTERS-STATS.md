@@ -27,7 +27,8 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
    (`HIRO_API_KEY_1…`, `HIRO_API_KEYS`, `HIRO_API_KEY`, in that order, then a keyless attempt),
    rotating to the next key on 401, 403 or 429. Keyless requests from Cloudflare are often refused,
    so make sure at least one key is set for the Pages environment you are deploying.
-3. History fills in over the first few requests (up to 2,400 events per refresh). While it is
+3. History fills in over the first few requests (up to 1,000 events per refresh, so roughly a minute
+   for ~5,000 plays). While it is
    incomplete, `complete` is `false` and the page says it is still counting, so partial totals are
    never presented as final.
 
@@ -39,6 +40,11 @@ one endpoint so they cannot disagree, and both agree with the counts on `/music/
   still being copied; call again after 20 seconds.
 - `403`, `401` or `429`: Hiro refused the request. Check the Hiro key variables above.
 - `-1`: the request did not reach Hiro (network error or timeout).
+- `-2`: Hiro answered, but not with a contract log page (unexpected body).
+
+Hiro's v2 logs endpoint rejects offsets above 1000 (HTTP 400) and its v1 events endpoint reports no
+total, so old history is read through v1 and each v1 page is followed by a one-event v2 read to
+confirm no new play arrived while reading. Both endpoints cap `limit` at 50.
 
 The page treats "nothing counted yet" as warming up, or unavailable when `syncError` is set. It never
 shows it as zero.
