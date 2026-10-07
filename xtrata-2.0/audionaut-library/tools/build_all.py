@@ -18,7 +18,7 @@ import flactools as F
 S = os.environ.get("AUDIONAUT_SCRATCH", "/tmp/audionaut-scratch")
 OUT = os.environ.get("AUDIONAUT_OUT", f"{S}/flac_out")
 ONLY = {x for x in os.environ.get("AUDIONAUT_PACKS", "").split(",") if x}
-# 8 Oct 2026: the Real Kit was renamed Analog Kit. The listing-page data still says Real Kit, so names are rewritten here.
+# 7 Oct 2026: the Real Kit was renamed Analog Kit. The listing-page data still says Real Kit, so names are rewritten here.
 RENAMES = [("Real Kit", "Analog Kit"), ("realkit", "analogkit")]
 
 

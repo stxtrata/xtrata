@@ -1,5 +1,5 @@
 {
- "note": "The Real Kit was renamed Analog Kit on 8 Oct 2026. Audio and pcmSha256 are unchanged; names, ids, tags and the stored-byte sha256 changed.",
+ "note": "The Real Kit was renamed Analog Kit on 7 Oct 2026. Audio and pcmSha256 are unchanged; names, ids, tags and the stored-byte sha256 changed.",
  "pack": {
   "realkit": "analogkit"
  },
