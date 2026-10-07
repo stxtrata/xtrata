@@ -13,6 +13,7 @@
 // - The wallet needs a little STX for fees (default 0.003 STX per transfer). The dry run says how much.
 // - The Stacks mempool holds about 25 pending transactions per sender, so each --send run sends at most
 //   --max (default 20). Wait for them to confirm, then run it again; it works from what the wallet holds now.
+// - --only-identity moves just the AIBTC agent-identity NFT (use it with --to <new agent wallet>).
 // - AIBTC "agent-identity" NFTs are skipped unless you pass --include-identity (they link the wallet to its AIBTC registration).
 // - Every transfer carries a post-condition that the sender sends exactly that NFT.
 // - Add --curl if Node's fetch cannot reach the network on your machine.
@@ -40,7 +41,8 @@ const SEND = flag('--send');
 const USE_CURL = flag('--curl');
 const LIST_ONLY = arg('--list-only', null);
 const EXPECT = arg('--expect', null);
-const SKIP_IDENTITY = !flag('--include-identity');
+const ONLY_IDENTITY = flag('--only-identity');
+const SKIP_IDENTITY = !flag('--include-identity') && !ONLY_IDENTITY;
 const PATH = "m/44'/5757'/0'/0/0";
 const ADDR = /^SP[0-9A-Z]{38,40}$/;
 
@@ -115,6 +117,7 @@ async function main() {
   let items = await holdings(from);
   const identity = items.filter((t) => t.contract.includes('identity-registry'));
   if (SKIP_IDENTITY) items = items.filter((t) => !t.contract.includes('identity-registry'));
+  if (ONLY_IDENTITY) items = identity;
   console.log(`Holds ${items.length} NFTs to move${identity.length && SKIP_IDENTITY ? ` (${identity.length} AIBTC identity NFT left in place; --include-identity to move it)` : ''}:`);
   summarise(items);
 
