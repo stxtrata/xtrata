@@ -137,3 +137,28 @@ Estimated cost of the pre-inscription part (live core fee units: begin 0.1, seal
 - See Yourself Out, 12 files: about 6.6 STX in core fees over roughly 74 transactions.
 - Bitcoin Monkeys, ~310 files of ~0.3-1.4 MB: about 0.23-0.43 STX each, roughly 70-130 STX in
   core fees and 1,200+ transactions.
+
+## Legacy candidate: OG Boom contracts (researched 7 Oct 2026, M2 pool)
+
+Research only; nothing built or deployed. Full write-up in the Forever Twins - Degrants project doc
+`boom-helper-feasibility-2026-10-07.md`.
+
+| Source | Minted (Hiro, 7 Oct) | Group | Verdict |
+|---|---|---|---|
+| `SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boom-nfts` | 13,363 | G1-type, legacy interface | Safe with conditions: bespoke helper, finite snapshot scope |
+| `SP497E7RX3233ATBS2AB9G4WTHB63X5PBSP5VGAQ.boom-nfts-50` | 0 mint events | n/a | Skip; confirm empty with `last-token-id` |
+| `SP1K1A1PMGW2ZJCNF46NWZWHG8TS1D23EGH1KNK60.boom-nfts` | 74 | G1-type, legacy interface | Safe with conditions; cheapest M2 candidate; open-mint wrinkle |
+
+- Asset name `boom` in all three; no admin, approval, pause or market functions; `transfer`/`burn`
+  need the owner as `tx-sender` or `contract-caller`, so a token the helper holds can only be moved
+  by helper code.
+- Not SIP-009: `transfer` errors are a tuple (the template's `try!` on `SOURCE transfer` will not
+  type-check; use `match`), no `get-token-uri`, `last-token-id` naming. Needs a bespoke legacy
+  variant, one helper per source.
+- Minting is open: scope by explicit token-ID snapshot. The 74-token contract appears to have no
+  creator check in `mint-series`, so anyone can mint to any principal (including a helper): test
+  strays.
+- Manifest needs a Boom reader (`get-meta?` by id on contract 1; mint txs/events on contract 3,
+  which has no read by id). On-chain `hash` per token may authenticate recovered art (unchecked).
+- Source was read via a summarising fetch tool; byte-verify with `npm run screen` / `live-check`
+  before any build.
