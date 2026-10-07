@@ -13,6 +13,7 @@ import {
   validateHomepageContent
 } from './homepage-content.js';
 import { pickSwap as pickWallSwap, pickWall } from './wall-rotation.js';
+import { initMusicSupporters, stopMusicSupporters } from './music-supporters.js';
 
 const HOME_ACTION_EVENT = 'xtrata:homepage-action';
 const HOME_MOUNT_IDS = [
@@ -1088,8 +1089,10 @@ export const initHomepage = () => {
     // different SPA page is active prevents hidden third-party frames from
     // issuing requests and polluting that page's browser diagnostics.
     clearHomepage();
+    stopMusicSupporters();
     return;
   }
+  initMusicSupporters();
   renderStrip();
   renderWall();
   renderNowPlaying();
