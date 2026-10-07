@@ -2,7 +2,7 @@
 import {describe, it, expect} from 'vitest';
 import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
-import {handleMusicStats, readMusicStats, refreshMusicStats, MIN_REFRESH_MS, MAX_PAGES_PER_REFRESH, PAGE_SIZE} from '../../lib/music-stats';
+import {handleMusicStats, readMusicStats, refreshMusicStats, MIN_REFRESH_MS, MAX_PAGES_PER_REFRESH, PAGE_SIZE, FIRST_VISIT_PAGES} from '../../lib/music-stats';
 import {parsePaidPlayEvent} from '../../../public/radio/paid-play-event.mjs';
 import {aggregateHeroes} from '../../../public/radio/music-heroes.mjs';
 const {DatabaseSync} = createRequire(import.meta.url)('node:sqlite');
@@ -153,6 +153,67 @@ describe('Music supporter statistics', () => {
     expect(stats.plays).toBe(2);
     expect(stats.supporters).toBe(2);
     expect(stats.latest.find(p => p.payer === wallet(5))?.at).toBeNull();
+  });
+
+  describe('Hiro access', () => {
+    const log = Array.from({length: 30}, (_, i) => event(i + 1, 1 + (i % 4)));
+    const served = (init: any) => {
+      const results = log.slice().reverse().slice(0, 20);
+      return Response.json({total: log.length, limit: 20, offset: 0, results});
+    };
+    it('sends the configured keys the way the /hiro proxy does and rotates on a rejection', async () => {
+      const seen: Array<string | null> = [];
+      const transport = (async (url: any, init: any) => {
+        const key = new Headers(init.headers).get('x-api-key');
+        seen.push(key);
+        if (key === 'key-one') return new Response('{}', {status: 429});
+        const u = new URL(String(url));
+        const offset = Number(u.searchParams.get('offset')), limit = Number(u.searchParams.get('limit'));
+        return Response.json({total: log.length, results: log.slice().reverse().slice(offset, offset + limit)});
+      }) as unknown as typeof fetch;
+      const db = database();
+      const result = await refreshMusicStats({DB: db as any, HIRO_API_KEY_1: 'key-one', HIRO_API_KEY_2: 'key-two'}, transport, T0);
+      expect(result).toMatchObject({ok: true, cursor: 30});
+      expect(seen[0]).toBe('key-one');
+      expect(seen).toContain('key-two');
+      expect((await readMusicStats({DB: db as any})).plays).toBe(30);
+    });
+    it('falls back to a keyless request and accepts a single HIRO_API_KEY or a list', async () => {
+      const keys: Array<string | null> = [];
+      const transport = (async (_url: any, init: any) => { keys.push(new Headers(init.headers).get('x-api-key')); return served(init); }) as unknown as typeof fetch;
+      await refreshMusicStats({DB: database() as any, HIRO_API_KEY: 'solo'}, transport, T0);
+      expect(keys[0]).toBe('solo');
+      keys.length = 0;
+      await refreshMusicStats({DB: database() as any, HIRO_API_KEYS: 'a, b'}, transport, T0);
+      expect(keys[0]).toBe('a');
+      keys.length = 0;
+      await refreshMusicStats({DB: database() as any}, transport, T0);
+      expect(keys[0]).toBeNull();
+    });
+    it('reports why the chain could not be read instead of looking like zero plays', async () => {
+      const db = database();
+      const denied = (async () => new Response('{}', {status: 403})) as unknown as typeof fetch;
+      const failed = await refreshMusicStats({DB: db as any}, denied, T0);
+      expect(failed.ok).toBe(false);
+      const stats = await readMusicStats({DB: db as any});
+      expect(stats).toMatchObject({plays: 0, complete: false, syncError: 403});
+      const down = (async () => { throw Error('offline'); }) as unknown as typeof fetch;
+      await refreshMusicStats({DB: db as any}, down, T0 + MIN_REFRESH_MS);
+      expect((await readMusicStats({DB: db as any})).syncError).toBe(-1);
+      const healthy = hiro(log);
+      await refreshMusicStats({DB: db as any}, healthy.transport, T0 + 2 * MIN_REFRESH_MS);
+      expect(await readMusicStats({DB: db as any})).toMatchObject({plays: 30, complete: true, syncError: null});
+    });
+    it('keeps the first visitor waiting for only the first batch of history', async () => {
+      const big = Array.from({length: FIRST_VISIT_PAGES * PAGE_SIZE + 200}, (_, i) => event(i + 1, 1 + (i % 50)));
+      const db = database(), h = hiro(big);
+      const response = await handleMusicStats(new Request('https://xtrata.xyz/api/music-stats'), {DB: db as any}, h.transport, T0);
+      const body: any = await response.json();
+      expect(body.plays).toBe(FIRST_VISIT_PAGES * PAGE_SIZE);
+      expect(body.complete).toBe(false);
+      await refreshMusicStats({DB: db as any}, h.transport, T0 + MIN_REFRESH_MS);
+      expect(await readMusicStats({DB: db as any})).toMatchObject({plays: big.length, complete: true});
+    });
   });
 
   describe('HTTP handler', () => {

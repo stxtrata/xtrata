@@ -8021,6 +8021,7 @@
     }
     [data-state='loading'] .home-sup-dot,
     [data-state='checking'] .home-sup-dot,
+    [data-state='warming'] .home-sup-dot,
     [data-state='unavailable'] .home-sup-dot { background: var(--home-muted); animation: none; }
     [data-state='stale'] .home-sup-dot,
     [data-state='syncing'] .home-sup-dot { background: var(--home-amber); animation: none; }

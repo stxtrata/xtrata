@@ -111,6 +111,40 @@ describe('banner and hero', () => {
     expect(text('#musicBanner')).toContain('still counting');
   });
 
+  it('treats "nothing counted yet" as warming up, never as zero', async () => {
+    vi.stubGlobal('fetch', reply(payload({plays: 0, supporters: 0, microStx: 0, latest: [], complete: false, syncError: null})));
+    initMusicSupporters();
+    await settle();
+    expect(document.getElementById('musicSupporters')!.dataset.state).toBe('warming');
+    expect(document.getElementById('musicBanner')!.hidden).toBe(false);
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('…');
+    expect(text('#musicSupporters [data-sup="supporters"]')).toBe('…');
+    expect(text('#musicBanner')).not.toMatch(/\b0 paid plays/);
+    expect(text('#musicSupporters [data-sup="status"]')).toContain('first batch');
+  });
+
+  it('hides the banner when the server reports it cannot read the chain', async () => {
+    vi.stubGlobal('fetch', reply(payload({plays: 0, supporters: 0, microStx: 0, latest: [], complete: false, syncError: 403})));
+    initMusicSupporters();
+    await settle();
+    expect(document.getElementById('musicSupporters')!.dataset.state).toBe('unavailable');
+    expect(document.getElementById('musicBanner')!.hidden).toBe(true);
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('—');
+  });
+
+  it('keeps remembered totals when the server later reports nothing counted', async () => {
+    vi.stubGlobal('fetch', reply(payload()));
+    initMusicSupporters();
+    await settle();
+    stopMusicSupporters();
+    document.body.innerHTML = banner + hero;
+    vi.stubGlobal('fetch', reply(payload({plays: 0, supporters: 0, microStx: 0, latest: [], complete: false})));
+    initMusicSupporters();
+    await settle();
+    expect(document.getElementById('musicBanner')!.dataset.state).toBe('stale');
+    expect(text('#musicSupporters [data-sup="plays"]')).toBe('4,674');
+  });
+
   it('hides the banner and shows a dash, not zero, when the totals cannot be read', async () => {
     vi.stubGlobal('fetch', reply({error: 'x'}, 503));
     initMusicSupporters();
