@@ -245,7 +245,7 @@ tr:last-child td { border-bottom: 0; }
     <div>
       <div class="label lime fresh"><span class="dot"></span><span id="fresh">Reading the chain…</span><button class="ghost" id="refresh" type="button" style="margin-left:8px">Refresh</button></div>
       <h1 style="margin-top:12px">Check your tickets.</h1>
-      <p class="tag">One inscription gets you in. Everything else improves your odds.</p>
+      <p class="tag">One inscription or one Audionaut gets you in. Everything else improves your odds.</p>
       <p class="fast">Easiest ticket: <a href="#arcade-tip">get a Top 10 score in the Arcade</a>.</p>
     </div>
     <div class="big"><b id="bigN">0</b><span>tickets in the draw</span></div>
@@ -277,7 +277,7 @@ tr:last-child td { border-bottom: 0; }
     </div>
     <div class="steps">
       <div class="card"><div class="n">1</div><h3>Announce your wallet</h3><p>Post from X: "I'm entering #XtrataBounty with wallet SP…" and tag @XtrataLayers.</p></div>
-      <div class="card"><div class="n">2</div><h3>Make an inscription</h3><p>Inscribe something new through Xtrata with that wallet on or after 1 October. You can do it before or after your other tickets. It is ticket 1, and any tickets you have already earned switch on as soon as you do.</p></div>
+      <div class="card"><div class="n">2</div><h3>Make an inscription</h3><p>Inscribe something new through Xtrata with that wallet on or after 1 October. You can do it before or after your other tickets. It is ticket 1, and any tickets you have already earned switch on as soon as you do. Collecting an Audionaut does the same job and is worth 5 tickets.</p></div>
       <div class="card"><div class="n">3</div><h3>Keep using it</h3><p>Play, collect, post scores and trade from the same wallet. Each different action adds a ticket.</p></div>
       <div class="card"><div class="n">4</div><h3>Submit by 21 Oct</h3><p>Send your X handle, wallet and inscription IDs in the Xtrata Telegram.</p></div>
     </div>
@@ -306,7 +306,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="head">
       <div class="label teal">Ways to earn</div>
       <h2>Use Xtrata. Earn raffle tickets.</h2>
-      <p>Your inscription is your first ticket and puts you in the draw. Each other different action adds one more, so more actions mean better odds.</p>
+      <p>Your inscription is your first ticket and puts you in the draw. Collecting one or more Audionauts is worth 5 tickets and puts you in too. Each other different action adds one more, so more actions mean better odds.</p>
     </div>
     <div class="tip" id="arcade-tip">
       <div>
@@ -321,7 +321,7 @@ tr:last-child td { border-bottom: 0; }
       <div class="label teal">Example</div>
       <div>Inscribe a song and you are in the draw with 1 ticket. Play some tracks in the Lounge and post a high score and you have 3.</div>
       <div class="bar" aria-hidden="true"><i class="f"></i><i class="f2"></i><i class="f2"></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="label">3 of 8 tickets · in the draw from ticket 1</div>
+      <div class="label">3 of 8 ways to earn · in the draw from your first</div>
     </div>
   </section>
 
@@ -355,8 +355,8 @@ tr:last-child td { border-bottom: 0; }
     <div class="faq">
       <details><summary>I inscribed but I have no tickets</summary><p>Tickets only count for the wallet that made the inscription. Check that you inscribed through Xtrata on or after 1 October with the same wallet you are searching, then press Refresh. New actions appear a few minutes after they confirm on chain.</p></details>
       <details><summary>My wallet is not listed</summary><p>The board lists every wallet that has made an inscription, collected an Audionaut or used a ticket action since 1 October. If you have done none of these with that wallet yet, it will not appear. A wallet that has not inscribed has no tickets in the draw.</p></details>
-      <details><summary>Why are my tickets "held"?</summary><p>An inscription or an Audionaut is ticket 1 and it unlocks the rest. Until your wallet has one, other actions are counted but not entered. They switch on the moment you inscribe or collect.</p></details>
-      <details><summary>Do repeat actions add more tickets?</summary><p>Each different action adds one ticket, so playing ten songs is one ticket. Every high score you commit on-chain is its own ticket.</p></details>
+      <details><summary>Why are my tickets "held"?</summary><p>An inscription (1 ticket) or an Audionaut (5 tickets) puts you in the draw and unlocks the rest. Until your wallet has one, other actions are counted but not entered. They switch on the moment you inscribe or collect.</p></details>
+      <details><summary>Do repeat actions add more tickets?</summary><p>Each different action adds one ticket, so playing ten songs is one ticket. Collecting Audionauts is worth 5 tickets per wallet, however many you collect: one Audionaut or ten, it is 5. Every high score you commit on-chain is its own ticket.</p></details>
       <details><summary>I use more than one wallet</summary><p>Only one wallet per X account counts, and it must be the one you announced. Do everything with that wallet.</p></details>
       <details><summary>Where do winners get announced?</summary><p>Weekly raffle winners are announced in the Xtrata Telegram. Main prizes and special awards are announced on Wednesday 28 October.</p></details>
     </div>
@@ -389,10 +389,10 @@ tr:last-child td { border-bottom: 0; }
   }
 
   // ---- Ticket kinds. To add a new ticket, add a KINDS row, a ways row and a SOURCES row. ----
-  // per: 'one' = one ticket for the kind, 'each' = one ticket for every action.
+  // per: 'one' = a flat award for the kind however many actions (w tickets, default 1), 'each' = one ticket for every action.
   var KINDS = [
     { k: 'ins', name: 'Inscription', unit: 'inscription', per: 'one', hint: 'Inscribe something new through Xtrata' },
-    { k: 'aud', name: 'Audionaut', unit: 'Audionaut', per: 'one', hint: 'Collect an Audionaut' },
+    { k: 'aud', name: 'Audionaut', unit: 'Audionaut', per: 'one', w: 5, hint: 'Collect an Audionaut (5 tickets)' },
     { k: 'sc', name: 'High score on-chain', unit: 'score', per: 'each', hint: 'Commit a high score in Astro Blaster 3 or the Arcade' },
     { k: 'ch', name: 'On-Chain Chess', unit: 'game', per: 'one', hint: 'Play a game of On-Chain Chess' },
     { k: 'mu', name: 'Music plays', unit: 'play', per: 'one', hint: 'Play songs in the Xtrata Music app or Lounge' },
@@ -446,7 +446,7 @@ tr:last-child td { border-bottom: 0; }
   function listFromState(st) { return st ? Object.keys(st.addrs).map(function (k) { return { a: k, n: st.addrs[k].n }; }) : []; }
 
   // ---- Tickets ----
-  function earned(kind, n) { return n > 0 ? (kind.per === 'each' ? n : 1) : 0; }
+  function earned(kind, n) { return n > 0 ? (kind.per === 'each' ? n : (kind.w || 1)) : 0; }
   function calc(a) {
     var n = a.n || {}, valid = ((n.ins || 0) + (n.aud || 0)) > 0, total = 0;
     KINDS.forEach(function (x) { total += earned(x, n[x.k] || 0); });
@@ -482,7 +482,7 @@ tr:last-child td { border-bottom: 0; }
     { t: 'Play a game of On-Chain Chess', tag: '+1 ticket', href: 'https://xtrata.xyz/i/3072' },
     { t: 'Claim a sponsored drop (no STX needed)', tag: '+1 ticket', href: 'https://xtrata.xyz' },
     { t: 'Like a song on-chain', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
-    { t: 'Collect an Audionaut', tag: '+1 ticket · also puts you in the draw', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
+    { t: 'Collect an Audionaut', tag: '+5 tickets · also puts you in the draw', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
     { t: 'Commit a high score on-chain in Astro Blaster 3 (#3075)', tag: '+1 ticket per score', href: 'https://xtrata.xyz/i/3075' },
     { t: 'List or buy something on the Market', tag: '+1 ticket', href: 'https://xtrata.xyz/market' }
   ];

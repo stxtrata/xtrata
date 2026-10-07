@@ -2,6 +2,10 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: a wallet with 1 or more Audionauts earns 5 tickets (2026-10-07)
+- `public/bounty/zdao/tracker/1/index.html`: the Audionaut kind is now a flat 5 tickets per wallet, however many Audionauts it holds (it was 1). Added a `w` weight to the ticket kinds; `earned()` returns `w` for a flat kind. An Audionaut still counts as the wallet's entry (validity is unchanged), and inscription stays 1 ticket, so a wallet with both has 6 before other actions. Copy updated in the hero line, step 2, the ways list (+5 tickets), the ways intro, the example label and the two FAQ answers.
+- **Verified:** browser run against the baked snapshot: a wallet with 1 inscription, 3 Audionauts and 18 scores shows 24 (1 + 5 + 18); 1 Audionaut and 8 scores shows 13; 1 Audionaut and 1 score shows 6; 1 Audionaut alone shows 5. No page errors.
+
 ## Bounty tracker: Arcade link follows the v1.5.0 parent (2026-10-06)
 - `public/bounty/zdao/tracker/1/index.html`: the "Play the Arcade" button and the "(#3081)" label now point at parent #3111, matching the homepage tile and `/arcade` redirect. Checked the rest of the repo: no other live link still uses #3081. The remaining mentions are historical (launch canary notes and tests, the `3081` entry kept in `ARCADE_INSCRIPTION_IDS` so old boards stay valid, and the `xtrata-arcade-3081.webp` image filename).
 
