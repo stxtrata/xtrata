@@ -7342,6 +7342,11 @@
       }
     };
 
+    const isDeferredGridPlayable = (token) => {
+      const kind = getMediaKind(token.meta?.mimeType ?? null);
+      return kind === 'html' || kind === 'audio';
+    };
+
     const scheduleBackgroundThumbnailHydration = (token, thumbElement) => {
       const cacheKey = getThumbnailKey(token);
       if (
@@ -7352,6 +7357,26 @@
         return false;
       }
       if (!shouldBackgroundHydrateThumbnail(token)) {
+        return false;
+      }
+      // Explorer grid: songs / HTML players / audio are NOT downloaded in the
+      // background. Downloading every one of them (often MBs each, read from
+      // chain chunks) is what made pages take minutes. They show a poster and
+      // load only when selected. Cached results still paint via
+      // applyCachedThumbnail / gridLiveMediaCache before we get here.
+      if (isDeferredGridPlayable(token)) {
+        const label = getGridMimeLabel(token.meta?.mimeType ?? null) || 'HTML';
+        const poster = document.createElement('div');
+        poster.className = 'token-thumb-gate';
+        const posterLabel = document.createElement('div');
+        posterLabel.className = 'token-thumb-gate__label';
+        posterLabel.textContent = label;
+        const posterHint = document.createElement('div');
+        posterHint.className = 'token-thumb-gate__hint';
+        posterHint.textContent = 'Tap to open';
+        poster.append(posterLabel, posterHint);
+        thumbElement.replaceChildren(poster);
+        thumbElement.dataset.thumbnailState = 'deferred-playable';
         return false;
       }
       state.thumbnailHydrationAttempted.add(cacheKey);
