@@ -303,3 +303,21 @@ epoch = "latest"
 path = "contracts/rendered/ft3lod-see-yourself-out.clar"
 clarity_version = 4
 epoch = "latest"
+
+# --- Bitcoin Birds (v3-only: public get-owner variant for v1, G2 for v2)
+[contracts.bitcoin-birds]
+path = "contracts/legacy/bitcoin-birds.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.bitcoin-birds-v2]
+path = "contracts/legacy/bitcoin-birds-v2.clar"
+clarity_version = 2
+epoch = "latest"
+[contracts.ft3-bitcoin-birds]
+path = "contracts/rendered/ft3-bitcoin-birds.clar"
+clarity_version = 4
+epoch = "latest"
+[contracts.ft3-bitcoin-birds-v2]
+path = "contracts/rendered/ft3-bitcoin-birds-v2.clar"
+clarity_version = 4
+epoch = "latest"

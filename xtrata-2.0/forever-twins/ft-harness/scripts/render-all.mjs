@@ -11,7 +11,7 @@ for (const f of ['simnet-zombie-wabbits', 'simnet-gamma-pepe']) {
   const c = JSON.parse(readFileSync(join(ROOT, 'scripts/configs', `${f}.json`), 'utf8'));
   out(f === 'simnet-zombie-wabbits' ? 'ft2-zombie-wabbits' : 'ft2-gamma-pepe', c);
 }
-for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources)
+for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources.filter((x) => !x.v3Only))
   out(`ft2-${s.name}`, { ...base, collectionKey: s.name, source: `.${s.name}`, sourceAsset: s.asset, group: s.group });
 out('ft2-leaky-g1', { ...base, collectionKey: 'leaky-g1', source: '.mock-leaky-market', sourceAsset: 'leaky', group: 'G1' });
 out('ft2-leaky-g2', { ...base, collectionKey: 'leaky-g2', source: '.mock-leaky-market', sourceAsset: 'leaky', group: 'G2' });

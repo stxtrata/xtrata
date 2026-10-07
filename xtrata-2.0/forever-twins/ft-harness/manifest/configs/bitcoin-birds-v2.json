@@ -1,0 +1,17 @@
+{
+  "collectionKey": "bitcoin-birds-v2",
+  "source": "SP2K10SKSRN9Q2AM68SDV0W97ZYS07P0B109E4ZD3.bitcoin-birds-v2",
+  "sourceAsset": "bitcoin-birds-v2",
+  "ids": {
+    "from": 1,
+    "to": 15
+  },
+  "_note": "Mint is unfinished (15 of up to 111 minted when checked 2026-10-07). Set ids.to to get-last-token-id at snapshot time. metadataUri 'chain' reads the source's get-token-uri (ipfs://ipfs/QmdXZFxFvNgE9PbLX97R2Z3jXNf1fmJ4htsfWgqwXNZJGf/json/{id}.json). Gamma serves the art from Qmcd6wM1yewvuorzVNdANM8mSUZhbFstYBTpAKPoSM9fjQ/images/ with irregular names (BRD-01.PNG, BRD-2.PNG, BRD-03.PNG, BRD-3.PNG ... BRD-14.PNG); see docs for the cross-check list.",
+  "metadataUri": "chain",
+  "gateway": "https://ipfs.filebase.io",
+  "scope": "minted-at-snapshot",
+  "reviewer": null,
+  "concurrency": 4,
+  "retries": 3,
+  "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-birds-v2/{id}.json"
+}

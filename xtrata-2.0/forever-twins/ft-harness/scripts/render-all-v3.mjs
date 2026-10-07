@@ -26,7 +26,8 @@ for (const [f, name] of [['simnet-zombie-wabbits', 'ft3-zombie-wabbits'], ['simn
               group: c.group ?? (f === 'simnet-gamma-pepe' ? 'G2' : 'G1'), listingReadFn: c.listingReadFn });
 }
 for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources)
-  out(`ft3-${s.name}`, { collectionKey: s.name, source: `.${s.name}`, sourceAsset: s.asset, group: s.group });
+  out(`ft3-${s.name}`, { collectionKey: s.name, source: `.${s.name}`, sourceAsset: s.asset, group: s.group,
+    ...(s.ownerRead === 'public' ? { sourceOwnerRead: 'public', heldIdsReadFn: s.heldIdsReadFn } : {}) });
 // large-on-demand variants (sim/large-on-demand-v3.mjs): finalise without waiting for large files
 for (const s of JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources)
   if (['bitcoin-monkeys', 'see-yourself-out'].includes(s.name))

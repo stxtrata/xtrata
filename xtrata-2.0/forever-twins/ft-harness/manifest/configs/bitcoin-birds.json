@@ -1,0 +1,16 @@
+{
+  "collectionKey": "bitcoin-birds",
+  "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
+  "sourceAsset": "bitcoin-birds",
+  "ids": {
+    "from": 0,
+    "to": 399
+  },
+  "_note": "get-token-uri on this source returns one shared JSON for every id, so per-token art comes from the Pinata IPFS directory Gamma serves (bird-<id>.png, ids 0-399). Confirm the CID against the 400 minted tokens before finalising.",
+  "mediaUri": "https://stxnft.mypinata.cloud/ipfs/QmNcUCdjFK39Pk5iRrKY7Ez6hmqBcdnuxDZDAjTmeoxUqZ/bird-{id}.png",
+  "scope": "minted-at-snapshot",
+  "reviewer": null,
+  "concurrency": 4,
+  "retries": 3,
+  "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-birds/{id}.json"
+}
