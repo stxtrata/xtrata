@@ -1,0 +1,45 @@
+{
+ "audionautExtension": {
+  "kind": "codec",
+  "version": 1,
+  "id": "codec-flac",
+  "title": "FLAC decoder",
+  "author": null,
+  "license": null,
+  "requires": {
+   "codecApi": 1
+  },
+  "supersedes": null
+ },
+ "module": {
+  "bytes": 4211,
+  "sha256": "60acc6a49daa8bb888b4ad374a8f559f854be3403b34ab19557a056d305e2c46",
+  "chunks16384": 1,
+  "mime": "text/javascript",
+  "ref": null
+ },
+ "codec": {
+  "id": "flac",
+  "api": 1,
+  "version": "1.0.0",
+  "payload": "flac",
+  "implementation": "pure JavaScript, no WebAssembly, no imports",
+  "interface": "export async createDecoder(opts?) -> { decode(bytes)->{sampleRate,length,channels:Float32Array[]}, decodeInt(bytes)->{sampleRate,channels,bitsPerSample,length,data:Int32Array[]}, free() }"
+ },
+ "provenance": {
+  "origin": "original code written for Audionaut; no third-party code",
+  "format": "https://xiph.org/flac/format.html",
+  "source": "codecs/src/flacdec.mjs + flac.src.mjs",
+  "build": "esbuild --bundle --minify --format=esm"
+ },
+ "tests": {
+  "bitExactSounds": "2438/2438 (all converted packs)",
+  "crcVerified": true,
+  "libFLACcrossCheck": "2438/2438 decoded identically by libFLAC",
+  "speed": "about 405x realtime in Node 22"
+ },
+ "notes": [
+  "author and license are left null for the owner to set at inscription",
+  "kind 'codec' is a proposed addition to the extension kinds in the plan (section 6)"
+ ]
+}
