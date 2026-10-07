@@ -5868,6 +5868,24 @@
         tokenId: token.id
       });
 
+    // Fast path: the server assembles inscription bytes once and caches them
+    // (/runtime/content), so a 5 MB / 350-chunk inscription arrives in seconds
+    // instead of the browser reading every chunk from the chain. Size-checked;
+    // returns null on any problem so callers fall back to on-chain reads.
+    const fetchRuntimeContentBytes = async (token) => {
+      try {
+        const url = getTokenRuntimeContentUrl(token);
+        const expected = Number(token.meta?.totalSize ?? 0n);
+        if (!url || !(expected > 0)) return null;
+        const response = await fetch(url, { credentials: 'omit' });
+        if (!response.ok) return null;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return bytes.length === expected ? bytes : null;
+      } catch {
+        return null;
+      }
+    };
+
     const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {
       if (!rawHtml) {
         return rawHtml;
@@ -7165,7 +7183,7 @@
           size: token.meta?.totalSize?.toString() ?? null,
           mimeType: token.meta?.mimeType ?? null
         });
-        const bytes = await fetchOnChainContent({
+        const bytes = (await fetchRuntimeContentBytes(token)) ?? await fetchOnChainContent({
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient),
           cacheContractId,
@@ -7786,7 +7804,7 @@
         mimeType: token.meta.mimeType ?? null,
         requestId
       });
-      const bytes = await fetchOnChainContent({
+      const bytes = (await fetchRuntimeContentBytes(token)) ?? await fetchOnChainContent({
         client: contentClient,
         fallbackClients: getContentFallbackClients(contentClient),
         cacheContractId,

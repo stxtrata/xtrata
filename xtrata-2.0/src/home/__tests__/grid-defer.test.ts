@@ -22,3 +22,11 @@ describe('Explorer grid defers songs and HTML', () => {
     expect(main).toContain('void runBackgroundThumbnailHydration({');
   });
 });
+
+describe('selected preview uses the server-assembled content first', () => {
+  it('tries /runtime/content before reading chunks from chain', () => {
+    expect(main).toContain('const fetchRuntimeContentBytes');
+    expect(main).toMatch(/\(await fetchRuntimeContentBytes\(token\)\) \?\? await fetchOnChainContent/);
+    expect(main).toContain('bytes.length === expected');
+  });
+});
