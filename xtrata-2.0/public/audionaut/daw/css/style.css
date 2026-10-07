@@ -2538,3 +2538,8 @@ button:disabled {
 /* instrument rows: compact picker so all four rows align (folder shown in tooltip + popover) */
 .channel.instrument .synth-picker-btn { min-width: 112px; max-width: 150px; }
 .channel.instrument .synth-picker-btn .sp-folder { display: none; }
+
+/* FLAC sample packs: licence line under the library selection */
+.pack-info{margin:.4rem 0 .2rem}
+.pack-info .pack-licence{margin:.15rem 0 0;font-size:.82em;line-height:1.35;overflow-wrap:anywhere}
+.pack-info.warn .pack-licence{color:#e8a33d;font-weight:600}
