@@ -75,11 +75,13 @@ export const buildUpsertSql = ({
   bytes = null,
   title = '',
   artist = '',
+  source = 'cover',
   now = Date.now()
 }) => {
   if (!CONTRACT_PATTERN.test(contractId)) throw new Error(`Invalid contract id: ${contractId}`);
-  if (!Number.isSafeInteger(tokenId) || tokenId < 1) throw new Error(`Invalid token id: ${tokenId}`);
+  if (!Number.isSafeInteger(tokenId) || tokenId < 0) throw new Error(`Invalid token id: ${tokenId}`);
   if (!['ready', 'none', 'failed'].includes(status)) throw new Error(`Invalid status: ${status}`);
+  if (!['cover', 'render'].includes(source)) throw new Error(`Invalid source: ${source}`);
   if (status === 'ready' && (!key || !/^[0-9a-f]{16}$/.test(etag ?? ''))) {
     throw new Error('A ready thumbnail needs a key and an etag');
   }
@@ -94,7 +96,7 @@ export const buildUpsertSql = ({
     sqlInt(bytes),
     sqlString(cleanText(title)),
     sqlString(cleanText(artist)),
-    "'cover'",
+    sqlString(source),
     sqlInt(now)
   ].join(', ');
   // A failure must never replace a thumbnail that is already stored.

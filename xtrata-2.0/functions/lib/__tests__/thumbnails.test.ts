@@ -28,7 +28,9 @@ describe('parseThumbnailRequest', () => {
     ]) {
       expect(parseThumbnailRequest(contract, '1')).toBeNull();
     }
-    for (const id of ['0', '-1', '1.5', 'abc', '', '12345678901', undefined]) {
+    // v2 has a token #0, so zero is a real id.
+    expect(parseThumbnailRequest(CONTRACT, '0')).toEqual({ contractId: CONTRACT, tokenId: 0 });
+    for (const id of ['-1', '1.5', 'abc', '', '12345678901', undefined]) {
       expect(parseThumbnailRequest(CONTRACT, id)).toBeNull();
     }
   });

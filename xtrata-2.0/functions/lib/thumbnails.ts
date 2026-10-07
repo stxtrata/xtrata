@@ -32,7 +32,8 @@ export const parseThumbnailRequest = (
   if (typeof contractId !== 'string' || !CONTRACT_PATTERN.test(contractId)) return null;
   if (typeof tokenId !== 'string' || !/^\d{1,10}$/.test(tokenId)) return null;
   const id = Number(tokenId);
-  if (!Number.isSafeInteger(id) || id < 1) return null;
+  // Token ids start at 0 on some contracts (v2 has a #0).
+  if (!Number.isSafeInteger(id) || id < 0) return null;
   return { contractId, tokenId: id };
 };
 
