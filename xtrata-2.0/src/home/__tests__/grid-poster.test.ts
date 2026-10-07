@@ -228,3 +228,99 @@ describe('the main grid never lets an inscription take the click', () => {
     expect(rule.slice(0, rule.indexOf('}'))).toContain('pointer-events: none');
   });
 });
+
+describe('still pictures use their stored thumbnail', () => {
+  const at = main.indexOf('const renderGridImageThumb');
+  const source = main.slice(at, main.indexOf('const renderRelationshipThumbMedia', at));
+  const thumbStart = main.indexOf('const getGridThumbUrl');
+  const thumbSource = main.slice(thumbStart, main.indexOf('const renderGridPoster', thumbStart));
+
+  const load = (extra: Record<string, unknown> = {}) => {
+    const calls = { pixel: [] as unknown[], runtime: 0, label: [] as unknown[] };
+    const factory = new Function(
+      'document',
+      'getTokenCacheContractId',
+      'getThumbnailKey',
+      'applyPixelPerfectImageRendering',
+      'renderGridRuntimeImage',
+      'setTokenThumbLabel',
+      'getGridMimeLabel',
+      `${thumbSource}\n${source}\nreturn { renderGridImageThumb };`
+    );
+    const api = factory(
+      document,
+      (t: { sourceContractId?: string }) => t.sourceContractId ?? null,
+      (t: { id: bigint }) => `k${t.id}`,
+      (_img: unknown, opts: unknown) => calls.pixel.push(opts),
+      () => {
+        calls.runtime += 1;
+        return extra.runtimeWorks !== false;
+      },
+      (_el: unknown, label: unknown) => calls.label.push(label),
+      () => 'PNG'
+    ) as { renderGridImageThumb: (t: unknown, el: HTMLElement) => boolean };
+    return { ...api, calls };
+  };
+  const tok = (over: Record<string, unknown> = {}) => ({
+    id: 5n,
+    sourceContractId: CONTRACT,
+    meta: { mimeType: 'image/png' },
+    thumbVersion: 'abc12345',
+    ...over
+  });
+  const cell = () => {
+    const el = document.createElement('div');
+    el.dataset.thumbnailKey = 'k5';
+    document.body.append(el);
+    return el;
+  };
+
+  it('shows the small stored picture with the original mime type for pixel-art scaling', () => {
+    const { renderGridImageThumb, calls } = load();
+    const el = cell();
+    expect(renderGridImageThumb(tok(), el)).toBe(true);
+    const img = el.querySelector('img')!;
+    expect(img.getAttribute('src')).toBe(`/thumb/${encodeURIComponent(CONTRACT)}/5?v=abc12345`);
+    expect(el.dataset.thumbnailState).toBe('server-thumb');
+    expect(el.classList.contains('has-thumbnail')).toBe(true);
+    expect(calls.pixel[0]).toMatchObject({ mimeType: 'image/png', squareFrame: true });
+    expect(img.draggable).toBe(false);
+  });
+
+  it('does nothing when the server offered no thumbnail (animated, unchecked or missing)', () => {
+    const { renderGridImageThumb } = load();
+    const el = cell();
+    expect(renderGridImageThumb(tok({ thumbVersion: null }), el)).toBe(false);
+    expect(el.querySelector('img')).toBeNull();
+  });
+
+  it('goes back to the full picture if the thumbnail will not load', () => {
+    const { renderGridImageThumb, calls } = load();
+    const el = cell();
+    renderGridImageThumb(tok(), el);
+    el.querySelector('img')!.dispatchEvent(new Event('error'));
+    expect(calls.runtime).toBe(1);
+    expect(el.classList.contains('has-thumbnail')).toBe(false);
+  });
+
+  it('falls back to the label when even the full picture cannot start', () => {
+    const { renderGridImageThumb, calls } = load({ runtimeWorks: false });
+    const el = cell();
+    renderGridImageThumb(tok(), el);
+    el.querySelector('img')!.dispatchEvent(new Event('error'));
+    expect(calls.label).toEqual(['PNG']);
+    expect(el.dataset.thumbnailState).toBe('failed-thumb');
+  });
+
+  it('is chosen for picture files only, ahead of the songs and HTML branch', () => {
+    const cardStart = main.indexOf('const renderTokenGrid = (options = {}) =>');
+    const card = main.slice(cardStart, main.indexOf('const updateSelectedTokenGridCard', cardStart));
+    const imageAt = card.indexOf('renderGridImageThumb(token, thumb)');
+    const svgAt = card.indexOf('isSvgToken(token) && renderGridRuntimeImage(token, thumb)');
+    const deferAt = card.indexOf('} else if (isDeferredGridPlayable(token)) {');
+    expect(imageAt).toBeGreaterThan(svgAt);
+    expect(imageAt).toBeLessThan(deferAt);
+    expect(card.slice(imageAt - 120, imageAt)).toContain("getMediaKind(token.meta?.mimeType ?? null) === 'image'");
+  });
+});
+

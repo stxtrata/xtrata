@@ -7668,6 +7668,54 @@
       liveGridHtmlObserver.observe(thumbElement);
     };
 
+    // A still picture with a stored thumbnail shows that thumbnail (a few KB)
+    // instead of downloading the whole file. The server only offers a thumbnail
+    // for a picture it has checked and found still, so animated files, and any
+    // picture not checked yet, keep loading the original and keep playing.
+    // Returns false when there is no thumbnail so the caller uses the old path.
+    const renderGridImageThumb = (token, thumbElement) => {
+      const thumbUrl = getGridThumbUrl(token);
+      if (!thumbUrl) {
+        return false;
+      }
+      const cacheKey = getThumbnailKey(token);
+      const img = document.createElement('img');
+      img.alt = 'Inscription preview';
+      img.decoding = 'async';
+      img.loading = 'lazy';
+      img.draggable = false;
+      img.referrerPolicy = 'no-referrer';
+      applyPixelPerfectImageRendering(img, {
+        mimeType: token.meta?.mimeType ?? null,
+        sourceUrl: thumbUrl,
+        squareFrame: true
+      });
+      img.addEventListener(
+        'error',
+        () => {
+          if (
+            !thumbElement.isConnected ||
+            thumbElement.dataset.thumbnailKey !== cacheKey ||
+            thumbElement.dataset.thumbnailState !== 'server-thumb'
+          ) {
+            return;
+          }
+          // The thumbnail is missing or unreadable: show the full picture instead.
+          thumbElement.classList.remove('has-thumbnail');
+          if (!renderGridRuntimeImage(token, thumbElement)) {
+            setTokenThumbLabel(thumbElement, getGridMimeLabel(token.meta?.mimeType ?? null));
+            thumbElement.dataset.thumbnailState = 'failed-thumb';
+          }
+        },
+        { once: true }
+      );
+      img.src = thumbUrl;
+      thumbElement.classList.add('has-thumbnail');
+      thumbElement.dataset.thumbnailState = 'server-thumb';
+      thumbElement.replaceChildren(img);
+      return true;
+    };
+
     const renderRelationshipThumbMedia = async (token, media, role) => {
       if (!media.isConnected) {
         return false;
@@ -7875,6 +7923,12 @@
             // SVG with no precomputed data-uri (e.g. served from the D1 index):
             // render the vector directly from the runtime content endpoint
             // instead of the rasterizer, which fails for size-less SVGs.
+            shouldApplyCachedThumbnail = false;
+          } else if (
+            getMediaKind(token.meta?.mimeType ?? null) === 'image' &&
+            renderGridImageThumb(token, thumb)
+          ) {
+            // Still picture with a stored thumbnail: no full download.
             shouldApplyCachedThumbnail = false;
           } else if (isDeferredGridPlayable(token)) {
             // Songs, HTML and audio: a picture or text poster straight away, with

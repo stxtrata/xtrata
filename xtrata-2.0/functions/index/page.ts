@@ -1,5 +1,5 @@
 import { queryAll } from '../lib/db';
-import { loadThumbnailInfo } from '../lib/thumbnails';
+import { loadThumbnailInfo, thumbnailVersionFor } from '../lib/thumbnails';
 import type { RuntimeEnv } from '../runtime/lib';
 
 // Combined lineage page endpoint. The grids resolve a visible page primary-first
@@ -153,7 +153,7 @@ export const onRequest = async (context: {
             sealed: row.sealed === 1,
             tokenUri: row.token_uri ?? null,
             migrationSource: row.migration_source,
-            thumb: info?.version ?? null,
+            thumb: thumbnailVersionFor(info, row.mime),
             title: info?.title || null,
             artist: info?.artist || null
           });

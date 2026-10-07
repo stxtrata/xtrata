@@ -5,7 +5,8 @@ import {
   isThumbnailVersion,
   loadThumbnailInfo,
   parseThumbnailRequest,
-  thumbnailKey
+  thumbnailKey,
+  thumbnailVersionFor
 } from '../thumbnails';
 
 const CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
@@ -33,6 +34,29 @@ describe('parseThumbnailRequest', () => {
     for (const id of ['-1', '1.5', 'abc', '', '12345678901', undefined]) {
       expect(parseThumbnailRequest(CONTRACT, id)).toBeNull();
     }
+  });
+});
+
+describe('thumbnailVersionFor', () => {
+  const info = (animated: number | null, version: string | null = 'abcdef0123456789') => ({
+    version, title: '', artist: '', animated
+  });
+  it('lets a still picture use its thumbnail', () => {
+    expect(thumbnailVersionFor(info(0), 'image/png')).toBe('abcdef0123456789');
+  });
+  it('keeps animated and unchecked pictures on their normal path', () => {
+    expect(thumbnailVersionFor(info(1), 'image/gif')).toBeNull();
+    expect(thumbnailVersionFor(info(null), 'image/png')).toBeNull();
+    expect(thumbnailVersionFor(info(null), 'IMAGE/WEBP')).toBeNull();
+  });
+  it('always gives a song its cover unless it is marked animated', () => {
+    expect(thumbnailVersionFor(info(null), 'text/html')).toBe('abcdef0123456789');
+    expect(thumbnailVersionFor(info(0), 'audio/mpeg')).toBe('abcdef0123456789');
+    expect(thumbnailVersionFor(info(1), 'text/html')).toBeNull();
+  });
+  it('has nothing to offer without a version', () => {
+    expect(thumbnailVersionFor(undefined, 'image/png')).toBeNull();
+    expect(thumbnailVersionFor(info(0, null), 'image/png')).toBeNull();
   });
 });
 
@@ -92,8 +116,8 @@ describe('loadThumbnailInfo', () => {
       ])
     };
     const info = await loadThumbnailInfo(env as never, [CONTRACT], [1, 2, 3]);
-    expect(info.get(`${CONTRACT}:1`)).toEqual({ version: '9f2c1ab4d0e57718', title: 'A', artist: 'B' });
-    expect(info.get(`${CONTRACT}:2`)).toEqual({ version: null, title: 'C', artist: '' });
+    expect(info.get(`${CONTRACT}:1`)).toEqual({ version: '9f2c1ab4d0e57718', title: 'A', artist: 'B', animated: null });
+    expect(info.get(`${CONTRACT}:2`)).toEqual({ version: null, title: 'C', artist: '', animated: null });
     // A ready row with a malformed etag must not produce a thumbnail URL.
     expect(info.get(`${CONTRACT}:3`)?.version).toBeNull();
   });
@@ -105,7 +129,7 @@ describe('loadThumbnailInfo', () => {
       ])
     };
     const info = await loadThumbnailInfo(env as never, [CONTRACT], [1]);
-    expect(info.get(`${CONTRACT}:1`)).toEqual({ version: null, title: 'x y', artist: 'a b' });
+    expect(info.get(`${CONTRACT}:1`)).toEqual({ version: null, title: 'x y', artist: 'a b', animated: null });
   });
 
   it('returns nothing, without throwing, when the table is missing', async () => {

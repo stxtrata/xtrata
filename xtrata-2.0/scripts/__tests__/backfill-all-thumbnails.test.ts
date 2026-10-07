@@ -12,6 +12,9 @@ const png = (width: number, height: number, channels: 3 | 4 = 4) =>
     .png()
     .toBuffer();
 
+const FIXTURES: Record<string, string> = {"gif": "R0lGODlhCAAIAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAACAAIAAAIDwABCBxIsKDBgwgTKkwYEAAh+QQBCgABACwAAAAACAAIAIEAAP8AAAAAAAAAAAAIDwABCBxIsKDBgwgTKkwYEAA7", "webp": "UklGRoQAAABXRUJQVlA4WAoAAAACAAAABwAABwAAQU5JTQYAAAAAAAAAAABBTk1GKAAAAAAAAAAAAAcAAAcAAGQAAAJWUDhMDwAAAC8HwAEABxD9j/4HIqL/AQBBTk1GKAAAAAAAAAAAAAcAAAcAAGQAAABWUDhMDwAAAC8HwAEABxDR//4HIqL/AQA=", "apng": "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAACGFjVEwAAAACAAAAAPONk3AAAAAaZmNUTAAAAAAAAAAIAAAACAAAAAAAAAAAAAEACgAA8k66YgAAABZJREFUeJxj/M/A8J8BD2DCJzl8FAAAElsCDh9KSV0AAAAaZmNUTAAAAAEAAAAIAAAACAAAAAAAAAAAAAEACgAAaT1QtgAAABpmZEFUAAAAAnicY2Rg+P+fAQ9gwic5fBQAABBdAg7EQ+AwAAAAAElFTkSuQmCC", "png": "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAYAAADED76LAAAAFklEQVR4nGP8z8DwnwEPYMInOXwUAAASWwIOH0pJXQAAAABJRU5ErkJggg==", "gifstill": "R0lGODdhCAAIAIEAAP8AAAAAAAAAAAAAACwAAAAACAAIAAAIDwABCBxIsKDBgwgTKkwYEAA7"};
+const fixture = (name: string) => Buffer.from(FIXTURES[name], 'base64');
+
 describe('classifyKind', () => {
   it('groups mime types into the kinds that decide how a thumbnail is made', () => {
     expect(script.classifyKind('image/png')).toBe('image');
@@ -161,5 +164,46 @@ describe('SQL and options', () => {
     expect(() => script.parseArgs(['--max-bytes', '5'])).toThrow();
     expect(() => script.parseArgs(['--origin', 'http://x'])).toThrow();
     expect(() => script.parseArgs(['--nope'])).toThrow(/Unknown/);
+  });
+});
+
+describe('animation detection', () => {
+  it('finds real animated files and leaves still ones alone', async () => {
+    expect(await script.detectAnimated(fixture('gif'), sharp)).toBe(true);
+    expect(await script.detectAnimated(fixture('webp'), sharp)).toBe(true);
+    expect(await script.detectAnimated(fixture('apng'), sharp)).toBe(true);
+    expect(await script.detectAnimated(fixture('png'), sharp)).toBe(false);
+    expect(await script.detectAnimated(fixture('gifstill'), sharp)).toBe(false);
+  });
+  it('reads an animated PNG from its header alone', () => {
+    expect(script.isAnimatedPng(fixture('apng'))).toBe(true);
+    expect(script.isAnimatedPng(fixture('apng').subarray(0, 60))).toBe(true);
+    expect(script.isAnimatedPng(fixture('png'))).toBe(false);
+    expect(script.isAnimatedPng(new Uint8Array([1, 2, 3]))).toBe(false);
+    expect(script.isAnimatedPng(Buffer.from('not a png at all, just text'))).toBe(false);
+  });
+  it('reports the flag on the thumbnail it makes', async () => {
+    expect((await script.makeImageThumbnail(fixture('gif'), sharp)).animated).toBe(true);
+    expect((await script.makeImageThumbnail(fixture('png'), sharp)).animated).toBe(false);
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4"/></svg>');
+    expect((await script.makeImageThumbnail(svg, sharp, { svg: true })).animated).toBeNull();
+  });
+  it('saves the flag with the row and never lets a cover re-run erase it', () => {
+    const sql = buildUpsertSql({
+      contractId: CONTRACT, tokenId: 4, status: 'ready', key: 'k', etag: 'abcdef0123456789', source: 'render', animated: 1
+    });
+    expect(sql).toContain('animated');
+    expect(sql).toContain('COALESCE(excluded.animated, inscription_thumbnails.animated)');
+    expect(() => buildUpsertSql({ contractId: CONTRACT, tokenId: 4, status: 'none', animated: 2 })).toThrow(/animated/);
+  });
+  it('builds the recheck queries safely', () => {
+    const sql = script.buildUncheckedSql();
+    expect(sql).toContain('t.animated IS NULL');
+    expect(sql).toContain("t.status = 'ready'");
+    expect(sql).toContain("i.mime NOT LIKE 'image/svg%'");
+    expect(script.buildAnimatedUpdateSql({ contractId: CONTRACT, tokenId: 0, animated: 0 })).toContain('SET animated = 0');
+    expect(() => script.buildAnimatedUpdateSql({ contractId: "x'; --", tokenId: 1, animated: 0 })).toThrow();
+    expect(() => script.buildAnimatedUpdateSql({ contractId: CONTRACT, tokenId: 1, animated: 5 })).toThrow();
+    expect(script.parseArgs(['--recheck-animated']).recheckAnimated).toBe(true);
   });
 });
