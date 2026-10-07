@@ -5868,6 +5868,30 @@
         tokenId: token.id
       });
 
+    // Live performance trace for the Explorer. Open the browser console and
+    // filter on "xtrata-perf", or run  copy(xtrataPerfReport())  and paste it.
+    // Every line is ms since the selection began, so the slow step stands out.
+    const perfTrace = [];
+    const perfState = { id: null, t0: 0 };
+    const perfBegin = (token) => {
+      perfState.id = token.id.toString();
+      perfState.t0 = performance.now();
+      perfTrace.length = 0;
+      perfMark('select', { size: String(token.meta?.totalSize ?? ''), mime: token.meta?.mimeType ?? '' });
+    };
+    const perfMark = (step, details = {}) => {
+      const at = Math.round(performance.now() - perfState.t0);
+      const row = { id: perfState.id, step, atMs: at, ...details };
+      perfTrace.push(row);
+      try { console.log('[xtrata-perf]', `#${row.id}`, `+${at}ms`, step, details); } catch {}
+    };
+    try {
+      window.xtrataPerf = perfTrace;
+      window.xtrataPerfReport = () => perfTrace
+        .map((r) => `+${r.atMs}ms  #${r.id}  ${r.step}  ${JSON.stringify({ ...r, id: undefined, step: undefined, atMs: undefined })}`)
+        .join('\n');
+    } catch {}
+
     // Fast path: the server assembles inscription bytes once and caches them
     // (/runtime/content), so a 5 MB / 350-chunk inscription arrives in seconds
     // instead of the browser reading every chunk from the chain. Size-checked;
@@ -5877,11 +5901,25 @@
         const url = getTokenRuntimeContentUrl(token);
         const expected = Number(token.meta?.totalSize ?? 0n);
         if (!url || !(expected > 0)) return null;
+        const began = performance.now();
+        perfMark('runtime-fetch:start', { url });
         const response = await fetch(url, { credentials: 'omit' });
+        perfMark('runtime-fetch:headers', {
+          status: response.status,
+          cache: response.headers.get('cf-cache-status'),
+          ms: Math.round(performance.now() - began)
+        });
         if (!response.ok) return null;
         const bytes = new Uint8Array(await response.arrayBuffer());
+        perfMark('runtime-fetch:done', {
+          bytes: bytes.length,
+          expected,
+          match: bytes.length === expected,
+          ms: Math.round(performance.now() - began)
+        });
         return bytes.length === expected ? bytes : null;
-      } catch {
+      } catch (error) {
+        perfMark('runtime-fetch:error', { error: String(error?.message ?? error) });
         return null;
       }
     };
@@ -5890,6 +5928,7 @@
       if (!rawHtml) {
         return rawHtml;
       }
+      perfMark('prepare-html:start', { context: contextLabel, chars: rawHtml.length });
       const html = embedHtml(rawHtml);
       const moduleBaseHref = buildRuntimeModuleBaseHref({
         network: state.network,
@@ -5899,21 +5938,28 @@
       });
       const htmlWithBase = injectHtmlBaseHref(html, moduleBaseHref);
       if (!hasRuntimeContentUrls(htmlWithBase)) {
+        perfMark('prepare-html:done', { inlined: false, chars: htmlWithBase.length });
         return htmlWithBase;
       }
       const contentClient = getTokenClient(token);
+      perfMark('inline-runtime-urls:start', {
+        urls: (htmlWithBase.match(/\/runtime\/content\?[^"'\s)]+/g) ?? []).slice(0, 8)
+      });
       try {
         debugLog('preview', 'inlining runtime content for HTML inscription', {
           tokenId: token.id.toString(),
           contractId: getTokenCacheContractId(token),
           context: contextLabel
         });
-        return await inlineRuntimeContentUrls({
+        const inlined = await inlineRuntimeContentUrls({
           html: htmlWithBase,
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient)
         });
+        perfMark('inline-runtime-urls:done', { chars: inlined.length });
+        return inlined;
       } catch (error) {
+        perfMark('inline-runtime-urls:error', { error: String(error?.message ?? error) });
         const message = error instanceof Error ? error.message : String(error);
         debugLog(
           'preview',
@@ -7718,6 +7764,13 @@
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
+      perfMark('render-payload', { source, bytes: bytes.length, hasHtmlDoc: !!htmlDoc });
+      {
+        const previewFrame = dom.tokenPreviewMedia.querySelector('iframe');
+        if (previewFrame) {
+          previewFrame.addEventListener('load', () => perfMark('iframe-load'), { once: true });
+        }
+      }
       // The selected inscription gets the machine: its grid tile stops (it runs here)
       // and the grid holds back while an HTML preview loads.
       liveHtmlFrameManager.focusPreview(
@@ -7804,15 +7857,20 @@
         mimeType: token.meta.mimeType ?? null,
         requestId
       });
-      const bytes = (await fetchRuntimeContentBytes(token)) ?? await fetchOnChainContent({
-        client: contentClient,
-        fallbackClients: getContentFallbackClients(contentClient),
-        cacheContractId,
-        id: token.id,
-        senderAddress: getReadOnlySenderAddress(),
-        totalSize: token.meta.totalSize,
-        mimeType: token.meta.mimeType ?? null
-      });
+      let bytes = await fetchRuntimeContentBytes(token);
+      if (!bytes) {
+        perfMark('chain-fetch:start', { reason: 'runtime fast path unavailable' });
+        bytes = await fetchOnChainContent({
+          client: contentClient,
+          fallbackClients: getContentFallbackClients(contentClient),
+          cacheContractId,
+          id: token.id,
+          senderAddress: getReadOnlySenderAddress(),
+          totalSize: token.meta.totalSize,
+          mimeType: token.meta.mimeType ?? null
+        });
+        perfMark('chain-fetch:done', { bytes: bytes.length });
+      }
       const mimeType = resolveMimeType(token.meta.mimeType ?? null, bytes) ?? token.meta.mimeType ?? 'application/octet-stream';
       const htmlDoc = getMediaKind(mimeType) === 'html'
         ? await prepareRuntimeHtmlForToken(token, new TextDecoder().decode(bytes), 'preview')
@@ -7878,6 +7936,7 @@
 
       void updateWalletTokenUriHeadPreview(token.tokenUri);
 
+      perfBegin(token);
       clearElement(dom.tokenPreviewMedia, 'Loading');
       renderSelectedInscriptionMeta(token);
       void refreshSelectedTokenOwner(token, requestId);

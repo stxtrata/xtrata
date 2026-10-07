@@ -30,3 +30,13 @@ describe('selected preview uses the server-assembled content first', () => {
     expect(main).toContain('bytes.length === expected');
   });
 });
+
+describe('Explorer perf trace', () => {
+  it('records each slow-prone step and exposes a copyable report', () => {
+    for (const step of ['select', 'runtime-fetch:done', 'chain-fetch:start', 'inline-runtime-urls:start', 'inline-runtime-urls:done', 'render-payload', 'iframe-load']) {
+      expect(main).toContain(`'${step}'`);
+    }
+    expect(main).toContain('window.xtrataPerfReport');
+    expect(main).toContain('perfBegin(token);');
+  });
+});
