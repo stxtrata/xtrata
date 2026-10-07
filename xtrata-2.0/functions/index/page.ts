@@ -1,4 +1,5 @@
 import { queryAll } from '../lib/db';
+import { loadThumbnailInfo } from '../lib/thumbnails';
 import type { RuntimeEnv } from '../runtime/lib';
 
 // Combined lineage page endpoint. The grids resolve a visible page primary-first
@@ -13,6 +14,10 @@ import type { RuntimeEnv } from '../runtime/lib';
 // so the client can attribute ownership/lineage exactly as the per-contract path
 // did. SVG tokens are included: the client renders them from the R2-backed
 // runtime content endpoint (no per-token chain reconstruction needed).
+//
+// Each token also carries `thumb` (the version of its stored grid thumbnail, or
+// null), plus `title` and `artist` when known, so a tile can show a picture and
+// text without downloading the inscription. See functions/lib/thumbnails.ts.
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -102,6 +107,7 @@ export const onRequest = async (context: {
       [...contracts, ...ids]
     );
     const dbRows = (result.results ?? []) as IndexDbRow[];
+    const thumbInfo = await loadThumbnailInfo(env, contracts, ids);
 
     // Index rows by contract -> token_id so we can resolve each id primary-first.
     const byContract = new Map<string, Map<number, IndexDbRow>>();
@@ -126,11 +132,15 @@ export const onRequest = async (context: {
       sealed: boolean;
       tokenUri: string | null;
       migrationSource: string | null;
+      thumb: string | null;
+      title: string | null;
+      artist: string | null;
     }> = [];
     for (const id of ids) {
       for (const contractId of contracts) {
         const row = byContract.get(contractId)?.get(id);
         if (row) {
+          const info = thumbInfo.get(`${contractId}:${row.token_id}`);
           tokens.push({
             id: row.token_id,
             sourceContract: contractId,
@@ -142,7 +152,10 @@ export const onRequest = async (context: {
             totalChunks: row.total_chunks,
             sealed: row.sealed === 1,
             tokenUri: row.token_uri ?? null,
-            migrationSource: row.migration_source
+            migrationSource: row.migration_source,
+            thumb: info?.version ?? null,
+            title: info?.title || null,
+            artist: info?.artist || null
           });
           break; // primary-first: first contract that has it wins
         }

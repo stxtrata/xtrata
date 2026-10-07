@@ -2082,6 +2082,106 @@
       opacity: 0.7;
     }
 
+    /* Static grid poster for songs and HTML (renderGridPoster in src/home/main.js).
+       It runs nothing and has no click handler: pointer events pass straight
+       through to the card, so a single click selects the token and opens the
+       preview. */
+    .token-thumb-poster {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: var(--control);
+      color: var(--muted);
+      pointer-events: none;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .token-thumb-poster__text {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 8px;
+      max-width: 100%;
+      text-align: center;
+    }
+
+    .token-thumb .token-thumb-poster__img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      -webkit-user-drag: none;
+    }
+
+    .token-thumb-poster__label {
+      font-weight: 800;
+      font-size: clamp(11px, 1.2vw, 13px);
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .token-thumb-poster__hint {
+      font-weight: 700;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    .token-thumb-poster__title,
+    .token-thumb-poster__artist {
+      max-width: 100%;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      line-height: 1.2;
+    }
+
+    .token-thumb-poster__title {
+      -webkit-line-clamp: 3;
+      font-weight: 800;
+      font-size: clamp(11px, 1.2vw, 13px);
+      color: var(--ink);
+    }
+
+    .token-thumb-poster__artist {
+      -webkit-line-clamp: 1;
+      font-weight: 700;
+      font-size: 10px;
+      opacity: 0.8;
+    }
+
+    /* Title and artist over a stored picture. White on a dark fade so it reads
+       on any cover. */
+    .token-thumb-poster__caption {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      padding: 16px 6px 5px;
+      text-align: left;
+      color: #fff;
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.74));
+    }
+
+    .token-thumb-poster__caption .token-thumb-poster__title,
+    .token-thumb-poster__caption .token-thumb-poster__artist {
+      color: #fff;
+      -webkit-line-clamp: 1;
+      font-size: 10px;
+    }
+
     .token-thumb.has-thumbnail {
       background: var(--control);
       color: transparent;

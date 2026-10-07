@@ -7187,6 +7187,13 @@
       }
 
       if (media.kind === 'html') {
+        if (!options.gated) {
+          // The main grid never runs an inscription. A live iframe in a tile was
+          // what made the first click run the page in the grid and only the
+          // second one open it in the preview. Show the static poster; the card
+          // click selects the token and the preview loads it.
+          return renderGridPoster(token, thumbElement);
+        }
         // Gated mount: the iframe only executes when on-screen and within the
         // live-frame budget (or on click). Prevents N heavy board inscriptions
         // from running at once. See liveHtmlFrameManager above. Relationship
@@ -7438,6 +7445,115 @@
       return kind === 'html' || kind === 'audio';
     };
 
+    // URL of the stored grid thumbnail for a token, or null when the index has
+    // none. The version comes from /index/page and makes the URL immutable.
+    const getGridThumbUrl = (token) => {
+      const version = token.thumbVersion;
+      if (typeof version !== 'string' || !/^[A-Za-z0-9_-]{4,64}$/.test(version)) {
+        return null;
+      }
+      const contractId = getTokenCacheContractId(token);
+      if (!contractId) {
+        return null;
+      }
+      return `/thumb/${encodeURIComponent(contractId)}/${token.id.toString()}?v=${version}`;
+    };
+
+    // The grid tile for a song or HTML inscription. It is a picture, never the
+    // inscription: no iframe, no script, no click handler of its own. A click
+    // falls through to the card, which selects the token and loads the preview,
+    // so one click is all it takes. With a stored thumbnail it is a plain <img>
+    // (a few KB); without one it is a type label plus the title when the index
+    // knows it. Title and artist are untrusted text from the chain, so they are
+    // only ever set with textContent.
+    const renderGridPoster = (token, thumbElement) => {
+      const label = getGridMimeLabel(token.meta?.mimeType ?? null) || 'HTML';
+      const title = typeof token.thumbTitle === 'string' ? token.thumbTitle.trim() : '';
+      const artist = typeof token.thumbArtist === 'string' ? token.thumbArtist.trim() : '';
+      const poster = document.createElement('div');
+      poster.className = 'token-thumb-poster';
+
+      const buildText = () => {
+        const wrap = document.createElement('div');
+        wrap.className = 'token-thumb-poster__text';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'token-thumb-poster__label';
+        labelEl.textContent = label;
+        wrap.append(labelEl);
+        if (title) {
+          const titleEl = document.createElement('div');
+          titleEl.className = 'token-thumb-poster__title';
+          titleEl.textContent = title;
+          wrap.append(titleEl);
+        }
+        if (artist) {
+          const artistEl = document.createElement('div');
+          artistEl.className = 'token-thumb-poster__artist';
+          artistEl.textContent = artist;
+          wrap.append(artistEl);
+        }
+        if (!title && !artist) {
+          const hintEl = document.createElement('div');
+          hintEl.className = 'token-thumb-poster__hint';
+          hintEl.textContent = 'Tap to open';
+          wrap.append(hintEl);
+        }
+        return wrap;
+      };
+
+      const thumbUrl = getGridThumbUrl(token);
+      if (thumbUrl) {
+        const img = document.createElement('img');
+        img.className = 'token-thumb-poster__img';
+        img.alt = title ? (artist ? `${title} by ${artist}` : title) : 'Inscription preview';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.draggable = false;
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener(
+          'error',
+          () => {
+            if (!poster.isConnected) {
+              return;
+            }
+            // The picture is missing or unreadable: fall back to the text poster.
+            poster.replaceChildren(buildText());
+            thumbElement.classList.remove('has-thumbnail');
+            thumbElement.dataset.thumbnailState = 'poster';
+          },
+          { once: true }
+        );
+        img.src = thumbUrl;
+        poster.append(img);
+        if (title || artist) {
+          const caption = document.createElement('div');
+          caption.className = 'token-thumb-poster__caption';
+          caption.setAttribute('aria-hidden', 'true');
+          if (title) {
+            const titleEl = document.createElement('div');
+            titleEl.className = 'token-thumb-poster__title';
+            titleEl.textContent = title;
+            caption.append(titleEl);
+          }
+          if (artist) {
+            const artistEl = document.createElement('div');
+            artistEl.className = 'token-thumb-poster__artist';
+            artistEl.textContent = artist;
+            caption.append(artistEl);
+          }
+          poster.append(caption);
+        }
+        thumbElement.classList.add('has-thumbnail');
+        thumbElement.dataset.thumbnailState = 'server-thumb';
+      } else {
+        poster.append(buildText());
+        thumbElement.classList.remove('has-thumbnail');
+        thumbElement.dataset.thumbnailState = 'poster';
+      }
+      thumbElement.replaceChildren(poster);
+      return true;
+    };
+
     const scheduleBackgroundThumbnailHydration = (token, thumbElement) => {
       const cacheKey = getThumbnailKey(token);
       if (
@@ -7456,18 +7572,7 @@
       // load only when selected. Cached results still paint via
       // applyCachedThumbnail / gridLiveMediaCache before we get here.
       if (isDeferredGridPlayable(token)) {
-        const label = getGridMimeLabel(token.meta?.mimeType ?? null) || 'HTML';
-        const poster = document.createElement('div');
-        poster.className = 'token-thumb-gate';
-        const posterLabel = document.createElement('div');
-        posterLabel.className = 'token-thumb-gate__label';
-        posterLabel.textContent = label;
-        const posterHint = document.createElement('div');
-        posterHint.className = 'token-thumb-gate__hint';
-        posterHint.textContent = 'Tap to open';
-        poster.append(posterLabel, posterHint);
-        thumbElement.replaceChildren(poster);
-        thumbElement.dataset.thumbnailState = 'deferred-playable';
+        renderGridPoster(token, thumbElement);
         return false;
       }
       state.thumbnailHydrationAttempted.add(cacheKey);
@@ -7695,6 +7800,11 @@
             // SVG with no precomputed data-uri (e.g. served from the D1 index):
             // render the vector directly from the runtime content endpoint
             // instead of the rasterizer, which fails for size-less SVGs.
+            shouldApplyCachedThumbnail = false;
+          } else if (isDeferredGridPlayable(token)) {
+            // Songs, HTML and audio: a picture or text poster straight away, with
+            // nothing downloaded and nothing to look up in the thumbnail cache.
+            renderGridPoster(token, thumb);
             shouldApplyCachedThumbnail = false;
           } else {
             const cacheKey = getThumbnailKey(token);

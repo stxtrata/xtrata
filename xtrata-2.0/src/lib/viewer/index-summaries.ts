@@ -24,6 +24,9 @@ type IndexRow = {
   sealed: boolean;
   tokenUri: string | null;
   migrationSource: string | null;
+  thumb?: string | null;
+  title?: string | null;
+  artist?: string | null;
 };
 
 const hexToBytes = (hex: string | null): Uint8Array => {
@@ -46,6 +49,9 @@ const rowToSummary = (row: IndexRow, contractId: string): TokenSummary => ({
   // index no longer needs to chain-fetch a data-uri for them.
   svgDataUri: null,
   sourceContractId: contractId,
+  thumbVersion: row.thumb ?? null,
+  thumbTitle: row.title ?? null,
+  thumbArtist: row.artist ?? null,
   meta: row.mime
     ? {
         owner: row.owner ?? '',
