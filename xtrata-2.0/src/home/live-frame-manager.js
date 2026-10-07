@@ -31,9 +31,9 @@ const HEAVY_HTML_BYTES = 512 * 1024;
 const PREVIEW_FOCUS_MAX_MS = 15_000; // longest the grid waits for a preview to load
 const PREVIEW_SETTLE_MS = 4_000; // quiet time after the preview document has loaded
 const GRID_STAGGER_MS = 250; // gap between grid tiles starting
-export const isHeavyGridHtml = (html, byteLength) =>
-  (Number(byteLength) || 0) >= HEAVY_HTML_BYTES ||
-  String(html || '').length >= HEAVY_HTML_BYTES ||
+export const isHeavyGridHtml = (html, byteLength, limit = HEAVY_HTML_BYTES) =>
+  (Number(byteLength) || 0) >= limit ||
+  String(html || '').length >= limit ||
   /['"]get-chunk['"]/.test(String(html || ''));
 const formatGridBytes = (n) =>
   n >= 1024 * 1024 ? `${(n / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
@@ -65,6 +65,8 @@ export const createLiveHtmlFrameManager = ({ injectHtml, maxLiveFrames, mimeLabe
   const posterHint = (record) =>
     record.key && record.key === focus.key
       ? 'Running in the preview'
+      : record.clickThrough
+      ? 'Tap to open'
       : record.heavy
       ? `${record.recursive ? 'Loads other inscriptions' : record.sizeLabel} · Tap to run`
       : 'Tap to load';
@@ -260,9 +262,18 @@ export const createLiveHtmlFrameManager = ({ injectHtml, maxLiveFrames, mimeLabe
     frame.sandbox = 'allow-scripts';
     frame.referrerPolicy = 'no-referrer';
     frame.loading = 'lazy';
+    // Click-through tiles (the main grid) are pictures: the page runs inside the
+    // tile but never takes a click or focus, so a click always selects the card.
+    const clickThrough = !!options.clickThrough;
+    if (clickThrough) {
+      frame.tabIndex = -1;
+      frame.setAttribute('aria-hidden', 'true');
+    }
 
     const poster = document.createElement('div');
-    poster.className = 'token-thumb-gate';
+    poster.className = clickThrough
+      ? 'token-thumb-gate token-thumb-gate--static'
+      : 'token-thumb-gate';
     const label = document.createElement('div');
     label.className = 'token-thumb-gate__label';
     label.textContent = mimeLabel(media.mimeType ?? null) || 'HTML';
@@ -272,14 +283,16 @@ export const createLiveHtmlFrameManager = ({ injectHtml, maxLiveFrames, mimeLabe
     poster.append(label, hint);
 
     const byteLength = media.bytes?.length ?? options.byteLength ?? 0;
+    const heavyLimit = Number(options.heavyBytes) > 0 ? Number(options.heavyBytes) : HEAVY_HTML_BYTES;
     const record = {
       frame,
       poster,
       hint,
       html: media.html,
       key: options.key ?? null,
-      heavy: isHeavyGridHtml(media.html, byteLength),
-      recursive: /['"]get-chunk['"]/.test(String(media.html || '')) && byteLength < HEAVY_HTML_BYTES,
+      clickThrough,
+      heavy: isHeavyGridHtml(media.html, byteLength, heavyLimit),
+      recursive: /['"]get-chunk['"]/.test(String(media.html || '')) && byteLength < heavyLimit,
       sizeLabel: formatGridBytes(Math.max(byteLength, String(media.html || '').length)),
       active: false,
       intersecting: false,
@@ -289,11 +302,13 @@ export const createLiveHtmlFrameManager = ({ injectHtml, maxLiveFrames, mimeLabe
     };
     hint.textContent = posterHint(record);
 
-    poster.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      forceActivate(record);
-    });
+    if (!clickThrough) {
+      poster.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        forceActivate(record);
+      });
+    }
 
     tiles.set(thumbElement, record);
     thumbElement.append(frame, poster);
@@ -334,5 +349,9 @@ export const createLiveHtmlFrameManager = ({ injectHtml, maxLiveFrames, mimeLabe
     tiles.clear();
   };
 
-  return { register, reset, focusPreview, setSuspended };
+  // True when the preview is not loading and the fullscreen viewer is closed:
+  // the grid may start fetching and running small pages.
+  const isQuiet = () => !suspended && focus.until <= now();
+
+  return { register, reset, focusPreview, setSuspended, isQuiet };
 };
