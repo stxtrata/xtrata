@@ -1,0 +1,15 @@
+{
+ "pack": "electronic",
+ "tier": "core",
+ "count": 82,
+ "container": {
+  "file": "electronic.audpack",
+  "bytes": 2006572,
+  "sha256": "f3b4842a73a7fb27a5d43a26469b5968815fdc6019c62d918bf9184205cfc674",
+  "chunks16384": 123,
+  "indexBytes": 138806,
+  "indexGzipBytes": 21693,
+  "payloadBytes": 1984867
+ },
+ "wavBytes": 5885326
+}
