@@ -83,8 +83,11 @@ cd canaries/build && python3 -m http.server 8080
 | 10 | Submit | wallet | A real run (Swerve) under your address, stored, hash-checked, re-played from the chain bytes in v1.4 (skipped if your entry from an earlier launch is already as good) |
 | 11-13 | Copycat | wallet, copycat | The stored replay from another wallet is refused with `(err u113)`; funds swept back |
 | 14 | Close canary board | wallet | Test board disabled before the production boards move |
-| 15 | Production boards | wallet x 3, then automatic | The temporary wallet is funded (about 0.6 STX), made contract owner, signs `set-board` for all 26 boards with the parent as engine id, hands ownership back and is swept. Top 10s and stored replays are kept |
-| 16 | Audit | none | Every board and inscription re-read; lists the repo and site changes to make |
+| 15 | Create and fund the board-signing wallet | wallet | The temporary wallet's key is saved to a file and your wallet sends it about 0.6 STX for fees (skipped if no board needs updating) |
+| 16 | Make it the contract owner | wallet, temporary wallet | `propose-owner` from your wallet, `accept-owner` from the temporary wallet |
+| 17 | Production boards | temporary wallet | `set-board` for all 26 boards with the parent as engine id, signed automatically one after another; Top 10s and stored replays are kept |
+| 18 | Hand ownership back | wallet, temporary wallet | The temporary wallet proposes you as owner, your wallet accepts, leftovers are swept |
+| 19 | Audit | none | Every board and inscription re-read; lists the repo and site changes to make |
 
 Cost on mainnet: three inscriptions, each in one transaction (`mint-single-tx-with-relationships`,
 0.01 STX plus 0.001 STX per chunk, so about 0.02 STX each), so 3 wallet signatures for the
@@ -128,7 +131,7 @@ chain and nothing is sent twice.
 ## Updating the production boards automatically
 
 `set-board` only works for the leaderboard contract's owner, so a funded temporary wallet cannot sign it on
-its own. Step 15 therefore does a short, resumable hand-over:
+its own. Steps 15 to 18 therefore do a short, resumable hand-over:
 
 1. It saves the temporary wallet's key to a file and asks you to confirm.
 2. Your wallet sends the temporary wallet enough for the fees (Xverse cannot sign a plain transfer from a
