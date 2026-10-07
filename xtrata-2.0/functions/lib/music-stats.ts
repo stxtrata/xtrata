@@ -11,16 +11,24 @@ import {applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey} from './hir
  * advances the cursor past a gap, and re-reading a page is harmless (txid is the key).
  * A read that failed is reported as failed, never as zero.
  */
-export const PAGE_SIZE = 20;
-export const MAX_PAGES_PER_REFRESH = 120;
+// Hiro caps `limit` at 50 on both log endpoints.
+export const PAGE_SIZE = 50;
+// Each page can cost two chain reads (see hiroPage), and a Pages Function may make only a limited
+// number of outbound requests per call, so one refresh stays well inside 50.
+export const MAX_PAGES_PER_REFRESH = 20;
 export const MIN_REFRESH_MS = 20_000;
 // The first visitor waits for this much history; the rest is copied by later refreshes.
-export const FIRST_VISIT_PAGES = 15;
+export const FIRST_VISIT_PAGES = 5;
 
 type Db = {prepare(query: string): any; batch(statements: any[]): Promise<any[]>};
 export type StatsEnv = {DB?: Db} & Record<string, unknown>;
 type Transport = typeof fetch;
-type LogPage = {total: number; results: any[]};
+// `total` is null when the endpoint that answered does not report one (the v1 events endpoint).
+type LogPage = {total: number | null; results: any[]};
+// Hiro's v2 logs endpoint rejects offsets above this with HTTP 400; older history needs the v1 endpoint.
+const V2_MAX_OFFSET = 1000;
+// Reported as syncError when Hiro answered but the body was not a contract log page.
+const INVALID_RESPONSE = -2;
 
 export type MusicStats = {
   version: 1;
@@ -60,24 +68,34 @@ async function hiroFetch(env: StatsEnv, transport: Transport, url: string): Prom
 
 async function hiroPage(env: StatsEnv, transport: Transport, offset: number, limit: number): Promise<LogPage> {
   const id = encodeURIComponent(PAID_PLAYS_CONTRACT);
+  // v2 reports the running total, but only serves the newest V2_MAX_OFFSET + limit events.
+  // v1 serves any offset but reports no total.
+  const attempts: Array<{path: string; v2: boolean}> = [];
+  if (offset <= V2_MAX_OFFSET) attempts.push({path: `/extended/v2/smart-contracts/${id}/logs?limit=${limit}&offset=${offset}`, v2: true});
+  attempts.push({path: `/extended/v1/contract/${id}/events?limit=${limit}&offset=${offset}`, v2: false});
   let last: unknown;
-  for (const path of [
-    `/extended/v2/smart-contracts/${id}/logs?limit=${limit}&offset=${offset}`,
-    `/extended/v1/contract/${id}/events?limit=${limit}&offset=${offset}`
-  ]) {
+  for (const {path, v2} of attempts) {
     try {
       const response = await hiroFetch(env, transport, hiroBase(env) + path);
       if (response.status === 429) throw Object.assign(Error('Hiro rate limit'), {status: 429});
       if (!response.ok) throw Object.assign(Error(`Hiro HTTP ${response.status}`), {status: response.status});
       const data: any = await response.json();
-      if (!Array.isArray(data.results) || !Number.isSafeInteger(data.total) || data.total < 0) throw Error('Invalid contract log response');
-      return {total: data.total, results: data.results};
+      const valid = Array.isArray(data?.results) && (!v2 || (Number.isSafeInteger(data.total) && data.total >= 0));
+      if (!valid) throw Object.assign(Error('Invalid contract log response'), {status: INVALID_RESPONSE});
+      return {total: v2 ? data.total : null, results: data.results};
     } catch (error: any) {
       if (error?.status === 429) throw error;
       last = error;
     }
   }
   throw last instanceof Error ? last : Error('Contract activity is unavailable');
+}
+
+// The newest total, or throws. Costs one small v2 read.
+async function currentTotal(env: StatsEnv, transport: Transport): Promise<number> {
+  const total = (await hiroPage(env, transport, 0, 1)).total;
+  if (total === null) throw Object.assign(Error('Invalid contract log response'), {status: INVALID_RESPONSE});
+  return total;
 }
 
 async function readState(db: Db): Promise<{cursor: number; total: number; checkedAt: number; lastStatus: number}> {
@@ -109,14 +127,16 @@ export async function refreshMusicStats(
   let cursor = state.cursor, total: number | null = null, pages = 0, copied = 0;
   try {
     while (pages < maxPages) {
-      if (total === null) total = (await hiroPage(env, transport, 0, 1)).total;
+      if (total === null) total = await currentTotal(env, transport);
       if (cursor >= total) break;
       const start = cursor + 1;
       const end = Math.min(start + PAGE_SIZE - 1, total);
       const offset = total - end;
       const page = await hiroPage(env, transport, offset, end - start + 1);
       pages++;
-      total = page.total;
+      // The v1 endpoint reports no total. Ask again after the page: if it still equals the total
+      // the offset was computed from, no event arrived while reading, so the page is aligned.
+      total = page.total ?? await currentTotal(env, transport);
       if (!page.results.length) break;
       // Results are newest first; absolute position of result j is high - j.
       const high = total - offset;

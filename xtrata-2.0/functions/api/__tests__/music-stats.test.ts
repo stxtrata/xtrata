@@ -43,20 +43,28 @@ function event(n: number, payer: number, over: {amount?: number; time?: number |
   };
 }
 
-/** A fake Hiro: `log` is oldest first; responses are newest first like the real API. */
+/**
+ * A fake Hiro that keeps the real API's rules: `log` is oldest first, results are newest first,
+ * limit is capped at 50, v2 rejects offsets above 1000 and v1 reports no total.
+ */
 function hiro(log: any[], hooks: {after?: (call: number) => void; fail?: (call: number) => boolean} = {}) {
   let call = 0;
+  const seen: string[] = [];
   const transport = (async (url: any) => {
     call++;
     if (hooks.fail?.(call)) return new Response('{}', {status: 429});
     const u = new URL(String(url));
+    const v2 = u.pathname.includes('/v2/');
+    seen.push(v2 ? 'v2' : 'v1');
     const offset = Number(u.searchParams.get('offset')), limit = Number(u.searchParams.get('limit'));
+    if (limit > 50 || (v2 && offset > 1000)) return Response.json({statusCode: 400, error: 'Bad Request'}, {status: 400});
     const results = log.slice().reverse().slice(offset, offset + limit);
-    const body = {total: log.length, limit, offset, results};
+    const body: any = {limit, offset, results};
+    if (v2) body.total = log.length;
     hooks.after?.(call);
     return Response.json(body);
   }) as unknown as typeof fetch;
-  return {transport, calls: () => call};
+  return {transport, calls: () => call, seen};
 }
 
 const T0 = 1_800_000_000_000;
@@ -128,7 +136,7 @@ describe('Music supporter statistics', () => {
   });
 
   it('keeps progress and reports failure when the chain read is rate limited', async () => {
-    const log = Array.from({length: 100}, (_, i) => event(i + 1, 1 + (i % 4)));
+    const log = Array.from({length: 3 * PAGE_SIZE}, (_, i) => event(i + 1, 1 + (i % 4)));
     const db = database(), h = hiro(log, {fail: call => call === 4});
     const failed = await refreshMusicStats({DB: db as any}, h.transport, T0);
     expect(failed.ok).toBe(false);
@@ -138,7 +146,42 @@ describe('Music supporter statistics', () => {
     expect(partial.complete).toBe(false);
     const healed = await refreshMusicStats({DB: db as any}, h.transport, T0 + MIN_REFRESH_MS);
     expect(healed.ok).toBe(true);
-    expect((await readMusicStats({DB: db as any})).plays).toBe(100);
+    expect((await readMusicStats({DB: db as any})).plays).toBe(3 * PAGE_SIZE);
+  });
+
+  it('reads history older than the v2 window through the v1 endpoint', async () => {
+    const log = Array.from({length: 1240}, (_, i) => event(i + 1, 1 + (i % 97)));
+    const db = database(), h = hiro(log);
+    for (let round = 0; round < 6; round++) await refreshMusicStats({DB: db as any}, h.transport, T0 + round * MIN_REFRESH_MS);
+    expect(h.seen).toContain('v1');
+    const stats = await readMusicStats({DB: db as any});
+    const heroes = aggregateHeroes(log.map(parsePaidPlayEvent).filter(Boolean));
+    expect(stats).toMatchObject({plays: 1240, supporters: heroes.length, complete: true, syncError: null});
+    expect(stats.latest[0].at).not.toBeNull(); // newest events come from v2, which has block times
+  });
+
+  it('never skips events when new ones arrive while a v1 page is being read', async () => {
+    const log = Array.from({length: 1100}, (_, i) => event(i + 1, 1 + (i % 61)));
+    const db = database();
+    let slid = false;
+    const h = hiro(log, {after: () => { if (!slid && h.seen.at(-1) === 'v1') { slid = true; log.push(event(1101, 900), event(1102, 901)); } }});
+    for (let round = 0; round < 6; round++) await refreshMusicStats({DB: db as any}, h.transport, T0 + round * MIN_REFRESH_MS);
+    expect(slid).toBe(true);
+    expect(await readMusicStats({DB: db as any})).toMatchObject({plays: 1102, supporters: 63, complete: true});
+  });
+
+  it('stays within a safe number of chain reads per refresh', async () => {
+    const log = Array.from({length: 3000}, (_, i) => event(i + 1, 1 + (i % 400)));
+    const db = database(), h = hiro(log);
+    await refreshMusicStats({DB: db as any}, h.transport, T0);
+    expect(h.calls()).toBeLessThanOrEqual(45);
+  });
+
+  it('reports an unreadable Hiro answer as its own error, not as a network failure', async () => {
+    const db = database();
+    const odd = (async () => Response.json({unexpected: true})) as unknown as typeof fetch;
+    await refreshMusicStats({DB: db as any}, odd, T0);
+    expect((await readMusicStats({DB: db as any})).syncError).toBe(-2);
   });
 
   it('ignores other contracts, wrong amounts and repeated transactions, but still advances', async () => {
@@ -158,8 +201,8 @@ describe('Music supporter statistics', () => {
   describe('Hiro access', () => {
     const log = Array.from({length: 30}, (_, i) => event(i + 1, 1 + (i % 4)));
     const served = (init: any) => {
-      const results = log.slice().reverse().slice(0, 20);
-      return Response.json({total: log.length, limit: 20, offset: 0, results});
+      const results = log.slice().reverse().slice(0, 50);
+      return Response.json({total: log.length, limit: 50, offset: 0, results});
     };
     it('sends the configured keys the way the /hiro proxy does and rotates on a rejection', async () => {
       const seen: Array<string | null> = [];
