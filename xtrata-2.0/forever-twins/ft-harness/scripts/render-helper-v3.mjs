@@ -17,6 +17,12 @@
 //   maxFeeUstx         ceiling on set-fee, fixed forever at deploy
 //   rescueEnabled      true | false  (spec decision D2)
 //   rescueDelayBurnBlocks  e.g. 432 (~3 days of Bitcoin blocks)
+//   sourceOwnerRead    optional: "readonly" (default; source get-owner is read-only) or "public"
+//                      (source get-owner is define-public, e.g. Bitcoin Birds v1). "public" needs
+//                      heldIdsReadFn. The two read-only views then answer custody from the source's
+//                      per-owner id list instead of get-owner; the public paths are unchanged.
+//   heldIdsReadFn      "public" only: READ-ONLY source fn (principal) -> { ids: (list N uint) },
+//                      e.g. "get-birds-entry-by-owner"
 //   profileTier        must be "S" (standard). Adapters are separate contracts.
 //   largeOnDemand      optional boolean, default false. true: finalisation does not wait for large
 //                      (over 512 KB) entries, and anyone may twin one later with inscribe-large.
@@ -71,6 +77,11 @@ export function render(cfg, { example = false } = {}) {
   if (typeof cfg.rescueEnabled !== 'boolean') throw new Error('rescueEnabled must be boolean');
   if (cfg.largeOnDemand !== undefined && typeof cfg.largeOnDemand !== 'boolean') throw new Error('largeOnDemand must be boolean');
   const lod = cfg.largeOnDemand === true;
+  const ownerRead = cfg.sourceOwnerRead ?? 'readonly';
+  if (!['readonly', 'public'].includes(ownerRead)) throw new Error('sourceOwnerRead must be "readonly" or "public"');
+  const pubOwn = ownerRead === 'public';
+  if (pubOwn && !/^[a-z][a-z0-9-]*$/.test(cfg.heldIdsReadFn ?? '')) throw new Error('sourceOwnerRead "public" needs a valid heldIdsReadFn');
+  if (!pubOwn && cfg.heldIdsReadFn !== undefined) throw new Error('heldIdsReadFn is only for sourceOwnerRead "public"');
 
   const master = principal(cfg.master, 'master', { contract: 'yes' });
   const source = principal(cfg.source, 'source', { contract: 'yes' });
@@ -89,6 +100,7 @@ export function render(cfg, { example = false } = {}) {
   const values = {
     GROUP: cfg.group,
     LISTING_READ_FN: listingReadFn,
+    HELD_IDS_READ_FN: pubOwn ? cfg.heldIdsReadFn : '',
     COLLECTION_KEY: cfg.collectionKey,
     MASTER: master,
     SOURCE: source,
@@ -107,10 +119,18 @@ export function render(cfg, { example = false } = {}) {
     .replace(new RegExp(`;;@${cfg.group}-(BEGIN|END)\\n`, 'g'), '');
   // large-on-demand: keep the LOD blocks or the NOLOD blocks, never both
   const dropLod = lod ? 'NOLOD' : 'LOD', keepLod = lod ? 'LOD' : 'NOLOD';
-  const tmpl = tmpl0
+  const tmpl1 = tmpl0
     .replace(new RegExp(`;;@${dropLod}-BEGIN\\n[\\s\\S]*?;;@${dropLod}-END\\n`, 'g'), '')
     .replace(new RegExp(`;;@${keepLod}-(BEGIN|END)\\n`, 'g'), '');
-  if (/;;@(G[12]|LOD|NOLOD)-/.test(tmpl)) throw new Error('unbalanced markers in template');
+  // public-owner sources keep the PUBOWN block; standard sources render byte-identically to before
+  // (the read-only views call source-owner / is-some directly)
+  const tmplO = pubOwn
+    ? tmpl1.replace(/;;@PUBOWN-(BEGIN|END)\n/g, '')
+    : tmpl1.replace(/;;@PUBOWN-BEGIN\n[\s\S]*?;;@PUBOWN-END\n/g, '')
+        .replace(/\(source-owner-ro token-id\)/g, '(source-owner token-id)')
+        .replace(/\(source-live o\)/g, '(is-some o)');
+  const tmpl = tmplO;
+  if (/;;@(G[12]|LOD|NOLOD|PUBOWN)-/.test(tmpl)) throw new Error('unbalanced markers in template');
   const out = tmpl.replace(/\{\{([A-Z_]+)\}\}/g, (_, k) => {
     if (!(k in values)) throw new Error(`unknown placeholder ${k}`);
     return values[k];

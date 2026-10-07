@@ -28,7 +28,7 @@ const hasFn = (c, f) => ifaces.get(c).functions.some((x) => x.name === f);
 const consistent = (h, id) => JSON.stringify(val(ro(h, 'get-custody-state', [Cl.uint(id)]))).includes('"consistent":{"type":"bool","value":true}');
 const stranded = (h, id) => JSON.stringify(val(ro(h, 'get-custody-state', [Cl.uint(id)]))).includes('"stranded":{"type":"bool","value":true}');
 
-const cfg = JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources;
+const cfg = JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources.filter((x) => !x.v3Only);
 const sources = [
   { name: 'zombie-wabbits', group: 'G1', family: 'stacksart', mint: 'public-mint' },
   ...cfg.filter((x) => x.family === 'stacksart'),

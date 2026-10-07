@@ -1,4 +1,4 @@
-;; forever-twin-helper-v3 :: {{COLLECTION_KEY}} :: group {{GROUP}}
+;; forever-twin-helper-v3 :: bitcoin-birds :: group G1
 ;; ---------------------------------------------------------------------------
 ;; STATUS: REFERENCE PROTOTYPE. Supersedes forever-twin-helper-v2 for new
 ;; deployments. Passes sim/family-suite-v3.mjs on simnet. NOT audited.
@@ -62,30 +62,27 @@
 (define-constant ERR-FEE-CAP (err u214))
 (define-constant ERR-BAD-CANONICAL (err u215))
 (define-constant ERR-RESCUE-DISABLED (err u216))
-;;@G2-BEGIN
-(define-constant ERR-LISTED (err u217))
-;;@G2-END
 (define-constant ERR-FEE-ODD (err u218))
 (define-constant ERR-NO-PENDING-OWNER (err u219))
 (define-constant ERR-PREBIND-MISMATCH (err u220))
 (define-constant ERR-PREBIND-PENDING (err u221))
 
 (define-constant INTERFACE-VERSION u3)
-(define-constant COLLECTION-KEY "{{COLLECTION_KEY}}")
-(define-constant MASTER {{MASTER}})
-(define-constant SOURCE {{SOURCE}})
-(define-constant PAYEE-A {{PAYEE_A}})
-(define-constant PAYEE-B {{PAYEE_B}})
-(define-constant MAX-FEE {{MAX_FEE_USTX}})
-(define-constant RESCUE-ENABLED {{RESCUE_ENABLED}})
-(define-constant RESCUE-DELAY {{RESCUE_DELAY_BURN_BLOCKS}})
+(define-constant COLLECTION-KEY "bitcoin-birds")
+(define-constant MASTER .xtrata-v3-2-3)
+(define-constant SOURCE .bitcoin-birds)
+(define-constant PAYEE-A 'STMGEYD8AKTNZZ9FWVMKFD8ZZ1GB14T3D4M5WYCH)
+(define-constant PAYEE-B 'ST1YBSKDQSKVWWK8Y7RBZMQCP2VHRW1Y9GJY00DGA)
+(define-constant MAX-FEE u5000000)
+(define-constant RESCUE-ENABLED true)
+(define-constant RESCUE-DELAY u3)
 (define-constant MAX-SINGLE-TX-BYTES u524288)
 (define-constant MAX-RECORD-BYTES u33554432) ;; core cap: 2048 chunks x 16,384 bytes
 
 ;; --- owner and fee -------------------------------------------------------------
 (define-data-var contract-owner principal tx-sender)
 (define-data-var pending-owner (optional principal) none)
-(define-data-var inscribe-fee uint {{INITIAL_FEE_USTX}})
+(define-data-var inscribe-fee uint u1000000)
 
 ;; --- canonical record ----------------------------------------------------------
 (define-data-var canonical-finalized bool false)
@@ -122,9 +119,8 @@
 ;; read-only checker cannot resolve a constant-bound contract-call? target and
 ;; would reject get-custody-state / stray-side as "writing". Verified in simnet.
 (define-private (source-owner (token-id uint))
-  (unwrap-panic (contract-call? {{SOURCE}} get-owner token-id)))
+  (unwrap-panic (contract-call? .bitcoin-birds get-owner token-id)))
 
-;;@PUBOWN-BEGIN
 ;; PUBLIC-OWNER SOURCES (profile FT-CP-1 variant). This source's `get-owner` is
 ;; declared `define-public`, so no read-only function may call it. The public
 ;; paths (swaps, inscribe, rescue execution) still use the real `get-owner`
@@ -135,29 +131,22 @@
 ;; get-custody-state `original-owner` is (some this-contract) when held and
 ;; none otherwise; none then means "not held here", not "burned".
 (define-private (source-held-by-me (token-id uint))
-  (is-some (index-of? (get ids (contract-call? {{SOURCE}} {{HELD_IDS_READ_FN}} current-contract)) token-id)))
+  (is-some (index-of? (get ids (contract-call? .bitcoin-birds get-birds-entry-by-owner current-contract)) token-id)))
 
 (define-private (source-owner-ro (token-id uint))
   (if (source-held-by-me token-id) (some current-contract) none))
 
 (define-private (source-live (o (optional principal))) true)
 
-;;@PUBOWN-END
 (define-private (twin-owner (xtrata-id uint))
-  (unwrap-panic (contract-call? {{MASTER}} get-owner xtrata-id)))
-;;@G2-BEGIN
-
-;; G2: the source's own listing record for this token, whatever its tuple shape.
-(define-private (source-listed (token-id uint))
-  (is-some (contract-call? {{SOURCE}} {{LISTING_READ_FN}} token-id)))
-;;@G2-END
+  (unwrap-panic (contract-call? .xtrata-v3-2-3 get-owner xtrata-id)))
 
 (define-private (release-twin-to (id uint) (recipient principal))
   (as-contract? ((with-nft MASTER "xtrata-inscription" (list id)))
     (try! (contract-call? MASTER transfer id current-contract recipient))))
 
 (define-private (release-original-to (id uint) (recipient principal))
-  (as-contract? ((with-nft SOURCE "{{SOURCE_ASSET}}" (list id)))
+  (as-contract? ((with-nft SOURCE "bitcoin-birds" (list id)))
     (try! (contract-call? SOURCE transfer id current-contract recipient))))
 
 ;; Each payee receives exactly half of the fee. A payee who inscribes pays only
@@ -224,9 +213,7 @@
     (try! (assert-owner))
     (asserts! (not (var-get canonical-finalized)) ERR-FINALIZED)
     (asserts! (is-eq expected-count (var-get canonical-count)) ERR-COUNT-MISMATCH)
-;;@NOLOD-BEGIN
     (asserts! (is-eq (var-get large-unbound) u0) ERR-PREBIND-PENDING)
-;;@NOLOD-END
     (var-set manifest-hash manifest)
     (var-set canonical-finalized true)
     (print { event: "canonical-finalized", collection: COLLECTION-KEY, manifest-hash: manifest, canonical-count: expected-count })
@@ -275,59 +262,6 @@
              fee: u0, route: "preinscribed" })
     (ok xtrata-id)))
 
-;;@LOD-BEGIN
-;; =============================================================================
-;; large-on-demand (this helper only): anyone may twin a large token after
-;; finalisation. `finalize-canonical` does not wait for large entries; each one
-;; is completed later by whoever funds it. The funder inscribes the file through
-;; the core's multi-transaction upload (begin-inscription -> add-chunk-batch ->
-;; seal-inscription, passing the record's content-hash, mime, total-size and
-;; token-uri) and then calls inscribe-large with the resulting inscription.
-;;  - same checks as bind-preinscribed: the core's record of that inscription must
-;;    equal this token's canonical entry exactly, and the caller must hold it
-;;  - same fee as inscribe (50/50 to the fixed payees); the twin moves from the
-;;    caller into custody in the same call, exactly the state `inscribe` leaves
-;;  - core upload sessions are keyed by (uploader, hash), so nobody else can touch
-;;    or block an upload in progress; if someone else binds the token first the
-;;    funder keeps a valid inscription and loses only the core fees
-;; =============================================================================
-(define-public (inscribe-large (token-id uint) (xtrata-id uint))
-  (let (
-      (c (unwrap! (map-get? Canonical token-id) ERR-NOT-CANONICAL))
-      (orig-owner (unwrap! (source-owner token-id) ERR-NO-SUCH-TOKEN))
-      (m (unwrap! (contract-call? MASTER get-inscription-meta xtrata-id) ERR-PREBIND-MISMATCH))
-      (uri (unwrap! (contract-call? MASTER get-token-uri-raw xtrata-id) ERR-PREBIND-MISMATCH))
-      (n (+ (var-get inscribed-count) u1))
-    )
-    (asserts! (var-get canonical-finalized) ERR-NOT-FINALIZED)
-    ;; small entries use `inscribe`
-    (asserts! (is-large (get total-size c)) ERR-PREBIND-MISMATCH)
-    (asserts! (is-none (map-get? Bindings token-id)) ERR-ALREADY-INSCRIBED)
-    ;; an original already sitting in this contract would be born stranded
-    (asserts! (not (is-eq orig-owner current-contract)) ERR-CUSTODY)
-    ;; the twin must be exactly what the record fixes
-    (asserts! (and (get sealed m)
-                   (is-eq (get final-hash m) (get content-hash c))
-                   (is-eq (get total-size m) (get total-size c))
-                   (is-eq (get mime-type m) (get mime c))
-                   (is-eq uri (get token-uri c))) ERR-PREBIND-MISMATCH)
-    ;; the caller must hold it; it moves into custody in this same call
-    (asserts! (is-eq (twin-owner xtrata-id) (some tx-sender)) ERR-CUSTODY)
-    (asserts! (map-insert TwinToOriginal xtrata-id token-id) ERR-ALREADY-INSCRIBED)
-    (try! (charge-fee tx-sender))
-    (try! (contract-call? MASTER transfer xtrata-id tx-sender current-contract))
-    (asserts! (is-eq (twin-owner xtrata-id) (some current-contract)) ERR-CUSTODY)
-    (map-insert Bindings token-id {
-      xtrata-id: xtrata-id, content-hash: (get content-hash c), inscriber: tx-sender,
-      xtrata-escrowed: true, at: stacks-block-height })
-    (var-set large-unbound (- (var-get large-unbound) u1))
-    (var-set inscribed-count n)
-    (print { event: "inscribed", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: xtrata-id,
-             content-hash: (get content-hash c), inscriber: tx-sender, inscribed-count: n,
-             fee: (var-get inscribe-fee), route: "large-on-demand" })
-    (ok xtrata-id)))
-
-;;@LOD-END
 ;; =============================================================================
 ;; inscribe: anyone may fund; the canonical record fixes everything but the chunks
 ;; =============================================================================
@@ -369,14 +303,8 @@
         (x-id (get xtrata-id b)))
     (asserts! (get xtrata-escrowed b) ERR-WRONG-STATE)
     (asserts! (is-eq (twin-owner x-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
-    (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (contract-call? SOURCE transfer token-id tx-sender current-contract))
     (asserts! (is-eq (source-owner token-id) (some current-contract)) ERR-CUSTODY)
-;;@G2-BEGIN
-    (asserts! (not (source-listed token-id)) ERR-LISTED)
-;;@G2-END
     (try! (release-twin-to x-id tx-sender))
     (map-set Bindings token-id (merge b { xtrata-escrowed: false }))
     (print { event: "swap-original-for-twin", collection: COLLECTION-KEY, token-id: token-id, xtrata-id: x-id, holder: tx-sender })
@@ -483,12 +411,7 @@
 ;; =============================================================================
 (define-read-only (get-twin-interface)
   { interface-version: INTERFACE-VERSION, collection-key: COLLECTION-KEY, master: MASTER, source: SOURCE,
-;;@G1-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G1",
-;;@G1-END
-;;@G2-BEGIN
-    source-asset: "{{SOURCE_ASSET}}", route: "standard", group: "G2",
-;;@G2-END
+    source-asset: "bitcoin-birds", route: "standard", group: "G1",
     canonical-finalized: (var-get canonical-finalized),
     canonical-count: (var-get canonical-count), manifest-hash: (var-get manifest-hash),
     inscribed-count: (var-get inscribed-count), swaps-enabled: true, large-unbound: (var-get large-unbound),
@@ -500,9 +423,6 @@
 (define-read-only (get-canonical (token-id uint)) (map-get? Canonical token-id))
 (define-read-only (get-original-by-twin (xtrata-id uint)) (map-get? TwinToOriginal xtrata-id))
 (define-read-only (get-rescue (token-id uint)) (map-get? Rescues token-id))
-;;@G2-BEGIN
-(define-read-only (is-source-listed (token-id uint)) (source-listed token-id))
-;;@G2-END
 (define-read-only (fee-for (payer principal)) (fee-for-internal payer))
 (define-read-only (get-fee) (ok (var-get inscribe-fee)))
 (define-read-only (get-payees) { payee-a: PAYEE-A, payee-b: PAYEE-B, per-payee: (half) })

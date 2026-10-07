@@ -1,0 +1,194 @@
+{
+  "suite": "birds-edge-v3",
+  "ranAt": "2026-10-07T20:39:13.112Z",
+  "environment": "clarinet-sdk simnet (local). Not mainnet state.",
+  "pass": 29,
+  "fail": 0,
+  "results": [
+    {
+      "id": "B-1",
+      "title": "full supply mints; id 0 exists; supply cap holds",
+      "specRef": "B-1",
+      "checks": [
+        {
+          "label": "400 mints succeed",
+          "pass": true,
+          "detail": "400"
+        },
+        {
+          "label": "ids are exactly 0..399, each once",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "401st mint refused (u101)",
+          "pass": true,
+          "detail": "101"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "B-2",
+      "title": "read-only views before any custody",
+      "specRef": "B-2",
+      "checks": [
+        {
+          "label": "stray-side(0) is none while the holder owns it",
+          "pass": true,
+          "detail": "{\"type\":\"(optional none)\",\"value\":null}"
+        },
+        {
+          "label": "get-custody-state(0) is none before binding",
+          "pass": true,
+          "detail": "{\"type\":\"(optional none)\",\"value\":null}"
+        },
+        {
+          "label": "owner finalises the 400-entry record",
+          "pass": true,
+          "detail": ""
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "B-3",
+      "title": "ids 0 and 399 inscribe, swap in, report consistent",
+      "specRef": "B-3",
+      "checks": [
+        {
+          "label": "sponsor inscribes id 0",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "holder swaps id 0 in",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 0 custody consistent (id-list path)",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint)))\",\"value\":{\"type\":\"(tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint))\",\"value\":{\"consistent\":{\"type\":\"bool\",\"value\":true},\"original-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.ft3-bitcoin-birds\"}},\"stranded\":{\"type\":\"bool\",\"value\":false},\"twin-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5\"}},\"xtrata-escrowed\":{\"type\":\"bool\",\"value\":false},\"xtrata-id\":{\"type\":\"uint\",\"value\":\"0\"}}}}"
+        },
+        {
+          "label": "id 0 is not stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "sponsor inscribes id 399",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "holder swaps id 399 in",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 399 custody consistent (id-list path)",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint)))\",\"value\":{\"type\":\"(tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint))\",\"value\":{\"consistent\":{\"type\":\"bool\",\"value\":true},\"original-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.ft3-bitcoin-birds\"}},\"stranded\":{\"type\":\"bool\",\"value\":false},\"twin-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5\"}},\"xtrata-escrowed\":{\"type\":\"bool\",\"value\":false},\"xtrata-id\":{\"type\":\"uint\",\"value\":\"1\"}}}}"
+        },
+        {
+          "label": "id 399 is not stranded",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "an unbound, holder-owned id reports no stray",
+          "pass": true,
+          "detail": "{\"type\":\"(optional none)\",\"value\":null}"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "B-4",
+      "title": "helper holds the whole collection (id list at its 400 cap)",
+      "specRef": "B-4",
+      "checks": [
+        {
+          "label": "398 remaining originals transferred to the helper (list reaches 400)",
+          "pass": true,
+          "detail": "398 "
+        },
+        {
+          "label": "source id list for the helper holds all 400",
+          "pass": true,
+          "detail": "400"
+        },
+        {
+          "label": "every id is owned by the helper per get-owner",
+          "pass": true,
+          "detail": "400"
+        },
+        {
+          "label": "stray-side(0): bound and twin escrow flag false -> consistent, not stray",
+          "pass": true,
+          "detail": "{\"type\":\"(optional none)\",\"value\":null}"
+        },
+        {
+          "label": "stray-side(200): unbound original sent directly is reported as stray \"original\"",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (string-ascii 8))\",\"value\":{\"type\":\"(string-ascii 8)\",\"value\":\"original\"}}"
+        },
+        {
+          "label": "stray-side(398) likewise",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (string-ascii 8))\",\"value\":{\"type\":\"(string-ascii 8)\",\"value\":\"original\"}}"
+        },
+        {
+          "label": "get-custody-state(399) still consistent at the cap",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint)))\",\"value\":{\"type\":\"(tuple (consistent bool) (original-owner (optional principal)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint))\",\"value\":{\"consistent\":{\"type\":\"bool\",\"value\":true},\"original-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.ft3-bitcoin-birds\"}},\"stranded\":{\"type\":\"bool\",\"value\":false},\"twin-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5\"}},\"xtrata-escrowed\":{\"type\":\"bool\",\"value\":false},\"xtrata-id\":{\"type\":\"uint\",\"value\":\"1\"}}}}"
+        }
+      ],
+      "notes": []
+    },
+    {
+      "id": "B-5",
+      "title": "redemption and rescue at the cap",
+      "specRef": "B-5",
+      "checks": [
+        {
+          "label": "holder redeems id 0 (list drops to 399)",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "id 0 custody consistent after redemption (twin held, original with the holder)",
+          "pass": true,
+          "detail": "{\"type\":\"(optional (tuple (consistent bool) (original-owner (optional none)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint)))\",\"value\":{\"type\":\"(tuple (consistent bool) (original-owner (optional none)) (stranded bool) (twin-owner (optional principal)) (xtrata-escrowed bool) (xtrata-id uint))\",\"value\":{\"consistent\":{\"type\":\"bool\",\"value\":true},\"original-owner\":{\"type\":\"(optional none)\",\"value\":null},\"stranded\":{\"type\":\"bool\",\"value\":false},\"twin-owner\":{\"type\":\"(optional principal)\",\"value\":{\"type\":\"principal\",\"value\":\"ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.ft3-bitcoin-birds\"}},\"xtrata-escrowed\":{\"type\":\"bool\",\"value\":true},\"xtrata-id\":{\"type\":\"uint\",\"value\":\"0\"}}}}"
+        },
+        {
+          "label": "twin of id 0 back in helper custody",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "id 0 can be swapped back in",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "label": "owner proposes rescue of stray id 200",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "rescue executes after the delay; id 200 back with the holder",
+          "pass": true,
+          "detail": "ok"
+        },
+        {
+          "label": "stray-side(200) cleared",
+          "pass": true,
+          "detail": "{\"type\":\"(optional none)\",\"value\":null}"
+        }
+      ],
+      "notes": []
+    }
+  ]
+}
