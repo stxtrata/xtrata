@@ -304,6 +304,7 @@ const TokenCard = (props: {
             client={props.client}
             fallbackClient={props.fallbackClient}
             isActiveTab={props.isActiveTab}
+            deferPlayableMedia
           />
         </div>
         <div className="token-card__meta" aria-hidden="true">

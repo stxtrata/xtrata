@@ -13,6 +13,7 @@
 // - The wallet needs a little STX for fees (default 0.003 STX per transfer). The dry run says how much.
 // - The Stacks mempool holds about 25 pending transactions per sender, so each --send run sends at most
 //   --max (default 20). Wait for them to confirm, then run it again; it works from what the wallet holds now.
+// - --only-identity moves just the AIBTC agent-identity NFT (use it with --to <new agent wallet>).
 // - AIBTC "agent-identity" NFTs are skipped unless you pass --include-identity (they link the wallet to its AIBTC registration).
 // - Every transfer carries a post-condition that the sender sends exactly that NFT.
 // - Add --curl if Node's fetch cannot reach the network on your machine.
@@ -21,7 +22,9 @@ import readline from 'node:readline';
 import { execFileSync } from 'node:child_process';
 import { mnemonicToSeedSync } from '@scure/bip39';
 import { HDKey } from '@scure/bip32';
+import { readFileSync, existsSync } from 'node:fs';
 import { StacksMainnet } from '@stacks/network';
+import { createApiKeyMiddleware, createFetchFn } from '@stacks/common';
 import {
   AnchorMode, PostConditionMode, NonFungibleConditionCode, TransactionVersion,
   broadcastTransaction, getAddressFromPrivateKey, makeContractCall,
@@ -38,14 +41,28 @@ const SEND = flag('--send');
 const USE_CURL = flag('--curl');
 const LIST_ONLY = arg('--list-only', null);
 const EXPECT = arg('--expect', null);
-const SKIP_IDENTITY = !flag('--include-identity');
+const ONLY_IDENTITY = flag('--only-identity');
+const SKIP_IDENTITY = !flag('--include-identity') && !ONLY_IDENTITY;
 const PATH = "m/44'/5757'/0'/0/0";
 const ADDR = /^SP[0-9A-Z]{38,40}$/;
 
+// Hiro API key: HIRO_API_KEY from the environment, else the HIRO_API_KEY line in xtrata-2.0/.env.local. Never printed.
+const loadApiKey = () => {
+  if (process.env.HIRO_API_KEY?.trim()) return process.env.HIRO_API_KEY.trim();
+  const f = new URL('../.env.local', import.meta.url);
+  if (existsSync(f)) {
+    const m = /^\s*HIRO_API_KEY\s*=\s*["']?([^"'\s#]+)/m.exec(readFileSync(f, 'utf8'));
+    if (m) return m[1];
+  }
+  return '';
+};
+const API_KEY = API.startsWith('https://api.hiro.so') ? loadApiKey() : ''; // the key is only ever sent to Hiro
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const getJson = async (path) => {
   const url = API + path;
-  if (USE_CURL) return JSON.parse(execFileSync('curl', ['-sS', '-m', '60', url], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
-  const r = await fetch(url);
+  if (USE_CURL) return JSON.parse(execFileSync('curl', ['-sS', '-m', '60', ...(API_KEY ? ['-H', `x-api-key: ${API_KEY}`] : []), url], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
+  const r = await fetch(url, API_KEY ? { headers: { 'x-api-key': API_KEY } } : undefined);
   if (!r.ok) throw new Error(`${r.status} ${url}`);
   return r.json();
 };
@@ -96,10 +113,11 @@ async function main() {
   if (from !== EXPECT) throw new Error(`this phrase controls ${from}, not ${EXPECT}. Stopping; nothing was signed.`);
   if (from === TO) throw new Error('--to is the same as the wallet');
 
-  console.log(`From : ${from}\nTo   : ${TO}\nMode : ${SEND ? 'SEND' : 'dry run (add --send to broadcast)'}\n`);
+  console.log(`From : ${from}\nTo   : ${TO}\nMode : ${SEND ? 'SEND' : 'dry run (add --send to broadcast)'}\nHiro API key: ${API_KEY ? 'loaded' : 'none (public rate limits apply)'}\n`);
   let items = await holdings(from);
   const identity = items.filter((t) => t.contract.includes('identity-registry'));
   if (SKIP_IDENTITY) items = items.filter((t) => !t.contract.includes('identity-registry'));
+  if (ONLY_IDENTITY) items = identity;
   console.log(`Holds ${items.length} NFTs to move${identity.length && SKIP_IDENTITY ? ` (${identity.length} AIBTC identity NFT left in place; --include-identity to move it)` : ''}:`);
   summarise(items);
 
@@ -114,7 +132,7 @@ async function main() {
 
   const n = await getJson(`/extended/v1/address/${from}/nonces`);
   let nonce = BigInt(n.possible_next_nonce);
-  const network = new StacksMainnet({ url: API });
+  const network = new StacksMainnet({ url: API, ...(API_KEY ? { fetchFn: createFetchFn(createApiKeyMiddleware({ apiKey: API_KEY })) } : {}) });
   let ok = 0;
   for (const t of batch) {
     const [addr, name] = t.contract.split('.');
@@ -125,10 +143,20 @@ async function main() {
       postConditionMode: PostConditionMode.Deny,
       postConditions: [makeStandardNonFungiblePostCondition(from, NonFungibleConditionCode.Sends, createAssetInfo(addr, name, t.assetName), uintCV(t.id))]
     });
-    const res = await broadcastTransaction(tx, network);
+    let res;
+    for (let attempt = 1; ; attempt++) {
+      try { res = await broadcastTransaction(tx, network); break; }
+      catch (e) {
+        // The public Hiro API rate-limits per minute and answers with plain text; wait and send the same signed tx again.
+        if (attempt >= 5) throw e;
+        console.log(`  rate-limited (attempt ${attempt}); waiting 30 s, then retrying #${t.id}`);
+        await sleep(30000);
+      }
+    }
     if (res.error) { console.error(`  #${t.id} (${t.assetName}): ${res.error} ${res.reason || ''}. Stopping.`); break; }
     ok++; nonce++;
     console.log(`  sent ${t.assetName} #${t.id}  ${res.txid}`);
+    await sleep(1500);
   }
   console.log(`\nBroadcast ${ok} of ${batch.length}. ${items.length - ok} still to move. Wait for these to confirm, then run again.`);
 }

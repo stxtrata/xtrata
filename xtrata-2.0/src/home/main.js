@@ -5868,10 +5868,94 @@
         tokenId: token.id
       });
 
+    // Live performance trace for the Explorer. Open the browser console and
+    // filter on "xtrata-perf", or run  copy(xtrataPerfReport())  and paste it.
+    // Every line is ms since the selection began, so the slow step stands out.
+    const perfTrace = [];
+    const perfState = { id: null, t0: 0 };
+    const perfBegin = (token) => {
+      perfState.id = token.id.toString();
+      perfState.t0 = performance.now();
+      perfTrace.length = 0;
+      perfMark('select', { size: String(token.meta?.totalSize ?? ''), mime: token.meta?.mimeType ?? '' });
+    };
+    const perfMark = (step, details = {}) => {
+      const at = Math.round(performance.now() - perfState.t0);
+      const row = { id: perfState.id, step, atMs: at, ...details };
+      perfTrace.push(row);
+      try { console.log('[xtrata-perf]', `#${row.id}`, `+${at}ms`, step, details); } catch {}
+    };
+    try {
+      window.xtrataPerf = perfTrace;
+      window.xtrataPerfReport = () => perfTrace
+        .map((r) => `+${r.atMs}ms  #${r.id}  ${r.step}  ${JSON.stringify({ ...r, id: undefined, step: undefined, atMs: undefined })}`)
+        .join('\n');
+    } catch {}
+
+    // Fast path: the server assembles inscription bytes once and caches them
+    // (/runtime/content), so a 5 MB / 350-chunk inscription arrives in seconds
+    // instead of the browser reading every chunk from the chain. Size-checked;
+    // returns null on any problem so callers fall back to on-chain reads.
+    // The server prepends a <base href> to HTML (a few bytes), so the raw length
+    // is slightly larger than the on-chain size. We remove exactly that tag and
+    // then require the byte count to equal the on-chain size; otherwise null.
+    const stripServerBaseTag = (bytes, expected) => {
+      if (bytes.length === expected) return bytes;
+      const extra = bytes.length - expected;
+      if (extra <= 0 || extra > 2048) return null;
+      const head = new TextDecoder('latin1').decode(bytes.subarray(0, 4096));
+      const match = /<base href="[^"]*">/i.exec(head);
+      if (!match || match[0].length !== extra) return null;
+      const out = new Uint8Array(expected);
+      out.set(bytes.subarray(0, match.index), 0);
+      out.set(bytes.subarray(match.index + extra), match.index);
+      return out;
+    };
+
+    const runtimeFetchInflight = new Map();
+    const fetchRuntimeContentBytes = (token) => {
+      const key = `${getTokenCacheContractId(token)}:${token.id}`;
+      const existing = runtimeFetchInflight.get(key);
+      if (existing) return existing;
+      const promise = (async () => {
+        try {
+          const url = getTokenRuntimeContentUrl(token);
+          const expected = Number(token.meta?.totalSize ?? 0n);
+          if (!url || !(expected > 0)) return null;
+          const began = performance.now();
+          perfMark('runtime-fetch:start', { url });
+          const response = await fetch(url, { credentials: 'omit' });
+          perfMark('runtime-fetch:headers', {
+            status: response.status,
+            cache: response.headers.get('x-xtrata-runtime-cache'),
+            ms: Math.round(performance.now() - began)
+          });
+          if (!response.ok) return null;
+          const raw = new Uint8Array(await response.arrayBuffer());
+          const bytes = stripServerBaseTag(raw, expected);
+          perfMark('runtime-fetch:done', {
+            bytes: raw.length,
+            expected,
+            match: !!bytes,
+            ms: Math.round(performance.now() - began)
+          });
+          return bytes;
+        } catch (error) {
+          perfMark('runtime-fetch:error', { error: String(error?.message ?? error) });
+          return null;
+        } finally {
+          runtimeFetchInflight.delete(key);
+        }
+      })();
+      runtimeFetchInflight.set(key, promise);
+      return promise;
+    };
+
     const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {
       if (!rawHtml) {
         return rawHtml;
       }
+      perfMark('prepare-html:start', { context: contextLabel, chars: rawHtml.length });
       const html = embedHtml(rawHtml);
       const moduleBaseHref = buildRuntimeModuleBaseHref({
         network: state.network,
@@ -5881,21 +5965,28 @@
       });
       const htmlWithBase = injectHtmlBaseHref(html, moduleBaseHref);
       if (!hasRuntimeContentUrls(htmlWithBase)) {
+        perfMark('prepare-html:done', { inlined: false, chars: htmlWithBase.length });
         return htmlWithBase;
       }
       const contentClient = getTokenClient(token);
+      perfMark('inline-runtime-urls:start', {
+        urls: (htmlWithBase.match(/\/runtime\/content\?[^"'\s)]+/g) ?? []).slice(0, 8)
+      });
       try {
         debugLog('preview', 'inlining runtime content for HTML inscription', {
           tokenId: token.id.toString(),
           contractId: getTokenCacheContractId(token),
           context: contextLabel
         });
-        return await inlineRuntimeContentUrls({
+        const inlined = await inlineRuntimeContentUrls({
           html: htmlWithBase,
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient)
         });
+        perfMark('inline-runtime-urls:done', { chars: inlined.length });
+        return inlined;
       } catch (error) {
+        perfMark('inline-runtime-urls:error', { error: String(error?.message ?? error) });
         const message = error instanceof Error ? error.message : String(error);
         debugLog(
           'preview',
@@ -7165,7 +7256,7 @@
           size: token.meta?.totalSize?.toString() ?? null,
           mimeType: token.meta?.mimeType ?? null
         });
-        const bytes = await fetchOnChainContent({
+        const bytes = (await fetchRuntimeContentBytes(token)) ?? await fetchOnChainContent({
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient),
           cacheContractId,
@@ -7342,6 +7433,11 @@
       }
     };
 
+    const isDeferredGridPlayable = (token) => {
+      const kind = getMediaKind(token.meta?.mimeType ?? null);
+      return kind === 'html' || kind === 'audio';
+    };
+
     const scheduleBackgroundThumbnailHydration = (token, thumbElement) => {
       const cacheKey = getThumbnailKey(token);
       if (
@@ -7352,6 +7448,26 @@
         return false;
       }
       if (!shouldBackgroundHydrateThumbnail(token)) {
+        return false;
+      }
+      // Explorer grid: songs / HTML players / audio are NOT downloaded in the
+      // background. Downloading every one of them (often MBs each, read from
+      // chain chunks) is what made pages take minutes. They show a poster and
+      // load only when selected. Cached results still paint via
+      // applyCachedThumbnail / gridLiveMediaCache before we get here.
+      if (isDeferredGridPlayable(token)) {
+        const label = getGridMimeLabel(token.meta?.mimeType ?? null) || 'HTML';
+        const poster = document.createElement('div');
+        poster.className = 'token-thumb-gate';
+        const posterLabel = document.createElement('div');
+        posterLabel.className = 'token-thumb-gate__label';
+        posterLabel.textContent = label;
+        const posterHint = document.createElement('div');
+        posterHint.className = 'token-thumb-gate__hint';
+        posterHint.textContent = 'Tap to open';
+        poster.append(posterLabel, posterHint);
+        thumbElement.replaceChildren(poster);
+        thumbElement.dataset.thumbnailState = 'deferred-playable';
         return false;
       }
       state.thumbnailHydrationAttempted.add(cacheKey);
@@ -7675,6 +7791,13 @@
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
+      perfMark('render-payload', { source, bytes: bytes.length, hasHtmlDoc: !!htmlDoc });
+      {
+        const previewFrame = dom.tokenPreviewMedia.querySelector('iframe');
+        if (previewFrame) {
+          previewFrame.addEventListener('load', () => perfMark('iframe-load'), { once: true });
+        }
+      }
       // The selected inscription gets the machine: its grid tile stops (it runs here)
       // and the grid holds back while an HTML preview loads.
       liveHtmlFrameManager.focusPreview(
@@ -7761,15 +7884,20 @@
         mimeType: token.meta.mimeType ?? null,
         requestId
       });
-      const bytes = await fetchOnChainContent({
-        client: contentClient,
-        fallbackClients: getContentFallbackClients(contentClient),
-        cacheContractId,
-        id: token.id,
-        senderAddress: getReadOnlySenderAddress(),
-        totalSize: token.meta.totalSize,
-        mimeType: token.meta.mimeType ?? null
-      });
+      let bytes = await fetchRuntimeContentBytes(token);
+      if (!bytes) {
+        perfMark('chain-fetch:start', { reason: 'runtime fast path unavailable' });
+        bytes = await fetchOnChainContent({
+          client: contentClient,
+          fallbackClients: getContentFallbackClients(contentClient),
+          cacheContractId,
+          id: token.id,
+          senderAddress: getReadOnlySenderAddress(),
+          totalSize: token.meta.totalSize,
+          mimeType: token.meta.mimeType ?? null
+        });
+        perfMark('chain-fetch:done', { bytes: bytes.length });
+      }
       const mimeType = resolveMimeType(token.meta.mimeType ?? null, bytes) ?? token.meta.mimeType ?? 'application/octet-stream';
       const htmlDoc = getMediaKind(mimeType) === 'html'
         ? await prepareRuntimeHtmlForToken(token, new TextDecoder().decode(bytes), 'preview')
@@ -7835,6 +7963,7 @@
 
       void updateWalletTokenUriHeadPreview(token.tokenUri);
 
+      perfBegin(token);
       clearElement(dom.tokenPreviewMedia, 'Loading');
       renderSelectedInscriptionMeta(token);
       void refreshSelectedTokenOwner(token, requestId);
