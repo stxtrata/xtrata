@@ -117,11 +117,12 @@ describe('incremental ledger reader', () => {
     expect(b.addresses.find((x: any) => x.addr === 'SPD').n.ins).toBe(1);
   });
 
-  it('works with the slimmed state the page bakes in (no per-draw counts)', async () => {
+  it('works with the slimmed state the page bakes in (per-draw counts and draw list kept)', async () => {
     const w = seeded();
-    const pageCfg = { api: 'x', draws: [] };
+    const pageCfg = { api: 'x', draws: ['2026-10-07T22:59:59Z', '2026-10-14T22:59:59Z', '2026-10-21T22:59:59Z'] };
     const a = await L.run(pageCfg, w.get, null);
     const slim = slimState(a.state);
+    expect(slim.draws).toEqual(pageCfg.draws);
     w.add(C('xtrata-arcade-scores-v2'), 'submit-score', 'SPA', 600);
     w.reset();
     const b = await L.run(pageCfg, w.get, slim);
@@ -139,7 +140,7 @@ describe('tracker page snapshot', () => {
     const next = bake(html, state);
     const line = next.split('\n').find((l: string) => l.endsWith('/*SNAP*/'))!;
     const snap = JSON.parse(line.replace(/^ {2}var SNAP = /, '').replace(/; \/\*SNAP\*\/$/, ''));
-    expect(snap.addrs.SPX).toEqual({ addr: 'SPX', first: 1, last: 2, n: { ins: 1 }, w: [], tx: {}, g: {} });
+    expect(snap.addrs.SPX).toEqual({ addr: 'SPX', first: 1, last: 2, n: { ins: 1 }, w: [[1]], tx: {}, g: {} });
     expect(() => bake(html, { v: 1 })).toThrow();
     expect(bake(next, state)).toBe(next); // baking is repeatable
   });
