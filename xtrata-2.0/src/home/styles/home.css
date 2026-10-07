@@ -2067,6 +2067,14 @@
       display: none;
     }
 
+    /* Main-grid HTML tiles are pictures, not buttons: the poster never takes the
+       click, so one click selects the card. */
+    .token-thumb-gate--static {
+      cursor: inherit;
+      pointer-events: none;
+      user-select: none;
+    }
+
     .token-thumb-gate__label {
       font-weight: 800;
       font-size: clamp(11px, 1.2vw, 13px);

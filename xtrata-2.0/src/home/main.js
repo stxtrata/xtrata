@@ -202,7 +202,7 @@
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
     import { rewriteHiroApiBasesForEmbeddedHtml } from '/src/lib/viewer/hiro-api-rewrite.ts';
-    import { createLiveHtmlFrameManager } from '/src/home/live-frame-manager.js';
+    import { createLiveHtmlFrameManager, isHeavyGridHtml } from '/src/home/live-frame-manager.js';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
@@ -7188,11 +7188,29 @@
 
       if (media.kind === 'html') {
         if (!options.gated) {
-          // The main grid never runs an inscription. A live iframe in a tile was
-          // what made the first click run the page in the grid and only the
-          // second one open it in the preview. Show the static poster; the card
-          // click selects the token and the preview loads it.
-          return renderGridPoster(token, thumbElement);
+          // The main grid runs only small pages, and only click-through: the
+          // frame never takes a click, so one click selects the card and opens
+          // the preview. (The old poster took the first click to start the page,
+          // which is what made it two clicks.) Big pages, loaders that read other
+          // inscriptions, and anything with a stored thumbnail stay a poster.
+          const bytes = Math.max(
+            Number(token.meta?.totalSize ?? 0n),
+            media.bytes?.length ?? 0
+          );
+          if (
+            !isLiveGridHtml(token) ||
+            isHeavyGridHtml(media.html, bytes, GRID_LIVE_HTML_MAX_BYTES)
+          ) {
+            return renderGridPoster(token, thumbElement);
+          }
+          liveHtmlFrameManager.register(thumbElement, media, {
+            gated: false,
+            clickThrough: true,
+            heavyBytes: GRID_LIVE_HTML_MAX_BYTES,
+            key: getThumbnailKey(token),
+            byteLength: bytes
+          });
+          return true;
         }
         // Gated mount: the iframe only executes when on-screen and within the
         // live-frame budget (or on click). Prevents N heavy board inscriptions
@@ -7445,6 +7463,21 @@
       return kind === 'html' || kind === 'audio';
     };
 
+    // HTML inscriptions under this size run inside their grid tile (click-through,
+    // viewport-gated, one at a time) instead of showing a static poster. Anything
+    // with a stored thumbnail uses the picture instead.
+    const GRID_LIVE_HTML_MAX_BYTES = 1024 * 1024;
+    const isLiveGridHtml = (token) => {
+      if (getMediaKind(token.meta?.mimeType ?? null) !== 'html') {
+        return false;
+      }
+      if (getGridThumbUrl(token)) {
+        return false;
+      }
+      const size = token.meta?.totalSize ?? 0n;
+      return size > 0n && size < BigInt(GRID_LIVE_HTML_MAX_BYTES);
+    };
+
     // URL of the stored grid thumbnail for a token, or null when the index has
     // none. The version comes from /index/page and makes the URL immutable.
     const getGridThumbUrl = (token) => {
@@ -7571,7 +7604,7 @@
       // chain chunks) is what made pages take minutes. They show a poster and
       // load only when selected. Cached results still paint via
       // applyCachedThumbnail / gridLiveMediaCache before we get here.
-      if (isDeferredGridPlayable(token)) {
+      if (isDeferredGridPlayable(token) && !isLiveGridHtml(token)) {
         renderGridPoster(token, thumbElement);
         return false;
       }
@@ -7592,6 +7625,47 @@
       });
       pumpBackgroundThumbnailHydrationQueue();
       return true;
+    };
+
+    // Small HTML tiles: fetch only once the tile is near the viewport, and not
+    // while the selected inscription is still loading in the preview.
+    const liveGridHtmlTargets = new WeakMap();
+    let liveGridHtmlObserver = null;
+    const startLiveGridHtmlFetch = (token, thumbElement) => {
+      if (!thumbElement.isConnected) {
+        return;
+      }
+      if (!liveHtmlFrameManager.isQuiet()) {
+        window.setTimeout(() => startLiveGridHtmlFetch(token, thumbElement), 500);
+        return;
+      }
+      scheduleBackgroundThumbnailHydration(token, thumbElement);
+    };
+    const watchLiveGridHtml = (token, thumbElement) => {
+      if (typeof IntersectionObserver !== 'function') {
+        startLiveGridHtmlFetch(token, thumbElement);
+        return;
+      }
+      if (!liveGridHtmlObserver) {
+        liveGridHtmlObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting && entry.target.isConnected) {
+                continue;
+              }
+              liveGridHtmlObserver.unobserve(entry.target);
+              const target = liveGridHtmlTargets.get(entry.target);
+              liveGridHtmlTargets.delete(entry.target);
+              if (target && entry.target.isConnected) {
+                startLiveGridHtmlFetch(target, entry.target);
+              }
+            }
+          },
+          { root: null, rootMargin: '200px', threshold: 0 }
+        );
+      }
+      liveGridHtmlTargets.set(thumbElement, token);
+      liveGridHtmlObserver.observe(thumbElement);
     };
 
     const renderRelationshipThumbMedia = async (token, media, role) => {
@@ -7771,6 +7845,7 @@
         meta.className = 'token-meta';
         let shouldApplyCachedThumbnail = false;
         let shouldScheduleBackgroundHydration = false;
+        let shouldWatchLiveHtml = false;
 
         if (id === null) {
           card.disabled = true;
@@ -7804,7 +7879,19 @@
           } else if (isDeferredGridPlayable(token)) {
             // Songs, HTML and audio: a picture or text poster straight away, with
             // nothing downloaded and nothing to look up in the thumbnail cache.
-            renderGridPoster(token, thumb);
+            // Small HTML pages with no stored picture then start running in the
+            // tile once they scroll into view (watchLiveGridHtml).
+            const liveCandidate = isLiveGridHtml(token);
+            const cachedHtml = liveCandidate
+              ? state.gridLiveMediaCache.get(getThumbnailKey(token))
+              : null;
+            if (
+              !(cachedHtml && cachedHtml.kind === 'html' &&
+                renderGridLiveMedia(token, thumb, cachedHtml))
+            ) {
+              renderGridPoster(token, thumb);
+              shouldWatchLiveHtml = liveCandidate;
+            }
             shouldApplyCachedThumbnail = false;
           } else {
             const cacheKey = getThumbnailKey(token);
@@ -7843,6 +7930,9 @@
         }
         card.append(thumb, meta);
         dom.tokenGrid.append(card);
+        if (token && allowBackgroundHydration && shouldWatchLiveHtml) {
+          watchLiveGridHtml(token, thumb);
+        }
         if (token && allowBackgroundHydration && shouldScheduleBackgroundHydration) {
           scheduleBackgroundThumbnailHydration(token, thumb);
         } else if (token && allowBackgroundHydration && shouldApplyCachedThumbnail) {

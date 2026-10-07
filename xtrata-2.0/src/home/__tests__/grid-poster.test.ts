@@ -146,18 +146,60 @@ describe('grid poster for songs and HTML', () => {
   });
 });
 
-describe('the main grid never runs an inscription', () => {
+describe('the main grid never lets an inscription take the click', () => {
   const liveMediaStart = main.indexOf('const renderGridLiveMedia');
   const liveMedia = main.slice(liveMediaStart, main.indexOf('const shouldBackgroundHydrateThumbnail', liveMediaStart));
   const htmlBranch = liveMedia.slice(liveMedia.indexOf("media.kind === 'html'"), liveMedia.indexOf("media.kind === 'pdf'"));
 
-  it('mounts a live frame only for gated (relationship) thumbnails', () => {
+  it('runs a non-gated tile only when it is small, and only click-through', () => {
     const gatedAt = htmlBranch.indexOf('if (!options.gated)');
+    const smallAt = htmlBranch.indexOf('!isLiveGridHtml(token)');
+    const heavyAt = htmlBranch.indexOf('isHeavyGridHtml(media.html, bytes, GRID_LIVE_HTML_MAX_BYTES)');
     const posterAt = htmlBranch.indexOf('renderGridPoster(token, thumbElement)');
     const registerAt = htmlBranch.indexOf('liveHtmlFrameManager.register(');
     expect(gatedAt).toBeGreaterThan(-1);
-    expect(posterAt).toBeGreaterThan(gatedAt);
+    expect(smallAt).toBeGreaterThan(gatedAt);
+    expect(heavyAt).toBeGreaterThan(smallAt);
+    expect(posterAt).toBeGreaterThan(heavyAt);
     expect(registerAt).toBeGreaterThan(posterAt);
+    const registerCall = htmlBranch.slice(registerAt, htmlBranch.indexOf(');', registerAt));
+    expect(registerCall).toContain('clickThrough: true');
+    expect(registerCall).toContain('gated: false');
+    // The relationship (gated) mount keeps its click-to-run behaviour.
+    expect(htmlBranch.lastIndexOf('liveHtmlFrameManager.register(')).toBeGreaterThan(registerAt);
+  });
+
+  it('caps live grid HTML at 1 MiB and never for tokens with a stored picture', () => {
+    const at = main.indexOf('const GRID_LIVE_HTML_MAX_BYTES');
+    const source = main.slice(at, main.indexOf('// URL of the stored grid thumbnail', at));
+    const make = (thumbUrl: string | null, kind = 'html') =>
+      new Function(
+        'getMediaKind',
+        'getGridThumbUrl',
+        `${source}\nreturn { isLiveGridHtml, GRID_LIVE_HTML_MAX_BYTES };`
+      )(() => kind, () => thumbUrl) as {
+        isLiveGridHtml: (t: unknown) => boolean;
+        GRID_LIVE_HTML_MAX_BYTES: number;
+      };
+    const tok = (size: bigint | null) => ({ meta: size === null ? null : { mimeType: 'text/html', totalSize: size } });
+    const { isLiveGridHtml, GRID_LIVE_HTML_MAX_BYTES } = make(null);
+    expect(GRID_LIVE_HTML_MAX_BYTES).toBe(1024 * 1024);
+    expect(isLiveGridHtml(tok(854_300n))).toBe(true);
+    expect(isLiveGridHtml(tok(BigInt(1024 * 1024 - 1)))).toBe(true);
+    expect(isLiveGridHtml(tok(BigInt(1024 * 1024)))).toBe(false);
+    expect(isLiveGridHtml(tok(4_640_000n))).toBe(false);
+    expect(isLiveGridHtml(tok(0n))).toBe(false);
+    expect(isLiveGridHtml(tok(null))).toBe(false);
+    expect(make('/thumb/x/1?v=abcd').isLiveGridHtml(tok(300_000n))).toBe(false);
+    expect(make(null, 'audio').isLiveGridHtml(tok(300_000n))).toBe(false);
+  });
+
+  it('starts small HTML only when the tile is near the viewport and the preview is quiet', () => {
+    const at = main.indexOf('const startLiveGridHtmlFetch');
+    const source = main.slice(at, main.indexOf('const renderRelationshipThumbMedia', at));
+    expect(source).toContain('liveHtmlFrameManager.isQuiet()');
+    expect(source).toContain('new IntersectionObserver');
+    expect(source).toContain('scheduleBackgroundThumbnailHydration(token, thumbElement)');
   });
 
   it('sends songs and HTML straight to the poster when a card is built', () => {
@@ -169,6 +211,8 @@ describe('the main grid never runs an inscription', () => {
     expect(deferAt).toBeGreaterThan(-1);
     expect(cacheAt).toBeGreaterThan(deferAt);
     expect(card).toContain('renderGridPoster(token, thumb);');
+    // Small HTML with no stored picture starts after the poster is up, once visible.
+    expect(card).toContain('watchLiveGridHtml(token, thumb)');
   });
 
   it('keeps the poster free of handlers, markup injection and frames', () => {
