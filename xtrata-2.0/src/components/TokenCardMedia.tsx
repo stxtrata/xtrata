@@ -71,6 +71,12 @@ type TokenCardMediaProps = {
   pixelateOnUpscale?: boolean;
   preferFullResolution?: boolean;
   letterboxNonSquare?: boolean;
+  /**
+   * Grid mode: never download or mount interactive media (HTML, audio,
+   * video) for this card. Shows a light placeholder with a play badge
+   * instead; the full preview loads when the token is opened.
+   */
+  deferPlayableMedia?: boolean;
 };
 
 export default function TokenCardMedia(props: TokenCardMediaProps) {
@@ -179,12 +185,18 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     normalizedMetaMimeType === 'image/webp' ||
     normalizedMetaMimeType === 'image/apng' ||
     isPngAnimationProbeCandidate;
+  const isDeferredPlayable =
+    !!props.deferPlayableMedia &&
+    !props.preferFullResolution &&
+    (mediaKind === 'html' || mediaKind === 'audio' || mediaKind === 'video');
   const shouldLoadPlaybackMedia =
+    !isDeferredPlayable &&
     !!props.token.meta &&
     (isWithinGridEagerLoadWindow || props.preferFullResolution) &&
     !svgPreview &&
     (mediaKind === 'video' || mediaKind === 'audio');
   const shouldLoadNonVideo =
+    !isDeferredPlayable &&
     !!props.token.meta &&
     (isWithinGridEagerLoadWindow || props.preferFullResolution) &&
     !svgPreview &&
@@ -525,6 +537,7 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
     ? injectRecursiveBridgeHtml(gridHtmlPreview, bridgeId)
     : gridHtmlPreview;
   const allowTokenUriFallback =
+    !isDeferredPlayable &&
     !hasThumbnail &&
     ((mediaKind === 'video' || mediaKind === 'audio')
       ? totalSize === null || totalSize > MAX_GRID_EAGER_FULL_LOAD_BYTES
@@ -972,7 +985,14 @@ export default function TokenCardMedia(props: TokenCardMediaProps) {
   );
 
   let mediaElement: JSX.Element;
-  if (isHtmlDocument && htmlDoc) {
+  if (isDeferredPlayable) {
+    mediaElement = renderDocCard({
+      label: mediaKind === 'html' ? 'HTML' : docBadge,
+      title: docTitle ?? `#${props.token.id.toString()}`,
+      snippet: 'Tap to play.',
+      showPlay: true
+    });
+  } else if (isHtmlDocument && htmlDoc) {
     if (lastPreviewLogRef.current !== 'html') {
       lastPreviewLogRef.current = 'html';
       logDebug('preview', 'Token card HTML preview resolved', {
