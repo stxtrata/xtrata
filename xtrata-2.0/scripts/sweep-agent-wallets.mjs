@@ -42,6 +42,8 @@ const SKIP_IDENTITY = !flag('--include-identity');
 const PATH = "m/44'/5757'/0'/0/0";
 const ADDR = /^SP[0-9A-Z]{38,40}$/;
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 const getJson = async (path) => {
   const url = API + path;
   if (USE_CURL) return JSON.parse(execFileSync('curl', ['-sS', '-m', '60', url], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
@@ -125,10 +127,20 @@ async function main() {
       postConditionMode: PostConditionMode.Deny,
       postConditions: [makeStandardNonFungiblePostCondition(from, NonFungibleConditionCode.Sends, createAssetInfo(addr, name, t.assetName), uintCV(t.id))]
     });
-    const res = await broadcastTransaction(tx, network);
+    let res;
+    for (let attempt = 1; ; attempt++) {
+      try { res = await broadcastTransaction(tx, network); break; }
+      catch (e) {
+        // The public Hiro API rate-limits per minute and answers with plain text; wait and send the same signed tx again.
+        if (attempt >= 5) throw e;
+        console.log(`  rate-limited (attempt ${attempt}); waiting 30 s, then retrying #${t.id}`);
+        await sleep(30000);
+      }
+    }
     if (res.error) { console.error(`  #${t.id} (${t.assetName}): ${res.error} ${res.reason || ''}. Stopping.`); break; }
     ok++; nonce++;
     console.log(`  sent ${t.assetName} #${t.id}  ${res.txid}`);
+    await sleep(1500);
   }
   console.log(`\nBroadcast ${ok} of ${batch.length}. ${items.length - ok} still to move. Wait for these to confirm, then run again.`);
 }
