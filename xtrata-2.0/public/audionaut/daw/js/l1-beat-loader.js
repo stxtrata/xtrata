@@ -1,6 +1,6 @@
 import { store } from "./state.js";
 import { engine } from "./engine.js";
-import { fetchAndDecode, assignDecodedSample } from "./loader.js";
+import { fetchAndDecode, assignDecodedSample, unloadChannelSample } from "./loader.js";
 import { expandPattern } from "./beats.js";
 import { onboardVariant } from "./onboard-library.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
@@ -188,16 +188,17 @@ export async function loadBeatPreset(preset, options = {}) {
     project.instruments[i].solo = false;
     store.emit("instrument", { i });
   }
-  // Clear what the previous beat left on channels this beat does not use, in every collection:
-  // a muted channel that keeps its steps is still visible in the grid and would come back on unmute.
-  // Channels the user added beyond the previous beat's own are left alone.
+  // Unload what the previous beat left on channels this beat does not use, in every collection:
+  // the steps, the sample and the channel's settings, so nothing of the old kit stays loaded or
+  // comes back on unmute. Only channels the previous beat itself loaded are touched; channels
+  // the user added beyond it are left alone.
   for (
     let i = prepared.length;
     i < (project.lastPresetChannels || 0) && i < store.numChannels;
     i++
   ) {
     sequence.steps[i].fill(0);
-    engine.silenceChannel(i);
+    unloadChannelSample(i);
   }
   prepared.forEach(({ def, result, steps, trimStart, trimEnd }, i) => {
     assignDecodedSample(i, def.source, result);
