@@ -275,6 +275,27 @@
       "twinTokenUri": "https://xtrata.xyz/ft/see-yourself-out/{id}.json",
       "manifest": null,
       "coverage": null
+    },
+    {
+      "key": "bitcoin-birds",
+      "name": "Bitcoin Birds",
+      "itemNoun": "Bitcoin Bird",
+      "community": null,
+      "status": "planned",
+      "interface": "v3",
+      "group": "G1",
+      "helper": null,
+      "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
+      "sourceAsset": "bitcoin-birds",
+      "legacyPage": null,
+      "theme": {
+        "logo": null,
+        "accent": "#1c7ed6"
+      },
+      "blurb": "All 400 Bitcoin Birds, backed up on chain. The collection's own token URI points to a website that no longer serves the art; the images survive only as a single IPFS folder. Helper not yet deployed.",
+      "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-birds/{id}.json",
+      "manifest": null,
+      "coverage": null
     }
   ]
 }

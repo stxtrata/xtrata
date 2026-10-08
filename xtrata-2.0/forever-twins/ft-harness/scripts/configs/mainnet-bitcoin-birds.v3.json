@@ -10,7 +10,7 @@
   "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
   "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22"
  ],
- "initialFeeUstx": 1000000,
+ "initialFeeUstx": 0,
  "maxFeeUstx": 5000000,
  "rescueEnabled": true,
  "rescueDelayBurnBlocks": 432,

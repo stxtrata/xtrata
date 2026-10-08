@@ -24,7 +24,7 @@ declare const __PINS__: string;
 type Cfg = {
   key: string; name: string; master: string; source: string; group: string; payees: [string, string];
   initialFeeUstx: number; maxFeeUstx: number; deployer: string; contractName: string; gateway: string; manifestPath: string;
-  listingReadFn?: string; testToken?: number; largeOnDemand?: boolean;
+  listingReadFn?: string; testToken?: number; largeOnDemand?: boolean; sourceOwnerRead?: string; heldIdsReadFn?: string;
 };
 type Tok = { id: number; original: { mediaUris: string[]; metadataUri?: string }; twin: { contentHash: string; sha256: string; mime: string; totalSize: number; tokenUri: string; route?: string } };
 const CFG: Cfg = JSON.parse(__CFG__);
@@ -419,7 +419,13 @@ const STEPS: Step[] = [
       if (badUri) throw new Error(`Token ${badUri.id} has an invalid token-uri.`);
       if (asText(await coreRead('is-paused')) === 'true') throw new Error(`${CFG.master} is paused.`);
       if ((await chain.contractSource(CFG.source)) === null) throw new Error(`Source collection ${CFG.source} not found on chain.`);
-      await chain.read(CFG.source, 'get-owner', [uintCV(tokens[0].id)]);
+      if (CFG.sourceOwnerRead === 'public') {
+        // The source's get-owner is a public function (cannot be called read-only). The helper variant reads the source's per-owner id list instead; check that read works.
+        if (!CFG.heldIdsReadFn) throw new Error('Config says sourceOwnerRead public but has no heldIdsReadFn.');
+        await chain.read(CFG.source, CFG.heldIdsReadFn, [principalCV(CFG.deployer)]);
+      } else {
+        await chain.read(CFG.source, 'get-owner', [uintCV(tokens[0].id)]);
+      }
       const sourceNote = await sourceChecks();
       const existing = await chain.contractSource(helperId());
       let deployed: 'free' | 'ours' = 'free';
