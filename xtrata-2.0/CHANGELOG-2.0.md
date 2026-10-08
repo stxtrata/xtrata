@@ -2,12 +2,14 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
-## Leather: structured-message signing uses the RPC API (2026-10-08)
-- New Leather builds reject the legacy `structuredDataSignatureRequest` bridge with "This legacy method is no longer supported. Upgrade to the LeatherProvider.request() RPC API", which broke signing the X handle on the bounty tracker and the BNS proof on the music profile page.
-- `src/lib/wallet/structured-sign.ts`: tries `request('stx_signStructuredMessage')` first for every non-Xverse wallet and falls back to the legacy bridge only when the wallet reports the method as unsupported, so old and new Leather both work. Xverse is unchanged. A cancel or wallet error is never retried through the legacy bridge.
+## Leather: new builds work, old wallets are left alone (2026-10-08)
+- New Leather builds reject the legacy `structuredDataSignatureRequest` bridge with "This legacy method is no longer supported. Upgrade to the LeatherProvider.request() RPC API", which broke signing the X handle on the bounty tracker and the BNS proof on the music profile page. The standalone Duels page, which used the legacy connect and transaction bridges directly, was affected the same way.
+- `src/lib/wallet/structured-sign.ts`: tries the legacy bridge first wherever it exists, so every wallet that signs today is unchanged. Only the "legacy method is no longer supported" answer (or a missing bridge) moves a non-Xverse wallet to `request('stx_signStructuredMessage')`. A cancel or any other wallet error is never retried; Xverse never uses the RPC.
 - `src/music-profile/page.ts` now uses the same helper instead of its own copy of the legacy call.
-- Tracker bundle rebuilt (`public/bounty/zdao/tracker/1/wallet.js`) and its script tag bumped to `?v=2`. `docs/WALLET-PLAYBOOK.md` §7 updated.
-- **Verified:** 8 new tests in `src/lib/wallet/__tests__/structured-sign.test.ts` (RPC envelope and bare result, older-Leather fallback, legacy-only wallet, no re-prompt on cancel, RPC error envelope, Xverse path, no signer); 229 wallet, music-profile and tracker tests pass; the rebuilt bundle loads in a browser with no errors. Not tested against a real Leather wallet.
+- `public/duels/index.html`: when Leather is the wallet in use (selected, or the only wallet installed), connect uses `getAddresses` and contract calls use `stx_callContract`, the same calls the main app already makes with Leather. Other wallets, and Leather without those RPC methods, stay on the legacy SDK path. Cancels are surfaced, not retried.
+- **Audited and left unchanged (already RPC first with a legacy fallback):** `src/lib/wallet/connect.ts` (connect, contract call, deploy, STX transfer), `public/runtime/wallet-shim.js`, the arcade high-score code, the Forever Twins pages (@stacks/connect v8 helpers), and the radio and arcade bundles built from `connect.ts`. Archived x-board and Forever Twins versions are untouched.
+- Tracker bundle rebuilt (`public/bounty/zdao/tracker/1/wallet.js`) and its script tag bumped to `?v=3`. `docs/WALLET-PLAYBOOK.md` §7 updated.
+- **Verified:** 10 tests in `src/lib/wallet/__tests__/structured-sign.test.ts` (legacy first and untouched, new Leather moves to the RPC, no re-prompt on cancel, Xverse never uses the RPC, no signer); a harness over the real Duels page code (8 cases: new Leather, no Leather, Leather beside Xverse unselected or selected either way, old Leather without the RPC, cancels); 190 wallet tests pass; the rebuilt bundle loads with no errors. Not tested against a real Leather wallet.
 
 ## Bounty tracker: merged with main's Live draw (2026-10-08)
 - Merged `origin/main` (Live draw, Draw 1 result, chess 2 tickets, team wallets excluded) into the Audionaut-5 / size-ticket / team-wallet branch. Audionaut 5 now exists once (main's `w: 5`), unchanged.
