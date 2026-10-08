@@ -30,6 +30,20 @@
   .gcard .cost{font-size:12px;color:var(--mute)}
   .sumrow{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 2px;font-size:14px}
   .sumrow b{font-variant-numeric:tabular-nums}
+  .risk{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:2px 0 8px}
+  .risk .lvl{font-weight:800;font-size:15px;padding:3px 14px;border-radius:999px;border:2px solid currentColor}
+  .risk .lvl.bad{color:var(--bad)} .risk .lvl.warn{color:var(--warn)} .risk .lvl.ok{color:var(--ok)} .risk .lvl.mute{color:var(--mute)}
+  .scale{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px;font-size:12px}
+  .scale span{padding:2px 10px;border-radius:999px;border:1px solid var(--line);color:var(--mute)}
+  .scale span.on{font-weight:800;color:var(--ink);border-color:currentColor}
+  .scale span.on.bad{color:var(--bad)} .scale span.on.warn{color:var(--warn)} .scale span.on.ok{color:var(--ok)} .scale span.on.mute{color:var(--mute)}
+  .meter{height:12px;border-radius:999px;background:var(--soft);border:1px solid var(--line);overflow:hidden;margin:8px 0 6px}
+  .meter>i{display:block;height:100%;background:var(--ok)}
+  .live-on{font-size:18px;font-weight:800;margin:10px 0 0}
+  .prose-card h3{font-size:15px;margin:16px 0 4px}
+  .prose-card p,.prose-card ul{margin:4px 0}
+  .prose-card li{margin:3px 0}
+  .info-links{display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;font-size:14px}
 </style>
 </head>
 <body>
@@ -70,6 +84,16 @@
       <div id="stateMsg"></div>
     </section>
 
+    <section class="card hidden" id="riskCard">
+      <h2>How safe is the original art?</h2>
+      <div id="riskOut"></div>
+    </section>
+
+    <section class="card hidden prose-card" id="aboutCard">
+      <h2>About this collection</h2>
+      <div id="aboutOut"></div>
+    </section>
+
     <section class="card hidden" id="mineCard">
       <h2>Your NFTs in this collection <span id="mineCount" class="mute small"></span></h2>
       <div id="mineOut"></div>
@@ -80,6 +104,12 @@
       <dl class="facts" id="facts"></dl>
     </section>
 
+    <section class="card hidden prose-card" id="techCard">
+      <h2>Technical details and quirks</h2>
+      <ul class="plain" id="techList"></ul>
+      <div id="ownerNote"></div>
+    </section>
+
     <section class="card" id="lookupCard">
       <h2>Look up a token</h2>
       <div class="row">
@@ -87,6 +117,7 @@
         <button id="lookupBtn" type="button">Look up</button>
       </div>
       <div id="lookupOut"></div>
+      <p class="mute small hidden" id="ownerFoot">The original owner is read from the chain’s transfer history for this collection (see “Technical details and quirks”), so it can lag a transfer by a few minutes.</p>
     </section>
 
     <section class="card hidden" id="actionCard">
@@ -98,6 +129,31 @@
       <h2>Twins <span id="galleryCount" class="mute small"></span></h2>
       <p class="sub tight">Every twin made so far. Each token has two sides, the original NFT and its permanent twin. One side is with its holder; the other is held in escrow by the helper. The holder can swap sides whenever they like.</p>
       <div id="galleryOut"><p class="mute">Loading twins…</p></div>
+    </section>
+
+    <section class="card prose-card" id="learnCard">
+      <h2>Why permanence matters, and why twin your art</h2>
+      <h3>An NFT is a token, not the picture</h3>
+      <p>On Stacks, most NFT contracts store a number and a link, not the artwork. The picture lives wherever the link points. If that place disappears or is changed, the token still exists but the picture is gone or different.</p>
+      <h3>How art goes missing</h3>
+      <ul class="plain">
+        <li><b>A website shuts down or moves.</b> The Stacks Art links used by Bitcoin Birds and several other collections now return an ordinary web page instead of the art.</li>
+        <li><b>IPFS content nobody keeps.</b> IPFS names a file by its fingerprint, which lets you check you got the right file. It does not keep the file online: it stays reachable only while at least one computer chooses to host it.</li>
+        <li><b>The owner repoints it.</b> Unless a collection’s metadata is frozen, the contract owner can change what every token’s link says.</li>
+      </ul>
+      <h3>What “on-chain” means here</h3>
+      <p>A twin stores the file’s bytes in Stacks transactions, inside the Xtrata contract. There is no link left to break: the picture is part of the chain’s history, which is anchored to Bitcoin and held by every full node. It costs a small fee per file, paid once.</p>
+      <h3>How a twin works</h3>
+      <p>Before anything is inscribed, the helper records a fingerprint of every token’s art in a public record, and it only accepts a twin that matches. A twin and its original are tied one to one, as two sides of the same token: one side is with its holder, the other is in escrow in the helper, and the holder can swap sides whenever they like. Nothing about the original is changed or moved.</p>
+      <h3>Why twin your art</h3>
+      <ul class="plain">
+        <li>It survives a dead link, a vanished host or a repointed contract. The picture no longer depends on anyone’s server.</li>
+        <li>Anyone can fund a twin, and funding gives no claim on the original. A holder, an artist or a community can protect a whole collection, as was done for Bitcoin Birds.</li>
+        <li>Anyone can check it: the twin’s hash must match the public record, and the record’s hash is on-chain.</li>
+        <li>It is reversible. The holder can swap back to the original NFT at any time.</li>
+      </ul>
+      <h3>What a twin does not do</h3>
+      <p>It does not repair the original contract’s link, change who owns what, or make an NFT worth more. It is a backup, not an investment. Not financial advice.</p>
     </section>
 
     <section class="card" id="warnCard">
@@ -120,8 +176,8 @@
 </div></footer>
 
 <script type="module">
-import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261007a';
-import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261007a';
+import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, RISK_LEVELS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261008a';
+import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261008a';
 import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261007a';
 
 const $ = (id) => document.getElementById(id);
@@ -255,6 +311,85 @@ function renderStateMsg() {
   if (!coll.helper) add('warn', 'No helper contract is deployed for this collection yet. Nothing can be inscribed or swapped, and this page does not link to a tool.');
   if (helperSt && helperSt.mismatches && helperSt.mismatches.length) add('bad', `The deployed helper does not match the registry (${esc(helperSt.mismatches.join('; '))}). Actions are disabled until this is resolved.`);
   if (helperSt && coll.helper && helperSt.interface === 'v3' && helperSt.finalized === false) add('warn', 'The record is not finalised yet, so nothing can be inscribed or swapped.');
+}
+
+// ---- who holds a token when the source's get-owner is a PUBLIC function (registry flag sourceOwnerRead: "public") ----
+// Clarity cannot run another contract's public function from a read-only call, so the usual get-owner read errors.
+// The chain's NFT event index has the answer: the newest event for the token says who received it.
+async function nftOwner(c, tokenId) {
+  const value = '0x01' + BigInt(tokenId).toString(16).padStart(32, '0'); // Clarity uint
+  const r = await fetch(`${location.origin}/hiro/mainnet/extended/v1/tokens/nft/history?asset_identifier=${encodeURIComponent(`${c.source}::${c.sourceAsset}`)}&value=${value}&limit=1`);
+  if (!r.ok) throw new Error(`Owner history unavailable (HTTP ${r.status})`);
+  const ev = ((await r.json()).results || [])[0];
+  if (!ev) throw new Error('No ownership history found for this token');
+  return ev.asset_event_type === 'burn' ? null : (ev.recipient || null);
+}
+
+// ---- information panels (registry `info`, plus live numbers) ----
+const para = (t) => `<p>${esc(t)}</p>`;
+function renderRisk() {
+  const card = $('riskCard'), out = $('riskOut');
+  const r = coll.info && coll.info.risk;
+  if (!r) { card.classList.add('hidden'); return; }
+  const lv = RISK_LEVELS[r.level] || RISK_LEVELS.unrated;
+  card.classList.remove('hidden');
+  const scale = ['lost', 'high', 'medium', 'lower'].map((k) => `<span class="${r.level === k ? `on ${RISK_LEVELS[k].tone}` : ''}">${esc(RISK_LEVELS[k].label)}</span>`).join('');
+  // live: how much of the collection is backed up on-chain right now
+  const n = helperSt && helperSt.inscribedCount, tot = helperSt && (helperSt.canonicalCount || helperSt.sourceTotal);
+  let live;
+  if (!coll.helper) live = `<div class="msg warn">No helper is deployed for this collection yet, so none of its art is backed up on-chain by Forever Twins.</div>`;
+  else if (n == null || !tot) live = `<div class="msg">The live count could not be read right now.</div>`;
+  else {
+    const frac = Math.min(1, n / tot), complete = n >= tot;
+    const pct = complete ? 100 : n > 0 && frac < 0.01 ? '<1' : Math.floor(frac * 100);
+    const words = complete
+      ? `<b>Fully on-chain.</b> Every ${esc(coll.itemNoun)} has a permanent twin, so the art no longer depends on the original link. The original NFTs still carry their old links; the twins are the copy that survives them.`
+      : n === 0 ? `No ${esc(coll.itemNoun)} has a permanent twin yet. Until one is made, its art depends on the original link.`
+      : `${fmt(n)} of ${fmt(tot)} have a permanent twin. The other ${fmt(tot - n)} still depend on the original link.`;
+    live = `<div class="live-on ${complete ? 'ok' : ''}">On-chain today: ${pct}%</div>
+      <div class="meter" role="img" aria-label="${fmt(n)} of ${fmt(tot)} twinned"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
+      <p class="small">${words}</p>`;
+  }
+  out.innerHTML = `<div class="risk"><span class="lvl ${lv.tone}">${esc(lv.label)} risk</span><span class="mute small">of the original art being lost or changed</span></div>
+    <p><b>${esc(r.headline)}</b></p>
+    <dl class="facts spaced">${(r.points || []).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    ${r.caveat ? `<p class="mute small">${esc(r.caveat)}</p>` : ''}
+    <p class="mute small">Our judgement from the evidence above${r.asOf ? `, checked ${esc(r.asOf)}` : ''}. It is not an audit and it is not a promise about the future.</p>
+    <div class="scale" aria-label="Risk scale">${scale}</div>
+    <details class="spaced"><summary class="mute small">How we rate</summary>
+      <ul class="plain small">${['lost', 'high', 'medium', 'lower'].map((k) => `<li><b>${esc(RISK_LEVELS[k].label)}:</b> ${esc(RISK_LEVELS[k].blurb)}</li>`).join('')}</ul>
+      <p class="mute small">“Lower” needs a pointer that is content-addressed, frozen and widely hosted. No collection here meets that yet. The rating describes the original art’s link, before any twin; the number above shows how much a twin now protects.</p></details>
+    <div class="spaced">${live}</div>`;
+}
+function renderAbout() {
+  const card = $('aboutCard'), out = $('aboutOut'), i = coll.info;
+  if (!i || (!i.about && !i.who)) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const comm = coll.community ? getCommunity(reg, coll.community) : null;
+  const who = i.who
+    ? `<h3>Artist and community</h3>${para(i.who.text)}${(i.who.links || []).length ? `<div class="info-links">${i.who.links.map((l) => `<a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.label)}</a>`).join('')}</div>` : ''}`
+    : `<h3>Artist and community</h3><p class="mute">We have not recorded who made this collection yet.</p>${comm ? `<p><a href="${communityUrl(comm.slug)}">${esc(comm.name)} community page</a></p>` : ''}`;
+  out.innerHTML = (i.about || []).map(para).join('') + who;
+}
+function renderTech() {
+  const card = $('techCard'), list = $('techList'), note = $('ownerNote');
+  const items = [];
+  items.push(coll.group === 'G2'
+    ? 'Custody group G2: the source has its own marketplace, and a listed original cannot be swapped until it is unlisted.'
+    : 'Custody group G1: the source has no marketplace of its own, so an original moves by a plain transfer.');
+  if (coll.largeOnDemand) items.push('Files over 512 KB do not fit in one transaction. For those, the page uses a large-file route that uploads the file in several transactions from a one-use temporary wallet that the visitor funds.');
+  if (coll.interface === 'v3') items.push('The helper records every token’s fingerprint in a finalised record before any twin can be made, so a twin can only be the art that was recorded.');
+  if (coll.twinTokenUri) items.push(`Each twin has a standard token link (${coll.twinTokenUri.replace('{id}', '<number>')}) that returns NFT JSON pointing at its inscription.`);
+  for (const t of (coll.info && coll.info.technical) || []) items.push(t);
+  list.innerHTML = items.map((t) => `<li>${esc(t)}</li>`).join('');
+  if (coll.sourceOwnerRead === 'public') {
+    note.innerHTML = `<h3>Why the owner’s address needed a workaround</h3>
+      <p>This collection’s contract offers its owner lookup (<span class="mono">get-owner</span>) as a <i>public</i> function. Clarity, the language Stacks contracts are written in, does not let a read-only call run another contract’s public function, so tools that ask the usual way get an error instead of an address.</p>
+      <p>This page reads ownership from the chain’s transfer history instead: it takes the token’s newest transfer and shows who received it. Two things follow. A new owner can show up a few minutes after a transfer confirms, while the index catches up. And a token that is listed on a marketplace shows the marketplace contract as its holder, because the marketplace holds it while it is listed.</p>
+      <p>Swaps are not affected. The contract checks ownership itself, and your wallet only lets a swap through if you really hold the token.</p>`;
+  } else note.innerHTML = '';
+  card.classList.remove('hidden');
+  $('ownerFoot').classList.toggle('hidden', coll.sourceOwnerRead !== 'public');
 }
 
 // ---- token lookup ----
@@ -750,7 +885,7 @@ async function refreshState() {
     const total = await adapter.sourceTotal(coll);
     helperSt = st ? Object.assign(st, { sourceTotal: total }) : (total != null ? { sourceTotal: total, inscribedCount: null, interface: coll.interface } : null);
   } catch (e) { $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">Live read failed: ${esc(e.message)}. Registry data is shown instead.</div>`); }
-  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderActions();
+  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderRisk(); renderAbout(); renderTech(); renderActions();
 }
 async function boot() {
   const key = routeKey(location.pathname, location.search, 'collection');
@@ -779,7 +914,7 @@ async function boot() {
   if (coll.group === 'G2') $('g2Warn').classList.remove('hidden');
   if (!coll.helper) $('warnCard').classList.add('hidden');
   $('page').classList.remove('hidden');
-  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderActions();
+  renderSteps(coll); renderStats(); renderFacts(); renderStateMsg(); renderRisk(); renderAbout(); renderTech(); renderActions();
 
   $('lookupBtn').addEventListener('click', lookup);
   $('tokenId').addEventListener('keydown', (e) => e.key === 'Enter' && lookup());
@@ -787,7 +922,7 @@ async function boot() {
 
   try {
     chain = await import('/forever-twins/assets/xtrata-forever-twins.js?v=20261005b');
-    adapter = createAdapter({ read, core: { contract: reg.core.contract, assetName: reg.core.assetName },
+    adapter = createAdapter({ read, nftOwner, core: { contract: reg.core.contract, assetName: reg.core.assetName },
       cl: { uint: (n) => chain.Cl.uint(BigInt(n)), principal: (p) => chain.Cl.principal(p), buffer: (b) => chain.Cl.buffer(b), list: (l) => chain.Cl.list(l), ascii: (t) => chain.Cl.stringAscii(t) } });
     try { const sess = chain.getForeverTwinsWalletSession(); if (sess && sess.address) setWallet(sess.address); } catch {}
     if (coll.largeOnDemand) { try { const toks = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(LARGE_JOB_PREFIX)) { const j = JSON.parse(localStorage.getItem(k)); if (j && j.helper === coll.helper && j.status !== 'COMPLETE' && !(j.status === 'STOPPED' && !j.keepKey)) toks.push(j.token); } } if (toks.length) $('stateMsg').insertAdjacentHTML('beforeend', `<div class="msg warn">You have an unfinished large-file twin in this browser: ${toks.map((t) => `<a href="?token=${esc(t)}">token #${esc(t)}</a>`).join(', ')}. Open it to let it continue or to see where it stands.</div>`); } catch { /* storage unavailable */ } }

@@ -68,6 +68,34 @@ await check('rejects unknown community', bad((r) => { r.collections[0].community
 await check('rejects community/collection disagreement', bad((r) => { r.communities[0].collections.pop(); }, 'not in its list'));
 await check('rejects live community with no live collection', bad((r) => { const n = r.collections.find((c) => c.key === 'nyc-degens'); n.status = 'planned'; n.helper = null; r.communities[1].status = 'live'; }, 'no live collection'));
 await check('rejects v3 twinTokenUri without {id}', bad((r) => { r.collections.find((c) => c.key === 'nyc-degens').twinTokenUri = 'https://xtrata.xyz/ft/x.json'; }, '{id}'));
+await check('collection info: every collection that has info passes; unknown levels, fields and non-https links are rejected', () => {
+  assert.ok(reg.collections.filter((c) => c.info).length >= 8, 'expected info on every collection');
+  for (const c of reg.collections) assert.deepEqual(R.validateInfo(c.info || {}), [], c.key);
+  assert.ok(R.validateInfo({ risk: { level: 'severe', headline: 'x' } }).some((m) => m.includes('risk.level')));
+  assert.ok(R.validateInfo({ risk: { level: 'high' } }).some((m) => m.includes('headline')));
+  assert.ok(R.validateInfo({ who: { text: 'x', links: [{ label: 'a', url: 'http://x.example' }] } }).some((m) => m.includes('https')));
+  assert.ok(R.validateInfo({ about: [''] }).length > 0);
+  assert.ok(R.validateInfo({ banana: 1 }).some((m) => m.includes('not a known field')));
+  const r = clone(reg); r.collections.find((c) => c.key === 'bitcoin-birds').info.risk.level = 'nope';
+  assert.ok(R.validateRegistry(r).some((m) => m.includes('bitcoin-birds') && m.includes('info.risk.level')));
+});
+await check('every collection page shows a risk rating and says where the evidence came from', () => {
+  for (const c of reg.collections) { assert.ok(c.info && c.info.risk, `${c.key} has no info.risk`); assert.ok(R.RISK_LEVELS[c.info.risk.level], c.key); if (c.info.risk.level !== 'unrated') assert.ok(c.info.risk.asOf, `${c.key}: rated risk needs a date`); }
+});
+await check('sourceOwnerRead only accepts "public"; heroTwin may use token 0', () => {
+  const r = clone(reg); r.collections.find((c) => c.key === 'bitcoin-birds').sourceOwnerRead = 'private';
+  assert.ok(R.validateRegistry(r).some((m) => m.includes('sourceOwnerRead')));
+  assert.deepEqual(R.validateRegistry(reg), []);
+  const b = R.getCollection(reg, 'bitcoin-birds'); assert.equal(b.theme.heroTwin.tokenId, 0); assert.equal(b.sourceOwnerRead, 'public');
+});
+await check('Bitcoin Birds live entry: helper, manifest hash equals the published file, coverage 400 of 400', async () => {
+  const b = R.getCollection(reg, 'bitcoin-birds'); assert.equal(b.status, 'live'); assert.equal(b.interface, 'v3');
+  const f = resolve(FT, '..', 'public/ft/data/bitcoin-birds.manifest.json'); assert.ok(existsSync(f));
+  assert.equal((await import('node:crypto')).createHash('sha256').update(readFileSync(f)).digest('hex'), b.manifest.sha256);
+  assert.equal(b.manifest.count, 400); assert.deepEqual([b.coverage.recovered, b.coverage.of], [400, 400]);
+  const res = JSON.parse(readFileSync(resolve(FT, '..', 'functions/ft/collections.json'), 'utf8')).collections['bitcoin-birds'];
+  assert.equal(res.helper, b.helper); assert.equal(res.manifestSha256, b.manifest.sha256); assert.equal(res.manifestStatus, 'final');
+});
 
 // ---------------------------------------------------------------- B. routes
 section('B. routes');
@@ -158,6 +186,29 @@ await check('token with escrowed twin: original liquid, custody consistent', asy
 await check('token with swapped-in original: twin liquid', async () => {
   const c = v3(); const a = A.createAdapter({ ...fakeChain(c.helper, baseState(c, c.helper)), cl, core: CORE }); const v = await a.tokenView(c, 3);
   assert.equal(v.side, 'twin-liquid'); assert.equal(v.liquidOwner, ME); assert.equal(v.custody.consistent, true); assert.equal(a.validSwap(v), 'twin-to-original');
+});
+await check('public get-owner source: the usual get-owner read is never made; owner comes from the injected history lookup', async () => {
+  const c = v3({ sourceOwnerRead: 'public' }); const st = baseState(c, c.helper); const f = fakeChain(c.helper, st);
+  const asked = [];
+  const a = A.createAdapter({ ...f, cl, core: CORE, nftOwner: async (coll, id) => { asked.push(String(id)); return st.owner[id] || null; } });
+  const v = await a.tokenView(c, 1);
+  assert.deepEqual(asked, ['1']); assert.ok(!f.calls.some(([ct, fn]) => ct === c.source && fn === 'get-owner'), 'source get-owner must not be read');
+  assert.equal(v.sourceOwner, ME); assert.equal(v.sourceOwnerError, null); assert.equal(v.side, 'original-liquid'); assert.equal(v.custody.consistent, true);
+  const v3t = await a.tokenView(c, 3); assert.equal(v3t.side, 'twin-liquid'); assert.equal(v3t.custody.consistent, true);
+});
+await check('public get-owner source with no lookup injected, or a failing lookup: unreadable, never "consistent"', async () => {
+  const c = v3({ sourceOwnerRead: 'public' }); const st = baseState(c, c.helper);
+  const none = A.createAdapter({ ...fakeChain(c.helper, st), cl, core: CORE }); const v0 = await none.tokenView(c, 1);
+  assert.equal(v0.custody.unreadable, true); assert.equal(v0.custody.consistent, false); assert.ok(v0.sourceOwnerError);
+  const boom = A.createAdapter({ ...fakeChain(c.helper, st), cl, core: CORE, nftOwner: async () => { throw new Error('index down'); } }); const v1 = await boom.tokenView(c, 1);
+  assert.equal(v1.custody.unreadable, true); assert.match(v1.sourceOwnerError, /index down/);
+  const burned = A.createAdapter({ ...fakeChain(c.helper, st), cl, core: CORE, nftOwner: async () => null }); const v2 = await burned.tokenView(c, 2);
+  assert.equal(v2.sourceOwner, null); assert.equal(v2.sourceOwnerError, null);
+});
+await check('a collection without the flag never uses the injected lookup', async () => {
+  const c = v3(); const st = baseState(c, c.helper); let used = 0;
+  const a = A.createAdapter({ ...fakeChain(c.helper, st), cl, core: CORE, nftOwner: async () => { used++; return OTHER; } }); const v = await a.tokenView(c, 1);
+  assert.equal(used, 0); assert.equal(v.sourceOwner, ME);
 });
 await check('stored flag disagreeing with real ownership is not trusted', async () => {
   const c = v3(); const s = baseState(c, c.helper); s.owner[1] = c.helper; // original left holder but flag says escrowed twin

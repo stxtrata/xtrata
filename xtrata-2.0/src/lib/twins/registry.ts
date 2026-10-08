@@ -128,6 +128,17 @@ export const FOREVER_TWIN_COLLECTIONS: readonly ForeverTwinCollection[] = [
       'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys',
     sourceContractId: 'SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys',
     sourceAssetName: 'bitcoin-monkeys'
+  },
+  {
+    key: 'bitcoin-birds',
+    name: 'Bitcoin Birds',
+    itemNoun: 'Bitcoin Bird',
+    network: 'mainnet',
+    masterContractId: XTRATA_MASTER,
+    helperContractId:
+      'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-birds',
+    sourceContractId: 'SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds',
+    sourceAssetName: 'bitcoin-birds'
   }
 ];
 

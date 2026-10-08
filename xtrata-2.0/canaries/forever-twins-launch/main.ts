@@ -652,7 +652,7 @@ const STEPS: Step[] = [
       const out = sent.map((e: any) => ({ to: e.asset.recipient as string, amount: BigInt(e.asset.amount) }));
       const total = out.reduce((s: bigint, e: any) => s + e.amount, 0n);
       const half = feeFor / 2n;
-      for (const p of CFG.payees) if (p !== w.address && !out.some((e: any) => e.to === p && e.amount === half)) throw new Error(`Expected ${stx(half)} to payee ${p}; transfers were ${JSON.stringify(out.map((e: any) => [e.to, e.amount.toString()]))}.`);
+      if (half > 0n) for (const p of CFG.payees) if (p !== w.address && !out.some((e: any) => e.to === p && e.amount === half)) throw new Error(`Expected ${stx(half)} to payee ${p}; transfers were ${JSON.stringify(out.map((e: any) => [e.to, e.amount.toString()]))}.`);
       if (total > cap) throw new Error(`Wallet sent ${stx(total)}, over the cap ${stx(cap)}.`);
       let xtrataId = '';
       await eventually(`Binding #${t.id}`, async () => { const b = await read('get-binding', [uintCV(t.id)]); if (isNone(b)) return 'no binding yet'; xtrataId = asText(field(b, 'xtrata-id')); return null; });

@@ -3,6 +3,9 @@
 //   read(contractId, functionName, args) -> plain JS value (uints as strings, tuples as objects,
 //                                           {ok}/{err} responses, {some} optionals decoded by unwrap*)
 //   cl = { uint(n), principal(p), buffer(bytes), list(items), ascii(text) }  (Clarity value builders)
+//   nftOwner(coll, tokenId) -> principal | null   (optional) the current holder from the chain's NFT event history.
+//     Needed for sources whose get-owner is a PUBLIC function (e.g. Bitcoin Birds): Clarity cannot call another
+//     contract's public function from a read-only call, so the usual read fails. Registry flag: sourceOwnerRead "public".
 
 export const CHUNK_SIZE = 16384;
 export const MAX_CHUNKS = 32;
@@ -37,7 +40,7 @@ export const explainError = (code) => V3_ERRORS[Number(code)] || `Contract error
 
 export const isLargeTotal = (bytes) => Number(bytes) > SINGLE_TX_MAX_BYTES;
 
-export function createAdapter({ read, cl, core }) {
+export function createAdapter({ read, cl, core, nftOwner }) {
   const needHelper = (coll) => { if (!coll.helper) throw new Error(`${coll.key} has no helper contract yet`); };
 
   async function sourceTotal(coll) {
@@ -100,7 +103,10 @@ export function createAdapter({ read, cl, core }) {
   async function tokenView(coll, tokenId) {
     const idArg = cl.uint(tokenId);
     const safe = async (p) => { try { return await p; } catch (e) { return { __error: e.message }; } };
-    const ownerRaw = await safe(read(coll.source, 'get-owner', [idArg]));
+    const publicOwner = coll.sourceOwnerRead === 'public';
+    const ownerRaw = await safe(publicOwner
+      ? (nftOwner ? Promise.resolve(nftOwner(coll, tokenId)) : Promise.reject(new Error('Owner lookup is unavailable for this collection right now')))
+      : read(coll.source, 'get-owner', [idArg]));
     const sourceOwner = ownerRaw && ownerRaw.__error ? null : unwrapOptional(ownerRaw);
     const view = { tokenId: String(tokenId), sourceOwner, sourceOwnerError: ownerRaw && ownerRaw.__error || null,
       binding: null, canonical: null, twinOwner: null, custody: null, listed: null, side: null, liquidOwner: sourceOwner };

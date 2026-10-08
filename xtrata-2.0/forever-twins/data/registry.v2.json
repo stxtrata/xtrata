@@ -79,7 +79,6 @@
       "source": "SP16SRR777TVB1WS5XSS9QT3YEZEC9JQFKYZENRAJ.bitcoin-pepe",
       "sourceAsset": "bitcoin-pepe",
       "legacyPage": "/forever-twins/bitcoin-pepes/",
-      "claimUrl": "https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
       "theme": {
         "logo": "/forever-twins/assets/bitcoin-pepe-maxi.png",
         "accent": "#2f9e44"
@@ -87,7 +86,39 @@
       "blurb": "The first public Forever Twins collection. Holders give their Pepe a permanent on-chain twin, claimable on Fak.fun.",
       "manifest": null,
       "coverage": null,
-      "helperSourceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff"
+      "helperSourceSha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+      "info": {
+        "about": [
+          "Bitcoin Pepes is a Stacks collection and was the first Forever Twins collection to go live, together with Fak.fun and before the grant.",
+          "Its helper is one of the original three, so it works through its own page and read functions rather than the newer sealed-record design."
+        ],
+        "technical": [
+          "The original helpers pay their fee by a transfer from the sender, so inscribing from a fee-payout address fails on-chain. Use a different wallet.",
+          "They do not need a finalised record to work, and they have no published manifest.",
+          "The source has its own marketplace (custody group G2): unlist before swapping."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "Our 24 Sep scan found PNG art behind Pinata metadata links. We have not checked whether those links can be changed.",
+          "points": [
+            [
+              "Art lives at",
+              "Pinata-hosted metadata links, image/png."
+            ],
+            [
+              "Can the pointer change?",
+              "Not checked."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured."
+            ]
+          ],
+          "asOf": "24 Sep 2026",
+          "caveat": "Provisional: from a single early scan."
+        }
+      },
+      "claimUrl": "https://fak.fun/SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun"
     },
     {
       "key": "leo-cats",
@@ -108,7 +139,30 @@
       "blurb": "LEO Cats holders can create a permanent on-chain counterpart backed by Xtrata.",
       "manifest": null,
       "coverage": null,
-      "helperSourceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b"
+      "helperSourceSha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+      "info": {
+        "about": [
+          "LEO Cats is a Stacks collection of 10,000 cats. Its helper is one of the original three, built with Fak.fun before the grant."
+        ],
+        "technical": [
+          "The original helpers pay their fee by a transfer from the sender, so inscribing from a fee-payout address fails on-chain. Use a different wallet.",
+          "They do not need a finalised record to work, and they have no published manifest."
+        ],
+        "risk": {
+          "level": "unrated",
+          "headline": "We have not recorded where this collection’s art is hosted, so we do not rate it yet.",
+          "points": [
+            [
+              "Art lives at",
+              "Not recorded."
+            ],
+            [
+              "Can the pointer change?",
+              "Not checked."
+            ]
+          ]
+        }
+      }
     },
     {
       "key": "miami-degens",
@@ -129,7 +183,30 @@
       "blurb": "Miami Degens holders can create a permanent Xtrata twin, then swap which side stays liquid.",
       "manifest": null,
       "coverage": null,
-      "helperSourceSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513"
+      "helperSourceSha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513",
+      "info": {
+        "about": [
+          "Miami Degens is a Stacks collection. Its helper is one of the original three, built with Fak.fun before the grant."
+        ],
+        "technical": [
+          "The original helpers pay their fee by a transfer from the sender, so inscribing from a fee-payout address fails on-chain. Use a different wallet.",
+          "They do not need a finalised record to work, and they have no published manifest."
+        ],
+        "risk": {
+          "level": "unrated",
+          "headline": "We have not recorded where this collection’s art is hosted, so we do not rate it yet.",
+          "points": [
+            [
+              "Art lives at",
+              "Not recorded."
+            ],
+            [
+              "Can the pointer change?",
+              "Not checked."
+            ]
+          ]
+        }
+      }
     },
     {
       "key": "nyc-degens",
@@ -163,7 +240,40 @@
         "of": 420,
         "asOf": "block 9,127,020, 5 Oct 2026"
       },
-      "helperSourceSha256": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951"
+      "helperSourceSha256": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951",
+      "info": {
+        "about": [
+          "NYC Degens is a Stacks collection of 420 tokens (about 50.8 MB in total; every file is at most 130 KB). It was the first collection built on the Forever Twins v3 helper and was deployed and finalised on 5 Oct 2026.",
+          "The 420 canonical records are sealed on-chain, so a twin can only be made from exactly the art that was recorded."
+        ],
+        "technical": [
+          "The source has no marketplace of its own, so swaps are plain transfers (custody group G1).",
+          "Token links are built from stored lookups and point into an IPFS folder (QmayEq…)."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "The art is on IPFS. We have not re-checked whether the pointer can change or how widely it is hosted.",
+          "points": [
+            [
+              "Art lives at",
+              "IPFS folder QmayEq…."
+            ],
+            [
+              "Contract points to",
+              "ipfs://QmayEq…/ through stored lookups."
+            ],
+            [
+              "Can the pointer change?",
+              "Not re-checked."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured."
+            ]
+          ],
+          "asOf": "25 Sep 2026 (re-check pending)"
+        }
+      }
     },
     {
       "key": "megapont-ape-club",
@@ -197,7 +307,41 @@
         "of": 2500,
         "asOf": "block 9,127,306, 5 Oct 2026"
       },
-      "helperSourceSha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90"
+      "helperSourceSha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
+      "info": {
+        "about": [
+          "Megapont Ape Club is a Stacks collection of 2,500 apes, one of several Megapont collections. 2,489 of the files are PNGs under 9.1 KB; 11 are animated GIFs, the largest about 480 KB. Nothing needs the large-file route.",
+          "All 2,500 canonical records are sealed on-chain in the helper, and anyone can fund a twin."
+        ],
+        "technical": [
+          "The source has its own marketplace. A listed ape cannot be moved by the helper, so unlist it before swapping (custody group G2).",
+          "Metadata is IPFS (ipfs://QmRhkJ…/{id}) and the art is a separate IPFS folder (QmZjrC…). The metadata is not frozen.",
+          "The asset name is case-sensitive: Megapont-Ape-Club."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "The art is on IPFS, but the metadata is not frozen and we have not measured how many hosts keep it.",
+          "points": [
+            [
+              "Art lives at",
+              "IPFS folder QmZjrC…."
+            ],
+            [
+              "Contract points to",
+              "ipfs://QmRhkJ…/{id} for metadata."
+            ],
+            [
+              "Can the pointer change?",
+              "Yes. The owner can set the base URI until the metadata is frozen, and it is not frozen."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured."
+            ]
+          ],
+          "asOf": "5 Oct 2026"
+        }
+      }
     },
     {
       "key": "bitcoin-monkeys",
@@ -232,7 +376,41 @@
         "asOf": "block 9,133,680, 6 Oct 2026"
       },
       "largeOnDemand": true,
-      "helperSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f"
+      "helperSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+      "info": {
+        "about": [
+          "Bitcoin Monkeys is a Stacks collection of 2,500 monkeys, all minted. Most files are small, but 283 are larger than 512 KB (the largest is about 1.6 MB), so they are twinned through the large-file route.",
+          "All 2,500 canonical records are sealed on-chain in the helper, so each file can only be twinned with exactly the art that was recorded."
+        ],
+        "technical": [
+          "The collection’s metadata points to an IPFS folder (QmXPHz…), and the contract builds each token’s link from stored lookups. The metadata is not frozen, so the owner can still call set-root-uri.",
+          "Files over 512 KB cannot fit in one transaction. The large-file route uploads them in several transactions from a one-use temporary wallet that the visitor funds.",
+          "The helper for this collection includes the large-file code, which was fork-tested but has not had an independent audit."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "The art is on IPFS, but the contract’s metadata is not frozen and we have not measured how many hosts keep it.",
+          "points": [
+            [
+              "Art lives at",
+              "IPFS folder QmXPHz…, files named bitcoin_monkeys_<n>."
+            ],
+            [
+              "Contract points to",
+              "ipfs://QmXPHz…/ plus a per-token name."
+            ],
+            [
+              "Can the pointer change?",
+              "Yes. metadata-frozen is false and the owner can still repoint it."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured. We fetched all 2,500 files through our own IPFS node."
+            ]
+          ],
+          "asOf": "6 Oct 2026"
+        }
+      }
     },
     {
       "key": "ordinal-pepe",
@@ -253,7 +431,36 @@
       "blurb": "Second complete Forever Twins collection: 100 of 100 files are small enough for a single transaction. Helper not yet deployed.",
       "twinTokenUri": "https://xtrata.xyz/ft/ordinal-pepe/{id}.json",
       "manifest": null,
-      "coverage": null
+      "coverage": null,
+      "info": {
+        "about": [
+          "Ordinal Pepe is a Stacks collection of 100 tokens. All 100 share one 140,745-byte GIF, so one preserved file protects the whole collection.",
+          "The helper is built but not yet deployed."
+        ],
+        "technical": [
+          "The source has its own marketplace (custody group G2): a listed token cannot be swapped until it is unlisted.",
+          "Token links are IPFS (ipfs://ipfs/QmRFMu…/json/{id}.json) and are not frozen."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "The art is on IPFS and the pointer is not frozen. We have not measured how widely it is hosted.",
+          "points": [
+            [
+              "Art lives at",
+              "IPFS folder QmRFMu…."
+            ],
+            [
+              "Can the pointer change?",
+              "Yes. Not frozen."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured."
+            ]
+          ],
+          "asOf": "6 Oct 2026"
+        }
+      }
     },
     {
       "key": "see-yourself-out",
@@ -274,28 +481,121 @@
       "blurb": "Cohort 3 for Milestone 1. Helper not yet deployed.",
       "twinTokenUri": "https://xtrata.xyz/ft/see-yourself-out/{id}.json",
       "manifest": null,
-      "coverage": null
+      "coverage": null,
+      "info": {
+        "about": [
+          "See Yourself Out is described in our notes as season 2 of a series by Boozy, an evolving art experiment of 100 tokens. Twinning is on hold while we talk to the artist.",
+          "Because the art evolves, a twin preserves the art as it was when it was recorded."
+        ],
+        "technical": [
+          "12 of the 100 files are over 512 KB (the largest is 5.7 MB), so they would need the large-file route.",
+          "Metadata and images are on IPFS only and the metadata is not frozen."
+        ],
+        "risk": {
+          "level": "medium",
+          "headline": "IPFS only, not frozen, and the art is designed to change.",
+          "points": [
+            [
+              "Art lives at",
+              "IPFS only (metadata QmYw49…, images QmS5is…)."
+            ],
+            [
+              "Can the pointer change?",
+              "Yes. Not frozen."
+            ],
+            [
+              "How widely hosted?",
+              "Not measured."
+            ]
+          ],
+          "asOf": "5 Oct 2026"
+        }
+      }
     },
     {
       "key": "bitcoin-birds",
       "name": "Bitcoin Birds",
       "itemNoun": "Bitcoin Bird",
       "community": null,
-      "status": "planned",
+      "status": "live",
       "interface": "v3",
       "group": "G1",
-      "helper": null,
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-birds",
       "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
       "sourceAsset": "bitcoin-birds",
+      "sourceOwnerRead": "public",
       "legacyPage": null,
       "theme": {
         "logo": null,
-        "accent": "#1c7ed6"
+        "accent": "#1c7ed6",
+        "heroTwin": {
+          "tokenId": 0,
+          "xtrataId": 3129
+        }
       },
-      "blurb": "All 400 Bitcoin Birds, backed up on chain. The collection's own token URI points to a website that no longer serves the art; the images survive only as a single IPFS folder. Helper not yet deployed.",
+      "blurb": "All 400 Bitcoin Birds now have a permanent on-chain twin, inscribed by the Xtrata team at no charge so the whole collection is backed up on Bitcoin’s Stacks layer. The collection’s own token URI points to a website that no longer serves the art, so the twins are now the copy that does not depend on any outside host. Holders can swap between the original NFT and its twin at any time.",
       "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-birds/{id}.json",
-      "manifest": null,
-      "coverage": null
+      "manifest": {
+        "url": "/ft/data/bitcoin-birds.manifest.json",
+        "sha256": "6c19c50821e7a447a8874c4d516b0962cd3eff051bcf23f17552175f8e470145",
+        "count": 400
+      },
+      "coverage": {
+        "recovered": 400,
+        "of": 400,
+        "asOf": "8 Oct 2026"
+      },
+      "helperSourceSha256": "2f15eb3d8ea5e6bac3cdf62208ef621d3df8c2f6e64426af04c0739f0e326b9a",
+      "info": {
+        "about": [
+          "Bitcoin Birds is a collection of 400 pixel-art birds on Stacks, numbered 0 to 399. Every file is a small PNG (3 to 8 KB), so the whole set is about 2 MB.",
+          "The collection’s contract stores one link for all of its birds, and that link (stacksart.com/assets/birds.json) now returns an ordinary web page, not token data. The pictures themselves are kept in a single IPFS folder that marketplaces such as Gamma read from. Nothing on the chain names that folder.",
+          "That made Birds one of the clearest cases for a backup: a complete collection whose only route to its art was a third party’s index. All 400 twins were inscribed by the Xtrata team, with the helper fee set to zero for this collection."
+        ],
+        "who": {
+          "text": "A third-party listing (NFT Calendar) describes Bitcoin Birds as a handmade pixel-art collection by a single independent creator, with a 400-piece mint in March 2023 and sales on Gamma. The contract was deployed from the same address as the Stacks Art collections. We have not spoken to the creator and that listing is our only source for these details, so treat them as unconfirmed.",
+          "links": [
+            {
+              "label": "Listing (NFT Calendar)",
+              "url": "https://nftcalendar.io/event/bitcoin-birds/"
+            },
+            {
+              "label": "Collection on Gamma",
+              "url": "https://gamma.io/stacks/collections/bitcoin-birds"
+            }
+          ]
+        },
+        "technical": [
+          "Token numbers run from 0 to 399. Token 0 reads its link from a separate variable from every other bird; both were set to the same link.",
+          "The collection’s link can still be changed by the contract owner, and there is no freeze. Nothing stops it being pointed somewhere else later.",
+          "A bird that is listed for sale on the Stacks Art marketplace is held by that marketplace contract until it sells or is delisted, so the “original owner” shown for a listed bird is the marketplace. Delist before swapping.",
+          "The helper checks custody for Birds by reading the source contract’s own per-owner list, because the source does not expose a read-only owner lookup (see the note on owner addresses below)."
+        ],
+        "risk": {
+          "level": "high",
+          "headline": "Before the twins, the only route from the chain to the art was a dead website and one company’s index.",
+          "points": [
+            [
+              "Art lives at",
+              "One IPFS folder (QmNcUC…oUxZ, files bird-0.png to bird-399.png), served to marketplaces through a Pinata gateway. Found through Gamma’s index."
+            ],
+            [
+              "Contract points to",
+              "https://www.stacksart.com/assets/birds.json for every bird. It now returns the Stacks Art web page."
+            ],
+            [
+              "Can the pointer change?",
+              "Yes. The contract owner can set it, with no freeze."
+            ],
+            [
+              "How widely hosted?",
+              "Not known. We could not show who besides the original Pinata account holds that folder."
+            ]
+          ],
+          "asOf": "7–8 Oct 2026",
+          "caveat": "We have not confirmed that this folder is the artist’s original set; Gamma’s index is the only evidence that ties it to the collection. The twins preserve exactly what that folder served on 8 Oct 2026, hashed and recorded in the public manifest."
+        }
+      }
     }
   ]
 }
