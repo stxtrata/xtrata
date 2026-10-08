@@ -1,0 +1,40 @@
+{
+  "site": "https://xtrata.xyz",
+  "expectedFlows": ["app", "wallet_connect", "mint", "drop_claim", "market_buy", "collection_publish"],
+  "codeClasses": {
+    "ops": ["RENDER_CRASH", "SPONSOR_LOW_FLOAT", "SPONSOR_REJECTED", "HIRO_RATE_LIMIT", "BROADCAST_FAILED", "CONFIRM_TIMEOUT", "UPLOAD_FAILED", "ASSET_TOO_LARGE", "READ_ONLY_BACKOFF", "WALLET_RPC_INTERNAL"],
+    "user": ["WALLET_REJECTED", "WALLET_LOCKED", "WALLET_NOT_FOUND", "NETWORK_OFFLINE", "SESSION_EXPIRED", "INSUFFICIENT_FUNDS", "INSUFFICIENT_FEE"],
+    "unknown": ["UNCAUGHT", ""]
+  },
+  "scoring": {
+    "classWeight": { "ops": 1.0, "unknown": 0.9, "review": 0.6, "user": 0.25 },
+    "newMultiplier": 1.3,
+    "risingMultiplier": 1.2,
+    "risingRatio": 1.5,
+    "minSessions": 2,
+    "occurrenceWeight": 0.2
+  },
+  "coverage": {
+    "uncaughtShareForClassify": 0.3,
+    "minEventsForFlow": 1
+  },
+  "evaluation": {
+    "windowDays": 3,
+    "resolvedDrop": 0.8,
+    "improvedDrop": 0.4,
+    "regressedRise": 0.2,
+    "minBaselineOccurrences": 3
+  },
+  "limits": {
+    "maxOpenSitePrs": 3,
+    "maxAttemptsPerIssue": 2,
+    "maxChangedLines": 400,
+    "maxChangedFiles": 12,
+    "maxHarnessChangedLines": 250
+  },
+  "paths": {
+    "siteForbidden": ["contracts/", "dist/", "wrangler.toml", "functions/wrangler.toml", "functions/migrations/", "node_modules/", "scripts/health/", "package.json", "package-lock.json", ".env"],
+    "siteSensitive": ["src/lib/wallet/", "src/agent-one/", "functions/sponsor/", "src/lib/contract/", "src/lib/telemetry/", "functions/log.ts"],
+    "harnessAllowed": ["scripts/health/"]
+  }
+}

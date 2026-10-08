@@ -1,0 +1,327 @@
+{
+ "ready": true,
+ "secured": true,
+ "generatedAt": 1791446400000,
+ "range": "7d",
+ "rangeHours": 168,
+ "kpis": {
+  "crashOuts": 1287,
+  "totalEvents": 20431,
+  "distinctIssues": 14,
+  "sessionsAffected": 642,
+  "sessionsTotal": 3120,
+  "walletsAffected": 511,
+  "erroredJourneys": 934,
+  "recoveredJourneys": 690,
+  "gaveUpJourneys": 244,
+  "recoveryPct": 74
+ },
+ "byFlow": [
+  {
+   "flow": "market_buy",
+   "errors": 512,
+   "events": 6200
+  },
+  {
+   "flow": "mint",
+   "errors": 388,
+   "events": 5400
+  },
+  {
+   "flow": "drop_claim",
+   "errors": 243,
+   "events": 4800
+  },
+  {
+   "flow": "wallet_connect",
+   "errors": 98,
+   "events": 3100
+  },
+  {
+   "flow": "collection_publish",
+   "errors": 34,
+   "events": 600
+  },
+  {
+   "flow": "app",
+   "errors": 12,
+   "events": 331
+  }
+ ],
+ "trend": [
+  {
+   "day": "2026-07-15",
+   "errors": 210,
+   "events": 3000
+  },
+  {
+   "day": "2026-07-16",
+   "errors": 245,
+   "events": 3100
+  },
+  {
+   "day": "2026-07-17",
+   "errors": 198,
+   "events": 2900
+  },
+  {
+   "day": "2026-07-18",
+   "errors": 262,
+   "events": 3300
+  },
+  {
+   "day": "2026-07-19",
+   "errors": 176,
+   "events": 2800
+  },
+  {
+   "day": "2026-07-20",
+   "errors": 121,
+   "events": 2700
+  },
+  {
+   "day": "2026-07-21",
+   "errors": 75,
+   "events": 2631
+  }
+ ],
+ "topIssues": [
+  {
+   "fingerprint": "3a9f0c11d2e4",
+   "flow": "market_buy",
+   "step": "settle",
+   "errorCode": "SPONSOR_REJECTED",
+   "sample": "sponsor submit rejected: post-condition on <addr> failed",
+   "occurrences": 214,
+   "sessions": 168,
+   "wallets": 141,
+   "lastSeen": 1784671478120,
+   "route": "/market-buy",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "77b1e0aa41cd",
+   "flow": "mint",
+   "step": "broadcast",
+   "errorCode": "NONCE_MISMATCH",
+   "sample": "broadcast failed: nonce mismatch, expected <n> got <n>",
+   "occurrences": 189,
+   "sessions": 152,
+   "wallets": 149,
+   "lastSeen": 1784671718120,
+   "route": "/mint",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "c2d4f8091a7b",
+   "flow": "drop_claim",
+   "step": "sign",
+   "errorCode": "WALLET_REJECTED",
+   "sample": "user canceled the request",
+   "occurrences": 168,
+   "sessions": 160,
+   "wallets": 158,
+   "lastSeen": 1784671178120,
+   "route": "/drop-claim",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "ea55d1207f39",
+   "flow": "market_buy",
+   "step": "confirm",
+   "errorCode": "CONFIRM_TIMEOUT",
+   "sample": "timed out waiting for tx <hash> to confirm",
+   "occurrences": 121,
+   "sessions": 96,
+   "wallets": 90,
+   "lastSeen": 1784670578120,
+   "route": "/market-buy",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "90ab34cd12ef",
+   "flow": "mint",
+   "step": "upload",
+   "errorCode": "UPLOAD_FAILED",
+   "sample": "asset upload failed: 413 payload too large",
+   "occurrences": 87,
+   "sessions": 71,
+   "wallets": 66,
+   "lastSeen": 1784669438120,
+   "route": "/mint",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "5f5f5f101010",
+   "flow": "app",
+   "step": "render",
+   "errorCode": "RENDER_CRASH",
+   "sample": "Cannot read properties of undefined (reading map)",
+   "occurrences": 63,
+   "sessions": 58,
+   "wallets": 20,
+   "lastSeen": 1784671778120,
+   "route": "/app",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "bb77cc33aa11",
+   "flow": "drop_claim",
+   "step": "submit",
+   "errorCode": "SPONSOR_LOW_FLOAT",
+   "sample": "sponsor float below threshold (<n> ustx)",
+   "occurrences": 44,
+   "sessions": 39,
+   "wallets": 38,
+   "lastSeen": 1784668418120,
+   "route": "/drop-claim",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  },
+  {
+   "fingerprint": "d0d0beef1234",
+   "flow": "wallet_connect",
+   "step": "authorize",
+   "errorCode": "WALLET_NOT_FOUND",
+   "sample": "no compatible wallet provider detected",
+   "occurrences": 39,
+   "sessions": 39,
+   "wallets": 0,
+   "lastSeen": 1784666498120,
+   "route": "/wallet-connect",
+   "appVersion": "2026.10.07",
+   "walletKind": "xverse",
+   "browser": "chrome",
+   "device": "desktop",
+   "os": "mac",
+   "stack": null,
+   "context": null
+  }
+ ],
+ "funnels": [
+  {
+   "flow": "market_buy",
+   "steps": [
+    {
+     "flow": "market_buy",
+     "step": "quote",
+     "started": 1400,
+     "succeeded": 1360,
+     "errored": 22,
+     "abandoned": 18
+    },
+    {
+     "flow": "market_buy",
+     "step": "sign",
+     "started": 1360,
+     "succeeded": 1180,
+     "errored": 96,
+     "abandoned": 84
+    },
+    {
+     "flow": "market_buy",
+     "step": "broadcast",
+     "started": 1180,
+     "succeeded": 1090,
+     "errored": 78,
+     "abandoned": 12
+    },
+    {
+     "flow": "market_buy",
+     "step": "confirm",
+     "started": 1090,
+     "succeeded": 980,
+     "errored": 101,
+     "abandoned": 9
+    },
+    {
+     "flow": "market_buy",
+     "step": "settle",
+     "started": 980,
+     "succeeded": 766,
+     "errored": 214,
+     "abandoned": 0
+    }
+   ]
+  },
+  {
+   "flow": "mint",
+   "steps": [
+    {
+     "flow": "mint",
+     "step": "reserve",
+     "started": 900,
+     "succeeded": 872,
+     "errored": 16,
+     "abandoned": 12
+    },
+    {
+     "flow": "mint",
+     "step": "upload",
+     "started": 872,
+     "succeeded": 785,
+     "errored": 87,
+     "abandoned": 0
+    },
+    {
+     "flow": "mint",
+     "step": "sign",
+     "started": 785,
+     "succeeded": 690,
+     "errored": 61,
+     "abandoned": 34
+    },
+    {
+     "flow": "mint",
+     "step": "broadcast",
+     "started": 690,
+     "succeeded": 540,
+     "errored": 150,
+     "abandoned": 0
+    }
+   ]
+  }
+ ],
+ "_note": "Synthetic sample data (from the /debug design preview). Not real telemetry."
+}
