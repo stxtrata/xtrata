@@ -75,6 +75,23 @@ cd canaries/build && python3 -m http.server 8765
 Cost for NYC Degens: deploy and 5 seed calls plus finalise are small network fees; the test inscription costs the
 full fee (0.1 STX) plus the core fee (about 0.02 STX) because this wallet is not a payee. Keep at least 3 STX free.
 
+## Managing a live helper (the "Manage the deployed helper" panel)
+
+The page doubles as the owner's management terminal once a helper is deployed; it needs no launch step to have been run in
+this browser. Connect the owner wallet in step 1, press **Refresh from chain**, and the panel shows the owner, pending owner,
+fee and ceiling, record/finalised/inscribed counts, rescue settings and burn height, all read live. Changes:
+
+| Tool | Calls | Refused before signing when |
+|---|---|---|
+| Inscription fee | `set-fee` | amount is not a number, is odd in micro-STX (u218), is over the deploy-time ceiling (u214), or is already the current fee |
+| Ownership | `propose-ownership` / `cancel-ownership-proposal` | address is not a mainnet SP… address; you must type the collection key to confirm. The new owner signs `accept-ownership` from its own wallet |
+| Stray rescue | `propose-rescue` / `cancel-rescue` / `execute-rescue` | the chain reports no stray side for that token, a rescue is already proposed, rescue is disabled, or the Bitcoin-block delay has not passed |
+
+Every write first re-reads the chain and refuses unless the connected wallet is the helper's **current owner** (if the
+temporary seeding wallet still owns it, it says so). Fee changes show the cost of the remaining un-inscribed tokens at the old
+and new rate before asking you to sign. Transactions resume after a reload and are never re-sent. Swaps are not affected by
+anything here. Step 4 (Verify) accepts a fee changed by the owner as long as it is still even and within the ceiling.
+
 ## After the canary
 
 1. `functions/ft/collections.json`: set `helper` and `manifestStatus: "final"`, deploy the resolver.

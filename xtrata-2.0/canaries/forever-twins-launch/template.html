@@ -60,6 +60,13 @@ textarea { width:100%; min-height:150px; padding:10px; border-radius:9px; border
 .chooser__item img { width:28px; height:28px; grid-row: span 2; border-radius:6px; }
 .chooser__item code { grid-column:2; font-size:11px; color:var(--muted); }
 .chooser__item:hover { border-color:var(--green); }
+.kv { display:grid; grid-template-columns: max-content 1fr; gap:6px 14px; margin:12px 0 0; font-size:13px; }
+.kv dt { color:var(--muted); } .kv dd { margin:0; overflow-wrap:anywhere; } .kv dd.mono { font-family: ui-monospace, monospace; }
+.tools { display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:12px; margin-top:14px; }
+.tool { border:1px solid var(--line); border-radius:12px; background:#0b0c0a; padding:12px 14px; display:grid; gap:10px; align-content:start; }
+.tool h3 { margin:0; font-size:14px; } .tool p { margin:0; font-size:12px; color:var(--muted); }
+.tool .actions { gap:8px; }
+.tool .button { padding:8px 12px; font-size:12px; }
 @media (max-width:600px) { .step__head { grid-template-columns:30px 1fr; } .step__head .badge { grid-column: 2; justify-self:start; } }
 </style>
 </head>
@@ -82,6 +89,47 @@ textarea { width:100%; min-height:150px; padding:10px; border-radius:9px; border
   <div class="walletbar">Temporary seeding wallet: <code id="hot"></code></div>
   <p id="status" role="status" aria-live="polite">Ready.</p>
   <div class="steps" id="steps"></div>
+  <section class="panel" id="manage">
+    <h2>Manage the deployed helper</h2>
+    <p id="manage-intro">The steps above are the launch. This panel is the owner's terminal for a helper that is already live: it works at any time after deployment (connect in step 1, then refresh), reads everything from the chain, and signs each change in your wallet. A change is refused before anything is signed unless the chain says your wallet is the helper's current owner. Swaps are never affected by anything here.</p>
+    <div class="actions">
+      <button class="button ghost" id="m-refresh" type="button">Refresh from chain</button>
+      <span class="build" id="m-stamp">not read yet</span>
+    </div>
+    <dl class="kv" id="m-kv"></dl>
+    <div class="tools">
+      <div class="tool">
+        <h3>Inscription fee</h3>
+        <p>One flat fee per inscription, split exactly in half between the two payees (a payee inscribing pays only the other half). Must be an even number of micro-STX and at most the ceiling fixed at deploy. Takes effect for every inscription after the block it confirms in; already-inscribed tokens are untouched.</p>
+        <label>New fee (STX)<input id="m-fee" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="1" /></label>
+        <p class="hint" id="m-fee-hint"></p>
+        <div class="actions"><button class="button" id="m-setfee" type="button">Set fee</button></div>
+      </div>
+      <div class="tool">
+        <h3>Ownership</h3>
+        <p>Two-step hand-over: you propose a wallet, that wallet signs accept-ownership from its own address. Nothing changes until it accepts, and you can withdraw the proposal before then. Once another wallet owns the helper, this canary (pinned to the deployer) can no longer manage it. For the seeding hand-over to the temporary wallet use the launch steps above, not this.</p>
+        <label>New owner (SP… address)<input id="m-owner" autocomplete="off" spellcheck="false" placeholder="SP…" /></label>
+        <div class="actions">
+          <button class="button" id="m-propose" type="button">Propose new owner</button>
+          <button class="button ghost" id="m-cancel-owner" type="button">Withdraw proposal</button>
+        </div>
+      </div>
+      <div class="tool">
+        <h3>Stray rescue</h3>
+        <p>Only for a token where the helper holds something it should not (an original sent to it directly, or both halves of a bound pair). Look the token up first: the chain reports which side is stray. A rescue is announced on chain, executable after the rescue delay in Bitcoin blocks, and can be cancelled until then. It can never break a bound pair.</p>
+        <label>Token id<input id="m-token" type="number" min="0" step="1" /></label>
+        <div class="actions"><button class="button ghost" id="m-lookup" type="button">Look up</button></div>
+        <p class="note" id="m-look" hidden></p>
+        <label>Recipient (SP… address)<input id="m-recipient" autocomplete="off" spellcheck="false" placeholder="SP…" /></label>
+        <div class="actions">
+          <button class="button" id="m-propose-rescue" type="button">Propose rescue</button>
+          <button class="button ghost" id="m-cancel-rescue" type="button">Cancel rescue</button>
+          <button class="button ghost" id="m-execute-rescue" type="button">Execute rescue</button>
+        </div>
+      </div>
+    </div>
+    <ul class="txs" id="m-txs"></ul>
+  </section>
   <section class="panel">
     <h2>Activity</h2>
     <div class="actions" style="margin-bottom:10px">

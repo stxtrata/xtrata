@@ -114,3 +114,11 @@ A throwaway wallet cannot sign owner-only calls, so hand it ownership for the ru
   route changes.
 - End the canary with an "audit" step that lists the repo and site edits still to make (redirects,
   tiles, id lists) so nothing is forgotten after the launch.
+
+## Canaries are also the management terminal
+
+Do not build a launch canary that goes silent after launch. If the contract keeps owner powers (fee, ownership, rescue,
+pause, ...), give the page a panel that works at any time after deployment: read everything from the chain, sign each change
+in the owner wallet, refuse before signing unless the chain says the connected wallet is the current owner, and make
+"verify" steps check the rules a value must obey rather than its launch value (an owner may have changed it). Worked
+example: the "Manage the deployed helper" panel in `forever-twins-launch` (`set-fee`, ownership, stray rescue).

@@ -472,13 +472,17 @@ const STEPS: Step[] = [
       const g = await iface();
       const want: Record<string, string> = {
         'collection-key': CFG.key, master: CFG.master, source: CFG.source, group: CFG.group, 'payee-a': CFG.payees[0], 'payee-b': CFG.payees[1],
-        fee: String(CFG.initialFeeUstx), 'max-fee': String(CFG.maxFeeUstx), owner: CFG.deployer
+        'max-fee': String(CFG.maxFeeUstx), owner: CFG.deployer
       };
       for (const [k, v] of Object.entries(want)) {
         const got = g(k);
         if (got.replace(/^"|"$/g, '') !== v) throw new Error(`get-twin-interface ${k} is ${got}, expected ${v}.`);
       }
-      return `source matches · master ${short(CFG.master)} · ${CFG.group} · payees ${short(CFG.payees[0])} / ${short(CFG.payees[1])} · fee ${stx(CFG.initialFeeUstx)} (max ${stx(CFG.maxFeeUstx)}) · owner ${short(CFG.deployer)} · canonical records ${g('canonical-count')} · finalised ${g('canonical-finalized')} · inscribed ${g('inscribed-count')}`;
+      // the fee is the one thing the owner may change after deploy (management panel below), so check the rules it must obey, not the starting value
+      const fee = BigInt(g('fee'));
+      if (fee % 2n !== 0n || fee > BigInt(CFG.maxFeeUstx)) throw new Error(`get-twin-interface fee is ${fee}: must be even and at most ${CFG.maxFeeUstx}.`);
+      const feeNote = fee === BigInt(CFG.initialFeeUstx) ? `fee ${stx(fee)}` : `fee ${stx(fee)} (changed by the owner; deployed at ${stx(CFG.initialFeeUstx)})`;
+      return `source matches · master ${short(CFG.master)} · ${CFG.group} · payees ${short(CFG.payees[0])} / ${short(CFG.payees[1])} · ${feeNote} (max ${stx(CFG.maxFeeUstx)}) · owner ${short(CFG.deployer)} · canonical records ${g('canonical-count')} · finalised ${g('canonical-finalized')} · inscribed ${g('inscribed-count')}`;
     }
   },
   {
@@ -762,7 +766,7 @@ const execute = async (s: Step) => {
     log('error', `${s.title}: ${st.note}`);
     status(`${s.title}: ${st.note}`, 'error');
   } finally {
-    busy = false; save(); renderSteps(); renderHeader();
+    busy = false; save(); renderSteps(); renderHeader(); renderManage();
   }
 };
 
@@ -794,7 +798,7 @@ const bind = () => {
     state.testToken = v; save();
   });
   $('#gateway').addEventListener('change', (e) => { state.gateway = (e.target as HTMLInputElement).value.trim(); save(); });
-  $('#disconnect').addEventListener('click', async () => { await wallet.disconnect(); connected = null; step('connect').status = 'todo'; save(); renderHeader(); renderSteps(); log('info', 'Wallet disconnected.'); });
+  $('#disconnect').addEventListener('click', async () => { await wallet.disconnect(); connected = null; step('connect').status = 'todo'; save(); renderHeader(); renderSteps(); renderManage(); log('info', 'Wallet disconnected.'); });
   $('#export').addEventListener('click', () => {
     const report = { ...state, build: __BUILD__, network: NET, config: CFG, pins: PINS, helper: helperId() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
@@ -816,7 +820,7 @@ const bind = () => {
   $('#forget').addEventListener('click', () => {
     if (!confirm('Forget local progress? Nothing on chain changes; the canary re-reads the chain and resumes from what is already there. The temporary wallet key is kept in this browser either way, so you can still hand ownership back or sweep it.')) return;
     try { localStorage.removeItem(stateKey()); } catch { /* ignore */ }
-    load(); restoreLog(); renderHeader(); renderSteps(); status('Local progress cleared.', 'ok');
+    load(); restoreLog(); renderHeader(); renderSteps(); renderManage(); status('Local progress cleared.', 'ok');
   });
 };
 const restoreLog = () => {
@@ -824,9 +828,215 @@ const restoreLog = () => {
     l.txid ? [' ', el('a', { href: chain.txUrl(l.txid), target: '_blank', rel: 'noopener' }, short(l.txid))] : null)));
 };
 
+// ---------- management terminal (any time after deployment) ----------
+// The launch steps above are one-way scaffolding; once a helper is live this panel is how the owner runs it: the fee, the
+// two-step ownership hand-over and the stray-only rescue (the only owner powers a v3 helper has after finalise). Nothing here
+// touches swaps. Every refresh re-reads the chain; every write is signed by the connected wallet and refused before signing
+// unless the chain says that wallet is the current owner. Pending transactions resume after a reload and are never re-sent.
+type Snap = { owner: string; pending: string | null; fee: bigint; maxFee: bigint; finalised: boolean; canonical: number; inscribed: number; rescueEnabled: boolean; rescueDelay: number; burn: number; balance: bigint | null; at: string };
+type Look = { id: number; xtrataId: string | null; side: string | null; rescue: { recipient: string; side: string; eligibleAt: number } | null };
+let snap: Snap | null = null;
+let look: Look | null = null;
+const PRINCIPAL = /^S[PM][0-9A-Z]{28,41}$/;
+const unquote = (v: string) => v.replace(/^['"]|['"]$/g, '');
+const burnHeight = async () => {
+  const { status: st, body } = await chain.json('/v2/info');
+  if (st !== 200 || body?.burn_block_height === undefined) throw new Error('Could not read the burn block height.');
+  return Number(body.burn_block_height);
+};
+/** Everything the panel shows, read fresh from the chain. */
+const snapshot = async (): Promise<Snap> => {
+  if ((await chain.contractSource(helperId())) === null) throw new Error(`${helperId()} is not deployed yet: there is nothing to manage. Run the launch steps first.`);
+  const g = await iface();
+  let balance: bigint | null = null;
+  try { balance = await chain.balance(CFG.deployer); } catch { /* shown as unknown */ }
+  snap = { owner: unquote(g('owner')), pending: principalOrNull(g('pending-owner')), fee: BigInt(g('fee')), maxFee: BigInt(g('max-fee')), finalised: g('canonical-finalized') === 'true',
+    canonical: Number(g('canonical-count')), inscribed: Number(g('inscribed-count')), rescueEnabled: g('rescue-enabled') === 'true', rescueDelay: Number(g('rescue-delay')), burn: await burnHeight(), balance, at: new Date().toLocaleTimeString() };
+  return snap;
+};
+/** The connected wallet must be the on-chain owner right now; otherwise nothing is signed. */
+const requireOwner = async () => {
+  const w = requireWallet();
+  const s = await snapshot();
+  if (s.owner !== w.address) {
+    const hint = hotExists() && s.owner === hotAddress() ? 'The temporary seeding wallet still owns it: press "Return ownership to my wallet" first.' : 'Nothing was sent.';
+    throw new Error(`The helper is owned by ${s.owner}, not the connected wallet ${w.address}. ${hint}`);
+  }
+  return { w, s };
+};
+/** Like execute() for the launch steps: one action at a time, result in the status line and the log. */
+const manage = async (label: string, fn: () => Promise<string>) => {
+  if (busy) return;
+  busy = true; renderSteps(); renderManage();
+  status(`${label}…`);
+  try {
+    const note = await fn();
+    log('ok', `${label}: ${note}`); status(`${label}: ${note}`, 'ok');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    log('error', `${label}: ${msg}`); status(`${label}: ${msg}`, 'error');
+  } finally { busy = false; save(); renderSteps(); renderManage(); }
+};
+/** "1", "0.5", "1.000000" -> micro-STX. */
+const parseStx = (raw: string) => {
+  const m = raw.trim().match(/^(\d+)(?:\.(\d{1,6}))?$/);
+  if (!m) throw new Error(`"${raw}" is not an STX amount (use digits with up to 6 decimals, for example 1 or 0.5).`);
+  return BigInt(m[1]) * 1_000_000n + BigInt((m[2] ?? '').padEnd(6, '0'));
+};
+const feeCheck = (ustx: bigint, s: Snap) => {
+  if (ustx % 2n !== 0n) throw new Error(`${stx(ustx)} is an odd number of micro-STX, so it cannot split in half exactly (the contract refuses it, u218). Nothing was sent.`);
+  if (ustx > s.maxFee) throw new Error(`${stx(ustx)} is over this helper's ceiling of ${stx(s.maxFee)}, fixed at deploy (the contract refuses it, u214). Nothing was sent.`);
+};
+const setFee = (raw: string) => manage('Set fee', async () => {
+  const ustx = parseStx(raw);
+  const { s } = await requireOwner();
+  feeCheck(ustx, s);
+  if (ustx === s.fee) return `the fee is already ${stx(ustx)}; nothing sent`;
+  const left = Math.max(0, tokens.length - s.inscribed);
+  const msg = `Change the inscription fee of ${helperId()}\n\nfrom ${stx(s.fee)} to ${stx(ustx)} (${stx(ustx / 2n)} to each payee; a payee inscribing pays only the other half).\n\n${left} of ${tokens.length} tokens are not inscribed yet: sponsoring them from a payee wallet would cost ${stx((ustx / 2n) * BigInt(left))} in helper fees at the new rate (${stx((s.fee / 2n) * BigInt(left))} at the current one).\n\nSign set-fee in your wallet?`;
+  if (!window.confirm(msg)) throw new Error('Not confirmed; nothing was sent.');
+  await runTx('manage', uniq('manage', `set-fee ${stx(ustx)}`), () => walletCall('set-fee', [uintCV(ustx)]));
+  await eventually('Fee', async () => ((await snapshot()).fee === ustx ? null : `fee ${stx(snap!.fee)}`));
+  return `fee is now ${stx(ustx)} (${stx(ustx / 2n)} per payee)`;
+});
+const proposeOwner = (raw: string) => manage('Propose new owner', async () => {
+  const to = raw.trim();
+  if (!PRINCIPAL.test(to)) throw new Error('Enter a mainnet wallet address (SP…). A contract cannot accept ownership from this page.');
+  const { w, s } = await requireOwner();
+  if (to === w.address) throw new Error('That wallet already owns the helper.');
+  if (s.pending === to) return `${to} is already proposed; it must sign accept-ownership from its own wallet (nothing sent)`;
+  const typed = window.prompt(`Propose ${to} as the new owner of ${helperId()}.\n\nNothing changes until that wallet signs accept-ownership. Once it does, this canary (pinned to ${CFG.deployer}) can no longer manage the helper; only the new owner can set the fee or propose a rescue. You can withdraw the proposal at any time before it is accepted.\n\nType ${CFG.key} to continue.`);
+  if (typed !== CFG.key) throw new Error('Not confirmed; nothing was sent.');
+  await runTx('manage', uniq('manage', `propose-ownership ${short(to)}`), () => walletCall('propose-ownership', [principalCV(to)]));
+  await eventually('Pending owner', async () => ((await snapshot()).pending === to ? null : 'not proposed yet'));
+  return `${to} is proposed; it must sign accept-ownership from its own wallet`;
+});
+const cancelOwner = () => manage('Withdraw ownership proposal', async () => {
+  const { s } = await requireOwner();
+  if (!s.pending) return 'no proposal is pending; nothing sent';
+  await runTx('manage', uniq('manage', 'cancel-ownership-proposal'), () => walletCall('cancel-ownership-proposal', []));
+  await eventually('Pending owner', async () => ((await snapshot()).pending === null ? null : `still ${snap!.pending}`));
+  return 'proposal withdrawn; your wallet remains the owner';
+});
+const tokenArg = (raw: string) => {
+  const id = Number(raw);
+  if (!Number.isInteger(id) || !tokenById(id)) throw new Error(`Token ${raw || '(blank)'} is not in the manifest.`);
+  return id;
+};
+const readLook = async (id: number): Promise<Look> => {
+  const b = await read('get-binding', [uintCV(id)]);
+  const side = await read('stray-side', [uintCV(id)]);
+  const r = await read('get-rescue', [uintCV(id)]);
+  look = { id, xtrataId: isNone(b) ? null : asText(field(b, 'xtrata-id')), side: isNone(side) ? null : asText(side),
+    rescue: isNone(r) ? null : { recipient: unquote(asText(field(r, 'recipient'))), side: asText(field(r, 'side')), eligibleAt: Number(asText(field(r, 'eligible-at'))) } };
+  return look;
+};
+const lookText = (l: Look, burn: number) => {
+  const bind = l.xtrataId ? `bound to Xtrata #${l.xtrataId}` : 'not inscribed';
+  const stray = l.side ? `STRAY ${l.side}: the helper holds the ${l.side} of #${l.id} although it should not` : 'nothing stray: the helper holds only what it should for this token';
+  const resc = l.rescue ? ` · rescue proposed: ${l.rescue.side} → ${l.rescue.recipient}, ${burn >= l.rescue.eligibleAt ? `executable now (eligible from burn block ${l.rescue.eligibleAt})` : `executable in ${l.rescue.eligibleAt - burn} Bitcoin blocks (burn block ${l.rescue.eligibleAt})`}` : ' · no rescue proposed';
+  return `#${l.id}: ${bind} · ${stray}${resc}`;
+};
+const lookup = (raw: string) => manage('Look up token', async () => {
+  const id = tokenArg(raw);
+  const s = await snapshot();
+  return lookText(await readLook(id), s.burn);
+});
+const proposeRescue = (idRaw: string, recRaw: string) => manage('Propose rescue', async () => {
+  const id = tokenArg(idRaw); const to = recRaw.trim();
+  if (!PRINCIPAL.test(to)) throw new Error('Enter the recipient as a mainnet wallet address (SP…).');
+  const { s } = await requireOwner();
+  if (!s.rescueEnabled) throw new Error('Rescue is disabled in this helper (fixed at deploy). Nothing was sent.');
+  const l = await readLook(id);
+  if (!l.side) throw new Error(`#${id} has no stray side: the helper holds nothing it should not for this token, so there is nothing to rescue (the contract refuses it, u212). Nothing was sent.`);
+  if (l.rescue) throw new Error(`#${id} already has a rescue proposed (${l.rescue.side} → ${l.rescue.recipient}). Cancel it first to propose another. Nothing was sent.`);
+  const hours = Math.round((s.rescueDelay * 10) / 60);
+  if (!window.confirm(`Propose returning the stray ${l.side} of #${id} to ${to}.\n\nThis is announced on chain and becomes executable after ${s.rescueDelay} Bitcoin blocks (about ${hours} hours). It can be cancelled until it is executed, and the recipient cannot be changed except by cancelling and proposing again.\n\nSign propose-rescue in your wallet?`)) throw new Error('Not confirmed; nothing was sent.');
+  await runTx('manage', uniq('manage', `propose-rescue #${id}`), () => walletCall('propose-rescue', [uintCV(id), principalCV(to)]));
+  await eventually(`Rescue #${id}`, async () => ((await readLook(id)).rescue ? null : 'not recorded yet'));
+  return `rescue of the ${l.side} of #${id} to ${to} proposed, executable from burn block ${look!.rescue!.eligibleAt} (now ${s.burn})`;
+});
+const cancelRescue = (idRaw: string) => manage('Cancel rescue', async () => {
+  const id = tokenArg(idRaw);
+  await requireOwner();
+  const l = await readLook(id);
+  if (!l.rescue) return `#${id} has no rescue proposed; nothing sent`;
+  await runTx('manage', uniq('manage', `cancel-rescue #${id}`), () => walletCall('cancel-rescue', [uintCV(id)]));
+  await eventually(`Rescue #${id}`, async () => ((await readLook(id)).rescue ? 'still recorded' : null));
+  return `rescue of #${id} cancelled`;
+});
+const executeRescue = (idRaw: string) => manage('Execute rescue', async () => {
+  const id = tokenArg(idRaw);
+  const { s } = await requireOwner();
+  const l = await readLook(id);
+  if (!l.rescue) throw new Error(`#${id} has no rescue proposed. Nothing was sent.`);
+  if (s.burn < l.rescue.eligibleAt) throw new Error(`The rescue of #${id} is not executable yet: ${l.rescue.eligibleAt - s.burn} Bitcoin blocks to go (eligible from burn block ${l.rescue.eligibleAt}, now ${s.burn}; the contract refuses it, u213). Nothing was sent.`);
+  if (l.side !== l.rescue.side) throw new Error(`The stray side of #${id} is now ${l.side ?? 'none'} but the rescue was proposed for the ${l.rescue.side}; the contract would refuse it (u212). Cancel the rescue. Nothing was sent.`);
+  if (!window.confirm(`Execute the rescue of #${id}: the helper releases the ${l.rescue.side} to ${l.rescue.recipient}.\n\nSign execute-rescue in your wallet?`)) throw new Error('Not confirmed; nothing was sent.');
+  // the helper (not the wallet) moves the asset, so this call runs in allow mode; the wallet itself sends nothing
+  await runTx('manage', uniq('manage', `execute-rescue #${id}`), () => walletCall('execute-rescue', [uintCV(id)], [], PostConditionMode.Allow));
+  await eventually(`Rescue #${id}`, async () => ((await readLook(id)).rescue ? 'still recorded' : null));
+  return `rescue of #${id} executed: ${l.rescue.side} released to ${l.rescue.recipient}`;
+});
+
+const renderManage = () => {
+  const deployed = step('preflight').data.deployed === 'ours' || !!snap;
+  // writes need a connected wallet; if the last read showed another owner they stay disabled, otherwise the action re-reads the chain itself and refuses
+  const owner = !!connected && (!snap || snap.owner === connected.address);
+  const kv = $('#m-kv');
+  if (snap) {
+    const rows: [string, string, boolean?][] = [
+      ['Helper', helperId(), true], ['Owner', snap.owner === CFG.deployer ? `${snap.owner} (your wallet)` : snap.owner, true],
+      ['Pending owner', snap.pending ?? 'none', true],
+      ['Fee', `${stx(snap.fee)} (${stx(snap.fee / 2n)} per payee) · ceiling ${stx(snap.maxFee)}`],
+      ['Records', `${snap.canonical}/${tokens.length} canonical · ${snap.finalised ? 'finalised' : 'NOT finalised'} · ${snap.inscribed}/${tokens.length} inscribed`],
+      ['Rescue', snap.rescueEnabled ? `enabled · ${snap.rescueDelay} Bitcoin blocks delay · burn block now ${snap.burn}` : 'disabled'],
+      ['Deployer balance', snap.balance === null ? 'could not read' : stx(snap.balance)]
+    ];
+    kv.replaceChildren(...rows.flatMap(([k, v, mono]) => [el('dt', {}, k), el('dd', { class: mono ? 'mono' : '' }, v)]));
+    $('#m-stamp').textContent = `read from the chain at ${snap.at}`;
+  }
+  const hint = $('#m-fee-hint');
+  if (snap) {
+    try {
+      const raw = ($('#m-fee') as HTMLInputElement).value;
+      if (!raw.trim()) hint.textContent = '';
+      else { const u = parseStx(raw); feeCheck(u, snap); hint.textContent = u === snap.fee ? 'That is the current fee.' : `${stx(u)} → ${stx(u / 2n)} to each payee; a payee pays ${stx(u / 2n)} per inscription, anyone else ${stx(u)}.`; }
+    } catch (e) { hint.textContent = (e as Error).message.replace(/ Nothing was sent\.$/, ''); }
+  }
+  const l = look;
+  const lookEl = $('#m-look');
+  if (l && snap) { lookEl.textContent = lookText(l, snap.burn); lookEl.removeAttribute('hidden'); } else lookEl.setAttribute('hidden', '');
+  const gate = (id: string, ok: boolean) => (($('#' + id) as HTMLButtonElement).disabled = busy || !ok);
+  gate('m-refresh', true);
+  gate('m-lookup', true);
+  for (const id of ['m-setfee', 'm-propose', 'm-cancel-owner', 'm-propose-rescue', 'm-cancel-rescue', 'm-execute-rescue']) gate(id, owner);
+  $('#m-cancel-owner').toggleAttribute('hidden', !(snap && snap.pending));
+  $('#manage-intro').textContent = !connected
+    ? 'Connect your wallet in step 1 to make changes; reading works without it. ' + INTRO_MANAGE
+    : !snap ? 'Press "Refresh from chain" to read the helper (every action re-reads it anyway). ' + INTRO_MANAGE
+    : owner ? INTRO_MANAGE
+    : `Your wallet is connected but the chain says ${snap.owner} owns the helper, so changes are disabled. ` + INTRO_MANAGE;
+  const txs = step('manage').txs;
+  $('#m-txs').replaceChildren(...txs.map((t) => el('li', {}, `${t.label} — ${t.status}${t.result ? ` ${t.result}` : ''} `, el('a', { href: chain.txUrl(t.txid), target: '_blank', rel: 'noopener' }, short(t.txid)))));
+};
+const INTRO_MANAGE = "This panel is the owner's terminal for a helper that is already live: it works at any time after deployment, reads everything from the chain, and signs each change in your wallet. A change is refused before anything is signed unless the chain says your wallet is the current owner. Swaps are never affected by anything here.";
+const bindManage = () => {
+  const val = (id: string) => ($('#' + id) as HTMLInputElement).value;
+  $('#m-refresh').addEventListener('click', () => void manage('Refresh from chain', async () => { const s = await snapshot(); if (look) await readLook(look.id); return `owner ${short(s.owner)} · fee ${stx(s.fee)} · ${s.inscribed}/${tokens.length} inscribed · ${s.finalised ? 'finalised' : 'not finalised'}`; }));
+  $('#m-fee').addEventListener('input', renderManage);
+  $('#m-setfee').addEventListener('click', () => void setFee(val('m-fee')));
+  $('#m-propose').addEventListener('click', () => void proposeOwner(val('m-owner')));
+  $('#m-cancel-owner').addEventListener('click', () => void cancelOwner());
+  $('#m-lookup').addEventListener('click', () => void lookup(val('m-token')));
+  $('#m-propose-rescue').addEventListener('click', () => void proposeRescue(val('m-token'), val('m-recipient')));
+  $('#m-cancel-rescue').addEventListener('click', () => void cancelRescue(val('m-token')));
+  $('#m-execute-rescue').addEventListener('click', () => void executeRescue(val('m-token')));
+};
+
 // ---------- boot ----------
 load();
 wallet.setConnectMessage(`Xtrata Forever Twins launch: ${CFG.name}`);
 if (location.protocol === 'file:') $('#file-banner').removeAttribute('hidden');
 if (state.steps.connect?.status === 'pass') state.steps.connect.status = 'todo'; // wallet connection never survives a reload
-bind(); restoreLog(); renderHeader(); renderSteps();
+bind(); bindManage(); restoreLog(); renderHeader(); renderSteps(); renderManage();

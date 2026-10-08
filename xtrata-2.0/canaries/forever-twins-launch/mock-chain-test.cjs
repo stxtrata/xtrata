@@ -39,10 +39,11 @@ const check = (ok, what) => { console.log(`${ok ? '  ok  ' : '  FAIL'} ${what}`)
 
 // ---------- mock chain ----------
 const S = { failSeedAt: 0, seedCalls: 0, manualFund: false, seedSenders: [], xfers: [], lowFee: [], hotFees: [], walletAddr: OTHER, blk: 900000, nonce: 100, txs: new Map(), contracts: new Map(), bal: new Map(), resolver: false, tamper: false, drift: false, writes: [],
-  H: { owner: DEPLOYER, pending: null, canon: new Map(), finalized: false, mhash: Buffer.alloc(32), bindings: new Map(), nextXid: 5000, xowner: new Map() } };
+  H: { owner: DEPLOYER, pending: null, canon: new Map(), finalized: false, mhash: Buffer.alloc(32), bindings: new Map(), nextXid: 5000, xowner: new Map(), rescues: new Map() }, stray: new Map() };
 S.contracts.set(SOURCE, '(mock source collection)');
-const half = 50000n, FEE = 100000n;
-const feeFor = (payer) => (payer === JIM ? 0n : half) + (payer === RAPHA ? 0n : half);
+let FEE = 100000n;   // the management panel changes it later in the run
+const half = () => FEE / 2n;
+const feeFor = (payer) => (payer === JIM ? 0n : half()) + (payer === RAPHA ? 0n : half());
 const newTx = (status, repr, events = []) => { const id = '0x' + crypto.randomBytes(32).toString('hex'); S.txs.set(id, { tx_status: status, tx_result: { repr }, block_height: ++S.blk, events }); return id; };
 const principalStr = (cv) => cvToString(cv);
 
@@ -56,6 +57,8 @@ function callRead(contract, fn, args) {
     if (fn === 'get-canonical') { const c = H.canon.get(Number(num(args[0]))); return c ? someCV(tupleCV({ 'content-hash': bufferCV(c.hash), mime: stringAsciiCV(c.mime), 'total-size': uintCV(c.size), 'token-uri': stringAsciiCV(c.uri) })) : noneCV(); }
     if (fn === 'get-binding') { const b = H.bindings.get(Number(num(args[0]))); return b ? someCV(tupleCV({ 'xtrata-id': uintCV(b.xid), 'content-hash': bufferCV(b.hash), inscriber: principalCV(b.by), 'xtrata-escrowed': boolCV(true), at: uintCV(S.blk) })) : noneCV(); }
     if (fn === 'fee-for') return uintCV(feeFor(principalStr(args[0])));
+    if (fn === 'stray-side') { const side = S.stray.get(Number(num(args[0]))); return side ? someCV(stringAsciiCV(side)) : noneCV(); }
+    if (fn === 'get-rescue') { const r = H.rescues.get(Number(num(args[0]))); return r ? someCV(tupleCV({ recipient: principalCV(r.recipient), side: stringAsciiCV(r.side), 'eligible-at': uintCV(r.eligibleAt) })) : noneCV(); }
     if (fn === 'get-custody-state') { const b = H.bindings.get(Number(num(args[0]))); return b ? someCV(tupleCV({ 'xtrata-id': uintCV(b.xid), 'xtrata-escrowed': boolCV(true), 'original-owner': someCV(principalCV(JIM)), 'twin-owner': someCV(principalCV(HELPER)), consistent: boolCV(true), stranded: boolCV(false) })) : noneCV(); }
   } else if (contract === CORE) {
     if (fn === 'is-paused') return boolCV(false);
@@ -74,7 +77,11 @@ function callWrite(contract, fn, args, sender, params) {
   const H = S.H;
   if (contract !== HELPER) throw new Error('mock write to unknown contract ' + contract);
   S.writes.push(fn);
-  if (['seed-canonical', 'finalize-canonical', 'propose-ownership', 'cancel-ownership-proposal'].includes(fn) && sender !== H.owner) return ['abort_by_response', '(err u204)'];
+  if (['seed-canonical', 'finalize-canonical', 'propose-ownership', 'cancel-ownership-proposal', 'set-fee', 'propose-rescue', 'cancel-rescue', 'execute-rescue'].includes(fn) && sender !== H.owner) return ['abort_by_response', '(err u204)'];
+  if (fn === 'set-fee') { const f = num(args[0]); if (f > 5000000n) return ['abort_by_response', '(err u214)']; if (f % 2n !== 0n) return ['abort_by_response', '(err u218)']; FEE = f; return ['success', '(ok true)']; }
+  if (fn === 'propose-rescue') { const id = Number(num(args[0])), side = S.stray.get(id); if (!side) return ['abort_by_response', '(err u212)']; H.rescues.set(id, { recipient: principalStr(args[1]), side, eligibleAt: S.blk + 432 }); return ['success', '(ok true)']; }
+  if (fn === 'cancel-rescue') { if (!H.rescues.delete(Number(num(args[0])))) return ['abort_by_response', '(err u212)']; return ['success', '(ok true)']; }
+  if (fn === 'execute-rescue') { const id = Number(num(args[0])), r = H.rescues.get(id); if (!r) return ['abort_by_response', '(err u212)']; if (S.blk < r.eligibleAt) return ['abort_by_response', '(err u213)']; H.rescues.delete(id); S.stray.delete(id); return ['success', '(ok true)']; }
   if (fn === 'propose-ownership') { H.pending = principalStr(args[0]); return ['success', '(ok true)']; }
   if (fn === 'cancel-ownership-proposal') { if (!H.pending) return ['abort_by_response', '(err u205)']; H.pending = null; return ['success', '(ok true)']; }
   if (fn === 'accept-ownership') { if (!H.pending) return ['abort_by_response', '(err u205)']; if (sender !== H.pending) return ['abort_by_response', '(err u204)']; H.owner = H.pending; H.pending = null; return ['success', '(ok true)']; }
@@ -98,7 +105,7 @@ function callWrite(contract, fn, args, sender, params) {
     if (!(params.postConditions || []).length || params.postConditionMode !== 'allow') return ['abort_by_response', '(err u999 mock: expected an allow-mode call with a sender post-condition)'];
     const chunks = BigInt(args[1].list.length), core = chunks * 1000n + 10000n, events = [];
     const xfer = (from, to, amount) => events.push({ event_type: 'stx_asset', asset: { asset_event_type: 'transfer', sender: from, recipient: to, amount: String(amount) } });
-    for (const p of [JIM, RAPHA]) if (p !== sender) xfer(sender, p, half);
+    for (const p of [JIM, RAPHA]) if (p !== sender) xfer(sender, p, half());
     xfer(sender, HELPER, core); xfer(HELPER, CORE, core);
     const xid = H.nextXid++;
     H.bindings.set(id, { xid, hash: rec.hash, by: sender }); H.xowner.set(xid, HELPER);
@@ -128,6 +135,7 @@ async function route(r) {
   if (!/\/hiro\//.test(p) && !/api\.(mainnet\.)?hiro\.so/.test(u.hostname)) return r.abort();
   const q = p.replace(/^\/hiro\/(mainnet|testnet)/, '');
   let m;
+  if (q === '/v2/info') return json({ burn_block_height: S.blk, stacks_tip_height: S.blk });
   if ((m = q.match(/^\/v2\/contracts\/call-read\/([^/]+)\/([^/]+)\/([^/]+)$/))) {
     const args = JSON.parse(r.request().postData()).arguments.map(hexToCV);
     try { return json({ okay: true, result: cvToHex(callRead(m[1] + '.' + m[2], m[3], args)) }); } catch (e) { return json({ okay: false, cause: String(e.message) }); }
@@ -200,6 +208,23 @@ async function route(r) {
     return b;
   };
   const passes = (b) => b.startsWith('pass');
+  // management panel: press a button, wait for its result in the status line (the panel re-enables Refresh when done)
+  const statusText = () => page.$eval('#status', (e) => e.textContent);
+  const runManage = async (sel, label, fill = {}) => {
+    for (const [id, v] of Object.entries(fill)) await page.fill(id, String(v));
+    await page.click(sel, { timeout: 20000 });
+    const t0 = Date.now(); let t = '';
+    for (;;) {
+      await page.waitForTimeout(300);
+      t = await statusText();
+      const idle = await page.$eval('#m-refresh', (e) => !e.disabled);
+      if (t.startsWith(label + ':') && idle) break;
+      if (Date.now() - t0 > 120000) { t = 'TIMEOUT|' + t; break; }
+    }
+    console.log(('manage:' + label).padEnd(28), t.slice(0, 300));
+    return t;
+  };
+  const mok = (t) => /^[^:]+: (?!The |Not |Token |Enter |"|\d+(\.\d+)? STX is )/.test(t) && !/TIMEOUT/.test(t);   // the panel reports failures as sentences starting with these
 
   // 1. wrong wallet is refused, right wallet connects
   let b = await runStep('connect', { chooser: true });
@@ -225,6 +250,11 @@ async function route(r) {
   check(/^SP[0-9A-Z]{30,}$/.test(hotAddr) && hotAddr !== DEPLOYER, 'temporary wallet address is shown');
   check((S.bal.get(hotAddr) ?? 0n) >= 100000n && (S.bal.get(hotAddr) ?? 0n) < 3_000_000n, 'float is small: ' + (S.bal.get(hotAddr) ?? 0n) + ' µSTX');
   b = await runStep('handover'); check(passes(b) && S.H.owner === hotAddr && S.H.pending === null, 'wallet proposed, temporary wallet accepted: it owns the helper');
+  {
+    const w0 = S.writes.length;
+    const t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '1' });
+    check(/owned by/.test(t) && /Return ownership/.test(t) && S.writes.length === w0 && FEE === 100000n, 'manage: set-fee refused before signing while the temporary wallet owns the helper');
+  }
   b = await runStep('seed'); check(b.startsWith('fail') && /temporary wallet/.test(b) && S.H.canon.size === 35 && S.H.owner === hotAddr, 'forced failure on the second batch stops the run: 10 earlier + 25 = 35 records on chain, helper still with the temporary wallet');
   await page.click('#handback'); await page.waitForTimeout(1500);
   for (let i = 0; i < 60 && S.H.owner !== DEPLOYER; i++) await page.waitForTimeout(500);
@@ -261,13 +291,65 @@ async function route(r) {
   const text = await page.$eval('textarea', (t) => t.value);
   check(text.includes(HELPER) && text.includes(hex(sha(MANIFEST_TEXT))) && /"status": "live"/.test(text), 'hand-off names the helper, the manifest hash and a registry entry');
 
+  // 3b. management panel: fee, ownership, rescue (all against the live mock helper, owner = the Xtrata wallet)
+  let t = await runManage('#m-refresh', 'Refresh from chain');
+  check(mok(t) && /fee 0\.1 STX/.test(t) && /finalised/.test(t), 'manage: refresh reads owner, fee and counts from the chain');
+  const kv = await page.$eval('#m-kv', (e) => e.textContent);
+  check(/0\.1 STX \(0\.05 STX per payee\)/.test(kv) && /ceiling 5 STX/.test(kv) && /60\/60 canonical/.test(kv) && /1\/60 inscribed/.test(kv), 'manage: readout shows fee split, ceiling, records and inscribed count');
+  let w0 = S.writes.length;
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '1.000001' });
+  check(/odd number of micro-STX/.test(t) && S.writes.length === w0, 'manage: odd fee refused before signing');
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '6' });
+  check(/over this helper's ceiling/.test(t) && S.writes.length === w0, 'manage: fee over the ceiling refused before signing');
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': 'abc' });
+  check(/not an STX amount/.test(t) && S.writes.length === w0, 'manage: unparseable fee refused before signing');
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '0.1' });
+  check(/already 0\.1 STX/.test(t) && S.writes.length === w0, 'manage: setting the current fee sends nothing');
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '1' });
+  check(mok(t) && /fee is now 1 STX \(0\.5 STX per payee\)/.test(t) && FEE === 1000000n && S.writes.length === w0 + 1, 'manage: set-fee to 1 STX signed, confirmed and read back');
+  check(/1 STX \(0\.5 STX per payee\)/.test(await page.$eval('#m-kv', (e) => e.textContent)), 'manage: readout shows the new fee');
+  check(S.H.owner === DEPLOYER, 'manage: owner unchanged by set-fee');
+  t = await runManage('#m-setfee', 'Set fee', { '#m-fee': '1' });
+  check(/already 1 STX/.test(t) && S.writes.length === w0 + 1, 'manage: repeating the same fee sends nothing');
+  w0 = S.writes.length;
+  t = await runManage('#m-propose', 'Propose new owner', { '#m-owner': 'not-an-address' });
+  check(/mainnet wallet address/.test(t) && S.writes.length === w0, 'manage: bad owner address refused before signing');
+  t = await runManage('#m-propose', 'Propose new owner', { '#m-owner': OTHER });
+  check(mok(t) && S.H.pending === OTHER && S.H.owner === DEPLOYER, 'manage: propose-ownership recorded a pending owner, owner unchanged');
+  t = await runManage('#m-cancel-owner', 'Withdraw ownership proposal');
+  check(mok(t) && S.H.pending === null, 'manage: proposal withdrawn');
+  w0 = S.writes.length;
+  t = await runManage('#m-lookup', 'Look up token', { '#m-token': '2' });
+  check(mok(t) && /#2: not inscribed/.test(t) && /nothing stray/.test(t) && /no rescue proposed/.test(t), 'manage: lookup of a clean token');
+  t = await runManage('#m-lookup', 'Look up token', { '#m-token': String(TEST_TOKEN) });
+  check(mok(t) && new RegExp(`#${TEST_TOKEN}: bound to Xtrata #5000`).test(t) && /nothing stray/.test(t), 'manage: lookup shows the binding of the test token');
+  t = await runManage('#m-propose-rescue', 'Propose rescue', { '#m-token': '2', '#m-recipient': JIM });
+  check(/no stray side/.test(t) && S.writes.length === w0, 'manage: rescue refused before signing when nothing is stray');
+  S.stray.set(2, 'original');
+  t = await runManage('#m-lookup', 'Look up token', { '#m-token': '2' });
+  check(mok(t) && /STRAY original/.test(t), 'manage: lookup reports a stray original');
+  t = await runManage('#m-propose-rescue', 'Propose rescue', { '#m-token': '2', '#m-recipient': JIM });
+  check(mok(t) && S.H.rescues.get(2)?.recipient === JIM && /executable from burn block/.test(t), 'manage: propose-rescue recorded with the timelock');
+  w0 = S.writes.length;
+  t = await runManage('#m-execute-rescue', 'Execute rescue', { '#m-token': '2' });
+  check(/not executable yet/.test(t) && /Bitcoin blocks to go/.test(t) && S.writes.length === w0, 'manage: execute refused before signing inside the timelock');
+  S.blk += 432;
+  t = await runManage('#m-execute-rescue', 'Execute rescue', { '#m-token': '2' });
+  check(mok(t) && !S.H.rescues.has(2) && !S.stray.has(2) && S.writes.length === w0 + 1, 'manage: execute-rescue after the delay releases the stray');
+  S.stray.set(4, 'twin');
+  t = await runManage('#m-propose-rescue', 'Propose rescue', { '#m-token': '4', '#m-recipient': RAPHA });
+  check(mok(t) && S.H.rescues.has(4), 'manage: second rescue proposed (twin side)');
+  t = await runManage('#m-cancel-rescue', 'Cancel rescue', { '#m-token': '4' });
+  check(mok(t) && !S.H.rescues.has(4), 'manage: cancel-rescue removes it');
+  S.stray.delete(4);
+
   // 4. forget local progress: everything is re-found on chain, nothing is sent twice
   const writes = S.writes.length;
   await page.click('#forget'); await page.waitForTimeout(500);
   for (const id of ['connect']) { b = await runStep(id, { chooser: true }); check(passes(b), 're-connect after forgetting progress'); }
   b = await runStep('preflight'); check(passes(b) && /already deployed/.test(b), 'preflight finds the deployed helper');
   b = await runStep('deploy'); check(passes(b) && /nothing to send/.test(b), 'deploy sends nothing the second time');
-  b = await runStep('verify'); check(passes(b), 'verify passes on a finalised helper');
+  b = await runStep('verify'); check(passes(b) && /fee 1 STX \(changed by the owner; deployed at 0\.1 STX\)/.test(b), 'verify passes on a finalised helper and reports the owner-changed fee');
   const xfersBefore = S.xfers.length;
   b = await runStep('tempwallet'); check(passes(b) && /no temporary wallet needed/.test(b), 'temporary wallet step sends nothing when everything is seeded');
   b = await runStep('handover'); check(passes(b) && /nothing to seed/.test(b), 'hand-over step sends nothing when everything is seeded');
