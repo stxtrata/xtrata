@@ -3619,7 +3619,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     Boolean(resumeTargetAsset) ||
     mintRoute === 'staged' ||
     [beginState, uploadState, sealState].some((state) => state !== 'idle');
-  const descriptionIsLong = collectionDescription.length > 260;
+  // Collapsed description: show everything down to the first link (e.g. the Ordinals
+  // inscription) so the key reference is never cut off; the rest sits behind "Read more".
+  // With no link, fall back to a four-line clamp.
+  const descriptionLinkMatch = /https?:\/\/\S+/.exec(collectionDescription);
+  const descriptionPreview = descriptionLinkMatch
+    ? collectionDescription.slice(0, descriptionLinkMatch.index + descriptionLinkMatch[0].length)
+    : null;
+  const descriptionIsLong = descriptionPreview
+    ? collectionDescription.slice(descriptionPreview.length).trim().length > 0
+    : collectionDescription.length > 260;
 
   const renderGalleryTile = (asset: (typeof mintedGallery)[number]) => {
     const tokenId = mintedTokenIds[asset.asset_id] ?? null;
@@ -3809,12 +3818,18 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             </div>
             <p
               className={`collection-live-page__description${
-                descriptionIsLong && !descriptionExpanded
+                descriptionIsLong && !descriptionExpanded && !descriptionPreview
                   ? ' collection-live-page__description--clamped'
                   : ''
               }`}
             >
-              <LinkifiedText text={collectionDescription} />
+              <LinkifiedText
+                text={
+                  descriptionIsLong && !descriptionExpanded && descriptionPreview
+                    ? descriptionPreview
+                    : collectionDescription
+                }
+              />
             </p>
             {descriptionIsLong && (
               <button
