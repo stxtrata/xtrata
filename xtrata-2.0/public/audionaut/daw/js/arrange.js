@@ -12,7 +12,8 @@ import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // group by the snap amount (Shift = 4x), Delete removes it, Esc clears the selection.
 // Dragging a region's left edge trims it in place: the audio stays where it is on the
 // timeline and the region start moves right (or left) as a fractional offset, exactly
-// like the right edge trims from the end.
+// like the right edge trims from the end. With several regions selected, trimming the
+// edge of one of them trims the same edge of every selected region by the same amount.
 // Click = edit, right-click = reverse, click empty = add.
 
 import {
@@ -296,11 +297,152 @@ function hitTest(ch, x) {
   return { kind: "empty" };
 }
 
+// ---- group trim: one edge dragged, the same edge of every selected region follows
+// Per-region limits come from the regions that are NOT selected (they stay put); the
+// selected ones move together, so a collision between two of them just freezes the drag
+// at the last valid position.
+function startGroupTrim(ch, cv, h, e) {
+  const sd = stepDurSec();
+  const items = selectedItems();
+  const memberKeys = new Set(items.map((it) => selKey(it.ch, it.step)));
+  const members = [];
+  for (const it of items) {
+    const buffer = engine.buffers?.[it.ch];
+    if (!buffer) continue;
+    const region = channelRegions(it.ch).find((r) => r.step === it.step);
+    if (!region) continue;
+    const row = store.seq.steps[it.ch];
+    let lo = 0,
+      hi = NUM_STEPS - 0.001;
+    for (let t = 0; t < NUM_STEPS; t++) {
+      if (!stepVal(row[t]) || memberKeys.has(selKey(it.ch, t))) continue;
+      if (t < it.step) lo = Math.max(lo, t + 1);
+      else hi = Math.min(hi, t - 0.001);
+    }
+    members.push({
+      ch: it.ch,
+      step: it.step,
+      val: it.val,
+      region,
+      buffer,
+      sd,
+      trimStart0: region.trimStart,
+      trimEnd0: region.trimEnd,
+      pos0: region.pos,
+      lo,
+      hi,
+    });
+  }
+  if (members.length < 2) return null;
+  return {
+    kind: h.kind === "trimL" ? "gtrimL" : "gtrimR",
+    global: true,
+    ch,
+    region: h.region,
+    startClientX: e.clientX,
+    startClientY: e.clientY,
+    scale: cv.width / cv.getBoundingClientRect().width,
+    moved: false,
+    members,
+    orig: origRows(members),
+  };
+}
+
+// What one member's trim looks like for a pointer travel of `delta` steps.
+function planGroupTrim(m, delta, left) {
+  const r = m.region;
+  if (!left) {
+    // right edge: audible length changes by `delta` steps (a reversed region's right edge
+    // is the start of its range)
+    const newSteps = Math.max(0.1, r.naturalSteps + delta);
+    const frac = (newSteps * m.sd * r.pitch) / m.buffer.duration;
+    return {
+      m,
+      pos: m.pos0,
+      props: r.rev
+        ? { trimStart: Math.max(0, m.trimEnd0 - frac), trimEnd: m.trimEnd0 }
+        : {
+            trimStart: m.trimStart0,
+            trimEnd: Math.max(m.trimStart0 + 1e-7, Math.min(1, m.trimStart0 + frac)),
+          },
+    };
+  }
+  const k = (m.sd * r.pitch) / m.buffer.duration; // share of the sample per step
+  if (r.loop) {
+    // sustained loops keep their own start; only the sample start moves
+    return {
+      m,
+      pos: m.pos0,
+      props: {
+        trimStart: Math.min(m.trimEnd0 - 1e-7, Math.max(0, m.trimStart0 + delta * k)),
+        trimEnd: m.trimEnd0,
+      },
+    };
+  }
+  // the audio that is left keeps playing at the same moment, so the start moves by
+  // exactly what was trimmed (the offset)
+  const span = (m.trimEnd0 - m.trimStart0 - 1e-7) / k;
+  const room = r.rev ? (1 - m.trimEnd0) / k : m.trimStart0 / k;
+  const lo = Math.max(-room, m.lo - m.pos0);
+  const hi = Math.min(span, m.hi - m.pos0);
+  const pos = r3(m.pos0 + Math.max(lo, Math.min(hi, delta)));
+  const dS = pos - m.pos0;
+  return {
+    m,
+    pos,
+    props: r.rev
+      ? { trimStart: m.trimStart0, trimEnd: m.trimEnd0 - dS * k }
+      : { trimStart: m.trimStart0 + dS * k, trimEnd: m.trimEnd0 },
+  };
+}
+
+function applyGroupTrim(d, delta) {
+  const left = d.kind === "gtrimL";
+  const plans = d.members.map((m) => planGroupTrim(m, delta, left));
+  if (left) {
+    const used = new Set();
+    for (const p of plans) {
+      p.slot = Math.floor(p.pos);
+      const key = selKey(p.m.ch, p.slot);
+      if (used.has(key)) return; // two selected regions would share a step slot
+      used.add(key);
+    }
+    const rows = new Map([...d.orig].map(([ch, row]) => [ch, row.slice()]));
+    for (const p of plans) rows.get(p.m.ch)[p.m.step] = 0;
+    for (const p of plans)
+      rows.get(p.m.ch)[p.slot] = withStepOff(p.m.val, r3(p.pos - p.slot));
+    for (const [ch, row] of rows) store.seq.steps[ch] = row;
+    for (const p of plans)
+      if (p.slot !== p.m.step)
+        store.emit("step", { ch: p.m.ch, step: p.m.step, val: store.seq.steps[p.m.ch][p.m.step] });
+  } else {
+    for (const p of plans) p.slot = p.m.step;
+  }
+  for (const p of plans) store.setStepProps(p.m.ch, p.slot, p.props);
+  selection = new Set(plans.map((p) => selKey(p.m.ch, p.slot)));
+  d.moved = true;
+  renderArrange();
+}
+
 function onStripDown(ch, cv, e) {
   if (e.ctrlKey) lastCtrlDown = performance.now();
   if (e.button === 2) return;
   const x = stripXY(cv, e);
   const h = hitTest(ch, x);
+  if (
+    (h.kind === "trimL" || h.kind === "trimR") &&
+    selection.size > 1 &&
+    selection.has(selKey(ch, h.region.step))
+  ) {
+    const g = startGroupTrim(ch, cv, h, e);
+    if (g) {
+      drag = g;
+      e.preventDefault();
+      window.addEventListener("mousemove", onGlobalMove);
+      window.addEventListener("mouseup", onGlobalUp);
+      return;
+    }
+  }
   if (h.kind === "trimL" || h.kind === "trimR" || h.kind === "xfade") {
     // the left edge may slide between the neighbouring triggers' step slots
     const row = store.seq.steps[ch];
@@ -518,11 +660,15 @@ function onGlobalMove(e) {
       d.scale = cv.width / cv.getBoundingClientRect().width;
       document.body.style.cursor = "grabbing";
       cv.style.cursor = "grabbing";
-    } else {
+    } else if (d.kind === "maybeClick") {
       d.kind = "marquee";
       if (!d.shift) selection.clear();
       d.base = new Set(selection);
     }
+  }
+  if (d.kind === "gtrimL" || d.kind === "gtrimR") {
+    applyGroupTrim(d, (dx * d.scale) / cw());
+    return;
   }
   if (d.kind === "move") {
     // snap the grabbed region's own position to the grid (Alt = free, Ctrl = 1/16), the
@@ -581,6 +727,14 @@ function onGlobalUp(e) {
         ? `${plural(selection.size)} selected. Drag one to move the group, Delete removes.`
         : "No regions selected.",
     );
+    renderArrange();
+    return;
+  }
+  if (d.kind === "gtrimL" || d.kind === "gtrimR") {
+    if (d.moved)
+      setStatus(
+        `Trimmed ${plural(d.members.length)} from the ${d.kind === "gtrimL" ? "left" : "right"} together.`,
+      );
     renderArrange();
     return;
   }
