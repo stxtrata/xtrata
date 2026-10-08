@@ -83,6 +83,17 @@ describe('wallet provider chooser', () => {
     expect(installed.map((entry) => entry.name).sort()).toEqual(['Leather', 'Xverse Wallet']);
   });
 
+  it('uses the embedded default icon when a registered wallet icon cannot load', () => {
+    const win = window as typeof window & { btc_providers?: unknown[] };
+    win.btc_providers = [
+      { id: 'LeatherProvider', name: 'Leather', icon: '/assets/leather.svg', webUrl: 'https://leather.io' }
+    ];
+    const embedded = 'data:image/svg+xml;base64,AAAA';
+    const installed = __testing.getInstalledProvidersOnHost([{ ...LEATHER_DEFAULT, icon: embedded }]);
+    expect(installed).toHaveLength(1);
+    expect(installed[0].icon).toBe(embedded);
+  });
+
   it('does not list a default provider that is not injected at all', () => {
     installXverseMobile();
     const installed = __testing.getInstalledProvidersOnHost([XVERSE_DEFAULT, LEATHER_DEFAULT]);

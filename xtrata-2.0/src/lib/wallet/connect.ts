@@ -245,7 +245,14 @@ const getInstalledProvidersOnHost = (defaultProviders: WebBTCProvider[]): WebBTC
       !registered.some((entry) => isSameWalletProvider(entry, candidate)) &&
       !!resolveProviderOnWindow(host, candidate.id)
   );
-  return registered.concat(additional);
+  // The wallet's own registered icon is often a path or extension URL that a
+  // web page cannot load (Leather shows a broken image). When we ship an
+  // embedded icon for the same wallet, use that instead.
+  const withIcons = registered.map((entry) => {
+    const fallback = defaultProviders.find((candidate) => isSameWalletProvider(entry, candidate));
+    return fallback?.icon ? { ...entry, icon: fallback.icon } : entry;
+  });
+  return withIcons.concat(additional);
 };
 
 type WalletActionBase = {
