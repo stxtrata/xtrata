@@ -48,9 +48,9 @@ export type ResolverConfig = {
 
 export type ParsedPath = { key: string; id: number } | null;
 
-// "12.json" -> 12. Rejects anything that is not a plain positive integer with the .json suffix.
+// "12.json" -> 12, "0.json" -> 0 (some collections start at id 0). Rejects anything that is not a plain non-negative integer with the .json suffix.
 export const parseTokenFile = (file: string): number | null => {
-  const m = /^([1-9][0-9]{0,8})\.json$/.exec(file);
+  const m = /^(0|[1-9][0-9]{0,8})\.json$/.exec(file);
   return m ? Number(m[1]) : null;
 };
 
