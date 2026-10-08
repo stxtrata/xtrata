@@ -5,6 +5,7 @@ import { expandPattern } from "./beats.js";
 import { onboardVariant } from "./onboard-library.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
 import { ALL_SYNTH_DRUMS } from "./synthdrums.js";
+import { packSoundRow } from "./pack-library.js";
 
 const sourceKey = (source) =>
   source.type === "synth" && SOUND_BY_KEY[source.value]
@@ -22,7 +23,7 @@ export async function prepareBeatPreset(
 ) {
   cancelled(signal);
   if (
-    !["original", "l1", "combined", "tonal"].includes(
+    !["original", "l1", "combined", "tonal", "analog"].includes(
       preset.collection || "original",
     ) ||
     !preset.channels.length ||
@@ -38,9 +39,24 @@ export async function prepareBeatPreset(
       preset.collection !== "l1" &&
       source.type === "synth" &&
       !!(ALL_SYNTH_DRUMS[source.value] || SOUND_BY_KEY[source.value]);
-    if (!ordinal && !builtIn)
+    // Analog Kit beats use sample-pack recordings only (the Analog Kit, plus the Electronic Kit's
+    // 808 sub kicks for the few beats that carry a bass hit); no other collection may use packs.
+    const pack =
+      preset.collection === "analog" &&
+      source.type === "pack" &&
+      (() => {
+        try {
+          packSoundRow(source.value);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+    if (preset.collection === "analog" ? !pack : !ordinal && !builtIn)
       throw new Error(
-        "Beat sources must be Bitcoin inscriptions or supported built-in sounds; L1-only kits require inscriptions throughout.",
+        preset.collection === "analog"
+          ? "Analog Kit beats must use sounds from the installed sample packs."
+          : "Beat sources must be Bitcoin inscriptions or supported built-in sounds; L1-only kits require inscriptions throughout.",
       );
     sources.set(sourceKey(source), source);
   }

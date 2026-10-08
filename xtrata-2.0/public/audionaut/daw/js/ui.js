@@ -35,7 +35,9 @@ import {
 } from "./onboard-catalog.js";
 import { ONBOARD_MANIFEST } from "./onboard-manifest.js";
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
-import { packSoundRow, packSoundNotice } from "./pack-library.js";
+import { packSoundRow, packSoundNotice, prefetchPack } from "./pack-library.js";
+import { analogBeats, ANALOG_PERSONAS } from "./analog-kits.js";
+import { ANALOG_PACK_ID } from "./analog-pack.js";
 import { EXPANDED_COMBINED_BEAT_PRESETS as COMBINED_BEAT_PRESETS } from "./combined-beats.js";
 import { loadBeatPreset } from "./l1-beat-loader.js";
 import { record as recordHistory } from "./history.js";
@@ -1596,15 +1598,21 @@ export function initFxModal() {
 
 // --- Beats (preset) modal ---
 let beatLoad = null;
-const currentBeatCollection = () =>
-  ({
-    original: BEAT_PRESETS,
-    l1: L1_BEAT_PRESETS,
-    combined: COMBINED_BEAT_PRESETS,
-    tonal: TONAL_BEAT_PRESETS,
-    "drums-studio": DRUM_BEATS_STUDIO,
-    "drums-l1": DRUM_BEATS_L1,
-  })[$("#beats-collection").value] || DRUM_BEATS_STUDIO;
+const currentBeatCollection = () => {
+  const key = $("#beats-collection").value;
+  // The Analog Kit set is built lazily (and per kit voicing) the first time it is opened.
+  if (key === "drums-analog") return analogBeats($("#beats-kit").value || "auto");
+  return (
+    {
+      original: BEAT_PRESETS,
+      l1: L1_BEAT_PRESETS,
+      combined: COMBINED_BEAT_PRESETS,
+      tonal: TONAL_BEAT_PRESETS,
+      "drums-studio": DRUM_BEATS_STUDIO,
+      "drums-l1": DRUM_BEATS_L1,
+    }[key] || DRUM_BEATS_STUDIO
+  );
+};
 
 const beatId = (preset) =>
   preset.id ||
@@ -1692,8 +1700,10 @@ function renderBeatsList() {
   const genre = $("#beats-genre").value;
   const key = $("#beats-collection").value;
   const isDrums = key.startsWith("drums-");
+  const isAnalog = key === "drums-analog";
   const filter = isDrums ? $("#beats-type").value : "";
   $("#beats-type").hidden = !isDrums;
+  $("#beats-kit").hidden = !isAnalog;
   const query = $("#beats-search").value.trim().toLowerCase();
   const collection = currentBeatCollection();
   const matches = collection.filter(
@@ -1710,9 +1720,11 @@ function renderBeatsList() {
   const isCombined = key === "combined";
   const isTonal = key === "tonal";
   $("#beats-title").textContent = isDrums
-    ? isL1
-      ? "Drum Beats · Bitcoin L1"
-      : "Drum Beats · Studio Kit"
+    ? isAnalog
+      ? "Drum Beats · Analog Kit"
+      : isL1
+        ? "Drum Beats · Bitcoin L1"
+        : "Drum Beats · Studio Kit"
     : isTonal
       ? "Onboard Tonal Beats"
       : isL1
@@ -1725,6 +1737,8 @@ function renderBeatsList() {
       "Drums only — kicks, snares, toms, hats and cymbals from the Studio kit, in every genre. ★ Start here lists the generic essentials first.",
     "drums-l1":
       "Drums only, from Bitcoin L1 single hits (OB1 + OG). Toms, rims and shakers are retunes of those hits. ★ Start here lists the essentials first.",
+    "drums-analog":
+      "Drums only, played on the Analog Kit: real acoustic drum recordings (CC0) voiced on six kits — Jazz Club, Rusty, Unruly, Swirly, Concert and Modern Mix. Pick a kit to hear any beat on it. ★ Start here lists the essentials first.",
     l1: "Bitcoin samples only (OB1 + OG hits). Loads the current pattern; other tracks are muted.",
     combined:
       "L1 percussion plus the embedded bank. Loads the current pattern; other tracks are muted.",
@@ -1732,7 +1746,7 @@ function renderBeatsList() {
     original: "Four-bar arrangements with bass and melody on the embedded sound bank.",
   }[key];
   $("#beats-summary").textContent =
-    `${matches.length} of ${collection.length} beats · ${kitNote} Local today / planned L2.`;
+    `${matches.length} of ${collection.length} beats · ${kitNote} ${isAnalog ? "The Analog Kit sample pack (7.9 MB) downloads the first time you load a beat from it." : "Local today / planned L2."}`;
   const list = $("#beats-list");
   list.innerHTML = "";
   matches.forEach((preset) => {
@@ -1748,7 +1762,7 @@ function renderBeatsList() {
       el(
         "span",
         "beat-meta",
-        `${preset.genre} · ${preset.bpm} BPM${preset.swing ? ` · swing ${preset.swing}%` : ""} · ${preset.bars} bar${preset.bars > 1 ? "s" : ""} · ${preset.channels.length} ch`,
+        `${preset.genre} · ${preset.feltBpm ? `${preset.feltBpm} BPM feel (grid ${preset.bpm})` : `${preset.bpm} BPM`}${preset.swing ? ` · swing ${preset.swing}%` : ""} · ${preset.bars} bar${preset.bars > 1 ? "s" : ""} · ${preset.channels.length} ch${preset.persona ? ` · ${ANALOG_PERSONAS.find((p) => p.key === preset.persona)?.label} kit` : ""}`,
       ),
     );
     if (preset.description)
@@ -1759,7 +1773,9 @@ function renderBeatsList() {
         el(
           "summary",
           "",
-          isCombined
+          isAnalog
+            ? `Analog Kit recordings · ${preset.channels.length} channels`
+            : isCombined
             ? `Sources · ${preset.channels.filter((c) => c.source.type === "ordinal").length} L1 + ${preset.channels.filter((c) => c.source.type === "synth").length} built-in`
             : isL1
               ? `L1 sample inscriptions · ${preset.channels.length} channels`
@@ -1777,7 +1793,15 @@ function renderBeatsList() {
           })),
       );
       details.append(references);
-      if (isCombined || !isL1) {
+      if (isAnalog) {
+        for (const channel of preset.channels)
+          details.append(
+            el("div", "beat-meta", `${channel.name} · ${channel.source.label}`),
+          );
+        const first = preset.channels.find((c) => c.source.type === "pack");
+        if (first)
+          details.append(el("p", "beat-meta", `Licence · ${packSoundNotice(first.source.value)}`));
+      } else if (isCombined || !isL1) {
         details.append(
           el("p", "beat-meta", "Built-in sounds · local today / planned L2"),
         );
@@ -1823,7 +1847,34 @@ export function initBeatsModal() {
     if (genres.includes(previous)) sel.value = previous;
     renderBeatsList();
   };
-  $("#beats-collection").addEventListener("change", updateGenres);
+  // Analog Kit: kit voicing menu, plus fetching the sample pack ahead of the first load.
+  const kitSelect = $("#beats-kit");
+  kitSelect.replaceChildren(new Option("Kit: each beat's own", "auto"));
+  for (const persona of ANALOG_PERSONAS) kitSelect.append(new Option(`${persona.label} kit`, persona.key));
+  const analogOption = [...$("#beats-collection").options].find((o) => o.value === "drums-analog");
+  if (analogOption) analogOption.textContent = `Analog kit drums · ${analogBeats("auto").length}`;
+  const warmAnalogPack = async () => {
+    if ($("#beats-collection").value !== "drums-analog" || beatLoad) return;
+    const status = $("#beats-status");
+    if (!status.textContent) status.textContent = "Preparing the Analog Kit sample pack (7.9 MB)…";
+    const result = await prefetchPack(ANALOG_PACK_ID);
+    if (!beatLoad && /^Preparing the Analog Kit/.test(status.textContent))
+      status.textContent = result.ok
+        ? "Analog Kit ready. Pick a beat to load it."
+        : "The Analog Kit sample pack could not be downloaded yet; it will retry when you load a beat.";
+  };
+  kitSelect.addEventListener("change", () => {
+    renderBeatsList();
+    // Hearing the same beat on another kit: reload the current Analog beat in the new voicing.
+    const loaded = store.project.lastBeat;
+    if (loaded?.collection !== "analog") return;
+    const row = [...$("#beats-list").children].find((r) => r.dataset.beatId === loaded.id);
+    if (row?.beatPreset) applyCatalogPreset(row.beatPreset);
+  });
+  $("#beats-collection").addEventListener("change", () => {
+    updateGenres();
+    warmAnalogPack();
+  });
   $("#beats-search").addEventListener("input", renderBeatsList);
   $("#beats-type").addEventListener("change", renderBeatsList);
   sel.addEventListener("change", renderBeatsList);
@@ -1839,6 +1890,7 @@ export function initBeatsModal() {
     $("#beats-status").textContent = "";
     updateGenres();
     $("#modal-beats").classList.remove("hidden");
+    warmAnalogPack();
   };
   $("#btn-beats").addEventListener("click", () => open("drums-studio"));
   $("#beats-play").addEventListener("click", () => {
