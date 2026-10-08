@@ -71,6 +71,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .hint { color: var(--mute); font-size: 13px; }
 .btn.small { padding: 9px 16px; font-size: 14px; }
 tr.me td { background: var(--lime-soft); }
+.teamtag { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--lime); }
 .youtag, .selftag { font: 600 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
 
 /* sticky wallet bar: connect, who you are, where you stand, your X handle */
@@ -454,7 +455,7 @@ tr:last-child td { border-bottom: 0; }
     KINDS.forEach(function (x) { total += earned(x, n[x.k] || 0, n); });
     return { valid: valid, total: total, tickets: valid ? total : 0 };
   }
-  var START = loadState(), HANDLES = {}, LINKED = {}, WINNERS = {}, DATA = listFromState(START), AT = START ? START.at : '', rows = [], live = false, offline = false, ME = '';
+  var START = loadState(), HANDLES = {}, TEAMW = {}, LINKED = {}, WINNERS = {}, DATA = listFromState(START), AT = START ? START.at : '', rows = [], live = false, offline = false, ME = '';
   function rebuild() {
     rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; return { a: a, valid: c.valid, held: c.total, tickets: c.tickets, handle: team || self, self: !!self, won: WINNERS[a.a] }; });
     rows.sort(function (x, y) { return (y.tickets - x.tickets) || (y.held - x.held) || (x.a.a < y.a.a ? -1 : 1); });
@@ -520,7 +521,7 @@ tr:last-child td { border-bottom: 0; }
       var r = x.r, i = x.i, own = ME && r.a.a === ME;
       var tr = el('tr', 'click' + (own ? ' me' : '')); tr.tabIndex = 0;
       tr.appendChild(el('td', 'num mono', String(i + 1)));
-      var wt = el('td', 'mono', short(r.a.a)); if (own) wt.appendChild(el('small', 'youtag', ' you')); tr.appendChild(wt);
+      var wt = el('td', 'mono', short(r.a.a)); if (own) wt.appendChild(el('small', 'youtag', ' you')); if (TEAMW[r.a.a]) wt.appendChild(el('small', 'teamtag', ' team · ' + TEAMW[r.a.a])); tr.appendChild(wt);
       var hc = el('td', '', r.handle || '—');
       if (r.handle && r.self) hc.appendChild(el('small', 'selftag', ' self-linked'));
       tr.appendChild(hc);
@@ -636,7 +637,7 @@ tr:last-child td { border-bottom: 0; }
   }
   $('refresh').addEventListener('click', function () { refresh(true); });
   function loadHandles() {
-    fetch('/bounty/zdao/tracker/1/handles.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { HANDLES = j.handles || {}; WINNERS = j.winners || {}; repaint(); }).catch(function () {});
+    fetch('/bounty/zdao/tracker/1/handles.json', { cache: 'no-cache' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { HANDLES = j.handles || {}; TEAMW = j.team || {}; WINNERS = j.winners || {}; repaint(); }).catch(function () {});
     fetch('/bounty/handles?c=zdao-1').then(function (r) { return r.ok ? r.json() : {}; }).then(function (j) { LINKED = j.handles || {}; HANDLING = j.available !== false; repaint(); }).catch(function () {});
   }
   var HANDLING = true;
@@ -688,7 +689,7 @@ tr:last-child td { border-bottom: 0; }
       setTimeout(function () { inp.focus(); inp.select(); }, 0);
     } else if (cur) {
       hd.appendChild(el('span', 'label', 'X')); hd.appendChild(el('span', 'h', cur));
-      if (team) hd.appendChild(el('small', 'selftag', 'confirmed by the team'));
+      if (team) hd.appendChild(el('small', 'selftag', TEAMW[ME] ? 'team wallet · ' + TEAMW[ME] : 'confirmed by the team'));
       else {
         hd.appendChild(el('small', 'selftag', 'self-linked'));
         if (HANDLING) hd.appendChild(btn('Edit', 'ghost', function () { editing = true; say(''); paintWallet(); }));

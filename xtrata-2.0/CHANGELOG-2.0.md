@@ -2,6 +2,11 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: only jim.btc, xtrata.btc and audionals.btc are team wallets (2026-10-08)
+
+- `handles.json` gains a `team` map (address to BNS name) for the three team wallets, resolved from BNS v2 on 8 Oct. Those wallets show a "team · name" tag on the board and "team wallet" in the wallet bar, and their handles are locked.
+- Everyone else, including the M0VH0 wallet, is no longer in `handles.json` and can link or edit their own X handle by signing.
+
 ## Bounty tracker: inscriptions earn tickets by file size, and the M0VH0 handle (2026-10-07)
 - **Rule:** every inscription from 1 October is scored on its own size and added up: up to 1 MB (1,048,576 bytes) = 1 ticket, over 1 MB = 2, over 2 MB = 3, over 3 MB = 4, over 4 MB = 5, never more than 5 each. Audionauts stay a flat 5 per wallet. Other kinds are unchanged.
 - `public/bounty/zdao/tracker/1/ledger-reader.js`: the reader now also reads `begin-inscription` and `begin-or-get` calls to learn the size a later `seal-*` call refers to (matched by expected hash), takes the size straight from `mint-single-tx*` calls, and scores each item of a `seal-inscription-batch` on its own. Per wallet it keeps `n.ins` (inscriptions) and `n.inp` (size tickets, also per draw) and `n.inu` (inscriptions whose begin it could not see, scored 1 and flagged). Sizes are remembered in the saved state (`sizes`) so an incremental read still finds the begin of a seal it sees later. Call counts for the inscription source now count each batch item.
