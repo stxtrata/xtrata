@@ -2,6 +2,13 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Leather: structured-message signing uses the RPC API (2026-10-08)
+- New Leather builds reject the legacy `structuredDataSignatureRequest` bridge with "This legacy method is no longer supported. Upgrade to the LeatherProvider.request() RPC API", which broke signing the X handle on the bounty tracker and the BNS proof on the music profile page.
+- `src/lib/wallet/structured-sign.ts`: tries `request('stx_signStructuredMessage')` first for every non-Xverse wallet and falls back to the legacy bridge only when the wallet reports the method as unsupported, so old and new Leather both work. Xverse is unchanged. A cancel or wallet error is never retried through the legacy bridge.
+- `src/music-profile/page.ts` now uses the same helper instead of its own copy of the legacy call.
+- Tracker bundle rebuilt (`public/bounty/zdao/tracker/1/wallet.js`) and its script tag bumped to `?v=2`. `docs/WALLET-PLAYBOOK.md` §7 updated.
+- **Verified:** 8 new tests in `src/lib/wallet/__tests__/structured-sign.test.ts` (RPC envelope and bare result, older-Leather fallback, legacy-only wallet, no re-prompt on cancel, RPC error envelope, Xverse path, no signer); 229 wallet, music-profile and tracker tests pass; the rebuilt bundle loads in a browser with no errors. Not tested against a real Leather wallet.
+
 ## Bounty tracker: merged with main's Live draw (2026-10-08)
 - Merged `origin/main` (Live draw, Draw 1 result, chess 2 tickets, team wallets excluded) into the Audionaut-5 / size-ticket / team-wallet branch. Audionaut 5 now exists once (main's `w: 5`), unchanged.
 - **Draw 1 stays frozen:** the Live draw's `tix(c, i)` keeps 1 ticket for inscribing in Draw 1, so its pool still reproduces `draws/draw1/frozen.csv` exactly (19 wallets, 133 tickets). Size tickets apply from Draw 2 (`c.inp`); `inp` and `inu` are bookkeeping keys and are never counted as tickets of their own.

@@ -150,6 +150,15 @@ persisted. Never call connect-ui's `getInstalledProviders` directly.
   connected address instead of requiring the key.
 - Disconnect tries `stx_disconnect` / `wallet_disconnect` / `disconnect` /
   `deactivate` in order, tolerating unsupported responses.
+- **Structured-message signing (SIP-018) goes through the RPC first.** Current
+  Leather removed the legacy `structuredDataSignatureRequest` bridge and answers
+  it with "This legacy method is no longer supported. Upgrade to the
+  LeatherProvider.request() RPC API". `requestStructuredSignature()` calls
+  `request('stx_signStructuredMessage', { message, domain })` (hex Clarity values,
+  JSON-RPC envelope or bare result) for every non-Xverse wallet, and falls back to
+  the legacy bridge only when the wallet reports the RPC method as unsupported
+  (older Leather). A user cancel or wallet error never falls through to a second
+  prompt. Xverse keeps its Stacks bridge. Locked by `structured-sign.test.ts`.
 
 ## 8. Sponsored (origin-only) signing
 

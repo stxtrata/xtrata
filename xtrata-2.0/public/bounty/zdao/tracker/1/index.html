@@ -690,7 +690,7 @@ tr:last-child td { border-bottom: 0; }
   function loadWallet() {
     if (window.XtrataBountyWallet) return Promise.resolve(window.XtrataBountyWallet);
     if (!walletP) walletP = new Promise(function (ok, bad) {
-      var sc = document.createElement('script'); sc.type = 'module'; sc.src = '/bounty/zdao/tracker/1/wallet.js?v=1';
+      var sc = document.createElement('script'); sc.type = 'module'; sc.src = '/bounty/zdao/tracker/1/wallet.js?v=2';
       sc.onload = function () { window.XtrataBountyWallet ? ok(window.XtrataBountyWallet) : bad(new Error('Wallet support did not start.')); };
       sc.onerror = function () { walletP = null; bad(new Error('Could not load wallet support. Check your connection and try again.')); };
       document.head.appendChild(sc);
