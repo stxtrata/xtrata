@@ -1,5 +1,6 @@
 // @ts-ignore Plain JS module shared with the browser readers; it ships no declarations.
 import {PAID_PLAYS_CONTRACT, parsePaidPlayEvent} from '../../public/radio/paid-play-event.mjs';
+import {radioArtist, radioTitle} from '../../src/lib/radio/artist-credits.mjs';
 import {applyHiroApiKey, getHiroApiKeys, shouldRetryWithNextHiroKey} from './hiro-keys';
 
 /**
@@ -40,7 +41,11 @@ export type MusicStats = {
   supporters: number;
   plays: number;
   microStx: number;
-  latest: Array<{txid: string; song: number; core: number; payer: string; recipient: string; at: number | null}>;
+  /** Newest first. title, artist and artwork are null when the song's details are not known (yet). */
+  latest: Array<{
+    txid: string; song: number; core: number; payer: string; recipient: string; at: number | null;
+    title: string | null; artist: string | null; artwork: string | null;
+  }>;
   complete: boolean;
   checkedAt: number | null;
   /** HTTP status of the last failed chain read (-1 for a network error), or null when the last read worked. */
@@ -187,6 +192,35 @@ export async function refreshMusicStats(
   }
 }
 
+type SongDetails = {title: string | null; artist: string | null; artwork: string | null};
+
+/**
+ * Title, artist and artwork for songs on the current core, from the radio catalogue that the
+ * Songs page uses (radio_metadata). Only core 3 songs are catalogued, exactly as on /music/heroes.
+ * Anything missing stays null so the page can say "Song #id" instead of inventing a name.
+ */
+async function songDetails(db: Db, rows: any[]): Promise<Map<number, SongDetails>> {
+  const ids = [...new Set(rows.filter(row => Number(row.core) === 3).map(row => Number(row.song_id)))];
+  const found = new Map<number, SongDetails>();
+  if (!ids.length) return found;
+  try {
+    const result = await db.prepare(
+      `SELECT token_id, title, artist, cover FROM radio_metadata WHERE token_id IN (${ids.map(() => '?').join(',')})`
+    ).bind(...ids).all();
+    for (const row of result.results as any[]) {
+      const id = Number(row.token_id);
+      const title = radioTitle(id, String(row.title || '')).trim().slice(0, 200);
+      const artist = radioArtist(id, String(row.artist || '')).trim().slice(0, 200);
+      found.set(id, {
+        title: title && !/^Inscription #\d+$/.test(title) ? title : null,
+        artist: artist || null,
+        artwork: row.cover ? `/radio/artwork?id=${id}` : null
+      });
+    }
+  } catch { /* The catalogue is optional enrichment: without it plays are listed by song number. */ }
+  return found;
+}
+
 export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
   const db = env.DB;
   if (!db) throw Error('Missing D1 binding');
@@ -196,6 +230,7 @@ export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
     readState(db)
   ]);
   const plays = Number(totals?.plays ?? 0);
+  const details = await songDetails(db, latest.results as any[]);
   return {
     version: 1,
     supporters: Number(totals?.supporters ?? 0),
@@ -203,7 +238,8 @@ export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
     microStx: plays * 50,
     latest: (latest.results as any[]).map(row => ({
       txid: row.txid, song: Number(row.song_id), core: Number(row.core), payer: row.payer, recipient: row.recipient,
-      at: row.block_time ? Number(row.block_time) : null
+      at: row.block_time ? Number(row.block_time) : null,
+      ...(Number(row.core) === 3 && details.get(Number(row.song_id)) || {title: null, artist: null, artwork: null})
     })),
     complete: state.total > 0 && state.cursor >= state.total,
     checkedAt: state.checkedAt || null,

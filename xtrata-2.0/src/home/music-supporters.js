@@ -45,6 +45,8 @@ export const nextMilestone = (plays) => {
   return {previous, next: previous, percent: 100};
 };
 
+const ARTWORK = /^\/radio\/artwork\?id=\d{1,10}$/;
+const text = (value) => (typeof value === 'string' && value.trim() ? value.trim().slice(0, 200) : null);
 const count = (value) => Number.isSafeInteger(value) && value >= 0;
 
 export const parseStats = (data) => {
@@ -53,7 +55,10 @@ export const parseStats = (data) => {
   const latest = [];
   for (const play of data.latest) {
     if (!play || !TX.test(play.txid) || !count(play.song) || !ADDRESS.test(play.payer)) return null;
-    latest.push({txid: play.txid, song: play.song, payer: play.payer, at: Number.isFinite(play.at) && play.at > 0 ? play.at : null});
+    latest.push({
+      txid: play.txid, song: play.song, payer: play.payer, at: Number.isFinite(play.at) && play.at > 0 ? play.at : null,
+      title: text(play.title), artist: text(play.artist), artwork: ARTWORK.test(play.artwork) ? play.artwork : null
+    });
   }
   return {
     plays: data.plays,
@@ -100,28 +105,58 @@ const staleNote = () => {
   return '';
 };
 
+const artTile = (play) => {
+  const art = document.createElement('div');
+  art.className = 'home-sup__art';
+  art.setAttribute('aria-hidden', 'true');
+  art.textContent = '♪';
+  if (play.artwork) {
+    const img = document.createElement('img');
+    img.alt = '';
+    img.width = 64;
+    img.height = 64;
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    img.onerror = () => img.remove(); // The note stays when the artwork cannot load.
+    img.src = play.artwork;
+    art.append(img);
+  }
+  return art;
+};
+
 const feedItem = (play, fresh) => {
   const item = document.createElement('li');
   item.className = `home-sup__rcpt${fresh ? ' is-new' : ''}`;
+  const body = document.createElement('div');
+  body.className = 'home-sup__text';
   const song = document.createElement('b');
-  song.textContent = `Song #${play.song}`;
+  song.textContent = play.title || `Song #${play.song}`;
+  body.append(song);
+  if (play.artist) {
+    const artist = document.createElement('span');
+    artist.className = 'home-sup__artist';
+    artist.textContent = play.artist;
+    body.append(artist);
+  }
   const from = document.createElement('span');
   from.textContent = `from ${shortAddress(play.payer)} · 0.000050 STX`;
-  item.append(song, from);
+  body.append(from);
   const ago = play.at ? formatAgo(play.at) : '';
   if (ago) {
     const age = document.createElement('span');
     age.className = 'home-sup__age';
     age.dataset.at = String(play.at);
     age.textContent = ago;
-    item.append(age);
+    body.append(age);
   }
   const link = document.createElement('a');
   link.href = `${EXPLORER}${play.txid}?chain=mainnet`;
   link.target = '_blank';
   link.rel = 'noopener noreferrer';
   link.textContent = 'Confirmed on-chain ↗';
-  item.append(link);
+  body.append(link);
+  item.append(artTile(play), body);
   return item;
 };
 

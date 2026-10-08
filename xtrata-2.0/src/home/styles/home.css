@@ -8103,20 +8103,36 @@
     }
     .home-sup__rcpt {
       display: grid;
-      align-content: start;
-      gap: 3px;
+      grid-template-columns: 64px minmax(0, 1fr);
+      align-items: start;
+      gap: 12px;
       min-width: 0;
       padding: 13px 15px;
       border: 1px solid var(--home-line);
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.02);
     }
-    .home-sup__rcpt b { font-size: 14px; font-weight: 800; }
+    .home-sup__text { display: grid; align-content: start; gap: 3px; min-width: 0; }
+    .home-sup__art {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 64px;
+      height: 64px;
+      overflow: hidden;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(151, 118, 255, 0.28), rgba(255, 255, 255, 0.05));
+      color: var(--home-muted);
+      font-size: 24px;
+    }
+    .home-sup__art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .home-sup__rcpt b { font-size: 14px; font-weight: 800; overflow-wrap: anywhere; }
+    .home-sup__rcpt .home-sup__artist { color: var(--home-ink); font-family: inherit; font-size: 13px; }
     .home-sup__rcpt span { color: var(--home-muted); font: 12px var(--home-mono); overflow-wrap: anywhere; }
     .home-sup__rcpt .home-sup__age { color: var(--home-lime); }
     .home-sup__rcpt a { width: fit-content; color: var(--home-ink); font-size: 12px; }
     .home-sup__rcpt.is-new { animation: home-sup-arrive 0.9s ease; }
-    .home-sup__rcpt.is-skel { min-height: 92px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.08), rgba(255,255,255,0.03)); background-size: 200% 100%; animation: home-sup-shimmer 1.4s linear infinite; }
+    .home-sup__rcpt.is-skel { display: block; min-height: 92px; background: linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.08), rgba(255,255,255,0.03)); background-size: 200% 100%; animation: home-sup-shimmer 1.4s linear infinite; }
     .home-sup__empty { grid-column: 1 / -1; color: var(--home-muted); font-size: 13px; }
     [data-state='stale'] .home-sup__feed,
     [data-state='unavailable'] .home-sup__feed { opacity: 0.55; }

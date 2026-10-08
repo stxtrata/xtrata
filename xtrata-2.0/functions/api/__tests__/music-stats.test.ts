@@ -34,8 +34,8 @@ function database(migrate = true) {
 const CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0';
 const hex = (n: number) => '0x' + n.toString(16).padStart(64, '0');
 const wallet = (n: number) => 'SP' + String(n).padStart(10, '0');
-function event(n: number, payer: number, over: {amount?: number; time?: number | null; contract?: string; txid?: string} = {}) {
-  const repr = `(tuple (amount u${over.amount ?? 50}) (core u3) (event "radio-paid-play") (id u${3000 + (n % 40)}) (payer '${wallet(payer)}) (receipt 0x584d0102271903001e1e7034b2ac0f3b) (recipient '${wallet(9000 + (n % 7))}) (total u${n}) (version u1))`;
+function event(n: number, payer: number, over: {amount?: number; time?: number | null; contract?: string; txid?: string; core?: number; song?: number} = {}) {
+  const repr = `(tuple (amount u${over.amount ?? 50}) (core u${over.core ?? 3}) (event "radio-paid-play") (id u${over.song ?? 3000 + (n % 40)}) (payer '${wallet(payer)}) (receipt 0x584d0102271903001e1e7034b2ac0f3b) (recipient '${wallet(9000 + (n % 7))}) (total u${n}) (version u1))`;
   return {
     event_type: 'smart_contract_log', tx_id: over.txid ?? hex(n),
     ...(over.time === null ? {} : {block_time: over.time ?? 1_790_000_000 + n}),
@@ -223,6 +223,43 @@ describe('Music supporter statistics', () => {
     const failing = database();
     await refreshMusicStats({DB: failing as any}, (async () => { throw Error('offline'); }) as unknown as typeof fetch, T0);
     expect(await refreshMusicStats({DB: failing as any}, h.transport, T0 + CATCHUP_REFRESH_MS)).toMatchObject({skipped: true});
+  });
+
+  describe('song details for the latest plays', () => {
+    const catalogue = (db: any) => db.sql.exec(`
+      CREATE TABLE radio_metadata (token_id INTEGER PRIMARY KEY, title TEXT, artist TEXT, cover TEXT NOT NULL DEFAULT '');
+      INSERT INTO radio_metadata VALUES (3002, 'Easy Now', 'Hundred Little Reasons', 'data:image/png;base64,AAAA');
+      INSERT INTO radio_metadata VALUES (3001, 'Plain Title', '', '');
+      INSERT INTO radio_metadata VALUES (3003, 'Inscription #3003', '', '');
+    `);
+    const synced = async (log: any[], enrich = true) => {
+      const db = database(), h = hiro(log);
+      if (enrich) catalogue(db);
+      await refreshMusicStats({DB: db as any}, h.transport, T0);
+      return readMusicStats({DB: db as any});
+    };
+    it('adds title, artist and artwork for core 3 songs the catalogue knows', async () => {
+      const stats = await synced([event(1, 1), event(2, 2), event(3, 3)]);
+      // event(n) plays song 3000 + (n % 40): songs 3001, 3002, 3003 for n = 1, 2, 3.
+      const bySong = Object.fromEntries(stats.latest.map(p => [p.song, p]));
+      expect(bySong[3002]).toMatchObject({title: 'Easy Now', artist: 'Hundred Little Reasons', artwork: '/radio/artwork?id=3002'});
+      expect(bySong[3001]).toMatchObject({title: 'Plain Title', artist: null, artwork: null});
+      expect(bySong[3003]).toMatchObject({title: null, artist: null, artwork: null}); // placeholder names are not titles
+    });
+    it('leaves details empty for other cores and when the catalogue is missing', async () => {
+      const other = await synced([event(2, 1, {core: 1})]);
+      expect(other.latest[0]).toMatchObject({core: 1, song: 3002, title: null, artist: null, artwork: null});
+      const none = await synced([event(2, 1)], false);
+      expect(none.latest[0]).toMatchObject({song: 3002, title: null, artist: null, artwork: null});
+      expect(none.plays).toBe(1);
+    });
+    it('applies the supplied artist and title corrections used by the Songs page', async () => {
+      const db = database(), h = hiro([event(1, 1, {song: 312})]);
+      db.sql.exec(`CREATE TABLE radio_metadata (token_id INTEGER PRIMARY KEY, title TEXT, artist TEXT, cover TEXT NOT NULL DEFAULT '');
+        INSERT INTO radio_metadata VALUES (312, 'raw title', 'raw artist', '');`);
+      await refreshMusicStats({DB: db as any}, h.transport, T0);
+      expect((await readMusicStats({DB: db as any})).latest[0]).toMatchObject({song: 312, title: 'Smalltalk', artist: 'Hundred Little Reasons'});
+    });
   });
 
   it('ignores other contracts, wrong amounts and repeated transactions, but still advances', async () => {
