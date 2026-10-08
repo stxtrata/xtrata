@@ -304,6 +304,7 @@ const modal = {
   tagline: "Modal percussion - marimba, xylophone, vibes, glockenspiel, kalimba, tubular bell, singing bowl, steel pan, wood block",
   color: "#e0c24a",
   params: paramDefs,
+  live: { oneShot: true, gate: 0.6 }, // struck bars ring out over their own decay
   voice: modalVoice,
   scope: modalScope,
   lines: [

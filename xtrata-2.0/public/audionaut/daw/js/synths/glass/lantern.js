@@ -362,6 +362,7 @@ const lantern = {
   tagline: "A struck spectrum that opens into a living harmonic halo",
   color: "#eeb978",
   params: PARAMS,
+  live: { oneShot: true, gate: 0.6 }, // offline-rendered bloom: rings out, render stays short
   voice(ctx, dest, note, P) {
     const { pitch, vel, time, dur } = note;
     const r = cached(settings({ ...DEFAULTS, ...P }), num(pitch, 60), clamp(num(vel, 0.8), 0, 1.5), clamp(num(dur, 0.5), 0.01, 60), ctx.sampleRate);

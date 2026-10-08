@@ -408,6 +408,7 @@ const kit = {
   tagline: "Synth drum kit - 808 / 909 / lo-fi voicings, GM note map: kick, snare, clap, hats, toms, cymbals, cowbell",
   color: "#ff6b5a",
   params: paramDefs,
+  live: { oneShot: true, gate: 0.35 }, // drums ring out; key-up does not cut them
   voice: kitVoice,
   scope: kitScope,
   lines: [

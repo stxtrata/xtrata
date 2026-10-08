@@ -161,6 +161,7 @@ const fm4 = {
   color: "#22d3ee",
   params: fmParams,
   presets: FM_PRESETS,
+  live: { hold: 2.5 }, // offline-rendered: held notes render a 2.5 s gate, key-up fades
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     playData(ctx, dest, renderFm(P, pitch, vel, dur, ctx.sampleRate), time);
   },
@@ -526,6 +527,7 @@ const pluck = {
     { name: "Muted Bass", params: { decay: 0.7, tone: 0.3, pick: 0.5, pos: 0.25, snap: 0.2, twin: 0, body: 8, bodyFreq: 110, damp: 0.08 } },
     { name: "Dulcimer Shimmer", params: { decay: 5.5, tone: 0.9, pick: 0, pos: 0.15, snap: 0.15, twin: 0.8, body: 2, bodyFreq: 520, damp: 1.8 } },
   ],
+  live: { oneShot: true, gate: 0.6 }, // plucked strings ring out
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const data = renderPluck(P, pitch, vel, dur, ctx.sampleRate);
     const chain = [];

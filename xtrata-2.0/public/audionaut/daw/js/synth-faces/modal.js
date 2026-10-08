@@ -195,11 +195,9 @@ import { Kit } from "./runtime.js";
       c.style.setProperty('--L', L(i) + 'px'); c.style.setProperty('--tl', (L(i) / 150).toFixed(3));
       c.innerHTML = '<div class="tube"></div><div class="bar"><span class="nt">' + nname(m) + '</span><span class="num">#' + NUMS[i] + '</span><i class="dot"></i></div>';
       fld.appendChild(c); cols.push({ el: c, bar: c.firstChild.nextSibling, m });
-      const held = new Map();
-      c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); const r = c.getBoundingClientRect(); const f = clamp((e.clientY - r.top) / r.height, 0, 1); held.set(e.pointerId, 1); P.noteOn(m, 0.45 + 0.5 * (1 - Math.abs(f - 0.4) * 1.4)); e.preventDefault(); });
-      const up = e => { if (held.delete(e.pointerId)) P.noteOff(m); };
-      c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
     });
+    // bars play through the shared keyboard path: glissando, multi-touch, held notes
+    P.surface(fld, { velAt: (e, c) => { const r = c.getBoundingClientRect(); const f = clamp((e.clientY - r.top) / r.height, 0, 1); return 0.45 + 0.5 * (1 - Math.abs(f - 0.4) * 1.4); } });
     const sub = () => { const b = P.get('body'), pl = PAL[b]; fld.style.setProperty('--rs', Math.min(1, P.get('resonator') * (0.25 + 0.75 * BODIES[BN[b]].res / 0.9 + (BODIES[BN[b]].res === 0 ? 0.0 : 0)))); cols.forEach(o => { o.bar.style.setProperty('--c1', pl[0]); o.bar.style.setProperty('--c2', pl[1]); o.bar.style.setProperty('--hd', P.get('hardness')); o.bar.style.setProperty('--sp', P.get('strike')); o.el.firstChild.style.setProperty('--rs', fld.style.getPropertyValue('--rs')); }); };
     ['body', 'resonator', 'hardness', 'strike'].forEach(id => P.sub(id, sub));
     const S = tracker(P), pc = $(root, '#pc').getContext('2d');

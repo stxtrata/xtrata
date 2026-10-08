@@ -343,6 +343,7 @@ const tine = {
   tagline: "Electric & acoustic keys - Rhodes tine, Wurli reed, piano and clav models with touch-sensitive timbre",
   color: "#f5a65b",
   params: paramDefs,
+  live: { hold: 2.5 }, // offline-rendered: held notes render a 2.5 s gate, key-up fades
   voice: tineVoice,
   scope: tineScope,
   lines: [

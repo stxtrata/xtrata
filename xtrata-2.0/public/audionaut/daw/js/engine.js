@@ -392,6 +392,122 @@ class Engine {
     );
   }
 
+  // ---- live (held) notes: on-screen keys, computer keys and MIDI all come through here.
+  // Voices are one-shot, so a held note is played with a long gate (the synth's `live.hold`,
+  // default 8 s) into a per-note gate gain. Key-up fades that gate over the patch's release
+  // and stops every source the voice created, so the voice's own onended cleanup runs.
+  // Synths may declare `live: { oneShot, gate, hold, release(P) }`: oneShot voices (drums,
+  // mallets, plucks) ignore key-up and ring out over `gate` seconds.
+  _liveProxy() {
+    const ctx = this.ctx;
+    if (this._lp?.ctx === ctx) return this._lp;
+    const rec = { ctx, list: null, fns: new Map() };
+    const SRC = new Set(["createOscillator", "createBufferSource", "createConstantSource"]);
+    rec.proxy = new Proxy(ctx, {
+      get(t, prop) {
+        const v = Reflect.get(t, prop, t);
+        if (typeof v !== "function") return v;
+        let f = rec.fns.get(prop);
+        if (!f) {
+          f = SRC.has(prop)
+            ? (...a) => {
+                const n = v.apply(t, a);
+                if (rec.list) {
+                  const s = { node: n, stopAt: null };
+                  const stop = n.stop.bind(n);
+                  n.stop = (w = 0, ...x) => {
+                    s.stopAt = w;
+                    return stop(w, ...x);
+                  };
+                  rec.list.push(s);
+                }
+                return n;
+              }
+            : v.bind(t);
+          rec.fns.set(prop, f);
+        }
+        return f;
+      },
+    });
+    this._lp = rec;
+    return rec;
+  }
+
+  startNote(i, pitch, vel = 1) {
+    this.ensureContext();
+    const inst = store.instrument(i);
+    const synth = SYNTH_BANK[inst?.synthId];
+    if (!synth || !this.instrumentGains?.[i]) return 0;
+    const P = { ...synthDefaults(inst.synthId), ...(inst.params || {}) };
+    const lv = synth.live || {};
+    const oneShot = !!lv.oneShot;
+    const hold = oneShot ? lv.gate ?? 0.6 : lv.hold ?? 8;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const gate = ctx.createGain();
+    gate.connect(this.instrumentGains[i]);
+    const lp = this._liveProxy();
+    const sources = [];
+    lp.list = sources;
+    try {
+      synth.voice(lp.proxy, gate, { pitch, vel, time: t, dur: hold }, P);
+    } catch (e) {
+      console.warn("voice error", e);
+    } finally {
+      lp.list = null;
+    }
+    let rel = typeof lv.release === "function" ? lv.release(P) : P.release ?? P.rel ?? 0.25;
+    rel = Math.min(3, Math.max(0.03, Number.isFinite(+rel) ? +rel : 0.25));
+    const id = (this._liveSeq = (this._liveSeq || 0) + 1);
+    const n = { id, i, pitch, t, gate, sources, oneShot, rel, timer: 0 };
+    (this._live ||= new Map()).set(id, n);
+    // the gate node is dropped once every source has ended (or the latest stop time passes)
+    const ends = () =>
+      Math.max(
+        t + hold + rel,
+        ...sources.map((s) =>
+          s.stopAt != null ? s.stopAt : s.node.buffer && !s.node.loop ? t + s.node.buffer.duration : t + hold + rel,
+        ),
+      );
+    n.dropAt = ends;
+    n.timer = setTimeout(() => gate.disconnect(), Math.min(60, ends() - t + 0.5) * 1000);
+    emitNoteVisual(i, pitch, true);
+    return id;
+  }
+
+  releaseNote(id) {
+    const n = this._live?.get(id);
+    if (!n) return;
+    this._live.delete(id);
+    emitNoteVisual(n.i, n.pitch, false);
+    if (n.oneShot || !this.ctx) return; // rings out; the gate is dropped by its timer
+    const now = this.ctx.currentTime;
+    const at = Math.max(now, n.t + 0.06); // a tap still sounds like a short note
+    const end = at + n.rel;
+    const g = n.gate.gain;
+    g.cancelScheduledValues(at);
+    g.setValueAtTime(1, at);
+    g.exponentialRampToValueAtTime(0.0001, end);
+    for (const s of n.sources) {
+      if (s.stopAt != null && s.stopAt <= end + 0.02) continue;
+      try {
+        s.node.stop(end + 0.02);
+      } catch {
+        /* already finished */
+      }
+    }
+    clearTimeout(n.timer);
+    n.timer = setTimeout(() => n.gate.disconnect(), (end - now + 0.3) * 1000);
+  }
+
+  releaseAll(i = null) {
+    for (const n of [...(this._live?.values() || [])]) if (i == null || n.i === i) this.releaseNote(n.id);
+  }
+
+  liveCount() {
+    return this._live?.size || 0;
+  }
+
   setMasterVolume(v) {
     if (this.masterGain)
       this.masterGain.gain.setTargetAtTime(v, this.ctx.currentTime, 0.01);

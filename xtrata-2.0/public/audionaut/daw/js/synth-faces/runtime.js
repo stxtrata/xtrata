@@ -4,7 +4,7 @@
 // and builds its UI with the helpers on `P` (bind / sub / keyboard / scope ...). Unlike the
 // design-audition page this version is wired to the real thing:
 //   - values live in `store.instrument(i).params` (same object the MIDI-roll sliders use),
-//   - notes go through `engine.triggerNote`, so the synth you hear is the synth in the bank,
+//   - notes go through the shared live path (live-keys.js → engine.startNote), so the synth you hear is the synth in the bank,
 //   - note lights follow every note on that instrument (sequencer, roll, MIDI, mouse).
 // Faces use face-native values: knobs are real numbers in the synth's own units, selects are
 // the index into the synth's option list (converted to the option value on write).
@@ -12,12 +12,14 @@
 import { store } from "../state.js";
 import { engine } from "../engine.js";
 import { SYNTH_BANK, synthDefaults } from "../synths.js";
+import { attachKeyboard, noteOn, noteOff, allOff, keyOffset } from "../live-keys.js";
 
 const REG = {};
 const fontsDone = new Set();
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-const NOTE_LEN = 0.6; // seconds — synth voices are one-shot, so notes get a fixed gate
+const AUDITION = 0.45; // seconds a preset / pad audition is held
 let curInst = null;
+let faceSeq = 0;
 const taps = new Map();
 
 function addFonts(q) {
@@ -93,6 +95,8 @@ function makeP(synthId, inst, def, root) {
   const noteSubs = new Set();
   const presetSubs = new Set();
   const born = performance.now();
+  const src = `face${++faceSeq}`; // prefix for this face's held notes (pads, bars, auditions)
+  const kbs = [];
   let last = {};
   const readReal = () => ({ ...synthDefaults(synthId), ...(store.instrument(inst).params || {}) });
   const readFace = () => {
@@ -175,14 +179,15 @@ function makeP(synthId, inst, def, root) {
       return u;
     },
     text(el, id) { P.sub(id, () => { el.textContent = P.fmt(id); }); },
-    loadPreset(i) {
-      if (performance.now() - born < 300) return; // faces auto-pick preset 0 at build time; never overwrite the user's patch
+    loadPreset(i, o) {
+      if (!(o && o.force) && performance.now() - born < 300) return; // faces auto-pick preset 0 at build time; never overwrite the user's patch
       const pr = (synth.presets || [])[i];
       if (!pr) return;
       presetIdx = i;
       store.setInstrumentProp(inst, "params", { ...synthDefaults(synthId), ...(pr.params || {}) });
       presetSubs.forEach((f) => f(i, pr.name));
-      P.noteOn(60 - 12 + 12 * 0 + 12, 0.8);
+      P.noteOn(60, 0.8);
+      setTimeout(() => P.noteOff(60), AUDITION * 1000);
     },
     onPreset(fn) {
       presetSubs.add(fn);
@@ -278,54 +283,77 @@ function makeP(synthId, inst, def, root) {
       el.addEventListener("dblclick", () => { P.set(idX, pdef(def, idX).def); P.set(idY, pdef(def, idY).def); });
       return el;
     },
-    // notes go to the real engine; lights come back through the synth-note event
-    noteOn(m, v) { engine.ensureContext(); engine.triggerNote(inst, m, v || 0.8, 0, synthId === "kit" ? 0.35 : NOTE_LEN); },
-    noteOff() {},
+    // notes go to the shared live-note path (held until noteOff); lights come back through synth-note
+    noteOn(m, v) { noteOn(`${src}:${m}`, inst, m, v || 0.8); },
+    noteOff(m) { if (m == null) allOff(`${src}:`); else noteOff(`${src}:${m}`); },
     onNote(fn) { noteSubs.add(fn); const u = () => noteSubs.delete(fn); disposers.push(u); return u; },
+    // On-screen keyboard: glissando, multi-touch, held notes, shared octave shift (live-keys.js).
     keyboard(el, o) {
       o = o || {};
       const from = o.from == null ? 48 : o.from, oct = o.octaves || 3;
       const whites = [0, 2, 4, 5, 7, 9, 11], blackAt = { 0: 1, 2: 3, 5: 6, 7: 8, 9: 10 };
-      el.innerHTML = "<style>.kb{position:relative;display:flex;width:100%;height:100%;user-select:none;touch-action:none}.kb-w{flex:1;position:relative;background:#f4f4f4;border:1px solid #444;border-top:0;border-radius:0 0 4px 4px}.kb-w.on{background:#bbb}.kb-b{position:absolute;top:0;height:62%;width:var(--bw,3.4%);background:#1a1a1a;border-radius:0 0 3px 3px;z-index:2}.kb-b.on{background:#555}</style>";
+      el.innerHTML = "<style>.kb{position:relative;display:flex;width:100%;height:100%;user-select:none;-webkit-user-select:none;touch-action:none;-webkit-touch-callout:none}.kb-w{flex:1;position:relative;background:#f4f4f4;border:1px solid #444;border-top:0;border-radius:0 0 4px 4px;transition:background-color 60ms}.kb-w.on{background:#bbb;transition:none}.kb-b{position:absolute;top:0;height:62%;width:var(--bw,3.4%);background:#1a1a1a;border-radius:0 0 3px 3px;z-index:2;transition:background-color 60ms}.kb-b.on{background:#555;transition:none}</style>";
       const kb = document.createElement("div");
       kb.className = "kb";
       el.appendChild(kb);
       const total = oct * 7;
       let wi = 0;
+      const mk = (cls, base) => { const d = document.createElement("div"); d.className = cls; d.dataset.base = base; return d; };
       for (let k = 0; k < oct; k++) whites.forEach((semi) => {
         const m = from + 12 * k + semi;
-        const w = document.createElement("div");
-        w.className = "kb-w"; w.dataset.midi = m; kb.appendChild(w);
+        kb.appendChild(mk("kb-w", m));
         if (blackAt[semi] != null) {
-          const b = document.createElement("div");
-          b.className = "kb-b"; b.dataset.midi = m + 1;
+          const b = mk("kb-b", m + 1);
           b.style.left = ((wi + 1) / total) * 100 + "%";
           b.style.marginLeft = "calc(var(--bw,3.4%) / -2)";
           kb.appendChild(b);
         }
         wi++;
       });
-      const last2 = document.createElement("div");
-      last2.className = "kb-w"; last2.dataset.midi = from + 12 * oct; kb.appendChild(last2);
+      kb.appendChild(mk("kb-w", from + 12 * oct));
       kb.style.setProperty("--bw", (100 / (total + 1)) * 0.62 + "%");
-      const held = new Map();
-      kb.addEventListener("pointerdown", (e) => {
-        const n = e.target.closest("[data-midi]");
-        if (!n) return;
-        kb.setPointerCapture(e.pointerId);
-        const m = +n.dataset.midi;
-        held.set(e.pointerId, m);
-        P.noteOn(m, 0.4 + 0.5 * clamp((e.offsetY || 30) / (n.clientHeight || 100), 0, 1));
-        e.preventDefault();
+      const keys = [...kb.children].filter((n) => n.dataset.base);
+      const lit = new Map(); // midi -> number of notes sounding it
+      const paint = () => keys.forEach((n) => n.classList.toggle("on", (lit.get(+n.dataset.midi) || 0) > 0));
+      const renumber = () => {
+        const off = keyOffset();
+        keys.forEach((n) => { n.dataset.midi = +n.dataset.base + off; });
+        paint();
+      };
+      renumber();
+      const h = attachKeyboard(kb, {
+        inst: () => inst,
+        keyAt: (n) => { const k = n.closest && n.closest("[data-midi]"); return k && kb.contains(k) ? { midi: +k.dataset.midi, el: k } : null; },
       });
-      const up = (e) => held.delete(e.pointerId);
-      kb.addEventListener("pointerup", up);
-      kb.addEventListener("pointercancel", up);
+      kbs.push(h);
+      const onOct = () => renumber();
+      document.addEventListener("live-octave", onOct);
+      disposers.push(() => document.removeEventListener("live-octave", onOct));
       P.onNote((ev) => {
+        const c = (lit.get(ev.midi) || 0) + (ev.type === "on" ? 1 : -1);
+        if (c > 0) lit.set(ev.midi, c); else lit.delete(ev.midi);
         const n = kb.querySelector('[data-midi="' + ev.midi + '"]');
-        if (n) n.classList.toggle("on", ev.type === "on");
+        if (n) n.classList.toggle("on", c > 0);
       });
       return kb;
+    },
+    // Any fixed layout of [data-midi] elements (mallet bars, pads) played like a keyboard.
+    surface(el, o) {
+      o = o || {};
+      const h = attachKeyboard(el, {
+        inst: () => inst,
+        velAt: o.velAt,
+        keyAt: (n) => { const k = n.closest && n.closest("[data-midi]"); return k && el.contains(k) ? { midi: +k.dataset.midi, el: k } : null; },
+      });
+      kbs.push(h);
+      el.dataset.fixedKeys = "1"; // fixed layout: does not follow the octave shift
+      const lit = new Map();
+      P.onNote((ev) => {
+        const c = (lit.get(ev.midi) || 0) + (ev.type === "on" ? 1 : -1);
+        if (c > 0) lit.set(ev.midi, c); else lit.delete(ev.midi);
+        el.querySelectorAll('[data-midi="' + ev.midi + '"]').forEach((n) => n.classList.toggle("on", c > 0));
+      });
+      return h;
     },
     raf(fn) {
       let id = 0, dead = false;
@@ -392,6 +420,8 @@ function makeP(synthId, inst, def, root) {
       store.setInstrumentProp(inst, "params", r);
     },
     dispose() {
+      kbs.forEach((k) => k.release());
+      allOff(`${src}:`);
       disposers.forEach((f) => f());
       disposers.length = 0;
       all.clear();
