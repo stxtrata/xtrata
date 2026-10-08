@@ -38,8 +38,10 @@ export function makeChannel(i) {
     solo: false,
     trimStart: 0, // 0..1 fraction of buffer
     trimEnd: 1,
-    fx: { filter: "off", cutoff: 8000, drive: 0, delay: 0, reverb: 0 },
-    inserts: [], // insert plugin slots: [{ type, enabled, params }]
+    // Plugin chains (see plugins.js), signal order fader → inserts → fx.
+    // Each is a list of { id, type, enabled, params }.
+    inserts: [],
+    fx: [],
   };
 }
 
@@ -72,8 +74,8 @@ export function makeInstrument(i) {
     volume: 0.8,
     mute: false,
     solo: false,
-    fx: { filter: "off", cutoff: 8000, drive: 0, delay: 0, reverb: 0 },
-    inserts: [], // same insert slots as sample channels: [{ type, enabled, params }]
+    inserts: [], // same plugin chains as sample channels
+    fx: [],
   };
 }
 

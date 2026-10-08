@@ -48,9 +48,11 @@ import { openRoll } from "./pianoroll.js";
 import { openSynthPanel } from "./synth-panel.js";
 import {
   PLUGIN_TYPES,
-  MAX_INSERTS,
-  makeInsert,
+  makeSlot,
   pluginDefaults,
+  pluginsFor,
+  pluginNames,
+  normalizeOwner,
 } from "./plugins.js";
 
 const $ = (s) => document.querySelector(s);
@@ -123,18 +125,14 @@ export function buildChannels() {
     trimBtn.title = "Trim / waveform";
     trimBtn.addEventListener("click", () => openTrim(ch));
 
-    const fxBtn = el("button", "ch-btn fx", "FX");
-    fxBtn.title = "Channel FX: filter, drive, delay, reverb";
-    fxBtn.addEventListener("click", () => openFx(ch));
+    const fxBtn = el("button", "ch-btn fx fxb", "FX");
+    fxBtn.title = `FX chain: ${pluginNames("fx")}`;
+    fxBtn.addEventListener("click", () => openChain(ch, false, "fx"));
 
     const insBtn = el("button", "ch-btn fx ins", "INS");
-    insBtn.title =
-      "Insert plugins: EQ, compressor, gate, distortion, chorus, flanger, phaser, tremolo, bitcrusher";
-    insBtn.classList.toggle(
-      "has-inserts",
-      (c.inserts || []).some((i) => i?.enabled),
-    );
-    insBtn.addEventListener("click", () => openInserts(ch));
+    insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
+    insBtn.addEventListener("click", () => openChain(ch, false, "inserts"));
+    markChainButtons(c, fxBtn, insBtn);
 
     const vol = el("input", "ch-vol");
     vol.type = "range";
@@ -339,18 +337,14 @@ export function buildInstruments() {
     panelBtn.hidden = !synth.ui;
     panelBtn.addEventListener("click", () => openSynthPanel(i));
 
-    const fxBtn = el("button", "ch-btn fx", "FX");
-    fxBtn.title = "Synth FX: filter, drive, delay, reverb";
-    fxBtn.addEventListener("click", () => openFx(i, true));
+    const fxBtn = el("button", "ch-btn fx fxb", "FX");
+    fxBtn.title = `FX chain: ${pluginNames("fx")}`;
+    fxBtn.addEventListener("click", () => openChain(i, true, "fx"));
 
     const insBtn = el("button", "ch-btn fx ins", "INS");
-    insBtn.title =
-      "Insert plugins: EQ, compressor, gate, distortion, chorus, flanger, phaser, tremolo, bitcrusher";
-    insBtn.classList.toggle(
-      "has-inserts",
-      (instr.inserts || []).some((x) => x?.enabled),
-    );
-    insBtn.addEventListener("click", () => openInserts(i, true));
+    insBtn.title = `Insert chain: ${pluginNames("inserts")}`;
+    insBtn.addEventListener("click", () => openChain(i, true, "inserts"));
+    markChainButtons(instr, fxBtn, insBtn);
 
     const previewBtn = el("button", "ch-btn", "▹");
     previewBtn.title = "Preview (C3)";
@@ -537,10 +531,7 @@ export function refreshInstrumentRow(i) {
   row.querySelector(".ch-name").value = instr.name;
   const ss = row.querySelector(".inst-synth-select");
   if (ss && ss.value !== instr.synthId && instr.synthId in SYNTH_BANK) ss.value = instr.synthId;
-  row.querySelector(".ins")?.classList.toggle(
-    "has-inserts",
-    (instr.inserts || []).some((x) => x?.enabled),
-  );
+  markChainButtons(instr, row.querySelector(".fxb"), row.querySelector(".ins"));
   const pb = row.querySelector(".panel-open");
   if (pb) pb.hidden = !synth.ui;
   drawInstStrip(i);
@@ -580,10 +571,7 @@ export function refreshChannelRow(ch) {
   row.querySelector(".mute").classList.toggle("active", c.mute);
   row.querySelector(".solo").classList.toggle("active", c.solo);
   row.classList.toggle("has-sample", !!c.sampleName);
-  row.querySelector(".ins")?.classList.toggle(
-    "has-inserts",
-    (c.inserts || []).some((i) => i?.enabled),
-  );
+  markChainButtons(c, row.querySelector(".fxb"), row.querySelector(".ins"));
 }
 
 export function refreshAllChannels() {
@@ -1424,176 +1412,293 @@ export function initTrimModal() {
   });
 }
 
-// --- insert plugins modal ---
-let insertsChannel = 0;
-let insertsIsInst = false; // true when editing a synth instrument's chain
+// --- plugin chain panel (INS and FX buttons) ---
+// One panel, two chains. Both are ordered lists of plugin slots from plugins.js:
+// add from a grouped list, bypass, reorder (drag or arrows), expand for knobs, remove.
 
-// Channel- or instrument-aware accessors shared by the FX and INS modals.
+// Channel- or instrument-aware accessors.
 const ownerOf = (isInst, i) => (isInst ? store.instrument(i) : store.channel(i));
 const setOwnerProp = (isInst, i, prop, v) =>
   isInst ? store.setInstrumentProp(i, prop, v) : store.setChannelProp(i, prop, v);
 const refreshOwnerRow = (isInst, i) =>
   isInst ? refreshInstrumentRow(i) : refreshChannelRow(i);
 
-function renderInsertSlots() {
-  const root = $("#inserts-slots");
-  root.innerHTML = "";
-  const c = ownerOf(insertsIsInst, insertsChannel);
-  c.inserts = c.inserts || [];
-  for (let slot = 0; slot < MAX_INSERTS; slot++) {
-    const def = c.inserts[slot] || null;
-    const box = el("div", "insert-slot" + (def?.enabled ? " on" : ""));
-    if (def && PLUGIN_TYPES[def.type])
-      box.style.setProperty("--plug-color", PLUGIN_TYPES[def.type].color);
+// Light the FX / INS buttons when their chain has an active plugin.
+function markChainButtons(owner, fxBtn, insBtn) {
+  if (!owner) return;
+  if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner);
+  const live = (arr) => (arr || []).filter((s) => s?.enabled).length;
+  const nFx = live(owner.fx);
+  const nIns = live(owner.inserts);
+  fxBtn?.classList.toggle("has-fx", nFx > 0);
+  insBtn?.classList.toggle("has-inserts", nIns > 0);
+  if (fxBtn) fxBtn.dataset.count = nFx || "";
+  if (insBtn) insBtn.dataset.count = nIns || "";
+}
 
-    const head = el("div", "insert-head");
-    const sel = el("select", "insert-type");
-    const optEmpty = el("option", "", "— empty —");
-    optEmpty.value = "";
-    sel.appendChild(optEmpty);
-    Object.entries(PLUGIN_TYPES).forEach(([id, t]) => {
+const chain = { idx: 0, isInst: false, kind: "inserts", open: new Set(), drag: null };
+const CHAIN_LABEL = { inserts: "insert", fx: "FX" };
+
+const chainOwner = () => ownerOf(chain.isInst, chain.idx);
+const chainSlots = (kind = chain.kind) => {
+  const o = chainOwner();
+  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts)) normalizeOwner(o);
+  return o[kind];
+};
+
+// Every structural change goes through here: new array → store (undoable) → engine.
+function commitChain(arr, kind = chain.kind) {
+  setOwnerProp(chain.isInst, chain.idx, kind, arr);
+  engine.syncChain(chain.idx, chain.isInst);
+  renderChain();
+  refreshOwnerRow(chain.isInst, chain.idx);
+}
+
+function moveSlot(from, to) {
+  const arr = [...chainSlots()];
+  if (to < 0 || to >= arr.length || from === to) return;
+  const [s] = arr.splice(from, 1);
+  arr.splice(to, 0, s);
+  commitChain(arr);
+}
+
+const decimals = (step) => {
+  const t = String(step);
+  return t.includes(".") ? t.split(".")[1].length : 0;
+};
+const fmt = (ps, v) => (+v).toFixed(decimals(ps.step));
+// Log sliders run 0..1000 internally and map exponentially onto min..max.
+const toSlider = (ps, v) =>
+  ps.log ? Math.round((1000 * Math.log(v / ps.min)) / Math.log(ps.max / ps.min)) : v;
+const fromSlider = (ps, x) => {
+  if (!ps.log) return +x;
+  const v = ps.min * Math.pow(ps.max / ps.min, +x / 1000);
+  return +(Math.round(v / ps.step) * ps.step).toFixed(decimals(ps.step));
+};
+
+function renderParams(slot) {
+  const t = PLUGIN_TYPES[slot.type];
+  const grid = el("div", "synth-params chain-params");
+  const P = { ...pluginDefaults(slot.type), ...(slot.params || {}) };
+  const live = (key, v) => {
+    slot.params = { ...P, ...slot.params, [key]: v };
+    P[key] = v;
+    engine.updateSlot(chain.idx, chain.isInst, slot.id);
+    store.emit("dirty"); // history snapshots (debounced) — slider drags are undoable
+  };
+  t.params.forEach((ps) => {
+    const wrap = el("label", "synth-param");
+    wrap.appendChild(el("span", "", ps.label));
+    if (ps.options) {
+      const sel = el("select");
+      ps.options.forEach(([v, label]) => {
+        const o = el("option", "", label);
+        o.value = v;
+        sel.appendChild(o);
+      });
+      sel.value = P[ps.key];
+      sel.addEventListener("change", () => live(ps.key, sel.value));
+      wrap.appendChild(sel);
+    } else {
+      const input = el("input");
+      input.type = "range";
+      input.min = ps.log ? 0 : ps.min;
+      input.max = ps.log ? 1000 : ps.max;
+      input.step = ps.log ? 1 : ps.step;
+      input.value = toSlider(ps, P[ps.key]);
+      const val = el("span", "synth-val", fmt(ps, P[ps.key]));
+      input.addEventListener("input", () => {
+        const v = fromSlider(ps, input.value);
+        val.textContent = fmt(ps, v);
+        live(ps.key, v);
+      });
+      input.addEventListener("dblclick", () => {
+        input.value = toSlider(ps, ps.def);
+        val.textContent = fmt(ps, ps.def);
+        live(ps.key, ps.def);
+      });
+      input.title = "Double-click to reset";
+      wrap.append(input, val);
+    }
+    grid.appendChild(wrap);
+  });
+  return grid;
+}
+
+function renderChain() {
+  const root = $("#chain-slots");
+  if (!root) return;
+  const owner = chainOwner();
+  $("#chain-owner-label").textContent = `— ${owner.name}`;
+  document.querySelectorAll("#modal-chain .chain-tabs .tab").forEach((b) => {
+    const k = b.dataset.chain;
+    b.classList.toggle("active", k === chain.kind);
+    b.setAttribute("aria-selected", k === chain.kind);
+    const n = chainSlots(k).length;
+    b.querySelector(".chain-count").textContent = n ? n : "";
+  });
+  root.innerHTML = "";
+  const slots = chainSlots();
+  if (!slots.length) {
+    const empty = el(
+      "li",
+      "chain-empty",
+      `Add ${chain.kind === "fx" ? "an FX" : "an insert"} plugin below to start this chain.`,
+    );
+    root.appendChild(empty);
+  }
+  slots.forEach((slot, i) => {
+    const t = PLUGIN_TYPES[slot.type];
+    const li = el("li", "chain-slot" + (slot.enabled ? " on" : ""));
+    li.dataset.id = slot.id;
+    li.style.setProperty("--plug-color", t.color);
+
+    const head = el("div", "chain-head");
+    head.draggable = true;
+    const grip = el("span", "chain-grip", "⋮⋮");
+    grip.title = "Drag to reorder";
+    const name = el("button", "chain-name", t.name);
+    name.title = "Show / hide controls";
+    name.setAttribute("aria-expanded", chain.open.has(slot.id));
+    name.addEventListener("click", () => {
+      chain.open.has(slot.id) ? chain.open.delete(slot.id) : chain.open.add(slot.id);
+      renderChain();
+    });
+    const cat = el("span", "chain-cat", t.category);
+
+    const power = el(
+      "button",
+      "ch-btn tiny chain-power" + (slot.enabled ? " active" : ""),
+      slot.enabled ? "ON" : "BYP",
+    );
+    power.title = slot.enabled ? "Bypass this plugin" : "Turn this plugin back on";
+    power.setAttribute("aria-pressed", slot.enabled);
+    power.addEventListener("click", () =>
+      commitChain(
+        chainSlots().map((s) => (s.id === slot.id ? { ...s, enabled: !s.enabled } : s)),
+      ),
+    );
+    const up = el("button", "ch-btn tiny", "▲");
+    up.title = "Move up";
+    up.disabled = i === 0;
+    up.addEventListener("click", () => moveSlot(i, i - 1));
+    const down = el("button", "ch-btn tiny", "▼");
+    down.title = "Move down";
+    down.disabled = i === slots.length - 1;
+    down.addEventListener("click", () => moveSlot(i, i + 1));
+    const del = el("button", "ch-btn tiny chain-del", "✕");
+    del.title = "Remove";
+    del.addEventListener("click", () => {
+      chain.open.delete(slot.id);
+      commitChain(chainSlots().filter((s) => s.id !== slot.id));
+    });
+
+    head.append(el("span", "chain-num", `${i + 1}`), grip, name, cat, power, up, down, del);
+    li.appendChild(head);
+    if (chain.open.has(slot.id)) li.appendChild(renderParams(slot));
+
+    // drag to reorder (by the header row, so sliders still drag normally)
+    head.addEventListener("dragstart", (e) => {
+      chain.drag = slot.id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", slot.id);
+      li.classList.add("dragging");
+    });
+    head.addEventListener("dragend", () => {
+      chain.drag = null;
+      li.classList.remove("dragging");
+      root.querySelectorAll(".drop-before,.drop-after").forEach((n) =>
+        n.classList.remove("drop-before", "drop-after"),
+      );
+    });
+    li.addEventListener("dragover", (e) => {
+      if (!chain.drag) return;
+      e.preventDefault();
+      const r = li.getBoundingClientRect();
+      const after = e.clientY > r.top + r.height / 2;
+      li.classList.toggle("drop-after", after);
+      li.classList.toggle("drop-before", !after);
+    });
+    li.addEventListener("dragleave", () => li.classList.remove("drop-before", "drop-after"));
+    li.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const after = li.classList.contains("drop-after");
+      li.classList.remove("drop-before", "drop-after");
+      const arr = chainSlots();
+      const from = arr.findIndex((s) => s.id === chain.drag);
+      if (from < 0) return;
+      let to = arr.findIndex((s) => s.id === slot.id) + (after ? 1 : 0);
+      if (from < to) to--;
+      moveSlot(from, to);
+    });
+    root.appendChild(li);
+  });
+
+  // Add list: this chain's plugins, grouped by category
+  const sel = $("#chain-add-type");
+  const keep = sel.value;
+  sel.innerHTML = "";
+  for (const [category, items] of pluginsFor(chain.kind)) {
+    const og = el("optgroup");
+    og.label = category;
+    for (const [id, t] of items) {
       const o = el("option", "", t.name);
       o.value = id;
-      sel.appendChild(o);
-    });
-    sel.value = def?.type || "";
-    sel.addEventListener("change", () => {
-      const arr = [...(ownerOf(insertsIsInst, insertsChannel).inserts || [])];
-      arr[slot] = sel.value ? makeInsert(sel.value) : null;
-      setOwnerProp(insertsIsInst, insertsChannel, "inserts", arr);
-      engine.rebuildInserts(insertsChannel, insertsIsInst);
-      renderInsertSlots();
-      refreshOwnerRow(insertsIsInst, insertsChannel);
-    });
-
-    head.append(el("span", "insert-slot-num", `${slot + 1}`), sel);
-
-    if (def) {
-      const enable = el(
-        "button",
-        "ch-btn tiny" + (def.enabled ? " active" : ""),
-        def.enabled ? "ON" : "off",
-      );
-      enable.title = "Bypass toggle";
-      enable.addEventListener("click", () => {
-        def.enabled = !def.enabled;
-        setOwnerProp(
-          insertsIsInst,
-          insertsChannel,
-          "inserts",
-          ownerOf(insertsIsInst, insertsChannel).inserts,
-        );
-        engine.rebuildInserts(insertsChannel, insertsIsInst);
-        renderInsertSlots();
-      });
-      head.appendChild(enable);
+      og.appendChild(o);
     }
-    box.appendChild(head);
-
-    if (def && PLUGIN_TYPES[def.type]) {
-      const t = PLUGIN_TYPES[def.type];
-      const grid = el("div", "synth-params");
-      const P = { ...pluginDefaults(def.type), ...(def.params || {}) };
-      t.params.forEach((ps) => {
-        const wrap = el("label", "synth-param");
-        const lab = el("span", "", ps.label);
-        const input = el("input");
-        input.type = "range";
-        input.min = ps.min;
-        input.max = ps.max;
-        input.step = ps.step;
-        input.value = P[ps.key];
-        const val = el("span", "synth-val", String(P[ps.key]));
-        input.addEventListener("input", () => {
-          def.params = { ...P, ...def.params, [ps.key]: +input.value };
-          P[ps.key] = +input.value;
-          val.textContent = input.value;
-          engine.updateInsertParams(insertsChannel, slot, insertsIsInst);
-          store.emit("dirty");
-        });
-        wrap.append(lab, input, val);
-        grid.appendChild(wrap);
-      });
-      box.appendChild(grid);
-    }
-    root.appendChild(box);
+    sel.appendChild(og);
   }
+  if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  $("#chain-add-btn").textContent = `+ Add ${CHAIN_LABEL[chain.kind]}`;
 }
 
-function openInserts(ch, isInst = false) {
-  insertsChannel = ch;
-  insertsIsInst = isInst;
+function openChain(idx, isInst = false, kind = "inserts") {
+  chain.idx = idx;
+  chain.isInst = isInst;
+  chain.kind = kind;
   engine.ensureContext();
-  $("#inserts-channel-label").textContent = `— ${ownerOf(isInst, ch).name}`;
-  $("#modal-inserts").classList.remove("hidden");
-  renderInsertSlots();
+  normalizeOwner(chainOwner());
+  $("#modal-chain").classList.remove("hidden");
+  renderChain();
 }
 
-export function initInsertsModal() {
-  $("#inserts-close").addEventListener("click", () => {
-    $("#modal-inserts").classList.add("hidden");
-    refreshOwnerRow(insertsIsInst, insertsChannel);
+export function initChainPanel() {
+  document.querySelectorAll("#modal-chain .chain-tabs .tab").forEach((b) =>
+    b.addEventListener("click", () => {
+      chain.kind = b.dataset.chain;
+      renderChain();
+    }),
+  );
+  $("#chain-add-btn").addEventListener("click", () => {
+    const type = $("#chain-add-type").value;
+    if (!PLUGIN_TYPES[type]) return;
+    const slot = makeSlot(type);
+    chain.open.add(slot.id); // new plugins open with their controls showing
+    commitChain([...chainSlots(), slot]);
   });
+  $("#chain-preview").addEventListener("click", () =>
+    chain.isInst
+      ? engine.triggerNote(chain.idx, 48, 1, 0, 0.4)
+      : engine.trigger(chain.idx),
+  );
+  $("#chain-clear").addEventListener("click", () => {
+    if (chainSlots().length) commitChain([]);
+  });
+  $("#chain-close").addEventListener("click", () => {
+    $("#modal-chain").classList.add("hidden");
+    refreshOwnerRow(chain.isInst, chain.idx);
+  });
+  document.addEventListener("open-inst-fx", (e) => openChain(e.detail, true, "fx"));
   document.addEventListener("open-inst-inserts", (e) =>
-    openInserts(e.detail, true),
+    openChain(e.detail, true, "inserts"),
   );
 }
-
-// --- FX modal ---
-let fxChannel = 0;
-let fxIsInst = false;
-
-function openFx(ch, isInst = false) {
-  fxChannel = ch;
-  fxIsInst = isInst;
-  engine.ensureContext();
-  const fx = ownerOf(isInst, ch).fx || {};
-  $("#fx-channel-label").textContent = `— ${ownerOf(isInst, ch).name}`;
-  $("#fx-filter").value = fx.filter || "off";
-  $("#fx-cutoff").value = fx.cutoff || 8000;
-  $("#fx-cutoff-val").textContent = `${fx.cutoff || 8000} Hz`;
-  $("#fx-drive").value = fx.drive || 0;
-  $("#fx-delay").value = fx.delay || 0;
-  $("#fx-reverb").value = fx.reverb || 0;
-  $("#modal-fx").classList.remove("hidden");
-}
-
-export function initFxModal() {
-  const apply = () => {
-    const fx = {
-      filter: $("#fx-filter").value,
-      cutoff: +$("#fx-cutoff").value,
-      drive: +$("#fx-drive").value,
-      delay: +$("#fx-delay").value,
-      reverb: +$("#fx-reverb").value,
-    };
-    setOwnerProp(fxIsInst, fxChannel, "fx", fx);
-    engine.applyFx(fxChannel, fxIsInst);
-    $("#fx-cutoff-val").textContent = `${fx.cutoff} Hz`;
-  };
-  ["#fx-filter", "#fx-cutoff", "#fx-drive", "#fx-delay", "#fx-reverb"].forEach(
-    (sel) => $(sel).addEventListener("input", apply),
-  );
-  $("#fx-preview").addEventListener("click", () =>
-    fxIsInst
-      ? engine.triggerNote(fxChannel, 48, 1, 0, 0.4)
-      : engine.trigger(fxChannel),
-  );
-  document.addEventListener("open-inst-fx", (e) => openFx(e.detail, true));
-  $("#fx-reset").addEventListener("click", () => {
-    setOwnerProp(fxIsInst, fxChannel, "fx", {
-      filter: "off",
-      cutoff: 8000,
-      drive: 0,
-      delay: 0,
-      reverb: 0,
-    });
-    engine.applyFx(fxChannel, fxIsInst);
-    openFx(fxChannel, fxIsInst);
-  });
-  $("#fx-close").addEventListener("click", () =>
-    $("#modal-fx").classList.add("hidden"),
-  );
+// Re-render if an undo/redo or project load lands while the panel is open.
+export function refreshChainPanel() {
+  if ($("#modal-chain") && !$("#modal-chain").classList.contains("hidden")) {
+    if (!chainOwner()) return $("#modal-chain").classList.add("hidden");
+    renderChain();
+  }
 }
 
 // --- Beats (preset) modal ---

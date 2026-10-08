@@ -11,7 +11,7 @@ import {
   stepOff,
 } from "./state.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
-import { PLUGIN_TYPES, pluginDefaults } from "./plugins.js";
+import { PLUGIN_TYPES, pluginDefaults, normalizeOwner } from "./plugins.js";
 
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
@@ -57,47 +57,20 @@ class Engine {
       this.reverbNode.buffer = this._makeImpulse(2.2, 3);
       this.reverbNode.connect(this.masterGain);
 
-      // --- per-channel chains: gain → filter → drive → master (+ delay/reverb sends) ---
-      this.channelFilters = [];
-      this.channelShapers = [];
-      this.channelDelaySends = [];
-      this.channelReverbSends = [];
+      // --- per-channel chains: fader gain → inserts → FX → master ---
+      // Both chains are lists of plugins from plugins.js. Delay/reverb are "send"
+      // plugins inside the FX chain that tap into the shared buses above.
+      this.chains = new Map(); // "c3" | "i0" → { input, out, slots: Map(id → instance), sig }
       this.ensureChannelChains();
 
-      // --- instrument (synth) channels ---
-      // Same chain as the sample channels: gain → filter → drive → inserts → master
-      // (+ delay/reverb sends), so synths get the FX and INS buttons too.
+      // --- instrument (synth) channels: exactly the same chain as sample channels ---
       this.instrumentGains = [];
-      this.instFilters = [];
-      this.instShapers = [];
-      this.instDelaySends = [];
-      this.instReverbSends = [];
-      this.instInsertOuts = [];
-      this.instInsertChains = [];
       for (let i = 0; i < NUM_INSTRUMENTS; i++) {
         const g = this.ctx.createGain();
         g.gain.value = store.instrument(i).volume;
-        const f = this.ctx.createBiquadFilter();
-        const ws = this.ctx.createWaveShaper();
-        const dSend = this.ctx.createGain();
-        dSend.gain.value = 0;
-        const rSend = this.ctx.createGain();
-        rSend.gain.value = 0;
-        const insertOut = this.ctx.createGain();
-        g.connect(f).connect(ws);
-        ws.connect(insertOut);
-        insertOut.connect(this.masterGain);
-        insertOut.connect(dSend).connect(this.delayNode);
-        insertOut.connect(rSend).connect(this.reverbNode);
         this.instrumentGains.push(g);
-        this.instFilters.push(f);
-        this.instShapers.push(ws);
-        this.instDelaySends.push(dSend);
-        this.instReverbSends.push(rSend);
-        this.instInsertOuts.push(insertOut);
-        this.instInsertChains.push([]);
-        this.applyFx(i, true);
-        this.rebuildInserts(i, true);
+        this._makeChain(`i${i}`, g);
+        this.syncChain(i, true);
       }
     }
     if (this.ctx.state === "suspended") this.ctx.resume();
@@ -111,104 +84,180 @@ class Engine {
     for (let i = this.channelGains.length; i < store.numChannels; i++) {
       const g = this.ctx.createGain();
       g.gain.value = store.channel(i).volume;
-      const f = this.ctx.createBiquadFilter();
-      const ws = this.ctx.createWaveShaper();
-      const dSend = this.ctx.createGain();
-      dSend.gain.value = 0;
-      const rSend = this.ctx.createGain();
-      rSend.gain.value = 0;
-      g.connect(f).connect(ws);
-      const insertOut = this.ctx.createGain();
-      ws.connect(insertOut); // default: empty chain (rebuilt by rebuildInserts)
-      insertOut.connect(this.masterGain);
-      insertOut.connect(dSend).connect(this.delayNode);
-      insertOut.connect(rSend).connect(this.reverbNode);
-      (this.insertOuts ||= []).push(insertOut);
-      (this.insertChains ||= []).push([]);
       this.channelGains.push(g);
-      this.channelFilters.push(f);
-      this.channelShapers.push(ws);
-      this.channelDelaySends.push(dSend);
-      this.channelReverbSends.push(rSend);
-      this.applyFx(i);
-      this.rebuildInserts(i);
+      this._makeChain(`c${i}`, g);
+      this.syncChain(i);
     }
   }
 
-  // (Re)build the insert plugin chain for a channel from store state.
-  // `inst` = true targets a synth instrument bus instead of a sample channel.
-  rebuildInserts(ch, inst = false) {
-    const outs = inst ? this.instInsertOuts : this.insertOuts;
-    const chains = inst ? this.instInsertChains : this.insertChains;
-    if (!this.ctx || !outs?.[ch]) return;
-    const owner = inst ? store.instrument(ch) : store.channel(ch);
-    const ws = inst ? this.instShapers[ch] : this.channelShapers[ch];
-    const out = outs[ch];
-    // tear down old chain
+  _makeChain(key, input) {
+    const out = this.ctx.createGain();
+    out.connect(this.masterGain);
+    input.connect(out); // empty chain until syncChain wires plugins in
+    this.chains.set(key, { input, out, slots: new Map(), sig: "" });
+  }
+
+  // One plugin instance wrapped in a bypass switch:
+  //   inp → feed → plugin → wet → out
+  //   inp → dry ─────────────────→ out
+  // Bypass fades wet/feed down and dry up, so toggling never rebuilds anything and
+  // a bypassed send stops feeding its bus.
+  _makeInstance(def) {
+    const ctx = this.ctx;
+    const type = PLUGIN_TYPES[def.type];
+    const nodes = type.create(ctx, {
+      delayBus: this.delayNode,
+      reverbBus: this.reverbNode,
+    });
+    const inp = ctx.createGain();
+    const feed = ctx.createGain();
+    const wet = ctx.createGain();
+    const dry = ctx.createGain();
+    const out = ctx.createGain();
+    inp.connect(feed).connect(nodes.input);
+    nodes.output.connect(wet).connect(out);
+    inp.connect(dry).connect(out);
+    const on = def.enabled !== false;
+    feed.gain.value = wet.gain.value = on ? 1 : 0;
+    dry.gain.value = on ? 0 : 1;
+    return { def, typeId: def.type, type, nodes, inp, feed, wet, dry, out, on, pkey: "" };
+  }
+
+  _applyParams(it, def) {
+    const P = { ...pluginDefaults(def.type), ...(def.params || {}) };
+    const key = JSON.stringify(P);
+    if (key === it.pkey) return; // unchanged — skip (curves are costly to rebuild)
+    it.pkey = key;
+    it.type.apply(this.ctx, it.nodes, P);
+  }
+
+  _setBypass(it, on) {
+    if (it.on === on) return;
+    it.on = on;
+    const t = this.ctx.currentTime;
+    it.feed.gain.setTargetAtTime(on ? 1 : 0, t, 0.008);
+    it.wet.gain.setTargetAtTime(on ? 1 : 0, t, 0.008);
+    it.dry.gain.setTargetAtTime(on ? 0 : 1, t, 0.008);
+  }
+
+  _disposeInstance(it) {
     try {
-      ws.disconnect();
+      it.type.dispose?.(it.nodes);
     } catch {
       /* noop */
     }
-    for (const old of chains[ch] || []) {
-      try {
-        old.nodes.output.disconnect();
-      } catch {
-        /* noop */
+    const seen = new Set();
+    const walk = (v) => {
+      if (!v || typeof v !== "object" || seen.has(v)) return;
+      seen.add(v);
+      if (Array.isArray(v)) return v.forEach(walk);
+      if (v instanceof AudioNode) {
+        if (typeof v.stop === "function")
+          try {
+            v.stop();
+          } catch {
+            /* already stopped */
+          }
+        try {
+          v.disconnect();
+        } catch {
+          /* noop */
+        }
       }
-      try {
-        old.nodes.lfo?.stop();
-      } catch {
-        /* noop */
-      }
-    }
-    chains[ch] = [];
-    const defs = (owner.inserts || []).filter(
-      (i) => i && i.enabled && PLUGIN_TYPES[i.type],
-    );
-    let node = ws;
-    for (const def of defs) {
-      const type = PLUGIN_TYPES[def.type];
-      const nodes = type.create(this.ctx);
-      type.apply(this.ctx, nodes, {
-        ...pluginDefaults(def.type),
-        ...(def.params || {}),
-      });
-      node.connect(nodes.input);
-      node = nodes.output;
-      chains[ch].push({ def, type, nodes });
-    }
-    node.connect(out);
-    this._ensureGateLoop();
+    };
+    Object.values(it.nodes).forEach(walk);
+    [it.inp, it.feed, it.wet, it.dry, it.out].forEach(walk);
   }
 
-  // Live-update params of insert `slot` on channel without rebuilding the graph.
-  updateInsertParams(ch, slot, inst = false) {
-    const chain = (inst ? this.instInsertChains : this.insertChains)?.[ch];
-    const def = (inst ? store.instrument(ch) : store.channel(ch)).inserts?.[slot];
-    if (!chain || !def) return;
-    const found = chain.find((c) => c.def === def);
-    if (found)
-      found.type.apply(this.ctx, found.nodes, {
-        ...pluginDefaults(def.type),
-        ...(def.params || {}),
-      });
+  // Bring a channel's (or synth's, inst = true) audio chain in line with its
+  // store state: inserts then FX. Plugins are kept by slot id, so a reorder only
+  // rewires, a bypass only crossfades, and a param change only re-applies params.
+  syncChain(idx, inst = false) {
+    if (!this.ctx) return;
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const owner = inst ? store.instrument(idx) : store.channel(idx);
+    if (!chain || !owner) return;
+    normalizeOwner(owner);
+    const defs = [...owner.inserts, ...owner.fx].filter(
+      (d) => PLUGIN_TYPES[d.type],
+    );
+    const sig = defs.map((d) => `${d.id}:${d.type}`).join("|");
+    if (sig !== chain.sig) {
+      const next = new Map();
+      for (const d of defs) {
+        let it = chain.slots.get(d.id);
+        if (it && it.typeId !== d.type) {
+          this._disposeInstance(it);
+          it = null;
+        }
+        next.set(d.id, it || this._makeInstance(d));
+      }
+      for (const [id, it] of chain.slots)
+        if (next.get(id) !== it) this._disposeInstance(it);
+      try {
+        chain.input.disconnect();
+      } catch {
+        /* noop */
+      }
+      for (const it of next.values())
+        try {
+          it.out.disconnect();
+        } catch {
+          /* noop */
+        }
+      let node = chain.input;
+      for (const it of next.values()) {
+        node.connect(it.inp);
+        node = it.out;
+      }
+      node.connect(chain.out);
+      chain.slots = next;
+      chain.sig = sig;
+      this._ensureGateLoop();
+    }
+    for (const d of defs) {
+      const it = chain.slots.get(d.id);
+      it.def = d;
+      this._applyParams(it, d);
+      this._setBypass(it, d.enabled !== false);
+    }
+  }
+
+  // Live param/bypass update for one slot (called while a slider moves).
+  updateSlot(idx, inst, id) {
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const owner = inst ? store.instrument(idx) : store.channel(idx);
+    const it = chain?.slots.get(id);
+    const def = [...(owner?.inserts || []), ...(owner?.fx || [])].find(
+      (d) => d?.id === id,
+    );
+    if (!it || !def) return this.syncChain(idx, inst);
+    it.def = def;
+    this._applyParams(it, def);
+    this._setBypass(it, def.enabled !== false);
+  }
+
+  // Older call sites: both now mean "sync this owner's whole chain".
+  rebuildInserts(ch, inst = false) {
+    this.syncChain(ch, inst);
+  }
+  applyFx(ch, inst = false) {
+    this.syncChain(ch, inst);
   }
 
   // Service loop for control-rate plugins (noise gate level detection).
   _ensureGateLoop() {
-    const allChains = [...(this.insertChains || []), ...(this.instInsertChains || [])];
-    const hasGate = allChains.some((chain) =>
-      chain.some((c) => c.type.service),
-    );
+    const live = () => {
+      const out = [];
+      for (const chain of this.chains?.values() || [])
+        for (const it of chain.slots.values()) if (it.type.service) out.push(it);
+      return out;
+    };
+    const hasGate = live().length > 0;
     if (hasGate && !this._gateTimer) {
       this._gateTimer = setInterval(() => {
-        for (const chain of [
-          ...(this.insertChains || []),
-          ...(this.instInsertChains || []),
-        ]) {
-          for (const c of chain) c.type.service?.(this.ctx, c.nodes);
-        }
+        for (const it of live())
+          if (it.on) it.type.service(this.ctx, it.nodes);
       }, 30);
     } else if (!hasGate && this._gateTimer) {
       clearInterval(this._gateTimer);
@@ -239,44 +288,6 @@ class Engine {
       }
     }
     return buf;
-  }
-
-  _driveCurve(amount) {
-    const curve = new Float32Array(257);
-    const k = 1 + amount * 12;
-    for (let i = 0; i < 257; i++) {
-      const x = i / 128 - 1;
-      curve[i] = amount > 0 ? Math.tanh(x * k) / Math.tanh(k) : x;
-    }
-    return curve;
-  }
-
-  // Apply a channel's fx settings ({filter, cutoff, drive, delay, reverb}) to its nodes.
-  applyFx(ch, inst = false) {
-    const filters = inst ? this.instFilters : this.channelFilters;
-    if (!this.ctx || !filters?.[ch]) return;
-    const fx = (inst ? store.instrument(ch) : store.channel(ch)).fx || {};
-    const f = filters[ch];
-    if (fx.filter === "lp") {
-      f.type = "lowpass";
-      f.frequency.value = fx.cutoff || 8000;
-      f.Q.value = 0.9;
-    } else if (fx.filter === "hp") {
-      f.type = "highpass";
-      f.frequency.value = fx.cutoff || 200;
-      f.Q.value = 0.9;
-    } else {
-      f.type = "lowpass";
-      f.frequency.value = 20000;
-      f.Q.value = 0.0001;
-    } // bypass
-    (inst ? this.instShapers : this.channelShapers)[ch].curve = this._driveCurve(
-      fx.drive || 0,
-    );
-    (inst ? this.instDelaySends : this.channelDelaySends)[ch].gain.value =
-      fx.delay || 0;
-    (inst ? this.instReverbSends : this.channelReverbSends)[ch].gain.value =
-      fx.reverb || 0;
   }
 
   setBuffer(ch, buffer) {

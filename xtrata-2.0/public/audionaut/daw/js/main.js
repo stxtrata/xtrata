@@ -231,6 +231,7 @@ function initSubscriptions() {
     syncHeaderFromProject();
     ui.buildChannels();
     ui.buildInstruments();
+    ui.refreshChainPanel();
     ui.refreshSoloDim();
     if (engine.ctx) engine.applySolo();
     ui.renderSequenceBar();
@@ -306,8 +307,7 @@ function boot() {
   initSubscriptions();
   ui.initLoaderModal();
   ui.initTrimModal();
-  ui.initFxModal();
-  ui.initInsertsModal();
+  ui.initChainPanel();
   ui.initBeatsModal();
   initPianoRoll();
   initSynthPanel();
