@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify it yourself · Forever Twins</title>
+<meta name="description" content="Check a Forever Twins helper, its record and a twin directly against the chain, without trusting the website.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs"><a href="/forever-twins/guides/">Guides</a> › Verify it yourself</span>
+</div></header>
+<main class="wrap">
+<article class="card prose">
+
+<h1>Verify it yourself</h1>
+<p class="updated">Updated 6 October 2026. Worked example: Megapont Ape Club #3.</p>
+<p>You are not just checking that an image appears in a wallet. You are checking that the helper is the one the registry lists, that its source is the code we tested, that its record matches the published manifest, and that a twin&rsquo;s bytes hash to the fingerprint locked in the record. Everything below uses public data: the <a href="/forever-twins/data/registry.v2.json">registry</a>, the Stacks API and the chain.</p>
+
+<h2>The helpers today</h2>
+<div id="helpers"><p class="mute">Loading the registry&hellip;</p></div>
+
+<h2>1. Check the helper&rsquo;s source</h2>
+<p>The table above lists the SHA-256 of each deployed helper&rsquo;s source. Fetch the deployed source and hash it:</p>
+<pre><code>curl -s https://api.hiro.so/v2/contracts/source/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/forever-twin-megapont-ape-club \
+  | node -e "let s='';process.stdin.on('data',d=&gt;s+=d).on('end',()=&gt;console.log(require('crypto').createHash('sha256').update(JSON.parse(s).source).digest('hex')))"</code></pre>
+<p>It should print <code>d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90</code>, which is also the hash of the template-rendered file in the repository. (Checked 6 October 2026 for NYC Degens, Megapont Ape Club and Bitcoin Monkeys.)</p>
+
+<h2>2. Read the helper&rsquo;s state</h2>
+<p>In the <a href="https://explorer.hiro.so/sandbox/contract-call?chain=mainnet">explorer&rsquo;s contract-call sandbox</a>, or any Stacks read-only call, use these on the helper:</p>
+<table>
+  <tr><th><code>get-twin-interface</code></th><td>Everything at once: group, whether the record is finalised, counts, fee, ceiling, payees, rescue settings, owner and the manifest hash.</td></tr>
+  <tr><th><code>is-finalized</code></th><td>Whether the record is locked.</td></tr>
+  <tr><th><code>get-fee</code>, <code>get-payees</code></th><td>The current fee and the two payee addresses (each gets half).</td></tr>
+  <tr><th><code>get-inscribed-count</code></th><td>How many twins exist.</td></tr>
+  <tr><th><code>get-large-unbound</code></th><td>Large files not yet bound (large-on-demand helpers).</td></tr>
+  <tr><th><code>get-canonical (token-id)</code></th><td>The locked record for one token: content hash, mime type, size, token URI.</td></tr>
+  <tr><th><code>get-binding (token-id)</code></th><td>The twin&rsquo;s Xtrata inscription id, once it exists.</td></tr>
+  <tr><th><code>get-custody-state (token-id)</code></th><td>Which side of the pair is in the helper.</td></tr>
+  <tr><th><code>is-source-listed (token-id)</code></th><td>Whether the original is listed on its own market (G2 helpers).</td></tr>
+</table>
+<p>The <code>manifest-hash</code> in <code>get-twin-interface</code> should equal the SHA-256 of the published manifest file listed above. For Megapont Ape Club: <code>0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552</code>.</p>
+
+<h2>3. Check a twin</h2>
+<p>For Megapont Ape Club #3, <code>get-binding</code> returns Xtrata inscription <strong>3104</strong>. Fetch its bytes and compute the Xtrata rolling hash: start with 32 zero bytes, then for every 16,384-byte chunk, <code>h = sha256(h || chunk)</code>.</p>
+<pre><code>const bytes = new Uint8Array(await (await fetch(
+  'https://xtrata.xyz/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3104')).arrayBuffer());
+let h = new Uint8Array(32);
+for (let i = 0; i &lt; bytes.length; i += 16384) {
+  const c = bytes.subarray(i, i + 16384), m = new Uint8Array(32 + c.length);
+  m.set(h); m.set(c, 32);
+  h = new Uint8Array(await crypto.subtle.digest('SHA-256', m));
+}
+console.log('0x' + [...h].map(b =&gt; b.toString(16).padStart(2, '0')).join(''));</code></pre>
+<p>It should print <code>0x228d05485b14893163188d64f96260fe0d3b5bb614c2af0f74f0b65cf14af138</code>, the content hash in the helper&rsquo;s record for token 3 (<code>get-canonical</code>) and in the token&rsquo;s <a href="/ft/megapont-ape-club/3.json">metadata</a>. The metadata also lists the original contract, token id and the original media URI so you can compare the twin with the original artwork.</p>
+<p>You can read the same bytes straight from the Xtrata core contract (<code>xtrata-v3-2-3</code>): <code>get-inscription-meta</code> shows whether it is sealed, its size, mime type and final hash, and <code>get-chunk</code> / <code>get-chunk-batch</code> return the chunks.</p>
+
+<h2>4. Check the original</h2>
+<p>The metadata gives the original contract and token id. On that contract, <code>get-owner</code> shows who holds the original, and <code>get-custody-state</code> on the helper should agree with real ownership: if the original&rsquo;s owner is the helper, the twin is with the holder, and the other way round.</p>
+
+</article>
+</main>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a> · <a href="https://github.com/stxtrata/xtrata/tree/main/xtrata-2.0/forever-twins/ft-harness">Source</a></div></footer>
+<script type="module">
+import { loadRegistry, STATUS, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261007a';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+try {
+  const reg = await loadRegistry();
+  const rows = reg.collections.filter((c) => c.helper).map((c) => `<tr>
+    <td><a href="/forever-twins/collection/${esc(c.key)}">${esc(c.name)}</a><br><span class="mute small">${esc(c.interface)} · ${esc(c.group)} · ${esc(STATUS[c.status].label)}</span></td>
+    <td><a class="mono" href="${esc(contractExplorer(c.helper))}" target="_blank" rel="noopener">${esc(c.helper)}</a></td>
+    <td class="mono">${esc(c.helperSourceSha256 || 'not recorded')}</td>
+    <td>${c.manifest ? `<a href="${esc(c.manifest.url)}">manifest</a><br><span class="mono">${esc(c.manifest.sha256)}</span>` : '<span class="mute">none (earlier helper)</span>'}</td></tr>`).join('');
+  document.getElementById('helpers').innerHTML = `<div class="tablewrap"><table style="min-width:640px"><tr><th>Collection</th><th>Helper contract</th><th>Deployed source SHA-256</th><th>Manifest SHA-256</th></tr>${rows}</table></div>`;
+} catch (e) { document.getElementById('helpers').innerHTML = `<div class="msg bad">${esc(e.message)}</div>`; }
+</script>
+</body>
+</html>

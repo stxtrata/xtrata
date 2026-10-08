@@ -226,6 +226,39 @@ tr:last-child td { border-bottom: 0; }
 .faq summary { cursor: pointer; font-weight: 600; }
 .faq p { margin: 8px 0 0; color: var(--mute); max-width: 70ch; }
 .fresh .ghost { padding: 3px 10px; }
+
+/* live draw */
+.live { background: var(--panel); border: 1.5px solid #3a5018; border-radius: 14px; padding: clamp(16px, 3vw, 24px); gap: 16px; }
+.live .rec { display: inline-flex; align-items: center; gap: 8px; }
+.live .rec i { width: 9px; height: 9px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 4px var(--red-soft); animation: recp 1.6s ease-in-out infinite; }
+@keyframes recp { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .live .rec i { animation: none; } }
+.cd { font: 800 clamp(40px, 9vw, 76px)/1 var(--mono); letter-spacing: -.03em; color: var(--lime); font-variant-numeric: tabular-nums; }
+.lsteps { display: grid; gap: 8px; }
+.lst { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); }
+.lst .mk { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--mono); border: 1.5px solid var(--line2); color: var(--dim); }
+.lst b { font-size: 15px; } .lst p { margin: 2px 0 0; color: var(--mute); font-size: 13px; overflow-wrap: anywhere; }
+.lst.done { border-color: #3a5018; } .lst.done .mk { background: var(--lime); border-color: var(--lime); color: var(--lime-ink); }
+.lst.act { border-color: var(--teal); } .lst.act .mk { border-color: var(--teal); color: var(--teal); }
+.lst.wait { opacity: .55; }
+.slots { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.slot { border: 1.5px dashed var(--line2); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px; background: var(--bg); min-width: 0; min-height: 108px; }
+.slot.lock { border-style: solid; border-color: #3a5018; background: var(--lime-soft); animation: pop .5s ease-out; }
+.slot.lock.res { border-color: #5a3d14; background: var(--amber-soft); }
+@keyframes pop { 0% { transform: scale(.94); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .slot.lock { animation: none; } }
+.slot .sw { font: 700 14px var(--mono); overflow-wrap: anywhere; } .slot .sw.dim { color: var(--dim); } .slot .sw.spin { color: var(--teal); }
+.slot .sh { font-size: 13px; color: var(--fg); overflow-wrap: anywhere; } .slot .st { font: 500 11px var(--mono); color: var(--mute); }
+.vbadge { border-radius: 10px; padding: 10px 14px; font-weight: 600; font-size: 14px; border: 1px solid; }
+.vbadge.ok { background: var(--lime-soft); border-color: #3a5018; color: var(--lime); }
+.vbadge.bad { background: var(--amber-soft); border-color: #5a3d14; color: var(--amber); }
+.vdet { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.vdet summary { cursor: pointer; font-weight: 600; } .vdet p { margin: 8px 0; color: var(--mute); font-size: 13px; max-width: 70ch; }
+.vdet a { color: var(--lime); }
+.lprev details { margin-top: 6px; } .lprev summary { cursor: pointer; color: var(--mute); font-size: 13px; } .lprev p { margin: 4px 0 0; font-size: 12px; color: var(--mute); }
+.live .ghost { align-self: flex-start; }
+@media (max-width: 860px) { .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .slots { grid-template-columns: 1fr; } }
 </style>
 
 </head>
@@ -253,6 +286,15 @@ tr:last-child td { border-bottom: 0; }
   </div>
 
   <div class="stats" id="stats"></div>
+
+  <section class="live" id="live" aria-labelledby="liveH">
+    <div class="head">
+      <div class="label lime rec"><i></i><span>Live draw</span></div>
+      <h2 id="liveH">Draw 1</h2>
+      <p id="liveP"></p>
+    </div>
+    <div id="liveBox" aria-live="polite"></div>
+  </section>
 
   <section class="checker" aria-labelledby="chk-h">
     <div class="head">
@@ -330,7 +372,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="head">
       <div class="label lav">The draws</div>
       <h2>Three weeks, three draws</h2>
-      <p>Tickets carry forward. A ticket stays in the pool for every draw until its wallet is picked. Winners are announced in the Telegram and the main prizes on Wednesday 28 October.</p>
+      <p>Tickets carry forward. Each draw picks 3 winners (4 in week 3) plus 2 reserves, and only the winners' tickets are used up. Everyone else rolls over into the next draw. A wallet cannot win twice in the same week. Xtrata team wallets are not in the draws. Winners are announced in the Telegram and the main prizes on Wednesday 28 October.</p>
     </div>
     <div class="weeks" id="weeks"></div>
   </section>
@@ -357,7 +399,7 @@ tr:last-child td { border-bottom: 0; }
       <details><summary>I inscribed but I have no tickets</summary><p>Tickets only count for the wallet that made the inscription. Check that you inscribed through Xtrata on or after 1 October with the same wallet you are searching, then press Refresh. New actions appear a few minutes after they confirm on chain.</p></details>
       <details><summary>My wallet is not listed</summary><p>The board lists every wallet that has made an inscription, collected an Audionaut or used a ticket action since 1 October. If you have done none of these with that wallet yet, it will not appear. A wallet that has not inscribed has no tickets in the draw.</p></details>
       <details><summary>Why are my tickets "held"?</summary><p>An inscription (1 to 5 tickets by size) or an Audionaut (5 tickets) puts you in the draw and unlocks the rest. Until your wallet has one, other actions are counted but not entered. They switch on the moment you inscribe or collect.</p></details>
-      <details><summary>How many tickets is an inscription worth?</summary><p>It depends on the size of the file. Up to 1 MB (1,048,576 bytes) is 1 ticket, over 1 MB is 2, over 2 MB is 3, over 3 MB is 4, and over 4 MB is 5. Five is the most one inscription can earn, however large the file. Every inscription you make from 1 October is scored on its own and added up. If the page cannot see an inscription's size yet it counts 1 ticket until the next full read of the chain.</p></details>
+      <details><summary>How many tickets is an inscription worth?</summary><p>It depends on the size of the file. Up to 1 MB (1,048,576 bytes) is 1 ticket, over 1 MB is 2, over 2 MB is 3, over 3 MB is 4, and over 4 MB is 5. Five is the most one inscription can earn, however large the file. Every inscription you make from 1 October is scored on its own and added up. If the page cannot see an inscription's size yet it counts 1 ticket until the next full read of the chain. Draw 1 was frozen before this rule and counted an inscription as 1 ticket; size tickets apply from Draw 2.</p></details>
       <details><summary>Do repeat actions add more tickets?</summary><p>Each different action adds one ticket, so playing ten songs is one ticket. Inscriptions are the exception: every inscription earns its own tickets by size, so ten inscribed songs earn at least ten. Collecting Audionauts is worth 5 tickets per wallet, however many you collect: one Audionaut or ten, it is 5. Every high score you commit on-chain is its own ticket.</p></details>
       <details><summary>I use more than one wallet</summary><p>Only one wallet per X account counts, and it must be the one you announced. Do everything with that wallet.</p></details>
       <details><summary>Where do winners get announced?</summary><p>Weekly raffle winners are announced in the Xtrata Telegram. Main prizes and special awards are announced on Wednesday 28 October.</p></details>
@@ -377,9 +419,10 @@ tr:last-child td { border-bottom: 0; }
 <script src="/bounty/zdao/tracker/1/ledger-reader.js?v=1"></script>
 <script>
 (function () {
-  var SNAP = {"v":2,"cutoff":"2026-10-01T00:00:00Z","draws":[],"at":"2026-10-07T20:38:33.591Z","full":"2026-10-07T20:38:33.591Z","heads":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":["0xee028bd84c7a911b49b3fc4a65315b6efa740782da5afdae2cf8d6d6fcca8b89","0x11dbacfc19787fa1f7cd7c7e58fee6c09a622bf7592cf3fa9e23dde41a3b788d","0x9422ec2b82d52c85e25f56548bebee077bf6313426900f477e5b74fb1e4f1ce8"],"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":["0xe7d5a6f67d39332c2414664012a857d24659589ab84c5a95f8f6739c1b3f287d","0x320cc59dcfa67bf9439566c23aae5a2ead66ea8f32a21bd3f3f34b65fb1cfb42","0xdc60da75901f4f5024d5d917356b770ea76fe676b4a9eef46d0b4cd575c04402"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":["0x97424c02b60e591f69a2a9ff8498102016e4f4ac04f04bf17ea67c9b8e5df76b"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":["0x80bb4aa7f66012704c4a71e93c3f64c9bec3433cd32315d44759514cfad22c67","0x0734433a1a0374137aec56fafcfe45a984ec07f25f2de0636ab72c17fbfc5688","0x01e6db41273c956f6826acd06c4fae326bc3c4965580590326553806e83087a2"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":["0xa763c8fbe6ac835171999bdf0dcf97219884a4bb50bad9d3e6eb447f65c21883"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":["0x41e7c5008d2d65a1a5d8e344a68991859b90ddf1a07267a6a44da3e67a7f2086"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":["0xcca5647216931d8c06bd8e1587f38f4521968d3d7cda36a615244333c9e1b60b","0x4ce812f0b5180fddab61c53dcc4b3ff34537cd8b5080c25fb6283f653c83b39a","0x28f53f2b23c9d81d14645447c55041cb2574305008095733903e33b76d36fb2c"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":["0x255807ce4b14c6f1ba81b592a9a15347662690303f133a5a3b40ef2304ec52d6"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":["0x18580066b0031abafaeea3cb93910101118e95a86cc371386f97039380f80d1e"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":[],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":["0xe8040d9ae9f361a385c54daaed9e6f5d569a76ab113d94f37854550acaf2a184"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":["0x32f40d8143d4a87043f644108020df1e2151fbd50a149fa98c56ce91002377a0"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":["0xab1924559595c6a18964835fa38e67baee28765199b45cf98b5fdb09df67802e"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":[],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":["0x63aa685be2d36c7dd86a5382b2025f78a2f756472260d4a84ca69b8e3c629ba4"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":["0x56af50f4d383fbd7c897ea80c40b81a3443d6024d9978031856fa9df67ff5891"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":["0x253ce0fffbe93765e1f3270b0d38f40da483bc29843fce4bf292aae9d0a09a54"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":["0x9209abe9eec3a834a891a2e88ffd399d02d4700413ffe0ec9fd653f821d8b2d7"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":["0x7cdbc8c2b3e2d6acd848e23ca279a56bd2f9b8e156b14032f9565b8567957007"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":["0x164621c4c512bf7ad3cbcde9ecb9fabcdbaf95289c9bf4bf2563cef4b1547ff8"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":["0x4db0396d76514fa32be6ad9b8888889e66f6c6942b1e71ece7cce18dd39308d3"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":["0xa6636c3a7e8a28c357e3394cf9362932f9e0c3fc5a90004b8e5b600af712941c"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":["0xae46972387216d5e5b01b07cc53cc4466905fbb0bf1ebf16d4448f1e00543e44"]},"top":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":1791377417000,"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":1791403409000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":1784311576000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":1791400010000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":1786143385000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":1785969495000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":1791405157000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":1784151208000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":1785423187000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":1789426843000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":1783880478000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":1785445736000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":1785599175000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":1783726593000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":1783726593000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":1783714592000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":1790770899000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":1783714592000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":1786025963000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":1783712725000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":1785464355000},"calls":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":17,"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":14,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":84,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":1269,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":0},"sizes":{"e42aef3d1e04e85eed1a4015db21e5ee91badba568f8986b9f141c87be14c47b":524804,"0a0eafbd26f9ae076de2bb01354211d33490b3291f9d9190aec8254c9cd718aa":2199306,"6b687ef68a35df343409118424ba51af52765e68bae950a56b6afd1d496b632c":21669,"1707caa6944bbb50e6cdee01e3717242668379204968cc2a8f0cd9b63db52569":192257,"8e5d641128254e4afb14fd20c85c8d2c1cf8e7619e27482f17382f69d5c7cf1f":820587,"bbcc55d5a106baa2a8ea79b6735d3183876d275aaee01a9070c176cc99343895":3691158,"81ae26b27a1408105788f3888a8b8dc521074fefc97bb09c87ebe421942d0144":5808561,"df918e6777bb5c2216af71362633eed64ea6580ce8157e9d3505965363125fac":2641734},"addrs":{"SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR":{"addr":"SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR","first":1790964618000,"last":1790964618000,"n":{"ins":1,"inp":3},"w":[],"tx":{},"g":{}},"SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G":{"addr":"SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G","first":1790997039000,"last":1790997039000,"n":{"ins":2,"inp":6},"w":[],"tx":{},"g":{}},"SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB":{"addr":"SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB","first":1791002527000,"last":1791002527000,"n":{"ins":2,"inp":5},"w":[],"tx":{},"g":{}},"SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ":{"addr":"SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ","first":1791002527000,"last":1791112861000,"n":{"ins":2,"inp":2,"sc":2},"w":[],"tx":{},"g":{}},"SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC":{"addr":"SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC","first":1790882387000,"last":1791277877000,"n":{"ins":1,"inp":1,"aud":3,"sc":20},"w":[],"tx":{},"g":{}},"SP350YMZ2S1YE5HAC66VW101GNZT90RBKVNSY2BTA":{"addr":"SP350YMZ2S1YE5HAC66VW101GNZT90RBKVNSY2BTA","first":1791252882000,"last":1791252882000,"n":{"ins":1,"inp":1},"w":[],"tx":{},"g":{}},"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X":{"addr":"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X","first":1791281192000,"last":1791281192000,"n":{"ins":2,"inp":2},"w":[],"tx":{},"g":{}},"SP4HK1N3JWY67Y5FSTAQDZSV2K0YS2WRNBMKCXHF":{"addr":"SP4HK1N3JWY67Y5FSTAQDZSV2K0YS2WRNBMKCXHF","first":1791284390000,"last":1791284390000,"n":{"ins":1,"inp":3},"w":[],"tx":{},"g":{}},"SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5":{"addr":"SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5","first":1791305025000,"last":1791305025000,"n":{"ins":1,"inp":1},"w":[],"tx":{},"g":{}},"SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0":{"addr":"SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0","first":1791203549000,"last":1791400010000,"n":{"ins":1,"inp":1,"sc":21},"w":[],"tx":{},"g":{}},"SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ":{"addr":"SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ","first":1791243793000,"last":1791350433000,"n":{"ins":2,"inp":2,"aud":1,"sc":14},"w":[],"tx":{},"g":{}},"SP303G827ND3PSGDW5XTVS8PKY37H5MF7CBF3QR5E":{"addr":"SP303G827ND3PSGDW5XTVS8PKY37H5MF7CBF3QR5E","first":1791377417000,"last":1791377417000,"n":{"ins":1,"inp":1},"w":[],"tx":{},"g":{}},"SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7":{"addr":"SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7","first":1790876420000,"last":1791288169000,"n":{"aud":1,"sc":2},"w":[],"tx":{},"g":{}},"SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY":{"addr":"SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY","first":1790877130000,"last":1790877130000,"n":{"aud":1},"w":[],"tx":{},"g":{}},"SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9":{"addr":"SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9","first":1790884761000,"last":1791313953000,"n":{"aud":2,"sc":22},"w":[],"tx":{},"g":{}},"SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8":{"addr":"SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8","first":1790888509000,"last":1790888509000,"n":{"aud":1},"w":[],"tx":{},"g":{}},"SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q":{"addr":"SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q","first":1790897913000,"last":1790897913000,"n":{"aud":1},"w":[],"tx":{},"g":{}},"SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP":{"addr":"SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP","first":1791234217000,"last":1791234217000,"n":{"aud":3},"w":[],"tx":{},"g":{}},"SP2RNHHQDTHGHPEVX83291K4AQZVGWEJ7WCQQDA9R":{"addr":"SP2RNHHQDTHGHPEVX83291K4AQZVGWEJ7WCQQDA9R","first":1791403409000,"last":1791403409000,"n":{"aud":1},"w":[],"tx":{},"g":{}},"SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B":{"addr":"SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B","first":1790864336000,"last":1790864336000,"n":{"sc":1},"w":[],"tx":{},"g":{}},"SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA":{"addr":"SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA","first":1791101234000,"last":1791101234000,"n":{"sc":2},"w":[],"tx":{},"g":{}},"SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW":{"addr":"SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW","first":1791025804000,"last":1791025804000,"n":{"mu":6},"w":[],"tx":{},"g":{}},"SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K":{"addr":"SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K","first":1791054053000,"last":1791405157000,"n":{"mu":1263},"w":[],"tx":{},"g":{}}}}; /*SNAP*/
+  var SNAP = {"v":2,"cutoff":"2026-10-01T00:00:00Z","draws":["2026-10-07T22:59:59Z","2026-10-14T22:59:59Z","2026-10-21T22:59:59Z"],"at":"2026-10-08T09:28:49.884Z","full":"2026-10-08T09:28:49.884Z","heads":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":["0x9ecabab959215b6ebf9ec649fef71b850e15e3148e34cc929a9a7c7effcab809","0x31eea6934de4ce1e186c2a39a17246c8175c836e28352459af987906028ed06a","0x4ef393ace02a5c4ce550c2b664a45043918152e31f7d91ca880ddb67b99f2b65"],"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":["0xe7d5a6f67d39332c2414664012a857d24659589ab84c5a95f8f6739c1b3f287d","0x320cc59dcfa67bf9439566c23aae5a2ead66ea8f32a21bd3f3f34b65fb1cfb42","0xdc60da75901f4f5024d5d917356b770ea76fe676b4a9eef46d0b4cd575c04402"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":["0x97424c02b60e591f69a2a9ff8498102016e4f4ac04f04bf17ea67c9b8e5df76b"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":["0x80bb4aa7f66012704c4a71e93c3f64c9bec3433cd32315d44759514cfad22c67","0x0734433a1a0374137aec56fafcfe45a984ec07f25f2de0636ab72c17fbfc5688","0x01e6db41273c956f6826acd06c4fae326bc3c4965580590326553806e83087a2"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":["0xa763c8fbe6ac835171999bdf0dcf97219884a4bb50bad9d3e6eb447f65c21883"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":["0x41e7c5008d2d65a1a5d8e344a68991859b90ddf1a07267a6a44da3e67a7f2086"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":["0xddcd17ab0cbb43b90847a9582d03a721f3c94c89bc4f9c186953d192d1f053a7","0xa3e3ab4cb19133cdbb64ae7bcfdaef478bbf823d7324075ee865be229697e81b","0x9271a8111ddc97d3d99015f4344ddc514dec71203228ced64633e9148d29beac"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":["0x255807ce4b14c6f1ba81b592a9a15347662690303f133a5a3b40ef2304ec52d6"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":["0x18580066b0031abafaeea3cb93910101118e95a86cc371386f97039380f80d1e"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":[],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":["0xe8040d9ae9f361a385c54daaed9e6f5d569a76ab113d94f37854550acaf2a184"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":["0x32f40d8143d4a87043f644108020df1e2151fbd50a149fa98c56ce91002377a0"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":["0xab1924559595c6a18964835fa38e67baee28765199b45cf98b5fdb09df67802e"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":[],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":["0x63aa685be2d36c7dd86a5382b2025f78a2f756472260d4a84ca69b8e3c629ba4"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":["0x56af50f4d383fbd7c897ea80c40b81a3443d6024d9978031856fa9df67ff5891"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":["0x253ce0fffbe93765e1f3270b0d38f40da483bc29843fce4bf292aae9d0a09a54"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":["0x9209abe9eec3a834a891a2e88ffd399d02d4700413ffe0ec9fd653f821d8b2d7"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":["0xee5569699eadb5c9264717f08c539f6f0c45b488166e59bea579d300194d5154","0xc479848df2a22a62732444402ea98f08d41045103c595e2dc5f677da92aef829","0x7cdbc8c2b3e2d6acd848e23ca279a56bd2f9b8e156b14032f9565b8567957007"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":["0x164621c4c512bf7ad3cbcde9ecb9fabcdbaf95289c9bf4bf2563cef4b1547ff8"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":["0x4db0396d76514fa32be6ad9b8888889e66f6c6942b1e71ece7cce18dd39308d3"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":["0xa6636c3a7e8a28c357e3394cf9362932f9e0c3fc5a90004b8e5b600af712941c"],"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":["0xae46972387216d5e5b01b07cc53cc4466905fbb0bf1ebf16d4448f1e00543e44"]},"top":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":1791410224000,"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":1791403409000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":1784311576000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":1791400010000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":1786143385000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":1785969495000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":1791440614000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":1784151208000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":1785423187000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":1789426843000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":1783880478000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":1785445736000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":1785599175000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":1783726593000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":1783726593000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":1783714592000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":1791410224000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":1783714592000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":1786025963000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":1783712725000,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":1785464355000},"calls":{"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3":20,"SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746":14,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v1-3":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-arcade-scores-v2":84,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v3":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-chess-log-v2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0":1431,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-drops-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-v1-2":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-stx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sbtc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-usdc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-stx-v1-1":2,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-sbtc-v1-1":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-0":0,"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-market-sponsored-usdcx-v1-1":0},"sizes":{"b6cbe15738c0d579489eab1ebd5c2aab55dbd5dd99dabebfda494976b66d2eab":773176,"e45eaba447a934b8583b24acd57eb6653613d429318d42a01ed3092eb5152368":539470,"e42aef3d1e04e85eed1a4015db21e5ee91badba568f8986b9f141c87be14c47b":524804,"0a0eafbd26f9ae076de2bb01354211d33490b3291f9d9190aec8254c9cd718aa":2199306,"6b687ef68a35df343409118424ba51af52765e68bae950a56b6afd1d496b632c":21669,"1707caa6944bbb50e6cdee01e3717242668379204968cc2a8f0cd9b63db52569":192257,"8e5d641128254e4afb14fd20c85c8d2c1cf8e7619e27482f17382f69d5c7cf1f":820587,"bbcc55d5a106baa2a8ea79b6735d3183876d275aaee01a9070c176cc99343895":3691158,"81ae26b27a1408105788f3888a8b8dc521074fefc97bb09c87ebe421942d0144":5808561,"df918e6777bb5c2216af71362633eed64ea6580ce8157e9d3505965363125fac":2641734},"addrs":{"SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR":{"addr":"SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR","first":1790964618000,"last":1790964618000,"n":{"ins":1,"inp":3},"w":[{"ins":1,"inp":3},{"ins":1,"inp":3},{"ins":1,"inp":3}],"tx":{},"g":{}},"SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G":{"addr":"SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G","first":1790997039000,"last":1790997039000,"n":{"ins":2,"inp":6},"w":[{"ins":2,"inp":6},{"ins":2,"inp":6},{"ins":2,"inp":6}],"tx":{},"g":{}},"SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB":{"addr":"SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB","first":1791002527000,"last":1791002527000,"n":{"ins":2,"inp":5},"w":[{"ins":2,"inp":5},{"ins":2,"inp":5},{"ins":2,"inp":5}],"tx":{},"g":{}},"SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ":{"addr":"SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ","first":1791002527000,"last":1791112861000,"n":{"ins":2,"inp":2,"sc":2},"w":[{"ins":2,"inp":2,"sc":2},{"ins":2,"inp":2,"sc":2},{"ins":2,"inp":2,"sc":2}],"tx":{},"g":{}},"SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC":{"addr":"SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC","first":1790882387000,"last":1791410224000,"n":{"ins":1,"inp":1,"aud":3,"sc":20,"mk":2},"w":[{"ins":1,"inp":1,"aud":3,"sc":20,"mk":2},{"ins":1,"inp":1,"aud":3,"sc":20,"mk":2},{"ins":1,"inp":1,"aud":3,"sc":20,"mk":2}],"tx":{},"g":{}},"SP350YMZ2S1YE5HAC66VW101GNZT90RBKVNSY2BTA":{"addr":"SP350YMZ2S1YE5HAC66VW101GNZT90RBKVNSY2BTA","first":1791252882000,"last":1791252882000,"n":{"ins":1,"inp":1},"w":[{"ins":1,"inp":1},{"ins":1,"inp":1},{"ins":1,"inp":1}],"tx":{},"g":{}},"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X":{"addr":"SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X","first":1791281192000,"last":1791281192000,"n":{"ins":2,"inp":2},"w":[{"ins":2,"inp":2},{"ins":2,"inp":2},{"ins":2,"inp":2}],"tx":{},"g":{}},"SP4HK1N3JWY67Y5FSTAQDZSV2K0YS2WRNBMKCXHF":{"addr":"SP4HK1N3JWY67Y5FSTAQDZSV2K0YS2WRNBMKCXHF","first":1791284390000,"last":1791284390000,"n":{"ins":1,"inp":3},"w":[{"ins":1,"inp":3},{"ins":1,"inp":3},{"ins":1,"inp":3}],"tx":{},"g":{}},"SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5":{"addr":"SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5","first":1791305025000,"last":1791305025000,"n":{"ins":1,"inp":1},"w":[{"ins":1,"inp":1},{"ins":1,"inp":1},{"ins":1,"inp":1}],"tx":{},"g":{}},"SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0":{"addr":"SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0","first":1791203549000,"last":1791400010000,"n":{"ins":1,"inp":1,"sc":21},"w":[{"ins":1,"inp":1,"sc":21},{"ins":1,"inp":1,"sc":21},{"ins":1,"inp":1,"sc":21}],"tx":{},"g":{}},"SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ":{"addr":"SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ","first":1791243793000,"last":1791350433000,"n":{"ins":2,"inp":2,"aud":1,"sc":14},"w":[{"ins":2,"inp":2,"aud":1,"sc":14},{"ins":2,"inp":2,"aud":1,"sc":14},{"ins":2,"inp":2,"aud":1,"sc":14}],"tx":{},"g":{}},"SP303G827ND3PSGDW5XTVS8PKY37H5MF7CBF3QR5E":{"addr":"SP303G827ND3PSGDW5XTVS8PKY37H5MF7CBF3QR5E","first":1791377417000,"last":1791377417000,"n":{"ins":1,"inp":1},"w":[{"ins":1,"inp":1},{"ins":1,"inp":1},{"ins":1,"inp":1}],"tx":{},"g":{}},"SP1Y9QXTQYA0N7Y8Q2C9MZ58B2909K12F4JHSCC3G":{"addr":"SP1Y9QXTQYA0N7Y8Q2C9MZ58B2909K12F4JHSCC3G","first":1791407300000,"last":1791407300000,"n":{"ins":2,"inp":2},"w":[{"ins":2,"inp":2},{"ins":2,"inp":2},{"ins":2,"inp":2}],"tx":{},"g":{}},"SP140XZ39ZEPWDRRFQ4WK60XWDF6Y7KQGDD6DTX22":{"addr":"SP140XZ39ZEPWDRRFQ4WK60XWDF6Y7KQGDD6DTX22","first":1791410224000,"last":1791410224000,"n":{"ins":1,"inp":1},"w":[{"ins":1,"inp":1},{"ins":1,"inp":1},{"ins":1,"inp":1}],"tx":{},"g":{}},"SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7":{"addr":"SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7","first":1790876420000,"last":1791288169000,"n":{"aud":1,"sc":2},"w":[{"aud":1,"sc":2},{"aud":1,"sc":2},{"aud":1,"sc":2}],"tx":{},"g":{}},"SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY":{"addr":"SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY","first":1790877130000,"last":1790877130000,"n":{"aud":1},"w":[{"aud":1},{"aud":1},{"aud":1}],"tx":{},"g":{}},"SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9":{"addr":"SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9","first":1790884761000,"last":1791313953000,"n":{"aud":2,"sc":22},"w":[{"aud":2,"sc":22},{"aud":2,"sc":22},{"aud":2,"sc":22}],"tx":{},"g":{}},"SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8":{"addr":"SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8","first":1790888509000,"last":1790888509000,"n":{"aud":1},"w":[{"aud":1},{"aud":1},{"aud":1}],"tx":{},"g":{}},"SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q":{"addr":"SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q","first":1790897913000,"last":1790897913000,"n":{"aud":1},"w":[{"aud":1},{"aud":1},{"aud":1}],"tx":{},"g":{}},"SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP":{"addr":"SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP","first":1791234217000,"last":1791234217000,"n":{"aud":3},"w":[{"aud":3},{"aud":3},{"aud":3}],"tx":{},"g":{}},"SP2RNHHQDTHGHPEVX83291K4AQZVGWEJ7WCQQDA9R":{"addr":"SP2RNHHQDTHGHPEVX83291K4AQZVGWEJ7WCQQDA9R","first":1791403409000,"last":1791403409000,"n":{"aud":1},"w":[{"aud":1},{"aud":1},{"aud":1}],"tx":{},"g":{}},"SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B":{"addr":"SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B","first":1790864336000,"last":1790864336000,"n":{"sc":1},"w":[{"sc":1},{"sc":1},{"sc":1}],"tx":{},"g":{}},"SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA":{"addr":"SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA","first":1791101234000,"last":1791101234000,"n":{"sc":2},"w":[{"sc":2},{"sc":2},{"sc":2}],"tx":{},"g":{}},"SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW":{"addr":"SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW","first":1791025804000,"last":1791025804000,"n":{"mu":6},"w":[{"mu":6},{"mu":6},{"mu":6}],"tx":{},"g":{}},"SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K":{"addr":"SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K","first":1791054053000,"last":1791440614000,"n":{"mu":1425},"w":[{"mu":1307},{"mu":1425},{"mu":1425}],"tx":{},"g":{}}}}; /*SNAP*/
   var CUTOFF = '2026-10-01T00:00:00Z';
-  var DRAWS = ['2026-10-07T22:59:59Z', '2026-10-14T22:59:59Z', '2026-10-21T22:59:59Z'];
+  var DRAWS = ['2026-10-07T22:59:59Z', '2026-10-14T22:59:59Z', '2026-10-21T22:59:59Z'], TESTDRAW = false;
+  try { var lt = /[?&]liveTest=([^&]+)/.exec(location.search); if (lt && !isNaN(Date.parse(decodeURIComponent(lt[1])))) { DRAWS[0] = decodeURIComponent(lt[1]); TESTDRAW = true; } } catch (e) {}
   var DEP = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
   var AUD = 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX.xtrata-collection-audionauts-1-3c855746';
   function $(i) { return document.getElementById(i); }
@@ -397,7 +440,7 @@ tr:last-child td { border-bottom: 0; }
     { k: 'ins', name: 'Inscription', unit: 'inscription', per: 'size', hint: 'Inscribe something new through Xtrata (1 to 5 tickets each, by size)' },
     { k: 'aud', name: 'Audionaut', unit: 'Audionaut', per: 'one', w: 5, hint: 'Collect an Audionaut (5 tickets)' },
     { k: 'sc', name: 'High score on-chain', unit: 'score', per: 'each', hint: 'Commit a high score in Astro Blaster 3 or the Arcade' },
-    { k: 'ch', name: 'On-Chain Chess', unit: 'game', per: 'one', hint: 'Play a game of On-Chain Chess' },
+    { k: 'ch', name: 'On-Chain Chess', unit: 'game', per: 'one', w: 2, hint: 'Play a game of On-Chain Chess' },
     { k: 'mu', name: 'Music plays', unit: 'play', per: 'one', hint: 'Play songs in the Xtrata Music app or Lounge' },
     { k: 'dr', name: 'Sponsored drop', unit: 'claim', per: 'one', hint: 'Claim a sponsored drop' },
     { k: 'lk', name: 'On-chain like', unit: 'like', per: 'one', hint: 'Like a song on-chain' },
@@ -425,7 +468,7 @@ tr:last-child td { border-bottom: 0; }
   // down to those and adds what is new. The saved state lives in this browser and is baked into the page.
   var API = location.origin + '/hiro/mainnet';
   var STORE = 'xt-bounty-tracker-2';
-  var CFG = { api: API, cutoff: CUTOFF, draws: [], fullEveryMs: 3 * 864e5 };
+  var CFG = { api: API, cutoff: CUTOFF, draws: DRAWS, fullEveryMs: 3 * 864e5 };
   // Three tries per request. Once one request has run out of tries the chain is not answering, so the rest
   // of this read gives up at once instead of waiting a minute to show the saved copy.
   var down = false;
@@ -445,8 +488,8 @@ tr:last-child td { border-bottom: 0; }
     return saved && (!base || Date.parse(saved.at) >= Date.parse(base.at)) ? saved : base;
   }
   function saveState(st) { try { localStorage.setItem(STORE, JSON.stringify(st)); } catch (e) {} }
-  function listOf(addresses) { return addresses.map(function (x) { return { a: x.addr, n: x.n }; }); }
-  function listFromState(st) { return st ? Object.keys(st.addrs).map(function (k) { return { a: k, n: st.addrs[k].n }; }) : []; }
+  function listOf(addresses) { return addresses.map(function (x) { return { a: x.addr, n: x.n, w: x.w }; }); }
+  function listFromState(st) { return st ? Object.keys(st.addrs).map(function (k) { return { a: k, n: st.addrs[k].n, w: st.addrs[k].w }; }) : []; }
 
   // ---- Tickets ----
   function earned(kind, n, all) { return n > 0 ? (kind.per === 'each' ? n : kind.per === 'size' ? (all && all.inp != null ? all.inp : 1) : (kind.w || 1)) : 0; }
@@ -457,14 +500,14 @@ tr:last-child td { border-bottom: 0; }
   }
   var START = loadState(), HANDLES = {}, TEAMW = {}, LINKED = {}, WINNERS = {}, DATA = listFromState(START), AT = START ? START.at : '', rows = [], live = false, offline = false, ME = '';
   function rebuild() {
-    rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; return { a: a, valid: c.valid, held: c.total, tickets: c.tickets, handle: team || self, self: !!self, won: WINNERS[a.a] }; });
+    rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; var tm = !!TEAM[a.a]; return { a: a, valid: c.valid && !tm, team: tm, held: c.total, tickets: tm ? 0 : c.tickets, handle: team || self, self: !!self, won: WINNERS[a.a] }; });
     rows.sort(function (x, y) { return (y.tickets - x.tickets) || (y.held - x.held) || (x.a.a < y.a.a ? -1 : 1); });
   }
 
   // ---- Header numbers ----
   function paintTop() {
     var pool = 0, inDraw = 0, waiting = 0;
-    rows.forEach(function (r) { if (r.valid) { inDraw++; pool += r.tickets; } else if (r.held > 0) waiting++; });
+    rows.forEach(function (r) { if (r.team) return; if (r.valid) { inDraw++; pool += r.tickets; } else if (r.held > 0) waiting++; });
     $('bigN').textContent = pool;
     $('fresh').textContent = offline ? 'Could not reach the chain just now. Showing the last saved copy' + (AT ? ' from ' + when(AT, true) : '') + '.' : (live ? 'Live from the chain' : 'Last saved copy') + (AT ? ' · read ' + when(AT, true) : '');
     var draws = DRAWS.map(Date.parse), now = Date.now(), nextI = -1;
@@ -475,14 +518,14 @@ tr:last-child td { border-bottom: 0; }
     [[inDraw, 'Wallets in the draw'], [pool, 'Tickets in the pool'], [waiting, 'Waiting for a first inscription'], [nextTxt, nextSub]].forEach(function (s) {
       var d = el('div', 'stat'); d.appendChild(el('b', '', String(s[0]))); d.appendChild(el('span', '', s[1])); st.appendChild(d);
     });
-    $('boardNote').textContent = rows.length + ' wallets have used Xtrata since 1 October. Wallets without an inscription or an Audionaut are waiting: their tickets switch on the moment they inscribe or collect.';
+    $('boardNote').textContent = rows.length + ' wallets have used Xtrata since 1 October (Xtrata team wallets are shown but are not in the draws). Wallets without an inscription or an Audionaut are waiting: their tickets switch on the moment they inscribe or collect.';
   }
 
   // ---- Static sections ----
   var ways = [
     { t: 'Inscribe your work through Xtrata', tag: '1 to 5 tickets each, by size · puts you in the draw', first: 1, href: 'https://xtrata.xyz' },
     { t: 'Play songs in the Xtrata Music app or Lounge', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
-    { t: 'Play a game of On-Chain Chess', tag: '+1 ticket', href: 'https://xtrata.xyz/i/3072' },
+    { t: 'Play a game of On-Chain Chess', tag: '+2 tickets', href: 'https://xtrata.xyz/i/3072' },
     { t: 'Claim a sponsored drop (no STX needed)', tag: '+1 ticket', href: 'https://xtrata.xyz' },
     { t: 'Like a song on-chain', tag: '+1 ticket', href: 'https://xtrata.xyz/music/lounge' },
     { t: 'Collect an Audionaut', tag: '+5 tickets · also puts you in the draw', href: 'https://xtrata.xyz/collection/audionauts-1-0' },
@@ -525,7 +568,7 @@ tr:last-child td { border-bottom: 0; }
       var hc = el('td', '', r.handle || '—');
       if (r.handle && r.self) hc.appendChild(el('small', 'selftag', ' self-linked'));
       tr.appendChild(hc);
-      var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.won ? 'Winner' : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
+      var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.team ? 'Team' : r.won ? 'Winner' : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
       var tk = el('td', 'num tk ' + (r.valid ? 'ok' : 'wait'), String(r.tickets));
       if (!r.valid && r.held) { var sm = el('small', 'heldtag', ' +' + r.held + ' held'); tk.appendChild(sm); }
       tr.appendChild(tk);
@@ -561,7 +604,7 @@ tr:last-child td { border-bottom: 0; }
     var a = r ? r.a : { a: addr, n: {} }, c = r || { valid: false, held: 0, tickets: 0, handle: '', won: null };
     var who = el('div', 'who');
     var l = el('div'); l.appendChild(el('div', 'addr', a.a)); if (c.handle) l.appendChild(el('div', 'hint', c.handle)); who.appendChild(l);
-    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.won ? 'Winner of draw ' + c.won.draw : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
+    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.team ? 'Xtrata team · not in the draws' : c.won ? 'Winner of draw ' + c.won.draw : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
     out.appendChild(who);
     var sc = el('div', 'score'); sc.appendChild(el('b', c.valid ? 'ok' : 'wait', String(c.tickets)));
     sc.appendChild(el('p', '', c.valid ? 'tickets in every draw from week 1. They carry forward until this wallet is picked.' : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
@@ -618,7 +661,7 @@ tr:last-child td { border-bottom: 0; }
   $('example').addEventListener('click', function () { if (rows[0]) { $('q').value = rows[0].a.a; check(); } });
 
   // ---- Load: show the saved copy at once, then add whatever is new ----
-  function repaint() { rebuild(); paintTop(); drawBoard(); paintWallet(); if ($('q').value.trim()) check(); }
+  function repaint() { rebuild(); paintTop(); drawBoard(); paintWallet(); if ($('q').value.trim()) check(); try { liveRepaint(); } catch (e) { console.error(e); } }
   var busy = false;
   async function refresh(force) {
     if (busy) return; busy = true;
@@ -738,6 +781,183 @@ tr:last-child td { border-bottom: 0; }
   }
   // Restore a previous connection quietly: only load the wallet code if this browser already has a session.
   try { if (/"isConnected":true/.test(localStorage.getItem('xtrata.v15.1.wallet.session') || '')) loadWallet().then(function (w) { ME = w.address(); barKey = ''; paintWallet(); drawBoard(); syncChecker(''); }).catch(function () {}); } catch (e) {}
+
+  // ---- Live draw ----
+  // Everything below is a pure function of public chain data, so every visitor's browser computes the same draw.
+  // Rules: pool = wallets with an inscription or Audionaut counted up to the cut-off (Bitcoin block time), Audionaut = 5 tickets,
+  // team wallets excluded. Seed = hash of the first Bitcoin block after the cut-off. Pick k = sha256(seed|drawN|pickK) mod remaining tickets.
+  var TEAM = { 'SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7': 1, 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X': 1, 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX': 1 };   // jim.btc, xtrata.btc, audionals.btc
+  var NWIN = [3, 3, 4], NRES = 2, AUDW = 5, CHW = 2, ENGINE = { 0: true };   // draws this page can compute itself (draw 1 for now)
+  var LV = [{}, {}, {}], liveBuilt = false, REDUCED = false;
+  try { REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  function cutOf(i) { return Date.parse(DRAWS[i]); }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function hms(ms) { var s = Math.max(0, Math.floor(ms / 1000)), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return (d ? d + 'd ' : '') + pad2(h) + ':' + pad2(m) + ':' + pad2(s % 60); }
+  async function sha(str) { var b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)); return Array.prototype.map.call(new Uint8Array(b), function (x) { return (x < 16 ? '0' : '') + x.toString(16); }).join(''); }
+  // Draw 1 was frozen before size tickets, so it keeps 1 ticket per wallet for inscribing (its published list must stay reproducible).
+  // Draws 2 and 3 count each inscription by size (c.inp, 1 to 5 each, summed). inp and inu are bookkeeping, never tickets of their own.
+  function tix(c, i) {
+    c = c || {}; var t = 0;
+    Object.keys(c).forEach(function (k) { var n = c[k]; if (!(n > 0) || k === 'inp' || k === 'inu') return; t += k === 'aud' ? AUDW : k === 'ch' ? CHW : k === 'sc' ? n : k === 'ins' && i > 0 && c.inp != null ? c.inp : 1; });
+    return { valid: ((c.ins || 0) + (c.aud || 0)) > 0, total: t };
+  }
+  function poolFor(i) {
+    var out = [];
+    DATA.forEach(function (a) { if (TEAM[a.a] || !a.w || !a.w[i]) return; var t = tix(a.w[i], i); if (t.valid && t.total > 0) out.push({ wallet: a.a, tickets: t.total }); });
+    out.sort(function (x, y) { return x.wallet < y.wallet ? -1 : 1; });
+    return out;
+  }
+  function csvOf(pool) { return 'wallet,tickets\n' + pool.map(function (p) { return p.wallet + ',' + p.tickets; }).join('\n') + '\n'; }
+  async function seedFor(i) {
+    var cut = Math.floor(cutOf(i) / 1000);
+    var t = (await get(API + '/extended/v2/blocks?limit=1')).results[0];
+    if (t.burn_block_time <= cut) return { latest: t.burn_block_time_iso };
+    var lo = t.height - 30000, hi = t.height;
+    while (lo < hi) { var mid = Math.floor((lo + hi) / 2), b = await get(API + '/extended/v2/blocks/' + mid); if (b.burn_block_time > cut) hi = mid; else lo = mid + 1; }
+    var b2 = await get(API + '/extended/v2/blocks/' + lo);
+    return { height: b2.burn_block_height, hash: b2.burn_block_hash, time: b2.burn_block_time_iso };
+  }
+  async function pickAll(seed, N, pool) {
+    var p = pool.map(function (x) { return { wallet: x.wallet, tickets: x.tickets }; }), picks = [], want = NWIN[N - 1] + NRES;
+    for (var k = 0; k < want && p.length; k++) {
+      var total = p.reduce(function (s, x) { return s + x.tickets; }, 0);
+      var h = await sha(seed + '|draw' + N + '|pick' + k), r = Number(BigInt('0x' + h) % BigInt(total)), acc = 0, c = -1;
+      for (var j = 0; j < p.length; j++) { acc += p[j].tickets; if (r < acc) { c = j; break; } }
+      var x = p.splice(c, 1)[0];
+      picks.push({ place: k < NWIN[N - 1] ? 'Winner ' + (k + 1) : 'Reserve ' + (k - NWIN[N - 1] + 1), reserve: k >= NWIN[N - 1], wallet: x.wallet, tickets: x.tickets, chance: Math.round(x.tickets / total * 1000) / 10 });
+    }
+    return picks;
+  }
+  function refreshNow() { return new Promise(function (res) { (function go() { if (busy) return setTimeout(go, 300); refresh(true).then(res, res); })(); }); }
+  function handleOf(w) { return HANDLES[w] || (LINKED[w] && LINKED[w].h) || ''; }
+
+  async function runDraw(i) {
+    var S = LV[i]; S.started = true; S.step = 2; liveRender();
+    var seed;
+    for (;;) {
+      try { seed = await seedFor(i); } catch (e) { seed = {}; }
+      if (seed.hash) break;
+      S.latest = seed.latest || S.latest; liveRender(); await sleep(12000);
+    }
+    S.seed = seed; S.step = 3; liveRender();
+    await refreshNow();
+    S.pool = poolFor(i); S.csv = csvOf(S.pool); S.hash = await sha(S.csv);
+    S.picks = await pickAll(seed.hash, i + 1, S.pool);
+    S.step = 4; S.revealed = 0; liveRender();
+    await reveal(i);
+    S.done = true; S.step = 5; liveRender(); checkOfficial(i);
+  }
+  async function reveal(i) {
+    var S = LV[i];
+    for (var k = 0; k < S.picks.length; k++) {
+      if (S.skip || REDUCED) { S.revealed = S.picks.length; break; }
+      S.spin = k; liveRender();
+      var spinMs = S.picks[k].reserve ? 1100 : 2400, t0 = Date.now();
+      while (Date.now() - t0 < spinMs && !S.skip) {
+        var el0 = $('spinTxt'); if (el0 && S.pool.length) el0.textContent = short(S.pool[Math.floor(Math.random() * S.pool.length)].wallet);
+        await sleep(70);
+      }
+      S.spin = -1; S.revealed = k + 1; liveRender(); await sleep(S.skip ? 0 : 650);
+    }
+    S.revealed = S.picks.length;
+  }
+  async function checkOfficial(i) {
+    var S = LV[i];
+    try {
+      var r = await fetch('/bounty/zdao/tracker/1/draws/draw' + (i + 1) + '/result.json', { cache: 'no-cache' });
+      if (!r.ok) return; var j = await r.json();
+      var same = j.csvSha256 === S.hash && JSON.stringify((j.picks || []).map(function (p) { return p.wallet; })) === JSON.stringify(S.picks.map(function (p) { return p.wallet; }));
+      S.official = same ? 'match' : 'differs'; liveRender();
+    } catch (e) {}
+  }
+  async function loadOfficialOnly(i) {
+    var S = LV[i]; if (S.official === 'only' || S.tried) return; S.tried = true;
+    try {
+      var r = await fetch('/bounty/zdao/tracker/1/draws/draw' + (i + 1) + '/result.json', { cache: 'no-cache' });
+      if (!r.ok) return; var j = await r.json();
+      S.picks = (j.picks || []).map(function (p) { return { place: p.place, reserve: /Reserve/.test(p.place), wallet: p.wallet, tickets: p.tickets, chance: p.chance }; });
+      S.hash = j.csvSha256; S.seed = j.seed ? { height: j.seed.height, hash: j.seed.hash, time: j.seed.time } : null; S.official = 'only'; S.done = true; S.step = 5; S.revealed = S.picks.length; liveRender();
+    } catch (e) {}
+  }
+
+  function liveIndex() {
+    var now = Date.now();
+    for (var i = 0; i < 3; i++) if (now < cutOf(i) + 48 * 36e5) return i;   // show a draw until 48 h after its cut-off, then the next one
+    return 2;
+  }
+  function slotNode(S, k) {
+    var p = S.picks && S.picks[k], d = el('div', 'slot' + (p && p.reserve ? ' res' : '') + (S.revealed > k ? ' lock' : ''));
+    d.appendChild(el('div', 'label ' + (p && p.reserve ? 'amber' : 'lime'), p ? p.place : (k < NWIN[S.i] ? 'Winner ' + (k + 1) : 'Reserve ' + (k - NWIN[S.i] + 1))));
+    if (p && S.revealed > k) {
+      d.appendChild(el('div', 'sw mono', short(p.wallet)));
+      var h = handleOf(p.wallet); d.appendChild(el('div', 'sh', h || 'handle not linked yet'));
+      d.appendChild(el('div', 'st', p.tickets + ' tickets · ' + p.chance + '% chance'));
+    } else if (S.spin === k) {
+      var sp = el('div', 'sw mono spin', '…'); sp.id = 'spinTxt'; d.appendChild(sp); d.appendChild(el('div', 'sh', 'Drawing…'));
+    } else { d.appendChild(el('div', 'sw mono dim', '— — —')); }
+    return d;
+  }
+  function stepNode(state, title, body) {
+    var s = el('div', 'lst ' + state); s.appendChild(el('span', 'mk', state === 'done' ? '✓' : state === 'act' ? '●' : '·'));
+    var t = el('div'); t.appendChild(el('b', '', title)); if (body) t.appendChild(el('p', '', body)); s.appendChild(t); return s;
+  }
+  function liveRender() {
+    var box = $('liveBox'); if (!box) return;
+    var i = liveIndex(), S = LV[i]; S.i = i; var now = Date.now(), cut = cutOf(i), after = now >= cut;
+    $('liveH').textContent = 'Draw ' + (i + 1) + ' · ' + when(cut) + ', 23:59 BST' + (TESTDRAW && i === 0 ? ' (REHEARSAL, test cut-off ' + DRAWS[0] + ')' : '');
+    box.textContent = '';
+    if (!after) {
+      $('liveP').textContent = 'Tickets freeze at the cut-off. Come back then and watch the draw happen here, no refresh needed.';
+      var cd = el('div', 'cd', hms(cut - now)); cd.id = 'liveCd'; box.appendChild(cd);
+      box.appendChild(el('div', 'label', 'until the Draw ' + (i + 1) + ' cut-off · ' + NWIN[i] + ' winners · 10 STX each'));
+      var pl = poolFor(i), tk = pl.reduce(function (s, x) { return s + x.tickets; }, 0);
+      box.appendChild(el('p', 'hint', 'Right now ' + pl.length + ' wallets and ' + tk + ' tickets are in line for this draw (team wallets excluded). This changes until the cut-off.'));
+    } else if (!ENGINE[i] && !S.picks) {
+      $('liveP').textContent = 'The cut-off has passed. The team runs this draw and the winners appear here and in the Telegram.';
+      box.appendChild(el('p', 'hint', 'Waiting for the published result.')); loadOfficialOnly(i);
+    } else {
+      $('liveP').textContent = S.done ? 'Draw complete. Anyone can re-run it from the public chain data.' : 'The draw is running now.';
+      var steps = el('div', 'lsteps');
+      steps.appendChild(stepNode('done', 'Cut-off reached', 'Tickets count up to ' + when(cut, true) + ' by Bitcoin block time.'));
+      steps.appendChild(stepNode(S.step > 2 ? 'done' : 'act', S.step > 2 ? 'Seed block found' : 'Waiting for the next Bitcoin block', S.seed ? 'Bitcoin block ' + S.seed.height + ' at ' + when(Date.parse(S.seed.time), true) + '. Its hash is the seed.' : (S.latest ? 'Latest block so far: ' + when(Date.parse(S.latest), true) + '. The first block after the cut-off is the seed, so nobody can know it in advance.' : 'The first Bitcoin block after the cut-off is the seed, so nobody can know it in advance.')));
+      steps.appendChild(stepNode(S.step > 3 ? 'done' : S.step === 3 ? 'act' : 'wait', 'Ticket list frozen', S.hash ? (S.pool ? S.pool.length + ' wallets, ' + S.pool.reduce(function (s, x) { return s + x.tickets; }, 0) + ' tickets. List hash ' + S.hash.slice(0, 16) + '…' : 'List hash ' + S.hash.slice(0, 16) + '…') : ''));
+      steps.appendChild(stepNode(S.done ? 'done' : S.step === 4 ? 'act' : 'wait', S.done ? 'Winners drawn' : 'Drawing winners', ''));
+      box.appendChild(steps);
+      if (S.picks) {
+        var grid = el('div', 'slots'); for (var k = 0; k < S.picks.length; k++) grid.appendChild(slotNode(S, k)); box.appendChild(grid);
+        if (!S.done && S.step === 4) { var sk = el('button', 'ghost', 'Skip animation'); sk.type = 'button'; sk.addEventListener('click', function () { S.skip = true; }); box.appendChild(sk); }
+      }
+      if (S.done) {
+        if (S.official === 'match') box.appendChild(el('div', 'vbadge ok', '✓ Matches the official result published by the team'));
+        else if (S.official === 'differs') box.appendChild(el('div', 'vbadge bad', 'This differs from the official result. Follow the Telegram announcement.'));
+        else if (S.official === 'only') box.appendChild(el('div', 'vbadge ok', 'Official result published by the team'));
+        var det = el('details', 'vdet'); det.appendChild(el('summary', '', 'Verify this draw yourself'));
+        var vp = el('p', '', 'Pick k is the SHA-256 of "seed|drawN|pickK" taken modulo the remaining tickets, over the frozen list sorted by wallet. Winners are removed one at a time. Winners must have announced their wallet on X and submitted it in the Telegram within 24 hours, otherwise the first reserve takes the prize.');
+        det.appendChild(vp);
+        if (S.seed) { var sl = el('p'); sl.appendChild(document.createTextNode('Seed: Bitcoin block ' + S.seed.height + ' ')); sl.appendChild(link('mempool.space', 'https://mempool.space/block/' + String(S.seed.hash).replace(/^0x/, ''))); det.appendChild(sl); }
+        if (S.csv) { var dl = el('button', 'ghost', 'Download the frozen ticket list (CSV)'); dl.type = 'button'; dl.addEventListener('click', function () { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([S.csv], { type: 'text/csv' })); a.download = 'xtrata-bounty-draw' + (i + 1) + '-frozen.csv'; document.body.appendChild(a); a.click(); a.remove(); }); det.appendChild(dl); }
+        box.appendChild(det);
+        if (S.picks && !REDUCED && S.official !== 'only') { var rp = el('button', 'ghost', 'Replay the reveal'); rp.type = 'button'; rp.addEventListener('click', function () { S.skip = false; S.done = false; S.revealed = 0; S.step = 4; liveRender(); reveal(i).then(function () { S.done = true; S.step = 5; liveRender(); }); }); box.appendChild(rp); }
+      }
+    }
+    if (after && i < 2 && (S.done || S.official === 'only')) box.appendChild(el('p', 'hint', 'Next: Draw ' + (i + 2) + ' closes ' + when(cutOf(i + 1), true) + ' (' + hms(cutOf(i + 1) - now) + ' to go).'));
+    // finished earlier draws, compact
+    var prev = el('div', 'lprev');
+    for (var q = 0; q < i; q++) if (LV[q].done && LV[q].picks) {
+      var dd = el('details'); dd.appendChild(el('summary', '', 'Draw ' + (q + 1) + ' winners'));
+      LV[q].picks.filter(function (p) { return !p.reserve; }).forEach(function (p) { dd.appendChild(el('p', 'mono', p.place + ': ' + short(p.wallet) + (handleOf(p.wallet) ? '  ' + handleOf(p.wallet) : '') + '  (' + p.tickets + ' tickets)')); });
+      prev.appendChild(dd);
+    }
+    if (prev.childNodes.length) box.appendChild(prev);
+  }
+  function liveTick() {
+    var now = Date.now(), i = liveIndex(), cd = $('liveCd');
+    if (cd) cd.textContent = hms(cutOf(i) - now);
+    if (now >= cutOf(i) && ENGINE[i] && !LV[i].started) { runDraw(i); }
+    else if (now >= cutOf(i) && !LV[i].started && !LV[i].tried) { LV[i].started = true; liveRender(); }
+    if (cd && now >= cutOf(i)) liveRender();
+  }
+  function liveRepaint() { if (!$('liveBox')) return; if (!liveBuilt) { liveBuilt = true; setInterval(liveTick, 1000); } var i = liveIndex(); if (!(LV[i].started && !LV[i].done)) liveRender(); }
 
   repaint(); check(); paintWallet(); loadHandles();
   refresh(false);

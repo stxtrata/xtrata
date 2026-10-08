@@ -9,13 +9,14 @@
     "test:v2": "npm run render && node sim/acceptance-v2.mjs",
     "test:shared-probe": "node sim/shared-helper-probe.mjs",
     "test:live-check": "node live-check/test-against-simnet.mjs",
-    "test": "npm run render && npm run test:existing && npm run test:v2 && npm run test:families && npm run test:v3 && npm run test:prebind && npm run test:lod && npm run test:wizard && npm run test:fuzz && npm run test:manifest && npm run test:registry && npm run test:registry-v2 && npm run test:shared-probe && npm run test:live-check",
+    "test": "npm run render && npm run test:existing && npm run test:v2 && npm run test:families && npm run test:v3 && npm run test:birds && npm run test:prebind && npm run test:lod && npm run test:wizard && npm run test:fuzz && npm run test:manifest && npm run test:registry && npm run test:registry-v2 && npm run test:shared-probe && npm run test:live-check",
     "screen:fetch": "bash screener/fetch-sources.sh",
     "screen": "python3 screener/screen_sources.py screener/sources > results/screen.json && python3 screener/summarise.py results/screen.json",
     "live-check": "node live-check/live-check.mjs",
     "prepare-legacy": "node scripts/prepare-legacy.mjs",
     "test:families": "npm run render && node sim/family-suite.mjs",
     "test:v3": "npm run render && node sim/family-suite-v3.mjs",
+    "test:birds": "npm run render && node sim/birds-edge-v3.mjs",
     "test:manifest": "node sim/manifest-pipeline.mjs",
     "manifest:build": "node manifest/build-manifest.mjs",
     "manifest:plan": "node manifest/seed-plan.mjs",
@@ -27,7 +28,8 @@
     "test:lod": "npm run render && node sim/large-on-demand-v3.mjs",
     "test:wizard": "node sim/large-wizard-engine.mjs",
     "test:fuzz": "node sim/lod-fuzz-v3.mjs",
-    "audit:lod": "node scripts/audit-lod.mjs --config scripts/configs/mainnet-bitcoin-monkeys.v3.json --manifest manifest/out/bitcoin-monkeys.manifest.json"
+    "audit:lod": "node scripts/audit-lod.mjs --config scripts/configs/mainnet-bitcoin-monkeys.v3.json --manifest manifest/out/bitcoin-monkeys.manifest.json",
+    "evidence": "node scripts/evidence-snapshot.mjs"
   },
   "dependencies": {
     "@stacks/clarinet-sdk": "3.24.0",
@@ -35,5 +37,6 @@
   },
   "engines": {
     "node": ">=20"
-  }
+  },
+  "license": "MIT"
 }

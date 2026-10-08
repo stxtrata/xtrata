@@ -1,0 +1,568 @@
+{
+  "generatedAt": "2026-10-06T23:03:33.263Z",
+  "api": "https://xtrata.xyz/hiro/mainnet",
+  "site": "https://xtrata.xyz",
+  "tip": {
+    "stacksTipHeight": 9136183,
+    "stacksTip": "624993de9a8fffc420a27cc7ee16f5544deb497194729683225df43bfd148afd"
+  },
+  "registry": "forever-twins/data/registry.v2.json",
+  "core": {
+    "contract": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+    "assetName": "xtrata-inscription"
+  },
+  "collections": [
+    {
+      "key": "bitcoin-pepes",
+      "name": "Bitcoin Pepes",
+      "interface": "v1",
+      "group": "G2",
+      "source": {
+        "sha256": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "bytes": 7320,
+        "registryPin": "a7e0bb232bf0b22325db54f15ebc5145976bcb36ccadac824dd6f4449224faff",
+        "matchesPin": true
+      },
+      "sourceAsset": "bitcoin-pepe",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.pepe-4ever-fakfun",
+      "status": "live",
+      "deploy": {
+        "txId": "0x2a7247e091f5b6bfcc6357669dcaf39d7d2442b3b08ac4302f14dfe14bbf24c8",
+        "block": 8275872,
+        "canonical": true
+      },
+      "reads": {
+        "get-inscribed-count": {
+          "value": "2089"
+        },
+        "get-fee": {
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "value": "87"
+        }
+      }
+    },
+    {
+      "key": "leo-cats",
+      "name": "LEO Cats",
+      "interface": "v1",
+      "group": "G2",
+      "source": {
+        "sha256": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+        "bytes": 7306,
+        "registryPin": "56586eec666deda1d5ecd709684f3db936ca0bb23feb4b1963453a60856e823b",
+        "matchesPin": true
+      },
+      "sourceAsset": "leo-cats",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.leo-fakfun-xtrata",
+      "status": "live",
+      "deploy": {
+        "txId": "0xa2e3bd1440f1a51c1501350ef16d88ab6cf56fd5e757a165ed91f9c627ab6835",
+        "block": 8295453,
+        "canonical": true
+      },
+      "reads": {
+        "get-inscribed-count": {
+          "value": "101"
+        },
+        "get-fee": {
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "value": "69"
+        }
+      }
+    },
+    {
+      "key": "miami-degens",
+      "name": "Miami Degens",
+      "interface": "v1",
+      "group": "G1",
+      "source": {
+        "sha256": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513",
+        "bytes": 7314,
+        "registryPin": "c0fc432d0596e6ca8450a6822d82ea123bc581f8de042b89313f958b88cb6513",
+        "matchesPin": true
+      },
+      "sourceAsset": "miami-degens",
+      "helper": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22.miami-degens-fakfun-xtrata",
+      "status": "live",
+      "deploy": {
+        "txId": "0xbafa037838a2e6e3d9986c335b727df12831c291727d068ef8f318cc67684ceb",
+        "block": 8316097,
+        "canonical": true
+      },
+      "reads": {
+        "get-inscribed-count": {
+          "value": "1"
+        },
+        "get-fee": {
+          "value": "4000000"
+        },
+        "get-free-threshold": {
+          "value": "69"
+        }
+      }
+    },
+    {
+      "key": "nyc-degens",
+      "name": "NYC Degens",
+      "interface": "v3",
+      "group": "G1",
+      "source": {
+        "sha256": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951",
+        "bytes": 23881,
+        "registryPin": "cfa6b98191f5ae8185eee6f81380c53ede5a33e41587841fcd802f0179f3d951",
+        "matchesPin": true
+      },
+      "sourceAsset": "nyc-degens",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-nyc-degens",
+      "status": "live",
+      "deploy": {
+        "txId": "0x3b95cdcb752e7b6c70a33a2ef4e4e163228b7ed4cae8721870a37826b4fcef4b",
+        "block": 9127801,
+        "canonical": true
+      },
+      "reads": {
+        "is-finalized": {
+          "value": true
+        },
+        "get-inscribed-count": {
+          "value": "2"
+        },
+        "get-fee": {
+          "value": "100000"
+        },
+        "get-large-unbound": {
+          "value": "0"
+        },
+        "get-twin-interface": {
+          "value": {
+            "canonical-count": "420",
+            "canonical-finalized": true,
+            "collection-key": "nyc-degens",
+            "fee": "100000",
+            "group": "G1",
+            "inscribed-count": "2",
+            "interface-version": "3",
+            "large-unbound": "0",
+            "manifest-hash": "0x30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+            "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+            "max-fee": "5000000",
+            "owner": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "payee-a": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+            "payee-b": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+            "pending-owner": null,
+            "rescue-delay": "432",
+            "rescue-enabled": true,
+            "route": "standard",
+            "source": "SP1SCEXE6PMGPAC6B4N5P2MDKX8V4GF9QDE1FNNGJ.nyc-degens",
+            "source-asset": "nyc-degens",
+            "swaps-enabled": true
+          }
+        }
+      },
+      "transactions": {
+        "total": 10,
+        "byFunction": {
+          "swap-original-for-twin": 1,
+          "inscribe": 2,
+          "finalize-canonical": 1,
+          "seed-canonical": 5,
+          "deploy": 1
+        },
+        "calls": [
+          {
+            "function": "deploy",
+            "txId": "0x3b95cdcb752e7b6c70a33a2ef4e4e163228b7ed4cae8721870a37826b4fcef4b",
+            "status": "success",
+            "block": 9127801,
+            "time": "2026-10-05T16:04:35.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "finalize-canonical",
+            "txId": "0xfee86519fa0d6201d071d5072be53facc38436461a9b75e346b8e7ef8f386a17",
+            "status": "success",
+            "block": 9128366,
+            "time": "2026-10-05T18:21:00.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x173a1a8d8a3a9cfc5bf93a5eb82e506d85ad7da3415d2f37a8fbf3982a76b7ec",
+            "status": "success",
+            "block": 9128412,
+            "time": "2026-10-05T18:21:00.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x5d6c809aa4b0b7dccb99feffb19c5e24ae5bfd6704a8d4b9cc4c5085a382c332",
+            "status": "success",
+            "block": 9129150,
+            "time": "2026-10-05T21:03:37.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "swap-original-for-twin",
+            "txId": "0xa7cbb628416fa28c6ca073e96d93ecfb6825d91079e03a7098c47d6f4523081a",
+            "status": "success",
+            "block": 9129157,
+            "time": "2026-10-05T21:03:37.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          }
+        ],
+        "seed": {
+          "calls": 5,
+          "first": "0xdb3461f9911564e03dacda93b0c9758e7294ac95d1298e951594773c5b4c6f68",
+          "last": "0x65b5faa44b727b2eff4a43b8c8f4c81f0382ff7997833b373851e77abd4cdac3",
+          "allSucceeded": true
+        }
+      },
+      "manifest": {
+        "registrySha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+        "count": 420,
+        "repoFileSha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+        "liveSha256": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+        "onChainHash": "30dbd4313a969c56dacc075da7f2f1ef4c685accaa53e58bea5450dc6e4faf9b",
+        "allMatch": true
+      },
+      "snapshot": {
+        "stacksTipHeight": 9127020,
+        "stacksTip": "0x672420e6b338aa8b0b159b0949f0b0d33e5c3bacdcc2836f89cb06f1a1f9d826",
+        "takenAt": "2026-10-05T12:50:39.145Z"
+      },
+      "resolver": {
+        "sampleToken": 1,
+        "httpStatus": 200,
+        "status": "inscribed"
+      },
+      "coverage": {
+        "recovered": 420,
+        "of": 420,
+        "asOf": "block 9,127,020, 5 Oct 2026"
+      }
+    },
+    {
+      "key": "megapont-ape-club",
+      "name": "Megapont Ape Club",
+      "interface": "v3",
+      "group": "G2",
+      "source": {
+        "sha256": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
+        "bytes": 24419,
+        "registryPin": "d092d883666f1da55664d856eef4ad7125d4d94eadc6b3a74a2578b799910e90",
+        "matchesPin": true
+      },
+      "sourceAsset": "Megapont-Ape-Club",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-megapont-ape-club",
+      "status": "live",
+      "deploy": {
+        "txId": "0xe3a7b6c3aa708a40e80127e44d9f22570f37835e81caa54e07eaae508e2219f5",
+        "block": 9129661,
+        "canonical": true
+      },
+      "reads": {
+        "is-finalized": {
+          "value": true
+        },
+        "get-inscribed-count": {
+          "value": "5"
+        },
+        "get-fee": {
+          "value": "1000000"
+        },
+        "get-large-unbound": {
+          "value": "0"
+        },
+        "get-twin-interface": {
+          "value": {
+            "canonical-count": "2500",
+            "canonical-finalized": true,
+            "collection-key": "megapont-ape-club",
+            "fee": "1000000",
+            "group": "G2",
+            "inscribed-count": "5",
+            "interface-version": "3",
+            "large-unbound": "0",
+            "manifest-hash": "0x0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+            "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+            "max-fee": "5000000",
+            "owner": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "payee-a": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+            "payee-b": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+            "pending-owner": null,
+            "rescue-delay": "432",
+            "rescue-enabled": true,
+            "route": "standard",
+            "source": "SP3D6PV2ACBPEKYJTCMH7HEN02KP87QSP8KTEH335.megapont-ape-club-nft",
+            "source-asset": "Megapont-Ape-Club",
+            "swaps-enabled": true
+          }
+        }
+      },
+      "transactions": {
+        "total": 32,
+        "byFunction": {
+          "inscribe": 5,
+          "finalize-canonical": 1,
+          "seed-canonical": 25,
+          "deploy": 1
+        },
+        "calls": [
+          {
+            "function": "deploy",
+            "txId": "0xe3a7b6c3aa708a40e80127e44d9f22570f37835e81caa54e07eaae508e2219f5",
+            "status": "success",
+            "block": 9129661,
+            "time": "2026-10-05T22:49:29.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "finalize-canonical",
+            "txId": "0x043c09b61a852446acb62e9577d28fb98f857d4903ceda68e499bd4b6f1df30f",
+            "status": "success",
+            "block": 9130166,
+            "time": "2026-10-06T00:36:00.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x10ea00243e892532966c3546efa49ead1fa0177d1063cbc4f3ec15ee00fb621d",
+            "status": "success",
+            "block": 9130171,
+            "time": "2026-10-06T00:36:00.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x3a63e16e0c5eaee3d372c4bbcbf91255baaeb0c68a4c67d1906c95e7b37cbb86",
+            "status": "success",
+            "block": 9130281,
+            "time": "2026-10-06T01:04:41.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x3921af56f8de11e8870077f25139b0b5642f941453d470141a4cc267350f5126",
+            "status": "success",
+            "block": 9130281,
+            "time": "2026-10-06T01:04:41.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0xd4edb074f84ea98d31d81a5439d0827f5479d6ca9ffd7c1ca13c88b8c61431d4",
+            "status": "success",
+            "block": 9130283,
+            "time": "2026-10-06T01:04:41.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x120a4f4f9c46c5e0c256f46854823842803e5515993c504e0c855f1adaf6b39f",
+            "status": "success",
+            "block": 9130287,
+            "time": "2026-10-06T01:09:53.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          }
+        ],
+        "seed": {
+          "calls": 25,
+          "first": "0xdcbf025f5ec03b3516755eecfe1c1fb9c7a42429b38cb65ccedb86ee7b6ba115",
+          "last": "0x90a33cb3fec1aa7a25fa5535f0d924565e1adda1707409b74c080433ce997cde",
+          "allSucceeded": true
+        }
+      },
+      "manifest": {
+        "registrySha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+        "count": 2500,
+        "repoFileSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+        "liveSha256": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+        "onChainHash": "0a3097e17ba545f7ebcd2961da8cdc83075e6a85ea5e01eb8697eb9cd68cc552",
+        "allMatch": true
+      },
+      "snapshot": {
+        "stacksTipHeight": 9127306,
+        "stacksTip": "0x71ef53bef5189bf99baf38ff34a547af1acd370f4b21b50622ae3d5e3e82316b",
+        "takenAt": "2026-10-05T14:03:14.653Z"
+      },
+      "resolver": {
+        "sampleToken": 1,
+        "httpStatus": 200,
+        "status": "inscribed"
+      },
+      "coverage": {
+        "recovered": 2500,
+        "of": 2500,
+        "asOf": "block 9,127,306, 5 Oct 2026"
+      }
+    },
+    {
+      "key": "bitcoin-monkeys",
+      "name": "Bitcoin Monkeys",
+      "interface": "v3",
+      "group": "G1",
+      "source": {
+        "sha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+        "bytes": 27196,
+        "registryPin": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
+        "matchesPin": true
+      },
+      "sourceAsset": "bitcoin-monkeys",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-monkeys",
+      "status": "live",
+      "deploy": {
+        "txId": "0xa694862c40d675da8933a8602782a26570610bf40a2613d0f62f01062c24d653",
+        "block": 9134279,
+        "canonical": true
+      },
+      "reads": {
+        "is-finalized": {
+          "value": true
+        },
+        "get-inscribed-count": {
+          "value": "6"
+        },
+        "get-fee": {
+          "value": "1000000"
+        },
+        "get-large-unbound": {
+          "value": "282"
+        },
+        "get-twin-interface": {
+          "value": {
+            "canonical-count": "2500",
+            "canonical-finalized": true,
+            "collection-key": "bitcoin-monkeys",
+            "fee": "1000000",
+            "group": "G1",
+            "inscribed-count": "6",
+            "interface-version": "3",
+            "large-unbound": "282",
+            "manifest-hash": "0xb1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+            "master": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3",
+            "max-fee": "5000000",
+            "owner": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+            "payee-a": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+            "payee-b": "SPV9K21TBFAK4KNRJXF5DFP8N7W46G4V9RCJDC22",
+            "pending-owner": null,
+            "rescue-delay": "432",
+            "rescue-enabled": true,
+            "route": "standard",
+            "source": "SP2KAF9RF86PVX3NEE27DFV1CQX0T4WGR41X3S45C.bitcoin-monkeys",
+            "source-asset": "bitcoin-monkeys",
+            "swaps-enabled": true
+          }
+        }
+      },
+      "transactions": {
+        "total": 33,
+        "byFunction": {
+          "inscribe-large": 1,
+          "inscribe": 5,
+          "finalize-canonical": 1,
+          "seed-canonical": 25,
+          "deploy": 1
+        },
+        "calls": [
+          {
+            "function": "deploy",
+            "txId": "0xa694862c40d675da8933a8602782a26570610bf40a2613d0f62f01062c24d653",
+            "status": "success",
+            "block": 9134279,
+            "time": "2026-10-06T15:33:44.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "finalize-canonical",
+            "txId": "0xed0931bfa38c76ab428d9e70861080dbecdfd9458edac92130363f90b72bc9ed",
+            "status": "success",
+            "block": 9134476,
+            "time": "2026-10-06T16:28:32.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x0b3295b71e18e51a5a0131b023c9bcf971d97f6df26cc570deb4901fd9b01f9b",
+            "status": "success",
+            "block": 9134482,
+            "time": "2026-10-06T16:30:18.000Z",
+            "sender": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x44242aa770a062626cd18217c40006ad1ea227f34ba57d9bbc0121517a06161d",
+            "status": "success",
+            "block": 9134528,
+            "time": "2026-10-06T16:42:41.000Z",
+            "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x399a5f1898ddd0cc4b1e869de5be31c3aee1bf22b8671f0d685ac6ddfe58b4a3",
+            "status": "success",
+            "block": 9134531,
+            "time": "2026-10-06T16:42:41.000Z",
+            "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0xa8902628c327b6b48bd57cd9e598d36417f628bcf145d605245b43d4ed040c6c",
+            "status": "success",
+            "block": 9134531,
+            "time": "2026-10-06T16:42:41.000Z",
+            "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+          },
+          {
+            "function": "inscribe",
+            "txId": "0x4b0e732f4b5082d1ba7405d7fd3ba13ca64027b5623c3751ba9edac672da2aa1",
+            "status": "success",
+            "block": 9134535,
+            "time": "2026-10-06T16:42:41.000Z",
+            "sender": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7"
+          },
+          {
+            "function": "inscribe-large",
+            "txId": "0x642deadb2e027143cce464f35be63cced4e572db06e1a6bf3b2378b5d8f20191",
+            "status": "success",
+            "block": 9134567,
+            "time": "2026-10-06T16:43:45.000Z",
+            "sender": "SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5"
+          }
+        ],
+        "seed": {
+          "calls": 25,
+          "first": "0xc7181b22360b88ba01ad518d4ddd9823bacd696e5a24f278e5d6611d827e0886",
+          "last": "0xdb74e8b61fd25021a939d16b92b5290688900b78d3d98a566524d5a5e6d60474",
+          "allSucceeded": true
+        }
+      },
+      "manifest": {
+        "registrySha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "count": 2500,
+        "repoFileSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "liveSha256": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "onChainHash": "b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c",
+        "allMatch": true
+      },
+      "snapshot": {
+        "stacksTipHeight": 9133680,
+        "stacksTip": "0xc288d350f8aec1fdf0766026b12b647bff3ed5bc0a18ce0d54238ad257e22f18",
+        "takenAt": "2026-10-06T13:24:43.794Z"
+      },
+      "resolver": {
+        "sampleToken": 1,
+        "httpStatus": 200,
+        "status": "not-inscribed"
+      },
+      "coverage": {
+        "recovered": 2500,
+        "of": 2500,
+        "asOf": "block 9,133,680, 6 Oct 2026"
+      }
+    }
+  ]
+}

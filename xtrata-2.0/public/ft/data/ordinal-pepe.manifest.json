@@ -1,0 +1,2019 @@
+{
+  "spec": "FT-SPEC-2",
+  "collectionKey": "ordinal-pepe",
+  "source": "SP2ZY7ETKYAN1M7R4HWQ77Q4CVDVH8PVQ41XS0N0S.ordinal-pepe",
+  "sourceAsset": "ordinal-pepe",
+  "scope": "minted-at-snapshot",
+  "snapshot": {
+    "stacksTipHeight": 9133554,
+    "stacksTip": "0x94114d75ecb485d79143438febd6cb17daac7cab3b63f6aa9f0408567343f090",
+    "takenAt": "2026-10-06T12:57:23.163Z"
+  },
+  "reviewer": null,
+  "hashRule": "twin.contentHash = xtrata rolling hash: 16384-byte chunks, h0 = 32 zero bytes, h = sha256(h || chunk)",
+  "twinTokenUri": "https://xtrata.xyz/ft/ordinal-pepe/{id}.json",
+  "count": 100,
+  "tokens": [
+    {
+      "id": 1,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/1.json",
+        "metadataSha256": "e16b1dec9fbe8702201a0b3fa5382d723aa6cb76bb889528fcd101a110f59ac5",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(1)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/1.json"
+      }
+    },
+    {
+      "id": 2,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/2.json",
+        "metadataSha256": "6c7e41bd6996c97242632e72355fc66411cbaa026d780a818c130f861e91de3f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(1)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/2.json"
+      }
+    },
+    {
+      "id": 3,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/3.json",
+        "metadataSha256": "17495e783cc3dd7a8ccc77f823c96c2375c997382b1ad13cb09ee858af1e2c5d",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(1).gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/3.json"
+      }
+    },
+    {
+      "id": 4,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/4.json",
+        "metadataSha256": "08651a591106f5b1b3fccb6f1eb0cf1647e26a64a110c29bf4acf2539470c535",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(2)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/4.json"
+      }
+    },
+    {
+      "id": 5,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/5.json",
+        "metadataSha256": "07bd63ca088a4e287af5a13ecbf414c248c644c65d0d056f03d5cbc1bfa8201a",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(2)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/5.json"
+      }
+    },
+    {
+      "id": 6,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/6.json",
+        "metadataSha256": "6c5ddecc8b0c412c7c6c1d04fa9f814907bf0a35af8680c1e76de60cac801c16",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(3)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/6.json"
+      }
+    },
+    {
+      "id": 7,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/7.json",
+        "metadataSha256": "4831d55872fce1ac95d440dd84aed64d77f728329cbe23fd22cc777d349c45b8",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(3)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/7.json"
+      }
+    },
+    {
+      "id": 8,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/8.json",
+        "metadataSha256": "8b9b8d007a3418f49dfb9891be4972687906cccb6d640f9a779436d421341134",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(4)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/8.json"
+      }
+    },
+    {
+      "id": 9,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/9.json",
+        "metadataSha256": "b667b135313f9b85110318176abd61bdaeda1483d492cb27e914c745dc228005",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(4)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/9.json"
+      }
+    },
+    {
+      "id": 10,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/10.json",
+        "metadataSha256": "69ebb836093f20e3b99294824106d9b7d074ccb36fd275f2280ecbbb4cc19a96",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(5)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/10.json"
+      }
+    },
+    {
+      "id": 11,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/11.json",
+        "metadataSha256": "fd8ad6cf30284560cd228485090fa7a8d6cd6c877e282e7fce64ab97ab1c5472",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(5)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/11.json"
+      }
+    },
+    {
+      "id": 12,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/12.json",
+        "metadataSha256": "9f6e5e5ff2d9f4900026ae90646e037326812b87e0a3e3e75e77b9c514906f53",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(6)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/12.json"
+      }
+    },
+    {
+      "id": 13,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/13.json",
+        "metadataSha256": "a535e6b9ff58e1f79c229f8459fb3f85f6b919c3533e48b8c11e675ae7ff3607",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(6)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/13.json"
+      }
+    },
+    {
+      "id": 14,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/14.json",
+        "metadataSha256": "da54f193213927ea2a02dffdf6056a7eefd81305747c41f66767b00944bcc9fa",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(7)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/14.json"
+      }
+    },
+    {
+      "id": 15,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/15.json",
+        "metadataSha256": "f337606bc9db52c70d1947d67cc778b3ffa44100ef3f2b5a7a9748fd4ad39af4",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(7)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/15.json"
+      }
+    },
+    {
+      "id": 16,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/16.json",
+        "metadataSha256": "b4d8f4bede58de0693e8bd2b28a002f70e235fb65ee6f0384ee21c065b99c563",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(8)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/16.json"
+      }
+    },
+    {
+      "id": 17,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/17.json",
+        "metadataSha256": "9f2f12b5c4f28d7377c11f89cca70dc0159a4c578db40922acc3fd7f7b5caff7",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(8)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/17.json"
+      }
+    },
+    {
+      "id": 18,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/18.json",
+        "metadataSha256": "48e8c405667030c39d7d006f1c4f81aa8991a0c60bfec6ec15d8ab74b3e69fa9",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(9)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/18.json"
+      }
+    },
+    {
+      "id": 19,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/19.json",
+        "metadataSha256": "d3072b0a39dc0142a0849ddf8fe5440a20b19fcb6ae032edfa3f459530003633",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(9)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/19.json"
+      }
+    },
+    {
+      "id": 20,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/20.json",
+        "metadataSha256": "9e72455adcb946f94a4ea0c45c2c261d13afbd7a402030f6f687bd46bf252955",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(10)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/20.json"
+      }
+    },
+    {
+      "id": 21,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/21.json",
+        "metadataSha256": "4b42809ed5210ec9b3f9e99f93d4b3b136a73d7b2ec2bb06d48a65a3abcfca10",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(10)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/21.json"
+      }
+    },
+    {
+      "id": 22,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/22.json",
+        "metadataSha256": "9be8196d76b1a5c0a62a82dc747123bda69a10733ea35201b28db383d2ecb11c",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(11)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/22.json"
+      }
+    },
+    {
+      "id": 23,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/23.json",
+        "metadataSha256": "3ce6d7b5cea986ab6cac8eff13f8aaed87f95a36223a0c0a81537778d402cdfc",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(11)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/23.json"
+      }
+    },
+    {
+      "id": 24,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/24.json",
+        "metadataSha256": "e4e49c0486ee554ba28e768ec9e264b63ed84cd95373abc2d8e44cc31bfc2aae",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(12)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/24.json"
+      }
+    },
+    {
+      "id": 25,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/25.json",
+        "metadataSha256": "8ed0cabb1e6203ada6a64752d0dcf044300e19a12cb78531cf40da53b5ca1940",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(12)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/25.json"
+      }
+    },
+    {
+      "id": 26,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/26.json",
+        "metadataSha256": "bc9a1b71343b1ab20c085e9acd43198f68e4b02278b79389c4f09e7a9bade898",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(13)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/26.json"
+      }
+    },
+    {
+      "id": 27,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/27.json",
+        "metadataSha256": "eb7d0237cdcfeb9eaf6fcae369d1ceb24126e8069e6564ba15a499520950459c",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(13)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/27.json"
+      }
+    },
+    {
+      "id": 28,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/28.json",
+        "metadataSha256": "536c0d223937bca758634df3a08b908f2c4dd6a2556410d450ce198169f08590",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(14)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/28.json"
+      }
+    },
+    {
+      "id": 29,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/29.json",
+        "metadataSha256": "d26e51ba66f3778e76eabba9ca34dc0dabdf685e96e34c2f03b050d522891b1b",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(14)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/29.json"
+      }
+    },
+    {
+      "id": 30,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/30.json",
+        "metadataSha256": "12f5e3da3801ef1abb10a7e2099745d7abc1b83665220080f5cd3d7c8ab88380",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(15)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/30.json"
+      }
+    },
+    {
+      "id": 31,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/31.json",
+        "metadataSha256": "83306812e6139a5cec2a1b81c4f99c936e9b968c17fd7549335b173de45a921e",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(15)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/31.json"
+      }
+    },
+    {
+      "id": 32,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/32.json",
+        "metadataSha256": "78332a6cbd3d1a8e54c3aadcad97d9fb2993c302ba628bbc5ed18dbd24283ded",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(16)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/32.json"
+      }
+    },
+    {
+      "id": 33,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/33.json",
+        "metadataSha256": "74f610d72eb74b071c8d082a6239f2102447af05d5249bc97202a132f33125d8",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(16)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/33.json"
+      }
+    },
+    {
+      "id": 34,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/34.json",
+        "metadataSha256": "ced09a1f4b82c081b2865aaac3b328943a279a4c1067d171dee11b541aebe45b",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(17)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/34.json"
+      }
+    },
+    {
+      "id": 35,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/35.json",
+        "metadataSha256": "62f2bdbfe53c2349fede684ae9e18fefbe98fe559b542e2f49dc45f03962727c",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(17)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/35.json"
+      }
+    },
+    {
+      "id": 36,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/36.json",
+        "metadataSha256": "cff857cd8c2caec7b34e59b34b7c595c777f5e752c177a4cf167798dfcf9548f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(18)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/36.json"
+      }
+    },
+    {
+      "id": 37,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/37.json",
+        "metadataSha256": "39047e2c58b529d9103ab3c87e363311b796a426f50fa5c46c3cdb20c0663a0f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(18)%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/37.json"
+      }
+    },
+    {
+      "id": 38,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/38.json",
+        "metadataSha256": "9bb70fc9c35b8c3202514d65ddb2d0e77e8b3176f7d14b471ccdec5406721c0d",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(19)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/38.json"
+      }
+    },
+    {
+      "id": 39,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/39.json",
+        "metadataSha256": "89adae915d9966fe1f2faef8063e7dbfdee25f35add3f1167dd37660e0bd7bc9",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(20)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/39.json"
+      }
+    },
+    {
+      "id": 40,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/40.json",
+        "metadataSha256": "15aecda7f525656e0272dea90e367ee2af6469ec92a9a43ab54f270eb9342a88",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(21)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/40.json"
+      }
+    },
+    {
+      "id": 41,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/41.json",
+        "metadataSha256": "2d58ed363de6a2aaca2389fdc8bf094a54976900bd635edd59ed689f1efdc3c5",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(22)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/41.json"
+      }
+    },
+    {
+      "id": 42,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/42.json",
+        "metadataSha256": "d9c912c3b4f76b8eda73bb09f38cb72c14cc04bc047a8577d65c28fcec8472c2",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(23)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/42.json"
+      }
+    },
+    {
+      "id": 43,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/43.json",
+        "metadataSha256": "bd2e2ac62c7ad88758994c05f1e4277c4530f5e5e8bddc6dce7c705b1f734271",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(24)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/43.json"
+      }
+    },
+    {
+      "id": 44,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/44.json",
+        "metadataSha256": "fc4488fbaf6d8c8a0bcb42ebf9d4871480ac65642be96302b38fed6539159e78",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(25)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/44.json"
+      }
+    },
+    {
+      "id": 45,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/45.json",
+        "metadataSha256": "c4623f2c28e217731cdc0d9345b2b8ce3dd06d357140a298d428e830992bebe8",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(26)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/45.json"
+      }
+    },
+    {
+      "id": 46,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/46.json",
+        "metadataSha256": "b6cee7e04771dcaf20f4a950355d085e2f56bf25275d8081fb692e6ef3bc8501",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(27)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/46.json"
+      }
+    },
+    {
+      "id": 47,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/47.json",
+        "metadataSha256": "3164a2984df0db27811dd9302fb2c7c6e92fa1bd18dea56c8ea280efff762f9a",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(28)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/47.json"
+      }
+    },
+    {
+      "id": 48,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/48.json",
+        "metadataSha256": "daae2c856b0abda7da058823806133bce77bd3407cef690e027347d4046255bf",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(29)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/48.json"
+      }
+    },
+    {
+      "id": 49,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/49.json",
+        "metadataSha256": "cc3565e5e1ee28e40dd7d28abadbd1a45287a02cdf64b282e6ce55d851eda066",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(30)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/49.json"
+      }
+    },
+    {
+      "id": 50,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/50.json",
+        "metadataSha256": "8db524285672fde37f8140a0c7ba7efaaba20373d42b310f80f76cfe22962519",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(31)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/50.json"
+      }
+    },
+    {
+      "id": 51,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/51.json",
+        "metadataSha256": "d02fa857c0511b0839d4379a31ee97d205826fbb9bd48ba6d962e959627cbfd6",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(32)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/51.json"
+      }
+    },
+    {
+      "id": 52,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/52.json",
+        "metadataSha256": "30bb732dc653a7c1b9da5eade3a222bbb9229b9d47c6a5dce2d3497029b2c6ea",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(33)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/52.json"
+      }
+    },
+    {
+      "id": 53,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/53.json",
+        "metadataSha256": "e8c18164ccaaf297d9a941a96ef15212fa61444ea6a3cb0d09e0645437754294",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(34)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/53.json"
+      }
+    },
+    {
+      "id": 54,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/54.json",
+        "metadataSha256": "6c2dc0dfd9e9802c80fccc996cb0bf991719342bed1466034237b636f517ffa1",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(35)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/54.json"
+      }
+    },
+    {
+      "id": 55,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/55.json",
+        "metadataSha256": "e1849b5aa229bd646768ae095695adeb8098ad6ca5f6a47c6b4a3a46161b804a",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(36)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/55.json"
+      }
+    },
+    {
+      "id": 56,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/56.json",
+        "metadataSha256": "8ddc124f3c9b9e349fcc30865841ed9f52d4441956ef3fba30ea71ec07280d3e",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(37)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/56.json"
+      }
+    },
+    {
+      "id": 57,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/57.json",
+        "metadataSha256": "c081a9ed453c6fee04677c6d178bf072d7568a3101069e17f2b379532ef2d832",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(38)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/57.json"
+      }
+    },
+    {
+      "id": 58,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/58.json",
+        "metadataSha256": "a506da9710285ddee13baf0ec710b0af71fc0d71fd2e2cd303e90e0da646ad7f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(39)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/58.json"
+      }
+    },
+    {
+      "id": 59,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/59.json",
+        "metadataSha256": "6f87058779f14f4862e5b801a6621d51b16549e314efdce48125257785153172",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(40)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/59.json"
+      }
+    },
+    {
+      "id": 60,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/60.json",
+        "metadataSha256": "6de3b86c1249173c66bf8622fe3bde84644d2d8c8447f0a82b3f178b89061635",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(41)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/60.json"
+      }
+    },
+    {
+      "id": 61,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/61.json",
+        "metadataSha256": "cf938623535d4f42a8f883313b1d38936c2577a5a273045832fb912bd478b044",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(42)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/61.json"
+      }
+    },
+    {
+      "id": 62,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/62.json",
+        "metadataSha256": "3eb521fa702e14d6e835cc3b0121cb48e8ac0e3b891d6a9c87c8173ac7b9a9a9",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(43)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/62.json"
+      }
+    },
+    {
+      "id": 63,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/63.json",
+        "metadataSha256": "e31278fcdd9dc91e872d115b48f6944b630facdb1fb14fd5d17c882b7ea61ac4",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(44)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/63.json"
+      }
+    },
+    {
+      "id": 64,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/64.json",
+        "metadataSha256": "fa7b5c1959b36f1fceeb940a4862d5ddf9c371d167295236aae5cef5724fbaab",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(45)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/64.json"
+      }
+    },
+    {
+      "id": 65,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/65.json",
+        "metadataSha256": "addf0fdd4d2b10373e3400de33047c7eb6b4250d5e074bd5f8ae5ec85c3c12c0",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(46)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/65.json"
+      }
+    },
+    {
+      "id": 66,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/66.json",
+        "metadataSha256": "2389a0bb9a00e9e8e831c31f3510db91d0230a2c970516270c370bb909a316b6",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(47)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/66.json"
+      }
+    },
+    {
+      "id": 67,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/67.json",
+        "metadataSha256": "bf7eabc442568129c9088bf1e8ac89933b4d522a369de8c163e77a1655a20d9a",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(48)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/67.json"
+      }
+    },
+    {
+      "id": 68,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/68.json",
+        "metadataSha256": "6f732bc0a629d4450dded71dad538c7c990729e0c129f2a86214f4c24bc5f50f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(49)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/68.json"
+      }
+    },
+    {
+      "id": 69,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/69.json",
+        "metadataSha256": "44e6246d20741abc161040214021d96d8e5617c768ed4f57c9e05de10f64c83c",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(50)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/69.json"
+      }
+    },
+    {
+      "id": 70,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/70.json",
+        "metadataSha256": "d0023b18a9e1230239af1730f87e06991ddf3dabea6c6865c901a48c6992ec80",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(51)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/70.json"
+      }
+    },
+    {
+      "id": 71,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/71.json",
+        "metadataSha256": "981a5e451b358d96e890cc63c4abf91d157dd98c00e2f9321cd90682073bfd7d",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(52)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/71.json"
+      }
+    },
+    {
+      "id": 72,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/72.json",
+        "metadataSha256": "02db2b4bf8604b80452dba3089998cf70f724b7b1b66b09458ff2a894aa59cb8",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(53)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/72.json"
+      }
+    },
+    {
+      "id": 73,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/73.json",
+        "metadataSha256": "41adc5f05b6feb235a6becfa3cfaae2abfb20d301eef3224a86df690b28b8dc5",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(54)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/73.json"
+      }
+    },
+    {
+      "id": 74,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/74.json",
+        "metadataSha256": "6729efed9c27a7e73b414a5d6a26eb0426fa6410355331ac0902020a72edcdae",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(55)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/74.json"
+      }
+    },
+    {
+      "id": 75,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/75.json",
+        "metadataSha256": "51a0afd04a573583634f81a63b38c763400fceb9166a86808d84c801352309a1",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(56)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/75.json"
+      }
+    },
+    {
+      "id": 76,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/76.json",
+        "metadataSha256": "131753ac08e3d3181f4b2cc690cce7fb2eef9e308768786851314f75dbd1a855",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(57)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/76.json"
+      }
+    },
+    {
+      "id": 77,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/77.json",
+        "metadataSha256": "cdf085ab24cd3ad35d4ca90a62cca19cf762efb5408350d3b43ae78dc3cb842b",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(58)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/77.json"
+      }
+    },
+    {
+      "id": 78,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/78.json",
+        "metadataSha256": "3b6a50464d5cf07b90d179108d5b851ed61c1c40b9e84779ab55189d74dbd890",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(59)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/78.json"
+      }
+    },
+    {
+      "id": 79,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/79.json",
+        "metadataSha256": "d259fcc796e7dd7f7a04ceef2ef039bcd6a1535c2b10e533cc4fb510889e592f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(60)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/79.json"
+      }
+    },
+    {
+      "id": 80,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/80.json",
+        "metadataSha256": "81703853ff020379c5f4babfc3983cb6c09614d7600bbd984d3e5affe6068b82",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(61)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/80.json"
+      }
+    },
+    {
+      "id": 81,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/81.json",
+        "metadataSha256": "4fa49868de876d520d7135f962c4f2a8b9c670d6680c249fb4e4f93116d208c3",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(62)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/81.json"
+      }
+    },
+    {
+      "id": 82,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/82.json",
+        "metadataSha256": "652a4f94c7521e8b06aa1e314dc53987083193daa4940ed357b44a107f0c536a",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(63)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/82.json"
+      }
+    },
+    {
+      "id": 83,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/83.json",
+        "metadataSha256": "95425dc5b1a5bf8e7e5e495bc878e09f0bbfb7d7a171c5464eeb697a579d41e1",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(64)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/83.json"
+      }
+    },
+    {
+      "id": 84,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/84.json",
+        "metadataSha256": "0a98ef04e5cca800c80c7cf5d6c5b677400fa4d1207f56db86f3f3e4872f6bfc",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(65)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/84.json"
+      }
+    },
+    {
+      "id": 85,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/85.json",
+        "metadataSha256": "16d2ed006b480a58ce5949552ca988ce5f5f3f2fb2073c6d1554f942afbf0e8f",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(66)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/85.json"
+      }
+    },
+    {
+      "id": 86,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/86.json",
+        "metadataSha256": "5b280a4d3cde62cf0b2c1cd66a3edc1232f25f8bb1ae863ffb3036e29c588cc5",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(67)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/86.json"
+      }
+    },
+    {
+      "id": 87,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/87.json",
+        "metadataSha256": "1601568163d530a5ca175ebcc09bfb545b0f4d2a77ffd8fbbc511e6bf0950dd2",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(68)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/87.json"
+      }
+    },
+    {
+      "id": 88,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/88.json",
+        "metadataSha256": "853bbadc667886b7f82143ac89d0984ef338bc019979aa563dc7c3f87d8bab00",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(69)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/88.json"
+      }
+    },
+    {
+      "id": 89,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/89.json",
+        "metadataSha256": "094f299368d727b5412f482a16a9ee7d80c666fa60c6b5f17c4bc46e3b1a2e70",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(70)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/89.json"
+      }
+    },
+    {
+      "id": 90,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/90.json",
+        "metadataSha256": "1b4940193a6cc49e14032f1d58eeac6ce0d0cd49326a0944044b1e925d55c07d",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(71)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/90.json"
+      }
+    },
+    {
+      "id": 91,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/91.json",
+        "metadataSha256": "8e9a63939cfc88f6af0879694bf7560513979e84edf2d440c8dc8a84d465180c",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(72)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/91.json"
+      }
+    },
+    {
+      "id": 92,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/92.json",
+        "metadataSha256": "720d3f4444fc409ff90731f996c599ed12adbe1f5b96d86ac65ad33f74e0f4d4",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(73)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/92.json"
+      }
+    },
+    {
+      "id": 93,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/93.json",
+        "metadataSha256": "13f4387bd514350f3fca5aa6ab6039085b8c68b53769a8b84b56f31294c582ae",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(74)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/93.json"
+      }
+    },
+    {
+      "id": 94,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/94.json",
+        "metadataSha256": "374e21bdb6c1837edbdeb514eef848127be13d8118c4d2eab94b622c94ee8643",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(75)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/94.json"
+      }
+    },
+    {
+      "id": 95,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/95.json",
+        "metadataSha256": "6618078674cefe056a5ec9590ab052fabaea126ed079495282e1dc74155594ff",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(76)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/95.json"
+      }
+    },
+    {
+      "id": 96,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/96.json",
+        "metadataSha256": "dc8cf380adb363905e84e02157cfbd7b505d695095474c7fb6bdcc0dc3d7bcc1",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(77)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/96.json"
+      }
+    },
+    {
+      "id": 97,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/97.json",
+        "metadataSha256": "b7ff4c0d283759921eba739aab3c907950a3c42ee303a434f66054fc3bf2618e",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(78)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/97.json"
+      }
+    },
+    {
+      "id": 98,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/98.json",
+        "metadataSha256": "df38da56c8692f2b8c013fe94be2f274df1bfe3e356ef46b32743f7a5fd92700",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(79)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/98.json"
+      }
+    },
+    {
+      "id": 99,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/99.json",
+        "metadataSha256": "36604209600bdca646ea3ce5b8e566b85ebdc0075d511c95a7b5425fa3522914",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(80)%20-%20Copia%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/99.json"
+      }
+    },
+    {
+      "id": 100,
+      "original": {
+        "metadataUri": "ipfs://ipfs/QmRFMuPYN74ws2TipRtBibHDueJxyi4TpviwGmpedGDQgw/json/100.json",
+        "metadataSha256": "71b31d94bee0e1463758c5dc441507e6d433b7fdfb202c26bfd61aa4fa77f249",
+        "mediaUris": [
+          "ipfs://ipfs/QmX1iFN3QnfBfcrUbsqKZFBuDRx9V2MMDFmuV6yUQErYTM/images/13047-5878%20(80)%20-%20Copia%20-%20Copia.gif"
+        ],
+        "mediaSha256": [
+          "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a"
+        ]
+      },
+      "twin": {
+        "contentHash": "0x87d4e814a924c8578fb5c92f452afb9c504c74b92d85dc3d0f582f21be1ea24d",
+        "sha256": "2ac89462e08f2360fef6f5f999ebef02d843e018ccc39c1ddf91e041fcfeba9a",
+        "mime": "image/gif",
+        "totalSize": 140745,
+        "tokenUri": "https://xtrata.xyz/ft/ordinal-pepe/100.json"
+      }
+    }
+  ],
+  "dependencies": []
+}

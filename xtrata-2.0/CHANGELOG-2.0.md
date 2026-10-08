@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: merged with main's Live draw (2026-10-08)
+- Merged `origin/main` (Live draw, Draw 1 result, chess 2 tickets, team wallets excluded) into the Audionaut-5 / size-ticket / team-wallet branch. Audionaut 5 now exists once (main's `w: 5`), unchanged.
+- **Draw 1 stays frozen:** the Live draw's `tix(c, i)` keeps 1 ticket for inscribing in Draw 1, so its pool still reproduces `draws/draw1/frozen.csv` exactly (19 wallets, 133 tickets). Size tickets apply from Draw 2 (`c.inp`); `inp` and `inu` are bookkeeping keys and are never counted as tickets of their own.
+- The Live draw's `TEAM` list now has all three team wallets (jim.btc, xtrata.btc, audionals.btc); `handles.json` `team` supplies the names shown on the board.
+- Snapshot re-baked from a full chain read with the draw list, per-draw counts and sizes (25 wallets, 10 sizes). `slimState` keeps `draws` and `sizes`.
+
 ## Bounty tracker: only jim.btc, xtrata.btc and audionals.btc are team wallets (2026-10-08)
 
 - `handles.json` gains a `team` map (address to BNS name) for the three team wallets, resolved from BNS v2 on 8 Oct. Those wallets show a "team · name" tag on the board and "team wallet" in the wallet bar, and their handles are locked.
@@ -18,6 +24,18 @@ Everything not listed here was copied verbatim from xtrata-1.0. Every change bel
 ## Bounty tracker: a wallet with 1 or more Audionauts earns 5 tickets (2026-10-07)
 - `public/bounty/zdao/tracker/1/index.html`: the Audionaut kind is now a flat 5 tickets per wallet, however many Audionauts it holds (it was 1). Added a `w` weight to the ticket kinds; `earned()` returns `w` for a flat kind. An Audionaut still counts as the wallet's entry (validity is unchanged), and inscription stays 1 ticket, so a wallet with both has 6 before other actions. Copy updated in the hero line, step 2, the ways list (+5 tickets), the ways intro, the example label and the two FAQ answers.
 - **Verified:** browser run against the baked snapshot: a wallet with 1 inscription, 3 Audionauts and 18 scores shows 24 (1 + 5 + 18); 1 Audionaut and 8 scores shows 13; 1 Audionaut and 1 score shows 6; 1 Audionaut alone shows 5. No page errors.
+
+## Bounty tracker: Draw 1 result published (2026-10-08)
+- `public/bounty/zdao/tracker/1/draws/draw1/` holds the official Draw 1 files: `frozen.csv` (wallet,tickets, 19 wallets / 133 tickets, SHA-256 `0e897ca2...121b`), `meta.json` (seed = Bitcoin block 970404 `0x00000000000000000001...c269`, mined 2026-10-08 00:17 BST; exclusions; weights) and `result.json` (3 winners, 2 reserves). The Live draw section compares its own result with `result.json` and shows "Matches the official result".
+- `handles.json`: the three Draw 1 winners are recorded under `winners` so they show as Winner on the leaderboard.
+- **Verified:** the page (in a headless browser against the live site) and `freeze.mjs`/`draw.mjs` produced the same list hash and the same 3 winners and 2 reserves.
+
+## Bounty tracker: Live draw, Audionaut 5, chess 2, team wallets excluded (2026-10-07)
+- `public/bounty/zdao/tracker/1/index.html`: new **Live draw** section under the stats. Before a cut-off it shows a countdown and the wallets and tickets currently in line. After the Draw 1 cut-off (23:59:59 BST) it waits for the first Bitcoin block mined after it (the ledger dates every transaction by its Bitcoin block, so the pool is only final then), uses that block's hash as the seed, re-reads the chain, freezes the ticket list (wallet,tickets sorted by wallet, SHA-256 shown) and draws 3 winners and 2 reserves with a step-by-step reveal. Pick k is SHA-256 of `seed|drawN|pickK` modulo the remaining tickets, winners removed one at a time, so every visitor's browser gets the same result. It offers a CSV download of the frozen list, a "Verify this draw yourself" panel and a replay, and compares with `/bounty/zdao/tracker/1/draws/drawN/result.json` if the team publishes one ("Matches the official result"). Draws 2 and 3 only show a countdown, then the published result. Only Draw 1 is computed in the page for now.
+- Ticket rules: an Audionaut is worth 5 tickets (once per wallet) and On-Chain Chess 2 (`KINDS[].w`); the two Xtrata team wallets (`TEAM`) show on the board as "Team" and are left out of every count and draw. Copy on the page matches (ways to earn, example, draws text).
+- Page now passes its draw list to the ledger reader (`CFG.draws = DRAWS`) and keeps per-draw counts (`w`) so the pool at each cut-off can be computed. Test hook: `?liveTest=<ISO time>` replaces the Draw 1 cut-off and labels the section "REHEARSAL".
+- `scripts/bounty-tracker-bake.mjs` now keeps `w` and the draw list in the baked state (before, it dropped both, which would have forced every first visit into a full read once the page asks for draws); test updated.
+- **Verified:** `npx vitest run src/bounty-tracker functions/bounty` (17 tests) and a headless browser rehearsal with `?liveTest=2026-10-07T19:00:00Z`: the page produced the same frozen list (hash `8d3e3e9fc5dea90e…`) and the same 3 winners and 2 reserves as the offline `freeze.mjs`/`draw.mjs` scripts. Desktop and 390 px checked; no page errors.
 
 ## Bounty tracker: Arcade link follows the v1.5.0 parent (2026-10-06)
 - `public/bounty/zdao/tracker/1/index.html`: the "Play the Arcade" button and the "(#3081)" label now point at parent #3111, matching the homepage tile and `/arcade` redirect. Checked the rest of the repo: no other live link still uses #3081. The remaining mentions are historical (launch canary notes and tests, the `3081` entry kept in `ARCADE_INSCRIPTION_IDS` so old boards stay valid, and the `xtrata-arcade-3081.webp` image filename).

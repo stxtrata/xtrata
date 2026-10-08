@@ -1,8 +1,10 @@
 import { cp, mkdir, readdir, rm, stat } from 'node:fs/promises';
-import { basename, join, parse } from 'node:path';
+import { basename, join, parse, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+
+const FOREVER_TWINS_INTERNAL_DIRS = new Set(['ft-harness', 'ops', 'strategy', 'copy', 'publish', 'scripts', 'functions', 'docs']);
 
 const staticApps = [
   { source: 'music', target: 'dist/music' },
@@ -16,7 +18,15 @@ const staticApps = [
   },
   {
     source: 'forever-twins',
-    target: 'dist/forever-twins'
+    target: 'dist/forever-twins',
+    // Internal working files are not published: the test harness, campaign and outreach drafts,
+    // prospect/ledger spreadsheets and loose markdown notes. Public pages, assets, registry and
+    // guides are everything else.
+    exclude: (rel) => {
+      const parts = rel.split('/');
+      if (parts.length === 1) return /\.md$/i.test(parts[0]) || FOREVER_TWINS_INTERNAL_DIRS.has(parts[0]);
+      return FOREVER_TWINS_INTERNAL_DIRS.has(parts[0]) || (parts[0] === 'data' && /\.csv$/i.test(parts[parts.length - 1]));
+    }
   },
   {
     source: 'suno-more',
@@ -53,7 +63,7 @@ const staticApps = [
 // be published to the static site. node_modules/dist excluded for size.
 const ignoredNames = new Set(['.DS_Store', '.git', '.gitignore', '.gitIgnore', 'node_modules', '.env', '.env.local', 'dist']);
 
-const copyStaticApp = async ({ source, target }) => {
+const copyStaticApp = async ({ source, target, exclude }) => {
   const sourcePath = join(repoRoot, source);
   const targetPath = join(repoRoot, target);
   const sourceStats = await stat(sourcePath).catch(() => null);
@@ -68,7 +78,12 @@ const copyStaticApp = async ({ source, target }) => {
     recursive: true,
     filter: (path) => {
       const name = basename(path);
-      return !ignoredNames.has(name);
+      if (ignoredNames.has(name)) return false;
+      if (exclude) {
+        const rel = relative(sourcePath, path).split(sep).join('/');
+        if (rel && exclude(rel)) return false;
+      }
+      return true;
     }
   });
 

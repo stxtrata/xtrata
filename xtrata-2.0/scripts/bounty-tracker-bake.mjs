@@ -2,8 +2,8 @@
 // Bake a collector state into the tracker page so first paint shows real numbers and the first
 // visit only has to fetch what happened since. Usage:
 //   node scripts/bounty-tracker-bake.mjs path/to/ledger-state.json
-// The state comes from XtrataLedger.run(...).state (localStorage['xt-ledger-state']). The page does not
-// use per-draw counts or first-transaction ids, so they are dropped to keep the page small.
+// The state comes from XtrataLedger.run(...).state (localStorage['xt-ledger-state']). The page's Live draw
+// needs the per-draw counts (`w`) and the draw list, so both are kept; first-transaction ids are dropped to keep the page small.
 import { readFileSync, writeFileSync } from 'node:fs';
 const PAGE = new URL('../public/bounty/zdao/tracker/1/index.html', import.meta.url);
 
@@ -11,10 +11,10 @@ export function slimState(state) {
   if (!state || state.v !== 2 || !state.addrs || !state.heads) throw new Error('Not a collector state (v2).');
   const addrs = {};
   for (const [addr, rec] of Object.entries(state.addrs)) {
-    const slim = { addr, first: rec.first, last: rec.last, n: rec.n, w: [], tx: {}, g: rec.g || {} };
+    const slim = { addr, first: rec.first, last: rec.last, n: rec.n, w: rec.w || [], tx: {}, g: rec.g || {} };
     addrs[addr] = slim;
   }
-  return { v: 2, cutoff: state.cutoff, draws: [], at: state.at, full: state.full, heads: state.heads, top: state.top, calls: state.calls, sizes: state.sizes || {}, addrs };
+  return { v: 2, cutoff: state.cutoff, draws: state.draws || [], at: state.at, full: state.full, heads: state.heads, top: state.top, calls: state.calls, sizes: state.sizes || {}, addrs };
 }
 export function bake(html, state) {
   const line = '  var SNAP = ' + JSON.stringify(slimState(state)) + '; /*SNAP*/';

@@ -1,0 +1,15 @@
+{
+ "pack": "zithers",
+ "tier": "core",
+ "count": 68,
+ "container": {
+  "file": "zithers.audpack",
+  "bytes": 4037757,
+  "sha256": "5521d4ee73f5786335a418c2405ab0f3299a6f3d6beea9b831df82bb20f2191e",
+  "chunks16384": 247,
+  "indexBytes": 109267,
+  "indexGzipBytes": 17253,
+  "payloadBytes": 4020492
+ },
+ "wavBytes": 10741898
+}

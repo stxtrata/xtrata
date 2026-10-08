@@ -124,6 +124,25 @@
 (define-private (source-owner (token-id uint))
   (unwrap-panic (contract-call? {{SOURCE}} get-owner token-id)))
 
+;;@PUBOWN-BEGIN
+;; PUBLIC-OWNER SOURCES (profile FT-CP-1 variant). This source's `get-owner` is
+;; declared `define-public`, so no read-only function may call it. The public
+;; paths (swaps, inscribe, rescue execution) still use the real `get-owner`
+;; through `source-owner` above. The two read-only views (`stray-side`,
+;; `get-custody-state`) instead ask whether the source's own per-owner id list
+;; for THIS contract contains the token. This is exact for custody questions
+;; ("does the helper hold it?"). It cannot name a third-party owner, so in
+;; get-custody-state `original-owner` is (some this-contract) when held and
+;; none otherwise; none then means "not held here", not "burned".
+(define-private (source-held-by-me (token-id uint))
+  (is-some (index-of? (get ids (contract-call? {{SOURCE}} {{HELD_IDS_READ_FN}} current-contract)) token-id)))
+
+(define-private (source-owner-ro (token-id uint))
+  (if (source-held-by-me token-id) (some current-contract) none))
+
+(define-private (source-live (o (optional principal))) true)
+
+;;@PUBOWN-END
 (define-private (twin-owner (xtrata-id uint))
   (unwrap-panic (contract-call? {{MASTER}} get-owner xtrata-id)))
 ;;@G2-BEGIN
@@ -382,7 +401,7 @@
 ;;  - announced on-chain, executable after RESCUE-DELAY Bitcoin blocks
 ;; =============================================================================
 (define-read-only (stray-side (token-id uint))
-  (let ((o (source-owner token-id)))
+  (let ((o (source-owner-ro token-id)))
     (match (map-get? Bindings token-id)
       b (let ((t (twin-owner (get xtrata-id b))))
           (if (and (is-eq o (some current-contract)) (is-eq t (some current-contract)))
@@ -497,11 +516,11 @@
 ;; disagrees with the binding; viewers must show that state, not hide it.
 (define-read-only (get-custody-state (token-id uint))
   (match (map-get? Bindings token-id)
-    b (let ((o (source-owner token-id)) (t (twin-owner (get xtrata-id b))) (me (some current-contract)))
+    b (let ((o (source-owner-ro token-id)) (t (twin-owner (get xtrata-id b))) (me (some current-contract)))
         (some { xtrata-id: (get xtrata-id b), xtrata-escrowed: (get xtrata-escrowed b),
                 original-owner: o, twin-owner: t,
                 consistent: (if (get xtrata-escrowed b)
-                              (and (is-eq t me) (not (is-eq o me)) (is-some o))
+                              (and (is-eq t me) (not (is-eq o me)) (source-live o))
                               (and (is-eq o me) (not (is-eq t me)) (is-some t))),
                 stranded: (and (is-eq o me) (is-eq t me)) }))
     none))

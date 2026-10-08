@@ -1,0 +1,15 @@
+{
+ "pack": "pianoby",
+ "tier": "attribution",
+ "count": 54,
+ "container": {
+  "file": "pianoby.audpack",
+  "bytes": 2669772,
+  "sha256": "671e15198ab93c6c0733a7b3f550187b36e532a6b0b2ee0d28f200a50a083836",
+  "chunks16384": 163,
+  "indexBytes": 123106,
+  "indexGzipBytes": 23680,
+  "payloadBytes": 2646080
+ },
+ "wavBytes": 10656086
+}

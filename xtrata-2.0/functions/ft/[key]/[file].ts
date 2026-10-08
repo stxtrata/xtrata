@@ -76,8 +76,10 @@ export const onRequest = async ({
   const key = Array.isArray(params.key) ? params.key[0] : params.key;
   const file = Array.isArray(params.file) ? params.file[0] : params.file;
   const collection = key ? config.collections[key] : undefined;
-  // Not a collection key (for example /ft/data/<file>): serve the static asset as is.
-  if (!key || !collection) return env.ASSETS.fetch(request);
+  // /ft/data/<file> are the static manifest files: serve them as they are.
+  if (key === 'data') return env.ASSETS.fetch(request);
+  // Anything else that is not a registered collection is a real 404, not the app shell.
+  if (!key || !collection) return json({ error: `unknown collection "${key ?? ''}"` }, 404, 'public, max-age=300');
 
   const id = file ? parseTokenFile(file) : null;
   if (id === null) return json({ error: 'expected /ft/<collection>/<id>.json' }, 400, 'no-store');

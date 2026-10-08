@@ -366,6 +366,15 @@ const sweepHot = async (stepId: string) => {
   });
   return chain.balance(hot);
 };
+/** Fees the temporary wallet needs for `n` board updates, accepting ownership, handing it back, and the sweep, with a margin. */
+const boardFloat = (n: number, o: { propose?: boolean; accept?: boolean } = {}) =>
+  TEMP_TX_FEE * BigInt(n + (o.propose === false ? 0 : 1) + (o.accept === false ? 0 : 1)) + SWEEP_TX_FEE + 20_000n;
+/** Which boards still need updating, and who owns the contract, read from the chain. */
+const boardPlan = async () => {
+  const todo: Board[] = [];
+  for (const b of PRODUCTION) if (!boardMatches(await readBoard(b.id), b)) todo.push(b);
+  return { todo, owner: await ownerOf(), pending: await pendingOwnerOf() };
+};
 /**
  * Gives contract ownership back to the deployer if the temporary wallet holds it: the temporary wallet proposes, the connected
  * wallet accepts. Safe to call at any point; does nothing when ownership is already back.
@@ -955,56 +964,58 @@ const STEPS: Step[] = [
     }
   },
   {
-    id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: 'Web wallet · 3 signatures, then automatic',
-    intro: `Sets every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards) to the parent inscription as engine id, no entry fee, enabled. Only the leaderboard owner can do this, so the canary signs all of them automatically with its temporary wallet: your wallet (1) sends the temporary wallet enough for the network fees, (2) makes it the contract owner, and (3) accepts ownership back when the last board is done. Unspent funds are swept back. The temporary key is saved to a file before the hand-over, and this step resumes from the chain if it is interrupted, including handing ownership back. Boards that already match (including boards on an earlier parent proven to load the same parts) are skipped; if none need updating, nothing is sent.`,
+    id: 'boardwallet', title: 'Create and fund the board-signing wallet', who: 'Web wallet · 1 signature',
+    intro: `Only the leaderboard owner can register boards, and the owner would otherwise have to approve all ${PRODUCTION.length} updates by hand. So the canary uses the temporary wallet it created in this browser (the same one as the copycat test). This step saves that wallet's key to a file, then asks your wallet to send it enough STX for the network fees of every board update plus the hand-back (about ${stx(boardFloat(PRODUCTION.length))} for ${PRODUCTION.length} boards; what is not spent is swept back at the end). Xverse cannot sign a plain transfer from a page: the address and amount are shown and the step waits for the funds to arrive. Boards that already match are not counted; if none need updating, nothing is created or sent.`,
+    action: 'Create and fund the wallet',
+    run: async () => {
+      const me = state.deployer!, hot = hotAddress();
+      const { todo, owner, pending } = await boardPlan();
+      if (owner !== me && owner !== hot) throw new Error(`The leaderboard is owned by ${owner}, which is neither your wallet nor the canary's temporary wallet ${hot}. Nothing was sent.`);
+      if (!todo.length && owner === me) return `all ${PRODUCTION.length} boards already match: no board-signing wallet needed, nothing sent · temporary wallet ${hot} holds ${stx(await chain.balance(hot))}`;
+      const target = owner === me ? boardFloat(todo.length) : boardFloat(todo.length, { propose: pending !== me, accept: false });
+      if (owner === me && pending !== hot) {
+        downloadHotKey();
+        const msg = `${todo.length} boards need updating.\n\nThe temporary wallet ${hot} will sign them. Its key has just been saved to a file in your downloads: keep it until the canary says ownership is back with your wallet.\n\nNext your wallet sends it about ${stx(target)} for network fees (what is unspent is swept back). Continue?`;
+        if (!confirm(msg)) throw new Error('Cancelled before anything was sent.');
+      }
+      const have = await ensureHotFunds('production', target, 'board-signing wallet');
+      return `temporary wallet ${hot} created, key saved to a file, and funded: it holds ${stx(have)} for ${todo.length} board update${todo.length === 1 ? '' : 's'}`;
+    }
+  },
+  {
+    id: 'handover', title: 'Make the temporary wallet the contract owner', who: 'Web wallet · 1 signature',
+    intro: 'Your wallet proposes the temporary wallet as the leaderboard contract\'s owner (`propose-owner`) and the temporary wallet accepts (`accept-owner`, signed in this page). It stays the owner only for the next step; the one after that hands ownership back to your wallet. If anything stops in between, the next step\'s button, or "Return ownership to my wallet" below, finishes the hand-back.',
+    action: 'Hand over ownership',
+    run: async () => {
+      const me = state.deployer!, hot = hotAddress();
+      const { todo, owner, pending } = await boardPlan();
+      if (owner !== me && owner !== hot) throw new Error(`The leaderboard is owned by ${owner}, which is neither your wallet nor the temporary wallet. Nothing was sent.`);
+      if (!todo.length && owner === me) return 'no boards need updating: ownership stays with your wallet, nothing sent';
+      if (owner === hot) return `the temporary wallet ${short(hot)} already owns the contract (nothing sent)`;
+      if ((await chain.balance(hot)) < boardFloat(todo.length, { propose: true, accept: true }) - 40_000n) throw new Error('The temporary wallet is not funded yet. Run the previous step first.');
+      if (pending !== hot) {
+        await runTx('production', uniq('production', `make ${short(hot)} the contract owner (propose)`), () => walletCall(scoresId(), 'propose-owner', [principalCV(hot)]));
+        await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? null : 'not proposed yet'));
+      }
+      await hotCall('production', 'temporary wallet accepts ownership', 'accept-owner', []);
+      await eventually('Owner', async () => ((await ownerOf()) === hot ? null : 'not accepted yet'));
+      return `the temporary wallet ${short(hot)} now owns the leaderboard contract (hand it back in the last board step) · ${todo.length} boards to update`;
+    }
+  },
+  {
+    id: 'production', title: `Point the ${PRODUCTION.length} production boards at the parent`, who: 'Temporary wallet (signed in this page)',
+    intro: `The temporary wallet signs \`set-board\` for every arcade board (${PRODUCTION.filter((b) => b.mode === 0).length} score boards, ${PRODUCTION.filter((b) => b.mode === 1).length} time boards): the parent inscription as engine id, no entry fee, enabled. One after another, each confirmed before the next, with no wallet prompts. The contract keeps each board's Top 10 and stored replays when its engine id changes. Boards that already match (including boards on an earlier parent proven to load the same parts) are skipped, so a reload or an error resumes where it stopped.`,
     action: 'Update boards automatically',
     run: async () => {
-      const id = state.inscriptionId!;
-      const me = state.deployer!, hot = hotAddress();
-      const todo: Board[] = [];
-      for (const b of PRODUCTION) if (!boardMatches(await readBoard(b.id), b)) todo.push(b);
-      let owner = await ownerOf(), pending = await pendingOwnerOf();
-      if (owner !== me && owner !== hot) throw new Error(`The leaderboard is owned by ${owner}, which is neither your wallet nor the canary's temporary wallet ${hot}. Nothing was sent.`);
-
-      // Nothing to change: just make sure the temporary wallet cannot take ownership later.
-      if (!todo.length && owner === me) {
-        if (pending === hot) {
-          await runTx('production', uniq('production', 'cancel the pending hand-over'), () => walletCall(scoresId(), 'propose-owner', [principalCV(me)]));
-          await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? 'still the temporary wallet' : null));
-        }
-        const left = await sweepHot('production');
-        return `${PRODUCTION.length} boards already on engine inscription #${id}${(state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : ''} · nothing sent · temporary wallet holds ${stx(left)}`;
-      }
-
-      const need = (n: number, handback: boolean, accept: boolean) => TEMP_TX_FEE * BigInt(n + (handback ? 1 : 0) + (accept ? 1 : 0)) + SWEEP_TX_FEE + 20_000n;
-      const holdsOwnership = () => `The leaderboard is owned by the canary's temporary wallet ${hot} until it is handed back. Press the step's button again, or "Return ownership to my wallet", to finish. Its key was saved to a file (and stays in this browser).`;
+      const id = state.inscriptionId!, hot = hotAddress();
+      const { todo, owner } = await boardPlan();
+      const kept = (state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : '';
+      if (!todo.length) return `${PRODUCTION.length} boards already on engine inscription #${id}${kept} · nothing sent`;
+      if (owner !== hot) throw new Error('The temporary wallet does not own the contract yet. Run the two previous steps first.');
       let updated = 0;
       try {
-        // 1 + 2. Fund the temporary wallet, then make it the owner.
-        if (owner === me) {
-          if (pending !== hot) {
-            downloadHotKey();
-            const msg = `${todo.length} boards need updating. Only the contract owner can do that, so the canary will:\n\n1. ask your wallet to send the temporary wallet about ${stx(need(todo.length, true, true))} (fees; the unspent rest is swept back)\n2. ask your wallet to make ${short(hot)} the contract owner\n3. sign all ${todo.length} board updates itself\n4. hand ownership back (your wallet signs once more) and sweep the leftovers.\n\nThe temporary key has just been saved to a file in your downloads. Keep it until ownership is back with your wallet. Continue?`;
-            if (!confirm(msg)) throw new Error('Cancelled before anything was sent.');
-          }
-          await ensureHotFunds('production', need(todo.length, true, true), 'boards');
-          if (pending !== hot) {
-            await runTx('production', uniq('production', `make ${short(hot)} the contract owner (propose)`), () => walletCall(scoresId(), 'propose-owner', [principalCV(hot)]));
-            await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? null : 'not proposed yet'));
-          }
-          await hotCall('production', 'temporary wallet accepts ownership', 'accept-owner', []);
-          await eventually('Owner', async () => ((await ownerOf()) === hot ? null : 'not accepted yet'));
-          owner = hot;
-        } else {
-          // Resuming with the temporary wallet already the owner: make sure it can pay for what is left.
-          await ensureHotFunds('production', need(todo.length, pending !== me, false), 'boards');
-        }
-
-        // 3. All the board updates, signed by the temporary wallet.
-        let n = 0;
         for (const b of todo) {
-          n++;
-          status(`Pointing ${b.id} at #${id} (${n} of ${todo.length})…`);
+          status(`Pointing ${b.id} at #${id} (${updated + 1} of ${todo.length})…`);
           await hotCall('production', `set-board ${b.id} → #${id}`, 'set-board',
             [stringAsciiCV(b.id), uintCV(b.mode), uintCV(b.max), uintCV(0), uintCV(BigInt(id)), boolCV(false), boolCV(true)]);
           await eventually(b.id, async () => (boardMatches(await readBoard(b.id), b) ? null : 'not set yet'));
@@ -1013,13 +1024,28 @@ const STEPS: Step[] = [
       } catch (error) {
         let held = false;
         try { held = (await ownerOf()) === hot; } catch { /* ignore */ }
-        if (held) throw new Error(`${error instanceof Error ? error.message : String(error)} — ${holdsOwnership()}`);
+        if (held) throw new Error(`${error instanceof Error ? error.message : String(error)} — The leaderboard is owned by the temporary wallet ${hot} until it is handed back. Press this step's button again to continue, or "Return ownership to my wallet" to give it back now. Its key was saved to a file (and stays in this browser).`);
         throw error;
       }
-      await handBack();
+      return `${PRODUCTION.length} boards on engine inscription #${id}${kept} · ${updated} updated automatically by the temporary wallet`;
+    }
+  },
+  {
+    id: 'handback', title: 'Hand ownership back and sweep the temporary wallet', who: 'Web wallet · 1 signature',
+    intro: 'The temporary wallet proposes your wallet as owner again and your wallet accepts (`accept-owner`). Then anything left in the temporary wallet is swept back to you. The step also clears a hand-over that was proposed but never accepted, so the temporary key can never take ownership later.',
+    action: 'Hand back and sweep',
+    run: async () => {
+      const me = state.deployer!, hot = hotAddress();
+      const moved = await handBack();
+      let owner = await ownerOf();
+      if (owner !== me) throw new Error(`The leaderboard is owned by ${owner}, not your wallet.`);
+      if ((await pendingOwnerOf()) === hot) {
+        await runTx('production', uniq('production', 'cancel the pending hand-over'), () => walletCall(scoresId(), 'propose-owner', [principalCV(me)]));
+        await eventually('Pending owner', async () => ((await pendingOwnerOf()) === hot ? 'still the temporary wallet' : null));
+      }
+      for (const b of PRODUCTION) if (!boardMatches(await readBoard(b.id), b)) throw new Error(`Board ${b.id} does not match the parent yet. Run the board step again before finishing.`);
       const left = await sweepHot('production');
-      const kept = (state.equivalent || []).length ? ` or an equivalent earlier parent (${(state.equivalent || []).map((x) => '#' + x).join(', ')})` : '';
-      return `${PRODUCTION.length} boards on engine inscription #${id}${kept} · ${updated} updated automatically · ownership is back with ${short(me)} · temporary wallet holds ${stx(left)}`;
+      return `${moved ? 'ownership handed back to your wallet' : 'your wallet already owns the contract (nothing to hand back, nothing sent)'} · all ${PRODUCTION.length} boards match · temporary wallet holds ${stx(left)}`;
     }
   },
   {

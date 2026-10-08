@@ -113,6 +113,14 @@
 
     <!-- One rotating strip replaces the Collections banner and the campaign cards.
          Slides live in HOMEPAGE_STRIP_SLIDES (src/home/homepage-content.js). -->
+    <!-- Music Supporters banner. Filled by src/home/music-supporters.js from /api/music-stats.
+         Hidden by the script when the totals cannot be read, so it never shows a false zero. -->
+    <a class="home-supbar home-only" id="musicBanner" href="/music/heroes" target="_blank" rel="noopener" data-sup-root data-state="loading" data-home-action="supporters:banner">
+      <span class="home-supbar__tag"><span class="home-sup-dot" aria-hidden="true"></span><span class="home-supbar__tag-word">Xtrata Music</span></span>
+      <span class="home-supbar__text"><strong data-sup="plays">…</strong> paid plays from <strong data-sup="supporters">…</strong> <span class="home-supbar__long">music supporters</span><span class="home-supbar__short">supporters</span><span data-sup="stale-note"></span></span>
+      <span class="home-supbar__go">See the Music Heroes →</span>
+    </a>
+
     <section class="home-strip home-only" id="homeStrip" aria-label="What's new on Xtrata" data-tone="violet"></section>
 
     <section class="living-hero living-hero--wall registry-intro home-only" id="registryIntro" aria-labelledby="registryIntroTitle">
@@ -135,6 +143,43 @@
     </section>
 
     <section class="home-panel home-bounty home-only" id="homeBounty" aria-label="The Create, Inscribe, Share bounty"></section>
+
+    <section class="home-panel home-sup home-only" id="musicSupporters" aria-labelledby="homeSupTitle" data-sup-root data-state="loading">
+      <div class="home-sup__top">
+        <div class="home-sup__copy">
+          <span class="home-kicker home-kicker--violet">Xtrata Music · Music Supporters</span>
+          <h2 class="home-panel__title" id="homeSupTitle">Every play <em>supports someone.</em></h2>
+          <p class="home-sup__lead">Listeners in the Xtrata Music app pay a small amount straight to the song holder each time a song starts. Every payment is recorded on Stacks, so anyone can count them.</p>
+          <div class="home-sup__actions">
+            <a class="home-btn home-btn--solid" style="--tone: var(--home-violet)" href="/music/heroes" target="_blank" rel="noopener" data-home-action="supporters:heroes">Meet the Music Heroes →</a>
+            <a class="home-btn" href="/music/lounge#downloads" target="_blank" rel="noopener" data-home-action="supporters:get-app">Get Xtrata Music</a>
+          </div>
+        </div>
+        <div class="home-sup__ledger">
+          <div class="home-sup__live"><span class="home-sup-dot" aria-hidden="true"></span><span data-sup="status">Checking the chain…</span></div>
+          <div class="home-sup__stat">
+            <div class="home-sup__num" data-sup="supporters">…</div>
+            <div class="home-sup__label">Music supporters</div>
+            <p class="home-sup__note">Addresses that have paid for at least one song start. An address is a wallet, not necessarily a different person.</p>
+          </div>
+          <div class="home-sup__stat">
+            <div class="home-sup__num" data-sup="plays">…</div>
+            <div class="home-sup__label">Paid plays, verifiable on-chain</div>
+            <p class="home-sup__note">Each one sent 0.000050 STX to the song holder.</p>
+          </div>
+          <div class="home-sup__mini"><span>Paid to song holders</span><strong data-sup="stx">…</strong></div>
+          <div>
+            <div class="home-sup__mini"><span data-sup="milestone-label">Next milestone</span><strong data-sup="milestone-left"></strong></div>
+            <div class="home-sup__bar" role="progressbar" aria-label="Progress to the next paid-play milestone" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-sup="bar"></i></div>
+          </div>
+          <p class="home-sup__src">Counted from <a href="https://explorer.hiro.so/txid/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0?chain=mainnet" target="_blank" rel="noopener noreferrer">xtrata-radio-plays-v1-0 ↗</a> · amounts exclude network fees</p>
+        </div>
+      </div>
+      <div class="home-sup__latest">
+        <div class="home-sup__latest-head"><h3>Latest paid plays</h3><span data-sup="feed-meta"></span></div>
+        <ol class="home-sup__feed" data-sup-feed></ol>
+      </div>
+    </section>
 
     <section class="home-panel home-music home-only" id="music" aria-labelledby="homeMusicTitle">
       <div class="home-panel__head">

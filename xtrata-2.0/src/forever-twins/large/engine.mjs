@@ -13,7 +13,7 @@
 // ft-harness/sim/large-wizard-engine.mjs and against the real chain in the page (chain-io.ts).
 //
 // Differences from Agent One, on purpose:
-//  * the 10% processing fee is the same rule as Agent One (a percentage of the request, grossed up so real costs
+//  * the 5% processing fee is the same rule as Agent One (a percentage of the request, grossed up so real costs
 //    are covered, paid to the agent fee address) but is taken only after the twin is bound; a failed, cancelled or
 //    lost job is refunded in full. The helper's own fee is a separate line in the quote
 //  * NO duplicate-hash shortcut. The core lets several wallets seal identical bytes; Agent One would
@@ -54,7 +54,7 @@ export const CONFIG = Object.freeze({
   batchMultX10: 20n,              // multi-tx upload fee reserve = 2.0 x the 1 µSTX/byte floor
   roundUstx: 10_000n,             // round the request up to 0.01 STX
   sweepFeeBudget: 60_000n,        // first sweep pass keeps 3x the floor fee so a fee bump never fails
-  agentFeePct: 10n,               // processing fee: this % of EVERYTHING that was ever sent to the one-use wallet
+  agentFeePct: 5n,                // processing fee: this % of EVERYTHING that was ever sent to the one-use wallet
   maxStepFailures: 12             // consecutive failures of one step before it is parked, not retried
 });
 

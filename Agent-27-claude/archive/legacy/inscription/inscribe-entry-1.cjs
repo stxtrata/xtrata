@@ -33,7 +33,7 @@ const { StacksMainnet } = require('@stacks/network');
 
 const CONTRACT_ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X';
 const CONTRACT_NAME = 'xtrata-v2-1-0';
-const MNEMONIC = 'capital process seat brief true sketch error desk arena salt maple three grape endless vessel science feel such electric turn angle cat right boring';
+const MNEMONIC = process.env.AGENT27_MNEMONIC;
 const HTML_FILE = __dirname + '/inscriptions/entry-20260227.html';
 const TOKEN_URI = 'data:text/html,agent-27-entry-1';
 const GENESIS_TOKEN_ID = 107;

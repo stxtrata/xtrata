@@ -1,6 +1,6 @@
 # Milestones
 
-Status as of 25 September 2026. Update the status column and the evidence log in
+Status as of 6 October 2026. Update the status column and the evidence log in
 [reporting.md](reporting.md) as things land.
 
 ## Agreed definition of "preserved"
@@ -10,8 +10,10 @@ anyone can use it**. That means its canonical record is fully seeded and finalis
 token in the collection *can* be inscribed. It does **not** mean the whole collection has been
 inscribed. The target is at least a handful of real users per collection.
 
-> TBD: confirm with the DeGrants team that this definition is accepted, and whether Milestone 1
-> is due at the end of Q3 (30 September 2026) or is simply the first stage of the grant period.
+> Confirmed with the DeGrants team (Andrea), reported by Jim on 6 October 2026: a publicly
+> accessible contract that anyone can use counts as preserved; an open preservation gateway is
+> enough. Milestone 1 is due **Tuesday 13 October 2026** ($1,600 on approval); the plan is to
+> submit on Monday 12 October in the grants tracker.
 
 ## Milestone 1: Public Preservation Service + Initial Cohort
 
@@ -19,12 +21,12 @@ Tracker status: In progress.
 
 | # | Deliverable (as published) | Status | Notes |
 |---|---|---|---|
-| 1.1 | Launch the public Forever Twins preservation service | Not started | Needs deployed v3 helpers and a holder-facing page |
-| 1.2 | Preserve at least 3 additional at-risk collections beyond Bitcoin Pepes, LEO Cats and Miami Degens | Contracts and tooling ready | v3 passes 453/453 in the real harness; manifest builder, seeding plan and checker built; picks recommended ([collections.md](../project/collections.md)), awaiting Jim; nothing deployed |
-| 1.3 | Publish the Forever Twins preservation registry | Built, not published | `ft-harness/registry/`: JSON with the 3 live v1 helpers, a page reading every helper live, `npm run registry:verify`. Add v3 helpers as they deploy |
-| 1.4 | Publish an educational explainer and "Preserve Your Collection" guide | Drafts started | [what-is-forever-twins.md](../project/what-is-forever-twins.md), [preserve-your-collection.md](../guides/preserve-your-collection.md) |
-| 1.5 | Publish onboarding documentation | Draft started | [onboarding.md](../guides/onboarding.md) |
-| 1.6 | Release the preservation tooling and registry as open source | Not started | [open-source-release.md](../operations/open-source-release.md) |
+| 1.1 | Launch the public Forever Twins preservation service | Live | Shared collection pages at `/forever-twins/collection/<key>`, collections directory, community pages, resolver at `/ft/<collection>/<id>.json` |
+| 1.2 | Preserve at least 3 additional at-risk collections beyond Bitcoin Pepes, LEO Cats and Miami Degens | Done (evidence being collected) | NYC Degens, Megapont Ape Club and Bitcoin Monkeys: helpers deployed, seeded and finalised on mainnet, source hashes match the pinned template, each with test inscriptions. Ordinal Pepe is ready as a fourth. Evidence bundle in progress |
+| 1.3 | Publish the Forever Twins preservation registry | Published | `/forever-twins/data/registry.v2.json` (six live collections, helper source hashes, manifests, recovered counts) and `/forever-twins/collections/`; `npm run registry:verify` checks the helpers against the chain |
+| 1.4 | Publish an educational explainer and "Preserve Your Collection" guide | Published | `/forever-twins/guides/what-is-forever-twins`, `/forever-twins/guides/preserve-your-collection` (the markdown in this folder is the older draft) |
+| 1.5 | Publish onboarding documentation | Published | `/forever-twins/guides/onboarding` and `/forever-twins/guides/verify-it-yourself` |
+| 1.6 | Release the preservation tooling and registry as open source | In progress | Repository is public; README written; licence not yet chosen; see [open-source-release.md](../operations/open-source-release.md) |
 
 ## Milestone 2
 

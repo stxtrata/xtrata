@@ -53,6 +53,14 @@ export function validateRegistry(reg) {
     if (c.interface === 'v1' && c.status === 'live' && !c.legacyPage) err(`${id}: live v1 helpers must keep a legacyPage (the only write path for v1)`);
     if (c.legacyPage != null && !/^\/forever-twins\/[a-z0-9-]+\/$/.test(c.legacyPage)) err(`${id}: legacyPage must look like /forever-twins/<name>/`);
     if (c.largeOnDemand != null && (typeof c.largeOnDemand !== 'boolean' || c.interface !== 'v3' || !c.helper)) err(`${id}: largeOnDemand must be a boolean on a v3 collection with a helper`);
+    if (c.helperSourceSha256 != null && !/^[0-9a-f]{64}$/.test(c.helperSourceSha256)) err(`${id}: helperSourceSha256 must be 64 lowercase hex characters`);
+    if (c.interface === 'v3' && c.helper && !c.helperSourceSha256) err(`${id}: a live v3 helper needs helperSourceSha256 so anyone can check the deployed source`);
+    if (c.coverage != null) {
+      const cv = c.coverage;
+      if (!Number.isInteger(cv.recovered) || cv.recovered < 0) err(`${id}: coverage.recovered must be a whole number`);
+      else if (c.manifest && Number.isInteger(c.manifest.count) && cv.recovered > c.manifest.count) err(`${id}: coverage.recovered exceeds the manifest count`);
+      if (cv.of != null && c.manifest && cv.of !== c.manifest.count) err(`${id}: coverage.of must equal the manifest count`);
+    }
     if (c.interface === 'v3' && c.twinTokenUri != null && !String(c.twinTokenUri).includes('{id}')) err(`${id}: twinTokenUri must contain {id}`);
     if (c.helper) {
       if (helpers.has(c.helper)) err(`${id}: helper already used by "${helpers.get(c.helper)}"`);

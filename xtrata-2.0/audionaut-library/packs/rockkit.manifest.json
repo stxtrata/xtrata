@@ -1,0 +1,15 @@
+{
+ "pack": "rockkit",
+ "tier": "attribution",
+ "count": 115,
+ "container": {
+  "file": "rockkit.audpack",
+  "bytes": 4963870,
+  "sha256": "03e27ae5eafbc55b32c6cb49baa48bd3a68465c54f7ec92e25ed52dbb253d817",
+  "chunks16384": 303,
+  "indexBytes": 183467,
+  "indexGzipBytes": 28170,
+  "payloadBytes": 4935688
+ },
+ "wavBytes": 12555510
+}

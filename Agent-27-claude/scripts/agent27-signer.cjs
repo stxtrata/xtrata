@@ -3,7 +3,7 @@ const { HDKey } = require('@scure/bip32');
 
 const DERIVATION_PATH = "m/44'/5757'/0'/0/0";
 const DEFAULT_MNEMONIC =
-  'capital process seat brief true sketch error desk arena salt maple three grape endless vessel science feel such electric turn angle cat right boring';
+  process.env.AGENT27_MNEMONIC;
 
 function deriveKeyFromMnemonic(mnemonic) {
   const seed = mnemonicToSeedSync(mnemonic.trim());

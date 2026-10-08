@@ -34,7 +34,14 @@ const isOk = (r) => r.result.type === 'ok';
 const code = (r) => (r.result.type === 'err' ? String(r.result.value.value) : 'ok');
 const json = (r) => cvToJSON(r.result);
 const principalOf = (cv) => (cv && cv.type === 'some' ? cv.value.value : null);
-const own = (c, id) => principalOf(ro(c, 'get-owner', [Cl.uint(id)]).result.value);
+// Sources whose get-owner is define-public (Bitcoin Birds v1) cannot be read via read-only calls;
+// the harness reads those through a public call from the deployer (no state change in the source).
+const publicOwnerSources = new Set(JSON.parse(readFileSync(join(ROOT, 'scripts/legacy-sources.json'), 'utf8')).sources
+  .filter((x) => x.ownerRead === 'public').map((x) => x.name));
+const own = (c, id) => {
+  const r = publicOwnerSources.has(c.split('.')[1]) ? pub(c, 'get-owner', [Cl.uint(id)], D) : ro(c, 'get-owner', [Cl.uint(id)]);
+  return principalOf(r.result.value);
+};
 const ifaces = s.getContractsInterfaces();
 const deployed = (c) => ifaces.has(c);
 const hasFn = (c, f) => ifaces.get(c).functions.some((x) => x.name === f);

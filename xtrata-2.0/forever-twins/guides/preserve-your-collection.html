@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preserve your collection · Forever Twins</title>
+<meta name="description" content="How holders and communities create Forever Twins, swap, and get a collection onto the registry.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs"><a href="/forever-twins/guides/">Guides</a> › Preserve your collection</span>
+</div></header>
+<main class="wrap">
+<article class="card prose">
+
+<h1>Preserve your collection</h1>
+<p class="updated">Updated 6 October 2026. For holders and collection communities.</p>
+
+<h2>Is my collection at risk?</h2>
+<p>Open the metadata links of a few of your NFTs. If the image loads from IPFS, a project&rsquo;s own website or a cloud bucket, it depends on someone continuing to keep that online. If it already fails to load, the art may be lost unless a copy exists somewhere.</p>
+
+<h2>If your collection already has a helper</h2>
+<p>Find it on the <a href="/forever-twins/collections/">collections page</a>. Each collection page shows its helper contract, fee, and the four coverage numbers.</p>
+<p>Three older collections (Bitcoin Pepes, LEO Cats and Miami Degens) run on earlier helpers and keep their original pages, which the collection page links to. The newer ones (NYC Degens, Megapont Ape Club and Bitcoin Monkeys) use the shared collection page.</p>
+
+<h3>Create a twin</h3>
+<ol>
+  <li>Open the collection page and connect your wallet.</li>
+  <li>Enter the token number. The page reads the chain and shows whether it already has a twin.</li>
+  <li>Check the fee and the on-chain storage cost the page quotes, then confirm. The page checks the art against the locked fingerprint before it asks your wallet to sign.</li>
+</ol>
+<p>Anyone can create a twin for any token. Paying gives no rights over the original.</p>
+<p><strong>Files over 512 KB</strong> (some Bitcoin Monkeys, for example) use a guided route: the page creates a temporary wallet in your browser, shows the exact amount to fund it with, runs all the upload transactions, creates the twin and returns the leftover STX. A 5% processing fee goes to Xtrata, only if the twin is made. You can stop and resume.</p>
+
+<h3>Swap your original for its twin</h3>
+<ol>
+  <li>On the collection page, look up a token you own that has a twin.</li>
+  <li>If your collection has its own marketplace (a &ldquo;G2&rdquo; collection such as Megapont Ape Club), <strong>unlist the NFT there first</strong>. The helper refuses a listed token (error <code>u217</code>).</li>
+  <li>Confirm. Your original goes into the helper and the twin comes to your wallet. No helper fee.</li>
+</ol>
+
+<h3>Get your original back</h3>
+<p>While you hold the twin, swap back. You return the twin and receive the original. Whoever holds the twin can do this, so selling the twin also sells the right to the original.</p>
+
+<div class="msg warn"><strong>Never send an NFT directly to a helper&rsquo;s address.</strong> Use the collection page or the helper&rsquo;s swap functions. A direct transfer cannot be told apart from a mistake, so it cannot simply be returned.</div>
+
+<h2>If the website is gone</h2>
+<p>The helpers are public contracts. Anyone can call them from any wallet or tool that can call a Stacks contract, with no permission from us. The function list and error codes are in the <a href="https://github.com/stxtrata/xtrata/tree/main/DeGrants/Forever%20Twins/docs/reference">reference docs</a>, and <a href="/forever-twins/guides/verify-it-yourself">Verify it yourself</a> shows how to check what you are calling.</p>
+
+<h2>If your collection doesn&rsquo;t have a helper yet</h2>
+<p>Read <a href="/forever-twins/guides/onboarding">Onboarding a collection</a> for what we need, then message <a href="https://x.com/XtrataLayers">@XtrataLayers</a> on X.</p>
+
+<h2>FAQ</h2>
+<p><strong>Does this change my original NFT?</strong> No.</p>
+<p><strong>Who can pause or stop swaps?</strong> Nobody. The contracts have no pause.</p>
+<p><strong>What can the owner do?</strong> Set the fee (within a ceiling fixed at deployment), rescue a mistaken transfer after a public delay, and hand over ownership. It cannot change the record, move a paired token or change who is paid.</p>
+<p><strong>Where does the fee go?</strong> It is split equally between two payee addresses fixed in the contract. The storage cost goes to Xtrata.</p>
+<p><strong>Can a twin&rsquo;s art be swapped for something else?</strong> No. Each token&rsquo;s fingerprint is locked in the helper before anyone can use it, and the full list is published.</p>
+<p><strong>Is my whole collection on-chain now?</strong> Only the tokens that have twins. The collection page shows how many.</p>
+
+</article>
+</main>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a> · <a href="https://github.com/stxtrata/xtrata/tree/main/xtrata-2.0/forever-twins/ft-harness">Source</a></div></footer>
+
+</body>
+</html>

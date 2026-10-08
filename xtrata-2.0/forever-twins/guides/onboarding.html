@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding a collection · Forever Twins</title>
+<meta name="description" content="What a collection needs to get a Forever Twins helper, and what happens at each step.">
+<link rel="icon" href="/forever-twins/assets/xtrata-X-no-text-256x256.png">
+<link rel="stylesheet" href="/forever-twins/assets/ft-shared.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="/forever-twins/">Forever Twins</a>
+  <span class="crumbs"><a href="/forever-twins/guides/">Guides</a> › Onboarding a collection</span>
+</div></header>
+<main class="wrap">
+<article class="card prose">
+
+<h1>Onboarding a collection</h1>
+<p class="updated">Updated 6 October 2026. For collection teams and community members proposing a collection.</p>
+
+<h2>Eligibility</h2>
+<p>A collection can use the standard helper if:</p>
+<ul>
+  <li>its mint has <strong>finished</strong>. The record covers the tokens that exist when the manifest is built; tokens minted later are not covered.</li>
+  <li>each token&rsquo;s art is <strong>32 MB or smaller</strong>. Files up to 512 KB are inscribed in a single transaction. Larger files go through a multi-transaction route (see below).</li>
+  <li>its contract has a plain holder-authorised <code>transfer</code> and a read-only owner lookup, and nothing can move a token out of the helper without the helper&rsquo;s signature.</li>
+  <li>the art can still be fetched, from the original host or a verifiable backup.</li>
+</ul>
+<p>Collections whose contract has its own market (<code>list-in-ustx</code> / <code>buy-in-ustx</code>) use the <strong>G2</strong> template, which refuses to take a listed token, so holders must unlist before swapping. Collections with plain transfers use <strong>G1</strong>. Collections that fit neither need an adapter and are handled case by case.</p>
+
+<h2>What we need from you</h2>
+<ul>
+  <li>The contract address and a link to the collection.</li>
+  <li>Where the art and metadata are hosted today.</li>
+  <li>Any original art files or backups your team holds.</li>
+  <li>A community contact for announcements and questions.</li>
+</ul>
+<p>Message <a href="https://x.com/XtrataLayers">@XtrataLayers</a> on X to start.</p>
+
+<h2>What happens</h2>
+<ol>
+  <li><strong>Screening.</strong> We check the contract and confirm its group (G1 or G2).</li>
+  <li><strong>Manifest.</strong> We fetch every token&rsquo;s art, record its fingerprint, file type and size, and publish the manifest. The manifest records the chain height it was built at.</li>
+  <li><strong>Deploy and seed.</strong> The helper is deployed and the record is loaded into it in batches of 100 tokens.</li>
+  <li><strong>Check.</strong> The manifest is public so the community can check it against the original collection and against the helper before it is locked.</li>
+  <li><strong>Finalise.</strong> The record is locked for good. Nothing can be inscribed before this.</li>
+  <li><strong>Launch.</strong> The collection is added to the <a href="/forever-twins/collections/">registry</a> and gets a page.</li>
+</ol>
+
+<h2>Large files</h2>
+<p>Art over 512 KB cannot use the single-transaction route. Helpers can be deployed in one of two ways:</p>
+<ul>
+  <li><strong>Pre-inscribed.</strong> The owner inscribes each large file through the core&rsquo;s multi-transaction upload and binds it to its token before the record is finalised.</li>
+  <li><strong>Large-on-demand.</strong> The record is finalised with large files still unbound, and any visitor can create the twin later through the collection page&rsquo;s guided route (temporary wallet, resumable uploads, leftover STX returned). Bitcoin Monkeys uses this because 283 of its 2,500 files are over 512 KB.</li>
+</ul>
+
+<h2>After launch</h2>
+<ul>
+  <li>Holders create twins and swap whenever they like. Nothing expires.</li>
+  <li>The fee is shown on the collection page and in the contract (<code>get-fee</code>).</li>
+  <li>Please share the &ldquo;never send your NFT directly to the helper&rdquo; warning with your community.</li>
+</ul>
+
+<h2>For developers</h2>
+<p>The helper template, renderer, manifest builder, tests and deployment notes are in the <a href="https://github.com/stxtrata/xtrata/tree/main/xtrata-2.0/forever-twins/ft-harness">ft-harness folder</a> of the repository. This is an unaudited prototype. Each deployed helper is pinned to the exact source we tested: see <a href="/forever-twins/guides/verify-it-yourself">Verify it yourself</a>.</p>
+
+</article>
+</main>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a> · <a href="https://github.com/stxtrata/xtrata/tree/main/xtrata-2.0/forever-twins/ft-harness">Source</a></div></footer>
+
+</body>
+</html>

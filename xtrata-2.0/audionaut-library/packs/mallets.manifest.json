@@ -1,0 +1,15 @@
+{
+ "pack": "mallets",
+ "tier": "core",
+ "count": 84,
+ "container": {
+  "file": "mallets.audpack",
+  "bytes": 4046504,
+  "sha256": "0b19b1952aa29a5ef99f3b711dc77a94869968ce5293715da427d1c59a7402b3",
+  "chunks16384": 247,
+  "indexBytes": 133663,
+  "indexGzipBytes": 20604,
+  "payloadBytes": 4025888
+ },
+ "wavBytes": 13202676
+}

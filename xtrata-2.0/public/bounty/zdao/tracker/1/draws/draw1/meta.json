@@ -1,0 +1,280 @@
+{
+ "draw": 1,
+ "dryRun": false,
+ "cutoff": "2026-10-07T22:59:59Z",
+ "readAt": "2026-10-07T23:18:25.016Z",
+ "csvSha256": "0e897ca200b5ea315f0b6cca8907ba40d81e298ab205791e9b4e321c4486121b",
+ "winners": 3,
+ "reserves": 2,
+ "weights": {
+  "aud": 5,
+  "ch": 2
+ },
+ "poolWallets": 19,
+ "poolTickets": 133,
+ "seed": {
+  "height": 970404,
+  "hash": "0x0000000000000000000141e6be4189208cd48e16c8d4e7c59ac5a2a6bb47c269",
+  "time": "2026-10-07T23:17:27.000Z",
+  "stacksHeight": 9142879
+ },
+ "excluded": [
+  {
+   "wallet": "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7",
+   "reason": "Xtrata team (@jimdotbtc)",
+   "tickets": 7
+  },
+  {
+   "wallet": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+   "reason": "Xtrata team (contract wallet, @XtrataLayers)",
+   "tickets": 1
+  }
+ ],
+ "held": [
+  {
+   "wallet": "SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K",
+   "held": 1
+  },
+  {
+   "wallet": "SPRNRHWSD7REAEXVTHDQWKPD4MFBG41025FNN3GA",
+   "held": 2
+  },
+  {
+   "wallet": "SP3GXE1PV02ZTMDYCP168PK0N4SG9GDGX4Q59PAPW",
+   "held": 1
+  },
+  {
+   "wallet": "SP93M3QT0M5GZP711PAH37RFZ1WCSEHVN2XE657B",
+   "held": 1
+  }
+ ],
+ "handles": {
+  "SP10W2EEM757922QTVDZZ5CSEW55JEFNN30J69TM7": "@jimdotbtc (team-confirmed)",
+  "SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ": "@moofv_ (self-linked)",
+  "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X": "@XtrataLayers (self-linked)"
+ },
+ "insTiers": {
+  "fromDraw": 2,
+  "mbBytes": 1000000,
+  "max": 5
+ },
+ "detail": [
+  {
+   "wallet": "SP1040BA2G20FHSBP00PQN8ANQ85P617QQR7MWPVJ",
+   "tickets": 3,
+   "totalAtCutoff": 3,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 2,
+    "sc": 2
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP140XZ39ZEPWDRRFQ4WK60XWDF6Y7KQGDD6DTX22",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP1BP036PHHJMZG6G2YYVKW4GH15KRD7YNKT6VW8Q",
+   "tickets": 5,
+   "totalAtCutoff": 5,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 1
+   },
+   "insTier": 0,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP1RB1V65A1PAAXYT8PVFFFC6T1FN9E8RQX7HMDKC",
+   "tickets": 27,
+   "totalAtCutoff": 27,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1,
+    "aud": 3,
+    "sc": 20,
+    "mk": 2
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP1WKDXKMM7JTKCCXZ5H3P4T6CNATV0XFSH42WXFB",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 2
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP1Y3SBM038WTVWESKE6SA7RXPYRPMTQT93XR9RN5",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP1Y9QXTQYA0N7Y8Q2C9MZ58B2909K12F4JHSCC3G",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 2
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP2D05S3BF330VK47T0D935GZ55557FQDC9QK68G",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 2
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP2RNHHQDTHGHPEVX83291K4AQZVGWEJ7WCQQDA9R",
+   "tickets": 5,
+   "totalAtCutoff": 5,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 1
+   },
+   "insTier": 0,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP2Z2CBMGWB9MQZAF5Z8X56KS69XRV3SJF4WKJ7J9",
+   "tickets": 27,
+   "totalAtCutoff": 27,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 2,
+    "sc": 22
+   },
+   "insTier": 0,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP303G827ND3PSGDW5XTVS8PKY37H5MF7CBF3QR5E",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP34RM95V725YTTGXZKRJYG1V84AH909ZB9717NBR",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP350YMZ2S1YE5HAC66VW101GNZT90RBKVNSY2BTA",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP38B5H07H1XJ756EEPMS8VBJE9HPGH03C50VPNAJ",
+   "tickets": 20,
+   "totalAtCutoff": 20,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 2,
+    "aud": 1,
+    "sc": 14
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0",
+   "tickets": 22,
+   "totalAtCutoff": 22,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1,
+    "sc": 21
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP3WAAYXPC6WZNEC7SHGR36D32RJPZVXRR1BG0QSY",
+   "tickets": 5,
+   "totalAtCutoff": 5,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 1
+   },
+   "insTier": 0,
+   "insSizes": []
+  },
+  {
+   "wallet": "SP4HK1N3JWY67Y5FSTAQDZSV2K0YS2WRNBMKCXHF",
+   "tickets": 1,
+   "totalAtCutoff": 1,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "ins": 1
+   },
+   "insTier": 1,
+   "insSizes": []
+  },
+  {
+   "wallet": "SPV00QHST52GD7D0SEWV3R5N04RD4Q1PMA3TE2MP",
+   "tickets": 5,
+   "totalAtCutoff": 5,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 3
+   },
+   "insTier": 0,
+   "insSizes": []
+  },
+  {
+   "wallet": "SPZ2X7Q0Z69KTN7SZF90MR9AZGZ2ETXFGMFXKKN8",
+   "tickets": 5,
+   "totalAtCutoff": 5,
+   "consumedByEarlierWin": 0,
+   "counts": {
+    "aud": 1
+   },
+   "insTier": 0,
+   "insSizes": []
+  }
+ ]
+}

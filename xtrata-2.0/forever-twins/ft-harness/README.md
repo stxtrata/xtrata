@@ -11,7 +11,7 @@ Evidence, acceptance tests and read-only tooling for **FT-SPEC-2**
 ```bash
 cd xtrata-2.0/forever-twins/ft-harness
 npm ci                # @stacks/clarinet-sdk 3.24.0, @stacks/transactions 7
-npm test              # all five suites, 428 checks; results in results/*.json
+npm test              # all suites (counts are printed per suite); results in results/*.json
 npm run screen        # screen the 28 pinned sources -> results/screen.json
 npm run live-check    # READ-ONLY mainnet check -> results/live-check-<timestamp>.json
 ```

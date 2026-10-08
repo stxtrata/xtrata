@@ -202,7 +202,7 @@
       inlineRuntimeContentUrls
     } from '/src/lib/viewer/runtime-inline.ts';
     import { rewriteHiroApiBasesForEmbeddedHtml } from '/src/lib/viewer/hiro-api-rewrite.ts';
-    import { createLiveHtmlFrameManager } from '/src/home/live-frame-manager.js';
+    import { createLiveHtmlFrameManager, isHeavyGridHtml } from '/src/home/live-frame-manager.js';
     import { buildRuntimeInscriptionContentUrl } from '/src/lib/collections/cover-image.ts';
     import { runGameSave } from '/src/lib/viewer/game-save.ts';
     import { installPublicWalletBridge, reviewPublicWalletRequest } from '/src/lib/viewer/public-wallet-bridge.ts';
@@ -5868,10 +5868,94 @@
         tokenId: token.id
       });
 
+    // Live performance trace for the Explorer. Open the browser console and
+    // filter on "xtrata-perf", or run  copy(xtrataPerfReport())  and paste it.
+    // Every line is ms since the selection began, so the slow step stands out.
+    const perfTrace = [];
+    const perfState = { id: null, t0: 0 };
+    const perfBegin = (token) => {
+      perfState.id = token.id.toString();
+      perfState.t0 = performance.now();
+      perfTrace.length = 0;
+      perfMark('select', { size: String(token.meta?.totalSize ?? ''), mime: token.meta?.mimeType ?? '' });
+    };
+    const perfMark = (step, details = {}) => {
+      const at = Math.round(performance.now() - perfState.t0);
+      const row = { id: perfState.id, step, atMs: at, ...details };
+      perfTrace.push(row);
+      try { console.log('[xtrata-perf]', `#${row.id}`, `+${at}ms`, step, details); } catch {}
+    };
+    try {
+      window.xtrataPerf = perfTrace;
+      window.xtrataPerfReport = () => perfTrace
+        .map((r) => `+${r.atMs}ms  #${r.id}  ${r.step}  ${JSON.stringify({ ...r, id: undefined, step: undefined, atMs: undefined })}`)
+        .join('\n');
+    } catch {}
+
+    // Fast path: the server assembles inscription bytes once and caches them
+    // (/runtime/content), so a 5 MB / 350-chunk inscription arrives in seconds
+    // instead of the browser reading every chunk from the chain. Size-checked;
+    // returns null on any problem so callers fall back to on-chain reads.
+    // The server prepends a <base href> to HTML (a few bytes), so the raw length
+    // is slightly larger than the on-chain size. We remove exactly that tag and
+    // then require the byte count to equal the on-chain size; otherwise null.
+    const stripServerBaseTag = (bytes, expected) => {
+      if (bytes.length === expected) return bytes;
+      const extra = bytes.length - expected;
+      if (extra <= 0 || extra > 2048) return null;
+      const head = new TextDecoder('latin1').decode(bytes.subarray(0, 4096));
+      const match = /<base href="[^"]*">/i.exec(head);
+      if (!match || match[0].length !== extra) return null;
+      const out = new Uint8Array(expected);
+      out.set(bytes.subarray(0, match.index), 0);
+      out.set(bytes.subarray(match.index + extra), match.index);
+      return out;
+    };
+
+    const runtimeFetchInflight = new Map();
+    const fetchRuntimeContentBytes = (token) => {
+      const key = `${getTokenCacheContractId(token)}:${token.id}`;
+      const existing = runtimeFetchInflight.get(key);
+      if (existing) return existing;
+      const promise = (async () => {
+        try {
+          const url = getTokenRuntimeContentUrl(token);
+          const expected = Number(token.meta?.totalSize ?? 0n);
+          if (!url || !(expected > 0)) return null;
+          const began = performance.now();
+          perfMark('runtime-fetch:start', { url });
+          const response = await fetch(url, { credentials: 'omit' });
+          perfMark('runtime-fetch:headers', {
+            status: response.status,
+            cache: response.headers.get('x-xtrata-runtime-cache'),
+            ms: Math.round(performance.now() - began)
+          });
+          if (!response.ok) return null;
+          const raw = new Uint8Array(await response.arrayBuffer());
+          const bytes = stripServerBaseTag(raw, expected);
+          perfMark('runtime-fetch:done', {
+            bytes: raw.length,
+            expected,
+            match: !!bytes,
+            ms: Math.round(performance.now() - began)
+          });
+          return bytes;
+        } catch (error) {
+          perfMark('runtime-fetch:error', { error: String(error?.message ?? error) });
+          return null;
+        } finally {
+          runtimeFetchInflight.delete(key);
+        }
+      })();
+      runtimeFetchInflight.set(key, promise);
+      return promise;
+    };
+
     const prepareRuntimeHtmlForToken = async (token, rawHtml, contextLabel = 'preview') => {
       if (!rawHtml) {
         return rawHtml;
       }
+      perfMark('prepare-html:start', { context: contextLabel, chars: rawHtml.length });
       const html = embedHtml(rawHtml);
       const moduleBaseHref = buildRuntimeModuleBaseHref({
         network: state.network,
@@ -5881,21 +5965,28 @@
       });
       const htmlWithBase = injectHtmlBaseHref(html, moduleBaseHref);
       if (!hasRuntimeContentUrls(htmlWithBase)) {
+        perfMark('prepare-html:done', { inlined: false, chars: htmlWithBase.length });
         return htmlWithBase;
       }
       const contentClient = getTokenClient(token);
+      perfMark('inline-runtime-urls:start', {
+        urls: (htmlWithBase.match(/\/runtime\/content\?[^"'\s)]+/g) ?? []).slice(0, 8)
+      });
       try {
         debugLog('preview', 'inlining runtime content for HTML inscription', {
           tokenId: token.id.toString(),
           contractId: getTokenCacheContractId(token),
           context: contextLabel
         });
-        return await inlineRuntimeContentUrls({
+        const inlined = await inlineRuntimeContentUrls({
           html: htmlWithBase,
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient)
         });
+        perfMark('inline-runtime-urls:done', { chars: inlined.length });
+        return inlined;
       } catch (error) {
+        perfMark('inline-runtime-urls:error', { error: String(error?.message ?? error) });
         const message = error instanceof Error ? error.message : String(error);
         debugLog(
           'preview',
@@ -7096,6 +7187,31 @@
       }
 
       if (media.kind === 'html') {
+        if (!options.gated) {
+          // The main grid runs only small pages, and only click-through: the
+          // frame never takes a click, so one click selects the card and opens
+          // the preview. (The old poster took the first click to start the page,
+          // which is what made it two clicks.) Big pages, loaders that read other
+          // inscriptions, and anything with a stored thumbnail stay a poster.
+          const bytes = Math.max(
+            Number(token.meta?.totalSize ?? 0n),
+            media.bytes?.length ?? 0
+          );
+          if (
+            !isLiveGridHtml(token) ||
+            isHeavyGridHtml(media.html, bytes, GRID_LIVE_HTML_MAX_BYTES)
+          ) {
+            return renderGridPoster(token, thumbElement);
+          }
+          liveHtmlFrameManager.register(thumbElement, media, {
+            gated: false,
+            clickThrough: true,
+            heavyBytes: GRID_LIVE_HTML_MAX_BYTES,
+            key: getThumbnailKey(token),
+            byteLength: bytes
+          });
+          return true;
+        }
         // Gated mount: the iframe only executes when on-screen and within the
         // live-frame budget (or on click). Prevents N heavy board inscriptions
         // from running at once. See liveHtmlFrameManager above. Relationship
@@ -7165,7 +7281,7 @@
           size: token.meta?.totalSize?.toString() ?? null,
           mimeType: token.meta?.mimeType ?? null
         });
-        const bytes = await fetchOnChainContent({
+        const bytes = (await fetchRuntimeContentBytes(token)) ?? await fetchOnChainContent({
           client: contentClient,
           fallbackClients: getContentFallbackClients(contentClient),
           cacheContractId,
@@ -7342,6 +7458,135 @@
       }
     };
 
+    const isDeferredGridPlayable = (token) => {
+      const kind = getMediaKind(token.meta?.mimeType ?? null);
+      return kind === 'html' || kind === 'audio';
+    };
+
+    // HTML inscriptions under this size run inside their grid tile (click-through,
+    // viewport-gated, one at a time) instead of showing a static poster. Anything
+    // with a stored thumbnail uses the picture instead.
+    const GRID_LIVE_HTML_MAX_BYTES = 1024 * 1024;
+    const isLiveGridHtml = (token) => {
+      if (getMediaKind(token.meta?.mimeType ?? null) !== 'html') {
+        return false;
+      }
+      if (getGridThumbUrl(token)) {
+        return false;
+      }
+      const size = token.meta?.totalSize ?? 0n;
+      return size > 0n && size < BigInt(GRID_LIVE_HTML_MAX_BYTES);
+    };
+
+    // URL of the stored grid thumbnail for a token, or null when the index has
+    // none. The version comes from /index/page and makes the URL immutable.
+    const getGridThumbUrl = (token) => {
+      const version = token.thumbVersion;
+      if (typeof version !== 'string' || !/^[A-Za-z0-9_-]{4,64}$/.test(version)) {
+        return null;
+      }
+      const contractId = getTokenCacheContractId(token);
+      if (!contractId) {
+        return null;
+      }
+      return `/thumb/${encodeURIComponent(contractId)}/${token.id.toString()}?v=${version}`;
+    };
+
+    // The grid tile for a song or HTML inscription. It is a picture, never the
+    // inscription: no iframe, no script, no click handler of its own. A click
+    // falls through to the card, which selects the token and loads the preview,
+    // so one click is all it takes. With a stored thumbnail it is a plain <img>
+    // (a few KB); without one it is a type label plus the title when the index
+    // knows it. Title and artist are untrusted text from the chain, so they are
+    // only ever set with textContent.
+    const renderGridPoster = (token, thumbElement) => {
+      const label = getGridMimeLabel(token.meta?.mimeType ?? null) || 'HTML';
+      const title = typeof token.thumbTitle === 'string' ? token.thumbTitle.trim() : '';
+      const artist = typeof token.thumbArtist === 'string' ? token.thumbArtist.trim() : '';
+      const poster = document.createElement('div');
+      poster.className = 'token-thumb-poster';
+
+      const buildText = () => {
+        const wrap = document.createElement('div');
+        wrap.className = 'token-thumb-poster__text';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'token-thumb-poster__label';
+        labelEl.textContent = label;
+        wrap.append(labelEl);
+        if (title) {
+          const titleEl = document.createElement('div');
+          titleEl.className = 'token-thumb-poster__title';
+          titleEl.textContent = title;
+          wrap.append(titleEl);
+        }
+        if (artist) {
+          const artistEl = document.createElement('div');
+          artistEl.className = 'token-thumb-poster__artist';
+          artistEl.textContent = artist;
+          wrap.append(artistEl);
+        }
+        if (!title && !artist) {
+          const hintEl = document.createElement('div');
+          hintEl.className = 'token-thumb-poster__hint';
+          hintEl.textContent = 'Tap to open';
+          wrap.append(hintEl);
+        }
+        return wrap;
+      };
+
+      const thumbUrl = getGridThumbUrl(token);
+      if (thumbUrl) {
+        const img = document.createElement('img');
+        img.className = 'token-thumb-poster__img';
+        img.alt = title ? (artist ? `${title} by ${artist}` : title) : 'Inscription preview';
+        img.loading = 'lazy';
+        img.decoding = 'async';
+        img.draggable = false;
+        img.referrerPolicy = 'no-referrer';
+        img.addEventListener(
+          'error',
+          () => {
+            if (!poster.isConnected) {
+              return;
+            }
+            // The picture is missing or unreadable: fall back to the text poster.
+            poster.replaceChildren(buildText());
+            thumbElement.classList.remove('has-thumbnail');
+            thumbElement.dataset.thumbnailState = 'poster';
+          },
+          { once: true }
+        );
+        img.src = thumbUrl;
+        poster.append(img);
+        if (title || artist) {
+          const caption = document.createElement('div');
+          caption.className = 'token-thumb-poster__caption';
+          caption.setAttribute('aria-hidden', 'true');
+          if (title) {
+            const titleEl = document.createElement('div');
+            titleEl.className = 'token-thumb-poster__title';
+            titleEl.textContent = title;
+            caption.append(titleEl);
+          }
+          if (artist) {
+            const artistEl = document.createElement('div');
+            artistEl.className = 'token-thumb-poster__artist';
+            artistEl.textContent = artist;
+            caption.append(artistEl);
+          }
+          poster.append(caption);
+        }
+        thumbElement.classList.add('has-thumbnail');
+        thumbElement.dataset.thumbnailState = 'server-thumb';
+      } else {
+        poster.append(buildText());
+        thumbElement.classList.remove('has-thumbnail');
+        thumbElement.dataset.thumbnailState = 'poster';
+      }
+      thumbElement.replaceChildren(poster);
+      return true;
+    };
+
     const scheduleBackgroundThumbnailHydration = (token, thumbElement) => {
       const cacheKey = getThumbnailKey(token);
       if (
@@ -7352,6 +7597,15 @@
         return false;
       }
       if (!shouldBackgroundHydrateThumbnail(token)) {
+        return false;
+      }
+      // Explorer grid: songs / HTML players / audio are NOT downloaded in the
+      // background. Downloading every one of them (often MBs each, read from
+      // chain chunks) is what made pages take minutes. They show a poster and
+      // load only when selected. Cached results still paint via
+      // applyCachedThumbnail / gridLiveMediaCache before we get here.
+      if (isDeferredGridPlayable(token) && !isLiveGridHtml(token)) {
+        renderGridPoster(token, thumbElement);
         return false;
       }
       state.thumbnailHydrationAttempted.add(cacheKey);
@@ -7370,6 +7624,95 @@
         queueDepth: state.thumbnailHydrationQueue.length
       });
       pumpBackgroundThumbnailHydrationQueue();
+      return true;
+    };
+
+    // Small HTML tiles: fetch only once the tile is near the viewport, and not
+    // while the selected inscription is still loading in the preview.
+    const liveGridHtmlTargets = new WeakMap();
+    let liveGridHtmlObserver = null;
+    const startLiveGridHtmlFetch = (token, thumbElement) => {
+      if (!thumbElement.isConnected) {
+        return;
+      }
+      if (!liveHtmlFrameManager.isQuiet()) {
+        window.setTimeout(() => startLiveGridHtmlFetch(token, thumbElement), 500);
+        return;
+      }
+      scheduleBackgroundThumbnailHydration(token, thumbElement);
+    };
+    const watchLiveGridHtml = (token, thumbElement) => {
+      if (typeof IntersectionObserver !== 'function') {
+        startLiveGridHtmlFetch(token, thumbElement);
+        return;
+      }
+      if (!liveGridHtmlObserver) {
+        liveGridHtmlObserver = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting && entry.target.isConnected) {
+                continue;
+              }
+              liveGridHtmlObserver.unobserve(entry.target);
+              const target = liveGridHtmlTargets.get(entry.target);
+              liveGridHtmlTargets.delete(entry.target);
+              if (target && entry.target.isConnected) {
+                startLiveGridHtmlFetch(target, entry.target);
+              }
+            }
+          },
+          { root: null, rootMargin: '200px', threshold: 0 }
+        );
+      }
+      liveGridHtmlTargets.set(thumbElement, token);
+      liveGridHtmlObserver.observe(thumbElement);
+    };
+
+    // A still picture with a stored thumbnail shows that thumbnail (a few KB)
+    // instead of downloading the whole file. The server only offers a thumbnail
+    // for a picture it has checked and found still, so animated files, and any
+    // picture not checked yet, keep loading the original and keep playing.
+    // Returns false when there is no thumbnail so the caller uses the old path.
+    const renderGridImageThumb = (token, thumbElement) => {
+      const thumbUrl = getGridThumbUrl(token);
+      if (!thumbUrl) {
+        return false;
+      }
+      const cacheKey = getThumbnailKey(token);
+      const img = document.createElement('img');
+      img.alt = 'Inscription preview';
+      img.decoding = 'async';
+      img.loading = 'lazy';
+      img.draggable = false;
+      img.referrerPolicy = 'no-referrer';
+      applyPixelPerfectImageRendering(img, {
+        mimeType: token.meta?.mimeType ?? null,
+        sourceUrl: thumbUrl,
+        squareFrame: true
+      });
+      img.addEventListener(
+        'error',
+        () => {
+          if (
+            !thumbElement.isConnected ||
+            thumbElement.dataset.thumbnailKey !== cacheKey ||
+            thumbElement.dataset.thumbnailState !== 'server-thumb'
+          ) {
+            return;
+          }
+          // The thumbnail is missing or unreadable: show the full picture instead.
+          thumbElement.classList.remove('has-thumbnail');
+          if (!renderGridRuntimeImage(token, thumbElement)) {
+            setTokenThumbLabel(thumbElement, getGridMimeLabel(token.meta?.mimeType ?? null));
+            thumbElement.dataset.thumbnailState = 'failed-thumb';
+          }
+        },
+        { once: true }
+      );
+      img.src = thumbUrl;
+      thumbElement.classList.add('has-thumbnail');
+      thumbElement.dataset.thumbnailState = 'server-thumb';
+      thumbElement.replaceChildren(img);
       return true;
     };
 
@@ -7550,6 +7893,7 @@
         meta.className = 'token-meta';
         let shouldApplyCachedThumbnail = false;
         let shouldScheduleBackgroundHydration = false;
+        let shouldWatchLiveHtml = false;
 
         if (id === null) {
           card.disabled = true;
@@ -7579,6 +7923,29 @@
             // SVG with no precomputed data-uri (e.g. served from the D1 index):
             // render the vector directly from the runtime content endpoint
             // instead of the rasterizer, which fails for size-less SVGs.
+            shouldApplyCachedThumbnail = false;
+          } else if (
+            getMediaKind(token.meta?.mimeType ?? null) === 'image' &&
+            renderGridImageThumb(token, thumb)
+          ) {
+            // Still picture with a stored thumbnail: no full download.
+            shouldApplyCachedThumbnail = false;
+          } else if (isDeferredGridPlayable(token)) {
+            // Songs, HTML and audio: a picture or text poster straight away, with
+            // nothing downloaded and nothing to look up in the thumbnail cache.
+            // Small HTML pages with no stored picture then start running in the
+            // tile once they scroll into view (watchLiveGridHtml).
+            const liveCandidate = isLiveGridHtml(token);
+            const cachedHtml = liveCandidate
+              ? state.gridLiveMediaCache.get(getThumbnailKey(token))
+              : null;
+            if (
+              !(cachedHtml && cachedHtml.kind === 'html' &&
+                renderGridLiveMedia(token, thumb, cachedHtml))
+            ) {
+              renderGridPoster(token, thumb);
+              shouldWatchLiveHtml = liveCandidate;
+            }
             shouldApplyCachedThumbnail = false;
           } else {
             const cacheKey = getThumbnailKey(token);
@@ -7617,6 +7984,9 @@
         }
         card.append(thumb, meta);
         dom.tokenGrid.append(card);
+        if (token && allowBackgroundHydration && shouldWatchLiveHtml) {
+          watchLiveGridHtml(token, thumb);
+        }
         if (token && allowBackgroundHydration && shouldScheduleBackgroundHydration) {
           scheduleBackgroundThumbnailHydration(token, thumb);
         } else if (token && allowBackgroundHydration && shouldApplyCachedThumbnail) {
@@ -7675,6 +8045,13 @@
         pdfSourceUrl:
           getTokenRuntimeContentUrl(token) ?? inscriptionEndpointUrl(token.id)
       });
+      perfMark('render-payload', { source, bytes: bytes.length, hasHtmlDoc: !!htmlDoc });
+      {
+        const previewFrame = dom.tokenPreviewMedia.querySelector('iframe');
+        if (previewFrame) {
+          previewFrame.addEventListener('load', () => perfMark('iframe-load'), { once: true });
+        }
+      }
       // The selected inscription gets the machine: its grid tile stops (it runs here)
       // and the grid holds back while an HTML preview loads.
       liveHtmlFrameManager.focusPreview(
@@ -7761,15 +8138,20 @@
         mimeType: token.meta.mimeType ?? null,
         requestId
       });
-      const bytes = await fetchOnChainContent({
-        client: contentClient,
-        fallbackClients: getContentFallbackClients(contentClient),
-        cacheContractId,
-        id: token.id,
-        senderAddress: getReadOnlySenderAddress(),
-        totalSize: token.meta.totalSize,
-        mimeType: token.meta.mimeType ?? null
-      });
+      let bytes = await fetchRuntimeContentBytes(token);
+      if (!bytes) {
+        perfMark('chain-fetch:start', { reason: 'runtime fast path unavailable' });
+        bytes = await fetchOnChainContent({
+          client: contentClient,
+          fallbackClients: getContentFallbackClients(contentClient),
+          cacheContractId,
+          id: token.id,
+          senderAddress: getReadOnlySenderAddress(),
+          totalSize: token.meta.totalSize,
+          mimeType: token.meta.mimeType ?? null
+        });
+        perfMark('chain-fetch:done', { bytes: bytes.length });
+      }
       const mimeType = resolveMimeType(token.meta.mimeType ?? null, bytes) ?? token.meta.mimeType ?? 'application/octet-stream';
       const htmlDoc = getMediaKind(mimeType) === 'html'
         ? await prepareRuntimeHtmlForToken(token, new TextDecoder().decode(bytes), 'preview')
@@ -7835,6 +8217,7 @@
 
       void updateWalletTokenUriHeadPreview(token.tokenUri);
 
+      perfBegin(token);
       clearElement(dom.tokenPreviewMedia, 'Loading');
       renderSelectedInscriptionMeta(token);
       void refreshSelectedTokenOwner(token, requestId);

@@ -1,0 +1,15 @@
+{
+ "pack": "guitars",
+ "tier": "core",
+ "count": 43,
+ "container": {
+  "file": "guitars.audpack",
+  "bytes": 1817518,
+  "sha256": "71c8e8b04d0f3d91e154037d4bad713dc6f74cce4e708af189b7c19d74fa6809",
+  "chunks16384": 111,
+  "indexBytes": 70309,
+  "indexGzipBytes": 12290,
+  "payloadBytes": 1805216
+ },
+ "wavBytes": 6832788
+}

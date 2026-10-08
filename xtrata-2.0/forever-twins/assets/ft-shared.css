@@ -56,3 +56,23 @@ ul.plain{margin:0;padding-left:20px}
 footer{border-top:1px solid var(--line);color:var(--mute);font-size:13px;padding:18px 0 40px}
 footer a{color:var(--mute)}
 @media(max-width:560px){dl.facts{grid-template-columns:1fr}.hero img{width:60px;height:60px}h1{font-size:23px}}
+/* Guides (long-form pages) */
+.prose{padding:24px 26px;max-width:760px;margin-left:auto;margin-right:auto}
+.prose h1{margin-bottom:6px}
+.prose h2{font-size:19px;margin:28px 0 8px}
+.prose h3{font-size:16px;margin:18px 0 6px}
+.prose p,.prose li{line-height:1.65}
+.prose ul,.prose ol{padding-left:22px}
+.prose li{margin:4px 0}
+.prose code{font-family:var(--mono);font-size:13px;background:var(--soft);padding:1px 5px;border-radius:5px;word-break:break-word}
+.prose pre{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12.5px;line-height:1.5}
+.prose pre code{background:none;padding:0}
+.prose table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}
+.prose th,.prose td{border-bottom:1px solid var(--line);text-align:left;padding:6px 8px;vertical-align:top}
+.prose .updated{color:var(--mute);font-size:13px;margin:0 0 16px}
+.guide-list{list-style:none;padding:0;display:grid;gap:12px}
+.guide-list a{display:block;border:1px solid var(--line);border-radius:10px;padding:12px 14px;text-decoration:none;color:var(--ink);background:var(--panel)}
+.guide-list a strong{display:block;color:var(--accent)}
+.guide-list a span{color:var(--mute);font-size:14px}
+.prose .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.prose td.mono,.prose .mono{word-break:break-all}

@@ -27,9 +27,9 @@
     <section class="card"><h2>Collections</h2><div class="grid" id="grid"></div></section>
   </div>
 </main>
-<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/collections/">All collections</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
 <script type="module">
-import { loadRegistry, getCommunity, collectionsOf, routeKey, heroImage, STATUS, COMMUNITY_STATUS, collectionUrl } from '/forever-twins/assets/ft-registry.js?v=20261006a';
+import { loadRegistry, getCommunity, collectionsOf, routeKey, heroImage, STATUS, COMMUNITY_STATUS, collectionUrl } from '/forever-twins/assets/ft-registry.js?v=20261007a';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const missing = (msg) => { document.title = 'Community not found · Forever Twins'; const m = document.createElement('meta'); m.name = 'robots'; m.content = 'noindex'; document.head.appendChild(m); $('nfText').textContent = msg; $('notfound').classList.remove('hidden'); };

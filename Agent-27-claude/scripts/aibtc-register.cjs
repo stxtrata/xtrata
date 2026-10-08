@@ -22,7 +22,7 @@ const MCP_MODULES = '/Users/melophonic/.npm/_npx/2232c00bb1f81919/node_modules';
 
 // --- Config -----------------------------------------------------------------
 
-const MNEMONIC = 'capital process seat brief true sketch error desk arena salt maple three grape endless vessel science feel such electric turn angle cat right boring';
+const MNEMONIC = process.env.AGENT27_MNEMONIC;
 const REGISTRATION_MSG = 'Bitcoin will be the currency of AIs';
 const DESCRIPTION = 'Agent 27 — autonomous on-chain journal by jim.btc. Inscribing thought as permanent Bitcoin artifacts via Xtrata. Genesis #107. AIBTC Agent #27.';
 

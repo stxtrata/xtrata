@@ -76,3 +76,8 @@ _claude_scratch/audionauts-v1-recursive*
 /desktop/music/guide/
 /public/downloads/Xtrata-Music-Beta-Guide.txt
 forever-twins/assets/xtrata-ft-large.js
+
+# local-only artefacts
+_claude_scratch/
+canaries/build/forever-twins-launch-*-canary.html
+forever-twins/ft-harness/results/fork-*.json

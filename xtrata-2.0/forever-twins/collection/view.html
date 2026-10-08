@@ -114,14 +114,15 @@
 <footer><div class="wrap">
   <a href="/forever-twins/">Forever Twins</a> ·
   <a href="/forever-twins/collections/">All collections</a> ·
+  <a href="/forever-twins/guides/">Guides</a> ·
   <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a>
   <span id="footLegacy"></span>
 </div></footer>
 
 <script type="module">
-import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261006b';
-import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261006b';
-import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261006b';
+import { loadRegistry, getCollection, getCommunity, routeKey, heroImage, STATUS, communityUrl, contractExplorer } from '/forever-twins/assets/ft-registry.js?v=20261007a';
+import { createAdapter, chunkBytes, rollingHash, sameHash, isLargeTotal, unwrapOptional } from '/forever-twins/assets/ft-adapter.js?v=20261007a';
+import { fetchArt, firstOk, uriCandidates, imageFrom } from '/forever-twins/assets/ft-media.js?v=20261007a';
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -209,7 +210,7 @@ function renderStats() {
   const swap = helperSt && helperSt.inscribedCount != null ? (helperSt.swapsEnabled ? fmt(helperSt.inscribedCount) : '0') : '—';
   const cov = coll.coverage;
   const tiles = [];
-  if (cov && cov.recovered != null) tiles.push(['Recovered', fmt(cov.recovered), cov.asOf ? `snapshot ${esc(cov.asOf)}` : 'art fetched and verified (snapshot)']);
+  if (cov && cov.recovered != null) tiles.push(['Recovered', fmt(cov.recovered), `${cov.of != null ? `of ${fmt(cov.of)} · ` : ''}art fetched and hashed${cov.asOf ? `, snapshot ${esc(cov.asOf)}` : ''}`]);
   if (v1) {
     // The original helpers do not expose a seeded count; their free allowance is the number that matters to a minter.
     const th = helperSt && helperSt.freeThreshold, n = helperSt && helperSt.inscribedCount;
@@ -416,7 +417,7 @@ async function fetchOriginalBytes(tokenId, onProgress) {
 }
 async function getLargeWizard() {
   if (largeWiz) return largeWiz;
-  const m = await import('/forever-twins/assets/xtrata-ft-large.js?v=20261006b');
+  const m = await import('/forever-twins/assets/xtrata-ft-large.js?v=20261007a');
   largeWiz = m.createLargeWizard({ coll, reg, mismatch: () => (helperSt && helperSt.mismatches && helperSt.mismatches[0]) || null, fetchBytes: fetchOriginalBytes });
   return largeWiz;
 }

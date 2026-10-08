@@ -312,10 +312,10 @@ async function route(r) {
     await page.reload(); await page.waitForTimeout(1000);
     console.log('-- re-run after forgetting local progress');
     const wc = S.walletCalls, sent = S.sent.length;
-    const f = await runSteps(['connect', 'preflight', 'deploy', 'verify', ...ids.filter((i) => /^pack-|^parent$/.test(i)), 'inscription', 'board', 'submit', 'fund', 'copy', 'sweep', 'close', 'production']);
+    const f = await runSteps(['connect', 'preflight', 'deploy', 'verify', ...ids.filter((i) => /^pack-|^parent$/.test(i)), 'inscription', 'board', 'submit', 'fund', 'copy', 'sweep', 'close', 'boardwallet', 'handover', 'production', 'handback']);
     const caught = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /already closed on parent|already ran for parent|already refused on chain|nothing sent/.test(n.textContent)).length);
     console.log(`catch-up: ${caught} steps recognised as already done · wallet calls ${S.walletCalls - wc} · contract calls ${S.sent.length - sent}`);
-    if (S.walletCalls !== wc || S.sent.length !== sent || caught < 7) results.failed = 'catch-up';
+    if (S.walletCalls !== wc || S.sent.length !== sent || caught < 9) results.failed = 'catch-up';
     const reused = await page.evaluate(() => [...document.querySelectorAll('.note')].filter((n) => /re-used, nothing sent/.test(n.textContent)).length);
     console.log(`re-run: ${reused} inscriptions re-used, ${S.core.fees.length - before} fees paid, ${S.calls.length - calls} calls sent`);
     if (f || reused !== 3 || S.core.fees.length !== before || S.calls.length !== calls) results.failed = 'resume';

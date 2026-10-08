@@ -18,9 +18,9 @@
   <p class="sub">Read from the public <a href="/forever-twins/data/registry.v2.json">registry</a>. A collection is only offered for twins and swaps once its helper is live; planned ones are shown so the pipeline is visible.</p>
   <div id="out"><p class="mute">Loading…</p></div>
 </main>
-<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
+<footer><div class="wrap"><a href="/forever-twins/">Forever Twins</a> · <a href="/forever-twins/guides/">Guides</a> · <a href="/forever-twins/data/registry.v2.json">Registry (JSON)</a></div></footer>
 <script type="module">
-import { loadRegistry, collectionsOf, independentCollections, heroImage, STATUS, COMMUNITY_STATUS, collectionUrl, communityUrl } from '/forever-twins/assets/ft-registry.js?v=20261006a';
+import { loadRegistry, collectionsOf, independentCollections, heroImage, STATUS, COMMUNITY_STATUS, collectionUrl, communityUrl } from '/forever-twins/assets/ft-registry.js?v=20261007a';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 let REG = null;
 const tile = (c) => {

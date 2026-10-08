@@ -1,0 +1,15 @@
+{
+ "pack": "world",
+ "tier": "core",
+ "count": 85,
+ "container": {
+  "file": "world.audpack",
+  "bytes": 4374374,
+  "sha256": "4bcddcaa5a390de937a415ff09831489cb48bf12d34bf8115d78c37ea295fb6b",
+  "chunks16384": 267,
+  "indexBytes": 133938,
+  "indexGzipBytes": 22327,
+  "payloadBytes": 4352035
+ },
+ "wavBytes": 10822500
+}

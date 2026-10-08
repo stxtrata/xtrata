@@ -1,0 +1,15 @@
+{
+ "pack": "epiano",
+ "tier": "attribution",
+ "count": 56,
+ "container": {
+  "file": "epiano.audpack",
+  "bytes": 1844592,
+  "sha256": "f6d59f74db4975af4262005112181244860bcd2ca0ea39f965b68fae1690e852",
+  "chunks16384": 113,
+  "indexBytes": 103571,
+  "indexGzipBytes": 19087,
+  "payloadBytes": 1825493
+ },
+ "wavBytes": 8591008
+}

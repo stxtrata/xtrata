@@ -237,9 +237,9 @@ await T('P-1 planFunding: covers worst case, rounds up, scales with size and con
   const busy = planFunding({ bytes: 1_585_346, chunks: 97, core, helperFee: STX, congestionX10: 40n });
   ok(busy.required > big.required, 'a congested network asks for more');
   ok(big.required < 10n * STX, 'a 1.5 MB file stays under 10 STX');
-  eq(big.agentFee, big.required * 10n / 100n, 'processing fee is 10% of the request');
+  eq(big.agentFee, big.required * 5n / 100n, 'processing fee is 5% of the request');
   const nofee = planFunding({ bytes: 1_585_346, chunks: 97, core, helperFee: STX }, { ...CONFIG, agentFeePct: 0n });
-  ok(big.required - big.agentFee >= nofee.required, 'after the 10% comes out, the real costs are still covered');
+  ok(big.required - big.agentFee >= nofee.required, 'after the 5% comes out, the real costs are still covered');
   console.log(`   1.59 MB file: request ${Number(big.required) / 1e6} STX, expected cost ${Number(big.expected) / 1e6} STX`);
 });
 
@@ -279,7 +279,7 @@ await T('H-1 happy path: fund, upload, seal, bind, grace, sweep', async () => {
   ok(sweepMoves.every((m) => m.t >= helperMove.t), 'no STX left the wallet before the bind was mined');
   ok(sweepMoves[0].t - helperMove.t <= 2 * 20_000, `change went out within two blocks of the bind (${(sweepMoves[0].t - helperMove.t) / 1000} s)`);
   ok(S.chain.stxMoves.filter((m) => m.from === job.address).every((m) => m.to === funder || m.to === 'CORE' || m.to === JIM || m.to === RAPHA || m.to === AGENT), 'STX only went to the core, the payees, the agent fee address or the funder');
-  eq(S.chain.balanceOf(AGENT), S.chain.received.get(job.address) * 10n / 100n, 'the 10% processing fee is 10% of everything the wallet received');
+  eq(S.chain.balanceOf(AGENT), S.chain.received.get(job.address) * 5n / 100n, 'the 5% processing fee is 5% of everything the wallet received');
   const feeMove = S.chain.stxMoves.find((m) => m.to === AGENT); ok(feeMove && feeMove.t === sweepMoves[0].t, 'the fee and the change were mined in the same block');
   const feeTx = S.chain.broadcasts.find((x) => x.to === AGENT), chTx = S.chain.broadcasts.find((x) => x.to === funder && x.t >= bindEvent.t);
   ok(feeTx && chTx && chTx.nonce === feeTx.nonce + 1n && chTx.t === feeTx.t, 'broadcast back to back at consecutive nonces');
@@ -568,24 +568,24 @@ await T('Z-2 resumable stop: after a stall the upload session is kept and the jo
   eq(S.chain.coreBroadcasts.filter((x) => x === 'begin').length, 1, 'the paid-for session was reused');
 });
 
-await T('Q-1 overpaying: the fee is 10% of everything that arrived, the rest comes back', async () => {
+await T('Q-1 overpaying: the fee is 5% of everything that arrived, the rest comes back', async () => {
   const S = setup({ size: 600_000 }); const job = await start(S); const funder = fund(S, job, 'SPVISITOR', 10n * STX);
   const before = S.chain.balanceOf(funder);
   const final = await S.engine.run(job.id);
   eq(final.status, 'COMPLETE', 'completes');
   const received = BigInt(job.required) + 10n * STX;
-  eq(S.chain.balanceOf(AGENT), received * 10n / 100n, '10% of the full amount sent (' + Number(received) / 1e6 + ' STX)');
+  eq(S.chain.balanceOf(AGENT), received * 5n / 100n, '5% of the full amount sent (' + Number(received) / 1e6 + ' STX)');
   ok(S.chain.balanceOf(funder) - before > 10n * STX - 100_000n - 0n, 'the extra STX came back to the payer');
   ok(S.chain.balanceOf(job.address) <= 60_000n, 'wallet emptied');
 });
 
-await T('Q-2 top-up mid-job counts toward the 10%', async () => {
+await T('Q-2 top-up mid-job counts toward the 5%', async () => {
   const S = setup({ size: 600_000 }); const job = await start(S); const funder = fund(S, job);
   S.chain.at(30_000, (c) => { c.helperFee = 4n * STX; });
   S.chain.at(30 * 60_000, (c) => { c.credit(funder, 20n * STX); c.transfer(funder, job.address, 5n * STX); });
   const final = await S.engine.run(job.id);
   eq(final.status, 'COMPLETE', 'completes');
-  eq(S.chain.balanceOf(AGENT), (BigInt(job.required) + 5n * STX) * 10n / 100n, '10% of the first payment plus the top-up');
+  eq(S.chain.balanceOf(AGENT), (BigInt(job.required) + 5n * STX) * 5n / 100n, '5% of the first payment plus the top-up');
 });
 
 await T('Q-3 tab closed right after the fee is broadcast: reopened job pays the fee once, not twice', async () => {
@@ -597,7 +597,7 @@ await T('Q-3 tab closed right after the fee is broadcast: reopened job pays the 
   const e2 = S.mk(); e2.attach(job.id);
   const final = await e2.run(job.id);
   eq(final.status, 'COMPLETE', 'completes');
-  eq(S.chain.balanceOf(AGENT), BigInt(job.required) * 10n / 100n, 'the fee was paid exactly once');
+  eq(S.chain.balanceOf(AGENT), BigInt(job.required) * 5n / 100n, 'the fee was paid exactly once');
   ok(S.chain.balanceOf(job.address) <= 60_000n, 'wallet emptied');
 });
 
@@ -607,7 +607,7 @@ await T('Q-4 the fee read is stale (less than funding saw): refused, retried, ne
   S.chain.received = { get: (a) => (lies > 0 && a === job.address ? (lies--, 1n) : real.get(a)), set: (a, v) => real.set(a, v) };
   const final = await S.engine.run(job.id);
   eq(final.status, 'COMPLETE', 'completes');
-  eq(S.chain.balanceOf(AGENT), BigInt(job.required) * 10n / 100n, 'the full 10% after the read recovered');
+  eq(S.chain.balanceOf(AGENT), BigInt(job.required) * 5n / 100n, 'the full 5% after the read recovered');
 });
 
 console.log(`\n${passed} checks passed, ${failed} failed`);
