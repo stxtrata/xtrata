@@ -3619,7 +3619,16 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
     Boolean(resumeTargetAsset) ||
     mintRoute === 'staged' ||
     [beginState, uploadState, sealState].some((state) => state !== 'idle');
-  const descriptionIsLong = collectionDescription.length > 260;
+  // Collapsed description: show everything down to the first link (e.g. the Ordinals
+  // inscription) so the key reference is never cut off; the rest sits behind "Read more".
+  // With no link, fall back to a four-line clamp.
+  const descriptionLinkMatch = /https?:\/\/\S+/.exec(collectionDescription);
+  const descriptionPreview = descriptionLinkMatch
+    ? collectionDescription.slice(0, descriptionLinkMatch.index + descriptionLinkMatch[0].length)
+    : null;
+  const descriptionIsLong = descriptionPreview
+    ? collectionDescription.slice(descriptionPreview.length).trim().length > 0
+    : collectionDescription.length > 260;
 
   const renderGalleryTile = (asset: (typeof mintedGallery)[number]) => {
     const tokenId = mintedTokenIds[asset.asset_id] ?? null;
@@ -3753,7 +3762,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   usesV15 ? ' collection-live-page__hero-price-card--collection' : ''
                 }`}
               >
-                <span className="collection-live-page__hero-price-label">{usesV15 ? (mintPending ? 'Minting…' : 'Mint now') : 'Mint price'}</span>
+                <span className="collection-live-page__hero-price-label">{mintPending
+                  ? 'Minting…'
+                  : mintUnavailableReason
+                    ? 'Mint unavailable'
+                    : resumeTargetAsset
+                      ? 'Resume mint'
+                      : 'Mint now'}</span>
                 <strong>{usesV15 ? buyerMax === null ? 'Loading price…' : toMicroStxLabel(buyerMax) : mintPriceLabel}</strong>
                 {!usesV15 && (
                   <span className="collection-live-page__hero-price-subtle">
@@ -3761,6 +3776,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   </span>
                 )}
               </button>
+              <p className="collection-live-page__mint-note">
+                No limit per wallet. Batch minting is coming, for now mint one after another.
+              </p>
               {freeMint && (
                 <p className="collection-live-page__hero-media-note">
                   This price covers Xtrata protocol fees only. Collectors still pay wallet mining
@@ -3800,12 +3818,18 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
             </div>
             <p
               className={`collection-live-page__description${
-                descriptionIsLong && !descriptionExpanded
+                descriptionIsLong && !descriptionExpanded && !descriptionPreview
                   ? ' collection-live-page__description--clamped'
                   : ''
               }`}
             >
-              <LinkifiedText text={collectionDescription} />
+              <LinkifiedText
+                text={
+                  descriptionIsLong && !descriptionExpanded && descriptionPreview
+                    ? descriptionPreview
+                    : collectionDescription
+                }
+              />
             </p>
             {descriptionIsLong && (
               <button
@@ -3846,20 +3870,6 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </div>
             )}
             <div className="collection-live-page__hero-actions">
-              <button
-                className="button"
-                type="button"
-                onClick={() => void handleMintNow()}
-                disabled={mintPending || walletPending || Boolean(mintUnavailableReason)}
-              >
-                {mintPending
-                  ? 'Minting...'
-                  : mintUnavailableReason
-                    ? 'Mint unavailable'
-                    : resumeTargetAsset
-                      ? 'Resume mint'
-                      : 'Mint one now'}
-              </button>
               <button
                 className="button button--ghost"
                 type="button"

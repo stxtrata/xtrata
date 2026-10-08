@@ -9797,11 +9797,18 @@ button.collection-live-page__hero-price-card {
   transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
+/* Same green for every collection template, so the card is always the one mint button */
+button.collection-live-page__hero-price-card,
 button.collection-live-page__hero-price-card.collection-live-page__hero-price-card--collection {
   border-color: rgba(74, 222, 128, 0.6);
   background: #15803d;
   color: #f0fdf4;
   box-shadow: 0 6px 18px rgba(21, 128, 61, 0.35);
+}
+
+button.collection-live-page__hero-price-card .collection-live-page__hero-price-label {
+  font-size: 1rem;
+  letter-spacing: 0.08em;
 }
 
 button.collection-live-page__hero-price-card:hover:not(:disabled) {
@@ -9822,4 +9829,12 @@ button.collection-live-page__hero-price-card:disabled {
   cursor: not-allowed;
   opacity: 0.6;
   box-shadow: none;
+}
+
+.collection-live-page__mint-note {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--muted);
 }
