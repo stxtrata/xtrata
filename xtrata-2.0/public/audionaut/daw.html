@@ -539,6 +539,7 @@
         <div class="beats-filter">
           <select id="beats-collection" aria-label="Beat collection">
             <optgroup label="Drum beats · drums only">
+              <option value="drums-analog">Analog kit drums</option>
               <option value="drums-studio">Studio kit drums · 139</option>
               <option value="drums-l1">Bitcoin L1 drums · 139</option>
             </optgroup>
@@ -553,6 +554,9 @@
             <option value="">All drum beats</option>
             <option value="start">★ Start here</option>
             <option value="bass">With a bass hit</option>
+          </select>
+          <select id="beats-kit" aria-label="Analog kit voicing" hidden>
+            <option value="auto">Kit: each beat's own</option>
           </select>
           <select id="beats-genre" aria-label="Beat genre">
             <option value="">All genres</option>

@@ -23,3 +23,13 @@ The Audionaut studio (`/audionaut/daw.html`) loads these packs as static files, 
 - A channel loaded from a pack stores `{type: "pack", value: "<pack>/<assetId>", audioSha256: <pcmSha256>}`. Saved projects reload it and refuse it if the installed pack's hash differs.
 - Tests: `src/audionaut/__tests__/pack-library.test.ts` (loads, verifies and decodes all 2,438 sounds in Node, plus tamper cases).
 - When a pack is inscribed, only the fetch in `pack-library.js` changes (from `media/packs/<id>.audpack` to the inscription); the container hash, sound ids and project sources stay the same.
+
+## Analog Kit beats (the Beats button → "Analog kit drums")
+
+A library of 307 drum beats voiced with the Analog Kit pack (`analogkit`, CC0): all 139 grooves of the Studio set re-voiced, plus 168 new grooves in 10 new genres (42 genres in all). The three beats that carry an 808 bass hit take it from the Electronic Kit's sub kicks. Nothing here is inscribed; it is browser code plus data.
+
+- Code: `public/audionaut/daw/js/analog-kits.js` (voicing, personas, levels, tails, layer splits, per-genre uniqueness) with `analog-grooves-a.js` … `-d.js` (the new grooves), `analog-adds.js` (extra hits that give rare recordings a home), `analog-pins.js` (fixed recordings for selected roles), `analog-calibration.js` and `analog-headroom.js` (generated, below), `analog-pack.js` (the pack id).
+- `node audionaut-library/tools/build-analog-calibration.mjs` decodes the Analog Kit (and the Electronic Kit kicks), verifies the stored and PCM hashes, and writes `analog-calibration.js`: loudness, tail length, pitch clarity, brightness, duration, PCM hash and peak per sound. Re-run it if the pack changes.
+- `node audionaut-library/tools/render-analog-beats.mjs [--kit jazz] [--wav]` mixes every beat offline the way the engine does and fails on clipping or silence; `--wav` writes audition WAVs to `audionaut-library/renders/` (git-ignored: generated audio stays local). `--write-headroom` renders every beat on every kit (Auto and the six personas) and rewrites `analog-headroom.js`, the per-beat volume trims that keep every beat under 0.95 of full scale. Re-run it after changing any groove, voice, pin, add or the calibration table.
+- Tests: `src/audionaut/__tests__/analog-beats.test.ts` (structure on all seven kit settings, all 213 recordings used, unique sound sets within a genre, double-grid tempos, bass beats, headroom table).
+- The Beats dialog has a **Kit** menu for this collection: "each beat's own" or any of the six personas (Jazz Club, Rusty, Unruly, Swirly, Concert, Modern Mix) re-voices every beat.

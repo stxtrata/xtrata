@@ -165,7 +165,7 @@ function normalizeNative(data) {
   const chCount = p.channels.length;
   if (
     data.lastBeat &&
-    ["original", "l1", "combined", "tonal"].includes(
+    ["original", "l1", "combined", "tonal", "analog"].includes(
       data.lastBeat.collection,
     ) &&
     typeof data.lastBeat.id === "string" &&

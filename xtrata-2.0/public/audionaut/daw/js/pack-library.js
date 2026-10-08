@@ -138,6 +138,15 @@ export function clearPackCache() {
   packs.clear();
 }
 
+// Starts (or joins) the download of one pack so the first beat from it plays sooner. Safe to call
+// repeatedly; failures are returned, not thrown, because prefetching is only an optimisation.
+export function prefetchPack(id, options = {}) {
+  return packFor(id, options).then(
+    () => ({ ok: true }),
+    (error) => ({ ok: false, error }),
+  );
+}
+
 let flacDecoder;
 async function jsDecoder() {
   return (flacDecoder ||= import("./codecs/codec-flac.mjs")
