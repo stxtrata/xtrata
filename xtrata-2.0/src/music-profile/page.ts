@@ -1,5 +1,5 @@
-import {signStructuredMessage, legacyNetworkFromConnectNetwork} from '@stacks/connect';
-import {connectWallet, disconnectWallet, getStacksProvider, getSelectedWalletProviderId} from '../lib/wallet/connect';
+import {connectWallet, disconnectWallet} from '../lib/wallet/connect';
+import {requestStructuredSignature} from '../lib/wallet/structured-sign';
 import {createWalletSessionStore} from '../lib/wallet/session';
 import {profileData} from '../../scripts/wizard/music-profile-proof.mjs';
 const $=(id:string)=>document.getElementById(id)!;
@@ -42,19 +42,10 @@ $('profile-sign').onclick=async()=>{
   if(!wallet.isConnected&&!(await connect())){status('Connect your BNS wallet to verify.');return;}
   if(wallet.address!==challenge.owner)throw Error('The connected wallet does not own this BNS name. Use Switch wallet to select '+challenge.owner+'.');
   if(Date.now()>challenge.expires)throw Error('This request expired. Start a new request in the music app.');
-  let provider=getStacksProvider();
-  // Xverse's account picker uses its Bitcoin bridge; structured signing lives
-  // on its Stacks bridge. Keep the user's selected wallet family.
-  if(/xverse/i.test(getSelectedWalletProviderId()||'')&&typeof provider?.structuredDataSignatureRequest!=='function'){
-   const w=window as any;provider=w.XverseProviders?.StacksProvider??w.xverseProviders?.StacksProvider;
-  }
-  if(typeof provider?.structuredDataSignatureRequest!=='function')throw Error('This wallet does not expose structured-message signing. Try a supported Stacks wallet or choose transfer verification in the music app.');
-  // Build an unsigned request envelope directly. The legacy popup helper reads
-  // Blockstack user data even when an explicit address was supplied.
-  const token=await signStructuredMessage({...profileData(challenge,'owner'),network:legacyNetworkFromConnectNetwork('mainnet'),stxAddress:challenge.owner});
-  const result=await provider.structuredDataSignatureRequest(token);
-  if(!result?.signature)throw Error('The wallet did not return a signature. Nothing was linked.');
-  busy=false;await finish({ownerProof:result.signature});
+  // Leather's current builds only answer the RPC method; older wallets use the legacy bridge. One shared helper handles both
+  // (Xverse keeps its Stacks bridge), see src/lib/wallet/structured-sign.ts.
+  const ownerProof=await requestStructuredSignature({...profileData(challenge,'owner'),network:'mainnet',stxAddress:challenge.owner});
+  busy=false;await finish({ownerProof});
  }catch(e){status((e as Error).message||'Verification cancelled. Nothing changed.');}finally{busy=false;}
 };
 $('profile-check').onclick=()=>void finish({txid:($('profile-txid') as HTMLInputElement).value.trim()});
