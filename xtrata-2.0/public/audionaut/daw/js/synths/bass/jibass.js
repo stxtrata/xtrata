@@ -1,6 +1,6 @@
-// synths/bass/jibass.js — jiBASS: analog bass synth (module for the Audionaut synth bank).
+// synths/bass/jibass.js — Whale: analog bass synth (module for the Audionaut synth bank).
 //
-// Ported from the standalone jiBASS page. What makes it different from the host's
+// Ported from the standalone Whale page. What makes it different from the host's
 // jiMS10 / Acidals / SubZero:
 //   * TWIN detuned main oscillators (THICKEN) + a selectable -1 octave sub (SQR/SIN/TRI)
 //   * DRIVE is a tanh shaper that sits BEFORE the resonant filter (the filter then
@@ -285,7 +285,7 @@ const svg = {
 };
 
 const jibass = {
-  name: "jiBASS",
+  name: "Whale",
   tagline: "Analog bass - twin detuned saws + sub, drive into a resonant filter with a rise-and-fall envelope",
   color: "#ef4444",
   params: paramDefs,
@@ -298,7 +298,7 @@ const jibass = {
     { name: "Reese Walk (Dm)", dsl: "0:D2:8 8:F2:4 12:G2:4 16:D2:8 24:C2:4 28:A1:4" },
   ],
   presets: [
-    { name: "Init (jiBASS)", params: {} },
+    { name: "Init (Whale)", params: {} },
     {
       name: "Sub Thump",
       params: { wave: "square", subWave: "sine", subLevel: 1, detune: 4, punch: 5, cutoff: 120, reso: 1, envMod: 500, fAttack: 0.004, fDecay: 0.2, keyTrack: 0.3, attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.2, drive: 0.25, driveAt: "pre" },
@@ -330,7 +330,7 @@ const jibass = {
   ],
   ui: {
     theme: { accent: "#ef4444", lcd: "#fca5a5", lcdBg: "#2a1215", edge: "#3d1c1c", bg: "#1f1212" },
-    logo: ["ji", "BASS"],
+    logo: ["", "Whale"],
     sub: "ANALOG BASS SYNTH",
     cc: { 74: "cutoff", 71: "reso", 73: "attack", 72: "release", 75: "fDecay", 76: "subLevel", 77: "envMod", 7: "level", 1: "drive", 78: "detune" },
     sections: [

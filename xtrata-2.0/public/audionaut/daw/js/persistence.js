@@ -17,6 +17,25 @@ import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
 import { normalizeOwner } from "./plugins.js";
+
+// Display names the synths carried before the rename. A saved instrument whose name is still
+// the old stock name follows the synth to its new name; custom names are never touched.
+const LEGACY_SYNTH_NAMES = {
+  fm4: "jiFM4",
+  vox: "jiVOX",
+  pluck: "jiPLUCK",
+  jibass: "jiBASS",
+  ensemble: "jiENSEMBLE",
+  tine: "jiTINE",
+  kit: "jiKIT",
+  tonewheel: "jiTONEWHEEL",
+  morph: "jiMORPH",
+  texture: "jiTEXTURE",
+  winds: "jiWINDS",
+  modal: "jiMODAL",
+  lantern: "jiLANTERN",
+  prism: "jiPRISM",
+};
 const finite = (value, fallback, min, max) =>
   Number.isFinite(+value) ? Math.max(min, Math.min(max, +value)) : fallback;
 function wordMetadata(value) {
@@ -190,7 +209,13 @@ function normalizeNative(data) {
         inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
       p.instruments[i].inserts = inst?.inserts;
       normalizeOwner(p.instruments[i]);
-      // Projects saved before the jiFM4 / jiVOX / jiPLUCK synths had every slot on
+      {
+        const cur0 = p.instruments[i];
+        const legacy = LEGACY_SYNTH_NAMES[cur0.synthId];
+        if (legacy && String(cur0.name || "").trim().toLowerCase() === legacy.toLowerCase())
+          cur0.name = SYNTH_BANK[cur0.synthId].name;
+      }
+      // Projects saved before the Coinbase / Gm / Taproot synths had every slot on
       // jiMS10. Move slots that were never touched (stock name, no tweaks, no notes
       // in any sequence) onto the new default synth for that slot.
       const cur = p.instruments[i];

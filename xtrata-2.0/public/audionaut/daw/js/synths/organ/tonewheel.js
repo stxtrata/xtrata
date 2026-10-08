@@ -1,4 +1,4 @@
-// synths/organ/tonewheel.js — jiTONEWHEEL: drawbar tonewheel organ (Audionaut synth module).
+// synths/organ/tonewheel.js — Cathedral: drawbar tonewheel organ (Audionaut synth module).
 //
 // The classic electromechanical organ, one note = one tiny graph:
 //   * NINE DRAWBARS (16' 5 1/3' 8' 4' 2 2/3' 2' 1 3/5' 1 1/3' 1'), each 0-8 in 3 dB steps like the
@@ -378,7 +378,7 @@ const svg = {
 const bars = (label, ...items) => ({ type: "row", items: items.map(([key, lab]) => ({ type: "fader", key, label: lab, fmt: "int", rand: true })), label });
 
 const tonewheel = {
-  name: "jiTONEWHEEL",
+  name: "Cathedral",
   tagline: "Drawbar tonewheel organ - nine drawbars, key click, percussion, scanner vibrato/chorus and rotary speaker",
   color: "#c98a3d",
   params: paramDefs,
@@ -402,7 +402,7 @@ const tonewheel = {
   ],
   ui: {
     theme: { accent: "#c98a3d", lcd: "#ffd9a0", lcdBg: "#241a0e", edge: "#463018", bg: "#1b140c" },
-    logo: ["ji", "TONEWHEEL"],
+    logo: ["", "Cathedral"],
     sub: "DRAWBAR ORGAN",
     cc: { 74: "cutoff", 71: "drive", 73: "keyClick", 72: "release", 75: "percDecay", 76: "percLevel", 77: "rotaryDepth", 7: "level" },
     sections: [

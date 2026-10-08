@@ -248,7 +248,7 @@ export const SYNTH_BANK = {
     ],
   },
 
-  ...NEW_SYNTHS, // jiFM4 · jiVOX · jiPLUCK — see synths-voices.js
+  ...NEW_SYNTHS, // Coinbase · Gm · Taproot — see synths-voices.js
   acidals: {
     name: "Acidals 303",
     tagline: "Resonant acid bass with filter envelope + accent/slide feel",
@@ -732,7 +732,7 @@ export const SYNTH_BANK = {
     ],
   },
 
-  ...EXTRA_SYNTHS, // jiBASS · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · jiLANTERN · jiPRISM · TIDAL GLASS · TIDELACE — see synths/index.js
+  ...EXTRA_SYNTHS, // Whale · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · Lightnode · Schnorr · TIDAL GLASS · TIDELACE — see synths/index.js
 };
 
 

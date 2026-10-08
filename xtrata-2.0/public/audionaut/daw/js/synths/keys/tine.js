@@ -1,4 +1,4 @@
-// synths/keys/tine.js — jiTINE: electric & acoustic keys (Audionaut synth module).
+// synths/keys/tine.js — Privkey: electric & acoustic keys (Audionaut synth module).
 //
 // Four keyboard models in one instrument, all rendered per note into an AudioBuffer
 // (sample-by-sample JS DSP, LRU-cached so repeated loop notes cost nothing):
@@ -339,7 +339,7 @@ const svg = {
 };
 
 const tine = {
-  name: "jiTINE",
+  name: "Privkey",
   tagline: "Electric & acoustic keys - Rhodes tine, Wurli reed, piano and clav models with touch-sensitive timbre",
   color: "#f5a65b",
   params: paramDefs,
@@ -363,7 +363,7 @@ const tine = {
   ],
   ui: {
     theme: { accent: "#f5a65b", lcd: "#ffe0b8", lcdBg: "#2a1c0f", edge: "#4d3620", bg: "#1f1710" },
-    logo: ["ji", "TINE"],
+    logo: ["", "Privkey"],
     sub: "ELECTRIC & ACOUSTIC KEYS",
     cc: { 74: "brightness", 71: "bark", 73: "hammer", 72: "release", 75: "decay", 76: "touch", 77: "tremolo", 78: "ping", 7: "level" },
     sections: [

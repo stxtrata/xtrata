@@ -1,4 +1,4 @@
-// synths/pad/ensemble.js — jiENSEMBLE: string machine / pad / choir (Audionaut synth module).
+// synths/pad/ensemble.js — Layers: string machine / pad / choir (Audionaut synth module).
 //
 // The classic 70s "string machine" recipe, built for one-shot Audionaut notes:
 //   * three REGISTERS (16' / 8' / 4') of detuned sawtooth (or square / triangle) voices
@@ -318,7 +318,7 @@ const svg = {
 };
 
 const ensemble = {
-  name: "jiENSEMBLE",
+  name: "Layers",
   tagline: "String machine, pad and choir - registers, three-phase ensemble chorus, swelling filter",
   color: "#7dd3c0",
   params: paramDefs,
@@ -363,7 +363,7 @@ const ensemble = {
   ],
   ui: {
     theme: { accent: "#7dd3c0", lcd: "#c9f5ea", lcdBg: "#0d2623", edge: "#274944", bg: "#101e1d" },
-    logo: ["ji", "ENSEMBLE"],
+    logo: ["", "Layers"],
     sub: "STRING MACHINE / PAD / CHOIR",
     cc: { 74: "cutoff", 71: "reso", 73: "attack", 72: "release", 75: "sweep", 76: "ensemble", 77: "detune", 78: "vibrato", 7: "level" },
     sections: [

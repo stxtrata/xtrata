@@ -1,4 +1,4 @@
-// synths/drums/kit.js — jiKIT: a synthesised drum kit played as notes (Audionaut synth module).
+// synths/drums/kit.js — ASIC: a synthesised drum kit played as notes (Audionaut synth module).
 //
 // One instrument = one whole kit. The MIDI note picks the drum (General-MIDI layout, so GM beats work):
 //   C1/B0 (35,36) kick   C#2 (37) rim   D2/E2 (38,40) snare   D#2 (39) clap
@@ -404,7 +404,7 @@ const svg = {
 };
 
 const kit = {
-  name: "jiKIT",
+  name: "ASIC",
   tagline: "Synth drum kit - 808 / 909 / lo-fi voicings, GM note map: kick, snare, clap, hats, toms, cymbals, cowbell",
   color: "#ff6b5a",
   params: paramDefs,
@@ -440,7 +440,7 @@ const kit = {
   ],
   ui: {
     theme: { accent: "#ff6b5a", lcd: "#ffc9c2", lcdBg: "#2b1210", edge: "#4a2320", bg: "#1f1211" },
-    logo: ["ji", "KIT"],
+    logo: ["", "ASIC"],
     sub: "SYNTH DRUM KIT · GM NOTE MAP",
     cc: { 74: "tone", 71: "drive", 73: "kickClick", 72: "snareDecay", 75: "kickDecay", 76: "snareSnap", 77: "hatTone", 78: "clapDecay", 7: "level" },
     sections: [

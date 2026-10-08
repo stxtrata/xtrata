@@ -1,4 +1,4 @@
-// synths/glass/prism.js — jiPRISM, "Spectral Bloom Instrument".
+// synths/glass/prism.js — Schnorr, "Spectral Bloom Instrument".
 // One tuned fundamental plus six refracting partials. Each partial blooms in
 // after the strike (staggered onset + attack), glides from a "refracted"
 // (inharmonic) ratio toward the pure harmonic series ("gravity"), decays faster
@@ -7,7 +7,7 @@
 // velocity drives strike depth, overtone weight and level; the gate length (dur)
 // decides how much of the bloom is heard before every partial is released.
 // Node graph per note: ~38 nodes (7+1+1 oscillators), soft-clipped, cleaned on end.
-// No imports, samples, fetches or randomness. Ported from the standalone jiPRISM page.
+// No imports, samples, fetches or randomness. Ported from the standalone Schnorr page.
 
 const range = (key, label, min, max, step, def) => ({ key, label, type: "range", min, max, step, def });
 
@@ -175,7 +175,7 @@ const ICON_BRONZE = '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4
 
 export const PRISM_SYNTHS = {
   prism: {
-    name: "jiPRISM",
+    name: "Schnorr",
     tagline: "Spectral bloom — strike a note, watch its harmonics unfold",
     color: "#73e0db",
     params: prismParams,
@@ -314,7 +314,7 @@ export const PRISM_SYNTHS = {
 
     ui: {
       theme: { accent: "#73e0db", lcd: "#b6f8ef", lcdBg: "#081817", edge: "#304344", bg: "#152023" },
-      logo: ["ji", "PRISM"],
+      logo: ["", "Schnorr"],
       sub: "SPECTRAL BLOOM INSTRUMENT",
       cc: { 1: "refraction", 16: "bloom", 17: "gravity", 18: "strike", 19: "orbit", 74: "cutoff", 73: "attack", 75: "decay", 70: "sustain", 72: "release", 7: "level" },
       sections: [

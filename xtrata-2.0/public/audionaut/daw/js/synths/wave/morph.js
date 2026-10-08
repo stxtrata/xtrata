@@ -1,4 +1,4 @@
-// synths/wave/morph.js — jiMORPH: wavetable morph + phase-distortion tables + West-Coast fold (Audionaut synth module).
+// synths/wave/morph.js — Szabo: wavetable morph + phase-distortion tables + West-Coast fold (Audionaut synth module).
 //
 // A different kind of oscillator from everything else in the bank: the sound is a WAVE that moves.
 //   * TABLES: twelve single-cycle waves built in code (sine, saw, pulse, square, three Casio-CZ style
@@ -370,7 +370,7 @@ const tableRadio = (key) => ({
 });
 
 const morph = {
-  name: "jiMORPH",
+  name: "Szabo",
   tagline: "Wavetable morph - phase-distortion tables, sine wavefolder, FM and a low-pass gate",
   color: "#9d7bff",
   params: paramDefs,
@@ -394,7 +394,7 @@ const morph = {
   ],
   ui: {
     theme: { accent: "#9d7bff", lcd: "#ddd0ff", lcdBg: "#1b1530", edge: "#3a2f66", bg: "#150f26" },
-    logo: ["ji", "MORPH"],
+    logo: ["", "Szabo"],
     sub: "WAVETABLE · PD · FOLD · FM · LPG",
     cc: { 74: "cutoff", 71: "reso", 73: "attack", 72: "release", 75: "morphEnd", 76: "fold", 77: "wobble", 78: "fmIndex", 7: "level" },
     sections: [
