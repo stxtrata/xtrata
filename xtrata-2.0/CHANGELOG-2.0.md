@@ -2,6 +2,29 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: merged with main's Live draw (2026-10-08)
+- Merged `origin/main` (Live draw, Draw 1 result, chess 2 tickets, team wallets excluded) into the Audionaut-5 / size-ticket / team-wallet branch. Audionaut 5 now exists once (main's `w: 5`), unchanged.
+- **Draw 1 stays frozen:** the Live draw's `tix(c, i)` keeps 1 ticket for inscribing in Draw 1, so its pool still reproduces `draws/draw1/frozen.csv` exactly (19 wallets, 133 tickets). Size tickets apply from Draw 2 (`c.inp`); `inp` and `inu` are bookkeeping keys and are never counted as tickets of their own.
+- The Live draw's `TEAM` list now has all three team wallets (jim.btc, xtrata.btc, audionals.btc); `handles.json` `team` supplies the names shown on the board.
+- Snapshot re-baked from a full chain read with the draw list, per-draw counts and sizes (25 wallets, 10 sizes). `slimState` keeps `draws` and `sizes`.
+
+## Bounty tracker: only jim.btc, xtrata.btc and audionals.btc are team wallets (2026-10-08)
+
+- `handles.json` gains a `team` map (address to BNS name) for the three team wallets, resolved from BNS v2 on 8 Oct. Those wallets show a "team · name" tag on the board and "team wallet" in the wallet bar, and their handles are locked.
+- Everyone else, including the M0VH0 wallet, is no longer in `handles.json` and can link or edit their own X handle by signing.
+
+## Bounty tracker: inscriptions earn tickets by file size, and the M0VH0 handle (2026-10-07)
+- **Rule:** every inscription from 1 October is scored on its own size and added up: up to 1 MB (1,048,576 bytes) = 1 ticket, over 1 MB = 2, over 2 MB = 3, over 3 MB = 4, over 4 MB = 5, never more than 5 each. Audionauts stay a flat 5 per wallet. Other kinds are unchanged.
+- `public/bounty/zdao/tracker/1/ledger-reader.js`: the reader now also reads `begin-inscription` and `begin-or-get` calls to learn the size a later `seal-*` call refers to (matched by expected hash), takes the size straight from `mint-single-tx*` calls, and scores each item of a `seal-inscription-batch` on its own. Per wallet it keeps `n.ins` (inscriptions) and `n.inp` (size tickets, also per draw) and `n.inu` (inscriptions whose begin it could not see, scored 1 and flagged). Sizes are remembered in the saved state (`sizes`) so an incremental read still finds the begin of a seal it sees later. Call counts for the inscription source now count each batch item.
+- `scripts/bounty-tracker-bake.mjs` keeps `sizes` in the baked state. `index.html`: new `per: 'size'` ticket kind, copy for the hero, step 2, ways list, example and a new FAQ answer; the snapshot was re-baked from a full read of the live chain (23 wallets).
+- `handles.json`: added `SP3AJC728JY0Y43E8RT6K4VDWPT265RDMXJ8M0VH0` = `@3hunnatheArtist`, which had only been typed into the ledger, so the two now show the same handle. The ledger also shows the tracker's team and self-linked handles as a fallback.
+- **Needs a decision later:** an inscription begun before 1 October and sealed after has no begin in the window and scores 1 until a begin is seen.
+- **Verified:** `npx vitest run src/bounty-tracker functions/bounty` (22 tests, 5 new for sizes: exact megabyte boundaries, begin-then-seal, single-tx, batch, remembered sizes across runs, unseen begin) and a browser run of the baked page: the wallet with 1 inscription, 3 Audionauts and 20 scores shows 26, 1 Audionaut with 14 scores and 2 inscriptions shows 21.
+
+## Bounty tracker: a wallet with 1 or more Audionauts earns 5 tickets (2026-10-07)
+- `public/bounty/zdao/tracker/1/index.html`: the Audionaut kind is now a flat 5 tickets per wallet, however many Audionauts it holds (it was 1). Added a `w` weight to the ticket kinds; `earned()` returns `w` for a flat kind. An Audionaut still counts as the wallet's entry (validity is unchanged), and inscription stays 1 ticket, so a wallet with both has 6 before other actions. Copy updated in the hero line, step 2, the ways list (+5 tickets), the ways intro, the example label and the two FAQ answers.
+- **Verified:** browser run against the baked snapshot: a wallet with 1 inscription, 3 Audionauts and 18 scores shows 24 (1 + 5 + 18); 1 Audionaut and 8 scores shows 13; 1 Audionaut and 1 score shows 6; 1 Audionaut alone shows 5. No page errors.
+
 ## Bounty tracker: Draw 1 result published (2026-10-08)
 - `public/bounty/zdao/tracker/1/draws/draw1/` holds the official Draw 1 files: `frozen.csv` (wallet,tickets, 19 wallets / 133 tickets, SHA-256 `0e897ca2...121b`), `meta.json` (seed = Bitcoin block 970404 `0x00000000000000000001...c269`, mined 2026-10-08 00:17 BST; exclusions; weights) and `result.json` (3 winners, 2 reserves). The Live draw section compares its own result with `result.json` and shows "Matches the official result".
 - `handles.json`: the three Draw 1 winners are recorded under `winners` so they show as Winner on the leaderboard.
