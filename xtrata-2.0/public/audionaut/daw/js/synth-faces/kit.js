@@ -25,18 +25,7 @@ import { Kit } from "./runtime.js";
     R('tone', 'Tone (low-pass)', 800, 18000, 16000, 50, v => v >= 1000 ? (v / 1000).toFixed(1) + ' kHz' : Math.round(v) + ' Hz', { log: true }),
     R('level', 'Output Level', 0, 1.5, 1, 0.01, v => Math.round(v * 100) + '%')
   ];
-  const KN = { '808': 0, '909': 1, lofi: 2 };
-  const pr = (name, kit, o) => ({ name, values: Object.assign({ kit: KN[kit] }, o) });
-  const presets = [
-    pr('Init (808 Kit)', '808', {}),
-    pr('909 Punch', '909', { kickTune: 56, kickDecay: 0.38, kickPunch: 0.7, kickClick: 0.6, snareTune: 200, snareSnap: 0.75, snareDecay: 0.19, hatTone: 0.6, hatDecay: 0.05, openDecay: 0.38, clapDecay: 0.2, clapSpread: 0.35, tomDecay: 0.33, cymDecay: 1.9, drive: 0.35 }),
-    pr('Lo-Fi Dust', 'lofi', { kickTune: 46, kickDecay: 0.42, kickPunch: 0.4, kickClick: 0.2, snareTune: 170, snareSnap: 0.5, snareDecay: 0.24, hatTone: 0.3, hatDecay: 0.07, openDecay: 0.3, clapDecay: 0.26, clapSpread: 0.7, tomDecay: 0.45, cymDecay: 1.3, drive: 0.3, tone: 5200 }),
-    pr('Deep Sub Kit', '808', { kickTune: 38, kickDecay: 1.1, kickPunch: 0.35, kickClick: 0.15, snareTune: 160, snareSnap: 0.35, snareDecay: 0.28, hatTone: 0.35, hatDecay: 0.05, openDecay: 0.5, clapDecay: 0.3, clapSpread: 0.6, tomTune: -4, tomDecay: 0.7, cymDecay: 2.2, drive: 0.15, tone: 9000 }),
-    pr('Tight Trap', '808', { kickTune: 44, kickDecay: 0.9, kickPunch: 0.5, kickClick: 0.3, snareTune: 210, snareSnap: 0.85, snareDecay: 0.14, hatTone: 0.8, hatDecay: 0.035, openDecay: 0.25, clapDecay: 0.16, clapSpread: 0.25, tomDecay: 0.25, cymDecay: 1.4, drive: 0.25 }),
-    pr('House Machine', '909', { kickTune: 52, kickDecay: 0.3, kickPunch: 0.55, kickClick: 0.5, snareTune: 190, snareSnap: 0.55, snareDecay: 0.17, hatTone: 0.7, hatDecay: 0.04, openDecay: 0.55, clapDecay: 0.28, clapSpread: 0.5, tomDecay: 0.3, cymDecay: 2.4, drive: 0.4 }),
-    pr('Boom Bap Break', 'lofi', { kickTune: 54, kickDecay: 0.3, kickPunch: 0.55, kickClick: 0.35, snareTune: 190, snareSnap: 0.7, snareDecay: 0.22, hatTone: 0.4, hatDecay: 0.06, openDecay: 0.28, clapDecay: 0.2, clapSpread: 0.5, tomDecay: 0.35, cymDecay: 1.1, drive: 0.5, tone: 6800 }),
-    pr('Dub Toms & Rims', '808', { kickTune: 60, kickDecay: 0.3, kickPunch: 0.8, kickClick: 0.2, snareTune: 150, snareSnap: 0.25, snareDecay: 0.12, hatTone: 0.2, hatDecay: 0.06, openDecay: 0.7, clapDecay: 0.4, clapSpread: 0.8, tomTune: 3, tomDecay: 0.95, cymDecay: 2.8, drive: 0.1, tone: 7500 })
-  ];
+  /* presets come from the synth def (P.presets, the whole kit library); the LCD shows name + nn/NN */
 
   /* ---------- shared helpers ---------- */
   const PADROWS = [[48, 49, 50, 51], [44, 45, 46, 47], [40, 41, 42, 43], [36, 37, 38, 39]];
@@ -81,9 +70,7 @@ import { Kit } from "./runtime.js";
     root.querySelectorAll('[data-pt]').forEach(b => b.addEventListener('click', () => { pl && pl.classList.toggle('open'); }));
     let cur = 0;
     root.querySelectorAll('[data-pp]').forEach(b => b.addEventListener('click', () => P.loadPreset((cur + +b.dataset.pp + npr) % npr)));
-    let first = true;
     P.onPreset((i, name) => {
-      if (first) { first = false; if (i < 0) { setTimeout(() => P.loadPreset(0), 0); } }
       if (i >= 0) cur = i; const nm = i >= 0 ? name : 'Custom';
       pn.forEach(e => { e.textContent = nm; }); pi.forEach(e => { e.textContent = (i >= 0 ? String(i + 1).padStart(2, '0') : '--') + '/' + String(npr).padStart(2, '0'); });
       if (pl) pl.querySelectorAll('[data-pl]').forEach(b => b.classList.toggle('on', +b.dataset.pl === i));
@@ -260,7 +247,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('kit', {
     fonts: 'family=Chakra+Petch:wght@400;500;700&family=Sora:wght@300;400;500;600;700&family=Anton&family=Space+Mono:wght@400;700',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       { key: 'A', name: 'ASIC', accent: '#c9ced4', build: buildA },
       undefined,

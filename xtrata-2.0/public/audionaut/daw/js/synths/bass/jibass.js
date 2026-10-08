@@ -131,7 +131,9 @@ function jibassVoice(ctx, dest, note, P) {
   osc1.type = P.wave === "square" ? "square" : "sawtooth";
   const osc3 = ctx.createOscillator();
   osc3.type = osc1.type;
-  osc3.detune.value = P.detune;
+  // THICKEN spreads the twins symmetrically around the note so wide detune stays in tune
+  osc1.detune.value = -P.detune / 2;
+  osc3.detune.value = P.detune / 2;
   const sub = ctx.createOscillator();
   sub.type = ["square", "sine", "triangle"].includes(P.subWave) ? P.subWave : "square";
   const subGain = ctx.createGain();
@@ -230,7 +232,7 @@ function jibassScope(P) {
   const k = 1 + P.drive * 12;
   const norm = 1 / Math.tanh(k);
   const gq = Math.pow(10, P.reso / 20);
-  const dm = Math.pow(2, P.detune / 1200);
+  const dm = Math.pow(2, P.detune / 2400);
   const sq = P.wave === "square";
   const wav = (ph) => (sq ? (ph < 0.5 ? 1 : -1) : 2 * ph - 1);
   const subw = (ph) =>
@@ -258,7 +260,7 @@ function jibassScope(P) {
       a1 = (-2 * cs) / a0;
       a2 = (1 - al) / a0;
     }
-    p1 = (p1 + f0 / sr) % 1;
+    p1 = (p1 + f0 / dm / sr) % 1;
     p3 = (p3 + (f0 * dm) / sr) % 1;
     ps = (ps + f0 / 2 / sr) % 1;
     let x = (wav(p1) + wav(p3) + subw(ps) * P.subLevel) * IN_TRIM;
@@ -284,6 +286,95 @@ const svg = {
   post: '<path d="M2 12 H12 M12 7 H18 V17 H12 Z M18 12 H22"/>',
 };
 
+// ---------- preset library, stored as data: one row = name + 19 values in PK order.
+// Selects are option indices: wave 0 saw 1 sqr | subWave 0 sqr 1 sin 2 tri | root 0 sub 1 main | driveAt 0 pre 1 post
+//          wave sub root subLv det punch cut  reso env  fAtk fDec kTrk  att  dec  sus  rel  drive dAt level
+const PK = "wave subWave root subLevel detune punch cutoff reso envMod fAttack fDecay keyTrack attack decay sustain release drive driveAt level".split(" ");
+const OPT = { wave: ["sawtooth", "square"], subWave: ["square", "sine", "triangle"], root: ["sub", "main"], driveAt: ["pre", "post"] };
+const BANK = {
+  Sub: [
+    ["Sub Thump", "1 1 0 1 4 5 120 1 500 .004 .2 .3 .004 .3 .75 .2 .25 0 1"],
+    ["808 Boom", "1 1 0 1 0 12 70 0 150 .002 .15 1 .002 1.2 .45 .6 .3 0 1.5"],
+    ["808 Crunch", "1 1 0 1 0 7 80 0 300 .002 .1 1 .002 1 .5 .5 .55 1 1"],
+    ["Pure Sub", "1 1 0 1 0 0 70 0 0 .002 .1 1 .008 .3 1 .25 0 0 1"],
+    ["Kick Bass", "1 1 0 1 2 12 110 2 900 .002 .08 1 .002 .35 .15 .2 .35 0 1.5"],
+    ["Trap Sub", "1 1 0 1 0 4 80 0 200 .002 .2 1 .004 1.5 .55 .5 .45 1 1"],
+    ["Round Sub", "1 2 0 1 2 0 90 1 400 .004 .25 .8 .006 .4 .85 .3 .15 0 1"],
+  ],
+  Pluck: [
+    ["Rubber Pluck", "0 2 0 .8 8 0 220 8 2800 .004 .2 .5 .004 .3 .18 .12 .5 0 1"],
+    ["Funk Slap", "0 2 0 .7 6 1 300 9 4000 .002 .12 .5 .002 .25 .25 .1 .45 0 1"],
+    ["Finger Bass", "0 2 0 .8 4 0 220 2 1200 .004 .3 .4 .006 .6 .4 .15 .2 0 1"],
+    ["Pick Bass", "0 0 0 .5 8 0 480 4 3000 .002 .08 .5 .002 .4 .35 .12 .5 0 1"],
+    ["Disco Pluck", "1 1 0 .7 5 0 260 12 3500 .002 .15 .5 .002 .22 .3 .08 .35 0 .63"],
+    ["Muted Thumb", "0 1 0 1 3 1 150 3 900 .002 .08 .3 .002 .25 .15 .1 .3 0 1.5"],
+    ["Wah Pluck", "0 2 0 .6 10 0 200 14 3200 .06 .2 .5 .004 .4 .3 .12 .4 0 1"],
+    ["Bubble Bass", "1 1 0 .8 4 0 120 16 2500 .002 .1 1 .002 .3 .2 .1 .3 0 .64"],
+  ],
+  Acid: [
+    ["Acid Squelch", "0 0 0 .25 3 0 260 18 5200 .003 .22 .6 .003 .3 .2 .07 .5 0 1"],
+    ["Acid Screamer", "0 0 0 .2 2 0 140 20 7000 .002 .3 1 .002 .35 .3 .07 .9 0 .76"],
+    ["Acid Square", "1 0 0 .2 0 0 150 17 4500 .002 .18 1 .002 .3 .25 .06 .5 0 .65"],
+    ["Dark Acid", "0 1 0 .5 4 0 90 16 2200 .002 .4 .8 .002 .5 .35 .1 .3 0 .76"],
+    ["Acid Fuzz", "0 0 0 .3 6 0 240 15 5000 .002 .25 .6 .002 .3 .3 .08 .8 1 1.5"],
+    ["Acid Yawn", "0 0 0 .3 5 0 150 18 4000 .08 .6 .5 .004 .6 .5 .12 .45 0 .69"],
+    ["Acid Blip", "0 0 0 .4 3 0 300 19 6000 .002 .1 .6 .002 .3 .15 .05 .6 0 1.5"],
+  ],
+  Reese: [
+    ["Reese Growl", "0 1 0 .7 40 0 380 3 1500 .3 1.2 .4 .02 .8 .8 .4 .7 0 1"],
+    ["Classic Reese", "0 1 0 .6 25 0 500 2 0 .002 .1 .4 .01 .5 1 .3 .3 0 .62"],
+    ["Neuro Reese", "0 1 0 .5 35 0 900 6 600 .1 .5 .3 .01 .5 .9 .25 .9 1 .78"],
+    ["Liquid Reese", "0 1 0 .7 18 0 350 1 300 .2 .8 .3 .03 .6 .9 .4 .2 0 .72"],
+    ["Dark Reese", "0 1 0 .7 50 0 220 4 400 .05 .6 .3 .015 .8 .9 .35 .5 0 .7"],
+    ["Rolling Reese", "0 1 0 .6 30 0 200 5 1800 .5 1.5 .4 .02 1 .8 .4 .6 0 .68"],
+    ["Square Reese", "1 1 0 .6 30 0 600 3 500 .05 .4 .3 .01 .6 .9 .3 .6 0 .66"],
+  ],
+  Dub: [
+    ["Deep Dub", "1 1 0 1 3 2 90 2 300 .01 .5 .2 .008 .5 .9 .45 .1 0 1"],
+    ["Roots Bass", "1 1 0 1 2 0 90 1 200 .01 .4 .8 .01 .8 .8 .3 .15 0 .77"],
+    ["Steppers", "1 2 0 1 3 0 100 2 600 .004 .15 .8 .006 .4 .85 .25 .2 0 1"],
+    ["Rockers Pluck", "1 1 0 .9 2 1 130 3 800 .004 .2 .8 .004 .5 .4 .2 .2 0 1"],
+    ["Sound System", "1 1 0 1 4 1.5 110 3 400 .01 .3 .7 .006 .6 .95 .5 .35 0 .63"],
+    ["Lovers Round", "0 2 0 1 5 0 160 2 400 .03 .3 .3 .016 .5 .7 .35 .1 0 1"],
+    ["Digi Dub", "1 0 0 .7 0 0 180 5 300 .006 .2 .6 .004 .4 .6 .15 .3 0 .64"],
+  ],
+  Analog: [
+    ["Wow Bass", "0 0 0 .5 20 0 130 10 4500 .14 .35 .5 .012 .5 .55 .2 .55 0 1"],
+    ["Night Drive", "0 0 0 .6 12 0 260 7 3000 .002 .18 .5 .002 .2 .35 .08 .3 0 1"],
+    ["Classic Mono", "0 0 0 .8 6 0 300 4 2000 .004 .4 .4 .004 .5 .6 .15 .35 0 .83"],
+    ["Brass Bass", "0 1 0 .6 18 0 200 3 3000 .05 .5 .5 .01 .6 .8 .2 .3 0 .77"],
+    ["Velvet Mono", "1 1 0 .8 8 0 220 2 900 .02 .4 .3 .02 .6 .85 .35 .1 0 .81"],
+    ["Italo Pulse", "1 0 0 .6 6 0 350 8 2000 .002 .1 .5 .002 .15 .3 .08 .3 0 1.25"],
+    ["Synthwave Saw", "0 0 0 .5 14 0 400 5 2500 .004 .25 .5 .004 .3 .5 .1 .3 0 1"],
+  ],
+  Growl: [
+    ["Dirty Fuzz", "1 0 0 .6 12 0 700 4 1800 .01 .25 .3 .006 .35 .6 .12 1 1 1"],
+    ["Growler", "0 0 0 .5 30 0 500 10 3000 .15 .5 .5 .01 .5 .8 .2 1 0 .66"],
+    ["Grit Square", "1 1 0 .7 10 0 300 6 2000 .004 .3 .4 .004 .4 .7 .15 .85 1 1"],
+    ["Industrial", "0 0 0 .4 22 0 200 14 4000 .004 .3 .5 .004 .4 .6 .1 1 1 1"],
+    ["Tear-Out", "0 1 0 .6 45 0 1200 8 1500 .25 .4 .3 .01 .5 .85 .25 1 0 .73"],
+    ["Fuzz Pedal", "1 0 0 1 4 0 1500 2 0 .002 .1 .2 .004 .5 .8 .15 1 1 .83"],
+    ["Overdriven Pick", "0 2 0 .6 8 0 800 3 2500 .002 .15 .4 .002 .35 .45 .12 .75 1 1.3"],
+  ],
+  Hollow: [
+    ["Hollow Square", "1 2 0 .7 4 0 350 3 800 .01 .3 1 .006 .5 .7 .2 .1 0 .77"],
+    ["Wooden Bass", "1 1 0 .9 2 0 200 12 1500 .002 .06 1 .002 .35 .15 .12 .15 0 1.36"],
+    ["Glass Bass", "1 1 0 .8 3 0 900 20 2500 .002 .08 1 .002 .5 .2 .2 .1 0 1"],
+    ["Hollow Tube", "1 1 1 .3 2 0 600 9 0 .002 .1 1 .01 .5 .85 .25 .1 0 .63"],
+    ["Vowel Bass", "1 2 0 .7 6 0 250 13 900 .12 .5 1 .01 .5 .8 .2 .2 0 .56"],
+    ["Clank", "1 0 1 .3 0 .5 1200 7 3000 .002 .04 .6 .002 .18 .12 .08 .2 0 1.5"],
+    ["Upright Thump", "1 2 0 1 2 .5 120 5 1200 .002 .09 .9 .002 .7 .1 .2 .1 0 1.1"],
+  ],
+};
+const row = (name, cat, vals) => ({
+  name,
+  cat,
+  params: Object.fromEntries(vals.split(" ").map((x, i) => [PK[i], OPT[PK[i]] ? OPT[PK[i]][+x] : +x])),
+});
+// Init first, then grouped by category
+const PRESETS = [{ name: "Init (Whale)", cat: "Analog", params: {} }];
+for (const cat in BANK) for (const [n, v] of BANK[cat]) PRESETS.push(row(n, cat, v));
+
 const jibass = {
   name: "Whale",
   tagline: "Analog bass - twin detuned saws + sub, drive into a resonant filter with a rise-and-fall envelope",
@@ -296,38 +387,10 @@ const jibass = {
     { name: "Sub Pressure (F)", dsl: "0:F1:6 8:F1:2 10:Ab1:2 12:C2:4 16:F1:6 24:Eb1:4 28:C2:2 30:Bb1:2" },
     { name: "Acid Roller (Am)", dsl: "0:A1:1 1:A1:1:80 2:A2:1:127 3:A1:1 4:C2:1 5:A1:1:80 6:G2:1:127 7:E2:1 8:A1:1 9:A1:1:80 10:A2:1:127 11:A1:1 12:C2:1 13:E2:1 14:G2:1:127 15:A2:1 16:A1:1 17:A1:1:80 18:A2:1:127 19:A1:1 20:D2:1 21:A1:1:80 22:C3:1:127 23:A2:1 24:A1:1 25:G1:1:80 26:A1:1 27:E2:1:127 28:G1:1 29:A1:1 30:C2:1:127 31:E2:1" },
     { name: "Reese Walk (Dm)", dsl: "0:D2:8 8:F2:4 12:G2:4 16:D2:8 24:C2:4 28:A1:4" },
+    { name: "Dub Steppers (Gm)", dsl: "0:G1:3 4:G1:1:90 6:Bb1:2 8:D2:3 12:C2:2 14:Bb1:2 16:G1:3 20:G1:1:90 22:F1:2 24:D1:4 28:F1:2 30:G1:2" },
+    { name: "Night Drive (Am)", dsl: "0:A1:1 2:A1:1:90 4:A2:1:127 6:A1:1:90 8:A1:1 10:A1:1:90 12:A2:1:127 14:A1:1:90 16:F1:1 18:F1:1:90 20:F2:1:127 22:F1:1:90 24:G1:1 26:G1:1:90 28:G2:1:127 30:E2:1:90" },
   ],
-  presets: [
-    { name: "Init (Whale)", params: {} },
-    {
-      name: "Sub Thump",
-      params: { wave: "square", subWave: "sine", subLevel: 1, detune: 4, punch: 5, cutoff: 120, reso: 1, envMod: 500, fAttack: 0.004, fDecay: 0.2, keyTrack: 0.3, attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.2, drive: 0.25, driveAt: "pre" },
-    },
-    {
-      name: "Rubber Pluck",
-      params: { wave: "sawtooth", subWave: "triangle", subLevel: 0.8, detune: 8, punch: 0, cutoff: 220, reso: 8, envMod: 2800, fAttack: 0.004, fDecay: 0.2, keyTrack: 0.5, attack: 0.004, decay: 0.3, sustain: 0.18, release: 0.12, drive: 0.5, driveAt: "pre" },
-    },
-    {
-      name: "Acid Squelch",
-      params: { wave: "sawtooth", subWave: "square", subLevel: 0.25, detune: 3, punch: 0, cutoff: 260, reso: 18, envMod: 5200, fAttack: 0.003, fDecay: 0.22, keyTrack: 0.6, attack: 0.003, decay: 0.3, sustain: 0.2, release: 0.07, drive: 0.5, driveAt: "pre" },
-    },
-    {
-      name: "Reese Growl",
-      params: { wave: "sawtooth", subWave: "sine", subLevel: 0.7, detune: 40, punch: 0, cutoff: 380, reso: 3, envMod: 1500, fAttack: 0.3, fDecay: 1.2, keyTrack: 0.4, attack: 0.02, decay: 0.8, sustain: 0.8, release: 0.4, drive: 0.7, driveAt: "pre" },
-    },
-    {
-      name: "Wow Bass",
-      params: { wave: "sawtooth", subWave: "square", subLevel: 0.5, detune: 20, punch: 0, cutoff: 130, reso: 10, envMod: 4500, fAttack: 0.14, fDecay: 0.35, keyTrack: 0.5, attack: 0.012, decay: 0.5, sustain: 0.55, release: 0.2, drive: 0.55, driveAt: "pre" },
-    },
-    {
-      name: "Dirty Fuzz",
-      params: { wave: "square", subWave: "square", subLevel: 0.6, detune: 12, punch: 0, cutoff: 700, reso: 4, envMod: 1800, fAttack: 0.01, fDecay: 0.25, keyTrack: 0.3, attack: 0.006, decay: 0.35, sustain: 0.6, release: 0.12, drive: 1, driveAt: "post" },
-    },
-    {
-      name: "Deep Dub",
-      params: { wave: "square", subWave: "sine", subLevel: 1, detune: 3, punch: 2, cutoff: 90, reso: 2, envMod: 300, fAttack: 0.01, fDecay: 0.5, keyTrack: 0.2, attack: 0.008, decay: 0.5, sustain: 0.9, release: 0.45, drive: 0.1, driveAt: "pre" },
-    },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#ef4444", lcd: "#fca5a5", lcdBg: "#2a1215", edge: "#3d1c1c", bg: "#1f1212" },
     logo: ["", "Whale"],
