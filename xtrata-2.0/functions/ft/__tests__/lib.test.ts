@@ -33,9 +33,10 @@ describe('parseTokenFile', () => {
   it('accepts plain integers with .json', () => {
     expect(parseTokenFile('12.json')).toBe(12);
     expect(parseTokenFile('420.json')).toBe(420);
+    expect(parseTokenFile('0.json')).toBe(0);
   });
   it('rejects everything else', () => {
-    for (const bad of ['0.json', '012.json', '-1.json', '1.JSON', '1', '1.json.js', '../1.json', '1e3.json', '']) {
+    for (const bad of ['00.json', '012.json', '-1.json', '1.JSON', '1', '1.json.js', '../1.json', '1e3.json', '']) {
       expect(parseTokenFile(bad)).toBeNull();
     }
   });
