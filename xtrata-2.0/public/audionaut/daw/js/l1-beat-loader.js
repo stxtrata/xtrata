@@ -188,15 +188,17 @@ export async function loadBeatPreset(preset, options = {}) {
     project.instruments[i].solo = false;
     store.emit("instrument", { i });
   }
-  if (!exclusive)
-    for (
-      let i = prepared.length;
-      i < (project.lastPresetChannels || 0) && i < store.numChannels;
-      i++
-    ) {
-      sequence.steps[i].fill(0);
-      engine.silenceChannel(i);
-    }
+  // Clear what the previous beat left on channels this beat does not use, in every collection:
+  // a muted channel that keeps its steps is still visible in the grid and would come back on unmute.
+  // Channels the user added beyond the previous beat's own are left alone.
+  for (
+    let i = prepared.length;
+    i < (project.lastPresetChannels || 0) && i < store.numChannels;
+    i++
+  ) {
+    sequence.steps[i].fill(0);
+    engine.silenceChannel(i);
+  }
   prepared.forEach(({ def, result, steps, trimStart, trimEnd }, i) => {
     assignDecodedSample(i, def.source, result);
     Object.assign(store.channel(i), {
