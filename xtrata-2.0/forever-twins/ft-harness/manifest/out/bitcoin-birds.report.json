@@ -1,0 +1,25 @@
+{
+  "collectionKey": "bitcoin-birds",
+  "requested": 400,
+  "built": 400,
+  "partial": false,
+  "failures": [],
+  "oversize": [],
+  "maxSingleTxBytes": 524288,
+  "maxRecordBytes": 33554432,
+  "largest": {
+    "id": 235,
+    "bytes": 7545
+  },
+  "mimes": {
+    "image/png": 400
+  },
+  "mediaHosts": {
+    "ipfs": 400
+  },
+  "preinscribed": [],
+  "preinscribedCoreFeeUstx": 0,
+  "identicalContent": [],
+  "seedingCalls": 4,
+  "seconds": 130
+}

@@ -22,5 +22,11 @@
     "manifestSha": "a6d742297081353aaaa64c536e7ea30587d7e341f12d5b491b38cd885b6e54a4",
     "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
     "pinnedAt": "2026-10-07"
+  },
+  "bitcoin-birds": {
+    "helperSha": "2f15eb3d8ea5e6bac3cdf62208ef621d3df8c2f6e64426af04c0739f0e326b9a",
+    "manifestSha": "6c19c50821e7a447a8874c4d516b0962cd3eff051bcf23f17552175f8e470145",
+    "deployer": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    "pinnedAt": "2026-10-08"
   }
 }

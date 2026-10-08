@@ -73,7 +73,8 @@ const page = {
   key, name, master: cfg.master, source: cfg.source, group: cfg.group, payees: cfg.payees,
   initialFeeUstx: cfg.initialFeeUstx, maxFeeUstx: cfg.maxFeeUstx, deployer: pins.deployer,
   contractName: `forever-twin-${key}`.slice(0, 40), gateway: 'http://127.0.0.1:8080', manifestPath: `/ft/data/${key}.manifest.json`,
-  listingReadFn: cfg.listingReadFn || undefined, testToken: cfg.testToken || undefined,
+  listingReadFn: cfg.listingReadFn || undefined, testToken: Number.isInteger(cfg.testToken) ? cfg.testToken : undefined,
+  sourceOwnerRead: cfg.sourceOwnerRead === 'public' ? 'public' : undefined, heldIdsReadFn: cfg.sourceOwnerRead === 'public' ? cfg.heldIdsReadFn : undefined,
   largeOnDemand: cfg.largeOnDemand === true ? true : undefined
 };
 
