@@ -3753,7 +3753,13 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   usesV15 ? ' collection-live-page__hero-price-card--collection' : ''
                 }`}
               >
-                <span className="collection-live-page__hero-price-label">{usesV15 ? (mintPending ? 'Minting…' : 'Mint now') : 'Mint price'}</span>
+                <span className="collection-live-page__hero-price-label">{mintPending
+                  ? 'Minting…'
+                  : mintUnavailableReason
+                    ? 'Mint unavailable'
+                    : resumeTargetAsset
+                      ? 'Resume mint'
+                      : 'Mint now'}</span>
                 <strong>{usesV15 ? buyerMax === null ? 'Loading price…' : toMicroStxLabel(buyerMax) : mintPriceLabel}</strong>
                 {!usesV15 && (
                   <span className="collection-live-page__hero-price-subtle">
@@ -3846,20 +3852,6 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
               </div>
             )}
             <div className="collection-live-page__hero-actions">
-              <button
-                className="button"
-                type="button"
-                onClick={() => void handleMintNow()}
-                disabled={mintPending || walletPending || Boolean(mintUnavailableReason)}
-              >
-                {mintPending
-                  ? 'Minting...'
-                  : mintUnavailableReason
-                    ? 'Mint unavailable'
-                    : resumeTargetAsset
-                      ? 'Resume mint'
-                      : 'Mint one now'}
-              </button>
               <button
                 className="button button--ghost"
                 type="button"
