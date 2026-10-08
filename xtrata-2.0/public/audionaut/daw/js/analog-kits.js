@@ -5,8 +5,9 @@
 // How a beat is voiced
 //   · A recipe is abstract drum ROLES on a 16th grid (see percussion-recipes.js). Here each role
 //     is mapped to recordings by a PERSONA (Jazz Club, Rusty, Unruly, Swirly, Concert, Modern Mix).
-//   · Levels come from analog-calibration.js (measured loudness), not from hand-set gains, and
-//     tails are trimmed per role and tempo so long recordings (kicks ~1 s, hats ~0.4 s) don't smear.
+//   · Levels come from analog-calibration.js (measured loudness), not from hand-set gains.
+//   · Every hit plays its recording's FULL region: nothing is trimmed. Where a short sound is
+//     needed (busy hat patterns) a naturally quick-decaying recording is chosen instead.
 //   · Dynamics: a step is only normal (x) or accent (X, +1.9 dB). Roles that use both are split
 //     into a medium-layer channel and a hard-layer channel, so accents are real harder hits.
 //   · A beat has at most 16 channels; splits are undone, least important first, to fit.
@@ -98,15 +99,8 @@ const TARGET = {
   TB: -25, TK: -29, CG: -20, CS: -21, QU: -21, BH: -22, BL: -21, DJ: -21, DB: -20, FD: -20,
   CJ: -19, CM: -21, CP: -21, WB: -24, CV: -25, TR: -27, BD: -22,
 };
-// Longest useful body (seconds) per role at a mid tempo; scaled for slow and fast tempos.
-const CAP = {
-  K: 0.48, K2: 0.6, BA: 0.9, S: 0.3, S2: 0.16, SS: 0.2, RS: 0.28, SB: 0.3, C: 0.26, H: 0.1,
-  HP: 0.12, HT: 0.06, HH: 0.28, O: 0.34, RD: 0.5, RB: 0.42, CR: 1.1, SP: 0.5, CH: 0.9, SC: 1.4,
-  CC: 1.0, GO: 2.0, B: 0.3, B2: 0.35, R: 0.15, T3: 0.5, T2: 0.5, T1: 0.55, F1: 0.65, F2: 0.7,
-  SH: 0.14, TB: 0.2, TK: 0.05, CG: 0.5, CS: 0.4, QU: 0.45, BH: 0.3, BL: 0.32, DJ: 0.5, DB: 0.4,
-  FD: 0.7, CJ: 0.25, CM: 0.25, CP: 0.2, WB: 0.2, CV: 0.2, TR: 0.9, BD: 0.45,
-};
-const DENSE = new Set(["H", "HP", "HT", "SH", "TB", "TK", "B2", "R", "CV", "WB", "TR"]);
+// A closed hat that decays by this many seconds (calibration tail) or less counts as a quick hat.
+const QUICK_TAIL = 0.43;
 const SOFT_ROLES = new Set(["S2", "HT", "TK", "HP"]);
 // When a beat needs more than 16 channels, layer splits are undone in this order (first = first).
 const UNSPLIT_FIRST = ["HT", "TK", "SH", "TB", "B2", "R", "CV", "WB", "B", "HP", "H", "HH", "O", "C", "RD", "RB", "CR", "SS", "RS", "S2", "S", "K"];
@@ -462,10 +456,15 @@ function plan(recipe, persona, seed, bump, pins = null) {
     if (!options?.length) throw new Error(`${persona.key}: no voice for role ${role} (${recipe.id})`);
     const axis = axisRole.indexOf(role);
     const pinned = pins?.[role];
-    const voice = pinned
-      ? pinVoice(pinned)
-      : options[(seed + (axis >= 0 ? digit[axis] : (OFFSET[role] ?? 0))) % options.length];
-    return { role, voice, pattern: expandRole(recipe, role), split: false };
+    const step = seed + (axis >= 0 ? digit[axis] : (OFFSET[role] ?? 0));
+    let voice = pinned ? pinVoice(pinned) : options[step % options.length];
+    const pattern = expandRole(recipe, role);
+    // Busy hats: never trim a long hat. Play a recording that is quick by nature instead.
+    if (!pinned && (role === "H" || role === "HT") && pattern.replace(/\./g, "").length / 64 > 0.4 && voice.m.tail > QUICK_TAIL) {
+      const quick = [...persona.voices.H, ...persona.voices.HT].filter((v, i, a) => v.m.tail <= QUICK_TAIL && a.findIndex((w) => w.m.assetId === v.m.assetId) === i);
+      if (quick.length) voice = quick[step % quick.length];
+    }
+    return { role, voice, pattern, split: false };
   });
 }
 
@@ -517,18 +516,7 @@ function build(recipe, persona, index, pins = null) {
     const gain = 10 ** ((TARGET[role] - ref.loud) / 20) * voice.g * (recipe.level?.[role] ?? 1);
     const hitsOf = (pat) => pat.replace(/\./g, "").length;
     const mk = (sound, pattern, suffix) => {
-      const hits = hitsOf(pattern);
-      const crowded = hits / 64 > 0.6 ? 0.78 : 1;
-      const felt = recipe.felt ?? recipe.bpm;
-      const scale = felt <= 85 ? 1.4 : felt >= 150 ? 0.75 : 1;
-      let tail = CAP[role] * scale;
-      const stepSec = 60 / recipe.bpm / 4;
-      if (DENSE.has(role) && hits / 64 > 0.4) tail = Math.min(tail, stepSec * 1.6);
-      // Never let a role ring across more than ~2.5 of its own median gaps, so dense patterns
-      // don't pile up voices and clip.
-      const gaps = gapsOf(pattern);
-      if (gaps.length) tail = Math.min(tail, Math.max(0.08, 2.5 * gaps[gaps.length >> 1] * stepSec));
-      tail = Math.max(0.03, Math.min(tail, sound.tail + 0.02, sound.dur));
+      const crowded = hitsOf(pattern) / 64 > 0.6 ? 0.78 : 1;
       return {
         source: {
           type: "pack",
@@ -542,7 +530,7 @@ function build(recipe, persona, index, pins = null) {
         pattern,
         volume: +Math.min(1, Math.max(0.05, gain * crowded)).toFixed(3),
         pitch: voice.p,
-        trimSeconds: [0, +tail.toFixed(2)],
+        trimSeconds: [0, Math.ceil(sound.dur * 1000) / 1000], // the full recording
         fx: { ...voice.fx, ...recipe.fx[role] },
       };
     };
@@ -585,14 +573,6 @@ function build(recipe, persona, index, pins = null) {
     channels,
     description: `${recipe.world ? "World rhythm" : "Drum beat"} at ${recipe.felt ?? recipe.bpm} BPM on the ${persona.label} kit with ${parts.join(", ")}${withBass ? ", plus an 808 bass hit (Electronic Kit sub kick) because the style calls for it" : " — drums only, no bass or melody"}; four bars with a fill in the last.${feel} Analog Kit recordings (CC0).`,
   };
-}
-
-// Sorted gaps (in steps) between consecutive hits of a 64-step pattern, wrapping around the loop.
-function gapsOf(pattern) {
-  const at = [];
-  for (let i = 0; i < pattern.length; i++) if (pattern[i] !== ".") at.push(i);
-  if (at.length < 2) return [];
-  return at.map((p, i) => (at[(i + 1) % at.length] - p + pattern.length) % pattern.length || pattern.length).sort((a, b) => a - b);
 }
 
 const cache = new Map();

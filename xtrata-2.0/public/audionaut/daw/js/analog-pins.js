@@ -58,7 +58,7 @@ export const ANALOG_PINS = {
   "rock-driving-8ths": { K: "kicks-rusty-24in-rusty-24in-open-hard" },
   "rock-half-time": { K: "kicks-unruly-20in-unruly-20in-clean-soft" },
   "rock-ride-crash": { RD: "cymbals-rides-swirly-ride" },
-  "rumba-clave-cascara": { K: "kicks-swirly-buzz-kick" },
+  "rumba-clave-cascara": { K: "kicks-swirly-buzz-kick", H: "hi-hats-closed-swirly-closed" },
   "soukous-sebene": { SP: "hi-hats-pedal-and-foot-swirly-foot-splash" },
   "stomp-and-clap": { SS: "rim-and-stick-cross-stick-concert-b", K: "kicks-concert-orchestral" },
   "trap-halftime": { S: "snares-piccolo-13in-piccolo-13in-dig" },
