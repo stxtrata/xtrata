@@ -1,5 +1,5 @@
 // Shared, transactional L1/L2 audio loader. Remote preview cache is bounded.
-import { store, stepVal } from "./state.js";
+import { store, stepVal, makeChannel } from "./state.js";
 import { engine } from "./engine.js";
 import { renderSynthSample, ALL_SYNTH_DRUMS } from "./synthdrums.js";
 import { SOUND_BY_KEY } from "./onboard-catalog.js";
@@ -354,6 +354,21 @@ export function assignDecodedSample(ch, source, result, { reset = true } = {}) {
       .slice(0, 24);
   store.emit("channel", { ch, prop: "source", value: channel.source });
   return channel.sampleName;
+}
+// Empties a channel: stops its voices, drops the decoded audio and returns every sample-related
+// setting to a fresh channel's defaults. A load still in flight for this channel is discarded.
+// Steps are left to the caller (they live per sequence).
+export function unloadChannelSample(ch) {
+  const channel = store.channel(ch);
+  if (!channel) return false;
+  tickets.set(ch, Symbol());
+  engine.silenceChannel(ch);
+  engine.setBuffer(ch, null);
+  for (const key of Object.keys(channel)) delete channel[key];
+  Object.assign(channel, makeChannel(ch));
+  engine.rebuildInserts?.(ch);
+  store.emit("channel", { ch });
+  return true;
 }
 export function reserveSampleAssignment(ch) {
   const project = store.project,

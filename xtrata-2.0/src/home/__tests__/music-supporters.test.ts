@@ -102,6 +102,35 @@ describe('banner and hero', () => {
     expect(items[2].querySelector('.home-sup__age')!.textContent).toMatch(/min ago$/);
   });
 
+  it('shows the song title, artist and artwork when known, and falls back to the song number', async () => {
+    const latest = [
+      {txid: hex(3), song: 2188, core: 3, payer: 'SPX4KR3G5Z1SZT4RVF4ATHV4ZP4KXPWSZ4424W6K', recipient: 'SP1', at: null,
+        title: 'Easy Now', artist: 'Hundred Little Reasons', artwork: '/radio/artwork?id=2188'},
+      {txid: hex(2), song: 877, core: 1, payer: 'SP1ABCDEFGHJKLMNPQRSTUVWXYZ0123456', recipient: 'SP1', at: null, title: null, artist: null, artwork: null},
+      {txid: hex(1), song: 1310, core: 3, payer: 'SP3RK7HD', recipient: 'SP1', at: null,
+        title: 'Plain Title', artist: null, artwork: 'https://evil.example/x.png'}
+    ];
+    vi.stubGlobal('fetch', reply(payload({latest})));
+    initMusicSupporters();
+    await settle();
+    const items = [...document.querySelectorAll('.home-sup__rcpt')];
+    expect(items[0].querySelector('b')!.textContent).toBe('Easy Now');
+    expect(items[0].querySelector('.home-sup__artist')!.textContent).toBe('Hundred Little Reasons');
+    expect(items[0].querySelector('.home-sup__art img')!.getAttribute('src')).toBe('/radio/artwork?id=2188');
+    expect(items[0].querySelector('.home-sup__art img')!.getAttribute('alt')).toBe('');
+    expect(items[1].querySelector('b')!.textContent).toBe('Song #877');
+    expect(items[1].querySelector('.home-sup__artist')).toBeNull();
+    expect(items[1].querySelector('.home-sup__art img')).toBeNull();
+    expect(items[1].querySelector('.home-sup__art')!.textContent).toBe('♪');
+    expect(items[2].querySelector('b')!.textContent).toBe('Plain Title');
+    expect(items[2].querySelector('.home-sup__art img')).toBeNull(); // only same-origin catalogue artwork is accepted
+    // Failed artwork leaves the note tile instead of a broken image.
+    (items[0].querySelector('.home-sup__art img') as HTMLImageElement).onerror!(new Event('error'));
+    expect(items[0].querySelector('.home-sup__art img')).toBeNull();
+    // Song details are text, never markup.
+    expect(items[0].innerHTML).not.toContain('<script');
+  });
+
   it('says the history is still being counted instead of presenting partial totals as final', async () => {
     vi.stubGlobal('fetch', reply(payload({complete: false, plays: 800})));
     initMusicSupporters();
