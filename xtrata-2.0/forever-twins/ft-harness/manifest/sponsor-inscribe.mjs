@@ -3,7 +3,7 @@
 //
 //   node manifest/sponsor-inscribe.mjs --manifest manifest/out/nyc-degens.manifest.json \
 //        --helper SP...helper-name [--gateway http://127.0.0.1:8080] [--only 174 | 1-20,50]
-//        [--batch 20] [--max-fee-ustx 500000] [--api https://api.hiro.so]
+//        [--batch 20] [--max-fee-ustx 500000] [--api https://api.hiro.so] [--read-delay-ms 600] [--fee-ustx 12000]
 //        [--execute --confirm SP...helper-name]        (omit both for a DRY RUN)
 //        [--offline]                                   (files only, no chain reads; no --helper needed)
 //
@@ -78,13 +78,23 @@ export async function buildInscribeTx({ helper, token, chunks, senderKey, sender
   });
 }
 
-function makeApi(base, apiKey) {
+function makeApi(base, apiKey, minGapMs = 0) {
   const headers = apiKey ? { 'x-api-key': apiKey } : {};
-  const call = async (path, init = {}, tries = 6) => {
+  let lastCall = 0;
+  const call = async (path, init = {}, tries = 10) => {
     let last;
     for (let a = 0; a < tries; a++) {
+      // spacing between calls keeps a keyless run under the public rate limit (--read-delay-ms)
+      const wait = lastCall + minGapMs - Date.now();
+      if (wait > 0) await sleep(wait);
+      lastCall = Date.now();
       const res = await fetch(`${base}${path}`, { ...init, headers: { ...headers, ...(init.headers || {}) } });
-      if (res.status === 429 || res.status >= 500) { last = new Error(`HTTP ${res.status} ${path}`); await sleep(1500 * (a + 1)); continue; }
+      if (res.status === 429 || res.status >= 500) {
+        last = new Error(`HTTP ${res.status} ${path}`);
+        const ra = Number(res.headers.get('retry-after'));
+        await sleep(Math.min(30000, Number.isFinite(ra) && ra > 0 ? ra * 1000 : 2000 * (a + 1)));
+        continue;
+      }
       if (res.status === 404) return { status: 404, body: null };
       if (!res.ok) throw new Error(`HTTP ${res.status} ${path}`);
       return { status: res.status, body: await res.json() };
@@ -126,8 +136,11 @@ async function main() {
   const gateway = opt('gateway', 'http://127.0.0.1:8080');
   const batchSize = Math.min(25, Math.max(1, Number(opt('batch', '20'))));
   const maxFee = BigInt(opt('max-fee-ustx', '500000'));
+  const fixedFee = opt('fee-ustx') !== undefined ? BigInt(opt('fee-ustx')) : undefined;   // optional: use this network fee for every transaction instead of the node's estimate
+  if (fixedFee !== undefined && fixedFee > maxFee) throw new Error('--fee-ustx is above --max-fee-ustx');
   const apiBase = opt('api', process.env.FT_API || 'https://api.hiro.so').replace(/\/$/, '');
-  const { call, readOnly } = makeApi(apiBase, process.env.HIRO_API_KEY);
+  const { call, readOnly } = makeApi(apiBase, process.env.HIRO_API_KEY, Number(opt('read-delay-ms', '600')));
+  const feeCache = new Map(), quoteCache = new Map();   // fee-for is the same for every token; the core quote depends only on size and chunk count
 
   const text = readFileSync(manifestPath, 'utf8');
   const manifest = JSON.parse(text);
@@ -198,9 +211,14 @@ async function main() {
       const chunks = await verifyToken(token, await fetchBytes(url));
       let feeFor = 0n, core = 0n;
       if (!offline) {
-        feeFor = uintOf(await readOnly(helper, 'fee-for', [Cl.principal(payer)], payer));
-        const q = await readOnly(master, 'quote-single-tx-fee', [Cl.uint(token.twin.totalSize), Cl.uint(chunks.length)], payer);
-        core = BigInt(descend(q, 'total-fee').value);
+        if (!feeCache.has(payer)) feeCache.set(payer, uintOf(await readOnly(helper, 'fee-for', [Cl.principal(payer)], payer)));
+        feeFor = feeCache.get(payer);
+        const qk = `${token.twin.totalSize}:${chunks.length}`;
+        if (!quoteCache.has(qk)) {
+          const q = await readOnly(master, 'quote-single-tx-fee', [Cl.uint(token.twin.totalSize), Cl.uint(chunks.length)], payer);
+          quoteCache.set(qk, BigInt(descend(q, 'total-fee').value));
+        }
+        core = quoteCache.get(qk);
       }
       totalHelperFee += feeFor; totalCore += core;
       prepared.push({ token, chunks, feeFor, core });
@@ -214,7 +232,7 @@ async function main() {
     if (balance < need) throw new Error(`balance ${Number(balance) / 1e6} STX is below the ${Number(need) / 1e6} STX this batch could need (fees capped at ${Number(maxFee) / 1e6} each)`);
     const sent = [];
     for (const p of prepared) {
-      const t = await buildInscribeTx({ helper, token: p.token, chunks: p.chunks, senderKey, senderAddress: sender, nonce, capUstx: p.feeFor + p.core });
+      const t = await buildInscribeTx({ helper, token: p.token, chunks: p.chunks, senderKey, senderAddress: sender, nonce, capUstx: p.feeFor + p.core, feeUstx: fixedFee });
       const netFee = BigInt(t.auth.spendingCondition.fee);
       if (netFee > maxFee) throw new Error(`network fee ${netFee} exceeds --max-fee-ustx ${maxFee}; raise it or wait`);
       const res = await tx.broadcastTransaction({ transaction: t, network: 'mainnet' });

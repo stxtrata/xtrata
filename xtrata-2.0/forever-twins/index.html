@@ -466,6 +466,24 @@
         <div class="col-foot"><span class="btn sm">View Bitcoin Monkeys →</span></div>
       </a>
 
+      <!-- ACTIVE: Bitcoin Birds (fully sponsored: all 400 twins inscribed by the Xtrata team) -->
+      <a id="bb-card" class="col-card col-card--hero active" href="/forever-twins/collection/bitcoin-birds" style="color:inherit">
+        <img class="col-banner col-banner--twin" src="/inscription/mainnet/SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X/xtrata-v3-2-3/3129" alt="Bitcoin Birds Forever Twins: first inscribed twin" onerror="var d=document.createElement('div');d.className='col-banner col-banner--text';d.setAttribute('role','img');d.setAttribute('aria-label','Bitcoin Birds Forever Twins');d.textContent='BITCOIN BIRDS';this.replaceWith(d)" />
+        <div class="col-top">
+          <div class="col-head">
+            <span class="col-badge live">● Live</span><span id="bb-stamp" class="forevered-stamp">Forevered</span>
+            <h3>Bitcoin Birds</h3>
+            <div class="chain">Stacks · bitcoin-birds → forever-twin-bitcoin-birds</div>
+          </div>
+        </div>
+        <div class="col-body">All 400 Bitcoin Birds have a permanent on-chain twin, inscribed by the Xtrata team so the whole collection is backed up. Holders can swap between the original and the twin whenever they like.</div>
+        <div class="col-metrics">
+          <div class="col-metric"><div class="v live" id="bb-inscribed">— / —</div><div class="k">Twins migrated</div></div>
+          <div class="col-metric"><div class="v" id="bb-status">—</div><div class="k">Migration status</div></div>
+        </div>
+        <div class="col-foot"><span class="btn sm">View Bitcoin Birds →</span></div>
+      </a>
+
     </div>
 
     <div class="cta-strip">
@@ -634,6 +652,17 @@ const COLLECTIONS = [
     statusEl: "bm-status",
     cardEl: "bm-card",
     stampEl: "bm-stamp"
+  },
+  {
+    // Count + source total for Bitcoin Birds (Forever Twins helper v3, fully sponsored).
+    addr: "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X",
+    name: "forever-twin-bitcoin-birds",
+    sourceAddr: "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG",
+    sourceName: "bitcoin-birds",
+    countEl: "bb-inscribed",
+    statusEl: "bb-status",
+    cardEl: "bb-card",
+    stampEl: "bb-stamp"
   }
 ];
 const API = "https://api.hiro.so";

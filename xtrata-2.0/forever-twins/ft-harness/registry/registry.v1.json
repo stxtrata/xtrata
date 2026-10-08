@@ -76,6 +76,17 @@
       "largeOnDemand": true,
       "expectedSourceSha256": "de53ff3fdfd4e4afc189a7a30ead536256f567eedd47a83a65d894f97d828c0f",
       "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-06; canonical record finalised (2500 records, manifest b1522c246125bd174e6cc468f148033a46a1f3b9e0ebd73245a987ebd839680c); audit-lod cleared the rendered source before deploy (10 stages incl. mainnet fork simulation); test inscription #2 -> Xtrata #3113"
+    },
+    {
+      "key": "bitcoin-birds",
+      "name": "Bitcoin Birds",
+      "source": "SPJW1XE278YMCEYMXB8ZFGJMH8ZVAAEDP2S2PJYG.bitcoin-birds",
+      "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-birds",
+      "interface": "v3",
+      "group": "G1",
+      "status": "live",
+      "expectedSourceSha256": "2f15eb3d8ea5e6bac3cdf62208ef621d3df8c2f6e64426af04c0739f0e326b9a",
+      "evidence": "deployed from the Xtrata wallet via the launch canary 2026-10-08 (the canary pins the helper source hash); canonical record finalised (400 records, manifest 6c19c50821e7a447a8874c4d516b0962cd3eff051bcf23f17552175f8e470145); fee set to 0 for this collection; all 400 twins inscribed 2026-10-08 (#0 through the canary, #1 to #399 by the sponsor script, Xtrata ids 3129 to 3528). The mainnet-fork rehearsal and the audit gate were not run for this helper before deploy."
     }
   ]
 }

@@ -20,6 +20,47 @@ const KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const CORE_SINGLE_TX_MAX_BYTES = 32 * 16384; // 524,288: above this the owner pre-inscribes
 
+export const RISK_LEVELS = {
+  lost:    { label: 'Lost',     tone: 'bad',  order: 0, blurb: 'The pointer is already dead. The art cannot be found from the contract.' },
+  high:    { label: 'High',     tone: 'bad',  order: 1, blurb: 'The art depends on one company’s website or database, or the contract gives no usable pointer.' },
+  medium:  { label: 'Medium',   tone: 'warn', order: 2, blurb: 'The art is on IPFS, but the owner can still repoint it and nobody has checked how many hosts keep it.' },
+  lower:   { label: 'Lower',    tone: 'ok',   order: 3, blurb: 'Content-addressed, frozen and widely hosted.' },
+  unrated: { label: 'Not rated yet', tone: 'mute', order: 4, blurb: 'We have not checked where this collection’s art lives.' }
+};
+const isText = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
+const isUrl = (v) => typeof v === 'string' && /^https:\/\/[^\s]+$/.test(v);
+
+/** Optional per-collection page content (registry field `info`). Returns problems; empty means valid. */
+export function validateInfo(info) {
+  const out = [];
+  if (!info || typeof info !== 'object' || Array.isArray(info)) return ['must be an object'];
+  const list = (k, max, n) => {
+    if (info[k] == null) return;
+    if (!Array.isArray(info[k]) || info[k].length > n || !info[k].every((t) => isText(t, max))) out.push(`${k} must be up to ${n} non-empty strings of at most ${max} characters`);
+  };
+  list('about', 700, 6);
+  list('technical', 500, 12);
+  if (info.who != null) {
+    const w = info.who;
+    if (!w || typeof w !== 'object' || !isText(w.text, 900)) out.push('who.text is required (at most 900 characters)');
+    else if (w.links != null && !(Array.isArray(w.links) && w.links.length <= 6 && w.links.every((l) => l && isText(l.label, 60) && isUrl(l.url)))) out.push('who.links must be {label, url} with https URLs');
+  }
+  if (info.risk != null) {
+    const r = info.risk;
+    if (!r || typeof r !== 'object') out.push('risk must be an object');
+    else {
+      if (!RISK_LEVELS[r.level]) out.push(`risk.level must be one of ${Object.keys(RISK_LEVELS).join(', ')}`);
+      if (!isText(r.headline, 300)) out.push('risk.headline is required (at most 300 characters)');
+      if (r.points != null && !(Array.isArray(r.points) && r.points.length <= 8 && r.points.every((p) => Array.isArray(p) && p.length === 2 && isText(p[0], 60) && isText(p[1], 600)))) out.push('risk.points must be up to 8 [label, text] pairs');
+      if (r.asOf != null && !isText(r.asOf, 60)) out.push('risk.asOf must be a short string');
+      if (r.caveat != null && !isText(r.caveat, 600)) out.push('risk.caveat must be a short string');
+    }
+  }
+  const known = new Set(['about', 'who', 'technical', 'risk']);
+  for (const k of Object.keys(info)) if (!known.has(k)) out.push(`${k} is not a known field`);
+  return out;
+}
+
 /** Returns a list of human-readable problems; empty means valid. */
 export function validateRegistry(reg) {
   const errors = [];
@@ -41,7 +82,7 @@ export function validateRegistry(reg) {
     keys.add(c.key);
     if (!c.name) err(`${id}: name missing`);
     const ht = c.theme && c.theme.heroTwin;
-    if (ht && !(Number.isInteger(ht.tokenId) && ht.tokenId > 0 && Number.isInteger(ht.xtrataId) && ht.xtrataId > 0)) err(`${id}: theme.heroTwin needs positive integer tokenId and xtrataId`);
+    if (ht && !(Number.isInteger(ht.tokenId) && ht.tokenId >= 0 && Number.isInteger(ht.xtrataId) && ht.xtrataId > 0)) err(`${id}: theme.heroTwin needs a whole-number tokenId (0 or more) and a positive integer xtrataId`);
     if (!STATUS[c.status]) err(`${id}: unknown status "${c.status}"`);
     if (!['v1', 'v3'].includes(c.interface)) err(`${id}: interface must be v1 or v3`);
     if (!['G1', 'G2'].includes(c.group)) err(`${id}: group must be G1 or G2`);
@@ -61,6 +102,8 @@ export function validateRegistry(reg) {
       else if (c.manifest && Number.isInteger(c.manifest.count) && cv.recovered > c.manifest.count) err(`${id}: coverage.recovered exceeds the manifest count`);
       if (cv.of != null && c.manifest && cv.of !== c.manifest.count) err(`${id}: coverage.of must equal the manifest count`);
     }
+    if (c.sourceOwnerRead != null && c.sourceOwnerRead !== 'public') err(`${id}: sourceOwnerRead must be "public" when present`);
+    if (c.info != null) for (const m of validateInfo(c.info)) err(`${id}: info.${m}`);
     if (c.interface === 'v3' && c.twinTokenUri != null && !String(c.twinTokenUri).includes('{id}')) err(`${id}: twinTokenUri must contain {id}`);
     if (c.helper) {
       if (helpers.has(c.helper)) err(`${id}: helper already used by "${helpers.get(c.helper)}"`);

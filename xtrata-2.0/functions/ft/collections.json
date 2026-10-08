@@ -45,8 +45,8 @@
       "helper": "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.forever-twin-bitcoin-birds",
       "manifestPath": "/ft/data/bitcoin-birds.manifest.json",
       "manifestSha256": "6c19c50821e7a447a8874c4d516b0962cd3eff051bcf23f17552175f8e470145",
-      "manifestStatus": "draft",
-      "_note": "Manifest built 8 Oct 2026 (400 of 400, art from the Pinata IPFS directory Gamma serves). Helper not yet deployed. Flip to final only after the helper is finalised and production serves this exact manifest."
+      "manifestStatus": "final",
+      "_note": "Helper deployed, seeded and finalised 8 Oct 2026 via the launch canary (production served this exact manifest); all 400 twins inscribed the same day."
     }
   }
 }
