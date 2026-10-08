@@ -55,6 +55,15 @@ shows it as zero.
 Until the migration is applied the endpoint answers 503 and the page hides the banner and shows
 a dash in the hero. It never shows zero for a failed read.
 
+## Song details in the hero
+
+Each of the three latest plays shows the song's artwork, title and artist when they are known, and
+falls back to `Song #id` with a note tile otherwise. The details come from the same catalogue the Songs
+page and `/music/heroes` use (`radio_metadata`, with the supplied artist and title corrections), so they
+exist only for core 3 songs the catalogue has already read. Other cores, songs not yet read, and
+placeholder names such as `Inscription #3088` stay empty rather than being guessed. Artwork is served by
+the existing `/radio/artwork?id=` route and the page accepts only that path. The banner is unchanged.
+
 ## Page behaviour
 
 - The banner and hero are `home-only` in `index.html`. Remove that class from `#musicBanner` to
