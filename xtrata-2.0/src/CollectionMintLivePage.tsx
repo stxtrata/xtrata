@@ -3767,6 +3767,9 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   </span>
                 )}
               </button>
+              <p className="collection-live-page__mint-note">
+                No limit per wallet. Batch minting is coming, for now mint one after another.
+              </p>
               {freeMint && (
                 <p className="collection-live-page__hero-media-note">
                   This price covers Xtrata protocol fees only. Collectors still pay wallet mining

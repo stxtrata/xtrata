@@ -9830,3 +9830,11 @@ button.collection-live-page__hero-price-card:disabled {
   opacity: 0.6;
   box-shadow: none;
 }
+
+.collection-live-page__mint-note {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  color: var(--muted);
+}
