@@ -8,10 +8,10 @@
   },
   "_note": "get-token-uri on this source returns one shared JSON for every id, so per-token art comes from the IPFS directory Gamma serves via Pinata (bird-<id>.png, ids 0-399). mediaUri is written as ipfs:// so --gateway (e.g. a local node) is honoured. Confirm the CID against the 400 minted tokens before finalising.",
   "mediaUri": "ipfs://QmNcUCdjFK39Pk5iRrKY7Ez6hmqBcdnuxDZDAjTmeoxUqZ/bird-{id}.png",
-  "gateway": "https://ipfs.filebase.io",
+  "gateway": "http://127.0.0.1:8080",
   "scope": "minted-at-snapshot",
   "reviewer": null,
-  "concurrency": 4,
-  "retries": 3,
+  "concurrency": 2,
+  "retries": 5,
   "twinTokenUri": "https://xtrata.xyz/ft/bitcoin-birds/{id}.json"
 }
