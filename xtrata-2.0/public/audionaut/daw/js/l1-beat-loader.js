@@ -1,3 +1,4 @@
+import { normalizeOwner } from "./plugins.js";
 import { store } from "./state.js";
 import { engine } from "./engine.js";
 import { fetchAndDecode, assignDecodedSample, unloadChannelSample } from "./loader.js";
@@ -213,15 +214,9 @@ export async function loadBeatPreset(preset, options = {}) {
       trimStart,
       trimEnd,
       inserts: [],
-      fx: {
-        filter: "off",
-        cutoff: 8000,
-        drive: 0,
-        delay: 0,
-        reverb: 0,
-        ...def.fx,
-      },
+      fx: { ...def.fx }, // preset FX are written in the old object form…
     });
+    normalizeOwner(store.channel(i)); // …and become plugin chain slots here
     sequence.steps[i] = steps;
     engine.rebuildInserts?.(i);
     store.emit("channel", { ch: i });

@@ -16,6 +16,7 @@ import { validateWordSelection } from "./word-index.js";
 import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
+import { normalizeOwner } from "./plugins.js";
 const finite = (value, fallback, min, max) =>
   Number.isFinite(+value) ? Math.max(min, Math.min(max, +value)) : fallback;
 function wordMetadata(value) {
@@ -105,8 +106,7 @@ function normalizeNative(data) {
     data.channels.slice(0, count).forEach((c, i) => {
       if (!c || typeof c !== "object")
         throw new Error("The project contains an invalid channel.");
-      const fx = { ...p.channels[i].fx, ...(c.fx || {}) };
-      Object.assign(p.channels[i], c, { fx });
+      Object.assign(p.channels[i], c);
       const channel = p.channels[i];
       if (
         c.clipSnapshot &&
@@ -159,7 +159,10 @@ function normalizeNative(data) {
       );
       channel.sampleMidi =
         c.sampleMidi == null ? null : finite(c.sampleMidi, 60, 0, 127) | 0;
-      channel.inserts = Array.isArray(c.inserts) ? c.inserts.slice(0, 4) : [];
+      // fx/inserts: current chains, or the old fixed FX object + 4 insert slots
+      channel.inserts = c.inserts;
+      channel.fx = c.fx && typeof c.fx === "object" ? c.fx : [];
+      normalizeOwner(channel);
     });
   }
   const chCount = p.channels.length;
@@ -183,13 +186,10 @@ function normalizeNative(data) {
       if (!SYNTH_BANK[p.instruments[i].synthId])
         p.instruments[i].synthId = "jims10";
       p.instruments[i].volume = finite(p.instruments[i].volume, 0.8, 0, 1.5);
-      p.instruments[i].fx = {
-        ...makeInstrument(i).fx,
-        ...(inst && typeof inst.fx === "object" ? inst.fx : {}),
-      };
-      p.instruments[i].inserts = Array.isArray(inst?.inserts)
-        ? inst.inserts.slice(0, 4)
-        : [];
+      p.instruments[i].fx =
+        inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
+      p.instruments[i].inserts = inst?.inserts;
+      normalizeOwner(p.instruments[i]);
       // Projects saved before the jiFM4 / jiVOX / jiPLUCK synths had every slot on
       // jiMS10. Move slots that were never touched (stock name, no tweaks, no notes
       // in any sequence) onto the new default synth for that slot.
