@@ -316,8 +316,47 @@ async function loadConnect() {
   }
   throw new Error('Could not load wallet SDK');
 }
+/* Leather: current builds removed the legacy auth/transaction bridge ("This legacy method is no longer supported. Upgrade to the
+   LeatherProvider.request() RPC API"). When Leather is the wallet in use, connect and sign through request(), the same
+   getAddresses / stx_callContract calls the main Xtrata app already uses with Leather. Every other wallet, and any Leather
+   that reports the RPC method as unsupported, stays on the legacy SDK path below, unchanged. */
+function rpcUnsupported(e) {
+  const m = String((e && e.message) || e || '').toLowerCase();
+  return (e && e.code === -32601) || /method not found|not supported|unsupported|not implemented|not available/.test(m);
+}
+function rpcCancelled(e) {
+  const m = String((e && e.message) || e || '').toLowerCase();
+  return (e && (e.code === 4001 || e.code === -32000)) || /cancel|reject|denied|declined|closed/.test(m);
+}
+function leatherRpc(mod) {
+  const p = window.LeatherProvider;
+  if (!p || typeof p.request !== 'function') return null;
+  let selected = '';
+  try { selected = String((mod && mod.getSelectedProviderId && mod.getSelectedProviderId()) || ''); } catch (e) {}
+  if (/leather/i.test(selected)) return p;
+  if (selected) return null;                                   // another wallet was picked
+  return (window.XverseProviders || window.xverseProviders) ? null : p;   // Leather is the only wallet installed
+}
+async function leatherAddress(p) {
+  for (const method of ['getAddresses', 'stx_getAddresses']) {
+    try {
+      const res = await p.request(method);
+      if (res && res.error) { const err = new Error(res.error.message || 'Wallet error'); err.code = res.error.code; throw err; }
+      const r = (res && res.result) || res || {};
+      const list = r.addresses || r.accounts || [];
+      const hit = list.find((a) => a && typeof a.address === 'string' && /^SP/.test(a.address) && (!a.symbol || a.symbol === 'STX'));
+      if (hit) return hit.address;
+    } catch (e) {
+      if (rpcCancelled(e)) throw new Error('Wallet connect cancelled');
+      if (!rpcUnsupported(e)) return null;                      // unknown failure: let the legacy path try as before
+    }
+  }
+  return null;
+}
 async function connectWallet() {
   const mod = await loadConnect();
+  const lp = leatherRpc(mod);
+  if (lp) { const addr = await leatherAddress(lp); if (addr) { session.address = addr; return addr; } }
   return new Promise((resolve, reject) => {
     mod.showConnect({
       appDetails: { name: 'Xtrata Duels', icon: location.origin + '/favicons/favicon-32x32.png' },
@@ -337,6 +376,26 @@ async function connectWallet() {
 async function contractCall(fnName, functionArgs, postConditionMode) {
   const mod = await loadConnect();
   const [contractAddress, contractName] = CONFIG.duelsContract.split('.');
+  const lp = leatherRpc(mod);
+  if (lp) {
+    try {
+      const tx = await loadTx();
+      const res = await lp.request('stx_callContract', {
+        contract: CONFIG.duelsContract, functionName: fnName,
+        functionArgs: functionArgs.map((a) => tx.cvToHex(a).replace(/^0x/, '')),
+        network: CONFIG.network, postConditionMode: (postConditionMode || 'allow') === 'allow' ? 'allow' : 'deny'
+      });
+      if (res && res.error) { const err = new Error(res.error.message || 'Wallet error'); err.code = res.error.code; throw err; }
+      const r = (res && res.result) || res || {};
+      const txId = r.txid || r.txId;
+      if (!txId) throw new Error('Wallet response did not include a transaction id.');
+      return { txId };
+    } catch (e) {
+      if (rpcCancelled(e)) throw new Error('Transaction cancelled');
+      if (!rpcUnsupported(e)) throw e;
+      /* Leather without the RPC method: fall through to the legacy popup below */
+    }
+  }
   return new Promise((resolve, reject) => {
     mod.openContractCall({
       contractAddress, contractName, functionName: fnName,

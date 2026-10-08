@@ -150,15 +150,20 @@ persisted. Never call connect-ui's `getInstalledProviders` directly.
   connected address instead of requiring the key.
 - Disconnect tries `stx_disconnect` / `wallet_disconnect` / `disconnect` /
   `deactivate` in order, tolerating unsupported responses.
-- **Structured-message signing (SIP-018) goes through the RPC first.** Current
-  Leather removed the legacy `structuredDataSignatureRequest` bridge and answers
-  it with "This legacy method is no longer supported. Upgrade to the
-  LeatherProvider.request() RPC API". `requestStructuredSignature()` calls
+- **Structured-message signing (SIP-018): legacy bridge first, RPC only when it
+  is gone.** Current Leather removed the legacy `structuredDataSignatureRequest`
+  bridge and answers it with "This legacy method is no longer supported. Upgrade
+  to the LeatherProvider.request() RPC API". `requestStructuredSignature()` keeps
+  every wallet that signs through the legacy bridge today on that bridge, and only
+  that answer (or a missing bridge) moves a non-Xverse wallet to
   `request('stx_signStructuredMessage', { message, domain })` (hex Clarity values,
-  JSON-RPC envelope or bare result) for every non-Xverse wallet, and falls back to
-  the legacy bridge only when the wallet reports the RPC method as unsupported
-  (older Leather). A user cancel or wallet error never falls through to a second
-  prompt. Xverse keeps its Stacks bridge. Locked by `structured-sign.test.ts`.
+  JSON-RPC envelope or bare result). A user cancel or any other wallet error is
+  surfaced as is and never re-prompted; Xverse never goes to the RPC. Locked by
+  `structured-sign.test.ts`.
+- `public/duels/index.html` loads @stacks/connect 7.10.2 directly. Connect and
+  contract calls go through `request()` (`getAddresses`, `stx_callContract`) only
+  when Leather is the wallet in use; every other wallet, and Leather without the
+  RPC method, stays on the legacy SDK path.
 
 ## 8. Sponsored (origin-only) signing
 
