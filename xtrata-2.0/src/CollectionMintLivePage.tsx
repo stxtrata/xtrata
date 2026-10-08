@@ -3744,19 +3744,23 @@ export default function CollectionMintLivePage(props: CollectionMintLivePageProp
                   {statePillLabel}
                 </span>
               </div>
-              <div
+              <button
+                type="button"
+                onClick={() => void handleMintNow()}
+                disabled={mintPending || walletPending || Boolean(mintUnavailableReason)}
+                title={mintUnavailableReason ?? undefined}
                 className={`collection-live-page__hero-price-card ${mintPriceToneClass}${
                   usesV15 ? ' collection-live-page__hero-price-card--collection' : ''
                 }`}
               >
-                <span className="collection-live-page__hero-price-label">{usesV15 ? 'Price' : 'Mint price'}</span>
+                <span className="collection-live-page__hero-price-label">{usesV15 ? (mintPending ? 'Minting…' : 'Mint now') : 'Mint price'}</span>
                 <strong>{usesV15 ? buyerMax === null ? 'Loading price…' : toMicroStxLabel(buyerMax) : mintPriceLabel}</strong>
                 {!usesV15 && (
                   <span className="collection-live-page__hero-price-subtle">
                     {mintPriceDisplay.secondary ?? '\u00a0'}
                   </span>
                 )}
-              </div>
+              </button>
               {freeMint && (
                 <p className="collection-live-page__hero-media-note">
                   This price covers Xtrata protocol fees only. Collectors still pay wallet mining
