@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: Draws 2 and 3 run in the page, a win takes one ticket (2026-10-09)
+- `public/bounty/zdao/tracker/1/index.html`: `ENGINE` now covers all three draws (it was Draw 1 only). `poolFor(i)` takes one ticket off a wallet for every earlier draw it won (`handles.json` `winners`, draws numbered below the one being drawn), drops it if nothing is left, and everything else rolls over. Past winners stay in every later draw. The winners list is re-fetched fresh right before each draw runs.
+- Inscription tickets by size (1 to 5 each, summed over every inscription, Draw 2 onwards; Draw 1 stays frozen at 1) were already live from the ledger reader (`inp`); the draw now uses exactly those numbers.
+- Rehearsal hooks: `?liveTest=<ISO>` (Draw 1, as before), `?liveTest2=<ISO>` and `?liveTest3=<ISO>` pretend that draw closed at that time and label the panel REHEARSAL.
+- **Verified:** rehearsal of Draw 2 at 2026-10-09T06:00:00Z in a browser gave the same frozen list (sha256 8952c935…, 21 wallets / 160 tickets, identical CSV) and the same 3 winners + 2 reserves as the offline `freeze.mjs` + `draw.mjs`, which now read the same ledger reader and `inp`. 14 reader tests pass.
+
 ## Leather: new builds work, old wallets are left alone (2026-10-08)
 - New Leather builds reject the legacy `structuredDataSignatureRequest` bridge with "This legacy method is no longer supported. Upgrade to the LeatherProvider.request() RPC API", which broke signing the X handle on the bounty tracker and the BNS proof on the music profile page. The standalone Duels page, which used the legacy connect and transaction bridges directly, was affected the same way.
 - `src/lib/wallet/structured-sign.ts`: tries the legacy bridge first wherever it exists, so every wallet that signs today is unchanged. Only the "legacy method is no longer supported" answer (or a missing bridge) moves a non-Xverse wallet to `request('stx_signStructuredMessage')`. A cancel or any other wallet error is never retried; Xverse never uses the RPC.
