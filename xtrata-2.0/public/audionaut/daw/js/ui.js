@@ -10,6 +10,7 @@ import {
   stepOff,
 } from "./state.js";
 import { engine } from "./engine.js";
+import { Kit as PluginFaces } from "./plugin-faces/index.js";
 import { loadSample, fetchAndDecode } from "./loader.js";
 import { SAMPLE_LIBRARY } from "./library.js";
 import { renderOrdinalChip, renderOrdinalReferences } from "./ordinal-links.js";
@@ -1454,6 +1455,84 @@ function commitChain(arr, kind = chain.kind) {
   refreshOwnerRow(chain.isInst, chain.idx);
 }
 
+// ---- plugin faces: a pop-out front panel for models that have one (js/plugin-faces/) ----
+let faceH = null; // { dispose, id, idx, isInst, subs:Set }
+function closePluginFace() {
+  if (!faceH) return;
+  const f = faceH;
+  faceH = null;
+  f.dispose();
+  engine.releaseSlotTaps(f.idx, f.isInst, f.id);
+  $("#modal-plugin-face")?.classList.add("hidden");
+}
+function openPluginFace(slotId) {
+  const idx = chain.idx;
+  const isInst = chain.isInst;
+  const find = () => ownerOf(isInst, idx)?.[chain.kind]?.find((s) => s.id === slotId) ||
+    [...(ownerOf(isInst, idx)?.inserts || []), ...(ownerOf(isInst, idx)?.fx || [])].find((s) => s.id === slotId);
+  const slot0 = find();
+  if (!slot0 || !PluginFaces.has(slot0.type)) return;
+  closePluginFace();
+  engine.ensureContext();
+  let modal = $("#modal-plugin-face");
+  if (!modal) {
+    modal = el("div", "modal hidden");
+    modal.id = "modal-plugin-face";
+    modal.innerHTML =
+      '<div class="pf-box"><div class="pf-bar"><b id="pf-title"></b><span id="pf-sub"></span><span class="pf-spacer"></span><button id="pf-preview" class="ch-btn tiny" title="Play a test note or hit through this plugin">TEST</button><button id="pf-done" class="ch-btn tiny primary">DONE</button></div><div class="pf-host"></div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener("pointerdown", (e) => {
+      if (e.target === modal) closePluginFace();
+    });
+    $("#pf-done").addEventListener("click", closePluginFace);
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape" && faceH) {
+          e.stopImmediatePropagation();
+          closePluginFace();
+        }
+      },
+      true,
+    );
+  }
+  const t0 = PLUGIN_TYPES[slot0.type];
+  $("#pf-title").textContent = t0.name;
+  $("#pf-sub").textContent = ` · ${t0.role || t0.category} · ${ownerOf(isInst, idx)?.name || ""}`;
+  $("#pf-preview").onclick = () =>
+    isInst ? engine.triggerNote(idx, 48, 1, 0, 0.5) : engine.trigger(idx);
+  const subs = new Set();
+  const link = {
+    getParams: () => ({ ...pluginDefaults(slot0.type), ...(find()?.params || {}) }),
+    setParams(o) {
+      const sl = find();
+      if (!sl) return;
+      sl.params = { ...pluginDefaults(sl.type), ...(sl.params || {}), ...o };
+      engine.updateSlot(idx, isInst, slotId);
+      store.emit("dirty");
+    },
+    getEnabled: () => find()?.enabled !== false,
+    setEnabled(b) {
+      const sl = find();
+      if (!sl || (sl.enabled !== false) === b) return;
+      sl.enabled = b;
+      engine.updateSlot(idx, isInst, slotId);
+      store.emit("dirty");
+      if (!$("#modal-chain").classList.contains("hidden")) renderChain();
+    },
+    onChange(fn) {
+      subs.add(fn);
+      return () => subs.delete(fn);
+    },
+    inst: () => engine.slotInstance(idx, isInst, slotId),
+    taps: () => engine.slotTaps(idx, isInst, slotId),
+  };
+  modal.classList.remove("hidden");
+  const h = PluginFaces.mount(modal.querySelector(".pf-host"), slot0.type, link, { chrome: 80 });
+  faceH = { id: slotId, idx, isInst, subs, dispose: () => h?.dispose() };
+}
+const notifyPluginFace = () => faceH?.subs.forEach((f) => f());
+
 function moveSlot(from, to) {
   const arr = [...chainSlots()];
   if (to < 0 || to >= arr.length || from === to) return;
@@ -1564,7 +1643,12 @@ function renderChain() {
       chain.open.has(slot.id) ? chain.open.delete(slot.id) : chain.open.add(slot.id);
       renderChain();
     });
-    const cat = el("span", "chain-cat", t.category);
+    const cat = el("span", "chain-cat", t.role || t.category);
+    const faceBtn = PluginFaces.has(slot.type) ? el("button", "ch-btn tiny chain-face", "FACE") : null;
+    if (faceBtn) {
+      faceBtn.title = `Open the ${t.name} front panel`;
+      faceBtn.addEventListener("click", () => openPluginFace(slot.id));
+    }
 
     const power = el(
       "button",
@@ -1593,7 +1677,7 @@ function renderChain() {
       commitChain(chainSlots().filter((s) => s.id !== slot.id));
     });
 
-    head.append(el("span", "chain-num", `${i + 1}`), grip, name, cat, power, up, down, del);
+    head.append(el("span", "chain-num", `${i + 1}`), grip, name, cat, ...(faceBtn ? [faceBtn] : []), power, up, down, del);
     li.appendChild(head);
     if (chain.open.has(slot.id)) li.appendChild(renderParams(slot));
 
@@ -1642,7 +1726,7 @@ function renderChain() {
     const og = el("optgroup");
     og.label = category;
     for (const [id, t] of items) {
-      const o = el("option", "", t.name);
+      const o = el("option", "", t.role ? `${t.name} · ${t.role}` : t.name);
       o.value = id;
       og.appendChild(o);
     }
@@ -1695,6 +1779,7 @@ export function initChainPanel() {
 }
 // Re-render if an undo/redo or project load lands while the panel is open.
 export function refreshChainPanel() {
+  notifyPluginFace();
   if ($("#modal-chain") && !$("#modal-chain").classList.contains("hidden")) {
     if (!chainOwner()) return $("#modal-chain").classList.add("hidden");
     renderChain();

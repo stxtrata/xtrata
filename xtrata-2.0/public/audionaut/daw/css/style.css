@@ -2684,3 +2684,47 @@ button:disabled {
   padding: 4px 10px;
   background: #0b0f14;
 }
+
+/* ---- plugin face pop-out (js/plugin-faces) ---- */
+#modal-plugin-face {
+  z-index: 70;
+}
+.pf-box {
+  width: min(1100px, 97vw);
+  max-height: 97vh;
+  background: #0a0d12;
+  border: 1px solid #2a3340;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+.pf-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #11161d;
+  border-bottom: 1px solid #000;
+  font: 600 11px var(--font-mono);
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.pf-bar b {
+  color: #e8eef5;
+  letter-spacing: 2px;
+}
+.pf-spacer {
+  flex: 1;
+}
+.pf-host {
+  line-height: 0;
+  background: #000;
+}
+.chain-face {
+  color: var(--accent, #2edb84);
+}
+.pf-bar .ch-btn {
+  white-space: nowrap;
+  padding: 4px 10px;
+  line-height: 1.2;
+}
