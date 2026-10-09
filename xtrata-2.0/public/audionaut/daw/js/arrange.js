@@ -1,6 +1,6 @@
 import { midiName } from "./onboard-catalog.js";
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
-// arrange.js — Logic-style arrange view: the step grid flips to waveform regions.
+// arrange.js — Logic-style arrange view (the default): waveform regions, with the step grid as the alternative view.
 // Regions render their real audible length; choke cuts at the next trigger; per-step
 // crossfades (xfade, ms) blend a region into the next one — drag the boundary to set.
 // Drag region edges to trim, drag a region's body to move it. Regions sit at their true
@@ -31,7 +31,8 @@ const CELL_W = 14, // px per step at 1x zoom
   STRIP_H = 40;
 const EDGE_PX = 5; // trim-handle zone at region edges
 const XF_PX = 6; // crossfade-handle zone around a cutting boundary
-let arrangeMode = false;
+const VIEW_KEY = "audionaut.view"; // "wave" | "grid" — last view chosen in this browser
+let arrangeMode = true; // the wave view is the default; initArrange() applies the stored choice
 let zoom = 1; // 1, 2, 4, 8 — canvas pixels per step = CELL_W * zoom
 let snap = 1; // move grid in steps: 1, .5, .25, .125, .0625 — 0 = free
 const FINE_SNAP = 1 / 16; // grid while Ctrl is held
@@ -46,6 +47,41 @@ const stripFor = (ch) =>
 
 export function isArrangeMode() {
   return arrangeMode;
+}
+
+function readViewPref() {
+  try {
+    return localStorage.getItem(VIEW_KEY) !== "grid";
+  } catch {
+    return true; // storage blocked: first-visit default
+  }
+}
+function saveViewPref(on) {
+  try {
+    localStorage.setItem(VIEW_KEY, on ? "wave" : "grid");
+  } catch {
+    /* storage blocked: the choice just lasts for this session */
+  }
+}
+
+// Single place that switches view: body class, button state and label, strips.
+// The label names the view the button switches TO.
+function setArrangeMode(on, { save = true } = {}) {
+  arrangeMode = !!on;
+  document.body.classList.toggle("arrange-mode", arrangeMode);
+  const btn = document.querySelector("#btn-view");
+  if (btn) {
+    btn.classList.toggle("active", arrangeMode);
+    btn.textContent = arrangeMode ? "Grid" : "Wave";
+    btn.title = arrangeMode
+      ? "Switch to the step grid"
+      : "Switch to the wave (arrange) view";
+  }
+  if (save) saveViewPref(arrangeMode);
+  if (arrangeMode) {
+    attachStrips();
+    renderArrange();
+  }
 }
 
 const stepDurSec = () => 60 / store.project.bpm / 4;
@@ -921,16 +957,9 @@ export function attachStrips() {
 
 export function initArrange() {
   const btn = document.querySelector("#btn-view");
-  btn.addEventListener("click", () => {
-    arrangeMode = !arrangeMode;
-    document.body.classList.toggle("arrange-mode", arrangeMode);
-    btn.classList.toggle("active", arrangeMode);
-    btn.textContent = arrangeMode ? "Steps" : "Arrange";
-    if (arrangeMode) {
-      attachStrips();
-      renderArrange();
-    }
-  });
+  btn.addEventListener("click", () => setArrangeMode(!arrangeMode));
+  // opens in the stored view; first-time visitors get the wave view
+  setArrangeMode(readViewPref(), { save: false });
 
   const snapSel = document.querySelector("#arrange-snap");
   const zoomSel = document.querySelector("#arrange-zoom");

@@ -11,6 +11,7 @@ import { initMidi } from "./midi-input.js";
 import {
   initArrange,
   arrangePlayhead,
+  attachStrips,
   isArrangeMode,
   syncArrangeControls,
 } from "./arrange.js";
@@ -330,6 +331,7 @@ function boot() {
   if (!restored) {
     syncHeaderFromProject();
     ui.buildChannels();
+    attachStrips();
     ui.buildInstruments();
     ui.renderSequenceBar();
   } else {
