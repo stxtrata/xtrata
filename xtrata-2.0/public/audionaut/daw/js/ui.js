@@ -53,6 +53,9 @@ import {
   pluginDefaults,
   pluginsFor,
   pluginNames,
+  returnsOf,
+  typeParams,
+  sharedKeys,
   normalizeOwner,
 } from "./plugins.js";
 
@@ -1455,6 +1458,19 @@ function commitChain(arr, kind = chain.kind) {
   refreshOwnerRow(chain.isInst, chain.idx);
 }
 
+// Params a send shows for its project-wide return live in project.returns, not in the slot.
+function splitShared(type, o) {
+  const keys = sharedKeys(PLUGIN_TYPES[type]);
+  const own = {};
+  const shared = {};
+  for (const [k, v] of Object.entries(o)) (keys.has(k) ? shared : own)[k] = v;
+  return { own, shared };
+}
+function writeShared(type, shared) {
+  Object.assign(returnsOf(store.project)[PLUGIN_TYPES[type].shared], shared);
+  engine.applyReturns();
+}
+
 // ---- plugin faces: a pop-out front panel for models that have one (js/plugin-faces/) ----
 let faceH = null; // { dispose, id, idx, isInst, subs:Set }
 function closePluginFace() {
@@ -1503,11 +1519,17 @@ function openPluginFace(slotId) {
     isInst ? engine.triggerNote(idx, 48, 1, 0, 0.5) : engine.trigger(idx);
   const subs = new Set();
   const link = {
-    getParams: () => ({ ...pluginDefaults(slot0.type), ...(find()?.params || {}) }),
+    getParams: () => ({
+      ...pluginDefaults(slot0.type),
+      ...(find()?.params || {}),
+      ...(t0.shared ? returnsOf(store.project)[t0.shared] : {}),
+    }),
     setParams(o) {
       const sl = find();
       if (!sl) return;
-      sl.params = { ...pluginDefaults(sl.type), ...(sl.params || {}), ...o };
+      const { own, shared } = splitShared(sl.type, o);
+      sl.params = { ...pluginDefaults(sl.type), ...(sl.params || {}), ...own };
+      if (Object.keys(shared).length) writeShared(sl.type, shared);
       engine.updateSlot(idx, isInst, slotId);
       store.emit("dirty");
     },
@@ -1526,6 +1548,7 @@ function openPluginFace(slotId) {
     },
     inst: () => engine.slotInstance(idx, isInst, slotId),
     taps: () => engine.slotTaps(idx, isInst, slotId),
+    bus: () => (t0.shared ? engine.busTap(t0.shared) : null),
   };
   modal.classList.remove("hidden");
   const h = PluginFaces.mount(modal.querySelector(".pf-host"), slot0.type, link, { chrome: 80 });
@@ -1558,14 +1581,20 @@ const fromSlider = (ps, x) => {
 function renderParams(slot) {
   const t = PLUGIN_TYPES[slot.type];
   const grid = el("div", "synth-params chain-params");
-  const P = { ...pluginDefaults(slot.type), ...(slot.params || {}) };
+  const P = {
+    ...pluginDefaults(slot.type),
+    ...(slot.params || {}),
+    ...(t.shared ? returnsOf(store.project)[t.shared] : {}),
+  };
+  const shared = sharedKeys(t);
   const live = (key, v) => {
-    slot.params = { ...P, ...slot.params, [key]: v };
     P[key] = v;
+    if (shared.has(key)) writeShared(slot.type, { [key]: v });
+    else slot.params = { ...pluginDefaults(slot.type), ...slot.params, [key]: v };
     engine.updateSlot(chain.idx, chain.isInst, slot.id);
     store.emit("dirty"); // history snapshots (debounced) — slider drags are undoable
   };
-  t.params.forEach((ps) => {
+  typeParams(t).forEach((ps) => {
     const wrap = el("label", "synth-param");
     wrap.appendChild(el("span", "", ps.label));
     if (ps.options) {

@@ -11,7 +11,7 @@ import {
   stepOff,
 } from "./state.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
-import { PLUGIN_TYPES, pluginDefaults, normalizeOwner } from "./plugins.js";
+import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS } from "./plugins.js";
 
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
@@ -38,24 +38,62 @@ class Engine {
       this.masterGain.gain.value = store.project.masterVolume;
       this.masterGain.connect(this.ctx.destination);
 
-      // --- master FX buses ---
-      // Delay bus: dotted-8th echo, BPM-synced, with filtered feedback.
-      this.delayNode = this.ctx.createDelay(2);
-      this.delayNode.delayTime.value = this._delayTime();
-      this.delayFeedback = this.ctx.createGain();
-      this.delayFeedback.gain.value = 0.35;
-      const delayTone = this.ctx.createBiquadFilter();
-      delayTone.type = "lowpass";
-      delayTone.frequency.value = 4000;
-      this.delayNode
-        .connect(delayTone)
-        .connect(this.delayFeedback)
-        .connect(this.delayNode);
-      this.delayNode.connect(this.masterGain);
-      // Reverb bus: generated noise impulse (fully on-board, no external files).
-      this.reverbNode = this.ctx.createConvolver();
-      this.reverbNode.buffer = this._makeImpulse(2.2, 3);
-      this.reverbNode.connect(this.masterGain);
+      // --- master FX buses (settings live in project.returns, see applyReturns) ---
+      // Delay bus: BPM-synced echo, two lines (L and R) so the feedback can ping-pong.
+      // Ping-pong 0 leaves line R silent and line L exactly the original single echo
+      // (filtered feedback, centre output); at 1 the echoes alternate hard left and right.
+      this.delayNode = this.ctx.createDelay(10); // line L: the bus the sends feed
+      this.delayR = this.ctx.createDelay(10);
+      const dfx = (this.delayFx = {});
+      dfx.toneL = this.ctx.createBiquadFilter();
+      dfx.toneR = this.ctx.createBiquadFilter();
+      dfx.toneL.type = dfx.toneR.type = "lowpass";
+      dfx.selfL = this.ctx.createGain();
+      dfx.selfR = this.ctx.createGain();
+      dfx.crossLR = this.ctx.createGain();
+      dfx.crossRL = this.ctx.createGain();
+      this.delayNode.connect(dfx.toneL);
+      this.delayR.connect(dfx.toneR);
+      dfx.toneL.connect(dfx.selfL).connect(this.delayNode);
+      dfx.toneR.connect(dfx.selfR).connect(this.delayR);
+      dfx.toneL.connect(dfx.crossLR).connect(this.delayR);
+      dfx.toneR.connect(dfx.crossRL).connect(this.delayNode);
+      dfx.ret = this.ctx.createGain(); // return level into the master
+      dfx.centerL = this.ctx.createGain(); // (1 - spread): the stereo-preserving original path
+      dfx.centerR = this.ctx.createGain();
+      dfx.hardL = this.ctx.createGain(); // spread: collapsed to one side
+      dfx.hardR = this.ctx.createGain();
+      const pan = this.ctx.createChannelMerger(2);
+      this.delayNode.connect(dfx.centerL).connect(dfx.ret);
+      this.delayR.connect(dfx.centerR).connect(dfx.ret);
+      this.delayNode.connect(dfx.hardL).connect(pan, 0, 0);
+      this.delayR.connect(dfx.hardR).connect(pan, 0, 1);
+      pan.connect(dfx.ret);
+      dfx.ret.connect(this.masterGain);
+      // Reverb bus: generated noise impulse (fully on-board, no external files). The impulse
+      // is rebuilt when decay, shape, damping or width change; two convolvers crossfade so a
+      // new tail never clicks in.
+      this.reverbNode = this.ctx.createGain(); // the bus the sends feed
+      const rfx = (this.reverbFx = {});
+      rfx.pre = this.ctx.createDelay(0.5);
+      rfx.ret = this.ctx.createGain();
+      rfx.convs = [0, 1].map(() => {
+        const conv = this.ctx.createConvolver();
+        const gain = this.ctx.createGain();
+        gain.gain.value = 0;
+        this.reverbNode.connect(rfx.pre);
+        rfx.pre.connect(conv);
+        conv.connect(gain).connect(rfx.ret);
+        return { conv, gain };
+      });
+      rfx.active = 0;
+      rfx.sig = "";
+      rfx.ret.connect(this.masterGain);
+      this.applyReturns(true);
+      if (!this._returnsHooked) {
+        this._returnsHooked = true;
+        store.on("load", () => this.ctx && this.applyReturns());
+      }
 
       // --- per-channel chains: fader gain → inserts → FX → master ---
       // Both chains are lists of plugins from plugins.js. Delay/reverb are "send"
@@ -308,28 +346,119 @@ class Engine {
   }
 
   _delayTime() {
-    return (60 / (store.project.bpm || 120)) * 0.75; // dotted 8th
+    const div = BEAT_DIVS.find(([v]) => v === returnsOf(store.project).delay.time) || BEAT_DIVS[2];
+    return Math.min(9.9, (60 / (store.project.bpm || 120)) * div[1]); // default: dotted 8th
   }
 
   syncDelayToBpm() {
-    if (this.delayNode)
-      this.delayNode.delayTime.setTargetAtTime(
-        this._delayTime(),
-        this.ctx.currentTime,
-        0.05,
-      );
+    if (this.delayNode) this.applyReturns();
   }
 
-  _makeImpulse(duration, decayPow) {
-    const len = Math.ceil(this.ctx.sampleRate * duration);
-    const buf = this.ctx.createBuffer(2, len, this.ctx.sampleRate);
+  // Pushes project.returns onto the shared delay and reverb. Cheap to call often (slider
+  // drags, undo, load, tempo change); the reverb impulse is only rebuilt when it must be.
+  applyReturns(first = false) {
+    if (!this.ctx || !this.delayFx) return;
+    const R = returnsOf(store.project);
+    const now = this.ctx.currentTime;
+    const t = first ? 0 : 0.05;
+    const set = (param, v) => (first ? (param.value = v) : param.setTargetAtTime(v, now, t || 0.01));
+    const d = R.delay;
+    const dfx = this.delayFx;
+    const time = this._delayTime();
+    set(this.delayNode.delayTime, time);
+    set(this.delayR.delayTime, time);
+    set(dfx.toneL.frequency, d.tone);
+    set(dfx.toneR.frequency, d.tone);
+    const fb = d.feedback;
+    set(dfx.selfL.gain, fb * (1 - d.spread));
+    set(dfx.selfR.gain, fb * (1 - d.spread));
+    set(dfx.crossLR.gain, fb * d.spread);
+    set(dfx.crossRL.gain, fb * d.spread);
+    set(dfx.centerL.gain, 1 - d.spread);
+    set(dfx.centerR.gain, 1 - d.spread);
+    set(dfx.hardL.gain, d.spread);
+    set(dfx.hardR.gain, d.spread);
+    set(dfx.ret.gain, d.ret);
+    const r = R.reverb;
+    const rfx = this.reverbFx;
+    set(rfx.pre.delayTime, r.predelay / 1000);
+    set(rfx.ret.gain, r.ret);
+    this._scheduleImpulse(first);
+  }
+
+  // The impulse depends on decay/shape/damp/width only; rebuilt (debounced) when they change.
+  _scheduleImpulse(now = false) {
+    const r = returnsOf(store.project).reverb;
+    const sig = [r.decay, r.shape, r.damp, r.width].join("|");
+    const rfx = this.reverbFx;
+    if (sig === rfx.sig) return;
+    clearTimeout(rfx.timer);
+    const go = () => {
+      rfx.sig = sig;
+      const next = rfx.active ^ 1;
+      const buf = this._makeReverbImpulse(r);
+      const a = rfx.convs[rfx.active];
+      const b = rfx.convs[next];
+      b.conv.buffer = buf;
+      const t = this.ctx.currentTime;
+      if (now) {
+        a.gain.gain.value = 0;
+        b.gain.gain.value = 1;
+      } else {
+        b.gain.gain.setTargetAtTime(1, t, 0.03);
+        a.gain.gain.setTargetAtTime(0, t, 0.03);
+      }
+      rfx.active = next;
+    };
+    if (now) go();
+    else rfx.timer = setTimeout(go, 140);
+  }
+
+  // Fixed noise bed (so dragging a knob changes the tail's shape, not its random grain),
+  // shaped by decay and slope, optionally darkened and narrowed. With the defaults this is the
+  // original impulse: raw noise under a (1 - t)^3 fade over 2.2 s.
+  _makeReverbImpulse({ decay, shape, damp, width }) {
+    const sr = this.ctx.sampleRate;
+    const max = Math.ceil(sr * 8);
+    if (!this._noise || this._noise[0].length !== max) {
+      this._noise = [0, 1].map(() => Float32Array.from({ length: max }, () => Math.random() * 2 - 1));
+    }
+    const len = Math.ceil(sr * decay);
+    const buf = this.ctx.createBuffer(2, len, sr);
+    const L = this._noise[0];
+    const Rn = this._noise[1];
+    const dark = damp < 19999;
     for (let c = 0; c < 2; c++) {
-      const d = buf.getChannelData(c);
+      const out = buf.getChannelData(c);
+      const own = c ? Rn : L;
+      let y = 0;
       for (let i = 0; i < len; i++) {
-        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decayPow);
+        const x = own[i] * (c ? width : 1) + (c ? L[i] * (1 - width) : 0);
+        let v = x;
+        if (dark) {
+          // one-pole low-pass whose cutoff falls as the tail ages (air absorbs highs first)
+          const fc = damp * (1 - 0.75 * (i / len));
+          y += (1 - Math.exp((-2 * Math.PI * fc) / sr)) * (x - y);
+          v = y;
+        }
+        out[i] = v * Math.pow(1 - i / len, shape);
       }
     }
     return buf;
+  }
+
+  // Analyser on a return's output for faces (created on first ask, a side branch).
+  busTap(ns) {
+    if (!this.ctx || !this.delayFx) return null;
+    this._busTaps = this._busTaps || {};
+    if (!this._busTaps[ns]) {
+      const a = this.ctx.createAnalyser();
+      a.fftSize = 2048;
+      a.smoothingTimeConstant = 0.6;
+      (ns === "delay" ? this.delayFx.ret : this.reverbFx.ret).connect(a);
+      this._busTaps[ns] = a;
+    }
+    return this._busTaps[ns];
   }
 
   setBuffer(ch, buffer) {

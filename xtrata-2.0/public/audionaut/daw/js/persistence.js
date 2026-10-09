@@ -16,7 +16,7 @@ import { validateWordSelection } from "./word-index.js";
 import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
-import { normalizeOwner } from "./plugins.js";
+import { normalizeOwner, cleanReturns } from "./plugins.js";
 
 // Display names the synths carried before the rename. A saved instrument whose name is still
 // the old stock name follows the synth to its new name; custom names are never touched.
@@ -290,6 +290,7 @@ function normalizeNative(data) {
   p.swing = finite(p.swing, 0, 0, 60);
   p.masterVolume = finite(p.masterVolume, 0.9, 0, 1.5);
   p.fadeMs = finite(p.fadeMs, 15, 1, 500);
+  if (data.returns && typeof data.returns === "object") p.returns = cleanReturns(data.returns);
   p.currentSequence =
     finite(data.currentSequence, 0, 0, p.sequences.length - 1) | 0;
   return p;

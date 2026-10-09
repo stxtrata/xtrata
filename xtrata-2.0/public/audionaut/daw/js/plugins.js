@@ -51,6 +51,66 @@ function makeSend(ctx, bus) {
   return { input: thru, output: thru, send };
 }
 
+// ------------------------------------------------------------------ shared returns
+// The delay and the reverb every send feeds are project-wide, so their settings live in
+// project.returns (saved with the song) rather than in any one slot. A send plugin names its
+// return in `shared`, and the panels show these params next to the slot's own Send amount.
+// Defaults are the fixed values the buses always had: a dotted-8th echo at 35% feedback
+// through a 4 kHz low-pass, and a 2.2 s noise-burst reverb. Nothing saved changes sound.
+export const BEAT_DIVS = [
+  ["1/16", 0.25],
+  ["1/8", 0.5],
+  ["1/8.", 0.75],
+  ["1/4", 1],
+  ["1/4.", 1.5],
+  ["1/2", 2],
+  ["1 bar", 4],
+];
+export const RETURN_SCHEMA = {
+  delay: [
+    { key: "time", label: "Echo time", options: BEAT_DIVS.map(([v]) => [v, v]), def: "1/8." },
+    { key: "feedback", label: "Feedback", min: 0, max: 0.92, step: 0.01, def: 0.35 },
+    { key: "tone", label: "Tone (Hz)", log: true, min: 500, max: 16000, step: 50, def: 4000 },
+    { key: "spread", label: "Ping-pong", min: 0, max: 1, step: 0.01, def: 0 },
+    { key: "ret", label: "Return", min: 0, max: 1.5, step: 0.01, def: 1 },
+  ],
+  reverb: [
+    { key: "decay", label: "Decay (s)", min: 0.3, max: 8, step: 0.1, def: 2.2 },
+    { key: "shape", label: "Shape", min: 1.5, max: 6, step: 0.1, def: 3 },
+    { key: "predelay", label: "Pre-delay (ms)", min: 0, max: 250, step: 1, def: 0 },
+    { key: "damp", label: "Damping (Hz)", log: true, min: 800, max: 20000, step: 100, def: 20000 },
+    { key: "width", label: "Width", min: 0, max: 1, step: 0.01, def: 1 },
+    { key: "ret", label: "Return", min: 0, max: 1.5, step: 0.01, def: 1 },
+  ],
+};
+
+function cleanParamSet(schema, raw) {
+  const out = {};
+  for (const p of schema) {
+    const v = raw?.[p.key];
+    if (p.options) out[p.key] = p.options.some(([o]) => o === v) ? v : p.def;
+    else out[p.key] = Number.isFinite(+v) && v !== null && v !== "" ? Math.max(p.min, Math.min(p.max, +v)) : p.def;
+  }
+  return out;
+}
+export const returnDefaults = () => ({
+  delay: cleanParamSet(RETURN_SCHEMA.delay, null),
+  reverb: cleanParamSet(RETURN_SCHEMA.reverb, null),
+});
+export const cleanReturns = (raw) => ({
+  delay: cleanParamSet(RETURN_SCHEMA.delay, raw?.delay),
+  reverb: cleanParamSet(RETURN_SCHEMA.reverb, raw?.reverb),
+});
+// The project's return settings, created on first use so older projects need no migration.
+export function returnsOf(project) {
+  if (!project.returns) project.returns = returnDefaults();
+  return project.returns;
+}
+// Every param a plugin's panel shows: its own, then its shared return's.
+export const typeParams = (t) => [...(t?.params || []), ...(RETURN_SCHEMA[t?.shared] || [])];
+// Which keys of a mixed param object belong to the shared return
+export const sharedKeys = (t) => new Set((RETURN_SCHEMA[t?.shared] || []).map((p) => p.key));
+
 
 // ------------------------------------------------------------------ shared DSP helpers
 const dbToLin = (db) => Math.pow(10, db / 20);
@@ -2604,7 +2664,9 @@ export const PLUGIN_TYPES = {
   // Pass the signal straight through and tap a copy into the project's shared delay
   // or reverb. Where the send sits in the chain decides what it taps.
   delaySend: {
-    name: "Delay send",
+    name: "Blocktime",
+    role: "Delay send",
+    shared: "delay",
     kind: "fx",
     category: "Space",
     color: "#facc15",
@@ -2620,7 +2682,9 @@ export const PLUGIN_TYPES = {
   },
 
   reverbSend: {
-    name: "Reverb send",
+    name: "Liquidity",
+    role: "Reverb send",
+    shared: "reverb",
     kind: "fx",
     category: "Space",
     color: "#a78bfa",
