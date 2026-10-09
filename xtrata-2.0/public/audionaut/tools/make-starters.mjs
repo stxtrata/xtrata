@@ -18,11 +18,13 @@ import { SONGS, buildNotes } from "./starter-songs.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(HERE, "../daw/data/starters");
+const DEFAULT_ID = "afrobeat"; // opens on a first visit; listed first
 const WELCOME = {
   id: "welcome",
   name: "Welcome Funk",
+  projectName: "Welcome to The Audionaut", // the saved file carries its own title
   genre: "Funk",
-  blurb: "The default: funk break, acid pluck, Rhodes and a bass line.",
+  blurb: "The original starter: funk break, acid pluck, Rhodes and a bass line.",
   file: "starter-session.json",
   bpm: 108,
 };
@@ -227,7 +229,7 @@ let previous = [];
 try { previous = JSON.parse(fs.readFileSync(indexPath, "utf8")).songs || []; } catch { /* first run */ }
 const byId = new Map(previous.map((s) => [s.id, s]));
 for (const s of index) byId.set(s.id, s);
-const order = [WELCOME.id, ...SONGS.map((s) => s.id)];
+const order = [DEFAULT_ID, WELCOME.id, ...SONGS.map((s) => s.id).filter((id) => id !== DEFAULT_ID)];
 const songsOut = order.map((id) => (id === WELCOME.id ? WELCOME : byId.get(id))).filter(Boolean);
 fs.writeFileSync(indexPath, JSON.stringify({ songs: songsOut }, null, 1) + "\n");
 console.log("logs:", logs);

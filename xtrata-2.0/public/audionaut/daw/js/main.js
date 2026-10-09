@@ -51,23 +51,23 @@ engine.onStep = (step) => {
 };
 
 // ------------------------------------------------------------ starter session
-// Ready-made songs so the first screen has something to play. The first (Welcome Funk) opens on a
-// first visit; the dropdown next to the Starter button lists the whole library
-// (daw/data/starters/index.json) and loads + plays whichever is picked.
+// Ready-made songs so the first screen has something to play. Lagos Late Night opens on a first
+// visit and is what the Starter button loads; the dropdown next to the button lists the whole
+// library (daw/data/starters/index.json) and loads + plays whichever is picked.
 const DATA_URL = new URL("../data/", import.meta.url);
-const STARTER_URL = new URL("starter-session.json", DATA_URL);
+const STARTER_URL = new URL("starters/afrobeat.json", DATA_URL);
 const STARTERS_INDEX_URL = new URL("starters/index.json", DATA_URL);
 const WELCOME =
-  "Welcome to The Audionaut — press Space to play the song, or type A–L to play the synth.";
+  "Welcome to The Audionaut — Lagos Late Night. Press Space to play the song, or type A–L to play the synth.";
 let starterTicket = 0; // a newer pick makes an older one that is still loading give up
 
-// Replaces the current project with a starter song (default: the welcome session). `guard` lets
+// Replaces the current project with a starter song (default: Lagos Late Night). `guard` lets
 // boot() back out if the person has already done something else (New, Load) while the file was on
 // its way.
 async function loadStarter({ guard = null, url = STARTER_URL, message = WELCOME } = {}) {
   const ticket = ++starterTicket;
   const response = await fetch(url);
-  if (!response.ok) throw new Error(`Starter session unavailable (${response.status}).`);
+  if (!response.ok) throw new Error(`Starter song unavailable (${response.status}).`);
   const text = await response.text();
   if (ticket !== starterTicket || (guard && store.project !== guard)) return false;
   persist.importProject(text);
@@ -144,13 +144,14 @@ async function initStarterLibrary() {
       ui.setStatus(`Starter song failed: ${err.message}`, true);
     }
   });
-  // anything that replaces the project another way clears the pick
-  store.on("load", () => {
-    if (select.value && store.project.projectName !== songs.find((s) => s.id === select.value)?.name) {
-      select.value = "";
-      current = "";
-    }
-  });
+  // the pick follows whichever project is open: a library song shows its name, anything else clears it
+  const syncPick = () => {
+    const name = store.project.projectName;
+    current = songs.find((s) => (s.projectName || s.name) === name)?.id || "";
+    select.value = current;
+  };
+  store.on("load", syncPick);
+  syncPick(); // the first-visit song may have finished loading before the index arrived
 }
 
 // ------------------------------------------------------------ header controls
