@@ -42,6 +42,8 @@ export function makeChannel(i) {
     // Each is a list of { id, type, enabled, params }.
     inserts: [],
     fx: [],
+    // Delay / reverb sends, tapped after the last plugin: { delay?, reverb? } of { amount, enabled }
+    sends: {},
   };
 }
 
@@ -76,6 +78,7 @@ export function makeInstrument(i) {
     solo: false,
     inserts: [], // same plugin chains as sample channels
     fx: [],
+    sends: {},
   };
 }
 

@@ -16,6 +16,9 @@ import { PLUGIN_TYPES, pluginDefaults, normalizeOwner, returnsOf, BEAT_DIVS } fr
 const LOOKAHEAD_MS = 25; // scheduler tick
 const SCHEDULE_AHEAD = 0.12; // seconds scheduled in advance
 
+// Strip sends are addressed like slots, as "send:delay" / "send:reverb".
+const sendBusId = (id) => (typeof id === "string" && id.startsWith("send:") ? id.slice(5) : null);
+
 class Engine {
   constructor() {
     this.ctx = null;
@@ -132,7 +135,50 @@ class Engine {
     const out = this.ctx.createGain();
     out.connect(this.masterGain);
     input.connect(out); // empty chain until syncChain wires plugins in
-    this.chains.set(key, { input, out, slots: new Map(), sig: "" });
+    // The strip's delay and reverb sends tap the chain output (after the last plugin):
+    //   out → amount → on/off → shared bus      (levels come from owner.sends, see syncChain)
+    // "inst" is a stand-in for the plugin instance a slot would have, so faces can meter it.
+    const sendFx = {};
+    for (const [bus, node] of [
+      ["delay", this.delayNode],
+      ["reverb", this.reverbNode],
+    ]) {
+      const amt = this.ctx.createGain();
+      const en = this.ctx.createGain();
+      amt.gain.value = 0;
+      en.gain.value = 1;
+      out.connect(amt).connect(en).connect(node);
+      sendFx[bus] = { amt, en, on: true, inst: { inp: out, out, nodes: null, taps: null } };
+    }
+    this.chains.set(key, { input, out, slots: new Map(), sig: "", sendFx });
+  }
+
+  // Bring a strip's two send values in line with owner.sends. Amount moves at once (as the
+  // old send plugin's did); on/off crossfades so a bypass never clicks. A strip that was just
+  // (re)loaded, meaning a different owner object than last time, jumps straight to its state,
+  // so opening a song never fades its sends in.
+  _applySends(chain, owner) {
+    const fresh = chain.owner !== owner;
+    chain.owner = owner;
+    for (const bus of ["delay", "reverb"]) {
+      const f = chain.sendFx[bus];
+      const rec = owner.sends?.[bus];
+      const on = !!rec && rec.enabled !== false;
+      const amount = rec ? rec.amount : 0;
+      if (f.amount !== amount) {
+        f.amt.gain.value = amount;
+        f.amount = amount;
+      }
+      if (f.on !== on) {
+        f.on = on;
+        if (f.init && !fresh) f.en.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.008);
+        else f.en.gain.value = on ? 1 : 0;
+      }
+      if (!f.init) {
+        f.en.gain.value = on ? 1 : 0;
+        f.init = true;
+      }
+    }
   }
 
   // One plugin instance wrapped in a bypass switch:
@@ -260,12 +306,14 @@ class Engine {
       this._applyParams(it, d);
       this._setBypass(it, d.enabled !== false);
     }
+    this._applySends(chain, owner);
   }
 
   // Live param/bypass update for one slot (called while a slider moves).
   updateSlot(idx, inst, id) {
     const chain = this.chains?.get((inst ? "i" : "c") + idx);
     const owner = inst ? store.instrument(idx) : store.channel(idx);
+    if (chain && owner && sendBusId(id)) return this._applySends(chain, owner);
     const it = chain?.slots.get(id);
     const def = [...(owner?.inserts || []), ...(owner?.fx || [])].find(
       (d) => d?.id === id,
@@ -278,7 +326,10 @@ class Engine {
 
   // Live plugin instance for a slot (nodes, meters) — used by plugin faces.
   slotInstance(idx, inst, id) {
-    return this.chains?.get((inst ? "i" : "c") + idx)?.slots.get(id) || null;
+    const chain = this.chains?.get((inst ? "i" : "c") + idx);
+    const bus = sendBusId(id);
+    if (bus) return chain?.sendFx[bus].inst || null; // a strip send ("send:delay")
+    return chain?.slots.get(id) || null;
   }
   // Input/output analysers on a slot, created on first ask (side branches, never in the path).
   slotTaps(idx, inst, id) {

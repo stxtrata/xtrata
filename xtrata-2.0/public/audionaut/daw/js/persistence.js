@@ -181,6 +181,7 @@ function normalizeNative(data) {
       // fx/inserts: current chains, or the old fixed FX object + 4 insert slots
       channel.inserts = c.inserts;
       channel.fx = c.fx && typeof c.fx === "object" ? c.fx : [];
+      channel.sends = c.sends; // delay / reverb send values; older files hold them as FX slots
       normalizeOwner(channel);
     });
   }
@@ -208,6 +209,7 @@ function normalizeNative(data) {
       p.instruments[i].fx =
         inst && inst.fx && typeof inst.fx === "object" ? inst.fx : [];
       p.instruments[i].inserts = inst?.inserts;
+      p.instruments[i].sends = inst?.sends;
       normalizeOwner(p.instruments[i]);
       {
         const cur0 = p.instruments[i];

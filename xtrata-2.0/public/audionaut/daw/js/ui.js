@@ -57,6 +57,10 @@ import {
   typeParams,
   sharedKeys,
   normalizeOwner,
+  sendRows,
+  sendBusOf,
+  cleanSends,
+  addSend,
 } from "./plugins.js";
 
 const $ = (s) => document.querySelector(s);
@@ -1432,7 +1436,8 @@ function markChainButtons(owner, fxBtn, insBtn) {
   if (!owner) return;
   if (!Array.isArray(owner.fx) || !Array.isArray(owner.inserts)) normalizeOwner(owner);
   const live = (arr) => (arr || []).filter((s) => s?.enabled).length;
-  const nFx = live(owner.fx);
+  // the strip's delay / reverb sends count as FX (they are rows in the FX list)
+  const nFx = live(owner.fx) + sendRows(owner).filter((r) => r.enabled).length;
   const nIns = live(owner.inserts);
   fxBtn?.classList.toggle("has-fx", nFx > 0);
   insBtn?.classList.toggle("has-inserts", nIns > 0);
@@ -1446,13 +1451,25 @@ const CHAIN_LABEL = { inserts: "insert", fx: "FX" };
 const chainOwner = () => ownerOf(chain.isInst, chain.idx);
 const chainSlots = (kind = chain.kind) => {
   const o = chainOwner();
-  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts)) normalizeOwner(o);
+  if (!Array.isArray(o.fx) || !Array.isArray(o.inserts) || !o.sends) normalizeOwner(o);
   return o[kind];
 };
+// What the list shows: the plugin slots, then (FX tab) the strip's delay / reverb sends as
+// rows. Sends are strip values, not slots; they always sit last, after the final plugin.
+const chainRows = (kind = chain.kind) =>
+  kind === "fx" ? [...chainSlots("fx"), ...sendRows(chainOwner())] : chainSlots(kind);
 
 // Every structural change goes through here: new array → store (undoable) → engine.
 function commitChain(arr, kind = chain.kind) {
   setOwnerProp(chain.isInst, chain.idx, kind, arr);
+  engine.syncChain(chain.idx, chain.isInst);
+  renderChain();
+  refreshOwnerRow(chain.isInst, chain.idx);
+}
+
+// Strip sends change as a whole object (undoable, like a chain), then rewire the engine.
+function commitSends(sends) {
+  setOwnerProp(chain.isInst, chain.idx, "sends", sends);
   engine.syncChain(chain.idx, chain.isInst);
   renderChain();
   refreshOwnerRow(chain.isInst, chain.idx);
@@ -1484,8 +1501,11 @@ function closePluginFace() {
 function openPluginFace(slotId) {
   const idx = chain.idx;
   const isInst = chain.isInst;
-  const find = () => ownerOf(isInst, idx)?.[chain.kind]?.find((s) => s.id === slotId) ||
-    [...(ownerOf(isInst, idx)?.inserts || []), ...(ownerOf(isInst, idx)?.fx || [])].find((s) => s.id === slotId);
+  const find = () =>
+    slotId.startsWith("send:")
+      ? sendRows(ownerOf(isInst, idx)).find((s) => s.id === slotId)
+      : ownerOf(isInst, idx)?.[chain.kind]?.find((s) => s.id === slotId) ||
+        [...(ownerOf(isInst, idx)?.inserts || []), ...(ownerOf(isInst, idx)?.fx || [])].find((s) => s.id === slotId);
   const slot0 = find();
   if (!slot0 || !PluginFaces.has(slot0.type)) return;
   closePluginFace();
@@ -1642,11 +1662,12 @@ function renderChain() {
     const k = b.dataset.chain;
     b.classList.toggle("active", k === chain.kind);
     b.setAttribute("aria-selected", k === chain.kind);
-    const n = chainSlots(k).length;
+    const n = chainRows(k).length;
     b.querySelector(".chain-count").textContent = n ? n : "";
   });
   root.innerHTML = "";
-  const slots = chainSlots();
+  const slots = chainRows();
+  const nReal = chainSlots().length; // rows past this are the strip's sends (not slots)
   if (!slots.length) {
     const empty = el(
       "li",
@@ -1661,10 +1682,11 @@ function renderChain() {
     li.dataset.id = slot.id;
     li.style.setProperty("--plug-color", t.color);
 
+    const isSend = !!slot.synthetic;
     const head = el("div", "chain-head");
-    head.draggable = true;
-    const grip = el("span", "chain-grip", "⋮⋮");
-    grip.title = "Drag to reorder";
+    head.draggable = !isSend;
+    const grip = el("span", "chain-grip", isSend ? "→" : "⋮⋮");
+    grip.title = isSend ? "A send: taps the signal after the last plugin" : "Drag to reorder";
     const name = el("button", "chain-name", t.name);
     name.title = "Show / hide controls";
     name.setAttribute("aria-expanded", chain.open.has(slot.id));
@@ -1686,23 +1708,33 @@ function renderChain() {
     );
     power.title = slot.enabled ? "Bypass this plugin" : "Turn this plugin back on";
     power.setAttribute("aria-pressed", slot.enabled);
-    power.addEventListener("click", () =>
+    power.addEventListener("click", () => {
+      if (isSend) {
+        const sends = cleanSends(chainOwner().sends);
+        sends[slot.synthetic].enabled = !sends[slot.synthetic].enabled;
+        return commitSends(sends);
+      }
       commitChain(
         chainSlots().map((s) => (s.id === slot.id ? { ...s, enabled: !s.enabled } : s)),
-      ),
-    );
+      );
+    });
     const up = el("button", "ch-btn tiny", "▲");
     up.title = "Move up";
-    up.disabled = i === 0;
+    up.disabled = i === 0 || isSend;
     up.addEventListener("click", () => moveSlot(i, i - 1));
     const down = el("button", "ch-btn tiny", "▼");
     down.title = "Move down";
-    down.disabled = i === slots.length - 1;
+    down.disabled = i >= nReal - 1;
     down.addEventListener("click", () => moveSlot(i, i + 1));
     const del = el("button", "ch-btn tiny chain-del", "✕");
     del.title = "Remove";
     del.addEventListener("click", () => {
       chain.open.delete(slot.id);
+      if (isSend) {
+        const sends = cleanSends(chainOwner().sends);
+        delete sends[slot.synthetic];
+        return commitSends(sends);
+      }
       commitChain(chainSlots().filter((s) => s.id !== slot.id));
     });
 
@@ -1710,6 +1742,10 @@ function renderChain() {
     li.appendChild(head);
     if (chain.open.has(slot.id)) li.appendChild(renderParams(slot));
 
+    if (isSend) {
+      root.appendChild(li);
+      return; // sends are not reorderable: they always follow the last plugin
+    }
     // drag to reorder (by the header row, so sliders still drag normally)
     head.addEventListener("dragstart", (e) => {
       chain.drag = slot.id;
@@ -1785,6 +1821,15 @@ export function initChainPanel() {
   $("#chain-add-btn").addEventListener("click", () => {
     const type = $("#chain-add-type").value;
     if (!PLUGIN_TYPES[type]) return;
+    const bus = sendBusOf(type);
+    if (bus) {
+      // delay / reverb are the strip's sends: one of each per strip
+      const o = { sends: cleanSends(chainOwner().sends) };
+      if (!addSend(o, bus))
+        return setStatus(`${chainOwner().name} already has a ${PLUGIN_TYPES[type].name} send.`);
+      chain.open.add(`send:${bus}`);
+      return commitSends(o.sends);
+    }
     const slot = makeSlot(type);
     chain.open.add(slot.id); // new plugins open with their controls showing
     commitChain([...chainSlots(), slot]);
@@ -1796,6 +1841,7 @@ export function initChainPanel() {
   );
   $("#chain-clear").addEventListener("click", () => {
     if (chainSlots().length) commitChain([]);
+    if (chain.kind === "fx" && sendRows(chainOwner()).length) commitSends({});
   });
   $("#chain-close").addEventListener("click", () => {
     $("#modal-chain").classList.add("hidden");
