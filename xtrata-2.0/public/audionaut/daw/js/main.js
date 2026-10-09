@@ -51,32 +51,107 @@ engine.onStep = (step) => {
 };
 
 // ------------------------------------------------------------ starter session
-// A ready-made song (drums, bass, keys, pad, lead) so the first screen has something to play.
-const STARTER_URL = new URL("../data/starter-session.json", import.meta.url);
+// Ready-made songs so the first screen has something to play. Lagos Late Night opens on a first
+// visit and is what the Starter button loads; the dropdown next to the button lists the whole
+// library (daw/data/starters/index.json) and loads + plays whichever is picked.
+const DATA_URL = new URL("../data/", import.meta.url);
+const STARTER_URL = new URL("starters/afrobeat.json", DATA_URL);
+const STARTERS_INDEX_URL = new URL("starters/index.json", DATA_URL);
 const WELCOME =
-  "Welcome to The Audionaut — press Space to play the song, or type A–L to play the synth.";
+  "Welcome to The Audionaut — Lagos Late Night. Press Space to play the song, or type A–L to play the synth.";
+let starterTicket = 0; // a newer pick makes an older one that is still loading give up
 
-// Replaces the current project with the starter. `guard` lets boot() back out if the person
-// has already done something else (New, Load) while the file was on its way.
-async function loadStarter({ guard = null } = {}) {
-  const response = await fetch(STARTER_URL);
-  if (!response.ok) throw new Error(`Starter session unavailable (${response.status}).`);
+// Replaces the current project with a starter song (default: Lagos Late Night). `guard` lets
+// boot() back out if the person has already done something else (New, Load) while the file was on
+// its way.
+async function loadStarter({ guard = null, url = STARTER_URL, message = WELCOME } = {}) {
+  const ticket = ++starterTicket;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Starter song unavailable (${response.status}).`);
   const text = await response.text();
-  if (guard && store.project !== guard) return false;
+  if (ticket !== starterTicket || (guard && store.project !== guard)) return false;
   persist.importProject(text);
   resetHistory();
   ui.setStatus("Loading the starter session's sounds…");
   const project = store.project;
   const failures = await sampleRestore;
-  if (project !== store.project) return true;
+  if (ticket !== starterTicket || project !== store.project) return false;
   ui.refreshAllChannels();
   ui.setStatus(
     failures.length
       ? `Starter opened; retry audio in channels ${failures.join(", ")}.`
-      : WELCOME,
+      : message,
     !!failures.length,
   );
   return true;
+}
+
+// Has the person changed anything since the current project finished loading? Playing, chaining
+// sequences and the project's own samples arriving do not count; steps, notes, synth and mixer
+// changes do. Used to decide when switching songs needs a confirmation.
+const sessionState = { loading: false, edited: false };
+function trackEdits() {
+  for (const event of ["step", "regions", "notes", "instrument", "channel", "channels", "samples", "project"])
+    store.on(event, () => {
+      if (!sessionState.loading) sessionState.edited = true;
+    });
+  store.on("load", () => {
+    sessionState.edited = false;
+    sessionState.loading = true;
+    const mine = sampleRestore;
+    mine.then(
+      () => sampleRestore === mine && (sessionState.loading = false),
+      () => (sessionState.loading = false),
+    );
+  });
+}
+
+// The song library behind the dropdown. Fails quietly: without the index the select stays hidden
+// and the Starter button still works.
+async function initStarterLibrary() {
+  const select = $("#starter-select");
+  let songs;
+  try {
+    const response = await fetch(STARTERS_INDEX_URL);
+    if (!response.ok) return;
+    songs = (await response.json()).songs;
+  } catch {
+    return;
+  }
+  if (!Array.isArray(songs) || !songs.length) return;
+  select.replaceChildren(new Option("♪ Starter songs…", ""));
+  for (const song of songs)
+    select.append(new Option(`${song.name} · ${song.genre} · ${song.bpm}`, song.id));
+  select.hidden = false;
+  let current = "";
+  select.addEventListener("change", async () => {
+    const song = songs.find((s) => s.id === select.value);
+    if (!song) return;
+    // Auditioning should be quick: only ask when there is something of the person's own to lose.
+    if (sessionState.edited && !confirm(`Load "${song.name}"? Unsaved changes will be lost.`)) {
+      select.value = current;
+      return;
+    }
+    current = select.value;
+    stopAll();
+    try {
+      const loaded = await loadStarter({
+        url: new URL(song.file, DATA_URL),
+        message: `${song.name} — ${song.blurb} Space plays and stops.`,
+      });
+      if (loaded && !engine.isPlaying) togglePlay();
+    } catch (err) {
+      ui.setStatus(`Starter song failed: ${err.message}`, true);
+    }
+  });
+  // the pick follows whichever project is open: a library song shows its name, anything else clears it
+  const syncPick = () => {
+    const name = store.project.projectName;
+    current = songs.find((s) => (s.projectName || s.name) === name)?.id || "";
+    select.value = current;
+  };
+  store.on("load", syncPick);
+  syncPick(); // the first-visit song may have finished loading before the index arrived
 }
 
 // ------------------------------------------------------------ header controls
@@ -340,10 +415,12 @@ function initSubscriptions() {
 function boot() {
   persist.restoreSettings();
   initHeader();
+  initStarterLibrary();
   initSequenceBar();
   initFileOps();
   initKeyboard();
   initSubscriptions();
+  trackEdits();
   ui.initLoaderModal();
   ui.initTrimModal();
   ui.initChainPanel();
