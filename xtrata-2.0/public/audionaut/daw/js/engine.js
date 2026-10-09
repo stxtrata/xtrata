@@ -211,6 +211,7 @@ class Engine {
         node = it.out;
       }
       node.connect(chain.out);
+      for (const it of next.values()) if (it.taps) it.out.connect(it.taps.outAn); // face meters survive a reorder
       chain.slots = next;
       chain.sig = sig;
       this._ensureGateLoop();
@@ -235,6 +236,47 @@ class Engine {
     it.def = def;
     this._applyParams(it, def);
     this._setBypass(it, def.enabled !== false);
+  }
+
+  // Live plugin instance for a slot (nodes, meters) — used by plugin faces.
+  slotInstance(idx, inst, id) {
+    return this.chains?.get((inst ? "i" : "c") + idx)?.slots.get(id) || null;
+  }
+  // Input/output analysers on a slot, created on first ask (side branches, never in the path).
+  slotTaps(idx, inst, id) {
+    const it = this.slotInstance(idx, inst, id);
+    if (!it) return null;
+    if (!it.taps) {
+      const mk = () => {
+        const a = this.ctx.createAnalyser();
+        a.fftSize = 4096;
+        a.smoothingTimeConstant = 0.7;
+        a.minDecibels = -100;
+        a.maxDecibels = -10;
+        return a;
+      };
+      it.taps = { inAn: mk(), outAn: mk() };
+      it.inp.connect(it.taps.inAn);
+      it.out.connect(it.taps.outAn);
+    }
+    return it.taps;
+  }
+  releaseSlotTaps(idx, inst, id) {
+    const it = this.slotInstance(idx, inst, id);
+    if (!it?.taps) return;
+    for (const a of [it.taps.inAn, it.taps.outAn])
+      try {
+        a.disconnect();
+      } catch {
+        /* noop */
+      }
+    try {
+      it.inp.disconnect(it.taps.inAn);
+      it.out.disconnect(it.taps.outAn);
+    } catch {
+      /* noop */
+    }
+    it.taps = null;
   }
 
   // Older call sites: both now mean "sync this owner's whole chain".

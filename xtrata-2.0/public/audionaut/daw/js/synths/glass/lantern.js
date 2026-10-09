@@ -1,7 +1,7 @@
-// synths/glass/lantern.js — jiLANTERN, the "Harmonic Bloom" synthesizer, as a SYNTH_BANK module.
+// synths/glass/lantern.js — Lightnode, the "Harmonic Bloom" synthesizer, as a SYNTH_BANK module.
 // A struck, slightly detuned spectrum retunes into pure integer harmonics (the "bloom")
 // while a second, slowly swelling layer of the same partials (the "halo") fades in beneath
-// it. Ported from the standalone jiLANTERN page: the note is rendered sample-by-sample into
+// it. Ported from the standalone Lightnode page: the note is rendered sample-by-sample into
 // one stereo AudioBuffer (a rotating-phasor sine bank, per-partial hit/halo envelopes,
 // opposing drift LFO, bloom-swept low-pass, tick burst and the 8-tap damped ping-pong echo),
 // so a note costs 2 audio nodes however rich it is. Results are kept in a small LRU cache,
@@ -358,7 +358,7 @@ const MAT_ICONS = {
 };
 
 const lantern = {
-  name: "jiLANTERN",
+  name: "Lightnode",
   tagline: "A struck spectrum that opens into a living harmonic halo",
   color: "#eeb978",
   params: PARAMS,
@@ -407,7 +407,7 @@ const lantern = {
   ],
   ui: {
     theme: { accent: "#eeb978", lcd: "#ffdda7", lcdBg: "#131411", edge: "#494335", bg: "#242521" },
-    logo: ["ji", "LANTERN"],
+    logo: ["", "Lightnode"],
     sub: "HARMONIC BLOOM SYNTHESIZER",
     cc: { 74: "cutoff", 71: "tension", 73: "attack", 72: "release", 1: "drift", 7: "level", 91: "space", 75: "bloom", 76: "halo", 77: "strike" },
     sections: [

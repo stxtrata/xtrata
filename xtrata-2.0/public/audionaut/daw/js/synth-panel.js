@@ -1,5 +1,5 @@
 // synth-panel.js — hardware-style front panels for the character synths
-// (jiMS10, jiFM4, jiVOX, jiPLUCK). Each synth in synths.js carries a `ui` spec
+// (jiMS10, Coinbase, Gm, Taproot). Each synth in synths.js carries a `ui` spec
 // (sections of knobs / faders / buttons / XY pads / live displays + a colour theme);
 // this module turns the spec into a panel. Controls write the same
 // `instrument.params` object the MIDI-roll slider grid uses, so both views stay in
@@ -11,6 +11,7 @@ import { store } from "./state.js";
 import { engine, emitNoteVisual } from "./engine.js";
 import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
+import { Kit } from "./synth-faces/index.js";
 import { voxFormants, fmRoles, FM_MOD, FM_CARRIERS, FM_ALGOS, VOWEL_NAMES } from "./synths-voices.js";
 
 const $ = (s) => document.querySelector(s);
@@ -50,6 +51,11 @@ let learn = false;
 let learnTarget = null;
 let ccMap = {};
 let selfWrite = false;
+let faceH = null; // mounted custom front panel ({P, refit, dispose}) when the synth has one
+const disposeFace = () => {
+  if (faceH) faceH.dispose();
+  faceH = null;
+};
 const lit = new Map(); // pitch -> count of sources currently sounding it
 const heldTyped = new Map(); // typed key -> pitch
 
@@ -599,7 +605,35 @@ function buildItem(item, into) {
   }
 }
 
+// Custom front panel (synth-faces/<id>.js): the face draws every control itself and talks to the
+// store through the face runtime, so this shell only supplies the slim toolbar.
+function buildFace(id) {
+  const synth = SYNTH_BANK[id];
+  const accent = synth.ui?.theme?.accent || synth.color || "#2edb84";
+  root.className = `sfp sfp-face sfp-${id}`;
+  root.style.setProperty("--sfp-accent", accent);
+  root.setAttribute("aria-label", `${synth.name} synth panel`);
+  root.innerHTML = `
+    <div class="sfp-head sfp-face-bar">
+      <div class="sfp-sub"><b>${synth.name}</b><span id="sfp-inst"></span></div>
+      <div class="sfp-oct"><button id="sfp-oct-dn" class="sfp-btn" title="Octave down (Z)">−</button><span id="sfp-oct-lbl"></span><button id="sfp-oct-up" class="sfp-btn" title="Octave up (X)">+</button></div>
+      <div class="sfp-head-btns">
+        <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
+        <button id="sfp-fx" class="sfp-btn" title="Filter / drive / delay / reverb for this synth">FX</button>
+        <button id="sfp-ins" class="sfp-btn" title="Insert plugins: EQ, compressor, chorus, phaser…">INSERTS</button>
+        <button id="sfp-rand" class="sfp-btn" title="Randomise the sound">RANDOM</button>
+        <button id="sfp-init" class="sfp-btn" title="Reset every control to its default">INIT</button>
+        <button id="sfp-close" class="sfp-btn primary">DONE</button>
+      </div>
+    </div>
+    <div class="sfp-face-host"></div>
+    <div id="sfp-status" class="sfp-status"></div>`;
+  faceH = Kit.mount(root.querySelector(".sfp-face-host"), id, inst);
+  wireHeader();
+}
+
 function build(id) {
+  disposeFace();
   synthId = id;
   const synth = SYNTH_BANK[id];
   spec = synth.ui;
@@ -608,6 +642,7 @@ function build(id) {
   widgets = {};
   vizzes = [];
   ccMap = loadCcMap();
+  if (Kit.has(id)) return buildFace(id);
   const t = spec.theme;
   root.className = `sfp sfp-${id}`;
   root.style.setProperty("--sfp-accent", t.accent);
@@ -706,7 +741,7 @@ function wireHeader() {
   $("#sfp-ins").addEventListener("click", () =>
     document.dispatchEvent(new CustomEvent("open-inst-inserts", { detail: inst })),
   );
-  $("#sfp-preset").addEventListener("change", (e) => {
+  $("#sfp-preset")?.addEventListener("change", (e) => {
     const preset = SYNTH_BANK[synthId].presets?.[+e.target.value];
     if (!preset) return;
     selfWrite = true;
@@ -717,7 +752,7 @@ function wireHeader() {
     play(48 + (baseOctave - 3) * 12);
     setStatus(`Preset: ${preset.name}`);
   });
-  $("#sfp-learn").addEventListener("click", () => {
+  $("#sfp-learn")?.addEventListener("click", () => {
     learn = !learn;
     learnTarget = null;
     $("#sfp-learn").classList.toggle("on", learn);
@@ -734,7 +769,7 @@ function wireHeader() {
 }
 
 function afterSync(P) {
-  // jiFM4: tag each operator as carrier (heard) or modulator for the chosen algorithm
+  // Coinbase: tag each operator as carrier (heard) or modulator for the chosen algorithm
   if (synthId === "fm4") {
     const roles = fmRoles(P.algo);
     root.querySelectorAll(".fm-op").forEach((s) => {
@@ -756,6 +791,11 @@ function syncAll() {
 }
 
 function randomise() {
+  if (faceH) {
+    faceH.P.randomise();
+    play(48 + (baseOctave - 3) * 12);
+    return setStatus("Randomised — tweak to taste (INIT resets).");
+  }
   const P = current();
   for (const [key, item] of Object.entries(ctrls)) {
     if (item.rand === false) continue;
@@ -921,6 +961,7 @@ export function openSynthPanel(i) {
   if (isMidiOn() || midiStatus().error) paintMidi();
 }
 export function closeSynthPanel() {
+  disposeFace();
   root.closest(".modal").classList.add("hidden");
   learn = false;
   learnTarget = null;

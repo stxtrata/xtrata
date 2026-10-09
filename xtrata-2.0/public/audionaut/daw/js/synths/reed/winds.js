@@ -1,4 +1,4 @@
-// synths/reed/winds.js — jiWINDS: brass, flute, reed and bowed strings (Audionaut synth module).
+// synths/reed/winds.js — Muneeb: brass, flute, reed and bowed strings (Audionaut synth module).
 //
 // One breath-and-bow instrument with four models, all per-note node graphs:
 //   BRASS   detuned sawtooth pair through a resonant low-pass that BLOOMS open as the "lips" speak,
@@ -315,7 +315,7 @@ const svg = {
 };
 
 const winds = {
-  name: "jiWINDS",
+  name: "Muneeb",
   tagline: "Breath & bow - brass, flute, reed and bowed strings with a blooming filter and delayed vibrato",
   color: "#d97f5a",
   params: paramDefs,
@@ -339,7 +339,7 @@ const winds = {
   ],
   ui: {
     theme: { accent: "#d97f5a", lcd: "#ffd2bd", lcdBg: "#2a1610", edge: "#4c2a1d", bg: "#1f130e" },
-    logo: ["ji", "WINDS"],
+    logo: ["", "Muneeb"],
     sub: "BRASS · FLUTE · REED · BOWED",
     cc: { 74: "brightness", 71: "swell", 73: "attack", 72: "release", 75: "breath", 76: "vibrato", 77: "body", 78: "detune", 7: "level" },
     sections: [

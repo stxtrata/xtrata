@@ -60,9 +60,9 @@ export function makeSequence(numChannels = NUM_CHANNELS) {
 // A fresh project gives each synth channel its own character voice (see synths.js).
 const DEFAULT_SYNTHS = [
   ["jims10", "jiMS10"],
-  ["fm4", "jiFM4"],
-  ["vox", "jiVOX"],
-  ["pluck", "jiPLUCK"],
+  ["fm4", "Coinbase"],
+  ["vox", "Gm"],
+  ["pluck", "Taproot"],
 ];
 
 export function makeInstrument(i) {

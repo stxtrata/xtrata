@@ -1,7 +1,7 @@
 // synths-voices.js — three character synths with their own front panels:
-//   jiFM4   4-operator FM (glass keys, bells, FM bass)         — rendered sample-by-sample
-//   jiVOX   formant / vowel voice (choirs, talking leads)       — Web Audio node graph
-//   jiPLUCK Karplus–Strong strings & mallets                    — rendered sample-by-sample
+//   Coinbase   4-operator FM (glass keys, bells, FM bass)         — rendered sample-by-sample
+//   Gm   formant / vowel voice (choirs, talking leads)       — Web Audio node graph
+//   Taproot Karplus–Strong strings & mallets                    — rendered sample-by-sample
 // Each entry matches the SYNTH_BANK shape (name, tagline, color, params, lines,
 // voice) plus `ui` (front-panel layout, read by synth-panel.js), `presets`, and
 // `scope`/helpers the panel uses for its live displays. No imports from synths.js
@@ -33,7 +33,7 @@ function playData(ctx, dest, data, time, chain = []) {
   };
 }
 
-// ============================================================ jiFM4
+// ============================================================ Coinbase
 export const FM_ALGOS = ["stack", "twin", "fork", "organ"];
 // MOD[a][k] = ops (0-based) that phase-modulate op k; CARRIERS[a] = ops heard.
 export const FM_MOD = [
@@ -156,7 +156,7 @@ const FM_PRESETS = [
 ];
 
 const fm4 = {
-  name: "jiFM4",
+  name: "Coinbase",
   tagline: "4-operator FM — glass keys, bells, brass and FM bass",
   color: "#22d3ee",
   params: fmParams,
@@ -172,7 +172,7 @@ const fm4 = {
   ],
   ui: {
     theme: { accent: "#22d3ee", lcd: "#7df3ff", lcdBg: "#04141a", edge: "#1d3b46", bg: "#10202a" },
-    logo: ["ji", "FM4"],
+    logo: ["", "Coinbase"],
     sub: "4-OPERATOR FM SYNTHESIZER",
     cc: { 74: "r2", 71: "fb", 73: "attack", 72: "release", 75: "d1", 76: "l2", 77: "l3", 7: "level" },
     sections: [
@@ -215,7 +215,7 @@ const fm4 = {
   },
 };
 
-// ============================================================ jiVOX
+// ============================================================ Gm
 // formant frequencies (Hz) for A E I O U, plus relative gains and bandwidths
 const VOWELS = [
   [800, 1150, 2900],
@@ -275,7 +275,7 @@ const voxParams = [
 ];
 
 const vox = {
-  name: "jiVOX",
+  name: "Gm",
   tagline: "Formant voice — vowel choirs, talking leads and breathy pads",
   color: "#f472b6",
   params: voxParams,
@@ -369,7 +369,7 @@ const vox = {
   ],
   ui: {
     theme: { accent: "#f472b6", lcd: "#ffb3da", lcdBg: "#1a0713", edge: "#4a2038", bg: "#26121e" },
-    logo: ["ji", "VOX"],
+    logo: ["", "Gm"],
     sub: "FORMANT VOICE SYNTHESIZER",
     cc: { 74: "vowel", 71: "shift", 73: "attack", 72: "release", 75: "choir", 76: "breath", 77: "vibDepth", 7: "level" },
     sections: [
@@ -418,7 +418,7 @@ const vox = {
   },
 };
 
-// ============================================================ jiPLUCK
+// ============================================================ Taproot
 export function renderPluck(P, pitch, vel, dur, sr) {
   const f0 = midiToFreq(pitch);
   const tone = clamp(P.tone * (0.55 + 0.45 * vel), 0, 1);
@@ -514,7 +514,7 @@ const pluckParams = [
 ];
 
 const pluck = {
-  name: "jiPLUCK",
+  name: "Taproot",
   tagline: "Karplus–Strong strings — nylon, harp, koto, mallets and muted bass",
   color: "#fbbf24",
   params: pluckParams,
@@ -547,7 +547,7 @@ const pluck = {
   ],
   ui: {
     theme: { accent: "#fbbf24", lcd: "#ffd97a", lcdBg: "#1b1204", edge: "#4c3a14", bg: "#2a1f0e" },
-    logo: ["ji", "PLUCK"],
+    logo: ["", "Taproot"],
     sub: "KARPLUS–STRONG STRING SYNTHESIZER",
     cc: { 74: "tone", 71: "decay", 73: "snap", 72: "damp", 75: "twin", 76: "body", 77: "bodyFreq", 7: "level" },
     sections: [

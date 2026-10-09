@@ -1663,7 +1663,7 @@ button:disabled {
   }
 }
 
-/* ------------------------------------------------ synth front panels (jiMS10 · jiFM4 · jiVOX · jiPLUCK) */
+/* ------------------------------------------------ synth front panels (jiMS10 · Coinbase · Gm · Taproot) */
 .ch-btn.panel-open {
   font-size: 12px;
 }
@@ -2194,7 +2194,7 @@ button:disabled {
 
 /* ---- jiMS10: green hardware mono-synth (default grid above) ---- */
 
-/* ---- jiFM4: cyan operator rack ---- */
+/* ---- Coinbase: cyan operator rack ---- */
 .sfp-fm4 {
   width: 1040px;
 }
@@ -2261,7 +2261,7 @@ button:disabled {
   min-width: 70px;
 }
 
-/* ---- jiVOX: pink vowel lab ---- */
+/* ---- Gm: pink vowel lab ---- */
 .sfp-vox {
   width: 1040px;
 }
@@ -2329,7 +2329,7 @@ button:disabled {
   background: rgba(40, 8, 26, 0.45);
 }
 
-/* ---- jiPLUCK: amber wooden string board ---- */
+/* ---- Taproot: amber wooden string board ---- */
 .sfp-pluck {
   width: 1020px;
   background:
@@ -2645,3 +2645,86 @@ button:disabled {
 .pack-info{margin:.4rem 0 .2rem}
 .pack-info .pack-licence{margin:.15rem 0 0;font-size:.82em;line-height:1.35;overflow-wrap:anywhere}
 .pack-info.warn .pack-licence{color:#e8a33d;font-weight:600}
+
+/* ---- custom synth faces (js/synth-faces): the face draws the whole panel, we only add a slim bar ---- */
+.sfp.sfp-face {
+  width: min(1180px, 96vw);
+  padding: 0;
+  background: #0a0d12;
+  overflow: hidden;
+  border-radius: 10px;
+}
+.sfp-face .sfp-face-bar {
+  padding: 6px 10px;
+  gap: 12px;
+  border-bottom: 1px solid #000;
+  background: #11161d;
+  flex-wrap: nowrap;
+}
+.sfp-face .sfp-face-bar .sfp-sub b {
+  color: #e8eef5;
+  font-size: 12px;
+  letter-spacing: 2px;
+  margin-right: 4px;
+}
+.sfp-face .sfp-oct {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font: 600 10px var(--font-mono);
+  color: var(--dim);
+}
+.sfp-face .sfp-face-host {
+  line-height: 0;
+  background: #000;
+}
+.sfp-face .sfp-status {
+  margin: 0;
+  padding: 4px 10px;
+  background: #0b0f14;
+}
+
+/* ---- plugin face pop-out (js/plugin-faces) ---- */
+#modal-plugin-face {
+  z-index: 70;
+}
+.pf-box {
+  width: min(1100px, 97vw);
+  max-height: 97vh;
+  background: #0a0d12;
+  border: 1px solid #2a3340;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+.pf-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #11161d;
+  border-bottom: 1px solid #000;
+  font: 600 11px var(--font-mono);
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.pf-bar b {
+  color: #e8eef5;
+  letter-spacing: 2px;
+}
+.pf-spacer {
+  flex: 1;
+}
+.pf-host {
+  line-height: 0;
+  background: #000;
+}
+.chain-face {
+  color: var(--accent, #2edb84);
+}
+.pf-bar .ch-btn {
+  white-space: nowrap;
+  padding: 4px 10px;
+  line-height: 1.2;
+}

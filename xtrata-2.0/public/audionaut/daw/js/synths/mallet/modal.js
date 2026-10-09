@@ -1,4 +1,4 @@
-// synths/mallet/modal.js — jiMODAL: struck bars, bells, bowls and tines (Audionaut synth module).
+// synths/mallet/modal.js — Ordinal: struck bars, bells, bowls and tines (Audionaut synth module).
 //
 // Modal synthesis: a struck object is a handful of decaying sinusoidal modes whose frequency
 // ratios, strengths and decay times are what make a marimba sound like a marimba and not a bell.
@@ -300,7 +300,7 @@ const svg = {
 };
 
 const modal = {
-  name: "jiMODAL",
+  name: "Ordinal",
   tagline: "Modal percussion - marimba, xylophone, vibes, glockenspiel, kalimba, tubular bell, singing bowl, steel pan, wood block",
   color: "#e0c24a",
   params: paramDefs,
@@ -324,7 +324,7 @@ const modal = {
   ],
   ui: {
     theme: { accent: "#e0c24a", lcd: "#fff0b0", lcdBg: "#2a2410", edge: "#4a3f1a", bg: "#1d190c" },
-    logo: ["ji", "MODAL"],
+    logo: ["", "Ordinal"],
     sub: "MODAL PERCUSSION",
     cc: { 74: "hardness", 71: "damping", 73: "noise", 72: "release", 75: "decay", 76: "strike", 77: "tremolo", 78: "beat", 7: "level" },
     sections: [

@@ -1,4 +1,4 @@
-// synths/fx/texture.js — jiTEXTURE: noise, drones, risers, grain clouds and impacts (Audionaut synth module).
+// synths/fx/texture.js — Mempool: noise, drones, risers, grain clouds and impacts (Audionaut synth module).
 //
 // A sound-design instrument for the things that are NOT notes: five models that all follow the pitch you play, so
 // a riser can land on the key of the track and a drone can sit under a chord.
@@ -549,7 +549,7 @@ const svg = {
 };
 
 const texture = {
-  name: "jiTEXTURE",
+  name: "Mempool",
   tagline: "Weather for your tracks - wind, risers, drones, grain clouds and impacts that follow the key",
   color: "#7fb7c4",
   params: paramDefs,
@@ -574,7 +574,7 @@ const texture = {
   ],
   ui: {
     theme: { accent: "#7fb7c4", lcd: "#d4f1f7", lcdBg: "#102228", edge: "#27444d", bg: "#0d1b20" },
-    logo: ["ji", "TEXTURE"],
+    logo: ["", "Mempool"],
     sub: "WIND · RISER · DRONE · CLOUD · IMPACT",
     cc: { 74: "tone", 71: "res", 73: "attack", 72: "release", 75: "motion", 76: "rate", 77: "tonal", 78: "spread", 7: "level" },
     sections: [
