@@ -230,6 +230,19 @@
           >Ready — click a lane to add a region, drag its edges to trim, ⊕ loads a sample.</span
         >
       </footer>
+
+      <!-- Docked synth panel: the synth face and keyboard live here, always one key press from sound -->
+      <section id="synth-dock" class="synth-dock" aria-label="Synth dock">
+        <div class="synth-dock-bar">
+          <div id="synth-dock-tabs" class="synth-dock-tabs" role="tablist" aria-label="Synths"></div>
+          <span class="synth-dock-hint">Type A–L to play · Z / X octave · Space plays the song</span>
+          <button id="synth-dock-size" class="synth-dock-btn" type="button" title="Make the synth panel taller or shorter">⤢</button>
+          <button id="synth-dock-toggle" class="synth-dock-btn" type="button" aria-expanded="true" title="Hide the synth panel">▾</button>
+        </div>
+        <div id="synth-dock-body" class="synth-dock-body">
+          <div id="synth-front" class="sfp" role="region" aria-label="Synth panel"></div>
+        </div>
+      </section>
     </div>
 
     <!-- Sample loader modal -->
@@ -520,11 +533,6 @@
         </div>
         <div id="roll-status" class="lib-status"></div>
       </div>
-    </div>
-
-    <!-- jiMS10 hardware-style synth panel -->
-    <div id="modal-synth" class="modal hidden">
-      <div id="synth-front" class="sfp" role="dialog" aria-label="Synth panel"></div>
     </div>
 
     <!-- Beat presets modal -->

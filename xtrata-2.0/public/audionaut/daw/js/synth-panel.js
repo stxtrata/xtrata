@@ -6,6 +6,8 @@
 // sync and everything saves with the project. While a panel is open you can play it:
 // on-screen keys, computer keys (A–L, Z/X octave) and Web MIDI notes; MIDI CC knobs
 // can be controlled and learned (per synth).
+// The panel lives in the bottom dock (#synth-dock): open on first visit, one tab per synth,
+// collapsible. While it is expanded and no modal is open, A–L play it straight away.
 
 import { store } from "./state.js";
 import { engine } from "./engine.js";
@@ -639,12 +641,12 @@ function buildFace(id) {
       ${presetMenu(synth)}
       <div class="sfp-oct"><button id="sfp-oct-dn" class="sfp-btn" title="Octave down (Z)">−</button><span id="sfp-oct-lbl"></span><button id="sfp-oct-up" class="sfp-btn" title="Octave up (X)">+</button></div>
       <div class="sfp-head-btns">
-        <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
+        <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while the synth dock is open"><i class="led"></i>MIDI IN</button>
         <button id="sfp-fx" class="sfp-btn" title="Filter / drive / delay / reverb for this synth">FX</button>
         <button id="sfp-ins" class="sfp-btn" title="Insert plugins: EQ, compressor, chorus, phaser…">INSERTS</button>
         <button id="sfp-rand" class="sfp-btn" title="Randomise the sound">RANDOM</button>
         <button id="sfp-init" class="sfp-btn" title="Reset every control to its default">INIT</button>
-        <button id="sfp-close" class="sfp-btn primary">DONE</button>
+        <button id="sfp-close" class="sfp-btn primary" title="Collapse the synth dock">HIDE</button>
       </div>
     </div>
     <div class="sfp-face-host"></div>
@@ -686,13 +688,13 @@ function build(id) {
       <div class="sfp-sub">${spec.sub}<span id="sfp-inst"></span></div>
       ${presetMenu(synth)}
       <div class="sfp-head-btns">
-        <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
+        <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while the synth dock is open"><i class="led"></i>MIDI IN</button>
         <button id="sfp-learn" class="sfp-btn" title="MIDI learn: click a control, then move a knob/fader on your controller"><i class="led"></i>LEARN</button>
         <button id="sfp-fx" class="sfp-btn" title="Filter / drive / delay / reverb for this synth">FX</button>
         <button id="sfp-ins" class="sfp-btn" title="Insert plugins: EQ, compressor, chorus, phaser…">INSERTS</button>
         <button id="sfp-rand" class="sfp-btn" title="Randomise the sound">RANDOM</button>
         <button id="sfp-init" class="sfp-btn" title="Reset every control to its default">INIT</button>
-        <button id="sfp-close" class="sfp-btn primary">DONE</button>
+        <button id="sfp-close" class="sfp-btn primary" title="Collapse the synth dock">HIDE</button>
       </div>
     </div>
     <div class="sfp-body"></div>
@@ -871,17 +873,17 @@ function setStatus(msg) {
   const s = $("#sfp-status");
   if (s) s.textContent = msg;
 }
-const isOpen = () => root && !root.closest(".modal").classList.contains("hidden");
+const dockOpen = () => document.body.classList.contains("synth-dock-open");
+const modalOpen = () => !!document.querySelector(".modal:not(.hidden)");
+// the dock is expanded and showing a synth panel
+const isOpen = () => !!root && dockOpen() && root.dataset.built === "1";
+// computer keys and MIDI belong to the dock only while no modal (roll, loader…) is on top
+const keysLive = () => isOpen() && !modalOpen();
 
 function onKey(e) {
-  if (!isOpen()) return;
-  if (e.key === "Escape") {
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    return closeSynthPanel();
-  }
+  if (!keysLive()) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
-  if (e.target.matches?.("input, textarea, select")) return;
+  if (e.target.matches?.("input, textarea, select, [contenteditable]")) return;
   const k = e.key.toLowerCase();
   if (k === "z" || k === "x") {
     e.stopImmediatePropagation();
@@ -909,7 +911,7 @@ function onMidi({ data }) {
   const [status, d1, d2 = 0] = data;
   const type = status & 0xf0;
   if (type === 0xb0) {
-    if (!isOpen()) return;
+    if (!keysLive()) return;
     if (learn && learnTarget) {
       for (const cc of Object.keys(ccMap)) if (ccMap[cc] === learnTarget) delete ccMap[cc];
       ccMap[d1] = learnTarget;
@@ -926,9 +928,8 @@ function onMidi({ data }) {
     writeParam(key, v);
     widgets[key]?.set(v);
   } else if (type === 0x90 && d2 > 0) {
-    if (!isOpen()) return;
-    // the roll has its own MIDI handler — don't double-trigger when it's also visible
-    if (!$("#modal-roll").classList.contains("hidden")) return;
+    // the roll has its own MIDI handler — keysLive() is false while it (or any modal) is open
+    if (!keysLive()) return;
     noteOn(`midi:${status & 15}:${d1}`, inst, d1, d2 / 127); // held until note-off
   } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
     noteOff(`midi:${status & 15}:${d1}`);
@@ -951,42 +952,131 @@ function paintMidi() {
   );
 }
 
-// ------------------------------------------------------------ open / close
-export function openSynthPanel(i) {
-  const id = store.instrument(i).synthId;
-  if (!SYNTH_BANK[id]?.ui) return;
-  inst = i;
-  setMidiTarget(i);
-  ensureMidi();
-  engine.ensureContext();
-  lit.clear();
-  learn = false;
-  learnTarget = null;
-  build(id);
-  syncAll();
-  paintKeys();
-  root.closest(".modal").classList.remove("hidden");
-  requestAnimationFrame(drawViz); // canvases need layout before they can size
-  root.querySelector(".fader, .knob")?.focus({ preventScroll: true });
-  setStatus(
-    "Drag pots up/down · wheel · Shift = fine · double-click = reset · play: A–L keys, on-screen keys or MIDI.",
-  );
-  $("#sfp-midi")?.classList.toggle("on", isMidiOn());
-  if (isMidiOn() || midiStatus().error) paintMidi();
+// ------------------------------------------------------------ dock: open / close / tabs
+const DOCK_KEY = "audionaut.dock"; // { open, tall, inst } — per-browser conveniences
+const dockPref = () => {
+  try {
+    return JSON.parse(localStorage.getItem(DOCK_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+};
+const saveDockPref = (patch) => {
+  try {
+    localStorage.setItem(DOCK_KEY, JSON.stringify({ ...dockPref(), ...patch }));
+  } catch {
+    /* storage unavailable — the dock just starts open next time */
+  }
+};
+const dockEl = () => $("#synth-dock");
+
+function paintTabs() {
+  const tabs = $("#synth-dock-tabs");
+  if (!tabs) return;
+  tabs.innerHTML = "";
+  store.project.instruments.forEach((ins, i) => {
+    const synth = SYNTH_BANK[ins.synthId];
+    const b = el("button", `synth-dock-tab${i === inst ? " on" : ""}`);
+    b.type = "button";
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-selected", String(i === inst));
+    b.style.setProperty("--tab-color", synth?.color || "#2edb84");
+    b.appendChild(el("i"));
+    b.appendChild(document.createTextNode(ins.name));
+    b.title = `${ins.name} — ${synth?.name || ins.synthId}`;
+    b.addEventListener("click", () => openSynthPanel(i));
+    tabs.appendChild(b);
+  });
 }
-export function closeSynthPanel() {
+
+function hideDockPanel() {
   kbHandle?.release();
   kbHandle = null;
   allOff("key:");
   disposeFace();
-  root.closest(".modal").classList.add("hidden");
   learn = false;
   learnTarget = null;
+  root.dataset.built = "0";
+  root.innerHTML = "";
+}
+
+// Build the face for the selected instrument into the dock.
+function showDockInstrument() {
+  if (!root) return;
+  hideDockPanel();
+  paintTabs();
+  setMidiTarget(inst);
+  const ins = store.instrument(inst);
+  const id = ins.synthId;
+  if (!SYNTH_BANK[id]?.ui) {
+    root.className = "sfp sfp-empty";
+    root.textContent = `${ins.name} has no front panel yet — open its MIDI roll (♪) to edit it.`;
+    return;
+  }
+  lit.clear();
+  build(id);
+  root.dataset.built = "1";
+  syncAll();
+  paintKeys();
+  requestAnimationFrame(() => {
+    faceH?.refit();
+    drawViz();
+  });
+  $("#sfp-midi")?.classList.toggle("on", isMidiOn());
+  if (isMidiOn() || midiStatus().error) paintMidi();
+}
+
+function setDockOpen(on, { save = true } = {}) {
+  const dock = dockEl();
+  if (!dock) return;
+  document.body.classList.toggle("synth-dock-open", on);
+  dock.classList.toggle("collapsed", !on);
+  const t = $("#synth-dock-toggle");
+  t.setAttribute("aria-expanded", String(on));
+  t.textContent = on ? "▾" : "▴";
+  t.title = on ? "Hide the synth panel" : "Show the synth panel";
+  if (save) saveDockPref({ open: on });
+  if (on) showDockInstrument();
+  else {
+    hideDockPanel();
+    paintTabs();
+  }
+}
+
+// Select a synth and make sure the dock is showing it (🎛 buttons, tabs, the roll's panel button).
+export function openSynthPanel(i) {
+  if (!root || !store.instrument(i)) return;
+  // a visible roll owns the computer keys, so hand over to the dock
+  $("#modal-roll")?.classList.add("hidden");
+  inst = i;
+  saveDockPref({ inst: i, open: true });
+  ensureMidi();
+  engine.ensureContext();
+  if (dockOpen()) showDockInstrument();
+  else setDockOpen(true, { save: false });
+  setStatus(
+    "Drag pots up/down · wheel · Shift = fine · double-click = reset · play: A–L keys, on-screen keys or MIDI.",
+  );
+}
+export function closeSynthPanel() {
+  setDockOpen(false);
 }
 
 export function initSynthPanel() {
   root = $("#synth-front");
   if (!root) return;
+  const pref = dockPref();
+  inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
+  dockEl().classList.toggle("tall", !!pref.tall);
+  $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
+  $("#synth-dock-size").addEventListener("click", () => {
+    const tall = dockEl().classList.toggle("tall");
+    saveDockPref({ tall });
+    requestAnimationFrame(() => {
+      faceH?.refit();
+      drawViz();
+    });
+  });
   addMidiListener(onMidi);
   document.addEventListener("midi-status", paintMidi);
   window.addEventListener("keydown", onKey, true);
@@ -1004,13 +1094,25 @@ export function initSynthPanel() {
   document.addEventListener("synth-note", (e) => {
     if (e.detail.i === inst) setLit(e.detail.pitch, e.detail.on);
   });
-  $("#modal-synth").addEventListener("pointerdown", (e) => {
-    if (e.target.id === "modal-synth") closeSynthPanel();
-  });
   document.addEventListener("open-synth-panel", (e) => openSynthPanel(e.detail));
   // keep the panel in step with edits made elsewhere (MIDI-roll sliders, undo, load)
   store.on("instrument", ({ i, prop }) => {
     if (!selfWrite && isOpen() && i === inst && prop === "params") syncAll();
   });
-  store.on("load", () => isOpen() && closeSynthPanel());
+  // a new project, a loaded file or undo/redo: keep the dock on the same synth, rebuilt from the new state
+  store.on("load", () => {
+    if (!store.instrument(inst)) inst = 0;
+    if (dockOpen()) showDockInstrument();
+    else paintTabs();
+  });
+  // names and synth swaps show on the tabs (and the face follows a swapped synth)
+  store.on("instrument", ({ i, prop }) => {
+    if (prop === "name") paintTabs();
+    if (prop === "synthId") {
+      paintTabs();
+      if (i === inst && dockOpen()) showDockInstrument();
+    }
+  });
+  document.addEventListener("instrument-renamed", paintTabs);
+  setDockOpen(pref.open !== false, { save: false }); // first visit: open on the first synth
 }

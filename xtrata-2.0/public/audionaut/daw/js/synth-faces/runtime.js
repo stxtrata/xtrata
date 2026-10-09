@@ -471,9 +471,16 @@ export const Kit = {
     curInst = inst;
     const P = makeP(synthId, inst, def, root);
     const fit = () => {
-      const maxH = Math.max(240, window.innerHeight * 0.96 - 92);
+      // In the dock the face gets whatever height the dock body has left after the bar and status line;
+      // as a pop-out it keeps the window-based budget.
+      const dockBody = host.closest(".synth-dock-body");
+      const chrome = host.parentElement ? host.parentElement.offsetHeight - host.offsetHeight : 92;
+      const maxH = dockBody
+        ? Math.max(120, dockBody.clientHeight - chrome)
+        : Math.max(240, window.innerHeight * 0.96 - 92);
       const s = Math.min(host.clientWidth / w, maxH / h, 1.4) || 1;
       stage.style.transform = `scale(${s})`;
+      stage.style.left = Math.max(0, (host.clientWidth - w * s) / 2) + "px";
       wrap.style.height = h * s + "px";
     };
     const ro = new ResizeObserver(fit);
