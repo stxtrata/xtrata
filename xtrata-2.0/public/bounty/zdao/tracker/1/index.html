@@ -104,6 +104,7 @@ html { scroll-padding-top: 120px; }
 .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 11px; font: 600 11px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; border: 1px solid transparent; white-space: nowrap; }
 .pill.ok { background: var(--lime-soft); color: var(--lime); border-color: #3a5018; }
 .pill.wait { background: var(--amber-soft); color: var(--amber); border-color: #5a3d14; }
+.usedtag { font: 500 11px var(--mono); color: var(--lav); white-space: nowrap; }
 .pill.win { background: var(--lav-soft); color: var(--lav); border-color: #3d3670; }
 .score { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 20px; align-items: center; }
 .score b { font: 800 clamp(54px, 9vw, 80px)/.9 var(--display); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
@@ -372,7 +373,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="head">
       <div class="label lav">The draws</div>
       <h2>Three weeks, three draws</h2>
-      <p>Tickets carry forward. Each draw picks 3 winners (4 in week 3) plus 2 reserves, and only the winners' tickets are used up. Everyone else rolls over into the next draw. A wallet cannot win twice in the same week. Xtrata team wallets are not in the draws. Winners are announced in the Telegram and the main prizes on Wednesday 28 October.</p>
+      <p>Tickets carry forward. Each draw picks 3 winners (4 in week 3) plus 2 reserves, and a winner uses up just one ticket. Every other ticket rolls over, so past winners stay in every later draw. A wallet cannot win twice in the same week. Xtrata team wallets are not in the draws. Winners are announced in the Telegram and the main prizes on Wednesday 28 October.</p>
     </div>
     <div class="weeks" id="weeks"></div>
   </section>
@@ -402,6 +403,7 @@ tr:last-child td { border-bottom: 0; }
       <details><summary>How many tickets is an inscription worth?</summary><p>It depends on the size of the file. Up to 1 MB (1,048,576 bytes) is 1 ticket, over 1 MB is 2, over 2 MB is 3, over 3 MB is 4, and over 4 MB is 5. Five is the most one inscription can earn, however large the file. Every inscription you make from 1 October is scored on its own and added up. If the page cannot see an inscription's size yet it counts 1 ticket until the next full read of the chain. Draw 1 was frozen before this rule and counted an inscription as 1 ticket; size tickets apply from Draw 2.</p></details>
       <details><summary>Do repeat actions add more tickets?</summary><p>Each different action adds one ticket, so playing ten songs is one ticket. Inscriptions are the exception: every inscription earns its own tickets by size, so ten inscribed songs earn at least ten. Collecting Audionauts is worth 5 tickets per wallet, however many you collect: one Audionaut or ten, it is 5. Every high score you commit on-chain is its own ticket.</p></details>
       <details><summary>I use more than one wallet</summary><p>Only one wallet per X account counts, and it must be the one you announced. Do everything with that wallet.</p></details>
+      <details><summary>I won a draw. Am I still in the later draws?</summary><p>Yes. Winning uses up one ticket and every other ticket rolls over, so you stay in every later draw, with any new tickets you earn counting in full. You just cannot win twice in the same week. Your row shows "Winner · still in play" and how many tickets were used.</p></details>
       <details><summary>Where do winners get announced?</summary><p>Weekly raffle winners are announced in the Xtrata Telegram. Main prizes and special awards are announced on Wednesday 28 October.</p></details>
     </div>
   </section>
@@ -500,7 +502,7 @@ tr:last-child td { border-bottom: 0; }
   }
   var START = loadState(), HANDLES = {}, TEAMW = {}, LINKED = {}, WINNERS = {}, DATA = listFromState(START), AT = START ? START.at : '', rows = [], live = false, offline = false, ME = '';
   function rebuild() {
-    rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; var tm = !!TEAM[a.a]; return { a: a, valid: c.valid && !tm, team: tm, held: c.total, tickets: tm ? 0 : c.tickets, handle: team || self, self: !!self, won: WINNERS[a.a] }; });
+    rows = DATA.map(function (a) { var c = calc(a); var team = HANDLES[a.a] || '', self = !team && LINKED[a.a] ? LINKED[a.a].h : ''; var tm = !!TEAM[a.a], wn = WINNERS[a.a], nw = wn ? (wn.draws ? wn.draws.length : 1) : 0; return { a: a, valid: c.valid && !tm, team: tm, held: c.total, tickets: tm ? 0 : Math.max(0, c.tickets - nw), handle: team || self, self: !!self, won: wn, used: nw }; });
     rows.sort(function (x, y) { return (y.tickets - x.tickets) || (y.held - x.held) || (x.a.a < y.a.a ? -1 : 1); });
   }
 
@@ -568,9 +570,10 @@ tr:last-child td { border-bottom: 0; }
       var hc = el('td', '', r.handle || '—');
       if (r.handle && r.self) hc.appendChild(el('small', 'selftag', ' self-linked'));
       tr.appendChild(hc);
-      var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.team ? 'Team' : r.won ? 'Winner' : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
+      var st = el('td'); st.appendChild(el('span', 'pill ' + (r.won ? 'win' : r.valid ? 'ok' : 'wait'), r.team ? 'Team' : r.won ? (r.valid ? 'Winner · still in play' : 'Winner') : r.valid ? 'In the draw' : 'Waiting')); tr.appendChild(st);
       var tk = el('td', 'num tk ' + (r.valid ? 'ok' : 'wait'), String(r.tickets));
       if (!r.valid && r.held) { var sm = el('small', 'heldtag', ' +' + r.held + ' held'); tk.appendChild(sm); }
+      if (r.won && r.used) tk.appendChild(el('small', 'usedtag', ' −' + r.used + ' used'));
       tr.appendChild(tk);
       var ac = el('td'); ac.appendChild(chipsFor(r.a)); tr.appendChild(ac);
       tr.addEventListener('click', function () { pickRow(r); });
@@ -604,10 +607,10 @@ tr:last-child td { border-bottom: 0; }
     var a = r ? r.a : { a: addr, n: {} }, c = r || { valid: false, held: 0, tickets: 0, handle: '', won: null };
     var who = el('div', 'who');
     var l = el('div'); l.appendChild(el('div', 'addr', a.a)); if (c.handle) l.appendChild(el('div', 'hint', c.handle)); who.appendChild(l);
-    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.team ? 'Xtrata team · not in the draws' : c.won ? 'Winner of draw ' + c.won.draw : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
+    who.appendChild(el('span', 'pill ' + (c.won ? 'win' : c.valid ? 'ok' : 'wait'), c.team ? 'Xtrata team · not in the draws' : c.won ? 'Winner of draw ' + c.won.draw + (c.valid ? ' · still in the draws' : '') : c.valid ? 'In the draw' : 'Waiting for a first inscription'));
     out.appendChild(who);
     var sc = el('div', 'score'); sc.appendChild(el('b', c.valid ? 'ok' : 'wait', String(c.tickets)));
-    sc.appendChild(el('p', '', c.valid ? 'tickets in every draw from week 1. They carry forward until this wallet is picked.' : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
+    sc.appendChild(el('p', '', c.valid ? (c.won ? 'tickets in the next draws. This wallet won draw ' + c.won.draw + ' and used up ' + c.used + ' ticket' + (c.used === 1 ? '' : 's') + '. Everything else carries forward, and new tickets count in full.' : 'tickets in every draw from week 1. They carry forward until this wallet is picked.') : (c.held ? c.held + ' ticket' + (c.held === 1 ? ' is' : 's are') + ' held. They switch on the moment this wallet inscribes or collects an Audionaut.' : 'No Xtrata activity found for this wallet since 1 October.')));
     out.appendChild(sc);
 
     // where you stand: three things that must be true
@@ -716,7 +719,7 @@ tr:last-child td { border-bottom: 0; }
     id.appendChild(el('span', 'label lime', 'You'));
     var ad = el('span', 'me-addr', short(ME)); ad.title = ME; id.appendChild(ad);
     if (mine) {
-      id.appendChild(el('span', 'pill ' + (mine.won ? 'win' : mine.valid ? 'ok' : 'wait'), mine.won ? 'Winner' : mine.valid ? 'In the draw' : 'Waiting'));
+      id.appendChild(el('span', 'pill ' + (mine.won ? 'win' : mine.valid ? 'ok' : 'wait'), mine.won ? (mine.valid ? 'Winner · still in play' : 'Winner') : mine.valid ? 'In the draw' : 'Waiting'));
       id.appendChild(el('span', 'me-tk' + (mine.valid ? '' : ' wait'), mine.valid ? mine.tickets + (mine.tickets === 1 ? ' ticket' : ' tickets') : '0 tickets' + (mine.held ? ' · ' + mine.held + ' held' : '')));
     } else {
       id.appendChild(el('span', 'pill wait', 'Not on the board yet'));

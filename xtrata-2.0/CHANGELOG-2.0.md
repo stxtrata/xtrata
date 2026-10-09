@@ -34,6 +34,12 @@ Everything not listed here was copied verbatim from xtrata-1.0. Every change bel
 - `public/bounty/zdao/tracker/1/index.html`: the Audionaut kind is now a flat 5 tickets per wallet, however many Audionauts it holds (it was 1). Added a `w` weight to the ticket kinds; `earned()` returns `w` for a flat kind. An Audionaut still counts as the wallet's entry (validity is unchanged), and inscription stays 1 ticket, so a wallet with both has 6 before other actions. Copy updated in the hero line, step 2, the ways list (+5 tickets), the ways intro, the example label and the two FAQ answers.
 - **Verified:** browser run against the baked snapshot: a wallet with 1 inscription, 3 Audionauts and 18 scores shows 24 (1 + 5 + 18); 1 Audionaut and 8 scores shows 13; 1 Audionaut and 1 score shows 6; 1 Audionaut alone shows 5. No page errors.
 
+## Bounty tracker: winners stay in play, a win uses up one ticket (2026-10-09)
+- Rule (Jim, 9 Oct): winning a draw uses up ONE ticket; every other ticket rolls over, so past winners stay in all later draws (they just cannot win twice in the same week).
+- `public/bounty/zdao/tracker/1/index.html`: winners now show "Winner · still in play" with their remaining tickets and a "−1 used" tag (e.g. 27 shows as 26), the wallet checker explains it, the Draws text is updated and an FAQ entry "I won a draw. Am I still in the later draws?" is added. The pool numbers use the reduced counts. `handles.json` `winners` entries may carry `draws: [1, 3]` for repeat winners (one ticket used per win).
+- Offline draw scripts (`freeze.mjs`/`draw.mjs`, kept in the bounty folder) now record `consumed` as the number of wins rather than the winner's whole ticket count. A Draw 2 dry run puts the three Draw 1 winners in the pool with 26, 4 and 4 tickets.
+- **Verified:** headless browser run of the page against the live chain (leaderboard, wallet checker, no page errors).
+
 ## Bounty tracker: Draw 1 result published (2026-10-08)
 - `public/bounty/zdao/tracker/1/draws/draw1/` holds the official Draw 1 files: `frozen.csv` (wallet,tickets, 19 wallets / 133 tickets, SHA-256 `0e897ca2...121b`), `meta.json` (seed = Bitcoin block 970404 `0x00000000000000000001...c269`, mined 2026-10-08 00:17 BST; exclusions; weights) and `result.json` (3 winners, 2 reserves). The Live draw section compares its own result with `result.json` and shows "Matches the official result".
 - `handles.json`: the three Draw 1 winners are recorded under `winners` so they show as Winner on the leaderboard.
