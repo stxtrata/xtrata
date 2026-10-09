@@ -1,0 +1,164 @@
+{
+ "songs": [
+  {
+   "id": "welcome",
+   "name": "Welcome Funk",
+   "genre": "Funk",
+   "blurb": "The default: funk break, acid pluck, Rhodes and a bass line.",
+   "file": "starter-session.json",
+   "bpm": 108
+  },
+  {
+   "id": "deep-house",
+   "name": "Deep House Sunrise",
+   "genre": "Deep House",
+   "blurb": "Warm Rhodes stabs over a shuffling kick, kalimba melody.",
+   "bpm": 120,
+   "file": "starters/deep-house.json"
+  },
+  {
+   "id": "peak-techno",
+   "name": "Warehouse Peak Time",
+   "genre": "Techno",
+   "blurb": "Acid bass pulse, poly stabs and a resonant sweep lead.",
+   "bpm": 132,
+   "file": "starters/peak-techno.json"
+  },
+  {
+   "id": "lofi-rain",
+   "name": "Rainy Window",
+   "genre": "Lo-Fi",
+   "blurb": "Dusty tines, tape moon pad, vibes melody. Slow and warm.",
+   "bpm": 68,
+   "file": "starters/lofi-rain.json"
+  },
+  {
+   "id": "boom-bap",
+   "name": "Boom Bap Dusk",
+   "genre": "Hip-Hop",
+   "blurb": "Upright piano chops, tape strings and a soulful hook.",
+   "bpm": 90,
+   "file": "starters/boom-bap.json"
+  },
+  {
+   "id": "trap",
+   "name": "Trap Halftime",
+   "genre": "Trap",
+   "blurb": "808 boom, plucked arps and a music-box hook.",
+   "bpm": 140,
+   "file": "starters/trap.json"
+  },
+  {
+   "id": "disco",
+   "name": "Saturday Night Disco",
+   "genre": "Disco",
+   "blurb": "Octave bass, funky tines, strings and a sax lead.",
+   "bpm": 118,
+   "file": "starters/disco.json"
+  },
+  {
+   "id": "dub",
+   "name": "Roots and Echo",
+   "genre": "Reggae / Dub",
+   "blurb": "One-drop skank, deep dub bass, echoing recorder.",
+   "bpm": 76,
+   "file": "starters/dub.json"
+  },
+  {
+   "id": "jungle",
+   "name": "Jungle Roller",
+   "genre": "Jungle",
+   "blurb": "170 bpm breaks, rolling reese bass and ringing bells.",
+   "bpm": 170,
+   "file": "starters/jungle.json"
+  },
+  {
+   "id": "afrobeat",
+   "name": "Lagos Late Night",
+   "genre": "Afrobeat",
+   "blurb": "Scratchy guitar, horn hits, finger bass and a sax lead.",
+   "bpm": 112,
+   "file": "starters/afrobeat.json"
+  },
+  {
+   "id": "bossa",
+   "name": "Bossa Afternoon",
+   "genre": "Bossa Nova",
+   "blurb": "Nylon guitar comping, upright bass and a flute melody.",
+   "bpm": 128,
+   "file": "starters/bossa.json"
+  },
+  {
+   "id": "jazz",
+   "name": "Midnight Swing",
+   "genre": "Jazz",
+   "blurb": "Walking bass, grand piano comping and a muted trumpet.",
+   "bpm": 126,
+   "file": "starters/jazz.json"
+  },
+  {
+   "id": "reggaeton",
+   "name": "Perreo Nights",
+   "genre": "Reggaeton",
+   "blurb": "Tresillo 808s, steel pan hook and a nylon-string groove.",
+   "bpm": 96,
+   "file": "starters/reggaeton.json"
+  },
+  {
+   "id": "amapiano",
+   "name": "Piano and Log Drum",
+   "genre": "Amapiano",
+   "blurb": "Soft EP chords, log drum bass and a kalimba lead.",
+   "bpm": 112,
+   "file": "starters/amapiano.json"
+  },
+  {
+   "id": "dubstep",
+   "name": "Half-Step Wobble",
+   "genre": "Dubstep",
+   "blurb": "Wobbling bass, dark drone and a vowel lead.",
+   "bpm": 140,
+   "file": "starters/dubstep.json"
+  },
+  {
+   "id": "rock",
+   "name": "Highway Anthem",
+   "genre": "Rock",
+   "blurb": "Driving 8ths, power chords and a clean guitar hook.",
+   "bpm": 124,
+   "file": "starters/rock.json"
+  },
+  {
+   "id": "synthpop",
+   "name": "Neon Drive",
+   "genre": "Synth-Pop",
+   "blurb": "Juno pads, saw bass pulse and a bright lead. 80s dashboard.",
+   "bpm": 118,
+   "file": "starters/synthpop.json"
+  },
+  {
+   "id": "gospel",
+   "name": "Sunday Shout",
+   "genre": "Gospel / Soul",
+   "blurb": "Church organ, grand piano, choir hook and a walking bass.",
+   "bpm": 128,
+   "file": "starters/gospel.json"
+  },
+  {
+   "id": "cinematic",
+   "name": "Heroic Horizon",
+   "genre": "Cinematic",
+   "blurb": "Strings, French horns and felt piano over a marching pulse.",
+   "bpm": 110,
+   "file": "starters/cinematic.json"
+  },
+  {
+   "id": "uk-garage",
+   "name": "Two-Step Garage",
+   "genre": "UK Garage",
+   "blurb": "Bouncy sub bass, piano stabs and a soulful diva lead.",
+   "bpm": 132,
+   "file": "starters/uk-garage.json"
+  }
+ ]
+}
