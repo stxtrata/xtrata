@@ -198,7 +198,7 @@ export async function loadBeatPreset(preset, options = {}) {
     i < (project.lastPresetChannels || 0) && i < store.numChannels;
     i++
   ) {
-    sequence.steps[i].fill(0);
+    store.clearChannelRegions(i, store.project.sequences.indexOf(sequence), { quiet: true });
     unloadChannelSample(i);
   }
   prepared.forEach(({ def, result, steps, trimStart, trimEnd }, i) => {
@@ -217,7 +217,10 @@ export async function loadBeatPreset(preset, options = {}) {
       fx: { ...def.fx }, // preset FX are written in the old object form…
     });
     normalizeOwner(store.channel(i)); // …and become plugin chain slots here
-    sequence.steps[i] = steps;
+    store.writePattern(i, steps, {
+      seqIndex: store.project.sequences.indexOf(sequence),
+      quiet: true,
+    });
     engine.rebuildInserts?.(i);
     store.emit("channel", { ch: i });
   });
