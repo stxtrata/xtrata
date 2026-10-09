@@ -11,8 +11,8 @@ Status values: not started / in progress / done / blocked.
 |---|---|---|
 | 0 Audit | done | branch verified, renames present, harnesses recreated in `audionaut/tools/` |
 | 1 Keyboard feel (shared) | done | `live-keys.js` + `engine.startNote/releaseNote`; all 14 pass the keyboard suite |
-| 2 Synths | not started | order below |
-| Final regression + report | not started | |
+| 2 Synths | done | all 14 committed; see table |
+| Final regression + report | done | MORNING_REPORT.md |
 
 ## Phase 0 audit (baseline, before any change)
 
@@ -72,17 +72,17 @@ Presets for all 13 face synths are shown inside the face (lists / pips / chips);
 
 | # | Synth | Status | Presets | Commit | Notes |
 |---|---|---|---|---|---|
-| 1 | Whale | not started | 8 | | |
-| 2 | Privkey | not started | 8 | | |
-| 3 | Cathedral | not started | 8 | | |
-| 4 | ASIC | not started | 8 | | |
-| 5 | Layers | not started | 8 | | |
-| 6 | Ordinal | not started | 8 | | |
-| 7 | Muneeb | not started | 8 | | |
-| 8 | Szabo | not started | 8 | | |
-| 9 | Mempool | not started | 9 | | |
-| 10 | Lightnode | not started | 8 | | |
-| 11 | Schnorr | not started | 8 | | |
-| 12 | Coinbase | not started | 6 | | |
-| 13 | Gm | not started | 6 | | |
-| 14 | Taproot | not started | 6 | | |
+| 1 | Whale | done | 58 | see git log | |
+| 2 | Privkey | done | 55 | see git log | |
+| 3 | Cathedral | done | 58 | see git log | |
+| 4 | ASIC | done | 56 | see git log | |
+| 5 | Layers | done | 56 | see git log | |
+| 6 | Ordinal | done | 51 | see git log | |
+| 7 | Muneeb | done | 54 | see git log | |
+| 8 | Szabo | done | 64 | see git log | |
+| 9 | Mempool | done | 56 | see git log | |
+| 10 | Lightnode | done | 50 | see git log | |
+| 11 | Schnorr | done | 52 | see git log | |
+| 12 | Coinbase | done | 58 | see git log | |
+| 13 | Gm | done | 54 | see git log | |
+| 14 | Taproot | done | 50 | see git log | |

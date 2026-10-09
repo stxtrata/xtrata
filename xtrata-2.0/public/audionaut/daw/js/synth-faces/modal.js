@@ -108,7 +108,7 @@ import { Kit } from "./runtime.js";
       if (i >= 0) cur = i;
       $$(root, '[data-pname]').forEach(e => { e.textContent = name || 'Custom'; });
       $$(root, '[data-pidx]').forEach(e => { e.textContent = String(i < 0 ? 1 : i + 1).padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
-      if (lst) $$(lst, '[data-i]').forEach(b => b.classList.toggle('cur', +b.dataset.i === i));
+      if (lst) $$(lst, '[data-i]').forEach(b => { const on = +b.dataset.i === i; b.classList.toggle('cur', on); if (on) lst.scrollLeft = b.offsetLeft - (lst.clientWidth - b.offsetWidth) / 2; });
     });
   }
   const cell = (id, label, t, cls) => '<div class="' + (cls || 'kn') + '" data-k="' + id + '" data-t="' + (t || 'k') + '"><span class="vl"></span><div class="ctl ' + (t === 'f' ? 'fd' : 'dial') + '"></div><label>' + label + '</label></div>';
@@ -132,8 +132,8 @@ import { Kit } from "./runtime.js";
 .A .pb .nm{width:330px;height:34px;border:1px solid #2aa39b88;background:#0a1110;padding:3px 10px;display:flex;flex-direction:column;justify-content:center}
 .A .pb .nm i{font-style:normal;font-size:9px;letter-spacing:2px;color:#2aa39bcc}
 .A .pb .nm b{font-size:14px;font-weight:700;color:#e8fbf8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.A .chips{position:absolute;left:24px;top:64px;width:912px;height:24px;display:flex;gap:4px}
-.A .chips button{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;height:24px;line-height:22px;padding:0 6px;border:1px solid #2aa39b55;font-size:9px;color:#8bc9c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.A .chips{position:absolute;left:24px;top:64px;width:912px;height:30px;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#2aa39b55 transparent}
+.A .chips button{all:unset;box-sizing:border-box;cursor:pointer;flex:0 0 auto;max-width:150px;height:24px;line-height:22px;padding:0 6px;border:1px solid #2aa39b55;font-size:9px;color:#8bc9c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .A .chips button i{font-style:normal;color:#2aa39b;margin-right:4px}
 .A .chips button:hover{background:#2aa39b22}.A .chips button.cur{background:#2aa39b;color:#06100f;border-color:#2aa39b}.A .chips button.cur i{color:#06100f}
 .A .frame{position:absolute;left:24px;top:96px;width:912px;height:246px;padding:10px;border-radius:6px;background:repeating-linear-gradient(92deg,#00000018 0 2px,transparent 2px 7px),repeating-linear-gradient(88deg,#ffffff0d 0 1px,transparent 1px 11px),linear-gradient(180deg,#a8733f,#7a4a26 50%,#8e5b30);box-shadow:inset 0 2px 0 #ffcf9a55,inset 0 -3px 0 #0006,0 6px 18px #0009}

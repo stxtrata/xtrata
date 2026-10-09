@@ -4,7 +4,6 @@ import { Kit } from "./runtime.js";
   const ALG = ['stack', 'twin', 'fork', 'organ'];
   const MOD = [[[1], [2], [3], []], [[1], [], [3], []], [[1, 2, 3], [], [], []], [[], [], [], []]]; // MOD[a][k] = ops modulating op k
   const CAR = [[0], [0, 2], [0], [0, 1, 2, 3]];
-  const A = n => ALG.indexOf(n);
   const sec = v => (v < 1 ? Math.round(v * 1000) + ' ms' : v.toFixed(2) + ' s');
   const pct = v => Math.round(v * 100) + '%';
   const rat = v => v.toFixed(2) + '×';
@@ -21,17 +20,6 @@ import { Kit } from "./runtime.js";
     { id: 'vel', label: 'Velocity→Index', min: 0, max: 1, step: 0.01, def: 0.6, fmt: pct },
     { id: 'level', label: 'Output Level', min: 0, max: 1.5, step: 0.01, def: 1, fmt: pct });
 
-  const presets = [
-    { name: 'Glass Keys', values: {} },
-    { name: 'Tubular Bell', values: { algo: A('twin'), fb: 0, r1: 1, l1: 0.8, d1: 3.5, r2: 3.5, l2: 0.55, d2: 2.5, r3: 2.75, l3: 0.45, d3: 2.4, r4: 5.5, l4: 0.3, d4: 1.2, sustain: 0, release: 1.4, vel: 0.5 } },
-    { name: 'FM Bass', values: { algo: A('stack'), fb: 0.35, r1: 1, l1: 0.9, d1: 0.7, r2: 1, l2: 0.7, d2: 0.25, r3: 2, l3: 0.3, d3: 0.15, r4: 1, l4: 0.2, d4: 0.2, sustain: 0.6, attack: 0.004, release: 0.12, vel: 0.5 } },
-    { name: 'Brass Section', values: { algo: A('fork'), fb: 0.1, r1: 1, l1: 0.9, d1: 1.4, r2: 1, l2: 0.5, d2: 0.9, r3: 2, l3: 0.25, d3: 0.5, r4: 3, l4: 0.15, d4: 0.4, sustain: 0.7, attack: 0.04, release: 0.2, vel: 0.7 } },
-    { name: 'Drawbar Organ', values: { algo: A('organ'), fb: 0.12, r1: 0.5, l1: 0.7, d1: 4, r2: 1, l2: 0.8, d2: 4, r3: 2, l3: 0.5, d3: 4, r4: 4, l4: 0.3, d4: 4, sustain: 1, attack: 0.012, release: 0.08, vel: 0.2 } },
-    { name: 'Metal Hit', values: { algo: A('stack'), fb: 0.7, r1: 1, l1: 0.8, d1: 0.9, r2: 1.5, l2: 0.8, d2: 0.5, r3: 3.5, l3: 0.6, d3: 0.3, r4: 7, l4: 0.5, d4: 0.2, sustain: 0, attack: 0.002, release: 0.5, vel: 0.8 } },
-    { name: 'Marimba Wood', values: { algo: A('twin'), fb: 0, r1: 1, l1: 0.9, d1: 0.9, r2: 4, l2: 0.35, d2: 0.1, r3: 1, l3: 0.3, d3: 0.35, r4: 10, l4: 0.15, d4: 0.06, sustain: 0, attack: 0.002, release: 0.3, vel: 0.6 } },
-    { name: 'Rhodes Dream', values: { algo: A('twin'), fb: 0.08, r1: 1, l1: 0.85, d1: 3, r2: 14, l2: 0.12, d2: 0.1, r3: 1, l3: 0.4, d3: 2, r4: 1, l4: 0.25, d4: 1.2, sustain: 0.25, attack: 0.004, release: 0.6, vel: 0.75 } }
-  ];
-
   /* ---------- shared helpers ---------- */
   const hx = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16).padStart(8, '0'); };
   const opKey = (P, n) => [P.get('r' + n), P.get('l' + n), P.get('d' + n)].map(x => x.toFixed(2)).join('|');
@@ -43,17 +31,14 @@ import { Kit } from "./runtime.js";
     P.sub('algo', v => root.querySelectorAll('[data-algo]').forEach(b => b.classList.toggle('on', +b.dataset.algo === v)));
     const n = P.presets.length; let idx = -1;
     P.onPreset((i, nm) => {
-      idx = i;
-      root.querySelectorAll('[data-pname]').forEach(e => { e.textContent = nm || '—'; });
-      root.querySelectorAll('[data-pidx]').forEach(e => { e.textContent = String(Math.max(i, 0) + 1).padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
-      root.querySelectorAll('[data-pip]').forEach(e => e.classList.toggle('on', +e.dataset.pip === i));
+      if (i >= 0) idx = i;
+      root.querySelectorAll('[data-pname]').forEach(e => { e.textContent = i < 0 ? 'Edited' : nm || '—'; });
+      root.querySelectorAll('[data-pidx]').forEach(e => { e.textContent = (i < 0 ? '··' : String(i + 1)).padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
     });
     root.querySelectorAll('[data-prev]').forEach(b => b.addEventListener('click', () => P.loadPreset((idx - 1 + n) % n)));
     root.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => P.loadPreset((idx + 1) % n)));
-    root.querySelectorAll('[data-pip]').forEach(b => b.addEventListener('click', () => P.loadPreset(+b.dataset.pip)));
     if (idx < 0 && n) P.loadPreset(0);
   };
-  const pips = P => P.presets.map((p, i) => `<i data-pip="${i}" title="${p.name}"></i>`).join('');
   const ICON = {
     stack: '<path d="M6 22h6M20 22h6M34 22h6" /><path d="M9 18V8" /><rect x="3" y="18" width="8" height="8"/><rect x="16" y="18" width="8" height="8"/><rect x="29" y="18" width="8" height="8"/><rect x="42" y="18" width="3" height="8" opacity=".0"/>',
     twin: '<rect x="6" y="18" width="8" height="8"/><rect x="6" y="3" width="8" height="8"/><rect x="32" y="18" width="8" height="8"/><rect x="32" y="3" width="8" height="8"/><path d="M10 11v7M36 11v7"/>',
@@ -99,8 +84,8 @@ import { Kit } from "./runtime.js";
  .hd .lg{font-size:26px;font-weight:700;letter-spacing:.3em;color:transparent;background:linear-gradient(#fff2bf,#e0b24a 45%,#8f6a22);-webkit-background-clip:text;background-clip:text}
  .hd .sb{margin-left:14px;font-size:10px;letter-spacing:.2em;color:#a58640}
  .pb{margin-left:auto;display:flex;align-items:center;gap:8px}.pb button{background:linear-gradient(#e8c66a,#9a7428);border:0;border-radius:50%;width:24px;height:24px;color:#2a1d07;font-weight:700;cursor:pointer}
- .pb .nm{min-width:170px;text-align:center;font-size:14px;font-weight:700;color:#fff2bf}.pb .ix{font-size:10px;letter-spacing:.15em;color:#a58640}
- .pips{display:flex;gap:4px}.pips i{width:9px;height:9px;border-radius:50%;border:1px solid #a58640;cursor:pointer}.pips i.on{background:radial-gradient(circle at 35% 30%,#fff2bf,#e0b24a);box-shadow:0 0 8px #e0b24a}
+ .pb .nm{width:210px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font-size:14px;font-weight:700;color:#fff2bf}.pb .ix{font-size:10px;letter-spacing:.15em;color:#a58640}
+
  .coin{left:${CX - R - 6}px;top:${CY - R - 6}px}
  .rk{position:absolute;width:62px;text-align:center}.rl{font-size:11px;font-weight:700;color:#2a1d07;letter-spacing:.1em;margin-top:-4px;text-shadow:0 1px 0 #ffffff55;position:relative;z-index:2}
  .rk .rl{position:absolute;left:0;right:0;top:-12px;color:#e0b24a;text-shadow:none;margin:0}
@@ -126,7 +111,7 @@ import { Kit } from "./runtime.js";
  .kbw .kb-b{background:linear-gradient(#3a2d14,#0c0a06);border:1px solid #7b5a1a;border-top:0}.kbw .kb-b.on{background:#e0b24a}
  </style><div class="m">
  <div class="hd"><span class="lg">COINBASE</span><span class="sb">FOUR-OPERATOR FM · MINTED ON THE RIM</span>
-  <div class="pb"><button data-prev>‹</button><div><div class="nm" data-pname></div><div style="text-align:center" class="ix">STRIKE <span data-pidx></span></div></div><button data-next>›</button><div class="pips">${pips(P)}</div></div></div>
+  <div class="pb"><button data-prev>‹</button><div><div class="nm" data-pname></div><div style="text-align:center" class="ix">STRIKE <span data-pidx></span></div></div><button data-next>›</button></div></div>
  <svg class="coin" width="${2 * R + 12}" height="${2 * R + 12}" viewBox="${CX - R - 6} ${CY - R - 6} ${2 * R + 12} ${2 * R + 12}">
   <defs><radialGradient id="gold" cx="35%" cy="28%" r="85%"><stop offset="0" stop-color="#fff2bf"/><stop offset=".35" stop-color="#e0b24a"/><stop offset=".8" stop-color="#8f6a22"/><stop offset="1" stop-color="#5b4018"/></radialGradient>
   <radialGradient id="gold2" cx="60%" cy="70%" r="80%"><stop offset="0" stop-color="#f1cf74"/><stop offset=".6" stop-color="#b88a2c"/><stop offset="1" stop-color="#6b4d17"/></radialGradient>
@@ -176,7 +161,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('fm4', {
     fonts: 'family=Space+Mono:wght@400;700&family=VT323&family=Cinzel:wght@500;700',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       undefined,
       undefined,

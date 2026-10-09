@@ -99,7 +99,7 @@ function tickBurst(sr, fc) {
 function echoField(cur, L, R, n, na, sr, space, width, damp) {
   const send = space * 0.48;
   const [c0, c1, c2, d1, d2] = lowpass(damp, 0.5, sr);
-  const live = Math.min(n, na + 4096); // beyond this the cascade holds only inaudible ring-down
+  const live = Math.min(n, na + Math.round(sr * 0.085)); // beyond this the cascade holds only inaudible ring-down
   let off = 0;
   let fbGain = 1;
   for (let i = 0; i < 8; i++) {
@@ -131,6 +131,14 @@ function echoField(cur, L, R, n, na, sr, space, width, damp) {
   }
 }
 
+const sc = (v) => {
+  const u = v / 0.98;
+  if (u >= 3) return 0.98;
+  if (u <= -3) return -0.98;
+  const u2 = u * u;
+  return (0.98 * u * (27 + u2)) / (27 + 9 * u2);
+};
+
 // ------------------------------------------------------------------ the renderer
 // Returns { L, R } Float32Arrays (or { L } mono for the scope). `o.maxSec` caps the length,
 // `o.noEcho` drops the echo field (used by the scope).
@@ -141,17 +149,16 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
   const f0 = 440 * Math.pow(2, (clamp(num(pitch, 60), 0, 127) - 69) / 12);
   if (vel < 0.002 || p.level === 0 || (p.strike === 0 && p.halo === 0)) return null;
 
-  const nyqG = sr * 0.44;
   const space = o.noEcho ? 0 : p.space;
   const peak = PEAK_K * Math.pow(vel, 1.25) * p.level;
   const sus = Math.max(EPS, peak * p.sustain);
   const susR = sus / peak;
   const A = p.attack;
-  const D = p.decay;
+  const DK = p.decay;
   const R = p.release;
 
   // amplitude envelope exactly as the page schedules it (linear attack, exp decay, exp release)
-  const ungated = (x) => (x < A ? (peak * x) / A : x < A + D ? peak * Math.pow(susR, (x - A) / D) : sus);
+  const ungated = (x) => (x < A ? (peak * x) / A : x < A + DK ? peak * Math.pow(susR, (x - A) / DK) : sus);
   const relStart = Math.max(EPS, ungated(gate));
   const ampAt = (x) => {
     if (x <= gate) return x <= 0 ? 0 : ungated(x);
@@ -164,28 +171,47 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
   const maxSec = o.maxSec || 8;
   const n = Math.max(64, Math.min(Math.floor(maxSec * sr), Math.ceil((tEnd + tail) * sr)));
   const na = Math.min(n, Math.ceil(tEnd * sr) + 1); // samples that carry dry signal
-  const L = new Float32Array(n);
-  const Rr = new Float32Array(n);
-
   // velocity opens the filter a little (the page was velocity→level only; this is the "touch" amount)
   const cutoff = clamp(p.cutoff * Math.pow(2, p.touch * 2.5 * (Math.min(vel, 1.4) - 1)), 180, 18000);
+  const spec = SPECTRA[p.material];
+
+  // ---- internal rate: the partial bank, filter and echo run at sr/D, where D is picked so the
+  // highest audible partial stays well under the internal Nyquist; the result is upsampled
+  // (4-point Hermite + an image-killing low-pass) and the full-rate tick is added on top.
+  let fmax = 1;
+  for (let i = 0; i < spec.ratios.length; i++) {
+    const t = f0 * spec.ratios[i];
+    fmax = Math.max(fmax, t, t * Math.pow(2, (spec.skew[i] * p.tension) / 12));
+  }
+  const bw = Math.min(fmax * (1.02 + p.drift * 0.01), cutoff * 3);
+  const D = o.full ? 1 : clamp(Math.floor((sr * 0.19) / bw), 1, Math.max(1, Math.floor(sr / 8000)));
+  const srL = sr / D;
+  const nL = Math.ceil(n / D) + 3;
+  const naL = Math.min(nL - 3, Math.ceil(na / D) + 1);
+  const nyqG = srL * 0.44;
+  const L = new Float32Array(nL);
+  const Rr = new Float32Array(nL);
 
   // ---- partial bank: rotating phasors, gains/frequencies updated per block
-  const spec = SPECTRA[p.material];
   const lfoHz = 0.11 + p.drift * 0.53;
   const lfoW = 2 * Math.PI * lfoHz;
+  // block lengths: fine while the strike flashes / the spectrum glides, coarse once it has settled
+  const bEarly = Math.max(4, Math.round(srL * 0.0013));
+  const bGlide = Math.max(8, Math.round(srL * 0.0026));
+  const bLate = Math.max(16, Math.round(srL * 0.006));
   for (let i = 0; i < spec.ratios.length; i++) {
     const target = f0 * spec.ratios[i];
     const start = target * Math.pow(2, (spec.skew[i] * p.tension) / 12);
     if (Math.max(target, start) * 1.02 >= nyqG) continue; // never fold back
+    const hitPeak = spec.weights[i] * p.strike * (i === 0 ? 1 : 0.8 + p.tension * 0.6);
+    const lightPeak = spec.weights[i] * p.halo * (i === 0 ? 0.92 : 1.18);
+    if (hitPeak < 2e-4 && lightPeak < 2e-4) continue; // inaudible partial
     const glideT = p.bloom * (0.65 + i * 0.12);
     const lnRatio = Math.log(target / start);
     const detCents = i > 0 ? p.drift * (2 + i * 1.15) * (i % 2 ? 1 : -1) : 0;
     const panBase = i === 0 ? 0 : (i % 2 ? -1 : 1) * (0.25 + i * 0.105) * p.width;
     const panMove = i > 0 && p.drift > 0 ? p.drift * p.width * 0.065 * (i % 2 ? -1 : 1) : 0;
-    const hitPeak = spec.weights[i] * p.strike * (i === 0 ? 1 : 0.8 + p.tension * 0.6);
     const hitT = (0.22 + p.bloom * 0.25) / (1 + i * 0.12);
-    const lightPeak = spec.weights[i] * p.halo * (i === 0 ? 0.92 : 1.18);
     const lightT = Math.max(0.012, p.bloom * (0.3 + i * 0.115));
     const hitLn = hitPeak > 0 ? Math.log(EPS / hitPeak) : 0;
     const gainAt = (t) => {
@@ -193,6 +219,9 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
       if (hitPeak > 0 && t < hitT) g += t < 0.003 ? (hitPeak * t) / 0.003 : hitPeak * Math.exp((hitLn * (t - 0.003)) / (hitT - 0.003));
       return g;
     };
+    // a pure strike partial stops writing once it has decayed away
+    const end = lightPeak < 2e-4 ? Math.min(naL, Math.ceil(hitT * srL) + bLate) : naL;
+    const tSettle = Math.max(0.15, glideT, hitPeak > 0 ? Math.min(hitT, 0.6) : 0);
     let [pl, pr] = panGains(panBase);
     let x = 1;
     let y = 0;
@@ -200,40 +229,31 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
     let s = 0;
     let lastF = -1;
     let pos = 0;
-    while (pos < na) {
-      const t0 = pos / sr;
-      const B = Math.min(t0 < 0.15 ? 16 : 64, na - pos);
-      const tm = (pos + B * 0.5) / sr;
+    while (pos < end) {
+      const t0 = pos / srL;
+      const B = Math.min(t0 < 0.15 ? bEarly : t0 < tSettle ? bGlide : bLate, end - pos);
+      const tm = (pos + B * 0.5) / srL;
       let f = tm < glideT ? start * Math.exp((lnRatio * tm) / glideT) : target;
       if (detCents !== 0) f *= Math.pow(2, (detCents * Math.sin(lfoW * tm)) / 1200);
       if (f !== lastF) {
-        const w = (2 * Math.PI * f) / sr;
+        const w = (2 * Math.PI * f) / srL;
         c = Math.cos(w);
         s = Math.sin(w);
         lastF = f;
       }
       if (panMove !== 0) [pl, pr] = panGains(panBase + panMove * Math.sin(lfoW * tm));
       const g0 = gainAt(t0);
-      const g1 = gainAt((pos + B) / sr);
+      const g1 = gainAt((pos + B) / srL);
       const dg = (g1 - g0) / B;
-      if (g0 > 1e-7 || g1 > 1e-7) {
-        let g = g0;
-        for (let j = 0; j < B; j++) {
-          const nx = x * c - y * s;
-          y = y * c + x * s;
-          x = nx;
-          const v = y * g;
-          L[pos + j] += v * pl;
-          Rr[pos + j] += v * pr;
-          g += dg;
-        }
-      } else {
-        // silent block: keep the phasor turning without writing
-        for (let j = 0; j < B; j++) {
-          const nx = x * c - y * s;
-          y = y * c + x * s;
-          x = nx;
-        }
+      let g = g0;
+      for (let j = 0; j < B; j++) {
+        const nx = x * c - y * s;
+        y = y * c + x * s;
+        x = nx;
+        const v = y * g;
+        L[pos + j] += v * pl;
+        Rr[pos + j] += v * pr;
+        g += dg;
       }
       const mag = Math.sqrt(x * x + y * y) || 1;
       x /= mag;
@@ -242,22 +262,11 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
     }
   }
 
-  // ---- strike tick joins the mix ahead of the filter
-  if (p.strike > 0) {
-    const tk = tickBurst(sr, Math.min(nyqG, 800 + cutoff * 0.45));
-    const tg = p.strike * (p.material === "reed" ? 0.15 : 0.07);
-    const m = Math.min(tk.length, na);
-    for (let i = 0; i < m; i++) {
-      L[i] += tk[i] * tg;
-      Rr[i] += tk[i] * tg;
-    }
-  }
-
   // ---- bloom-swept low-pass + amplitude envelope (+ mono feed for the echo field)
   const fc0 = Math.min(nyqG, cutoff * (0.65 + p.strike * 0.35));
   const fc1 = Math.min(nyqG, cutoff);
   const lnSweep = Math.log(fc1 / fc0);
-  let [b0, b1, b2, a1, a2] = lowpass(fc0, 0.6, sr);
+  let [b0, b1, b2, a1, a2] = lowpass(fc0, 0.6, srL);
   let lx1 = 0;
   let lx2 = 0;
   let ly1 = 0;
@@ -267,20 +276,21 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
   let ry1 = 0;
   let ry2 = 0;
   const dry = 1 - 0.22 * space;
-  const mono = space > 0.004 ? new Float32Array(n) : null;
+  const mono = space > 0.004 ? new Float32Array(nL) : null;
+  const bF = Math.max(8, (32 / D) | 0);
   let swept = false;
-  for (let pos = 0; pos < na; ) {
-    const t0 = pos / sr;
-    const B = Math.min(32, na - pos);
+  for (let pos = 0; pos < naL; ) {
+    const t0 = pos / srL;
+    const B = Math.min(bF, naL - pos);
     if (!swept) {
-      const tm = (pos + B * 0.5) / sr;
+      const tm = (pos + B * 0.5) / srL;
       if (tm >= p.bloom) {
-        [b0, b1, b2, a1, a2] = lowpass(fc1, 0.6, sr);
+        [b0, b1, b2, a1, a2] = lowpass(fc1, 0.6, srL);
         swept = true;
-      } else [b0, b1, b2, a1, a2] = lowpass(fc0 * Math.exp((lnSweep * tm) / p.bloom), 0.6, sr);
+      } else [b0, b1, b2, a1, a2] = lowpass(fc0 * Math.exp((lnSweep * tm) / p.bloom), 0.6, srL);
     }
     const e0 = ampAt(t0);
-    const e1 = ampAt((pos + B) / sr);
+    const e1 = ampAt((pos + B) / srL);
     const de = (e1 - e0) / B;
     let e = e0;
     for (let j = 0; j < B; j++) {
@@ -306,23 +316,113 @@ export function renderLantern(Pin, pitch, velIn, durIn, sr, o = {}) {
     }
     pos += B;
   }
+  for (let k = naL; k < nL; k++) {
+    L[k] = 0;
+    Rr[k] = 0;
+  }
 
   // ---- space: eight alternating damped echoes (0.173 / 0.277 s), panned left/right.
   // Delay and low-pass commute, so the chain is run as an in-place low-pass cascade over the
   // mono feed and each stage is added to the mix at its cumulative delay.
-  if (mono) echoField(mono, L, Rr, n, na, sr, space, p.width, Math.min(4800, cutoff));
+  if (mono) echoField(mono, L, Rr, nL - 3, naL, srL, space, p.width, Math.min(4800, cutoff, nyqG));
 
-  // ---- safe soft-clip, head/tail fades
-  const fade = Math.min(n >> 1, Math.floor(0.03 * sr));
-  const head = Math.min(n >> 2, Math.floor(0.0015 * sr));
-  for (let k = 0; k < n; k++) {
-    let f = 1;
-    if (k > n - fade) f = (n - k) / fade;
-    if (k < head) f *= k / head;
-    L[k] = 0.98 * Math.tanh((L[k] * f) / 0.98);
-    Rr[k] = 0.98 * Math.tanh((Rr[k] * f) / 0.98);
+  // ---- strike tick (full rate): band-passed noise through the opening filter and the envelope
+  let tk = null;
+  if (p.strike > 0) {
+    tk = tickBurst(sr, Math.min(sr * 0.44, 800 + cutoff * 0.45));
+    const [t0c, t1c, t2c, t3c, t4c] = lowpass(Math.min(sr * 0.44, cutoff * (0.65 + p.strike * 0.35)), 0.6, sr);
+    const tg = p.strike * (p.material === "reed" ? 0.15 : 0.07) * dry;
+    let x1 = 0;
+    let x2 = 0;
+    let y1 = 0;
+    let y2 = 0;
+    const m = Math.min(tk.length, na);
+    for (let i = 0; i < m; i++) {
+      const v = tk[i];
+      const yv = t0c * v + t1c * x1 + t2c * x2 - t3c * y1 - t4c * y2;
+      x2 = x1;
+      x1 = v;
+      y2 = y1;
+      y1 = yv;
+      tk[i] = yv * tg * ampAt(i / sr);
+    }
   }
-  return { L, R: Rr };
+
+  // ---- cheap soft-clip (≈ 0.98·tanh(x/0.98)) at the internal rate, then upsample + de-image,
+  // add the tick, head/tail fades
+  for (let k = 0; k < nL; k++) {
+    L[k] = sc(L[k]);
+    Rr[k] = sc(Rr[k]);
+  }
+  const nLo = Math.ceil(n / D);
+  const fade = Math.min(nLo >> 1, Math.floor(0.03 * srL));
+  const head = Math.min(nLo >> 2, Math.floor(0.0015 * srL));
+  for (let k = 0; k < head; k++) {
+    L[k] *= k / head;
+    Rr[k] *= k / head;
+  }
+  for (let k = nLo - fade + 1; k < nLo; k++) {
+    L[k] *= (nLo - k) / fade;
+    Rr[k] *= (nLo - k) / fade;
+  }
+  for (let k = nLo; k < nL; k++) {
+    L[k] = 0;
+    Rr[k] = 0;
+  }
+  // low-rate result: the browser resamples the buffer natively; the tick rides in its own buffer
+  if (o.lowRate) return { L: L.subarray(0, nLo), R: Rr.subarray(0, nLo), sr: srL, tick: tk };
+  let OL = L;
+  let OR = Rr;
+  if (D > 1) {
+    OL = new Float32Array(n);
+    OR = new Float32Array(n);
+    const W = new Float32Array(D * 4);
+    for (let ph = 0; ph < D; ph++) {
+      const f = ph / D;
+      const f2 = f * f;
+      const f3 = f2 * f;
+      W[ph * 4] = -0.5 * f + f2 - 0.5 * f3;
+      W[ph * 4 + 1] = 1 - 2.5 * f2 + 1.5 * f3;
+      W[ph * 4 + 2] = 0.5 * f + 2 * f2 - 1.5 * f3;
+      W[ph * 4 + 3] = -0.5 * f2 + 0.5 * f3;
+    }
+    const [u0, u1, u2, u3, u4] = lowpass(srL * 0.3, -3, sr);
+    for (const [src, dst] of [[L, OL], [Rr, OR]]) {
+      let x1 = 0;
+      let x2 = 0;
+      let y1 = 0;
+      let y2 = 0;
+      let am = 0;
+      for (let i = 0, k = 0; k < n; i++) {
+        const a0 = am;
+        const a1v = src[i];
+        const a2v = src[i + 1];
+        const a3v = src[i + 2];
+        am = a1v;
+        for (let w = 0; w < W.length && k < n; w += 4, k++) {
+          const v = W[w] * a0 + W[w + 1] * a1v + W[w + 2] * a2v + W[w + 3] * a3v;
+          const y = u0 * v + u1 * x1 + u2 * x2 - u3 * y1 - u4 * y2;
+          x2 = x1;
+          x1 = v;
+          y2 = y1;
+          y1 = y;
+          dst[k] = y;
+        }
+      }
+    }
+  }
+  if (tk) {
+    const m = Math.min(tk.length, n);
+    for (let k = 0; k < m; k++) {
+      OL[k] += tk[k];
+      OR[k] += tk[k];
+    }
+  }
+  if (OL.length !== n) {
+    OL = OL.subarray(0, n);
+    OR = OR.subarray(0, n);
+  }
+  return { L: OL, R: OR };
 }
 
 // ------------------------------------------------------------------ LRU cache of rendered notes
@@ -337,15 +437,15 @@ function cached(P, pitch, vel, dur, sr) {
     CACHE.set(key, hit);
     return hit;
   }
-  hit = renderLantern(P, pitch, vel, dur, sr);
-  const size = hit ? hit.L.length * 2 : 0;
+  hit = renderLantern(P, pitch, vel, dur, sr, { lowRate: true });
+  const size = hit ? hit.L.length * 2 + (hit.tick ? hit.tick.length : 0) : 0;
   CACHE.set(key, hit);
   cacheFloats += size;
   for (const [k, v] of CACHE) {
     if (cacheFloats <= CACHE_MAX_FLOATS && CACHE.size <= 64) break;
     if (k === key) continue;
     CACHE.delete(k);
-    cacheFloats -= v ? v.L.length * 2 : 0;
+    cacheFloats -= v ? v.L.length * 2 + (v.tick ? v.tick.length : 0) : 0;
   }
   return hit;
 }
@@ -357,6 +457,64 @@ const MAT_ICONS = {
   prism: '<path d="m12 3 10 18H2L12 3Zm0 0v18"/>',
 };
 
+// ------------------------------------------------------------------ presets as a compact table
+// columns: cat, name, material, strike, tension, cutoff, touch, bloom, halo, drift, width, space,
+// attack, decay, sustain, release, level  (the first eight rows are the original Lightnode patches)
+const PK = ["material", "strike", "tension", "cutoff", "touch", "bloom", "halo", "drift", "width", "space", "attack", "decay", "sustain", "release", "level"];
+const PRESET_ROWS = [
+  ["Bloom", "Amber Glass", 0, 0.58, 0.36, 6400, 0.35, 1.15, 0.64, 0.24, 0.78, 0.32, 0.008, 0.8, 0.68, 1.9, 0.85],
+  ["Bloom", "Honey Bloom", 0, 0.5, 0.2, 3200, 0.4, 0.8, 0.7, 0.15, 0.6, 0.25, 0.01, 1, 0.7, 1.6, 0.88],
+  ["Bloom", "Copper Wake", 1, 0.7, 0.5, 5200, 0.3, 1.6, 0.55, 0.2, 0.7, 0.3, 0.005, 1.2, 0.5, 2, 1.5],
+  ["Bloom", "Slow Dawn", 0, 0.35, 0.9, 7000, 0.3, 3.6, 0.8, 0.3, 0.85, 0.4, 0.05, 2, 0.8, 2.8, 0.92],
+  ["Bloom", "Struck Lantern", 2, 0.8, 0.45, 9000, 0.5, 0.35, 0.5, 0.1, 0.7, 0.2, 0.003, 0.6, 0.45, 1.2, 1.5],
+  ["Bloom", "Brass Ember", 1, 0.45, 0.25, 2600, 0.6, 0.6, 0.6, 0.1, 0.5, 0.15, 0.03, 0.9, 0.75, 0.9, 1.05],
+  ["Pads", "Paper Sun", 1, 0.18, 0.21, 3700, 0.35, 1.75, 0.9, 0.37, 0.74, 0.36, 0.38, 1.4, 0.82, 3.1, 0.85],
+  ["Pads", "Unstruck Light", 0, 0, 0.68, 8500, 0.35, 3.2, 1, 0.65, 1, 0.58, 0.2, 2.1, 0.95, 4.6, 0.85],
+  ["Pads", "Breath Veil", 1, 0, 0.1, 2400, 0.2, 2.2, 1, 0.45, 0.9, 0.45, 0.9, 2, 0.9, 3.5, 0.63],
+  ["Pads", "Chorus Lanterns", 0, 0.1, 0, 5200, 0.2, 1.2, 0.9, 1, 1, 0.4, 0.3, 1.5, 0.85, 2.6, 0.59],
+  ["Pads", "Silk Air", 2, 0, 0.05, 12000, 0.1, 1.8, 0.85, 0.7, 1, 0.55, 0.6, 2.4, 0.8, 3.6, 0.61],
+  ["Pads", "Night Fog", 0, 0, 0.2, 900, 0.2, 2.6, 1, 0.5, 0.8, 0.5, 1.2, 2.5, 0.9, 4, 0.62],
+  ["Pads", "Aurora Wash", 2, 0.15, 0.6, 8000, 0.3, 3, 0.95, 0.85, 1, 0.7, 0.5, 2.6, 0.85, 4.5, 0.59],
+  ["Swells", "Bowed Glass", 0, 0, 0.3, 4200, 0.5, 1.2, 0.9, 0.3, 0.6, 0.3, 1.1, 1.5, 0.85, 1.4, 0.71],
+  ["Swells", "Cello Lantern", 1, 0, 0.15, 2000, 0.5, 0.8, 1, 0.25, 0.4, 0.25, 0.7, 1.2, 0.9, 1.1, 0.58],
+  ["Swells", "Viola Haze", 1, 0.05, 0.4, 3400, 0.4, 1.6, 0.95, 0.55, 0.8, 0.4, 1.4, 2, 0.8, 2, 0.82],
+  ["Swells", "Reverse Swell", 2, 0, 0.7, 6000, 0.3, 2.5, 1, 0.2, 0.9, 0.35, 2.4, 3, 1, 0.8, 1.28],
+  ["Swells", "Tide Bow", 0, 0, 0.1, 1500, 0.6, 2, 1, 0.65, 0.9, 0.3, 1.8, 2, 0.95, 2.4, 0.88],
+  ["Swells", "Ember Strings", 1, 0.1, 0.05, 2800, 0.4, 0.5, 0.9, 0.4, 0.75, 0.2, 0.45, 1, 0.85, 1.2, 0.65],
+  ["Organ", "Chapel Drawbar", 0, 0, 0, 5000, 0.2, 0.04, 1, 0.05, 0.5, 0.3, 0.01, 0.3, 1, 0.4, 0.45],
+  ["Organ", "Reed Organ", 1, 0.05, 0, 3000, 0.3, 0.06, 1, 0.1, 0.4, 0.2, 0.02, 0.5, 1, 0.3, 0.49],
+  ["Organ", "Prism Pipes", 2, 0, 0, 9000, 0.2, 0.08, 1, 0.08, 0.7, 0.45, 0.04, 0.5, 1, 0.6, 0.41],
+  ["Organ", "Cathedral Bloom", 0, 0, 0.15, 7000, 0.2, 1.4, 1, 0.12, 0.9, 0.85, 0.15, 2, 0.95, 3.2, 0.47],
+  ["Organ", "Hum Organ", 1, 0, 0, 900, 0.2, 0.04, 1, 0.2, 0.3, 0.1, 0.015, 0.4, 1, 0.25, 0.48],
+  ["Plucks", "Midnight Bells", 0, 0.94, 0.72, 4100, 0.35, 1.4, 0.24, 0.08, 0.92, 0.68, 0.004, 1.8, 0.22, 2.8, 1.2],
+  ["Plucks", "Orbit Seeds", 2, 0.88, 0.9, 12000, 0.35, 0.17, 0.48, 0.18, 0.96, 0.38, 0.002, 0.26, 0.18, 0.62, 1.3],
+  ["Plucks", "Glass Mallet", 0, 1, 0.2, 7000, 0.6, 0.1, 0.3, 0, 0.5, 0.2, 0.002, 0.5, 0, 0.6, 1.5],
+  ["Plucks", "Marimba Light", 1, 0.9, 0.05, 3000, 0.7, 0.06, 0.35, 0, 0.3, 0.1, 0.002, 0.35, 0, 0.35, 1.5],
+  ["Plucks", "Harp Bloom", 0, 0.85, 0.5, 5000, 0.5, 0.3, 0.35, 0.1, 0.7, 0.3, 0.002, 0.9, 0.05, 1.2, 1.5],
+  ["Plucks", "Kalimba Ember", 2, 0.9, 0, 2200, 0.6, 0.05, 0.4, 0.05, 0.4, 0.15, 0.002, 0.4, 0, 0.5, 1.5],
+  ["Plucks", "Celesta Dust", 2, 1, 0.3, 14000, 0.5, 0.12, 0.2, 0.1, 0.9, 0.5, 0.002, 0.7, 0.02, 1.4, 1.5],
+  ["Plucks", "Muted Pluck", 1, 0.8, 0.3, 900, 0.8, 0.04, 0.35, 0, 0.2, 0.05, 0.002, 0.18, 0, 0.2, 1.5],
+  ["Plucks", "Bent Pluck", 0, 0.95, 1, 4000, 0.5, 0.25, 0.3, 0.05, 0.6, 0.2, 0.002, 0.45, 0, 0.5, 1.44],
+  ["Bass", "Low Embers", 1, 0.86, 0.15, 1350, 0.35, 0.12, 0.58, 0.06, 0.15, 0.06, 0.004, 0.3, 0.48, 0.48, 0.85],
+  ["Bass", "Sub Bloom", 0, 0.2, 0.1, 500, 0.3, 0.3, 0.8, 0.05, 0.1, 0, 0.005, 0.6, 0.85, 0.4, 0.66],
+  ["Bass", "Reed Bass", 1, 0.7, 0.2, 1100, 0.6, 0.1, 0.5, 0.03, 0.15, 0, 0.003, 0.35, 0.6, 0.25, 1.47],
+  ["Bass", "Round Pluck Bass", 0, 0.9, 0.1, 800, 0.7, 0.08, 0.3, 0, 0, 0, 0.002, 0.4, 0.35, 0.3, 1.5],
+  ["Bass", "Prism Bass", 2, 0.6, 0.5, 1600, 0.5, 0.2, 0.6, 0.1, 0.2, 0.05, 0.004, 0.5, 0.7, 0.3, 0.93],
+  ["Bass", "Drone Bass", 1, 0, 0.3, 700, 0.2, 1.5, 1, 0.35, 0.4, 0.15, 0.4, 1.5, 1, 1.5, 0.57],
+  ["Lo-Fi", "Felt Lamp", 0, 0.4, 0.2, 600, 0.3, 0.7, 0.7, 0.3, 0.5, 0.2, 0.02, 1.2, 0.6, 1.5, 0.92],
+  ["Lo-Fi", "Tape Moon", 1, 0.3, 0.35, 1200, 0, 1, 0.8, 0.75, 0.7, 0.3, 0.05, 1.5, 0.7, 1.8, 0.78],
+  ["Lo-Fi", "Radio Glow", 2, 0.5, 0.4, 1800, 0.2, 0.4, 0.6, 0.6, 0.3, 0.1, 0.01, 0.8, 0.55, 1, 1.09],
+  ["Lo-Fi", "Paper Lantern", 1, 0.2, 0.1, 450, 0.2, 0.9, 0.9, 0.2, 0.6, 0.45, 0.3, 1.8, 0.8, 2.4, 0.67],
+  ["Lo-Fi", "Dusty Keys", 0, 0.7, 0.15, 1500, 0.5, 0.3, 0.4, 0.4, 0.5, 0.2, 0.003, 0.9, 0.3, 0.8, 1.5],
+  ["FX", "Rain in Reverse", 2, 0.08, 0.83, 10500, 0.35, 2.75, 0.94, 0.43, 1, 0.64, 0.08, 2.2, 0.9, 3.8, 0.85],
+  ["FX", "Prism Weather", 2, 0.72, 1, 11500, 0.35, 1.9, 0.78, 0.9, 1, 0.7, 0.006, 0.9, 0.64, 3.2, 0.85],
+  ["FX", "Swarm Glass", 2, 0.3, 1, 9000, 0.3, 4, 0.9, 1, 1, 0.8, 0.1, 3, 0.9, 5, 0.68],
+  ["FX", "Comet Tail", 0, 1, 0.95, 12000, 0.3, 0.05, 0.45, 0.2, 1, 1, 0.002, 0.7, 0.3, 1.6, 1.5],
+  ["FX", "Echo Fireflies", 2, 0.9, 0.6, 16000, 0.4, 0.1, 0.35, 0.3, 1, 0.9, 0.002, 0.4, 0.25, 0.9, 1.5],
+  ["FX", "Ghost Choir", 1, 0, 0.8, 3000, 0.2, 3.8, 1, 0.9, 1, 0.75, 1.5, 3, 0.9, 6, 0.77],
+];
+const PRESETS = PRESET_ROWS.map(([cat, name, ...v]) => ({ name, cat, params: Object.fromEntries(PK.map((k, i) => [k, k === "material" ? MATERIALS[v[i]] : v[i]])) }));
+
 const lantern = {
   name: "Lightnode",
   tagline: "A struck spectrum that opens into a living harmonic halo",
@@ -367,20 +525,24 @@ const lantern = {
     const { pitch, vel, time, dur } = note;
     const r = cached(settings({ ...DEFAULTS, ...P }), num(pitch, 60), clamp(num(vel, 0.8), 0, 1.5), clamp(num(dur, 0.5), 0.01, 60), ctx.sampleRate);
     if (!r) return;
-    const buf = ctx.createBuffer(2, r.L.length, ctx.sampleRate);
-    buf.getChannelData(0).set(r.L);
-    buf.getChannelData(1).set(r.R);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(dest);
-    src.onended = () => {
-      try {
-        src.disconnect();
-      } catch {
-        /* already gone */
-      }
+    // the bloom buffer is stored at the internal rate (the browser resamples it), the strike tick at full rate
+    const play = (chans, rate) => {
+      const buf = ctx.createBuffer(chans.length, chans[0].length, rate);
+      chans.forEach((c, i) => buf.getChannelData(i).set(c));
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(dest);
+      src.onended = () => {
+        try {
+          src.disconnect();
+        } catch {
+          /* already gone */
+        }
+      };
+      src.start(time);
     };
-    src.start(time);
+    play([r.L, r.R], r.sr || ctx.sampleRate);
+    if (r.tick) play([r.tick], ctx.sampleRate);
   },
   // bloom silhouette of an A3 (no echo field): the strike flash, the retuning and the halo swell
   scope: (P) => {
@@ -395,17 +557,10 @@ const lantern = {
     { name: "Suspended Light · chords", dsl: "0:D3:14:88 0:F3:14:78 0:A3:14:73 16:Bb2:14:87 16:F3:14:76 16:A3:14:72 32:G3:14:85 32:A3:14:75 32:D4:14:70 48:A2:14:89 48:E3:14:77 48:G3:14:73" },
     { name: "Firefly Code · pulses", dsl: "0:D4:1:102 3:A4:1:74 6:F4:2:88 10:E4:1:70 12:C4:2:92 16:D4:1:99 19:F4:1:78 22:A4:2:89 26:C5:1:69 28:A4:2:93 32:G4:1:101 35:D5:1:75 38:Bb4:2:85 42:A4:1:72 44:F4:2:91 48:A4:1:98 51:E4:1:75 54:C4:2:88 58:E4:1:70 60:A3:2:89" },
     { name: "Low Embers · bass", dsl: "0:D2:6:107 8:D3:3:81 12:A2:2:91 16:Bb1:6:104 24:F2:3:83 28:Bb2:2:87 32:G2:6:105 40:D3:3:81 44:F2:2:88 48:A1:6:108 56:E2:3:85 60:A2:2:93" },
+    { name: "Chapel Steps · organ", dsl: "0:C3:7:86 0:E3:7:76 0:G3:7:74 8:C3:7:84 8:F3:7:75 8:A3:7:72 16:B2:7:85 16:D3:7:75 16:G3:7:73 24:C3:7:86 24:E3:7:76 24:G3:7:74 32:A2:7:85 32:C3:7:76 32:E3:7:74 40:F2:7:84 40:A2:7:75 40:C3:7:73 48:G2:7:86 48:B2:7:76 48:D3:7:74 56:C3:7:88 56:E3:7:78 56:G3:7:75" },
+    { name: "Glass Rain · mallets", dsl: "0:E5:1:98 2:B4:1:74 4:G5:1:86 6:D5:1:70 8:E5:1:94 10:A4:1:72 12:C5:1:88 14:G4:1:70 16:D5:1:96 18:A4:1:73 20:F5:1:85 22:C5:1:69 24:D5:1:92 26:G4:1:72 28:B4:1:86 30:E4:1:70 32:C5:1:97 34:G4:1:74 36:E5:1:87 38:B4:1:71 40:A4:1:93 42:E4:1:72 44:C5:1:85 46:A4:1:70 48:B4:1:96 50:F#4:1:74 52:D5:1:87 54:A4:1:71 56:G#4:2:94 60:B4:2:80" },
   ],
-  presets: [
-    { name: "Amber Glass", params: {} },
-    { name: "Paper Sun", params: { material: "reed", strike: 0.18, tension: 0.21, cutoff: 3700, bloom: 1.75, halo: 0.9, drift: 0.37, width: 0.74, space: 0.36, attack: 0.38, decay: 1.4, sustain: 0.82, release: 3.1 } },
-    { name: "Rain in Reverse", params: { material: "prism", strike: 0.08, tension: 0.83, bloom: 2.75, halo: 0.94, cutoff: 10500, drift: 0.43, width: 1, space: 0.64, attack: 0.08, decay: 2.2, sustain: 0.9, release: 3.8 } },
-    { name: "Midnight Bells", params: { level: 1.2, strike: 0.94, tension: 0.72, cutoff: 4100, bloom: 1.4, halo: 0.24, drift: 0.08, width: 0.92, space: 0.68, attack: 0.004, decay: 1.8, sustain: 0.22, release: 2.8 } },
-    { name: "Orbit Seeds", params: { level: 1.3, material: "prism", strike: 0.88, tension: 0.9, bloom: 0.17, halo: 0.48, cutoff: 12000, drift: 0.18, width: 0.96, space: 0.38, attack: 0.002, decay: 0.26, sustain: 0.18, release: 0.62 } },
-    { name: "Unstruck Light", params: { strike: 0, tension: 0.68, bloom: 3.2, halo: 1, cutoff: 8500, drift: 0.65, width: 1, space: 0.58, attack: 0.2, decay: 2.1, sustain: 0.95, release: 4.6 } },
-    { name: "Low Embers", params: { material: "reed", strike: 0.86, tension: 0.15, bloom: 0.12, halo: 0.58, cutoff: 1350, drift: 0.06, width: 0.15, space: 0.06, attack: 0.004, decay: 0.3, sustain: 0.48, release: 0.48 } },
-    { name: "Prism Weather", params: { material: "prism", strike: 0.72, tension: 1, bloom: 1.9, halo: 0.78, cutoff: 11500, drift: 0.9, width: 1, space: 0.7, attack: 0.006, decay: 0.9, sustain: 0.64, release: 3.2 } },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#eeb978", lcd: "#ffdda7", lcdBg: "#131411", edge: "#494335", bg: "#242521" },
     logo: ["", "Lightnode"],

@@ -131,7 +131,9 @@ function windsVoice(ctx, dest, note, P) {
 
   // ---------- amp envelope: attack (overshoots by ACCENT, settles), hold, release
   const amp = track(ctx.createGain());
-  const top = Math.max(FLOOR, v * GAIN * P.level);
+  // per-model trim keeps the four models (and clarinet <-> oboe) at a similar loudness
+  const trim = { brass: 1.3, flute: 0.85, reed: 1 + 0.4 * clamp(P.nasal, 0, 1), bowed: 1.35 }[model];
+  const top = Math.max(FLOOR, v * GAIN * trim * P.level);
   const over = 1 + 0.55 * P.accent;
   const settle = Math.min(gate, A + 0.14);
   amp.gain.setValueAtTime(0, time);
@@ -148,7 +150,7 @@ function windsVoice(ctx, dest, note, P) {
 
   // ---------- tone sources
   const mix = track(ctx.createGain());
-  const pitchParams = []; // detune AudioParams the scoop and vibrato drive
+  const pitchParams = []; // [detune AudioParam, base cents] the scoop and vibrato drive
   const mkOsc = (typeOrWave, cents, level) => {
     const o = ctx.createOscillator();
     if (typeof typeOrWave === "string") o.type = typeOrWave;
@@ -160,7 +162,7 @@ function windsVoice(ctx, dest, note, P) {
     g.connect(mix);
     sources.push(o);
     track(o);
-    pitchParams.push(o.detune);
+    pitchParams.push([o.detune, cents]);
     return o;
   };
 
@@ -186,11 +188,12 @@ function windsVoice(ctx, dest, note, P) {
   // scoop: start flat, glide up into the pitch
   if (P.scoop > 0.02) {
     const sc = -P.scoop * 100;
-    for (const d of pitchParams) {
-      const base = d.value;
+    // (base cents come from the table: AudioParam.value is still 0 before `time`, which used to
+    // collapse the section detune whenever a scoop was set)
+    for (const [d, base] of pitchParams) {
       d.cancelScheduledValues(time);
       d.setValueAtTime(base + sc, time);
-      d.linearRampToValueAtTime(base, time + 0.07 + 0.02 * P.scoop);
+      d.setTargetAtTime(base, time + 0.005, 0.025 + 0.012 * P.scoop);
     }
   }
 
@@ -205,7 +208,7 @@ function windsVoice(ctx, dest, note, P) {
     vg.gain.setValueAtTime(0, time + P.vibDelay);
     vg.gain.linearRampToValueAtTime(vib, time + P.vibDelay + 0.4);
     lfo.connect(vg);
-    for (const d of pitchParams) vg.connect(d);
+    for (const [d] of pitchParams) vg.connect(d);
     sources.push(lfo);
     track(lfo);
   }
@@ -307,6 +310,76 @@ function windsScope(P) {
   return out;
 }
 
+// ---- preset library as data: "name|cat|model|bright swell accent attack release breath nasal body detune scoop vib vibRate vibDelay level"
+// model: B brass, F flute, R reed, S bowed strings; "-" leaves a param at its default (and out of the preset).
+const PK = ["brightness", "swell", "accent", "attack", "release", "breath", "nasal", "body", "detune", "scoop", "vibrato", "vibRate", "vibDelay", "level"];
+const PM = { B: "brass", F: "flute", R: "reed", S: "bowed" };
+const PRESET_TABLE = `Init (Brass Section)|Brass|-|
+Solo Trumpet|Brass|B|.68 .85 .6 .035 .12 .15 - .75 0 .45 7 5.6 .35
+Mellow Horn|Brass|B|.22 .45 .1 .14 .3 .2 - .5 4 .15 4 5 .5
+Flugelhorn|Brass|B|.3 .55 .2 .06 .22 .3 - .45 0 .25 9 5.2 .4 1
+French Horns|Brass|B|.18 .5 .15 .12 .45 .12 - .7 9 .2 5 4.8 .6 1.15
+Trombone Slide|Brass|B|.45 .7 .35 .05 .2 .18 - .7 3 1.6 6 5 .5
+Tuba|Brass|B|.12 .35 .3 .05 .18 .1 - .85 2 .2 3 4.5 .7 1.1
+Muted Trumpet|Brass|B|.3 .2 .25 .025 .1 .35 - 1 0 .3 6 5.8 .3 .9
+Big Band Brass|Brass|B|.72 .8 .55 .025 .15 .12 - .7 14 .55 8 5.6 .3 .9
+Fanfare|Brass|B|.85 .9 .8 .015 .25 .1 - .8 10 .1 0 5 1.5 .85
+Cinematic Horns|Brass|B|.28 .65 .15 .45 1.1 .15 - .75 12 .1 4 4.6 .8
+Brass Swell Pad|Brass|B|.35 1 .05 .9 1.4 .1 - .55 18 0 5 4.8 1
+Brass Stab|Stabs|B|.75 .85 .8 .01 .08 .12 - .7 12 .3 0 5 1.5 .85
+Funk Hits|Stabs|B|.82 .95 .9 .005 .06 .1 - .65 16 .6 0 5 1.5 .8
+Sforzando|Stabs|B|.62 1 1 .02 .3 .2 - .9 10 .05 0 5 1.5 .85
+80s Synth Brass|Stabs|B|.6 1 .45 .02 .25 0 - .2 24 0 0 5 1.5 .85
+String Stab|Stabs|S|.65 .7 .85 .008 .12 .55 - .75 14 0 0 5 1.5 1
+Orchestra Hit|Stabs|S|.8 .9 1 .005 .45 .6 - .9 28 .4 0 5 1.5 .8
+Sax Section Stab|Stabs|R|.7 .8 .8 .01 .1 .3 .7 .7 14 .35 0 5 1.5 .9
+Concert Flute|Flutes|F|.5 .15 .15 .07 .12 .45 - .3 2 .05 16 5.4 .3
+Alto Flute|Flutes|F|.3 .1 .1 .09 .2 .4 - .5 1 .05 12 5 .4 1.05
+Piccolo|Flutes|F|.75 .2 .3 .04 .08 .3 - .2 0 .05 14 6 .25 .9
+Pan Pipes|Flutes|F|.35 .25 .5 .02 .35 .85 - .45 0 .15 0 5 1.5
+Breathy Flute|Flutes|F|.4 .1 .05 .18 .4 1 - .3 3 .1 10 4.8 .5
+Shakuhachi|Flutes|F|.3 .3 .45 .05 .35 .9 - .6 0 1 30 4.2 .6
+Recorder|Flutes|F|.55 0 .2 .03 .06 .2 - .25 0 0 0 5 1.5 .95
+Flute Choir|Flutes|F|.45 .2 .1 .15 .5 .5 - .4 14 .05 12 5.2 .4 .9
+Ocarina|Flutes|F|.05 0 .1 .04 .1 .15 - .7 0 .1 6 5.6 .3 1.05
+Clarinet|Reeds|R|.4 .3 .2 .04 .12 .2 0 .5 2 .1 5 5 .5
+Oboe|Reeds|R|.55 .35 .25 .05 .12 .15 .85 .8 2 .1 14 5.8 .25
+Bass Clarinet|Reeds|R|.25 .25 .2 .05 .18 .25 .05 .7 1 .1 3 4.8 .6 1.1
+English Horn|Reeds|R|.4 .3 .15 .07 .2 .15 .65 .9 1 .1 12 5.2 .35
+Bassoon|Reeds|R|.3 .3 .3 .04 .14 .15 .55 1 1 .05 8 5 .4 1.1
+Alto Sax|Reeds|R|.62 .6 .45 .03 .15 .35 .6 .75 3 .5 18 5.6 .3
+Tenor Sax Growl|Reeds|R|.78 .75 .65 .02 .15 .6 .75 .9 8 .8 24 5.4 .25 .9
+Soprano Sax|Reeds|R|.7 .5 .35 .04 .14 .3 .45 .6 2 .3 20 6 .2
+Reed Section|Reeds|R|.5 .5 .3 .06 .2 .25 .5 .7 15 .3 8 5.4 .35 .95
+Musette|Reeds|R|.6 .2 .2 .02 .15 .05 .9 .5 30 0 0 5 1.5 .9
+Solo Violin|Strings|S|.6 .5 .3 .09 .2 .35 - .7 4 .25 22 5.8 .3
+Viola|Strings|S|.42 .45 .25 .11 .25 .3 - .8 3 .2 18 5.4 .35
+Cello|Strings|S|.32 .4 .2 .16 .3 .3 - .85 3 .12 14 5 .5
+Double Bass|Strings|S|.2 .35 .35 .08 .25 .4 - 1 2 .1 8 4.6 .5 .95
+String Ensemble|Strings|S|.45 .5 .1 .35 .7 .25 - .7 18 .05 10 5.2 .45 .9
+Slow Strings|Strings|S|.38 .6 .05 1.2 1.6 .15 - .65 20 0 8 5 .7 .9
+Nervous Strings|Strings|S|.55 .4 .2 .05 .3 .45 - .7 12 0 45 7.5 0 .95
+Fiddle|Strings|S|.72 .6 .55 .03 .12 .5 - .6 2 .5 16 6.2 .2
+Erhu|Strings|S|.5 .5 .3 .08 .25 .3 - 1 0 1.2 34 5.6 .2 .68
+Contrabass Swell|Strings|S|.15 .8 .05 .8 1 .5 - 1 8 0 4 4.4 .8 1.1
+Glass Breath|Hybrid|F|.95 .6 .3 .3 1.2 .7 - .1 22 0 20 3 .5 .85
+Wind Choir Pad|Hybrid|F|.6 .5 .05 1 1.8 .35 - .5 26 0 10 4.6 .8 .9
+Ghost Whistle|Hybrid|F|.0 .8 0 .4 1.5 .2 - 0 0 2 55 3.5 .9 1.1
+Dream Reed|Hybrid|R|.35 .9 .05 .7 2 .2 .35 .4 24 0 12 4 1 .95
+Bowed Brass|Hybrid|B|.4 .9 .1 .6 1.2 .6 - .9 8 0 12 5 .6
+Hollow Bow|Hybrid|S|.25 1 .5 .25 .9 .9 - .2 30 .6 25 3.2 .4 1.1`;
+function windsPresets() {
+  return PRESET_TABLE.split("\n").map((row) => {
+    const [name, cat, m, vals = ""] = row.split("|");
+    const params = {};
+    if (PM[m]) params.model = PM[m];
+    vals.split(" ").forEach((v, i) => {
+      if (v && v !== "-") params[PK[i]] = +v;
+    });
+    return { name, cat, params };
+  });
+}
+
 const svg = {
   brass: '<path d="M3 12 H9 M9 12 C9 6 15 6 15 12 C15 18 9 18 9 12 M15 12 H21 L24 9 M21 12 L24 15"/>',
   flute: '<path d="M2 11 H22 V13 H2 Z M6 11 V13 M10 11 V13 M14 11 V13"/>',
@@ -325,18 +398,11 @@ const winds = {
     { name: "Brass Stabs (Am)", dsl: "0:A3:3 0:C4:3 0:E4:3 0:A4:3 6:A3:2 6:C4:2 6:E4:2 6:A4:2 10:G3:3 10:B3:3 10:D4:3 10:G4:3 16:F3:3 16:A3:3 16:C4:3 16:F4:3 22:F3:2 22:A3:2 22:C4:2 22:F4:2 26:E3:4:110 26:G#3:4:110 26:B3:4:110 26:E4:4:110 32:A3:3 32:C4:3 32:E4:3 32:A4:3 38:C4:2 38:E4:2 38:G4:2 38:C5:2 42:B3:6:120 42:D4:6:120 42:F#4:6:120 42:B4:6:120" },
     { name: "Flute Melody (G)", dsl: "0:G4:4 4:B4:2 6:D5:6 12:C5:2 14:B4:2 16:A4:4 20:F#4:2 22:G4:10 32:B4:4 36:D5:2 38:G5:6 44:F#5:2 46:E5:2 48:D5:4 52:B4:2 54:G4:10" },
     { name: "Reed Duet (C)", dsl: "0:E4:8 0:C4:8 8:F4:4 8:D4:4 12:G4:4 12:E4:4 16:A4:8 16:F4:8 24:G4:6 24:E4:6 30:E4:2 32:C5:8 32:G4:8 40:B4:4 40:F4:4 44:A4:4 44:E4:4 48:G4:12 48:D4:12" },
+    { name: "Sax Riff (F blues)", dsl: "0:F3:2 2:Ab3:2 4:A3:1 5:C4:3 8:Eb4:4 12:C4:2 14:F3:2 16:Bb3:6 22:Ab3:2 24:F3:8 32:C4:2 34:Eb4:2 36:F4:4 40:Eb4:2 42:C4:2 44:Bb3:2 46:Ab3:2 48:F3:12:110" },
+    { name: "String Pad (C-Am-F-G)", dsl: "0:C3:16 0:G3:16 0:E4:16 16:A2:16 16:E3:16 16:C4:16 32:F2:16 32:C3:16 32:A3:16 48:G2:16 48:D3:16 48:B3:16" },
     { name: "Cello Line (Dm)", dsl: "0:D2:8 8:A2:4 12:F2:4 16:G2:8 24:D2:4 28:E2:4 32:F2:8 40:C3:4 44:A2:4 48:D2:14 62:D2:2:80" },
   ],
-  presets: [
-    { name: "Init (Brass Section)", params: {} },
-    { name: "Solo Trumpet", params: { model: "brass", brightness: 0.68, swell: 0.85, accent: 0.6, attack: 0.035, release: 0.12, breath: 0.15, body: 0.75, detune: 0, scoop: 0.45, vibrato: 7, vibRate: 5.6, vibDelay: 0.35 } },
-    { name: "Mellow Horn", params: { model: "brass", brightness: 0.22, swell: 0.45, accent: 0.1, attack: 0.14, release: 0.3, breath: 0.2, body: 0.5, detune: 4, scoop: 0.15, vibrato: 4, vibRate: 5, vibDelay: 0.5 } },
-    { name: "Concert Flute", params: { model: "flute", brightness: 0.5, swell: 0.15, accent: 0.15, attack: 0.07, release: 0.12, breath: 0.45, body: 0.3, detune: 2, scoop: 0.05, vibrato: 16, vibRate: 5.4, vibDelay: 0.3 } },
-    { name: "Clarinet", params: { model: "reed", nasal: 0, brightness: 0.4, swell: 0.3, accent: 0.2, attack: 0.04, release: 0.12, breath: 0.2, body: 0.5, detune: 2, scoop: 0.1, vibrato: 5, vibRate: 5, vibDelay: 0.5 } },
-    { name: "Oboe", params: { model: "reed", nasal: 0.85, brightness: 0.55, swell: 0.35, accent: 0.25, attack: 0.05, release: 0.12, breath: 0.15, body: 0.8, detune: 2, scoop: 0.1, vibrato: 14, vibRate: 5.8, vibDelay: 0.25 } },
-    { name: "Solo Violin", params: { model: "bowed", brightness: 0.6, swell: 0.5, accent: 0.3, attack: 0.09, release: 0.2, breath: 0.35, body: 0.7, detune: 4, scoop: 0.25, vibrato: 22, vibRate: 5.8, vibDelay: 0.3 } },
-    { name: "Cello", params: { model: "bowed", brightness: 0.32, swell: 0.4, accent: 0.2, attack: 0.16, release: 0.3, breath: 0.3, body: 0.85, detune: 3, scoop: 0.12, vibrato: 14, vibRate: 5, vibDelay: 0.5 } },
-  ],
+  presets: windsPresets(),
   ui: {
     theme: { accent: "#d97f5a", lcd: "#ffd2bd", lcdBg: "#2a1610", edge: "#4c2a1d", bg: "#1f130e" },
     logo: ["", "Muneeb"],

@@ -21,13 +21,13 @@ import { Kit } from "./runtime.js";
   function presetUI(root, P) {
     const n = P.presets.length; let idx = -1;
     const list = root.querySelector('[data-pl]');
-    if (list) list.innerHTML = P.presets.map((p, j) => `<button data-pj="${j}"><span>${pad2(j + 1)}</span>${p.name}</button>`).join('');
+    if (list) list.innerHTML = P.presets.map((p, j) => (p.cat && p.cat !== (P.presets[j - 1] || {}).cat ? `<b>${p.cat.toUpperCase()}</b>` : '') + `<button data-pj="${j}"><span>${pad2(j + 1)}</span>${p.name}</button>`).join('');
     const menu = root.querySelector('[data-pmenu]');
     P.onPreset((i, name) => {
       idx = i;
       root.querySelectorAll('[data-pn]').forEach(e => e.textContent = i < 0 ? '\u2014 init \u2014' : name);
       root.querySelectorAll('[data-pi]').forEach(e => e.textContent = i < 0 ? '--' : pad2(i + 1));
-      root.querySelectorAll('[data-pj]').forEach(b => b.classList.toggle('on', +b.dataset.pj === i));
+      root.querySelectorAll('[data-pj]').forEach(b => { const on = +b.dataset.pj === i; b.classList.toggle('on', on); if (on && list) list.scrollTop = b.offsetTop - list.offsetTop - 40; });
     });
     root.querySelectorAll('[data-pp]').forEach(b => b.addEventListener('click', () => P.loadPreset(idx <= 0 ? n - 1 : idx - 1)));
     root.querySelectorAll('[data-pnx]').forEach(b => b.addEventListener('click', () => P.loadPreset((idx + 1) % n)));
@@ -150,8 +150,9 @@ import { Kit } from "./runtime.js";
 .pr button{width:20px;height:20px;background:#3a291b;font-size:13px;line-height:1}.pr button:hover{background:#d58a4a;color:#1b1209}
 .pr .pi{font-size:9px;color:#d58a4a;font-weight:700}
 .core{display:block;margin-top:6px;border:1px solid #5a4430;background:#0e0a07}
-.log{margin-top:6px;border-top:1px solid #5a4430}
-.log button{display:flex;gap:8px;width:100%;text-align:left;padding:2.5px 4px;font-size:10px;font-weight:500;color:#c9ac8a;border-bottom:1px solid #2a1f16}
+.log{margin-top:6px;border-top:1px solid #5a4430;max-height:150px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#5a4430 #0e0a07}
+.log b{display:block;padding:4px 4px 2px;font-size:8px;letter-spacing:.18em;color:#e9b27c;font-weight:700;background:#15100c;position:sticky;top:0}
+.log button{display:flex;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;gap:8px;width:100%;text-align:left;padding:2.5px 4px;font-size:10px;font-weight:500;color:#c9ac8a;border-bottom:1px solid #2a1f16}
 .log button span{color:#8a6f52;font-size:9px;width:20px}
 .log button.on{background:#d58a4a;color:#1b1209;font-weight:700}.log button.on span{color:#1b1209}
 .log button:hover:not(.on){background:#241a12}

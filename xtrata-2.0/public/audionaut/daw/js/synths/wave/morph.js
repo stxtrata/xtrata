@@ -46,7 +46,7 @@ const TABLES = {
   pdLow: { td: pd(2.6) },
   pdMid: { td: pd(6.4) },
   pdHigh: { td: pd(13.5) },
-  ah: { harm: (n) => (n === 1 ? 1 : 0.15) * 0 + (n === 1 ? 0.8 : 0) + 1.1 * gauss(n, 5, 1.6) + 0.8 * gauss(n, 9, 2) + 0.3 / n },
+  ah: { harm: (n) => (n === 1 ? 0.8 : 0) + 1.1 * gauss(n, 5, 1.6) + 0.8 * gauss(n, 9, 2) + 0.3 / n },
   oo: { harm: (n) => (n === 1 ? 1 : 0) + 1.0 * gauss(n, 2, 0.9) + 0.35 * gauss(n, 4, 1.2) },
   organ: { harm: (n) => ({ 1: 1, 2: 0.8, 3: 0.65, 4: 0.5, 6: 0.4, 8: 0.3 }[n] || 0) },
   comb: { harm: (n) => (n === 1 ? 1 : n % 3 === 0 ? 0.9 / Math.sqrt(n) : 0.12 / n) },
@@ -148,8 +148,88 @@ const paramDefs = [
   { key: "decay", label: "Decay", type: "range", min: 0.02, max: 3, step: 0.01, def: 0.6 },
   { key: "sustain", label: "Sustain", type: "range", min: 0, max: 1, step: 0.01, def: 0.55 },
   { key: "release", label: "Release", type: "range", min: 0.02, max: 3, step: 0.01, def: 0.35 },
-  { key: "level", label: "Output Level", type: "range", min: 0, max: 1.5, step: 0.01, def: 1 },
+  { key: "level", label: "Output Level", type: "range", min: 0, max: 3, step: 0.01, def: 1 },
 ];
+
+// ---- preset library, stored as data: [name, cat, "v v v ..."] with values in PK order, "_" = default
+const PK = ["tableA", "tableB", "morph", "morphEnd", "morphTime", "wobble", "wobbleRate", "fold", "foldEnv", "fmRatio", "fmIndex", "modDecay", "unison", "cutoff", "reso", "lpg", "attack", "decay", "sustain", "release", "level"];
+const PRESET_TABLE = [
+  //                                  tA     tB      m   mE  mT  wob wR  fold fEnv fmR fmI mDec uni cut  reso lpg  A     D    S   R    lvl
+  ["Init (PD to Saw)", "Lead", ""],
+  ["Resonant Sweep Lead", "Lead", "pdLow pdHigh 0 1 1.4 0 _ .1 .2 _ _ _ 10 6500 1.2 .2 .02 .8 .8 .3"],
+  ["Saw Morph Lead", "Lead", "saw square 0 .7 .6 _ _ .15 .3 _ _ .4 12 5200 2 .25 .01 .5 .8 .3 1"],
+  ["Vowel Lead", "Lead", "ah oo .2 .8 .5 .15 5 .2 .3 _ _ .4 6 4500 1.5 .2 .02 .6 .75 .3 1"],
+  ["PD Sync Lead", "Lead", "pdMid pdHigh 0 1 .35 _ _ .2 .4 _ _ .3 4 7000 1 .3 .005 .4 .7 .25 1"],
+  ["Folded Solo", "Lead", "sine pdLow .1 .6 .8 .2 5.5 .55 .5 _ _ .5 6 3800 2.5 .3 .01 .6 .7 .35 1"],
+  ["FM Square Lead", "Lead", "square sine .2 .2 _ _ _ .1 .2 2 .35 .6 5 6000 1.2 .2 .01 .5 .75 .3 1"],
+  ["Organ Whistle", "Lead", "organ sine .5 .9 1.2 .1 6 .05 .1 _ _ _ 3 8000 .7 .1 .02 .5 .85 .25 1"],
+  ["Comb Lead", "Lead", "comb saw .3 .7 .8 .2 4 .25 .3 _ _ .4 10 5000 2 .2 .01 .5 .75 .3 1"],
+  ["Folded Bass", "Bass", "saw pulse .2 .6 .5 _ _ .85 .6 _ _ .4 0 900 4 .5 .004 .5 .7 .18"],
+  ["Sub Morph Bass", "Bass", "sine square 0 .5 .3 _ _ .3 .5 _ _ .25 0 800 1.5 .4 .004 .4 .7 .15 1.2"],
+  ["PD Reso Bass", "Bass", "pdLow pdMid 0 .8 .25 _ _ .1 .5 _ _ .3 0 1600 3 .6 .003 .35 .6 .15 1"],
+  ["FM Thump Bass", "Bass", "sine sine 0 0 _ _ _ .2 .6 1 .6 .15 0 1200 1 .7 .002 .3 .55 .12 1.2"],
+  ["Vowel Bass", "Bass", "oo ah 0 .6 .4 _ _ .3 .4 _ _ .3 4 1400 2 .5 .004 .45 .65 .18 1.1"],
+  ["Square Fold Bass", "Bass", "square pulse .3 .7 .3 _ _ .6 .7 _ _ .3 0 1100 3 .5 .003 .4 .6 .15 1.3"],
+  ["Wobble Bass", "Bass", "saw comb 0 1 .2 .6 2 .5 .3 _ _ .4 6 900 6 .3 .005 .5 .8 .2 1"],
+  ["Reese Morph", "Bass", "saw saw 0 0 _ _ _ .2 0 _ _ _ 30 1300 2 .1 .01 .6 .85 .25 1"],
+  ["Hollow Keys", "Keys", "square organ .1 .9 .25 _ _ .2 .3 _ _ _ 3 3600 1 .55 .004 .45 .25 .3 1.6"],
+  ["Glass EP", "Keys", "sine organ .1 .4 .6 _ _ .05 .3 1 .3 .6 3 6000 .7 .5 .003 .9 .25 .5 1.3"],
+  ["Organ Morph", "Keys", "organ square 0 .3 2 .15 6.5 .05 0 _ _ _ 4 5000 .7 0 .006 .3 .9 .15 .9"],
+  ["PD Clav", "Keys", "pdHigh pulse 0 .4 .1 _ _ .3 .6 _ _ .2 0 4000 2 .7 .002 .3 .2 .15 2"],
+  ["Vowel Piano", "Keys", "ah sine .2 .7 .5 _ _ .1 .4 _ _ .5 4 5000 1 .6 .003 .8 .2 .5 1.3"],
+  ["Toy Keys", "Keys", "square comb 0 .5 .1 _ _ .2 .5 4 .25 .3 0 7000 1 .5 .002 .5 .15 .3 2"],
+  ["Vowel Morph Pad", "Pad", "ah oo 0 1 3 .3 .4 .1 0 _ _ _ 16 5000 .8 0 .7 1.5 .9 1.5"],
+  ["Choir Drift", "Pad", "oo ah .2 .8 4 .35 .3 .1 0 _ _ _ 20 4000 .8 0 1.2 2 .9 2 1"],
+  ["PD Strings", "Pad", "pdLow saw .2 .7 3 .2 .5 .05 0 _ _ _ 24 5500 .7 0 .9 1.5 .85 1.6 1"],
+  ["Organ Haze", "Pad", "organ random 0 .6 4 .4 .2 .15 0 _ _ _ 18 3500 1 0 1.5 2 .9 2.5 1"],
+  ["Glass Pad", "Pad", "sine pdHigh 0 .5 4 .3 .7 0 0 3 .1 3 12 7000 .7 0 1 2 .85 2 1.1"],
+  ["Dark Fold Pad", "Pad", "square sine .5 .2 3 .3 .15 .45 0 _ _ _ 14 1500 2 0 1.4 2 .9 2 1.1"],
+  ["Comb Shimmer", "Pad", "comb pdMid 0 1 4 .5 1.2 .1 0 _ _ _ 22 9000 .7 0 1 2 .85 2.5 1.2"],
+  ["Buchla Pluck", "Pluck", "sine sine 0 0 _ _ _ .7 1 _ _ .35 0 1800 3 .9 .002 .35 0 .25 3"],
+  ["PD Pluck", "Pluck", "pdMid sine 0 .6 .15 _ _ .2 .7 _ _ .2 0 3500 2 .8 .002 .4 0 .3 2.8"],
+  ["Vowel Pluck", "Pluck", "ah oo 0 1 .2 _ _ .3 .6 _ _ .25 4 3000 2 .85 .002 .45 0 .35 3"],
+  ["Harp Morph", "Pluck", "sine saw 0 .4 .5 _ _ .1 .5 _ _ .5 3 5000 1 .7 .002 .9 0 .6 2.4"],
+  ["Comb Pizz", "Pluck", "comb square .2 .6 .15 _ _ .25 .8 _ _ .15 0 2500 3 .9 .002 .25 0 .2 2.4"],
+  ["FM Pluck", "Pluck", "sine square 0 .3 .2 _ _ .15 .5 2 .5 .25 2 4000 1.5 .8 .002 .4 0 .3 3"],
+  ["LPG Bongo", "LPG Perc", "sine sine 0 0 _ _ _ .5 .9 1 .3 .12 0 1400 4 .95 .002 .18 0 .15 3"],
+  ["LPG Conga", "LPG Perc", "sine oo .3 .3 _ _ _ .6 .8 _ _ .15 0 1100 3 .95 .002 .25 0 .2 3"],
+  ["Wood Block", "LPG Perc", "pdHigh sine 0 0 _ _ _ .4 1 3 .3 .05 0 3000 5 .9 .002 .08 0 .08 2.6"],
+  ["Metal Tine", "LPG Perc", "sine sine 0 0 _ _ _ .3 .7 7 .5 .2 0 6000 2 .9 .002 .5 0 .4 2.2"],
+  ["Fold Tom", "LPG Perc", "sine square 0 .2 _ _ _ .7 1 0.5 .3 .2 0 900 2 .9 .002 .3 0 .25 3"],
+  ["Bamboo Knock", "LPG Perc", "organ sine 0 0 _ _ _ .35 .9 4 .4 .07 0 2500 6 .95 .002 .12 0 .1 2.4"],
+  ["Slap Drum", "LPG Perc", "square sine 0 1 .05 _ _ .5 1 2 .4 .06 0 2000 3 1 .002 .14 0 .12 3"],
+  ["FM Chime", "Bell", "sine organ .3 .3 _ _ _ 0 0 3 .55 .7 4 9000 .7 .3 .003 1.1 0 .8 2.2"],
+  ["Digital Bell", "Bell", "sine pdHigh 0 .3 .4 _ _ 0 0 7 .6 1 3 9000 .7 .2 .002 1.6 0 1.4 2.3"],
+  ["Tubular Morph", "Bell", "organ sine .2 .8 2 _ _ .05 .2 4 .4 1.2 2 7000 .7 .2 .002 2.2 0 1.8 2"],
+  ["Glass Chime", "Bell", "sine comb .2 .2 _ _ _ .1 .3 3 .45 .8 6 10000 .7 .2 .002 1.5 0 1.3 2.4"],
+  ["Gamelan", "Bell", "square sine .5 .5 _ _ _ .2 .3 7 .4 .8 4 6000 1 .3 .002 1.4 0 1.2 2.6"],
+  ["Music Box", "Bell", "sine organ .3 .3 _ _ _ 0 .2 4 .3 .5 0 9000 .7 .4 .002 .9 0 .8 2.5"],
+  ["Ring Bell", "Bell", "random sine .3 .8 1.5 .2 .3 .1 .2 7 .5 1.2 8 8000 .7 .2 .002 2 0 1.6 2"],
+  ["Digital Wobble", "Growl", "comb random 0 1 .1 .8 5.5 .4 .2 _ _ _ 6 4500 2.5 .2 .005 .7 .75 .3"],
+  ["Fold Growl", "Growl", "saw pdMid 0 .7 .4 .3 3 .8 .5 _ _ .5 8 2000 5 .3 .005 .6 .8 .25 0.85"],
+  ["Formant Growl", "Growl", "ah oo 0 1 .3 .7 4 .6 .4 _ _ .4 6 2400 4 .2 .005 .5 .8 .25 1"],
+  ["FM Snarl", "Growl", "saw sine .3 .3 _ _ _ .5 .4 0.5 .5 .6 8 2500 3 .3 .005 .5 .8 .25 1"],
+  ["Comb Rasp", "Growl", "comb pulse 0 1 .6 .5 7 .7 .4 _ _ .5 12 3500 3 .2 .01 .6 .75 .3 .9"],
+  ["Wobble Growl", "Growl", "pdHigh saw 0 1 .1 .9 2.5 .6 .3 _ _ .5 10 1800 6 .2 .005 .6 .85 .25 1"],
+  ["Talking Fold", "Growl", "oo pdMid 0 .8 .3 .8 1.5 .5 .3 _ _ .5 6 2000 5 .2 .005 .6 .8 .25 0.85"],
+  ["Slow Table Sweep", "Sweep", "saw pdHigh 0 1 4 _ _ .1 0 _ _ _ 14 6000 1.5 0 .5 2 .85 1.8 1"],
+  ["Vowel Sweep", "Sweep", "ah oo 0 1 4 .2 .15 .2 0 _ _ _ 12 4000 2 0 .8 2 .85 2 1"],
+  ["Fold Riser", "Sweep", "sine pdMid 0 1 4 _ _ .9 0 _ _ _ 10 2500 4 0 1.5 3 .9 1.5 .9"],
+  ["Random Drift", "Sweep", "random comb 0 1 3 .6 .8 .25 0 _ _ _ 20 5000 2 0 .6 2 .8 2 1"],
+  ["Tidal Morph", "Sweep", "square organ 0 1 2.5 .7 .25 .2 0 _ _ _ 16 4500 1.5 0 .7 2 .85 2 1"],
+  ["Glitch Scan", "Sweep", "comb random 0 1 .05 1 11 .4 .3 _ _ .3 6 7000 3 .1 .01 .6 .7 .4 .9"],
+  ["Falling Table", "Sweep", "pdHigh sine 1 0 3 _ _ .3 0 _ _ _ 10 5000 2 0 .3 2.5 .8 1.5 1"],
+];
+const STR_KEYS = { tableA: 1, tableB: 1, fmRatio: 1 };
+function expandPresets(rows) {
+  return rows.map(([name, cat, s]) => {
+    const params = {};
+    s.split(" ").forEach((v, i) => {
+      if (v && v !== "_") params[PK[i]] = STR_KEYS[PK[i]] ? v : parseFloat(v);
+    });
+    return { name, cat, params };
+  });
+}
 
 // equal-power crossfade curves for the morph (A falls, B rises), `n` points
 function morphCurves(m0, m1, n) {
@@ -381,17 +461,10 @@ const morph = {
     { name: "Pluck Arp (Am)", dsl: "0:A3:2 2:C4:2 4:E4:2 6:A4:2 8:E4:2 10:C4:2 12:A3:2 14:C4:2:90 16:G3:2 18:B3:2 20:D4:2 22:G4:2 24:D4:2 26:B3:2 28:G3:2 30:B3:2:90" },
     { name: "Evolving Pad (Dm9)", dsl: "0:D3:30 0:F3:30 0:A3:30 0:C4:30 0:E4:30 32:Bb2:30 32:D3:30 32:F3:30 32:A3:30 32:C4:30" },
     { name: "Lead Line (G)", dsl: "0:G4:3 4:B4:2 6:D5:4 12:C5:2 14:B4:2 16:A4:3 20:F#4:2 22:G4:8 32:D5:3 36:E5:2 38:G5:4 44:F#5:2 46:E5:2 48:D5:4 52:B4:2 54:G4:8" },
+    { name: "Bell Melody (C)", dsl: "0:E5:4 4:G5:4 8:C6:6 16:B5:2 18:A5:2 20:G5:8 32:F5:4 36:A5:4 40:D6:6 48:C6:2 50:B5:2 52:C6:10" },
+    { name: "Growl Riff (Dm)", dsl: "0:D2:2 2:D2:1:80 4:F2:2 6:D2:1:80 8:A2:3:110 12:G2:2 14:F2:2 16:D2:2 18:D2:1:80 20:C3:3:110 24:A2:2 26:G2:2 28:F2:4" },
   ],
-  presets: [
-    { name: "Init (PD to Saw)", params: {} },
-    { name: "Resonant Sweep Lead", params: { tableA: "pdLow", tableB: "pdHigh", morph: 0, morphEnd: 1, morphTime: 1.4, wobble: 0, fold: 0.1, foldEnv: 0.2, unison: 10, cutoff: 6500, reso: 1.2, lpg: 0.2, attack: 0.02, decay: 0.8, sustain: 0.8, release: 0.3 } },
-    { name: "Vowel Morph Pad", params: { tableA: "ah", tableB: "oo", morph: 0, morphEnd: 1, morphTime: 3, wobble: 0.3, wobbleRate: 0.4, fold: 0.1, foldEnv: 0, unison: 16, cutoff: 5000, reso: 0.8, lpg: 0, attack: 0.7, decay: 1.5, sustain: 0.9, release: 1.5 } },
-    { name: "Buchla Pluck", params: { tableA: "sine", tableB: "sine", morph: 0, morphEnd: 0, fold: 0.7, foldEnv: 1, modDecay: 0.35, unison: 0, cutoff: 1800, reso: 3, lpg: 0.9, attack: 0.002, decay: 0.35, sustain: 0, release: 0.25, level: 1.5 } },
-    { name: "Folded Bass", params: { tableA: "saw", tableB: "pulse", morph: 0.2, morphEnd: 0.6, morphTime: 0.5, fold: 0.85, foldEnv: 0.6, modDecay: 0.4, unison: 0, cutoff: 900, reso: 4, lpg: 0.5, attack: 0.004, decay: 0.5, sustain: 0.7, release: 0.18 } },
-    { name: "FM Chime", params: { tableA: "sine", tableB: "organ", morph: 0.3, morphEnd: 0.3, fold: 0, foldEnv: 0, fmRatio: "3", fmIndex: 0.55, modDecay: 0.7, unison: 4, cutoff: 9000, reso: 0.7, lpg: 0.3, attack: 0.003, decay: 1.1, sustain: 0, release: 0.8, level: 1.5 } },
-    { name: "Digital Wobble", params: { tableA: "comb", tableB: "random", morph: 0, morphEnd: 1, morphTime: 0.1, wobble: 0.8, wobbleRate: 5.5, fold: 0.4, foldEnv: 0.2, unison: 6, cutoff: 4500, reso: 2.5, lpg: 0.2, attack: 0.005, decay: 0.7, sustain: 0.75, release: 0.3 } },
-    { name: "Hollow Keys", params: { tableA: "square", tableB: "organ", morph: 0.1, morphEnd: 0.9, morphTime: 0.25, fold: 0.2, foldEnv: 0.3, unison: 3, cutoff: 3600, reso: 1, lpg: 0.55, attack: 0.004, decay: 0.45, sustain: 0.25, release: 0.3 } },
-  ],
+  presets: expandPresets(PRESET_TABLE),
   ui: {
     theme: { accent: "#9d7bff", lcd: "#ddd0ff", lcdBg: "#1b1530", edge: "#3a2f66", bg: "#150f26" },
     logo: ["", "Szabo"],

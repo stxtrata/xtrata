@@ -12,3 +12,7 @@ One line each: what was decided and why.
 - Pointer velocity = key height (0.45 at the top, 1.0 at the front edge), computer keys 0.8, MIDI its own velocity.
 - Fixed-layout playing surfaces (Ordinal's bars) do not follow the octave shift, because each bar is labelled with its note.
 - The host preset menu was added to the face toolbar (the faces' own preset strips cannot hold 48–96 entries); faces keep their own browsers and both stay in sync.
+- Phase 2 was run as parallel agents (one per synth, brief in `audionaut/tools/POLISH-BRIEF.md`), each restricted to its own module + face; the coordinator ran the shared suites and committed.
+- Face preset lists now receive each preset's `cat` from the host (`runtime.js presetList`), so faces that group by category show headers.
+- Several engines got fixes that slightly change existing presets' level or width (Muneeb section detune now actually sounds; Whale detune centred; Layers/ASIC/Mempool gain staging). Preset names and parameter values are unchanged.
+- Schnorr gained 4 material options (reed, bar, sub, cloud) and Strike range 0–2; Szabo `level` max 1.5→3. Defaults and existing values unchanged.

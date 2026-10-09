@@ -64,25 +64,39 @@ function rng(seed) {
   };
 }
 
-// one exponentially decaying sinusoid with a soft onset, added into out[]
-function addMode(out, sr, freq, amp, phase, tau, rise) {
-  const n = out.length;
-  const w = (TWO_PI * freq) / sr;
-  const wr = Math.cos(w);
-  const wi = Math.sin(w);
-  let cr = Math.cos(phase);
-  let ci = Math.sin(phase);
-  let e = 1;
-  const r = Math.exp(-1 / (tau * sr));
-  const end = Math.min(n, Math.ceil(tau * 11.5 * sr)); // stop below -100 dB
-  const riseN = Math.max(1, Math.floor(rise * sr));
+// one or two (beating twin) exponentially decaying sinusoids with a soft onset, added into out[]
+// in a single pass; stops once it has decayed below -60 dB of full scale (ring(amp, tau)), so long
+// buffers only pay for the modes still ringing. Pass a2 = 0 for a single mode.
+const ring = (amp, tau) => tau * Math.log(Math.max(1, amp * 1000));
+function addMode(out, sr, f, a, ph, tau, rise, f2 = f, a2 = 0, ph2 = 0, tau2 = tau) {
+  const w = (TWO_PI * f) / sr, w2 = (TWO_PI * f2) / sr;
+  const wr = Math.cos(w), wi = Math.sin(w), vr = Math.cos(w2), vi = Math.sin(w2);
+  let cr = Math.cos(ph), ci = Math.sin(ph), dr = Math.cos(ph2), di = Math.sin(ph2);
+  let e = a, e2 = a2;
+  const r = Math.exp(-1 / (tau * sr)), r2 = Math.exp(-1 / (tau2 * sr));
+  const end = Math.min(out.length, Math.ceil(Math.max(ring(a, tau), ring(a2, tau2)) * sr));
+  const riseN = Math.min(end, Math.max(1, Math.floor(rise * sr)));
+  if (!a2) {
+    for (let i = 0; i < end; i++) {
+      out[i] += i < riseN ? (e * ci * i) / riseN : e * ci;
+      const nr = cr * wr - ci * wi;
+      ci = cr * wi + ci * wr;
+      cr = nr;
+      e *= r;
+    }
+    return;
+  }
   for (let i = 0; i < end; i++) {
-    const ramp = i < riseN ? i / riseN : 1;
-    out[i] += amp * e * ramp * ci;
+    const v = e * ci + e2 * di;
+    out[i] += i < riseN ? (v * i) / riseN : v;
     const nr = cr * wr - ci * wi;
     ci = cr * wi + ci * wr;
     cr = nr;
     e *= r;
+    const mr = dr * vr - di * vi;
+    di = dr * vi + di * vr;
+    dr = mr;
+    e2 *= r2;
   }
 }
 
@@ -103,32 +117,32 @@ function renderModal(P, pitch, vel, gate, sr) {
 
   // build the mode list first so the buffer length can follow the longest-ringing mode
   const modes = [];
-  let tauMax = 0.02;
+  let tEnd = 0.02; // when the last mode falls below -60 dB
   B.modes.forEach(([ratio0, a0], k) => {
     const ratio = ratio0 + (Math.max(1, Math.round(ratio0)) - ratio0) * P.purity;
     const f = f0 * ratio;
-    if (f > ny || f > 19000) return;
+    if (f > ny || f > 16000) return;
     const w =
       k === 0 ? 1 : (0.2 + 0.8 * strike) * (0.6 + 0.4 * Math.abs(Math.cos(Math.PI * strike * k * 0.7)));
     const lowpass = 1 / Math.sqrt(1 + Math.pow(f / fc, 2));
     const amp = a0 * w * lowpass;
+    if (k > 0 && amp < 0.012) return; // inaudible under the fundamental: skip (most high-pitch / soft-mallet modes)
     const tau = clamp((B.T0 * P.decay * pitchScale) / Math.pow(ratio, dampExp), 0.008, 14);
     modes.push({ f, amp, tau, k });
-    tauMax = Math.max(tauMax, tau);
+    tEnd = Math.max(tEnd, ring(amp, tau * (P.beat > 0.01 ? 1.08 : 1)));
   });
 
   const resAmp = P.resonator * B.res;
-  if (resAmp > 0.001) tauMax = Math.max(tauMax, (modes[0] ? modes[0].tau : 0.2) * 1.6);
-  const len = Math.max(64, Math.floor(sr * Math.min(MAX_LEN, gate + R * 1.15 + 0.03, tauMax * 9.5 + 0.05)));
+  if (resAmp > 0.001 && modes[0]) tEnd = Math.max(tEnd, ring(resAmp * 0.85, modes[0].tau * 1.6));
+  const len = Math.max(64, Math.floor(sr * Math.min(MAX_LEN, gate + R * 1.15 + 0.03, tEnd + 0.05)));
   const out = new Float32Array(len);
 
   const split = P.beat > 0.01;
   for (const m of modes) {
     const ph = rand() * TWO_PI;
-    if (split) {
+    if (split && m.amp > 0.05) {
       const d = 1 + P.beat * 0.0032 * (1 + 0.5 * m.k);
-      addMode(out, sr, m.f, m.amp * 0.62, ph, m.tau, rise);
-      addMode(out, sr, m.f * d, m.amp * 0.62, ph + 1.3, m.tau * 1.08, rise);
+      addMode(out, sr, m.f, m.amp * 0.62, ph, m.tau, rise, m.f * d, m.amp * 0.62, ph + 1.3, m.tau * 1.08);
     } else {
       addMode(out, sr, m.f, m.amp, ph, m.tau, rise);
     }
@@ -152,23 +166,31 @@ function renderModal(P, pitch, vel, gate, sr) {
   }
 
   // damper (release after the gate) + edge fades, then normalise and gently compress
-  const gi = Math.floor(gate * sr);
-  const relK = (3 * Math.LN10) / (R * sr);
+  const gi = Math.min(len, Math.floor(gate * sr));
+  const relR = Math.exp((-3 * Math.LN10) / (R * sr));
+  const fadeAt = len - 192;
   let peak = 0;
-  for (let i = 0; i < len; i++) {
-    let m = 1;
-    if (i > gi) m = Math.exp(-(i - gi) * relK);
-    const tail = len - i;
-    if (tail < 192) m *= tail / 192;
+  for (let i = 0; i < gi; i++) {
+    const a = Math.abs(out[i]);
+    if (a > peak) peak = a;
+  }
+  let m = 1;
+  for (let i = gi; i < len; i++) {
+    m *= relR;
     out[i] *= m;
     const a = Math.abs(out[i]);
     if (a > peak) peak = a;
   }
+  for (let i = Math.max(0, fadeAt); i < len; i++) out[i] *= (len - i) / 192;
   if (peak > 1e-9) {
-    const c = 1.5;
-    const g = 1 / peak;
-    const nrm = 1 / Math.tanh(c);
-    for (let i = 0; i < len; i++) out[i] = Math.tanh(out[i] * g * c) * nrm;
+    // soft knee ~ tanh(1.5x)/tanh(1.5) as a cheap rational tanh, normalised to peak 1
+    const g = 1.5 / peak;
+    const nrm = 47.25 / 43.875;
+    for (let i = 0; i < len; i++) {
+      const x = out[i] * g;
+      const x2 = x * x;
+      out[i] = ((x * (27 + x2)) / (27 + 9 * x2)) * nrm;
+    }
   }
   return out;
 }
@@ -299,6 +321,68 @@ const svg = {
   wood: '<path d="M4 9 H20 V16 H4 Z M8 9 V16"/>',
 };
 
+// presets as data: "name|cat|body|hardness strike damping decay purity resonator beat noise tremolo tremRate release level"
+const CATS = ["Marimba Perc", "Xylo & Wood Hit", "Vibes", "Bells & Glock", "Kalimba Pluck", "Steel Pan Perc", "Bowls & Drones", "FX Hit"];
+const PKEYS = ["hardness", "strike", "damping", "decay", "purity", "resonator", "beat", "noise", "tremolo", "tremRate", "release", "level"];
+const PRESETS = [
+  "Init (Marimba)|0|marimba|.5 .4 .5 1 0 .5 0 .5 0 5.2 3 1",
+  "Rosewood Marimba|0|marimba|.4 .45 .5 1.2 0 .8 0 .4 0 5.2 3 1.4",
+  "Soft Felt Marimba|0|marimba|.15 .35 .6 1.1 0 .9 0 .2 0 5.2 3 .75",
+  "Hard Rubber Marimba|0|marimba|.75 .5 .45 1 0 .5 0 .6 0 5.2 3 1.25",
+  "Bass Marimba|0|marimba|.3 .3 .65 1.6 0 1 0 .25 0 5.2 3 1.25",
+  "Dead-Stroke Marimba|0|marimba|.6 .4 .8 .4 0 .5 0 .5 0 5.2 .08 1.5",
+  "Tuned Marimba|0|marimba|.45 .4 .5 1 .8 .7 0 .35 0 5.2 3 1.3",
+  "Edge-Struck Marimba|0|marimba|.55 .9 .4 1 0 .6 0 .45 0 5.2 3 1.5",
+  "Bright Xylophone|1|xylophone|.85 .6 .55 1 .2 .3 0 .7 0 5.2 .5 1.5",
+  "Orchestral Xylo|1|xylophone|.7 .5 .5 1.3 0 .4 0 .55 0 5.2 1 1.5",
+  "Soft Xylo|1|xylophone|.35 .4 .5 1.2 0 .5 0 .3 0 5.2 1 1.5",
+  "Woodblock|1|wood|.7 .5 .5 1 0 .5 0 .7 0 5.2 .3 1.5",
+  "Temple Block|1|wood|.5 .4 .5 2.2 .3 .9 0 .5 0 5.2 .6 1.5",
+  "Log Drum|1|wood|.3 .4 .3 3 .6 1 0 .3 0 5.2 .8 1.4",
+  "Claves|1|wood|.95 .6 .5 1.6 .5 .1 0 .9 0 5.2 .4 1.5",
+  "Soft Vibes|2|vibes|.3 .35 .35 1.1 0 .6 .1 .35 .55 5.1 3 1",
+  "Dry Vibes|2|vibes|.45 .4 .45 1 0 .6 0 .4 0 5.2 1.5 .8",
+  "Fast Motor Vibes|2|vibes|.4 .4 .4 1 0 .6 .05 .35 .7 7.5 3 1.1",
+  "Slow Motor Vibes|2|vibes|.25 .4 .35 1.3 0 .6 0 .25 .5 2.5 3 .9",
+  "Hard Mallet Vibes|2|vibes|.8 .5 .45 1 0 .5 0 .6 .3 5.5 3 .95",
+  "Long Vibes Halo|2|vibes|.1 .3 .2 2.4 0 .7 .15 .05 .35 3.5 4 .65",
+  "Jazz Vibes|2|vibes|.5 .4 .5 1 0 .7 .05 .4 .4 4.5 2 .95",
+  "Glockenspiel|3|glock|.8 .5 .4 1.1 0 0 .15 .45 0 5.2 2.5 1.1",
+  "Tubular Bell|3|bell|.65 .4 .3 1.2 .15 0 .25 .5 0 5.2 4 1",
+  "Music Box|3|glock|.9 .3 .55 .7 .4 0 0 .2 0 5.2 1.5 1.25",
+  "Celesta|3|glock|.4 .35 .6 .8 .7 0 0 .25 0 5.2 1.5 1.15",
+  "Church Bell|3|bell|.8 .4 .2 2.5 0 0 .4 .6 0 5.2 4 .95",
+  "Handbell|3|bell|.5 .4 .45 1 .5 0 .15 .35 0 5.2 2 .95",
+  "Chime Tree|3|glock|1 .6 .25 2 0 0 .6 .3 0 5.2 4 1.05",
+  "Toy Glock|3|glock|1 .45 .8 .4 .2 0 0 .8 0 5.2 .6 1.5",
+  "Kalimba Box|4|kalimba|.45 .3 .5 1.2 0 .85 .1 .35 0 5.2 1.5 .65",
+  "Bright Kalimba|4|kalimba|.75 .4 .45 1 0 .6 0 .5 0 5.2 1.5 .8",
+  "Mbira Buzz|4|kalimba|.6 .35 .45 1 0 .7 .7 .6 0 5.2 1.5 .9",
+  "Soft Thumb Piano|4|kalimba|.2 .3 .55 1.4 0 .9 0 .2 0 5.2 1.5 .6",
+  "Tuned Kalimba|4|kalimba|.5 .3 .5 1 .8 .8 0 .35 0 5.2 1.5 .7",
+  "Tine Keys|4|kalimba|.35 .25 .4 1.8 .9 .6 0 .15 .25 4 3 .6",
+  "Steel Pan|5|pan|.55 .45 .55 1 0 .4 .5 .5 0 5.2 1.5 1",
+  "Tenor Pan|5|pan|.7 .55 .5 1.2 0 .4 .35 .55 0 5.2 1.5 .95",
+  "Double Second Pan|5|pan|.45 .4 .45 1.4 0 .5 .65 .4 0 5.2 2 .85",
+  "Muted Pan|5|pan|.5 .4 .8 .4 0 .3 .3 .6 0 5.2 .2 1.3",
+  "Pan Roll|5|pan|.4 .45 .4 2 0 .4 .5 .3 .6 8 3 1",
+  "Singing Bowl|6|bowl|.35 .3 .25 1.4 0 0 .75 .15 0 5.2 4 .7",
+  "Deep Tibetan Bowl|6|bowl|.2 .25 .15 2.5 0 0 .9 .05 0 5.2 4 .65",
+  "Crystal Bowl|6|bowl|.25 .3 .2 2.2 .85 0 .4 .05 0 5.2 4 .8",
+  "Bell Drone|6|bell|.25 .35 .1 3 .3 0 .6 .05 0 5.2 4 .75",
+  "Breathing Bowl|6|bowl|.3 .3 .2 2 0 0 .6 .1 .4 1.2 4 .85",
+  "Metal Pipe Hit|7|bell|1 .9 .7 .5 0 0 0 1 0 5.2 1 .8",
+  "Glass Tick|7|glock|1 .8 .9 .25 0 0 0 .9 0 5.2 .3 1.5",
+  "Alien Bowl|7|bowl|.6 .7 .3 1.5 0 0 1 .2 .8 9 3 .75",
+  "Wood Clack|7|wood|1 .7 .6 .2 0 .2 0 1 0 5.2 .1 1.5",
+  "Wobble Pan|7|pan|.5 .5 .3 1.6 0 .4 1 .3 .5 6.5 3 1",
+].map((row) => {
+  const [name, c, body, nums] = row.split("|");
+  const params = { body };
+  nums.split(" ").forEach((x, i) => (params[PKEYS[i]] = +x));
+  return { name, cat: CATS[+c], params };
+});
+
 const modal = {
   name: "Ordinal",
   tagline: "Modal percussion - marimba, xylophone, vibes, glockenspiel, kalimba, tubular bell, singing bowl, steel pan, wood block",
@@ -312,17 +396,10 @@ const modal = {
     { name: "Vibes Ballad (Cmaj7 Am7)", dsl: "0:C3:14 0:E4:14 0:G4:14 0:B4:14 16:A2:14 16:C4:14 16:E4:14 16:G4:14 32:F3:14 32:A3:14 32:C4:14 32:E4:14 48:G2:14 48:B3:14 48:D4:14 48:F4:14" },
     { name: "Bell Tune (Glock, C)", dsl: "0:C5:4 4:E5:4 8:G5:4 12:E5:2 14:D5:2 16:C5:4 20:G4:4 24:E5:6:110 32:F5:4 36:A5:4 40:C6:6:120 46:A5:2 48:G5:4 52:E5:4 56:D5:3 60:C5:4:80" },
     { name: "Kalimba Loop (Dm)", dsl: "0:D4:3 3:F4:3 6:A4:3 9:D5:3 12:C5:3 15:A4:3 16:E4:3 19:G4:3 22:Bb4:3 25:E5:3 28:D5:3 31:Bb4:3 32:F4:3 35:A4:3 38:C5:3 41:F5:3 44:E5:3 47:C5:3 48:D4:3 51:A4:3 54:D5:3 57:F5:3 60:D5:3" },
+    { name: "Steel Pan Calypso (C F G)", dsl: "0:C5:2 2:E5:1 3:G5:2:110 6:E5:2 8:C5:1 9:D5:2 12:E5:2:90 14:G4:2 16:F4:2 18:A4:1 19:C5:2:110 22:A4:2 24:F5:2:120 26:E5:2 28:D5:2 30:C5:2 32:G4:2 34:B4:1 35:D5:2:110 38:B4:2 40:G5:2:120 42:F5:2 44:D5:2 46:B4:2 48:C5:3 51:E5:3 54:G5:2 56:C6:4:120 60:G5:2:80 62:E5:2:80" },
+    { name: "Bowl Meditation (D)", dsl: "0:D3:16:110 12:A3:12:80 24:F#4:10:70 32:D4:16:100 44:E4:12:70 52:A4:12:80" },
   ],
-  presets: [
-    { name: "Init (Marimba)", params: {} },
-    { name: "Soft Vibes", params: { body: "vibes", hardness: 0.3, strike: 0.35, damping: 0.35, decay: 1.1, purity: 0, resonator: 0.6, beat: 0.1, noise: 0.35, tremolo: 0.55, tremRate: 5.1, release: 3 } },
-    { name: "Bright Xylophone", params: { body: "xylophone", hardness: 0.85, strike: 0.6, damping: 0.55, decay: 1, purity: 0.2, resonator: 0.3, noise: 0.7, release: 0.5 } },
-    { name: "Glockenspiel", params: { body: "glock", hardness: 0.8, strike: 0.5, damping: 0.4, decay: 1.1, resonator: 0, beat: 0.15, noise: 0.45, release: 2.5 } },
-    { name: "Kalimba Box", params: { body: "kalimba", hardness: 0.45, strike: 0.3, damping: 0.5, decay: 1.2, resonator: 0.85, beat: 0.1, noise: 0.35, release: 1.5 } },
-    { name: "Tubular Bell", params: { body: "bell", hardness: 0.65, strike: 0.5, damping: 0.3, decay: 1.2, purity: 0.15, resonator: 0, beat: 0.25, noise: 0.5, release: 4 } },
-    { name: "Singing Bowl", params: { body: "bowl", hardness: 0.35, strike: 0.3, damping: 0.25, decay: 1.4, resonator: 0, beat: 0.75, noise: 0.15, release: 4 } },
-    { name: "Steel Pan", params: { body: "pan", hardness: 0.55, strike: 0.45, damping: 0.55, decay: 1, resonator: 0.4, beat: 0.5, noise: 0.5, release: 1.5 } },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#e0c24a", lcd: "#fff0b0", lcdBg: "#2a2410", edge: "#4a3f1a", bg: "#1d190c" },
     logo: ["", "Ordinal"],

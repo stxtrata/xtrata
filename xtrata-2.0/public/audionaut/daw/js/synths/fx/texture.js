@@ -18,6 +18,7 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const FLOOR = 0.0001;
 const GAIN = 0.4; // master voice scale (calibrated against the harness RMS band)
+const TRIM = { wind: 1.3, riser: 2.4, drone: 1.25, cloud: 1, impact: 1 }; // per-model level match
 
 const MODELS = ["wind", "riser", "drone", "cloud", "impact"];
 const CHORDS = {
@@ -169,6 +170,17 @@ function mulberry32(a) {
   };
 }
 
+// immutable white-noise table (grains read it at random offsets)
+let wTab = null;
+function whiteTab() {
+  if (!wTab) {
+    const r = mulberry32(4242);
+    wTab = new Float32Array(65536);
+    for (let i = 0; i < 65536; i++) wTab[i] = r() * 2 - 1;
+  }
+  return wTab;
+}
+
 function renderCloud(sr, f0, gate, A, R, P, variant, seed) {
   const grainMax = P.grain * 1.4;
   const body = gate + R * 0.6;
@@ -177,7 +189,9 @@ function renderCloud(sr, f0, gate, A, R, P, variant, seed) {
   const left = new Float32Array(n);
   const right = new Float32Array(n);
   const rng = mulberry32(seed + variant * 7919);
-  const count = Math.max(1, Math.round(P.density * body));
+  // grain budget (~1.5 M grain-samples at 48 kHz) bounds the render cost of long, dense, long-grain clouds;
+  // the level-normalise below keeps loudness unchanged when it kicks in
+  const count = Math.max(1, Math.round(Math.min(P.density * body, 31 / P.grain)));
   const intervals = CHORDS[P.chord] || null;
   const Q = 3 + P.res * 30;
   for (let gi = 0; gi < count; gi++) {
@@ -203,33 +217,33 @@ function renderCloud(sr, f0, gate, A, R, P, variant, seed) {
     const gl = Math.cos(((pan + 1) * Math.PI) / 4);
     const gr = Math.sin(((pan + 1) * Math.PI) / 4);
     // noise component through a state-variable band-pass at (a tone-shifted) grain frequency, level-matched to a sine
-    const nz = new Float32Array(len);
-    if (P.tonal < 0.98) {
-      const fcn = clamp(fr * Math.pow(2, P.tone * 2), 60, 6000);
-      const ff = 2 * Math.sin((Math.PI * fcn) / sr);
-      const qq = 1 / Q;
-      let low = 0, band = 0, ss = 0;
-      for (let i = 0; i < len; i++) {
-        const x = rng() * 2 - 1;
-        low += ff * band;
-        const high = x - low - qq * band;
-        band += ff * high;
-        nz[i] = band;
-        ss += band * band;
-      }
-      const k = 0.5 / Math.max(1e-6, Math.sqrt(ss / len));
-      for (let i = 0; i < len; i++) nz[i] *= k;
-    }
-    const w = (2 * Math.PI * fr) / sr;
-    const h2 = 0.3 * P.tone;
+    // noise component: white table through a state-variable band-pass at a tone-shifted grain frequency,
+    // level-matched to the sine with an analytic estimate of the filter's (ring-up aware) output RMS
+    const fcn = clamp(fr * Math.pow(2, P.tone * 2), 60, 6000);
+    const ff = 2 * Math.sin((Math.PI * fcn) / sr), qq = 1 / Q, tau = Q / ff;
+    const nrm = 0.416 * Math.sqrt(Q * ff * Math.max(0.05, 1 - (tau / len) * (1 - Math.exp(-len / tau))));
+    const tn = P.tonal < 0.98 ? ((1 - P.tonal) * 0.5) / nrm : 0;
+    const wt = whiteTab(), o = (rng() * 65536) | 0;
+    // sine pair and Hann window by rotation (no per-sample sin/cos: keeps the uncached render cheap)
+    const w = (2 * Math.PI * fr) / sr, cw = Math.cos(w), sw = Math.sin(w);
+    const dw = (2 * Math.PI) / (len - 1), cd = Math.cos(dw), sd = Math.sin(dw);
+    const h2 = 0.6 * P.tone, ta = 0.6 * P.tonal;
     const start = Math.round(t0 * sr);
+    let re = 1, im = 0, wr = 1, wi = 0, low = 0, band = 0;
     for (let i = 0; i < len && start + i < n; i++) {
-      const win = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (len - 1));
-      const p = w * i;
-      const s = (Math.sin(p) + h2 * Math.sin(2 * p)) * 0.6 * P.tonal + nz[i] * (1 - P.tonal);
-      const y = s * win * amp;
+      if (tn) {
+        low += ff * band;
+        band += ff * (wt[(o + i) & 65535] - low - qq * band);
+      }
+      const y = (im * (1 + h2 * re) * ta + band * tn) * (0.5 - 0.5 * wr) * amp;
       left[start + i] += y * gl;
       right[start + i] += y * gr;
+      let t = re * cw - im * sw;
+      im = re * sw + im * cw;
+      re = t;
+      t = wr * cd - wi * sd;
+      wi = wr * sd + wi * cd;
+      wr = t;
     }
   }
   // level-normalise (so DENSITY changes texture, not loudness) then soft-clip
@@ -272,7 +286,7 @@ function textureVoice(ctx, dest, note, P) {
   const model = MODELS.includes(P.model) ? P.model : "wind";
   const A = Math.min(Math.max(0.005, P.attack), Math.max(0.01, gate * 0.9));
   const R = Math.max(0.02, P.release);
-  const top = Math.max(FLOOR, vq * GAIN * P.level);
+  const top = Math.max(FLOOR, vq * GAIN * P.level * TRIM[model]);
   const fc = centre(f0, P);
   const Qres = 0.6 + P.res * 18;
   const tonal = P.tonal;
@@ -548,6 +562,79 @@ const svg = {
   cluster: '<circle cx="9" cy="18" r="1.4"/><circle cx="14" cy="14" r="1.4"/><circle cx="9" cy="10" r="1.4"/><circle cx="14" cy="6" r="1.4"/><circle cx="11" cy="3" r="1.4"/>',
 };
 
+// ---------------------------------------------------------------- presets (compact table)
+// columns: model tone res track color tonal motion rate sweep spread density grain chord decay attack release level
+// "-" = default. model w/r/d/c/i, chord f/o/5/M/m/x.
+const PK = "model tone res track color tonal motion rate sweep spread density grain chord decay attack release level".split(" ");
+const MC = { w: "wind", r: "riser", d: "drone", c: "cloud", i: "impact" };
+const CC = { f: "free", o: "octaves", 5: "fifths", M: "major", m: "minor", x: "cluster" };
+const PRESETS = [
+  ["Winds", "Init (Wind)", ""],
+  ["Winds", "Desert Wind", "w .35 .55 .5 .65 .05 .75 .35 - .85 - - - - .9 1.5"],
+  ["Winds", "Whistling Gale", "w .55 .9 1 .25 .4 .55 .8 - .7 - - - - .5 1.2"],
+  ["Winds", "Gentle Breeze", "w .45 .2 .4 .45 0 .4 .3 - .6 - - - - 1 1.5"],
+  ["Winds", "Arctic Blizzard", "w .6 .6 .3 .3 0 .85 1.2 - .9 - - - - .6 1.8 1.5"],
+  ["Winds", "Storm Front", "w .15 .35 .2 .85 0 .7 .25 - .7 - - - - 1.5 2.5"],
+  ["Winds", "Hurricane", "w .4 .5 .2 .5 0 1 2.5 - 1 - - - - .3 1"],
+  ["Winds", "Hollow Canyon", "w .25 .8 .9 .55 .25 .6 .18 - .8 - - - - 1.2 2.2"],
+  ["Winds", "Bottle Breath", "w .5 .95 1 .3 .55 .3 .5 - .3 - - - - .2 .6"],
+  ["Risers", "Tension Riser", "r .5 .45 .7 .25 .45 .7 2 4 .5 - - - - - .5"],
+  ["Risers", "White Noise Sweep", "r .55 .2 .3 0 0 .2 1 5 .3 - - - - - .35"],
+  ["Risers", "Pitch Riser", "r .5 .4 .9 .3 .8 .5 3 3 .7 - - - - - .4"],
+  ["Risers", "Long Build", "r .45 .55 .7 .4 .35 .9 1.5 6 .6 - - - - - .8 1.4"],
+  ["Risers", "Snare Roll Lift", "r .65 .3 .3 .1 .1 1 4 4 .2 - - - - - .2 1.5"],
+  ["Risers", "Dark Lift", "r .2 .5 .6 .8 .4 .6 1 3 .5 - - - - - .6"],
+  ["Risers", "Whoosh Up", "r .6 .25 .3 .2 0 .1 1 2 .4 - - - - - .3 1.5"],
+  ["Risers", "Siren Rise", "r .5 .9 1 .3 .6 .4 6 5 .5 - - - - - .4"],
+  ["Drones", "Dark Drone", "d .3 .3 1 .8 .8 .55 .15 - .55 - - - - 1.2 2.2"],
+  ["Drones", "Bright Saw Drone", "d .7 .3 1 .4 .9 .3 .2 - .4 - - - - 1 2"],
+  ["Drones", "Choir of Fans", "d .5 .5 1 .5 .6 .5 .1 - .9 - - - - 1.5 2.5 1.4"],
+  ["Drones", "Sub Cave", "d .1 .2 1 .9 .7 .4 .08 - .3 - - - - 2 3"],
+  ["Drones", "Breathing Organ", "d .45 .6 1 .4 .85 .8 .25 - .2 - - - - .8 1.5"],
+  ["Drones", "Rust Hum", "d .35 .8 1 .7 .5 .3 3 - .6 - - - - .4 1"],
+  ["Drones", "Wobble Drone", "d .4 .7 1 .5 .9 .9 2 - .5 - - - - .2 .8"],
+  ["Drones", "Noise Pad", "d .5 .4 .8 .4 .15 .6 .12 - .7 - - - - 1.5 2.5 1.5"],
+  ["Clouds", "Glass Cloud", "c .7 .6 1 - .92 - - - .5 55 .12 5 - .5 1.6"],
+  ["Clouds", "Grain Dust", "c .55 .7 .8 - .1 - - - .6 90 .03 f - .15 .8"],
+  ["Clouds", "Major Shimmer", "c .8 .5 1 - .95 - - - .7 70 .15 M - .6 2"],
+  ["Clouds", "Minor Mist", "c .4 .6 1 - .8 - - - .6 40 .2 m - 1 2.5"],
+  ["Clouds", "Octave Rain", "c .6 .5 1 - .9 - - - .9 25 .05 o - .1 1.2"],
+  ["Clouds", "Cluster Swarm", "c .5 .7 1 - .7 - - - .4 110 .04 x - .3 1"],
+  ["Clouds", "Breath Grains", "c .3 .4 1 - .2 - - - .8 60 .25 5 - .8 2"],
+  ["Clouds", "Sparse Droplets", "c .9 .5 1 - 1 - - - 1 6 .03 M - .01 1.5"],
+  ["Clouds", "Frozen Choir", "c .5 .5 1 - .85 - - - .3 30 .3 m - 1.2 3"],
+  ["Hits", "Sub Impact", "i .3 .2 1 .9 .85 .8 - 2.5 - - - - 3.2"],
+  ["Hits", "Cinematic Boom", "i .4 .3 1 .8 .6 .9 - 3 - - - - 4.5"],
+  ["Hits", "Door Slam", "i .55 .4 1 .6 .3 .3 - 1.5 - - - - .6 - - 1.5"],
+  ["Hits", "Thunder Clap", "i .7 .3 .4 .4 .2 1 - 2 - - - - 5"],
+  ["Hits", "Kick Drop", "i .3 .2 1 .9 1 .2 - 4 - - - - 1 - - 1.5"],
+  ["Hits", "Debris Crash", "i .8 .5 .4 .1 .1 .6 - 1 - - - - 2.5 - - 1.5"],
+  ["Hits", "Downlifter Sweep", "i .9 .8 .5 0 .1 .4 - 5 - - - - 6 - - 1.5"],
+  ["Hits", "Earthquake", "i .1 .3 1 1 .5 1 - 1 - - - - 6"],
+  ["Sci-Fi", "Laser Wind", "w .7 .98 1 .1 .7 .8 6 - .5 - - - - .1 .6"],
+  ["Sci-Fi", "Tractor Beam", "w .5 .85 1 .5 .8 .6 4 - .2 - - - - .3 1"],
+  ["Sci-Fi", "Warp Drive", "r .6 .7 1 .3 .7 .8 5 6 .8 - - - - - 1"],
+  ["Sci-Fi", "Teleport", "r .8 .8 1 .1 .9 1 8 6 1 - - - - - .3"],
+  ["Sci-Fi", "Reactor Hum", "d .3 .9 1 .6 .8 .6 8 - .3 - - - - .1 .6"],
+  ["Sci-Fi", "Alien Swarm", "c .7 .8 1 - .6 - - - 1 120 .02 x - .1 1"],
+  ["Sci-Fi", "Data Burst", "c .9 .6 1 - .5 - - - .9 100 .015 f - .005 .3"],
+  ["Ambience", "Sea Shore", "w .3 .15 .1 .7 0 1 .12 - 1 - - - - 1.5 2.5 1.5"],
+  ["Ambience", "Night Air", "w .55 .3 .3 .5 .05 .3 .1 - 1 - - - - 2 3 1.4"],
+  ["Ambience", "Distant Traffic", "d .15 .2 .2 .95 .1 .4 .07 - .8 - - - - 2 3 1.5"],
+  ["Ambience", "Air Con Room", "d .4 .1 .3 .6 0 .1 .05 - .5 - - - - 1 2 1.5"],
+  ["Ambience", "Rainfall", "c .7 .3 .3 - 0 - - - 1 120 .012 f - .5 1.5"],
+  ["Ambience", "Fireplace Crackle", "c .5 .2 .2 - 0 - - - .9 40 .01 f - .3 1.5"],
+  ["Ambience", "Cave Drips", "c .85 .9 1 - .9 - - - .8 4 .02 f - .01 2 1.4"],
+].map(([cat, name, s]) => {
+  const params = {};
+  (s ? s.split(" ") : []).forEach((v, i) => {
+    if (v === "-") return;
+    const k = PK[i];
+    params[k] = k === "model" ? MC[v] : k === "chord" ? CC[v] : +v;
+  });
+  return { name, cat, params };
+});
+
 const texture = {
   name: "Mempool",
   tagline: "Weather for your tracks - wind, risers, drones, grain clouds and impacts that follow the key",
@@ -560,18 +647,9 @@ const texture = {
     { name: "Riser + Hit (A)", dsl: "0:A2:16 16:A1:6:127 32:A2:16 48:A1:6:127 56:E2:4:90" },
     { name: "Cloud Chords (Dm)", dsl: "0:D3:16 0:F3:16 0:A3:16 16:Bb2:16 16:D3:16 16:F3:16 32:C3:16 32:E3:16 32:G3:16 48:A2:16 48:E3:16 48:A3:16" },
     { name: "Gusts (C)", dsl: "0:C3:6 8:G3:8:90 20:C3:6 28:D3:10:100 44:A2:8 54:C4:10:80" },
+    { name: "Droplets (E pent.)", dsl: "0:E4:4 6:G4:3:90 12:A4:4 20:B4:3:80 28:D5:4 36:E4:6:100 46:B3:4:80 54:G4:6" },
   ],
-  presets: [
-    { name: "Init (Wind)", params: {} },
-    { name: "Desert Wind", params: { model: "wind", tone: 0.35, res: 0.55, track: 0.5, color: 0.65, tonal: 0.05, motion: 0.75, rate: 0.35, spread: 0.85, attack: 0.9, release: 1.5 } },
-    { name: "Whistling Gale", params: { model: "wind", tone: 0.55, res: 0.9, track: 1, color: 0.25, tonal: 0.4, motion: 0.55, rate: 0.8, spread: 0.7, attack: 0.5, release: 1.2 } },
-    { name: "Tension Riser", params: { model: "riser", tone: 0.5, res: 0.45, track: 0.7, color: 0.25, tonal: 0.45, motion: 0.7, rate: 2, sweep: 4, spread: 0.5, release: 0.5 } },
-    { name: "White Noise Sweep", params: { model: "riser", tone: 0.55, res: 0.2, track: 0.3, color: 0, tonal: 0, motion: 0.2, rate: 1, sweep: 5, spread: 0.3, release: 0.35 } },
-    { name: "Dark Drone", params: { model: "drone", tone: 0.3, res: 0.3, track: 1, color: 0.8, tonal: 0.8, motion: 0.55, rate: 0.15, spread: 0.55, attack: 1.2, release: 2.2 } },
-    { name: "Glass Cloud", params: { model: "cloud", tone: 0.7, res: 0.6, track: 1, tonal: 0.92, density: 55, grain: 0.12, chord: "fifths", spread: 0.5, attack: 0.5, release: 1.6 } },
-    { name: "Grain Dust", params: { model: "cloud", tone: 0.55, res: 0.7, track: 0.8, tonal: 0.1, density: 90, grain: 0.03, chord: "free", spread: 0.6, attack: 0.15, release: 0.8 } },
-    { name: "Sub Impact", params: { model: "impact", tone: 0.3, res: 0.2, track: 1, color: 0.9, tonal: 0.85, motion: 0.8, sweep: 2.5, decay: 3.2 } },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#7fb7c4", lcd: "#d4f1f7", lcdBg: "#102228", edge: "#27444d", bg: "#0d1b20" },
     logo: ["", "Mempool"],

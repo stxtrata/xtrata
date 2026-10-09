@@ -91,7 +91,11 @@ import { Kit } from "./runtime.js";
     const n = P.presets.length; let cur = 0;
     const lst = $(root, '[data-plist]');
     if (lst) {
-      lst.innerHTML = P.presets.map((p, i) => '<button data-i="' + i + '">' + (o.item ? o.item(p, i) : p.name) + '</button>').join('');
+      let lc = null;
+      lst.innerHTML = P.presets.map((p, i) => {
+        const h = p.cat && p.cat !== lc ? '<h5>' + p.cat + '</h5>' : ''; lc = p.cat || lc;
+        return h + '<button data-i="' + i + '">' + (o.item ? o.item(p, i) : p.name) + '</button>';
+      }).join('');
       lst.addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) { P.loadPreset(+b.dataset.i); if (o.pick) o.pick(); } });
     }
     const pv = $(root, '[data-prev]'), nx = $(root, '[data-next]');
@@ -103,7 +107,7 @@ import { Kit } from "./runtime.js";
       if (i >= 0) cur = i;
       $$(root, '[data-pname]').forEach(e => { e.textContent = name || 'Custom'; });
       $$(root, '[data-pidx]').forEach(e => { e.textContent = (i < 0 ? 1 : i + 1 + '').toString().padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
-      if (lst) $$(lst, '[data-i]').forEach(b => b.classList.toggle('cur', +b.dataset.i === i));
+      if (lst) $$(lst, '[data-i]').forEach(b => { b.classList.toggle('cur', +b.dataset.i === i); if (+b.dataset.i === i && lst.classList.contains('open')) b.scrollIntoView({ block: 'nearest' }); });
     });
   }
   const cell = (id, label, t, cls) => '<div class="' + (cls || 'kn') + '" data-k="' + id + '" data-t="' + (t || 'k') + '"><span class="vl"></span><div class="ctl ' + (t === 'f' ? 'fd' : t === 'h' ? 'trk' : 'dial') + '"></div><label>' + label + '</label></div>';
@@ -126,9 +130,10 @@ import { Kit } from "./runtime.js";
 .A .pn i{display:block;font-style:normal;font-size:8px;letter-spacing:2.5px;color:#e0b24a99}
 .A .pn b{display:block;font-size:17px;font-style:italic;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff3cf}
 .A .plate .prog{width:auto;padding:0 10px;font-size:10px;letter-spacing:2px;border:1px solid #e0b24a88;height:26px;line-height:24px;text-transform:uppercase}
-.A .plist{position:absolute;right:0;top:56px;width:300px;z-index:30;background:#12103a;border:1px solid #e0b24a;box-shadow:0 12px 30px #000c;padding:6px;display:none}
+.A .plist{position:absolute;right:0;top:56px;width:340px;max-height:440px;overflow-y:auto;overscroll-behavior:contain;z-index:30;background:#12103a;border:1px solid #e0b24a;box-shadow:0 12px 30px #000c;padding:6px;display:none;scrollbar-color:#e0b24a66 #0a0925}
 .A .plist.open{display:block}
 .A .plist button{all:unset;display:block;box-sizing:border-box;width:100%;padding:5px 10px;cursor:pointer;font-size:14px;font-style:italic;color:#e8dcb8;border-bottom:1px solid #e0b24a22}
+.A .plist h5{margin:6px 0 2px;padding:2px 10px;font:500 9px Georgia,serif;letter-spacing:3px;text-transform:uppercase;color:#e0b24a;border-bottom:1px solid #e0b24a66}
 .A .plist button:hover{background:#e0b24a22}.A .plist button.cur{color:#14123a;background:#e0b24a;font-weight:700}
 .A .stage{position:absolute;left:24px;top:76px;width:560px;height:226px;border:1px solid #e0b24a88;box-shadow:0 0 0 3px #0a0925,0 0 0 4px #e0b24a44;overflow:hidden}
 .A .stage canvas{width:560px;height:226px;display:block}
@@ -183,7 +188,7 @@ import { Kit } from "./runtime.js";
       '</div>';
     wire(root, P); seg(root, P, '.tabs button');
     const pl = $(root, '.plist');
-    $(root, '[data-open]').addEventListener('click', () => pl.classList.toggle('open'));
+    $(root, '[data-open]').addEventListener('click', () => { pl.classList.toggle('open'); const c = $(pl, '.cur'); if (c && pl.classList.contains('open')) c.scrollIntoView({ block: 'nearest' }); });
     pnav(root, P, { pick: () => pl.classList.remove('open'), item: (p, i) => (i + 1) + '. ' + p.name });
     P.keyboard($(root, '#kb'), { from: 48, octaves: 3 });
     const S = tracker(P);

@@ -137,7 +137,7 @@ function makeP(synthId, inst, def, root) {
     (synth.presets || []).map((pr) => {
       const r = { ...synthDefaults(synthId), ...(pr.params || {}) }, values = {};
       def.params.forEach((fp) => (values[fp.id] = toFace(fp, rdef[fp.id], r[fp.id])));
-      return { name: pr.name, values };
+      return { name: pr.name, cat: pr.cat, values };
     });
   const presets = presetList();
   const matchPreset = () => {

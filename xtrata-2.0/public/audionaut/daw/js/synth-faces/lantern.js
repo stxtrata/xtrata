@@ -36,7 +36,7 @@ import { Kit } from "./runtime.js";
     { name: 'Prism Weather', values: { material: 2, strike: 0.72, tension: 1, bloom: 1.9, halo: 0.78, cutoff: 11500, drift: 0.9, width: 1, space: 0.7, attack: 0.006, decay: 0.9, sustain: 0.64, release: 3.2 } }
   ];
 
-  const BASE = '[data-plist]{display:none}[data-plist].open{display:grid}button{cursor:pointer;font-family:inherit;border:0;background:none;color:inherit;padding:0}canvas{display:block}';
+  const BASE = '[data-plist]{display:none}[data-plist].open{display:grid;max-height:min(420px,70vh);overflow-y:auto;overscroll-behavior:contain}button{cursor:pointer;font-family:inherit;border:0;background:none;color:inherit;padding:0}canvas{display:block}';
 
   /* wires generic data-attributes: data-b (bind), data-abs/ax/inv, data-t (text), data-set="id:val", preset controls */
   function wire(root, P) {
