@@ -2815,6 +2815,69 @@ export function legacyFxSlots(fx) {
   return { pre, post };
 }
 
+// ------------------------------------------------------------------ strip sends
+// A strip's delay and reverb sends are two values on the strip, owner.sends:
+//   { delay: { amount, enabled }, reverb: { amount, enabled } }   (a bus is absent when unused)
+// They tap the signal after the LAST plugin, which is where every shipped song already had
+// them. Older files stored each send as a plugin slot at the end of the FX list; normalizeOwner
+// folds those into owner.sends. A send that sits before another plugin stays a slot, so the
+// tap point (and the sound) never moves.
+export const SEND_BUSES = ["delay", "reverb"];
+export const SEND_TYPE = { delay: "delaySend", reverb: "reverbSend" };
+const SEND_BUS_OF = { delaySend: "delay", reverbSend: "reverb" };
+export const sendBusOf = (type) => SEND_BUS_OF[type] || null;
+
+export function cleanSends(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const bus of SEND_BUSES) {
+    const r = raw[bus];
+    if (!r || typeof r !== "object") continue;
+    const a = +r.amount;
+    out[bus] = {
+      amount: Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0.25,
+      enabled: r.enabled !== false,
+    };
+  }
+  return out;
+}
+
+// The strip's sends dressed as slots, so a list of plugin rows can show and edit them the same
+// way. Reads and writes go straight to owner.sends. Ids look like "send:delay".
+export function sendRows(owner) {
+  if (!owner?.sends) return [];
+  return SEND_BUSES.filter((bus) => owner.sends[bus]).map((bus) => {
+    const rec = owner.sends[bus];
+    return {
+      id: `send:${bus}`,
+      type: SEND_TYPE[bus],
+      synthetic: bus,
+      get enabled() {
+        return rec.enabled !== false;
+      },
+      set enabled(v) {
+        rec.enabled = !!v;
+      },
+      get params() {
+        return { amount: rec.amount };
+      },
+      set params(p) {
+        const a = +p?.amount;
+        if (Number.isFinite(a)) rec.amount = Math.max(0, Math.min(1, a));
+      },
+    };
+  });
+}
+
+// Add a send to a strip, or return false if it already has one for that bus.
+export function addSend(owner, bus, amount = 0.25) {
+  if (!SEND_TYPE[bus]) return false;
+  owner.sends = cleanSends(owner.sends);
+  if (owner.sends[bus]) return false;
+  owner.sends[bus] = { amount, enabled: true };
+  return true;
+}
+
 // Bring a channel or synth to the current shape, in place: fx and inserts become
 // clean slot arrays. A legacy fx object converts with the same signal order it had:
 // if there were inserts, its filter/drive go to the front of the insert chain
@@ -2824,6 +2887,7 @@ export function normalizeOwner(owner) {
   if (!owner) return false;
   const beforeIns = owner.inserts;
   const beforeFx = owner.fx;
+  const beforeSends = owner.sends;
   let inserts = cleanChain(owner.inserts);
   let fx;
   if (isLegacyFx(owner.fx)) {
@@ -2836,12 +2900,31 @@ export function normalizeOwner(owner) {
   // ids key live plugin instances, so they must be unique across both chains
   const insIds = new Set(inserts.map((s) => s.id));
   for (const s of fx) if (insIds.has(s.id)) s.id = slotId();
+  // Fold the send slots at the very end of the signal path into owner.sends. A bus the strip
+  // already has a send for keeps its extra slot (still audible, still in the list).
+  const sends = cleanSends(owner.sends);
+  const tail = [...inserts, ...fx];
+  let end = tail.length;
+  while (end > 0 && SEND_BUS_OF[tail[end - 1].type]) end--;
+  const folded = new Set();
+  for (const s of tail.slice(end)) {
+    const bus = SEND_BUS_OF[s.type];
+    if (sends[bus]) continue;
+    sends[bus] = { amount: s.params.amount, enabled: s.enabled };
+    folded.add(s.id);
+  }
+  if (folded.size) {
+    inserts = inserts.filter((s) => !folded.has(s.id));
+    fx = fx.filter((s) => !folded.has(s.id));
+  }
   const changed =
     JSON.stringify(inserts) !== JSON.stringify(beforeIns) ||
-    JSON.stringify(fx) !== JSON.stringify(beforeFx);
+    JSON.stringify(fx) !== JSON.stringify(beforeFx) ||
+    JSON.stringify(sends) !== JSON.stringify(beforeSends);
   if (changed) {
     owner.inserts = inserts;
     owner.fx = fx;
+    owner.sends = sends;
   }
   return changed;
 }

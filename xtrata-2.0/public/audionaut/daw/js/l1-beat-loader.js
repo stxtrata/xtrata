@@ -214,6 +214,7 @@ export async function loadBeatPreset(preset, options = {}) {
       trimStart,
       trimEnd,
       inserts: [],
+      sends: {},
       fx: { ...def.fx }, // preset FX are written in the old object form…
     });
     normalizeOwner(store.channel(i)); // …and become plugin chain slots here
