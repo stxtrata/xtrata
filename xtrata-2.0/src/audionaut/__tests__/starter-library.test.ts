@@ -15,10 +15,11 @@ const lib = async (file: string) => (await import(/* @vite-ignore */ path.join(D
 const load = (file: string) => JSON.parse(fs.readFileSync(path.join(DATA, file), 'utf8'));
 
 describe('starter song library', () => {
-  it('lists around twenty songs with unique ids, led by the welcome session', () => {
+  it('lists around twenty songs with unique ids, led by the default, Lagos Late Night', () => {
     expect(index.songs.length).toBeGreaterThanOrEqual(15);
     expect(new Set(index.songs.map((s) => s.id)).size).toBe(index.songs.length);
-    expect(index.songs[0].id).toBe('welcome');
+    expect(index.songs[0].id).toBe('afrobeat');
+    expect(index.songs.some((s) => s.id === 'welcome')).toBe(true);
     expect(new Set(index.songs.map((s) => s.genre)).size).toBeGreaterThanOrEqual(15);
   });
 
