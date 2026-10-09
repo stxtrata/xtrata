@@ -136,15 +136,12 @@ function initSequenceBar() {
     store.selectSequence(store.project.currentSequence + 1),
   );
   $("#btn-copy-seq").addEventListener("click", () => {
-    seqClipboard = JSON.parse(JSON.stringify(store.seq));
+    seqClipboard = store.copySequence();
     ui.setStatus(`Copied sequence ${store.project.currentSequence + 1}`);
   });
   $("#btn-paste-seq").addEventListener("click", () => {
     if (!seqClipboard) return ui.setStatus("Nothing copied yet", true);
-    store.project.sequences[store.project.currentSequence] = JSON.parse(
-      JSON.stringify(seqClipboard),
-    );
-    store.emit("sequence", store.project.currentSequence);
+    store.pasteSequence(seqClipboard);
     ui.setStatus(`Pasted into sequence ${store.project.currentSequence + 1}`);
   });
   $("#btn-clear-seq").addEventListener("click", () => store.clearSequence());
@@ -229,10 +226,11 @@ function initKeyboard() {
 }
 
 // ------------------------------------------------------------ store subscriptions
-const audioKey = (c) => JSON.stringify([c.source ?? null, c.clipSnapshot ?? null]);
+// Undo/redo keeps playback running when every pool sample still has the same audio source.
+const audioKey = (s) => JSON.stringify([s.id, s.source ?? null, s.clipSnapshot ?? null]);
 function sameAudioSources(a, b) {
-  if (!a || !b || a.channels.length !== b.channels.length) return false;
-  return a.channels.every((c, i) => audioKey(c) === audioKey(b.channels[i]));
+  if (!a?.samples || !b?.samples || a.samples.length !== b.samples.length) return false;
+  return a.samples.every((s, i) => audioKey(s) === audioKey(b.samples[i]));
 }
 
 function initSubscriptions() {
@@ -255,8 +253,7 @@ function initSubscriptions() {
     if (!keepAudio) {
       stopAll();
       engine.stopPreview();
-      engine.buffers.fill(null);
-      engine.reverseBuffers.fill(null);
+      engine.clearBuffers();
     }
     engine.clampPlayingSequence();
     if (engine.ctx)

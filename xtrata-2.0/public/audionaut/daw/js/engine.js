@@ -1,15 +1,7 @@
 import { sustainDuration, sampleLoop } from "./onboard-library.js";
 // engine.js — Web Audio playback engine with sample-accurate lookahead scheduling.
 
-import {
-  store,
-  NUM_CHANNELS,
-  NUM_STEPS,
-  NUM_INSTRUMENTS,
-  stepVal,
-  stepObj,
-  stepOff,
-} from "./state.js";
+import { store, NUM_STEPS, NUM_INSTRUMENTS } from "./state.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { PLUGIN_TYPES, pluginDefaults, normalizeOwner } from "./plugins.js";
 
@@ -21,8 +13,12 @@ class Engine {
     this.ctx = null;
     this.masterGain = null;
     this.channelGains = [];
-    this.buffers = new Array(NUM_CHANNELS).fill(null); // decoded AudioBuffers
-    this.reverseBuffers = new Array(NUM_CHANNELS).fill(null); // lazily built
+    // Decoded audio is cached by what the sample IS (its source identity),
+    // not by pool entry or channel, so two entries with the same source share one decode.
+    this.buffers = new Map(); // sampleKey → AudioBuffer
+    this.reverseBuffers = new Map(); // sampleKey → reversed copy, built on first use
+    this._keys = new WeakMap(); // source object → sampleKey
+    this._regionIdx = new WeakMap(); // sequence → { rev, rows } step index (see _regionIndex)
     this.isPlaying = false;
     this.currentStep = 0;
     this.playingSequence = 0;
@@ -332,9 +328,64 @@ class Engine {
     return buf;
   }
 
+  // ---- decoded audio, keyed by sample content
+  // Same audio, same key: the source's identity (never its label), memoised per source object
+  // because an embedded file's value can be megabytes long.
+  sampleKey(sample) {
+    const src = sample?.source;
+    if (!src) return null;
+    let key = this._keys.get(src);
+    if (!key) {
+      let id = String(src.value ?? "");
+      if (src.type === "file") {
+        let h = 2166136261;
+        for (let i = 0; i < id.length; i++) {
+          h ^= id.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        id = `${id.length}:${(h >>> 0).toString(16)}`;
+      }
+      key = [src.type, id, src.audioSha256 || "", src.sourceSha256 || "", src.assetId || ""].join("|");
+      this._keys.set(src, key);
+    }
+    return key;
+  }
+  // The sample a channel plays by default: its pool entry, or the channel itself (whose sample
+  // properties read as stock defaults) while it has none.
+  _defaultSample(ch) {
+    return store.sampleOf(ch) || store.channel(ch);
+  }
+  bufferFor(sample) {
+    const key = this.sampleKey(sample);
+    return key ? this.buffers.get(key) || null : null;
+  }
+  bufferOf(ch) {
+    return this.bufferFor(this._defaultSample(ch));
+  }
+  setSampleBuffer(sample, buffer) {
+    const key = this.sampleKey(sample);
+    if (!key) return;
+    this.reverseBuffers.delete(key);
+    if (buffer) this.buffers.set(key, buffer);
+    else this.buffers.delete(key);
+  }
+  // Sets (or with null drops) the decoded audio of the channel's default sample. Call it after
+  // the sample's source is in place.
   setBuffer(ch, buffer) {
-    this.buffers[ch] = buffer;
-    this.reverseBuffers[ch] = null;
+    this.setSampleBuffer(this._defaultSample(ch), buffer);
+  }
+  clearBuffers() {
+    this.buffers.clear();
+    this.reverseBuffers.clear();
+  }
+  // Forget decoded audio no pool entry refers to any more (a replaced beat's kit, say).
+  pruneBuffers() {
+    const live = new Set(store.project.samples.map((s) => this.sampleKey(s)));
+    for (const key of [...this.buffers.keys()])
+      if (!live.has(key)) {
+        this.buffers.delete(key);
+        this.reverseBuffers.delete(key);
+      }
   }
 
   silenceChannel(ch) {
@@ -348,22 +399,24 @@ class Engine {
     if (this._lastVoice) this._lastVoice[ch] = null;
   }
 
-  getReverseBuffer(ch) {
-    if (!this.reverseBuffers[ch] && this.buffers[ch]) {
-      const src = this.buffers[ch];
-      const rev = this.ctx.createBuffer(
-        src.numberOfChannels,
-        src.length,
-        src.sampleRate,
-      );
+  getReverseBufferFor(sample) {
+    const key = this.sampleKey(sample),
+      src = key && this.buffers.get(key);
+    if (!src) return null;
+    let rev = this.reverseBuffers.get(key);
+    if (!rev) {
+      rev = this.ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
       for (let c = 0; c < src.numberOfChannels; c++) {
         const from = src.getChannelData(c);
         const to = rev.getChannelData(c);
         for (let i = 0, n = src.length; i < n; i++) to[i] = from[n - 1 - i];
       }
-      this.reverseBuffers[ch] = rev;
+      this.reverseBuffers.set(key, rev);
     }
-    return this.reverseBuffers[ch];
+    return rev;
+  }
+  getReverseBuffer(ch) {
+    return this.getReverseBufferFor(this._defaultSample(ch));
   }
 
   setChannelVolume(ch, v) {
@@ -615,7 +668,7 @@ class Engine {
 
   _isEmpty(seq) {
     return (
-      seq.steps.every((row) => row.every((v) => v === 0)) &&
+      seq.regions.every((row) => row.length === 0) &&
       (seq.notes || []).every((list) => list.length === 0)
     );
   }
@@ -626,25 +679,51 @@ class Engine {
     if (this.playingSequence > last) this.playingSequence = Math.max(0, last);
   }
 
+  // Regions bucketed by the 16th they start in, per channel. Rebuilt when a region changes
+  // (store.regionRev), never inside the tick loop's per-step work.
+  _regionIndex(seq) {
+    let entry = this._regionIdx.get(seq);
+    if (!entry || entry.rev !== store.regionRev) {
+      entry = {
+        rev: store.regionRev,
+        rows: seq.regions.map((row) => {
+          const byStep = new Map();
+          for (const r of row) {
+            const at = Math.floor(r.pos);
+            const list = byStep.get(at);
+            if (list) list.push(r);
+            else byStep.set(at, [r]);
+          }
+          return byStep;
+        }),
+      };
+      this._regionIdx.set(seq, entry);
+    }
+    return entry.rows;
+  }
+
   _scheduleStep(step, time) {
     const seq = store.project.sequences[this.playingSequence];
     const stepDur = this.stepDuration();
-    // A step's offset spans the real gap to the next step (swing included), so a
-    // late hit can never overtake the next step's trigger.
+    // A region's offset inside its 16th spans the real gap to the next step (swing included),
+    // so a late hit can never overtake the next step's trigger.
     const swing = store.project.swing / 100;
     const gap = stepDur + (step % 2 === 0 ? stepDur * swing : -stepDur * swing);
+    const rows = this._regionIndex(seq);
     for (let ch = 0; ch < store.numChannels; ch++) {
-      const raw = seq.steps[ch]?.[step];
-      const v = stepVal(raw);
-      if (!v) continue;
-      const c = store.channel(ch);
+      const here = rows[ch]?.get(step);
+      if (!here) continue;
       if (!this.channelAudible(ch)) continue;
-      this.trigger(
-        ch,
-        time + stepOff(raw) * gap,
-        v === 2 ? 1.25 : 1,
-        stepObj(raw),
-      );
+      for (const region of here) {
+        const off = Math.min(region.pos - step, 0.999);
+        this.trigger(
+          ch,
+          time + (off > 0 ? off : 0) * gap,
+          region.v === 2 ? 1.25 : 1,
+          region,
+          store.sampleById(region.sample) || undefined,
+        );
+      }
     }
     // instrument notes starting on this step
     for (let i = 0; i < NUM_INSTRUMENTS; i++) {
@@ -663,11 +742,12 @@ class Engine {
     }
   }
 
-  // Trigger a channel's sample at `time`. `over` = per-step overrides
-  // ({rev, trimStart, trimEnd, pitch}) that take precedence over channel settings.
-  trigger(ch, time = 0, velocity = 1, over = null) {
+  // Trigger a sample on a channel at `time`. `over` = per-region overrides
+  // ({rev, trimStart, trimEnd, pitch, xfade, gateSteps}) that take precedence over the sample's
+  // own settings; `sample` is the pool entry (default: the channel's default sample).
+  trigger(ch, time = 0, velocity = 1, over = null, sample = null) {
     this.ensureContext();
-    const c = store.channel(ch);
+    const c = sample || this._defaultSample(ch);
     const rev = over?.rev ?? c.reverse;
     const rawPitch = over?.pitch ?? c.pitch;
     const pitch = Number.isFinite(rawPitch)
@@ -687,7 +767,7 @@ class Engine {
           Math.min(1, rawEnd),
         )
       : 1;
-    const buffer = rev ? this.getReverseBuffer(ch) : this.buffers[ch];
+    const buffer = rev ? this.getReverseBufferFor(c) : this.bufferFor(c);
     if (!buffer) return;
     const t = time || this.ctx.currentTime;
 
@@ -852,7 +932,7 @@ class Engine {
   // Audition an arbitrary trim range (used by trim modal)
   audition(ch, startFrac, endFrac) {
     this.ensureContext();
-    const buffer = this.buffers[ch];
+    const buffer = this.bufferOf(ch);
     if (!buffer) return;
     const src = this.ctx.createBufferSource();
     src.buffer = buffer;

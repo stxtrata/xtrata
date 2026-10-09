@@ -1,4 +1,4 @@
-import { store, stepVal } from "./state.js";
+import { store } from "./state.js";
 import { engine } from "./engine.js";
 import {
   fetchAndDecode,
@@ -107,7 +107,7 @@ export async function loadClip(ch, source, clip, options = {}) {
     gateSteps: snapshot.playback.gateSteps,
     unresolvedSource: null,
   });
-  if (sequence.steps[ch].every((s) => !stepVal(s))) sequence.steps[ch][0] = 1;
+  if (!store.regions(ch, sequence).length) store.setStep(ch, 0, 1, sequence);
   store.emit("channel", { ch, prop: "clipSnapshot" });
   store.emit("sequence", project.currentSequence);
   record(true);

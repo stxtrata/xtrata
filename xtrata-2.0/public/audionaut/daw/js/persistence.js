@@ -5,6 +5,9 @@ import {
   makeProject,
   makeSequence,
   makeChannel,
+  makeLegacyChannel,
+  makeLegacyProject,
+  makeLegacySequence,
   makeInstrument,
   NUM_CHANNELS,
   MAX_CHANNELS,
@@ -17,6 +20,18 @@ import { SYNTH_BANK } from "./synths.js";
 import { validateSoundMetadata } from "./onboard-library.js";
 import { validateClipSnapshot } from "./clip-contract.js";
 import { normalizeOwner } from "./plugins.js";
+import {
+  bindChannel,
+  blankSample,
+  collectUnusedSamples,
+  ensureDefaultSample,
+  invalidatePool,
+  isBlankSample,
+  newId,
+  rowToRegions,
+  sampleById as poolSampleById,
+  sortRegions,
+} from "./region-model.js";
 
 // Display names the synths carried before the rename. A saved instrument whose name is still
 // the old stock name follows the synth to its new name; custom names are never touched.
@@ -54,7 +69,10 @@ function wordMetadata(value) {
   }
 }
 
-const AUTOSAVE_KEY = "audionaut.v0.2.project";
+// v0.3 stores the sample-pool-and-regions model. The v0.2 key is read once when there is no v0.3
+// autosave (an old session), migrated on load, and removed with the next clear.
+const AUTOSAVE_KEY = "audionaut.v0.3.project";
+const AUTOSAVE_KEY_V2 = "audionaut.v0.2.project";
 const SETTINGS_KEY = "audionaut.v0.2.settings";
 
 // Pretty-printed for files people may open; `compact` (autosave) saves ~30% of
@@ -63,7 +81,7 @@ export function exportProject({ compact = false } = {}) {
   return JSON.stringify(
     {
       ...store.project,
-      format: "audionaut-workstation/2",
+      format: "audionaut-workstation/3",
       clipSnapshotVersion: 1,
     },
     null,
@@ -89,11 +107,66 @@ export function importProject(json) {
   const project =
     data.format?.startsWith("audional-sequencer-x") ||
     data.format === "audional-sequencer-l1xl2/1" ||
-    data.format === "audionaut-workstation/2"
+    data.format === "audionaut-workstation/2" ||
+    data.format === "audionaut-workstation/3"
       ? normalizeNative(data)
       : convertLegacy(data);
   store.loadProject(project);
   return project;
+}
+
+// Validates and bounds the sample fields of `target` (a pool entry, or a v2 channel standing in
+// for its default sample) from the raw saved values `c`.
+function cleanSample(target, c, songMode) {
+  if (
+    c.clipSnapshot &&
+    (!Number.isFinite(c.trimStart) ||
+      !Number.isFinite(c.trimEnd) ||
+      c.trimStart < 0 ||
+      c.trimEnd > 1 ||
+      c.trimEnd <= c.trimStart ||
+      !Number.isFinite(c.pitch) ||
+      c.pitch < 0.1 ||
+      c.pitch > 4 ||
+      (c.gateSteps != null &&
+        (!Number.isFinite(c.gateSteps) ||
+          c.gateSteps < 0 ||
+          c.gateSteps > 64)))
+  )
+    throw new Error(
+      "Invalid saved clip playback settings; the current project was retained.",
+    );
+  target.sampleName = String(c.sampleName || "").slice(0, 160);
+  target.pitch = finite(c.pitch, 1, 0.1, songMode ? 100 : 4);
+  target.trimStart = finite(c.trimStart, 0, 0, 1 - 1e-7);
+  target.trimEnd = finite(c.trimEnd, 1, target.trimStart + 1e-7, 1);
+  target.reverse = !!c.reverse;
+  target.source = c.source ?? null;
+  target.wordSelection = wordMetadata(c.wordSelection);
+  target.clipSnapshot = c.clipSnapshot
+    ? validateClipSnapshot(c.clipSnapshot)
+    : null;
+  if (
+    target.clipSnapshot &&
+    (target.source?.type !== "ordinal" ||
+      target.source.value !== target.clipSnapshot.source.inscriptionId ||
+      target.source.audioSha256 !==
+        target.clipSnapshot.retrieved.payloadHash ||
+      target.source.sourceSha256 !== target.clipSnapshot.retrieved.sourceHash)
+  )
+    throw new Error("Channel source differs from its pinned clip snapshot.");
+  target.soundMetadata = c.soundMetadata
+    ? validateSoundMetadata(c.soundMetadata)
+    : null;
+  target.gateSteps = finite(
+    c.gateSteps,
+    target.soundMetadata?.loop ? 8 : 0,
+    0,
+    64,
+  );
+  target.sampleMidi =
+    c.sampleMidi == null ? null : finite(c.sampleMidi, 60, 0, 127) | 0;
+  if (c.analysis && typeof c.analysis === "object") target.analysis = c.analysis;
 }
 
 function normalizeNative(data) {
@@ -117,67 +190,45 @@ function normalizeNative(data) {
     continuous: data.continuous ?? true,
     currentSequence: 0,
   });
+  // Channels, and the sample pool they play from. Version 2 files keep each channel's sample on
+  // the channel itself (and steps in the sequences); version 3 files carry `samples` and
+  // `defaultSample`. Either way the sample fields are validated by cleanSample, and v2 channels
+  // are cleaned through their view of their default sample.
+  const isV3 = Array.isArray(data.samples);
   if (Array.isArray(data.channels)) {
     const count = Math.max(1, Math.min(data.channels.length, MAX_CHANNELS));
     while (p.channels.length < count)
-      p.channels.push(makeChannel(p.channels.length));
+      p.channels.push(bindChannel(p, makeChannel(p.channels.length)));
     p.channels.length = count;
+    p.sequences.forEach((seq) => (seq.regions.length = count));
+    if (isV3) {
+      p.nextId = Math.max(0, Math.floor(+data.nextId || 0));
+      const seen = new Set();
+      p.samples = data.samples.slice(0, 4096).flatMap((raw) => {
+        if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || seen.has(raw.id)) return [];
+        seen.add(raw.id);
+        const sample = { id: raw.id };
+        Object.assign(sample, blankSample(raw.id), raw);
+        cleanSample(sample, raw, p.songOrigin);
+        return [sample];
+      });
+      invalidatePool(p);
+    }
     data.channels.slice(0, count).forEach((c, i) => {
       if (!c || typeof c !== "object")
         throw new Error("The project contains an invalid channel.");
-      Object.assign(p.channels[i], c);
       const channel = p.channels[i];
-      if (
-        c.clipSnapshot &&
-        (!Number.isFinite(c.trimStart) ||
-          !Number.isFinite(c.trimEnd) ||
-          c.trimStart < 0 ||
-          c.trimEnd > 1 ||
-          c.trimEnd <= c.trimStart ||
-          !Number.isFinite(c.pitch) ||
-          c.pitch < 0.1 ||
-          c.pitch > 4 ||
-          (c.gateSteps != null &&
-            (!Number.isFinite(c.gateSteps) ||
-              c.gateSteps < 0 ||
-              c.gateSteps > 64)))
-      )
-        throw new Error(
-          "Invalid saved clip playback settings; the current project was retained.",
-        );
-      channel.name = String(channel.name || `Channel ${i + 1}`).slice(0, 64);
-      channel.sampleName = String(channel.sampleName || "").slice(0, 160);
-      channel.volume = finite(channel.volume, 0.9, 0, p.songOrigin ? 3 : 1.5);
-      channel.pitch = finite(channel.pitch, 1, 0.1, p.songOrigin ? 100 : 4);
-      channel.trimStart = finite(channel.trimStart, 0, 0, 1 - 1e-7);
-      channel.trimEnd = finite(channel.trimEnd, 1, channel.trimStart + 1e-7, 1);
-      channel.wordSelection = wordMetadata(c.wordSelection);
-      channel.clipSnapshot = c.clipSnapshot
-        ? validateClipSnapshot(c.clipSnapshot)
-        : null;
-      if (
-        channel.clipSnapshot &&
-        (channel.source?.type !== "ordinal" ||
-          channel.source.value !== channel.clipSnapshot.source.inscriptionId ||
-          channel.source.audioSha256 !==
-            channel.clipSnapshot.retrieved.payloadHash ||
-          channel.source.sourceSha256 !==
-            channel.clipSnapshot.retrieved.sourceHash)
-      )
-        throw new Error(
-          "Channel source differs from its pinned clip snapshot.",
-        );
-      channel.soundMetadata = c.soundMetadata
-        ? validateSoundMetadata(c.soundMetadata)
-        : null;
-      channel.gateSteps = finite(
-        c.gateSteps,
-        channel.soundMetadata?.loop ? 8 : 0,
-        0,
-        64,
-      );
-      channel.sampleMidi =
-        c.sampleMidi == null ? null : finite(c.sampleMidi, 60, 0, 127) | 0;
+      if (isV3) {
+        for (const k of ["color", "mute", "solo"]) if (k in c) channel[k] = c[k];
+        channel.defaultSample = poolSampleById(p, c.defaultSample)
+          ? c.defaultSample
+          : null;
+      } else {
+        Object.assign(channel, c);
+        cleanSample(channel, c, p.songOrigin);
+      }
+      channel.name = String(c.name || `Channel ${i + 1}`).slice(0, 64);
+      channel.volume = finite(c.volume, 0.9, 0, p.songOrigin ? 3 : 1.5);
       // fx/inserts: current chains, or the old fixed FX object + 4 insert slots
       channel.inserts = c.inserts;
       channel.fx = c.fx && typeof c.fx === "object" ? c.fx : [];
@@ -236,36 +287,81 @@ function normalizeNative(data) {
     });
   }
   if (Array.isArray(data.sequences) && data.sequences.length) {
+    // v3 regions: keep only well-formed ones that point at a pool entry that exists.
+    const cleanRegion = (r, seen) => {
+      if (
+        !r ||
+        typeof r !== "object" ||
+        !Number.isFinite(+r.pos) ||
+        !poolSampleById(p, r.sample)
+      )
+        return [];
+      let id = typeof r.id === "string" && /^r\w{1,12}$/.test(r.id) ? r.id : null;
+      if (id) p.nextId = Math.max(p.nextId, parseInt(id.slice(1), 36) || 0);
+      if (!id || seen.has(id)) id = newId(p, "r");
+      seen.add(id);
+      return [
+        {
+          id,
+          sample: r.sample,
+          pos: finite(r.pos, 0, 0, NUM_STEPS - 1e-6),
+          v: r.v === 2 ? 2 : 1,
+          ...(r.rev != null && { rev: !!r.rev }),
+          ...(r.trimStart != null && { trimStart: +r.trimStart }),
+          ...(r.trimEnd != null && { trimEnd: +r.trimEnd }),
+          ...(r.pitch != null && { pitch: +r.pitch }),
+          ...(r.xfade != null && { xfade: +r.xfade }),
+          ...(r.gateSteps != null && { gateSteps: finite(r.gateSteps, 0, 0, 64) }),
+          ...(r.sampleMidi != null && { sampleMidi: finite(r.sampleMidi, 60, 0, 127) | 0 }),
+          ...(r.wordSelection && { wordSelection: wordMetadata(r.wordSelection) }),
+        },
+      ];
+    };
     p.sequences = data.sequences.slice(0, MAX_SEQUENCES).map((s) => {
       const seq = makeSequence(chCount);
-      (s.steps || []).slice(0, chCount).forEach((row, ch) => {
-        row.slice(0, NUM_STEPS).forEach((v, st) => {
-          if (v && typeof v === "object") {
-            seq.steps[ch][st] = {
-              v: v.v === 2 ? 2 : 1,
-              ...(v.rev != null && { rev: !!v.rev }),
-              ...(v.trimStart != null && { trimStart: +v.trimStart }),
-              ...(v.trimEnd != null && { trimEnd: +v.trimEnd }),
-              ...(v.pitch != null && { pitch: +v.pitch }),
-              ...(v.xfade != null && { xfade: +v.xfade }),
-              ...(v.off != null &&
-                finite(v.off, 0, 0, 0.999) > 0 && {
-                  off: finite(v.off, 0, 0, 0.999),
-                }),
-              ...(v.gateSteps != null && {
-                gateSteps: finite(v.gateSteps, 0, 0, 64),
-              }),
-              ...(v.sampleMidi != null && {
-                sampleMidi: finite(v.sampleMidi, 60, 0, 127) | 0,
-              }),
-            };
-            if (v.wordSelection)
-              seq.steps[ch][st].wordSelection = wordMetadata(v.wordSelection);
-          } else {
-            seq.steps[ch][st] = v ? (v === 2 ? 2 : 1) : 0;
-          }
+      if (isV3) {
+        const seen = new Set();
+        (s.regions || []).slice(0, chCount).forEach((row, ch) => {
+          seq.regions[ch] = sortRegions(
+            (Array.isArray(row) ? row : []).slice(0, 4096).flatMap((r) => cleanRegion(r, seen)),
+          );
         });
-      });
+      } else {
+        (s.steps || []).slice(0, chCount).forEach((row, ch) => {
+          const clean = new Array(NUM_STEPS).fill(0);
+          row.slice(0, NUM_STEPS).forEach((v, st) => {
+            if (v && typeof v === "object") {
+              clean[st] = {
+                v: v.v === 2 ? 2 : 1,
+                ...(v.rev != null && { rev: !!v.rev }),
+                ...(v.trimStart != null && { trimStart: +v.trimStart }),
+                ...(v.trimEnd != null && { trimEnd: +v.trimEnd }),
+                ...(v.pitch != null && { pitch: +v.pitch }),
+                ...(v.xfade != null && { xfade: +v.xfade }),
+                ...(v.off != null &&
+                  finite(v.off, 0, 0, 0.999) > 0 && {
+                    off: finite(v.off, 0, 0, 0.999),
+                  }),
+                ...(v.gateSteps != null && {
+                  gateSteps: finite(v.gateSteps, 0, 0, 64),
+                }),
+                ...(v.sampleMidi != null && {
+                  sampleMidi: finite(v.sampleMidi, 60, 0, 127) | 0,
+                }),
+              };
+              if (v.wordSelection)
+                clean[st].wordSelection = wordMetadata(v.wordSelection);
+            } else {
+              clean[st] = v ? (v === 2 ? 2 : 1) : 0;
+            }
+          });
+          // Steps on a channel that has no sample yet still need a pool entry to point at.
+          if (clean.some(Boolean))
+            seq.regions[ch] = sortRegions(
+              rowToRegions(p, clean, ensureDefaultSample(p, p.channels[ch]).id),
+            );
+        });
+      }
       (s.notes || []).slice(0, NUM_INSTRUMENTS).forEach((list, i) => {
         seq.notes[i] = (list || [])
           .filter(
@@ -286,6 +382,14 @@ function normalizeNative(data) {
       return seq;
     });
   }
+  // v2 files list every channel's (mostly stock) sample fields. Keep a pool entry only where it
+  // holds something or a region plays it.
+  const played = new Set(p.sequences.flatMap((seq) => seq.regions.flat().map((r) => r.sample)));
+  for (const c of p.channels) {
+    const own = poolSampleById(p, c.defaultSample);
+    if (own && isBlankSample(own) && !played.has(own.id)) c.defaultSample = null;
+  }
+  collectUnusedSamples(p);
   p.bpm = finite(p.bpm, 120, 20, 420);
   p.swing = finite(p.swing, 0, 0, 60);
   p.masterVolume = finite(p.masterVolume, 0.9, 0, 1.5);
@@ -297,7 +401,7 @@ function normalizeNative(data) {
 
 // Convert the original Audional Sequencer (B64x / BETA_XI) preset format.
 function convertLegacy(data) {
-  const p = makeProject();
+  const p = makeLegacyProject();
   p.projectName = data.projectName || "Imported project";
   p.artistName = data.artistName || "";
   p.bpm = +data.projectBPM || +data.bpm || 120;
@@ -313,7 +417,7 @@ function convertLegacy(data) {
     Math.min(urls.length, MAX_CHANNELS),
   );
   while (p.channels.length < legacyCount)
-    p.channels.push(makeChannel(p.channels.length));
+    p.channels.push(makeLegacyChannel(p.channels.length));
   for (let i = 0; i < Math.min(urls.length, legacyCount); i++) {
     const c = p.channels[i];
     if (urls[i]) {
@@ -342,7 +446,7 @@ function convertLegacy(data) {
   );
   p.sequences = [];
   for (const key of keys.slice(0, MAX_SEQUENCES)) {
-    const seq = makeSequence(p.channels.length);
+    const seq = makeLegacySequence(p.channels.length);
     const chans = seqs[key] || {};
     for (const chKey of Object.keys(chans)) {
       const chIdx = parseInt(chKey.replace(/\D/g, ""), 10);
@@ -355,7 +459,7 @@ function convertLegacy(data) {
     }
     p.sequences.push(seq);
   }
-  if (!p.sequences.length) p.sequences.push(makeSequence());
+  if (!p.sequences.length) p.sequences.push(makeLegacySequence());
   return p;
 }
 
@@ -372,7 +476,8 @@ export function autosave() {
 
 export function restoreAutosave() {
   try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
+    const raw =
+      localStorage.getItem(AUTOSAVE_KEY) ?? localStorage.getItem(AUTOSAVE_KEY_V2);
     if (raw) {
       importProject(raw);
       return true;
@@ -386,6 +491,7 @@ export function restoreAutosave() {
 export function clearAutosave() {
   try {
     localStorage.removeItem(AUTOSAVE_KEY);
+    localStorage.removeItem(AUTOSAVE_KEY_V2);
   } catch {
     /* storage unavailable */
   }
