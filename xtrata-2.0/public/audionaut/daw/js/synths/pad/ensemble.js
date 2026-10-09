@@ -16,7 +16,7 @@ const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 const FLOOR = 0.0001;
-const GAIN = 0.62; // master voice scale (calibrated against the harness RMS band)
+const GAIN = 0.84; // master voice scale (calibrated against the harness RMS band)
 const DELAY_BASE = 0.0125; // centre delay of each ensemble tap (s)
 const DELAY_SWING = 0.0035; // max delay modulation at depth 1 (s)
 
@@ -153,7 +153,7 @@ function ensembleVoice(ctx, dest, note, P) {
       o.frequency.setValueAtTime(f0 * mult, time);
       o.detune.setValueAtTime(spread[k] * P.detune * 2, time);
       const og = ctx.createGain();
-      og.gain.value = (lv * norm * waveTrim) / voices;
+      og.gain.value = (lv * norm * waveTrim * 0.7071) / Math.sqrt(voices); // power-sum of detuned voices: 2 -> 1/2 as before
       o.connect(og);
       og.connect(mix);
       oscs.push({ o, og });
@@ -186,6 +186,10 @@ function ensembleVoice(ctx, dest, note, P) {
     lp.frequency.exponentialRampToValueAtTime(clamp(base + (peak - base) * 0.35, base, 18000), t1 + Math.max(0.05, P.sweepOut));
   }
   mix.connect(lp);
+  // a cutoff close to the fundamental strips most harmonic power: make up part of it (saw power below
+  // harmonic N ~ 1 - 0.61/N), so dark patches sit near the level of bright ones
+  const nPass = Math.max(1, clamp(base + P.sweep * 0.35, base, 18000) / f0);
+  mix.gain.value = Math.min(1.6, 1 / Math.sqrt(1 - 0.61 / nPass));
 
   // ---------- CHOIR: parallel vowel formants; otherwise straight through
   const body = ctx.createGain();
@@ -198,7 +202,7 @@ function ensembleVoice(ctx, dest, note, P) {
       bp.frequency.value = fc;
       bp.Q.value = 7;
       const bg = ctx.createGain();
-      bg.gain.value = fg * 2.6;
+      bg.gain.value = fg * 3.4;
       lp.connect(bp);
       bp.connect(bg);
       bg.connect(body);
@@ -304,6 +308,77 @@ function ensembleScope(P) {
   return out;
 }
 
+// ---- preset library, stored as data: "Cat|Name|tone wave 16' 8' 4' detune cutoff reso sweep sweepIn sweepOut
+// vowel ensemble ensRate vibrato vibRate attack decay sustain release [level]".
+// tone s/p/c = strings/pad/choir, wave s/q/t = saw/square/triangle, vowel a/o/e/u, "-" = leave at default.
+const PK = "tone wave reg16 reg8 reg4 detune cutoff reso sweep sweepIn sweepOut vowel ensemble ensRate vibrato vibRate attack decay sustain release level".split(" ");
+const PC = { tone: { s: "strings", p: "pad", c: "choir" }, wave: { s: "sawtooth", q: "square", t: "triangle" }, vowel: { a: "ah", o: "oh", e: "ee", u: "oo" } };
+const PRESETS = `Strings|Init (String Machine)|
+Strings|Solina Strings|s s .35 1 .8 9 4200 .8 1200 .5 1.5 - 1 .55 4 5.6 .32 .6 .9 .7
+Strings|Cello Section|s s .9 1 0 8 1800 .9 900 .4 1.2 - .8 .5 6 5.2 .25 .7 .9 .9
+Strings|Violin Ensemble|s s 0 .6 1 7 5200 .7 1500 .3 1 - 1 .65 7 5.8 .2 .5 .9 .8
+Strings|Disco Strings|s s .2 1 1 12 6000 1.2 2500 .15 .6 - 1 .8 3 6 .08 .4 .85 .5
+Strings|Staccato Strings|s s .3 1 .6 9 3800 1 2000 .05 .25 - .9 .6 0 5 .01 .22 .3 .2 1.5
+Strings|Tape Strings|s t .5 1 .4 16 2200 .6 600 .8 2 - .9 .3 9 4.6 .5 .9 .85 1.3 0.5
+Strings|Dark Strings|s s .8 1 .2 10 900 1.5 1400 1.2 2.5 - .85 .45 4 5 .6 1 .9 1.4
+Strings|Square Strings|s q .3 1 .7 10 3000 1 1500 .4 1.4 - .9 .6 4 5.4 .3 .7 .9 .9 0.65
+Pads|Warm Analog Pad|p s .7 1 .2 18 1100 2.5 3800 2.2 3.5 - .55 .35 0 5 1.1 1.5 .85 2.2 1.5
+Pads|Triangle Glow|p t .5 1 .6 12 5200 .5 0 .5 1 - .6 .7 6 5.8 .7 1 .9 1.4
+Pads|Velvet Pad|p s .5 1 .3 14 1600 1.5 2400 1.4 2.5 - .7 .4 0 5 .9 1.2 .9 1.8
+Pads|Glass Pad|p t 0 .7 1 9 8000 .5 0 .5 1 - .8 .9 4 6 .8 1 .85 2 0.55
+Pads|Warm Square Pad|p q .6 1 .2 15 1300 2 2000 1.5 3 - .6 .35 0 5 1 1.4 .85 2
+Pads|Airy Pad|p s 0 .6 1 20 6500 .4 3000 2 3 - 1 .3 2 5 1.2 1.5 .8 2.5
+Pads|Hazy Pad|p s .4 1 .5 30 1400 .8 1800 2.5 4 - 1 .18 6 3.2 1.4 2 .9 3 1.5
+Pads|Soft Felt Pad|p t .6 1 .3 8 1200 .3 400 1 2 - .5 .5 0 5 .6 1 .8 1.5 0.7
+Choirs|Choir Ah|c s .3 1 .35 7 3600 1 800 .6 1.2 a .7 .5 10 5.2 .55 .8 .85 1.2
+Choirs|Hollow Oo Choir|c q .5 1 .1 10 2400 .5 600 1.4 2 u .8 .42 14 5 .8 1 .8 1.6
+Choirs|Choir Oh|c s .3 1 .3 8 3000 .8 700 .6 1.2 o .7 .45 9 5 .6 .9 .85 1.3
+Choirs|Bright Ee Choir|c s .1 1 .6 6 5000 .6 1000 .4 1 e .65 .55 8 5.4 .4 .8 .85 1 1.5
+Choirs|Cathedral Choir|c s .6 1 .3 12 2800 1 600 1.5 3 a 1 .3 7 4.8 1.1 1.5 .9 3
+Choirs|Ghost Voices|c t .3 1 .5 18 3200 .5 500 2 3 u 1 .2 16 4.2 1.3 2 .8 3.5
+Choirs|Male Ensemble Oh|c q .8 1 0 9 2000 .6 500 .8 1.5 o .7 .4 8 5 .5 1 .85 1.2 1.5
+Choirs|Robot Choir|c q .2 1 .4 3 4000 2 0 .5 1 a .3 .9 0 5 .05 .4 .9 .4
+Choirs|Angel Ee|c t 0 .8 1 10 6000 .4 800 1.2 2 e .9 .5 12 5.6 1 1.4 .85 2.4 0.75
+Brass|Ensemble Brass|s s .4 1 .3 8 900 2 4200 .08 .6 - .5 .7 3 5.5 .05 .4 .8 .4
+Brass|Soft Horns|p s .5 1 0 6 700 1.5 2600 .2 .9 - .4 .5 4 5.2 .12 .6 .8 .5
+Brass|Synth Brass Stab|s s .3 1 .5 12 1100 3 5500 .04 .3 - .6 .8 0 5 .01 .3 .55 .3 1.5
+Brass|Square Brass|s q .5 1 .2 7 800 2.5 3500 .1 .7 - .5 .6 2 5.4 .06 .5 .75 .45
+Brass|Fanfare Swell|p s .4 1 .6 10 1000 2 6000 .5 1.5 - .7 .55 5 5.6 .4 .8 .85 .8 1.5
+Brass|Low Tuba Section|p q 1 .6 0 6 500 1.5 1500 .15 .8 - .4 .4 0 5 .06 .5 .8 .4
+Organ|Combo Organ|s q .3 1 .8 2 5000 .3 0 .5 1 - .35 1.4 0 5 .005 .1 1 .08 0.7
+Organ|Drawbar Flutes|p t .8 1 .7 1 6000 0 0 .5 1 - .5 1.8 0 5 .005 .1 1 .1 0.5
+Organ|Chorale Organ|s s .6 1 .6 4 2400 .5 0 .5 1 - .8 .9 0 5 .02 .1 1 .3
+Organ|Church Reed|p q 1 .8 .5 3 3000 1 0 .5 1 - .3 .6 0 5 .03 .2 .95 .6
+Organ|Rotary Organ|p q .4 1 .6 2 4000 .5 0 .5 1 - 1 2.5 6 6.8 .005 .1 1 .15 0.6
+Drones|Slow Swell Drone|p s 1 .7 0 26 500 4 5200 3.5 5 - .4 .2 3 3.5 2.4 2 1 3.5 1.5
+Drones|Deep Bed|p s 1 .4 0 22 350 2 800 3 5 - .6 .15 2 3 1.2 2 1 4
+Drones|Dark Choir Drone|c s 1 .7 0 15 1200 1 400 3 5 u .8 .15 6 3.5 1.2 2 1 4
+Drones|Iron Drone|p q 1 .8 .3 30 600 6 1600 4 6 - .5 .12 0 5 1 2 1 4
+Drones|Shimmer Drone|p t .6 .8 1 35 4000 .5 2000 4 6 - 1 .1 4 2.5 1.4 2 1 5 0.6
+Drones|Sub Hum|p t 1 .3 0 12 400 .5 200 2 4 - .3 .2 0 5 .8 2 1 3 0.6
+Sweeps|Bright Sweep|s s .3 1 .8 14 400 6 7000 1.5 3 - .9 .5 0 5 .3 1 .9 1.5
+Sweeps|Reso Bloom|p s .5 1 .4 16 300 9 6000 2 4 - .7 .35 0 5 .6 1.5 .9 2
+Sweeps|Quick Zip Sweep|s s .2 1 .6 10 600 7 7500 .15 .5 - .8 .7 0 5 .02 .4 .7 .5
+Sweeps|Choir Rise|c s .4 1 .5 10 500 2 5000 2.5 3 e .9 .4 8 5 .8 1.5 .9 2 1.5
+Sweeps|Slow Tide Sweep|p q .4 1 .5 20 500 5 4500 3.5 5 - 1 .15 0 5 .8 2 .9 2.5 0.6
+Sweeps|Dawn Sweep|s s 0 1 1 9 800 4 6500 3 4 - 1 .5 3 5 1.2 2 .9 2
+Poly|Bright Ensemble Stab|s s .15 1 1 14 6500 1.8 3800 .05 .35 - .9 .9 0 5 .012 .28 .35 .28 1.5
+Poly|Juno Pad|p s .3 1 .3 12 1800 2 1800 .6 1.5 - 1 .5 0 5 .3 1 .8 1.2
+Poly|OB Sweep Pad|p s .6 1 .4 16 900 3 4000 .8 2 - .6 .4 2 5 .4 1.2 .85 1.4
+Poly|Jump Poly Stab|s s .3 1 .6 12 2500 2 3000 .03 .3 - .8 .7 0 5 .005 .35 .6 .25 1.5
+Poly|80s Pulse Pad|p q .4 1 .5 14 2000 1.5 1500 .7 1.8 - .9 .55 3 5.5 .35 1 .85 1.3 0.7
+Poly|Dream Poly|p s 0 1 .8 18 3500 1 2000 1 2 - 1 .7 4 6 .5 1.2 .8 1.8
+Poly|Unison Keys|s s .5 1 .5 25 2200 1.5 2000 .1 .6 - .5 .6 0 5 .01 .8 .5 .6 1.5`
+  .split("\n")
+  .map((row) => {
+    const [cat, name, vals = ""] = row.split("|");
+    const params = {};
+    vals.split(" ").forEach((v, i) => {
+      if (v && v !== "-") params[PK[i]] = PC[PK[i]] ? PC[PK[i]][v] : +v;
+    });
+    return { name, cat, params };
+  });
+
 const svg = {
   saw: '<path d="M2 18 L12 6 L12 18 L22 6 L22 18"/>',
   sqr: '<path d="M2 18 L2 6 L12 6 L12 18 L22 18 L22 6"/>',
@@ -329,38 +404,10 @@ const ensemble = {
     { name: "Slow Fifths (Dm)", dsl: "0:D3:32 0:A3:32 0:F4:32 32:C3:32 32:G3:32 32:E4:32" },
     { name: "Choir Line (Em)", dsl: "0:E4:8 8:G4:8 16:B4:12 28:A4:4 32:G4:8 40:E4:8 48:D4:12 60:E4:4" },
     { name: "Stab Pulse (Cm)", dsl: "0:C4:2 0:Eb4:2 0:G4:2 4:C4:2 4:Eb4:2 4:G4:2 10:Bb3:2 10:D4:2 10:F4:2 16:C4:2 16:Eb4:2 16:G4:2 20:Ab3:2 20:C4:2 20:Eb4:2 26:Bb3:2 26:D4:2 26:F4:2" },
+    { name: "Brass Swells (Bb)", dsl: "0:Bb3:12 0:D4:12 0:F4:12 16:Eb4:12 16:G4:12 16:Bb3:12 32:F3:8 32:A3:8 32:C4:8 40:F3:20 40:Bb3:20 40:D4:20" },
+    { name: "Drone Pedal (E)", dsl: "0:E2:60 0:B2:60 8:E3:20 32:G3:14 48:F#3:12" },
   ],
-  presets: [
-    { name: "Init (String Machine)", params: {} },
-    {
-      name: "Solina Strings",
-      params: { tone: "strings", wave: "sawtooth", reg16: 0.35, reg8: 1, reg4: 0.8, detune: 9, cutoff: 4200, reso: 0.8, sweep: 1200, sweepIn: 0.5, sweepOut: 1.5, ensemble: 1, ensRate: 0.55, vibrato: 4, vibRate: 5.6, attack: 0.32, decay: 0.6, sustain: 0.9, release: 0.7 },
-    },
-    {
-      name: "Warm Analog Pad",
-      params: { tone: "pad", wave: "sawtooth", reg16: 0.7, reg8: 1, reg4: 0.2, detune: 18, cutoff: 1100, reso: 2.5, sweep: 3800, sweepIn: 2.2, sweepOut: 3.5, ensemble: 0.55, ensRate: 0.35, vibrato: 0, vibRate: 5, attack: 1.1, decay: 1.5, sustain: 0.85, release: 2.2 },
-    },
-    {
-      name: "Choir Ah",
-      params: { tone: "choir", vowel: "ah", wave: "sawtooth", reg16: 0.3, reg8: 1, reg4: 0.35, detune: 7, cutoff: 3600, reso: 1, sweep: 800, sweepIn: 0.6, sweepOut: 1.2, ensemble: 0.7, ensRate: 0.5, vibrato: 10, vibRate: 5.2, attack: 0.55, decay: 0.8, sustain: 0.85, release: 1.2 },
-    },
-    {
-      name: "Hollow Oo Choir",
-      params: { tone: "choir", vowel: "oo", wave: "square", reg16: 0.5, reg8: 1, reg4: 0.1, detune: 10, cutoff: 2400, reso: 0.5, sweep: 600, sweepIn: 1.4, sweepOut: 2, ensemble: 0.8, ensRate: 0.42, vibrato: 14, vibRate: 5, attack: 0.8, decay: 1, sustain: 0.8, release: 1.6 },
-    },
-    {
-      name: "Slow Swell Drone",
-      params: { tone: "pad", wave: "sawtooth", reg16: 1, reg8: 0.7, reg4: 0, detune: 26, cutoff: 500, reso: 4, sweep: 5200, sweepIn: 3.5, sweepOut: 5, ensemble: 0.4, ensRate: 0.2, vibrato: 3, vibRate: 3.5, attack: 2.4, decay: 2, sustain: 1, release: 3.5 },
-    },
-    {
-      name: "Bright Ensemble Stab",
-      params: { tone: "strings", wave: "sawtooth", reg16: 0.15, reg8: 1, reg4: 1, detune: 14, cutoff: 6500, reso: 1.8, sweep: 3800, sweepIn: 0.05, sweepOut: 0.35, ensemble: 0.9, ensRate: 0.9, vibrato: 0, vibRate: 5, attack: 0.012, decay: 0.28, sustain: 0.35, release: 0.28 },
-    },
-    {
-      name: "Triangle Glow",
-      params: { tone: "pad", wave: "triangle", reg16: 0.5, reg8: 1, reg4: 0.6, detune: 12, cutoff: 5200, reso: 0.5, sweep: 0, sweepIn: 0.5, sweepOut: 1, ensemble: 0.6, ensRate: 0.7, vibrato: 6, vibRate: 5.8, attack: 0.7, decay: 1, sustain: 0.9, release: 1.4 },
-    },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#7dd3c0", lcd: "#c9f5ea", lcdBg: "#0d2623", edge: "#274944", bg: "#101e1d" },
     logo: ["", "Layers"],

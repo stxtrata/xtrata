@@ -8,14 +8,15 @@
 // can be controlled and learned (per synth).
 
 import { store } from "./state.js";
-import { engine, emitNoteVisual } from "./engine.js";
+import { engine } from "./engine.js";
 import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { Kit } from "./synth-faces/index.js";
+import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { voxFormants, fmRoles, FM_MOD, FM_CARRIERS, FM_ALGOS, VOWEL_NAMES } from "./synths-voices.js";
 
 const $ = (s) => document.querySelector(s);
-const NOTE_LEN = 0.45; // seconds — voices are one-shot, so notes get a fixed gate
+const NOTE_LEN = 0.45; // seconds — preset / RANDOM audition length
 const KEYMAP = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14 };
 const BLACK = new Set([1, 3, 6, 8, 10]);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -46,7 +47,7 @@ let schema = {};
 let ctrls = {}; // key -> control item (for formats, curves, random)
 let widgets = {}; // key -> { set(v) }
 let vizzes = []; // [{ canvas, draw }]
-let baseOctave = 3;
+let baseOctave = getOctave(); // mirrors live-keys.js (shared with every on-screen keyboard)
 let learn = false;
 let learnTarget = null;
 let ccMap = {};
@@ -57,7 +58,7 @@ const disposeFace = () => {
   faceH = null;
 };
 const lit = new Map(); // pitch -> count of sources currently sounding it
-const heldTyped = new Map(); // typed key -> pitch
+let kbHandle = null; // classic-panel keyboard (live-keys attachKeyboard)
 
 // ------------------------------------------------------------ MIDI CC map (per synth)
 const ccKey = () => `audionaut.cc.${synthId}`;
@@ -605,6 +606,25 @@ function buildItem(item, into) {
   }
 }
 
+// Host preset menu: every factory preset, grouped by its `cat` (presets without one share a
+// "Presets" group). Option values are indices into synth.presets, so order never matters to saves.
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function presetMenu(synth) {
+  const list = synth.presets || [];
+  if (!list.length) return "";
+  const groups = new Map();
+  list.forEach((p, i) => {
+    const c = p.cat || "Presets";
+    if (!groups.has(c)) groups.set(c, []);
+    groups.get(c).push(`<option value="${i}">${esc(p.name)}</option>`);
+  });
+  const body =
+    groups.size > 1
+      ? [...groups].map(([c, o]) => `<optgroup label="${esc(c)} (${o.length})">${o.join("")}</optgroup>`).join("")
+      : [...groups.values()][0].join("");
+  return `<select id="sfp-preset" class="sfp-preset" title="Factory sounds (${list.length})" aria-label="Preset"><option value="">— ${list.length} presets —</option>${body}</select>`;
+}
+
 // Custom front panel (synth-faces/<id>.js): the face draws every control itself and talks to the
 // store through the face runtime, so this shell only supplies the slim toolbar.
 function buildFace(id) {
@@ -616,6 +636,7 @@ function buildFace(id) {
   root.innerHTML = `
     <div class="sfp-head sfp-face-bar">
       <div class="sfp-sub"><b>${synth.name}</b><span id="sfp-inst"></span></div>
+      ${presetMenu(synth)}
       <div class="sfp-oct"><button id="sfp-oct-dn" class="sfp-btn" title="Octave down (Z)">−</button><span id="sfp-oct-lbl"></span><button id="sfp-oct-up" class="sfp-btn" title="Octave up (X)">+</button></div>
       <div class="sfp-head-btns">
         <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
@@ -629,10 +650,17 @@ function buildFace(id) {
     <div class="sfp-face-host"></div>
     <div id="sfp-status" class="sfp-status"></div>`;
   faceH = Kit.mount(root.querySelector(".sfp-face-host"), id, inst);
+  // keep the host menu on whatever preset the face shows (face buttons, prev/next, auto-pick)
+  faceH?.P.onPreset((i) => {
+    const ps = $("#sfp-preset");
+    if (ps) ps.value = i >= 0 ? String(i) : "";
+  });
   wireHeader();
 }
 
 function build(id) {
+  kbHandle?.release();
+  kbHandle = null;
   disposeFace();
   synthId = id;
   const synth = SYNTH_BANK[id];
@@ -651,15 +679,12 @@ function build(id) {
   root.style.setProperty("--sfp-edge", t.edge);
   root.style.setProperty("--sfp-bg", t.bg);
   root.setAttribute("aria-label", `${synth.name} synth panel`);
-  const presets = (synth.presets || [])
-    .map((p, i) => `<option value="${i}">${p.name}</option>`)
-    .join("");
   const bar = spec.adsr ? "adsr" : spec.scopeLabel ? "scope" : "";
   root.innerHTML = `
     <div class="sfp-head">
       <div class="sfp-logo">${spec.logo[0]}<b>${spec.logo[1]}</b></div>
       <div class="sfp-sub">${spec.sub}<span id="sfp-inst"></span></div>
-      <select id="sfp-preset" class="sfp-preset" title="Factory sounds"><option value="">— presets —</option>${presets}</select>
+      ${presetMenu(synth)}
       <div class="sfp-head-btns">
         <button id="sfp-midi" class="sfp-btn" title="Play with a MIDI keyboard / controller while this panel is open"><i class="led"></i>MIDI IN</button>
         <button id="sfp-learn" class="sfp-btn" title="MIDI learn: click a control, then move a knob/fader on your controller"><i class="led"></i>LEARN</button>
@@ -707,23 +732,15 @@ function buildKeys() {
       k.style.left = `calc(${white} * var(--wk))`;
       white++;
     }
-    let down = null;
-    k.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      down = baseOctave * 12 + 12 + i;
-      play(down, 1);
-      emitNoteVisual(inst, down, true); // lit while the mouse is held
-    });
-    const up = () => {
-      if (down == null) return;
-      emitNoteVisual(inst, down, false);
-      down = null;
-    };
-    k.addEventListener("pointerup", up);
-    k.addEventListener("pointerleave", up);
-    k.addEventListener("pointercancel", up);
     keys.appendChild(k);
   }
+  kbHandle = attachKeyboard(keys, {
+    inst: () => inst,
+    keyAt: (n) => {
+      const k = n.closest?.(".sfp-key");
+      return k && keys.contains(k) ? { midi: baseOctave * 12 + 12 + +k.dataset.i, el: k } : null;
+    },
+  });
 }
 
 function wireHeader() {
@@ -744,6 +761,10 @@ function wireHeader() {
   $("#sfp-preset")?.addEventListener("change", (e) => {
     const preset = SYNTH_BANK[synthId].presets?.[+e.target.value];
     if (!preset) return;
+    if (faceH) {
+      faceH.P.loadPreset(+e.target.value, { force: true }); // face UI follows; auditions the sound
+      return setStatus(`Preset: ${preset.name}`);
+    }
     selfWrite = true;
     store.setInstrumentProp(inst, "params", { ...synthDefaults(synthId), ...preset.params });
     selfWrite = false;
@@ -842,7 +863,7 @@ function setLit(pitch, on) {
   paintKeys();
 }
 function shiftOctave(d) {
-  baseOctave = clamp(baseOctave + d, 0, 6);
+  baseOctave = setOctave(baseOctave + d);
   $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
   paintKeys();
 }
@@ -870,17 +891,11 @@ function onKey(e) {
     e.stopImmediatePropagation();
     e.preventDefault();
     if (e.repeat) return;
-    const pitch = baseOctave * 12 + 12 + KEYMAP[k];
-    play(pitch, 1);
-    heldTyped.set(k, pitch);
-    emitNoteVisual(inst, pitch, true); // held until key-up
+    noteOn(`key:${k}`, inst, baseOctave * 12 + 12 + KEYMAP[k], TYPED_VEL); // held until key-up
   }
 }
 function onKeyUp(e) {
-  const k = e.key.toLowerCase();
-  if (!heldTyped.has(k)) return;
-  emitNoteVisual(inst, heldTyped.get(k), false);
-  heldTyped.delete(k);
+  noteOff(`key:${e.key.toLowerCase()}`);
 }
 
 // ------------------------------------------------------------ MIDI
@@ -914,10 +929,9 @@ function onMidi({ data }) {
     if (!isOpen()) return;
     // the roll has its own MIDI handler — don't double-trigger when it's also visible
     if (!$("#modal-roll").classList.contains("hidden")) return;
-    play(d1, d2 / 127);
-    emitNoteVisual(inst, d1, true); // held until note-off
+    noteOn(`midi:${status & 15}:${d1}`, inst, d1, d2 / 127); // held until note-off
   } else if (type === 0x80 || (type === 0x90 && d2 === 0)) {
-    if (isOpen() && $("#modal-roll").classList.contains("hidden")) emitNoteVisual(inst, d1, false);
+    noteOff(`midi:${status & 15}:${d1}`);
   }
 }
 function paintMidi() {
@@ -961,6 +975,9 @@ export function openSynthPanel(i) {
   if (isMidiOn() || midiStatus().error) paintMidi();
 }
 export function closeSynthPanel() {
+  kbHandle?.release();
+  kbHandle = null;
+  allOff("key:");
   disposeFace();
   root.closest(".modal").classList.add("hidden");
   learn = false;
@@ -974,9 +991,13 @@ export function initSynthPanel() {
   document.addEventListener("midi-status", paintMidi);
   window.addEventListener("keydown", onKey, true);
   window.addEventListener("keyup", onKeyUp, true);
-  window.addEventListener("blur", () => {
-    for (const p of heldTyped.values()) emitNoteVisual(inst, p, false);
-    heldTyped.clear();
+  // blur / tab switch release every held note (live-keys.js)
+  document.addEventListener("live-octave", (e) => {
+    baseOctave = e.detail;
+    if (isOpen()) {
+      $("#sfp-oct-lbl").textContent = `C${baseOctave}`;
+      paintKeys();
+    }
   });
   window.addEventListener("resize", () => isOpen() && drawViz());
   // everything that sounds on this synth (sequencer, roll, MIDI, mouse) lights the keys

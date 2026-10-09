@@ -15,9 +15,14 @@ const PRISM_MATERIALS = {
   glass: [1, 2.01, 2.756, 4.08, 5.404, 6.71, 8.21],
   ceramic: [1, 1.593, 2.135, 2.918, 4.167, 5.431, 6.789],
   bronze: [1, 2.32, 3.18, 4.76, 6.27, 7.91, 9.63],
+  // added lattices (refraction 1 = full character, 0 = plain harmonic series)
+  reed: [1, 3, 5, 7, 9, 11, 13], // odd harmonics: hollow, clarinet / square-ish
+  bar: [1, 2.756, 5.404, 8.933, 13.34, 18.64, 24.81], // free bar: tines, anvils, xylophone
+  sub: [0.5, 1, 2, 3, 4, 6, 8], // sub-octave root under the played note: basses, drones
+  cloud: [1, 1.006, 1.994, 2.012, 2.985, 3.02, 4.01], // detuned pairs: beating ensemble / chorus
 };
 const PRISM_WEIGHTS = [1, 0.46, 0.32, 0.23, 0.17, 0.12, 0.085];
-const MATERIALS = ["glass", "ceramic", "bronze"];
+const MATERIALS = ["glass", "ceramic", "bronze", "reed", "bar", "sub", "cloud"];
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const num = (n, d) => (typeof n === "number" && Number.isFinite(n) ? n : d);
 const KGAIN = 0.2; // per-note headroom constant (tuned for default RMS)
@@ -97,7 +102,7 @@ const prismParams = [
   range("refraction", "Refraction", 0, 1, 0.01, 0.48),
   range("bloom", "Bloom", 0, 2, 0.01, 0.42),
   range("gravity", "Gravity", 0, 1, 0.01, 0.65),
-  range("strike", "Strike", 0, 1, 0.01, 0.32),
+  range("strike", "Strike", 0, 2, 0.01, 0.32),
   range("damping", "Damping", 0, 1, 0.01, 0.4),
   range("orbit", "Orbit", 0, 1, 0.01, 0.24),
   range("rate", "Orbit Rate", 0.03, 6, 0.01, 0.17),
@@ -172,6 +177,69 @@ function prismScope(P) {
 const ICON_GLASS = '<path d="M12 2 L22 12 L12 22 L2 12 Z M12 2 L8 12 L12 22 M2 12 H22"/>';
 const ICON_CERAMIC = '<path d="M5 4 H19 L17 19 Q12 23 7 19 Z M4 4 H20"/>';
 const ICON_BRONZE = '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>';
+const ICON_REED = '<path d="M4 20 V8 H8 V20 M10 20 V4 H14 V20 M16 20 V11 H20 V20"/>';
+const ICON_BAR = '<path d="M2 10 H22 V14 H2 Z M6 14 V19 M18 14 V19"/>';
+const ICON_SUB = '<path d="M2 12 Q7 2 12 12 T22 12"/>';
+const ICON_CLOUD = '<path d="M2 9 Q7 4 12 9 T22 9 M2 15 Q7 10 12 15 T22 15"/>';
+
+// Preset table: [name, cat, material#, refraction, bloom, gravity, strike, damping, orbit, rate, width,
+//                cutoff, attack, decay, sustain, release, level, testPitch?]
+const PK = ["material", "refraction", "bloom", "gravity", "strike", "damping", "orbit", "rate", "width", "cutoff", "attack", "decay", "sustain", "release", "level"];
+const pre = (r) => {
+  const o = { name: r[0], cat: r[1], params: {} };
+  PK.forEach((k, i) => (o.params[k] = i ? r[i + 2] : MATERIALS[r[2]]));
+  if (r[17]) o.testPitch = r[17];
+  return o;
+};
+// material#: 0 glass 1 ceramic 2 bronze 3 reed 4 bar 5 sub 6 cloud
+const CATS = ["Bells", "Keys", "Plucks", "Bass", "Leads", "Pads", "Perc Hits", "FX"];
+const byCat = (l) => [l[0], ...l.slice(1).map((p, i) => [p, i]).sort((x, y) => CATS.indexOf(x[0].cat) - CATS.indexOf(y[0].cat) || x[1] - y[1]).map((x) => x[0])];
+const PRISM_TABLE = [
+  ["Tine Chapel", "Bells", 4, 1, 0.05, 0, 0.4, 0.3, 0.2, 0.3, 0.7, 9000, 0.002, 2.5, 0, 3, 1.28],
+  ["Ceramic Gamelan", "Bells", 1, 1, 0, 0.2, 0.5, 0.35, 0.1, 0.2, 0.6, 6000, 0.002, 1.6, 0, 2, 1.39],
+  ["Tubular Dusk", "Bells", 2, 0.6, 0.1, 0.3, 0.6, 0.15, 0.2, 0.15, 0.8, 4500, 0.002, 3.5, 0, 4.5, 1.38],
+  ["Glass Rhodes", "Keys", 0, 0.06, 0.02, 1, 0.25, 0.7, 0.3, 4.5, 0.6, 3800, 0.003, 1.2, 0.25, 0.5, 0.9],
+  ["Reed Organ", "Keys", 3, 1, 0, 0, 0, 0, 0.15, 0.9, 0.4, 4200, 0.008, 0.3, 1, 0.08, 0.46],
+  ["Hollow Clav", "Keys", 3, 1, 0, 0, 0.35, 0.8, 0, 0.2, 0.3, 5200, 0.002, 0.35, 0.1, 0.12, 1.5],
+  ["Celesta Box", "Keys", 4, 0.35, 0, 0.7, 0.2, 0.6, 0.1, 0.3, 0.5, 7000, 0.002, 0.8, 0, 0.9, 1.26],
+  ["Felt Keys", "Keys", 0, 0.02, 0, 1, 0, 0.9, 0.1, 0.2, 0.5, 1600, 0.006, 0.9, 0.2, 0.4, 1.09],
+  ["Toy Piano Grit", "Keys", 1, 0.3, 0, 0.9, 0.8, 0.5, 0, 0.2, 0.4, 8000, 0.002, 0.7, 0.05, 0.5, 1.25],
+  ["Harp Wire", "Plucks", 0, 0, 0, 1, 0.15, 0.85, 0.2, 0.4, 0.7, 5200, 0.002, 0.55, 0, 0.6, 1.5],
+  ["Koto Prism", "Plucks", 1, 0.4, 0.03, 0.8, 0.5, 0.6, 0.1, 0.3, 0.5, 4200, 0.002, 0.5, 0, 0.5, 1.5],
+  ["Square Pluck", "Plucks", 3, 1, 0, 0, 0.2, 0.9, 0.1, 0.3, 0.4, 2600, 0.002, 0.3, 0, 0.3, 1.5],
+  ["Bronze Kalimba", "Plucks", 2, 0.3, 0, 0.8, 0.1, 0.7, 0, 0.2, 0.3, 3500, 0.002, 0.6, 0, 0.6, 1.28],
+  ["Sub Pluck", "Plucks", 5, 1, 0, 0, 0.3, 0.9, 0, 0.2, 0.2, 1400, 0.002, 0.35, 0, 0.25, 1.5, 45],
+  ["Glimmer Arp", "Plucks", 6, 1, 0, 0, 0.3, 0.5, 0.6, 3, 0.9, 9000, 0.002, 0.4, 0, 0.4, 1.3, 69],
+  ["Sine Sub", "Bass", 5, 1, 0, 0, 0.1, 1, 0, 0.2, 0, 400, 0.004, 0.8, 0.7, 0.12, 0.62, 52],
+  ["Reed Bass", "Bass", 3, 1, 0, 0, 0.25, 0.5, 0, 0.2, 0.2, 900, 0.003, 0.5, 0.5, 0.1, 0.8, 40],
+  ["Punch Bass", "Bass", 0, 0, 0, 1, 0.7, 0.9, 0, 0.2, 0.2, 1600, 0.002, 0.35, 0.4, 0.1, 1.01, 40],
+  ["Bronze Growl", "Bass", 2, 0.35, 0, 0.2, 1.2, 0.3, 0, 0.2, 0.3, 1100, 0.002, 0.9, 0.5, 0.15, 0.71, 40],
+  ["Rubber Bass", "Bass", 1, 1, 0, 1, 0.4, 0.6, 0, 0.2, 0.2, 1200, 0.003, 0.6, 0.5, 0.12, 0.79, 40],
+  ["Deep Pulse", "Bass", 6, 1, 0, 0, 0, 0.6, 0.3, 0.5, 0.5, 500, 0.01, 1, 0.8, 0.2, 0.56, 40],
+  ["Clarinet Beam", "Leads", 3, 1, 0.02, 0, 0.05, 0.3, 0.1, 0.3, 0.3, 3200, 0.03, 0.4, 0.85, 0.25, 0.54, 64],
+  ["Prism Saw", "Leads", 0, 0, 0, 1, 0.1, 0, 0.2, 0.5, 0.6, 6500, 0.01, 0.5, 0.8, 0.3, 0.54, 64],
+  ["Bronze Whistle", "Leads", 2, 1, 0, 1, 0.6, 0.9, 0.1, 0.3, 0.3, 5000, 0.02, 0.4, 0.9, 0.25, 0.54, 69],
+  ["Hollow Square", "Leads", 3, 1, 0, 0, 0.4, 0, 0, 0.2, 0.2, 8000, 0.005, 0.6, 0.75, 0.2, 0.56, 64],
+  ["Morph Lead", "Leads", 1, 1, 0.05, 1, 0.2, 0.4, 0.2, 0.6, 0.5, 4500, 0.01, 1.2, 0.7, 0.3, 0.58, 64],
+  ["Detune Lead", "Leads", 6, 1, 0, 0, 0.15, 0.2, 0.3, 1.5, 0.7, 5000, 0.01, 0.6, 0.8, 0.25, 0.55, 64],
+  ["Choir of Cells", "Pads", 6, 1, 0.8, 0, 0, 0.3, 0.7, 0.12, 1, 3500, 1.2, 2, 0.8, 3.5, 0.63],
+  ["Dark Reed Swell", "Pads", 3, 1, 1, 0, 0, 0.2, 0.5, 0.1, 0.9, 700, 1.5, 3, 0.9, 3, 0.75],
+  ["Gravity Well", "Pads", 2, 1, 2, 1, 0, 0.1, 0.5, 0.07, 1, 5000, 0.6, 3.5, 0.6, 4, 0.55],
+  ["Sub Drone", "Pads", 5, 1, 0.5, 0, 0, 0.4, 0.4, 0.07, 1, 300, 2, 3, 1, 4, 0.9],
+  ["Morning Haze", "Pads", 0, 0.2, 1.5, 0.5, 0, 0.5, 0.6, 0.2, 1, 2000, 1, 2.5, 0.7, 3.5, 0.61],
+  ["Anvil", "Perc Hits", 4, 1, 0, 0, 1.4, 0.3, 0, 0.2, 0.4, 12000, 0.002, 0.25, 0, 0.5, 1.35],
+  ["Wood Block", "Perc Hits", 1, 1, 0, 0, 0.3, 1, 0, 0.2, 0.2, 3000, 0.002, 0.08, 0, 0.1, 1.5, 69],
+  ["Steel Pan", "Perc Hits", 0, 0.3, 0, 0.9, 0.45, 0.5, 0.1, 0.3, 0.5, 6000, 0.002, 0.7, 0, 0.8, 1.4],
+  ["Gong Hit", "Perc Hits", 2, 1, 0.05, 0, 1.8, 0.1, 0.4, 0.3, 0.9, 7000, 0.002, 3.5, 0, 4, 1.31, 45],
+  ["Membrane Thud", "Perc Hits", 1, 1, 0, 0.6, 0.9, 0.8, 0, 0.2, 0.2, 1200, 0.002, 0.25, 0, 0.2, 1.5, 45],
+  ["Clank", "Perc Hits", 4, 0.7, 0, 0.3, 2, 0.2, 0, 0.2, 0.5, 14000, 0.002, 0.12, 0, 0.2, 1.5],
+  ["Noise Tick", "Perc Hits", 6, 1, 0, 0, 2, 0, 0, 0.2, 0.6, 14000, 0.002, 0.05, 0, 0.06, 1.49, 72],
+  ["Breath Shard", "FX", 6, 1, 0.4, 0, 2, 0.2, 1, 5, 1, 11000, 0.3, 1, 0.3, 1.5, 0.9],
+  ["Laser Fall", "FX", 4, 1, 0, 1, 1.2, 0.3, 0.3, 1, 0.8, 10000, 0.002, 1, 0.2, 1, 1.01],
+  ["Reverse Bloom", "FX", 0, 0.8, 2, 0.9, 0, 0, 0.5, 0.15, 1, 8000, 1.5, 2, 0.7, 2.5, 0.76],
+  ["Radio Ghost", "FX", 3, 0.5, 0.6, 0.3, 1, 0.5, 1, 6, 1, 1800, 0.05, 1.5, 0.5, 2, 0.64],
+  ["Sonar Ping", "FX", 0, 0, 0, 1, 0, 1, 0.8, 0.4, 1, 2000, 0.002, 2, 0, 3, 1.5, 69],
+];
 
 export const PRISM_SYNTHS = {
   prism: {
@@ -228,7 +296,7 @@ export const PRISM_SYNTHS = {
       if (P.strike > 0) {
         const mod = osc(Math.min(base * Math.SQRT2, nyquist * 0.15));
         strike = gain(0);
-        const depth = Math.min(base * (0.12 + Math.min(vel, 1.2) * 0.38) * P.strike, nyquist * 0.012);
+        const depth = Math.min(base * (0.12 + Math.min(vel, 1.2) * 0.38) * P.strike, nyquist * 0.012 * Math.max(1, P.strike));
         strike.gain.setValueAtTime(depth, time);
         strike.gain.exponentialRampToValueAtTime(Math.max(1e-6, depth * 1e-5), time + 0.03 + P.strike * 0.27);
         strike.gain.linearRampToValueAtTime(0, time + 0.05 + P.strike * 0.27);
@@ -299,18 +367,22 @@ export const PRISM_SYNTHS = {
       { name: "Glass Architecture", dsl: "0:A3:14:90 0:C4:14:76 0:E4:14:81 16:F3:14:87 16:A3:14:73 16:C4:14:78 32:C4:14:87 32:E4:14:75 32:G4:14:79 48:G3:16:90 48:B3:16:72 48:D4:16:80" },
       { name: "Bronze Footsteps", dsl: "0:A2:2:118 6:A3:2:71 10:E3:3:87 16:A2:3:107 22:C4:2:67 28:G3:3:82 32:F2:3:112 38:C3:2:84 44:E3:3:76 48:E2:3:118 54:B3:2:68 60:E3:4:94" },
       { name: "Tiny Machines", dsl: "0:A4:2:110 3:E5:2:65 8:C5:2:85 11:B4:2:67 16:A4:2:108 20:E5:2:81 24:G5:2:73 27:E5:2:63 32:F4:2:111 35:C5:2:66 40:A4:2:86 43:G4:2:68 48:E4:2:113 52:B4:2:82 56:D5:2:74 60:B4:3:70" },
+      { name: "Sub Lattice Bass", dsl: "0:A1:3:118 4:A1:2:84 8:A2:2:96 12:G1:3:104 16:F1:4:116 22:F1:2:82 24:C2:3:98 28:E2:2:90 32:D2:4:116 38:D2:2:80 40:F2:3:92 44:A1:3:102 48:E1:6:118 56:E2:2:96 60:G#1:3:104" },
+      { name: "Reed Line", dsl: "0:E4:4:96 4:G4:2:82 6:A4:6:100 12:C5:4:88 16:B4:3:90 20:A4:2:80 22:G4:6:94 28:E4:4:84 32:D4:4:92 36:E4:2:80 38:G4:4:90 42:A4:6:100 48:B4:3:96 52:A4:3:84 56:E4:8:92" },
     ],
 
-    presets: [
-      { name: "Prism Garden", params: {} },
-      { name: "Pocket Planet", params: { material: "ceramic", refraction: 0.22, bloom: 0.07, gravity: 0.86, strike: 0.18, damping: 0.75, decay: 0.58, sustain: 0, release: 0.85, cutoff: 4800, orbit: 0.1, level: 1.3 } },
-      { name: "Glass Cathedral", params: { refraction: 0.74, bloom: 1.25, gravity: 0.27, attack: 0.34, decay: 2.6, sustain: 0.55, release: 4.8, orbit: 0.56, rate: 0.08, width: 1, damping: 0.14, strike: 0.08, cutoff: 9200, level: 0.78 } },
-      { name: "Bronze Afterimage", params: { material: "bronze", refraction: 0.9, bloom: 0.16, gravity: 0.14, strike: 0.78, decay: 2.2, sustain: 0, release: 3.2, cutoff: 8900, damping: 0.25, width: 0.8 } },
-      { name: "Event Horizon", params: { material: "bronze", refraction: 0.82, bloom: 1.7, gravity: 1, attack: 0.16, decay: 3.4, sustain: 0.62, release: 4.6, strike: 0.06, orbit: 0.86, rate: 0.09, cutoff: 3900, damping: 0.08, width: 1, level: 0.8 } },
-      { name: "Ceramic Teeth", params: { material: "ceramic", refraction: 0.8, bloom: 0, gravity: 0.1, strike: 0.9, decay: 0.19, sustain: 0, release: 0.25, damping: 0.8, orbit: 0, width: 0.3, cutoff: 6700, level: 1.5 } },
-      { name: "Velvet Satellite", params: { material: "ceramic", refraction: 0.09, bloom: 0.85, gravity: 0.85, strike: 0, attack: 0.8, decay: 2.1, sustain: 0.64, release: 3.9, cutoff: 2400, orbit: 0.38, rate: 0.11, damping: 0.65, level: 0.82 } },
-      { name: "Unstable Jewellery", params: { material: "bronze", refraction: 1, bloom: 0.31, gravity: 0.52, strike: 0.68, decay: 1.05, sustain: 0.12, release: 1.9, orbit: 1, rate: 2.4, width: 1, cutoff: 10300, damping: 0.2, level: 0.8 } },
-    ],
+    // Init first, then grouped by category (stable order within a category)
+    presets: byCat([
+      { name: "Prism Garden", cat: "Bells", params: {} },
+      { name: "Pocket Planet", cat: "Plucks", params: { material: "ceramic", refraction: 0.22, bloom: 0.07, gravity: 0.86, strike: 0.18, damping: 0.75, decay: 0.58, sustain: 0, release: 0.85, cutoff: 4800, orbit: 0.1, level: 1.5 } },
+      { name: "Glass Cathedral", cat: "Pads", params: { refraction: 0.74, bloom: 1.25, gravity: 0.27, attack: 0.34, decay: 2.6, sustain: 0.55, release: 4.8, orbit: 0.56, rate: 0.08, width: 1, damping: 0.14, strike: 0.08, cutoff: 9200, level: 0.53 } },
+      { name: "Bronze Afterimage", cat: "Bells", params: { material: "bronze", refraction: 0.9, bloom: 0.16, gravity: 0.14, strike: 0.78, decay: 2.2, sustain: 0, release: 3.2, cutoff: 8900, damping: 0.25, width: 0.8, level: 1.5 } },
+      { name: "Event Horizon", cat: "Pads", params: { material: "bronze", refraction: 0.82, bloom: 1.7, gravity: 1, attack: 0.16, decay: 3.4, sustain: 0.62, release: 4.6, strike: 0.06, orbit: 0.86, rate: 0.09, cutoff: 3900, damping: 0.08, width: 1, level: 0.5 } },
+      { name: "Ceramic Teeth", cat: "Perc Hits", params: { material: "ceramic", refraction: 0.8, bloom: 0, gravity: 0.1, strike: 0.9, decay: 0.19, sustain: 0, release: 0.25, damping: 0.8, orbit: 0, width: 0.3, cutoff: 6700, level: 1.5 } },
+      { name: "Velvet Satellite", cat: "Pads", params: { material: "ceramic", refraction: 0.09, bloom: 0.85, gravity: 0.85, strike: 0, attack: 0.8, decay: 2.1, sustain: 0.64, release: 3.9, cutoff: 2400, orbit: 0.38, rate: 0.11, damping: 0.65, level: 0.58 } },
+      { name: "Unstable Jewellery", cat: "FX", params: { material: "bronze", refraction: 1, bloom: 0.31, gravity: 0.52, strike: 0.68, decay: 1.05, sustain: 0.12, release: 1.9, orbit: 1, rate: 2.4, width: 1, cutoff: 10300, damping: 0.2, level: 1.11 } },
+      ...PRISM_TABLE.map(pre),
+    ]),
 
     ui: {
       theme: { accent: "#73e0db", lcd: "#b6f8ef", lcdBg: "#081817", edge: "#304344", bg: "#152023" },
@@ -328,6 +400,10 @@ export const PRISM_SYNTHS = {
                 ["glass", "GLASS", ICON_GLASS, "0 0 24 24"],
                 ["ceramic", "CERAMIC", ICON_CERAMIC, "0 0 24 24"],
                 ["bronze", "BRONZE", ICON_BRONZE, "0 0 24 24"],
+                ["reed", "REED", ICON_REED, "0 0 24 24"],
+                ["bar", "BAR", ICON_BAR, "0 0 24 24"],
+                ["sub", "SUB", ICON_SUB, "0 0 24 24"],
+                ["cloud", "CLOUD", ICON_CLOUD, "0 0 24 24"],
               ],
             },
             {

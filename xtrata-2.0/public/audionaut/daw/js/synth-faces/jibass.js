@@ -29,18 +29,7 @@ import { Kit } from "./runtime.js";
     { id: 'driveAt', label: 'Drive Position', options: ['pre', 'post'], def: 0 },
     { id: 'level', label: 'Output Level', min: 0, max: 1.5, step: 0.01, def: 1, fmt: pct }
   ];
-  const W_ = { sawtooth: 0, square: 1 }, SW_ = { square: 0, sine: 1, triangle: 2 }, DA_ = { pre: 0, post: 1 };
-  const mk = (name, p) => { const v = Object.assign({}, p); if (v.wave) v.wave = W_[v.wave]; if (v.subWave) v.subWave = SW_[v.subWave]; if (v.driveAt) v.driveAt = DA_[v.driveAt]; return { name, values: v }; };
-  const presets = [
-    { name: 'Init (jiBASS)', values: {} },
-    mk('Sub Thump', { wave: 'square', subWave: 'sine', subLevel: 1, detune: 4, punch: 5, cutoff: 120, reso: 1, envMod: 500, fAttack: 0.004, fDecay: 0.2, keyTrack: 0.3, attack: 0.004, decay: 0.3, sustain: 0.75, release: 0.2, drive: 0.25, driveAt: 'pre' }),
-    mk('Rubber Pluck', { wave: 'sawtooth', subWave: 'triangle', subLevel: 0.8, detune: 8, punch: 0, cutoff: 220, reso: 8, envMod: 2800, fAttack: 0.004, fDecay: 0.2, keyTrack: 0.5, attack: 0.004, decay: 0.3, sustain: 0.18, release: 0.12, drive: 0.5, driveAt: 'pre' }),
-    mk('Acid Squelch', { wave: 'sawtooth', subWave: 'square', subLevel: 0.25, detune: 3, punch: 0, cutoff: 260, reso: 18, envMod: 5200, fAttack: 0.003, fDecay: 0.22, keyTrack: 0.6, attack: 0.003, decay: 0.3, sustain: 0.2, release: 0.07, drive: 0.5, driveAt: 'pre' }),
-    mk('Reese Growl', { wave: 'sawtooth', subWave: 'sine', subLevel: 0.7, detune: 40, punch: 0, cutoff: 380, reso: 3, envMod: 1500, fAttack: 0.3, fDecay: 1.2, keyTrack: 0.4, attack: 0.02, decay: 0.8, sustain: 0.8, release: 0.4, drive: 0.7, driveAt: 'pre' }),
-    mk('Wow Bass', { wave: 'sawtooth', subWave: 'square', subLevel: 0.5, detune: 20, punch: 0, cutoff: 130, reso: 10, envMod: 4500, fAttack: 0.14, fDecay: 0.35, keyTrack: 0.5, attack: 0.012, decay: 0.5, sustain: 0.55, release: 0.2, drive: 0.55, driveAt: 'pre' }),
-    mk('Dirty Fuzz', { wave: 'square', subWave: 'square', subLevel: 0.6, detune: 12, punch: 0, cutoff: 700, reso: 4, envMod: 1800, fAttack: 0.01, fDecay: 0.25, keyTrack: 0.3, attack: 0.006, decay: 0.35, sustain: 0.6, release: 0.12, drive: 1, driveAt: 'post' }),
-    mk('Deep Dub', { wave: 'square', subWave: 'sine', subLevel: 1, detune: 3, punch: 2, cutoff: 90, reso: 2, envMod: 300, fAttack: 0.01, fDecay: 0.5, keyTrack: 0.2, attack: 0.008, decay: 0.5, sustain: 0.9, release: 0.45, drive: 0.1, driveAt: 'pre' })
-  ];
+  // presets come from the synth def (P.presets); the face keeps no copy of its own
 
   function wire(root, P) {
     root.querySelectorAll('[data-p]').forEach(el => {
@@ -158,8 +147,12 @@ import { Kit } from "./runtime.js";
 .pb button:hover{background:#5ad1e6;color:#072a40}
 .pn{width:180px;height:34px;border-radius:17px;background:#041c2c;border:1px solid #0e4a6b;text-align:center;line-height:32px;font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden}
 .pnum{font-size:11px;color:#3f8ca3;width:38px}
-.log{position:absolute;right:30px;top:54px;display:flex;gap:5px}
-.log .pi{width:21px;height:9px;border-radius:5px;background:#0e4a6b;cursor:pointer}.log .pi.on{background:#5ad1e6;box-shadow:0 0 8px #5ad1e6}
+.pn{cursor:pointer}.pn:hover{border-color:#5ad1e6}
+.wh .plst{position:absolute;right:30px;top:56px;width:270px;max-height:350px;overflow-y:auto;z-index:20;display:none;padding:4px;background:#041c2c;border:1px solid #0e4a6b;border-radius:10px;box-shadow:0 12px 30px #000c;scrollbar-width:thin;scrollbar-color:#0e4a6b #041c2c}
+.wh .plst.open{display:block}
+.plst .pi{display:flex;gap:8px;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500;color:#7fc4d6;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plst .pi i{font-style:normal;color:#3f8ca3;width:18px;flex:none}
+.plst .pi:hover{background:#0b3b57}.plst .pi.on{background:#5ad1e6;color:#021019}.plst .pi.on i{color:#021019}
 .sn{position:absolute;left:26px;top:84px;width:336px;height:336px;border-radius:50%;border:2px solid #0e4a6b;box-shadow:0 0 30px #5ad1e622,inset 0 0 30px #000a;overflow:hidden;background:#021019}
 .sn canvas{position:absolute;inset:0;width:100%;height:100%}
 .gauge{position:absolute;left:378px;top:84px;width:44px;height:336px;border-radius:6px;border:1px solid #0e4a6b;background:linear-gradient(#2aa5c4,#0e5a7a 30%,#06293b 65%,#020f17);cursor:ns-resize;overflow:visible}
@@ -196,8 +189,8 @@ import { Kit } from "./runtime.js";
 <div class="wh">
  <div class="logo">Whale<small>SLOW AND HEAVY · LOW-END SONAR</small></div>
  <div class="dep">CURRENT DEPTH<b id="dep">11,000 m</b></div>
- <div class="pb"><button data-prev>&#9664;</button><div class="pn" data-pname></div><button data-next>&#9654;</button><div class="pnum" data-pnum></div></div>
- <div class="log" data-plist="div"></div>
+ <div class="pb"><button data-prev title="Previous preset">&#9664;</button><div class="pn" data-pname title="Browse presets"></div><button data-next title="Next preset">&#9654;</button><div class="pnum" data-pnum></div><button id="plt" title="Preset list">&#9776;</button></div>
+ <div class="plst" id="plst" data-plist="div" data-tpl="<i>{i}</i>{n}"></div>
  <div class="sn"><canvas id="cs" width="672" height="672"></canvas></div>
  <div class="gauge" data-p="cutoff" data-abs="y"><i class="mk"></i><i class="pk" id="pk"></i></div>
   <div class="sec" style="top:94px;height:100px"><h>SOURCE<i>TWIN SAWS + SUB</i></h>
@@ -215,6 +208,13 @@ import { Kit } from "./runtime.js";
     wire(root, P);
     P.keyboard(root.querySelector('#keys'), { from: 36, octaves: 3 });
     const J = tracker(P); const $ = s => root.querySelector(s);
+    // preset browser: a scrollable drop-down list (copes with any number of presets)
+    const pl = $('#plst'), shut = () => pl.classList.remove('open');
+    const tog = e => { e.stopPropagation(); if (pl.classList.toggle('open')) { const on = pl.querySelector('.on'); pl.scrollTop = on ? on.offsetTop - 140 : 0; } };
+    $('#plt').addEventListener('click', tog); $('.pn').addEventListener('click', tog);
+    pl.addEventListener('click', e => { e.stopPropagation(); if (e.target.closest('.pi')) shut(); });
+    root.addEventListener('pointerdown', e => { if (!pl.contains(e.target) && !e.target.closest('.pb')) shut(); });
+    root.addEventListener('keydown', e => { if (e.key === 'Escape') shut(); });
     const c = $('#cs').getContext('2d');
     const whale = new Path2D('M34 62 C34 44 60 38 84 42 C102 45 112 56 124 52 C122 60 124 68 130 72 C118 70 110 70 100 72 C80 78 50 80 34 62 Z');
     const foot = () => { $('#f1').textContent = 'PINGS SENT ' + String(J.hits).padStart(3, '0') + ' · ' + (440 * Math.pow(2, (J.midi - 69) / 12)).toFixed(1) + ' HZ'; }; foot(); P.onNote(foot);
@@ -260,7 +260,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('jibass', {
     fonts: 'family=Bebas+Neue&family=Rubik:wght@400;500;600;800&family=Rubik+Mono+One',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       undefined,
       { key: 'B', name: 'Whale', accent: '#5ad1e6', build: buildB },

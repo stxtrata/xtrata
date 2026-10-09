@@ -62,14 +62,14 @@ import { Kit } from "./runtime.js";
   }
   function presetMenu(P, o) {
     const n = P.presets.length; let cur = -1;
-    o.list.innerHTML = P.presets.map((p, i) => '<div class="it" data-i="' + i + '">' + o.item(p.name, i) + '</div>').join('');
+    o.list.innerHTML = P.presets.map((p, i) => '<div class="it" data-i="' + i + '">' + o.item(p.name, i) + (p.cat ? '<em>' + p.cat.toUpperCase() + '</em>' : '') + '</div>').join('');
     o.prev && (o.prev.onclick = () => P.loadPreset((Math.max(cur, 0) - 1 + n) % n));
     o.next && (o.next.onclick = () => P.loadPreset((cur + 1) % n));
     o.list.addEventListener('click', e => { const it = e.target.closest('.it'); if (it) { P.loadPreset(+it.dataset.i); if (o.pop) o.list.classList.remove('open'); } });
-    if (o.pop && o.name) o.name.addEventListener('click', () => o.list.classList.toggle('open'));
+    if (o.pop && o.name) o.name.addEventListener('click', () => { o.list.classList.toggle('open'); const c = o.list.querySelector('.cur'); if (c) o.list.scrollTop = Math.max(0, c.offsetTop - 120); });
     P.onPreset((i, nm) => {
       cur = i; if (o.name) o.name.innerHTML = i < 0 ? o.none : o.title(nm, i);
-      o.list.querySelectorAll('.it').forEach(el => el.classList.toggle('cur', +el.dataset.i === i));
+      o.list.querySelectorAll('.it').forEach(el => { const on = +el.dataset.i === i; el.classList.toggle('cur', on); if (on) o.list.scrollTop = Math.max(0, el.offsetTop - 120); });
       o.after && o.after(i, nm);
     });
   }
@@ -105,18 +105,7 @@ import { Kit } from "./runtime.js";
     R('reso', 'Resonance', 0, 14, 1.5, 0.1, v => v.toFixed(1)), R('lpg', 'LPG Amount', 0, 1, 0.6, 0.01, pct),
     R('attack', 'Attack', 0.002, 2, 0.01, 0.002, secs, true), R('decay', 'Decay', 0.02, 3, 0.6, 0.01, secs, true),
     R('sustain', 'Sustain', 0, 1, 0.55, 0.01, pct), R('release', 'Release', 0.02, 3, 0.35, 0.01, secs, true),
-    R('level', 'Output Level', 0, 1.5, 1, 0.01, v => Math.round(v / 1.5 * 100) + '%')
-  ];
-  const mk = (name, o) => { const v = {}; for (const k in o) v[k] = (k === 'tableA' || k === 'tableB') ? TN.indexOf(o[k]) : k === 'fmRatio' ? RATIOS.indexOf(o[k]) : o[k]; return { name, values: v }; };
-  const PRESETS = [
-    mk('Init (PD to Saw)', {}),
-    mk('Resonant Sweep Lead', { tableA: 'pdLow', tableB: 'pdHigh', morph: 0, morphEnd: 1, morphTime: 1.4, wobble: 0, fold: 0.1, foldEnv: 0.2, unison: 10, cutoff: 6500, reso: 1.2, lpg: 0.2, attack: 0.02, decay: 0.8, sustain: 0.8, release: 0.3 }),
-    mk('Vowel Morph Pad', { tableA: 'ah', tableB: 'oo', morph: 0, morphEnd: 1, morphTime: 3, wobble: 0.3, wobbleRate: 0.4, fold: 0.1, foldEnv: 0, unison: 16, cutoff: 5000, reso: 0.8, lpg: 0, attack: 0.7, decay: 1.5, sustain: 0.9, release: 1.5 }),
-    mk('Buchla Pluck', { tableA: 'sine', tableB: 'sine', morph: 0, morphEnd: 0, fold: 0.7, foldEnv: 1, modDecay: 0.35, unison: 0, cutoff: 1800, reso: 3, lpg: 0.9, attack: 0.002, decay: 0.35, sustain: 0, release: 0.25, level: 1.5 }),
-    mk('Folded Bass', { tableA: 'saw', tableB: 'pulse', morph: 0.2, morphEnd: 0.6, morphTime: 0.5, fold: 0.85, foldEnv: 0.6, modDecay: 0.4, unison: 0, cutoff: 900, reso: 4, lpg: 0.5, attack: 0.004, decay: 0.5, sustain: 0.7, release: 0.18 }),
-    mk('FM Chime', { tableA: 'sine', tableB: 'organ', morph: 0.3, morphEnd: 0.3, fold: 0, foldEnv: 0, fmRatio: '3', fmIndex: 0.55, modDecay: 0.7, unison: 4, cutoff: 9000, reso: 0.7, lpg: 0.3, attack: 0.003, decay: 1.1, sustain: 0, release: 0.8, level: 1.5 }),
-    mk('Digital Wobble', { tableA: 'comb', tableB: 'random', morph: 0, morphEnd: 1, morphTime: 0.1, wobble: 0.8, wobbleRate: 5.5, fold: 0.4, foldEnv: 0.2, unison: 6, cutoff: 4500, reso: 2.5, lpg: 0.2, attack: 0.005, decay: 0.7, sustain: 0.75, release: 0.3 }),
-    mk('Hollow Keys', { tableA: 'square', tableB: 'organ', morph: 0.1, morphEnd: 0.9, morphTime: 0.25, fold: 0.2, foldEnv: 0.3, unison: 3, cutoff: 3600, reso: 1, lpg: 0.55, attack: 0.004, decay: 0.45, sustain: 0.25, release: 0.3 })
+    R('level', 'Output Level', 0, 3, 1, 0.01, v => Math.round(v * 100) + '%')
   ];
   const hash = i => ((i + 3) * 2654435761 >>> 0).toString(16).slice(0, 7).padStart(7, '0');
 
@@ -133,7 +122,7 @@ import { Kit } from "./runtime.js";
 .pm{position:absolute;left:300px;top:16px;width:330px;height:42px;border:1px solid #7fb2ff;display:flex;align-items:center;background:#0c2f5e99}.pm .lab{position:absolute;top:-7px;left:10px;background:#0f3a73;font-size:9px;color:#ffd84d;padding:0 4px;letter-spacing:.12em}
 .pm button{width:34px;height:100%;background:none;border:0;color:#ffd84d;font:inherit;font-size:18px;cursor:pointer}.pm button:hover{background:#7fb2ff22}
 .pm .nm{flex:1;text-align:center;cursor:pointer;font-size:14px;letter-spacing:.06em;color:#fff;white-space:nowrap;overflow:hidden}.pm .nm i{color:#9cc3ff;font-style:normal;margin-right:8px}
-.pl{display:none;position:absolute;left:-1px;top:41px;width:332px;background:#0b2a55;border:1px solid #7fb2ff;z-index:30}.pl.open{display:block}.pl .it{padding:5px 12px;font-size:12px;cursor:pointer;display:flex;gap:10px}.pl .it:hover{background:#7fb2ff33}.pl .it.cur{color:#ffd84d}.pl .it i{color:#7fb2ff;font-style:normal}
+.pl{display:none;position:absolute;left:-1px;top:41px;width:332px;max-height:380px;overflow-y:auto;overscroll-behavior:contain;background:#0b2a55;border:1px solid #7fb2ff;z-index:30;scrollbar-width:thin;scrollbar-color:#7fb2ff #0b2a55}.pl.open{display:block}.pl .it{padding:5px 12px;font-size:12px;cursor:pointer;display:flex;gap:10px}.pl .it:hover{background:#7fb2ff33}.pl .it.cur{color:#ffd84d}.pl .it i{color:#7fb2ff;font-style:normal}.pl .it em{margin-left:auto;font-style:normal;font-size:9px;color:#7fb2ffaa;letter-spacing:.08em}
 .tb{position:absolute;left:660px;top:14px;width:276px;border:1px solid #7fb2ff;font-size:9.5px;letter-spacing:.08em;display:grid;grid-template-columns:1fr 1fr;background:#0c2f5e99}
 .tb div{padding:3px 7px;border:0 solid #7fb2ff88;border-width:0 1px 1px 0;white-space:nowrap}.tb div:nth-child(2n){border-right:0}.tb div:nth-last-child(-n+2){border-bottom:0}.tb b{color:#ffd84d;font-weight:400}
 .plot{position:absolute;left:24px;top:70px;width:600px;height:262px;border:1px solid #7fb2ff99;background:#0f3a73}
@@ -219,6 +208,6 @@ import { Kit } from "./runtime.js";
 
   Kit.register('morph', {
     fonts: 'family=Share+Tech+Mono&family=Playfair+Display:ital,wght@0,500;0,700;0,900;1,500&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;700',
-    w: 960, h: 560, params: PARAMS, presets: PRESETS, faces: [szabo, undefined, undefined].filter(Boolean)
+    w: 960, h: 560, params: PARAMS, faces: [szabo, undefined, undefined].filter(Boolean)
   });
 })();

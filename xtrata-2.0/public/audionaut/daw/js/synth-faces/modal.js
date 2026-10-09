@@ -108,7 +108,7 @@ import { Kit } from "./runtime.js";
       if (i >= 0) cur = i;
       $$(root, '[data-pname]').forEach(e => { e.textContent = name || 'Custom'; });
       $$(root, '[data-pidx]').forEach(e => { e.textContent = String(i < 0 ? 1 : i + 1).padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
-      if (lst) $$(lst, '[data-i]').forEach(b => b.classList.toggle('cur', +b.dataset.i === i));
+      if (lst) $$(lst, '[data-i]').forEach(b => { const on = +b.dataset.i === i; b.classList.toggle('cur', on); if (on) lst.scrollLeft = b.offsetLeft - (lst.clientWidth - b.offsetWidth) / 2; });
     });
   }
   const cell = (id, label, t, cls) => '<div class="' + (cls || 'kn') + '" data-k="' + id + '" data-t="' + (t || 'k') + '"><span class="vl"></span><div class="ctl ' + (t === 'f' ? 'fd' : 'dial') + '"></div><label>' + label + '</label></div>';
@@ -132,8 +132,8 @@ import { Kit } from "./runtime.js";
 .A .pb .nm{width:330px;height:34px;border:1px solid #2aa39b88;background:#0a1110;padding:3px 10px;display:flex;flex-direction:column;justify-content:center}
 .A .pb .nm i{font-style:normal;font-size:9px;letter-spacing:2px;color:#2aa39bcc}
 .A .pb .nm b{font-size:14px;font-weight:700;color:#e8fbf8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.A .chips{position:absolute;left:24px;top:64px;width:912px;height:24px;display:flex;gap:4px}
-.A .chips button{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;height:24px;line-height:22px;padding:0 6px;border:1px solid #2aa39b55;font-size:9px;color:#8bc9c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.A .chips{position:absolute;left:24px;top:64px;width:912px;height:30px;display:flex;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:#2aa39b55 transparent}
+.A .chips button{all:unset;box-sizing:border-box;cursor:pointer;flex:0 0 auto;max-width:150px;height:24px;line-height:22px;padding:0 6px;border:1px solid #2aa39b55;font-size:9px;color:#8bc9c4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .A .chips button i{font-style:normal;color:#2aa39b;margin-right:4px}
 .A .chips button:hover{background:#2aa39b22}.A .chips button.cur{background:#2aa39b;color:#06100f;border-color:#2aa39b}.A .chips button.cur i{color:#06100f}
 .A .frame{position:absolute;left:24px;top:96px;width:912px;height:246px;padding:10px;border-radius:6px;background:repeating-linear-gradient(92deg,#00000018 0 2px,transparent 2px 7px),repeating-linear-gradient(88deg,#ffffff0d 0 1px,transparent 1px 11px),linear-gradient(180deg,#a8733f,#7a4a26 50%,#8e5b30);box-shadow:inset 0 2px 0 #ffcf9a55,inset 0 -3px 0 #0006,0 6px 18px #0009}
@@ -195,11 +195,9 @@ import { Kit } from "./runtime.js";
       c.style.setProperty('--L', L(i) + 'px'); c.style.setProperty('--tl', (L(i) / 150).toFixed(3));
       c.innerHTML = '<div class="tube"></div><div class="bar"><span class="nt">' + nname(m) + '</span><span class="num">#' + NUMS[i] + '</span><i class="dot"></i></div>';
       fld.appendChild(c); cols.push({ el: c, bar: c.firstChild.nextSibling, m });
-      const held = new Map();
-      c.addEventListener('pointerdown', e => { c.setPointerCapture(e.pointerId); const r = c.getBoundingClientRect(); const f = clamp((e.clientY - r.top) / r.height, 0, 1); held.set(e.pointerId, 1); P.noteOn(m, 0.45 + 0.5 * (1 - Math.abs(f - 0.4) * 1.4)); e.preventDefault(); });
-      const up = e => { if (held.delete(e.pointerId)) P.noteOff(m); };
-      c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
     });
+    // bars play through the shared keyboard path: glissando, multi-touch, held notes
+    P.surface(fld, { velAt: (e, c) => { const r = c.getBoundingClientRect(); const f = clamp((e.clientY - r.top) / r.height, 0, 1); return 0.45 + 0.5 * (1 - Math.abs(f - 0.4) * 1.4); } });
     const sub = () => { const b = P.get('body'), pl = PAL[b]; fld.style.setProperty('--rs', Math.min(1, P.get('resonator') * (0.25 + 0.75 * BODIES[BN[b]].res / 0.9 + (BODIES[BN[b]].res === 0 ? 0.0 : 0)))); cols.forEach(o => { o.bar.style.setProperty('--c1', pl[0]); o.bar.style.setProperty('--c2', pl[1]); o.bar.style.setProperty('--hd', P.get('hardness')); o.bar.style.setProperty('--sp', P.get('strike')); o.el.firstChild.style.setProperty('--rs', fld.style.getPropertyValue('--rs')); }); };
     ['body', 'resonator', 'hardness', 'strike'].forEach(id => P.sub(id, sub));
     const S = tracker(P), pc = $(root, '#pc').getContext('2d');

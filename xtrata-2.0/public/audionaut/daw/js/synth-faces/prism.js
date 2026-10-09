@@ -8,11 +8,11 @@ import { Kit } from "./runtime.js";
   const lerp = (a, b, t) => a + (b - a) * t;
   const NOTES = ['C', 'C\u266F', 'D', 'D\u266F', 'E', 'F', 'F\u266F', 'G', 'G\u266F', 'A', 'A\u266F', 'B'];
   const params = [
-    { id: 'material', label: 'Material', options: ['Glass', 'Ceramic', 'Bronze'], def: 0 },
+    { id: 'material', label: 'Material', options: ['Glass', 'Ceramic', 'Bronze', 'Reed', 'Bar', 'Sub', 'Cloud'], def: 0 },
     { id: 'refraction', label: 'Refraction', min: 0, max: 1, def: 0.48, step: 0.01, fmt: pct },
     { id: 'bloom', label: 'Bloom', min: 0, max: 2, def: 0.42, step: 0.01, fmt: v => v.toFixed(2) + ' s' },
     { id: 'gravity', label: 'Gravity', min: 0, max: 1, def: 0.65, step: 0.01, fmt: pct },
-    { id: 'strike', label: 'Strike', min: 0, max: 1, def: 0.32, step: 0.01, fmt: pct },
+    { id: 'strike', label: 'Strike', min: 0, max: 2, def: 0.32, step: 0.01, fmt: pct },
     { id: 'damping', label: 'Damping', min: 0, max: 1, def: 0.4, step: 0.01, fmt: pct },
     { id: 'orbit', label: 'Orbit', min: 0, max: 1, def: 0.24, step: 0.01, fmt: pct },
     { id: 'rate', label: 'Orbit Rate', min: 0.03, max: 6, def: 0.17, step: 0.01, log: true, fmt: v => v.toFixed(2) + ' Hz' },
@@ -34,7 +34,7 @@ import { Kit } from "./runtime.js";
     { name: 'Velvet Satellite', values: { material: 1, refraction: 0.09, bloom: 0.85, gravity: 0.85, strike: 0, attack: 0.8, decay: 2.1, sustain: 0.64, release: 3.9, cutoff: 2400, orbit: 0.38, rate: 0.11, damping: 0.65, level: 0.82 } },
     { name: 'Unstable Jewellery', values: { material: 2, refraction: 1, bloom: 0.31, gravity: 0.52, strike: 0.68, decay: 1.05, sustain: 0.12, release: 1.9, orbit: 1, rate: 2.4, width: 1, cutoff: 10300, damping: 0.2, level: 0.8 } }
   ];
-  const BASE = '[data-plist]{display:none}[data-plist].open{display:grid}button{cursor:pointer;font-family:inherit;border:0;background:none;color:inherit;padding:0}canvas{display:block}';
+  const BASE = '[data-plist]{display:none;max-height:400px;overflow-y:auto;overscroll-behavior:contain}[data-plist].open{display:grid}button{cursor:pointer;font-family:inherit;border:0;background:none;color:inherit;padding:0}canvas{display:block}';
 
   /* wires generic data-attributes: data-b (bind), data-abs/ax/inv, data-t (text), data-set="id:val", preset controls */
   function wire(root, P) {
@@ -88,7 +88,7 @@ import { Kit } from "./runtime.js";
   }
   function setupCanvas(cv, w, h) { cv.width = w * 2; cv.height = h * 2; cv.style.width = w + 'px'; cv.style.height = h + 'px'; const c = cv.getContext('2d'); c.setTransform(2, 0, 0, 2, 0, 0); return c; }
   const lab = (P, id) => P.def(id).label;
-  const PAL = [[1, 2.01, 2.756, 4.08, 5.404, 6.71, 8.21], [1, 1.593, 2.135, 2.918, 4.167, 5.431, 6.789], [1, 2.32, 3.18, 4.76, 6.27, 7.91, 9.63]];
+  const PAL = [[1, 2.01, 2.756, 4.08, 5.404, 6.71, 8.21], [1, 1.593, 2.135, 2.918, 4.167, 5.431, 6.789], [1, 2.32, 3.18, 4.76, 6.27, 7.91, 9.63], [1, 3, 5, 7, 9, 11, 13], [1, 2.756, 5.404, 8.933, 13.34, 18.64, 24.81], [0.5, 1, 2, 3, 4, 6, 8], [1, 1.006, 1.994, 2.012, 2.985, 3.02, 4.01]];
   const PW = [1, 0.46, 0.32, 0.23, 0.17, 0.12, 0.085];
   const HUE = ['#ff5e5e', '#ff9a4a', '#ffd95a', '#6df08a', '#4de0e0', '#5a8cff', '#b87dff'];
   function model(P) {
@@ -120,7 +120,7 @@ import { Kit } from "./runtime.js";
 .sa .disp{position:absolute;left:24px;top:62px;width:912px;height:238px;border:1px solid #23232c;background:#0a0a10}
 .sa .sec{position:absolute;top:310px;font-size:8.5px;letter-spacing:.3em;text-transform:uppercase;color:#6c6c7e;height:14px;border-bottom:1px solid #2c2c36;white-space:nowrap}
 .sa .mat{position:absolute;left:24px;top:330px;width:76px}
-.sa .mat button{display:block;width:100%;text-align:left;padding:7px 0 7px 10px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#6c6c7e;border-left:1px solid #2c2c36;margin-bottom:6px}
+.sa .mat button{display:block;width:100%;text-align:left;padding:2px 0 2px 10px;font-size:10px;line-height:12px;letter-spacing:.16em;text-transform:uppercase;color:#6c6c7e;border-left:1px solid #2c2c36;margin-bottom:2px}
 .sa .mat button.on{color:#08080c;background:#e8e8f2;border-left-color:#e8e8f2}
 .sa .fd{position:absolute;top:326px;width:52px;text-align:center}
 .sa .fd output{display:block;height:14px;font-size:9.5px;font-variant-numeric:tabular-nums;color:#e8e8f2;white-space:nowrap}
@@ -158,7 +158,7 @@ import { Kit } from "./runtime.js";
       '<div class="pre"><span class="i"><span data-pidx></span>/<span data-pn></span></span><button data-prev>\u2039</button><b data-pname></b><button data-next>\u203A</button><button data-tgl style="font-size:12px">\u2261</button></div></div>' +
       '<div data-plist></div><div class="disp"><canvas></canvas></div>' +
       '<div class="sec" style="left:24px;width:76px">Material</div>' +
-      '<div class="mat"><button data-set="material:0">Glass</button><button data-set="material:1">Ceramic</button><button data-set="material:2">Bronze</button></div>' +
+      '<div class="mat">' + P.def('material').options.map((o, i) => '<button data-set="material:' + i + '">' + o + '</button>').join('') + '</div>' +
       html + '<div class="kbx"></div></div>';
     wire(root, P);
     const q = s => root.querySelector(s);

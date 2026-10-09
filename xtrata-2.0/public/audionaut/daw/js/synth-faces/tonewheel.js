@@ -19,19 +19,7 @@ import { Kit } from "./runtime.js";
     R('release', 'Release', 0.01, 1.5, 0.07, 0.01, v => v.toFixed(2) + ' s'),
     R('level', 'Output Level', 0, 1.5, 1, 0.01, v => Math.round(v * 100) + '%')
   ]);
-  const PO = { off: 0, '2nd': 1, '3rd': 2 }, SO = { off: 0, v1: 1, v2: 2, v3: 3, c1: 4, c2: 5, c3: 6 }, RO = { off: 0, slow: 1, fast: 2 };
-  const pr = (name, o) => { const v = Object.assign({}, o); if (v.perc !== undefined) v.perc = PO[v.perc]; if (v.scanner !== undefined) v.scanner = SO[v.scanner]; if (v.rotary !== undefined) v.rotary = RO[v.rotary]; return { name, values: v }; };
-  const Z = { d16: 0, d513: 0, d8: 0, d4: 0, d223: 0, d2: 0, d135: 0, d113: 0, d1: 0 };
-  const presets = [
-    pr('Init (40 8604 000)', {}),
-    pr('Jimmy Smith', { d16: 8, d513: 8, d8: 8, d4: 0, d223: 0, d2: 0, d135: 0, d113: 0, d1: 0, perc: '3rd', percDecay: 0.14, percLevel: 0.8, keyClick: 0.5, scanner: 'c3', rotary: 'fast', rotaryDepth: 0.55, cutoff: 8500, drive: 0.35 }),
-    pr('Gospel Full', { d16: 8, d513: 8, d8: 8, d4: 8, d223: 8, d2: 8, d135: 8, d113: 8, d1: 8, perc: 'off', keyClick: 0.4, scanner: 'v2', rotary: 'slow', rotaryDepth: 0.7, cutoff: 7500, drive: 0.3 }),
-    pr('Mellow Flute', { d16: 0, d513: 0, d8: 8, d4: 4, d223: 0, d2: 0, d135: 0, d113: 0, d1: 0, perc: 'off', keyClick: 0.15, scanner: 'off', rotary: 'off', cutoff: 4500, drive: 0 }),
-    pr('Reggae Bubble', { d16: 0, d513: 0, d8: 8, d4: 8, d223: 0, d2: 0, d135: 0, d113: 0, d1: 0, perc: '2nd', percDecay: 0.08, percLevel: 0.7, keyClick: 0.6, scanner: 'off', rotary: 'off', cutoff: 6000, drive: 0.15, attack: 0.002, release: 0.04 }),
-    pr('Rock Overdrive', { d16: 8, d513: 0, d8: 8, d4: 0, d223: 0, d2: 0, d135: 0, d113: 0, d1: 5, perc: 'off', keyClick: 0.35, scanner: 'c1', rotary: 'fast', rotaryDepth: 0.4, cutoff: 10000, drive: 0.85 }),
-    pr('Church Pipes', { d16: 8, d513: 0, d8: 7, d4: 6, d223: 0, d2: 5, d135: 0, d113: 3, d1: 0, perc: 'off', keyClick: 0.1, scanner: 'off', rotary: 'off', cutoff: 6000, drive: 0, attack: 0.03, release: 0.4 }),
-    pr('Whistle & Reed', { d16: 0, d513: 0, d8: 6, d4: 0, d223: 0, d2: 8, d135: 6, d113: 4, d1: 0, perc: '3rd', percDecay: 0.1, percLevel: 0.4, keyClick: 0.3, scanner: 'v3', rotary: 'off', cutoff: 9500, drive: 0.1 })
-  ];
+  /* presets come from the synth def (P.presets, 58 registrations); the hymn board lists them all */
 
   /* ---------- helpers ---------- */
   const amp = n => n <= 0 ? 0 : Math.pow(10, -(8 - n) * 3 / 20);
@@ -57,7 +45,7 @@ import { Kit } from "./runtime.js";
     [...new Set(sels.map(b => b.dataset.sel))].forEach(id => P.sub(id, v => sels.forEach(b => { if (b.dataset.sel === id) b.classList.toggle('on', +b.dataset.v === v); })));
     const pn = root.querySelectorAll('[data-pn]'), pi = root.querySelectorAll('[data-pi]'), pl = root.querySelector('[data-plist]'), npr = P.presets.length;
     if (pl) {
-      pl.innerHTML = P.presets.map((p, i) => `<button type="button" class="pit" data-pl="${i}"><span>${String(i + 1).padStart(2, '0')}</span><em>${p.name}</em></button>`).join('');
+      pl.innerHTML = P.presets.map((p, i) => `<button type="button" class="pit" data-pl="${i}" title="${p.name}"><span>${String(i + 1).padStart(2, '0')}</span><em>${p.name}</em></button>`).join('');
       pl.querySelectorAll('[data-pl]').forEach(b => b.addEventListener('click', () => { P.loadPreset(+b.dataset.pl); if (pl.classList.contains('pop')) pl.classList.remove('open'); }));
     }
     root.querySelectorAll('[data-pt]').forEach(b => b.addEventListener('click', () => { if (pl) pl.classList.toggle('open'); }));
@@ -67,7 +55,10 @@ import { Kit } from "./runtime.js";
       if (first) { first = false; if (i < 0) setTimeout(() => P.loadPreset(0), 0); }
       if (i >= 0) cur = i;
       pn.forEach(e => { e.textContent = i >= 0 ? name : 'Custom'; }); pi.forEach(e => { e.textContent = (i >= 0 ? String(i + 1).padStart(2, '0') : '--') + '/' + String(npr).padStart(2, '0'); });
-      if (pl) pl.querySelectorAll('[data-pl]').forEach(b => b.classList.toggle('on', +b.dataset.pl === i));
+      if (pl) pl.querySelectorAll('[data-pl]').forEach(b => {
+        const on = +b.dataset.pl === i; b.classList.toggle('on', on);
+        if (on && (b.offsetTop < pl.scrollTop || b.offsetTop + b.offsetHeight > pl.scrollTop + pl.clientHeight)) pl.scrollTop = b.offsetTop - 4;
+      });
     });
   }
   const keys = (el, P) => P.keyboard(el, { from: 36, octaves: 4 });
@@ -104,8 +95,9 @@ import { Kit } from "./runtime.js";
 .hymn{left:466px;top:20px;width:466px}
 .hn{display:flex;align-items:center;gap:10px;height:34px;border-bottom:1px solid #c9a24a}.hn button.ar{width:28px;height:28px;border:1px solid #c9a24a;background:none;color:#c9a24a;font:600 14px 'Cinzel';cursor:pointer;border-radius:50%}.hn button.ar:hover{background:#c9a24a;color:#1c1033}
 .hn .lbl{font-size:9px;letter-spacing:.24em;color:#9a82d6}.hn .nm{flex:1;text-align:center;font-size:17px;font-weight:600;letter-spacing:.1em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hn .no{font-size:11px;letter-spacing:.14em;color:#c9a24a}
-.board{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:8px}
-.pit{display:flex;flex-direction:column;align-items:center;justify-content:center;height:40px;background:#120a24;border:1px solid #c9a24a66;color:#e9dcc0;cursor:pointer;padding:0 4px;font-family:'Cinzel',serif}.pit span{font-size:15px;font-weight:700;color:#c9a24a;line-height:1}.pit em{font-style:normal;font-size:8.5px;letter-spacing:.06em;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.pit:hover{border-color:#c9a24a}.pit.on{background:#c9a24a}.pit.on span,.pit.on em{color:#1c1033}
+.board{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:22px;gap:4px;margin-top:6px;height:86px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px;scrollbar-width:thin;scrollbar-color:#c9a24a #120a24}
+.board::-webkit-scrollbar{width:6px}.board::-webkit-scrollbar-thumb{background:#c9a24a;border-radius:3px}.board::-webkit-scrollbar-track{background:#120a24}
+.pit{display:flex;align-items:center;gap:6px;min-width:0;height:22px;background:#120a24;border:1px solid #c9a24a66;color:#e9dcc0;cursor:pointer;padding:0 6px;font-family:'Cinzel',serif;text-align:left}.pit span{flex:none;font-size:10px;font-weight:700;color:#c9a24a;line-height:1}.pit em{flex:1;min-width:0;font-style:normal;font-size:9px;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pit:hover{border-color:#c9a24a}.pit.on{background:#c9a24a}.pit.on span,.pit.on em{color:#1c1033}
 .ctl{left:466px;top:150px;width:466px}
 .grpt{font-size:9px;letter-spacing:.24em;color:#c9a24a;display:flex;align-items:center;gap:8px;margin-bottom:6px}.grpt:after{content:'';flex:1;height:1px;background:#c9a24a66}
 .row{display:flex;gap:16px;margin-bottom:10px}.row>div{flex:1}
@@ -159,7 +151,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('tonewheel', {
     fonts: 'family=Manrope:wght@300;400;600;800&family=DM+Sans:wght@400;600&family=Courier+Prime:wght@400;700&family=Cinzel:wght@400;600;700',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       undefined,
       undefined,

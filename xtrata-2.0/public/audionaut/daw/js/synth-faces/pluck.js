@@ -17,15 +17,6 @@ import { Kit } from "./runtime.js";
     { id: 'bodyFreq', label: 'Body Frequency', min: 80, max: 1200, step: 5, def: 220, log: true, fmt: v => Math.round(v) + ' Hz' },
     { id: 'level', label: 'Output Level', min: 0, max: 1.5, step: 0.01, def: 1, fmt: pct }
   ];
-  const presets = [
-    { name: 'Nylon Guitar', values: {} },
-    { name: 'Steel Harp', values: { decay: 4, tone: 0.82, pick: 0.2, pos: 0.12, snap: 0.2, twin: 0.45, body: 3, bodyFreq: 300, damp: 1.2 } },
-    { name: 'Koto', values: { decay: 1.8, tone: 0.65, pick: 0.15, pos: 0.08, snap: 0.5, twin: 0.1, body: 6, bodyFreq: 420, damp: 0.5 } },
-    { name: 'Soft Mallet', values: { decay: 1.5, tone: 0.28, pick: 1, pos: 0.3, snap: 0, twin: 0.15, body: 4, bodyFreq: 160, damp: 0.4 } },
-    { name: 'Muted Bass', values: { decay: 0.7, tone: 0.3, pick: 0.5, pos: 0.25, snap: 0.2, twin: 0, body: 8, bodyFreq: 110, damp: 0.08 } },
-    { name: 'Dulcimer Shimmer', values: { decay: 5.5, tone: 0.9, pick: 0, pos: 0.15, snap: 0.15, twin: 0.8, body: 2, bodyFreq: 520, damp: 1.8 } }
-  ];
-
   /* ---------- shared wiring ---------- */
   function wire(root, P) {
     root.querySelectorAll('[data-p]').forEach(el => {
@@ -49,7 +40,7 @@ import { Kit } from "./runtime.js";
     root.querySelectorAll('[data-next]').forEach(b => b.addEventListener('click', () => P.loadPreset((cur + 1) % n)));
     P.onPreset((i, name) => {
       if (i < 0 && !wire.once) { wire.once = 1; P.loadPreset(0); return; }
-      cur = i < 0 ? 0 : i;
+      if (i >= 0) cur = i;
       root.querySelectorAll('[data-pname]').forEach(e => { e.textContent = i < 0 ? 'Edited' : name; });
       root.querySelectorAll('[data-pnum]').forEach(e => { e.textContent = String(cur + 1).padStart(2, '0') + '/' + String(n).padStart(2, '0'); });
       lists.forEach(l => [...l.children].forEach(c => c.classList.toggle('on', +c.dataset.i === i)));
@@ -126,11 +117,8 @@ import { Kit } from "./runtime.js";
 .pb{position:absolute;right:30px;top:11px;height:34px;display:flex;align-items:center;gap:8px}
 .pb button{width:30px;height:30px;border-radius:50%;border:2px solid #8a6a42;background:#4a331b;color:#a7d27a;font-size:14px;cursor:pointer;padding:0}
 .pb button:hover{background:#5d4224}
-.pn{min-width:170px;text-align:center;font-size:17px;font-style:italic;color:#e8d9bd;padding:3px 10px;background:#160e06;border:1px solid #5a4128;border-radius:3px;box-shadow:inset 0 2px 5px #000a}
-.pnum{font-size:10px;letter-spacing:.14em;color:#b59c72;width:38px;text-align:right}
-.seeds{display:flex;gap:5px;margin-left:6px}
-.seeds .pi{width:12px;height:12px;border-radius:50% 0 50% 0;background:#4a331b;border:1px solid #8a6a42;cursor:pointer;transform:rotate(-45deg)}
-.seeds .pi.on{background:#a7d27a;box-shadow:0 0 8px #a7d27a}
+.pn{width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font-size:17px;font-style:italic;color:#e8d9bd;padding:3px 10px;background:#160e06;border:1px solid #5a4128;border-radius:3px;box-shadow:inset 0 2px 5px #000a}
+.pnum{font-size:10px;letter-spacing:.14em;color:#b59c72;width:44px;text-align:right}
 .disp{position:absolute;left:24px;top:60px;width:912px;height:108px}
 .inl{position:absolute;top:0;height:108px;background:#150d06;border:2px solid #4a331b;border-radius:4px;box-shadow:inset 0 3px 10px #000c,0 1px 0 #6b4a2a}
 .inl canvas{position:absolute;inset:0;width:100%;height:100%}
@@ -164,7 +152,7 @@ import { Kit } from "./runtime.js";
 </style>
 <div class="tp">
  <div class="hd"><div class="logo">Taproot<small>ONE ROOT · THREE BRANCHES</small></div>
-  <div class="pb"><div class="seeds" data-plist="i" data-tpl="&nbsp;"></div><button data-prev>&#9664;</button><div class="pn" data-pname></div><button data-next>&#9654;</button><div class="pnum" data-pnum></div></div></div>
+  <div class="pb"><button data-prev>&#9664;</button><div class="pn" data-pname></div><button data-next>&#9654;</button><div class="pnum" data-pnum></div></div></div>
  <div class="disp">
   <div class="inl" style="left:0;width:580px"><canvas id="cs" width="1160" height="216"></canvas><span class="lb">THE STRING · HARMONICS GROW FROM THE PICK</span><span class="rd" id="rs"></span></div>
   <div class="inl" style="left:592px;width:160px"><canvas id="cb" width="320" height="216"></canvas><span class="lb">BODY</span><span class="rd" id="rb"></span></div>
@@ -252,7 +240,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('pluck', {
     fonts: 'family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500&family=Special+Elite&family=Audiowide',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       { key: 'A', name: 'Taproot', accent: '#a7d27a', build: buildA },
       undefined,

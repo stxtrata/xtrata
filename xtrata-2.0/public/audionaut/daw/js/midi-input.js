@@ -7,10 +7,9 @@
 // selection (browsers only show the permission prompt after a gesture). Controllers
 // plugged in later are picked up automatically. With neither the roll nor the synth
 // panel open, notes play the most recently selected instrument.
-import { engine, emitNoteVisual } from "./engine.js";
+import { noteOn, noteOff } from "./live-keys.js";
 
 const PREF_KEY = "audionaut.midi";
-const LIVE_DUR = 0.45; // seconds — voices are one-shot, so a played note gets a fixed gate
 const listeners = new Set();
 let access = null;
 let pending = null;
@@ -60,13 +59,9 @@ function liveFallback({ data }) {
   if (!hidden("modal-roll") || !hidden("modal-synth")) return;
   const [s, pitch, vel = 0] = data;
   const type = s & 0xf0;
-  if (type === 0x90 && vel > 0) {
-    engine.ensureContext();
-    engine.triggerNote(target, pitch, vel / 127, 0, LIVE_DUR);
-    emitNoteVisual(target, pitch, true);
-  } else if (type === 0x80 || (type === 0x90 && vel === 0)) {
-    emitNoteVisual(target, pitch, false);
-  }
+  // same held-note path as the on-screen and computer keys (live-keys.js)
+  if (type === 0x90 && vel > 0) noteOn(`midi:${s & 15}:${pitch}`, target, pitch, vel / 127);
+  else if (type === 0x80 || (type === 0x90 && vel === 0)) noteOff(`midi:${s & 15}:${pitch}`);
 }
 
 function connect() {

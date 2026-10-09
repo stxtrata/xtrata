@@ -1,7 +1,8 @@
 // synths/drums/kit.js — ASIC: a synthesised drum kit played as notes (Audionaut synth module).
 //
-// One instrument = one whole kit. The MIDI note picks the drum (General-MIDI layout, so GM beats work):
-//   C1/B0 (35,36) kick   C#2 (37) rim   D2/E2 (38,40) snare   D#2 (39) clap
+// One instrument = one whole kit. The MIDI note picks the drum (General-MIDI layout, so GM beats work;
+// note names use the app's C4 = 60, so the GM kick 36 is C2):
+//   B1/C2 (35,36) kick   C#2 (37) rim   D2/E2 (38,40) snare   D#2 (39) clap
 //   F2,G2 (41,43) low tom   A2,B2 (45,47) mid tom   C3,D3 (48,50) high tom
 //   F#2 (42) closed hat   G#2 (44) pedal hat   A#2 (46) open hat
 //   C#3/A3 (49,57) crash   D#3/B3 (51,59) ride   G#3 (56) cowbell
@@ -17,6 +18,8 @@ const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const FLOOR = 0.0001;
 const GAIN = 0.42; // master drum scale (calibrated against the harness RMS band)
+// per-drum mix trims so a kit is balanced out of the box (kick > snare/toms > clap > cymbals > hats)
+const MIX = { kick: 1, rim: 1.15, snare: 1.15, clap: 1.4, hatC: 1.1, hatP: 1.1, hatO: 1.1, tomL: 0.85, tomM: 0.85, tomH: 0.85, crash: 0.6, ride: 0.85, cow: 1.8 };
 
 // MIDI note -> drum
 const GM = {
@@ -34,21 +37,21 @@ const KITS = {
     snRatio: 1.78, snBodyDec: 0.11, snNoiseHP: 1500, snNoiseBP: 0, snNoise: 1,
     hatFreq: 205.3, hatNoise: 0, hatHP: 6500, hatBP: 9000,
     clapBP: 1150, clapQ: 1.6, clapBursts: 4, clapSpace: 1,
-    cow: [540, 800], tomDrop: 1.5, tomLen: 1, crush: 0, lp: 0,
+    cow: [540, 800], tomDrop: 1.5, tomLen: 1, crush: 0, lp: 0, hatLvl: 1.6,
   },
   "909": {
     kickRise: 4.6, kickDrop: 0.032, kickTri: 0.5, kickClick: 0.5, kickLen: 0.8,
     snRatio: 1.9, snBodyDec: 0.09, snNoiseHP: 2400, snNoiseBP: 0, snNoise: 1.25,
     hatFreq: 240, hatNoise: 0.55, hatHP: 8000, hatBP: 10500,
     clapBP: 1500, clapQ: 1.3, clapBursts: 3, clapSpace: 0.75,
-    cow: [587, 845], tomDrop: 1.9, tomLen: 0.85, crush: 0, lp: 0,
+    cow: [587, 845], tomDrop: 1.9, tomLen: 0.85, crush: 0, lp: 0, hatLvl: 1,
   },
   lofi: {
     kickRise: 2.1, kickDrop: 0.06, kickTri: 0.15, kickClick: 0.12, kickLen: 0.7,
     snRatio: 1.62, snBodyDec: 0.14, snNoiseHP: 900, snNoiseBP: 3200, snNoise: 0.95,
     hatFreq: 180, hatNoise: 1, hatHP: 5000, hatBP: 6500,
     clapBP: 950, clapQ: 1.1, clapBursts: 3, clapSpace: 1.4,
-    cow: [500, 750], tomDrop: 1.4, tomLen: 1.2, crush: 1, lp: 5600,
+    cow: [500, 750], tomDrop: 1.4, tomLen: 1.2, crush: 1, lp: 5600, hatLvl: 1,
   },
 };
 const METAL = [1, 1.4471, 1.617, 1.9265, 2.5028, 2.6637]; // classic 808-style square-wave metal ratios
@@ -90,12 +93,18 @@ function driveCurve(drive, crush) {
   }
   return c;
 }
+// output safety: linear up to 0.6, soft knee to a 0.86 ceiling; the curve spans +-CLIP_IN (input pre-scaled)
+const CLIP_IN = 3;
 let clipCurve = null;
 function safetyCurve() {
   if (!clipCurve) {
-    const n = 513;
+    const n = 1025;
     clipCurve = new Float32Array(n);
-    for (let i = 0; i < n; i++) clipCurve[i] = Math.tanh((i * 2) / (n - 1) - 1);
+    for (let i = 0; i < n; i++) {
+      const x = ((i * 2) / (n - 1) - 1) * CLIP_IN;
+      const a = Math.abs(x);
+      clipCurve[i] = Math.sign(x) * (a < 0.6 ? a : 0.6 + 0.26 * Math.tanh((a - 0.6) / 0.26));
+    }
   }
   return clipCurve;
 }
@@ -176,7 +185,8 @@ function kitVoice(ctx, dest, note, P) {
 
   // ---- output chain: bus -> drive -> tone -> safety clip -> dest
   const bus = track(ctx.createGain());
-  bus.gain.value = GAIN * P.level;
+  const hat = what === "hatC" || what === "hatP" || what === "hatO";
+  bus.gain.value = GAIN * P.level * MIX[what] * (hat ? K.hatLvl : 1);
   let tail = bus;
   if (P.drive > 0.01 || K.crush) {
     const sh = track(ctx.createWaveShaper());
@@ -191,9 +201,13 @@ function kitVoice(ctx, dest, note, P) {
     tail.connect(lp);
     tail = lp;
   }
+  // pre-scale into the safety curve; drive gets a makeup trim so it adds grit, not just level
+  // (without the shaper, 1.31 = its small-signal gain at drive 0, so the DRIVE knob has no level jump near 0)
+  const pre = gain((tail !== bus ? 1 / (1 + 0.9 * P.drive) : 1.31) / CLIP_IN);
+  tail.connect(pre);
   const clip = track(ctx.createWaveShaper());
   clip.curve = safetyCurve();
-  tail.connect(clip);
+  pre.connect(clip);
   clip.connect(dest);
 
   // metallic square cluster -> highpass -> bandpass (hats, cymbals, cowbell share it)
@@ -267,15 +281,17 @@ function kitVoice(ctx, dest, note, P) {
     const pk = 1.7 * Math.min(v, 1.4);
     g.gain.setValueAtTime(0, t);
     let tt = t;
+    // each burst: 0.6 ms rise (no hard step), fast decay to 8 %; the last burst rings out
     for (let i = 0; i < nb - 1; i++) {
-      g.gain.setValueAtTime(pk * (0.7 + 0.3 * (i % 2)), tt + 0.0005);
+      g.gain.linearRampToValueAtTime(pk * (0.7 + 0.3 * (i % 2)), tt + 0.0006);
       g.gain.exponentialRampToValueAtTime(pk * 0.08, tt + sp * 0.9);
       tt += sp;
+      g.gain.setValueAtTime(pk * 0.08, tt);
     }
-    g.gain.setValueAtTime(pk, tt + 0.0005);
+    g.gain.linearRampToValueAtTime(pk, tt + 0.0006);
     g.gain.exponentialRampToValueAtTime(FLOOR, tt + Math.max(0.05, P.clapDecay));
     end = Math.max(end, tt + P.clapDecay + 0.03);
-  } else if (what === "hatC" || what === "hatP" || what === "hatO") {
+  } else if (hat) {
     const dec = what === "hatO" ? P.openDecay : what === "hatP" ? P.hatDecay * 0.7 : P.hatDecay;
     const g = env(0.5 * Math.min(v, 1.4) * (0.8 + 0.2 * vb), dec * (0.85 + 0.3 * vb), 0.0007);
     g.connect(bus);
@@ -309,7 +325,7 @@ function kitVoice(ctx, dest, note, P) {
     metal(K.hatFreq * 1.25, 4200, 7500, 0.5, g, 1.3, 0.8);
     const n = noise();
     const bp = filt("bandpass", 7000, 0.45);
-    const ng = gain(K.hatNoise * 1.1 + 0.9);
+    const ng = gain(K.hatNoise * 0.5 + 0.9);
     n.connect(bp);
     bp.connect(ng);
     ng.connect(g);
@@ -403,11 +419,96 @@ const svg = {
   lofi: '<path d="M3 17 L7 7 L11 17 L15 7 L19 17 L21 12"/>',
 };
 
+// ---- preset library: every preset is a whole kit. Row = [name, kit, kickTune, kickDecay, kickPunch, kickClick,
+// snareTune, snareSnap, snareDecay, clapDecay, clapSpread, hatTone, hatDecay, openDecay, tomTune, tomDecay,
+// cymDecay, drive, tone, level?] grouped by category (expanded by a tiny helper below).
+const PK = ["kickTune", "kickDecay", "kickPunch", "kickClick", "snareTune", "snareSnap", "snareDecay", "clapDecay", "clapSpread",
+  "hatTone", "hatDecay", "openDecay", "tomTune", "tomDecay", "cymDecay", "drive", "tone", "level"];
+const BANK = {
+  "808 Drums": [
+    ["Deep Sub Kit", "808", 38, 1.1, 0.35, 0.15, 160, 0.35, 0.28, 0.3, 0.6, 0.35, 0.05, 0.5, -4, 0.7, 2.2, 0.15, 9000],
+    ["Miami Bass 808", "808", 42, 1.3, 0.3, 0.2, 230, 0.7, 0.18, 0.25, 0.45, 0.6, 0.045, 0.4, 2, 0.6, 1.8, 0.2, 14000],
+    ["808 Dry Room", "808", 54, 0.22, 0.65, 0.5, 200, 0.65, 0.1, 0.14, 0.3, 0.55, 0.03, 0.22, 0, 0.2, 0.7, 0.1, 12000],
+    ["Freestyle 808", "808", 68, 0.35, 0.75, 0.5, 265, 0.8, 0.15, 0.18, 0.4, 0.75, 0.04, 0.35, 7, 0.35, 1.2, 0.25, 16000],
+    ["808 Warm Tape", "808", 48, 0.6, 0.55, 0.25, 175, 0.5, 0.22, 0.24, 0.55, 0.35, 0.06, 0.5, -2, 0.45, 1.8, 0.35, 6000],
+    ["808 Ballad", "808", 45, 0.7, 0.35, 0.1, 165, 0.3, 0.32, 0.35, 0.75, 0.25, 0.07, 0.7, -3, 0.6, 2.8, 0.05, 8000],
+    ["808 Crunch", "808", 52, 0.55, 0.8, 0.6, 215, 0.85, 0.2, 0.2, 0.4, 0.65, 0.05, 0.4, 0, 0.35, 1.5, 0.75, 13000],
+  ],
+  "909 Drums": [
+    ["909 Punch", "909", 56, 0.38, 0.7, 0.6, 200, 0.75, 0.19, 0.2, 0.35, 0.6, 0.05, 0.38, 0, 0.33, 1.9, 0.35, 16000],
+    ["House Machine", "909", 52, 0.3, 0.55, 0.5, 190, 0.55, 0.17, 0.28, 0.5, 0.7, 0.04, 0.55, 0, 0.3, 2.4, 0.4, 16000],
+    ["Techno Warehouse", "909", 47, 0.45, 0.85, 0.8, 195, 0.7, 0.2, 0.3, 0.45, 0.65, 0.045, 0.6, -2, 0.4, 2.6, 0.6, 11000],
+    ["Deep House Soft", "909", 50, 0.55, 0.45, 0.25, 180, 0.45, 0.22, 0.32, 0.6, 0.45, 0.05, 0.8, -1, 0.45, 2.8, 0.1, 9500],
+    ["Garage Swing", "909", 58, 0.28, 0.6, 0.55, 230, 0.8, 0.13, 0.18, 0.7, 0.8, 0.03, 0.3, 2, 0.3, 1.6, 0.3, 16000],
+    ["Acid Tight", "909", 60, 0.22, 0.7, 0.7, 210, 0.65, 0.12, 0.16, 0.3, 0.85, 0.025, 0.25, 4, 0.25, 1.2, 0.45, 16000],
+    ["Minimal Click", "909", 55, 0.18, 0.5, 1, 250, 0.5, 0.08, 0.12, 0.2, 0.9, 0.02, 0.18, 6, 0.18, 0.8, 0.15, 16000],
+    ["Hardgroove Crunch", "909", 53, 0.35, 0.75, 0.65, 185, 0.75, 0.24, 0.26, 0.55, 0.55, 0.06, 0.5, -3, 0.5, 2.2, 0.8, 8500],
+  ],
+  "Trap Drums": [
+    ["Tight Trap", "808", 44, 0.9, 0.5, 0.3, 210, 0.85, 0.14, 0.16, 0.25, 0.8, 0.035, 0.25, 0, 0.25, 1.4, 0.25, 16000],
+    ["Trap Long 808", "808", 36, 1.4, 0.45, 0.2, 220, 0.9, 0.13, 0.18, 0.3, 0.85, 0.03, 0.25, -2, 0.35, 1.6, 0.3, 16000],
+    ["UK Drill", "808", 41, 1.2, 0.6, 0.35, 245, 0.95, 0.12, 0.15, 0.2, 0.9, 0.025, 0.22, 3, 0.3, 1.3, 0.35, 16000],
+    ["Phonk Memphis", "lofi", 45, 1, 0.7, 0.4, 200, 0.8, 0.16, 0.2, 0.45, 0.6, 0.04, 0.3, 0, 0.4, 1.4, 0.65, 7000],
+    ["Rage Distorted", "808", 40, 1.25, 0.75, 0.5, 225, 0.9, 0.15, 0.2, 0.35, 0.75, 0.035, 0.3, 0, 0.3, 1.5, 0.9, 15000],
+    ["Cloud Trap", "808", 43, 1.1, 0.35, 0.1, 190, 0.55, 0.25, 0.3, 0.65, 0.45, 0.05, 1, -4, 0.6, 3, 0.1, 8000],
+    ["Atlanta Snap", "808", 47, 0.8, 0.55, 0.4, 280, 1, 0.09, 0.1, 0.15, 0.85, 0.03, 0.2, 0, 0.25, 1.2, 0.3, 16000],
+    ["Plugg Bounce", "808", 49, 0.75, 0.4, 0.25, 300, 0.65, 0.11, 0.2, 0.35, 0.7, 0.035, 0.35, 5, 0.35, 1.4, 0.15, 12000],
+  ],
+  "Lo-fi Drums": [
+    ["Lo-Fi Dust", "lofi", 46, 0.42, 0.4, 0.2, 170, 0.5, 0.24, 0.26, 0.7, 0.3, 0.07, 0.3, 0, 0.45, 1.3, 0.3, 5200],
+    ["Boom Bap Break", "lofi", 54, 0.3, 0.55, 0.35, 190, 0.7, 0.22, 0.2, 0.5, 0.4, 0.06, 0.28, 0, 0.35, 1.1, 0.5, 6800],
+    ["Dusty Jazz Kit", "lofi", 58, 0.25, 0.25, 0.15, 220, 0.85, 0.38, 0.3, 0.8, 0.25, 0.08, 0.6, 2, 0.5, 2.6, 0.15, 3800],
+    ["Chillhop Study", "lofi", 52, 0.35, 0.45, 0.2, 185, 0.6, 0.2, 0.24, 0.6, 0.35, 0.05, 0.35, 0, 0.4, 1.6, 0.2, 4600],
+    ["SP Crunch", "lofi", 56, 0.3, 0.65, 0.45, 195, 0.75, 0.18, 0.2, 0.45, 0.5, 0.05, 0.3, 0, 0.3, 1, 0.8, 9000],
+    ["Basement Tape", "lofi", 50, 0.4, 0.5, 0.3, 175, 0.55, 0.26, 0.26, 0.55, 0.3, 0.06, 0.35, -2, 0.45, 1.4, 0.45, 2600],
+    ["Dilla Swing Kit", "lofi", 60, 0.28, 0.6, 0.4, 178, 0.65, 0.2, 0.22, 0.55, 0.45, 0.055, 0.32, 1, 0.35, 1.2, 0.55, 6000],
+    ["Muffled Next Door", "lofi", 44, 0.5, 0.4, 0.1, 160, 0.4, 0.25, 0.28, 0.6, 0.2, 0.06, 0.4, -3, 0.5, 1.5, 0.3, 1400, 1.2],
+  ],
+  "Electro Drums": [
+    ["Electro Funk", "808", 62, 0.35, 0.9, 0.5, 240, 0.8, 0.14, 0.18, 0.4, 0.7, 0.035, 0.3, 5, 0.4, 1.3, 0.3, 16000],
+    ["Robot Boogie", "909", 57, 0.3, 0.8, 0.6, 220, 0.6, 0.15, 0.2, 0.35, 0.75, 0.03, 0.3, 9, 0.5, 1.4, 0.3, 16000],
+    ["Breakdance Toms", "808", 58, 0.4, 0.85, 0.45, 205, 0.7, 0.17, 0.22, 0.5, 0.6, 0.04, 0.4, 12, 0.75, 1.5, 0.25, 16000],
+    ["Detroit Electro", "808", 55, 0.45, 0.7, 0.35, 190, 0.6, 0.18, 0.26, 0.55, 0.6, 0.045, 0.5, -5, 0.5, 1, 0.35, 11000],
+    ["Synth Pop 80s", "909", 54, 0.4, 0.6, 0.5, 175, 0.7, 0.45, 0.45, 0.6, 0.55, 0.05, 0.45, -3, 0.8, 2.4, 0.25, 14000],
+    ["Zapp Click", "808", 70, 0.15, 1, 0.9, 290, 0.4, 0.07, 0.1, 0.15, 0.95, 0.02, 0.16, 10, 0.2, 0.6, 0.2, 16000],
+    ["Industrial EBM", "909", 49, 0.4, 0.75, 0.6, 150, 0.85, 0.35, 0.35, 0.6, 0.4, 0.06, 0.45, -6, 0.55, 2, 0.7, 7000],
+    ["Pocket Calculator", "808", 65, 0.2, 0.5, 0.3, 310, 0.2, 0.1, 0.12, 0.1, 0.9, 0.025, 0.2, 8, 0.25, 0.9, 0, 16000, 1.2],
+  ],
+  "Acoustic Drums": [
+    ["Studio Rock Kit", "909", 58, 0.35, 0.45, 0.7, 210, 0.7, 0.3, 0.3, 0.6, 0.45, 0.06, 0.55, -2, 0.55, 2.4, 0.15, 12000],
+    ["Jazz Brushes", "lofi", 62, 0.22, 0.2, 0.1, 235, 0.9, 0.45, 0.4, 0.9, 0.3, 0.09, 0.7, 3, 0.45, 3.2, 0.05, 7000],
+    ["Funk Pocket", "909", 62, 0.25, 0.4, 0.6, 245, 0.6, 0.14, 0.18, 0.4, 0.6, 0.045, 0.3, 1, 0.35, 1.5, 0.2, 13000],
+    ["Arena Rock", "909", 50, 0.5, 0.5, 0.75, 170, 0.8, 0.55, 0.5, 0.7, 0.5, 0.07, 0.7, -5, 0.9, 3, 0.35, 11000],
+    ["Garage Indie", "lofi", 55, 0.35, 0.5, 0.5, 195, 0.75, 0.28, 0.28, 0.6, 0.45, 0.06, 0.5, -1, 0.5, 2, 0.45, 8000],
+    ["Reggae One Drop", "808", 56, 0.4, 0.4, 0.3, 285, 0.3, 0.12, 0.2, 0.5, 0.5, 0.05, 0.4, 2, 0.45, 1.8, 0.1, 10000],
+    ["Motown Room", "lofi", 52, 0.3, 0.4, 0.3, 200, 0.8, 0.33, 0.3, 0.7, 0.35, 0.06, 0.4, -2, 0.4, 1.8, 0.25, 5000],
+    ["Bebop High Tune", "909", 76, 0.3, 0.3, 0.4, 265, 0.75, 0.3, 0.25, 0.7, 0.4, 0.07, 0.6, 6, 0.5, 2.8, 0.1, 10000],
+  ],
+  "FX Drums": [
+    ["Dub Toms & Rims", "808", 60, 0.3, 0.8, 0.2, 150, 0.25, 0.12, 0.4, 0.8, 0.2, 0.06, 0.7, 3, 0.95, 2.8, 0.1, 7500],
+    ["Gabber Distortion", "909", 62, 0.6, 1, 1, 200, 0.9, 0.2, 0.25, 0.4, 0.8, 0.04, 0.35, 0, 0.35, 1.5, 1, 16000],
+    ["Telephone Kit", "909", 70, 0.25, 0.6, 0.6, 250, 0.7, 0.18, 0.2, 0.4, 0, 0.04, 0.3, 4, 0.3, 1, 0.6, 2800],
+    ["Bit Crusher", "lofi", 50, 0.4, 0.7, 0.6, 200, 0.8, 0.2, 0.22, 0.5, 0.6, 0.05, 0.4, 0, 0.4, 1.2, 1, 18000],
+    ["Laser Toms", "808", 100, 0.3, 1, 0.2, 320, 0.3, 0.1, 0.15, 0.3, 0.9, 0.04, 0.3, 12, 1, 0.8, 0.2, 16000],
+    ["Underwater", "808", 40, 1, 0.6, 0.4, 150, 0.6, 0.4, 0.5, 0.8, 0.5, 0.08, 0.9, -8, 0.8, 3, 0.3, 800, 1.1],
+    ["Glitch Ticks", "909", 80, 0.08, 1, 1, 320, 1, 0.05, 0.06, 0, 1, 0.02, 0.15, 12, 0.12, 0.4, 0.3, 16000],
+    ["Long Tails", "808", 34, 1.4, 0.5, 0.2, 140, 0.5, 0.6, 0.7, 1, 0.3, 0.3, 1.4, -12, 1, 3.2, 0.15, 10000],
+  ],
+};
+const PRESETS = [{ name: "Init (808 Kit)", cat: "808 Drums", params: {} }];
+for (const [cat, rows] of Object.entries(BANK))
+  for (const [name, kit, ...v] of rows) {
+    const params = { kit };
+    v.forEach((x, i) => (params[PK[i]] = x));
+    PRESETS.push({ name, cat, params });
+  }
+
 const kit = {
   name: "ASIC",
   tagline: "Synth drum kit - 808 / 909 / lo-fi voicings, GM note map: kick, snare, clap, hats, toms, cymbals, cowbell",
   color: "#ff6b5a",
   params: paramDefs,
+  live: { oneShot: true, gate: 0.35 }, // drums ring out; key-up does not cut them
   voice: kitVoice,
   scope: kitScope,
   lines: [
@@ -427,17 +528,16 @@ const kit = {
       name: "Fill & Cymbals",
       dsl: "0:C#3:8:110 0:C2:1 8:D2:1 12:D2:1:100 16:G2:2:100 18:A2:2:105 20:C3:2:110 22:D3:2:120 24:D#3:8:90 32:C2:1 34:G#3:2:100 36:D2:1 38:G#3:2:90 40:C2:1 42:C2:1:90 44:D2:1 46:G#3:2:100 48:F2:1:100 49:G2:1:100 50:A2:1:105 51:B2:1:105 52:C3:1:110 53:D3:1:115 54:D#2:1:120 55:D2:1:120 56:C2:2:127 56:C#3:8:127",
     },
+    {
+      name: "Electro Breakbeat (toms, cowbell)",
+      dsl: "0:C2:1 6:C2:1 10:C2:1:110 4:D2:1 12:D2:1 0:F#2:1:90 2:F#2:1:60 4:F#2:1:90 6:F#2:1:60 8:F#2:1:90 10:F#2:1:60 12:F#2:1:90 14:A#2:1:90 16:C2:1 22:C2:1 26:C2:1:110 27:C2:1:80 20:D2:1 28:D2:1 16:F#2:1:90 18:F#2:1:60 20:F#2:1:90 22:F#2:1:60 24:F#2:1:90 26:F#2:1:60 28:F#2:1:90 30:A#2:1:90 19:G#3:1:80 23:G#3:1:70 32:C2:1 38:C2:1 42:C2:1:110 36:D2:1 44:D2:1 32:F#2:1:90 34:F#2:1:60 36:F#2:1:90 38:F#2:1:60 40:F#2:1:90 42:F#2:1:60 44:F#2:1:90 46:A#2:1:90 48:C2:1 54:C2:1 52:D2:1 48:F#2:1:90 50:F#2:1:60 52:F#2:1:90 56:C3:1:110 58:A2:1:110 60:G2:1:115 62:F2:1:120",
+    },
+    {
+      name: "Rock Beat & Fill (crash)",
+      dsl: "0:C2:1 8:C2:1 10:C2:1:100 4:D2:1 12:D2:1:120 2:F#2:1:70 4:F#2:1:100 6:F#2:1:70 8:F#2:1:100 10:F#2:1:70 12:F#2:1:100 14:F#2:1:70 0:C#3:1:110 16:C2:1 24:C2:1 26:C2:1:100 20:D2:1 28:D2:1:120 16:F#2:1:100 18:F#2:1:70 20:F#2:1:100 22:F#2:1:70 24:F#2:1:100 26:F#2:1:70 28:F#2:1:100 30:F#2:1:70 32:C2:1 40:C2:1 42:C2:1:100 36:D2:1 44:D2:1:120 32:F#2:1:100 34:F#2:1:70 36:F#2:1:100 38:F#2:1:70 40:F#2:1:100 42:F#2:1:70 44:F#2:1:100 46:F#2:1:70 48:C2:1 56:C2:1 52:D2:1 55:D2:1:60 48:F#2:1:100 50:F#2:1:70 52:F#2:1:100 54:F#2:1:70 56:D3:1:110 57:D3:1:90 58:C3:1:110 59:C3:1:90 60:A2:1:115 61:F2:1:115 62:F2:1:120 63:E2:1:127",
+    },
   ],
-  presets: [
-    { name: "Init (808 Kit)", params: {} },
-    { name: "909 Punch", params: { kit: "909", kickTune: 56, kickDecay: 0.38, kickPunch: 0.7, kickClick: 0.6, snareTune: 200, snareSnap: 0.75, snareDecay: 0.19, hatTone: 0.6, hatDecay: 0.05, openDecay: 0.38, clapDecay: 0.2, clapSpread: 0.35, tomDecay: 0.33, cymDecay: 1.9, drive: 0.35 } },
-    { name: "Lo-Fi Dust", params: { kit: "lofi", kickTune: 46, kickDecay: 0.42, kickPunch: 0.4, kickClick: 0.2, snareTune: 170, snareSnap: 0.5, snareDecay: 0.24, hatTone: 0.3, hatDecay: 0.07, openDecay: 0.3, clapDecay: 0.26, clapSpread: 0.7, tomDecay: 0.45, cymDecay: 1.3, drive: 0.3, tone: 5200 } },
-    { name: "Deep Sub Kit", params: { kit: "808", kickTune: 38, kickDecay: 1.1, kickPunch: 0.35, kickClick: 0.15, snareTune: 160, snareSnap: 0.35, snareDecay: 0.28, hatTone: 0.35, hatDecay: 0.05, openDecay: 0.5, clapDecay: 0.3, clapSpread: 0.6, tomTune: -4, tomDecay: 0.7, cymDecay: 2.2, drive: 0.15, tone: 9000 } },
-    { name: "Tight Trap", params: { kit: "808", kickTune: 44, kickDecay: 0.9, kickPunch: 0.5, kickClick: 0.3, snareTune: 210, snareSnap: 0.85, snareDecay: 0.14, hatTone: 0.8, hatDecay: 0.035, openDecay: 0.25, clapDecay: 0.16, clapSpread: 0.25, tomDecay: 0.25, cymDecay: 1.4, drive: 0.25 } },
-    { name: "House Machine", params: { kit: "909", kickTune: 52, kickDecay: 0.3, kickPunch: 0.55, kickClick: 0.5, snareTune: 190, snareSnap: 0.55, snareDecay: 0.17, hatTone: 0.7, hatDecay: 0.04, openDecay: 0.55, clapDecay: 0.28, clapSpread: 0.5, tomDecay: 0.3, cymDecay: 2.4, drive: 0.4 } },
-    { name: "Boom Bap Break", params: { kit: "lofi", kickTune: 54, kickDecay: 0.3, kickPunch: 0.55, kickClick: 0.35, snareTune: 190, snareSnap: 0.7, snareDecay: 0.22, hatTone: 0.4, hatDecay: 0.06, openDecay: 0.28, clapDecay: 0.2, clapSpread: 0.5, tomDecay: 0.35, cymDecay: 1.1, drive: 0.5, tone: 6800 } },
-    { name: "Dub Toms & Rims", params: { kit: "808", kickTune: 60, kickDecay: 0.3, kickPunch: 0.8, kickClick: 0.2, snareTune: 150, snareSnap: 0.25, snareDecay: 0.12, hatTone: 0.2, hatDecay: 0.06, openDecay: 0.7, clapDecay: 0.4, clapSpread: 0.8, tomTune: 3, tomDecay: 0.95, cymDecay: 2.8, drive: 0.1, tone: 7500 } },
-  ],
+  presets: PRESETS,
   ui: {
     theme: { accent: "#ff6b5a", lcd: "#ffc9c2", lcdBg: "#2b1210", edge: "#4a2320", bg: "#1f1211" },
     logo: ["", "ASIC"],
@@ -462,7 +562,7 @@ const kit = {
         ],
       },
       {
-        title: "KICK  (C1 / B0)",
+        title: "KICK  (C2 / B1)",
         cls: "kt-kick",
         items: [
           {
