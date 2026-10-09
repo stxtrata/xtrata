@@ -2867,3 +2867,19 @@ button:disabled {
     --dock-h: clamp(240px, 46vh, 420px);
   }
 }
+
+/* ------------------------------------------------ first screen: synths above samples (wave view)
+   The synth lanes are short and the dock below plays the first one, so putting them first keeps
+   "samples AND synths" both on the opening screen at laptop heights. The step grid keeps its
+   classic order (channels, then instruments). */
+body.arrange-mode #sticky-top,
+body.arrange-mode #project-ordinal-links {
+  order: -2;
+}
+body.arrange-mode #instruments-wrap {
+  order: -1;
+  padding-bottom: 6px;
+}
+body.arrange-mode #instruments-wrap .section-label {
+  margin: 8px 0 4px;
+}
