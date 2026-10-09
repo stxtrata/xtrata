@@ -56,7 +56,8 @@ function onMessage(msg) {
 
 // Neither editor is open: play the selected instrument straight from the keyboard.
 function liveFallback({ data }) {
-  if (!hidden("modal-roll") || !hidden("modal-synth")) return;
+  // the roll, or a synth panel showing in the dock, handles its own notes
+  if (!hidden("modal-roll") || document.getElementById("synth-front")?.dataset.built === "1") return;
   const [s, pitch, vel = 0] = data;
   const type = s & 0xf0;
   // same held-note path as the on-screen and computer keys (live-keys.js)
