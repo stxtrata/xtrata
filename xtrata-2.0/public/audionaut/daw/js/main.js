@@ -50,6 +50,35 @@ engine.onStep = (step) => {
   if (isArrangeMode()) arrangePlayhead(step);
 };
 
+// ------------------------------------------------------------ starter session
+// A ready-made song (drums, bass, keys, pad, lead) so the first screen has something to play.
+const STARTER_URL = new URL("../data/starter-session.json", import.meta.url);
+const WELCOME =
+  "Welcome to The Audionaut — press Space to play the song, or type A–L to play the synth.";
+
+// Replaces the current project with the starter. `guard` lets boot() back out if the person
+// has already done something else (New, Load) while the file was on its way.
+async function loadStarter({ guard = null } = {}) {
+  const response = await fetch(STARTER_URL);
+  if (!response.ok) throw new Error(`Starter session unavailable (${response.status}).`);
+  const text = await response.text();
+  if (guard && store.project !== guard) return false;
+  persist.importProject(text);
+  resetHistory();
+  ui.setStatus("Loading the starter session's sounds…");
+  const project = store.project;
+  const failures = await sampleRestore;
+  if (project !== store.project) return true;
+  ui.refreshAllChannels();
+  ui.setStatus(
+    failures.length
+      ? `Starter opened; retry audio in channels ${failures.join(", ")}.`
+      : WELCOME,
+    !!failures.length,
+  );
+  return true;
+}
+
 // ------------------------------------------------------------ header controls
 function syncHeaderFromProject() {
   const p = store.project;
@@ -145,6 +174,15 @@ function initFileOps() {
       );
     } catch (err) {
       ui.setStatus(`Import failed: ${err.message}`, true);
+    }
+  });
+  $("#btn-starter").addEventListener("click", async () => {
+    if (!confirm("Load the starter session? Unsaved changes will be lost.")) return;
+    stopAll();
+    try {
+      await loadStarter();
+    } catch (err) {
+      ui.setStatus(`Starter session failed: ${err.message}`, true);
     }
   });
   $("#btn-new").addEventListener("click", () => {
@@ -334,6 +372,12 @@ function boot() {
     attachStrips();
     ui.buildInstruments();
     ui.renderSequenceBar();
+    // First visit (or cleared storage): open on the starter session. The empty project above
+    // is what shows if the file cannot be fetched.
+    ui.setStatus("Opening the starter session…");
+    loadStarter({ guard: store.project }).catch((err) =>
+      ui.setStatus(`Ready — ${err.message} Start with Beats or load a sample.`, true),
+    );
   } else {
     ui.setStatus("Restored autosaved project. Reloading samples…");
     sampleRestore
