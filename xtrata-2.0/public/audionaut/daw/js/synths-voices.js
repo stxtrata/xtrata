@@ -247,6 +247,41 @@ export function voxFormants(P, x) {
   });
 }
 
+// Estimated RMS of the voice source (3 saws + breath noise → brightness low-pass) through the
+// formant bank `fm`, before the 3.2 bank gain. Used to level-match vowels, voice sizes, sharpness,
+// breath and pitch so every patch sits at the same loudness. Harmonic power is averaged over a
+// small pitch spread (choir / vibrato wobble) so narrow formants don't make it jumpy.
+function voxRms(P, fm, f0, sr) {
+  const lp = (f) => 1 / (1 + Math.pow(f / P.bright, 4)); // |H|² of the source low-pass
+  const coh = Math.exp(-P.choir / 3); // 3 saws add coherently when un-detuned
+  const saw2 = 0.09 * (3 + 6 * coh) * 0.2026; // (0.3·Σsaws)² · (2/π)² ; ÷n² per harmonic
+  const top = Math.min(sr * 0.45, 12000);
+  const spread = Math.max(8, P.choir, P.vibDepth * 0.7) / 1200;
+  let pw = 0;
+  for (const s of [-1, 0, 1]) {
+    const f1 = f0 * Math.pow(2, s * spread);
+    for (let n = 1; n * f1 < top; n++) {
+      const f = n * f1;
+      let re = 0;
+      let im = 0;
+      for (const o of fm) {
+        const r = f / o.f;
+        const d = r / o.q;
+        const u = 1 - r * r;
+        const den = u * u + d * d;
+        re += (o.g * d * d) / den;
+        im += (o.g * d * u) / den;
+      }
+      pw += ((re * re + im * im) * lp(f) * saw2) / (2 * n * n);
+    }
+  }
+  pw /= 3;
+  const nb = P.breath * 0.55;
+  if (nb > 0.0055) for (const o of fm) pw += ((nb * nb) / 3) * o.g * o.g * lp(o.f) * ((Math.PI * o.f) / o.q / sr);
+  return Math.sqrt(pw) * 3.2;
+}
+const VOX_RMS = 0.11; // target note RMS (before velocity / level)
+
 const noiseCache = new WeakMap();
 function noiseBuffer(ctx) {
   let b = noiseCache.get(ctx);
@@ -275,19 +310,92 @@ const voxParams = [
   range("level", "Output Level", 0, 1.5, 0.01, 1),
 ];
 
+// Presets as data: [name, vowel, vowelTo, morph, shift, sharp, bright, choir, vibRate, vibDepth,
+// breath, attack, release, level?] grouped by category (expanded by presetTable below).
+const VOX_KEYS = ["vowel", "vowelTo", "morph", "shift", "sharp", "bright", "choir", "vibRate", "vibDepth", "breath", "attack", "release", "level"];
+const presetTable = (keys, groups) =>
+  Object.entries(groups).flatMap(([cat, rows]) =>
+    rows.map(([name, ...v]) => ({ name, cat, params: Object.fromEntries(v.map((x, i) => [keys[i], x])) })),
+  );
+const VOX_PRESETS = presetTable(VOX_KEYS, {
+  Choir: [
+    ["Ahh Choir", 0, 3, 0, 1, 1, 4500, 12, 5.2, 14, 0.12, 0.12, 0.6],
+    ["Cathedral", 3, 0, 1.2, 0.85, 0.8, 3200, 32, 4.6, 18, 0.15, 0.9, 2.4],
+    ["Child Choir", 1, 2, 0.6, 1.35, 1.2, 6000, 16, 5.2, 8, 0.1, 0.2, 0.8],
+    ["Monks Ooh", 4, 3, 0, 0.74, 1.1, 2400, 9, 4.2, 6, 0.08, 0.35, 1.4],
+    ["Gospel Oh", 3, 0, 0.5, 0.95, 1, 5200, 22, 5.8, 24, 0.1, 0.08, 0.9],
+    ["Chamber Eh", 1, 3, 0, 1.05, 1.3, 5000, 10, 5.4, 12, 0.06, 0.18, 0.7],
+    ["Soprano Ee", 2, 3, 0, 1.22, 1.4, 7500, 14, 6, 28, 0.05, 0.15, 0.9],
+    ["Mass Choir", 0.5, 3, 0, 0.9, 0.9, 4200, 40, 4.9, 20, 0.18, 0.4, 1.6],
+    ["Staccato Choir", 0, 3, 0, 1, 1, 5500, 18, 5.2, 0, 0.08, 0.01, 0.18],
+    ["Om Chant", 3, 4, 1.2, 0.76, 1.3, 2600, 8, 0.8, 3, 0.12, 0.6, 2],
+  ],
+  Pads: [
+    ["Ooo Pad", 4, 3, 0, 0.92, 1, 4500, 20, 5.2, 10, 0.2, 0.5, 1.2],
+    ["Vowel Drift", 0, 4, 2, 0.9, 0.9, 3600, 26, 3.2, 10, 0.14, 1.2, 2.5, 1.2],
+    ["Glass Ee Pad", 2, 1, 1.6, 1.3, 1.8, 8500, 30, 2.4, 6, 0.04, 0.8, 2.2],
+    ["Warm Oh Pad", 3, 3, 0, 0.8, 0.7, 2200, 20, 3.8, 8, 0.12, 0.7, 2],
+    ["Dusk Aah", 0, 3, 1.8, 0.82, 0.6, 2800, 36, 4.4, 14, 0.22, 1.1, 2.8],
+    ["Angel Pad", 1.5, 3, 0, 1.18, 1.5, 7000, 38, 5, 16, 0.1, 1, 3],
+    ["Wide Mmm", 4, 3, 0, 0.72, 0.55, 1200, 28, 3, 4, 0.05, 0.6, 1.8],
+  ],
+  Leads: [
+    ["Diva Lead", 0, 3, 0, 1.12, 1.3, 7500, 3, 5.6, 34, 0.06, 0.06, 0.5],
+    ["Tenor Lead", 3, 0, 0.25, 0.88, 1.2, 5500, 2, 5.2, 22, 0.05, 0.05, 0.4],
+    ["Synth Vox Lead", 1, 3, 0, 1, 1.6, 9000, 7, 6.5, 10, 0, 0.02, 0.25],
+    ["Ee Saw Lead", 2, 3, 0, 1.05, 0.6, 9000, 10, 5, 8, 0, 0.02, 0.3],
+    ["Soul Oh", 3, 3, 0, 0.96, 1.1, 4800, 4, 4.8, 40, 0.1, 0.1, 0.6],
+    ["Yodel Lead", 4, 2, 0.12, 1.08, 1, 6500, 3, 7, 18, 0.12, 0.02, 0.3],
+    ["Siren Lead", 0, 2, 0.8, 1.25, 1.5, 8000, 5, 8.5, 50, 0.03, 0.05, 0.5],
+  ],
+  Talk: [
+    ["Wah Lead", 0, 4, 0.45, 1, 1, 6500, 4, 5.2, 22, 0.05, 0.03, 0.25],
+    ["Yoy Talker", 2, 3, 0.3, 1, 1, 4500, 6, 5.2, 8, 0.12, 0.02, 0.2],
+    ["Talkbox Wow", 4, 0, 0.18, 1, 1.5, 7000, 0, 5.2, 0, 0, 0.01, 0.12],
+    ["Yeah Talk", 2, 0, 0.22, 1, 1.3, 6000, 2, 5.2, 6, 0.12, 0.02, 0.2],
+    ["Oy Funk", 3, 2, 0.15, 0.95, 1.6, 8000, 0, 5.2, 0, 0, 0.01, 0.1],
+    ["Ooh-Wee", 4, 2, 0.4, 1.1, 1.4, 7000, 6, 6, 12, 0.12, 0.03, 0.35],
+    ["Vocoder Wow", 4, 0, 1, 0.95, 1.8, 9000, 8, 5.2, 0, 0.02, 0.05, 0.6],
+  ],
+  Breath: [
+    ["Whisper", 1, 3, 0, 1, 1, 2500, 0, 5.2, 0, 0.95, 0.15, 0.5],
+    ["Breathy Aah", 0, 3, 0, 1, 1, 3500, 10, 5.2, 6, 0.6, 0.25, 1],
+    ["Hush Pad", 4, 3, 1.5, 0.9, 0.8, 2200, 24, 5.2, 4, 0.8, 0.9, 2.4],
+    ["Sigh", 0, 4, 1.2, 0.92, 1, 3000, 6, 5.2, 0, 0.7, 0.3, 1.4],
+    ["Airy Ee", 2, 3, 0, 1.2, 1.6, 8000, 16, 5.2, 10, 0.5, 0.4, 1.5],
+    ["Ghost Hiss", 1, 4, 2, 1.3, 2, 9000, 0, 5.2, 0, 1, 0.6, 2],
+  ],
+  Robot: [
+    ["Robot Vox", 2, 1, 0, 1.1, 1.9, 7000, 0, 5.2, 0, 0, 0.01, 0.1],
+    ["Toy Speaker", 1, 3, 0.08, 1.05, 2, 4000, 0, 5.2, 0, 0, 0.01, 0.06],
+    ["Droid Ah", 0, 3, 0, 0.78, 2, 9000, 0, 9, 4, 0, 0.01, 0.15],
+    ["Vocoder Pad", 3, 1, 1.4, 1, 1.9, 9000, 3, 5.2, 0, 0.03, 0.3, 1.2],
+    ["Cyborg Choir", 2, 0, 0.6, 0.9, 1.8, 8000, 1, 5.2, 0, 0, 0.1, 0.8],
+    ["Circuit Ee", 2, 3, 0, 1.4, 2, 9000, 0, 9, 60, 0, 0.01, 0.2],
+  ],
+  Bass: [
+    ["Bass Vox", 4, 3, 0, 0.72, 1.2, 2400, 4, 5.2, 0, 0, 0.01, 0.15],
+    ["Oh Bass", 3, 4, 0.2, 0.75, 1.4, 3000, 6, 5.2, 0, 0.02, 0.01, 0.2],
+    ["Wow Bass", 4, 0, 0.3, 0.8, 1.7, 4500, 2, 5.2, 0, 0, 0.01, 0.12],
+    ["Throat Drone", 0, 3, 0, 0.7, 1.9, 3500, 3, 0.5, 6, 0.1, 0.5, 1.5],
+    ["Basso Profundo", 3, 3, 0, 0.7, 0.9, 1800, 12, 4.5, 12, 0.08, 0.2, 1],
+  ],
+  FX: [
+    ["Alien Chant", 2, 4, 2, 1.4, 2, 6000, 40, 0.7, 60, 0.2, 0.8, 2.5],
+    ["Haunted Hall", 4, 3, 2, 0.72, 0.5, 1500, 40, 1.2, 45, 0.4, 1.5, 3, 1.4],
+    ["Laughing Gas", 0, 1, 0.05, 1.4, 1.2, 7000, 20, 9, 60, 0.12, 0.01, 0.3],
+    ["Tape Choir", 0, 3, 0, 0.95, 1, 2000, 6, 0.6, 35, 0.25, 0.3, 1.2],
+    ["Crowd Murmur", 1, 3, 1.5, 0.9, 0.6, 2500, 40, 2, 40, 0.5, 0.5, 1.5],
+    ["Gargle Bot", 0, 4, 0.1, 1.15, 2, 9000, 30, 9, 45, 0.3, 0.01, 0.4],
+  ],
+});
+
 const vox = {
   name: "Gm",
   tagline: "Formant voice — vowel choirs, talking leads and breathy pads",
   color: "#f472b6",
   params: voxParams,
-  presets: [
-    { name: "Ahh Choir", params: {} },
-    { name: "Ooo Pad", params: { vowel: 4, morph: 0, shift: 0.92, choir: 20, breath: 0.2, attack: 0.5, release: 1.2, vibDepth: 10 } },
-    { name: "Wah Lead", params: { vowel: 0, vowelTo: 4, morph: 0.45, choir: 4, breath: 0.05, attack: 0.03, release: 0.25, vibDepth: 22, bright: 6500 } },
-    { name: "Whisper", params: { vowel: 1, choir: 0, breath: 0.95, bright: 2500, attack: 0.15, release: 0.5, vibDepth: 0 } },
-    { name: "Robot Vox", params: { vowel: 2, vowelTo: 1, morph: 0, shift: 1.1, sharp: 1.9, choir: 0, vibDepth: 0, breath: 0, attack: 0.01, release: 0.1, bright: 7000 } },
-    { name: "Yoy Talker", params: { vowel: 2, vowelTo: 3, morph: 0.3, choir: 6, vibDepth: 8, attack: 0.02, release: 0.2 } },
-  ],
+  presets: VOX_PRESETS,
   voice(ctx, dest, { pitch, vel, time, dur }, P) {
     const f0 = midiToFreq(pitch);
     const end = time + Math.max(dur, P.attack + 0.05);
@@ -329,6 +437,20 @@ const vox = {
     const bank = ctx.createGain();
     const from = voxFormants(P, P.vowel);
     const to = P.morph > 0.005 ? voxFormants(P, P.vowelTo) : from;
+    // level-match: each formant set is scaled to the same estimated RMS (clamped so a
+    // note with nothing in its formants is not boosted into noise)
+    // (low notes are spikier pulse trains, so they get a little less RMS to keep peaks in check)
+    const target = 3.2 * VOX_RMS * Math.min(1, Math.pow(f0 / 160, 0.3));
+    const norm = (fm) => target / clamp(voxRms(P, fm, f0, ctx.sampleRate), 0.02, 3);
+    // the bank gain follows the morph path (formants glide linearly in Hz, as the filters do)
+    bank.gain.setValueAtTime(norm(from), time);
+    const SEG = 8;
+    if (to !== from)
+      for (let j = 1; j <= SEG; j++) {
+        const t = j / SEG;
+        const mid = from.map((a, k) => ({ f: a.f + (to[k].f - a.f) * t, g: a.g + (to[k].g - a.g) * t, q: a.q + (to[k].q - a.q) * t }));
+        bank.gain.linearRampToValueAtTime(norm(mid), time + P.morph * t);
+      }
     from.forEach((fm, k) => {
       const bp = ctx.createBiquadFilter();
       bp.type = "bandpass";
@@ -339,13 +461,13 @@ const vox = {
         bp.Q.linearRampToValueAtTime(to[k].q, time + P.morph);
       }
       const g = ctx.createGain();
-      g.gain.setValueAtTime(fm.g * 3.2, time);
-      if (to !== from) g.gain.linearRampToValueAtTime(to[k].g * 3.2, time + P.morph);
+      g.gain.setValueAtTime(fm.g, time);
+      if (to !== from) g.gain.linearRampToValueAtTime(to[k].g, time + P.morph);
       lp.connect(bp).connect(g).connect(bank);
     });
     // amplitude envelope
     const g = ctx.createGain();
-    const peak = Math.max(0.001, vel * 2.4 * P.level);
+    const peak = Math.max(0.001, vel * P.level);
     g.gain.setValueAtTime(0.0001, time);
     g.gain.exponentialRampToValueAtTime(peak, time + Math.max(0.01, P.attack));
     g.gain.setValueAtTime(peak, Math.max(end, time + P.attack + 0.001));
@@ -367,6 +489,8 @@ const vox = {
     { name: "Choir Chords (Am – F)", dsl: "0:A3:16 0:C4:16 0:E4:16 16:F3:16 16:A3:16 16:C4:16" },
     { name: "Talking Lead", dsl: "0:E4:3 4:G4:3 8:A4:4 12:G4:2 14:E4:2 16:D4:3 20:E4:3 24:G4:6" },
     { name: "Ooh Stabs (Dm)", dsl: "0:D4:2 0:F4:2 0:A4:2 6:D4:2 6:F4:2 6:A4:2 8:C4:2 8:E4:2 8:G4:2 14:C4:1 14:E4:1 14:G4:1" },
+    { name: "Vox Bass Groove (Cm)", dsl: "0:C2:2 3:C2:1 4:D#2:2 6:C2:1 8:G2:2 11:F2:1 12:D#2:2 14:C2:2 16:G#1:2 19:G#1:1 20:C2:2 24:A#1:2 27:A#1:1 28:D2:3" },
+    { name: "Monk Chant (D)", dsl: "0:D3:8 8:E3:4 12:F3:4 16:E3:8 24:D3:8 32:A2:8 40:C3:4 44:D3:12" },
   ],
   ui: {
     theme: { accent: "#f472b6", lcd: "#ffb3da", lcdBg: "#1a0713", edge: "#4a2038", bg: "#26121e" },

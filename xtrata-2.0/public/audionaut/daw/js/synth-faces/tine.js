@@ -12,18 +12,23 @@ import { Kit } from "./runtime.js";
   function presetUI(root, P) {
     const n = P.presets.length; let idx = -1;
     const list = root.querySelector('[data-pl]');
-    if (list) list.innerHTML = P.presets.map((p, j) => `<button data-pj="${j}"><span>${pad2(j + 1)}</span>${p.name}</button>`).join('');
+    if (list) list.innerHTML = P.presets.map((p, j) => `<button data-pj="${j}"><span>${pad2(j + 1)}</span><em>${MODELS[p.values.model] || ''}</em>${p.name}</button>`).join('');
     const menu = root.querySelector('[data-pmenu]');
     P.onPreset((i, name) => {
       idx = i;
       root.querySelectorAll('[data-pn]').forEach(e => e.textContent = i < 0 ? 'Init' : name);
-      root.querySelectorAll('[data-pi]').forEach(e => e.textContent = i < 0 ? '--' : pad2(i + 1));
+      root.querySelectorAll('[data-pi]').forEach(e => e.textContent = (i < 0 ? '--' : pad2(i + 1)) + '/' + n);
       root.querySelectorAll('[data-pj]').forEach(b => b.classList.toggle('on', +b.dataset.pj === i));
     });
     root.querySelectorAll('[data-pp]').forEach(b => b.addEventListener('click', () => P.loadPreset(idx <= 0 ? n - 1 : idx - 1)));
     root.querySelectorAll('[data-pnx]').forEach(b => b.addEventListener('click', () => P.loadPreset((idx + 1) % n)));
     root.querySelectorAll('[data-pj]').forEach(b => b.addEventListener('click', () => { P.loadPreset(+b.dataset.pj); if (menu) menu.classList.remove('open'); }));
-    root.querySelectorAll('[data-ptog]').forEach(b => b.addEventListener('click', () => { if (menu) menu.classList.toggle('open'); }));
+    root.querySelectorAll('[data-ptog]').forEach(b => b.addEventListener('click', () => {
+      if (!menu) return;
+      menu.classList.toggle('open');
+      const on = menu.querySelector('button.on');
+      if (on && menu.classList.contains('open')) menu.scrollTop = on.offsetTop - menu.clientHeight / 2;
+    }));
   }
   // approximate partial spectrum for the display (not the real engine)
   function harm(P, N) {
@@ -70,17 +75,6 @@ import { Kit } from "./runtime.js";
     { id: 'tremRate', label: 'Tremolo Rate (Hz)', min: 0.5, max: 9, step: 0.1, def: 4.8, fmt: v => v.toFixed(1) + ' Hz' },
     { id: 'level', label: 'Output Level', min: 0, max: 1.5, step: 0.01, def: 1, fmt: v => Math.round(v * 100) + '%' }
   ];
-  const pr = (name, o) => ({ name, values: o });
-  const presets = [
-    pr('Init (Suitcase Tine)', {}),
-    pr('Mellow Rhodes', { model: 0, brightness: .28, touch: .5, decay: 1.3, release: .45, bark: .2, ping: .35, tremolo: .25, tremRate: 4.2 }),
-    pr('Barking Rhodes', { model: 0, brightness: .7, touch: .9, decay: 1, release: .3, bark: .95, ping: .7 }),
-    pr('Wurli 200', { model: 1, brightness: .5, touch: .7, decay: .9, release: .25, bark: .6, hammer: .5, pickup: .28, tremolo: .5, tremRate: 5.6 }),
-    pr('Upright Piano', { model: 2, brightness: .35, touch: .6, decay: .9, release: .3, hammer: .55, stretch: .7, beat: .5 }),
-    pr('Bright Grand', { model: 2, brightness: .72, touch: .85, decay: 1.3, release: .5, hammer: .35, stretch: .45, beat: .35 }),
-    pr('Clav Funk', { model: 3, brightness: .65, touch: .8, decay: .8, release: .08, bark: .5, hammer: .7, pickup: .14 }),
-    pr('Muted Clav', { model: 3, brightness: .3, touch: .4, decay: .45, release: .05, bark: .2, hammer: .4, pickup: .42 })
-  ];
   const MODELS = ['TINE', 'REED', 'PIANO', 'CLAV'];
   const ICON = [
     '<path d="M12 3 V16 M9 16 H15 M12 16 V21 M6 8 C9 6 15 6 18 8"/>',
@@ -121,9 +115,9 @@ background:conic-gradient(from 0deg,#d9b872,#8a6a2e,#e8d09a,#7a5a22,#d9b872,#8a6
 .wl .pi{color:#b08d57;font-weight:700;font-size:10px}.wl .pn{flex:1;text-align:center;font-weight:700;font-size:12px;color:#f4dfa4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wl button{width:22px;height:22px;border:1px solid #b08d57;color:#f4dfa4;font-size:13px;line-height:1}.wl button:hover{background:#b08d57;color:#0b0905}
 .wl .mn{font-size:8.5px;letter-spacing:.14em;color:#b08d57;border:0}
-.menu{display:none;position:absolute;right:18px;top:48px;width:290px;background:#0b0905;border:1px solid #f4dfa4;z-index:9;padding:4px 0;box-shadow:0 10px 30px #000}
-.menu.open{display:block}.menu button{display:flex;gap:10px;width:100%;text-align:left;padding:4px 12px;font-size:11px}
-.menu button span{color:#b08d57;width:18px}.menu button:hover,.menu button.on{background:#b08d57;color:#0b0905}.menu button:hover span,.menu button.on span{color:#0b0905}
+.menu{display:none;position:absolute;right:18px;top:48px;width:290px;max-height:480px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#6b5530 #0b0905;background:#0b0905;border:1px solid #f4dfa4;z-index:9;padding:4px 0;box-shadow:0 10px 30px #000}
+.menu.open{display:block}.menu button{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;padding:4px 12px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.menu button span{color:#b08d57;width:18px;flex:none}.menu button em{font-style:normal;font-size:8px;letter-spacing:.12em;color:#6b5530;width:36px;flex:none}.menu button:hover em,.menu button.on em{color:#2a1d0a}.menu button:hover,.menu button.on{background:#b08d57;color:#0b0905}.menu button:hover span,.menu button.on span{color:#0b0905}
 .box{position:absolute;border:1px solid #6b5530;background:#0d0b07cc}
 .box h6{position:absolute;left:10px;top:-6px;margin:0;font-size:8.5px;letter-spacing:.2em;font-weight:500;color:#b08d57;background:#12100a;padding:0 5px}
 canvas{display:block}
@@ -209,7 +203,7 @@ ${bolts}${ticks}
 
   Kit.register('tine', {
     fonts: 'family=Shrikhand&family=Rubik:wght@500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;700',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       undefined,
       { key: 'B', name: 'Privkey', accent: '#b08d57', build: faceB },

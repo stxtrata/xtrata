@@ -30,16 +30,6 @@ import { Kit } from "./runtime.js";
     { id: 'release', label: 'Release', min: 0.05, max: 3, step: 0.01, def: 0.6, fmt: sec },
     { id: 'level', label: 'Output Level', min: 0, max: 1.5, step: 0.01, def: 1, fmt: pct }
   ];
-  const presets = [
-    { name: 'Ahh Choir', values: {} },
-    { name: 'Ooo Pad', values: { vowel: 4, morph: 0, shift: 0.92, choir: 20, breath: 0.2, attack: 0.5, release: 1.2, vibDepth: 10 } },
-    { name: 'Wah Lead', values: { vowel: 0, vowelTo: 4, morph: 0.45, choir: 4, breath: 0.05, attack: 0.03, release: 0.25, vibDepth: 22, bright: 6500 } },
-    { name: 'Whisper', values: { vowel: 1, choir: 0, breath: 0.95, bright: 2500, attack: 0.15, release: 0.5, vibDepth: 0 } },
-    { name: 'Robot Vox', values: { vowel: 2, vowelTo: 1, morph: 0, shift: 1.1, sharp: 1.9, choir: 0, vibDepth: 0, breath: 0, attack: 0.01, release: 0.1, bright: 7000 } },
-    { name: 'Yoy Talker', values: { vowel: 2, vowelTo: 3, morph: 0.3, choir: 6, vibDepth: 8, attack: 0.02, release: 0.2 } },
-    { name: 'Cathedral', values: { vowel: 3, vowelTo: 0, morph: 1.2, shift: 0.85, sharp: 0.8, choir: 32, vibRate: 4.6, vibDepth: 18, breath: 0.15, attack: 0.9, release: 2.4, bright: 3200 } },
-    { name: 'Child Choir', values: { vowel: 1, vowelTo: 2, morph: 0.6, shift: 1.35, sharp: 1.2, choir: 16, vibDepth: 8, breath: 0.1, attack: 0.2, release: 0.8, bright: 6000 } }
-  ];
 
   const wire = (root, P) => {
     root.querySelectorAll('[data-p]').forEach(el => { const o = {}; if (el.dataset.abs) { o.abs = true; o.axis = el.dataset.abs; } if (el.dataset.ax) o.axis = el.dataset.ax; if (el.dataset.rng) o.range = +el.dataset.rng; P.bind(el, el.dataset.p, o); });
@@ -115,7 +105,9 @@ import { Kit } from "./runtime.js";
  .kn:before{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 225deg,${BR}55 0,${BR}55 calc(var(--v)*270deg),transparent calc(var(--v)*270deg));-webkit-mask:radial-gradient(circle,transparent 62%,#000 64%);mask:radial-gradient(circle,transparent 62%,#000 64%);z-index:-1}
  .kn.drag{transform:scale(1.05)}
  .lt{display:flex;gap:6px;margin:2px 0 0}.lt button{width:34px;height:34px;border-radius:50%;border:3px solid #fff;background:#ffe9a6;color:${BR};font:700 17px 'Fredoka',sans-serif;cursor:pointer;box-shadow:0 3px 0 ${BR}44}.lt button.on{background:#ff7a45;color:#fff;border-color:${BR}}
- .chips{left:20px;top:442px;width:920px;display:flex;gap:6px;justify-content:center}.chips i{font-style:normal;background:#ffffffbb;border-radius:16px;padding:3px 11px;font-size:13px;cursor:pointer;box-shadow:0 2px 0 ${BR}33}.chips i.on{background:${BR};color:#fff}
+ .chips{left:20px;top:438px;width:920px;height:32px;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:${BR}55 transparent;padding:2px 4px 0;box-sizing:border-box;-webkit-mask:linear-gradient(90deg,transparent,#000 18px,#000 calc(100% - 18px),transparent);mask:linear-gradient(90deg,transparent,#000 18px,#000 calc(100% - 18px),transparent)}
+ .chips::-webkit-scrollbar{height:4px}.chips::-webkit-scrollbar-thumb{background:${BR}55;border-radius:2px}
+ .chips i{flex:none;white-space:nowrap;font-style:normal;background:#ffffffbb;border-radius:16px;padding:3px 11px;height:20px;line-height:20px;font-size:13px;cursor:pointer;box-shadow:0 2px 0 ${BR}33}.chips i.on{background:${BR};color:#fff}
  .kbw{left:20px;top:476px;width:920px;height:72px;border-radius:0 0 22px 22px;background:${BR};padding:4px 6px 0}
  .kbw .kb-w{background:linear-gradient(#fffdf5,#fff1c4);border:1px solid #d9a44a;border-top:0;border-radius:0 0 12px 12px}.kbw .kb-w.on{background:linear-gradient(#ffe27a,#ffb347)}
  .kbw .kb-b{background:#4a1a0a;border:0;border-radius:0 0 8px 8px}.kbw .kb-b.on{background:#ff7a45}
@@ -136,6 +128,10 @@ import { Kit } from "./runtime.js";
  <div class="kbw" id="kb"></div></div>`;
     wire(root, P);
     const $ = s => root.querySelector(s);
+    // preset strip: scrolls sideways (wheel too) and keeps the active chip in view
+    const strip = $('.chips');
+    strip.addEventListener('wheel', e => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { strip.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
+    P.onPreset(i => { const c = strip.querySelector(`[data-pip="${i}"]`); if (c) strip.scrollTo({ left: c.offsetLeft - (strip.clientWidth - c.offsetWidth) / 2, behavior: 'smooth' }); });
     const sun = $('#sun'); const CX = 150, CY = 150;
     let rays = ''; for (let i = 0; i < 16; i++) { const a = i * 22.5; rays += `<rect class="ray" x="-7" y="-148" width="14" height="${i % 2 ? 26 : 38}" rx="7" fill="#fff" fill-opacity=".85" transform="rotate(${a})"/>`; }
     sun.innerHTML = `<defs><radialGradient id="sg" cx="40%" cy="32%" r="80%"><stop offset="0" stop-color="#fffbd0"/><stop offset=".5" stop-color="${Y}"/><stop offset="1" stop-color="#ffab3a"/></radialGradient></defs>
@@ -167,7 +163,7 @@ import { Kit } from "./runtime.js";
 
   Kit.register('vox', {
     fonts: 'family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,500;1,9..144,700&family=Share+Tech+Mono&family=Fredoka:wght@500;700',
-    w: 960, h: 560, params, presets,
+    w: 960, h: 560, params,
     faces: [
       undefined,
       undefined,
