@@ -6,6 +6,8 @@
 //
 //   node tools/chain-null.mjs record BASELINE.json.gz    # run on the code you trust
 //   node tools/chain-null.mjs compare BASELINE.json.gz   # run on the change; exit 1 if any case differs
+//          --new-shape    write the fixtures' trailing sends as strip sends ({ delay, reverb } values)
+//                         instead of FX-list slots: the new data shape must sound the same
 //   flags: --limit=-90   null threshold in dB (residual vs the baseline peak; default -90)
 //          --only=text   only cases whose id contains text
 //          --list        print the case ids and exit
@@ -44,9 +46,23 @@ const CASES = [
   // through two delay nodes differently from run to run (one 128-sample block, inaudible), so this
   // case only compares the first second, before the echoes cross for the second time.
   { id: "pingpong-returns", until: 1.0, returns: { delay: { time: "1/4", feedback: 0.6, tone: 2500, spread: 0.5, ret: 0.8 }, reverb: { decay: 2.5, shape: 3, predelay: 0, damp: 20000, width: 1, ret: 1 } }, ch: [{ fx: [slot("a", "delaySend", { amount: 0.6 }), slot("b", "reverbSend", { amount: 0.2 })] }] },
+  { id: "synth-dry", inst: [{ inserts: [], fx: [] }] },
   { id: "synth-sends", inst: [{ inserts: [], fx: [slot("a", "delaySend", { amount: 0.4 }), slot("b", "reverbSend", { amount: 0.35 })] }] },
   { id: "synth-inserts-sends", inst: [{ inserts: [slot("a", "tilt", {})], fx: [slot("b", "reverbSend", { amount: 0.5 })] }] },
 ];
+
+// the same fixtures in the new data shape: trailing send slots become strip send values
+const BUS = { delaySend: "delay", reverbSend: "reverb" };
+function newShape(o) {
+  if (!Array.isArray(o.fx)) return o;
+  const fx = [...o.fx], sends = { ...(o.sends || {}) };
+  while (fx.length && BUS[fx[fx.length - 1].type]) {
+    const s = fx.pop();
+    if (!sends[BUS[s.type]]) sends[BUS[s.type]] = { amount: s.params.amount, enabled: s.enabled };
+  }
+  return { ...o, fx, sends };
+}
+if (flags["new-shape"]) for (const c of CASES) { c.ch = c.ch?.map(newShape); c.inst = c.inst?.map(newShape); }
 
 if (flags.list) { for (const c of CASES) console.log(c.id); process.exit(0); }
 if (!["record", "compare"].includes(mode)) {
@@ -83,10 +99,10 @@ async function render(c) {
     json.channels = (c.ch || []).map((o, i) => ({
       name: "T" + i, source: { type: "synth", value: "test:" + i, label: "T" + i }, sampleName: "T" + i,
       volume: 0.8, pitch: 1, reverse: false, mute: false, solo: false, trimStart: 0, trimEnd: 1,
-      inserts: o.inserts || [], fx: o.fx || [],
+      inserts: o.inserts || [], fx: o.fx || [], sends: o.sends || {},
     }));
-    json.instruments = (json.instruments || []).slice(0, 4).map((inst, i) => ({ ...inst, inserts: [], fx: [] }));
-    (c.inst || []).forEach((o, i) => { if (json.instruments[i]) { json.instruments[i].inserts = o.inserts || []; json.instruments[i].fx = o.fx || []; } });
+    json.instruments = (json.instruments || []).slice(0, 4).map((inst, i) => ({ ...inst, inserts: [], fx: [], sends: {} }));
+    (c.inst || []).forEach((o, i) => { if (json.instruments[i]) { json.instruments[i].inserts = o.inserts || []; json.instruments[i].fx = o.fx || []; json.instruments[i].sends = o.sends || {}; } });
     if (c.returns) json.returns = c.returns;
     json.format = "audionaut-workstation/2";
     json.bpm = 120;
@@ -121,6 +137,10 @@ async function render(c) {
       return buf;
     };
     (c.ch || []).forEach((_, i) => { engine.setBuffer(i, seeded(i)); engine.syncChain?.(i, false); });
+    // synth voices and noise beds draw from Math.random: restart it so the code that ran before
+    // this point (which differs between versions) cannot change what the notes sound like
+    let rz = 777;
+    Math.random = () => { rz = (Math.imul(rz, 1664525) + 1013904223) >>> 0; return rz / 4294967296; };
     (c.ch || []).forEach((_, i) => engine.trigger(i, 0.05 + i * 0.4, 1));
     (c.inst || []).forEach((_, i) => { engine.syncChain?.(i, true); engine.triggerNote?.(i, 60 + i * 3, 1, 0.1, 0.8); });
     const rendered = await ctx.startRendering();
@@ -154,7 +174,18 @@ for (const c of run) {
   if (flags.twice) { const r2 = await render(c); line += `  repeat ${nullDb(r, r2, c.until).db.toFixed(1)} dB`; }
   if (mode === "record") rec[c.id] = r;
   else if (!base[c.id]) { line += "  MISSING in baseline"; fails++; }
-  else { const n = nullDb(base[c.id], r, c.until); line += `  null ${n.db.toFixed(1)} dB ${n.db < limit ? "ok" : "DIFFERS"}`; if (n.db >= limit) fails++; }
+  else {
+    const n = nullDb(base[c.id], r, c.until);
+    line += `  null ${n.db.toFixed(1)} dB ${n.db < limit ? "ok" : "DIFFERS"}`;
+    if (n.db >= limit) {
+      fails++;
+      // where does it start? (helps tell a level change from a timing change)
+      const A = f32(base[c.id].l), B = f32(r.l), thr = n.pk * Math.pow(10, limit / 20);
+      let at = -1;
+      for (let i = 0; i < A.length; i++) if (Math.abs(A[i] - B[i]) > thr) { at = i; break; }
+      line += `  (first over limit at ${(at / SR).toFixed(3)} s)`;
+    }
+  }
   console.log(line);
 }
 if (mode === "record") { fs.writeFileSync(file, zlib.gzipSync(JSON.stringify(rec))); console.log(`recorded ${run.length} cases -> ${file}`); }
