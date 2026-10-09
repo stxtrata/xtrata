@@ -4,6 +4,8 @@
 //             attack / hold / release, range). Posts {open, level, gain} ~30×/s.
 //   an-trans  level-independent transient shaper (fast / slow / slowest envelope
 //             followers, gain = f(ratio)). Posts {attackGain, sustainGain} (dB) ~30×/s.
+//   an-crush  bitcrusher: sample-and-hold downsample (optional jitter) + bit-depth
+//             quantiser (optional TPDF dither). Channel-linked hold clock. No messages out.
 //
 // The processors are written as ONE ordinary function (processorsMain) whose source is
 // shipped to the worklet scope through a Blob URL, so there is no extra file to host and
@@ -265,8 +267,64 @@ function processorsMain() {
     }
   }
 
+  // Sample-and-hold downsampler + quantiser. One hold clock for all channels (so the
+  // stereo image is not smeared). `ds` may be fractional internally because jitter
+  // randomises each hold length around it (mean length stays `ds`).
+  class AnCrush extends AudioWorkletProcessor {
+    constructor(options) {
+      super();
+      this.p = { bits: 6, downsample: 1, jitter: 0, dither: false };
+      const o = options && options.processorOptions;
+      if (o && o.p) Object.assign(this.p, o.p);
+      this.held = [0, 0];
+      this.left = 0; // samples until the next capture
+      this.dead = false;
+      this.port.onmessage = (e) => {
+        const m = e.data || {};
+        if (m.type === "kill") this.dead = true;
+        else if (m.type === "params") Object.assign(this.p, m.p);
+      };
+    }
+    process(inputs, outputs) {
+      if (this.dead) return false;
+      const inp = inputs[0];
+      const out = outputs[0];
+      const n = out[0] ? out[0].length : 128;
+      if (!inp || !inp.length) {
+        for (const ch of out) ch.fill(0);
+        return true;
+      }
+      const nch = Math.min(inp.length, out.length, 2);
+      const { downsample, jitter, dither } = this.p;
+      const steps = Math.pow(2, this.p.bits) / 2;
+      const lsb = 1 / steps;
+      const held = this.held;
+      let left = this.left;
+      for (let i = 0; i < n; i++) {
+        left -= 1;
+        if (left <= 0) {
+          for (let c = 0; c < nch; c++) {
+            let v = inp[c][i];
+            if (v > 1) v = 1;
+            else if (v < -1) v = -1;
+            if (dither) v += (Math.random() - Math.random()) * lsb;
+            held[c] = Math.round(v * steps) / steps;
+          }
+          let len = downsample;
+          if (jitter > 0) len *= 1 + jitter * (Math.random() * 2 - 1) * 0.75;
+          left += Math.max(1, len);
+        }
+        for (let c = 0; c < nch; c++) out[c][i] = held[c];
+      }
+      for (let c = nch; c < out.length; c++) out[c].fill(0);
+      this.left = left;
+      return true;
+    }
+  }
+
   registerProcessor("an-gate", AnGate);
   registerProcessor("an-trans", AnTrans);
+  registerProcessor("an-crush", AnCrush);
 }
 
 const WORKLET_SRC = `(${processorsMain.toString()})();`;
