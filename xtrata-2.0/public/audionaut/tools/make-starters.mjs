@@ -15,6 +15,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { serve, page } from "./serve.mjs";
 import { SONGS, buildNotes } from "./starter-songs.mjs";
+import { render, analyse } from "./starter-render.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.resolve(HERE, "../daw/data/starters");
@@ -53,6 +54,60 @@ fs.mkdirSync(OUT, { recursive: true });
 const index = [];
 const report = [];
 
+// ---- offline calibration: render the saved song through the real engine, then fix the balance and
+// the master on what actually comes out (the realtime analyser above under-reads peaks and cannot see
+// the effect tails). Stems are rendered one at a time; volumes are linear, but the compressors in the
+// chains are not, so two passes.
+const TARGET_PEAK_DB = -1;
+const STEM_RMS = { lead: 0.5, keys: 0.5, pad: 0.45, bass: 0.85 }; // of the drums' RMS (starter-songs `mix` scales it)
+const rmsOf = (a) => Math.pow(10, a.rmsDb / 20);
+async function calibrate(song, file) {
+  const fp = path.join(OUT, file);
+  const roles = ["lead", "keys", "pad", "bass"];
+  const log = [];
+  for (let pass = 0; pass < 2; pass++) {
+    const proj = JSON.parse(fs.readFileSync(fp, "utf8"));
+    const dr = await render(browser, url, logs, `starters/${file}`, { solo: "drums" });
+    const drums = analyse(dr.L, dr.R);
+    let moved = 0, over = 0;
+    for (let i = 0; i < 4; i++) {
+      const r = await render(browser, url, logs, `starters/${file}`, { solo: roles[i] });
+      const a = analyse(r.L, r.R);
+      const want = rmsOf(drums) * STEM_RMS[roles[i]] * (song.parts[roles[i]].mix ?? 1);
+      const k = Math.max(0.25, Math.min(4, want / rmsOf(a)));
+      const inst = proj.instruments[i];
+      const wanted = inst.volume * k;
+      over = Math.max(over, wanted);
+      const next = +Math.max(0.06, Math.min(1, wanted)).toFixed(3);
+      moved = Math.max(moved, Math.abs(Math.log(next / inst.volume)));
+      inst.volume = next;
+    }
+    // a synth that wants more than full volume: bring the drums down instead, so the balance holds
+    if (over > 1) {
+      const d = Math.max(0.5, 1 / over);
+      for (const c of proj.channels) c.volume = +Math.max(0.05, c.volume * d).toFixed(3);
+      moved = Math.max(moved, Math.abs(Math.log(d)));
+    }
+    fs.writeFileSync(fp, JSON.stringify(proj));
+    log.push(moved);
+    if (moved < 0.05) break;
+  }
+  // master last: peak of the full mix (sequence 2) to about -1 dBFS. The master is a plain gain after
+  // everything, so the peak moves exactly with it; the loop only guards against a measurement hiccup.
+  let a;
+  for (let pass = 0; pass < 3; pass++) {
+    const proj = JSON.parse(fs.readFileSync(fp, "utf8"));
+    const r = await render(browser, url, logs, `starters/${file}`, {});
+    a = analyse(r.L, r.R);
+    if (Math.abs(a.peakDb - TARGET_PEAK_DB) < 0.4 && proj.masterVolume <= 1.5) break;
+    const k = Math.pow(10, (TARGET_PEAK_DB - a.peakDb) / 20);
+    proj.masterVolume = +Math.max(0.1, Math.min(1.5, proj.masterVolume * k)).toFixed(3);
+    fs.writeFileSync(fp, JSON.stringify(proj));
+  }
+  const final = JSON.parse(fs.readFileSync(fp, "utf8"));
+  return { master: final.masterVolume, vols: final.instruments.map((i) => i.volume), mix: { peak: a.peakDb, rms: a.rmsDb, crest: a.crestDb, corr: a.corr, low: a.lowPct }, passes: log.length };
+}
+
 for (const song of songs) {
   const notes = buildNotes(song);
   const t0 = Date.now();
@@ -62,9 +117,10 @@ for (const song of songs) {
     const { engine } = await import(base + "engine.js");
     const { DRUM_BEATS_ANALOG } = await import(base + "analog-kits.js");
     const { loadBeatPreset } = await import(base + "l1-beat-loader.js");
-    const { makeSlot } = await import(base + "plugins.js");
+    const { makeSlot, returnsOf } = await import(base + "plugins.js");
     const { synthDefaults, SYNTH_BANK } = await import(base + "synths.js");
     const { exportProject } = await import(base + "persistence.js");
+    const { drumChain, partChain, drumSends, returnsFor } = await import("/audionaut/tools/starter-mix.mjs");
 
     engine.stop();
     store.loadProject(makeProject());
@@ -76,6 +132,14 @@ for (const song of songs) {
     const roles = preset.channels.map((c) => c.role || "");
     const isKick = (r) => /^K\d*$/.test(r);
     const isSnare = (r) => /^(S|S\d|SS|C|C\d)$/.test(r);
+
+    // ---- production: a plugin chain per drum channel, by what the channel is
+    p.channels.forEach((c, ch) => {
+      c.inserts = drumChain(song, roles[ch]).map(([type, params]) => makeSlot(type, params));
+      c.fx = [];
+      c.sends = Object.fromEntries(Object.entries(drumSends(song, roles[ch])).map(([bus, amount]) => [bus, { amount, enabled: true }]));
+    });
+    Object.assign(returnsOf(p).delay, returnsFor(song).delay);
 
     // ---- drums: sequence 1 = the groove, 2 = groove with a bar-4 fill, 3 = breakdown
     const groove = p.sequences[0].steps.map((r) => r.slice());
@@ -115,8 +179,9 @@ for (const song of songs) {
         mute: false,
         solo: false,
         params: { ...synthDefaults(part.synth), ...(preset.params || {}) },
-        inserts: [],
-        fx: (part.fx || []).map(([type, amount]) => makeSlot(type, { amount })),
+        inserts: partChain(song, role).map(([type, params]) => makeSlot(type, params)),
+        fx: [],
+        sends: Object.fromEntries((part.fx || []).map(([type, amount]) => [type === "delaySend" ? "delay" : "reverb", { amount, enabled: true }])),
       });
       names[role] = `${part.synth}:${part.preset}`;
     });
@@ -139,68 +204,13 @@ for (const song of songs) {
     store.loadProject(p);
     const proj = store.project;
 
-    // ---- level balance by measurement (sequence 2, the full one)
-    const an = engine.ctx.createAnalyser();
-    an.fftSize = 2048;
-    engine.masterGain.connect(an);
-    const buf = new Float32Array(an.fftSize);
-    const measure = async (ms) => {
-      store.project.continuous = false;
-      store.selectSequence(1);
-      engine.stop();
-      engine.play();
-      let peak = 0, sum = 0, n = 0;
-      const t = performance.now();
-      while (performance.now() - t < ms) {
-        await new Promise((r) => setTimeout(r, 25));
-        an.getFloatTimeDomainData(buf);
-        let m = 0, s = 0;
-        for (const v of buf) { m = Math.max(m, Math.abs(v)); s += v * v; }
-        peak = Math.max(peak, m);
-        sum += s / buf.length;
-        n++;
-      }
-      engine.stop();
-      return { peak, rms: Math.sqrt(sum / n) };
-    };
-    const solo = (drums, part) => {
-      proj.channels.forEach((c) => (c.mute = !drums));
-      proj.instruments.forEach((inst, i) => (inst.mute = part !== i));
-      engine.applySolo?.({});
-    };
-    const MS = 5200;
-    solo(true, -1);
-    const drum = await measure(MS);
-    const rms = {};
-    const targets = { lead: 0.5, keys: 0.5, pad: 0.45, bass: 0.85 };
-    for (let i = 0; i < 4; i++) {
-      solo(false, i);
-      rms[slots[i]] = (await measure(MS)).rms;
-    }
-    slots.forEach((role, i) => {
-      const inst = proj.instruments[i];
-      if (rms[role] > 1e-4 && drum.rms > 1e-4) {
-        const want = drum.rms * (targets[role] * (song.parts[role].mix ?? 1));
-        inst.volume = +Math.max(0.06, Math.min(1, inst.volume * Math.max(0.35, Math.min(2.5, want / rms[role])))).toFixed(3);
-      }
-    });
-    let all;
-    for (let pass = 0; pass < 2; pass++) {
-      proj.channels.forEach((c) => (c.mute = false));
-      proj.instruments.forEach((inst) => (inst.mute = false));
-      engine.applySolo?.({});
-      all = await measure(MS + 1500);
-      const scale = 0.84 / Math.max(all.peak, 1e-3);
-      if (scale > 0.95 && scale < 1.05) break;
-      proj.masterVolume = +Math.max(0.2, Math.min(1, proj.masterVolume * scale)).toFixed(3);
-      engine.setMasterVolume?.(proj.masterVolume);
-    }
+    // levels: a starting point only — tools/make-starters.mjs calibrates them offline afterwards
+    proj.masterVolume = 0.5;
     proj.channels.forEach((c) => (c.mute = false));
     proj.instruments.forEach((inst) => (inst.mute = false));
     proj.continuous = true;
     proj.currentSequence = 0;
     engine.applySolo?.({});
-    engine.masterGain.disconnect(an);
     return {
       json: exportProject({ compact: true }),
       info: {
@@ -209,8 +219,6 @@ for (const song of songs) {
         swing: proj.swing,
         master: proj.masterVolume,
         vols: proj.instruments.map((i) => i.volume),
-        drumRms: +drum.rms.toFixed(3),
-        peak: +all.peak.toFixed(2),
         channels: proj.channels.map((c) => c.name),
       },
     };
@@ -218,9 +226,12 @@ for (const song of songs) {
 
   const file = `${song.id}.json`;
   fs.writeFileSync(path.join(OUT, file), result.json);
+  const cal = process.argv.includes("--no-calibrate") ? null : await calibrate(song, file);
+  if (cal) Object.assign(result.info, cal);
   index.push({ id: song.id, name: song.name, genre: song.genre, blurb: song.blurb, bpm: result.info.bpm, file: `starters/${file}` });
   report.push({ id: song.id, ...result.info, kb: Math.round(result.json.length / 1024), s: Math.round((Date.now() - t0) / 1000) });
-  console.log(`${song.id.padEnd(12)} bpm ${String(result.info.bpm).padEnd(4)} master ${result.info.master} peak ${result.info.peak} vols ${result.info.vols.join("/")} drumRms ${result.info.drumRms} ${Math.round(result.json.length / 1024)}KB ${Math.round((Date.now() - t0) / 1000)}s`);
+  console.log(`${song.id.padEnd(12)} bpm ${String(result.info.bpm).padEnd(4)} ${Math.round(result.json.length / 1024)}KB ${Math.round((Date.now() - t0) / 1000)}s` +
+    (result.info.mix ? `  master ${result.info.master} vols ${result.info.vols.join("/")}  peak ${result.info.mix.peak} rms ${result.info.mix.rms} crest ${result.info.mix.crest} corr ${result.info.mix.corr} low ${result.info.mix.low}%` : ""));
 }
 
 // index.json lists the whole library in order; keep songs from earlier runs that were not rebuilt
