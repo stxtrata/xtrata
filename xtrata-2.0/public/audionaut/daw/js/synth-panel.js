@@ -574,10 +574,12 @@ const VIZ = {
   },
 };
 
+const VIZKIT = { sizeCanvas, themeOf, lcdBackdrop };
 function drawViz() {
   const P = current();
   const synth = SYNTH_BANK[synthId];
-  vizzes.forEach(({ canvas, id }) => VIZ[id]?.(canvas, P, synth));
+  // a synth may bring its own displays (`synth.viz`, e.g. synths/basic-panels.js); they get the drawing helpers
+  vizzes.forEach(({ canvas, id }) => (synth.viz?.[id] || VIZ[id])?.(canvas, P, synth, VIZKIT));
 }
 
 // ------------------------------------------------------------ build

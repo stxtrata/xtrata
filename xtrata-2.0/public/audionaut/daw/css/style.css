@@ -2377,6 +2377,90 @@ button:disabled {
 .sfp-pluck .pl-out .sfp-sec-body {
   align-items: center;
 }
+
+/* ---- basic synths: Acidals, Stacker, SubZero, FMonad, Chip-8 (spec in js/synths/basic-panels.js) ----
+   Each section is a live display beside its controls, so a panel stays short enough for the dock. */
+.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8 {
+  --bp-viz-h: 104px;
+  border-top: 3px solid var(--sfp-accent);
+}
+.sfp-acidals .sfp-body { grid-template-columns: 0.55fr 2.3fr 1.25fr; }
+.sfp-stacker .sfp-body { grid-template-columns: 1.35fr 1.15fr 1.25fr; }
+.sfp-subzero .sfp-body { grid-template-columns: 0.55fr 2.5fr 1.15fr; }
+.sfp-fmonad .sfp-body { grid-template-columns: 1.4fr 1fr 1.2fr; }
+.sfp-chip8 .sfp-body { grid-template-columns: 0.5fr 1.7fr 1.15fr; }
+:is(.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8) .sfp-sec-body {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+:is(.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8) .sfp-sec-body > .sfp-viz {
+  flex: 1.25 1 0;
+  width: auto;
+  min-width: 0;
+  height: var(--bp-viz-h);
+}
+:is(.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8) .sfp-sec-body > .sfp-row {
+  flex: 1 1 0;
+  min-width: 0;
+}
+:is(.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8) .sfp-row > .sfp-viz {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+  height: var(--bp-viz-h);
+}
+/* a display with its knob beside it: the knob keeps its own width */
+.sfp-subzero .sfp-row > .knob-wrap { flex: 0 0 88px; }
+/* narrow selector sections: wave buttons stacked */
+.bp-narrow .sfp-sec-body { flex-direction: column; align-items: stretch; }
+.bp-narrow .sfp-radio { flex-direction: column; margin: 0; }
+.bp-narrow .sfp-opt { flex-direction: row; justify-content: center; gap: 8px; padding: 9px 6px; }
+.bp-narrow .sfp-opt span { letter-spacing: 1px; }
+.sfp-chip8 .bp-narrow .sfp-sec-body { align-items: center; }
+
+/* a little character each */
+.sfp-acidals {
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.022) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, rgba(254, 202, 87, 0.08), transparent 45%),
+    var(--sfp-bg);
+}
+.sfp-acidals .sfp-logo b { letter-spacing: 3px; text-shadow: 0 0 18px rgba(254, 202, 87, 0.35); }
+.sfp-acidals .sfp-sec { background: rgba(20, 14, 4, 0.55); }
+.sfp-stacker {
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(192, 132, 252, 0.2), transparent 60%),
+    var(--sfp-bg);
+}
+.sfp-stacker .sfp-logo b { letter-spacing: 3px; text-shadow: 0 0 18px rgba(192, 132, 252, 0.4); }
+.sfp-stacker .sfp-sec { background: rgba(14, 8, 24, 0.55); }
+.sfp-subzero {
+  background:
+    radial-gradient(ellipse at 50% 130%, rgba(84, 160, 255, 0.18), transparent 60%),
+    var(--sfp-bg);
+}
+.sfp-subzero .sfp-logo b { letter-spacing: 4px; text-shadow: 0 0 18px rgba(84, 160, 255, 0.4); }
+.sfp-subzero .sfp-sec { background: rgba(4, 10, 20, 0.6); }
+.sfp-fmonad {
+  background:
+    repeating-linear-gradient(0deg, rgba(34, 211, 238, 0.04) 0 1px, transparent 1px 3px),
+    var(--sfp-bg);
+}
+.sfp-fmonad .sfp-logo b { letter-spacing: 3px; text-shadow: 0 0 18px rgba(34, 211, 238, 0.4); }
+.sfp-fmonad .sfp-sec { background: rgba(3, 14, 18, 0.6); }
+.sfp-chip8 {
+  background:
+    linear-gradient(rgba(251, 113, 133, 0.05) 1px, transparent 1px) 0 0 / 100% 8px,
+    linear-gradient(90deg, rgba(251, 113, 133, 0.05) 1px, transparent 1px) 0 0 / 8px 100%,
+    var(--sfp-bg);
+}
+.sfp-chip8 .sfp-logo b { letter-spacing: 3px; font-family: var(--font-mono); text-shadow: 3px 3px 0 rgba(251, 113, 133, 0.35); }
+.sfp-chip8 .sfp-sec { background: rgba(26, 8, 14, 0.6); border-radius: 2px; }
+.sfp-chip8 .sfp-viz { image-rendering: pixelated; border-radius: 0; }
+@media (max-width: 900px) {
+  :is(.sfp-acidals, .sfp-stacker, .sfp-subzero, .sfp-fmonad, .sfp-chip8) .sfp-body { grid-template-columns: 1fr; }
+}
 @media (max-width: 900px) {
   .sfp-fm4 .sfp-body,
   .sfp-pluck .sfp-body {
