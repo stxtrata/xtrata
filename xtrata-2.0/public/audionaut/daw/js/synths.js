@@ -5,6 +5,7 @@
 
 import { NEW_SYNTHS } from "./synths-voices.js";
 import { EXTRA_SYNTHS } from "./synths/index.js";
+import { BASIC_PANELS } from "./synths/basic-panels.js";
 
 export function midiToFreq(m) {
   return 440 * Math.pow(2, (m - 69) / 12);
@@ -735,6 +736,8 @@ export const SYNTH_BANK = {
   ...EXTRA_SYNTHS, // Whale · KILN · ANNEAL · PALINODE · FAULTGLASS · Morrowglass · VITREOUS · Lightnode · Schnorr · TIDAL GLASS · TIDELACE — see synths/index.js
 };
 
+// Front panels, presets and waveform displays for the basic synths (Acidals, Stacker, SubZero, FMonad, Chip-8)
+for (const [id, extra] of Object.entries(BASIC_PANELS)) Object.assign(SYNTH_BANK[id], extra);
 
 export const DEFAULT_SYNTH = "jims10";
 
