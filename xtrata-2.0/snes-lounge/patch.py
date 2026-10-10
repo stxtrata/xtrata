@@ -146,6 +146,14 @@ rep("obstacle(5.06,5.05,1.15,1.15,-2.35619);contact(4.42,4.52,1.90,1.90,.5);","o
 rep("box([4.90,.018,4.95],[2.12,.028,1.98],mat.plain,'#24182d');plane([4.90,.036,4.95],2.02,1.88,mat.rug,'#d1b8cf',[-Math.PI/2,Math.PI/4,0]);","box([4.95,.018,5.55],[2.10,.028,1.95],mat.plain,'#24182d');plane([4.95,.036,5.55],2.0,1.85,mat.rug,'#d1b8cf',[-Math.PI/2,0,0]);")
 rep("camera.x=4.18;camera.y=1.67;camera.z=4.28;aim(5.02,1.53,5.00)","camera.x=3.95;camera.y=1.67;camera.z=5.97;aim(5.42,1.53,5.97)")
 rep("{x:4.42,z:4.52,d:1.95,kind:'arcade'","{x:4.0,z:5.8,d:1.95,kind:'arcade'")
+
+# --- separate the two screens: Full-screen follows where you are (cabinet -> Pixel Quest, sofa/console -> SNES)
+rep("c.drawImage(screenCanvas,0,0,canvas.width,canvas.height)}","c.drawImage(state.seat==='arcade'&&state.playing?pqCanvas:screenCanvas,0,0,canvas.width,canvas.height)}")
+rep("function openTheater(){","""const ARC_HINT='← → MOVE &nbsp; · &nbsp; SPACE / Z JUMP &nbsp; · &nbsp; R RESTART &nbsp; · &nbsp; TAB CONTROLS &nbsp; · &nbsp; ESC BACK';
+function setTheaterLabels(){const arc=state.seat==='arcade'&&state.playing,t=$('theaterTitle'),h=$('theaterHint');if(arc){t.textContent='PIXEL QUEST / ARCADE CABINET';h.innerHTML=ARC_HINT}else{t.textContent=adapter?'SNES / LIVE SCREEN':'PIXEL QUEST / ORIGINAL LOUNGE DEMO';if(window.__snesHint)h.innerHTML=window.__snesHint}}
+function openTheater(){""")
+rep("if(!state.playing&&!startPlay())return;\n resumeInput();state.theater=true;","if(!state.playing&&!(nearby()?.kind==='arcade'?startPlay(true):startPlay()))return;\n setTheaterLabels();resumeInput();state.theater=true;")
+rep("$('playBtn').innerHTML=(state.playing?'Return controller':'Pick up controller')+' <span class=\"key\">'+(state.playing?'G':'↵')+'</span>';","$('playBtn').innerHTML=(state.playing?(state.seat==='arcade'?'Leave arcade':'Return controller'):'Pick up controller')+' <span class=\"key\">'+(state.playing?'G':'↵')+'</span>';$('focusBtn').innerHTML=(state.playing&&state.seat==='arcade'?'Full-screen arcade':'Full-screen play')+' <span class=\"key\">F</span>';")
 rep('</body>','<script>\n'+host+'\n</script>\n</body>')
 open('src.html','w',encoding='utf-8').write(s)
 print('patched',len(s))

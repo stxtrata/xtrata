@@ -33,7 +33,7 @@
    setMuted(m){try{X.control(m?'mute':'unmute')}catch(e){}},
    resumeAudio(){try{win.dispatchEvent(new win.Event('pointerdown'))}catch(e){}}
   });
-  const hint=$('theaterHint');if(hint)hint.innerHTML='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';
+  window.__snesHint='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';const hint=$('theaterHint');if(hint)hint.innerHTML='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';
   loadBuiltIn();
   poll();setInterval(poll,1000);
  }

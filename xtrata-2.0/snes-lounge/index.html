@@ -741,7 +741,7 @@ function updateUI(){
  $('reticle').hidden=state.mode==='welcome'||owner!=='room';
  $('actionbar').hidden=state.mode==='welcome';
  $('sitBtn').innerHTML=(state.seated?'Stand up':'Take a seat')+' <span class="key">E</span>';
- $('playBtn').innerHTML=(state.playing?'Return controller':'Pick up controller')+' <span class="key">'+(state.playing?'G':'↵')+'</span>';
+ $('playBtn').innerHTML=(state.playing?(state.seat==='arcade'?'Leave arcade':'Return controller'):'Pick up controller')+' <span class="key">'+(state.playing?'G':'↵')+'</span>';$('focusBtn').innerHTML=(state.playing&&state.seat==='arcade'?'Full-screen arcade':'Full-screen play')+' <span class="key">F</span>';
  $('status').textContent=has?carried.label.toUpperCase()+' / '+(state.inputPaused?'INPUT PAUSED':owner==='room'?'ROOM CONTROLS':'GAME CONTROLS'):state.playing?'ARCADE / LIVE SCREEN':state.seated?'THE GOOD SOFA. THE BEST SEAT.':'NO QUARTERS. NO CURFEW.';
  $('viewLabel').textContent=state.seated?'SOFA VIEW':'FIRST-PERSON LOUNGE';
  const lookLabel=document.pointerLockElement===R.canvas?'Mouse look on':settings.mouseMode==='drag'?'Drag to look':'Click to look';
@@ -819,10 +819,12 @@ function stopPlay(){
  try{adapter?.onBlur?.()}catch(e){console.warn(e)}syncInputMode(false);updateUI();
  toast(item?item.label+' returned to its original spot.':'Back in the room.');
 }
+const ARC_HINT='← → MOVE &nbsp; · &nbsp; SPACE / Z JUMP &nbsp; · &nbsp; R RESTART &nbsp; · &nbsp; TAB CONTROLS &nbsp; · &nbsp; ESC BACK';
+function setTheaterLabels(){const arc=state.seat==='arcade'&&state.playing,t=$('theaterTitle'),h=$('theaterHint');if(arc){t.textContent='PIXEL QUEST / ARCADE CABINET';h.innerHTML=ARC_HINT}else{t.textContent=adapter?'SNES / LIVE SCREEN':'PIXEL QUEST / ORIGINAL LOUNGE DEMO';if(window.__snesHint)h.innerHTML=window.__snesHint}}
 function openTheater(){
  if(state.theater)return;
- if(state.settingsOpen)closeSettings(false);if(!state.playing&&!startPlay())return;
- resumeInput();state.theater=true;state.roomToggle=false;$('theater').hidden=false;unlock();releaseButtons();syncInputMode(false);updateUI();
+ if(state.settingsOpen)closeSettings(false);if(!state.playing&&!(nearby()?.kind==='arcade'?startPlay(true):startPlay()))return;
+ setTheaterLabels();resumeInput();state.theater=true;state.roomToggle=false;$('theater').hidden=false;unlock();releaseButtons();syncInputMode(false);updateUI();
  if(document.documentElement.requestFullscreen&&!document.fullscreenElement){const p=document.documentElement.requestFullscreen();if(p?.then)p.then(()=>{if(state.theater)nativeTheater=true;else if(document.fullscreenElement)document.exitFullscreen?.().catch(()=>{})}).catch(()=>{nativeTheater=false})}drawBigScreen();
 }
 function closeTheater(){
@@ -831,7 +833,7 @@ function closeTheater(){
  syncInputMode(false);updateUI();R.canvas.focus({preventScroll:true});toast('Back in the basement · Your controller stays with you. Click for mouse capture.');
 }
 
-function drawBigScreen(){const canvas=$('bigscreen'),c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(screenCanvas,0,0,canvas.width,canvas.height)}
+function drawBigScreen(){const canvas=$('bigscreen'),c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(state.seat==='arcade'&&state.playing?pqCanvas:screenCanvas,0,0,canvas.width,canvas.height)}
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&state.theater&&nativeTheater){nativeTheater=false;closeTheater()}});
 function floorHeight(x,z){if(x< -4.28&&x>-5.94&&z>=3.65&&z<=6.35)return clamp(Math.floor((z-3.65)/.26)+1,1,10)*.16;return 0}
 function canWalk(x,z){const radius=.22;if(x< -5.72||x>5.72||z< -5.33||z>6.23)return false;for(let o of obstacles){let dx=x-o.x,dz=z-o.z,c=Math.cos(o.angle),s=Math.sin(o.angle),lx=c*dx-s*dz,lz=s*dx+c*dz;if(Math.abs(lx)<o.hx+radius&&Math.abs(lz)<o.hz+radius)return false}return true}
@@ -1195,7 +1197,7 @@ syncSettingsUI();mixer.apply();syncInputMode(false);updateUI();drawGame(0,0,fals
    setMuted(m){try{X.control(m?'mute':'unmute')}catch(e){}},
    resumeAudio(){try{win.dispatchEvent(new win.Event('pointerdown'))}catch(e){}}
   });
-  const hint=$('theaterHint');if(hint)hint.innerHTML='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';
+  window.__snesHint='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';const hint=$('theaterHint');if(hint)hint.innerHTML='ARROWS MOVE &nbsp;·&nbsp; Z B &nbsp; X A &nbsp; A Y &nbsp; S X &nbsp;·&nbsp; Q L &nbsp; W R &nbsp;·&nbsp; ENTER START &nbsp;·&nbsp; BACKSPACE SELECT &nbsp;·&nbsp; ESC BACK';
   loadBuiltIn();
   poll();setInterval(poll,1000);
  }
