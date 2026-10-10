@@ -139,6 +139,13 @@ lead([[1.48,.075,-4.62],[1.55,.05,-4.78],[1.62,.045,-4.98]],.009,'#1c1824');""")
 
 
 rep("consoleUnit([1.58,.25,-5.35],.95);consoleUnit([-.0,.64,-5.5],.8,.02);","consoleUnit([1.58,.25,-5.35],.95);")
+
+# --- arcade cabinet squared up into the +x/+z corner, flush with both walls, facing along the room
+rep("G([5.06,0,5.05],[0,-2.35619,0],()=>{","G([5.565,0,5.97],[0,-Math.PI/2,0],()=>{")
+rep("obstacle(5.06,5.05,1.15,1.15,-2.35619);contact(4.42,4.52,1.90,1.90,.5);","obstacle(5.47,5.97,.98,1.06,0);contact(5.1,5.97,1.95,1.95,.5);")
+rep("box([4.90,.018,4.95],[2.12,.028,1.98],mat.plain,'#24182d');plane([4.90,.036,4.95],2.02,1.88,mat.rug,'#d1b8cf',[-Math.PI/2,Math.PI/4,0]);","box([4.95,.018,5.55],[2.10,.028,1.95],mat.plain,'#24182d');plane([4.95,.036,5.55],2.0,1.85,mat.rug,'#d1b8cf',[-Math.PI/2,0,0]);")
+rep("camera.x=4.18;camera.y=1.67;camera.z=4.28;aim(5.02,1.53,5.00)","camera.x=3.95;camera.y=1.67;camera.z=5.97;aim(5.42,1.53,5.97)")
+rep("{x:4.42,z:4.52,d:1.95,kind:'arcade'","{x:4.0,z:5.8,d:1.95,kind:'arcade'")
 rep('</body>','<script>\n'+host+'\n</script>\n</body>')
 open('src.html','w',encoding='utf-8').write(s)
 print('patched',len(s))

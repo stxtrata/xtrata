@@ -580,14 +580,14 @@ tube([-4.24,1.36,4.32],[-4.24,2.50,6.14],.044,mat.wood,'#b6926b');obstacle(-4.22
 box([-5.96,2.58,4.68],[.15,.37,.26],mat.metal,'#735a54',.018);box([-5.84,2.58,4.68],[.10,.29,.20],mat.softEmit,'#ffc990',.025);
 // Arcade cabinet, detailed joystick, coin slot and a second animated screen.
 const[arcadeCanvas,arcadeCtx]=canvas2(256,256),arcadeTex=R.texture(arcadeCanvas,{dynamic:true,nearest:true}),arcadeMat=R.material({texture:arcadeTex,emit:1.0,shadow:false});
-G([5.06,0,5.05],[0,-2.35619,0],()=>{
+G([5.565,0,5.97],[0,-Math.PI/2,0],()=>{
  box([0,.62,0],[.92,1.24,.74],mat.wood,'#252036',.035);box([0,1.51,-.14],[.97,.71,.55],mat.black,'#171624',.022);box([0,1.99,-.02],[1.03,.25,.73],mat.black,'#181827',.025);box([0,1.99,.36],[.95,.16,.01],mat.emit,'#b979bd');label('SUPER  16',[0,1.99,.373],.84,.15,[0,0,0],{w:512,h:128,font:'bold 76px Arial',fg:'#ffc285',bg:'#281522',emit:1.0});
  for(let s of[-1,1]){box([s*.48,1.1,0],[.07,1.80,.71],mat.wood,'#332840',.025);tube([s*.52,.14,.38],[s*.52,1.16,.38],.012,mat.emit,'#b168a0');tube([s*.52,1.16,.38],[s*.52,1.81,.18],.012,mat.emit,'#e2a576')}
  plane([0,1.53,.149],.79,.59,arcadeMat,'#ffffff',[-.12,0,0]);box([0,1.12,.28],[1.04,.09,.60],mat.black,'#302a40',.026,[-.10,0,0]);tube([-.23,1.15,.32],[-.23,1.31,.32],.012,mat.metal,'#aea4ba');sphere([-.23,1.32,.32],[.055,.053,.055],mat.plain,'#c28dbe',[],16,10);for(let i=0;i<4;i++)cylinder([.07+i*.075,1.195,.28+(i%2)*.06],.027,.027,.02,mat.plain,['#b07096','#6a9b94','#c5a468','#9497c4'][i],[],16);box([0,.52,.386],[.24,.32,.02],mat.metal,'#44404f',.015);box([0,.60,.405],[.08,.017,.02],mat.black,'#0d0b15');box([0,.44,.407],[.064,.048,.02],mat.softEmit,'#db816d',.008);label('FREE PLAY',[0,.84,.39],.55,.09,[0,0,0],{w:256,h:64,font:'bold 36px monospace',fg:'#d9b8e4',emit:.5});
-});obstacle(5.06,5.05,1.15,1.15,-2.35619);contact(4.42,4.52,1.90,1.90,.5);
+});obstacle(5.47,5.97,.98,1.06,0);contact(5.1,5.97,1.95,1.95,.5);
 // Dedicated arcade corner lighting, floor zone and neon wall sign.
 box([5.78,1.78,5.02],[.08,1.95,1.55],mat.softEmit,'#3e2046',.03);
-box([4.90,.018,4.95],[2.12,.028,1.98],mat.plain,'#24182d');plane([4.90,.036,4.95],2.02,1.88,mat.rug,'#d1b8cf',[-Math.PI/2,Math.PI/4,0]);
+box([4.95,.018,5.55],[2.10,.028,1.95],mat.plain,'#24182d');plane([4.95,.036,5.55],2.0,1.85,mat.rug,'#d1b8cf',[-Math.PI/2,0,0]);
 label(['ARCADE','CORNER'],[4.62,3.10,6.42],.96,.34,[0,Math.PI,0],{w:512,h:192,font:'bold 74px Arial',fg:'#f0b7f0',bg:'#261632',glow:12,spacing:1.05,emit:1.1});
 label('FREE PLAY',[5.76,2.60,4.78],.74,.12,[0,-Math.PI/2,0],{w:512,h:96,font:'bold 54px Arial',fg:'#ffd59e',bg:'#2b1726',glow:8,emit:.8});
 tube([5.72,1.55,4.18],[5.72,3.15,5.84],.014,mat.emit,'#d96ad1');
@@ -806,7 +806,7 @@ function startPlay(arcade=false){
  if(!arcade){const item=controllers.filter(canReachController).sort((a,b)=>controllerDistance(a)-controllerDistance(b))[0];
   if(!item){toast('Walk up to the coffee table and click a controller, or take a seat first.');return false}return pickupController(item.id)}
  resumeInput();releaseButtons();unlock();savedPlayCamera={...camera};state.seat='arcade';state.seated=false;
- camera.x=4.18;camera.y=1.67;camera.z=4.28;aim(5.02,1.53,5.00);state.playing=true;state.mode='play';
+ camera.x=3.95;camera.y=1.67;camera.z=5.97;aim(5.42,1.53,5.97);state.playing=true;state.mode='play';
  if(!game.started)restartGame();syncInputMode(false);try{adapter?.onBlur?.()}catch(e){console.warn(e)}
  updateUI();R.canvas.focus({preventScroll:true});toast('Arcade controls · G leaves the cabinet.');return true;
 }
@@ -835,7 +835,7 @@ function drawBigScreen(){const canvas=$('bigscreen'),c=canvas.getContext('2d');c
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&state.theater&&nativeTheater){nativeTheater=false;closeTheater()}});
 function floorHeight(x,z){if(x< -4.28&&x>-5.94&&z>=3.65&&z<=6.35)return clamp(Math.floor((z-3.65)/.26)+1,1,10)*.16;return 0}
 function canWalk(x,z){const radius=.22;if(x< -5.72||x>5.72||z< -5.33||z>6.23)return false;for(let o of obstacles){let dx=x-o.x,dz=z-o.z,c=Math.cos(o.angle),s=Math.sin(o.angle),lx=c*dx-s*dz,lz=s*dx+c*dz;if(Math.abs(lx)<o.hx+radius&&Math.abs(lz)<o.hz+radius)return false}return true}
-function nearby(){let candidates=[{x:.45,z:3.03,d:3.30,kind:'sofa',label:'Sink into the sofa'},{x:-3.58,z:0,d:2.05,kind:'left',label:'Take the corner sofa'},{x:3.85,z:.2,d:1.65,kind:'beanbag',label:'Settle into the beanbag'},{x:4.42,z:4.52,d:1.95,kind:'arcade',label:'Play the arcade'}];return candidates.filter(a=>Math.hypot(camera.x-a.x,camera.z-a.z)<a.d).sort((a,b)=>Math.hypot(camera.x-a.x,camera.z-a.z)-Math.hypot(camera.x-b.x,camera.z-b.z))[0]}
+function nearby(){let candidates=[{x:.45,z:3.03,d:3.30,kind:'sofa',label:'Sink into the sofa'},{x:-3.58,z:0,d:2.05,kind:'left',label:'Take the corner sofa'},{x:3.85,z:.2,d:1.65,kind:'beanbag',label:'Settle into the beanbag'},{x:4.0,z:5.8,d:1.95,kind:'arcade',label:'Play the arcade'}];return candidates.filter(a=>Math.hypot(camera.x-a.x,camera.z-a.z)<a.d).sort((a,b)=>Math.hypot(camera.x-a.x,camera.z-a.z)-Math.hypot(camera.x-b.x,camera.z-b.z))[0]}
 function controllerDistance(item){return Math.hypot(camera.x-item.position[0],camera.y-item.position[1],camera.z-item.position[2])}
 function rayBox(origin,direction,p,h,angle=0){
  const c=Math.cos(angle),s=Math.sin(angle),d=V.sub(origin,p);
