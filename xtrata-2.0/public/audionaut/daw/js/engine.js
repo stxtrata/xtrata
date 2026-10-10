@@ -463,6 +463,7 @@ class Engine {
   // Play a synth note. time=0 → now (preview). durSteps converted by caller to seconds.
   triggerNote(i, pitch, vel = 1, time = 0, durSec = 0.3) {
     this.ensureContext();
+    if (!time) this._warnIfMuted(i);
     const inst = store.instrument(i);
     const synth = SYNTH_BANK[inst.synthId];
     if (!synth) return;
@@ -528,8 +529,20 @@ class Engine {
     return rec;
   }
 
+  // A muted instrument is silent by design, but a key that makes no sound looks broken:
+  // tell the UI so it can say why.
+  _warnIfMuted(i) {
+    if (this.instrumentAudible(i)) return;
+    try {
+      document.dispatchEvent(new CustomEvent("synth-muted", { detail: { i } }));
+    } catch {
+      /* no DOM */
+    }
+  }
+
   startNote(i, pitch, vel = 1) {
     this.ensureContext();
+    this._warnIfMuted(i);
     const inst = store.instrument(i);
     const synth = SYNTH_BANK[inst?.synthId];
     if (!synth || !this.instrumentGains?.[i]) return 0;

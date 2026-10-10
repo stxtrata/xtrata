@@ -180,13 +180,14 @@ export async function loadBeatPreset(preset, options = {}) {
     channel.solo = false;
     if (channel.mute) engine.silenceChannel(i);
   }
-  for (
-    let i = 0;
-    i < project.instruments.length && exclusive;
-    i++
-  ) {
-    project.instruments[i].mute = true;
+  // Mute only the synth instruments that actually carry notes (those are the leftovers); an
+  // instrument with nothing sequenced has nothing to leak, so it stays audible for the keyboards.
+  const hasNotes = (i) =>
+    project.sequences.some((seq) => seq.notes?.[i]?.length > 0);
+  for (let i = 0; i < project.instruments.length && exclusive; i++) {
+    project.instruments[i].mute = hasNotes(i);
     project.instruments[i].solo = false;
+    engine.setInstrumentVolume?.(i, project.instruments[i].volume);
     store.emit("instrument", { i });
   }
   // Unload what the previous beat left on channels this beat does not use, in every collection:

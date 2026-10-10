@@ -1149,5 +1149,13 @@ export function initSynthPanel() {
     }
   });
   document.addEventListener("instrument-renamed", paintTabs);
+  let mutedAt = 0;
+  document.addEventListener("synth-muted", (e) => {
+    const now = Date.now();
+    if (now - mutedAt < 4000) return; // one hint, not one per key
+    mutedAt = now;
+    const ins = store.instrument(e.detail.i);
+    if (ins) setStatus(`${ins.name} is muted — click M on its row to hear it.`);
+  });
   setDockOpen(pref.open !== false, { save: false }); // first visit: open on the first synth
 }
