@@ -137,6 +137,8 @@ const cbrickM=R.material({...mat.black});
 G([1.48,.075,-4.62],[0,.5,0],()=>{box([0,0,0],[.15,.05,.085],cbrickM,'#26222f',.012);});
 lead([[1.48,.075,-4.62],[1.55,.05,-4.78],[1.62,.045,-4.98]],.009,'#1c1824');""")
 
+
+rep("consoleUnit([1.58,.25,-5.35],.95);consoleUnit([-.0,.64,-5.5],.8,.02);","consoleUnit([1.58,.25,-5.35],.95);")
 rep('</body>','<script>\n'+host+'\n</script>\n</body>')
 open('src.html','w',encoding='utf-8').write(s)
 print('patched',len(s))
