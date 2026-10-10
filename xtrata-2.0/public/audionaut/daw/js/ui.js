@@ -495,17 +495,23 @@ export function drawInstStrip(i) {
     c.fillStyle = "#26303d";
     c.fillRect((s * strip.width) / 4, 0, 1, strip.height);
   }
-  const notes = store.seq.notes?.[i] || [];
-  if (!notes.length) return;
-  const pitches = notes.map((n) => n.pitch);
-  const lo = Math.min(...pitches),
-    hi = Math.max(...pitches, lo + 1);
-  c.fillStyle = synth.color;
   const cw = strip.width / 64;
-  for (const n of notes) {
-    const y =
-      strip.height - 3 - ((n.pitch - lo) / (hi - lo)) * (strip.height - 6);
-    c.fillRect(n.step * cw, y, Math.max(2, n.dur * cw - 1), 3);
+  const notes = store.seq.notes?.[i] || [];
+  if (notes.length) {
+    const pitches = notes.map((n) => n.pitch);
+    const lo = Math.min(...pitches),
+      hi = Math.max(...pitches, lo + 1);
+    c.fillStyle = synth.color;
+    for (const n of notes) {
+      const y =
+        strip.height - 3 - ((n.pitch - lo) / (hi - lo)) * (strip.height - 6);
+      c.fillRect(n.step * cw, y, Math.max(2, n.dur * cw - 1), 3);
+    }
+  }
+  // playback position: the same green step highlight the audio strips draw
+  if (lastPlayheadStep >= 0) {
+    c.fillStyle = "rgba(67,255,164,0.25)";
+    c.fillRect(lastPlayheadStep * cw, 0, cw, strip.height);
   }
 }
 
@@ -647,6 +653,8 @@ export function movePlayhead(step) {
       `${Math.floor(step / 16) + 1}.${Math.floor((step % 16) / 4) + 1}`;
   }
   lastPlayheadStep = step;
+  // instrument rows show the position on their note strips too
+  for (let i = 0; i < NUM_INSTRUMENTS; i++) drawInstStrip(i);
 }
 
 // ---------------------------------------------------------------- sequences
