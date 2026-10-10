@@ -2944,6 +2944,34 @@ button:disabled {
 #synth-dock .sfp:not(.sfp-face) .sfp-keys-bar {
   margin-top: 6px;
 }
+/* the keyboard takes whatever the dock has left: full panel width, all the spare height */
+#synth-dock .sfp:not(.sfp-face) {
+  display: flex;
+  flex-direction: column;
+}
+#synth-dock .sfp:not(.sfp-face) > .sfp-head,
+#synth-dock .sfp:not(.sfp-face) > .sfp-body,
+#synth-dock .sfp:not(.sfp-face) > .sfp-status {
+  flex: none;
+}
+#synth-dock .sfp:not(.sfp-face) .sfp-keys-bar {
+  flex: 1 1 auto;
+  min-height: 74px; /* what the keyboard always had; it grows into any spare room */
+  max-height: 240px;
+  align-items: stretch;
+}
+#synth-dock .sfp:not(.sfp-face) .sfp-keys {
+  flex: 1 1 0;
+  height: auto;
+  min-width: 0;
+  --wk: calc(100% / 15); /* 15 white keys share the width */
+}
+#synth-dock .sfp:not(.sfp-face) .sfp-oct {
+  justify-content: center;
+}
+#synth-dock .sfp:not(.sfp-face) .sfp-scope {
+  flex: 0 0 300px;
+}
 #synth-dock .sfp:not(.sfp-face) .sfp-status {
   margin-top: 4px;
 }

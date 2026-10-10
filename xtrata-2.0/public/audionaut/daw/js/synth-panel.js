@@ -1089,7 +1089,7 @@ export function initSynthPanel() {
   if (!root) return;
   const pref = dockPref();
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
-  dockEl().classList.toggle("tall", !!pref.tall);
+  dockEl().classList.toggle("tall", pref.tall !== false); // the larger view unless the user chose the short one
   $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
   fw = makeFloatable(dockEl(), {
     handle: dockEl().querySelector(".synth-dock-bar"),
