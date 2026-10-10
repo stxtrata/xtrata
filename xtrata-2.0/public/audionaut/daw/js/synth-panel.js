@@ -14,6 +14,7 @@ import { engine } from "./engine.js";
 import { addMidiListener, ensureMidi, setMidiEnabled, isMidiOn, midiStatus, setMidiTarget } from "./midi-input.js";
 import { SYNTH_BANK, synthDefaults } from "./synths.js";
 import { Kit } from "./synth-faces/index.js";
+import { makeFloatable } from "./float-window.js";
 import { attachKeyboard, noteOn, noteOff, allOff, getOctave, setOctave, TYPED_VEL } from "./live-keys.js";
 import { voxFormants, fmRoles, FM_MOD, FM_CARRIERS, FM_ALGOS, VOWEL_NAMES } from "./synths-voices.js";
 
@@ -970,6 +971,25 @@ const saveDockPref = (patch) => {
 };
 const dockEl = () => $("#synth-dock");
 
+// The dock can float: the same element, taken out of the layout as a movable, resizable window
+// (float-window.js). Position and size are remembered; the toggle (▾) still collapses it to its bar.
+let fw = null;
+const refitFace = () =>
+  requestAnimationFrame(() => {
+    faceH?.refit();
+    if (isOpen()) drawViz();
+  });
+function setFloating(on, { save = true } = {}) {
+  if (!fw || fw.floating === on) return;
+  if (on) fw.float();
+  else fw.dock();
+  const b = $("#synth-dock-float");
+  b.setAttribute("aria-pressed", String(on));
+  b.title = on ? "Dock the synth panel back to the bottom" : "Float the synth panel as a window you can move and resize";
+  if (save) saveDockPref({ floating: on });
+  refitFace();
+}
+
 function paintTabs() {
   const tabs = $("#synth-dock-tabs");
   if (!tabs) return;
@@ -1069,6 +1089,19 @@ export function initSynthPanel() {
   inst = Number.isInteger(pref.inst) && store.instrument(pref.inst) ? pref.inst : 0;
   dockEl().classList.toggle("tall", !!pref.tall);
   $("#synth-dock-toggle").addEventListener("click", () => setDockOpen(!dockOpen()));
+  fw = makeFloatable(dockEl(), {
+    handle: dockEl().querySelector(".synth-dock-bar"),
+    key: "synth-dock",
+    minW: 560,
+    minH: 300,
+    onChange: (final) => (final ? refitFace() : faceH?.refit()),
+  });
+  $("#synth-dock-float").addEventListener("click", () => setFloating(!fw.floating));
+  // double-click the title bar's empty part (or its grip) to dock / float
+  dockEl().querySelector(".synth-dock-bar").addEventListener("dblclick", (e) => {
+    if (!e.target.closest("button, [role=tab]")) setFloating(!fw.floating);
+  });
+  if (pref.floating && window.innerWidth > 760) setFloating(true, { save: false });
   $("#synth-dock-size").addEventListener("click", () => {
     const tall = dockEl().classList.toggle("tall");
     saveDockPref({ tall });
