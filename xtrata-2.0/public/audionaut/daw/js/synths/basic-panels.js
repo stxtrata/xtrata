@@ -1,102 +1,15 @@
-// basic-panels.js — front panels, factory presets and waveform displays for the five original
+// basic-panels.js — front panels, factory presets and live displays for the five original
 // "basic" synths that used to open with no panel: Acidals 303, Stacker, SubZero, FMonad, Chip-8.
 //
 // Their sound engines are unchanged and live in ../synths.js (params, voice, lines). This module
 // only adds what the synth dock needs to show them like the other synths: a `ui` spec (knobs,
 // faders, radio buttons — the same spec format synth-panel.js builds jiMS10 and the glass synths
-// from), a `scope` that draws the waveform the current settings make, and a set of presets.
+// from), live displays tied to the controls, and a set of presets.
 // synths.js merges PANELS into SYNTH_BANK. Everything a control writes is an existing param key,
 // so saved projects and the MIDI-roll sliders are unaffected.
 
-const N = 1024;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const TAU = Math.PI * 2;
-
-// ---- waveform helpers (display only) ---------------------------------------------------------
-const saw = (ph) => 2 * (ph - Math.floor(ph + 0.5));
-const sqr = (ph) => (ph - Math.floor(ph) < 0.5 ? 1 : -1);
-const tri = (ph) => 4 * Math.abs(ph - Math.floor(ph + 0.75) + 0.25) - 1;
-const normalise = (a) => {
-  let m = 0;
-  for (const v of a) m = Math.max(m, Math.abs(v));
-  if (m > 0) for (let i = 0; i < a.length; i++) a[i] /= m / 0.9;
-  return a;
-};
-// One-pole low-pass; `fc` and `f0` in Hz (f0 = the fundamental the picture is drawn at).
-function onePole(a, fc, f0, cycles) {
-  const spc = N / cycles;
-  const k = 1 - Math.exp((-TAU * (fc / f0)) / spc);
-  let y = 0;
-  const out = new Float32Array(a.length);
-  for (let pass = 0; pass < 2; pass++) for (let i = 0; i < a.length; i++) out[i] = y += k * (a[i] - y);
-  return out;
-}
-// Resonant 2-pole (state-variable) low-pass, run twice round so the picture is the steady state.
-function svf(a, fc, q, f0, cycles) {
-  const fs = f0 * (N / cycles);
-  const f = clamp(2 * Math.sin((Math.PI * Math.min(fc, fs * 0.2)) / fs), 0.001, 1.2);
-  const damp = clamp(1 / Math.max(0.5, q), 0.04, 2);
-  let lo = 0, band = 0;
-  const out = new Float32Array(a.length);
-  for (let pass = 0; pass < 2; pass++)
-    for (let i = 0; i < a.length; i++) {
-      lo += f * band;
-      const hi = a[i] - lo - damp * band;
-      band += f * hi;
-      out[i] = lo;
-    }
-  return out;
-}
-
-const scopes = {
-  acidals(P) {
-    const cycles = 3;
-    const a = new Float32Array(N);
-    for (let i = 0; i < N; i++) a[i] = (P.wave === "square" ? sqr : saw)((i / N) * cycles);
-    return normalise(svf(a, P.cutoff + P.envMod * 0.35, 0.7 + P.reso * 0.55, 55, cycles));
-  },
-  stacker(P) {
-    const cycles = 6;
-    const voices = Math.max(1, Math.round(P.voices));
-    const a = new Float32Array(N);
-    for (let v = 0; v < voices; v++) {
-      const cents = (v - (voices - 1) / 2) * P.detune * 5; // exaggerated so the beating shows in six cycles
-      const r = Math.pow(2, cents / 1200);
-      for (let i = 0; i < N; i++) a[i] += saw(((i / N) * cycles * r + v * 0.137) % 1);
-    }
-    return normalise(onePole(a, P.cutoff, 220, cycles));
-  },
-  subzero(P) {
-    const cycles = 2;
-    const k = 1 + P.drive * 8;
-    const a = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      const x = P.wave === "triangle" ? tri((i / N) * cycles) : Math.sin(TAU * (i / N) * cycles);
-      a[i] = P.drive > 0 ? Math.tanh(x * k) / Math.tanh(k) : x;
-    }
-    return a;
-  },
-  fmonad(P) {
-    const cycles = 3;
-    const beta = clamp(P.index / (110 * P.ratio), 0, 9);
-    const a = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      const t = (i / N) * cycles;
-      a[i] = Math.sin(TAU * t + beta * Math.sin(TAU * t * P.ratio));
-    }
-    return a;
-  },
-  chip8(P) {
-    const cycles = 8;
-    const a = new Float32Array(N);
-    for (let i = 0; i < N; i++) {
-      const t = (i / N) * cycles;
-      a[i] = sqr(t) + sqr(t * (1 + P.width * 0.02 * 8)); // detune exaggerated so the hollow beating shows
-    }
-    return normalise(a);
-  },
-};
-
 
 // ---- live displays ---------------------------------------------------------------------------
 // Drawn by synth-panel.js (drawViz) with its helpers passed in as `kit`; each reads the live params.
@@ -347,7 +260,6 @@ const SVG = {
 const vizItem = (id, cls = "") => ({ type: "viz", id, cls });
 const PANELS = {
   acidals: {
-    scope: scopes.acidals,
     viz: { filter: filterCurve, env: envShape },
     presets: [
       { name: "Classic 303", params: { wave: "sawtooth", cutoff: 500, reso: 18, envMod: 1800, decay: 0.25 } },
@@ -361,7 +273,6 @@ const PANELS = {
       theme: { accent: "#feca57", lcd: "#ffe08a", lcdBg: "#1a1405", edge: "#4a3d1c", bg: "#1c1710" },
       logo: ["", "ACIDALS"],
       sub: "BASS LINE · 303",
-      scopeLabel: "WAVEFORM · FILTERED",
       env: { a: 0.003, d: "decay", s: 0.25, r: 0.08 },
       cc: { 74: "cutoff", 71: "reso", 12: "envMod", 75: "decay" },
       sections: [
@@ -397,7 +308,6 @@ const PANELS = {
   },
 
   stacker: {
-    scope: scopes.stacker,
     viz: { spread: stackSpread, filter: filterCurve, env: envShape },
     presets: [
       { name: "Rave Stab", params: { voices: 7, detune: 22, cutoff: 6500, attack: 0.005, release: 0.25 } },
@@ -411,7 +321,6 @@ const PANELS = {
       theme: { accent: "#c084fc", lcd: "#e4c6ff", lcdBg: "#150d1f", edge: "#3f2d57", bg: "#1b1326" },
       logo: ["", "STACKER"],
       sub: "SUPERSAW STACK",
-      scopeLabel: "WAVEFORM · STACK",
       env: { a: "attack", d: 0.2, s: 0.8, r: "release" },
       cc: { 74: "cutoff", 71: "detune", 73: "attack", 72: "release" },
       sections: [
@@ -429,7 +338,6 @@ const PANELS = {
   },
 
   subzero: {
-    scope: scopes.subzero,
     viz: { drive: driveCurve, snap: pitchSnap, env: envShape },
     presets: [
       { name: "808 Classic", params: { wave: "sine", drive: 0.25, glideUp: 0.04, release: 0.4 } },
@@ -443,7 +351,6 @@ const PANELS = {
       theme: { accent: "#54a0ff", lcd: "#b5d6ff", lcdBg: "#07111f", edge: "#25405f", bg: "#0d1724" },
       logo: ["", "SUBZERO"],
       sub: "SUB BASS · 808",
-      scopeLabel: "WAVEFORM · DRIVEN",
       env: { a: 0.004, d: 0.1, s: 0.9, r: "release" },
       cc: { 74: "drive", 75: "glideUp", 72: "release" },
       sections: [
@@ -475,7 +382,6 @@ const PANELS = {
   },
 
   fmonad: {
-    scope: scopes.fmonad,
     viz: { spectrum: fmSpectrum, modenv: modEnv, env: envShape },
     presets: [
       { name: "Glass Bell", params: { ratio: 3.5, index: 600, modDecay: 1.2, attack: 0.002, release: 2 } },
@@ -489,7 +395,6 @@ const PANELS = {
       theme: { accent: "#22d3ee", lcd: "#a8f0fb", lcdBg: "#06171b", edge: "#1f4a54", bg: "#0b1a1f" },
       logo: ["", "FMONAD"],
       sub: "2-OPERATOR FM",
-      scopeLabel: "WAVEFORM · FM",
       env: { a: "attack", d: 0.1, s: 0.5, r: "release" },
       cc: { 74: "index", 71: "ratio", 75: "modDecay", 72: "release" },
       sections: [
@@ -507,7 +412,6 @@ const PANELS = {
   },
 
   chip8: {
-    scope: scopes.chip8,
     viz: { vibrato, env: envShape },
     presets: [
       { name: "Hero Lead", params: { width: 0.25, vibRate: 5, vibDepth: 12, decay: 0.3 } },
@@ -521,7 +425,6 @@ const PANELS = {
       theme: { accent: "#fb7185", lcd: "#fecdd3", lcdBg: "#1f0b10", edge: "#5a2530", bg: "#22121a" },
       logo: ["", "CHIP-8"],
       sub: "PWM CHIPTUNE",
-      scopeLabel: "WAVEFORM · PULSE",
       env: { a: 0.002, d: "decay", s: 0.4, r: 0.08 },
       cc: { 74: "width", 76: "vibRate", 77: "vibDepth", 75: "decay" },
       sections: [
