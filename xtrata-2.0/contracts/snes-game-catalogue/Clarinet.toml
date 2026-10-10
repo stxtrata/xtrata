@@ -1,0 +1,35 @@
+[project]
+name = "snes-catalogue"
+requirements = []
+[contracts.nft-trait]
+path = "contracts/test-support/nft-trait.clar"
+clarity_version = 3
+epoch = "3.0"
+[contracts.xtrata-v1-1-1]
+path = "contracts/test/xtrata-v1-1-1.clar"
+clarity_version = 3
+epoch = "3.0"
+[contracts.xtrata-v2-1-0]
+path = "contracts/test/xtrata-v2-1-0.clar"
+clarity_version = 3
+epoch = "3.0"
+[contracts.xtrata-v3-2-3]
+path = "contracts/test/xtrata-v3-2-3.clar"
+clarity_version = 3
+epoch = "3.0"
+[contracts.mock-xtrata]
+path = "contracts/mock-xtrata.clar"
+clarity_version = 4
+epoch = "3.3"
+[contracts.mock-gate]
+path = "contracts/mock-gate.clar"
+clarity_version = 4
+epoch = "3.3"
+[contracts.snes-game-catalogue-v1]
+path = "contracts/snes-game-catalogue-v1.clar"
+clarity_version = 4
+epoch = "3.3"
+[contracts.snes-xtrata-adapter-v3-2-3]
+path = "contracts/test/snes-xtrata-adapter-v3-2-3.clar"
+clarity_version = 4
+epoch = "3.3"

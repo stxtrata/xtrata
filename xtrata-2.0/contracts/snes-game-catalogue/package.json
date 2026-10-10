@@ -1,0 +1,1 @@
+{"name":"snes-game-catalogue","version":"0.1.0","private":true,"type":"module","scripts":{"pretest":"node prepare-tests.mjs","test":"vitest run"},"devDependencies":{"@hirosystems/clarinet-sdk":"^3.8.0","@stacks/transactions":"^7.0.0","vitest":"^3.0.0","vitest-environment-clarinet":"^3.0.0"}}

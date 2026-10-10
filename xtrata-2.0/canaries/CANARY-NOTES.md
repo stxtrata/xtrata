@@ -114,3 +114,8 @@ A throwaway wallet cannot sign owner-only calls, so hand it ownership for the ru
   route changes.
 - End the canary with an "audit" step that lists the repo and site edits still to make (redirects,
   tiles, id lists) so nothing is forgotten after the launch.
+
+## snes-catalogue (added 2026-10-09, build v1)
+- Temporary-wallet float must cover every call it signs, including the refusal probes, hand-back, stranger step and sweep (`callsFor`); an early version under-counted and needed two top-up transfers.
+- Temporary-wallet transactions (sweep included) use the 0.02 STX fee floor; the mock node rejects anything lower.
+- `get-chunk-batch` returns a plain list, `mint-single-tx` returns `(ok {existed, token-id})`, and the admin is not automatically a publisher.

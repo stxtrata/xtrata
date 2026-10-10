@@ -1,0 +1,7 @@
+[
+  { "slug": "star-patrol", "title": "STAR PATROL", "note": "Vertical shooter. Built into the emulator; the first game on chain.", "profile": "", "board": null, "coreMin": 10000, "rom": "assets/roms/star-patrol.sfc", "cover": null, "icon": null },
+  { "slug": "crate-quest", "title": "CRATE QUEST", "note": "Push crates onto the marks. Test game.", "profile": "", "board": null, "coreMin": 10000, "rom": "assets/roms/crate-quest.sfc", "cover": "assets/art/crate-quest-cover.png", "icon": "assets/art/crate-quest-icon.png" },
+  { "slug": "sky-hopper", "title": "SKY HOPPER", "note": "Hop up the clouds. Test game.", "profile": "", "board": null, "coreMin": 10000, "rom": "assets/roms/sky-hopper.sfc", "cover": "assets/art/sky-hopper-cover.png", "icon": "assets/art/sky-hopper-icon.png" },
+  { "slug": "brick-storm", "title": "BRICK STORM", "note": "Break the bricks. Test game.", "profile": "", "board": null, "coreMin": 10000, "rom": "assets/roms/brick-storm.sfc", "cover": "assets/art/brick-storm-cover.png", "icon": "assets/art/brick-storm-icon.png" },
+  { "slug": "garden-snake", "title": "GARDEN SNAKE", "note": "Eat, grow, do not bite yourself. Test game.", "profile": "", "board": null, "coreMin": 10000, "rom": "assets/roms/garden-snake.sfc", "cover": "assets/art/garden-snake-cover.png", "icon": "assets/art/garden-snake-icon.png" }
+]
