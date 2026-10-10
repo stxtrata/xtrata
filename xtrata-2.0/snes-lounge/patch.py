@@ -98,18 +98,18 @@ host=open('host.js',encoding='utf-8').read()
 # --- walk-up console on the coffee table: click it (or E) to reset the SNES
 rep("controller([-.60,.709,.37],-.25);controller([.60,.709,.40],.28);controller([-4.2,1.04,-.88],.65);",
 """controller([-.60,.709,.37],-.25);controller([.60,.709,.40],.28);controller([-4.2,1.04,-.88],.65);
-const consoleItem={id:'console',label:'the console',position:[1.18,.74,-.36],angle:.18};
+const consoleItem={id:'console',label:'the console',position:[.42,.083,-4.15],angle:-.42};
 {const cb=R.material({...mat.plain}),cd=R.material({...mat.plain}),cdark=R.material({...mat.black}),cbtn=R.material({...mat.plain}),cled=R.material({emit:1.4,shadow:false});
- G(consoleItem.position,[0,consoleItem.angle,0],()=>{box([0,0,0],[.46,.07,.34],cb,'#b9b3c4',.03);box([0,.039,.015],[.40,.012,.27],cd,'#8d879b',.01);box([-.06,.047,-.02],[.2,.012,.045],cdark,'#2c2836',.006);box([.11,.047,-.01],[.075,.012,.12],cdark,'#363143',.006);box([0,-.006,.172],[.44,.034,.008],cdark,'#3a3548',.004);for(const x of[-.15,-.09])box([x,.0,.176],[.045,.028,.016],cbtn,'#8f6fb3',.008);box([.04,.0,.176],[.05,.028,.016],cbtn,'#d4755a',.008);box([.15,.012,.174],[.012,.012,.012],cled,'#7cf0b8',.003);box([-.19,.047,.1],[.045,.004,.012],cled,'#b78cf0',.002)});}
+ G(consoleItem.position,[0,consoleItem.angle,0],()=>{box([0,0,0],[.46,.07,.34],cb,'#b9b3c4',.03);box([0,.039,.015],[.40,.012,.27],cd,'#8d879b',.01);box([-.06,.047,-.02],[.2,.012,.045],cdark,'#2c2836',.006);box([.11,.047,-.01],[.075,.012,.12],cdark,'#363143',.006);box([0,-.006,.172],[.44,.034,.008],cdark,'#3a3548',.004);for(const x of[-.17,-.105])box([x,-.004,.176],[.05,.03,.016],cdark,'#1d1a26',.006);box([.04,.0,.176],[.05,.028,.016],cbtn,'#d4755a',.008);box([.15,.012,.174],[.012,.012,.012],cled,'#7cf0b8',.003);box([-.19,.047,.1],[.045,.004,.012],cled,'#b78cf0',.002)});}
 """)
 rep("function currentPickup(){","""function pickConsole(clientX=null,clientY=null){
  if(state.playing||state.settingsOpen||state.transition||state.inputPaused||state.mode==='welcome'||!$('help').hidden)return false;
- if(controllerDistance(consoleItem)>4.6)return false;
+ if(controllerDistance(consoleItem)>3.6)return false;
  const rect=R.canvas.getBoundingClientRect(),locked=document.pointerLockElement===R.canvas;
  const nx=locked||clientX===null?0:(clientX-rect.left)/rect.width*2-1,ny=locked||clientY===null?0:1-(clientY-rect.top)/rect.height*2;
  const cp=Math.cos(camera.pitch),forward=[-Math.sin(camera.yaw)*cp,Math.sin(camera.pitch),-Math.cos(camera.yaw)*cp],right=[Math.cos(camera.yaw),0,-Math.sin(camera.yaw)],up=V.cross(right,forward),tan=Math.tan(camera.fov/2),aspect=rect.width/rect.height;
  const dir=V.norm(forward.map((v,i)=>v+right[i]*nx*tan*aspect+up[i]*ny*tan)),origin=[camera.x,camera.y,camera.z];
- const t=rayBox(origin,dir,consoleItem.position,[.27,.07,.2],consoleItem.angle);
+ const t=rayBox(origin,dir,consoleItem.position,[.3,.09,.23],consoleItem.angle);
  return t!==null&&!blockedPickupRay(origin,dir,t);
 }
 function currentConsole(){return pickConsole(pickupPointer.inside?pickupPointer.x:null,pickupPointer.inside?pickupPointer.y:null)}
@@ -121,6 +121,21 @@ rep("if(!wasPaused){const item=pickController(e.clientX,e.clientY);if(item)picku
     "if(!wasPaused){const item=pickController(e.clientX,e.clientY);if(item)pickupController(item.id);else if(pickConsole(e.clientX,e.clientY))resetConsole()}")
 rep(" if(item){e.hidden=false;e.innerHTML='<span class=\"key\">Click</span> Pick up '+item.label+' <span class=\"pickup-detail\"> · E / Enter</span>';return}",
     " if(item){e.hidden=false;e.innerHTML='<span class=\"key\">Click</span> Pick up '+item.label+' <span class=\"pickup-detail\"> · E / Enter</span>';return}\n if(currentConsole()){e.hidden=false;e.innerHTML='<span class=\"key\">Click</span> Reset the console <span class=\"pickup-detail\"> · E</span>';return}")
+
+
+rep("cable([[-.6,.68,.21],[-.7,.68,-.1],[-.8,.68,-.72],[-.89,.50,-.84],[-.9,.06,-1.1],[-1.1,.052,-1.8],[-.65,.048,-3.2],[-.3,.047,-4.4],[-.15,.38,-5.16]]);",
+"""const cw=(x,y,z)=>{const a=consoleItem.angle,c=Math.cos(a),s=Math.sin(a);return[consoleItem.position[0]+c*x+s*z,consoleItem.position[1]+y,consoleItem.position[2]-s*x+c*z]};
+const portP=cw(-.17,-.004,.19);
+cable([[-.6,.68,.21],[-.7,.68,-.1],[-.8,.68,-.72],[-.89,.50,-.84],[-.9,.06,-1.1],[-1.1,.052,-1.8],[-.95,.05,-2.7],[-.35,.05,-3.1],[.05,.05,-3.45],[-.12,.05,-3.85],[portP[0]-.05,.05,portP[2]+.2],portP]);
+function lead(points,r,col){for(let i=0;i<points.length-1;i++)tube(points[i],points[i+1],r,controllerCable,col,6)}
+{const rear=cw(.12,-.01,-.18),rear2=cw(-.08,-.01,-.18);
+ lead([rear,[rear[0]+.16,.05,rear[2]-.25],[rear[0]+.62,.045,rear[2]-.18],[rear[0]+.95,.045,rear[2]-.62],[1.62,.045,-4.98],[1.9,.045,-5.12]],.011,'#1c1824');
+ lead([rear2,[rear2[0]-.2,.05,rear2[2]-.3],[rear2[0]-.5,.05,rear2[2]-.2],[rear2[0]-.62,.06,rear2[2]-.62],[-.25,.2,-5.02],[-.18,.37,-5.14]],.008,'#d6c25a');
+ lead([cw(-.02,-.01,-.18),[rear2[0]-.1,.05,rear2[2]-.25],[rear2[0]-.4,.05,rear2[2]-.45],[-.2,.18,-5.0],[-.13,.37,-5.14]],.008,'#e8e4ee');
+ lead([cw(-.14,-.01,-.18),[rear2[0]-.35,.05,rear2[2]-.15],[rear2[0]-.6,.05,rear2[2]-.55],[-.28,.18,-5.05],[-.2,.37,-5.15]],.008,'#c84e5e');}
+const cbrickM=R.material({...mat.black});
+G([1.48,.075,-4.62],[0,.5,0],()=>{box([0,0,0],[.15,.05,.085],cbrickM,'#26222f',.012);});
+lead([[1.48,.075,-4.62],[1.55,.05,-4.78],[1.62,.045,-4.98]],.009,'#1c1824');""")
 
 rep('</body>','<script>\n'+host+'\n</script>\n</body>')
 open('src.html','w',encoding='utf-8').write(s)
