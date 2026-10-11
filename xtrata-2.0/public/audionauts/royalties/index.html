@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Audionauts · Artist royalties</title>
+  <link rel="icon" href="/favicon.svg">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <main>
+    <header class="topline"><a href="/">XTRATA</a><span>Audionauts 1.0</span></header>
+    <section class="intro">
+      <p class="eyebrow">Artist ledger</p><h1>Audionaut royalties</h1>
+      <p>Follow the 5 STX royalty for each minted Audionaut, from its secret song to the artist’s receiving wallet.</p>
+    </section>
+    <section class="access" aria-label="Artist sign-in">
+      <div><h2 id="access-title">Sign in to view royalties</h2><p id="access-note">Use the wallet holding your artist’s first song. Sign a free message to verify your address.</p><p id="wallet-address" class="address" hidden></p></div>
+      <div class="buttons"><button id="sign-in">Sign in with wallet</button><button id="sign-out" class="secondary" hidden>Sign out</button></div>
+    </section>
+    <p id="message" role="status" aria-live="polite"></p>
+    <section id="ledger" hidden aria-label="Royalty ledger">
+      <div class="stats">
+        <div><span>Minted Audionauts</span><strong id="minted-count">—</strong></div>
+        <div><span>Paid · confirmed</span><strong id="paid-total">—</strong></div>
+        <div><span>No receipt recorded</span><strong id="unrecorded-total">—</strong></div>
+        <div><span>Need verification</span><strong id="unverified-count">—</strong></div>
+      </div>
+      <div class="tools"><div class="filters">
+        <label>Show<select id="scope"><option value="all">All artists</option><option value="mine">My royalties</option></select></label>
+        <label>Artist<select id="artist"><option value="">All artists</option></select></label>
+        <label>Payment<select id="status"><option value="">All payments</option><option value="paid">Paid</option><option value="unrecorded">No receipt</option><option value="unverified">Could not verify</option></select></label>
+        <label>Search<input id="search" type="search" placeholder="Edition, artist or song"></label>
+      </div><button id="refresh" class="secondary">Refresh</button></div>
+      <p id="updated" class="muted"></p>
+      <p id="ownership-warning" class="warning" hidden></p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Audionaut</th><th>Song / artist</th><th>Receiving wallet</th><th>Royalty</th><th>Payment</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <p id="empty" hidden>No minted Audionauts match these filters.</p>
+      <p class="explanation">A receiving wallet is the current holder of the artist’s earliest song inscription in this collection’s song list. Each minted edition earns one 5 STX royalty for its primary secret-song artist. Bonus songs and playlists do not add another royalty.</p>
+      <p class="explanation">“No receipt” means a payment has not been recorded here. Confirmed receipts include a transaction link and the address that held the artist’s receiving song when paid. Mint and ownership checks use a confirmed block, so recent activity can take a little time to appear.</p>
+      <details id="record-panel" hidden>
+        <summary>Record an existing payment</summary>
+        <p>Add a confirmed transfer receipt. A single transfer can cover several editions at 5 STX each, provided they share the receiving address.</p>
+        <form id="receipt-form">
+          <label>Payment transaction ID<input id="tx-id" required placeholder="0x…" maxlength="66" autocomplete="off"></label>
+          <label>Audionaut editions<input id="editions" required placeholder="e.g. 1, 12, 22" autocomplete="off"></label>
+          <button type="submit">Verify and record receipt</button>
+        </form>
+        <p id="receipt-message" role="status" aria-live="polite"></p>
+      </details>
+    </section>
+    <footer>Built using Xtrata Protocol <a href="/collection/audionauts-1-0">View the collection ↗</a></footer>
+  </main>
+  <script type="module" src="./page.js"></script>
+</body>
+</html>

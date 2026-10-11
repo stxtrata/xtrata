@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Audionaut artist royalty ledger (2026-10-12)
+- Added `/audionauts/royalties/`: receiving-song holders sign a free wallet message to view minted Audionauts, primary songs/artists, receiving wallets and 5 STX receipt status. Includes artist/search/payment filters and a personal royalty view.
+- `/api/audionaut-royalties` enforces authenticated receiving-holder/admin access independently of the studio auth rollout mode. Mints and receiving-song ownership come from the confirmed chain, not staging state.
+- Admins record existing transfer IDs and edition allocations. Payments are verified against their total, canonical confirmation and the artist's receiving-song holder at payment time. Pending/failed/unavailable evidence cannot show Paid; unrecorded payments show No receipt. Migration 023 prevents transaction/edition double allocation atomically.
+- Verified 18 live mints and ten receiving holders; 26 source/access tests and 87 existing wallet/session regression tests pass, browser checks pass with simulated sessions and disposable addresses, and ledger/site/worker builds pass. No production migration, deployment or payment performed. Plan and operator steps: `docs/plans/AUDIONAUT-ROYALTIES.md`.
+
 ## Bounty tracker: Draws 2 and 3 run in the page, a win takes one ticket (2026-10-09)
 - `public/bounty/zdao/tracker/1/index.html`: `ENGINE` now covers all three draws (it was Draw 1 only). `poolFor(i)` takes one ticket off a wallet for every earlier draw it won (`handles.json` `winners`, draws numbered below the one being drawn), drops it if nothing is left, and everything else rolls over. Past winners stay in every later draw. The winners list is re-fetched fresh right before each draw runs.
 - Inscription tickets by size (1 to 5 each, summed over every inscription, Draw 2 onwards; Draw 1 stays frozen at 1) were already live from the ledger reader (`inp`); the draw now uses exactly those numbers.
