@@ -35,6 +35,12 @@ export interface PasskeyPort {
 export interface Panel {
   kind: 'create' | 'confirm-passkey' | 'verify-passkey' | 'unlock' | 'session' | 'return' | 'link';
   title: string;
+  /**
+   * One or two plain lines shown above the button. When set, `lines` and `warnings` fold into a
+   * "Details" section below it, so the button is in view without scrolling. Without it, every line
+   * stays visible (used where the detail IS the thing to check, e.g. the full return address).
+   */
+  summary?: string;
   lines: string[];
   confirmLabel: string;
   /** Lines the listener must not miss (shown as warnings). */
@@ -172,6 +178,11 @@ export function createListeningEngine(deps: {
     const created = await deps.ui.act({
       kind: 'create',
       title: 'Create your listening wallet',
+      summary: (terms
+        ? `A small wallet made from a passkey on this device. It pays ${stx(costPerPlay(terms.fee))} STX for each song you listen to for 30 seconds, up to ${stx(terms.budget)} STX before it asks again.`
+        : 'A small wallet made from a passkey on this device.')
+        + ' Keep no more than 1 STX in it: if you lose the passkey, its funds are lost.'
+        + (existing.length ? ' This device already has one; this makes a separate wallet.' : ''),
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
         'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
@@ -221,6 +232,9 @@ export function createListeningEngine(deps: {
     const r = await deps.ui.act({
       kind: 'unlock',
       title: 'Unlock your listening wallet',
+      summary: (last ? `Wallet ${short(last.address)}. ` : '') + (terms
+        ? `One passkey tap unlocks it and keeps paying ${stx(costPerPlay(terms.fee))} STX per song you listen to for 30 seconds, up to ${stx(terms.budget)} STX before it asks again.`
+        : 'One passkey tap unlocks it for this visit.'),
       // Kept short: on the radio this panel opens by itself and its button should sit in view.
       lines: terms
         ? [last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
@@ -258,7 +272,10 @@ export function createListeningEngine(deps: {
   }
 
   async function approve(terms: SessionTerms, title: string): Promise<void> {
-    await deps.ui.act({ kind: 'session', title, lines: termsLines(terms), confirmLabel: 'Approve' }, async () => undefined);
+    await deps.ui.act({
+      kind: 'session', title, lines: termsLines(terms), confirmLabel: 'Approve',
+      summary: `Pays ${stx(costPerPlay(terms.fee))} STX per song you listen to for 30 seconds and ${stx(LIKE_FEE)} STX per like, up to ${stx(terms.budget)} STX before it asks again.`
+    }, async () => undefined);
     ledger = new SessionLedger(terms, now());
   }
 
@@ -379,6 +396,7 @@ export function createListeningEngine(deps: {
       await deps.ui.act({
         kind: 'return',
         title: p.mode === 'all' ? 'Return everything' : 'Return the excess',
+        summary: `Send ${stx(plan.amount)} STX to your main wallet ${main}. Network fee ${stx(plan.fee)} STX.`,
         lines: [
           `Send ${stx(plan.amount)} STX to your main wallet ${main}.`,
           `Network fee ${stx(plan.fee)} STX. Left in this wallet: ${stx(plan.remaining)} STX.`,

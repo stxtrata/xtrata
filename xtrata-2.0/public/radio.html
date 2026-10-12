@@ -159,13 +159,14 @@
   .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
   .ppp button:disabled{opacity:.55;cursor:wait}
   .ppp-frame-label{margin:12px 0 6px!important;font-size:10.5px!important;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan)!important}
-  .ppp-frame iframe{width:100%;height:190px;transition:height .2s;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
-  .ppp-frame--active iframe{height:440px}
-  /* One-tap unlock: while the unlock confirm waits in the wallet, show the wallet right under the stages. */
-  .ppp.ppp--armed{display:flex;flex-direction:column}
-  .ppp--armed>.ppp-head{order:-4}.ppp--armed>.ppp-steps{order:-3}.ppp--armed>.ppp-stage{order:-2}
-  .ppp--armed>.ppp-frame-label,.ppp--armed>.ppp-frame{order:-1}.ppp--armed>.ppp-frame{margin-bottom:8px}
-  .ppp--armed .ppp-frame iframe{height:300px}
+  .ppp-frame iframe{display:block;width:100%;height:340px;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
+  /* At rest (nothing to approve) the wallet box shrinks to nothing; it is never moved, so it never reloads. */
+  .ppp-frame--rest iframe{height:0;border:0}
+  .ppp-frame-label button{margin-left:6px}
+  .ppp-fold{margin:8px 0 0;font-size:12.5px;color:var(--mut)}
+  .ppp-fold>summary{cursor:pointer;color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;margin:4px 0}
+  .ppp-fold[open]>summary{margin-bottom:8px}
+  .ppp-key p{margin:4px 0 8px}
   .ppp-msg{color:var(--cyan)!important;font-size:12px!important;min-height:1em}.ppp-err{color:#ff8a8a!important;font-size:12px!important;overflow-wrap:anywhere}
   .ppp-err:empty,.ppp-msg:empty{display:none}
   .ppp-history{margin-top:10px;font-size:12px;color:var(--mut)}
@@ -241,13 +242,15 @@
       <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>SETUP HELPER</span></h3><span class="ppp-state" hidden></span></div>
       <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
       <p class="ppp-stage" hidden></p>
-      <dl class="ppp-facts" hidden></dl>
-      <div class="ppp-body"></div>
+      <!-- Top to bottom: what to do now, the wallet box when it needs a tap, buttons; details folded below. -->
+      <div class="ppp-key"></div>
+      <p class="ppp-frame-label" hidden><span>Listening wallet · approvals happen in this box</span></p>
+      <div class="ppp-frame" hidden></div>
       <div class="ppp-actions"></div>
       <p class="ppp-msg" role="status"></p>
       <p class="ppp-err" role="alert"></p>
-      <p class="ppp-frame-label" hidden>Listening wallet · approvals happen in this box</p>
-      <div class="ppp-frame" hidden></div>
+      <details class="ppp-fold ppp-more" hidden><summary>More about this step</summary><div class="ppp-body"></div></details>
+      <details class="ppp-fold ppp-wallets" hidden><summary>Wallet details</summary><dl class="ppp-facts"></dl></details>
       <details class="ppp-history" hidden></details>
     </section>
     <p class="strap">Every song on this station is an inscription — full audio files living permanently on-chain.
@@ -360,7 +363,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=38a1d9b78f4e')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=27fe2fecb0a7')}).catch(function(){});
 </script>
 </body>
 </html>

@@ -45,9 +45,20 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
       open = true;
       const ok = $<HTMLButtonElement>('p-ok'), cancel = $<HTMLButtonElement>('p-cancel'), error = $('p-error');
       $('p-title').textContent = panel.title;
-      $('p-lines').replaceChildren(...panel.lines.map((l) => Object.assign(document.createElement('p'), { textContent: l })));
-      $('p-warn').replaceChildren(...(panel.warnings ?? []).map((w) => Object.assign(document.createElement('li'), { textContent: w })));
-      $('p-warn').hidden = !panel.warnings?.length;
+      // With a summary, the button sits right under it and the full text folds into "Details".
+      const folded = !!panel.summary;
+      const para = (l: string) => Object.assign(document.createElement('p'), { textContent: l });
+      const item = (w: string) => Object.assign(document.createElement('li'), { textContent: w });
+      $('p-summary').textContent = panel.summary ?? '';
+      $('p-summary').hidden = !folded;
+      $('p-lines').replaceChildren(...(folded ? [] : panel.lines.map(para)));
+      $('p-warn').replaceChildren(...(folded ? [] : (panel.warnings ?? []).map(item)));
+      $('p-warn').hidden = folded || !panel.warnings?.length;
+      $('p-more-lines').replaceChildren(...(folded ? panel.lines.map(para) : []));
+      $('p-more-warn').replaceChildren(...(folded ? (panel.warnings ?? []).map(item) : []));
+      $('p-more-warn').hidden = !folded || !panel.warnings?.length;
+      ($('p-more') as HTMLDetailsElement).open = false;
+      $('p-more').hidden = !folded;
       ok.textContent = panel.confirmLabel;
       error.textContent = '';
       ok.disabled = cancel.disabled = false;
