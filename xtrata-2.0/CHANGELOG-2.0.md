@@ -2,6 +2,14 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Bounty tracker: wizard inscriptions count for the wallet that receives them (2026-10-12)
+- The inscription wizard mints from a throwaway wallet and then transfers the inscription to the person it was made for, so the ledger credited the throwaway wallet (and put it in the raffle pool) and the real recipient got nothing. Found on SP1BP036…, which received 13 wizard inscriptions and showed none.
+- `public/bounty/zdao/tracker/1/ledger-reader.js`: reads the NFT mint list to learn which token ids each mint call created, and the contract's direct `transfer` calls. A transfer made by the minter itself, within 6 hours of the mint, moves that inscription's ticket (count and size tickets) from the minter to the receiver, in the all-time counts and in every draw window the transfer fell inside (a hand-over after a cut-off counts from the next draw). Throwaway wallets end with no counts and no longer appear on the board. Gifts later than 6 hours, transfers by anyone else, and sales through a market do not move tickets.
+- **Draw 1 stays frozen:** `frozenDraws: 1` leaves draw 1's window exactly as it was counted, so the published Draw 1 list and result still reproduce (checked: the page's Draw 1 pool equals `draws/draw1/frozen.csv`).
+- Saved states carry `att: 1`; older saved states (visitors' browsers, the ledger task) are read again from scratch once. The snapshot baked into the page was rebuilt with the new attribution. `bounty-tracker-bake.mjs` keeps `att`. If the mint list cannot be read the mints simply stay with the wallet that sent them.
+- Result on today's chain: Draw 2 pool is 15 wallets / 251 tickets (was 21 / 160, including 30 throwaway wallets); SP1BP036… holds 13 inscriptions worth 63 size tickets.
+- **Verified:** 21 reader tests pass (7 new: hand-over with size tickets, draw windows, 6-hour and sender limits, one item of a batch, a transfer arriving in a later run equals a from-scratch read, mint list down, frozen draw 1); a full read of the real chain; the page in a browser (15 rows, no throwaway wallets); `freeze.mjs` gives the same 15 wallets / 251 tickets as the page.
+
 ## Music inscription: reassuring browser storage note (2026-10-12)
 - Reworded the shared keep-open banner's permanent-storage notice to start with reassurance that the inscription process is underway, followed by the request to keep the tab open and the low-disk-space explanation.
 - Removed the warning icon and used neutral text for this informational notice. File-save failures retain their warning appearance and recovery explanation.
