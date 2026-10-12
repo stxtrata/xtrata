@@ -975,11 +975,19 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   } catch { /* conservative default: stays false until a click */ }
 
   let forcedNext = null;
+  // The listener's own order for the LIKED station (set by the radio page's likes list).
+  // Likes not in it yet (new ones) come first, then the saved order.
+  let likedOrder = [];
+  const orderLiked = (ids) => {
+    if (!likedOrder.length) return ids;
+    const rank = new Map(likedOrder.map((id, i) => [id, i]));
+    return ids.map((id, i) => [id, rank.has(id) ? rank.get(id) : -ids.length + i]).sort((a, b) => a[1] - b[1]).map(([id]) => id);
+  };
   // Ordered pool for shuffle-OFF playback: liked band follows your saved list;
   // FM plays the curated order (then known chain songs ascending, preset ALL);
   // CHAIN walks every known song by ascending id.
   const sequentialPool = () => {
-    if (band === 'liked') return chainState.snapshot().likes.map((l) => String(l.tokenId));
+    if (band === 'liked') return orderLiked(chainState.snapshot().likes.map((l) => String(l.tokenId)));
     const known = knownPool.slice().sort((a, b) => Number(a) - Number(b));
     if (band === 'chain') return known;
     if (preset === 'music') return playlist.slice();
@@ -1608,6 +1616,18 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       if (!on) { switchOn(); } else { player.pause(); void tuneToNextTrack(); }
     },
     nudgeVolume,
+    /** The listener's order for the LIKED station: inscription ids, first plays first. */
+    setLikedOrder: (ids) => { likedOrder = Array.isArray(ids) ? ids.map(String).slice(0, 5000) : []; },
+    /**
+     * Read-only live spectrum for the radio page: fills `out` (a Uint8Array) with the analyser's
+     * frequency bins and returns true, or returns false when there is no analyser (not played yet,
+     * or a browser such as iOS Safari that gives none). Never affects playback.
+     */
+    getSpectrum: (out) => {
+      if (!analyser || !(out instanceof Uint8Array)) return false;
+      try { analyser.getByteFrequencyData(out); return true; } catch { return false; }
+    },
+    spectrumSize: () => (analyser ? analyser.frequencyBinCount : 0),
     subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
   // --- receiver faceplate wiring -----------------------------------------

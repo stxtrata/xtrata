@@ -182,7 +182,49 @@ function start(root: HTMLElement) {
     return [dt, dd];
   }
 
+  // The top bar button: pay-per-play's next step or live state, always in reach. Browsers only allow
+  // the passkey from a tap inside the wallet box, so it brings that box into view, ready to tap.
+  const top = document.getElementById('ppp-top') as HTMLButtonElement | null;
+  const focusPanel = () => {
+    const target = frameWrap.hidden || frameWrap.classList.contains('ppp-frame--rest') ? root : frameWrap;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    root.classList.remove('ppp-flash'); void root.offsetWidth; root.classList.add('ppp-flash');
+  };
+  if (top) top.onclick = () => {
+    const s = ppp.snapshot();
+    if (s.step === 'connect') { (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(); return; }
+    if (s.step === 'elsewhere' && s.gate?.radioUrl) { location.href = s.gate.radioUrl; return; }
+    if (s.step === 'locked' && !s.armed && !s.busy) void ppp.unlock();
+    focusPanel();
+  };
+  function renderTop(s: Snapshot) {
+    if (!top) return;
+    const set = (text: string, tone: string, title: string) => {
+      top.hidden = false;
+      top.className = 'ppp-top' + (tone ? ' is-' + tone : '');
+      top.replaceChildren(el('span', '', 'dot'), document.createTextNode(text));
+      top.title = title;
+    };
+    const left = s.session ? Math.min(s.session.playsLeft, s.playsLeft) : 0;
+    switch (s.step) {
+      case 'off': case 'not-invited': case 'unsupported': top.hidden = true; return;
+      case 'elsewhere': return set('Pay-per-play radio', 'quiet', 'Open the pay-per-play radio');
+      case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
+      case 'intro': return set('Set up pay-per-play', '', 'Create your passkey listening wallet');
+      case 'locked': return set(s.payingOn ? 'Unlock · keep paying' : 'Unlock wallet', '', 'Opens the listening wallet: one tap there asks for your passkey');
+      case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
+      case 'fund': return set(s.entries.some((e) => e.kind === 'play') ? 'Out of funds · top up' : 'Add funds', 'warn', 'Add up to 1 STX to keep paying artists');
+      case 'over': return set('Over 1 STX', 'warn', 'Return the excess to keep paying');
+      case 'loading': return set('Pay-per-play', 'quiet', 'Checking the listening wallet');
+      case 'ready':
+        return s.payingOn && left > 0
+          ? set(`On · ${left.toLocaleString()} plays left`, 'on', 'Paying artists as you listen')
+          : set('Paying off · switch on', 'off', 'Pay-per-play is switched off');
+    }
+  }
+
   function render(s: Snapshot) {
+    renderTop(s);
     root.hidden = s.step === 'off';
     if (root.hidden) return;
     const [pill, tone] = statePill(s);
