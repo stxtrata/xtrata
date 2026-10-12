@@ -89,6 +89,10 @@ interface Stored { version: 1; wallets: WalletRecord[]; last?: string }
 
 const STORE_KEY = 'xtrata.listening-wallet.v1';
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
+/** STX without trailing zeros, for the one-line summaries (0.00035, 1). */
+const stxs = (v: bigint) => stx(v).replace(/\.?0+$/, '');
+/** The one-line terms: price per song and the cap before it asks again. */
+const termsLine = (t: SessionTerms) => `${stxs(costPerPlay(t.fee))} STX a song · up to ${stxs(t.budget)} STX`;
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -179,12 +183,11 @@ export function createListeningEngine(deps: {
     const existing = load().wallets;
     const created = await deps.ui.act({
       kind: 'create',
-      title: 'Create your listening wallet',
-      summary: (terms
-        ? `A small wallet made from a passkey on this device. It pays ${stx(costPerPlay(terms.fee))} STX for each song you listen to for 30 seconds, up to ${stx(terms.budget)} STX before it asks again.`
-        : 'A small wallet made from a passkey on this device.')
-        + ' Keep no more than 1 STX in it: if you lose the passkey, its funds are lost.'
-        + (existing.length ? ' This device already has one; this makes a separate wallet.' : ''),
+      title: 'New listening wallet',
+      // One glance: the price, and the one rule that matters. Everything else is under Details.
+      summary: (terms ? termsLine(terms) + '. ' : '')
+        + 'Keep under 1 STX: lose the passkey, lose the funds.'
+        + (existing.length ? ' (A second wallet on this device.)' : ''),
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
         'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
@@ -198,7 +201,7 @@ export function createListeningEngine(deps: {
           ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet: to reach the old one later, choose its passkey when unlocking.`]
           : [])
       ],
-      confirmLabel: terms ? 'I understand · create and pay as I listen' : 'I understand · create with passkey'
+      confirmLabel: terms ? 'Create and pay as I listen' : 'Create with passkey'
     }, () => deps.passkey.create(existing.map((w) => w.credentialId)));
 
     // Prove PRF is live AND stable before the address is ever shown for funding
@@ -211,8 +214,8 @@ export function createListeningEngine(deps: {
           kind: first ? 'confirm-passkey' : 'verify-passkey',
           title: first ? 'Confirm your passkey' : 'One more check',
           lines: [first
-            ? 'Use the passkey you just saved, so we can confirm it works for listening payments.'
-            : 'Use the passkey once more. This checks it gives the same wallet every time before you add any funds.'],
+            ? 'Tap the passkey you just saved.'
+            : 'Once more, to check it gives the same wallet every time.'],
           confirmLabel: 'Use passkey'
         }, () => deps.passkey.evaluate(created.credentialId));
         if (r.credentialId !== created.credentialId) throw new Error('A different passkey was used. Start again with the new one.');
@@ -233,10 +236,8 @@ export function createListeningEngine(deps: {
     const last = anyPasskey ? undefined : lastRecord();
     const r = await deps.ui.act({
       kind: 'unlock',
-      title: 'Unlock your listening wallet',
-      summary: (last ? `Wallet ${short(last.address)}. ` : '') + (terms
-        ? `One passkey tap unlocks it and keeps paying ${stx(costPerPlay(terms.fee))} STX per song you listen to for 30 seconds, up to ${stx(terms.budget)} STX before it asks again.`
-        : 'One passkey tap unlocks it for this visit.'),
+      title: 'Welcome back',
+      summary: [last ? short(last.address) : '', terms ? termsLine(terms) : 'Unlock for this visit'].filter(Boolean).join(' · '),
       // Kept short: on the radio this panel opens by itself and its button should sit in view.
       lines: terms
         ? [last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
@@ -254,7 +255,7 @@ export function createListeningEngine(deps: {
         const again = await deps.ui.act({
           kind: 'verify-passkey',
           title: 'One more check',
-          lines: ['First time on this device: use the same passkey once more to confirm it gives the same wallet here.'],
+          lines: ['New device: tap the same passkey once more to check it gives the same wallet.'],
           confirmLabel: 'Use passkey'
         }, () => deps.passkey.evaluate(r.credentialId));
         second = again.prf;
@@ -276,7 +277,7 @@ export function createListeningEngine(deps: {
   async function approve(terms: SessionTerms, title: string): Promise<void> {
     await deps.ui.act({
       kind: 'session', title, lines: termsLines(terms), confirmLabel: 'Approve',
-      summary: `Pays ${stx(costPerPlay(terms.fee))} STX per song you listen to for 30 seconds and ${stx(LIKE_FEE)} STX per like, up to ${stx(terms.budget)} STX before it asks again.`
+      summary: `${stxs(costPerPlay(terms.fee))} STX a song · ${stxs(LIKE_FEE)} STX a like · up to ${stxs(terms.budget)} STX`
     }, async () => undefined);
     ledger = new SessionLedger(terms, now());
   }

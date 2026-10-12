@@ -221,7 +221,7 @@ export function createPppController(deps: PppDeps) {
     catch (e) {
       const m = e instanceof Error ? e.message : String(e);
       error = /Cancelled in the listening wallet/.test(m) ? '' : m;
-      if (!error) { message = 'Cancelled. Nothing was signed.'; armOff = true; }
+      if (!error) { message = 'Not now. Nothing was signed.'; armOff = true; }
     } finally { busy = null; await refresh(true); }
   }
 
@@ -333,7 +333,7 @@ export function createPppController(deps: PppDeps) {
       if (!payingOn(status.address)) await b.request('listening.stop');
       else await holdTab();
     }
-    say(resume ? 'Unlocked. Each song you listen to for 30 seconds pays its holder.' : 'Unlocked. Paying is switched off.');
+    say(resume ? 'Unlocked ✓' : 'Unlocked ✓ Paying is off.');
     const queued = likeAfterUnlock;
     likeAfterUnlock = null;
     if (queued && deps.now() - queued.at < 120_000) setTimeout(() => void refresh(true).then(() => toggleLike(queued)), 0);
@@ -352,7 +352,7 @@ export function createPppController(deps: PppDeps) {
       catch (e) {
         const m = e instanceof Error ? e.message : String(e);
         if (/Cancelled in the listening wallet/.test(m)) {
-          if (!afterArm) { armOff = true; say('Cancelled. Nothing was signed.'); }
+          if (!afterArm) { armOff = true; say('Not now. Nothing was signed.'); }
         } else if (/did not answer/.test(m)) {
           // The page stopped waiting (30 minutes): withdraw the panel and show a fresh one.
           await bridge?.request('listening.cancel').catch(() => undefined);
@@ -406,17 +406,17 @@ export function createPppController(deps: PppDeps) {
   const actions = {
     forceRefresh: () => refresh(true),
 
-    create: () => task('Waiting for your passkey in the listening wallet…', async () => {
+    create: () => task('Waiting for your passkey…', async () => {
       const b = await ensureBridge();
       await b.request('listening.unlock', { mode: 'create', terms: onTerms() });
       status = await b.request<StatusResult>('listening.status');
       setPayingOn(true);
-      say('Listening wallet created and paying is switched on. Next, link it to your main wallet.');
+      say('Wallet created ✓ Next: link it.');
       await holdTab();
     }),
 
     unlock: (anyPasskey = false): Promise<void> => {
-      const run = () => task('Waiting for your passkey in the listening wallet…', async () => unlockWith(await ensureBridge(), anyPasskey));
+      const run = () => task('Waiting for your passkey…', async () => unlockWith(await ensureBridge(), anyPasskey));
       if (!armed) return run();
       if (!anyPasskey) return armDone; // the same unlock is already waiting in the frame
       if (walletLacks('cancel')) { say('Tap Cancel in the listening wallet box first, then choose a different wallet.'); return Promise.resolve(); }
@@ -424,7 +424,7 @@ export function createPppController(deps: PppDeps) {
       return disarm(async () => { if (step() === 'locked' || step() === 'intro') await run(); });
     },
 
-    link: () => task('Waiting for your main wallet to sign…', async () => {
+    link: () => task('Sign in your wallet…', async () => {
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       const saved = (await deps.links(main)).find((l) => l.listening === status!.address);
@@ -438,10 +438,10 @@ export function createPppController(deps: PppDeps) {
         await deps.saveLink({ ...link, mainSignature, listeningSignature: r.listeningSignature });
         mainLinksAt = -Infinity;
       }
-      say('Linked. Returns from the listening wallet can only go to your main wallet.');
+      say('Linked ✓');
     }),
 
-    deposit: () => task('Waiting for your main wallet to approve the deposit…', async () => {
+    deposit: () => task('Approve the deposit in your wallet…', async () => {
       const main = deps.main();
       if (!main || !status?.address) throw new Error('Connect your main wallet first.');
       if (pendingDeposit()) throw new Error('A deposit is still confirming. Wait for it before adding more.');
@@ -450,14 +450,14 @@ export function createPppController(deps: PppDeps) {
       if (amount <= 0n) throw new Error('This wallet already holds 1 STX. No deposit needed.');
       depositTxid = await deps.deposit(main, status.address, amount);
       if (depositTxid) setPendingDeposit({ txid: depositTxid, amount: amount.toString(), at: deps.now() });
-      say('Deposit sent. It usually confirms within a few minutes; this page checks automatically.');
+      say('Deposit sent ✓ Usually confirms in a few minutes.');
     }),
 
     switchOn: () => task('Confirm in the listening wallet…', async () => {
       await holdTab();
       await bridge!.request('listening.approveSession', onTerms());
       setPayingOn(true);
-      say('Switched on. Each song you listen to for 30 seconds pays its holder until you switch it off or the wallet runs out.');
+      say('Paying is on ✓');
     }),
 
     /** Give up on payments the chain has never seen after 30 minutes. Their signed bytes are discarded. */
@@ -466,22 +466,22 @@ export function createPppController(deps: PppDeps) {
         if (await deps.chain.transaction(e.txid!)) continue;
         saveEntry({ ...e, status: 'failed', note: 'never seen on-chain; cleared by listener', raw: undefined });
       }
-      say('Cleared. If one of those still confirms later, it will simply show in your wallet history on the explorer.');
+      say('Cleared ✓');
     }),
 
     switchOff: () => task('Switching off…', async () => {
       await bridge?.request('listening.stop');
       setPayingOn(false);
-      say('Switched off. Music plays free until you switch it back on.');
+      say('Paying is off. Music stays free.');
     }),
 
     lock: () => task('Locking…', async () => {
       await bridge?.request('listening.lock');
       balance = undefined;
-      say('Locked. The listening key has been forgotten.');
+      say('Locked ✓');
     }),
 
-    returnFunds: (mode: ReturnMode) => task('Review the return in the listening wallet…', async () => {
+    returnFunds: (mode: ReturnMode) => task('Check the return in the listening wallet…', async () => {
       if (!status?.address || !status.linked) throw new Error('Link your main wallet first.');
       if (unresolved().length) throw new Error('Wait for the pending payment to confirm, then return funds.');
       const { balance: b, nonce } = await deps.chain.account(status.address);
@@ -501,8 +501,8 @@ export function createPppController(deps: PppDeps) {
       catch (e) { saveEntry({ ...entry, status: 'unknown', note: (e as Error).message }); throw e; }
       if (mode === 'all') setPayingOn(false);
       say(mode === 'all'
-        ? 'Return sent to your main wallet. Paying is switched off; switch it back on after adding funds.'
-        : 'Excess sent to your main wallet. Switch paying back on to continue.');
+        ? 'Returned to your wallet ✓ Paying is off.'
+        : 'Excess returned ✓ Switch paying back on to continue.');
     })
   };
 
@@ -537,7 +537,7 @@ export function createPppController(deps: PppDeps) {
       deps.validate(entry);
       saveEntry(entry);
       const label = detail.title ? `“${detail.title}”${detail.artist ? ` by ${detail.artist}` : ''}` : `song #${detail.song}`;
-      try { await deps.chain.broadcast(signed.raw, signed.txid); saveEntry({ ...entry, status: 'pending' }); message = `Paid play sent for ${label}.`; error = ''; }
+      try { await deps.chain.broadcast(signed.raw, signed.txid); saveEntry({ ...entry, status: 'pending' }); message = `♪ Paid ${label}`; error = ''; }
       catch (e) {
         saveEntry({ ...entry, status: definitelyRejected(e) ? 'failed' : 'unknown', note: (e as Error).message, ...(definitelyRejected(e) ? { raw: undefined } : {}) });
         error = (e as Error).message;
@@ -569,7 +569,7 @@ export function createPppController(deps: PppDeps) {
     const s = step(), main = deps.main();
     if (s === 'locked') {
       likeAfterUnlock = { ...d, at: deps.now() };
-      say(`Unlock to like ${label}: tap “Unlock and keep paying” in the listening wallet box. The like is sent straight after.`);
+      say(`Unlock to like ${label}. It sends straight after.`);
       return;
     }
     if (s === 'link') return fail('Link the listening wallet to your main wallet first, so your likes count for it.');
@@ -606,7 +606,7 @@ export function createPppController(deps: PppDeps) {
     const label = d.title ? `“${d.title}”${d.artist ? ` by ${d.artist}` : ''}` : `song #${d.song}`;
     const wait = deps.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
     try {
-      say(`Sending your ${d.liked ? 'like' : 'unlike'} for ${label} from the listening wallet…`);
+      say(`${d.liked ? 'Liking' : 'Unliking'} ${label}…`);
       // One transaction in flight per wallet (nonces): wait up to 2 minutes for an earlier one to confirm.
       const until = deps.now() + 120_000;
       while (paying || unresolved().length) {
@@ -632,7 +632,7 @@ export function createPppController(deps: PppDeps) {
       try {
         await deps.chain.broadcast(signed.raw, signed.txid);
         saveEntry({ ...entry, status: 'pending' });
-        message = `${d.liked ? 'Liked' : 'Unliked'} ${label} from your listening wallet, for your main wallet (0.0002 STX).`;
+        message = `${d.liked ? '♥ Liked' : 'Unliked'} ${label}`;
         error = '';
         try { deps.likeSent?.(d.song, d.liked); } catch { /* radio */ }
       } catch (e) {

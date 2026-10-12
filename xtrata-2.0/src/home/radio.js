@@ -1628,6 +1628,22 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       try { analyser.getByteFrequencyData(out); return true; } catch { return false; }
     },
     spectrumSize: () => (analyser ? analyser.frequencyBinCount : 0),
+    /** Where the current song is: seconds in, and its length (null while unknown, e.g. still loading). */
+    getPosition: () => ({
+      current: Number.isFinite(player.currentTime) ? player.currentTime : 0,
+      duration: nowPlaying && Number.isFinite(player.duration) && player.duration > 0 ? player.duration : null
+    }),
+    /**
+     * Jump within the current song (the radio page's timeline). Skipped-over audio never counts
+     * towards a listen or a paid play (audible-listen ignores seeks). Returns false when it can't.
+     */
+    seek: (seconds) => {
+      const d = player.duration;
+      if (!on || !nowPlaying || !Number.isFinite(d) || d <= 0 || !Number.isFinite(seconds)) return false;
+      try { player.currentTime = Math.max(0, Math.min(d - 0.25, seconds)); return true; } catch { return false; }
+    },
+    /** The current song's audio address, so the page can draw its whole waveform. */
+    currentSource: () => (nowPlaying && player.currentSrc) || null,
     subscribe: (cb) => { listeners.add(cb); cb(stateSnapshot()); return () => listeners.delete(cb); }
   };
   // --- receiver faceplate wiring -----------------------------------------
