@@ -1,5 +1,4 @@
 /** DOM for the wallet frame. Every approval button lives here, on the wallet origin. */
-import { stx } from '../../lib/listening-wallet/policy';
 import { CancelledError, type IdleView, type Panel, type UiPort } from './engine';
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -26,6 +25,7 @@ function visibilityGuard(target: Element) {
 
 export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
   let open = false;
+  let withdraw: (() => boolean) | null = null;
   const isVisible = visibilityGuard($('p-ok'));
   $('idle-stop').addEventListener('click', local.stop);
   $('idle-lock').addEventListener('click', local.lock);
@@ -50,18 +50,21 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
       setTimeout(() => { if (open) ok.disabled = false; }, ARM_DELAY_MS);
 
       return new Promise<T>((resolve, reject) => {
-        const close = () => { open = false; $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
+        let running = false;
+        const close = () => { open = false; withdraw = null; $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
+        withdraw = () => { if (running) return false; close(); reject(new CancelledError()); return true; };
         // The action starts synchronously inside the click so WebAuthn keeps the user activation.
         ok.onclick = (event) => {
           if (!event.isTrusted || performance.now() < armedAt) return;
           if (!isVisible()) { error.textContent = 'This panel is partly hidden by the page. Scroll it fully into view, then confirm.'; return; }
           ok.disabled = cancel.disabled = true;
           error.textContent = '';
+          running = true;
           action().then(
             (value) => { close(); resolve(value); },
             (err: unknown) => {
               const e = err as { retryable?: boolean; message?: string };
-              if (e?.retryable) { error.textContent = e.message ?? 'Try again.'; ok.disabled = cancel.disabled = false; return; }
+              if (e?.retryable) { running = false; error.textContent = e.message ?? 'Try again.'; ok.disabled = cancel.disabled = false; return; }
               close(); reject(err);
             }
           );
@@ -69,6 +72,8 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
         cancel.onclick = () => { close(); reject(new CancelledError()); };
       });
     },
+
+    cancel() { return withdraw ? withdraw() : false; },
 
     idle(view: IdleView) {
       const lines: string[] = [];
@@ -79,7 +84,7 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
         lines.push(`Unlocked · ${short(view.address!)}`);
         lines.push(view.linked ? `Returns go to your main wallet ${short(view.linked)}` : 'Not linked to a main wallet yet.');
         lines.push(view.session
-          ? `Paying as you listen · ${stx(BigInt(view.session.budgetLeft))} STX left before it asks again`
+          ? `Paying as you listen · up to ${view.session.playsLeft.toLocaleString()} more plays remaining`
           : 'Not paying. Music plays free.');
       }
       $('idle-lines').replaceChildren(...lines.map((l) => Object.assign(document.createElement('p'), { textContent: l })));

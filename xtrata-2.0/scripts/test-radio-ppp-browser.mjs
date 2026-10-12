@@ -79,6 +79,17 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.match(await frame.locator('#idle').innerText(), /Unlocked · SP/);
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Stage 5 of 8 · link/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-link-${viewport.width}.png` });
+  // One-tap unlock: a returning listener's first tap in the frame goes straight to the passkey.
+  await page.reload();
+  await panel.getByText(/It goes straight to your passkey/).waitFor();
+  assert.match(await panel.locator('.ppp-stage').innerText(), /^Stage 4 of 8 · unlock/);
+  await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor();
+  assert.equal(await panel.getByRole('button', { name: 'Unlock and keep paying' }).count(), 0); // no page button to click first
+  if (shots) await panel.screenshot({ path: `${shots}/ppp-armed-${viewport.width}.png` });
+  await page.waitForTimeout(900); // the frame's arming delay
+  await frame.locator('#p-ok').click(); // the one tap: the virtual authenticator answers the passkey prompt
+  await panel.getByRole('button', { name: 'Link to my wallet' }).waitFor();
+  assert.match(await frame.locator('#idle').innerText(), /Unlocked · SP/);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);
   await context.close();

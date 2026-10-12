@@ -133,6 +133,8 @@ function start(root: HTMLElement) {
     $('.ppp-frame-label').hidden = !showFrame;
     // The frame needs room while it is asking the listener something; it rests small otherwise.
     frameWrap.classList.toggle('ppp-frame--active', !!s.busy);
+    // Moving the iframe in the DOM would reload it, so the wallet is brought up with CSS order instead.
+    root.classList.toggle('ppp--armed', s.armed);
 
     // Every gate, numbered, from the radio address to paid plays; always shown so progress is clear.
     const stage = stageOf(s) ?? lastStage; // loading keeps the last known stage
@@ -199,8 +201,13 @@ function start(root: HTMLElement) {
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         break;
       case 'locked':
-        lines.push(el('p', s.payingOn ? 'Unlock it with your passkey to keep paying as you listen.' : 'Paying is switched off. Unlock to manage your wallet.', s.payingOn ? '' : 'ppp-mute'));
-        actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
+        if (s.armed) {
+          // The unlock confirm is already open in the frame: one tap there goes straight to the passkey.
+          lines.push(el('p', 'Tap “Unlock and keep paying” in the listening wallet box. It goes straight to your passkey.', 'ppp-cyan'));
+        } else {
+          lines.push(el('p', s.payingOn ? 'Unlock it with your passkey to keep paying as you listen.' : 'Paying is switched off. Unlock to manage your wallet.', s.payingOn ? '' : 'ppp-mute'));
+          actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
+        }
         actions.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
         break;
       case 'link':
@@ -228,7 +235,10 @@ function start(root: HTMLElement) {
         break;
       case 'ready':
         if (s.payingOn && s.session && s.session.playsLeft > 0) {
-          lines.push(el('p', 'Paying as you listen: each song pays its holder once you have heard 30 seconds of it. Skips stay free.', 'ppp-ok'));
+          // Whichever runs out first: the approval or the balance. A new approval brings the same figures back.
+          const left = Math.min(s.session.playsLeft, s.playsLeft);
+          lines.push(el('p', `Paying as you listen · up to ${left.toLocaleString()} more plays remaining`, 'ppp-ok'));
+          lines.push(el('p', 'Each song pays its holder once you have heard 30 seconds of it. Skips stay free.', 'ppp-mute'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
           lines.push(el('p', 'Paying is switched off. Music plays free.', 'ppp-mute'));

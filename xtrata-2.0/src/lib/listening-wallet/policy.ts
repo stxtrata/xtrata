@@ -132,7 +132,8 @@ export class SessionLedger {
     return {
       plays: this.count,
       spent: this.spent,
-      playsLeft: this.terms.maxPlays - this.count,
+      // Whichever runs out first: the approved number of plays or the approved budget.
+      playsLeft: Math.max(0, Math.min(this.terms.maxPlays - this.count, Number((this.terms.budget - this.spent) / costPerPlay(this.terms.fee)))),
       budgetLeft: this.terms.budget - this.spent,
       expires: this.terms.expires
     };

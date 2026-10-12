@@ -51,6 +51,8 @@ export type WalletMethod =
   | 'listening.signPlay'
   /** Show a return review inside the frame; sign only if the listener confirms. */
   | 'listening.prepareReturn'
+  /** Withdraw a waiting panel, as if the listener pressed Cancel. Can never approve anything. */
+  | 'listening.cancel'
   /** Stop paying but stay unlocked. */
   | 'listening.stop'
   /** Drop the key from memory. */
@@ -68,6 +70,7 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.approveSession',
   'listening.signPlay',
   'listening.prepareReturn',
+  'listening.cancel',
   'listening.stop',
   'listening.lock'
 ];
