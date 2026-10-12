@@ -10,6 +10,7 @@ import { showStxTransfer } from '../lib/wallet/connect';
 import { costPerPlay, HOLDER_PAYMENT, stx } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
 import { createPppController, type GateConfig, type Snapshot } from './controller';
+import { STAGES, stageOf, type StageView } from './stages';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -96,8 +97,7 @@ function start(root: HTMLElement) {
   const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
-  const STEPS = ['Create wallet', 'Link', 'Deposit', 'Paying'];
-  const stepIndex: Partial<Record<Snapshot['step'], number>> = { intro: 0, link: 1, fund: 2, loading: 2 };
+  let lastStage: StageView | null = null;
   type Shown = Snapshot['entries'][number] & { title?: string; artist?: string };
   const songLabel = (e: Shown) => (e.title ? `“${e.title}”${e.artist ? ` — ${e.artist}` : ''}` : `Song #${e.song}`);
   const STATUS_CLASS: Record<string, string> = { confirmed: 'ppp-ok', pending: 'ppp-warn', signed: 'ppp-warn', unknown: 'ppp-warn', prepared: 'ppp-warn', failed: 'ppp-bad', cancelled: 'ppp-mute' };
@@ -134,11 +134,21 @@ function start(root: HTMLElement) {
     // The frame needs room while it is asking the listener something; it rests small otherwise.
     frameWrap.classList.toggle('ppp-frame--active', !!s.busy);
 
-    const progress = $('.ppp-steps');
-    const at = stepIndex[s.step];
-    // Only during first setup; a returning listener with an empty wallet just sees the top-up.
-    progress.hidden = at === undefined || (s.step === 'fund' && s.entries.length > 0);
-    progress.replaceChildren(...STEPS.map((label, i) => el('li', label, at !== undefined && i < at ? 'done' : i === at ? 'now' : '')));
+    // Every gate, numbered, from the radio address to paid plays; always shown so progress is clear.
+    const stage = stageOf(s) ?? lastStage; // loading keeps the last known stage
+    lastStage = stage;
+    const progress = $('.ppp-steps'), caption = $('.ppp-stage');
+    progress.hidden = caption.hidden = !stage;
+    if (stage) {
+      progress.replaceChildren(...STAGES.map((label, i) => {
+        const li = el('li', '', i < stage.at ? 'done' : i === stage.at ? (stage.blocked ? 'now blocked' : 'now') : '');
+        li.append(el('span', i < stage.at ? '✓' : String(i + 1), 'n'), label);
+        if (i === stage.at) li.setAttribute('aria-current', 'step');
+        return li;
+      }));
+      caption.textContent = stage.caption;
+      caption.className = 'ppp-stage ' + (stage.at >= STAGES.length ? 'ppp-ok' : stage.blocked ? 'ppp-bad' : 'ppp-cyan');
+    }
 
     // Labelled facts: who is who, and what the wallet holds.
     const facts = $('.ppp-facts');
@@ -163,17 +173,17 @@ function start(root: HTMLElement) {
     const lines: HTMLElement[] = [];
     const actions: HTMLElement[] = [];
     const cost = costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'));
-    const payLine = `Each new song you hear sends ${stx(HOLDER_PAYMENT)} STX to whoever holds it, plus a ${stx(cost - HOLDER_PAYMENT)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`;
+    const payLine = `Each song you listen to for 30 seconds sends ${stx(HOLDER_PAYMENT)} STX to whoever holds it, plus a ${stx(cost - HOLDER_PAYMENT)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`;
     const busy = !!s.busy;
 
     switch (s.step) {
       case 'elsewhere': {
-        lines.push(el('p', 'Pay artists a tiny amount each time a new song starts, recorded on-chain. Pay-per-play has its own address, where nothing else on Xtrata can reach your listening wallet.'));
+        lines.push(el('p', 'Pay artists a tiny amount for each song you listen to for 30 seconds, recorded on-chain. Pay-per-play has its own address, where nothing else on Xtrata can reach your listening wallet.'));
         if (s.gate?.radioUrl) { const p = el('p'); p.append(link('Open the pay-per-play radio →', s.gate.radioUrl)); lines.push(p); }
         break;
       }
       case 'connect':
-        lines.push(el('p', 'Pay artists a tiny amount each time a new song starts, recorded on-chain. Connect your wallet above to turn it on. Listening is always free.'));
+        lines.push(el('p', 'Pay artists a tiny amount for each song you listen to for 30 seconds, recorded on-chain. Connect your wallet above to turn it on. Listening is always free.'));
         break;
       case 'not-invited':
         lines.push(el('p', 'Pay-per-play is in a small test right now. Listening is free for everyone, and it will open up soon.', 'ppp-mute'));
@@ -183,7 +193,7 @@ function start(root: HTMLElement) {
         break;
       case 'intro':
         lines.push(el('p', payLine));
-        lines.push(el('p', 'Once it has funds, every new song you hear pays automatically until you switch it off or the wallet runs out. No popups while you listen.', 'ppp-ok'));
+        lines.push(el('p', 'Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.', 'ppp-ok'));
         lines.push(el('p', 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
         actions.push(button('Turn on pay-per-play', () => void ppp.create(), 'primary'));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
@@ -205,7 +215,7 @@ function start(root: HTMLElement) {
         break;
       case 'fund': {
         if (s.entries.length) lines.push(el('p', 'Out of funds: songs play free until you top up. Paying carries on automatically once the top-up confirms.', 'ppp-bad'));
-        else if (s.payingOn) lines.push(el('p', 'Paying is switched on. Add funds and it starts with the next new song you hear.', 'ppp-ok'));
+        else if (s.payingOn) lines.push(el('p', 'Paying is switched on. Add funds and it starts with the next song you listen to for 30 seconds.', 'ppp-ok'));
         lines.push(el('p', `Add up to ${stx(s.allowance)} STX. 1 STX covers about ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} paid plays.`));
         lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
         if (s.depositPending && s.depositTxid) { const p = el('p', 'Deposit sent, waiting for it to confirm. This page checks automatically. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); lines.push(p); }
@@ -218,7 +228,7 @@ function start(root: HTMLElement) {
         break;
       case 'ready':
         if (s.payingOn && s.session && s.session.playsLeft > 0) {
-          lines.push(el('p', 'Paying as you listen: each new song you hear pays its holder.', 'ppp-ok'));
+          lines.push(el('p', 'Paying as you listen: each song pays its holder once you have heard 30 seconds of it. Skips stay free.', 'ppp-ok'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
           lines.push(el('p', 'Paying is switched off. Music plays free.', 'ppp-mute'));
@@ -273,9 +283,10 @@ function start(root: HTMLElement) {
     setTimeout(() => clearInterval(t), 60_000);
   }
 
-  window.addEventListener('xtrata:radio-audible-start', (e) => {
+  // A play is 30 seconds of audible listening (half of a shorter song); skips stay free.
+  window.addEventListener('xtrata:radio-listened', (e) => {
     const d = (e as CustomEvent).detail;
-    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string') void ppp.onAudibleStart({ ...d, ...titles.get(d.song) });
+    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string' && /^[0-9a-f]{32}$/.test(d.id)) void ppp.onListened({ song: d.song, id: d.id, ...titles.get(d.song) });
   });
   window.addEventListener('xtrata:wallet-changed', () => void ppp.refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void ppp.refresh(); });

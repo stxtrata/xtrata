@@ -22,7 +22,7 @@ export const RETURN_MEMO = 'Xtrata listening wallet return';
 export interface PlayRequest {
   core: number;
   song: number;
-  /** 16-byte receipt as 32 lowercase hex chars (the radio's audible-start id). */
+  /** 16-byte receipt as 32 lowercase hex chars (the radio's listen id). */
   receipt: string;
   fee: bigint;
   nonce: bigint;

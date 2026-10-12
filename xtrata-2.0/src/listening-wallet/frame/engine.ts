@@ -97,7 +97,7 @@ function termsFrom(params: TermsParams | undefined, now: number): SessionTerms |
 
 function termsLines(t: SessionTerms): string[] {
   return [
-    `Each new song you hear pays ${stx(50n)} STX to its holder, plus a ${stx(t.fee)} STX network fee.`,
+    `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(t.fee)} STX network fee.`,
     t.maxPlays === 1
       ? 'This approves ONE paid play.'
       : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,

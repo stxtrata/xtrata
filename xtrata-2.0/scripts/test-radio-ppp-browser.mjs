@@ -52,12 +52,17 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   await page.goto(MAINSITE + '/radio.html');
   await page.locator('#ppp').getByRole('link', { name: /Open the pay-per-play radio/ }).waitFor();
   assert.equal(await page.locator('.ppp-frame iframe').count(), 0);
+  assert.equal(await page.locator('.ppp-steps li').count(), 8);
+  assert.match(await page.locator('.ppp-stage').innerText(), /^Stage 1 of 8/);
   if (shots) await page.locator('#ppp').screenshot({ path: `${shots}/ppp-elsewhere-${viewport.width}.png` });
 
   await page.goto(SITE + '/radio.html');
   const panel = page.locator('#ppp');
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).waitFor();
   assert.match(await panel.innerText(), /CANARY/);
+  assert.match(await panel.locator('.ppp-stage').innerText(), /^Stage 4 of 8 · create your passkey/);
+  assert.equal(await panel.locator('.ppp-steps li.done').count(), 3);
+  assert.match(await panel.locator('.ppp-steps li[aria-current=step]').innerText(), /4\s*Passkey wallet/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-intro-${viewport.width}.png` });
 
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).click();
@@ -72,6 +77,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   try { await panel.getByRole('button', { name: 'Link to my wallet' }).waitFor(); }
   catch (e) { if (shots) await page.screenshot({ path: `${shots}/ppp-fail-${viewport.width}.png`, fullPage: true }); console.log('frame error:', await frame.locator('#p-error').innerText().catch(() => '?')); throw e; }
   assert.match(await frame.locator('#idle').innerText(), /Unlocked · SP/);
+  assert.match(await panel.locator('.ppp-stage').innerText(), /^Stage 5 of 8 · link/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-link-${viewport.width}.png` });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);

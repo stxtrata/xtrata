@@ -2,7 +2,7 @@
  * Radio pay-per-play controller (runs on xtrata.xyz, holds NO key material).
  *
  * Walks a listener from "turn on" to their first confirmed paid play, then lets them pay
- * automatically for each new song. The key lives only in the listening wallet frame on its
+ * automatically for each song listened to for 30 seconds. The key lives only in the listening wallet frame on its
  * own origin; this side reads the chain, broadcasts what the frame signed, and keeps a
  * public history. Music always keeps playing: any failure means that start plays free.
  */
@@ -78,7 +78,7 @@ export interface Snapshot {
   playsLeft: number;
   allowance: bigint;
   session: SessionSummary | null;
-  /** The listener's switch: once on, every new song pays until they switch it off or funds run out. */
+  /** The listener's switch: once on, every song listened to for 30 seconds pays until they switch it off or funds run out. */
   payingOn: boolean;
   entries: Entry[];
   depositTxid?: string;
@@ -315,7 +315,7 @@ export function createPppController(deps: PppDeps) {
         if (!payingOn(status.address)) await b.request('listening.stop');
         else await holdTab();
       }
-      say(resume ? 'Unlocked. Each new song you hear pays its holder.' : 'Unlocked. Paying is switched off.');
+      say(resume ? 'Unlocked. Each song you listen to for 30 seconds pays its holder.' : 'Unlocked. Paying is switched off.');
     }),
 
     link: () => task('Waiting for your main wallet to sign…', async () => {
@@ -351,7 +351,7 @@ export function createPppController(deps: PppDeps) {
       await holdTab();
       await bridge!.request('listening.approveSession', onTerms());
       setPayingOn(true);
-      say('Switched on. Each new song you hear pays its holder until you switch it off or the wallet runs out.');
+      say('Switched on. Each song you listen to for 30 seconds pays its holder until you switch it off or the wallet runs out.');
     }),
 
     /** Give up on payments the chain has never seen after 30 minutes. Their signed bytes are discarded. */
@@ -400,8 +400,11 @@ export function createPppController(deps: PppDeps) {
     })
   };
 
-  /** Called on every new audible start. Never throws and never delays playback. */
-  async function onAudibleStart(detail: { song: number; id: string; title?: string; artist?: string }) {
+  /**
+   * Called once a song has been heard for 30 seconds (half of a shorter song): that is a play,
+   * and a play gets paid. Never throws and never affects playback.
+   */
+  async function onListened(detail: { song: number; id: string; title?: string; artist?: string }) {
     if (paying || busy) return;
     paying = true;
     try {
@@ -442,5 +445,5 @@ export function createPppController(deps: PppDeps) {
     }
   }
 
-  return { snapshot, refresh, onAudibleStart, ...actions };
+  return { snapshot, refresh, onListened, ...actions };
 }
