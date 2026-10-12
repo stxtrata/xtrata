@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Xtrata listening wallet</title>
+</head>
+<body>
+<main id="app">
+  <header><strong>Listening wallet</strong><span class="origin">wallet.xtrata.xyz</span></header>
+  <section id="idle">
+    <div id="idle-lines"><p>Loading…</p></div>
+    <div class="row">
+      <button id="idle-stop" type="button" hidden>Stop paying</button>
+      <button id="idle-lock" type="button" hidden>Lock</button>
+    </div>
+  </section>
+  <section id="panel" hidden>
+    <h1 id="p-title"></h1>
+    <div id="p-lines"></div>
+    <ul id="p-warn" hidden></ul>
+    <div class="row">
+      <button id="p-ok" type="button" class="primary"></button>
+      <button id="p-cancel" type="button">Cancel</button>
+    </div>
+    <p id="p-error" role="alert"></p>
+  </section>
+</main>
+<script type="module" src="./main.ts"></script>
+</body>
+</html>

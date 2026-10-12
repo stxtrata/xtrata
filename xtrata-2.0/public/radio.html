@@ -130,6 +130,29 @@
   #radio-wallet-message{flex-basis:100%;color:#ffb9b9;overflow-wrap:anywhere}
   #radio-wallet-message:empty{display:none}
   @media(max-width:640px){.radio-wallet{width:100%;margin-left:0}.live{font-size:9px}}
+  /* pay-per-play (src/radio-ppp) */
+  .ppp{margin-top:18px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel)}
+  .ppp h3{margin:0 0 8px}
+  .ppp-badge{font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+  .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 10px;font-size:11px;color:var(--mut)}
+  .ppp-steps li{border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+  .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}.ppp-steps li.done::before{content:'✓ '}
+  .ppp-steps li.now{color:var(--ink);border-color:var(--cyan)}
+  .ppp p{margin:6px 0;font-size:13px;line-height:1.45}
+  .ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-ok{color:var(--ok)}
+  .ppp-addr code{font-family:var(--mono);font-size:11px;overflow-wrap:anywhere}
+  .ppp-addr button{margin-left:6px}
+  .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+  .ppp button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
+  .ppp button.primary{background:var(--cyan);color:#04121a;border-color:var(--cyan);font-weight:700}
+  .ppp button.quiet{color:var(--mut)}
+  .ppp button:disabled{opacity:.55;cursor:wait}
+  .ppp-frame iframe{width:100%;height:190px;transition:height .2s;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
+  .ppp-frame--active iframe{height:440px}
+  .ppp-msg{color:var(--mut);font-size:12px;min-height:1em}.ppp-err{color:#ffb9b9;font-size:12px;overflow-wrap:anywhere}
+  .ppp-err:empty,.ppp-msg:empty{display:none}
+  .ppp-history{margin-top:8px;font-size:12px;color:var(--mut)}.ppp-history div{margin:3px 0;overflow-wrap:anywhere}
+  .ppp-history a{color:var(--cyan)}
 </style>
 </head>
 <body>
@@ -193,6 +216,16 @@
       <div class="hint" id="likesHint">Like songs while they play — they get their own band, and play first when you tune in.</div>
       <div id="likesList"></div>
     </div>
+    <section class="ppp" id="ppp" hidden aria-label="Pay per play">
+      <h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>CANARY</span></h3>
+      <ol class="ppp-steps" hidden></ol>
+      <div class="ppp-body"></div>
+      <div class="ppp-actions"></div>
+      <p class="ppp-msg" role="status"></p>
+      <p class="ppp-err" role="alert"></p>
+      <div class="ppp-frame" hidden></div>
+      <details class="ppp-history" hidden></details>
+    </section>
     <p class="strap">Every song on this station is an inscription — full audio files living permanently on-chain.
       <a href="/wizard/" target="_blank" rel="noopener">Inscribe your own →</a>
       · <a href="/music/lounge">Music Support · listening room →</a>
@@ -289,5 +322,9 @@
 </script>
 <script src="/xtrata-radio.js" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
+<script type="module">
+// Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js')}).catch(function(){});
+</script>
 </body>
 </html>

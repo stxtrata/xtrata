@@ -86,3 +86,6 @@ forever-twins/ft-harness/results/fork-*.json
 # Generated artist portal bundles (rebuilt by prebuild)
 /music/artist/assets/artist.js
 /music/artist/assets/audionauts.js
+
+# Listening wallet origin build (separate Pages project)
+dist-listening-wallet

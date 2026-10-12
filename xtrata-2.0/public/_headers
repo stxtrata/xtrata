@@ -106,6 +106,8 @@
   Cache-Control: no-cache
 /music/lounge.html
   Cache-Control: no-cache
+/radio/ppp.js
+  Cache-Control: no-cache
 /radio/lounge.js
   Cache-Control: no-cache
 
