@@ -72,7 +72,9 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
     await page.locator('.ppp-frame').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
     await frame.locator('#p-ok').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
   };
-  await frame.locator('#p-warn').waitFor();
+  await frame.locator('#p-summary').waitFor();
+  assert.match(await frame.locator('#p-summary').innerText(), /Keep no more than 1 STX/); // the key warning stays visible
+  assert.equal(await frame.locator('#p-more').getAttribute('open'), null); // the rest is folded under Details
   if (shots) await panel.screenshot({ path: `${shots}/ppp-create-${viewport.width}.png` });
   // Create, confirm and re-check the passkey: three confirms, each enabled only once steadily visible.
   for (const until = Date.now() + 45_000; Date.now() < until;) {

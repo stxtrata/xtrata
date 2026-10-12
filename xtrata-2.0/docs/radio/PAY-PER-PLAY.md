@@ -56,6 +56,16 @@ About 2,850 plays per STX at the default fee. Below 0.05 STX the radio asks to t
 new paid plays pause and **Return excess** / **Return all** appear. Nothing is ever swept
 automatically.
 
+## Panel layout (for newcomers)
+
+Top to bottom, at every stage: the numbered stages and "Stage N of 8" line, one or two lines saying
+what to do now, the listening wallet box *only while it needs a tap* (it opens in place, right
+there, and rests closed otherwise, with a Show toggle), the buttons, then folds for "More about this
+step", "Wallet details" and the history. Inside the wallet box, panels show a short summary and the
+button first; the full terms and warnings fold under "Details" (the key warning, keep no more than
+1 STX / a lost passkey loses its funds, stays in the summary). The return-address confirm and the
+return review keep the full address visible.
+
 ## Likes and attribution
 
 - **Likes from the listening wallet.** Once a listener has a listening wallet on the radio, every tap
