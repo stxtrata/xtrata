@@ -43,7 +43,14 @@ Paying stays on until the listener presses **Switch off** (remembered on that de
 press **Switch on**) or the wallet runs out (songs then play free, and paying carries on by itself
 after a top-up confirms). One approval covers up to 1 STX of plays; after that, or after 7 days in
 one open tab, the wallet asks again. Closing the page drops the key; the next visit is one passkey
-tap ("Unlock and keep paying").
+tap. When a locked wallet has paying switched on, the radio opens its "Unlock and keep paying"
+confirm inside the wallet box as soon as the page loads, moved up under the stages, so the
+listener's first tap goes straight to the passkey. The paying terms are on that panel, and it is
+still the listener's own tap inside the wallet origin, with the arming delay and visibility check.
+Cancelling it stops it reopening until the listener asks again. "Use a different listening wallet"
+withdraws it (`listening.cancel`, which can only close a panel, never approve one). The panel shows
+"Paying as you listen · up to N more plays remaining": whichever runs out first of the approval and
+the balance.
 
 About 2,850 plays per STX at the default fee. Below 0.05 STX the radio asks to top up. Above 1 STX
 new paid plays pause and **Return excess** / **Return all** appear. Nothing is ever swept

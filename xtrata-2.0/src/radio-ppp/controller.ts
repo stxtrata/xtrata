@@ -86,6 +86,11 @@ export interface Snapshot {
   depositPending: boolean;
   /** The server holds a link for this listening wallet, so linking needs no new wallet popup. */
   serverLinked: boolean;
+  /**
+   * The unlock confirm is already waiting inside the listening wallet, so the listener's first tap
+   * there goes straight to their passkey.
+   */
+  armed: boolean;
   /** Unresolved payments older than 30 minutes that the chain has never seen. */
   stuck: number;
 }
@@ -119,6 +124,12 @@ export function createPppController(deps: PppDeps) {
   const notSeen = new Set<string>();
   let verified = false;
   let lockHeld = false;
+  // One-tap unlock: an unlock panel opened in the frame on page load, waiting for the listener.
+  let armed = false;
+  let armOff = false;          // the listener cancelled an unlock: wait for them to ask again
+  let armFailures = 0;
+  let afterArm: (() => Promise<void>) | null = null;
+  let armDone: Promise<void> = Promise.resolve();
   const fee = () => BigInt(gate?.limits.playFee ?? DEFAULT_PLAY_FEE.toString());
 
   const key = (kind: string, listening: string) => `xtrata.ppp.v1.${kind}:${listening}`;
@@ -168,7 +179,7 @@ export function createPppController(deps: PppDeps) {
     session: status?.session ?? null,
     payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
     depositPending: !!pendingDeposit(), serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
-    stuck: stuck().length
+    stuck: stuck().length, armed
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -180,7 +191,7 @@ export function createPppController(deps: PppDeps) {
     catch (e) {
       const m = e instanceof Error ? e.message : String(e);
       error = /Cancelled in the listening wallet/.test(m) ? '' : m;
-      if (!error) message = 'Cancelled. Nothing was signed.';
+      if (!error) { message = 'Cancelled. Nothing was signed.'; armOff = true; }
     } finally { busy = null; await refresh(true); }
   }
 
@@ -256,6 +267,7 @@ export function createPppController(deps: PppDeps) {
       if (force || !gate || gateFor !== main || deps.now() - gateAt > 300_000) { gate = await deps.config(main); gateAt = deps.now(); gateFor = main; }
       if (!gate.enabled || !gate.here || !main || !gate.allowed) {
         if (bridge && status?.session) await bridge.request('listening.stop').catch(() => undefined);
+        if (armed) void disarm();
         deps.changed();
         return;
       }
@@ -267,6 +279,62 @@ export function createPppController(deps: PppDeps) {
     } catch (e) {
       error = e instanceof Error ? e.message : 'Pay-per-play could not refresh. Listening stays free.';
     }
+    if (step() === 'locked') arm();
+    else if (armed) void disarm();
+    deps.changed();
+  }
+
+  /** Unlock inside the frame, resuming paying unless this device switched it off. */
+  async function unlockWith(b: Bridge, anyPasskey: boolean) {
+    const resume = !status?.address || payingOn(status.address);
+    await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey });
+    status = await b.request<StatusResult>('listening.status');
+    if (resume) {
+      // Picked a different wallet that this device has switched off: honour that.
+      if (!payingOn(status.address)) await b.request('listening.stop');
+      else await holdTab();
+    }
+    say(resume ? 'Unlocked. Each song you listen to for 30 seconds pays its holder.' : 'Unlocked. Paying is switched off.');
+  }
+
+  /**
+   * A locked wallet with paying switched on opens its unlock confirm in the frame straight away,
+   * so one tap there goes directly to the passkey. Still the listener's own tap, inside the frame.
+   */
+  function arm() {
+    if (armed || busy || armOff || armFailures >= 3 || !bridge || !status?.address || !payingOn(status.address)) return;
+    armed = true;
+    armDone = (async () => {
+      try { await unlockWith(bridge!, false); armFailures = 0; }
+      catch (e) {
+        const m = e instanceof Error ? e.message : String(e);
+        if (/Cancelled in the listening wallet/.test(m)) {
+          if (!afterArm) { armOff = true; say('Cancelled. Nothing was signed.'); }
+        } else if (/did not answer/.test(m)) {
+          // The page stopped waiting (30 minutes): withdraw the panel and show a fresh one.
+          await bridge?.request('listening.cancel').catch(() => undefined);
+        } else {
+          armFailures++;
+          error = m;
+        }
+      } finally {
+        armed = false;
+        const next = afterArm;
+        afterArm = null;
+        if (next) await next();
+        else await refresh(true);
+      }
+    })();
+  }
+
+  /** Withdraw a waiting unlock panel, then run `then`. A panel already confirmed finishes first. */
+  async function disarm(then?: () => Promise<void>) {
+    if (armed) {
+      afterArm = async () => {}; // leaving on purpose: no refresh, no re-arm, no "Cancelled" message
+      await bridge?.request('listening.cancel').catch(() => undefined);
+      await armDone;
+    }
+    if (then) await then();
     deps.changed();
   }
 
@@ -304,19 +372,13 @@ export function createPppController(deps: PppDeps) {
       await holdTab();
     }),
 
-    unlock: (anyPasskey = false) => task('Waiting for your passkey in the listening wallet…', async () => {
-      const b = await ensureBridge();
-      // A wallet known on this device resumes paying unless the listener switched it off.
-      const resume = !status?.address || payingOn(status.address);
-      await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey });
-      status = await b.request<StatusResult>('listening.status');
-      if (resume) {
-        // Picked a different wallet that this device has switched off: honour that.
-        if (!payingOn(status.address)) await b.request('listening.stop');
-        else await holdTab();
-      }
-      say(resume ? 'Unlocked. Each song you listen to for 30 seconds pays its holder.' : 'Unlocked. Paying is switched off.');
-    }),
+    unlock: (anyPasskey = false): Promise<void> => {
+      const run = () => task('Waiting for your passkey in the listening wallet…', async () => unlockWith(await ensureBridge(), anyPasskey));
+      if (!armed) return run();
+      if (!anyPasskey) return armDone; // the same unlock is already waiting in the frame
+      // A different wallet: withdraw the waiting panel, then ask for any listening-wallet passkey.
+      return disarm(async () => { if (step() === 'locked' || step() === 'intro') await run(); });
+    },
 
     link: () => task('Waiting for your main wallet to sign…', async () => {
       const main = deps.main();

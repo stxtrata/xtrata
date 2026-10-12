@@ -6,7 +6,7 @@ import {
 import { sha256 } from '@noble/hashes/sha256';
 import { bytesToHex } from '@noble/hashes/utils';
 import { createPppController, type GateConfig } from '../controller';
-import { createListeningEngine } from '../../listening-wallet/frame/engine';
+import { CancelledError, createListeningEngine, type Panel } from '../../listening-wallet/frame/engine';
 import { verifyLinkSignature } from '../../lib/listening-wallet/link';
 import { MIN_PLAY_INTERVAL_MS, TARGET } from '../../lib/listening-wallet/policy';
 import { validateSaved } from '../../radio-test-wallet/chain';
@@ -18,7 +18,7 @@ const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
-function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {}) {
+function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[] } = {}) {
   let time = 1_760_000_000_000;
   let main: string | undefined = MAIN;
   const gate: GateConfig = {
@@ -30,9 +30,17 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {})
   const store = new Map<string, string>();
   let evaluations = 0;
   const walletStore = new Map<string, string>();
+  const held: { panel: Panel; tap: () => void; cancel: () => void }[] = [];
   const engine = createListeningEngine({
     passkey: { available: () => true, create: async () => ({ credentialId: 'c1' }), evaluate: async () => { evaluations++; return { credentialId: 'c1', prf: PRF.slice() }; } },
-    ui: { act: async (_p, action) => action(), idle: () => {} },
+    ui: {
+      // Panels of the held kinds wait for the listener's tap, like the real frame; others confirm at once.
+      act: (panel, action) => (opts.hold?.includes(panel.kind)
+        ? new Promise((resolve, reject) => held.push({ panel, tap: () => action().then(resolve, reject), cancel: () => reject(new CancelledError()) }))
+        : action()),
+      cancel: () => { const h = held.shift(); if (!h) return false; h.cancel(); return true; },
+      idle: () => {}
+    },
     store: { get: (k) => walletStore.get(k) ?? null, set: (k, v) => void walletStore.set(k, v) },
     now: () => time
   });
@@ -63,7 +71,8 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {})
     for (const raw of chain.broadcasts) chain.mined.add('0x' + deserializeTransaction(raw).txid());
     chain.nonce = BigInt(chain.broadcasts.length);
   };
-  return { ppp, chain, gate, savedLinks, store, walletStore, tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -177,18 +186,19 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
   });
 
   it('restores the link on a new device from the server record without another wallet popup', async () => {
-    const s = setup();
+    const s = setup({}, { hold: ['unlock'] });
     await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link();
-    await s.ppp.lock();
-    expect(s.ppp.snapshot().step).toBe('locked');
-    await s.ppp.unlock();
+    await s.ppp.lock(); await s.settle();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: true });
+    s.tap(); await s.ppp.unlock();
     expect(s.ppp.snapshot()).toMatchObject({ linked: MAIN, step: 'fund' });
     // A second device: the passkey synced, but the frame has no local records.
-    await s.ppp.lock();
+    await s.ppp.lock(); await s.settle();
     s.walletStore.clear();
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('intro');
-    await s.ppp.unlock(true);
+    await s.ppp.forceRefresh(); await s.settle();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', armed: false }); // nothing to unlock here: the panel was withdrawn
+    const unlocking = s.ppp.unlock(true);
+    await s.settle(); s.tap(); await unlocking;
     s.tick(61_000); await s.ppp.forceRefresh();
     // The server link is found, but the frame still asks the listener to confirm it (no wallet popup).
     expect(s.ppp.snapshot()).toMatchObject({ listening: LISTENING, step: 'link', serverLinked: true });
@@ -250,5 +260,76 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
     expect(s.ppp.snapshot().gate?.radioUrl).toBe('https://radio.xtrata.test/radio.html');
     await s.ppp.onListened({ song: 1, id: rid(1) });
     expect(s.chain.broadcasts).toHaveLength(0);
+  });
+});
+
+describe('one-tap unlock', () => {
+  const lockedAndFunded = async (s: ReturnType<typeof setup>) => {
+    // Set up with panels confirming at once, then make unlock panels wait for a tap from here on.
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
+  };
+
+  it('opens the unlock confirm in the frame on load, so the first tap goes straight to the passkey', async () => {
+    const s = setup({}, { hold: ['unlock'] });
+    await lockedAndFunded(s);
+    await s.ppp.lock();
+    await s.settle();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: true, busy: null });
+    expect(s.held).toHaveLength(1);
+    expect(s.held[0].panel).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep paying' });
+    expect(s.held[0].panel.lines.join(' ')).toMatch(/30 seconds/); // the paying terms are on that same panel
+    const before = s.evaluations();
+    s.tap(); // the listener's one tap inside the frame
+    await s.ppp.unlock(); // a page "Unlock" while armed just waits for that same panel
+    expect(s.evaluations()).toBe(before + 1); // the tap went straight to one passkey use
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', armed: false, payingOn: true });
+    await s.ppp.onListened({ song: 1, id: rid(1) });
+    expect(s.chain.broadcasts).toHaveLength(1); // the first paid play went out
+  });
+
+  it('cancelling in the frame stops re-opening it until the listener asks again', async () => {
+    const s = setup({}, { hold: ['unlock'] });
+    await lockedAndFunded(s);
+    await s.ppp.lock(); await s.settle();
+    s.held[0].cancel(); s.held.shift();
+    await s.settle();
+    await s.ppp.forceRefresh(); await s.settle();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: false, message: 'Cancelled. Nothing was signed.' });
+    expect(s.held).toHaveLength(0);
+    const unlocking = s.ppp.unlock(); // the page button asks again
+    await s.settle();
+    expect(s.held).toHaveLength(1);
+    s.tap(); await unlocking;
+    expect(s.ppp.snapshot().step).toBe('ready');
+  });
+
+  it('"Use a different listening wallet" withdraws the waiting panel and asks for any passkey', async () => {
+    const s = setup({}, { hold: ['unlock'] });
+    await lockedAndFunded(s);
+    await s.ppp.lock(); await s.settle();
+    expect(s.held).toHaveLength(1);
+    const different = s.ppp.unlock(true);
+    await s.settle();
+    expect(s.held).toHaveLength(1); // the old panel went, a fresh any-passkey panel is waiting
+    expect(s.held[0].panel.lines[0]).toMatch(/Use your listening-wallet passkey/);
+    s.tap(); await different;
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', message: expect.stringMatching(/^Unlocked/) });
+  });
+
+  it('withdraws the panel when the main wallet disconnects, and never arms with paying switched off', async () => {
+    const s = setup({}, { hold: ['unlock'] });
+    await lockedAndFunded(s);
+    await s.ppp.lock(); await s.settle();
+    expect(s.ppp.snapshot().armed).toBe(true);
+    s.setMain(undefined);
+    await s.ppp.forceRefresh(); await s.settle();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'connect', armed: false });
+    expect(s.held).toHaveLength(0);
+
+    const t = setup({}, { hold: ['unlock'] });
+    await lockedAndFunded(t);
+    await t.ppp.switchOff(); await t.ppp.lock(); await t.settle();
+    expect(t.ppp.snapshot()).toMatchObject({ step: 'locked', armed: false, payingOn: false });
+    expect(t.held).toHaveLength(0);
   });
 });

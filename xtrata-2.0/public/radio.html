@@ -161,6 +161,11 @@
   .ppp-frame-label{margin:12px 0 6px!important;font-size:10.5px!important;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan)!important}
   .ppp-frame iframe{width:100%;height:190px;transition:height .2s;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
   .ppp-frame--active iframe{height:440px}
+  /* One-tap unlock: while the unlock confirm waits in the wallet, show the wallet right under the stages. */
+  .ppp.ppp--armed{display:flex;flex-direction:column}
+  .ppp--armed>.ppp-head{order:-4}.ppp--armed>.ppp-steps{order:-3}.ppp--armed>.ppp-stage{order:-2}
+  .ppp--armed>.ppp-frame-label,.ppp--armed>.ppp-frame{order:-1}.ppp--armed>.ppp-frame{margin-bottom:8px}
+  .ppp--armed .ppp-frame iframe{height:300px}
   .ppp-msg{color:var(--cyan)!important;font-size:12px!important;min-height:1em}.ppp-err{color:#ff8a8a!important;font-size:12px!important;overflow-wrap:anywhere}
   .ppp-err:empty,.ppp-msg:empty{display:none}
   .ppp-history{margin-top:10px;font-size:12px;color:var(--mut)}

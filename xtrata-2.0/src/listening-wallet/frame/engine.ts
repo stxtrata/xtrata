@@ -55,6 +55,11 @@ export interface UiPort {
    * Cancel rejects with CancelledError.
    */
   act<T>(panel: Panel, action: () => Promise<T>): Promise<T>;
+  /**
+   * Withdraw the open panel as if Cancel were pressed, unless its confirmed action is already
+   * running. Returns whether a waiting panel was withdrawn. Withdrawing can never approve anything.
+   */
+  cancel(): boolean;
   idle(view: IdleView): void;
 }
 
@@ -101,7 +106,7 @@ function termsLines(t: SessionTerms): string[] {
     t.maxPlays === 1
       ? 'This approves ONE paid play.'
       : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
-    'Skips within 20 seconds of a paid play, pauses and replays of the same start play free.'
+    'Songs skipped before 30 seconds play free, and paused or muted time does not count.'
   ];
 }
 
@@ -215,9 +220,12 @@ export function createListeningEngine(deps: {
     const r = await deps.ui.act({
       kind: 'unlock',
       title: 'Unlock your listening wallet',
-      lines: [last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
-        'The key is rebuilt from your passkey and forgotten when you lock or close this page.',
-        ...(terms ? termsLines(terms) : [])],
+      // Kept short: on the radio this panel opens by itself and its button should sit in view.
+      lines: terms
+        ? [last ? `Wallet ${short(last.address)}. One passkey tap unlocks it for this visit and carries on paying as you listen.` : 'Use your listening-wallet passkey to unlock it for this visit and carry on paying as you listen.',
+          `Each song you listen to for 30 seconds pays ${stx(50n)} STX to its holder, plus a ${stx(terms.fee)} STX network fee, for up to ${stx(terms.budget)} STX before it asks again. Switch off any time.`]
+        : [last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
+          'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
       confirmLabel: terms ? 'Unlock and keep paying' : 'Unlock with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
     let second: Uint8Array | undefined;
@@ -357,6 +365,9 @@ export function createListeningEngine(deps: {
       const tx = await makeSTXTokenTransfer({ ...returnTransferOptions(main, plan.amount, plan.fee, nonce), senderKey: id.privateKey });
       return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid(), amount: plan.amount.toString(), fee: plan.fee.toString(), recipient: main, mode: plan.mode };
     }),
+
+    // The page may withdraw a panel it asked for (e.g. to unlock a different wallet instead).
+    'listening.cancel': async () => ({ cancelled: deps.ui.cancel() }),
 
     'listening.stop': async () => { ledger = null; refreshIdle(); return { stopped: true }; },
 
