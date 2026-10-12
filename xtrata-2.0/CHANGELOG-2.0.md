@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Music artist portal and Xtrata royalty canary (2026-10-12)
+- Added `/music/artist/` with shared wallet sign-in, royalty overview, collection directory and planned pay-per-play reporting. Moved the ledger to `/music/artist/royalties/collections/audionauts-1-0/`; old page/assets permanently redirect and the old API remains compatible. Music and lounge link to the portal.
+- Matching Xtrata admin identity gets per-row 5 STX payment review and wallet approval. Durable edition reservations prevent overlapping attempts; submitted transaction IDs update immediately and confirmed historical-holder receipts reconcile automatically. Ambiguous results stay blocked for ID recovery; the background worker never signs or sends funds. Migration 025 adds attempt history and sale proof cache.
+- Xtrata-held receiving songs show royalties retained under the requested internal-settlement policy, with verified incoming Audionaut sale links where available. Protocol fees and incomplete/incorrect sale evidence cannot become sale proof. Historical payment reads now bind transaction block hashes to the canonical read-only index hash.
+- Verification: 148 targeted portal/royalty/wallet tests, two extension-free simulated browser workflows, both browser builds, Functions compilation, Worker dry-run and read-only live checks of 18 mints/seven retained royalties. No real wallet used for testing or payment sent. Details: `docs/plans/AUDIONAUT-ROYALTIES.md`.
+
 ## Audionaut royalty sign-in: recover throttled chain checks (2026-10-12)
 - Route mint, receiving-holder and historical receipt reads through the existing Hiro key pool and read cache. A throttled key is skipped on subsequent reads; the 15-second request deadline covers all key attempts.
 - Share concurrent chain snapshots for one minute; failures are never cached and expired ownership evidence is never reused for access.

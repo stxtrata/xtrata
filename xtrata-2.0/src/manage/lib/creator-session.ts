@@ -14,9 +14,9 @@ const asJson = async (response: Response) => {
   return body as Record<string, unknown>;
 };
 
-export async function fetchCreatorSession(): Promise<CreatorSessionState> {
+export async function fetchCreatorSession(endpoint = '/manage/session'): Promise<CreatorSessionState> {
   try {
-    const body = await asJson(await fetch('/manage/session', { cache: 'no-store', credentials: 'same-origin' }));
+    const body = await asJson(await fetch(endpoint, { cache: 'no-store', credentials: 'same-origin' }));
     if (body.available === false) return { status: 'unavailable' };
     if (!body.signedIn) return { status: 'signed-out', mode: String(body.mode ?? 'log') };
     return {
@@ -31,17 +31,18 @@ export async function fetchCreatorSession(): Promise<CreatorSessionState> {
 /** Challenge → wallet signature → session cookie. `sign` wraps the wallet call. */
 export async function signInCreator(
   address: string,
-  sign: (request: { domain: any; message: any; network: 'mainnet' | 'testnet'; stxAddress: string }) => Promise<string>
+  sign: (request: { domain: any; message: any; network: 'mainnet' | 'testnet'; stxAddress: string }) => Promise<string>,
+  endpoint = '/manage/session'
 ) {
-  const post = (body: unknown) => fetch('/manage/session', {
+  const post = (body: unknown) => fetch(endpoint, {
     method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
   });
   const { challenge } = (await asJson(await post({ action: 'challenge', address }))) as { challenge: CreatorChallenge };
   const signature = await sign({ ...creatorProofData(challenge), network: challenge.network, stxAddress: challenge.address });
   await asJson(await post({ action: 'verify', id: challenge.id, signature }));
-  return fetchCreatorSession();
+  return fetchCreatorSession(endpoint);
 }
 
-export async function signOutCreator() {
-  await fetch('/manage/session', { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined);
+export async function signOutCreator(endpoint = '/manage/session') {
+  await fetch(endpoint, { method: 'DELETE', credentials: 'same-origin' }).catch(() => undefined);
 }

@@ -21,7 +21,7 @@ page.on('pageerror', error => errors.push(error.message));
 await page.route('**/*', async route => {
   const url = new URL(route.request().url());
   if (url.origin !== 'https://royalties.test') return route.abort();
-  if (url.pathname === '/api/audionaut-royalties') {
+  if (url.pathname === '/api/music/artist/royalties/collections/audionauts-1-0') {
     ledgerFetches++;
     if (route.request().method() === 'POST') {
       assert.equal(mode, 'admin');
@@ -41,16 +41,16 @@ await page.route('**/*', async route => {
       automation: { checkedAt: Date.now(), error: null, summary: { incomplete: 1 }, payers: mode === 'admin' ? [address] : undefined,
         candidates: mode === 'admin' ? [{ tx_id: '0x' + 'a'.repeat(64), amount: '5000000', memo: '<img src=x>', note: 'No edition memo.' }] : undefined } } });
   }
-  if (url.pathname === '/manage/session') return route.fulfill({ json: { signedIn: false } });
+  if (url.pathname === '/api/music/artist/session') return route.fulfill({ json: { signedIn: false } });
   let file = url.pathname;
   if (file.endsWith('/')) file += 'index.html';
-  if (!file.startsWith('/audionauts/royalties/')) return route.fulfill({ body: '' });
+  if (!file.startsWith('/music/artist/')) return route.fulfill({ body: '' });
   return route.fulfill({ contentType: file.endsWith('.html') ? 'text/html' : file.endsWith('.css') ? 'text/css' : 'application/javascript',
-    body: await readFile(new URL('public' + file, root), 'utf8') });
+    body: await readFile(new URL(file.slice(1), root), 'utf8') });
 });
 try {
   await page.clock.install();
-  await page.goto('https://royalties.test/audionauts/royalties/');
+  await page.goto('https://royalties.test/music/artist/royalties/collections/audionauts-1-0/');
   await page.waitForFunction(() => !document.getElementById('message').textContent);
   assert.equal(await page.locator('#ledger').isVisible(), false);
   assert.equal(await page.locator('#sign-in').isVisible(), true);
@@ -103,7 +103,7 @@ try {
   mode = 'denied'; await page.click('#refresh'); await page.waitForFunction(() => document.getElementById('ledger').hidden);
   assert.equal(await page.locator('#rows tr').count(), 0);
   mode = 'recipient'; await page.reload(); await page.locator('#rows tr').first().waitFor();
-  const before = ledgerFetches, automaticRefresh = page.waitForResponse(response => response.url().endsWith('/api/audionaut-royalties'));
+  const before = ledgerFetches, automaticRefresh = page.waitForResponse(response => response.url().endsWith('/api/music/artist/royalties/collections/audionauts-1-0'));
   await page.clock.fastForward(60_000); await automaticRefresh;
   await page.waitForFunction(() => !document.getElementById('message').textContent);
   assert.equal(ledgerFetches, before + 1, 'Refreshes the active authorized ledger automatically');

@@ -60,3 +60,14 @@ it('uses the first-party service without forwarding caller credentials when no k
   await expect(royaltyChainFetch({})('https://example.com/v2/info')).rejects.toThrow('Unexpected');
   expect(fetcher).toHaveBeenCalledTimes(1);
 });
+
+it('binds real transaction block_hash to the canonical index hash before verifying a receipt', async () => {
+  const physical = '0x' + 'c'.repeat(64), fetcher = vi.fn(async (input: any) => String(input).includes('/tx/')
+    ? Response.json({ tx_id: '0x' + 'a'.repeat(64), tx_status: 'success', canonical: true, block_height: 120, block_hash: physical })
+    : Response.json({ canonical: true, height: 120, hash: physical, index_block_hash: hash }));
+  expect((await fetchPaymentTransaction({}, 'a'.repeat(64), fetcher)).index_block_hash).toBe(hash);
+  fetcher.mockImplementation(async (input: any) => String(input).includes('/tx/')
+    ? Response.json({ tx_status: 'success', canonical: true, block_height: 120, block_hash: physical })
+    : Response.json({ canonical: true, height: 120, hash: '0x' + 'd'.repeat(64), index_block_hash: hash }));
+  await expect(fetchPaymentTransaction({}, 'a'.repeat(64), fetcher)).rejects.toThrow('changed');
+});

@@ -7,6 +7,8 @@ import { royaltyChainFetch } from './audionaut-royalty-chain';
 import { networkForAddress } from './creator-proof';
 import type { Env } from './db';
 import catalogue from './audionaut-royalties-catalogue.json';
+import { XTRATA_OWNER_ADDRESS } from './creator-auth';
+import { readAudionautSale, type SaleProof } from './audionaut-royalty-sales';
 
 export const CORE = CORE_ASSET_ID.split('::')[0];
 const royaltyReader = (env: Env) => makeChainReader(env,
@@ -17,7 +19,7 @@ export type Edition = typeof catalogue.editions[number];
 export type ReceivingArtist = typeof catalogue.artists[number] & { address: string | null; error: string | null };
 export type MintedAudionaut = Edition & { tokenId: number; mintedAt: number };
 export type PaymentRecord = { tx_id: string; recipient: string; editions_json: string };
-export type PaymentState = { status: 'paid' | 'unrecorded' | 'unverified'; txId: string | null; recipient: string | null; note: string };
+export type PaymentState = { status: 'paid' | 'retained' | 'unrecorded' | 'unverified'; txId: string | null; recipient: string | null; note: string; proofKind?: 'transfer' | 'sale' | 'retained' };
 export type RoyaltyRow = MintedAudionaut & PaymentState & { receivingAddress: string | null; firstSongId: number; dueMicroStx: number };
 export type Snapshot = { minted: MintedAudionaut[]; artists: ReceivingArtist[]; checkedAt: number; blockHeight: number };
 
@@ -104,7 +106,18 @@ export async function fetchPaymentTransaction(env: Env, txId: string, fetcher: t
   applyHiroApiKey(headers, getHiroApiKeys(env)[0] ?? null);
   const response = await fetcher(`https://api.hiro.so/extended/v1/tx/${normalizeTxId(txId)}`, { headers, signal: AbortSignal.timeout(15000) });
   if (!response.ok) throw Error(`Could not verify payment (HTTP ${response.status}).`);
-  return response.json();
+  const tx = await response.json() as any;
+  // The transaction endpoint exposes block_hash, not the read-only tip's index
+  // hash. Bind both to the same canonical block before historical owner reads.
+  if ((tx.tx_status === 'success' || /^abort_by_/.test(tx.tx_status ?? '')) && tx.canonical === true && tx.is_unanchored !== true && !tx.index_block_hash) {
+    if (!Number.isSafeInteger(tx.block_height) || !/^0x[a-f0-9]{64}$/i.test(tx.block_hash ?? '')) throw Error('Payment block evidence is unavailable.');
+    const blockResponse = await fetcher(`https://api.hiro.so/extended/v1/block/by_height/${tx.block_height}`, { headers, signal: AbortSignal.timeout(15000) });
+    if (!blockResponse.ok) throw Error(`Could not verify payment block (HTTP ${blockResponse.status}).`);
+    const block = await blockResponse.json() as any;
+    if (block.canonical !== true || block.height !== tx.block_height || block.hash !== tx.block_hash || !/^0x[a-f0-9]{64}$/i.test(block.index_block_hash ?? '')) throw Error('Payment block changed. Retry verification.');
+    tx.index_block_hash = block.index_block_hash;
+  }
+  return tx;
 }
 
 /** Validate a whole transfer allocation at its own block. An artist's receiving
@@ -131,7 +144,8 @@ export async function verifyRoyaltyPayment(env: Env, record: PaymentRecord, snap
 }
 
 export async function royaltyRows(env: Env, snapshot: Snapshot, payments: PaymentRecord[],
-  verify: (record: PaymentRecord) => Promise<unknown> = record => verifyRoyaltyPayment(env, record, snapshot)): Promise<RoyaltyRow[]> {
+  verify: (record: PaymentRecord) => Promise<unknown> = record => verifyRoyaltyPayment(env, record, snapshot),
+  sale: (row: MintedAudionaut) => Promise<SaleProof> = row => readAudionautSale(env, row, snapshot)): Promise<RoyaltyRow[]> {
   const states = new Map<number, PaymentState>();
   await parallel(payments, async record => {
     const editions = paymentEditions(JSON.parse(record.editions_json));
@@ -143,9 +157,17 @@ export async function royaltyRows(env: Env, snapshot: Snapshot, payments: Paymen
       states.set(edition, state);
     }
   }, 4);
-  return snapshot.minted.map(row => {
+  return parallel(snapshot.minted, async row => {
     const artist = snapshot.artists.find(a => a.artist === row.artist)!;
+    let state = states.get(row.edition);
+    if (!state && artist.address === XTRATA_OWNER_ADDRESS) {
+      state = { status: 'retained', txId: null, recipient: XTRATA_OWNER_ADDRESS, proofKind: 'retained', note: 'Royalty retained by Xtrata, the receiving-song holder. No separate transfer is due.' };
+      try {
+        const receipt = await sale(row);
+        state = { ...state, txId: receipt.txId, proofKind: 'sale', note: 'Royalty retained by Xtrata. Confirmed Audionaut sale includes incoming STX to Xtrata.' };
+      } catch { state.note += ' Sale receipt could not yet be verified.'; }
+    }
     return { ...row, receivingAddress: artist.address, firstSongId: artist.firstSongId, dueMicroStx: ROYALTY_MICRO_STX,
-      ...(states.get(row.edition) ?? { status: 'unrecorded', txId: null, recipient: null, note: 'No payment receipt recorded for this edition.' }) };
+      ...(state ?? { status: 'unrecorded', txId: null, recipient: null, note: 'No payment receipt recorded for this edition.' }) };
   });
 }

@@ -2,6 +2,7 @@ import { CORE, readRoyaltySnapshot, verifyRoyaltyPayment, royaltyRows, fetchPaym
 import { COLLECTION_CONTRACT_ID } from '../../src/audionaut/core';
 import { makeChainReader } from './collection-storage/chain';
 import { queryAll, run, type Env } from './db';
+import { reconcileRoyaltyIntents } from './audionaut-royalty-admin';
 import { networkForAddress } from './creator-proof';
 
 // The first-party read proxy supplies the existing server-side Hiro keys. No
@@ -149,9 +150,10 @@ export async function runRoyaltyAutomation(env: Env, deps: AutomationDependencie
           [/unique|constraint/i.test(String(error)) ? 'A covered edition already has a receipt; this transfer needs review.' : error instanceof Error ? error.message.slice(0, 500) : 'Could not verify transfer.', now, candidate.tx_id]);
       }
     }
+    await reconcileRoyaltyIntents(env, live, { transaction: (env, id) => fetchPaymentTransaction(env, id, chainFetch), verify: (env, record, live) => deps.verify(env, record, live) });
     const all = (await queryAll(env, 'SELECT tx_id,recipient,editions_json FROM audionaut_royalty_payments')).results as PaymentRecord[];
     const rows = await deps.rows(env, live, all);
-    const summary = { minted: rows.length, paid: rows.filter(r => r.status === 'paid').length, unverified: rows.filter(r => r.status === 'unverified').length,
+    const summary = { minted: rows.length, paid: rows.filter(r => r.status === 'paid' || r.status === 'retained').length, unverified: rows.filter(r => r.status === 'unverified').length,
       imported, pages, incomplete, monitoredAddresses: addresses.length };
     await run(env, 'UPDATE audionaut_royalty_automation SET lease_until=0,checked_at=?,block_height=?,summary_json=?,error=? WHERE id=1',
       [now, live.blockHeight, JSON.stringify(summary), errors.length ? errors.join(' ').slice(0, 2000) : null]);

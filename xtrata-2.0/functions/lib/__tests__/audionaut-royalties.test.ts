@@ -87,11 +87,19 @@ describe('5 STX royalty receipt verification', () => {
     expect(() => paymentEditions([1, 1])).toThrow('once');
   });
   it('distinguishes unrecorded payments from temporarily unverifiable receipts', async () => {
-    const [noReceipt] = await royaltyRows({}, snapshot, []);
+    const external = { ...snapshot, artists: snapshot.artists.map(a => ({ ...a, address: 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX' })) };
+    const [noReceipt] = await royaltyRows({}, external, []);
     expect(noReceipt.status).toBe('unrecorded');
     const [failed] = await royaltyRows({}, snapshot, [{ tx_id: TX, recipient: ADDRESS, editions_json: '[1]' }], async () => { throw Error('offline'); });
     expect(failed.status).toBe('unverified'); expect(failed.note).toBe('offline');
     const [paid] = await royaltyRows({}, snapshot, [{ tx_id: TX, recipient: ADDRESS, editions_json: '[1]' }], async () => ({}));
     expect(paid.status).toBe('paid');
   });
+});
+
+it('settles Xtrata-held royalties by policy and distinguishes sale evidence from a transfer', async () => {
+  const [retained] = await royaltyRows({}, snapshot, [], undefined, async () => ({ txId: TX, amountMicroStx: '6000000' }));
+  expect(retained.status).toBe('retained'); expect(retained.proofKind).toBe('sale'); expect(retained.txId).toBe(TX);
+  const [awaitingProof] = await royaltyRows({}, snapshot, [], undefined, async () => { throw Error('429'); });
+  expect(awaitingProof.status).toBe('retained'); expect(awaitingProof.txId).toBeNull(); expect(awaitingProof.note).toContain('could not yet be verified');
 });

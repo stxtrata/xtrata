@@ -5,11 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Audionauts · Artist royalties</title>
   <link rel="icon" href="/favicon.svg">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="/music/artist/assets/style.css">
 </head>
 <body>
   <main>
-    <header class="topline"><a href="/">XTRATA</a><span>Audionauts 1.0</span></header>
+    <header class="topline"><a href="/music/artist/">XTRATA MUSIC</a><span>Artist portal</span></header>
+    <nav class="portal-nav" aria-label="Artist navigation"><a href="/music/artist/">Dashboard</a><a href="/music/artist/royalties/" aria-current="true">Royalties</a><a href="/music/artist/royalties/collections/">Collections</a><a href="/music/artist/royalties/plays/">Pay-per-play</a></nav>
+    <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/music/artist/royalties/">Royalties</a><span>/</span><a href="/music/artist/royalties/collections/">Collections</a><span>/</span><span aria-current="page">Audionauts 1.0</span></nav>
     <section class="intro">
       <p class="eyebrow">Artist ledger</p><h1>Audionaut royalties</h1>
       <p>Follow the 5 STX royalty for each minted Audionaut, from its secret song to the artist’s receiving wallet.</p>
@@ -22,7 +24,7 @@
     <section id="ledger" hidden aria-label="Royalty ledger">
       <div class="stats">
         <div><span>Minted Audionauts</span><strong id="minted-count">—</strong></div>
-        <div><span>Paid · confirmed</span><strong id="paid-total">—</strong></div>
+        <div><span>Settled · paid or retained</span><strong id="paid-total">—</strong></div>
         <div><span>No receipt recorded</span><strong id="unrecorded-total">—</strong></div>
         <div><span>Need verification</span><strong id="unverified-count">—</strong></div>
       </div>
@@ -42,7 +44,7 @@
       </table></div>
       <p id="empty" hidden>No minted Audionauts match these filters.</p>
       <p class="explanation">A receiving wallet is the current holder of the artist’s earliest song inscription in this collection’s song list. Each minted edition earns one 5 STX royalty for its primary secret-song artist. Bonus songs and playlists do not add another royalty.</p>
-      <p class="explanation">“No receipt” means a payment has not been recorded here. Confirmed receipts include a transaction link and the address that held the artist’s receiving song when paid. Mint and ownership checks use a confirmed block, so recent activity can take a little time to appear.</p>
+      <p class="explanation">“Paid · retained by Xtrata” marks royalties kept by Xtrata when it holds the artist’s receiving song. Where verified, the Audionaut sale links to incoming STX as supporting evidence. “No receipt” means a payment has not been recorded here. Confirmed receipts include a transaction link and the address that held the artist’s receiving song when paid. Mint and ownership checks use a confirmed block, so recent activity can take a little time to appear.</p>
       <details id="automation-panel" hidden>
         <summary>Automatic payment tracking</summary>
         <p>New receipts with an edition memo, such as <strong>audionaut:84</strong>, are verified every five minutes. For several editions, use <strong>audionaut:2,5</strong> and transfer 5 STX per edition to their shared receiving wallet.</p>
@@ -64,6 +66,8 @@
     </section>
     <footer>Built using Xtrata Protocol <a href="/collection/audionauts-1-0">View the collection ↗</a></footer>
   </main>
-  <script type="module" src="./page.js"></script>
+  <dialog id="payment-review" aria-labelledby="payment-title"><h2 id="payment-title">Review a 5 STX royalty</h2><p id="payment-edition"></p><p>Receiving wallet</p><p id="payment-recipient" class="address"></p><p id="payment-anchor" class="muted"></p><p>Send <strong>5 STX</strong> from xtrata.btc. Your wallet will show the network fee and ask for approval.</p><div class="buttons"><button id="payment-send">Review in wallet</button><button id="payment-back" class="secondary">Back</button></div></dialog>
+  <dialog id="attach-payment" aria-labelledby="attach-title"><h2 id="attach-title">Attach an existing transfer</h2><p>Use the transaction ID from your wallet history for this reserved royalty. The chain checker will verify it.</p><form id="attach-form"><input id="intent-id" type="hidden"><label>Transaction ID<input id="submitted-tx" required maxlength="66" placeholder="0x…"></label><p id="attach-message" role="status"></p><div class="buttons"><button type="submit">Save transaction ID</button><button id="attach-back" type="button" class="secondary">Back</button></div></form></dialog>
+  <script type="module" src="/music/artist/assets/audionauts.js"></script>
 </body>
 </html>

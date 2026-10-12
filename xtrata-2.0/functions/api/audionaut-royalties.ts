@@ -3,6 +3,7 @@ import { readCreatorSession } from '../lib/creator-auth';
 import { queryAll, type Env } from '../lib/db';
 import { readRoyaltySnapshot, royaltyRows, normalizeTxId, paymentEditions, verifyRoyaltyPayment, type Snapshot, type PaymentRecord } from '../lib/audionaut-royalties';
 
+import { prepareRoyaltyPayment, updateRoyaltyIntent, reconcileRoyaltyIntents, royaltyIntents } from '../lib/audionaut-royalty-admin';
 const PRIVATE = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 // Shared chain-only snapshot; never cache a viewer's session or ledger response.
 export function createSnapshotLoader(read = readRoyaltySnapshot, now = Date.now) {
@@ -17,7 +18,7 @@ export function createSnapshotLoader(read = readRoyaltySnapshot, now = Date.now)
         current.cached = { until: now() + 60_000, snapshot: value }; return value;
       }).finally(() => { current.pending = undefined; });
     }
-    return state.pending;
+    return state.pending!;
   };
 }
 const snapshot = createSnapshotLoader();
@@ -45,21 +46,31 @@ export async function handleRoyalties(request: Request, env: Env, deps: RoyaltyD
     if (!auth.session) return reply({ error: 'Sign in with an artist receiving wallet.' }, 401);
     signedIn = true;
     if (request.method === 'POST' && !auth.session.admin) return reply({ error: 'Only an Xtrata admin can record a receipt.' }, 403);
+    let body: any = null;
+    if (request.method === 'POST') {
+      if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({ error: 'JSON required.' }, 400);
+      const text = await request.text();
+      if (text.length > 4096) return reply({ error: 'Receipt request is too large.' }, 413);
+      body = JSON.parse(text);
+      if (body.action === 'submitted' || body.action === 'cancel') return reply(await updateRoyaltyIntent(env, auth.session.address, body));
+    }
     const live = await deps.snapshot(env);
     if (!auth.session.admin && !live.artists.some(a => a.address === auth.session!.address)) {
       if (live.artists.some(a => a.error)) return reply({ error: 'Could not verify all receiving addresses. Try again shortly.', signedIn: true, retryable: true }, 503);
       return reply({ error: 'This wallet does not hold an artist’s receiving song.' }, 403);
     }
+    if (request.method === 'GET') await reconcileRoyaltyIntents(env, live, deps);
     const records = await queryAll(env, 'SELECT tx_id, recipient, editions_json FROM audionaut_royalty_payments ORDER BY recorded_at DESC');
     if (request.method === 'GET') {
       return reply({ address: auth.session.address, admin: auth.session.admin, checkedAt: live.checkedAt,
         blockHeight: live.blockHeight, artists: live.artists, rows: await deps.rows(env, live, (records.results ?? []) as PaymentRecord[]),
-        automation: await automationInfo(env, auth.session.admin) });
+        intents: await royaltyIntents(env), automation: await automationInfo(env, auth.session.admin) });
     }
-    if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({ error: 'JSON required.' }, 400);
-    const text = await request.text();
-    if (text.length > 4096) return reply({ error: 'Receipt request is too large.' }, 413);
-    const body = JSON.parse(text);
+    if (body.action === 'prepare') {
+      const rows = await deps.rows(env, live, (records.results ?? []) as PaymentRecord[]);
+      try { return reply(await prepareRoyaltyPayment(env, auth.session.address, rows.find(row => row.edition === body.edition))); }
+      catch (error) { return reply({ error: error instanceof Error ? error.message : 'Could not prepare payment.' }, 409); }
+    }
     if (body.action === 'configure') {
       const payers = payerAddresses(body.payers);
       const db = env.DB ?? env.D1 ?? env.db;

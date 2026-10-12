@@ -1,15 +1,33 @@
 import { createStacksWalletAdapter } from '../lib/wallet/adapter';
 import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { signInCreator, signOutCreator } from '../manage/lib/creator-session';
+import { connectWallet, showStxTransfer } from '../lib/wallet/connect';
+import { StacksMainnet } from '@stacks/network';
+import { executeRoyaltyPayment, WalletPaymentCancelled, type PendingReceipt } from './payment';
+import type { RoyaltyIntent } from '../../functions/lib/audionaut-royalty-admin';
+import { ARTIST_SESSION_API, AUDIONAUT_ROYALTIES_API, XTRATA_ROYALTY_ADMIN } from '../music-artist/routes';
 import type { ReceivingArtist, RoyaltyRow } from '../../functions/lib/audionaut-royalties';
 
 type Ledger = { address: string; admin: boolean; checkedAt: number; blockHeight: number; artists: ReceivingArtist[]; rows: RoyaltyRow[];
+  intents?: RoyaltyIntent[];
   automation?: { checkedAt: number | null; error: string | null; summary?: { incomplete: number }; payers?: string[]; candidates?: { tx_id: string; memo: string; amount: string; note: string }[] } };
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const adapter = createStacksWalletAdapter({ appName: 'Audionauts Artist Royalties', appIcon: '/favicon.svg' });
 let ledger: Ledger | null = null, generation = 0;
 let busy = false;
-let signedIn = false;
+let signedIn = false, paying = false;
+let paymentRow: RoyaltyRow | null = null;
+const unsavedReceipts = new Map<string, PendingReceipt>();
+const pendingKey = 'xtrata-audionaut-pending-receipts';
+function pendingReceipts(): PendingReceipt[] {
+  try { const data = JSON.parse(localStorage.getItem(pendingKey) || '[]'); const stored = Array.isArray(data) ? data.filter(r => typeof r.intentId === 'string' && Number.isInteger(r.edition) && /^0x[a-f0-9]{64}$/.test(r.txId)).slice(0, 111) : []; return [...new Map([...stored, ...unsavedReceipts.values()].map(r => [r.intentId, r])).values()]; } catch { return [...unsavedReceipts.values()]; }
+}
+const forgetReceipt = (id: string) => { unsavedReceipts.delete(id); try { localStorage.setItem(pendingKey, JSON.stringify(pendingReceipts().filter(r => r.intentId !== id))); } catch { /* A previously saved ID is safe to retry idempotently. */ } };
+async function post(body: unknown) {
+  const response = await fetch(AUDIONAUT_ROYALTIES_API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await response.json(); if (!response.ok) throw Error(data.error || 'Could not save this payment.'); return data;
+}
+function intentFor(edition: number) { return ledger?.intents?.find(intent => intent.edition === edition && (intent.state === 'awaiting-wallet' || intent.state === 'submitted')); }
 const signInNote = 'Use the wallet holding your artist’s first song. Sign a free message to verify your address.';
 function waitingForChecks() {
   clearLedger();
@@ -24,11 +42,11 @@ const link = (text: string, href: string) => {
   const a = document.createElement('a'); a.textContent = text; a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; return a;
 };
 const note = (text: string) => { const s = document.createElement('small'); s.textContent = text; return s; };
-const statusText = { paid: 'Paid', unrecorded: 'No receipt', unverified: 'Could not verify' };
+const statusText = { paid: 'Paid', retained: 'Paid · retained by Xtrata', unrecorded: 'No receipt', unverified: 'Could not verify' };
 export function filterRows(rows: RoyaltyRow[], options: { scope: string; artist: string; status: string; search: string; address: string }) {
   const needle = options.search.trim().toLowerCase();
   return rows.filter(row => (options.scope !== 'mine' || row.receivingAddress === options.address || row.recipient === options.address) &&
-    (!options.artist || row.artist === options.artist) && (!options.status || row.status === options.status) &&
+    (!options.artist || row.artist === options.artist) && (!options.status || row.status === options.status || (options.status === 'paid' && row.status === 'retained')) &&
     (!needle || [String(row.edition), String(row.edition).padStart(3, '0'), String(row.tokenId), row.artist, row.title, row.name].some(s => s.toLowerCase().includes(needle))));
 }
 function renderRows() {
@@ -46,9 +64,27 @@ function renderRows() {
     cells[2].append(note(`Holder of song #${row.firstSongId}`));
     cells[3].textContent = '5 STX';
     const badge = document.createElement('span'); badge.className = 'badge ' + row.status; badge.textContent = statusText[row.status];
+    const intent = intentFor(row.edition);
+    if (intent && row.status === 'unrecorded') { badge.className = 'badge unverified'; badge.textContent = intent.state === 'submitted' ? 'Pending confirmation' : 'Awaiting wallet result'; }
     cells[4].append(badge);
-    if (row.txId) cells[4].append(note(''), link('View transfer ↗', explorer(row.txId)));
-    if (row.status === 'unverified') cells[4].append(note(row.note));
+    const recent = ledger?.intents?.find(attempt => attempt.edition === row.edition);
+    if (!intent && recent?.state === 'failed' && recent.tx_id) cells[4].append(note(recent.note), link('View failed transfer ↗', explorer(recent.tx_id)));
+    if (intent) {
+      if (intent.tx_id) cells[4].append(link('View submitted transfer ↗', explorer(intent.tx_id)));
+      cells[4].append(note(intent.note || 'Payment reserved. Check the wallet result before sending again.'));
+      if (!intent.tx_id && ledger?.address === XTRATA_ROYALTY_ADMIN && ledger.admin) {
+        const attach = document.createElement('button'); attach.textContent = 'Attach transaction ID'; attach.className = 'secondary payment-button';
+        attach.onclick = () => { el<HTMLInputElement>('intent-id').value = intent.id; el<HTMLInputElement>('submitted-tx').value = ''; el<HTMLDialogElement>('attach-payment').showModal(); };
+        cells[4].append(attach);
+      }
+    }
+    if (ledger?.admin && ledger.address === XTRATA_ROYALTY_ADMIN && row.status === 'unrecorded' && row.receivingAddress && !intent && row.receivingAddress !== XTRATA_ROYALTY_ADMIN) {
+      const pay = document.createElement('button'); pay.className = 'payment-button'; pay.textContent = 'Pay 5 STX'; pay.disabled = paying;
+      pay.onclick = () => { paymentRow = row; el('payment-edition').textContent = `#${String(row.edition).padStart(3, '0')} · ${row.artist}`; el('payment-recipient').textContent = row.receivingAddress; el('payment-anchor').textContent = `Receiving wallet checked at confirmed block ${ledger!.blockHeight.toLocaleString('en-GB')}.`; el<HTMLDialogElement>('payment-review').showModal(); };
+      cells[4].append(pay);
+    }
+    if (row.txId) cells[4].append(note(''), link(row.proofKind === 'sale' ? 'View Audionaut sale ↗' : 'View transfer ↗', explorer(row.txId)));
+    if (row.status === 'unverified' || row.status === 'retained') cells[4].append(note(row.note));
     if (row.status === 'paid' && row.recipient && row.recipient !== row.receivingAddress)
       cells[4].append(note(`Paid to former holder ${short(row.recipient)}`));
     tr.append(...cells); return tr;
@@ -56,18 +92,19 @@ function renderRows() {
   el('empty').hidden = rows.length !== 0;
 }
 function clearLedger() {
+  el<HTMLDialogElement>('payment-review').close(); el<HTMLDialogElement>('attach-payment').close(); paymentRow = null;
   ledger = null; el('ledger').hidden = true; el('rows').replaceChildren(); el('wallet-address').textContent = ''; el('wallet-address').hidden = true;
   el('candidates').replaceChildren(); el<HTMLTextAreaElement>('payers').value = '';
 }
 async function load() {
-  if (busy) return;
+  if (busy || paying) return;
   busy = true;
   const mine = ++generation;
   el<HTMLButtonElement>('refresh').disabled = true;
   el<HTMLButtonElement>('retry').disabled = true;
   el('message').textContent = 'Checking mints, receiving wallets and payment receipts…';
   try {
-    const response = await fetch('/api/audionaut-royalties', { credentials: 'same-origin', cache: 'no-store' });
+    const response = await fetch(AUDIONAUT_ROYALTIES_API, { credentials: 'same-origin', cache: 'no-store' });
     const body = await response.json();
     if (mine !== generation) return;
     if (!response.ok) {
@@ -79,12 +116,19 @@ async function load() {
     }
     signedIn = true; el('retry').hidden = true;
     ledger = body as Ledger;
+    if (ledger.admin && ledger.address === XTRATA_ROYALTY_ADMIN) {
+      for (const receipt of pendingReceipts()) {
+        const pending = ledger.intents?.find(intent => intent.id === receipt.intentId);
+        if (pending && !pending.tx_id) { pending.tx_id = receipt.txId; pending.state = 'submitted'; pending.note = 'Submitted. Receipt storage is retrying.'; }
+        try { await post({ action: 'submitted', intentId: receipt.intentId, txId: receipt.txId }); forgetReceipt(receipt.intentId); } catch { /* Keep a public ID for another attempt. */ } }
+      if (mine !== generation) return;
+    }
     el('ledger').hidden = false; el('sign-in').hidden = true; el('sign-out').hidden = false;
     el('wallet-address').hidden = false; el('wallet-address').textContent = ledger.address;
     el('access-title').textContent = ledger.admin ? 'Artist ledger · administrator' : 'Artist ledger · signed in';
     el('access-note').textContent = 'View all artists or filter to your royalties.';
     el('minted-count').textContent = String(ledger.rows.length);
-    el('paid-total').textContent = `${ledger.rows.filter(r => r.status === 'paid').length * 5} STX`;
+    el('paid-total').textContent = `${ledger.rows.filter(r => (r.status === 'paid' || r.status === 'retained')).length * 5} STX`;
     el('unrecorded-total').textContent = `${ledger.rows.filter(r => r.status === 'unrecorded').length * 5} STX`;
     el('unverified-count').textContent = String(ledger.rows.filter(r => r.status === 'unverified').length);
     const artist = el<HTMLSelectElement>('artist'), previous = artist.value;
@@ -123,13 +167,13 @@ el('sign-in').onclick = async () => {
     await adapter.connect();
     const address = adapter.getSession().address;
     if (!address || !/^(SP|SM)/.test(address)) throw Error('Choose a Stacks mainnet receiving wallet.');
-    await signInCreator(address, requestStructuredSignature); signedIn = true; await load();
+    await signInCreator(address, requestStructuredSignature, ARTIST_SESSION_API); signedIn = true; await load();
   } catch (error) { el('message').textContent = error instanceof Error ? error.message : 'Sign-in was cancelled.'; }
   finally { button.disabled = false; }
 };
 el('sign-out').onclick = async () => {
   ++generation; signedIn = false; waitingForChecks();
-  await signOutCreator(); await adapter.disconnect();
+  await signOutCreator(ARTIST_SESSION_API); await adapter.disconnect();
   el('sign-in').hidden = false; el('sign-out').hidden = true;
   el('access-title').textContent = 'Sign in to view royalties';
   el('access-note').textContent = 'Use the wallet holding your artist’s first song. Sign a free message to verify your address.';
@@ -145,7 +189,7 @@ el('receipt-form').onsubmit = async event => {
   try {
     const raw = el<HTMLInputElement>('editions').value;
     if (!/^\s*\d+(?:\s*,\s*\d+)*\s*$/.test(raw)) throw Error('Enter edition numbers separated by commas.');
-    const response = await fetch('/api/audionaut-royalties', { method: 'POST', credentials: 'same-origin',
+    const response = await fetch(AUDIONAUT_ROYALTIES_API, { method: 'POST', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ txId: el<HTMLInputElement>('tx-id').value, editions: raw.split(',').map(Number) }) });
     const body = await response.json();
     if (!response.ok) throw Error(body.error || 'Could not record this receipt.');
@@ -157,14 +201,14 @@ el('receipt-form').onsubmit = async event => {
 void load();
 // Refresh while an approved holder is viewing the page, with no overlapping
 // requests and no polling while signed out or when the tab is hidden.
-setInterval(() => { if (signedIn && !document.hidden && !busy && (!ledger || (!el<HTMLDetailsElement>('record-panel').open && !el<HTMLDetailsElement>('automation-panel').open))) void load(); }, 60_000);
-document.addEventListener('visibilitychange', () => { if (signedIn && !document.hidden && !busy) void load(); });
+setInterval(() => { if (signedIn && !document.hidden && !busy && !paying && !el<HTMLDialogElement>('payment-review').open && !el<HTMLDialogElement>('attach-payment').open && (!ledger || (!el<HTMLDetailsElement>('record-panel').open && !el<HTMLDetailsElement>('automation-panel').open))) void load(); }, 60_000);
+document.addEventListener('visibilitychange', () => { if (signedIn && !document.hidden && !busy && !paying) void load(); });
 el('payer-form').onsubmit = async event => {
   event.preventDefault(); if (!ledger?.admin) return;
   const button = el('payer-form').querySelector('button')!; button.disabled = true;
   try {
     const payers = el<HTMLTextAreaElement>('payers').value.split(/[\s,]+/).filter(Boolean);
-    const response = await fetch('/api/audionaut-royalties', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+    const response = await fetch(AUDIONAUT_ROYALTIES_API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'configure', payers }) });
     const body = await response.json(); if (!response.ok) throw Error(body.error || 'Could not save monitored addresses.');
     el('payer-message').textContent = 'Saved. The next automatic check will scan these paying wallets.';
@@ -181,9 +225,45 @@ el('export-csv').onclick = () => {
     return '"' + text.replace(/"/g, '""') + '"';
   };
   const headers = ['Audionaut edition', 'Audionaut name', 'Audionaut inscription', 'Song inscription', 'Song title', 'Artist', 'Receiving song', 'Current receiving address', 'Royalty STX', 'Payment status', 'Payment transaction', 'Paid to', 'Verified block'];
-  const text = [headers, ...ledger.rows.map(r => [r.edition, r.name, r.tokenId, r.songId, r.title, r.artist, r.firstSongId, r.receivingAddress, 5, statusText[r.status], r.txId, r.recipient, ledger!.blockHeight])]
+  const text = [headers, ...ledger.rows.map(r => [r.edition, r.name, r.tokenId, r.songId, r.title, r.artist, r.firstSongId, r.receivingAddress, 5, intentFor(r.edition) ? 'Payment in progress' : statusText[r.status], r.txId || intentFor(r.edition)?.tx_id, r.recipient, ledger!.blockHeight])]
     .map(row => row.map(quote).join(',')).join('\r\n') + '\r\n';
   const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }));
   const a = document.createElement('a'); a.href = url; a.download = 'Audionauts Song Assignments - live royalties.csv'; a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+el('payment-back').onclick = () => el<HTMLDialogElement>('payment-review').close();
+el('payment-send').onclick = async () => {
+  const row = paymentRow, viewer = ledger; if (!row || !viewer || paying) return;
+  el<HTMLDialogElement>('payment-review').close(); paying = true; renderRows(); el<HTMLButtonElement>('refresh').disabled = true;
+  el<HTMLButtonElement>('sign-out').disabled = true;
+  const mine = generation; let completionMessage = '';
+  try {
+    el('message').textContent = 'Review this 5 STX royalty in your wallet. Network fees are added by the wallet.';
+    const receipt = await executeRoyaltyPayment({ row, address: viewer.address, admin: viewer.admin,
+      connect: () => connectWallet({ appName: 'Xtrata Music · Audionaut royalty', appIcon: '/favicon.svg' }), post,
+      transfer: quote => new Promise((resolve, reject) => showStxTransfer({ recipient: quote.recipient, amount: String(quote.amountMicroStx),
+        memo: quote.memo, stxAddress: quote.sender, network: new StacksMainnet(), appDetails: { name: 'Xtrata Music · Audionaut royalty', icon: '/favicon.svg' },
+        onFinish: result => resolve(result.txId || ''), onCancel: () => reject(new WalletPaymentCancelled('Wallet approval cancelled.')),
+        onError: reject })),
+      remember: receipt => { unsavedReceipts.set(receipt.intentId, receipt); localStorage.setItem(pendingKey, JSON.stringify(pendingReceipts())); },
+      forget: forgetReceipt,
+      submitted: receipt => {
+        if (mine !== generation || !ledger) return;
+        ledger.intents = [...(ledger.intents || []), { id: receipt.intentId, edition: receipt.edition, recipient: row.receivingAddress!, sender: viewer.address,
+          tx_id: receipt.txId, state: 'submitted', note: 'Submitted. Waiting for confirmation.', created_at: Date.now(), updated_at: Date.now() }]; renderRows();
+      }
+    });
+    completionMessage = `Submitted ${receipt.txId}. The row will update after confirmation.`;
+  } catch (error) { completionMessage = error instanceof Error ? error.message : 'Check the wallet history before trying again.'; }
+  finally { paying = false; el<HTMLButtonElement>('sign-out').disabled = false; el<HTMLButtonElement>('refresh').disabled = false; await load(); if (ledger?.address === viewer.address) el('message').textContent = completionMessage; }
+};
+el('attach-form').onsubmit = async event => {
+  event.preventDefault(); const button = el('attach-form').querySelector<HTMLButtonElement>('button[type="submit"]')!; button.disabled = true;
+  try {
+    await post({ action: 'submitted', intentId: el<HTMLInputElement>('intent-id').value, txId: el<HTMLInputElement>('submitted-tx').value });
+    el<HTMLDialogElement>('attach-payment').close(); await load();
+  } catch (error) { el('attach-message').textContent = error instanceof Error ? error.message : 'Could not save the transaction ID.'; }
+  finally { button.disabled = false; }
+};
+el('attach-back').onclick = () => el<HTMLDialogElement>('attach-payment').close();

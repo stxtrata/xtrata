@@ -38,6 +38,7 @@ describe.skipIf(!sqliteAvailable)('durable receipt allocations', () => {
     const DB = memoryDb();
     DB.sqlite.exec(readFileSync(new URL('../../migrations/023_audionaut_royalties.sql', import.meta.url), 'utf8'));
     DB.sqlite.exec(readFileSync(new URL('../../migrations/024_audionaut_royalty_automation.sql', import.meta.url), 'utf8'));
+    DB.sqlite.exec(readFileSync(new URL('../../migrations/025_audionaut_royalty_admin.sql', import.meta.url), 'utf8'));
     return { DB } as any;
   }
   it('lets a receiving holder view the complete ledger', async () => {
@@ -59,6 +60,26 @@ describe.skipIf(!sqliteAvailable)('durable receipt allocations', () => {
     deps.verify = async () => { throw Error('Wrong recipient'); };
     expect((await handleRoyalties(post(), env, deps)).status).toBe(400);
     expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM audionaut_royalty_payments').get().n).toBe(0);
+  });
+  it('prepares only the canary wallet’s verified 5 STX recipient and stores an ID even during a chain outage', async () => {
+    const env = fixture(), deps = dependencies({ address: ADDRESS, admin: true });
+    const receiver = 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX';
+    deps.rows = async () => [{ ...snapshot.minted[0], status: 'unrecorded', receivingAddress: receiver }] as any;
+    const action = (body: unknown) => new Request(get().url, { method: 'POST', headers: { origin: 'https://xtrata.xyz', 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    const prepared = await handleRoyalties(action({ action: 'prepare', edition: 1, recipient: 'ATTACKER', amount: 1 }), env, deps);
+    expect(prepared.status).toBe(200); const quote = await prepared.json();
+    expect(quote.recipient).toBe(receiver); expect(quote.amountMicroStx).toBe(5000000); expect(quote.memo).toBe('audionaut:1');
+    deps.snapshot = async () => { throw Error('429'); };
+    expect((await handleRoyalties(action({ action: 'submitted', intentId: quote.id, txId: TX }), env, deps)).status).toBe(200);
+    expect(env.DB.sqlite.prepare('SELECT tx_id FROM audionaut_royalty_intents').get().tx_id).toBe(TX);
+    expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM audionaut_royalty_payments').get().n).toBe(0);
+  });
+  it('does not grant payment controls to another administrator', async () => {
+    const env = fixture(), deps = dependencies({ address: 'SP3JB6BCKV14CG25NF017CR7KRVSM8RAGHB52DWHX', admin: true });
+    deps.rows = async () => [{ ...snapshot.minted[0], status: 'unrecorded', receivingAddress: ADDRESS }] as any;
+    const request = new Request(get().url, { method: 'POST', headers: { origin: 'https://xtrata.xyz', 'content-type': 'application/json' }, body: JSON.stringify({ action: 'prepare', edition: 1 }) });
+    expect((await handleRoyalties(request, env, deps)).status).toBe(409);
+    expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM audionaut_royalty_intents').get().n).toBe(0);
   });
   it('restricts monitored-payer configuration to signed-in admins', async () => {
     const request = () => new Request(get().url, { method: 'POST', headers: { origin: 'https://xtrata.xyz', 'content-type': 'application/json' },

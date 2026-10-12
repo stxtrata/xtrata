@@ -96,7 +96,12 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 
 ## Artist manager portal
 
-- `public/audionauts/royalties/`, `src/audionaut-royalties/page.ts` and
+- `music/artist/` provides `/music/artist/`, royalty overview, collection list and
+  a planned pay-per-play reporting page. `src/music-artist/routes.ts` is the
+  collection/link registry; `functions/lib/music-artist.ts` maps each collection
+  to its verifier. Portal identity reuses the existing root-scoped signed cookie
+  through `/api/music/artist/session`.
+- `music/artist/royalties/collections/audionauts-1-0/`, `src/audionaut-royalties/page.ts` and
   `functions/api/audionaut-royalties.ts` provide the wallet-authenticated Audionaut
   artist ledger and live song/payment CSV export. `functions/lib/audionaut-royalties.ts`
   verifies minted identities, the first-song receiving holders and historical
@@ -106,6 +111,11 @@ Purpose: one-stop map of where code lives and which files to touch for common up
   `functions/lib/audionaut-royalty-chain.ts` reuses the Hiro proxy key pool/cache
   with a bounded request deadline; failed verification preserves sign-in for
   retry while hiding the ledger. Concurrent snapshot reads are shared.
+  `functions/lib/audionaut-royalty-admin.ts` reserves per-edition manual Xtrata
+  payments and reconciles submitted IDs. `audionaut-royalty-sales.ts` verifies
+  incoming collection-sale proof for Xtrata-retained royalties. Only the exact
+  Xtrata canary address gets browser payment buttons; the cron never signs.
+  Migration 025 adds attempt history and verified sale caches.
   Migrations 023/024 and `docs/plans/AUDIONAUT-ROYALTIES.md` describe operation.
 
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.

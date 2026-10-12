@@ -1,7 +1,8 @@
 # Audionaut artist royalty ledger
 
-Implemented 12 October 2026. Page: `/audionauts/royalties/`.
-API: `/api/audionaut-royalties`.
+Implemented 12 October 2026. Page: `/music/artist/royalties/collections/audionauts-1-0/`.
+API: `/api/music/artist/royalties/collections/audionauts-1-0`.
+The original page permanently redirects; the original API remains compatible.
 
 ## Plan and resulting behaviour
 
@@ -118,7 +119,7 @@ Before publishing this code:
 - Build with the normal pipeline. `build:audionaut` now also builds the ledger's
   wallet/page bundle; `public/` assets are copied by the normal Vite build.
 
-After deployment, visit `/audionauts/royalties/`, sign in with the admin wallet,
+After deployment, visit `/music/artist/royalties/collections/audionauts-1-0/`, sign in with the admin wallet,
 open **Record an existing payment**, and enter the transfer transaction ID and
 the comma-separated edition numbers it covers. A batch covering N editions must
 transfer exactly N × 5 STX to their common historical receiving wallet. The
@@ -231,3 +232,72 @@ empty local receipt fixture returned HTTP 200, 18 minted rows, and all ten artis
 holders resolved at confirmed block 9,184,143. Live HTML and JavaScript include
 the retry/recovery controls; signed-out production API remains HTTP 401 with
 private/no-store headers and no ledger data. No wallet was connected or signed.
+
+## Music artist portal and manual canary payments, 12 October 2026
+
+The user approved the `/music/artist/` hierarchy and then extended the earlier
+tracking-only scope with explicit payment buttons for the public Xtrata canary
+identity `SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X` (xtrata.btc). No actual
+signing or payment was authorized for our testing; all wallet tests simulate it.
+
+Canonical artist pages:
+- `/music/artist/`: sign-in and dashboard.
+- `/music/artist/royalties/`: income sources.
+- `/music/artist/royalties/collections/`: registered collection ledgers.
+- `/music/artist/royalties/collections/audionauts-1-0/`: existing ledger.
+- `/music/artist/royalties/plays/`: clearly labelled planned artist reporting,
+  linking to the existing Music lounge's confirmed listener payments.
+
+APIs mirror this under `/api/music/artist/`; session aliases the existing signed
+challenge handler and root-scoped HttpOnly cookie. Discovery and plays availability
+require a signed session even with studio auth off/log. Financial reads retain the
+collection-specific holder/admin checks. Add future collection metadata to
+`src/music-artist/routes.ts` and its dedicated verifier to `functions/lib/music-artist.ts`.
+The old `/api/audionaut-royalties` handler remains compatible for existing clients.
+Legacy page/index/assets redirect to the new page/assets. Links are added to Music
+and the lounge. Both browser bundles build into `music/artist/assets` before the
+existing static music copy step, so the copy does not erase the portal.
+
+Manual payments require the signed-in Xtrata administrator and a fresh matching
+mainnet wallet selection. Every eligible row offers a review showing the full
+receiving address, edition, 5 STX amount and confirmed ownership block. The wallet
+then asks for transfer approval and its fee. The server derives recipient/amount
+and memo `audionaut:<edition>`; it never trusts browser overrides. A partial unique
+index permits only one active attempt per edition across tabs. Submitted IDs are
+captured before storage, with public-ID-only local recovery if the server is busy.
+An explicit wallet cancellation releases the attempt; ambiguous results remain
+reserved and expose Attach transaction ID. Pending/dropped/noncanonical or wrong
+sender/amount/recipient/memo never count as Paid. A confirmed on-chain abort can
+be retried. GET and the five-minute verifier reconcile durable pending IDs and
+store canonical historical-holder-verified receipts atomically. The cron has no
+signer and sends no funds. Migration 025 adds attempt history and sale proof cache.
+
+Xtrata-held receiving songs show `Paid · retained by Xtrata` under the requested
+internal-settlement policy, separately typed as `retained` from external `paid`.
+No self-transfer is requested. Verified sale links require the exact collection
+mint, matching NFT token/confirmed block and at least 5 STX incoming sale revenue
+per minted token after the final NFT mint event. Protocol fees cannot count as
+sale revenue. Missing proof stays explicitly pending while the internal retention
+policy applies. Cached sale proofs recheck their canonical block. The transaction
+reader also binds Hiro's physical `block_hash` to the canonical `index_block_hash`
+before historical receiving-owner reads.
+
+Verification: 148 targeted royalty/portal/wallet tests, two extension-free browser
+simulations (shared sign-in/navigation, admin review, transaction ID and confirmation
+updates, cancellation, ambiguous recovery, recipient denial, CSV/filters, 429 retry,
+sign-out, planned plays and mobile), both browser builds, Functions compile and
+scheduled Worker dry-run. Live public-chain checks with a simulated session and
+local in-memory database found 18 mints, ten artist holders and seven Xtrata-retained
+royalties. Four sale receipts verified on the first pass; two more verified on
+retry, with the remaining proof deferred due to HTTP 429. No personal wallet was
+connected, no wallet secret was read, and no payment was signed or sent.
+
+Repeat browser checks:
+```
+npm run build:audionaut-royalties
+npm run build:music-artist
+node scripts/audionaut-royalties-smoke.mjs
+node scripts/music-artist-smoke.mjs
+```
+Hiro schema references: [NFT instance history](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/tokens/get-nft-instance-history)
+and [transaction events](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/transactions/get-transaction-events).

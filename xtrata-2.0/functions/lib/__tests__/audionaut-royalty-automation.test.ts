@@ -14,7 +14,7 @@ const snapshot: Snapshot = { checkedAt: 1, blockHeight: 120, minted: [catalogue.
   artists: catalogue.artists.map(a => ({ ...a, address: PAYEE, error: null })) };
 function fixture(transactions: any[] = []) {
   const DB = memoryDb();
-  for (const name of ['023_audionaut_royalties.sql', '024_audionaut_royalty_automation.sql']) DB.sqlite.exec(readFileSync(new URL('../../migrations/' + name, import.meta.url), 'utf8'));
+  for (const name of ['023_audionaut_royalties.sql', '024_audionaut_royalty_automation.sql', '025_audionaut_royalty_admin.sql']) DB.sqlite.exec(readFileSync(new URL('../../migrations/' + name, import.meta.url), 'utf8'));
   const deps: AutomationDependencies = { snapshot: vi.fn(async () => snapshot), canonical: vi.fn(async () => undefined), block: vi.fn(async () => HASH),
     page: vi.fn(async (_env, _address, _height, offset) => ({ total: transactions.length, results: transactions.slice(offset, offset + 50) })),
     verify: vi.fn(async () => undefined), rows: (env, live, records) => royaltyRows(env, live, records, async () => undefined) };

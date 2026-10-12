@@ -3,8 +3,17 @@
 /arcade/ /x/3111 302
 /audionaut /audionaut/index.html 200
 /audionaut/ /audionaut/index.html 200
-/audionauts/royalties /audionauts/royalties/ 301
-/audionauts/royalties/ /audionauts/royalties/index.html 200
+# Artist portal: preserve published Audionaut links and cached page assets.
+/audionauts/royalties /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/ /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/index.html /music/artist/royalties/collections/audionauts-1-0/ 301
+/audionauts/royalties/page.js /music/artist/assets/audionauts.js 301
+/audionauts/royalties/style.css /music/artist/assets/style.css 301
+/music/artist /music/artist/ 301
+/music/artist/royalties /music/artist/royalties/ 301
+/music/artist/royalties/plays /music/artist/royalties/plays/ 301
+/music/artist/royalties/collections /music/artist/royalties/collections/ 301
+/music/artist/royalties/collections/audionauts-1-0 /music/artist/royalties/collections/audionauts-1-0/ 301
 # Forever Twins: registry-driven pages. Each key is read from /forever-twins/data/registry.v2.json
 # /forever-twins/collection/<key> and /forever-twins/community/<slug> are served by functions/forever-twins/ (a rewrite here loses the key).
 /kp-loops /kp-loops/index.html 200

@@ -82,3 +82,7 @@ forever-twins/assets/xtrata-ft-large.js
 _claude_scratch/
 canaries/build/forever-twins-launch-*-canary.html
 forever-twins/ft-harness/results/fork-*.json
+
+# Generated artist portal bundles (rebuilt by prebuild)
+/music/artist/assets/artist.js
+/music/artist/assets/audionauts.js
