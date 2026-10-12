@@ -2,6 +2,12 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Audionaut royalty sign-in: recover throttled chain checks (2026-10-12)
+- Route mint, receiving-holder and historical receipt reads through the existing Hiro key pool and read cache. A throttled key is skipped on subsequent reads; the 15-second request deadline covers all key attempts.
+- Share concurrent chain snapshots for one minute; failures are never cached and expired ownership evidence is never reused for access.
+- Preserve a verified sign-in when chain checks fail, hide the ledger, offer Retry checks and retry once a minute while visible. Session expiry/denial clears the ledger and stops retries.
+- Verified: 57 targeted royalty/proxy tests and extension-free browser simulations covering 429 recovery, connection loss, session expiry, sign-out, desktop/mobile, filters and receipts. No personal wallet or payment used. Deploy authorized by the user.
+
 ## Audionaut artist royalty ledger (2026-10-12)
 - Added a five-minute Cloudflare background verifier, pinned/resumable payment-history scans, automatic allocation of edition-tagged receipts, monitored-payer settings and an ambiguous-transfer review list (migration 024). Authorized viewers refresh once a minute and can export current song assignments and proof links as CSV. Tracking only: no signer or payment broadcaster.
 - Automation checks: 37 targeted tests, simulated browser settings/export/refresh checks and Worker dry-run compilation pass. Production release uses current main plus only the royalty commits; user explicitly authorized push/deploy.

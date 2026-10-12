@@ -34,6 +34,7 @@ await page.route('**/*', async route => {
     }
     if (mode === 'out') return route.fulfill({ status: 401, json: { error: 'Sign in.' } });
     if (mode === 'denied') return route.fulfill({ status: 403, json: { error: 'This wallet does not hold a receiving song.' } });
+    if (mode === 'throttled') return route.fulfill({ status: 503, json: { error: 'Chain verification unavailable (429).', signedIn: true, retryable: true } });
     if (mode === 'offline') return route.abort();
     return route.fulfill({ json: { address, admin: mode === 'admin', checkedAt: Date.now(), blockHeight: 120,
       artists: catalogue.artists.map(a => ({ ...a, address, error: null })), rows,
@@ -106,11 +107,23 @@ try {
   await page.clock.fastForward(60_000); await automaticRefresh;
   await page.waitForFunction(() => !document.getElementById('message').textContent);
   assert.equal(ledgerFetches, before + 1, 'Refreshes the active authorized ledger automatically');
+  mode = 'throttled'; await page.click('#refresh'); await page.locator('#retry').waitFor();
+  assert.equal(await page.locator('#ledger').isVisible(), false);
+  assert.equal(await page.locator('#sign-in').isVisible(), false);
+  assert.equal(await page.locator('#sign-out').isVisible(), true);
+  mode = 'recipient'; await page.clock.fastForward(60_000); await page.locator('#rows tr').first().waitFor();
+  assert.equal(await page.locator('#retry').isVisible(), false);
+  mode = 'offline'; await page.click('#refresh'); await page.locator('#retry').waitFor();
+  mode = 'recipient'; await page.click('#retry'); await page.locator('#rows tr').first().waitFor();
+  mode = 'throttled'; await page.click('#refresh'); await page.locator('#retry').waitFor();
+  mode = 'out'; await page.click('#retry'); await page.locator('#sign-in').waitFor();
+  assert.equal(await page.locator('#retry').isVisible(), false);
+  mode = 'recipient'; await page.reload(); await page.locator('#rows tr').first().waitFor();
   await page.click('#sign-out'); assert.equal(await page.locator('#ledger').isVisible(), false);
   const signedOut = ledgerFetches; await page.clock.fastForward(120_000);
   assert.equal(ledgerFetches, signedOut, 'Does not poll signed-out sessions');
   assert.equal(await page.locator('#rows tr').count(), 0);
   assert.deepEqual(errors, []);
-  assert(ledgerFetches < 25, 'Requests remain bounded');
-  console.log('Browser smoke passed: private gate, filters, receipt discovery/settings, CSV export, active-page refresh, unsafe metadata, sign-out, desktop and mobile. All sessions/payments simulated.');
+  assert(ledgerFetches < 35, 'Requests remain bounded');
+  console.log('Browser smoke passed: private gate, filters, receipt discovery/settings, CSV export, active-page refresh, throttle/network recovery and session expiry, unsafe metadata, sign-out, desktop and mobile. All sessions/payments simulated.');
 } finally { await browser.close(); }

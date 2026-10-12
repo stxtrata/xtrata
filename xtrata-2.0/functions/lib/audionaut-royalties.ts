@@ -3,11 +3,14 @@ import { expectBuffer, expectOptional, expectPrincipal, expectTuple, expectUInt,
 import { CORE_ASSET_ID, COLLECTION_CONTRACT_ID } from '../../src/audionaut/core';
 import { makeChainReader, type ChainReader } from './collection-storage/chain';
 import { applyHiroApiKey, getHiroApiKeys } from './hiro-keys';
+import { royaltyChainFetch } from './audionaut-royalty-chain';
 import { networkForAddress } from './creator-proof';
 import type { Env } from './db';
 import catalogue from './audionaut-royalties-catalogue.json';
 
 export const CORE = CORE_ASSET_ID.split('::')[0];
+const royaltyReader = (env: Env) => makeChainReader(env,
+  { core: CORE, helper: COLLECTION_CONTRACT_ID, network: 'mainnet' }, royaltyChainFetch(env));
 export const ROYALTY_MICRO_STX = 5_000_000;
 export { catalogue };
 export type Edition = typeof catalogue.editions[number];
@@ -36,8 +39,7 @@ async function parallel<T, R>(items: T[], action: (item: T) => Promise<R>, width
 
 /** All mint and ownership reads refer to the same confirmed block. No staging row
  * or reservation is used as proof that a collectible has actually minted. */
-export async function readRoyaltySnapshot(env: Env, reader: ChainReader = makeChainReader(env,
-  { core: CORE, helper: COLLECTION_CONTRACT_ID, network: 'mainnet' })): Promise<Snapshot> {
+export async function readRoyaltySnapshot(env: Env, reader: ChainReader = royaltyReader(env)): Promise<Snapshot> {
   const anchor = await reader.anchor();
   const count = safeNumber(expectUInt(okValue(await reader.read(COLLECTION_CONTRACT_ID, 'get-minted-index-count', [], anchor.hash)), 'mint count'));
   if (count > 111) throw Error('Unexpected Audionaut supply.');
@@ -97,7 +99,7 @@ export function validatePaymentTransaction(tx: any, txId: string, recipient: str
   return { blockHeight: tx.block_height as number, blockHash: tx.index_block_hash.toLowerCase() as string };
 }
 
-export async function fetchPaymentTransaction(env: Env, txId: string, fetcher: typeof fetch = fetch) {
+export async function fetchPaymentTransaction(env: Env, txId: string, fetcher: typeof fetch = royaltyChainFetch(env)) {
   const headers = new Headers({ Accept: 'application/json' });
   applyHiroApiKey(headers, getHiroApiKeys(env)[0] ?? null);
   const response = await fetcher(`https://api.hiro.so/extended/v1/tx/${normalizeTxId(txId)}`, { headers, signal: AbortSignal.timeout(15000) });
@@ -108,7 +110,7 @@ export async function fetchPaymentTransaction(env: Env, txId: string, fetcher: t
 /** Validate a whole transfer allocation at its own block. An artist's receiving
  * song may have changed hands since payment, so use its historical owner. */
 export async function verifyRoyaltyPayment(env: Env, record: PaymentRecord, snapshot: Snapshot,
-  reader: ChainReader = makeChainReader(env, { core: CORE, helper: COLLECTION_CONTRACT_ID, network: 'mainnet' }),
+  reader: ChainReader = royaltyReader(env),
   fetchTx: (id: string) => Promise<any> = id => fetchPaymentTransaction(env, id)) {
   const editions = paymentEditions(JSON.parse(record.editions_json));
   const selected = editions.map(e => snapshot.minted.find(m => m.edition === e));

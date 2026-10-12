@@ -9,6 +9,14 @@ const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElem
 const adapter = createStacksWalletAdapter({ appName: 'Audionauts Artist Royalties', appIcon: '/favicon.svg' });
 let ledger: Ledger | null = null, generation = 0;
 let busy = false;
+let signedIn = false;
+const signInNote = 'Use the wallet holding your artist’s first song. Sign a free message to verify your address.';
+function waitingForChecks() {
+  clearLedger();
+  el('sign-in').hidden = signedIn; el('sign-out').hidden = !signedIn; el('retry').hidden = !signedIn;
+  el('access-title').textContent = signedIn ? 'Signed in · waiting for verification' : 'Sign in to view royalties';
+  el('access-note').textContent = signedIn ? 'Your sign-in is saved. Checks will retry automatically, or you can retry now.' : signInNote;
+}
 const explorer = (id: string) => `https://explorer.hiro.so/txid/${encodeURIComponent(id)}?chain=mainnet`;
 const addressLink = (address: string) => `https://explorer.hiro.so/address/${encodeURIComponent(address)}?chain=mainnet`;
 const short = (address: string) => address.slice(0, 7) + '…' + address.slice(-6);
@@ -56,17 +64,20 @@ async function load() {
   busy = true;
   const mine = ++generation;
   el<HTMLButtonElement>('refresh').disabled = true;
+  el<HTMLButtonElement>('retry').disabled = true;
   el('message').textContent = 'Checking mints, receiving wallets and payment receipts…';
   try {
     const response = await fetch('/api/audionaut-royalties', { credentials: 'same-origin', cache: 'no-store' });
     const body = await response.json();
     if (mine !== generation) return;
     if (!response.ok) {
-      clearLedger();
+      signedIn = response.status === 503 && body.signedIn === true;
+      waitingForChecks();
       el('message').textContent = response.status === 401 ? '' : body.error || 'Could not load the ledger.';
-      el('sign-in').hidden = false; el('sign-out').hidden = response.status === 401;
-      el('access-title').textContent = 'Sign in to view royalties'; return;
+      if (response.status === 403) el('sign-out').hidden = false;
+      return;
     }
+    signedIn = true; el('retry').hidden = true;
     ledger = body as Ledger;
     el('ledger').hidden = false; el('sign-in').hidden = true; el('sign-out').hidden = false;
     el('wallet-address').hidden = false; el('wallet-address').textContent = ledger.address;
@@ -101,8 +112,8 @@ async function load() {
     }
     el('message').textContent = ''; renderRows();
   } catch {
-    if (mine === generation) { clearLedger(); el('sign-in').hidden = false; el('message').textContent = 'Could not load the ledger. Check your connection and try again.'; }
-  } finally { busy = false; el<HTMLButtonElement>('refresh').disabled = false; }
+    if (mine === generation) { waitingForChecks(); el('message').textContent = 'Could not load the ledger. Check your connection and try again.'; }
+  } finally { busy = false; el<HTMLButtonElement>('refresh').disabled = false; el<HTMLButtonElement>('retry').disabled = false; }
 }
 el('sign-in').onclick = async () => {
   const button = el<HTMLButtonElement>('sign-in'); button.disabled = true;
@@ -112,12 +123,12 @@ el('sign-in').onclick = async () => {
     await adapter.connect();
     const address = adapter.getSession().address;
     if (!address || !/^(SP|SM)/.test(address)) throw Error('Choose a Stacks mainnet receiving wallet.');
-    await signInCreator(address, requestStructuredSignature); await load();
+    await signInCreator(address, requestStructuredSignature); signedIn = true; await load();
   } catch (error) { el('message').textContent = error instanceof Error ? error.message : 'Sign-in was cancelled.'; }
   finally { button.disabled = false; }
 };
 el('sign-out').onclick = async () => {
-  ++generation; clearLedger();
+  ++generation; signedIn = false; waitingForChecks();
   await signOutCreator(); await adapter.disconnect();
   el('sign-in').hidden = false; el('sign-out').hidden = true;
   el('access-title').textContent = 'Sign in to view royalties';
@@ -125,6 +136,7 @@ el('sign-out').onclick = async () => {
   el('message').textContent = '';
 };
 el('refresh').onclick = () => void load();
+el('retry').onclick = () => void load();
 for (const id of ['scope', 'artist', 'status', 'search']) el(id).addEventListener('input', renderRows);
 el('receipt-form').onsubmit = async event => {
   event.preventDefault(); if (!ledger?.admin) return;
@@ -145,8 +157,8 @@ el('receipt-form').onsubmit = async event => {
 void load();
 // Refresh while an approved holder is viewing the page, with no overlapping
 // requests and no polling while signed out or when the tab is hidden.
-setInterval(() => { if (ledger && !document.hidden && !busy && !el<HTMLDetailsElement>('record-panel').open && !el<HTMLDetailsElement>('automation-panel').open) void load(); }, 60_000);
-document.addEventListener('visibilitychange', () => { if (ledger && !document.hidden && !busy) void load(); });
+setInterval(() => { if (signedIn && !document.hidden && !busy && (!ledger || (!el<HTMLDetailsElement>('record-panel').open && !el<HTMLDetailsElement>('automation-panel').open))) void load(); }, 60_000);
+document.addEventListener('visibilitychange', () => { if (signedIn && !document.hidden && !busy) void load(); });
 el('payer-form').onsubmit = async event => {
   event.preventDefault(); if (!ledger?.admin) return;
   const button = el('payer-form').querySelector('button')!; button.disabled = true;

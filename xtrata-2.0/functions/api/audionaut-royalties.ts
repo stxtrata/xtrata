@@ -5,13 +5,22 @@ import { readRoyaltySnapshot, royaltyRows, normalizeTxId, paymentEditions, verif
 
 const PRIVATE = { 'Cache-Control': 'private, no-store', Vary: 'Cookie' };
 // Shared chain-only snapshot; never cache a viewer's session or ledger response.
-let cached: { until: number; snapshot: Snapshot } | null = null;
-async function snapshot(env: Env) {
-  if (cached && Date.now() < cached.until) return cached.snapshot;
-  const value = await readRoyaltySnapshot(env);
-  cached = { until: Date.now() + 60_000, snapshot: value };
-  return value;
+export function createSnapshotLoader(read = readRoyaltySnapshot, now = Date.now) {
+  const states = new WeakMap<Env, { cached?: { until: number; snapshot: Snapshot }; pending?: Promise<Snapshot> }>();
+  return async (env: Env) => {
+    let state = states.get(env);
+    if (!state) { state = {}; states.set(env, state); }
+    if (state.cached && now() < state.cached.until) return state.cached.snapshot;
+    if (!state.pending) {
+      const current = state;
+      current.pending = Promise.resolve().then(() => read(env)).then(value => {
+        current.cached = { until: now() + 60_000, snapshot: value }; return value;
+      }).finally(() => { current.pending = undefined; });
+    }
+    return state.pending;
+  };
 }
+const snapshot = createSnapshotLoader();
 export type RoyaltyDependencies = {
   session: typeof readCreatorSession;
   snapshot: (env: Env) => Promise<Snapshot>;
@@ -28,15 +37,17 @@ export async function handleRoyalties(request: Request, env: Env, deps: RoyaltyD
   if (!['GET', 'POST'].includes(request.method)) return reply({ error: 'Method not allowed.' }, 405);
   if (request.method === 'POST' && request.headers.get('origin') !== new URL(request.url).origin)
     return reply({ error: 'Open the ledger on Xtrata to record a payment.' }, 403);
+  let signedIn = false;
   try {
     // Deliberately strict even when collection-studio authorization is off/log.
     const auth = await deps.session(request, env);
     if (!auth.ok) return reply({ error: 'Sign-in is temporarily unavailable.' }, 503);
     if (!auth.session) return reply({ error: 'Sign in with an artist receiving wallet.' }, 401);
+    signedIn = true;
     if (request.method === 'POST' && !auth.session.admin) return reply({ error: 'Only an Xtrata admin can record a receipt.' }, 403);
     const live = await deps.snapshot(env);
     if (!auth.session.admin && !live.artists.some(a => a.address === auth.session!.address)) {
-      if (live.artists.some(a => a.error)) return reply({ error: 'Could not verify all receiving addresses. Try again shortly.' }, 503);
+      if (live.artists.some(a => a.error)) return reply({ error: 'Could not verify all receiving addresses. Try again shortly.', signedIn: true, retryable: true }, 503);
       return reply({ error: 'This wallet does not hold an artist’s receiving song.' }, 403);
     }
     const records = await queryAll(env, 'SELECT tx_id, recipient, editions_json FROM audionaut_royalty_payments ORDER BY recorded_at DESC');
@@ -82,7 +93,7 @@ export async function handleRoyalties(request: Request, env: Env, deps: RoyaltyD
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not load the royalty ledger.';
     if (/no such table|D1 binding/i.test(message)) return reply({ error: 'Royalty ledger storage is not installed yet. Apply the royalty migration.' }, 503);
-    return reply({ error: message }, request.method === 'POST' ? 400 : 503);
+    return reply({ error: message, ...(request.method === 'GET' && signedIn ? { signedIn: true, retryable: true } : {}) }, request.method === 'POST' ? 400 : 503);
   }
 }
 export const onRequest: PagesFunction = ({ request, env }) => handleRoyalties(request, env);

@@ -201,3 +201,24 @@ addresses and never connect an existing wallet or broadcast a transaction.
   transfers. Unlabelled payments need their covered editions assigned once.
   Future explicitly tagged transfers are reconciled automatically. No wallet
   key was used for signing and no STX was sent.
+
+## Throttled sign-in recovery, 12 October 2026
+
+A reported live sign-in connected Xverse successfully, then failed with `Chain
+verification unavailable (429)`. The API reader used only the first configured
+Hiro key, unlike the scheduled verifier's first-party proxy. Mint, holder and
+historical receipt reads now use that existing proxy service in-process on Pages,
+including its key cooldowns, failover and read cache. The scheduled worker keeps
+its existing first-party transport. Per-read deadlines bound all attempts.
+
+Concurrent API scans share their pending result and one-minute successful cache;
+failed scans are retried, and expired holder evidence cannot grant access.
+A valid session survives a temporary verification error, with a Retry checks
+button and visible-tab minute retries. Ledger data stays hidden until checks
+succeed; denial or expiry clears data and stops polling.
+
+Verification: 57 targeted tests, including actual default mint/holder/receipt
+transport with first-key 429, bounded all-key failure, abort handling, scan
+sharing/expiry/failure recovery, and authenticated API error privacy. Browser
+simulations cover automatic/manual recovery without wallet reconnection,
+connection loss, expired sessions and sign-out. No live wallet used.

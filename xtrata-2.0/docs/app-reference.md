@@ -103,6 +103,9 @@ Purpose: one-stop map of where code lives and which files to touch for common up
   5 STX receipts. `functions/lib/audionaut-royalty-automation.ts` and
   `workers/audionaut-royalties/` discover tagged payments every five minutes,
   resume history scans and preserve ambiguous transfers for admin assignment.
+  `functions/lib/audionaut-royalty-chain.ts` reuses the Hiro proxy key pool/cache
+  with a bounded request deadline; failed verification preserves sign-in for
+  retry while hiding the ledger. Concurrent snapshot reads are shared.
   Migrations 023/024 and `docs/plans/AUDIONAUT-ROYALTIES.md` describe operation.
 
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.

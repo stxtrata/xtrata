@@ -364,8 +364,9 @@ const forwardToHiro = async (params: {
   headers: Headers;
   body?: ArrayBuffer;
   env: Record<string, string | undefined>;
+  signal?: AbortSignal;
 }) => {
-  const { targetUrl, method, headers, body, env } = params;
+  const { targetUrl, method, headers, body, env, signal } = params;
   const apiKeys = getHiroApiKeys(env);
   const keyCandidates = buildKeyCandidates(apiKeys);
   let response: Response | null = null;
@@ -380,9 +381,11 @@ const forwardToHiro = async (params: {
         method,
         headers: attemptHeaders,
         body,
-        redirect: 'follow'
+        redirect: 'follow',
+        signal
       });
     } catch {
+      if (signal?.aborted) break;
       if (i < keyCandidates.length - 1) {
         continue;
       }
@@ -416,6 +419,7 @@ export const proxyHiroRequest = async (params: {
   env: Record<string, string | undefined>;
   network: string;
   path?: string | string[];
+  signal?: AbortSignal;
 }) => {
   const { request, env } = params;
   const targetBaseRaw = getTargetBase(params.network, env);
@@ -451,7 +455,8 @@ export const proxyHiroRequest = async (params: {
       method,
       headers,
       body,
-      env
+      env,
+      signal: params.signal
     });
 
   if (isSafeMethod(method)) {

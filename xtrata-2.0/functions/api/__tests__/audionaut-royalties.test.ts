@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { handleRoyalties, type RoyaltyDependencies } from '../audionaut-royalties';
+import { createSnapshotLoader, handleRoyalties, type RoyaltyDependencies } from '../audionaut-royalties';
 import { catalogue, type Snapshot } from '../../lib/audionaut-royalties';
 import { memoryDb, sqliteAvailable } from '../../lib/__tests__/storage/fixtures';
 const ADDRESS = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', TX = '0x' + 'a'.repeat(64);
@@ -69,5 +69,26 @@ describe.skipIf(!sqliteAvailable)('durable receipt allocations', () => {
     const body = await (await handleRoyalties(get(), env, dependencies({ address: ADDRESS, admin: true }))).json();
     expect(body.automation.payers).toEqual([ADDRESS]);
     expect((await (await handleRoyalties(get(), env, dependencies())).json()).automation.payers).toBeUndefined();
+  });
+});
+
+describe('royalty scan recovery', () => {
+  it('shares concurrent reads, expires holder evidence, and retries failed scans', async () => {
+    let time = 0;
+    const read = vi.fn(async () => snapshot), load = createSnapshotLoader(read, () => time), env = {};
+    await Promise.all([load(env), load(env), load(env)]);
+    expect(read).toHaveBeenCalledTimes(1);
+    time = 60_001; read.mockRejectedValueOnce(Error('429'));
+    await expect(load(env)).rejects.toThrow('429');
+    await load(env); expect(read).toHaveBeenCalledTimes(3);
+    await load({}); expect(read).toHaveBeenCalledTimes(4);
+  });
+  it('preserves verified sign-in during a failed scan without exposing the ledger', async () => {
+    const deps = dependencies(); deps.snapshot = async () => { throw Error('Chain verification unavailable (429).'); };
+    const response = await handleRoyalties(get(), {}, deps);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'Chain verification unavailable (429).', signedIn: true, retryable: true });
+    expect(deps.rows).not.toHaveBeenCalled();
+    expect(await (await handleRoyalties(get(), {}, dependencies(null))).json()).not.toHaveProperty('signedIn');
   });
 });
