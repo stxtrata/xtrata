@@ -22,7 +22,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {})
   let time = 1_760_000_000_000;
   let main: string | undefined = MAIN;
   const gate: GateConfig = {
-    enabled: true, allowed: true, walletOrigin: 'https://wallet.xtrata.test', canary: true,
+    enabled: true, allowed: true, here: true, radioUrl: 'https://radio.xtrata.test/radio.html', walletOrigin: 'https://wallet.xtrata.test', canary: true,
     limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 }, ...over
   };
   const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER };
@@ -219,6 +219,15 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
     const s = setup();
     await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); await s.ppp.approveFirstPlay();
     s.chain.owner = MAIN;
+    await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+  });
+
+  it('only points to the dedicated radio host anywhere else, and never loads the wallet there', async () => {
+    const s = setup({ here: false, walletOrigin: null });
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'elsewhere' });
+    expect(s.ppp.snapshot().gate?.radioUrl).toBe('https://radio.xtrata.test/radio.html');
     await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
     expect(s.chain.broadcasts).toHaveLength(0);
   });

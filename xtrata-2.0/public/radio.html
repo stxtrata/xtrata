@@ -322,6 +322,18 @@
 </script>
 <script src="/xtrata-radio.js" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
+<script>
+// On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
+// else there is sandboxed. Send links to the rest of Xtrata to the main site instead.
+(function(){
+  if(!/^radio\./.test(location.hostname))return;
+  document.addEventListener('click',function(e){
+    var a=e.target&&e.target.closest&&e.target.closest('a[href]');if(!a)return;
+    var u=new URL(a.getAttribute('href'),location.href);
+    if(u.origin===location.origin&&!/^\/radio(\.html|\/|$)/.test(u.pathname)){a.href='https://xtrata.xyz'+u.pathname+u.search+u.hash;}
+  },true);
+})();
+</script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
 fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js')}).catch(function(){});

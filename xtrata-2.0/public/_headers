@@ -140,3 +140,26 @@
   Cache-Control: no-cache
 /audionaut/daw/js/*
   Cache-Control: no-cache
+
+# Pay-per-play radio host (functions/lib/radio-host.ts, docs/radio/PAY-PER-PLAY.md).
+# The listening wallet trusts this origin, so nothing except the radio's own pages may run here:
+# every other static page is served sandboxed (opaque origin, no scripts). Function routes that
+# can execute inscriptions are guarded in code. If you change the hostname, change it here too.
+https://radio.xtrata.xyz/*
+  Content-Security-Policy: sandbox
+https://radio.xtrata.xyz/radio
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio.html
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/catalogue*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/stats*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/guide*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/share*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/embed*
+  ! Content-Security-Policy
+https://radio.xtrata.xyz/radio/endorse*
+  ! Content-Security-Policy

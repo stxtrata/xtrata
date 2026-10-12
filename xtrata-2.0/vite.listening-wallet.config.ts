@@ -11,8 +11,9 @@ import { resolve } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 
-// Production only by default. Staging must be added explicitly via the variable.
-const DEFAULT_PARENTS = 'https://xtrata.xyz';
+// The dedicated pay-per-play radio host only (functions/lib/radio-host.ts explains why it is not
+// xtrata.xyz). Anything else must be added explicitly via the variable.
+const DEFAULT_PARENTS = 'https://radio.xtrata.xyz';
 
 export function walletHeaders(parents: string[]): string {
   for (const p of parents) {

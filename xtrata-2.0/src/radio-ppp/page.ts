@@ -104,7 +104,7 @@ function start(root: HTMLElement) {
     root.hidden = s.step === 'off';
     if (root.hidden) return;
     $('.ppp-badge').hidden = !s.gate?.canary;
-    const showFrame = !['connect', 'not-invited', 'unsupported', 'off'].includes(s.step);
+    const showFrame = !['elsewhere', 'connect', 'not-invited', 'unsupported', 'off'].includes(s.step);
     frameWrap.hidden = !showFrame;
     // The frame needs room while it is asking the listener something; it rests small otherwise.
     frameWrap.classList.toggle('ppp-frame--active', !!s.busy);
@@ -122,6 +122,11 @@ function start(root: HTMLElement) {
     const busy = !!s.busy;
 
     switch (s.step) {
+      case 'elsewhere': {
+        lines.push(el('p', 'Pay artists a tiny amount each time a new song starts, recorded on-chain. Pay-per-play has its own address, where nothing else on Xtrata can reach your listening wallet.'));
+        if (s.gate?.radioUrl) { const p = el('p'); p.append(link('Open the pay-per-play radio →', s.gate.radioUrl)); lines.push(p); }
+        break;
+      }
       case 'connect':
         lines.push(el('p', 'Pay artists a tiny amount each time a new song starts, recorded on-chain. Connect your wallet above to turn it on. Listening is always free.'));
         break;

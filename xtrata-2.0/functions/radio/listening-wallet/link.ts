@@ -23,8 +23,9 @@ export async function onRequest({ request, env }: { request: Request; env: PppEn
     if (text.length > 4000) return reply({ error: 'Too large' }, 413);
     let body: any;
     try { body = JSON.parse(text); } catch { return reply({ error: 'Invalid JSON' }, 400); }
-    const g = gate(env, typeof body?.main === 'string' ? body.main : null);
+    const g = gate(env, typeof body?.main === 'string' ? body.main : null, request);
     if (!g.enabled) return reply({ error: 'Pay-per-play is switched off right now. Listening stays free.' }, 503);
+    if (!g.here) return reply({ error: 'Pay-per-play links are made on the pay-per-play radio only.' }, 403);
     if (!g.allowed) return reply({ error: 'This wallet is not in the pay-per-play canary yet.' }, 403);
     return reply({ link: await saveLink(env, body) });
   } catch (error) {

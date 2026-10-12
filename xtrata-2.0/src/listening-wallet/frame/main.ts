@@ -8,7 +8,7 @@ import { browserPasskey } from './passkey';
 import { domUi } from './ui';
 import './wallet.css';
 
-const parents = String(import.meta.env.VITE_LISTENING_WALLET_PARENTS || 'https://xtrata.xyz')
+const parents = String(import.meta.env.VITE_LISTENING_WALLET_PARENTS || 'https://radio.xtrata.xyz')
   .split(',').map((s) => s.trim()).filter(Boolean);
 
 const store: StorePort = {

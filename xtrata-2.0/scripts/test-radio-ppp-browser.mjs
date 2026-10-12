@@ -1,7 +1,7 @@
 // Visual + flow smoke test of the /radio pay-per-play panel with the real wallet frame.
 // Chain and API calls are mocked; no wallet popups, no funds. Stops at the link step,
 // which needs a real Xverse/Leather signature.
-// Usage: VITE_LISTENING_WALLET_PARENTS=https://xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
+// Usage: VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
 //        node scripts/test-radio-ppp-browser.mjs [screenshot-dir]
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 const shots = process.argv[2];
 const pub = new URL('../public/', import.meta.url), dist = new URL('../dist-listening-wallet/', import.meta.url);
 const csp = /Content-Security-Policy: (.+)/.exec(await readFile(new URL('_headers', dist), 'utf8'))[1];
-const SITE = 'https://xtrata.test', WALLET = 'https://wallet.xtrata.test';
+const SITE = 'https://radio.xtrata.test', MAINSITE = 'https://xtrata.test', WALLET = 'https://wallet.xtrata.test';
 const MAIN = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const types = { js: 'text/javascript', mjs: 'text/javascript', css: 'text/css', html: 'text/html', svg: 'image/svg+xml', json: 'application/json' };
 const type = (p) => types[p.split('.').pop()] || 'application/octet-stream';
@@ -21,7 +21,7 @@ const errors = [];
 for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900 }]) {
   const context = await browser.newContext({ viewport });
   await context.addInitScript(([key, main]) => {
-    if (location.origin === 'https://xtrata.test') localStorage.setItem(key, JSON.stringify({ isConnected: true, address: main, network: 'mainnet' }));
+    if (location.origin === 'https://radio.xtrata.test') localStorage.setItem(key, JSON.stringify({ isConnected: true, address: main, network: 'mainnet' }));
   }, ['xtrata.v15.1.wallet.session', MAIN]);
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
@@ -30,9 +30,11 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
       try { return route.fulfill({ body: await readFile(new URL(path, dist)), headers: { 'content-type': type(path), 'content-security-policy': csp } }); }
       catch { return route.fulfill({ status: 404, body: '' }); }
     }
-    if (url.origin !== SITE) return route.abort();
+    if (url.origin !== SITE && url.origin !== MAINSITE) return route.abort();
     if (url.pathname === '/radio/listening-wallet/config')
-      return json(route, { enabled: true, allowed: true, canary: true, walletOrigin: WALLET, limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 } });
+      return json(route, url.origin === SITE
+        ? { enabled: true, allowed: true, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 } }
+        : { enabled: true, allowed: false, here: false, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: null, limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 } });
     if (url.pathname === '/radio/listening-wallet/link') return json(route, { links: [] });
     if (url.pathname.startsWith('/hiro/mainnet/v2/accounts/')) return json(route, { balance: '0x0', nonce: 0 });
     if (url.pathname.startsWith('/hiro/') || url.pathname.startsWith('/radio/counts') || url.pathname.startsWith('/radio/chain-likes')) return json(route, {}, 404);
@@ -45,6 +47,12 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   const cdp = await context.newCDPSession(page);
   await cdp.send('WebAuthn.enable');
   await cdp.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', ctap2Version: 'ctap2_1', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, hasPrf: true, automaticPresenceSimulation: true } });
+
+  // On the main site the panel only points to the radio host and never loads the wallet.
+  await page.goto(MAINSITE + '/radio.html');
+  await page.locator('#ppp').getByRole('link', { name: /Open the pay-per-play radio/ }).waitFor();
+  assert.equal(await page.locator('.ppp-frame iframe').count(), 0);
+  if (shots) await page.locator('#ppp').screenshot({ path: `${shots}/ppp-elsewhere-${viewport.width}.png` });
 
   await page.goto(SITE + '/radio.html');
   const panel = page.locator('#ppp');

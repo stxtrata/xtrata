@@ -8,6 +8,9 @@ Pay-per-play is optional. People turn it on to do the right thing, because it fe
 a permanent on-chain record that they paid the artist. Listening is always free, for everyone, and
 any failure means that song plays free.
 
+Pay-per-play runs only on its own radio address, **radio.xtrata.xyz** (see "Why a separate radio
+address"). The radio on xtrata.xyz keeps working as before and its panel links there.
+
 This replaces the 17 Sep "local wizard" direction (docs/plans/RADIO-MUSIC-BALANCE-SIMPLIFIED.md) for
 the **web** radio. The desktop Music App keeps its own wallet.
 
@@ -37,8 +40,8 @@ automatically.
   and the public link signature. Lose the passkey and the balance is lost; that is shown before
   funding. The derivation constants are locked by known-answer tests: **never change them**.
 - **Separate origin.** The key exists only on `wallet.xtrata.xyz`, a separate Pages project with a
-  strict CSP (`default-src 'none'`, `connect-src 'none'`, `frame-ancestors` = the exact parents).
-  Script on xtrata.xyz cannot read it. The bridge (`src/lib/wallet/passkey/bridge`) has no method
+  strict CSP (`default-src 'none'`, `connect-src 'none'`, `frame-ancestors` = the exact parents,
+  by default only `https://radio.xtrata.xyz`). Script on any other origin cannot read it. The bridge (`src/lib/wallet/passkey/bridge`) has no method
   that returns key material, and `assertNoSecrets` blocks any reply that looks like one.
 - **Approvals happen in the frame.** Creating, unlocking, linking (setting the return address),
   approving spending and confirming a return are buttons inside the wallet origin. The page can ask;
@@ -46,7 +49,19 @@ automatically.
   and (where the browser supports IntersectionObserver v2, i.e. Chromium) refuse to confirm while
   the frame is covered, faded or transformed by the page. The bridge answers only the window that
   embeds it.
-- **What a compromised xtrata.xyz page could still do:**
+- **Why a separate radio address.** The wallet has to trust one web address to embed it. That
+  cannot be xtrata.xyz: its executable runtime (`/runtime/`) and gallery (`/g`) deliberately run
+  inscriptions *as* xtrata.xyz so wallet extensions work for the arcade and X-Board, and those
+  inscriptions have `https://xtrata.xyz/runtime/` written on-chain. Anyone could inscribe HTML and
+  link people to it. So the wallet trusts only `radio.xtrata.xyz`, served by the same Pages project,
+  where nothing but the radio may run as the origin:
+  - `/runtime/` (including the executable runtime), `/g`, `/explorer` and `/debug` redirect to
+    xtrata.xyz (`functions/lib/radio-host.ts`, folder `_middleware.ts` files);
+  - inscription content the radio needs (`/runtime/content`, `/i/`, `/inscription/`) is served with
+    `Content-Security-Policy: sandbox`, so HTML among it cannot run as the radio;
+  - every other static page on that host gets the same sandbox from `public/_headers`, except the
+    radio's own pages; links from the radio to the rest of Xtrata go to xtrata.xyz.
+- **What a compromised page on the radio address could still do** (should one ever exist there):
   - Within an approved session: trigger paid plays (50 microSTX to the real holder plus the
     approved fee each), at most one per 20 seconds, up to the session's play count and budget.
   - Ask to change the return address. The frame shows the full new address and, if one was set on
@@ -54,11 +69,10 @@ automatically.
     device with no local record there is no "replaces" warning, only the address to check.
   - Show misleading amounts in a return panel (the frame cannot read the chain). It cannot change
     the destination; a transfer larger than the real balance is rejected by the network.
-- **Launch blocker before opening beyond the canary:** inscribed HTML is served from xtrata.xyz
-  itself (`functions/runtime/content.ts`, and `/g` frames it with `allow-scripts allow-same-origin`),
-  so anyone who inscribes HTML can run script as xtrata.xyz, the origin the wallet trusts. Serve
-  inscription HTML with `Content-Security-Policy: sandbox allow-scripts` (no `allow-same-origin`) or
-  from a separate content origin before setting `RADIO_PPP_ALLOWLIST=all`.
+- **Still open on xtrata.xyz itself (not pay-per-play):** inscriptions run as xtrata.xyz there by
+  design, so a malicious one can read what xtrata.xyz stores in the browser and ask the listener's
+  Xverse/Leather to sign things. Moving the executable runtime to its own address would fix that but
+  changes the wallet bridge the arcade and X-Board use; it is separate, carefully tested work.
 - **One payment in flight.** A new start pays only when nothing is unresolved. A payment that was
   signed but may not have reached the network is re-broadcast with the same signed bytes, never
   replaced. A payment the node refused outright, or whose nonce another transaction used, is marked
@@ -76,17 +90,27 @@ automatically.
    isolation):
    - Repository: this repo, root directory `xtrata-2.0`.
    - Build command: `npm ci && npm run build:listening-wallet`. Output directory: `dist-listening-wallet`.
-   - Variable `VITE_LISTENING_WALLET_PARENTS` = `https://xtrata.xyz` (the default when unset; add
-     `,https://main-staging.xtrata.pages.dev` only if you want staging to use it). This sets both
-     the bridge allowlist and CSP `frame-ancestors`.
+   - Variable `VITE_LISTENING_WALLET_PARENTS` = `https://radio.xtrata.xyz` (the default when unset).
+     This sets both the bridge allowlist and CSP `frame-ancestors`. Never add `https://xtrata.xyz`.
    - Custom domain `wallet.xtrata.xyz`. **Treat this hostname as permanent**: passkeys bind to it,
      so changing it orphans every listening wallet.
    - No Functions, no analytics, no other files on this project, ever.
-3. **Main site variables** (Production; Preview as you like), then redeploy:
+3. **Radio address:** in the main xtrata Pages project, add the custom domain `radio.xtrata.xyz`
+   (same project, same deployment). If you pick a different hostname, also change the
+   `https://radio.xtrata.xyz` rules at the end of `public/_headers` and the wallet's parent variable.
+4. **Main site variables** (Production; Preview as you like), then redeploy:
+   - `RADIO_PPP_HOST` = `radio.xtrata.xyz`
    - `RADIO_LISTENING_WALLET_ORIGIN` = `https://wallet.xtrata.xyz`
    - `RADIO_PPP_ALLOWLIST` = your disposable canary main wallet address(es), comma-separated
    - `RADIO_PPP_ENABLED` = `1`
-4. **Kill switch:** set `RADIO_PPP_ENABLED` to `0` and redeploy. Open radios stop new payments at
+5. **Check the radio address is locked down** before turning anything on:
+   - `curl -sI https://radio.xtrata.xyz/runtime/` → `302` to `https://xtrata.xyz/runtime/`
+   - `curl -sI https://radio.xtrata.xyz/` → contains `content-security-policy: sandbox`
+   - `curl -sI https://radio.xtrata.xyz/radio` → no `content-security-policy` header
+   - `curl -sI "https://radio.xtrata.xyz/runtime/content?tokenId=1&network=mainnet&contractId=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3"` → `content-security-policy: sandbox`
+   If the second or third check fails, Cloudflare is not applying the host rules in `_headers`:
+   keep `RADIO_PPP_ENABLED` at `0` and tell me.
+6. **Kill switch:** set `RADIO_PPP_ENABLED` to `0` and redeploy. Open radios stop new payments at
    their next check: on the next song once the cached setting is over 5 minutes old, or immediately
    on any action. Broadcast transactions cannot be recalled.
 
@@ -95,7 +119,10 @@ automatically.
 Use a **disposable** main wallet and a small amount (AGENTS.md: never personal, deployer or sponsor
 wallets).
 
-- [ ] Desktop Chrome: create, link, deposit 1 STX, approve first play, confirm on explorer.
+- [ ] xtrata.xyz/radio shows only a link to radio.xtrata.xyz and loads no wallet.
+- [ ] radio.xtrata.xyz: the radio plays, artwork shows, and links like "Inscribe your own" open
+      xtrata.xyz.
+- [ ] Desktop Chrome on radio.xtrata.xyz/radio: create, link, deposit 1 STX, approve first play, confirm on explorer.
 - [ ] The holder received exactly 50 microSTX; the fee matches what was approved.
 - [ ] Lock, reload, unlock: same address, link restored, no new wallet popup.
 - [ ] Second tab: shows "already running in another tab", plays free.
@@ -129,6 +156,10 @@ When the checklist passes, widen `RADIO_PPP_ALLOWLIST` (or set it to `all`).
 - Cross-origin iframe passkeys need the parent's `allow` attribute (set by `src/radio-ppp/page.ts`)
   and browser support; the canary will show real coverage.
 - The radio page loads `/radio/ppp.js` only when `/radio/listening-wallet/config` says it is enabled.
+- Listeners connect their main wallet once on radio.xtrata.xyz: it is a different address from
+  xtrata.xyz, so the browser keeps its connection separately. The homepage radio stays free-play.
+- The bare `radio.xtrata.xyz/` shows a blank (sandboxed) page. Link people to
+  `radio.xtrata.xyz/radio`, or add a Cloudflare redirect rule from `/` to `/radio`.
 
 ## Code map
 
@@ -141,13 +172,14 @@ When the checklist passes, widen `RADIO_PPP_ALLOWLIST` (or set it to `all`).
 | `src/listening-wallet/frame/` | The wallet origin app (engine, passkey, UI) |
 | `src/radio-ppp/` | /radio panel and controller (no key) |
 | `functions/radio/listening-wallet/` | `config` (gate) and `link` endpoints |
+| `functions/lib/radio-host.ts`, `functions/*/_middleware.ts`, `public/_headers` | Radio address lockdown |
 | `functions/migrations/026_radio_listening_wallets.sql` | Public link records |
 
 ## Tests
 
 ```sh
-npx vitest run src/lib/listening-wallet src/listening-wallet src/radio-ppp functions/radio/__tests__/listening-wallet.test.ts
-VITE_LISTENING_WALLET_PARENTS=https://xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
+npx vitest run src/lib/listening-wallet src/listening-wallet src/radio-ppp functions/radio/__tests__/listening-wallet.test.ts functions/lib/__tests__/radio-host.test.ts
+VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet && npm run build:radio-ppp
 CHROME_PATH=<chrome or chromium> node scripts/test-listening-wallet-browser.mjs
 CHROME_PATH=<chrome or chromium> node scripts/test-radio-ppp-browser.mjs [screenshot-dir]
 npm run build:listening-wallet   # rebuild with the production parents afterwards

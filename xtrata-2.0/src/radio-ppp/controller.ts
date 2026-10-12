@@ -19,6 +19,9 @@ import type { Entry } from '../radio-test-wallet/model';
 export interface GateConfig {
   enabled: boolean;
   allowed: boolean;
+  /** True only on the dedicated pay-per-play radio host; elsewhere the panel points there. */
+  here: boolean;
+  radioUrl: string | null;
   walletOrigin: string | null;
   canary: boolean;
   limits: { playFee: string; returnFee: string; firstSessionPlays: number; maxSessionPlays: number; sessionHours: number };
@@ -58,7 +61,7 @@ export interface PppDeps {
 }
 
 export type Step =
-  | 'off' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
+  | 'off' | 'elsewhere' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
   | 'fund' | 'over' | 'first-play' | 'paying' | 'ready';
 
 export interface Snapshot {
@@ -138,6 +141,7 @@ export function createPppController(deps: PppDeps) {
 
   function step(): Step {
     if (!gate?.enabled) return 'off';
+    if (!gate.here) return 'elsewhere';
     const main = deps.main();
     if (!main) return 'connect';
     if (!gate.allowed) return 'not-invited';
@@ -252,7 +256,7 @@ export function createPppController(deps: PppDeps) {
       const main = deps.main();
       // The kill switch and allowlist are re-read at least every 5 minutes, and on every action.
       if (force || !gate || gateFor !== main || deps.now() - gateAt > 300_000) { gate = await deps.config(main); gateAt = deps.now(); gateFor = main; }
-      if (!gate.enabled || !main || !gate.allowed) {
+      if (!gate.enabled || !gate.here || !main || !gate.allowed) {
         if (bridge && status?.session) await bridge.request('listening.stop').catch(() => undefined);
         deps.changed();
         return;

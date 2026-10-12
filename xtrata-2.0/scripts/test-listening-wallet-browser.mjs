@@ -1,6 +1,6 @@
 // Real-browser check of the listening wallet origin: CSP, cross-origin iframe passkeys (Chrome's
 // virtual authenticator with PRF), the bridge, and frame-ancestors. No network, no funds.
-// Usage: VITE_LISTENING_WALLET_PARENTS=https://xtrata.test npm run build:listening-wallet
+// Usage: VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test npm run build:listening-wallet
 //        node scripts/test-listening-wallet-browser.mjs
 import { chromium } from 'playwright';
 import { readFile } from 'node:fs/promises';
@@ -10,9 +10,9 @@ import { deserializeTransaction } from '@stacks/transactions';
 const dist = new URL('../dist-listening-wallet/', import.meta.url);
 const headersFile = await readFile(new URL('_headers', dist), 'utf8');
 const csp = /Content-Security-Policy: (.+)/.exec(headersFile)[1];
-assert.match(csp, /frame-ancestors https:\/\/xtrata\.test/, 'build with VITE_LISTENING_WALLET_PARENTS=https://xtrata.test');
+assert.match(csp, /frame-ancestors https:\/\/radio\.xtrata\.test/, 'build with VITE_LISTENING_WALLET_PARENTS=https://radio.xtrata.test');
 
-const WALLET = 'https://wallet.xtrata.test', PARENT = 'https://xtrata.test', EVIL = 'https://evil.test';
+const WALLET = 'https://wallet.xtrata.test', PARENT = 'https://radio.xtrata.test', EVIL = 'https://evil.test';
 const parentPage = (walletOrigin) => `<!doctype html><meta charset="utf-8"><body>
 <iframe id="w" allow="publickey-credentials-get ${walletOrigin}; publickey-credentials-create ${walletOrigin}" src="${walletOrigin}/" style="width:480px;height:300px"></iframe>
 <script>
