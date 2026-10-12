@@ -23,7 +23,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {})
   let main: string | undefined = MAIN;
   const gate: GateConfig = {
     enabled: true, allowed: true, here: true, radioUrl: 'https://radio.xtrata.test/radio.html', walletOrigin: 'https://wallet.xtrata.test', canary: true,
-    limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 }, ...over
+    limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
   const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER };
   const savedLinks: any[] = [];
@@ -67,7 +67,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean } = {})
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
-  it('goes from turn-on to a confirmed first paid play, then pays automatically', async () => {
+  it('turns on once and then pays for every new song, with no extra step after the first', async () => {
     const s = setup();
     await s.ppp.forceRefresh();
     expect(s.ppp.snapshot().step).toBe('intro');
@@ -82,35 +82,56 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
     expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', linked: MAIN, allowance: TARGET });
 
     await s.ppp.deposit();
-    expect(s.ppp.snapshot()).toMatchObject({ step: 'first-play', balance: TARGET, allowance: 0n });
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', balance: TARGET, allowance: 0n, payingOn: true });
+    expect(s.ppp.snapshot().session!.playsLeft).toBeGreaterThan(100); // approved when the wallet was created
 
-    await s.ppp.onAudibleStart({ song: 7, id: rid(1) });
-    expect(s.chain.broadcasts).toHaveLength(0); // nothing pays before the in-frame approval
-
-    await s.ppp.approveFirstPlay();
-    expect(s.ppp.snapshot().session).toMatchObject({ playsLeft: 1 });
-    await s.ppp.onAudibleStart({ song: 7, id: rid(2) });
+    await s.ppp.onAudibleStart({ song: 7, id: rid(2), title: 'Night Drive', artist: 'Audionals' });
     expect(s.chain.broadcasts).toHaveLength(1);
-    expect(s.ppp.snapshot().step).toBe('paying');
-    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'play', song: 7, status: 'pending', recipient: HOLDER, amount: '50', fee: '300' });
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'play', song: 7, status: 'pending', recipient: HOLDER, amount: '50', fee: '300', title: 'Night Drive', artist: 'Audionals' });
+    expect(s.ppp.snapshot().message).toMatch(/“Night Drive” by Audionals/);
 
     s.tick(MIN_PLAY_INTERVAL_MS);
     await s.ppp.onAudibleStart({ song: 8, id: rid(3) });
     expect(s.chain.broadcasts).toHaveLength(1); // one unresolved payment at a time
 
     s.mineAll();
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', canaryPassed: true });
-    expect(s.ppp.snapshot().entries[0]).toMatchObject({ status: 'confirmed' });
-    expect(s.ppp.snapshot().entries[0].raw).toBeUndefined();
-
-    await s.ppp.payAutomatically();
-    expect(s.ppp.snapshot().session!.playsLeft).toBeGreaterThan(100);
     s.tick(MIN_PLAY_INTERVAL_MS);
-    await s.ppp.onAudibleStart({ song: 9, id: rid(4) });
+    await s.ppp.onAudibleStart({ song: 9, id: rid(4) }); // confirmed now, so the next song pays straight away
     expect(s.chain.broadcasts).toHaveLength(2);
     const tx = deserializeTransaction(s.chain.broadcasts[1]) as any;
     expect(tx.auth.spendingCondition.nonce).toBe(1n);
+    expect(s.ppp.snapshot().entries.find((e) => e.song === 7)).toMatchObject({ status: 'confirmed' });
+  });
+
+  it('stays switched off once switched off, including across a lock and unlock, until switched on again', async () => {
+    const s = setup();
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
+    await s.ppp.switchOff();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', payingOn: false, session: null });
+    await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    await s.ppp.lock(); await s.ppp.unlock();
+    expect(s.ppp.snapshot()).toMatchObject({ payingOn: false, session: null });
+    await s.ppp.switchOn();
+    expect(s.ppp.snapshot()).toMatchObject({ payingOn: true });
+    await s.ppp.onAudibleStart({ song: 1, id: rid(2) });
+    expect(s.chain.broadcasts).toHaveLength(1);
+  });
+
+  it('resumes paying after a lock with one unlock, and pays nothing while out of funds', async () => {
+    const s = setup();
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
+    await s.ppp.lock(); await s.ppp.unlock();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', payingOn: true });
+    s.chain.balance = 1_000n;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('fund');
+    await s.ppp.onAudibleStart({ song: 3, id: rid(5) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    s.chain.balance = TARGET;
+    await s.ppp.forceRefresh();
+    await s.ppp.onAudibleStart({ song: 3, id: rid(6) });
+    expect(s.chain.broadcasts).toHaveLength(1); // carries on after the top-up, no extra step
   });
 
   it('pauses above 1 STX and returns the excess only to the linked main wallet', async () => {
@@ -128,7 +149,7 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
 
   it('keeps music free on any payment problem: own song, other tab, kill switch, not invited, no wallet', async () => {
     const s = setup();
-    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); await s.ppp.approveFirstPlay();
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
     s.chain.owner = LISTENING;
     await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
     expect(s.chain.broadcasts).toHaveLength(0);
@@ -148,9 +169,9 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
     expect(t.ppp.snapshot().step).toBe('connect');
 
     const u = setup({}, { tabLock: false });
-    await u.ppp.forceRefresh(); await u.ppp.create(); await u.ppp.link(); await u.ppp.deposit();
-    await u.ppp.approveFirstPlay();
+    await u.ppp.forceRefresh(); await u.ppp.create();
     expect(u.ppp.snapshot().error).toMatch(/another tab/);
+    await u.ppp.link(); await u.ppp.deposit();
     await u.ppp.onAudibleStart({ song: 2, id: rid(9) });
     expect(u.chain.broadcasts).toHaveLength(0);
   });
@@ -180,10 +201,8 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
   it('catches up on confirmations at the next song even when the tab was in the background', async () => {
     const s = setup();
     await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
-    await s.ppp.approveFirstPlay();
     await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
     s.mineAll();
-    await s.ppp.payAutomatically();
     s.tick(MIN_PLAY_INTERVAL_MS);
     await s.ppp.onAudibleStart({ song: 2, id: rid(2) }); // no explicit refresh in between
     s.mineAll();
@@ -195,11 +214,12 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
   it('marks a payment the node refused as failed instead of blocking every later song', async () => {
     const s = setup();
     await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
-    await s.ppp.approveFirstPlay();
     s.chain.rejectNext = true;
     await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
     expect(s.ppp.snapshot().entries[0]).toMatchObject({ status: 'failed' });
-    expect(s.ppp.snapshot().step).toBe('first-play');
+    s.tick(MIN_PLAY_INTERVAL_MS);
+    await s.ppp.onAudibleStart({ song: 2, id: rid(2) });
+    expect(s.chain.broadcasts).toHaveLength(1);
   });
 
   it('offers no second deposit while one is confirming, so the wallet is not over-funded', async () => {
@@ -217,7 +237,7 @@ describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', (
 
   it('plays free when the listener\'s own main wallet holds the song', async () => {
     const s = setup();
-    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); await s.ppp.approveFirstPlay();
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
     s.chain.owner = MAIN;
     await s.ppp.onAudibleStart({ song: 1, id: rid(1) });
     expect(s.chain.broadcasts).toHaveLength(0);

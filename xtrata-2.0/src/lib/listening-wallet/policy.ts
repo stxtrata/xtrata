@@ -24,7 +24,8 @@ export const MAX_RETURN_FEE = 10_000n;
 export const LOW_BALANCE = 50_000n;
 /** Starts closer together than this play free. Bounds how fast a hostile page could spend. */
 export const MIN_PLAY_INTERVAL_MS = 20_000;
-export const MAX_SESSION_MS = 12 * 60 * 60 * 1000;
+/** A session only lives in the wallet frame's memory, so it also ends when the page closes. */
+export const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_SESSION_PLAYS = 3_000;
 
 export const costPerPlay = (fee: bigint) => fee + HOLDER_PAYMENT;
@@ -97,7 +98,7 @@ export function validateSessionTerms(terms: SessionTerms, now = Date.now()): Ses
   if (typeof terms.budget !== 'bigint' || terms.budget < costPerPlay(terms.fee) || terms.budget > TARGET)
     throw new Error('Session budget must cover one play and be at most 1 STX.');
   if (!Number.isFinite(terms.expires) || terms.expires <= now || terms.expires > now + MAX_SESSION_MS)
-    throw new Error('Session must end within 12 hours.');
+    throw new Error('Session must end within 7 days.');
   return terms;
 }
 

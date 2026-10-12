@@ -4,7 +4,6 @@ import { CancelledError, type IdleView, type Panel, type UiPort } from './engine
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
-const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 /** Panels can't be confirmed until they have been on screen this long (clickjacking/keyboard guard). */
 export const ARM_DELAY_MS = 800;
@@ -80,7 +79,7 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
         lines.push(`Unlocked · ${short(view.address!)}`);
         lines.push(view.linked ? `Returns go to your main wallet ${short(view.linked)}` : 'Not linked to a main wallet yet.');
         lines.push(view.session
-          ? `Paying as you listen · ${view.session.playsLeft} plays or ${stx(BigInt(view.session.budgetLeft))} STX left · until ${time(view.session.expires)}`
+          ? `Paying as you listen · ${stx(BigInt(view.session.budgetLeft))} STX left before it asks again`
           : 'Not paying. Music plays free.');
       }
       $('idle-lines').replaceChildren(...lines.map((l) => Object.assign(document.createElement('p'), { textContent: l })));

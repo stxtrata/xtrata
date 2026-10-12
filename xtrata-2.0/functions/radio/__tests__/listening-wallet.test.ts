@@ -43,7 +43,7 @@ describe('pay-per-play canary gate', () => {
     expect(await (await config({ env: { ...env, RADIO_PPP_HOST: '' }, request: get('/x?main=' + MAIN) })).json()).toMatchObject({ enabled: false, here: false });
   });
   it('admits only allowlisted wallets during the canary, everyone with "all"', async () => {
-    expect(await (await config({ env, request: get('/x?main=' + MAIN) })).json()).toMatchObject({ enabled: true, allowed: true, here: true, canary: true, walletOrigin: 'https://wallet.xtrata.xyz', limits: { firstSessionPlays: 1, playFee: '300' } });
+    expect(await (await config({ env, request: get('/x?main=' + MAIN) })).json()).toMatchObject({ enabled: true, allowed: true, here: true, canary: true, walletOrigin: 'https://wallet.xtrata.xyz', limits: { playFee: '300', sessionHours: 168 } });
     expect(await (await config({ env, request: get('/x?main=' + LISTENING) })).json()).toMatchObject({ enabled: true, allowed: false });
     expect(await (await config({ env: { ...env, RADIO_PPP_ALLOWLIST: 'all' }, request: get('/x?main=' + LISTENING) })).json()).toMatchObject({ allowed: true, canary: false });
   });

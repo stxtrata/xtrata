@@ -33,8 +33,8 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
     if (url.origin !== SITE && url.origin !== MAINSITE) return route.abort();
     if (url.pathname === '/radio/listening-wallet/config')
       return json(route, url.origin === SITE
-        ? { enabled: true, allowed: true, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 } }
-        : { enabled: true, allowed: false, here: false, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: null, limits: { playFee: '300', returnFee: '3000', firstSessionPlays: 1, maxSessionPlays: 3000, sessionHours: 4 } });
+        ? { enabled: true, allowed: true, here: true, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: WALLET, limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 } }
+        : { enabled: true, allowed: false, here: false, radioUrl: SITE + '/radio.html', canary: true, walletOrigin: null, limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 } });
     if (url.pathname === '/radio/listening-wallet/link') return json(route, { links: [] });
     if (url.pathname.startsWith('/hiro/mainnet/v2/accounts/')) return json(route, { balance: '0x0', nonce: 0 });
     if (url.pathname.startsWith('/hiro/') || url.pathname.startsWith('/radio/counts') || url.pathname.startsWith('/radio/chain-likes')) return json(route, {}, 404);

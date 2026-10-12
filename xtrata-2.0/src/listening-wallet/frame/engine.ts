@@ -77,7 +77,6 @@ interface Stored { version: 1; wallets: WalletRecord[]; last?: string }
 
 const STORE_KEY = 'xtrata.listening-wallet.v1';
 const short = (a: string) => a.slice(0, 6) + '…' + a.slice(-4);
-const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
 const equalBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 
@@ -101,7 +100,7 @@ function termsLines(t: SessionTerms): string[] {
     `Each new song you hear pays ${stx(50n)} STX to its holder, plus a ${stx(t.fee)} STX network fee.`,
     t.maxPlays === 1
       ? 'This approves ONE paid play.'
-      : `Up to ${t.maxPlays} paid plays, spending at most ${stx(t.budget)} STX, until ${time(t.expires)}.`,
+      : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
     'Skips within 20 seconds of a paid play, pauses and replays of the same start play free.'
   ];
 }
@@ -162,14 +161,15 @@ export function createListeningEngine(deps: {
     return identity;
   };
 
-  async function create(): Promise<ListeningIdentity> {
+  async function create(terms?: SessionTerms): Promise<ListeningIdentity> {
     const existing = load().wallets;
     const created = await deps.ui.act({
       kind: 'create',
       title: 'Create your listening wallet',
       lines: [
         'A small spending wallet for paying artists as you listen. It is made from a passkey on this device, so there is nothing to install and no key is stored anywhere.',
-        'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).'
+        'Your browser will ask you to save a passkey (Face ID, Touch ID, Windows Hello or your phone).',
+        ...(terms ? termsLines(terms) : [])
       ],
       warnings: [
         'Keep no more than 1 STX in it.',
@@ -179,7 +179,7 @@ export function createListeningEngine(deps: {
           ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet: to reach the old one later, choose its passkey when unlocking.`]
           : [])
       ],
-      confirmLabel: 'I understand · create with passkey'
+      confirmLabel: terms ? 'I understand · create and pay as I listen' : 'I understand · create with passkey'
     }, () => deps.passkey.create(existing.map((w) => w.credentialId)));
 
     // Prove PRF is live AND stable before the address is ever shown for funding
@@ -210,14 +210,15 @@ export function createListeningEngine(deps: {
     }
   }
 
-  async function unlockExisting(anyPasskey = false): Promise<ListeningIdentity> {
+  async function unlockExisting(anyPasskey = false, terms?: SessionTerms): Promise<ListeningIdentity> {
     const last = anyPasskey ? undefined : lastRecord();
     const r = await deps.ui.act({
       kind: 'unlock',
       title: 'Unlock your listening wallet',
       lines: [last ? `Wallet ${short(last.address)}. Use its passkey to unlock it for this visit.` : 'Use your listening-wallet passkey to unlock it for this visit.',
-        'The key is rebuilt from your passkey and forgotten when you lock or close this page.'],
-      confirmLabel: 'Unlock with passkey'
+        'The key is rebuilt from your passkey and forgotten when you lock or close this page.',
+        ...(terms ? termsLines(terms) : [])],
+      confirmLabel: terms ? 'Unlock and keep paying' : 'Unlock with passkey'
     }, () => deps.passkey.evaluate(last?.credentialId));
     let second: Uint8Array | undefined;
     try {
@@ -261,10 +262,12 @@ export function createListeningEngine(deps: {
       if (!deps.passkey.available()) throw new Error('This browser does not support passkeys. Listening stays free.');
       const terms = termsFrom(p.terms, now());
       if (!identity) {
-        const id = p.mode === 'create' ? await create() : await unlockExisting(p.anyPasskey === true);
+        // The terms are shown on the same panel as the passkey button, so that one confirm click
+        // inside the frame both unlocks and approves paying as you listen.
+        const id = p.mode === 'create' ? await create(terms) : await unlockExisting(p.anyPasskey === true, terms);
         identity = id;
-      }
-      if (terms) await approve(terms, 'Approve paying as you listen');
+        if (terms) ledger = new SessionLedger(terms, now());
+      } else if (terms) await approve(terms, 'Approve paying as you listen');
       return { address: identity.address, session: summary() };
     }),
 
