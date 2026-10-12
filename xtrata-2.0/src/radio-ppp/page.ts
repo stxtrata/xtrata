@@ -333,6 +333,8 @@ function start(root: HTMLElement) {
         else if (s.allowance > 0n && s.balanceState !== 'ok') actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
     }
+    if (s.walletOutdated)
+      lines.push(el('p', 'The listening wallet box is an older version, so likes go through your main wallet for now. Paid plays work as normal.', 'ppp-warn'));
     if (s.stuck) {
       key.push(el('p', s.stuck === 1 ? '1 payment has not appeared on-chain after 30 minutes.' : `${s.stuck} payments have not appeared on-chain after 30 minutes.`, 'ppp-warn'));
       actions.push(button('Clear stuck payments', () => void ppp.clearStuck()));

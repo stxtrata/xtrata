@@ -53,7 +53,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -76,7 +76,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like'] });
     expect(s.map.size).toBe(0);
   });
 
