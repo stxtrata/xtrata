@@ -232,7 +232,8 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
   .xao-keepopen .xao-ko-notify{margin-top:8px;padding:5px 11px;font:inherit;font-size:11.5px;border-radius:8px;cursor:pointer;
     border:1px solid var(--line);background:transparent;color:var(--ink)}
   .xao-keepopen .xao-ko-notify[hidden]{display:none}
-  .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}`);
+  .xao-keepopen .xao-ko-warn{font-size:11.5px;margin-top:6px;color:var(--bad,#e0603f)}
+  .xao-keepopen .xao-ko-warn.xao-ko-info{color:var(--mut)}`);
 
   if (!box) {
     box = document.createElement('div');
@@ -273,13 +274,14 @@ export function keepOpenBanner(opts: { job: any; status: string; mount: HTMLElem
   const agent = (window as any).XtrataAgent;
   let persistError: string | null = null;
   try { persistError = (agent && agent.getBytesPersistError && agent.getBytesPersistError()) || null; } catch { /* older bundle */ }
+  warn.classList.toggle('xao-ko-info', !persistError && opts.job?.storageDurability === 'refused');
 
   if (persistError) {
     warn.hidden = false;
     warn.textContent = `⚠ This browser would not save your file for resume (${persistError}). If you close this tab the job cannot resume and will refund instead.`;
   } else if (opts.job && opts.job.storageDurability === 'refused') {
     warn.hidden = false;
-    warn.textContent = '⚠ This browser declined to mark its storage as permanent, so it may clear the deposit key if disk space runs low. Try to leave this tab open until the job finishes.';
+    warn.textContent = 'Everything is fine — your inscription process is underway. Please keep this browser tab open until it finishes. Just so you know, your browser has not guaranteed permanent storage, so it may clear the deposit key if your device runs low on disk space.';
   } else {
     warn.hidden = true;
     warn.textContent = '';
