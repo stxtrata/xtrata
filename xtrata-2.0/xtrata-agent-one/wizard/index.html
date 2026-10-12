@@ -799,6 +799,7 @@ try{
 <script src="agent-one.js?v=2026-09-12.1"></script>
 <script src="optimize-audio.js?v=3"></script>
 <script src="optimize-image.js?v=1"></script>
+<script src="music-thumbnail.js?v=1"></script>
 <script>
 const API = '';   // backendless — all data flows through window.XtrataAgent (no HTTP API)
 // On-chain receipt: OFF by default. The receipt HTML is always saved + viewable; this
@@ -1898,6 +1899,18 @@ async function checkStuck(jobId){
 
 // Stand the banner down: goes through the panel so the leave guard is disarmed too.
 function clearKeepOpen(){ try{ window.XtrataUI.keepOpenBanner({ job:null, status:'', mount:$('#keepOpenSlot') }); }catch(e){} }
+// Song thumbnails: once a job completes, hand each minted song's cover to the site so its
+// Explorer tile has a picture straight away (best effort; see music-thumbnail.js).
+function sendSongThumbnails(job){
+  try{
+    const T=window.XtrataThumb; if(!T||!job) return;
+    const htmlByFile={};
+    if(FLOW.player&&FLOW.player.status==='ready'&&FLOW.player.file&&FLOW.player.info&&FLOW.player.info.html) htmlByFile[FLOW.player.file.name]=FLOW.player.info.html;
+    (BATCH.items||[]).forEach(it=>{ if(it.player&&it.player.status==='ready'&&it.player.file&&it.player.info&&it.player.info.html) htmlByFile[it.player.file.name]=it.player.info.html; });
+    const targets=job.items&&job.items.length?job.items:[job];
+    targets.forEach(t=>{ const html=htmlByFile[t.file]; if(t.tokenId&&html) T.postSongThumbnail(job.core,t.tokenId,html); });
+  }catch(_e){}
+}
 async function renderJobDetail(jobId,out,isActive){
   if(!jobId||!out)return;
   try{ const {job,status}=await api('/api/jobs/'+jobId);
@@ -1915,7 +1928,7 @@ async function renderJobDetail(jobId,out,isActive){
       // The agent IS this tab: while a job is live, closing it stops the work
       // mid-upload with the deposit still on a wallet only this browser can open.
       window.XtrataUI.keepOpenBanner({ job, status: st, mount: $('#keepOpenSlot') });
-      if((st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')&&!FLOW.done){ FLOW.done=true; setStep('done'); }
+      if((st==='COMPLETE'||st==='COMPLETE_WITH_SKIPS')&&!FLOW.done){ FLOW.done=true; setStep('done'); sendSongThumbnails(job); }
       else if(st!=='COMPLETE'&&st!=='COMPLETE_WITH_SKIPS'&&funded&&FLOW.done===false){ /* keep pay step lit until done */ }
     }
     // ---- Batch board: one row per item, live ticks as the batch mints ----

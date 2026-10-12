@@ -26,6 +26,9 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { buildUpsertSql, parseWranglerJson, sqlString, THUMBNAIL_SIZE, thumbKey } from './backfill-thumbnails.mjs';
 
+import { extractSongFromHtml } from './lib/song-cover.mjs';
+
+export { extractSongFromHtml };
 const run = promisify(execFile);
 
 export const DEFAULT_MAX_BYTES = 30 * 1024 * 1024;
@@ -35,7 +38,6 @@ export const MAKEABLE_KINDS = ['image', 'svg', 'html'];
 export const DEFAULT_KINDS = ['image', 'svg'];
 // Song players embed their audio, so a real one is never tiny. Smaller HTML is an app, a game or art.
 export const DEFAULT_MIN_HTML_BYTES = 200_000;
-const MAX_COVER_BYTES = 15 * 1024 * 1024;
 
 /** Group an inscription's mime type into the kind that decides how its thumbnail is made. */
 export const classifyKind = (mime) => {
@@ -74,64 +76,6 @@ export const isSafeSvg = (text) => {
   }
   if (/@import/i.test(source)) return false;
   return true;
-};
-
-/**
- * Song details from a song player file. Two templates exist: the original one
- * keeps them in a #xtrata-music-metadata script, the "opus player" keeps them
- * in the metadata of its #xtrataPlayerManifest script. Returns null for anything
- * that does not declare itself a song.
- */
-const readSongMetadata = (source) => {
-  const script = (id) =>
-    new RegExp(`<script\\b[^>]*\\bid=["']${id}["'][^>]*>([\\s\\S]*?)<\\/script>`, 'i').exec(source)?.[1] ?? null;
-  const parse = (text) => {
-    try {
-      return text === null ? null : JSON.parse(text);
-    } catch {
-      return null;
-    }
-  };
-  const music = parse(script('xtrata-music-metadata'));
-  if (music && music.schema === 'xtrata-music' && music.assetType === 'song') return music;
-  const manifest = parse(script('xtrataPlayerManifest'));
-  const meta = manifest?.metadata ?? manifest?.template?.metadata ?? null;
-  if (meta && typeof meta === 'object' && meta.assetType === 'song') return meta;
-  return null;
-};
-
-/**
- * Reads an Xtrata Music song player (the single-file HTML made by the song
- * templates). Returns { title, artist, cover } where cover is the embedded
- * picture bytes or null, or null when the file is not a song player. Nothing is
- * run or fetched: the file is only read as text.
- */
-export const extractSongFromHtml = (html) => {
-  const source = String(html);
-  const data = readSongMetadata(source);
-  if (!data) return null;
-  const title = typeof data.title === 'string' ? data.title : '';
-  const artist = typeof data.artist === 'string' ? data.artist : '';
-  // The cover is the picture tagged coverArt; otherwise the one inside the
-  // player's cover frame; otherwise the page's only embedded picture.
-  const pictures = [];
-  for (const tag of source.matchAll(/<img\b[^>]*>/gi)) {
-    const src = /\bsrc=["']data:image\/(?:png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)["']/i.exec(tag[0]);
-    if (!src) continue;
-    pictures.push({
-      tagged: /\bid=["']coverArt["']/i.test(tag[0]),
-      framed: /cover-media|xtrataCover/i.test(source.slice(Math.max(0, tag.index - 300), tag.index)),
-      data: src[1]
-    });
-  }
-  const chosen =
-    pictures.find((p) => p.tagged) ?? pictures.find((p) => p.framed) ?? (pictures.length === 1 ? pictures[0] : null);
-  let cover = null;
-  if (chosen) {
-    const bytes = Buffer.from(chosen.data.replace(/\s+/g, ''), 'base64');
-    if (bytes.length > 0 && bytes.length <= MAX_COVER_BYTES) cover = new Uint8Array(bytes);
-  }
-  return { title, artist, cover };
 };
 
 /**
@@ -519,6 +463,16 @@ const main = async () => {
             return;
           }
           text = { title: song.title, artist: song.artist, source: 'cover' };
+          if (!song.cover && song.coverRef) {
+            // Artwork that is another inscription: fetch that picture instead.
+            const ref = song.coverRef;
+            const url = ref.contractId
+              ? contentUrl(options.origin, ref.contractId, ref.tokenId)
+              : `${options.origin}/inscription/${ref.tokenId}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Referenced artwork #${ref.tokenId} request failed: HTTP ${res.status}`);
+            song.cover = new Uint8Array(await res.arrayBuffer());
+          }
           if (!song.cover) {
             statements.push(
               buildUpsertSql({ contractId: contract, tokenId, status: 'none', ...text })

@@ -125,3 +125,11 @@ migration is safe (the endpoint falls back to the old query); running either scr
 npx wrangler d1 execute xtrata-manage --remote --file functions/migrations/022_thumbnail_animated.sql
 node scripts/backfill-all-thumbnails.mjs --recheck-animated --concurrency 5
 ```
+
+## New songs: thumbnail at mint time
+
+- When a song job completes, the Inscription Wizard (`xtrata-agent-one/wizard/music-thumbnail.js`) shrinks the cover to a 256 px WebP in the browser and POSTs it to `/thumb/<contract>/<tokenId>` (`functions/lib/thumbnail-ingest.ts`).
+- The server accepts it only for a token that is in the index as `text/html`, has no ready thumbnail, and sends a real WebP of 40 KB or less. A token not yet indexed gets HTTP 409 and the wizard retries for about two minutes.
+- Covers that reference another inscription (`/inscription/<id>`) are followed by the backfill script (`coverRef` in `scripts/lib/song-cover.mjs`).
+- `npm run thumbnails:sync` fills anything the wizard missed (closed tab, other tools). It does not replace existing rows; use `--force` for that.
+- Pages Functions have no Images binding, which is why the resizing happens in the browser.

@@ -289,3 +289,34 @@ describe('html kind selection', () => {
     expect(script.buildMissingSql({ kinds: ['image', 'html'] })).toContain("OR i.mime LIKE 'text/html%'");
   });
 });
+
+describe('songs whose artwork is another inscription', () => {
+  const meta = JSON.stringify({ schema: 'xtrata-music', assetType: 'song', title: 'Ref Song', artist: 'Me' });
+  const page = (img: string) =>
+    `<script id="xtrata-music-metadata" type="application/json">${meta}</script><img id="coverArt" src="${img}">`;
+
+  it('reports the referenced token instead of a cover', async () => {
+    const { extractSongFromHtml } = await import('../lib/song-cover.mjs');
+    const a = extractSongFromHtml(page('https://xtrata.xyz/inscription/3075'));
+    expect(a?.cover).toBeNull();
+    expect(a?.coverRef).toEqual({ tokenId: 3075, contractId: null });
+    const b = extractSongFromHtml(page('https://xtrata.xyz/i/12'));
+    expect(b?.coverRef).toEqual({ tokenId: 12, contractId: null });
+    const c = extractSongFromHtml(
+      page('https://xtrata.xyz/runtime/content?contractId=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3&amp;tokenId=44&amp;network=mainnet')
+    );
+    expect(c?.coverRef).toEqual({
+      tokenId: 44,
+      contractId: 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3'
+    });
+  });
+
+  it('ignores links to other sites and has no reference when a picture is embedded', async () => {
+    const { extractSongFromHtml } = await import('../lib/song-cover.mjs');
+    expect(extractSongFromHtml(page('https://evil.example/inscription/5'))?.coverRef).toBeNull();
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+    const withCover = extractSongFromHtml(page(`data:image/png;base64,${png}`));
+    expect(withCover?.cover?.length).toBeGreaterThan(0);
+    expect(withCover?.coverRef).toBeNull();
+  });
+});

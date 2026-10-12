@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "thumbnails:sync": "node scripts/backfill-all-thumbnails.mjs --kinds image,svg,html",
     "build:canary:collection-v17": "node scripts/build-collection-v17-canary.mjs",
     "predev": "npm run arcade:games:manifest && npm run xboard:versions:manifest",
     "dev": "vite",

@@ -1,3 +1,4 @@
+import { ingestThumbnail, type IngestEnv } from '../../lib/thumbnail-ingest';
 import { isThumbnailVersion, parseThumbnailRequest, thumbnailKey } from '../../lib/thumbnails';
 
 // GET /thumb/<contract>/<tokenId>?v=<version>
@@ -6,6 +7,9 @@ import { isThumbnailVersion, parseThumbnailRequest, thumbnailKey } from '../../l
 // inscription itself. The version in `?v=` comes from /index/page (it is the
 // thumbnail's etag), so a URL that carries one never changes content and can be
 // cached for a year. Without it we cache briefly, so a replaced picture shows up.
+//
+// POST /thumb/<contract>/<tokenId>?title=&artist=&w=&h= with a small image/webp body
+// stores a song's thumbnail right after it is minted (see lib/thumbnail-ingest.ts).
 //
 // The bucket binding is THUMBNAILS. If it is not configured (or the object is
 // missing) the answer is a plain 404 and the grid keeps its text poster.
@@ -100,4 +104,13 @@ export const onRequest = async (context: {
     context.waitUntil(edge.put(cacheKey, response.clone()));
   }
   return response;
+};
+
+export const onRequestPost = (context: {
+  request: Request;
+  env: IngestEnv;
+  params?: Record<string, string | string[] | undefined>;
+}): Promise<Response> => {
+  const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  return ingestThumbnail(context.request, context.env, first(context.params?.contract), first(context.params?.tokenId));
 };
