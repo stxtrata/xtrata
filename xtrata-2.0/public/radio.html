@@ -138,8 +138,8 @@
   .ppp-badge{display:inline-block;white-space:nowrap;font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
   .ppp-state{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:999px;padding:3px 9px;border:1px solid currentColor;white-space:nowrap}
   .ppp-state--ok{color:var(--ok)}.ppp-state--warn{color:#ffcf8a}.ppp-state--bad{color:#ff8a8a}.ppp-state--mute{color:var(--mut)}
-  .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 6px;font-size:11px;color:var(--mut)}
-  .ppp-steps li{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px 2px 3px}
+  .ppp-steps{display:flex;flex-wrap:wrap;gap:4px;list-style:none;padding:0;margin:0 0 6px;font-size:10.5px;color:var(--mut)}
+  .ppp-steps li{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:999px;padding:2px 7px 2px 3px;white-space:nowrap}
   .ppp-steps .n{display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-weight:700}
   .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}
   .ppp-steps li.now{color:var(--cyan);border-color:var(--cyan);font-weight:700}
@@ -249,9 +249,8 @@
       <div class="ppp-actions"></div>
       <p class="ppp-msg" role="status"></p>
       <p class="ppp-err" role="alert"></p>
-      <details class="ppp-fold ppp-more" hidden><summary>More about this step</summary><div class="ppp-body"></div></details>
-      <details class="ppp-fold ppp-wallets" hidden><summary>Wallet details</summary><dl class="ppp-facts"></dl></details>
-      <details class="ppp-history" hidden></details>
+      <!-- Everything else lives in one fold: how it works, wallet details, quieter actions, history. -->
+      <details class="ppp-fold ppp-wallets" hidden><summary>Wallet &amp; history</summary><div class="ppp-body"></div><dl class="ppp-facts" hidden></dl><div class="ppp-actions ppp-actions2"></div><details class="ppp-history" hidden></details></details>
     </section>
     <p class="strap">Every song on this station is an inscription — full audio files living permanently on-chain.
       <a href="/wizard/" target="_blank" rel="noopener">Inscribe your own →</a>
@@ -363,7 +362,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=27fe2fecb0a7')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=6a8b14a3de9d')}).catch(function(){});
 </script>
 </body>
 </html>

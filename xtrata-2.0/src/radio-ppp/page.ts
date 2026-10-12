@@ -10,7 +10,7 @@ import { showStxTransfer } from '../lib/wallet/connect';
 import { costPerPlay, HOLDER_PAYMENT, stx } from '../lib/listening-wallet/policy';
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
 import { createPppController, type GateConfig, type Snapshot } from './controller';
-import { STAGES, stageOf, type StageView } from './stages';
+import { showSteps, STAGES, stageOf, type StageView } from './stages';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 
@@ -198,19 +198,19 @@ function start(root: HTMLElement) {
       && (asking || !['intro', 'loading'].includes(s.step));
     frameWrap.hidden = !showFrame;
     frameWrap.classList.toggle('ppp-frame--rest', !asking && !walletShown);
+    // The label only shows while the box is open; "Show listening wallet box" lives in the fold.
     const label = $('.ppp-frame-label');
-    label.hidden = !showFrame;
+    label.hidden = !showFrame || (!asking && !walletShown);
     label.replaceChildren(el('span', asking ? 'Listening wallet · tap the button in this box' : 'Listening wallet box'));
-    if (!asking) label.append(button(walletShown ? 'Hide' : 'Show', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'tiny'));
 
-    // Every gate, numbered, from the radio address to paid plays; always shown so progress is clear.
+    // Four steps, shown only during first-time setup. Once set up the panel is one line and a button.
     const stage = stageOf(s) ?? lastStage; // loading keeps the last known stage
     lastStage = stage;
-    // The walk-through is a setup helper until paid plays are taking place.
-    $('.ppp-badge').hidden = !stage || stage.at >= STAGES.length;
+    const setup = showSteps(s, stage);
+    $('.ppp-badge').hidden = !setup;
     const progress = $('.ppp-steps'), caption = $('.ppp-stage');
-    progress.hidden = caption.hidden = !stage;
-    if (stage) {
+    progress.hidden = caption.hidden = !setup;
+    if (stage && setup) {
       progress.replaceChildren(...STAGES.map((label, i) => {
         const li = el('li', '', i < stage.at ? 'done' : i === stage.at ? (stage.blocked ? 'now blocked' : 'now') : '');
         li.append(el('span', i < stage.at ? '✓' : String(i + 1), 'n'), label);
@@ -246,13 +246,14 @@ function start(root: HTMLElement) {
     if (last) loadCatalogue();
     if (last) rows.push(...fact('Last paid song', `${songLabel(last)} → ${short(last.recipient)}`, STATUS_CLASS[last.status] || ''));
     facts.replaceChildren(...rows);
-    $('.ppp-wallets').hidden = !rows.length;
+    facts.hidden = !rows.length;
 
     // `key`: the one or two lines a newcomer needs now, shown at the top. `lines`: everything else,
     // folded under "More about this step".
     const key: HTMLElement[] = [];
     const lines: HTMLElement[] = [];
     const actions: HTMLElement[] = [];
+    const more: HTMLElement[] = []; // quieter buttons, in the fold
     const cost = costPerPlay(BigInt(s.gate?.limits.playFee ?? '300'));
     const payLine = `Each song you listen to for 30 seconds sends ${stx(HOLDER_PAYMENT)} STX to whoever holds it, plus a ${stx(cost - HOLDER_PAYMENT)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`;
     const busy = !!s.busy;
@@ -290,7 +291,7 @@ function start(root: HTMLElement) {
           key.push(el('p', s.payingOn ? 'Unlock it with your passkey to keep paying as you listen.' : 'Paying is switched off. Unlock to manage your wallet.', s.payingOn ? '' : 'ppp-mute'));
           actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
         }
-        actions.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
+        more.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
         break;
       case 'link':
         key.push(el('p', s.serverLinked
@@ -320,8 +321,8 @@ function start(root: HTMLElement) {
         if (s.payingOn && s.session && s.session.playsLeft > 0) {
           // Whichever runs out first: the approval or the balance. A new approval brings the same figures back.
           const left = Math.min(s.session.playsLeft, s.playsLeft);
-          key.push(el('p', `Paying as you listen · up to ${left.toLocaleString()} more plays remaining`, 'ppp-ok'));
-          lines.push(el('p', 'Each song pays its holder once you have heard 30 seconds of it. Skips stay free. Tap the heart to like or unlike a song from this wallet (0.0002 STX).'));
+          key.push(el('p', `Paying as you listen · up to ${left.toLocaleString()} plays left`, 'ppp-ok'));
+          lines.push(el('p', 'Each song pays its holder once you have heard 30 seconds of it. Skips stay free. The heart likes or unlikes from this wallet for 0.0002 STX.'));
           actions.push(button('Switch off', () => void ppp.switchOff()));
         } else {
           key.push(el('p', 'Paying is switched off. Music plays free.', 'ppp-mute'));
@@ -336,27 +337,32 @@ function start(root: HTMLElement) {
       key.push(el('p', s.stuck === 1 ? '1 payment has not appeared on-chain after 30 minutes.' : `${s.stuck} payments have not appeared on-chain after 30 minutes.`, 'ppp-warn'));
       actions.push(button('Clear stuck payments', () => void ppp.clearStuck()));
     }
+    // Quieter actions live in the "Wallet & history" fold.
     if (['ready', 'fund'].includes(s.step) && s.linked && (s.balance ?? 0n) > 0n)
-      actions.push(button('Return all to my wallet', () => void ppp.returnFunds('all'), 'quiet'));
-    if (['ready', 'fund', 'link', 'over'].includes(s.step)) actions.push(button('Lock', () => void ppp.lock(), 'quiet'));
+      more.push(button('Return all to my wallet', () => void ppp.returnFunds('all'), 'quiet'));
+    if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
+    if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 
-    actions.forEach((a) => ((a as HTMLButtonElement).disabled = busy));
+    [...actions, ...more].forEach((a) => ((a as HTMLButtonElement).disabled = busy));
     // While the wallet box is asking for a tap it is the only thing to press: page buttons step aside.
     if (busy) actions.length = 0;
-    // The balance is the one wallet detail a listener needs at a glance.
+    // The balance is the one wallet detail a listener needs at a glance: on the same line once set up.
     if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step)) {
       const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
-      key.push(el('p', `Balance ${stx(s.balance)} STX`, tone));
+      const first = key.at(0);
+      if (s.step === 'ready' && first) first.append(el('span', ` · ${stx(s.balance)} STX`, tone));
+      else key.push(el('p', `Balance ${stx(s.balance)} STX`, tone));
     }
     $('.ppp-key').replaceChildren(...key);
     $('.ppp-body').replaceChildren(...lines);
-    $('.ppp-more').hidden = !lines.length;
     $('.ppp-actions').replaceChildren(...actions);
+    $('.ppp-actions2').replaceChildren(...more);
     $('.ppp-msg').textContent = s.busy || s.message;
     $('.ppp-err').textContent = s.error;
 
     const history = $('.ppp-history');
     history.hidden = !s.entries.length;
+    $('.ppp-wallets').hidden = !(lines.length || facts.childElementCount || more.length || s.entries.length);
     if (s.entries.length) loadCatalogue();
     history.replaceChildren(el('summary', `Payments, likes and returns (${s.entries.length})`), ...(s.entries as Shown[]).slice(0, 20).map((e) => {
       const row = el('div', '', 'ppp-row');

@@ -1,15 +1,19 @@
 import type { Snapshot } from './controller';
 
 /**
- * The pay-per-play gates in the order a listener passes them, from opening the radio
- * address to the first paid play. Shown numbered at the top of the panel throughout.
+ * Four plain steps from nothing to paid plays. Each groups the gates behind it:
+ *   Connect      the pay-per-play radio address, the main wallet, access (canary)
+ *   Passkey      create or unlock the listening wallet
+ *   Link & fund  link it to the main wallet, add funds (or bring it under 1 STX)
+ *   Listen       paying switched on, first paid play
+ * Shown only while setting up for the first time (see `showSteps`); once set up the panel is one line.
  */
-export const STAGES = ['Radio address', 'Connect wallet', 'Access', 'Passkey wallet', 'Link', 'Add funds', 'Switch on', 'First paid play'] as const;
+export const STAGES = ['Connect', 'Passkey', 'Link & fund', 'Listen'] as const;
 
 export interface StageView {
-  /** Index of the stage to do now; STAGES.length once paid plays are taking place. */
+  /** Index of the step to do now; STAGES.length once paid plays are taking place. */
   at: number;
-  /** The current stage is blocked rather than waiting on the listener. */
+  /** The current step is blocked rather than waiting on the listener. */
   blocked: boolean;
   /** One line under the track: where the listener is and what comes next. */
   caption: string;
@@ -18,25 +22,35 @@ export interface StageView {
 /** Where a listener stands. Returns null when the panel has nothing to show yet (loading). */
 export function stageOf(s: Pick<Snapshot, 'step' | 'payingOn' | 'session' | 'entries' | 'gate'>): StageView | null {
   const n = STAGES.length;
-  const view = (at: number, caption: string, blocked = false): StageView => ({ at, blocked, caption: at >= n ? caption : `Stage ${at + 1} of ${n} · ${caption}` });
+  const view = (at: number, caption: string, blocked = false): StageView => ({ at, blocked, caption: at >= n ? caption : `Step ${at + 1} of ${n} · ${caption}` });
   switch (s.step) {
     case 'off': case 'loading': return null;
-    case 'elsewhere': return view(0, 'open the pay-per-play radio address');
-    case 'connect': return view(1, 'connect your main Stacks wallet above');
-    case 'not-invited': return view(2, 'this wallet is not in the canary yet', true);
-    case 'unsupported': return view(3, 'this browser cannot make a passkey wallet', true);
-    case 'intro': return view(3, 'create your passkey listening wallet');
-    case 'locked': return view(3, 'unlock your passkey listening wallet');
-    case 'link': return view(4, 'link the listening wallet to your main wallet');
-    case 'fund': return view(5, 'add up to 1 STX to the listening wallet');
-    case 'over': return view(5, 'over 1 STX: return the excess to keep paying', true);
+    case 'elsewhere': return view(0, 'open the pay-per-play radio');
+    case 'connect': return view(0, 'connect your wallet above');
+    case 'not-invited': return view(0, 'this wallet is not in the test yet', true);
+    case 'unsupported': return view(1, 'this browser cannot make a passkey wallet', true);
+    case 'intro': return view(1, 'create your passkey listening wallet');
+    case 'locked': return view(1, 'unlock your passkey listening wallet');
+    case 'link': return view(2, 'link to your main wallet');
+    case 'fund': return view(2, 'add up to 1 STX');
+    case 'over': return view(2, 'over 1 STX: return the excess', true);
     case 'ready': {
-      if (!s.payingOn || !s.session || s.session.playsLeft < 1) return view(6, 'switch paying on');
+      if (!s.payingOn || !s.session || s.session.playsLeft < 1) return view(3, 'switch paying on');
       const plays = s.entries.filter((e) => e.kind === 'play');
-      if (plays.some((e) => e.status === 'confirmed')) return view(n, 'All stages done · paid plays are taking place');
-      if (plays.some((e) => ['signed', 'pending', 'unknown'].includes(e.status))) return view(7, 'first paid play sent, confirming on-chain');
-      return view(7, 'listen to a song for 30 seconds');
+      if (plays.some((e) => e.status === 'confirmed')) return view(n, 'Paid plays are taking place');
+      if (plays.some((e) => ['signed', 'pending', 'unknown'].includes(e.status))) return view(3, 'first paid play sent, confirming');
+      return view(3, 'listen to a song for 30 seconds');
     }
     default: return null;
   }
+}
+
+/**
+ * The steps are for first-time setup only. Someone who has paid before (or whose wallet is already
+ * linked) sees no track: unlocking, topping up or switching back on is just the one action.
+ */
+export function showSteps(s: Pick<Snapshot, 'step' | 'entries' | 'linked'>, stage: StageView | null) {
+  if (!stage || stage.at >= STAGES.length) return false;
+  if (s.entries.some((e) => e.kind === 'play')) return false; // has paid before: not first-time setup
+  return !(s.step === 'locked' && s.linked); // a returning, already linked wallet just unlocks
 }

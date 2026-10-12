@@ -58,13 +58,14 @@ automatically.
 
 ## Panel layout (for newcomers)
 
-Top to bottom, at every stage: the numbered stages and "Stage N of 8" line, one or two lines saying
-what to do now, the listening wallet box *only while it needs a tap* (it opens in place, right
-there, and rests closed otherwise, with a Show toggle), the buttons, then folds for "More about this
-step", "Wallet details" and the history. Inside the wallet box, panels show a short summary and the
-button first; the full terms and warnings fold under "Details" (the key warning, keep no more than
-1 STX / a lost passkey loses its funds, stays in the summary). The return-address confirm and the
-return review keep the full address visible.
+First-time setup shows four steps (Connect · Passkey · Link & fund · Listen) with a "Step N of 4"
+line and the SETUP HELPER badge. They go away for good once a paid play has confirmed (or when a
+linked wallet only needs unlocking): a set-up listener sees one line, "Paying as you listen · up to
+N plays left · balance", and a Switch off button. Everything else (how it works, wallet details,
+Return all, Lock, Show listening wallet box, history) is in one "Wallet & history" fold. The
+listening wallet box opens in place only while it needs a tap. Inside the wallet box, panels show a
+short summary and the button first; the full terms fold under "Details" (the key warning stays in
+the summary; the return-address confirm and return review keep the full address visible).
 
 ## Likes and attribution
 
