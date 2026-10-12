@@ -1,18 +1,19 @@
-import { queryAll, type Env } from '../lib/db';
-import { chainConfig, chainStates } from '../lib/radio-chain-likes';
+import type { Env } from '../lib/db';
+import { chainConfig, chainStates, paidPlaysTotal } from '../lib/radio-chain-likes';
 
 /**
  * GET /radio/song-stats?id=N — one song's on-chain counters for the radio's display:
  *   likes  the likes contract's current total for the song (read from the chain)
- *   plays  paid plays: pay-per-play receipts on the paid-plays contract, as copied into D1 by the
- *          music stats sync (functions/lib/music-stats.ts), so it can trail the chain by a minute.
+ *   plays  paid plays: the paid-plays contract's own per-song counter (`get-total`), so every paid
+ *          play from every wallet counts the moment it confirms. (Not the D1 copy of the event log
+ *          kept for the homepage tally: that only advances when the homepage asks, so it can trail.)
  * Each is null when it could not be read: a failed read is never reported as zero.
  */
 const RADIO_CORE_INDEX = 3;
 
-type Deps = { chainConfig: typeof chainConfig; chainStates: typeof chainStates };
+type Deps = { chainConfig: typeof chainConfig; chainStates: typeof chainStates; paidPlaysTotal: typeof paidPlaysTotal };
 
-export async function songStats(env: Env, id: number, deps: Deps = { chainConfig, chainStates }) {
+export async function songStats(env: Env, id: number, deps: Deps = { chainConfig, chainStates, paidPlaysTotal }) {
   const [likes, plays] = await Promise.all([
     (async () => {
       try {
@@ -23,11 +24,7 @@ export async function songStats(env: Env, id: number, deps: Deps = { chainConfig
       } catch { return null; }
     })(),
     (async () => {
-      try {
-        const r = await queryAll(env, 'SELECT COUNT(*) AS plays FROM music_paid_plays WHERE core=? AND song_id=?', [RADIO_CORE_INDEX, id]);
-        const n = Number((r.results?.[0] as { plays?: unknown } | undefined)?.plays);
-        return Number.isSafeInteger(n) ? n : null;
-      } catch { return null; }
+      try { return await deps.paidPlaysTotal(RADIO_CORE_INDEX, id, env); } catch { return null; }
     })()
   ]);
   return { id, likes, plays };

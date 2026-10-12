@@ -1,6 +1,8 @@
 import {Cl,cvToJSON,deserializeCV,serializeCV,validateStacksAddress} from '@stacks/transactions';
 import type {Env} from './db';
 import {applyHiroApiKey,getHiroApiKeys,shouldRetryWithNextHiroKey} from './hiro-keys';
+// @ts-ignore Plain JS module shared with the browser readers; it ships no declarations.
+import {PAID_PLAYS_CONTRACT} from '../../public/radio/paid-play-event.mjs';
 const CORE='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3';
 const API='https://api.mainnet.hiro.so';
 export function likesContract(env:Env):string|null {
@@ -76,6 +78,25 @@ export async function chainConfig(env:Env):Promise<ChainConfig|{enabled:false}>{
  if(v.version?.value!=='1'||v.core?.value!==CORE||v['batch-limit']?.value!=='25'||v['platform-fee']?.value!=='0')throw Error('Unexpected likes contract configuration');
  const value:ChainConfig={enabled:true as const,contract,network:'mainnet' as const,batchLimit:25,platformFee:0};
  configCache.set(contract,{value,at:Date.now()});return value;
+}
+/**
+ * The paid-plays contract's own counter for one song: every paid play ever made for it, from any
+ * wallet (`get-total`). This is the authoritative number; anything copied from the event log can
+ * only trail it.
+ */
+export async function paidPlaysTotal(core:number,id:number,env:Env={}):Promise<number>{
+ if(![1,2,3].includes(core)||!Number.isSafeInteger(id)||id<0)throw Error('Invalid song');
+ const [address,name]=String(PAID_PLAYS_CONTRACT).split('.');
+ const hex=(cv:Parameters<typeof serializeCV>[0])=>'0x'+Array.from(serializeCV(cv)).map(b=>b.toString(16).padStart(2,'0')).join('');
+ const response=await chainFetch(env,`/v2/contracts/call-read/${address}/${name}/get-total`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sender:address,arguments:[hex(Cl.uint(core)),hex(Cl.uint(id))]})},'get-total',{retryTransient:true});
+ if(!response.ok)throw new ChainReadUnavailable('Chain read unavailable',response.status===429?retryAfterSeconds(response,30):15);
+ const body=await response.json() as any;
+ if(!body.okay||typeof body.result!=='string')throw Error('Contract read failed');
+ const decoded=cvToJSON(deserializeCV(body.result));
+ if(decoded.type!=='uint'||!/^\d+$/.test(String(decoded.value)))throw Error('Malformed play total');
+ const total=Number(decoded.value);
+ if(!Number.isSafeInteger(total))throw Error('Malformed play total');
+ return total;
 }
 export async function chainStates(contract:string,ids:number[],listener=contract.split('.')[0],env:Env={}){
  if(ids.length>25||!ids.every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('Invalid song IDs');

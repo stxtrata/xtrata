@@ -51,7 +51,9 @@ The "less than $1" wording is fixed text: revisit it if STX trades above $1.
 ## This song on-chain
 
 The display shows the current song's **♥ likes** (the likes contract's total) and **▶ paid
-plays** (pay-per-play receipts, from the D1 copy kept by the music stats sync) from
+plays** (the paid-plays contract's own per-song counter, `get-total(core, id)`: every paid play
+from every wallet, read live; not the D1 copy of the event log, which only advances when the
+homepage tally asks and so can trail) from
 `GET /radio/song-stats?id=N` (functions/radio/song-stats.ts). Asked again on each song change and
 when a like or unlike confirms. A count that could not be read is hidden, never shown as 0.
 
