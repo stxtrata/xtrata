@@ -87,6 +87,8 @@
     "build:arcade-submit": "vite build -c vite.arcade-submit.config.ts",
     "build:bounty-tracker": "vite build -c vite.bounty-tracker.config.ts",
     "build:radio-wallet": "vite build -c vite.radio-wallet.config.ts",
+    "build:listening-wallet": "vite build -c vite.listening-wallet.config.ts",
+    "build:radio-ppp": "vite build -c vite.radio-ppp.config.ts",
     "build:music-support": "node scripts/music-support/package.mjs",
     "test:music-support-package": "node scripts/music-support/source-package-smoke.mjs",
     "music:lounge": "node scripts/wizard/radio-plays-server.mjs",

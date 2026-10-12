@@ -227,6 +227,14 @@ protocol that merely omits a dangerous field can grow one in a later change.
 known-answer address locks: if they change, existing wallets have been silently
 relocated to addresses their owners cannot reach. Fix the code, never the vector.
 
+## 6a. Radio listening wallet (2026-10-12)
+
+The first thing to use the wallet origin is the radio's temporary pay-per-play wallet
+(docs/radio/PAY-PER-PLAY.md). It does NOT seal a seed: its key is HKDF of the PRF output with its
+own salt (`xtrata.radio.listening-wallet.v1`), re-derived on every unlock and never stored. It reuses
+the bridge (new `listening.*` methods), the §3.1 rule (two matching PRF results before funding) and
+the §5a origin rules. It does not implement items 3–6 below for the main passkey wallet.
+
 ## 7. Not built yet
 
 1. **Deploy the wallet origin.** The bridge exists; the hostname does not. Needs

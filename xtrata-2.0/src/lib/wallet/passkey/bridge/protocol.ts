@@ -34,14 +34,42 @@ export type WalletMethod =
   /** Pre-sign a session-wallet return for the server to hold. */
   | 'wallet.preSignReturn'
   /** Display the recovery phrase inside the iframe. Returns acknowledgement only. */
-  | 'wallet.revealPhrase';
+  | 'wallet.revealPhrase'
+  /*
+   * Temporary listening wallet (radio pay-per-play). Its key is derived from the
+   * passkey on unlock and never stored; see src/lib/listening-wallet/derive.ts.
+   */
+  /** Device state, address, linked main wallet and session summary. */
+  | 'listening.status'
+  /** Create or unlock with a passkey; the listener taps a button inside the frame. */
+  | 'listening.unlock'
+  /** Verify the main wallet's link signature and countersign with the listening key. */
+  | 'listening.link'
+  /** Ask the listener (inside the frame) to approve session spending terms. */
+  | 'listening.approveSession'
+  /** Sign one paid play within the approved session. Returns signed bytes only. */
+  | 'listening.signPlay'
+  /** Show a return review inside the frame; sign only if the listener confirms. */
+  | 'listening.prepareReturn'
+  /** Stop paying but stay unlocked. */
+  | 'listening.stop'
+  /** Drop the key from memory. */
+  | 'listening.lock';
 
 export const WALLET_METHODS: readonly WalletMethod[] = [
   'wallet.status',
   'wallet.create',
   'wallet.sign',
   'wallet.preSignReturn',
-  'wallet.revealPhrase'
+  'wallet.revealPhrase',
+  'listening.status',
+  'listening.unlock',
+  'listening.link',
+  'listening.approveSession',
+  'listening.signPlay',
+  'listening.prepareReturn',
+  'listening.stop',
+  'listening.lock'
 ];
 
 export interface BridgeRequest {
