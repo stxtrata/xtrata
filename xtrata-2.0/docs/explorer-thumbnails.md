@@ -84,9 +84,15 @@ How each kind gets its thumbnail:
 | image | resized from the inscription (fit inside 256, never enlarged; pictures that already fit stay at their size, lossless, nearest-neighbour, so pixel art is not blurred) | `backfill-all-thumbnails.mjs` |
 | svg | rasterised, only when it has no script and no outside references | `backfill-all-thumbnails.mjs` |
 | song (audio player HTML) | the cover the radio already extracts | `backfill-thumbnails.mjs` |
+| song player HTML not in the radio catalogue | the cover (`<img id="coverArt">`) and title/artist (`#xtrata-music-metadata`) read out of the file itself; other HTML is skipped untouched | `backfill-all-thumbnails.mjs --kinds html` |
 | html | declared `xtrata:thumbnail` tag, else a rendered screenshot | planned (Phase 3) |
 | audio, video | cover, or a grabbed frame | planned |
 | text, json, code | no picture; the grid keeps its label | by design |
+
+Song players that never reached the radio catalogue are handled with `--kinds html` (opt in, so the default run is
+unchanged). Only files carrying the Xtrata Music metadata block with `assetType: song` are touched; HTML under
+`--min-html-bytes` (default 200000) is never downloaded, and any other HTML is left with no row so the render phase
+still finds it. A song with no embedded cover gets a `none` row that keeps its title and artist.
 
 Rows made from the file itself use `source = 'render'`. A re-run skips `ready` and `none` rows, retries `failed`
 ones, and never replaces a stored thumbnail with a failure.

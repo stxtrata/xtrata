@@ -207,3 +207,57 @@ describe('animation detection', () => {
     expect(script.parseArgs(['--recheck-animated']).recheckAnimated).toBe(true);
   });
 });
+
+
+describe('extractSongFromHtml (song players)', () => {
+  const cover = fixture('png').toString('base64');
+  const player = (meta: unknown, img = `<img id="coverArt" src="data:image/png;base64,${cover}" alt="">`) =>
+    `<!doctype html><html><head><title>x</title></head><body><div class="art">${img}</div>` +
+    `<script type="application/json" id="xtrata-music-metadata">${JSON.stringify(meta)}</script></body></html>`;
+  const song = { schema: 'xtrata-music', schemaVersion: 1, assetType: 'song', title: 'Cool Cool Mama', artist: 'Rex Speedway and The Denim Avengers' };
+
+  it('reads the title, artist and embedded cover', () => {
+    const out = script.extractSongFromHtml(player(song));
+    expect(out.title).toBe('Cool Cool Mama');
+    expect(out.artist).toBe('Rex Speedway and The Denim Avengers');
+    expect(Buffer.from(out.cover).equals(fixture('png'))).toBe(true);
+  });
+  it('returns the song with no cover when the picture is missing or not embedded', () => {
+    expect(script.extractSongFromHtml(player(song, '<div class="placeholder"></div>')).cover).toBeNull();
+    expect(script.extractSongFromHtml(player(song, '<img id="coverArt" src="https://example.com/a.png">')).cover).toBeNull();
+  });
+  it('ignores pictures that are not the cover', () => {
+    const other = `<img src="data:image/png;base64,${cover}">`;
+    expect(script.extractSongFromHtml(player(song, other)).cover).toBeNull();
+  });
+  it('returns null for anything that is not a song player', () => {
+    expect(script.extractSongFromHtml('<html><body><canvas></canvas></body></html>')).toBeNull();
+    expect(script.extractSongFromHtml(player({ ...song, assetType: 'image' }))).toBeNull();
+    expect(script.extractSongFromHtml(player({ ...song, schema: 'other' }))).toBeNull();
+    expect(script.extractSongFromHtml('<script type="application/json" id="xtrata-music-metadata">{oops</script>')).toBeNull();
+  });
+  it('makes a thumbnail from the extracted cover', async () => {
+    const out = script.extractSongFromHtml(player(song));
+    const thumb = await script.makeImageThumbnail(out.cover, sharp);
+    expect(thumb.width).toBeGreaterThan(0);
+    expect(thumb.bytes.length).toBeGreaterThan(0);
+  });
+});
+
+describe('html kind selection', () => {
+  it('is opt in: the default run still handles only pictures', () => {
+    expect(script.parseArgs([]).kinds).toEqual(['image', 'svg']);
+    expect(script.parseArgs(['--kinds', 'html']).kinds).toEqual(['html']);
+    expect(script.parseArgs([]).minHtmlBytes).toBe(200000);
+    expect(script.parseArgs(['--min-html-bytes', '0']).minHtmlBytes).toBe(0);
+    expect(() => script.parseArgs(['--min-html-bytes', '-1'])).toThrow();
+  });
+  it('asks for html rows only when html is selected', () => {
+    expect(script.buildMissingSql()).toContain("i.mime LIKE 'image/%'");
+    expect(script.buildMissingSql()).not.toContain('text/html');
+    const html = script.buildMissingSql({ kinds: ['html'] });
+    expect(html).toContain("i.mime LIKE 'text/html%'");
+    expect(html).not.toContain("'image/%'");
+    expect(script.buildMissingSql({ kinds: ['image', 'html'] })).toContain("OR i.mime LIKE 'text/html%'");
+  });
+});

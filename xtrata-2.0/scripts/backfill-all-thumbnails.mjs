@@ -6,10 +6,13 @@
  *   node scripts/backfill-all-thumbnails.mjs --plan              (read only: coverage table)
  *   node scripts/backfill-all-thumbnails.mjs --dry-run --limit 5 (fetch and resize, store nothing)
  *   node scripts/backfill-all-thumbnails.mjs                     (images and SVGs, whole chain)
+ *   node scripts/backfill-all-thumbnails.mjs --kinds html        (Xtrata Music song players)
  *
- * Images and SVGs are made here with sharp. Audio, video and HTML need other
- * sources (a song cover, a frame, a declared or rendered picture) and are only
- * counted in the coverage report; see docs/explorer-thumbnails.md.
+ * Images and SVGs are made here with sharp. Song players (single-file HTML from
+ * the Xtrata Music template) are read for their embedded cover and title with
+ * --kinds html; other HTML is skipped, untouched. Audio, video and all other HTML
+ * need a frame or a rendered picture and are only counted in the coverage report;
+ * see docs/explorer-thumbnails.md.
  *
  * Safe to re-run: rows already 'ready' or 'none' are skipped, 'failed' rows are
  * retried, and a failure never overwrites a stored thumbnail.
@@ -27,7 +30,12 @@ const run = promisify(execFile);
 
 export const DEFAULT_MAX_BYTES = 30 * 1024 * 1024;
 export const ALL_KINDS = ['image', 'svg', 'html', 'audio', 'video', 'text', 'other'];
-export const MAKEABLE_KINDS = ['image', 'svg'];
+export const MAKEABLE_KINDS = ['image', 'svg', 'html'];
+// 'html' is opt-in (--kinds html): it only handles Xtrata Music song players, whose cover is inside the file.
+export const DEFAULT_KINDS = ['image', 'svg'];
+// Song players embed their audio, so a real one is never tiny. Smaller HTML is an app, a game or art.
+export const DEFAULT_MIN_HTML_BYTES = 200_000;
+const MAX_COVER_BYTES = 15 * 1024 * 1024;
 
 /** Group an inscription's mime type into the kind that decides how its thumbnail is made. */
 export const classifyKind = (mime) => {
@@ -66,6 +74,39 @@ export const isSafeSvg = (text) => {
   }
   if (/@import/i.test(source)) return false;
   return true;
+};
+
+/**
+ * Reads an Xtrata Music song player (the single-file HTML made by the song
+ * template). Returns { title, artist, cover } where cover is the embedded
+ * picture bytes or null, or null when the file is not a song player. Nothing is
+ * run or fetched: the file is only read as text.
+ */
+export const extractSongFromHtml = (html) => {
+  const source = String(html);
+  const meta = /<script\b[^>]*\bid=["']xtrata-music-metadata["'][^>]*>([\s\S]*?)<\/script>/i.exec(source);
+  if (!meta) return null;
+  let data;
+  try {
+    data = JSON.parse(meta[1]);
+  } catch {
+    return null;
+  }
+  if (!data || data.schema !== 'xtrata-music' || data.assetType !== 'song') return null;
+  const title = typeof data.title === 'string' ? data.title : '';
+  const artist = typeof data.artist === 'string' ? data.artist : '';
+  let cover = null;
+  for (const tag of source.matchAll(/<img\b[^>]*>/gi)) {
+    const text = tag[0];
+    if (!/\bid=["']coverArt["']/i.test(text)) continue;
+    const src = /\bsrc=["']data:image\/(?:png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)["']/i.exec(text);
+    if (src) {
+      const bytes = Buffer.from(src[1].replace(/\s+/g, ''), 'base64');
+      if (bytes.length > 0 && bytes.length <= MAX_COVER_BYTES) cover = new Uint8Array(bytes);
+    }
+    break;
+  }
+  return { title, artist, cover };
 };
 
 /**
@@ -223,10 +264,14 @@ export const buildAnimatedUpdateSql = ({ contractId, tokenId, animated }) => {
   );
 };
 
-export const buildMissingSql = ({ contract = null, token = null, force = false } = {}) => {
+export const buildMissingSql = ({ contract = null, token = null, force = false, kinds = ['image', 'svg'] } = {}) => {
   const where = [];
   if (!force) where.push("(t.status IS NULL OR t.status = 'failed')");
-  where.push("(i.mime LIKE 'image/%')");
+  const mimes = [];
+  if (kinds.includes('image') || kinds.includes('svg')) mimes.push("i.mime LIKE 'image/%'");
+  if (kinds.includes('html')) mimes.push("i.mime LIKE 'text/html%'");
+  if (mimes.length === 0) throw new Error('No kinds to look for');
+  where.push(`(${mimes.join(' OR ')})`);
   if (contract) {
     if (!CONTRACT_FILTER.test(contract)) throw new Error(`Invalid contract id: ${contract}`);
     where.push(`i.contract = ${sqlString(contract)}`);
@@ -252,7 +297,8 @@ export const parseArgs = (argv) => {
     limit: Infinity,
     token: null,
     contract: null,
-    kinds: [...MAKEABLE_KINDS],
+    kinds: [...DEFAULT_KINDS],
+    minHtmlBytes: DEFAULT_MIN_HTML_BYTES,
     maxBytes: DEFAULT_MAX_BYTES,
     concurrency: 3,
     origin: 'https://xtrata.xyz',
@@ -275,6 +321,7 @@ export const parseArgs = (argv) => {
     else if (arg === '--contract') options.contract = next();
     else if (arg === '--kinds') options.kinds = next().split(',').map((k) => k.trim()).filter(Boolean);
     else if (arg === '--max-bytes') options.maxBytes = Number(next());
+    else if (arg === '--min-html-bytes') options.minHtmlBytes = Number(next());
     else if (arg === '--concurrency') options.concurrency = Number(next());
     else if (arg === '--origin') options.origin = next().replace(/\/+$/, '');
     else if (arg === '--db') options.db = next();
@@ -289,6 +336,9 @@ export const parseArgs = (argv) => {
   }
   if (!(Number.isInteger(options.concurrency) && options.concurrency >= 1 && options.concurrency <= 8)) {
     throw new Error('--concurrency must be between 1 and 8');
+  }
+  if (!(Number.isInteger(options.minHtmlBytes) && options.minHtmlBytes >= 0)) {
+    throw new Error('--min-html-bytes must be a whole number of bytes, 0 or more');
   }
   if (!(Number.isInteger(options.maxBytes) && options.maxBytes >= 1024)) {
     throw new Error('--max-bytes must be a whole number of bytes, at least 1024');
@@ -402,9 +452,12 @@ const main = async () => {
   }
   const tmp = mkdtempSync(join(tmpdir(), 'xtrata-thumbs-all-'));
   try {
-    let todo = (await d1Rows(options.db, buildMissingSql(options))).filter((row) =>
-      options.kinds.includes(classifyKind(row.mime))
-    );
+    let todo = (await d1Rows(options.db, buildMissingSql(options))).filter((row) => {
+      const kind = classifyKind(row.mime);
+      if (!options.kinds.includes(kind)) return false;
+      // Small HTML is an app or a game, not a song player: not worth downloading.
+      return kind !== 'html' || Number(row.total_size) >= options.minHtmlBytes;
+    });
     if (options.limit !== Infinity) todo = todo.slice(0, options.limit);
     console.log(`\n${todo.length} to do` + (options.dryRun ? ' (dry run: nothing will be uploaded or saved)' : ''));
 
@@ -428,8 +481,29 @@ const main = async () => {
           console.log(`  ${label}: skipped, ${row.total_size} bytes is over --max-bytes`);
           return;
         }
-        const svg = classifyKind(row.mime) === 'svg';
-        const bytes = await fetchContent(options.origin, contract, tokenId, options.maxBytes);
+        const kind = classifyKind(row.mime);
+        const svg = kind === 'svg';
+        let bytes = await fetchContent(options.origin, contract, tokenId, options.maxBytes);
+        let text = { title: '', artist: '', source: 'render' };
+        if (kind === 'html') {
+          const song = extractSongFromHtml(new TextDecoder().decode(bytes));
+          if (!song) {
+            // Nothing is recorded, so the later render phase still finds it.
+            totals.skipped += 1;
+            console.log(`  ${label}: not a song player, left for the render phase`);
+            return;
+          }
+          text = { title: song.title, artist: song.artist, source: 'cover' };
+          if (!song.cover) {
+            statements.push(
+              buildUpsertSql({ contractId: contract, tokenId, status: 'none', ...text })
+            );
+            totals.skipped += 1;
+            console.log(`  ${label}: song with no embedded cover, keeping its title`);
+            return;
+          }
+          bytes = song.cover;
+        }
         if (svg && !isSafeSvg(new TextDecoder().decode(bytes))) {
           statements.push(buildUpsertSql({ contractId: contract, tokenId, status: 'none', source: 'render' }));
           totals.skipped += 1;
@@ -455,7 +529,7 @@ const main = async () => {
               width: thumb.width,
               height: thumb.height,
               bytes: thumb.bytes.length,
-              source: 'render',
+              ...text,
               animated: thumb.animated === null ? null : thumb.animated ? 1 : 0
             })
           );
