@@ -9,7 +9,7 @@
 import { deserializeTransaction, cvToJSON } from '@stacks/transactions';
 import { linkData, type LinkRequest } from '../lib/listening-wallet/link';
 import {
-  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, playsCovered, RESERVE, TARGET,
+  balanceState, costPerPlay, DEFAULT_PLAY_FEE, DEFAULT_RETURN_FEE, fundingAllowance, LIKE_FEE, playsCovered, RESERVE, TARGET,
   type BalanceState, type ReturnMode
 } from '../lib/listening-wallet/policy';
 import { RADIO_CORE_INDEX } from '../lib/listening-wallet/tx';
@@ -60,6 +60,11 @@ export interface PppDeps {
   changed(): void;
   /** A like or unlike from the listening wallet confirmed: the radio should re-read its likes. */
   likesChanged?(): void;
+  /** The song's on-chain like state for the main wallet, including linked listening wallets (`by`). */
+  likeState?(main: string, song: number): Promise<{ liked: boolean; by: string[] }>;
+  /** A like/unlike from the listening wallet was sent, or could not be: the radio's heart follows. */
+  likeSent?(song: number, liked: boolean): void;
+  likeFailed?(song: number): void;
   /** Pause between checks while a like waits for an earlier transaction (tests pass a fake). */
   wait?(ms: number): Promise<void>;
 }
@@ -122,6 +127,9 @@ export function createPppController(deps: PppDeps) {
   let busy: string | null = null;
   let paying = false;
   let liking = false;
+  let checkingLike = false; // a heart tap is reading the song's state: no paid play signs meanwhile
+  // A heart tap while locked: sent right after the listener unlocks (within 2 minutes).
+  let likeAfterUnlock: { song: number; title?: string; artist?: string; likedBy?: string[]; at: number } | null = null;
   let likesConfirmed = false;
   let message = '';
   let error = '';
@@ -316,14 +324,18 @@ export function createPppController(deps: PppDeps) {
       else await holdTab();
     }
     say(resume ? 'Unlocked. Each song you listen to for 30 seconds pays its holder.' : 'Unlocked. Paying is switched off.');
+    const queued = likeAfterUnlock;
+    likeAfterUnlock = null;
+    if (queued && deps.now() - queued.at < 120_000) setTimeout(() => void refresh(true).then(() => toggleLike(queued)), 0);
   }
 
   /**
-   * A locked wallet with paying switched on opens its unlock confirm in the frame straight away,
+   * A locked wallet opens its unlock confirm in the frame straight away (with the paying terms when
+   * paying is switched on),
    * so one tap there goes directly to the passkey. Still the listener's own tap, inside the frame.
    */
   function arm() {
-    if (armed || busy || armOff || armFailures >= 3 || !bridge || !status?.address || !payingOn(status.address)) return;
+    if (armed || busy || armOff || armFailures >= 3 || !bridge || !status?.address) return;
     armed = true;
     armDone = (async () => {
       try { await unlockWith(bridge!, false); armFailures = 0; }
@@ -488,7 +500,7 @@ export function createPppController(deps: PppDeps) {
    * and a play gets paid. Never throws and never affects playback.
    */
   async function onListened(detail: { song: number; id: string; title?: string; artist?: string }) {
-    if (paying || busy || liking) return;
+    if (paying || busy || liking || checkingLike) return;
     paying = true;
     try {
       // Background tabs barely run timers: catch up on confirmations and the kill switch here.
@@ -529,16 +541,42 @@ export function createPppController(deps: PppDeps) {
   }
 
   /**
-   * Whether the listening wallet can take this heart tap: paying is on and approved, this tab holds
-   * the wallet, it is linked to the connected main wallet (so the like counts for it), and for an
-   * unlike, the like being removed is this listening wallet's own. Otherwise the main wallet does it.
+   * The radio's heart on the pay-per-play radio: once a listener has a listening wallet, every tap
+   * toggles the like from it, straight on the likes contract (0.0002 STX). It never opens the
+   * main-wallet page; anything missing (locked, not linked, no funds) is said in the panel instead.
    */
-  function canLike(d: { liked: boolean; likedBy?: string[] }) {
-    const main = deps.main();
-    if (step() !== 'ready' || !payingOn() || !status?.session || !lockHeld || !main || status.linked !== main) return false;
-    const by = d.likedBy ?? [];
-    if (d.liked) return by.length === 0; // never like twice for the same listener
-    return by.includes(status.address!) && !by.includes(main);
+  function heart(d: { song: number; title?: string; artist?: string; likedBy?: string[] }): boolean {
+    if (!gate?.here || !['ready', 'fund', 'over', 'locked', 'link', 'loading'].includes(step())) return false;
+    void toggleLike(d);
+    return true;
+  }
+
+  async function toggleLike(d: { song: number; title?: string; artist?: string; likedBy?: string[] }) {
+    const label = d.title ? `“${d.title}”` : `song #${d.song}`;
+    const fail = (m: string) => { error = m; message = ''; try { deps.likeFailed?.(d.song); } catch { /* radio */ } deps.changed(); };
+    const s = step(), main = deps.main();
+    if (s === 'locked') {
+      likeAfterUnlock = { ...d, at: deps.now() };
+      say(`Unlock to like ${label}: tap “Unlock and keep paying” in the listening wallet box. The like is sent straight after.`);
+      return;
+    }
+    if (s === 'link') return fail('Link the listening wallet to your main wallet first, so your likes count for it.');
+    if (s === 'fund') return fail('Top up the listening wallet to like: each like or unlike costs 0.0002 STX.');
+    if (s === 'over') return fail('Return the excess first: the listening wallet holds more than 1 STX.');
+    if (s !== 'ready' || !main) return fail('Still checking the listening wallet. Try the heart again in a moment.');
+    if (!status?.session) return fail('Paying is switched off. Switch it on to like from the listening wallet.');
+    if (!lockHeld) return fail('Pay-per-play is running in another tab. Like from that tab.');
+    // Read the song's current state (it may have changed on another device), so the tap toggles it.
+    let by: string[] | undefined;
+    checkingLike = true;
+    try { by = deps.likeState ? (await deps.likeState(main, d.song)).by : d.likedBy ?? []; }
+    catch { by = d.likedBy; }
+    finally { checkingLike = false; } // like() below takes over synchronously, before any await
+    if (!by) return fail(`Could not check ${label} right now. Try the heart again.`);
+    const listening = status.address!;
+    const mine = by.includes(listening);
+    if (!mine && by.length) return fail(`${label} was liked from your main wallet${by.includes(main) ? '' : ' or another listening wallet'}. Unlike it there (♥ ON-CHAIN).`);
+    await like({ song: d.song, liked: !mine, title: d.title, artist: d.artist });
   }
 
   /** Sign and send a like/unlike from the listening wallet. Never throws. */
@@ -561,11 +599,11 @@ export function createPppController(deps: PppDeps) {
       const { balance: b, nonce } = await deps.chain.account(listening);
       balance = b; balanceAt = deps.now();
       const signed = await bridge!.request<SignedResult>('listening.signLike', {
-        song: d.song, liked: d.liked, fee: fee().toString(), nonce: nonce.toString(), balance: b.toString()
+        song: d.song, liked: d.liked, fee: LIKE_FEE.toString(), nonce: nonce.toString(), balance: b.toString()
       });
       const entry = {
         id: randomId(), address: listening, kind: 'like', core: 0, song: d.song, liked: d.liked, recipient: '', amount: '0',
-        fee: fee().toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
+        fee: LIKE_FEE.toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
         ...(d.title ? { title: String(d.title).slice(0, 120) } : {}),
         ...(d.artist ? { artist: String(d.artist).slice(0, 120) } : {})
       } as Entry;
@@ -574,20 +612,23 @@ export function createPppController(deps: PppDeps) {
       try {
         await deps.chain.broadcast(signed.raw, signed.txid);
         saveEntry({ ...entry, status: 'pending' });
-        message = `${d.liked ? 'Liked' : 'Unliked'} ${label} from your listening wallet, for your main wallet. The heart updates once it confirms.`;
+        message = `${d.liked ? 'Liked' : 'Unliked'} ${label} from your listening wallet, for your main wallet (0.0002 STX).`;
         error = '';
+        try { deps.likeSent?.(d.song, d.liked); } catch { /* radio */ }
       } catch (e) {
         saveEntry({ ...entry, status: definitelyRejected(e) ? 'failed' : 'unknown', note: (e as Error).message, ...(definitelyRejected(e) ? { raw: undefined } : {}) });
         error = (e as Error).message;
+        if (definitelyRejected(e)) try { deps.likeFailed?.(d.song); } catch { /* radio */ }
       }
       status = await bridge!.request<StatusResult>('listening.status');
     } catch (e) {
       error = 'Like not sent: ' + (e instanceof Error ? e.message : 'the listening wallet is unavailable');
+      try { deps.likeFailed?.(d.song); } catch { /* radio */ }
     } finally {
       liking = false;
       deps.changed();
     }
   }
 
-  return { snapshot, refresh, onListened, canLike, like, ...actions };
+  return { snapshot, refresh, onListened, heart, toggleLike, ...actions };
 }

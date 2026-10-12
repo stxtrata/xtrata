@@ -711,16 +711,30 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     likesDialog.append(close);
     if (!likesDialog.open) likesDialog.showModal();
   };
+  // Likes sent from a pay-per-play listening wallet light (or clear) the heart straight away, until
+  // the confirmed on-chain state catches up (or 5 minutes pass).
+  const sentLikes = new Map();
+  const likeShown = (id) => {
+    const sent = sentLikes.get(String(id));
+    if (sent && Date.now() < sent.until && sent.liked !== isLiked(id)) return sent.liked;
+    if (sent) sentLikes.delete(String(id));
+    return isLiked(id);
+  };
+  window.addEventListener('xtrata:radio-like-sent', (e) => {
+    const d = e.detail;
+    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { sentLikes.set(String(d.song), { liked: d.liked, until: Date.now() + 300000 }); emit(); }
+  });
+  window.addEventListener('xtrata:radio-like-failed', (e) => { if (e.detail && sentLikes.delete(String(e.detail.song))) emit(); });
   const toggleLike = () => {
-    // Pay-per-play on radio.xtrata.xyz can sign the like from the listening wallet (no wallet popup);
-    // it returns true only when it takes the like on, otherwise the usual wallet review opens.
+    // On the pay-per-play radio a listener's listening wallet toggles the like itself, straight on the
+    // likes contract (no wallet popup). It returns true when it takes the tap; otherwise the usual
+    // main-wallet review opens.
     const viaListening = window.XtrataRadioLikeHandler;
-    const chain = chainState?.snapshot();
-    if (nowPlaying?.tokenId != null && typeof viaListening === 'function' && chain?.status === 'ready') {
-      const id = Number(nowPlaying.tokenId);
-      const current = chain.likes.find((l) => l.tokenId === String(nowPlaying.tokenId));
+    if (nowPlaying?.tokenId != null && typeof viaListening === 'function') {
+      const chain = chainState?.snapshot();
+      const current = chain?.status === 'ready' ? chain.likes.find((l) => l.tokenId === String(nowPlaying.tokenId)) : undefined;
       try {
-        if (viaListening({ song: id, liked: !current, likedBy: current?.by || [], title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) return Boolean(current);
+        if (viaListening({ song: Number(nowPlaying.tokenId), likedBy: chain?.status === 'ready' ? (current?.by || []) : undefined, title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) return likeShown(nowPlaying.tokenId);
       } catch { /* fall through to the wallet review */ }
     }
     if (nowPlaying?.tokenId != null) window.open('/radio/endorse?id=' + encodeURIComponent(nowPlaying.tokenId) + '&action=review', '_blank', 'noopener');
@@ -1720,7 +1734,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     renderRelatives(snap);
     renderPctl(snap);
     const heart = faceBtn('heart');
-    const confirmed = Boolean(snap.nowPlaying && isLiked(snap.nowPlaying.tokenId));
+    const confirmed = Boolean(snap.nowPlaying && likeShown(snap.nowPlaying.tokenId));
     heart.classList.toggle('is-lit', confirmed);
     heart.setAttribute('aria-pressed', String(confirmed));
     const chainStatus = chainState?.snapshot().status;

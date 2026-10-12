@@ -12,7 +12,7 @@ import { makeContractCall, makeSTXTokenTransfer } from '@stacks/transactions';
 import { deriveListeningIdentity, type ListeningIdentity } from '../../lib/listening-wallet/derive';
 import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../lib/listening-wallet/link';
 import {
-  costPerPlay, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
+  costPerPlay, LIKE_FEE, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
 import { likeCallOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import type {
@@ -107,7 +107,7 @@ function termsLines(t: SessionTerms): string[] {
       ? 'This approves ONE paid play.'
       : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
     'Songs skipped before 30 seconds play free, and paused or muted time does not count.',
-    'Likes you make on the radio are sent from this wallet too (network fee only) and count for your linked main wallet.'
+    `Tapping the radio's heart likes or unlikes from this wallet too, for a ${stx(LIKE_FEE)} STX network fee, and counts for your linked main wallet.`
   ];
 }
 

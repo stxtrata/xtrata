@@ -58,12 +58,15 @@ automatically.
 
 ## Likes and attribution
 
-- **Likes from the listening wallet.** With paying switched on, approved, linked to the connected
-  main wallet and running in this tab, the radio's heart sends `set-liked` from the listening wallet:
-  no wallet popup, network fee only (the session fee, counted against the same 1 STX approval,
-  at most one like every 3 s). Otherwise the heart opens the usual main-wallet review. The listening
-  wallet never likes a song that is already liked, and only unlikes its own likes; a like the main
-  wallet made is unliked by the main wallet.
+- **Likes from the listening wallet.** Once a listener has a listening wallet on the radio, every tap
+  on the heart toggles the like from it, straight on `xtrata-radio-likes-v1-0` (`set-liked`), for a
+  fixed 0.0002 STX network fee (`LIKE_FEE`) from the same 1 STX approval, at most one every 3 s.
+  No wallet popup, and it never opens the main-wallet endorse page. The tap reads the song's
+  current state first (`/radio/chain-likes`), so it likes or unlikes correctly even if the radio's
+  list is still loading. If something is missing the panel says what (unlock — the like is sent
+  straight after unlocking; link; top up; paying switched off; other tab). A like made from the
+  main wallet is left to the main wallet. The heart lights as soon as the like is sent
+  (`xtrata:radio-like-sent`) and settles on the confirmed state.
 - **Credited to the main wallet.** The likes contract keys likes by `tx-sender` and has no
   "on behalf of" call, so on-chain a like is the listening wallet's. The dual-signed link (both keys
   signed it, verified when saved) is what ties them together:
@@ -191,6 +194,15 @@ wallets).
 - [ ] Record txids and results in docs/radio/reports/.
 
 When the checklist passes, widen `RADIO_PPP_ALLOWLIST` (or set it to `all`).
+
+## Browser caching
+
+Cloudflare's zone **Browser Cache TTL** overrides the `no-cache` in `public/_headers` for scripts
+on the custom domains (they arrive with `max-age=14400`), so a browser could run a four-hour-old
+`/radio/ppp.js` or `/xtrata-radio.js` inside a fresh page. The pages load them by content hash
+instead (`?v=…`, written by `scripts/stamp-radio-assets.mjs` after `build:radio` and
+`build:radio-ppp`). Setting the zone's Browser Cache TTL to **Respect Existing Headers** fixes it
+for every other script too.
 
 ## Known limits
 
