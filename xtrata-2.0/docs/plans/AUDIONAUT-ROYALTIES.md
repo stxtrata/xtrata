@@ -222,3 +222,12 @@ transport with first-key 429, bounded all-key failure, abort handling, scan
 sharing/expiry/failure recovery, and authenticated API error privacy. Browser
 simulations cover automatic/manual recovery without wallet reconnection,
 connection loss, expired sessions and sign-out. No live wallet used.
+
+Released fix commit `20a60bc60` on production main. Pages deployment
+`598207e5-15ad-4e2d-a6b4-4dd5e683611a` completed at 06:59:37 UTC.
+The isolated release passed the same 57 tests, full site build and Functions
+compilation. A read-only live-chain handler check with a simulated session and
+empty local receipt fixture returned HTTP 200, 18 minted rows, and all ten artist
+holders resolved at confirmed block 9,184,143. Live HTML and JavaScript include
+the retry/recovery controls; signed-out production API remains HTTP 401 with
+private/no-store headers and no ledger data. No wallet was connected or signed.
