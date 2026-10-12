@@ -648,7 +648,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
-    likesStatus: chainState?.snapshot().status || 'disconnected', band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
+    likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
     relatives: relatives.slice()
@@ -1551,7 +1551,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     toggleLike,
     isLiked: () => (nowPlaying ? isLiked(nowPlaying.tokenId) : false),
     getLikes: () => chainState.snapshot().likes.slice(),
-    refreshLikes: () => chainState.refresh(true),
+    refreshLikes: () => chainState.refresh(true, true),
     cycleBand, setBand, cyclePreset,
     setShuffle, toggleShuffle: () => setShuffle(!shuffleMode),
     setLoop, toggleLoop: () => setLoop(!player.loop),
@@ -1706,7 +1706,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     heart.classList.toggle('is-lit', confirmed);
     heart.setAttribute('aria-pressed', String(confirmed));
     const chainStatus = chainState?.snapshot().status;
-    heart.title = chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' ? 'On-chain likes unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
+    heart.title = chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' || chainStatus === 'paused' ? 'On-chain like status is temporarily unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
     heart.setAttribute('aria-busy', String(chainStatus === 'loading'));
     heart.setAttribute('aria-label', heart.title);
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');
@@ -1800,11 +1800,12 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   chainState = createRadioOnchainState({wallet: () => walletSession.load(), metadata: id => trackCache.get(String(id)), changed: () => {
     likes = chainState.snapshot().likes.slice(); emit();
   }});
-  const refreshChainLikes = (force = false) => { void chainState.refresh(force); };
+  // force: skip the 60s throttle (focus/visibility) but still respect a failure backoff. manual: explicit user/wallet action, always runs.
+  const refreshChainLikes = (force = false, manual = false) => { void chainState.refresh(force, manual); };
   window.addEventListener('focus', () => refreshChainLikes(true));
-  window.addEventListener('xtrata:wallet-changed', () => refreshChainLikes(true));
+  window.addEventListener('xtrata:wallet-changed', () => refreshChainLikes(true, true));
   window.addEventListener('storage', event => {
-    if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true);
+    if (event.key === null || event.key === 'xtrata.v15.1.wallet.session' || event.key === LIKES_KEY || event.key?.startsWith('xtrata.radio.chain.pending:')) refreshChainLikes(true, true);
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshChainLikes(true); });
   window.setInterval(() => { if (!document.hidden) refreshChainLikes(); }, 15000);
