@@ -2,7 +2,8 @@ import {radioArtist,radioTitle} from './artist-credits.mjs';
 import {removeConfirmedLocalLikes} from './local-like-cleanup';
 import type {WalletSession} from '../wallet/types';
 type Track={id:number;title:string;artist?:string};
-export type ConfirmedRadioLike={tokenId:string;title:string;artist:string};
+/** `by`: which addresses liked it (the wallet and/or its linked listening wallets), when the server reports it. */
+export type ConfirmedRadioLike={tokenId:string;title:string;artist:string;by?:string[]};
 export type RadioOnchainStatus='disconnected'|'loading'|'ready'|'partial'|'unavailable'|'paused';
 /** `checkedAt`: last time this wallet's likes were fully confirmed. `retryAt`: when the next automatic attempt is due after a failure. */
 export type RadioOnchainSnapshot={wallet?:string;status:RadioOnchainStatus;likes:ConfirmedRadioLike[];checkedAt?:number;retryAt?:number};
@@ -53,7 +54,7 @@ export function createRadioOnchainState(options:{wallet:()=>WalletSession;change
     try{
      const data=await read('/radio/chain-likes?'+new URLSearchParams({wallet,ids:batch.map(t=>t.id).join(',')}));
      if(data.contract!==config.contract||!Array.isArray(data.rows)||batch.some(t=>!data.rows.some((r:any)=>r.id===t.id&&typeof r.liked==='boolean')))throw Error('Invalid state response');
-     for(const row of data.rows){const track=batch.find(t=>t.id===row.id);if(track&&row.liked===true){likes.push({tokenId:String(track.id),title:track.title,artist:track.artist||''});freshlyConfirmed.push(String(track.id));}}
+     for(const row of data.rows){const track=batch.find(t=>t.id===row.id);if(track&&row.liked===true){likes.push({tokenId:String(track.id),title:track.title,artist:track.artist||'',...(Array.isArray(row.by)?{by:row.by.filter((a:unknown)=>typeof a==='string')}:{})});freshlyConfirmed.push(String(track.id));}}
     }catch(error){if(signal.aborted)throw error;if(error instanceof HttpFailure){halted=true;note(error);}failed++;likes.push(...previous.filter(l=>batch.some(t=>String(t.id)===l.tokenId)));}
    }
    if(run!==generation||wallet!==address())return;

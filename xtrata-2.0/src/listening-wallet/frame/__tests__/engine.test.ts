@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   createStacksPrivateKey, deserializeTransaction, getAddressFromPrivateKey, makeRandomPrivKey, privateKeyToString,
-  signMessageHashRsv, TransactionVersion, cvToJSON
+  signMessageHashRsv, TransactionVersion, cvToJSON, addressToString, PostConditionMode
 } from '@stacks/transactions';
 import { createListeningEngine, CancelledError, type Panel, type PasskeyPort } from '../engine';
 import { deriveListeningIdentity } from '../../../lib/listening-wallet/derive';
 import { linkHash, verifyLinkSignature } from '../../../lib/listening-wallet/link';
-import { MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
+import { MIN_LIKE_INTERVAL_MS, MIN_PLAY_INTERVAL_MS, TARGET } from '../../../lib/listening-wallet/policy';
+import { LIKES_CONTRACT } from '../../../lib/listening-wallet/tx';
 import { assertNoSecrets } from '../../../lib/wallet/passkey/bridge/protocol';
 import { validateSaved } from '../../../radio-test-wallet/chain';
 
@@ -116,6 +117,37 @@ describe('listening wallet engine (wallet origin)', () => {
     await s.h['listening.signPlay'](play('500000', '1'));
     s.tick(MIN_PLAY_INTERVAL_MS);
     await expect(s.h['listening.signPlay'](play('500000', '2'))).rejects.toThrow(/number of paid plays/);
+  });
+
+  it('signs a like only in an approved session on a linked wallet: set-liked, moving nothing, fee from the budget', async () => {
+    const s = setup();
+    const like = (liked = true, nonce = '0', balance = '500000') => ({ song: 1234, liked, fee: '300', nonce, balance });
+    await s.h['listening.unlock']({ mode: 'create' });
+    await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Paying is switched off/);
+    await s.h['listening.approveSession'](s.terms(3000));
+    await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Link your main wallet first/);
+    const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
+    await s.h['listening.link']({ main: MAIN, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data });
+    const before = (await s.h['listening.status']()).session!.budgetLeft;
+    const signed = await s.h['listening.signLike'](like());
+    assertNoSecrets(signed);
+    const tx = deserializeTransaction(signed.raw) as any;
+    expect(`${addressToString(tx.payload.contractAddress)}.${tx.payload.contractName.content}`).toBe(LIKES_CONTRACT);
+    expect(tx.payload.functionName.content).toBe('set-liked');
+    expect(tx.postConditionMode).toBe(PostConditionMode.Deny);
+    expect(tx.postConditions.values).toHaveLength(0);
+    expect(BigInt(before) - BigInt((await s.h['listening.status']()).session!.budgetLeft)).toBe(300n); // the fee only
+    const entry = { id: 'l1', address: ADDRESS, kind: 'like' as const, core: 0, song: 1234, liked: true, recipient: '', amount: '0', fee: '300', nonce: '0', created: 0, status: 'signed' as const, raw: signed.raw, txid: signed.txid };
+    expect(() => validateSaved(entry)).not.toThrow();
+    expect(() => validateSaved({ ...entry, liked: false })).toThrow(/like does not match/);
+    expect(() => validateSaved({ ...entry, song: 99 })).toThrow(/like does not match/);
+    await expect(s.h['listening.signLike'](like(false, '1'))).rejects.toThrow(/Too soon/);
+    s.tick(MIN_LIKE_INTERVAL_MS);
+    await expect(s.h['listening.signLike'](like(false, '1', String(TARGET + 1n)))).rejects.toThrow(/more than 1 STX/);
+    await expect(s.h['listening.signLike'](like(false, '1', '3100'))).rejects.toThrow(/Top up/);
+    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '500' })).rejects.toThrow(/fee differs/);
+    await expect(s.h['listening.signLike']({ ...like(false, '1'), liked: 'yes' })).rejects.toThrow(/like or unlike/);
+    expect((deserializeTransaction((await s.h['listening.signLike'](like(false, '1'))).raw) as any).payload.functionArgs[1].type).toBeDefined();
   });
 
   it('pauses above 1 STX and when the balance cannot cover a play', async () => {

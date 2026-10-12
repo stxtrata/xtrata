@@ -56,6 +56,28 @@ About 2,850 plays per STX at the default fee. Below 0.05 STX the radio asks to t
 new paid plays pause and **Return excess** / **Return all** appear. Nothing is ever swept
 automatically.
 
+## Likes and attribution
+
+- **Likes from the listening wallet.** With paying switched on, approved, linked to the connected
+  main wallet and running in this tab, the radio's heart sends `set-liked` from the listening wallet:
+  no wallet popup, network fee only (the session fee, counted against the same 1 STX approval,
+  at most one like every 3 s). Otherwise the heart opens the usual main-wallet review. The listening
+  wallet never likes a song that is already liked, and only unlikes its own likes; a like the main
+  wallet made is unliked by the main wallet.
+- **Credited to the main wallet.** The likes contract keys likes by `tx-sender` and has no
+  "on behalf of" call, so on-chain a like is the listening wallet's. The dual-signed link (both keys
+  signed it, verified when saved) is what ties them together:
+  - `/radio/chain-likes?wallet=MAIN` adds the likes of every listening wallet linked to MAIN, with
+    `by` saying who liked each song, so the liked band follows the listener everywhere they connect.
+  - Music stats (`readMusicStats`) count a linked listening wallet as its main wallet, and the paid
+    plays reader (`chain-activity.js`, so Music Heroes too) credits its plays to the main wallet,
+    showing "via listening wallet …". `GET /radio/listening-wallet/link?listening=…` gives the map.
+- The panel shows which main wallet a listening wallet serves ("Linked to", with its BNS name when
+  it has one) and every listening wallet linked to the connected wallet. The walk-through header
+  says SETUP HELPER until paid plays are taking place.
+- Song names in the history come from the radio catalogue with the radio's own title and artist
+  overrides (`artist-credits.mjs`).
+
 ## Security model
 
 - **No stored key.** The key is HKDF(passkey PRF output) and is re-derived on every unlock
@@ -70,8 +92,9 @@ automatically.
 - **Approvals happen in the frame.** Creating, unlocking, linking (setting the return address),
   approving spending and confirming a return are buttons inside the wallet origin. The page can ask;
   it cannot approve. Confirm buttons are not focused, arm only after 0.8 s, ignore synthetic clicks,
-  and (where the browser supports IntersectionObserver v2, i.e. Chromium) refuse to confirm while
-  the frame is covered, faded or transformed by the page. The bridge answers only the window that
+  and (where the browser supports IntersectionObserver v2, i.e. Chromium) stay disabled until fully
+  visible for 0.8 s and refuse to confirm while the frame is covered, faded or transformed by the
+  page. Disabled buttons are dimmed with colour, never opacity, which v2 would read as hidden. The bridge answers only the window that
   embeds it.
 - **Why a separate radio address.** The wallet has to trust one web address to embed it. That
   cannot be xtrata.xyz: its executable runtime (`/runtime/`) and gallery (`/g`) deliberately run
@@ -88,6 +111,8 @@ automatically.
 - **What a compromised page on the radio address could still do** (should one ever exist there):
   - Within an approved session: trigger paid plays (50 microSTX to the real holder plus the
     approved fee each), at most one per 20 seconds, up to the session's play count and budget.
+  - Within an approved session: like or unlike songs from the listening wallet (fee only, at most
+    one every 3 seconds, from the same budget). A like moves no assets (Deny mode, no post-conditions).
   - Ask to change the return address. The frame shows the full new address and, if one was set on
     this device, warns that it replaces it. Only a listener who confirms that is at risk. On a new
     device with no local record there is no "replaces" warning, only the address to check.
@@ -97,7 +122,8 @@ automatically.
   design, so a malicious one can read what xtrata.xyz stores in the browser and ask the listener's
   Xverse/Leather to sign things. Moving the executable runtime to its own address would fix that but
   changes the wallet bridge the arcade and X-Board use; it is separate, carefully tested work.
-- **One payment in flight.** A new listen pays only when nothing is unresolved. A payment that was
+- **One payment in flight.** A new listen pays only when nothing is unresolved, and a like waits
+  (up to 2 minutes) for an earlier transaction to confirm, so they never race for a nonce. A payment that was
   signed but may not have reached the network is re-broadcast with the same signed bytes, never
   replaced. A payment the node refused outright, or whose nonce another transaction used, is marked
   failed. After 30 minutes unseen, the listener can clear it. Each new listen first catches up on
@@ -168,8 +194,11 @@ When the checklist passes, widen `RADIO_PPP_ALLOWLIST` (or set it to `all`).
 
 ## Known limits
 
-- Each main wallet keeps its newest five listening-wallet links on the server; older ones drop off
-  (that only affects restoring the link on another device). New links are capped at 500 an hour.
+- Each main wallet keeps its newest five listening-wallet links on the server; older ones drop off.
+  That affects restoring the link on another device, and the older wallet's likes and paid plays
+  are then no longer credited to the main wallet.
+- Each linked listening wallet adds one contract read per 25 songs when the main wallet's likes are
+  loaded. New links are capped at 500 an hour.
 - One listening-wallet passkey per authenticator: creating a second on the same device is refused
   ("use Unlock instead"). "Use a different listening wallet" lets the listener pick any of theirs.
 - The one-tab lock is per browser. Two devices unlocking the same wallet at once can race on a

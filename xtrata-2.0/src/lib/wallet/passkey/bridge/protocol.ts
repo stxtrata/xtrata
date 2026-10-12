@@ -49,6 +49,8 @@ export type WalletMethod =
   | 'listening.approveSession'
   /** Sign one paid play within the approved session. Returns signed bytes only. */
   | 'listening.signPlay'
+  /** Sign one radio like/unlike within the approved session (network fee only). */
+  | 'listening.signLike'
   /** Show a return review inside the frame; sign only if the listener confirms. */
   | 'listening.prepareReturn'
   /** Withdraw a waiting panel, as if the listener pressed Cancel. Can never approve anything. */
@@ -69,6 +71,7 @@ export const WALLET_METHODS: readonly WalletMethod[] = [
   'listening.link',
   'listening.approveSession',
   'listening.signPlay',
+  'listening.signLike',
   'listening.prepareReturn',
   'listening.cancel',
   'listening.stop',

@@ -1,7 +1,8 @@
 /**
  * Transaction shapes the listening wallet is allowed to sign. Nothing else is signable:
  * a paid play to xtrata-radio-plays-v1-0 that moves exactly 50 microSTX from the
- * listening wallet (post-condition, Deny mode), and an STX return to the linked main
+ * listening wallet (post-condition, Deny mode), a like or unlike on xtrata-radio-likes-v1-0
+ * that moves nothing (Deny mode, no post-conditions), and an STX return to the linked main
  * wallet. Fees and nonces are explicit, so no network call is made while signing.
  */
 import {
@@ -18,6 +19,28 @@ export const PLAYS_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-
 /** Core index for xtrata-v3-2-3 in the plays contract's config (core-1, core-2, core-3). */
 export const RADIO_CORE_INDEX = 3;
 export const RETURN_MEMO = 'Xtrata listening wallet return';
+export const LIKES_CONTRACT = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0';
+
+/** set-liked(id, liked): Deny mode with no post-conditions, so it cannot move any asset. */
+export function likeCallOptions(publicKey: string, p: { song: number; liked: boolean; fee: bigint; nonce: bigint }) {
+  if (!Number.isSafeInteger(p.song) || p.song < 0) throw new Error('Invalid song id.');
+  if (typeof p.liked !== 'boolean') throw new Error('Choose like or unlike.');
+  if (typeof p.nonce !== 'bigint' || p.nonce < 0n) throw new Error('Invalid nonce.');
+  const [contractAddress, contractName] = LIKES_CONTRACT.split('.');
+  return {
+    contractAddress,
+    contractName,
+    functionName: 'set-liked',
+    functionArgs: [Cl.uint(p.song), Cl.bool(p.liked)],
+    publicKey,
+    fee: p.fee,
+    nonce: p.nonce,
+    network: new StacksMainnet(),
+    anchorMode: AnchorMode.Any,
+    postConditionMode: PostConditionMode.Deny,
+    postConditions: []
+  };
+}
 
 export interface PlayRequest {
   core: number;

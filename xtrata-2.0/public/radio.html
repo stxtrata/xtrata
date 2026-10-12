@@ -135,7 +135,7 @@
   .ppp{margin-top:18px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel)}
   .ppp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
   .ppp h3{margin:0}
-  .ppp-badge{font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+  .ppp-badge{display:inline-block;white-space:nowrap;font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
   .ppp-state{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:999px;padding:3px 9px;border:1px solid currentColor;white-space:nowrap}
   .ppp-state--ok{color:var(--ok)}.ppp-state--warn{color:#ffcf8a}.ppp-state--bad{color:#ff8a8a}.ppp-state--mute{color:var(--mut)}
   .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 6px;font-size:11px;color:var(--mut)}
@@ -238,7 +238,7 @@
       <div id="likesList"></div>
     </div>
     <section class="ppp" id="ppp" hidden aria-label="Pay per play">
-      <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>CANARY</span></h3><span class="ppp-state" hidden></span></div>
+      <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>SETUP HELPER</span></h3><span class="ppp-state" hidden></span></div>
       <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
       <p class="ppp-stage" hidden></p>
       <dl class="ppp-facts" hidden></dl>

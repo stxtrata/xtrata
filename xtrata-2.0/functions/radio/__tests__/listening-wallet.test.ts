@@ -4,6 +4,9 @@ import { readFileSync } from 'node:fs';
 import { createStacksPrivateKey, getAddressFromPrivateKey, makeRandomPrivKey, privateKeyToString, signMessageHashRsv, TransactionVersion } from '@stacks/transactions';
 import { onRequest as config } from '../listening-wallet/config';
 import { onRequest as link } from '../listening-wallet/link';
+import { onRequest as chainLikes, mergeLinkedRows } from '../chain-likes';
+import { resetChainReadState } from '../../lib/radio-chain-likes';
+import { Cl, serializeCV } from '@stacks/transactions';
 import { linkHash } from '../../../src/lib/listening-wallet/link';
 
 const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
@@ -82,5 +85,42 @@ describe('listening wallet links', () => {
     for (let i = 0; i < 6; i++) expect((await post(submission(NOW - (6 - i) * 1000, mainKey, keys[i]))).status).toBe(200);
     const rows = db.prepare('SELECT listening FROM radio_listening_wallets WHERE main=? ORDER BY issued').all(MAIN).map((r: any) => r.listening);
     expect(rows).toEqual(keys.slice(1).map(addr));
+  });
+});
+
+describe('listening-wallet actions credited to the main wallet', () => {
+  it('looks up the main wallet for listening wallets (public, up to 100)', async () => {
+    await post(submission());
+    const r = await (await link({ env, request: get(`/radio/listening-wallet/link?listening=${LISTENING},${MAIN}`) })).json();
+    expect(r.links).toEqual([{ listening: LISTENING, main: MAIN }]);
+    expect((await link({ env, request: get('/radio/listening-wallet/link?listening=' + Array(101).fill(LISTENING).join(',')) })).status).toBe(400);
+  });
+
+  it('merges likes: liked if the main wallet or a linked listening wallet liked it, and says which', () => {
+    const own = [{ id: 1, liked: true, total: '2' }, { id: 2, liked: false, total: '1' }, { id: 3, liked: false, total: '0' }];
+    const merged = mergeLinkedRows(MAIN, own, [{ listening: LISTENING, rows: [{ id: 1, liked: true, total: '2' }, { id: 2, liked: true, total: '1' }, { id: 3, liked: false, total: '0' }] }]);
+    expect(merged).toEqual([
+      { id: 1, liked: true, total: '2', by: [MAIN, LISTENING] },
+      { id: 2, liked: true, total: '1', by: [LISTENING] },
+      { id: 3, liked: false, total: '0', by: [] }
+    ]);
+  });
+
+  it("returns a main wallet's likes including its linked listening wallets' likes", async () => {
+    await post(submission());
+    const contract = 'SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0';
+    const enc = (cv: any) => '0x' + Array.from(serializeCV(cv)).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const mainArg = enc(Cl.standardPrincipal(MAIN));
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init: RequestInit) => {
+      if (url.endsWith('get-config')) return new Response(JSON.stringify({ okay: true, result: enc(Cl.ok(Cl.tuple({ version: Cl.uint(1), core: Cl.contractPrincipal('SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X', 'xtrata-v3-2-3'), 'batch-limit': Cl.uint(25), 'platform-fee': Cl.uint(0) }))) }));
+      const listener = JSON.parse(String(init.body)).arguments[1];
+      const liked = listener === mainArg ? [true, false] : [false, true];
+      return new Response(JSON.stringify({ okay: true, result: enc(Cl.ok(Cl.list([7, 8].map((id, i) => Cl.tuple({ id: Cl.uint(id), liked: Cl.bool(liked[i]), total: Cl.uint(1) }))))) }));
+    }));
+    try {
+      const r = await (await chainLikes({ env: { ...env, RADIO_LIKES_CONTRACT: contract, HIRO_API_KEY: 'k' }, request: get('/radio/chain-likes?ids=7,8&wallet=' + MAIN) })).json();
+      expect(r.rows).toEqual([{ id: 7, liked: true, total: '1', by: [MAIN] }, { id: 8, liked: true, total: '1', by: [LISTENING] }]);
+      expect(r.linked).toEqual([LISTENING]);
+    } finally { vi.unstubAllGlobals(); resetChainReadState(); }
   });
 });

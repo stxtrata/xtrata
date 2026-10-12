@@ -224,9 +224,14 @@ async function songDetails(db: Db, rows: any[]): Promise<Map<number, SongDetails
 export async function readMusicStats(env: StatsEnv): Promise<MusicStats> {
   const db = env.DB;
   if (!db) throw Error('Missing D1 binding');
+  // A pay-per-play listening wallet counts as the main wallet it is linked to (dual-signed link).
+  const linked = (sql: string, plain: string) => db.prepare(sql).first().catch(() => db.prepare(plain).first());
+  const linkedAll = (sql: string, plain: string) => db.prepare(sql).all().catch(() => db.prepare(plain).all());
   const [totals, latest, state] = await Promise.all([
-    db.prepare('SELECT COUNT(*) AS plays, COUNT(DISTINCT payer) AS supporters FROM music_paid_plays').first(),
-    db.prepare('SELECT txid, payer, recipient, core, song_id, block_time FROM music_paid_plays ORDER BY pos DESC LIMIT 3').all(),
+    linked('SELECT COUNT(*) AS plays, COUNT(DISTINCT COALESCE(l.main, p.payer)) AS supporters FROM music_paid_plays p LEFT JOIN radio_listening_wallets l ON l.listening = p.payer',
+      'SELECT COUNT(*) AS plays, COUNT(DISTINCT payer) AS supporters FROM music_paid_plays'),
+    linkedAll('SELECT p.txid, COALESCE(l.main, p.payer) AS payer, p.recipient, p.core, p.song_id, p.block_time FROM music_paid_plays p LEFT JOIN radio_listening_wallets l ON l.listening = p.payer ORDER BY p.pos DESC LIMIT 3',
+      'SELECT txid, payer, recipient, core, song_id, block_time FROM music_paid_plays ORDER BY pos DESC LIMIT 3'),
     readState(db)
   ]);
   const plays = Number(totals?.plays ?? 0);

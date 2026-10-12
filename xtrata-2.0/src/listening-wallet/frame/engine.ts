@@ -14,9 +14,9 @@ import { isMainnetStandardAddress, signLink, verifyLinkSignature } from '../../l
 import {
   costPerPlay, RESERVE, returnPlan, SessionLedger, stx, TARGET, validateSessionTerms, type SessionTerms
 } from '../../lib/listening-wallet/policy';
-import { playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
+import { likeCallOptions, playCallOptions, returnTransferOptions } from '../../lib/listening-wallet/tx';
 import type {
-  LinkParams, LinkResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignPlayParams,
+  LinkParams, LinkResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams, SignPlayParams,
   StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
 
@@ -106,7 +106,8 @@ function termsLines(t: SessionTerms): string[] {
     t.maxPlays === 1
       ? 'This approves ONE paid play.'
       : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
-    'Songs skipped before 30 seconds play free, and paused or muted time does not count.'
+    'Songs skipped before 30 seconds play free, and paused or muted time does not count.',
+    'Likes you make on the radio are sent from this wallet too (network fee only) and count for your linked main wallet.'
   ];
 }
 
@@ -332,6 +333,31 @@ export function createListeningEngine(deps: {
         const options = playCallOptions(id.address, id.publicKey, { core: p.core, song: p.song, receipt: p.receipt, fee, nonce });
         const session = ledger;
         session.consume(fee, now());
+        const tx = await makeContractCall({ ...options, senderKey: id.privateKey });
+        if (identity !== id || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
+        refreshIdle();
+        return { raw: toHex(tx.serialize()), txid: '0x' + tx.txid() };
+      } finally {
+        signing = false;
+      }
+    },
+
+    // A like or unlike is a deliberate tap on the radio's heart, covered by the approved session:
+    // it moves nothing (Deny mode, no post-conditions) and costs only the session's network fee.
+    'listening.signLike': async (params: unknown): Promise<SignedResult> => {
+      const id = requireUnlocked();
+      if (!ledger) throw new Error('Paying is switched off, so likes go through your main wallet.');
+      if (!record(credentialId)?.link?.main) throw new Error('Link your main wallet first, so likes count for it.');
+      if (signing) throw new Error('Still signing. Try the like again in a moment.');
+      signing = true;
+      try {
+        const p = params as SignLikeParams;
+        const fee = bigintParam(p?.fee, 'fee'), nonce = bigintParam(p?.nonce, 'nonce'), balance = bigintParam(p?.balance, 'balance');
+        if (balance > TARGET) throw new Error('This wallet holds more than 1 STX. Return the excess first.');
+        if (balance < RESERVE + fee) throw new Error('Balance too low for the like fee. Top up first.');
+        const options = likeCallOptions(id.publicKey, { song: p.song, liked: p.liked, fee, nonce });
+        const session = ledger;
+        session.consumeLike(fee, now());
         const tx = await makeContractCall({ ...options, senderKey: id.privateKey });
         if (identity !== id || ledger !== session) throw new Error('Listening stopped before signing finished. Nothing was returned.');
         refreshIdle();

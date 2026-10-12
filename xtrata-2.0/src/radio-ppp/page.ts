@@ -11,6 +11,8 @@ import { costPerPlay, HOLDER_PAYMENT, stx } from '../lib/listening-wallet/policy
 import { account, api, balance, broadcast, owner, transaction, validateSaved, verify } from '../radio-test-wallet/chain';
 import { createPppController, type GateConfig, type Snapshot } from './controller';
 import { STAGES, stageOf, type StageView } from './stages';
+import { resolvePrimaryBnsName } from '../lib/bns/primary';
+import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 
 const root = document.getElementById('ppp');
 if (root) start(root);
@@ -88,8 +90,18 @@ function start(root: HTMLElement) {
       get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
       set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* history is a convenience */ } }
     },
-    changed: () => render(ppp.snapshot())
+    changed: () => render(ppp.snapshot()),
+    likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); }
   });
+
+  // The radio's heart asks here first: the listening wallet signs the like when it can, for the main wallet.
+  (window as any).XtrataRadioLikeHandler = (d: { song: number; liked: boolean; likedBy?: string[]; title?: string; artist?: string }) => {
+    if (!d || !Number.isSafeInteger(d.song) || d.song < 0 || typeof d.liked !== 'boolean') return false;
+    if (!ppp.canLike({ liked: d.liked, likedBy: Array.isArray(d.likedBy) ? d.likedBy : [] })) return false;
+    const n = songName(d.song, { title: d.title, artist: d.artist });
+    void ppp.like({ song: d.song, liked: d.liked, title: n.title || undefined, artist: n.artist || undefined });
+    return true;
+  };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
   const explorer = (txid: string) => `https://explorer.hiro.so/txid/${txid}?chain=mainnet`;
@@ -98,8 +110,49 @@ function start(root: HTMLElement) {
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
   let lastStage: StageView | null = null;
+  // BNS names (e.g. jim.btc) for main wallets, looked up once per address per page view.
+  const names = new Map<string, string | null>();
+  const nameOf = (address?: string) => {
+    if (!address) return null;
+    if (!names.has(address)) {
+      names.set(address, null);
+      resolvePrimaryBnsName({ address, network: 'mainnet' })
+        .then((n) => { if (n) { names.set(address, n); render(ppp.snapshot()); } })
+        .catch(() => { /* no name: the short address is shown */ });
+    }
+    return names.get(address) ?? null;
+  };
+  const who = (address?: string) => { const n = nameOf(address); return n ? `${n} · ${short(address)}` : short(address); };
   type Shown = Snapshot['entries'][number] & { title?: string; artist?: string };
-  const songLabel = (e: Shown) => (e.title ? `“${e.title}”${e.artist ? ` — ${e.artist}` : ''}` : `Song #${e.song}`);
+  // Song names exactly as the radio shows them: its catalogue, then the radio's own title and artist
+  // overrides (artist-credits), then what was playing when the entry was made.
+  const catalogue = new Map<number, { title?: string; artist?: string }>();
+  let catalogueAsked = false;
+  const placeholder = (t?: string) => !t || /^(?:Inscription )?#\d+$/.test(t.trim());
+  const loadCatalogue = () => {
+    if (catalogueAsked) return;
+    catalogueAsked = true;
+    fetch('/radio/counts?range=all&chainLikes=0', { cache: 'no-store', signal: AbortSignal.timeout(20000) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        for (const t of Array.isArray(data?.tracks) ? data.tracks : []) {
+          const id = Number(t?.id);
+          if (Number.isSafeInteger(id)) catalogue.set(id, { title: typeof t.title === 'string' ? t.title : undefined, artist: typeof t.artist === 'string' ? t.artist : undefined });
+        }
+        render(ppp.snapshot());
+      })
+      .catch(() => { catalogueAsked = false; /* names fall back to what was stored; try again later */ });
+  };
+  const songName = (id: number, stored?: { title?: string; artist?: string }) => {
+    const c = catalogue.get(id);
+    const title = radioTitle(id, [c?.title, stored?.title].find((t) => !placeholder(t)) || '');
+    const artist = radioArtist(id, c?.artist || stored?.artist || '');
+    return { title, artist };
+  };
+  const songLabel = (e: Shown) => {
+    const { title, artist } = songName(e.song, e);
+    return title ? `“${title}”${artist ? ` — ${artist}` : ''}` : `Song #${e.song}${artist ? ` — ${artist}` : ''}`;
+  };
   const STATUS_CLASS: Record<string, string> = { confirmed: 'ppp-ok', pending: 'ppp-warn', signed: 'ppp-warn', unknown: 'ppp-warn', prepared: 'ppp-warn', failed: 'ppp-bad', cancelled: 'ppp-mute' };
   const STATUS_TEXT: Record<string, string> = { confirmed: 'confirmed', pending: 'confirming', signed: 'sending', unknown: 'checking', prepared: 'preparing', failed: 'failed', cancelled: 'cancelled' };
 
@@ -108,7 +161,7 @@ function start(root: HTMLElement) {
     if (['elsewhere', 'connect', 'not-invited', 'unsupported', 'loading'].includes(s.step)) return ['', ''];
     if (s.step === 'over') return ['OVER 1 STX', 'bad'];
     if (s.step === 'locked') return ['LOCKED', 'mute'];
-    if (s.step === 'intro' || s.step === 'link') return ['SETUP', 'warn'];
+    if (s.step === 'intro' || s.step === 'link') return ['', '']; // the SETUP HELPER badge says it
     if (s.step === 'fund') return s.entries.length ? ['OUT OF FUNDS', 'bad'] : ['ADD FUNDS', 'warn'];
     return s.payingOn && s.session && s.session.playsLeft > 0 ? ['ON · PAYING', 'ok'] : ['OFF', 'mute'];
   }
@@ -122,7 +175,6 @@ function start(root: HTMLElement) {
   function render(s: Snapshot) {
     root.hidden = s.step === 'off';
     if (root.hidden) return;
-    $('.ppp-badge').hidden = !s.gate?.canary;
     const [pill, tone] = statePill(s);
     const pillEl = $('.ppp-state');
     pillEl.textContent = pill;
@@ -139,6 +191,8 @@ function start(root: HTMLElement) {
     // Every gate, numbered, from the radio address to paid plays; always shown so progress is clear.
     const stage = stageOf(s) ?? lastStage; // loading keeps the last known stage
     lastStage = stage;
+    // The walk-through is a setup helper until paid plays are taking place.
+    $('.ppp-badge').hidden = !stage || stage.at >= STAGES.length;
     const progress = $('.ppp-steps'), caption = $('.ppp-stage');
     progress.hidden = caption.hidden = !stage;
     if (stage) {
@@ -155,18 +209,26 @@ function start(root: HTMLElement) {
     // Labelled facts: who is who, and what the wallet holds.
     const facts = $('.ppp-facts');
     const rows: HTMLElement[] = [];
-    if (s.main && s.gate?.here) rows.push(...fact('Your wallet', short(s.main), 'ppp-addr-short'));
+    if (s.main && s.gate?.here) rows.push(...fact('Your wallet', who(s.main), 'ppp-addr-short'));
     if (s.listening) {
       const copy = button('Copy', () => void navigator.clipboard?.writeText(s.listening || ''), 'tiny');
       rows.push(...fact('Listening wallet', short(s.listening), 'ppp-addr-short', copy));
     }
-    if (s.listening && s.step !== 'intro' && s.step !== 'locked')
-      rows.push(...(s.linked ? fact('Returns go to', short(s.linked), 'ppp-addr-short') : fact('Returns go to', 'not linked yet', 'ppp-warn')));
+    // Which main wallet this listening wallet serves: its likes and paid plays count for that wallet.
+    if (s.listening && s.step !== 'intro')
+      rows.push(...(s.linked
+        ? fact('Linked to', `${who(s.linked)} · returns go here`, s.linked === s.main ? 'ppp-ok' : 'ppp-warn')
+        : fact('Linked to', 'not linked yet', 'ppp-warn')));
+    if (s.linkedListening.length && s.gate?.here) {
+      const list = s.linkedListening.map((a) => short(a) + (a === s.listening ? ' (this one)' : '')).join(', ');
+      rows.push(...fact(s.linkedListening.length === 1 ? 'Listening wallet linked to you' : 'Listening wallets linked to you', list, 'ppp-addr-short'));
+    }
     if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step)) {
       const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
       rows.push(...fact('Balance', `${stx(s.balance)} STX · about ${s.playsLeft.toLocaleString()} plays`, tone));
     }
     const last = (s.entries as Shown[]).find((e) => e.kind === 'play');
+    if (last) loadCatalogue();
     if (last) rows.push(...fact('Last paid song', `${songLabel(last)} → ${short(last.recipient)}`, STATUS_CLASS[last.status] || ''));
     facts.replaceChildren(...rows);
     facts.hidden = !rows.length;
@@ -212,8 +274,8 @@ function start(root: HTMLElement) {
         break;
       case 'link':
         lines.push(el('p', s.serverLinked
-          ? `This listening wallet was linked to ${short(s.main)} on another device. Confirm it in the listening wallet below.`
-          : `Link the listening wallet to your main wallet ${short(s.main)}. This is one signature, not a transaction: no fee, no spending permission. Afterwards, returns can only go back to this main wallet.`));
+          ? `This listening wallet was linked to ${who(s.main)} on another device. Confirm it in the listening wallet below.`
+          : `Link the listening wallet to your main wallet ${who(s.main)}. This is one signature, not a transaction: no fee, no spending permission. Afterwards, returns can only go back to this main wallet.`));
         lines.push(el('p', 'The listening wallet will show the full address. Check it is yours before confirming.', 'ppp-warn'));
         actions.push(button(s.serverLinked ? 'Confirm my wallet' : 'Link to my wallet', () => void ppp.link(), 'primary'));
         break;
@@ -265,11 +327,14 @@ function start(root: HTMLElement) {
 
     const history = $('.ppp-history');
     history.hidden = !s.entries.length;
-    history.replaceChildren(el('summary', `Payments and returns (${s.entries.length})`), ...(s.entries as Shown[]).slice(0, 20).map((e) => {
+    if (s.entries.length) loadCatalogue();
+    history.replaceChildren(el('summary', `Payments, likes and returns (${s.entries.length})`), ...(s.entries as Shown[]).slice(0, 20).map((e) => {
       const row = el('div', '', 'ppp-row');
       const what = e.kind === 'play'
         ? [el('span', songLabel(e), 'ppp-song'), el('span', ` · ${stx(BigInt(e.amount))} STX to ${short(e.recipient)}`, 'ppp-mute')]
-        : [el('span', `Returned ${stx(BigInt(e.amount))} STX`, 'ppp-song'), el('span', ` to ${short(e.recipient)}`, 'ppp-mute')];
+        : e.kind === 'like'
+          ? [el('span', `${e.liked ? '♥ Liked' : 'Unliked'} ${songLabel(e)}`, 'ppp-song'), el('span', ` · for ${who(s.linked)}`, 'ppp-mute')]
+          : [el('span', `Returned ${stx(BigInt(e.amount))} STX`, 'ppp-song'), el('span', ` to ${short(e.recipient)}`, 'ppp-mute')];
       row.append(el('span', STATUS_TEXT[e.status] || e.status, 'ppp-status ' + (STATUS_CLASS[e.status] || '')), ...what,
         el('span', ` · ${new Date(e.created).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} `, 'ppp-mute'));
       if (e.txid) row.append(link('tx ↗', explorer(e.txid)));
@@ -296,7 +361,7 @@ function start(root: HTMLElement) {
   // A play is 30 seconds of audible listening (half of a shorter song); skips stay free.
   window.addEventListener('xtrata:radio-listened', (e) => {
     const d = (e as CustomEvent).detail;
-    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string' && /^[0-9a-f]{32}$/.test(d.id)) void ppp.onListened({ song: d.song, id: d.id, ...titles.get(d.song) });
+    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string' && /^[0-9a-f]{32}$/.test(d.id)) { loadCatalogue(); const n = songName(d.song, titles.get(d.song)); void ppp.onListened({ song: d.song, id: d.id, title: n.title || undefined, artist: n.artist || undefined }); }
   });
   window.addEventListener('xtrata:wallet-changed', () => void ppp.refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void ppp.refresh(); });

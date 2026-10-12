@@ -18,7 +18,8 @@ const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
-function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[] } = {}) {
+function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void } = {}) {
+  let likesChanged = 0;
   let time = 1_760_000_000_000;
   let main: string | undefined = MAIN;
   const gate: GateConfig = {
@@ -65,14 +66,16 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     validate: validateSaved,
     tabLock: async () => opts.tabLock ?? true,
     store: { get: (k) => store.get(k) ?? null, set: (k, v) => void store.set(k, v) },
-    changed: () => {}
+    changed: () => {},
+    likesChanged: () => { likesChanged++; },
+    wait: async (ms) => { time += ms; opts.onWait?.(); }
   });
   const mineAll = () => {
     for (const raw of chain.broadcasts) chain.mined.add('0x' + deserializeTransaction(raw).txid());
     chain.nonce = BigInt(chain.broadcasts.length);
   };
   const settle = () => new Promise((r) => setTimeout(r, 0));
-  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
+  return { ppp, chain, gate, savedLinks, store, walletStore, held, settle, likesChanged: () => likesChanged, tap: () => held.shift()!.tap(), tick: (ms: number) => { time += ms; }, setMain: (m?: string) => { main = m; }, mineAll, evaluations: () => evaluations };
 }
 
 describe('radio pay-per-play walk-through (real wallet engine, mocked chain)', () => {
@@ -331,5 +334,73 @@ describe('one-tap unlock', () => {
     await t.ppp.switchOff(); await t.ppp.lock(); await t.settle();
     expect(t.ppp.snapshot()).toMatchObject({ step: 'locked', armed: false, payingOn: false });
     expect(t.held).toHaveLength(0);
+  });
+});
+
+describe('likes from the listening wallet, credited to the main wallet', () => {
+  const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+
+  it('takes a like only when paying is on and linked to the connected wallet, never liking twice', async () => {
+    const s = setup();
+    expect(s.ppp.canLike({ liked: true, likedBy: [] })).toBe(false); // nothing set up yet
+    await ready(s);
+    expect(s.ppp.canLike({ liked: true, likedBy: [] })).toBe(true);
+    expect(s.ppp.canLike({ liked: true, likedBy: [MAIN] })).toBe(false); // already liked by the main wallet
+    await s.ppp.switchOff();
+    expect(s.ppp.canLike({ liked: true, likedBy: [] })).toBe(false); // the main wallet does it instead
+    await s.ppp.switchOn();
+    s.setMain(HOLDER); await s.ppp.forceRefresh();
+    expect(s.ppp.canLike({ liked: true, likedBy: [] })).toBe(false); // linked to a different main wallet
+  });
+
+  it('unlikes only its own likes; a like made by the main wallet is left to the main wallet', async () => {
+    const s = setup();
+    await ready(s);
+    expect(s.ppp.canLike({ liked: false, likedBy: [LISTENING] })).toBe(true);
+    expect(s.ppp.canLike({ liked: false, likedBy: [MAIN] })).toBe(false);
+    expect(s.ppp.canLike({ liked: false, likedBy: [MAIN, LISTENING] })).toBe(false);
+    expect(s.ppp.canLike({ liked: false, likedBy: ['SP000000000000000000002Q6VF78'] })).toBe(false);
+  });
+
+  it('signs set-liked from the listening wallet, tracks it, and refreshes the radio likes once confirmed', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.like({ song: 7, liked: true, title: 'Night Drive', artist: 'Audionals' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    const tx = deserializeTransaction(s.chain.broadcasts[0]) as any;
+    expect(tx.payload.functionName.content).toBe('set-liked');
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'like', song: 7, liked: true, status: 'pending', title: 'Night Drive' });
+    expect(s.ppp.snapshot().message).toMatch(/^Liked “Night Drive” by Audionals from your listening wallet, for your main wallet/);
+    expect(s.likesChanged()).toBe(0);
+    s.mineAll(); await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().entries[0].status).toBe('confirmed');
+    expect(s.likesChanged()).toBe(1);
+    // a confirmed like is not a paid play: the setup helper still waits for the first paid play
+    expect(s.ppp.snapshot().entries.filter((e) => e.kind === 'play')).toHaveLength(0);
+  });
+
+  it('waits for an earlier payment to confirm before signing (one transaction in flight), and gives up after 2 minutes', async () => {
+    let mine = () => {};
+    const s = setup({}, { onWait: () => mine() });
+    await ready(s);
+    await s.ppp.onListened({ song: 1, id: rid(1) });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    await s.ppp.like({ song: 2, liked: true });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.ppp.snapshot().error).toMatch(/still confirming/);
+    mine = () => s.mineAll();
+    await s.ppp.like({ song: 2, liked: true });
+    expect(s.chain.broadcasts).toHaveLength(2);
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'like', song: 2, status: 'pending' });
+  });
+
+  it('a song played while a like is being sent plays free rather than racing it for the nonce', async () => {
+    const s = setup();
+    await ready(s);
+    const liking = s.ppp.like({ song: 2, liked: true });
+    await s.ppp.onListened({ song: 1, id: rid(1) });
+    await liking;
+    expect(s.ppp.snapshot().entries.filter((e) => e.kind === 'play')).toHaveLength(0);
+    expect(s.chain.broadcasts).toHaveLength(1);
   });
 });

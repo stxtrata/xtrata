@@ -24,6 +24,8 @@ export const MAX_RETURN_FEE = 10_000n;
 export const LOW_BALANCE = 50_000n;
 /** Starts closer together than this play free. Bounds how fast a hostile page could spend. */
 export const MIN_PLAY_INTERVAL_MS = 20_000;
+/** Likes cost only the network fee; this spacing stops a runaway page from spending the budget on them. */
+export const MIN_LIKE_INTERVAL_MS = 3_000;
 /** A session only lives in the wallet frame's memory, so it also ends when the page closes. */
 export const MAX_SESSION_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_SESSION_PLAYS = 3_000;
@@ -110,6 +112,7 @@ export class SessionLedger {
   private spent = 0n;
   private count = 0;
   private lastAt = -Infinity;
+  private lastLikeAt = -Infinity;
 
   constructor(readonly terms: SessionTerms, now = Date.now()) {
     validateSessionTerms(terms, now);
@@ -126,6 +129,17 @@ export class SessionLedger {
     this.spent += costPerPlay(fee);
     this.count++;
     this.lastAt = now;
+  }
+
+  /** Reserve one like: the network fee only, from the same approved budget. Throws and changes nothing if not allowed. */
+  consumeLike(fee: bigint, now = Date.now()): void {
+    const t = this.terms;
+    if (now >= t.expires) throw new Error('This listening session has ended. Approve a new one to keep paying.');
+    if (fee !== t.fee) throw new Error('Like fee differs from the approved session.');
+    if (this.spent + fee > t.budget) throw new Error('Approved session budget reached.');
+    if (now - this.lastLikeAt < MIN_LIKE_INTERVAL_MS) throw new Error('Too soon after the last like. Try again in a moment.');
+    this.spent += fee;
+    this.lastLikeAt = now;
   }
 
   get summary() {

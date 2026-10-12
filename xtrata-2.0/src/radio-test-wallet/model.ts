@@ -2,7 +2,7 @@ export const WALLET_DB='xtrata-radio-test-wallet-v1';
 export const CONTRACT='SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-plays-v1-0';
 export const HOLDER=50n;
 export const RESERVE=1000n;
-export type Entry={id:string;address:string;kind:'play'|'withdraw';core:number;song:number;recipient:string;amount:string;fee:string;nonce:string;created:number;status:'prepared'|'signed'|'unknown'|'pending'|'confirmed'|'failed'|'cancelled';txid?:string;raw?:string;confirmedAt?:number;actualFee?:string;note?:string;previewBytes?:number};
+export type Entry={id:string;address:string;kind:'play'|'withdraw'|'like';core:number;song:number;liked?:boolean;title?:string;artist?:string;recipient:string;amount:string;fee:string;nonce:string;created:number;status:'prepared'|'signed'|'unknown'|'pending'|'confirmed'|'failed'|'cancelled';txid?:string;raw?:string;confirmedAt?:number;actualFee?:string;note?:string;previewBytes?:number};
 export type Policy={fee:string;budget:string;max:number;expires:number;core:number;songs:number[]};
 export function micro(value:string):bigint{
  if(!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(value))throw Error('Use STX with up to six decimal places.');

@@ -78,6 +78,17 @@ export async function saveLink(env: PppEnv, body: LinkSubmission, now = Date.now
   return { main: link.main, listening: link.listening, issued: link.issued };
 }
 
+/**
+ * The main wallet each listening wallet is linked to (dual-signed, verified when saved), so its
+ * likes and paid plays can be credited to the listener's main wallet. Up to 100 per call.
+ */
+export async function mainsFor(env: PppEnv, listening: string[]) {
+  const list = [...new Set(listening)].filter(isMainnetStandardAddress).slice(0, 100);
+  if (!list.length) return [];
+  const rows = (await queryAll(env, `SELECT listening, main FROM radio_listening_wallets WHERE listening IN (${list.map(() => '?').join(',')})`, list)).results as { listening: string; main: string }[];
+  return rows.map((r) => ({ listening: r.listening, main: r.main }));
+}
+
 export async function linksFor(env: PppEnv, main: string) {
   const rows = (await queryAll(env, 'SELECT listening, issued, main_signature FROM radio_listening_wallets WHERE main=? ORDER BY issued DESC LIMIT ?', [main, MAX_LINKS_PER_MAIN])).results as { listening: string; issued: number; main_signature: string }[];
   return rows.map((r) => ({ listening: r.listening, issued: r.issued, mainSignature: r.main_signature }));
