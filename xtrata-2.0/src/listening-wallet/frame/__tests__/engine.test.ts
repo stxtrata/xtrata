@@ -42,7 +42,7 @@ function setup(opts: { createPrf?: boolean; outputs?: Uint8Array[]; cancel?: Pan
     }
   });
   const h = engine.handlers;
-  const terms = (maxPlays = 3) => ({ fee: '300', maxPlays, budget: String(350 * maxPlays), expires: time + 3600_000 });
+  const terms = (maxPlays = 3) => ({ fee: '300', maxPlays, budget: String(Math.min(350 * maxPlays, 1_000_000)), expires: time + 3600_000 });
   return { h, panels, map, idle, terms, evaluations: () => evaluations, tick: (ms: number) => { time += ms; }, now: () => time };
 }
 
@@ -157,9 +157,26 @@ describe('listening wallet engine (wallet origin)', () => {
   });
 
   it('signs nothing when the listener cancels in the frame', async () => {
-    const s = setup({ cancel: ['session'] });
+    const s = setup({ cancel: ['create'] });
     await expect(s.h['listening.unlock']({ mode: 'create', terms: s.terms() })).rejects.toBeInstanceOf(CancelledError);
-    await expect(s.h['listening.signPlay'](play())).rejects.toThrow(/No approved/);
+    await expect(s.h['listening.signPlay'](play())).rejects.toThrow(/Unlock/);
+    const t = setup({ cancel: ['session'] });
+    await t.h['listening.unlock']({ mode: 'create' });
+    await expect(t.h['listening.approveSession'](t.terms())).rejects.toBeInstanceOf(CancelledError);
+    await expect(t.h['listening.signPlay'](play())).rejects.toThrow(/No approved/);
+  });
+
+  it('shows the paying terms on the passkey panel itself, so one confirm creates and switches paying on', async () => {
+    const s = setup();
+    const r = await s.h['listening.unlock']({ mode: 'create', terms: s.terms(3000) });
+    expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
+    expect(s.panels[0].confirmLabel).toMatch(/pay as I listen/);
+    expect(s.panels[0].lines.join(' ')).toMatch(/until you switch it off or the wallet runs out/);
+    expect(r.session).toMatchObject({ playsLeft: 3000 });
+    await s.h['listening.lock']();
+    await s.h['listening.unlock']({ mode: 'unlock', terms: s.terms(3000) });
+    expect(s.panels.at(-1)).toMatchObject({ kind: 'unlock', confirmLabel: 'Unlock and keep paying' });
+    expect((await s.h['listening.status']()).session).toMatchObject({ playsLeft: 3000 });
   });
 
   it('drops the key on lock', async () => {

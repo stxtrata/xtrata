@@ -43,9 +43,9 @@ export function gate(env: PppEnv, main: string | null, request?: Request) {
     limits: {
       playFee: DEFAULT_PLAY_FEE.toString(),
       returnFee: DEFAULT_RETURN_FEE.toString(),
-      firstSessionPlays: 1,
       maxSessionPlays: MAX_SESSION_PLAYS,
-      sessionHours: 4
+      // Sessions also end when the page closes; this only bounds a tab left open for days.
+      sessionHours: 168
     }
   };
 }

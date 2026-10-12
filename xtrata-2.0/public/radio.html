@@ -131,27 +131,39 @@
   #radio-wallet-message:empty{display:none}
   @media(max-width:640px){.radio-wallet{width:100%;margin-left:0}.live{font-size:9px}}
   /* pay-per-play (src/radio-ppp) */
+  .ppp [hidden]{display:none!important}
   .ppp{margin-top:18px;border:1px solid var(--line);border-radius:14px;padding:14px;background:var(--panel)}
-  .ppp h3{margin:0 0 8px}
+  .ppp-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px}
+  .ppp h3{margin:0}
   .ppp-badge{font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+  .ppp-state{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:999px;padding:3px 9px;border:1px solid currentColor;white-space:nowrap}
+  .ppp-state--ok{color:var(--ok)}.ppp-state--warn{color:#ffcf8a}.ppp-state--bad{color:#ff8a8a}.ppp-state--mute{color:var(--mut)}
   .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 10px;font-size:11px;color:var(--mut)}
   .ppp-steps li{border:1px solid var(--line);border-radius:999px;padding:3px 9px}
   .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}.ppp-steps li.done::before{content:'✓ '}
-  .ppp-steps li.now{color:var(--ink);border-color:var(--cyan)}
-  .ppp p{margin:6px 0;font-size:13px;line-height:1.45}
-  .ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-ok{color:var(--ok)}
-  .ppp-addr code{font-family:var(--mono);font-size:11px;overflow-wrap:anywhere}
-  .ppp-addr button{margin-left:6px}
+  .ppp-steps li.now{color:var(--cyan);border-color:var(--cyan);font-weight:700}
+  .ppp-facts{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);font-size:12.5px}
+  .ppp-facts dt{color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;align-self:center;white-space:nowrap}
+  .ppp-facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere;align-self:center}
+  .ppp-addr-short{font-family:var(--mono);font-size:12px}
+  .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
+  .ppp .ppp-ok{color:var(--ok)}.ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-bad{color:#ff8a8a}.ppp .ppp-mute{color:var(--mut)}
   .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
   .ppp button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:40px}
   .ppp button.primary{background:var(--cyan);color:#04121a;border-color:var(--cyan);font-weight:700}
   .ppp button.quiet{color:var(--mut)}
+  .ppp button.tiny{min-height:0;padding:2px 8px;font-size:11px;color:var(--cyan)}
   .ppp button:disabled{opacity:.55;cursor:wait}
+  .ppp-frame-label{margin:12px 0 6px!important;font-size:10.5px!important;letter-spacing:.6px;text-transform:uppercase;color:var(--cyan)!important}
   .ppp-frame iframe{width:100%;height:190px;transition:height .2s;border:1px solid var(--line);border-radius:10px;background:#0b0f14}
   .ppp-frame--active iframe{height:440px}
-  .ppp-msg{color:var(--mut);font-size:12px;min-height:1em}.ppp-err{color:#ffb9b9;font-size:12px;overflow-wrap:anywhere}
+  .ppp-msg{color:var(--cyan)!important;font-size:12px!important;min-height:1em}.ppp-err{color:#ff8a8a!important;font-size:12px!important;overflow-wrap:anywhere}
   .ppp-err:empty,.ppp-msg:empty{display:none}
-  .ppp-history{margin-top:8px;font-size:12px;color:var(--mut)}.ppp-history div{margin:3px 0;overflow-wrap:anywhere}
+  .ppp-history{margin-top:10px;font-size:12px;color:var(--mut)}
+  .ppp-history summary{cursor:pointer;color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase}
+  .ppp-row{margin:6px 0;overflow-wrap:anywhere;line-height:1.5}
+  .ppp-song{color:var(--ink)}
+  .ppp-status{display:inline-block;min-width:76px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
   .ppp-history a{color:var(--cyan)}
 </style>
 </head>
@@ -217,12 +229,14 @@
       <div id="likesList"></div>
     </div>
     <section class="ppp" id="ppp" hidden aria-label="Pay per play">
-      <h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>CANARY</span></h3>
+      <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>CANARY</span></h3><span class="ppp-state" hidden></span></div>
       <ol class="ppp-steps" hidden></ol>
+      <dl class="ppp-facts" hidden></dl>
       <div class="ppp-body"></div>
       <div class="ppp-actions"></div>
       <p class="ppp-msg" role="status"></p>
       <p class="ppp-err" role="alert"></p>
+      <p class="ppp-frame-label" hidden>Listening wallet · approvals happen in this box</p>
       <div class="ppp-frame" hidden></div>
       <details class="ppp-history" hidden></details>
     </section>

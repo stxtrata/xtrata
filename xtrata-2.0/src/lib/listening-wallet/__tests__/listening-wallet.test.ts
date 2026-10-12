@@ -86,7 +86,7 @@ describe('1 STX policy', () => {
     const now = 1_000_000;
     expect(() => validateSessionTerms({ fee: 200n, maxPlays: 1, budget: 1000n, expires: now + 1000 }, now)).toThrow(/fee/);
     expect(() => validateSessionTerms({ fee: 300n, maxPlays: 1, budget: TARGET + 1n, expires: now + 1000 }, now)).toThrow(/budget/);
-    expect(() => validateSessionTerms({ fee: 300n, maxPlays: 1, budget: 350n, expires: now + 13 * 3600_000 }, now)).toThrow(/12 hours/);
+    expect(() => validateSessionTerms({ fee: 300n, maxPlays: 1, budget: 350n, expires: now + 8 * 24 * 3600_000 }, now)).toThrow(/7 days/);
     const ledger = new SessionLedger({ fee: 300n, maxPlays: 2, budget: 700n, expires: now + 3600_000 }, now);
     expect(() => ledger.consume(301n, now)).toThrow(/differs/);
     ledger.consume(300n, now);

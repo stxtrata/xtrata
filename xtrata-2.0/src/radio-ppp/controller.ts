@@ -24,7 +24,7 @@ export interface GateConfig {
   radioUrl: string | null;
   walletOrigin: string | null;
   canary: boolean;
-  limits: { playFee: string; returnFee: string; firstSessionPlays: number; maxSessionPlays: number; sessionHours: number };
+  limits: { playFee: string; returnFee: string; maxSessionPlays: number; sessionHours: number };
 }
 export interface StoredLink { listening: string; issued: number; mainSignature: string }
 
@@ -62,7 +62,7 @@ export interface PppDeps {
 
 export type Step =
   | 'off' | 'elsewhere' | 'connect' | 'not-invited' | 'unsupported' | 'intro' | 'locked' | 'link' | 'loading'
-  | 'fund' | 'over' | 'first-play' | 'paying' | 'ready';
+  | 'fund' | 'over' | 'ready';
 
 export interface Snapshot {
   step: Step;
@@ -78,7 +78,8 @@ export interface Snapshot {
   playsLeft: number;
   allowance: bigint;
   session: SessionSummary | null;
-  canaryPassed: boolean;
+  /** The listener's switch: once on, every new song pays until they switch it off or funds run out. */
+  payingOn: boolean;
   entries: Entry[];
   depositTxid?: string;
   /** A deposit was sent and has not confirmed yet: no further deposit is offered. */
@@ -129,7 +130,9 @@ export function createPppController(deps: PppDeps) {
     const list = [e, ...entries(e.address).filter((x) => !(x.txid === e.txid && x.kind === e.kind))].slice(0, 200);
     deps.store.set(key('entries', e.address), JSON.stringify(list));
   };
-  const canaryPassed = (listening = status?.address) => !!listening && deps.store.get(key('canary', listening)) !== null;
+  // On by default; only an explicit "Switch off" (or Return all) turns it off, and it stays off across visits.
+  const payingOn = (listening = status?.address) => !!listening && deps.store.get(key('on', listening)) !== '0';
+  const setPayingOn = (on: boolean) => { if (status?.address) deps.store.set(key('on', status.address), on ? '1' : '0'); };
   const unresolved = () => entries().filter((e) => UNRESOLVED.includes(e.status));
   type PendingDeposit = { txid: string; amount: string; at: number };
   const pendingDeposit = (): PendingDeposit | null => {
@@ -152,9 +155,8 @@ export function createPppController(deps: PppDeps) {
     if (status.linked !== main) return 'link';
     if (balance === undefined) return 'loading';
     if (balance > TARGET) return 'over';
-    if (unresolved().length && !canaryPassed()) return 'paying';
     if (balance < RESERVE + costPerPlay(fee())) return 'fund';
-    return canaryPassed() ? 'ready' : 'first-play';
+    return 'ready';
   }
 
   const snapshot = (): Snapshot => ({
@@ -164,7 +166,7 @@ export function createPppController(deps: PppDeps) {
     playsLeft: balance === undefined ? 0 : playsCovered(balance, fee()),
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
     session: status?.session ?? null,
-    canaryPassed: canaryPassed(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
+    payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
     depositPending: !!pendingDeposit(), serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
     stuck: stuck().length
   });
@@ -229,10 +231,6 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx.tx_status);
         if (s === 'success' && tx.canonical !== false && tx.is_unanchored === false) {
           saveEntry({ ...e, status: 'confirmed', confirmedAt: deps.now(), actualFee: String(tx.fee_rate ?? e.fee), raw: undefined });
-          if (e.kind === 'play' && !canaryPassed(e.address)) {
-            deps.store.set(key('canary', e.address), e.txid!);
-            say('First paid play confirmed on-chain. Pay-per-play is ready.');
-          }
         } else if (s.startsWith('abort_') || s.startsWith('dropped_')) {
           saveEntry({ ...e, status: 'failed', note: s, raw: undefined });
         } else if (e.status !== 'pending') saveEntry({ ...e, status: 'pending' });
@@ -272,13 +270,17 @@ export function createPppController(deps: PppDeps) {
     deps.changed();
   }
 
-  const sessionTerms = (plays: number, hours: number): TermsParams => {
-    const cost = costPerPlay(fee());
-    const spendable = (balance ?? 0n) - RESERVE;
-    const max = Math.max(1, Math.min(plays, Number(spendable / cost)));
-    const budget = BigInt(max) * cost;
-    return { fee: fee().toString(), maxPlays: max, budget: (budget > TARGET ? TARGET : budget).toString(), expires: deps.now() + hours * 3600_000 };
-  };
+  /**
+   * "Pay as I listen until I switch it off": up to 1 STX of plays per approval. The wallet still
+   * refuses any play the balance cannot cover (songs then play free until a top-up), and the
+   * session ends when the page closes; the next visit resumes with one passkey tap.
+   */
+  const onTerms = (): TermsParams => ({
+    fee: fee().toString(),
+    maxPlays: gate!.limits.maxSessionPlays,
+    budget: TARGET.toString(),
+    expires: deps.now() + gate!.limits.sessionHours * 3600_000
+  });
 
   async function holdTab() {
     if (!status?.address) return false;
@@ -295,19 +297,25 @@ export function createPppController(deps: PppDeps) {
 
     create: () => task('Waiting for your passkey in the listening wallet…', async () => {
       const b = await ensureBridge();
-      await b.request('listening.unlock', { mode: 'create' });
-      say('Listening wallet created. Next, link it to your main wallet.');
+      await b.request('listening.unlock', { mode: 'create', terms: onTerms() });
+      status = await b.request<StatusResult>('listening.status');
+      setPayingOn(true);
+      say('Listening wallet created and paying is switched on. Next, link it to your main wallet.');
+      await holdTab();
     }),
 
     unlock: (anyPasskey = false) => task('Waiting for your passkey in the listening wallet…', async () => {
       const b = await ensureBridge();
-      const auto = canaryPassed(status?.address);
-      if (auto) await refreshBalance(true);
-      const terms = auto && balance !== undefined && balanceState(balance, fee()) !== 'over' && balanceState(balance, fee()) !== 'empty'
-        ? sessionTerms(gate!.limits.maxSessionPlays, gate!.limits.sessionHours) : undefined;
-      await b.request('listening.unlock', { mode: 'unlock', terms, anyPasskey });
-      if (terms) await holdTab();
-      say(terms ? 'Unlocked. New songs you hear will pay their holders.' : 'Unlocked.');
+      // A wallet known on this device resumes paying unless the listener switched it off.
+      const resume = !status?.address || payingOn(status.address);
+      await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey });
+      status = await b.request<StatusResult>('listening.status');
+      if (resume) {
+        // Picked a different wallet that this device has switched off: honour that.
+        if (!payingOn(status.address)) await b.request('listening.stop');
+        else await holdTab();
+      }
+      say(resume ? 'Unlocked. Each new song you hear pays its holder.' : 'Unlocked. Paying is switched off.');
     }),
 
     link: () => task('Waiting for your main wallet to sign…', async () => {
@@ -339,17 +347,11 @@ export function createPppController(deps: PppDeps) {
       say('Deposit sent. It usually confirms within a few minutes; this page checks automatically.');
     }),
 
-    approveFirstPlay: () => task('Approve your first paid play in the listening wallet…', async () => {
+    switchOn: () => task('Confirm in the listening wallet…', async () => {
       await holdTab();
-      await bridge!.request('listening.approveSession', sessionTerms(gate!.limits.firstSessionPlays, 0.5));
-      say('Approved. The next new song you hear will pay its holder. Play or skip to a song to send it.');
-    }),
-
-    payAutomatically: () => task('Approve paying as you listen in the listening wallet…', async () => {
-      await holdTab();
-      await refreshBalance(true);
-      await bridge!.request('listening.approveSession', sessionTerms(gate!.limits.maxSessionPlays, gate!.limits.sessionHours));
-      say('On. Each new song you hear pays its holder until you stop or the session ends.');
+      await bridge!.request('listening.approveSession', onTerms());
+      setPayingOn(true);
+      say('Switched on. Each new song you hear pays its holder until you switch it off or the wallet runs out.');
     }),
 
     /** Give up on payments the chain has never seen after 30 minutes. Their signed bytes are discarded. */
@@ -361,9 +363,10 @@ export function createPppController(deps: PppDeps) {
       say('Cleared. If one of those still confirms later, it will simply show in your wallet history on the explorer.');
     }),
 
-    stop: () => task('Stopping…', async () => {
+    switchOff: () => task('Switching off…', async () => {
       await bridge?.request('listening.stop');
-      say('Stopped. Music plays free.');
+      setPayingOn(false);
+      say('Switched off. Music plays free until you switch it back on.');
     }),
 
     lock: () => task('Locking…', async () => {
@@ -390,19 +393,22 @@ export function createPppController(deps: PppDeps) {
       saveEntry(entry);
       try { await deps.chain.broadcast(r.raw, r.txid); saveEntry({ ...entry, status: 'pending' }); }
       catch (e) { saveEntry({ ...entry, status: 'unknown', note: (e as Error).message }); throw e; }
-      say(`Return sent to your main wallet. Pay-per-play is paused${mode === 'all' ? ' until you add funds and turn it on again' : ''}.`);
+      if (mode === 'all') setPayingOn(false);
+      say(mode === 'all'
+        ? 'Return sent to your main wallet. Paying is switched off; switch it back on after adding funds.'
+        : 'Excess sent to your main wallet. Switch paying back on to continue.');
     })
   };
 
   /** Called on every new audible start. Never throws and never delays playback. */
-  async function onAudibleStart(detail: { song: number; id: string }) {
+  async function onAudibleStart(detail: { song: number; id: string; title?: string; artist?: string }) {
     if (paying || busy) return;
     paying = true;
     try {
       // Background tabs barely run timers: catch up on confirmations and the kill switch here.
       await refresh();
       const s = step();
-      if ((s !== 'ready' && s !== 'first-play') || !status?.session || status.session.playsLeft < 1 || !lockHeld || unresolved().length) return;
+      if (s !== 'ready' || !payingOn() || !status?.session || status.session.playsLeft < 1 || !lockHeld || unresolved().length) return;
       if (!verified) { await deps.chain.verify(); verified = true; }
       const listening = status.address!;
       const { balance: b, nonce } = await deps.chain.account(listening);
@@ -414,11 +420,15 @@ export function createPppController(deps: PppDeps) {
       });
       const entry: Entry = {
         id: detail.id, address: listening, kind: 'play', core: RADIO_CORE_INDEX, song: detail.song, recipient, amount: '50',
-        fee: fee().toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid
-      };
+        fee: fee().toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
+        // Display only: the radio's title and artist for this song, kept with the public history.
+        ...(detail.title ? { title: String(detail.title).slice(0, 120) } : {}),
+        ...(detail.artist ? { artist: String(detail.artist).slice(0, 120) } : {})
+      } as Entry;
       deps.validate(entry);
       saveEntry(entry);
-      try { await deps.chain.broadcast(signed.raw, signed.txid); saveEntry({ ...entry, status: 'pending' }); message = `Paid play sent for song #${detail.song}.`; error = ''; }
+      const label = detail.title ? `“${detail.title}”${detail.artist ? ` by ${detail.artist}` : ''}` : `song #${detail.song}`;
+      try { await deps.chain.broadcast(signed.raw, signed.txid); saveEntry({ ...entry, status: 'pending' }); message = `Paid play sent for ${label}.`; error = ''; }
       catch (e) {
         saveEntry({ ...entry, status: definitelyRejected(e) ? 'failed' : 'unknown', note: (e as Error).message, ...(definitelyRejected(e) ? { raw: undefined } : {}) });
         error = (e as Error).message;

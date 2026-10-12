@@ -16,17 +16,22 @@ the **web** radio. The desktop Music App keeps its own wallet.
 
 ## How it works
 
-1. **Turn on.** The listener reads the warnings and creates a listening wallet with a passkey
-   (Face ID, Touch ID, Windows Hello or a phone). Nothing to install.
+1. **Turn on.** The listener reads the warnings and the paying terms, then creates a listening
+   wallet with a passkey (Face ID, Touch ID, Windows Hello or a phone). That one confirm inside the
+   wallet frame also switches paying on. Nothing to install.
 2. **Link.** Their main wallet (Xverse/Leather) signs one SIP-018 message, the listener confirms
    the full address inside the wallet frame, and the listening wallet countersigns. No fee, no
    spending permission. Returns go only to the main wallet confirmed this way.
 3. **Deposit.** One transfer popup sends what is needed to reach 1 STX (or copy the address). No
    second deposit is offered until it confirms.
-4. **Approve the first paid play** inside the wallet frame (1 play, 30 minutes).
-5. **Play.** The next new audible song pays 50 microSTX to its holder via `xtrata-radio-plays-v1-0`
-   plus a 300 microSTX fee. When it confirms, the canary is passed.
-6. **Pay automatically.** Approve a session (up to 4 hours, capped by balance) and each new song pays.
+4. **Listen.** From the next new audible song on, every song pays 50 microSTX to its holder via
+   `xtrata-radio-plays-v1-0` plus a 300 microSTX fee. No further step.
+
+Paying stays on until the listener presses **Switch off** (remembered on that device until they
+press **Switch on**) or the wallet runs out (songs then play free, and paying carries on by itself
+after a top-up confirms). One approval covers up to 1 STX of plays; after that, or after 7 days in
+one open tab, the wallet asks again. Closing the page drops the key; the next visit is one passkey
+tap ("Unlock and keep paying").
 
 About 2,850 plays per STX at the default fee. Below 0.05 STX the radio asks to top up. Above 1 STX
 new paid plays pause and **Return excess** / **Return all** appear. Nothing is ever swept

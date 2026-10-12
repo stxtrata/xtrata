@@ -91,28 +91,73 @@ function start(root: HTMLElement) {
   });
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
-  const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const explorer = (txid: string) => `https://explorer.hiro.so/txid/${txid}?chain=mainnet`;
   const el = (tag: string, text = '', cls = '') => { const n = document.createElement(tag); if (text) n.textContent = text; if (cls) n.className = cls; return n; };
   const button = (label: string, run: () => void, cls = '') => { const b = el('button', label, cls) as HTMLButtonElement; b.type = 'button'; b.onclick = run; return b; };
   const link = (label: string, href: string) => { const a = el('a', label) as HTMLAnchorElement; a.href = href; a.target = '_blank'; a.rel = 'noopener'; return a; };
 
-  const STEPS = ['Create wallet', 'Link', 'Deposit', 'First paid play'];
-  const stepIndex: Partial<Record<Snapshot['step'], number>> = { intro: 0, locked: 0, link: 1, fund: 2, 'first-play': 3, paying: 3, ready: 4, over: 4, loading: 2 };
+  const STEPS = ['Create wallet', 'Link', 'Deposit', 'Paying'];
+  const stepIndex: Partial<Record<Snapshot['step'], number>> = { intro: 0, link: 1, fund: 2, loading: 2 };
+  type Shown = Snapshot['entries'][number] & { title?: string; artist?: string };
+  const songLabel = (e: Shown) => (e.title ? `“${e.title}”${e.artist ? ` — ${e.artist}` : ''}` : `Song #${e.song}`);
+  const STATUS_CLASS: Record<string, string> = { confirmed: 'ppp-ok', pending: 'ppp-warn', signed: 'ppp-warn', unknown: 'ppp-warn', prepared: 'ppp-warn', failed: 'ppp-bad', cancelled: 'ppp-mute' };
+  const STATUS_TEXT: Record<string, string> = { confirmed: 'confirmed', pending: 'confirming', signed: 'sending', unknown: 'checking', prepared: 'preparing', failed: 'failed', cancelled: 'cancelled' };
+
+  /** One-word state for the header pill, coloured by how things stand. */
+  function statePill(s: Snapshot): [string, string] {
+    if (['elsewhere', 'connect', 'not-invited', 'unsupported', 'loading'].includes(s.step)) return ['', ''];
+    if (s.step === 'over') return ['OVER 1 STX', 'bad'];
+    if (s.step === 'locked') return ['LOCKED', 'mute'];
+    if (s.step === 'intro' || s.step === 'link') return ['SETUP', 'warn'];
+    if (s.step === 'fund') return s.entries.length ? ['OUT OF FUNDS', 'bad'] : ['ADD FUNDS', 'warn'];
+    return s.payingOn && s.session && s.session.playsLeft > 0 ? ['ON · PAYING', 'ok'] : ['OFF', 'mute'];
+  }
+
+  function fact(label: string, value: string, cls = '', extra?: HTMLElement) {
+    const dt = el('dt', label), dd = el('dd', value, cls);
+    if (extra) dd.append(' ', extra);
+    return [dt, dd];
+  }
 
   function render(s: Snapshot) {
     root.hidden = s.step === 'off';
     if (root.hidden) return;
     $('.ppp-badge').hidden = !s.gate?.canary;
+    const [pill, tone] = statePill(s);
+    const pillEl = $('.ppp-state');
+    pillEl.textContent = pill;
+    pillEl.className = 'ppp-state' + (tone ? ' ppp-state--' + tone : '');
+    pillEl.hidden = !pill;
     const showFrame = !['elsewhere', 'connect', 'not-invited', 'unsupported', 'off'].includes(s.step);
     frameWrap.hidden = !showFrame;
+    $('.ppp-frame-label').hidden = !showFrame;
     // The frame needs room while it is asking the listener something; it rests small otherwise.
     frameWrap.classList.toggle('ppp-frame--active', !!s.busy);
 
     const progress = $('.ppp-steps');
     const at = stepIndex[s.step];
-    progress.hidden = at === undefined || s.canaryPassed;
+    // Only during first setup; a returning listener with an empty wallet just sees the top-up.
+    progress.hidden = at === undefined || (s.step === 'fund' && s.entries.length > 0);
     progress.replaceChildren(...STEPS.map((label, i) => el('li', label, at !== undefined && i < at ? 'done' : i === at ? 'now' : '')));
+
+    // Labelled facts: who is who, and what the wallet holds.
+    const facts = $('.ppp-facts');
+    const rows: HTMLElement[] = [];
+    if (s.main && s.gate?.here) rows.push(...fact('Your wallet', short(s.main), 'ppp-addr-short'));
+    if (s.listening) {
+      const copy = button('Copy', () => void navigator.clipboard?.writeText(s.listening || ''), 'tiny');
+      rows.push(...fact('Listening wallet', short(s.listening), 'ppp-addr-short', copy));
+    }
+    if (s.listening && s.step !== 'intro' && s.step !== 'locked')
+      rows.push(...(s.linked ? fact('Returns go to', short(s.linked), 'ppp-addr-short') : fact('Returns go to', 'not linked yet', 'ppp-warn')));
+    if (s.balance !== undefined && ['fund', 'ready', 'over'].includes(s.step)) {
+      const tone = s.balanceState === 'ok' ? 'ppp-ok' : s.balanceState === 'low' ? 'ppp-warn' : 'ppp-bad';
+      rows.push(...fact('Balance', `${stx(s.balance)} STX · about ${s.playsLeft.toLocaleString()} plays`, tone));
+    }
+    const last = (s.entries as Shown[]).find((e) => e.kind === 'play');
+    if (last) rows.push(...fact('Last paid song', `${songLabel(last)} → ${short(last.recipient)}`, STATUS_CLASS[last.status] || ''));
+    facts.replaceChildren(...rows);
+    facts.hidden = !rows.length;
 
     const body = $('.ppp-body');
     const lines: HTMLElement[] = [];
@@ -131,74 +176,66 @@ function start(root: HTMLElement) {
         lines.push(el('p', 'Pay artists a tiny amount each time a new song starts, recorded on-chain. Connect your wallet above to turn it on. Listening is always free.'));
         break;
       case 'not-invited':
-        lines.push(el('p', 'Pay-per-play is in a small test right now. Listening is free for everyone, and it will open up soon.'));
+        lines.push(el('p', 'Pay-per-play is in a small test right now. Listening is free for everyone, and it will open up soon.', 'ppp-mute'));
         break;
       case 'unsupported':
-        lines.push(el('p', 'This browser cannot create the passkey pay-per-play needs. Listening is free. Try Chrome or Safari on a current phone or computer.'));
+        lines.push(el('p', 'This browser cannot create the passkey pay-per-play needs. Listening is free. Try Chrome or Safari on a current phone or computer.', 'ppp-warn'));
         break;
       case 'intro':
         lines.push(el('p', payLine));
+        lines.push(el('p', 'Once it has funds, every new song you hear pays automatically until you switch it off or the wallet runs out. No popups while you listen.', 'ppp-ok'));
         lines.push(el('p', 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
         actions.push(button('Turn on pay-per-play', () => void ppp.create(), 'primary'));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         break;
       case 'locked':
-        lines.push(el('p', `Your listening wallet ${short(s.listening)} is locked.`));
-        actions.push(button(s.canaryPassed ? 'Unlock and pay as you listen' : 'Unlock', () => void ppp.unlock(), 'primary'));
+        lines.push(el('p', s.payingOn ? 'Unlock it with your passkey to keep paying as you listen.' : 'Paying is switched off. Unlock to manage your wallet.', s.payingOn ? '' : 'ppp-mute'));
+        actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
         actions.push(button('Use a different listening wallet', () => void ppp.unlock(true), 'quiet'));
         break;
       case 'link':
         lines.push(el('p', s.serverLinked
           ? `This listening wallet was linked to ${short(s.main)} on another device. Confirm it in the listening wallet below.`
           : `Link the listening wallet to your main wallet ${short(s.main)}. This is one signature, not a transaction: no fee, no spending permission. Afterwards, returns can only go back to this main wallet.`));
-        lines.push(el('p', 'The listening wallet will show the full address. Check it is yours before confirming.'));
+        lines.push(el('p', 'The listening wallet will show the full address. Check it is yours before confirming.', 'ppp-warn'));
         actions.push(button(s.serverLinked ? 'Confirm my wallet' : 'Link to my wallet', () => void ppp.link(), 'primary'));
         break;
       case 'loading':
-        lines.push(el('p', 'Checking the listening wallet balance…'));
+        lines.push(el('p', 'Checking the listening wallet balance…', 'ppp-mute'));
         break;
       case 'fund': {
+        if (s.entries.length) lines.push(el('p', 'Out of funds: songs play free until you top up. Paying carries on automatically once the top-up confirms.', 'ppp-bad'));
+        else if (s.payingOn) lines.push(el('p', 'Paying is switched on. Add funds and it starts with the next new song you hear.', 'ppp-ok'));
         lines.push(el('p', `Add up to ${stx(s.allowance)} STX. 1 STX covers about ${Math.floor(Number(1_000_000n / cost)).toLocaleString()} paid plays.`));
-        const addr = el('p', '', 'ppp-addr');
-        addr.append(el('span', 'Or send from an exchange to '), el('code', s.listening || ''), button('Copy', () => void navigator.clipboard?.writeText(s.listening || '')));
-        lines.push(addr);
-        if (s.depositPending && s.depositTxid) { const p = el('p', 'Deposit sent, waiting for it to confirm. This page checks automatically. '); p.append(link('View', explorer(s.depositTxid))); lines.push(p); }
+        lines.push(el('p', `Or send STX from an exchange to the listening wallet address (Copy above).`, 'ppp-mute'));
+        if (s.depositPending && s.depositTxid) { const p = el('p', 'Deposit sent, waiting for it to confirm. This page checks automatically. ', 'ppp-warn'); p.append(link('View', explorer(s.depositTxid))); lines.push(p); }
         else if (s.allowance > 0n) actions.push(button(`Deposit ${stx(s.allowance)} STX from my wallet`, () => void ppp.deposit(), 'primary'));
         break;
       }
-      case 'first-play':
-        lines.push(el('p', payLine));
-        if (s.session?.playsLeft) lines.push(el('p', 'Approved. Now play or skip to a new song: once you can hear it, it sends your first payment.', 'ppp-ok'));
-        else actions.push(button('Approve my first paid play', () => void ppp.approveFirstPlay(), 'primary'));
+      case 'over':
+        lines.push(el('p', `This wallet holds more than the recommended 1 STX, so paid plays are paused. Return the excess or everything to your main wallet ${short(s.linked)}.`, 'ppp-bad'));
+        actions.push(button('Return excess', () => void ppp.returnFunds('excess'), 'primary'), button('Return all', () => void ppp.returnFunds('all')));
         break;
-      case 'paying':
-        lines.push(el('p', 'Your first payment is on its way. It usually confirms within a few minutes.'));
+      case 'ready':
+        if (s.payingOn && s.session && s.session.playsLeft > 0) {
+          lines.push(el('p', 'Paying as you listen: each new song you hear pays its holder.', 'ppp-ok'));
+          actions.push(button('Switch off', () => void ppp.switchOff()));
+        } else {
+          lines.push(el('p', 'Paying is switched off. Music plays free.', 'ppp-mute'));
+          actions.push(button('Switch on paying as I listen', () => void ppp.switchOn(), 'primary'));
+        }
+        if (s.balanceState === 'low') lines.push(el('p', 'Running low. Top up to keep paying artists.', 'ppp-warn'));
+        if (s.depositPending) lines.push(el('p', 'Top-up sent, waiting for it to confirm.', 'ppp-warn'));
+        else if (s.allowance > 0n && s.balanceState !== 'ok') actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
         break;
     }
     if (s.stuck) {
       lines.push(el('p', s.stuck === 1 ? '1 payment has not appeared on-chain after 30 minutes.' : `${s.stuck} payments have not appeared on-chain after 30 minutes.`, 'ppp-warn'));
       actions.push(button('Clear stuck payments', () => void ppp.clearStuck()));
     }
-    switch (s.step) {
-      case 'over':
-        lines.push(el('p', `This wallet holds ${stx(s.balance ?? 0n)} STX, more than the recommended 1 STX. Paid plays are paused. Return the excess or everything to your main wallet ${short(s.linked)}.`, 'ppp-warn'));
-        actions.push(button('Return excess', () => void ppp.returnFunds('excess'), 'primary'), button('Return all', () => void ppp.returnFunds('all')));
-        break;
-      case 'ready':
-        lines.push(el('p', `Balance ${stx(s.balance ?? 0n)} STX · about ${s.playsLeft.toLocaleString()} plays.`));
-        if (s.balanceState === 'low' || s.balanceState === 'empty')
-          lines.push(el('p', s.balanceState === 'empty' ? 'Out of funds: songs play free until you top up.' : 'Running low. Top up to keep paying artists.', 'ppp-warn'));
-        if (s.session && s.session.playsLeft > 0) {
-          lines.push(el('p', `Paying as you listen · up to ${s.session.playsLeft} more plays until ${time(s.session.expires)}.`, 'ppp-ok'));
-          actions.push(button('Stop paying', () => void ppp.stop()));
-        } else if (s.balanceState !== 'empty') actions.push(button('Pay automatically for each new song', () => void ppp.payAutomatically(), 'primary'));
-        if (s.depositPending) lines.push(el('p', 'Top-up sent, waiting for it to confirm.'));
-        else if (s.allowance > 0n && s.balanceState !== 'ok') actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
-        break;
-    }
-    if (['ready', 'fund', 'first-play', 'paying'].includes(s.step) && s.linked && (s.balance ?? 0n) > 0n)
+    if (['ready', 'fund'].includes(s.step) && s.linked && (s.balance ?? 0n) > 0n)
       actions.push(button('Return all to my wallet', () => void ppp.returnFunds('all'), 'quiet'));
-    if (['ready', 'fund', 'first-play', 'link', 'over', 'paying'].includes(s.step)) actions.push(button('Lock', () => void ppp.lock(), 'quiet'));
+    if (['ready', 'fund', 'link', 'over'].includes(s.step)) actions.push(button('Lock', () => void ppp.lock(), 'quiet'));
 
     actions.forEach((a) => ((a as HTMLButtonElement).disabled = busy));
     body.replaceChildren(...lines);
@@ -208,16 +245,37 @@ function start(root: HTMLElement) {
 
     const history = $('.ppp-history');
     history.hidden = !s.entries.length;
-    history.replaceChildren(el('summary', `Payments and returns (${s.entries.length})`), ...s.entries.slice(0, 20).map((e) => {
-      const li = el('div', `${new Date(e.created).toLocaleString()} · ${e.kind === 'play' ? `song #${e.song} · ${stx(BigInt(e.amount))} STX + fee` : `returned ${stx(BigInt(e.amount))} STX`} · ${e.status} `);
-      if (e.txid) li.append(link('tx', explorer(e.txid)));
-      return li;
+    history.replaceChildren(el('summary', `Payments and returns (${s.entries.length})`), ...(s.entries as Shown[]).slice(0, 20).map((e) => {
+      const row = el('div', '', 'ppp-row');
+      const what = e.kind === 'play'
+        ? [el('span', songLabel(e), 'ppp-song'), el('span', ` · ${stx(BigInt(e.amount))} STX to ${short(e.recipient)}`, 'ppp-mute')]
+        : [el('span', `Returned ${stx(BigInt(e.amount))} STX`, 'ppp-song'), el('span', ` to ${short(e.recipient)}`, 'ppp-mute')];
+      row.append(el('span', STATUS_TEXT[e.status] || e.status, 'ppp-status ' + (STATUS_CLASS[e.status] || '')), ...what,
+        el('span', ` · ${new Date(e.created).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} `, 'ppp-mute'));
+      if (e.txid) row.append(link('tx ↗', explorer(e.txid)));
+      return row;
     }));
+  }
+
+  // Song titles and artists from the radio itself, for history and messages.
+  const titles = new Map<number, { title?: string; artist?: string }>();
+  const watchRadio = () => {
+    const api = (window as any).XtrataRadio;
+    if (!api?.subscribe) return false;
+    api.subscribe((st: any) => {
+      const np = st?.nowPlaying;
+      if (np && Number.isSafeInteger(Number(np.tokenId))) titles.set(Number(np.tokenId), { title: np.title || undefined, artist: np.artist || undefined });
+    });
+    return true;
+  };
+  if (!watchRadio()) {
+    const t = setInterval(() => { if (watchRadio()) clearInterval(t); }, 500);
+    setTimeout(() => clearInterval(t), 60_000);
   }
 
   window.addEventListener('xtrata:radio-audible-start', (e) => {
     const d = (e as CustomEvent).detail;
-    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string') void ppp.onAudibleStart(d);
+    if (d && Number.isSafeInteger(d.song) && typeof d.id === 'string') void ppp.onAudibleStart({ ...d, ...titles.get(d.song) });
   });
   window.addEventListener('xtrata:wallet-changed', () => void ppp.refresh());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void ppp.refresh(); });
