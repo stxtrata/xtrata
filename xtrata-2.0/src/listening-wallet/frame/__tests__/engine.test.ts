@@ -121,7 +121,7 @@ describe('listening wallet engine (wallet origin)', () => {
 
   it('signs a like only in an approved session on a linked wallet: set-liked, moving nothing, fee from the budget', async () => {
     const s = setup();
-    const like = (liked = true, nonce = '0', balance = '500000') => ({ song: 1234, liked, fee: '300', nonce, balance });
+    const like = (liked = true, nonce = '0', balance = '500000') => ({ song: 1234, liked, fee: '200', nonce, balance });
     await s.h['listening.unlock']({ mode: 'create' });
     await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Paying is switched off/);
     await s.h['listening.approveSession'](s.terms(3000));
@@ -136,8 +136,8 @@ describe('listening wallet engine (wallet origin)', () => {
     expect(tx.payload.functionName.content).toBe('set-liked');
     expect(tx.postConditionMode).toBe(PostConditionMode.Deny);
     expect(tx.postConditions.values).toHaveLength(0);
-    expect(BigInt(before) - BigInt((await s.h['listening.status']()).session!.budgetLeft)).toBe(300n); // the fee only
-    const entry = { id: 'l1', address: ADDRESS, kind: 'like' as const, core: 0, song: 1234, liked: true, recipient: '', amount: '0', fee: '300', nonce: '0', created: 0, status: 'signed' as const, raw: signed.raw, txid: signed.txid };
+    expect(BigInt(before) - BigInt((await s.h['listening.status']()).session!.budgetLeft)).toBe(200n); // the 0.0002 STX fee only
+    const entry = { id: 'l1', address: ADDRESS, kind: 'like' as const, core: 0, song: 1234, liked: true, recipient: '', amount: '0', fee: '200', nonce: '0', created: 0, status: 'signed' as const, raw: signed.raw, txid: signed.txid };
     expect(() => validateSaved(entry)).not.toThrow();
     expect(() => validateSaved({ ...entry, liked: false })).toThrow(/like does not match/);
     expect(() => validateSaved({ ...entry, song: 99 })).toThrow(/like does not match/);
@@ -145,7 +145,9 @@ describe('listening wallet engine (wallet origin)', () => {
     s.tick(MIN_LIKE_INTERVAL_MS);
     await expect(s.h['listening.signLike'](like(false, '1', String(TARGET + 1n)))).rejects.toThrow(/more than 1 STX/);
     await expect(s.h['listening.signLike'](like(false, '1', '3100'))).rejects.toThrow(/Top up/);
-    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '500' })).rejects.toThrow(/fee differs/);
+    await expect(s.h['listening.signLike'](like(false, '1', '3200'))).resolves.toBeDefined(); // 3000 reserve + 200 fee
+    s.tick(MIN_LIKE_INTERVAL_MS);
+    await expect(s.h['listening.signLike']({ ...like(false, '1'), fee: '300' })).rejects.toThrow(/0.0002 STX/);
     await expect(s.h['listening.signLike']({ ...like(false, '1'), liked: 'yes' })).rejects.toThrow(/like or unlike/);
     expect((deserializeTransaction((await s.h['listening.signLike'](like(false, '1'))).raw) as any).payload.functionArgs[1].type).toBeDefined();
   });

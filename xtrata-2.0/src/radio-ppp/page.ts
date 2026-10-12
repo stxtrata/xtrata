@@ -91,16 +91,25 @@ function start(root: HTMLElement) {
       set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* history is a convenience */ } }
     },
     changed: () => render(ppp.snapshot()),
-    likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); }
+    likesChanged: () => { void (window as any).XtrataRadio?.refreshLikes?.(); },
+    likeState: async (main, song) => {
+      const r = await json('/radio/chain-likes?' + new URLSearchParams({ wallet: main, ids: String(song) }));
+      const row = Array.isArray(r?.rows) ? r.rows.find((x: any) => x?.id === song) : null;
+      if (!row || typeof row.liked !== 'boolean') throw new Error('Like state unavailable.');
+      return { liked: row.liked, by: Array.isArray(row.by) ? row.by.filter((a: unknown) => typeof a === 'string') : row.liked ? [main] : [] };
+    },
+    likeSent: (song, liked) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-sent', { detail: { song, liked } })),
+    likeFailed: (song) => window.dispatchEvent(new CustomEvent('xtrata:radio-like-failed', { detail: { song } }))
   });
 
   // The radio's heart asks here first: the listening wallet signs the like when it can, for the main wallet.
-  (window as any).XtrataRadioLikeHandler = (d: { song: number; liked: boolean; likedBy?: string[]; title?: string; artist?: string }) => {
-    if (!d || !Number.isSafeInteger(d.song) || d.song < 0 || typeof d.liked !== 'boolean') return false;
-    if (!ppp.canLike({ liked: d.liked, likedBy: Array.isArray(d.likedBy) ? d.likedBy : [] })) return false;
+  // Returns true when it takes the tap (any listener with a listening wallet here): it then toggles the
+  // like itself and never opens the main-wallet page.
+  (window as any).XtrataRadioLikeHandler = (d: { song: number; likedBy?: string[]; title?: string; artist?: string }) => {
+    if (!d || !Number.isSafeInteger(d.song) || d.song < 0) return false;
+    loadCatalogue();
     const n = songName(d.song, { title: d.title, artist: d.artist });
-    void ppp.like({ song: d.song, liked: d.liked, title: n.title || undefined, artist: n.artist || undefined });
-    return true;
+    return ppp.heart({ song: d.song, title: n.title || undefined, artist: n.artist || undefined, likedBy: Array.isArray(d.likedBy) ? d.likedBy : undefined });
   };
 
   const short = (a?: string) => (a ? a.slice(0, 6) + '…' + a.slice(-4) : '');
@@ -265,7 +274,7 @@ function start(root: HTMLElement) {
       case 'locked':
         if (s.armed) {
           // The unlock confirm is already open in the frame: one tap there goes straight to the passkey.
-          lines.push(el('p', 'Tap “Unlock and keep paying” in the listening wallet box. It goes straight to your passkey.', 'ppp-cyan'));
+          lines.push(el('p', `Tap “${s.payingOn ? 'Unlock and keep paying' : 'Unlock with passkey'}” in the listening wallet box. It goes straight to your passkey.`, 'ppp-cyan'));
         } else {
           lines.push(el('p', s.payingOn ? 'Unlock it with your passkey to keep paying as you listen.' : 'Paying is switched off. Unlock to manage your wallet.', s.payingOn ? '' : 'ppp-mute'));
           actions.push(button(s.payingOn ? 'Unlock and keep paying' : 'Unlock', () => void ppp.unlock(), 'primary'));
