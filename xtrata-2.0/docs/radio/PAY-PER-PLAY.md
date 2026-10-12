@@ -16,6 +16,13 @@ the **web** radio. The desktop Music App keeps its own wallet.
 
 ## How it works
 
+The panel shows every gate as a numbered track, always visible, with a "Stage N of 8" line under it:
+
+1 Radio address → 2 Connect wallet → 3 Access (canary allowlist) → 4 Passkey wallet → 5 Link →
+6 Add funds → 7 Switch on → 8 First paid play. A blocked gate (not invited, no passkey PRF, over
+1 STX) shows red. The track completes once a paid play has confirmed on-chain
+(`src/radio-ppp/stages.ts`).
+
 1. **Turn on.** The listener reads the warnings and the paying terms, then creates a listening
    wallet with a passkey (Face ID, Touch ID, Windows Hello or a phone). That one confirm inside the
    wallet frame also switches paying on. Nothing to install.
@@ -24,8 +31,13 @@ the **web** radio. The desktop Music App keeps its own wallet.
    spending permission. Returns go only to the main wallet confirmed this way.
 3. **Deposit.** One transfer popup sends what is needed to reach 1 STX (or copy the address). No
    second deposit is offered until it confirms.
-4. **Listen.** From the next new audible song on, every song pays 50 microSTX to its holder via
-   `xtrata-radio-plays-v1-0` plus a 300 microSTX fee. No further step.
+4. **Listen.** A song that has been heard for **30 seconds** is a play, and a play pays 50 microSTX
+   to its holder via `xtrata-radio-plays-v1-0` plus a 300 microSTX fee. No further step. Only
+   continuous audible playback counts: paused, muted, volume-zero, buffering and seeked-over time
+   does not, so skips stay free. A song shorter than a minute counts at half its length (the radio
+   play counter's rule); if the length is unknown it needs the full 30 seconds. The radio emits
+   `xtrata:radio-listened` once per song when this is reached (`src/lib/radio/audible-listen.ts`);
+   the earlier `xtrata:radio-audible-start` event still fires at audible start for the lounge.
 
 Paying stays on until the listener presses **Switch off** (remembered on that device until they
 press **Switch on**) or the wallet runs out (songs then play free, and paying carries on by itself
@@ -78,10 +90,10 @@ automatically.
   design, so a malicious one can read what xtrata.xyz stores in the browser and ask the listener's
   Xverse/Leather to sign things. Moving the executable runtime to its own address would fix that but
   changes the wallet bridge the arcade and X-Board use; it is separate, carefully tested work.
-- **One payment in flight.** A new start pays only when nothing is unresolved. A payment that was
+- **One payment in flight.** A new listen pays only when nothing is unresolved. A payment that was
   signed but may not have reached the network is re-broadcast with the same signed bytes, never
   replaced. A payment the node refused outright, or whose nonce another transaction used, is marked
-  failed. After 30 minutes unseen, the listener can clear it. Each new song first catches up on
+  failed. After 30 minutes unseen, the listener can clear it. Each new listen first catches up on
   confirmations and the kill switch, so background tabs keep working. One tab at a time (Web Locks).
 - **Passkey PRF must be proven stable** (two matching results) before an address is shown for
   funding, and again the first time a (synced) passkey is used on a new device. Devices without PRF get "pay-per-play isn't available here; listening stays free". There

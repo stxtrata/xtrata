@@ -138,10 +138,14 @@
   .ppp-badge{font-size:10px;letter-spacing:.6px;color:var(--bg);background:var(--cyan);border-radius:999px;padding:2px 7px;margin-left:6px;vertical-align:middle}
   .ppp-state{font-size:11px;font-weight:700;letter-spacing:.6px;border-radius:999px;padding:3px 9px;border:1px solid currentColor;white-space:nowrap}
   .ppp-state--ok{color:var(--ok)}.ppp-state--warn{color:#ffcf8a}.ppp-state--bad{color:#ff8a8a}.ppp-state--mute{color:var(--mut)}
-  .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 10px;font-size:11px;color:var(--mut)}
-  .ppp-steps li{border:1px solid var(--line);border-radius:999px;padding:3px 9px}
-  .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}.ppp-steps li.done::before{content:'✓ '}
+  .ppp-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:0 0 6px;font-size:11px;color:var(--mut)}
+  .ppp-steps li{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:2px 9px 2px 3px}
+  .ppp-steps .n{display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:50%;border:1px solid currentColor;font-size:10px;font-weight:700}
+  .ppp-steps li.done{color:var(--ok);border-color:var(--ok)}
   .ppp-steps li.now{color:var(--cyan);border-color:var(--cyan);font-weight:700}
+  .ppp-steps li.now .n{background:var(--cyan);color:#05121a;border-color:var(--cyan)}
+  .ppp-steps li.blocked{color:#ff8a8a;border-color:#ff8a8a}.ppp-steps li.blocked .n{background:#ff8a8a;border-color:#ff8a8a}
+  .ppp-stage{margin:0 0 10px;font-size:12px;font-weight:600}.ppp-cyan{color:var(--cyan)}
   .ppp-facts{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0 0 10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);font-size:12.5px}
   .ppp-facts dt{color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;align-self:center;white-space:nowrap}
   .ppp-facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere;align-self:center}
@@ -230,7 +234,8 @@
     </div>
     <section class="ppp" id="ppp" hidden aria-label="Pay per play">
       <div class="ppp-head"><h3>♪ PAY PER PLAY<span class="ppp-badge" hidden>CANARY</span></h3><span class="ppp-state" hidden></span></div>
-      <ol class="ppp-steps" hidden></ol>
+      <ol class="ppp-steps" hidden aria-label="Pay-per-play stages"></ol>
+      <p class="ppp-stage" hidden></p>
       <dl class="ppp-facts" hidden></dl>
       <div class="ppp-body"></div>
       <div class="ppp-actions"></div>

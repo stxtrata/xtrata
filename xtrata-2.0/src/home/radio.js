@@ -1,4 +1,5 @@
 import { attachAudibleStart } from '../lib/radio/audible-start.js';
+import { attachAudibleListen } from '../lib/radio/audible-listen';
 import {radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
@@ -655,6 +656,10 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   });
   const supportStarts = attachAudibleStart(player, detail => {
     window.dispatchEvent(new CustomEvent('xtrata:radio-audible-start', { detail }));
+  });
+  // A real listen (30 s audible, or half of a shorter song): pay-per-play pays on this.
+  const listens = attachAudibleListen(player, detail => {
+    window.dispatchEvent(new CustomEvent('xtrata:radio-listened', { detail }));
   });
   const emit = () => {
     const snapshot = stateSnapshot();
@@ -1323,6 +1328,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       }
       if (token !== tuneToken || !on) { endTune(); return; }
       supportStarts.select(Number(track.tokenId));
+      listens.select(Number(track.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(track.tokenId));
       if (player.src !== track.src) {
         player.src = track.src;
@@ -1501,6 +1507,7 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
       applyVolume();
       renderKnob();
       supportStarts.select(Number(saved.tokenId));
+      listens.select(Number(saved.tokenId));
       playCounter.select(PLAYABLE_CONTRACT, Number(saved.tokenId));
       player.src = track.src;
       currentTokenId = track.tokenId || null;
