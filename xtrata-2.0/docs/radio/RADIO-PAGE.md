@@ -32,6 +32,37 @@
 - **Pay-per-play panel**, then the links strap. On phones everything is one column and the walnut
   widget is the sticky mini-player.
 
+## Two looks: paying and not paying
+
+Pay-per-play sets `<html data-ppp>` (src/radio-ppp/page.ts `renderMode`):
+
+- `on`: the listening wallet is unlocked, paying is on and plays are left. The receiver gets a
+  gold trim with screws and a slow sheen, a warm amber display, a lit **ON AIR** lamp ("Paying
+  artists · N plays left"), gold controls, waveform and spectrum.
+- `off`: pay-per-play is available but not paying (not connected, not set up, locked, out of
+  funds, over 1 STX, or switched off). The radio goes drab (grey display, desaturated artwork),
+  the lamp reads "Not paying" in orange, the top bar adds "· ARTISTS UNPAID", and an orange strip
+  under the receiver says what is missing, that 1 STX (less than $1) pays for about 2,857 plays,
+  and offers the one next step (Set up, Unlock, Top up, Switch on…).
+- unset: pay-per-play is not offered (config off, unsupported). The normal cyan look.
+
+The "less than $1" wording is fixed text: revisit it if STX trades above $1.
+
+## This song on-chain
+
+The display shows the current song's **♥ likes** (the likes contract's total) and **▶ paid
+plays** (pay-per-play receipts, from the D1 copy kept by the music stats sync) from
+`GET /radio/song-stats?id=N` (functions/radio/song-stats.ts). Asked again on each song change and
+when a like or unlike confirms. A count that could not be read is hidden, never shown as 0.
+
+## Timeline
+
+Under the receiver: the whole song's waveform, played part lit, with elapsed and total time. Tap
+or drag to jump; arrow keys move 5 s. The engine exposes `getPosition()`, `seek(seconds)` and
+`currentSource()`. Peaks come from decoding the song once at a low sample rate (skipped for files
+over 20 MB or low-memory devices, which keep a plain bar). Skipped-over audio never counts towards
+a listen or a paid play.
+
 ## Checks
 
 `node scripts/test-radio-page-browser.mjs [shots]` drives the page with a stand-in engine (layout,

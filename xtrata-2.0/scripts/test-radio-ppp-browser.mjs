@@ -68,6 +68,10 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.equal(await page.locator('.ppp-steps li').count(), 4);
   assert.match(await page.locator('.ppp-stage').innerText(), /^Step 1 of 4/);
   if (shots) await page.locator('#ppp').screenshot({ path: `${shots}/ppp-elsewhere-${viewport.width}.png` });
+  // Not paying: the radio goes drab and a nudge says what it costs.
+  const mode = () => page.evaluate(() => document.documentElement.dataset.ppp ?? '');
+  assert.equal(await mode(), 'off');
+  assert.match(await page.locator('#pppNudge').innerText(), /1 STX \(less than \$1\) pays for 2,857 plays/);
 
   await page.goto(SITE + '/radio.html');
   const panel = page.locator('#ppp');
@@ -78,6 +82,9 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.equal(await panel.locator('.ppp-steps li.done').count(), 1);
   assert.match(await panel.locator('.ppp-steps li[aria-current=step]').innerText(), /2\s*Passkey/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-intro-${viewport.width}.png` });
+  assert.equal(await mode(), 'off');
+  assert.equal(await page.locator('#pppNudge button').innerText(), 'Set up');
+  if (shots) await page.screenshot({ path: `${shots}/page-off-${viewport.width}.png` });
 
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).click();
   const frame = page.frameLocator('.ppp-frame iframe');
@@ -87,7 +94,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
     await frame.locator('#p-ok').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
   };
   await frame.locator('#p-summary').waitFor();
-  assert.match(await frame.locator('#p-summary').innerText(), /Keep no more than 1 STX/); // the key warning stays visible
+  assert.match(await frame.locator('#p-summary').innerText(), /Keep under 1 STX/); // the key warning stays visible
   assert.equal(await frame.locator('#p-more').getAttribute('open'), null); // the rest is folded under Details
   if (shots) await panel.screenshot({ path: `${shots}/ppp-create-${viewport.width}.png` });
   // Create, confirm and re-check the passkey: three confirms, each enabled only once steadily visible.
@@ -107,9 +114,9 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   if (shots) await panel.screenshot({ path: `${shots}/ppp-link-${viewport.width}.png` });
   // One-tap unlock: a returning listener's first tap in the frame goes straight to the passkey.
   await page.reload();
-  await panel.getByText(/It goes straight to your passkey/).waitFor();
+  await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor(); // armed: the first tap is the passkey
+  assert.match(await frame.locator('#p-summary').innerText(), /^SP\w+…\w{4} · 0\.00035 STX a song · up to 1 STX$/); // one glance, details folded
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Step 2 of 4 · unlock/); // not linked yet in this test, so still first-time setup
-  await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor();
   assert.equal(await panel.getByRole('button', { name: 'Unlock and keep paying' }).count(), 0); // no page button to click first
   assert.equal(await page.locator('#ppp-top').innerText(), 'Unlock · keep paying');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -150,12 +157,22 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   // Set up: no steps, no badge, one line with plays left and balance, one button.
   assert.equal(await panel.locator('.ppp-steps').isVisible(), false);
   assert.equal(await panel.locator('.ppp-badge').isVisible(), false);
-  assert.match(await panel.locator('.ppp-key').innerText(), /^Paying as you listen · up to [\d,]+ plays left · 1\.000000 STX$/);
+  assert.match(await panel.locator('.ppp-key').innerText(), /^Paying as you listen · up to [\d,]+ plays left · 1\.0000 STX$/);
   assert.deepEqual(await panel.locator('.ppp-actions').first().getByRole('button').allInnerTexts(), ['Switch off']);
   assert.equal(await panel.locator('.ppp-frame-label').isVisible(), false);
   assert.match(await page.locator('#ppp-top').innerText(), /^On · [\d,]+ plays left$/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-ready-${viewport.width}.png` });
+  // Paying: gold trim, ON AIR lit, no nudges.
+  assert.equal(await mode(), 'on');
+  assert.equal(await page.locator('#pppNudge').isVisible(), false);
+  assert.match(await page.locator('#onair').textContent(), /ON AIR\s*Paying artists · [\d,]+ plays left/i);
   if (shots) await page.screenshot({ path: `${shots}/page-ready-${viewport.width}.png` });
+  // Switched off: drab again, with a one-tap way back.
+  await panel.getByRole('button', { name: 'Switch off' }).click();
+  await page.waitForFunction(() => document.documentElement.dataset.ppp === 'off');
+  assert.match(await page.locator('#pppNudge .nudge-t').innerText(), /Paying is off · artists get nothing/i);
+  assert.equal(await page.locator('#pppNudge button').innerText(), 'Switch on');
+  if (shots) await page.screenshot({ path: `${shots}/page-switched-off-${viewport.width}.png` });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);
   await context.close();

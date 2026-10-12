@@ -310,7 +310,7 @@ describe('one-tap unlock', () => {
     s.held[0].cancel(); s.held.shift();
     await s.settle();
     await s.ppp.forceRefresh(); await s.settle();
-    expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: false, message: 'Cancelled. Nothing was signed.' });
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', armed: false, message: 'Not now. Nothing was signed.' });
     expect(s.held).toHaveLength(0);
     const unlocking = s.ppp.unlock(); // the page button asks again
     await s.settle();
@@ -368,7 +368,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     expect(tx.auth.spendingCondition.fee).toBe(200n);
     expect(cvToJSON(tx.payload.functionArgs[1]).value).toBe(true);
     expect(s.sent).toEqual([[7, true]]);
-    expect(s.ppp.snapshot().message).toBe('Liked “Night Drive” from your listening wallet, for your main wallet (0.0002 STX).');
+    expect(s.ppp.snapshot().message).toBe('♥ Liked “Night Drive”');
     s.mineAll(); await s.ppp.forceRefresh();
     expect(s.likesChanged()).toBe(1);
     // tapped again once the chain shows it liked by this listening wallet: it unlikes
@@ -421,7 +421,7 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     await s.ppp.lock(); await s.settle();
     expect(s.ppp.heart({ song: 9, title: 'Entertainment' })).toBe(true);
     await settleLike(s);
-    expect(s.ppp.snapshot().message).toMatch(/^Unlock to like “Entertainment”: tap “Unlock and keep paying”/);
+    expect(s.ppp.snapshot().message).toBe('Unlock to like “Entertainment”. It sends straight after.');
     s.tap(); await s.ppp.unlock();
     await settleLike(s); await settleLike(s);
     expect(s.chain.broadcasts).toHaveLength(1);
