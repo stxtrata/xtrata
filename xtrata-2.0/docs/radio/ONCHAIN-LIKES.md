@@ -140,3 +140,34 @@ read requests, including authenticated config/state reads, rejected-key fallback
 timeout, private diagnostic fields, authenticated confirmation lookup, and environment
 forwarding from catalogue totals. No wallets were opened and no transactions submitted.
 Deployment and live verification remain pending the user's push.
+
+### Hiro 429 resilience (2026-10-12)
+
+On 2026-10-12 production returned HTTP 503 for every `/radio/chain-likes` call. Cloudflare
+real-time logs showed the `get-config` read answered **HTTP 429 by Hiro for both keys the
+Worker tried** (it only ever tried the first two). The likes contract itself was healthy.
+Because the config read gates every other call, one throttled read failed everything, and
+client retries (two requests per attempt, ~15 s tick, forced on focus) kept the pool throttled.
+
+Changes:
+
+- **Server:** all configured Hiro keys are tried (numbered keys first, as before). A key that
+  Hiro refuses (401/403/429) is moved to the back of the queue for the rest of its 2-minute
+  cooldown (per Worker isolate; honours a numeric `Retry-After`). A transient 5xx or dropped
+  connection on a config/state read is retried once after ~300 ms. The verified contract
+  config is cached for an hour and served stale if Hiro is unavailable (never for an
+  unexpected configuration). 503 responses now carry `Retry-After` and
+  `code: "upstream_unavailable"`; the error text is unchanged. Transaction confirmation
+  keeps its single-attempt-on-5xx behaviour.
+- **Client (`createRadioOnchainState`):** HTTP errors are not retried; only a dropped
+  connection/timeout gets one retry after 1.5 s. Failures back off 30 s → 1 min → 2 min →
+  5 min (±20 % jitter, or the server's `Retry-After` if longer). Focus/visibility events no
+  longer bypass a backoff; the Refresh button and wallet changes always run. After the
+  server reports an HTTP failure the remaining batches are skipped and their last confirmed
+  likes kept. New `paused` status (second consecutive failure) with `retryAt`/`checkedAt`.
+- **UI:** the radio panel explains a paused state with the retry time and last confirmed
+  time; the heart tooltip no longer implies likes are lost.
+
+Ops: if 429s persist, check the Hiro dashboard for the keys numbered 1 and 2 (and the
+Cloudflare `HIRO_API_KEY_n` bindings). Cooldown state is per isolate, so it is not shared
+across Cloudflare locations.

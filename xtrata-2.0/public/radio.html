@@ -234,7 +234,7 @@
     var list=$('likesList');list.innerHTML='';
     var likesStatus=s.likesStatus||'disconnected';
     $('likesHint').style.display=likesStatus==='ready'&&s.likes.length?'none':'';
-    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes where available; retrying automatically.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet.';
+    $('likesHint').textContent=likesStatus==='loading'?'Refreshing this wallet’s on-chain likes…':likesStatus==='partial'||likesStatus==='unavailable'?'Some likes could not be refreshed. Showing previously confirmed likes where available; retrying automatically.':likesStatus==='paused'?'The chain service is busy, so on-chain likes are paused'+(s.likesRetryAt?' until about '+new Date(s.likesRetryAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'')+'. Your likes are safe on-chain'+(s.likesCheckedAt?' (last confirmed '+new Date(s.likesCheckedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+')':'')+'. Retrying automatically, or press Refresh likes.':likesStatus==='disconnected'?'Connect your wallet to see its on-chain likes.':'No confirmed on-chain likes for this wallet yet.';
     s.likes.forEach(function(l){
       var row=document.createElement('div');row.className='lrow';
       row.innerHTML='<span class="lt" title="Play now">'+esc(l.title)+'</span><span class="la">'+esc(l.artist||('#'+l.tokenId))+'</span><button title="Remove">✕</button>';
