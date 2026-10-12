@@ -73,6 +73,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   const panel = page.locator('#ppp');
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).waitFor();
   assert.match(await panel.innerText(), /SETUP HELPER/);
+  assert.equal(await page.locator('#ppp-top').innerText(), 'Set up pay-per-play'); // always in the top bar
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Step 2 of 4 · create your passkey/);
   assert.equal(await panel.locator('.ppp-steps li.done').count(), 1);
   assert.match(await panel.locator('.ppp-steps li[aria-current=step]').innerText(), /2\s*Passkey/);
@@ -110,6 +111,10 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Step 2 of 4 · unlock/); // not linked yet in this test, so still first-time setup
   await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor();
   assert.equal(await panel.getByRole('button', { name: 'Unlock and keep paying' }).count(), 0); // no page button to click first
+  assert.equal(await page.locator('#ppp-top').innerText(), 'Unlock · keep paying');
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.locator('#ppp-top').click(); // brings the wallet box, unlock ready, into view
+  await page.waitForFunction(() => { const r = document.querySelector('.ppp-frame').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; });
   if (shots) await panel.screenshot({ path: `${shots}/ppp-armed-${viewport.width}.png` });
   await showConfirm();
   await frame.locator('#p-ok:not([disabled])').waitFor(); // enabled once up, and fully visible, for the arming delay
@@ -148,7 +153,9 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   assert.match(await panel.locator('.ppp-key').innerText(), /^Paying as you listen · up to [\d,]+ plays left · 1\.000000 STX$/);
   assert.deepEqual(await panel.locator('.ppp-actions').first().getByRole('button').allInnerTexts(), ['Switch off']);
   assert.equal(await panel.locator('.ppp-frame-label').isVisible(), false);
+  assert.match(await page.locator('#ppp-top').innerText(), /^On · [\d,]+ plays left$/);
   if (shots) await panel.screenshot({ path: `${shots}/ppp-ready-${viewport.width}.png` });
+  if (shots) await page.screenshot({ path: `${shots}/page-ready-${viewport.width}.png` });
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);
   await context.close();
