@@ -20,6 +20,7 @@ export type RoyaltyDependencies = {
   transaction: (env: Env, txId: string) => Promise<any>;
 };
 import { fetchPaymentTransaction } from '../lib/audionaut-royalties';
+import { automationInfo, payerAddresses } from '../lib/audionaut-royalty-automation';
 const defaults: RoyaltyDependencies = { session: readCreatorSession, snapshot, rows: royaltyRows, verify: verifyRoyaltyPayment, transaction: fetchPaymentTransaction };
 
 export async function handleRoyalties(request: Request, env: Env, deps: RoyaltyDependencies = defaults) {
@@ -41,12 +42,20 @@ export async function handleRoyalties(request: Request, env: Env, deps: RoyaltyD
     const records = await queryAll(env, 'SELECT tx_id, recipient, editions_json FROM audionaut_royalty_payments ORDER BY recorded_at DESC');
     if (request.method === 'GET') {
       return reply({ address: auth.session.address, admin: auth.session.admin, checkedAt: live.checkedAt,
-        blockHeight: live.blockHeight, artists: live.artists, rows: await deps.rows(env, live, (records.results ?? []) as PaymentRecord[]) });
+        blockHeight: live.blockHeight, artists: live.artists, rows: await deps.rows(env, live, (records.results ?? []) as PaymentRecord[]),
+        automation: await automationInfo(env, auth.session.admin) });
     }
     if (!request.headers.get('content-type')?.startsWith('application/json')) return reply({ error: 'JSON required.' }, 400);
     const text = await request.text();
     if (text.length > 4096) return reply({ error: 'Receipt request is too large.' }, 413);
     const body = JSON.parse(text);
+    if (body.action === 'configure') {
+      const payers = payerAddresses(body.payers);
+      const db = env.DB ?? env.D1 ?? env.db;
+      if (!db) throw Error('Receipt storage is unavailable.');
+      await db.prepare('UPDATE audionaut_royalty_automation SET payers_json=? WHERE id=1').bind(JSON.stringify(payers)).run();
+      return reply({ ok: true, payers });
+    }
     const txId = normalizeTxId(body.txId), editions = paymentEditions(body.editions);
     const selected = editions.map(e => live.minted.find(m => m.edition === e));
     if (selected.some(m => !m)) return reply({ error: 'Only minted editions can have a receipt.' }, 400);

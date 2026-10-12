@@ -37,6 +37,7 @@ describe.skipIf(!sqliteAvailable)('durable receipt allocations', () => {
   function fixture() {
     const DB = memoryDb();
     DB.sqlite.exec(readFileSync(new URL('../../migrations/023_audionaut_royalties.sql', import.meta.url), 'utf8'));
+    DB.sqlite.exec(readFileSync(new URL('../../migrations/024_audionaut_royalty_automation.sql', import.meta.url), 'utf8'));
     return { DB } as any;
   }
   it('lets a receiving holder view the complete ledger', async () => {
@@ -58,5 +59,15 @@ describe.skipIf(!sqliteAvailable)('durable receipt allocations', () => {
     deps.verify = async () => { throw Error('Wrong recipient'); };
     expect((await handleRoyalties(post(), env, deps)).status).toBe(400);
     expect(env.DB.sqlite.prepare('SELECT COUNT(*) AS n FROM audionaut_royalty_payments').get().n).toBe(0);
+  });
+  it('restricts monitored-payer configuration to signed-in admins', async () => {
+    const request = () => new Request(get().url, { method: 'POST', headers: { origin: 'https://xtrata.xyz', 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'configure', payers: [ADDRESS] }) });
+    const env = fixture();
+    expect((await handleRoyalties(request(), env, dependencies())).status).toBe(403);
+    expect((await handleRoyalties(request(), env, dependencies({ address: ADDRESS, admin: true }))).status).toBe(200);
+    const body = await (await handleRoyalties(get(), env, dependencies({ address: ADDRESS, admin: true }))).json();
+    expect(body.automation.payers).toEqual([ADDRESS]);
+    expect((await (await handleRoyalties(get(), env, dependencies())).json()).automation.payers).toBeUndefined();
   });
 });

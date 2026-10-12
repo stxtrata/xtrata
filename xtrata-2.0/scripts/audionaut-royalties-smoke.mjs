@@ -13,7 +13,7 @@ const rows = catalogue.editions.slice(0, 3).map((e, i) => ({ ...e, tokenId: 3100
   receivingAddress: i === 2 ? other : address, dueMicroStx: 5000000,
   status: ['paid', 'unrecorded', 'unverified'][i], txId: i === 1 ? null : '0x' + 'a'.repeat(64),
   recipient: i === 1 ? null : address, note: i === 2 ? 'Temporary chain lookup failure' : '' }));
-let mode = 'out', receiptError = false, ledgerFetches = 0;
+let mode = 'out', receiptError = false, ledgerFetches = 0, payerSaved = false;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
 const errors = [];
@@ -25,6 +25,10 @@ await page.route('**/*', async route => {
     ledgerFetches++;
     if (route.request().method() === 'POST') {
       assert.equal(mode, 'admin');
+      if (route.request().postDataJSON().action === 'configure') {
+        assert.deepEqual(route.request().postDataJSON().payers, [address]); payerSaved = true;
+        return route.fulfill({ json: { ok: true } });
+      }
       assert.deepEqual(route.request().postDataJSON().editions, [2]);
       return route.fulfill({ status: receiptError ? 400 : 200, json: receiptError ? { error: 'Wrong receiving address.' } : { ok: true } });
     }
@@ -32,7 +36,9 @@ await page.route('**/*', async route => {
     if (mode === 'denied') return route.fulfill({ status: 403, json: { error: 'This wallet does not hold a receiving song.' } });
     if (mode === 'offline') return route.abort();
     return route.fulfill({ json: { address, admin: mode === 'admin', checkedAt: Date.now(), blockHeight: 120,
-      artists: catalogue.artists.map(a => ({ ...a, address, error: null })), rows } });
+      artists: catalogue.artists.map(a => ({ ...a, address, error: null })), rows,
+      automation: { checkedAt: Date.now(), error: null, summary: { incomplete: 1 }, payers: mode === 'admin' ? [address] : undefined,
+        candidates: mode === 'admin' ? [{ tx_id: '0x' + 'a'.repeat(64), amount: '5000000', memo: '<img src=x>', note: 'No edition memo.' }] : undefined } } });
   }
   if (url.pathname === '/manage/session') return route.fulfill({ json: { signedIn: false } });
   let file = url.pathname;
@@ -42,6 +48,7 @@ await page.route('**/*', async route => {
     body: await readFile(new URL('public' + file, root), 'utf8') });
 });
 try {
+  await page.clock.install();
   await page.goto('https://royalties.test/audionauts/royalties/');
   await page.waitForFunction(() => !document.getElementById('message').textContent);
   assert.equal(await page.locator('#ledger').isVisible(), false);
@@ -64,6 +71,21 @@ try {
   assert.equal(await page.evaluate(() => window.metadataExecuted), undefined);
   rows[0].title = catalogue.editions[0].title;
   mode = 'admin'; await page.reload(); await page.locator('#record-panel').waitFor();
+  await page.locator('#automation-panel summary').click();
+  assert.equal(await page.locator('#candidates img').count(), 0);
+  await page.fill('#payers', address); await page.locator('#payer-form button').click();
+  await page.waitForFunction(() => document.getElementById('payer-message').textContent.startsWith('Saved.'));
+  assert.equal(payerSaved, true);
+  await page.locator('#candidates button').click();
+  assert.equal(await page.inputValue('#tx-id'), '0x' + 'a'.repeat(64));
+  assert.equal(await page.locator('#record-panel').getAttribute('open'), '');
+  await page.locator('#automation-panel summary').click();
+  await page.locator('#record-panel summary').click();
+  // The live document export includes receiving addresses and proof links.
+  const downloadPromise = page.waitForEvent('download'); await page.click('#export-csv');
+  const download = await downloadPromise;
+  const csv = await readFile(await download.path(), 'utf8');
+  assert(csv.includes('Payment transaction')); assert(csv.includes(address));
   await page.locator('#record-panel summary').click();
   await page.fill('#tx-id', '0x' + 'a'.repeat(64)); await page.fill('#editions', '2');
   receiptError = true; await page.locator('#receipt-form button').click();
@@ -80,9 +102,15 @@ try {
   mode = 'denied'; await page.click('#refresh'); await page.waitForFunction(() => document.getElementById('ledger').hidden);
   assert.equal(await page.locator('#rows tr').count(), 0);
   mode = 'recipient'; await page.reload(); await page.locator('#rows tr').first().waitFor();
+  const before = ledgerFetches, automaticRefresh = page.waitForResponse(response => response.url().endsWith('/api/audionaut-royalties'));
+  await page.clock.fastForward(60_000); await automaticRefresh;
+  await page.waitForFunction(() => !document.getElementById('message').textContent);
+  assert.equal(ledgerFetches, before + 1, 'Refreshes the active authorized ledger automatically');
   await page.click('#sign-out'); assert.equal(await page.locator('#ledger').isVisible(), false);
+  const signedOut = ledgerFetches; await page.clock.fastForward(120_000);
+  assert.equal(ledgerFetches, signedOut, 'Does not poll signed-out sessions');
   assert.equal(await page.locator('#rows tr').count(), 0);
   assert.deepEqual(errors, []);
-  assert(ledgerFetches < 20, 'No polling loop');
-  console.log('Browser smoke passed: private gate, filters, receipts, unsafe metadata, sign-out, desktop and mobile. All sessions/payments simulated.');
+  assert(ledgerFetches < 25, 'Requests remain bounded');
+  console.log('Browser smoke passed: private gate, filters, receipt discovery/settings, CSV export, active-page refresh, unsafe metadata, sign-out, desktop and mobile. All sessions/payments simulated.');
 } finally { await browser.close(); }

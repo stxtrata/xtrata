@@ -96,6 +96,15 @@ Purpose: one-stop map of where code lives and which files to touch for common up
 
 ## Artist manager portal
 
+- `public/audionauts/royalties/`, `src/audionaut-royalties/page.ts` and
+  `functions/api/audionaut-royalties.ts` provide the wallet-authenticated Audionaut
+  artist ledger and live song/payment CSV export. `functions/lib/audionaut-royalties.ts`
+  verifies minted identities, the first-song receiving holders and historical
+  5 STX receipts. `functions/lib/audionaut-royalty-automation.ts` and
+  `workers/audionaut-royalties/` discover tagged payments every five minutes,
+  resume history scans and preserve ambiguous transfers for admin assignment.
+  Migrations 023/024 and `docs/plans/AUDIONAUT-ROYALTIES.md` describe operation.
+
 - `src/config/manage.ts` defines `MANAGE_PATH`, parses `VITE_ARTIST_ALLOWLIST`, and exposes helpers for the gate; the same allowlist drives the `/manage` entry point.
 - `src/manage/ArtistManagerGate.tsx` handles wallet connect/disconnect, theme selection, and allowlist validation before rendering `CollectionManagerApp`.
 - `src/manage/ManageWalletContext.tsx` reuses the shared wallet adapter/session store to isolate the manage portal session from the public app.

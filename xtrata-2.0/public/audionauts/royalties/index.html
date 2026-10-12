@@ -33,6 +33,8 @@
         <label>Search<input id="search" type="search" placeholder="Edition, artist or song"></label>
       </div><button id="refresh" class="secondary">Refresh</button></div>
       <p id="updated" class="muted"></p>
+      <p id="automation-status" class="muted" role="status"></p>
+      <div class="buttons"><button id="export-csv" class="secondary">Download song and payment list</button></div>
       <p id="ownership-warning" class="warning" hidden></p>
       <div class="table-wrap"><table>
         <thead><tr><th>Audionaut</th><th>Song / artist</th><th>Receiving wallet</th><th>Royalty</th><th>Payment</th></tr></thead>
@@ -41,6 +43,14 @@
       <p id="empty" hidden>No minted Audionauts match these filters.</p>
       <p class="explanation">A receiving wallet is the current holder of the artist’s earliest song inscription in this collection’s song list. Each minted edition earns one 5 STX royalty for its primary secret-song artist. Bonus songs and playlists do not add another royalty.</p>
       <p class="explanation">“No receipt” means a payment has not been recorded here. Confirmed receipts include a transaction link and the address that held the artist’s receiving song when paid. Mint and ownership checks use a confirmed block, so recent activity can take a little time to appear.</p>
+      <details id="automation-panel" hidden>
+        <summary>Automatic payment tracking</summary>
+        <p>New receipts with an edition memo, such as <strong>audionaut:84</strong>, are verified every five minutes. For several editions, use <strong>audionaut:2,5</strong> and transfer 5 STX per edition to their shared receiving wallet.</p>
+        <p>Add the public paying wallet addresses to discover older transfers, including payments to former holders. Transfers without an edition memo need their covered editions assigned once.</p>
+        <form id="payer-form"><label>Paying wallet addresses<textarea id="payers" rows="3" placeholder="One Stacks mainnet address per line"></textarea></label><button type="submit">Save monitored addresses</button></form>
+        <p id="payer-message" role="status"></p>
+        <h3>Transfers awaiting assignment or verification</h3><div id="candidates"></div>
+      </details>
       <details id="record-panel" hidden>
         <summary>Record an existing payment</summary>
         <p>Add a confirmed transfer receipt. A single transfer can cover several editions at 5 STX each, provided they share the receiving address.</p>

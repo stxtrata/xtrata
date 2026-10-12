@@ -18,16 +18,57 @@ API: `/api/audionaut-royalties`.
 4. Require wallet message sign-in. Approved receiving holders and Xtrata admins
    can see the complete ledger and filter to their royalties. Server access is
    enforced even when the collection studio's `CREATOR_AUTH_MODE` is off or log.
-5. Track exactly 5 STX per minted edition. An admin links a successful existing
-   transfer to one or more editions. Verify the total, recipient, canonical block,
-   mint timing, and historical receiving-song ownership before storing it.
+5. Track exactly 5 STX per minted edition. Automatically discover and link
+   explicitly tagged transfers. An admin can assign older unlabelled transfers
+   to their covered editions. Verify total, recipient, canonical block, mint
+   timing, and historical receiving-song ownership before storing a receipt.
 6. Reverify recorded transfers on each refresh. Show Paid, No receipt, or Could
    not verify. The admin's allocation identifies the transfer as a royalty; the
    chain establishes that the specified amount reached the correct holder.
 
-This page records receipts only. It never constructs, signs or broadcasts a
-payment. Existing payments are not assumed unpaid: until their transaction IDs
-are entered, they are shown as **No receipt**.
+This page records receipts only, as confirmed by the user on 12 October. It never
+constructs, signs or broadcasts a payment. Existing payments are not assumed
+unpaid: editions without a verified allocation are shown as **No receipt**.
+
+## Automated operation
+
+The separate `xtrata-audionaut-royalties` Worker runs every five minutes, including
+when nobody has the page open. It uses the existing first-party Hiro read proxy
+and D1 database, with no wallet secrets. `workers/audionaut-royalties/wrangler.toml`
+owns its schedule. Apply migration 024 in addition to 023 before enabling it.
+
+- Scan current receiving wallets, previously monitored holders and optionally
+  configured paying wallets. An admin saves public payer addresses in the page.
+  Payer history is needed to discover payments to holders from before monitoring
+  began. No paying address has been assumed from unrelated wallet configuration.
+- For automatic allocation, use a standard direct STX transfer memo such as
+  `audionaut:84`, or `audionaut:2,5` for a 10 STX batch to a common receiving holder.
+  Memos must fit Stacks' 34-byte limit. Unrelated or ambiguous 5 STX transfers
+  cannot establish which edition was paid. Unlabelled transfers from configured
+  payers enter the admin review list; they need a one-time edition assignment.
+- Backfill three 50-transaction pages per address per run at a pinned canonical
+  block. Resume durable offsets on later runs and inspect a recent page while an
+  older backfill continues. Rewind on a changed canonical block. Incomplete or
+  failed discovery is visible on the page. Retry failed tagged candidates.
+- Validate each discovered transfer through the same historical ownership and
+  exact-amount checks as manual receipts. Store allocations atomically and
+  reverify the ledger each run. A database lease prevents overlapping scheduled
+  runs, and duplicate transfers or editions cannot create a second payment.
+- Refresh the authenticated, visible page once a minute, with no overlapping
+  requests. Pause while an admin form is open; stop when signed out or hidden.
+  **Download song and payment list** exports the current minted assignments,
+  receiving addresses and verified payment links as CSV. Source text is escaped
+  against spreadsheet formulas.
+
+This release recognizes direct token-transfer transactions. A contract's generic
+STX event or send-many payment does not establish the required edition memo and
+allocation under this policy, and must not be silently counted as Paid.
+
+Transaction pagination follows Hiro's official v1 address route's `until_block`
+and offset semantics; see [the route source](https://github.com/hirosystems/stacks-blockchain-api/blob/main/src/api/routes/v1/address.ts).
+The existing project uses v1 transaction evidence; these endpoints are currently
+deprecated in favor of v3 but remain supported. The background schedule uses
+[Cloudflare Worker Cron Triggers](https://developers.cloudflare.com/workers/configuration/cron-triggers/).
 
 ## Receiving songs
 
@@ -69,6 +110,8 @@ Before publishing this code:
 - Apply `functions/migrations/023_audionaut_royalties.sql` to the environment's D1
   database. It adds payment records and edition allocations; it does not alter
   existing collections or payments.
+- Apply `functions/migrations/024_audionaut_royalty_automation.sql` for resumable
+  discovery, candidate review and scheduler status.
 - Retain the existing `DB` binding, Hiro API keys and `XTRATA_ADMIN_ADDRESSES`.
   The latter defaults to the existing Xtrata owner address. Receiving holders do
   not need to be added to the creator allowlist.
@@ -84,8 +127,9 @@ edition can have only one receipt, enforced atomically in D1. Invalid/pending
 receipts are refused. Receipts are immutable in this first release; a mistaken
 allocation needs an audited operator database correction, not a recipient edit.
 
-Existing payment IDs have not been supplied or imported. No production migration,
-deployment, payment or wallet sign-in was performed during implementation.
+The user authorized pushing and production deployment on 12 October. Release
+preparation uses the current production branch plus these royalty commits only.
+No actual wallet sign-in, signing or payment is performed during verification.
 
 To refresh the reviewed catalogue, download the engine as text, then run:
 
@@ -119,9 +163,15 @@ Repeat the relevant checks with:
 
 ```bash
 npm run build:audionaut-royalties
-npx vitest run functions/lib/__tests__/audionaut-royalties.test.ts functions/api/__tests__/audionaut-royalties.test.ts
+npx vitest run functions/lib/__tests__/audionaut-royalties.test.ts functions/lib/__tests__/audionaut-royalty-automation.test.ts functions/api/__tests__/audionaut-royalties.test.ts
 node scripts/audionaut-royalties-smoke.mjs
 ```
 
 Screenshots and downloaded live evidence stay local under ignored scratch/tmp
 paths. Only source, tests, schema and documentation belong in the commit.
+
+Automation verification: 37 targeted tests passed. The browser smoke also checks
+monitored-address configuration, discovered candidate assignment, inert metadata,
+CSV download, one-minute authorized refresh and stopping after sign-out. Worker
+dry-run compilation passes. These checks use local simulations/disposable
+addresses and never connect an existing wallet or broadcast a transaction.

@@ -3,6 +3,8 @@
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
 ## Audionaut artist royalty ledger (2026-10-12)
+- Added a five-minute Cloudflare background verifier, pinned/resumable payment-history scans, automatic allocation of edition-tagged receipts, monitored-payer settings and an ambiguous-transfer review list (migration 024). Authorized viewers refresh once a minute and can export current song assignments and proof links as CSV. Tracking only: no signer or payment broadcaster.
+- Automation checks: 37 targeted tests, simulated browser settings/export/refresh checks and Worker dry-run compilation pass. Production release uses current main plus only the royalty commits; user explicitly authorized push/deploy.
 - Added `/audionauts/royalties/`: receiving-song holders sign a free wallet message to view minted Audionauts, primary songs/artists, receiving wallets and 5 STX receipt status. Includes artist/search/payment filters and a personal royalty view.
 - `/api/audionaut-royalties` enforces authenticated receiving-holder/admin access independently of the studio auth rollout mode. Mints and receiving-song ownership come from the confirmed chain, not staging state.
 - Admins record existing transfer IDs and edition allocations. Payments are verified against their total, canonical confirmation and the artist's receiving-song holder at payment time. Pending/failed/unavailable evidence cannot show Paid; unrecorded payments show No receipt. Migration 023 prevents transaction/edition double allocation atomically.

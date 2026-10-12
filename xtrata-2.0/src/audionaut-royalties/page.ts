@@ -3,10 +3,12 @@ import { requestStructuredSignature } from '../lib/wallet/structured-sign';
 import { signInCreator, signOutCreator } from '../manage/lib/creator-session';
 import type { ReceivingArtist, RoyaltyRow } from '../../functions/lib/audionaut-royalties';
 
-type Ledger = { address: string; admin: boolean; checkedAt: number; blockHeight: number; artists: ReceivingArtist[]; rows: RoyaltyRow[] };
+type Ledger = { address: string; admin: boolean; checkedAt: number; blockHeight: number; artists: ReceivingArtist[]; rows: RoyaltyRow[];
+  automation?: { checkedAt: number | null; error: string | null; summary?: { incomplete: number }; payers?: string[]; candidates?: { tx_id: string; memo: string; amount: string; note: string }[] } };
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const adapter = createStacksWalletAdapter({ appName: 'Audionauts Artist Royalties', appIcon: '/favicon.svg' });
 let ledger: Ledger | null = null, generation = 0;
+let busy = false;
 const explorer = (id: string) => `https://explorer.hiro.so/txid/${encodeURIComponent(id)}?chain=mainnet`;
 const addressLink = (address: string) => `https://explorer.hiro.so/address/${encodeURIComponent(address)}?chain=mainnet`;
 const short = (address: string) => address.slice(0, 7) + '…' + address.slice(-6);
@@ -47,8 +49,11 @@ function renderRows() {
 }
 function clearLedger() {
   ledger = null; el('ledger').hidden = true; el('rows').replaceChildren(); el('wallet-address').textContent = ''; el('wallet-address').hidden = true;
+  el('candidates').replaceChildren(); el<HTMLTextAreaElement>('payers').value = '';
 }
 async function load() {
+  if (busy) return;
+  busy = true;
   const mine = ++generation;
   el<HTMLButtonElement>('refresh').disabled = true;
   el('message').textContent = 'Checking mints, receiving wallets and payment receipts…';
@@ -79,10 +84,25 @@ async function load() {
     el('ownership-warning').hidden = !warnings.length;
     el('ownership-warning').textContent = warnings.map(a => `${a.artist}: ${a.error}`).join(' ');
     el('record-panel').hidden = !ledger.admin;
+    el('automation-panel').hidden = !ledger.admin;
+    const automatic = ledger.automation;
+    el('automation-status').textContent = automatic?.checkedAt
+      ? `Automatic receipt check: ${new Date(automatic.checkedAt).toLocaleString('en-GB')}.${automatic.summary?.incomplete ? ' Older payment history is still being scanned.' : ''}${automatic.error ? ' Some checks need another attempt: ' + automatic.error : ''}`
+      : 'Automatic receipt checks run every five minutes. Waiting for the first completed check.';
+    if (ledger.admin) {
+      if (document.activeElement !== el('payers')) el<HTMLTextAreaElement>('payers').value = (automatic?.payers ?? []).join('\n');
+      el('candidates').replaceChildren(...(automatic?.candidates ?? []).map(candidate => {
+        const p = document.createElement('p');
+        p.append(link(short(candidate.tx_id), explorer(candidate.tx_id)), ` · ${Number(candidate.amount) / 1e6} STX · ${candidate.memo || 'No edition memo'}`, note(candidate.note));
+        const button = document.createElement('button'); button.textContent = 'Assign editions'; button.className = 'secondary';
+        button.onclick = () => { el<HTMLInputElement>('tx-id').value = candidate.tx_id; el<HTMLDetailsElement>('record-panel').open = true; el('editions').focus(); };
+        p.append(button); return p;
+      }));
+    }
     el('message').textContent = ''; renderRows();
   } catch {
     if (mine === generation) { clearLedger(); el('sign-in').hidden = false; el('message').textContent = 'Could not load the ledger. Check your connection and try again.'; }
-  } finally { if (mine === generation) el<HTMLButtonElement>('refresh').disabled = false; }
+  } finally { busy = false; el<HTMLButtonElement>('refresh').disabled = false; }
 }
 el('sign-in').onclick = async () => {
   const button = el<HTMLButtonElement>('sign-in'); button.disabled = true;
@@ -123,3 +143,35 @@ el('receipt-form').onsubmit = async event => {
   finally { button.disabled = false; }
 };
 void load();
+// Refresh while an approved holder is viewing the page, with no overlapping
+// requests and no polling while signed out or when the tab is hidden.
+setInterval(() => { if (ledger && !document.hidden && !busy && !el<HTMLDetailsElement>('record-panel').open && !el<HTMLDetailsElement>('automation-panel').open) void load(); }, 60_000);
+document.addEventListener('visibilitychange', () => { if (ledger && !document.hidden && !busy) void load(); });
+el('payer-form').onsubmit = async event => {
+  event.preventDefault(); if (!ledger?.admin) return;
+  const button = el('payer-form').querySelector('button')!; button.disabled = true;
+  try {
+    const payers = el<HTMLTextAreaElement>('payers').value.split(/[\s,]+/).filter(Boolean);
+    const response = await fetch('/api/audionaut-royalties', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'configure', payers }) });
+    const body = await response.json(); if (!response.ok) throw Error(body.error || 'Could not save monitored addresses.');
+    el('payer-message').textContent = 'Saved. The next automatic check will scan these paying wallets.';
+    await load();
+  } catch (error) { el('payer-message').textContent = error instanceof Error ? error.message : 'Could not save addresses.'; }
+  finally { button.disabled = false; }
+};
+el('export-csv').onclick = () => {
+  if (!ledger) return;
+  const quote = (value: unknown) => {
+    let text = String(value ?? '');
+    // Neutralize spreadsheet formulas in source titles, credits and names.
+    if (/^\s*[=+@\-]|^[\t\r\n]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+  };
+  const headers = ['Audionaut edition', 'Audionaut name', 'Audionaut inscription', 'Song inscription', 'Song title', 'Artist', 'Receiving song', 'Current receiving address', 'Royalty STX', 'Payment status', 'Payment transaction', 'Paid to', 'Verified block'];
+  const text = [headers, ...ledger.rows.map(r => [r.edition, r.name, r.tokenId, r.songId, r.title, r.artist, r.firstSongId, r.receivingAddress, 5, statusText[r.status], r.txId, r.recipient, ledger!.blockHeight])]
+    .map(row => row.map(quote).join(',')).join('\r\n') + '\r\n';
+  const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'Audionauts Song Assignments - live royalties.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
