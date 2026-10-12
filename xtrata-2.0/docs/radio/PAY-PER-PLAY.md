@@ -98,11 +98,13 @@ automatically.
 3. **Radio address:** in the main xtrata Pages project, add the custom domain `radio.xtrata.xyz`
    (same project, same deployment). If you pick a different hostname, also change the
    `https://radio.xtrata.xyz` rules at the end of `public/_headers` and the wallet's parent variable.
-4. **Main site variables** (Production; Preview as you like), then redeploy:
-   - `RADIO_PPP_HOST` = `radio.xtrata.xyz`
-   - `RADIO_LISTENING_WALLET_ORIGIN` = `https://wallet.xtrata.xyz`
-   - `RADIO_PPP_ALLOWLIST` = your disposable canary main wallet address(es), comma-separated
-   - `RADIO_PPP_ENABLED` = `1`
+4. **Main site settings.** The project's variables are managed by `wrangler.toml`, so:
+   - `RADIO_PPP_HOST = "radio.xtrata.xyz"` and `RADIO_LISTENING_WALLET_ORIGIN =
+     "https://wallet.xtrata.xyz"` are already in `wrangler.toml` `[vars]`.
+   - Add two **Secrets** in the dashboard (Settings → Variables and Secrets → Production, type
+     Secret): `RADIO_PPP_ENABLED` = `1` and `RADIO_PPP_ALLOWLIST` = the canary main wallet
+     address(es), comma-separated. Secrets can be changed without a code push.
+   - Redeploy (a push to main, or retry the latest production deployment).
 5. **Check the radio address is locked down** before turning anything on:
    - `curl -sI https://radio.xtrata.xyz/runtime/` → `302` to `https://xtrata.xyz/runtime/`
    - `curl -sI https://radio.xtrata.xyz/` → contains `content-security-policy: sandbox`
@@ -110,7 +112,7 @@ automatically.
    - `curl -sI "https://radio.xtrata.xyz/runtime/content?tokenId=1&network=mainnet&contractId=SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-v3-2-3"` → `content-security-policy: sandbox`
    If the second or third check fails, Cloudflare is not applying the host rules in `_headers`:
    keep `RADIO_PPP_ENABLED` at `0` and tell me.
-6. **Kill switch:** set `RADIO_PPP_ENABLED` to `0` and redeploy. Open radios stop new payments at
+6. **Kill switch:** set the `RADIO_PPP_ENABLED` secret to `0` and retry the latest deployment. Open radios stop new payments at
    their next check: on the next song once the cached setting is over 5 minutes old, or immediately
    on any action. Broadcast transactions cannot be recalled.
 
