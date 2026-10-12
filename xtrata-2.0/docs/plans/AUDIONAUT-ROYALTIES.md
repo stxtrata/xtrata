@@ -301,3 +301,23 @@ node scripts/music-artist-smoke.mjs
 ```
 Hiro schema references: [NFT instance history](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/tokens/get-nft-instance-history)
 and [transaction events](https://docs.hiro.so/en/apis/stacks-blockchain-api/reference/transactions/get-transaction-events).
+
+Production release: isolated commit `4b0258bca` was pushed to `main` and
+`codex/music-artist-release`, excluding unrelated branch history and generated
+media. Pages production deployment `30628d13-9c0e-4e4b-a0a7-d88b242ff433`
+completed successfully at 08:34:46 UTC on 12 October 2026. Migration 025 was
+applied to `xtrata-manage`; both tables and the active-attempt unique index were
+verified. Scheduled tracker version `754b7295-8a7b-4455-a2ef-89f3300a358b`
+was deployed with its existing five-minute schedule and D1 binding.
+
+The isolated release passed the full site build, Functions compilation and all
+148 targeted tests. Live verification confirmed all five canonical pages and
+three shared assets return 200; legacy page/assets and trailing-slash aliases
+redirect correctly. New and compatible old financial APIs return private,
+no-store 401 responses without a session; the shared session reports signed out,
+and unknown collections return 404. A fresh extension-free Chrome browser
+checked all five deployed pages at mobile width with no horizontal overflow or
+page errors. No real wallet was connected and no payment was signed or sent.
+The first scheduled production scan after rollout completed without errors:
+18 mints, seven internally settled royalties, zero unverified rows, and four
+cached sale proofs. The production manual-attempt table remained empty.
