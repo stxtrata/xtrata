@@ -1,15 +1,23 @@
-import { gate, linksFor, saveLink, type PppEnv } from '../../lib/radio-listening-wallet';
+import { gate, linksFor, mainsFor, saveLink, type PppEnv } from '../../lib/radio-listening-wallet';
 import { isMainnetStandardAddress } from '../../../src/lib/listening-wallet/link';
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 
 /**
  * GET  /radio/listening-wallet/link?main=SP…  → that wallet's links (public signatures), so a
  *      listener unlocking on another device can have the wallet frame re-verify its return address.
+ * GET  /radio/listening-wallet/link?listening=SP…,SP…  → the main wallet each one is linked to
+ *      (up to 100), so their likes and paid plays are credited to the listener's main wallet.
  * POST /radio/listening-wallet/link           → save a dual-signed link (same origin only).
  */
 export async function onRequest({ request, env }: { request: Request; env: PppEnv }) {
   try {
     if (request.method === 'GET') {
+      const listening = new URL(request.url).searchParams.get('listening');
+      if (listening !== null) {
+        const list = listening.split(',').filter(Boolean);
+        if (!list.length || list.length > 100) return reply({ error: 'Up to 100 addresses' }, 400);
+        return reply({ links: await mainsFor(env, list) });
+      }
       const main = new URL(request.url).searchParams.get('main');
       if (!isMainnetStandardAddress(main)) return reply({ error: 'Mainnet wallet address required' }, 400);
       if (!gate(env, main).enabled) return reply({ links: [] });

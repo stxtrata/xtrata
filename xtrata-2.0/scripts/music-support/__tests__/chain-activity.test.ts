@@ -66,3 +66,12 @@ describe('payment history filters and supporters', () => {
     ]);
   });
 });
+
+it('credits pay-per-play listening wallets to their linked main wallet, keeping the sending address', async () => {
+ const {attributePlays,rankPayers}=await import('../../../public/radio/chain-activity.js');
+ const p=(txid:string,payer:string)=>({txid,payer,id:1,core:3,amount:50,recipient:'SPHOLDER',total:1});
+ const credited=attributePlays([p('a','SPMAIN'),p('b','SPLISTEN'),p('c','SPOTHER')],new Map([['SPLISTEN','SPMAIN']]));
+ expect(credited[1]).toMatchObject({payer:'SPMAIN',paidFrom:'SPLISTEN'});
+ expect(credited[0].paidFrom).toBeUndefined();
+ expect(rankPayers(credited).map((r:any)=>[r.payer,r.count])).toEqual([['SPMAIN',2],['SPOTHER',1]]);
+});

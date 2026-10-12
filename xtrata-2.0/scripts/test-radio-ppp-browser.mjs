@@ -59,7 +59,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   await page.goto(SITE + '/radio.html');
   const panel = page.locator('#ppp');
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).waitFor();
-  assert.match(await panel.innerText(), /CANARY/);
+  assert.match(await panel.innerText(), /SETUP HELPER/);
   assert.match(await panel.locator('.ppp-stage').innerText(), /^Stage 4 of 8 · create your passkey/);
   assert.equal(await panel.locator('.ppp-steps li.done').count(), 3);
   assert.match(await panel.locator('.ppp-steps li[aria-current=step]').innerText(), /4\s*Passkey wallet/);
@@ -67,11 +67,21 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
 
   await panel.getByRole('button', { name: 'Turn on pay-per-play' }).click();
   const frame = page.frameLocator('.ppp-frame iframe');
+  // A listener scrolls the wallet box to the middle of the screen, clear of the radio's fixed player bar.
+  const showConfirm = async () => {
+    await page.locator('.ppp-frame').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
+    await frame.locator('#p-ok').evaluate((el) => el.scrollIntoView({ block: 'center' })).catch(() => {});
+  };
   await frame.locator('#p-warn').waitFor();
   if (shots) await panel.screenshot({ path: `${shots}/ppp-create-${viewport.width}.png` });
-  for (let i = 0; i < 8; i++) {
+  // Create, confirm and re-check the passkey: three confirms, each enabled only once steadily visible.
+  for (const until = Date.now() + 45_000; Date.now() < until;) {
     if (await panel.getByRole('button', { name: 'Link to my wallet' }).isVisible()) break;
-    await frame.locator('#p-ok').click();
+    if (!(await frame.locator('#panel').isVisible().catch(() => false))) { await page.waitForTimeout(300); continue; }
+    // Like a listener: bring the confirm into view, wait for it to enable, then tap.
+    await showConfirm();
+    await frame.locator('#p-ok:not([disabled])').waitFor({ timeout: 5000 }).catch(() => {});
+    await frame.locator('#p-ok').click({ timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(600);
   }
   try { await panel.getByRole('button', { name: 'Link to my wallet' }).waitFor(); }
@@ -86,9 +96,11 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   await frame.locator('#p-ok', { hasText: 'Unlock and keep paying' }).waitFor();
   assert.equal(await panel.getByRole('button', { name: 'Unlock and keep paying' }).count(), 0); // no page button to click first
   if (shots) await panel.screenshot({ path: `${shots}/ppp-armed-${viewport.width}.png` });
-  await page.waitForTimeout(900); // the frame's arming delay
+  await showConfirm();
+  await frame.locator('#p-ok:not([disabled])').waitFor(); // enabled once up, and fully visible, for the arming delay
   await frame.locator('#p-ok').click(); // the one tap: the virtual authenticator answers the passkey prompt
-  await panel.getByRole('button', { name: 'Link to my wallet' }).waitFor();
+  try { await panel.getByRole('button', { name: 'Link to my wallet' }).waitFor(); }
+  catch (e) { console.log('one-tap frame error:', await frame.locator('#p-error').innerText().catch(() => '?'), '| page:', await panel.locator('.ppp-err, .ppp-msg').allInnerTexts().catch(() => '?')); throw e; }
   assert.match(await frame.locator('#idle').innerText(), /Unlocked · SP/);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow <= 1, `no horizontal scroll at ${viewport.width}px (${overflow})`);

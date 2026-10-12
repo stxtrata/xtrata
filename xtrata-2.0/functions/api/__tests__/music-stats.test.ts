@@ -86,6 +86,20 @@ describe('Music supporter statistics', () => {
     expect(stats.latest[0].at).toBe(1_790_000_137_000); // block_time seconds, stored as milliseconds
   });
 
+  it('counts a pay-per-play listening wallet as the main wallet it is linked to', async () => {
+    const log = Array.from({length: 137}, (_, i) => event(i + 1, 1 + (i * 7) % 23));
+    const db = database(), {transport} = hiro(log);
+    db.sql.exec(readFileSync('functions/migrations/026_radio_listening_wallets.sql', 'utf8'));
+    await refreshMusicStats({DB: db as any}, transport, T0);
+    expect((await readMusicStats({DB: db as any})).supporters).toBe(23);
+    // wallet 5 is a listening wallet linked to wallet 6, which also paid directly: one supporter, not two
+    db.sql.prepare('INSERT INTO radio_listening_wallets(listening, main, issued, main_signature, listening_signature, created_at, updated_at) VALUES(?,?,?,?,?,?,?)').run(wallet(5), wallet(6), 1, 'a', 'b', 1, 1);
+    const stats = await readMusicStats({DB: db as any});
+    expect(stats.supporters).toBe(22);
+    expect(stats.plays).toBe(137);
+    expect(stats.latest.every(p => p.payer !== wallet(5))).toBe(true);
+  });
+
   it('resumes a large first sync across refreshes without gaps', async () => {
     const size = MAX_PAGES_PER_REFRESH * PAGE_SIZE + 300;
     const log = Array.from({length: size}, (_, i) => event(i + 1, 1 + (i % 311)));

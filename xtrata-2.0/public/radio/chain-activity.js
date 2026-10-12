@@ -48,8 +48,8 @@ function row(play, track, fresh) {
   meta.textContent = [decodePaidReceipt(play.receipt).label, track?.artist, `Inscription #${play.id}`, `song total ${play.total}`].filter(Boolean).join(' · ');
   const payment = document.createElement('p');
   payment.className = 'chain-play-payment';
-  payment.textContent = `0.000050 STX from ${short(play.payer)} to ${short(play.recipient)}`;
-  payment.title = `Payer ${play.payer} · Recipient ${play.recipient}`;
+  payment.textContent = `0.000050 STX from ${short(play.payer)}${play.paidFrom ? ` via listening wallet ${short(play.paidFrom)}` : ''} to ${short(play.recipient)}`;
+  payment.title = `Payer ${play.payer}${play.paidFrom ? ` (sent from linked listening wallet ${play.paidFrom})` : ''} · Recipient ${play.recipient}`;
   const link = document.createElement('a');
   link.href = explorer(play.txid);
   link.target = '_blank';
@@ -64,9 +64,36 @@ export function filterPaidPlays(plays, tracks, query = '', role = 'either') {
   return plays.filter(play => {
     const track = play.core === 3 ? tracks.get(play.id) : null;
     const fields = role === 'payer' ? [play.payer] : role === 'recipient' ? [play.recipient]
-      : [play.id, track?.title, track?.artist, play.payer, play.recipient, play.txid];
+      : [play.id, track?.title, track?.artist, play.payer, play.paidFrom, play.recipient, play.txid];
     return fields.some(value => String(value ?? '').toLowerCase().includes(term));
   });
+}
+
+/**
+ * Pay-per-play listening wallets are credited to the main wallet they are linked to (a link both
+ * wallets signed). `paidFrom` keeps the address that actually sent the payment.
+ */
+export function attributePlays(plays, mainOf) {
+  return plays.map(play => {
+    const main = mainOf.get(play.payer);
+    return main && main !== play.payer ? {...play, payer: main, paidFrom: play.payer} : play;
+  });
+}
+const mainOf = new Map(), asked = new Set();
+async function linkPayers(payers) {
+  const fresh = [...new Set(payers)].filter(a => !asked.has(a));
+  if (!fresh.length) return false;
+  fresh.forEach(a => asked.add(a));
+  let found = false;
+  for (let i = 0; i < fresh.length; i += 100) {
+    try {
+      const r = await fetch('/radio/listening-wallet/link?listening=' + encodeURIComponent(fresh.slice(i, i + 100).join(',')), {cache: 'no-store', signal: AbortSignal.timeout(15000)});
+      const data = r.ok ? await r.json() : null;
+      for (const l of Array.isArray(data?.links) ? data.links : [])
+        if (typeof l?.listening === 'string' && typeof l?.main === 'string') { mainOf.set(l.listening, l.main); found = true; }
+    } catch { fresh.slice(i, i + 100).forEach(a => asked.delete(a)); }
+  }
+  return found;
 }
 
 export function rankPayers(plays) {
@@ -136,8 +163,10 @@ export function mountPaidPlayReaders() {
       };
     }
     function render() {
-      host.dispatchEvent(new CustomEvent('paid-history', {detail: {plays: [...plays.values()], tracks, complete, busy: busy || scanning, status: status.textContent}}));
-      const matches = filterPaidPlays([...plays.values()], tracks, search?.value, role?.value);
+      const credited = attributePlays([...plays.values()], mainOf);
+      void linkPayers([...plays.values()].map(play => play.payer)).then(found => { if (found) render(); });
+      host.dispatchEvent(new CustomEvent('paid-history', {detail: {plays: credited, tracks, complete, busy: busy || scanning, status: status.textContent}}));
+      const matches = filterPaidPlays(credited, tracks, search?.value, role?.value);
       const ranked = view?.value === 'payers';
       const results = ranked ? rankPayers(matches) : matches;
       const visible = results.slice(0, history ? shown : limit);

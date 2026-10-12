@@ -67,6 +67,15 @@ export interface SignPlayParams {
   balance: string;
 }
 
+export interface SignLikeParams {
+  song: number;
+  liked: boolean;
+  fee: string;
+  nonce: string;
+  /** Confirmed balance the page observed; the wallet refuses above the 1 STX target. */
+  balance: string;
+}
+
 export interface ReturnParams {
   mode: 'excess' | 'all';
   balance: string;

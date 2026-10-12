@@ -13,20 +13,29 @@ export const ARM_DELAY_MS = 800;
  */
 function visibilityGuard(target: Element) {
   let visible = true;
+  let since = -Infinity; // when it last became fully visible
   try {
     const io = new IntersectionObserver((entries) => {
       const e = entries[entries.length - 1] as IntersectionObserverEntry & { isVisible?: boolean };
-      if (typeof e.isVisible === 'boolean') visible = e.isVisible;
+      if (typeof e.isVisible !== 'boolean') return;
+      if (e.isVisible && !visible) since = performance.now();
+      visible = e.isVisible;
     }, { threshold: [1.0], trackVisibility: true, delay: 100 } as IntersectionObserverInit);
     io.observe(target);
+    // Only browsers with IntersectionObserver v2 report occlusion; elsewhere the arming delay alone applies.
+    if (typeof IntersectionObserverEntry !== 'undefined' && 'isVisible' in IntersectionObserverEntry.prototype) visible = false;
   } catch { /* v1 only: cannot tell, rely on the arming delay */ }
-  return () => visible;
+  return {
+    isVisible: () => visible,
+    /** Fully visible, and has been for `ms` (the page may have just moved or resized the frame). */
+    steady: (ms: number) => visible && performance.now() - since >= ms
+  };
 }
 
 export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
   let open = false;
   let withdraw: (() => boolean) | null = null;
-  const isVisible = visibilityGuard($('p-ok'));
+  const guard = visibilityGuard($('p-ok'));
   $('idle-stop').addEventListener('click', local.stop);
   $('idle-lock').addEventListener('click', local.lock);
 
@@ -45,18 +54,25 @@ export function domUi(local: { stop: () => void; lock: () => void }): UiPort {
       $('panel').hidden = false;
       $('idle').hidden = true;
       // No autofocus: a stray Enter/Space aimed at the radio must not approve anything.
+      // Confirm stays disabled until the panel has been up, and fully visible, for the arming delay,
+      // so it never invites a tap it would then refuse (e.g. while the page moves the frame).
       const armedAt = performance.now() + ARM_DELAY_MS;
       ok.disabled = true;
-      setTimeout(() => { if (open) ok.disabled = false; }, ARM_DELAY_MS);
+      let running = false;
+      const ready = () => performance.now() >= armedAt && guard.steady(ARM_DELAY_MS);
+      const arming = setInterval(() => {
+        if (!open) { clearInterval(arming); return; }
+        if (!running) ok.disabled = !ready();
+      }, 100);
 
       return new Promise<T>((resolve, reject) => {
-        let running = false;
-        const close = () => { open = false; withdraw = null; $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
+        const close = () => { open = false; withdraw = null; clearInterval(arming); $('panel').hidden = true; $('idle').hidden = false; ok.onclick = cancel.onclick = null; };
         withdraw = () => { if (running) return false; close(); reject(new CancelledError()); return true; };
         // The action starts synchronously inside the click so WebAuthn keeps the user activation.
         ok.onclick = (event) => {
           if (!event.isTrusted || performance.now() < armedAt) return;
-          if (!isVisible()) { error.textContent = 'This panel is partly hidden by the page. Scroll it fully into view, then confirm.'; return; }
+          if (!guard.isVisible()) { error.textContent = 'This panel is partly hidden by the page. Scroll it fully into view, then confirm.'; return; }
+          if (!guard.steady(ARM_DELAY_MS)) return; // just moved into view: the button re-enables shortly
           ok.disabled = cancel.disabled = true;
           error.textContent = '';
           running = true;

@@ -58,6 +58,10 @@ export interface PppDeps {
   tabLock(listening: string): Promise<boolean>;
   store: { get(key: string): string | null; set(key: string, value: string): void };
   changed(): void;
+  /** A like or unlike from the listening wallet confirmed: the radio should re-read its likes. */
+  likesChanged?(): void;
+  /** Pause between checks while a like waits for an earlier transaction (tests pass a fake). */
+  wait?(ms: number): Promise<void>;
 }
 
 export type Step =
@@ -84,6 +88,8 @@ export interface Snapshot {
   depositTxid?: string;
   /** A deposit was sent and has not confirmed yet: no further deposit is offered. */
   depositPending: boolean;
+  /** Listening wallets linked to the connected main wallet (dual-signed, public), newest first. */
+  linkedListening: string[];
   /** The server holds a link for this listening wallet, so linking needs no new wallet popup. */
   serverLinked: boolean;
   /**
@@ -115,12 +121,16 @@ export function createPppController(deps: PppDeps) {
   let balanceAt = -Infinity;
   let busy: string | null = null;
   let paying = false;
+  let liking = false;
+  let likesConfirmed = false;
   let message = '';
   let error = '';
   let depositTxid: string | undefined;
   let serverLink: StoredLink | null = null;
   let serverLinkFor: string | undefined;
-  let serverLinkAt = -Infinity;
+  let mainLinks: StoredLink[] = [];
+  let mainLinksFor: string | undefined;
+  let mainLinksAt = -Infinity;
   const notSeen = new Set<string>();
   let verified = false;
   let lockHeld = false;
@@ -178,7 +188,9 @@ export function createPppController(deps: PppDeps) {
     allowance: balance === undefined ? TARGET : fundingAllowance(balance, BigInt(pendingDeposit()?.amount ?? '0')),
     session: status?.session ?? null,
     payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
-    depositPending: !!pendingDeposit(), serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
+    depositPending: !!pendingDeposit(),
+    linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
+    serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
     stuck: stuck().length, armed
   });
 
@@ -208,14 +220,21 @@ export function createPppController(deps: PppDeps) {
     balanceAt = deps.now();
   }
 
-  /** Look up a link saved from another device. Using it still needs the listener's confirm in the frame. */
+  /**
+   * The main wallet's public links: shown in the panel, and how a link saved from another device is
+   * found. Using that link still needs the listener's confirm in the frame.
+   */
   async function lookupServerLink(main: string) {
+    if (mainLinksFor !== main || deps.now() - mainLinksAt >= 60_000) {
+      mainLinks = await deps.links(main);
+      mainLinksFor = main;
+      mainLinksAt = deps.now();
+    }
     if (status?.state !== 'unlocked' || status.linked === main) return;
     const id = `${main}:${status.address}`;
-    if (serverLinkFor === id && (serverLink || deps.now() - serverLinkAt < 60_000)) return;
-    serverLink = (await deps.links(main)).find((l) => l.listening === status!.address) ?? null;
+    if (serverLinkFor === id && serverLink) return;
+    serverLink = mainLinks.find((l) => l.listening === status!.address) ?? null;
     serverLinkFor = id;
-    serverLinkAt = deps.now();
   }
 
   async function reconcile() {
@@ -242,6 +261,7 @@ export function createPppController(deps: PppDeps) {
         const s = String(tx.tx_status);
         if (s === 'success' && tx.canonical !== false && tx.is_unanchored === false) {
           saveEntry({ ...e, status: 'confirmed', confirmedAt: deps.now(), actualFee: String(tx.fee_rate ?? e.fee), raw: undefined });
+          if (e.kind === 'like') likesConfirmed = true;
         } else if (s.startsWith('abort_') || s.startsWith('dropped_')) {
           saveEntry({ ...e, status: 'failed', note: s, raw: undefined });
         } else if (e.status !== 'pending') saveEntry({ ...e, status: 'pending' });
@@ -281,6 +301,7 @@ export function createPppController(deps: PppDeps) {
     }
     if (step() === 'locked') arm();
     else if (armed) void disarm();
+    if (likesConfirmed) { likesConfirmed = false; try { deps.likesChanged?.(); } catch { /* the radio re-reads on its own schedule */ } }
     deps.changed();
   }
 
@@ -392,8 +413,8 @@ export function createPppController(deps: PppDeps) {
         const mainSignature = await deps.signWithMain(main, linkData(link));
         const r = await bridge!.request<{ listeningSignature: string }>('listening.link', { main, issued: link.issued, mainSignature });
         await deps.saveLink({ ...link, mainSignature, listeningSignature: r.listeningSignature });
+        mainLinksAt = -Infinity;
       }
-      serverLinkAt = -Infinity;
       say('Linked. Returns from the listening wallet can only go to your main wallet.');
     }),
 
@@ -467,7 +488,7 @@ export function createPppController(deps: PppDeps) {
    * and a play gets paid. Never throws and never affects playback.
    */
   async function onListened(detail: { song: number; id: string; title?: string; artist?: string }) {
-    if (paying || busy) return;
+    if (paying || busy || liking) return;
     paying = true;
     try {
       // Background tabs barely run timers: catch up on confirmations and the kill switch here.
@@ -507,5 +528,66 @@ export function createPppController(deps: PppDeps) {
     }
   }
 
-  return { snapshot, refresh, onListened, ...actions };
+  /**
+   * Whether the listening wallet can take this heart tap: paying is on and approved, this tab holds
+   * the wallet, it is linked to the connected main wallet (so the like counts for it), and for an
+   * unlike, the like being removed is this listening wallet's own. Otherwise the main wallet does it.
+   */
+  function canLike(d: { liked: boolean; likedBy?: string[] }) {
+    const main = deps.main();
+    if (step() !== 'ready' || !payingOn() || !status?.session || !lockHeld || !main || status.linked !== main) return false;
+    const by = d.likedBy ?? [];
+    if (d.liked) return by.length === 0; // never like twice for the same listener
+    return by.includes(status.address!) && !by.includes(main);
+  }
+
+  /** Sign and send a like/unlike from the listening wallet. Never throws. */
+  async function like(d: { song: number; liked: boolean; title?: string; artist?: string }) {
+    if (liking) { say('Still sending your last like. Try again in a moment.'); return; }
+    liking = true;
+    const label = d.title ? `“${d.title}”${d.artist ? ` by ${d.artist}` : ''}` : `song #${d.song}`;
+    const wait = deps.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+    try {
+      say(`Sending your ${d.liked ? 'like' : 'unlike'} for ${label} from the listening wallet…`);
+      // One transaction in flight per wallet (nonces): wait up to 2 minutes for an earlier one to confirm.
+      const until = deps.now() + 120_000;
+      while (paying || unresolved().length) {
+        if (deps.now() > until) throw new Error('An earlier payment is still confirming. Try the like again shortly.');
+        await wait(5_000);
+        await refresh(true);
+      }
+      if (step() !== 'ready' || !status?.session) throw new Error('Paying stopped before the like was sent.');
+      const listening = status.address!;
+      const { balance: b, nonce } = await deps.chain.account(listening);
+      balance = b; balanceAt = deps.now();
+      const signed = await bridge!.request<SignedResult>('listening.signLike', {
+        song: d.song, liked: d.liked, fee: fee().toString(), nonce: nonce.toString(), balance: b.toString()
+      });
+      const entry = {
+        id: randomId(), address: listening, kind: 'like', core: 0, song: d.song, liked: d.liked, recipient: '', amount: '0',
+        fee: fee().toString(), nonce: nonce.toString(), created: deps.now(), status: 'signed', raw: signed.raw, txid: signed.txid,
+        ...(d.title ? { title: String(d.title).slice(0, 120) } : {}),
+        ...(d.artist ? { artist: String(d.artist).slice(0, 120) } : {})
+      } as Entry;
+      deps.validate(entry);
+      saveEntry(entry);
+      try {
+        await deps.chain.broadcast(signed.raw, signed.txid);
+        saveEntry({ ...entry, status: 'pending' });
+        message = `${d.liked ? 'Liked' : 'Unliked'} ${label} from your listening wallet, for your main wallet. The heart updates once it confirms.`;
+        error = '';
+      } catch (e) {
+        saveEntry({ ...entry, status: definitelyRejected(e) ? 'failed' : 'unknown', note: (e as Error).message, ...(definitelyRejected(e) ? { raw: undefined } : {}) });
+        error = (e as Error).message;
+      }
+      status = await bridge!.request<StatusResult>('listening.status');
+    } catch (e) {
+      error = 'Like not sent: ' + (e instanceof Error ? e.message : 'the listening wallet is unavailable');
+    } finally {
+      liking = false;
+      deps.changed();
+    }
+  }
+
+  return { snapshot, refresh, onListened, canLike, like, ...actions };
 }

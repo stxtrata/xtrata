@@ -712,6 +712,17 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     if (!likesDialog.open) likesDialog.showModal();
   };
   const toggleLike = () => {
+    // Pay-per-play on radio.xtrata.xyz can sign the like from the listening wallet (no wallet popup);
+    // it returns true only when it takes the like on, otherwise the usual wallet review opens.
+    const viaListening = window.XtrataRadioLikeHandler;
+    const chain = chainState?.snapshot();
+    if (nowPlaying?.tokenId != null && typeof viaListening === 'function' && chain?.status === 'ready') {
+      const id = Number(nowPlaying.tokenId);
+      const current = chain.likes.find((l) => l.tokenId === String(nowPlaying.tokenId));
+      try {
+        if (viaListening({ song: id, liked: !current, likedBy: current?.by || [], title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) return Boolean(current);
+      } catch { /* fall through to the wallet review */ }
+    }
     if (nowPlaying?.tokenId != null) window.open('/radio/endorse?id=' + encodeURIComponent(nowPlaying.tokenId) + '&action=review', '_blank', 'noopener');
     else openOnchainLikes();
     return nowPlaying ? isLiked(nowPlaying.tokenId) : false;
