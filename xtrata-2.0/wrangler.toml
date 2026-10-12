@@ -7,6 +7,11 @@ MUSIC_PROFILE_ENABLED = "1"
 # Deployed mainnet source verified byte-for-byte on 2026-09-14.
 RADIO_LIKES_CONTRACT = "SP3JNSEXAZP4BDSHV0DN3M8R3P0MY0EEBQQZX743X.xtrata-radio-likes-v1-0"
 RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
+# Radio pay-per-play (docs/radio/PAY-PER-PLAY.md). The fixed addresses live here; the switch
+# RADIO_PPP_ENABLED and the canary list RADIO_PPP_ALLOWLIST are dashboard Secrets so they can be
+# changed without a code push. Do not also define those two here: a var and a secret cannot share a name.
+RADIO_PPP_HOST = "radio.xtrata.xyz"
+RADIO_LISTENING_WALLET_ORIGIN = "https://wallet.xtrata.xyz"
 
 [limits]
 cpu_ms = 30000
