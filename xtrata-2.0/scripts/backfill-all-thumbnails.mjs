@@ -77,34 +77,59 @@ export const isSafeSvg = (text) => {
 };
 
 /**
+ * Song details from a song player file. Two templates exist: the original one
+ * keeps them in a #xtrata-music-metadata script, the "opus player" keeps them
+ * in the metadata of its #xtrataPlayerManifest script. Returns null for anything
+ * that does not declare itself a song.
+ */
+const readSongMetadata = (source) => {
+  const script = (id) =>
+    new RegExp(`<script\\b[^>]*\\bid=["']${id}["'][^>]*>([\\s\\S]*?)<\\/script>`, 'i').exec(source)?.[1] ?? null;
+  const parse = (text) => {
+    try {
+      return text === null ? null : JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+  const music = parse(script('xtrata-music-metadata'));
+  if (music && music.schema === 'xtrata-music' && music.assetType === 'song') return music;
+  const manifest = parse(script('xtrataPlayerManifest'));
+  const meta = manifest?.metadata ?? manifest?.template?.metadata ?? null;
+  if (meta && typeof meta === 'object' && meta.assetType === 'song') return meta;
+  return null;
+};
+
+/**
  * Reads an Xtrata Music song player (the single-file HTML made by the song
- * template). Returns { title, artist, cover } where cover is the embedded
+ * templates). Returns { title, artist, cover } where cover is the embedded
  * picture bytes or null, or null when the file is not a song player. Nothing is
  * run or fetched: the file is only read as text.
  */
 export const extractSongFromHtml = (html) => {
   const source = String(html);
-  const meta = /<script\b[^>]*\bid=["']xtrata-music-metadata["'][^>]*>([\s\S]*?)<\/script>/i.exec(source);
-  if (!meta) return null;
-  let data;
-  try {
-    data = JSON.parse(meta[1]);
-  } catch {
-    return null;
-  }
-  if (!data || data.schema !== 'xtrata-music' || data.assetType !== 'song') return null;
+  const data = readSongMetadata(source);
+  if (!data) return null;
   const title = typeof data.title === 'string' ? data.title : '';
   const artist = typeof data.artist === 'string' ? data.artist : '';
-  let cover = null;
+  // The cover is the picture tagged coverArt; otherwise the one inside the
+  // player's cover frame; otherwise the page's only embedded picture.
+  const pictures = [];
   for (const tag of source.matchAll(/<img\b[^>]*>/gi)) {
-    const text = tag[0];
-    if (!/\bid=["']coverArt["']/i.test(text)) continue;
-    const src = /\bsrc=["']data:image\/(?:png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)["']/i.exec(text);
-    if (src) {
-      const bytes = Buffer.from(src[1].replace(/\s+/g, ''), 'base64');
-      if (bytes.length > 0 && bytes.length <= MAX_COVER_BYTES) cover = new Uint8Array(bytes);
-    }
-    break;
+    const src = /\bsrc=["']data:image\/(?:png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=\s]+)["']/i.exec(tag[0]);
+    if (!src) continue;
+    pictures.push({
+      tagged: /\bid=["']coverArt["']/i.test(tag[0]),
+      framed: /cover-media|xtrataCover/i.test(source.slice(Math.max(0, tag.index - 300), tag.index)),
+      data: src[1]
+    });
+  }
+  const chosen =
+    pictures.find((p) => p.tagged) ?? pictures.find((p) => p.framed) ?? (pictures.length === 1 ? pictures[0] : null);
+  let cover = null;
+  if (chosen) {
+    const bytes = Buffer.from(chosen.data.replace(/\s+/g, ''), 'base64');
+    if (bytes.length > 0 && bytes.length <= MAX_COVER_BYTES) cover = new Uint8Array(bytes);
   }
   return { title, artist, cover };
 };

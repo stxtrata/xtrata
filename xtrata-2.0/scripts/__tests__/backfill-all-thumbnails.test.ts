@@ -226,15 +226,43 @@ describe('extractSongFromHtml (song players)', () => {
     expect(script.extractSongFromHtml(player(song, '<div class="placeholder"></div>')).cover).toBeNull();
     expect(script.extractSongFromHtml(player(song, '<img id="coverArt" src="https://example.com/a.png">')).cover).toBeNull();
   });
-  it('ignores pictures that are not the cover', () => {
-    const other = `<img src="data:image/png;base64,${cover}">`;
-    expect(script.extractSongFromHtml(player(song, other)).cover).toBeNull();
+  it('prefers the tagged cover over other pictures, and uses a lone untagged picture', () => {
+    const other = `<img src="data:image/jpeg;base64,${fixture('gifstill').toString('base64')}"><img id="coverArt" src="data:image/png;base64,${cover}">`;
+    expect(Buffer.from(script.extractSongFromHtml(player(song, other)).cover).equals(fixture('png'))).toBe(true);
+    const lone = `<img src="data:image/png;base64,${cover}">`;
+    expect(script.extractSongFromHtml(player(song, lone)).cover).not.toBeNull();
   });
   it('returns null for anything that is not a song player', () => {
     expect(script.extractSongFromHtml('<html><body><canvas></canvas></body></html>')).toBeNull();
     expect(script.extractSongFromHtml(player({ ...song, assetType: 'image' }))).toBeNull();
     expect(script.extractSongFromHtml(player({ ...song, schema: 'other' }))).toBeNull();
     expect(script.extractSongFromHtml('<script type="application/json" id="xtrata-music-metadata">{oops</script>')).toBeNull();
+  });
+  describe('opus player template (xtrataPlayerManifest)', () => {
+    const png64 = fixture('png').toString('base64');
+    const opus = (metadata: unknown, body: string) =>
+      `<!doctype html><html><head><title>x</title></head><body>${body}` +
+      `<script type="application/json" id="xtrataPlayerManifest">${JSON.stringify({ template: 'xtrata-opus-player-v6', metadata })}</script></body></html>`;
+    const frame = `<div id="xtrataCover" class="stage"><div class="cover-media"><img src="data:image/png;base64,${png64}"></div></div>`;
+    it('reads title, artist and the framed cover', () => {
+      const out = script.extractSongFromHtml(opus({ assetType: 'song', title: 'Let It Through', artist: '3ai3' }, frame));
+      expect(out.title).toBe('Let It Through');
+      expect(out.artist).toBe('3ai3');
+      expect(Buffer.from(out.cover).equals(fixture('png'))).toBe(true);
+    });
+    it('also reads metadata nested under template (the first template layout)', () => {
+      const html =
+        `<script type="application/json" id="xtrataPlayerManifest">${JSON.stringify({ template: { metadata: { assetType: 'song', title: 'A', artist: 'B' } } })}</script>` + frame;
+      expect(script.extractSongFromHtml(html).title).toBe('A');
+    });
+    it('does not guess when several pictures exist and none is the cover', () => {
+      const two = `<img src="data:image/png;base64,${png64}"><p>x</p><img src="data:image/png;base64,${png64}">`;
+      expect(script.extractSongFromHtml(opus({ assetType: 'song', title: 'T', artist: 'A' }, two)).cover).toBeNull();
+    });
+    it('only accepts songs, not stems or other assets', () => {
+      expect(script.extractSongFromHtml(opus({ assetType: 'stem', title: 'T' }, frame))).toBeNull();
+      expect(script.extractSongFromHtml(opus({ title: 'T' }, frame))).toBeNull();
+    });
   });
   it('makes a thumbnail from the extracted cover', async () => {
     const out = script.extractSongFromHtml(player(song));
