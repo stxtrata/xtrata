@@ -76,8 +76,15 @@ the summary; the return-address confirm and return review keep the full address 
   current state first (`/radio/chain-likes`), so it likes or unlikes correctly even if the radio's
   list is still loading. If something is missing the panel says what (unlock — the like is sent
   straight after unlocking; link; top up; paying switched off; other tab). A like made from the
-  main wallet is left to the main wallet. The heart lights as soon as the like is sent
-  (`xtrata:radio-like-sent`) and settles on the confirmed state.
+  main wallet is left to the main wallet.
+- **The heart while a like is on its way.** From the tap until the chain confirms, the heart is
+  orange and gently pulsing (`src/lib/radio/like-tracker.ts`: starting, sent, cooling), then locked
+  3 more seconds. Taps meanwhile do nothing, so a like cannot be toggled on and off in quick
+  succession. The controller enforces the same lock on what it signs (`LIKE_COOLDOWN_MS`), and
+  only one like is in flight at a time.
+- **Older wallet boxes.** The wallet build reports `features` in `listening.status` (`cancel`,
+  `like`). A build without `like` makes the heart fall back to the main-wallet page, and the
+  panel's fold says the wallet box is out of date, instead of a like timing out.
 - **Credited to the main wallet.** The likes contract keys likes by `tx-sender` and has no
   "on behalf of" call, so on-chain a like is the listening wallet's. The dual-signed link (both keys
   signed it, verified when saved) is what ties them together:
@@ -148,6 +155,12 @@ the summary; the return-address confirm and return review keep the full address 
   brute-forced offline.
 
 ## Deploy (all steps are yours)
+
+**Wallet box updates:** `.github/workflows/listening-wallet-deploy.yml` builds and deploys
+wallet.xtrata.xyz whenever its code changes on main (or from the Actions tab). It needs two
+repository secrets: `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages: Edit) and
+`CLOUDFLARE_ACCOUNT_ID`. Without them the job warns and does nothing; deploy by hand instead:
+`npm run build:listening-wallet && cd dist-listening-wallet && npx wrangler pages deploy . --project-name xtrata-listening-wallet --branch main`.
 
 1. **D1:** `npx wrangler d1 execute xtrata-manage --remote --file=functions/migrations/026_radio_listening_wallets.sql`
 2. **Wallet origin, a new Cloudflare Pages project** (not a path on xtrata.xyz, which would give no

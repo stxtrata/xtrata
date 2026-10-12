@@ -154,6 +154,7 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
   await context.close();
 }
 await browser.close();
+if (process.env.SHOW_ERRORS) console.log("page errors:", JSON.stringify(errors));
 const relevant = errors.filter((e) => !/radio|catalogue|counts|Failed to fetch|NetworkError|JSON/i.test(e));
 assert.deepEqual(relevant, []);
 console.log('radio pay-per-play panel check passed');

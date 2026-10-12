@@ -21,7 +21,15 @@ export interface StatusResult {
   /** Main wallet this listening wallet is linked to, if verified on this device. */
   linked?: string;
   session: SessionSummary | null;
+  /**
+   * What this wallet build can do, so the radio can tell an out-of-date wallet box (deployed
+   * separately) from a broken one. Absent on builds older than this field.
+   */
+  features?: string[];
 }
+
+/** Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE). */
+export const LISTENING_FEATURES = ['cancel', 'like'] as const;
 
 export interface TermsParams {
   fee: string;

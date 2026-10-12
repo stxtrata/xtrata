@@ -1,5 +1,6 @@
 import { attachAudibleStart } from '../lib/radio/audible-start.js';
 import { attachAudibleListen } from '../lib/radio/audible-listen';
+import { createLikeTracker } from '../lib/radio/like-tracker';
 import {radioArtist,radioTitle} from '../lib/radio/artist-credits.mjs';
 // Xtrata Radio — a little embedded radio station for the homepage soundtrack.
 // Toggling on makes a radio-tuning noise (WebAudio, no assets) and then plays a
@@ -646,13 +647,16 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   let relatives = [];
   let relativesFor = null;
 
+  // Set once the like tracking below exists: { liked, pending, locked } for the playing song.
+  let heartView = () => null;
   const stateSnapshot = () => ({
     on,
     playing: on && !player.paused && !player.ended,
     likesStatus: chainState?.snapshot().status || 'disconnected', likesRetryAt: chainState?.snapshot().retryAt, likesCheckedAt: chainState?.snapshot().checkedAt, band, preset, nowPlaying, likes: chainState ? chainState.snapshot().likes.slice() : [], volumeStep,
     shuffle: shuffleMode,
     loop: player.loop,
-    relatives: relatives.slice()
+    relatives: relatives.slice(),
+    heart: heartView()
   });
   const supportStarts = attachAudibleStart(player, detail => {
     window.dispatchEvent(new CustomEvent('xtrata:radio-audible-start', { detail }));
@@ -713,28 +717,34 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
   };
   // Likes sent from a pay-per-play listening wallet light (or clear) the heart straight away, until
   // the confirmed on-chain state catches up (or 5 minutes pass).
-  const sentLikes = new Map();
-  const likeShown = (id) => {
-    const sent = sentLikes.get(String(id));
-    if (sent && Date.now() < sent.until && sent.liked !== isLiked(id)) return sent.liked;
-    if (sent) sentLikes.delete(String(id));
-    return isLiked(id);
-  };
+  // Likes the pay-per-play listening wallet is sending: orange while on their way, locked until
+  // the chain confirms plus 3 seconds, so a like cannot be toggled on and off in quick succession.
+  const likeTrack = createLikeTracker({ isLiked, changed: (ms) => setTimeout(emit, ms) });
+  const likeShown = likeTrack.shown, likePending = likeTrack.pending, likeLocked = likeTrack.locked;
+  heartView = () => (nowPlaying?.tokenId != null
+    ? { liked: likeShown(nowPlaying.tokenId), pending: likePending(nowPlaying.tokenId), locked: likeLocked(nowPlaying.tokenId) }
+    : null);
   window.addEventListener('xtrata:radio-like-sent', (e) => {
     const d = e.detail;
-    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { sentLikes.set(String(d.song), { liked: d.liked, until: Date.now() + 300000 }); emit(); }
+    if (d && Number.isSafeInteger(d.song) && typeof d.liked === 'boolean') { likeTrack.sent(d.song, d.liked); emit(); }
   });
-  window.addEventListener('xtrata:radio-like-failed', (e) => { if (e.detail && sentLikes.delete(String(e.detail.song))) emit(); });
+  window.addEventListener('xtrata:radio-like-failed', (e) => { if (e.detail && likeTrack.failed(e.detail.song)) emit(); });
   const toggleLike = () => {
     // On the pay-per-play radio a listener's listening wallet toggles the like itself, straight on the
     // likes contract (no wallet popup). It returns true when it takes the tap; otherwise the usual
     // main-wallet review opens.
     const viaListening = window.XtrataRadioLikeHandler;
+    // A like for this song is still on its way (or just confirmed): ignore the tap.
+    if (nowPlaying?.tokenId != null && likeLocked(nowPlaying.tokenId)) return likeShown(nowPlaying.tokenId);
     if (nowPlaying?.tokenId != null && typeof viaListening === 'function') {
       const chain = chainState?.snapshot();
       const current = chain?.status === 'ready' ? chain.likes.find((l) => l.tokenId === String(nowPlaying.tokenId)) : undefined;
       try {
-        if (viaListening({ song: Number(nowPlaying.tokenId), likedBy: chain?.status === 'ready' ? (current?.by || []) : undefined, title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) return likeShown(nowPlaying.tokenId);
+        if (viaListening({ song: Number(nowPlaying.tokenId), likedBy: chain?.status === 'ready' ? (current?.by || []) : undefined, title: nowPlaying.title || '', artist: nowPlaying.artist || '' }) === true) {
+          likeTrack.started(nowPlaying.tokenId, !likeShown(nowPlaying.tokenId));
+          emit();
+          return likeShown(nowPlaying.tokenId);
+        }
       } catch { /* fall through to the wallet review */ }
     }
     if (nowPlaying?.tokenId != null) window.open('/radio/endorse?id=' + encodeURIComponent(nowPlaying.tokenId) + '&action=review', '_blank', 'noopener');
@@ -1735,10 +1745,14 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
     renderPctl(snap);
     const heart = faceBtn('heart');
     const confirmed = Boolean(snap.nowPlaying && likeShown(snap.nowPlaying.tokenId));
-    heart.classList.toggle('is-lit', confirmed);
+    const pending = Boolean(snap.heart?.pending);
+    heart.classList.toggle('is-lit', confirmed || pending);
+    heart.classList.toggle('is-pending', pending);
     heart.setAttribute('aria-pressed', String(confirmed));
     const chainStatus = chainState?.snapshot().status;
-    heart.title = chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' || chainStatus === 'paused' ? 'On-chain like status is temporarily unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
+    heart.title = pending ? (confirmed ? 'Like on its way — waiting for the chain to confirm' : 'Unlike on its way — waiting for the chain to confirm')
+      : snap.heart?.locked ? 'Confirmed on-chain'
+      : chainStatus === 'disconnected' ? 'Connect your wallet to like on-chain' : chainStatus === 'unavailable' || chainStatus === 'paused' ? 'On-chain like status is temporarily unavailable — open wallet actions' : confirmed ? 'Liked on-chain — open wallet actions to unlike' : 'Like on-chain — open wallet actions';
     heart.setAttribute('aria-busy', String(chainStatus === 'loading'));
     heart.setAttribute('aria-label', heart.title);
     faceBtn('playlist').classList.toggle('is-lit', snap.band === 'liked');

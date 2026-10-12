@@ -1,0 +1,69 @@
+name: Listening wallet deploy (wallet.xtrata.xyz)
+# The pay-per-play listening wallet is its own Cloudflare Pages project (direct upload), so merging
+# to main does not update it. This deploys it whenever its code changes on main, or on demand.
+# Needs two repository secrets: CLOUDFLARE_API_TOKEN (Account > Cloudflare Pages: Edit) and
+# CLOUDFLARE_ACCOUNT_ID. Without them the job explains what is missing and does nothing.
+on:
+  push:
+    branches: [main]
+    paths:
+      - xtrata-2.0/src/listening-wallet/**
+      - xtrata-2.0/src/lib/listening-wallet/**
+      - xtrata-2.0/src/lib/wallet/passkey/bridge/**
+      - xtrata-2.0/vite.listening-wallet.config.ts
+      - .github/workflows/listening-wallet-deploy.yml
+  workflow_dispatch:
+concurrency:
+  group: listening-wallet-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: xtrata-2.0
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check the Cloudflare secrets
+        id: secrets
+        working-directory: .
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID are not set; wallet.xtrata.xyz was not deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          sparse-checkout: |
+            xtrata-2.0
+            .github
+      - uses: actions/setup-node@v4
+        if: steps.secrets.outputs.ready == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: xtrata-2.0/package-lock.json
+      - if: steps.secrets.outputs.ready == 'true'
+        run: npm ci
+      - name: Build (trusts only https://radio.xtrata.xyz)
+        if: steps.secrets.outputs.ready == 'true'
+        run: npm run build:listening-wallet
+      - name: Check the build is the wallet only
+        if: steps.secrets.outputs.ready == 'true'
+        run: |
+          test -f dist-listening-wallet/index.html
+          test -f dist-listening-wallet/_headers
+          grep -q "frame-ancestors https://radio.xtrata.xyz" dist-listening-wallet/_headers
+          test ! -e dist-listening-wallet/functions
+      # Deployed from inside the output folder so no Pages Functions bundle is picked up.
+      - name: Deploy to wallet.xtrata.xyz
+        if: steps.secrets.outputs.ready == 'true'
+        working-directory: xtrata-2.0/dist-listening-wallet
+        run: npx wrangler pages deploy . --project-name xtrata-listening-wallet --branch main --commit-hash "$GITHUB_SHA" --commit-dirty=true

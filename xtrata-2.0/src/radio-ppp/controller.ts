@@ -93,6 +93,11 @@ export interface Snapshot {
   depositTxid?: string;
   /** A deposit was sent and has not confirmed yet: no further deposit is offered. */
   depositPending: boolean;
+  /**
+   * The wallet box (deployed separately, at wallet.xtrata.xyz) is an older build without like
+   * signing: the heart falls back to the main-wallet page until it is updated.
+   */
+  walletOutdated: boolean;
   /** Listening wallets linked to the connected main wallet (dual-signed, public), newest first. */
   linkedListening: string[];
   /** The server holds a link for this listening wallet, so linking needs no new wallet popup. */
@@ -114,6 +119,8 @@ export const definitelyRejected = (e: unknown) => {
   const err = e as { feeRejected?: boolean; message?: string };
   return err?.feeRejected === true || /\(400\)/.test(err?.message ?? '');
 };
+/** After a like or unlike confirms, the same song's heart stays locked this long. */
+export const LIKE_COOLDOWN_MS = 3_000;
 const randomId = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 export function createPppController(deps: PppDeps) {
@@ -149,6 +156,8 @@ export function createPppController(deps: PppDeps) {
   let afterArm: (() => Promise<void>) | null = null;
   let armDone: Promise<void> = Promise.resolve();
   const fee = () => BigInt(gate?.limits.playFee ?? DEFAULT_PLAY_FEE.toString());
+  // Builds before `features` existed report none: treat them as lacking every newer feature.
+  const walletLacks = (feature: string) => !!status && !(status.features ?? []).includes(feature);
 
   const key = (kind: string, listening: string) => `xtrata.ppp.v1.${kind}:${listening}`;
   const entries = (listening = status?.address): Entry[] => {
@@ -197,6 +206,7 @@ export function createPppController(deps: PppDeps) {
     session: status?.session ?? null,
     payingOn: payingOn(), entries: entries(), depositTxid: pendingDeposit()?.txid ?? depositTxid,
     depositPending: !!pendingDeposit(),
+    walletOutdated: walletLacks('like'),
     linkedListening: mainLinksFor && mainLinksFor === deps.main() ? mainLinks.map((l) => l.listening) : [],
     serverLinked: !!serverLink && serverLinkFor === `${deps.main()}:${status?.address}`,
     stuck: stuck().length, armed
@@ -409,6 +419,7 @@ export function createPppController(deps: PppDeps) {
       const run = () => task('Waiting for your passkey in the listening wallet…', async () => unlockWith(await ensureBridge(), anyPasskey));
       if (!armed) return run();
       if (!anyPasskey) return armDone; // the same unlock is already waiting in the frame
+      if (walletLacks('cancel')) { say('Tap Cancel in the listening wallet box first, then choose a different wallet.'); return Promise.resolve(); }
       // A different wallet: withdraw the waiting panel, then ask for any listening-wallet passkey.
       return disarm(async () => { if (step() === 'locked' || step() === 'intro') await run(); });
     },
@@ -547,6 +558,7 @@ export function createPppController(deps: PppDeps) {
    */
   function heart(d: { song: number; title?: string; artist?: string; likedBy?: string[] }): boolean {
     if (!gate?.here || !['ready', 'fund', 'over', 'locked', 'link', 'loading'].includes(step())) return false;
+    if (walletLacks('like')) return false; // an older wallet box cannot sign likes: the main wallet does it
     void toggleLike(d);
     return true;
   }
@@ -566,6 +578,14 @@ export function createPppController(deps: PppDeps) {
     if (s !== 'ready' || !main) return fail('Still checking the listening wallet. Try the heart again in a moment.');
     if (!status?.session) return fail('Paying is switched off. Switch it on to like from the listening wallet.');
     if (!lockHeld) return fail('Pay-per-play is running in another tab. Like from that tab.');
+    // One like per song at a time: locked until the last one confirms, then 3 more seconds, so a
+    // like cannot be toggled on and off in quick succession (each costs a network fee).
+    const previous = entries().find((e) => e.kind === 'like' && e.song === d.song);
+    if (previous && UNRESOLVED.includes(previous.status))
+      return fail(`Your last like for ${label} is still on its way. It can change again once it confirms.`);
+    if (liking) return fail('One like at a time: your last one is still being sent.');
+    if (previous?.status === 'confirmed' && deps.now() - (previous.confirmedAt ?? 0) < LIKE_COOLDOWN_MS)
+      return fail(`Your like for ${label} has only just confirmed. Try again in a moment.`);
     // Read the song's current state (it may have changed on another device), so the tap toggles it.
     let by: string[] | undefined;
     checkingLike = true;

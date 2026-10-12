@@ -78,6 +78,9 @@
   .cbtn:hover{border-color:var(--acc)} .cbtn:active{transform:scale(.94)}
   .cbtn.big{width:74px;height:74px;font-size:26px;border-color:#2b3a55}
   .cbtn.heart.on{color:#ff5d7d;border-color:#ff5d7d;box-shadow:0 0 18px rgba(255,93,125,.35)}
+  .cbtn.heart.pending{color:#ff9a2e;border-color:#ff9a2e;box-shadow:0 0 18px rgba(255,154,46,.35);animation:likepend 1.2s ease-in-out infinite}
+  @keyframes likepend{50%{opacity:.55}}
+  @media (prefers-reduced-motion:reduce){.cbtn.heart.pending{animation:none}}
   .power.on{color:var(--ok);border-color:var(--ok);box-shadow:0 0 18px rgba(61,220,151,.3)}
   .grp{margin-top:26px}
   .grp label{display:block;font-size:11px;font-weight:800;color:var(--mut);letter-spacing:.16em;margin-bottom:8px}
@@ -286,8 +289,11 @@
     if(np){pill.style.display='';pill.textContent='INSCRIPTION #'+np.tokenId;
       vb.classList.add('show');vb.href=np.href;al.style.display='';al.href=np.href;}
     else{pill.style.display='none';vb.classList.remove('show');al.style.display='none';}
-    var liked=!!(np&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
-    $('heart').classList.toggle('on',liked);
+    // The radio reports a like on its way (orange, taps ignored) and the 3 s lock after it confirms.
+    var hv=s.heart, liked=hv?hv.liked:!!(np&&s.likes.some(function(l){return l.tokenId===String(np.tokenId)}));
+    $('heart').classList.toggle('on',liked&&!(hv&&hv.pending));
+    $('heart').classList.toggle('pending',!!(hv&&hv.pending));
+    $('heart').title=hv&&hv.pending?'On its way to the chain — waiting to confirm':hv&&hv.locked?'Confirmed on-chain':'Like on-chain';
     Array.prototype.forEach.call($('bands').children,function(b){b.classList.toggle('on',b.dataset.b===s.band)});
     $('presetBtn').textContent='PRESET: '+(s.preset==='music'?'MUSIC':'ALL');
     var list=$('likesList');list.innerHTML='';
@@ -346,7 +352,7 @@
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=26a5f0524f30" defer></script>
+<script src="/xtrata-radio.js?v=3393ff1eb4ba" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -362,7 +368,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=6a8b14a3de9d')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=62c5e6006236')}).catch(function(){});
 </script>
 </body>
 </html>

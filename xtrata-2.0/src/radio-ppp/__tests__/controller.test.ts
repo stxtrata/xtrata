@@ -18,7 +18,7 @@ const MAIN = getAddressFromPrivateKey(mainKey, TransactionVersion.Mainnet);
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
-function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void } = {}) {
+function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean } = {}) {
   let likesChanged = 0;
   const likeBy = new Map<number, string[]>(), sent: [number, boolean][] = [], failed: number[] = [];
   let likeReadFails = false;
@@ -53,7 +53,15 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     config: async () => ({ ...gate, allowed: gate.allowed && !!main }),
     links: async () => savedLinks.map((l) => ({ listening: l.listening, issued: l.issued, mainSignature: l.mainSignature })),
     saveLink: async (body) => { savedLinks.push(body); },
-    bridge: async () => ({ request: (m: string, p?: unknown) => (engine.handlers as any)[m](p) }),
+    // `oldWallet`: a wallet box built before `features`, `listening.cancel` and `listening.signLike`.
+    bridge: async () => ({
+      request: async (m: string, p?: unknown) => {
+        if (opts.oldWallet && ['listening.cancel', 'listening.signLike'].includes(m)) return new Promise(() => {});
+        const r = await (engine.handlers as any)[m](p);
+        if (opts.oldWallet && m === 'listening.status') { const { features: _f, ...rest } = r; return rest; }
+        return r;
+      }
+    }),
     chain: {
       verify: async () => {},
       balance: async () => chain.balance,
@@ -444,5 +452,51 @@ describe('likes from the listening wallet, credited to the main wallet', () => {
     await liking;
     expect(s.ppp.snapshot().entries.filter((e) => e.kind === 'play')).toHaveLength(0);
     expect(s.chain.broadcasts).toHaveLength(1);
+  });
+});
+
+describe('heart lock and older wallet boxes', () => {
+  const ready = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
+
+  it('locks a song\'s heart until its last like confirms, then for 3 seconds more', async () => {
+    const s = setup();
+    await ready(s);
+    await s.ppp.toggleLike({ song: 7, title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    s.tick(5_000);
+    await s.ppp.toggleLike({ song: 7, title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1); // still on its way: nothing sent
+    expect(s.ppp.snapshot().error).toMatch(/Your last like for “Night Drive” is still on its way/);
+    expect(s.failed).toEqual([7]);
+    s.mineAll(); await s.ppp.forceRefresh(); // confirms now
+    s.likeBy.set(7, [LISTENING]);
+    await s.ppp.toggleLike({ song: 7, title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.ppp.snapshot().error).toMatch(/has only just confirmed/);
+    s.tick(3_000);
+    await s.ppp.toggleLike({ song: 7, title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(2); // the unlike goes through after the cool-down
+  });
+
+  it('a like on another song is not blocked by this song\'s lock, only queued behind its transaction', async () => {
+    let mine = () => {};
+    const s = setup({}, { onWait: () => mine() });
+    await ready(s);
+    await s.ppp.toggleLike({ song: 1 });
+    mine = () => s.mineAll();
+    s.tick(5_000);
+    await s.ppp.toggleLike({ song: 2 });
+    expect(s.chain.broadcasts).toHaveLength(2);
+  });
+
+  it('an older wallet box: the heart falls back to the main-wallet page and the panel says why', async () => {
+    const s = setup({}, { oldWallet: true });
+    await ready(s);
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', walletOutdated: true });
+    expect(s.ppp.heart({ song: 7 })).toBe(false);
+    expect(s.chain.broadcasts).toHaveLength(0);
+    const fresh = setup();
+    await ready(fresh);
+    expect(fresh.ppp.snapshot().walletOutdated).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ import type {
   LinkParams, LinkResult, ReturnParams, ReturnResult, SessionSummary, SignedResult, SignLikeParams, SignPlayParams,
   StatusResult, TermsParams, UnlockParams, UnlockResult
 } from '../../lib/listening-wallet/messages';
+import { LISTENING_FEATURES } from '../../lib/listening-wallet/messages';
 
 export interface PasskeyPort {
   /** WebAuthn present at all. PRF support is only known after a real ceremony. */
@@ -153,11 +154,12 @@ export function createListeningEngine(deps: {
     return { plays: x.plays, spent: x.spent.toString(), playsLeft: x.playsLeft, budgetLeft: x.budgetLeft.toString(), expires: x.expires };
   };
 
+  const features = [...LISTENING_FEATURES];
   const status = (): StatusResult => {
-    if (!deps.passkey.available()) return { state: 'unsupported', session: null };
-    if (identity) return { state: 'unlocked', address: identity.address, linked: record(credentialId)?.link?.main, session: summary() };
+    if (!deps.passkey.available()) return { state: 'unsupported', session: null, features };
+    if (identity) return { state: 'unlocked', address: identity.address, linked: record(credentialId)?.link?.main, session: summary(), features };
     const last = lastRecord();
-    return last ? { state: 'known', address: last.address, linked: last.link?.main, session: null } : { state: 'none', session: null };
+    return last ? { state: 'known', address: last.address, linked: last.link?.main, session: null, features } : { state: 'none', session: null, features };
   };
   const refreshIdle = () => deps.ui.idle(status());
 
