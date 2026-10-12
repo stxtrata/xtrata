@@ -2,6 +2,11 @@
 
 Everything not listed here was copied verbatim from xtrata-1.0. Every change below was verified after it was made (build + tests, and bundle byte-comparison where applicable).
 
+## Music inscription: reassuring browser storage note (2026-10-12)
+- Reworded the shared keep-open banner's permanent-storage notice to start with reassurance that the inscription process is underway, followed by the request to keep the tab open and the low-disk-space explanation.
+- Removed the warning icon and used neutral text for this informational notice. File-save failures retain their warning appearance and recovery explanation.
+- Verification: 50 existing keep-open, tab-progress and embedded leave-guard tests passed; the Agent One bundle rebuilt successfully. No wallet or payment used.
+
 ## Music artist portal and Xtrata royalty canary (2026-10-12)
 - Added `/music/artist/` with shared wallet sign-in, royalty overview, collection directory and planned pay-per-play reporting. Moved the ledger to `/music/artist/royalties/collections/audionauts-1-0/`; old page/assets permanently redirect and the old API remains compatible. Music and lounge link to the portal.
 - Matching Xtrata admin identity gets per-row 5 STX payment review and wallet approval. Durable edition reservations prevent overlapping attempts; submitted transaction IDs update immediately and confirmed historical-holder receipts reconcile automatically. Ambiguous results stay blocked for ID recovery; the background worker never signs or sends funds. Migration 025 adds attempt history and sale proof cache.
