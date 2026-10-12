@@ -175,3 +175,29 @@ monitored-address configuration, discovered candidate assignment, inert metadata
 CSV download, one-minute authorized refresh and stopping after sign-out. Worker
 dry-run compilation passes. These checks use local simulations/disposable
 addresses and never connect an existing wallet or broadcast a transaction.
+
+## Production rollout, 12 October 2026
+
+- Production code commits: `91184840e` (ledger) and `ceed76889` (automation),
+  cherry-picked onto current main. Pushed main and `codex/audionaut-royalties-release`.
+  Source implementation remains on `codex/audionaut-royalties`.
+- Migrations 023 and 024 applied to `xtrata-manage`; existing creator sessions
+  were already installed. Page deployment `55d39fe0-0f10-407c-b297-1b27c5970767`
+  completed successfully at 00:47:52 UTC. Confirmed actual Pages build root is
+  `xtrata-2.0`; no hosting configuration change was needed.
+- Worker version `ec75b877-469e-4f3d-a83d-0dcb39e419a5` deployed with its five-minute
+  schedule and production D1 binding. First real scheduled run at 00:50:09 UTC
+  completed in about 22 seconds, 144 ms CPU, with no errors.
+- First run: 18 minted editions at confirmed block 9,181,444; ten artist receiving
+  songs resolve to eight distinct wallets. Scanned 19 history pages and saved
+  eight address cursors; four historical backfills continue on later runs. Zero
+  receipts verified/imported so far. This does not mean all royalties are unpaid.
+- Live HTML, bundle, styles and unauthenticated API `401`/private no-store headers
+  verified. Fresh extension-free Chrome confirmed desktop and mobile sign-in
+  views with no page errors and no wallet connected. The production release
+  passed all 37 targeted tests, full site build and Functions compilation.
+- Paying address information has not been supplied; no payer was inferred or
+  configured. The administrator can add public paying addresses to locate older
+  transfers. Unlabelled payments need their covered editions assigned once.
+  Future explicitly tagged transfers are reconciled automatically. No wallet
+  key was used for signing and no STX was sent.
