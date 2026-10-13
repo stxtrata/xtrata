@@ -230,20 +230,32 @@ via the existing link. The panel gently points to Xverse/Leather and never block
 fund from a second disposable wallet, confirm a paid play, like a song, then return all and confirm
 the full address shown in the wallet box is the funder.
 
-## Linked listeners and a different connected wallet
+## One listening wallet per wallet address
 
-A listening wallet linked to a main wallet belongs to that wallet: the panel names the main wallet
-(BNS name first) as who plays, likes and returns are credited to, and the listening address is only a
-technical row in the Wallet fold (it is still needed to fund it). The wallet box greets it as
-"Welcome back, <name or short main address>"; the page passes the BNS name as a display-only `label`
-(the box is offline and sanitises it).
+A person with a Stacks wallet that has several addresses (Xverse, Leather) gets a **separate listening
+wallet for each address they connect**, on the same device. Each is linked to its own address, so that
+address's plays, likes and returns stay separate, like a playlist per profile. A passkey-only listener
+(no Stacks wallet) stays a single wallet.
 
-If a **different** main wallet is connected on that device, the panel stays on the `wrong-wallet`
-step: locked, no unlock card, no paying, likes, deposits, links or returns through that listener (the
-heart falls back to the connected wallet's own like path), and an unlocked listener is locked again.
-It says which wallet to connect. The one way out is "Link to <connected wallet> instead" in the Wallet
-fold, for a lost original wallet: it opens the usual unlock, and the box still asks "Change where
-returns go?" with the full address before anything is replaced.
+How it works (wallet box feature `multi`; `src/listening-wallet/frame/engine.ts`):
+- The page passes the connected address to `listening.status` and `listening.unlock`. The box answers
+  with **the wallet linked to that address**; else a wallet that was never linked (a passkey-only one,
+  which the first address to link it claims); else none, and the page offers a new one for that address.
+  A wallet linked to a *different* address is never offered. The address only chooses among this
+  device's wallets: it grants nothing, and every unlock, create, link and return still needs the
+  passkey and the in-box confirm with the full address.
+- Switching to another address while a wallet is open locks it (the box does this itself on the next
+  status call), drops what it was waiting to pay, and shows the new address's wallet or the set-up step.
+  A wallet opened for the same address stays open.
+- Creating a wallet for an address names the passkey `Xtrata listening wallet · SP…` so several are
+  can be told apart in the password manager. The device remembers up to 25 wallets (it never silently forgets
+  one that may hold funds). Funds in an address's wallet are reached by connecting that address.
+- The wallet box greets a linked wallet as "Welcome back, <name or short main address>" (the page passes
+  the BNS name as a display-only `label`, sanitised by the box). The panel shows "Credited to <name ·
+  address>" and keeps the listening address in a "Listening wallet (technical)" row, needed to fund it.
+- **Older wallet box** (no `multi`): it ignores the address and answers with its last wallet. If that
+  wallet is linked to a different address the panel stays on `wrong-wallet`: locked, with no unlock,
+  paying, likes, deposits, links or returns, and the box is told to update. Deploy the box by hand.
 
 ## Canary checklist
 
