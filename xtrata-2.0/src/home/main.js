@@ -49,6 +49,7 @@
       PEPE_ESCROW_RESOLVERS
     } from '/src/home/config.js';
     import { initXtrataRadio } from '/src/home/radio.js';
+    import { maybeUploadSongThumbnail } from '/src/home/song-thumbnail.js';
     import {
       getSelectedWalletProviderId,
       showStxTransfer,
@@ -8061,6 +8062,14 @@
       // Selection moved while the fullscreen viewer is open: the new preview waits too.
       if (state.fullscreenOpen) pauseBehindFullscreen(true, { replace: true });
       void warmThumbnailCacheFromBytes(token, bytes, mimeType);
+      // A song with no stored thumbnail gets one now, from the cover in the file just loaded.
+      void maybeUploadSongThumbnail({
+        contractId: getTokenCacheContractId(token),
+        tokenId: token.id,
+        bytes,
+        mimeType,
+        hasThumb: typeof token.thumbVersion === 'string' && token.thumbVersion.length > 0
+      });
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),
         contractId: getTokenCacheContractId(token),
