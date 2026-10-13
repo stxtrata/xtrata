@@ -133,3 +133,12 @@ node scripts/backfill-all-thumbnails.mjs --recheck-animated --concurrency 5
 - Covers that reference another inscription (`/inscription/<id>`) are followed by the backfill script (`coverRef` in `scripts/lib/song-cover.mjs`).
 - `npm run thumbnails:sync` fills anything the wizard missed (closed tab, other tools). It does not replace existing rows; use `--force` for that.
 - Pages Functions have no Images binding, which is why the resizing happens in the browser.
+
+## Songs with no thumbnail: made when someone opens them
+
+Songs minted outside the Inscription Wizard, or before its post-mint ping existed, have no
+thumbnail. When anyone selects one in the Explorer and the index lists no thumbnail for it,
+`src/home/song-thumbnail.js` reads the cover from the song file the page just loaded, shrinks it
+to a small WebP in the browser and sends it to `POST /thumb/<contract>/<id>`. The server only
+accepts it for an indexed HTML token with no ready thumbnail, so a stored one is never replaced.
+The tile shows it from the next page load. `thumbnails:sync` remains the way to fill many at once.
