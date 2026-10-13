@@ -8068,7 +8068,18 @@
         tokenId: token.id,
         bytes,
         mimeType,
-        hasThumb: typeof token.thumbVersion === 'string' && token.thumbVersion.length > 0
+        hasThumb: typeof token.thumbVersion === 'string' && token.thumbVersion.length > 0,
+        // Show the new picture on the grid tile at once, without a page reload.
+        onStored: (etag, details) => {
+          if (typeof etag !== 'string' || !/^[A-Za-z0-9_-]{4,64}$/.test(etag)) return;
+          token.thumbVersion = etag;
+          if (details?.title && !token.thumbTitle) token.thumbTitle = details.title;
+          if (details?.artist && !token.thumbArtist) token.thumbArtist = details.artist;
+          const tile = dom.tokenGrid.querySelector(
+            `.token-card[data-token-id="${token.id.toString()}"] .token-thumb`
+          );
+          if (tile) renderGridPoster(token, tile);
+        }
       });
       debugLog('preview', 'selected inscription preview rendered', {
         tokenId: token.id.toString(),

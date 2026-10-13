@@ -12,6 +12,16 @@ const EDGE = 256;
 const MAX_UPLOAD_BYTES = 40 * 1024;
 const attempted = new Set();
 
+// Every step is logged so the process can be followed in the browser console.
+// Filter the console by "song-thumb".
+const log = (step, detail = {}) => {
+  try {
+    console.info(`[song-thumb] ${step}`, detail);
+  } catch {
+    // no console
+  }
+};
+
 const isHtmlMime = (mime) => String(mime ?? '').toLowerCase().startsWith('text/html');
 
 /** URL of the inscription a song uses as artwork, on this site. */
@@ -52,29 +62,46 @@ export const maybeUploadSongThumbnail = async ({
   bytes,
   mimeType,
   hasThumb,
+  onStored,
   fetchImpl = (...a) => fetch(...a),
   encode = encodeWebp
 }) => {
+  const id = String(tokenId);
   try {
-    if (hasThumb || !contractId || !bytes?.length || !isHtmlMime(mimeType)) return 'skipped';
-    const key = `${contractId}:${String(tokenId)}`;
-    if (attempted.has(key)) return 'skipped';
+    log('check', { tokenId: id, hasThumb: Boolean(hasThumb), mimeType, bytes: bytes?.length ?? 0, contractId });
+    if (hasThumb) return (log('skip: index already lists a thumbnail', { tokenId: id }), 'skipped');
+    if (!contractId) return (log('skip: no contract id', { tokenId: id }), 'skipped');
+    if (!bytes?.length) return (log('skip: no content bytes', { tokenId: id }), 'skipped');
+    if (!isHtmlMime(mimeType)) return (log('skip: not HTML', { tokenId: id, mimeType }), 'skipped');
+    const key = `${contractId}:${id}`;
+    if (attempted.has(key)) return (log('skip: already tried in this page', { tokenId: id }), 'skipped');
     attempted.add(key);
     const song = extractSongFromHtml(new TextDecoder().decode(bytes));
-    if (!song) return 'skipped';
+    if (!song) return (log('skip: not a song player (no song metadata found)', { tokenId: id }), 'skipped');
+    log('song found', {
+      tokenId: id,
+      title: song.title,
+      artist: song.artist,
+      embeddedCoverBytes: song.cover ? song.cover.length : 0,
+      coverRef: song.coverRef
+    });
 
     let source = song.cover ? new Blob([song.cover]) : null;
     if (!source) {
       const url = coverUrlFor(song.coverRef);
-      if (!url) return 'skipped';
+      if (!url) return (log('skip: song has no embedded cover and no cover reference', { tokenId: id }), 'skipped');
+      log('fetching artwork inscription', { tokenId: id, url });
       const res = await fetchImpl(url);
-      if (!res.ok) return 'failed';
+      if (!res.ok) return (log('fail: artwork fetch', { tokenId: id, status: res.status }), 'failed');
       const blob = await res.blob();
-      if (!String(blob.type).startsWith('image/') || blob.size > MAX_COVER_BYTES) return 'failed';
+      if (!String(blob.type).startsWith('image/') || blob.size > MAX_COVER_BYTES) {
+        return (log('fail: artwork is not a usable picture', { tokenId: id, type: blob.type, size: blob.size }), 'failed');
+      }
       source = blob;
     }
     const thumb = await encode(source);
-    if (!thumb) return 'failed';
+    if (!thumb) return (log('fail: could not make a small WebP (too big or unsupported)', { tokenId: id }), 'failed');
+    log('thumbnail made', { tokenId: id, bytes: thumb.blob.size, w: thumb.w, h: thumb.h });
     const q = new URLSearchParams({
       title: song.title,
       artist: song.artist,
@@ -82,11 +109,23 @@ export const maybeUploadSongThumbnail = async ({
       h: String(thumb.h)
     });
     const res = await fetchImpl(
-      `/thumb/${encodeURIComponent(contractId)}/${encodeURIComponent(String(tokenId))}?${q.toString()}`,
+      `/thumb/${encodeURIComponent(contractId)}/${encodeURIComponent(id)}?${q.toString()}`,
       { method: 'POST', headers: { 'content-type': 'image/webp' }, body: thumb.blob }
     );
-    return res.status === 201 ? 'stored' : res.ok ? 'skipped' : 'failed';
-  } catch {
+    let reply = null;
+    try {
+      reply = await res.clone().json();
+    } catch {
+      // body not JSON
+    }
+    log('server replied', { tokenId: id, status: res.status, reply });
+    if (res.status === 201) {
+      if (typeof onStored === 'function') onStored(reply?.etag ?? null, { title: song.title, artist: song.artist });
+      return 'stored';
+    }
+    return res.ok ? 'skipped' : 'failed';
+  } catch (error) {
+    log('fail: error', { tokenId: id, error: String(error?.message ?? error) });
     return 'failed';
   }
 };
