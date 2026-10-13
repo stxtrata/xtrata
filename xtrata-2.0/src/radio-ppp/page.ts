@@ -497,12 +497,14 @@ function start(root: HTMLElement) {
           lines.push(el('p', `Otherwise, set up a new listening wallet for ${who(s.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`));
         } else if (!s.solo && s.main) lines.push(el('p', `This is the listening wallet for ${who(s.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, 'ppp-mute'));
         if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
-        // A live gift link is for a brand-new wallet: one button, nothing else to choose.
+        // A live gift link is for a brand-new wallet, so claiming it leads. Someone who already has a listening
+        // wallet (e.g. synced from another device) can still unlock it, or put the gift aside for now.
         const gift = gifts.liveGift();
         actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Turn on pay-per-play · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
         if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         if (!gift && s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
-        if (!gift) actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
+        actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
+        if (gift) actions.push(button('Not now', () => gifts.setAside(), 'quiet'));
         break;
       case 'locked':
         if (s.armed) {

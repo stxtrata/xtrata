@@ -59,6 +59,22 @@ for (const viewport of [{ width: 1280, height: 1000 }, { width: 390, height: 900
     try { const path = url.pathname.slice(1) || 'index.html'; return route.fulfill({ body: await readFile(new URL(path, pub)), headers: { 'content-type': type(path) } }); }
     catch { return route.fulfill({ status: 404, body: '' }); }
   });
+  // "Not now" puts the gift aside: the link is forgotten on this device, and the usual choices come back.
+  {
+    const aside = await context.newPage();
+    aside.setDefaultTimeout(15000);
+    aside.on('pageerror', (e) => errors.push(e.message));
+    await aside.goto(`${SITE}/radio.html#gift=${CODE}`);
+    const p = aside.locator('#ppp');
+    await p.getByText(/sent you 0\.25 STX/).waitFor();
+    await p.getByRole('button', { name: 'I already have a listening wallet' }).waitFor();
+    await p.getByRole('button', { name: 'Not now' }).click();
+    await p.getByRole('button', { name: 'Turn on pay-per-play · no wallet needed' }).waitFor();
+    assert.equal(await p.getByText(/sent you 0\.25 STX/).count(), 0, 'the gift banner is gone');
+    assert.equal(await aside.evaluate(() => localStorage.getItem('xtrata.radio.gift.incoming.v1')), null, 'forgotten on this device');
+    assert.equal(state.claims.length, 0, 'putting it aside claims nothing');
+    await aside.close();
+  }
   const page = await context.newPage();
   page.setDefaultTimeout(15000);
   page.on('pageerror', (e) => errors.push(e.message));
