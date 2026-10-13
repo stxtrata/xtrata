@@ -7,8 +7,8 @@ const css = readFileSync(new URL('../styles/home.css', import.meta.url), 'utf8')
 const hero = indexHtml.slice(indexHtml.indexOf('id="heroMusic"'), indexHtml.indexOf('</section>', indexHtml.indexOf('id="heroMusic"')));
 
 describe('homepage radio hero: on-chain music on any phone', () => {
-  it('leads with the gift link and keeps a way in for people who already have a Stacks wallet', () => {
-    expect(hero).toContain('Send a link. <em>Face ID does the rest.</em>');
+  it('leads with the passkey wallet and keeps a way in for people who already have a Stacks wallet', () => {
+    expect(hero).toContain('Make a wallet <em>with your face.</em>');
     expect(hero).toContain('href="https://radio.xtrata.xyz/radio#give"');
     expect(hero).toContain('href="https://radio.xtrata.xyz/radio"');
     expect(hero).toContain('href="/music/heroes"');
@@ -32,8 +32,8 @@ describe('homepage radio hero: on-chain music on any phone', () => {
     expect(hero).not.toMatch(/<(video|img|source)\b/);
   });
 
-  it('the strip points at the same gift flow', () => {
+  it('the strip sells the same passkey wallet', () => {
     const slide = HOMEPAGE_STRIP_SLIDES.find((s) => s.id === 'music-app');
-    expect(slide).toMatchObject({ title: 'New: send on-chain music to any phone.', href: 'https://radio.xtrata.xyz/radio#give' });
+    expect(slide).toMatchObject({ title: 'New: make a Stacks wallet with Face ID.', href: 'https://radio.xtrata.xyz/radio' });
   });
 });
