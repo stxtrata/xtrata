@@ -508,6 +508,7 @@ function start(root: HTMLElement) {
           key.push(el('p', 'Paying is off. Music stays free.', 'ppp-mute'));
           actions.push(button('Switch on paying as I listen', () => void ppp.switchOn(), 'primary'));
         }
+        if (s.queued) key.push(el('p', s.queued === 1 ? '1 song waiting to be paid · sends as soon as the last transaction confirms' : `${s.queued} songs waiting to be paid · sent one at a time as each transaction confirms`, 'ppp-warn'));
         if (s.balanceState === 'low') key.push(el('p', 'Running low · top up', 'ppp-warn'));
         if (s.depositPending) key.push(el('p', 'Top-up on its way…', 'ppp-warn'));
         else if (s.allowance > 0n && s.balanceState !== 'ok' && !s.solo) actions.push(button(`Top up ${stx(s.allowance)} STX`, () => void ppp.deposit()));
