@@ -53,7 +53,7 @@ const play = (balance = '500000', nonce = '0') => ({ core: 3, song: 1234, receip
 describe('listening wallet engine (wallet origin)', () => {
   it('creates a wallet only after two matching PRF results and stores no secrets', async () => {
     const s = setup();
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone'] });
     const r = await s.h['listening.unlock']({ mode: 'create' });
     expect(r.address).toBe(ADDRESS);
     expect(s.panels.map((p) => p.kind)).toEqual(['create', 'confirm-passkey', 'verify-passkey']);
@@ -76,7 +76,7 @@ describe('listening wallet engine (wallet origin)', () => {
     const other = Uint8Array.from(PRF); other[5] ^= 0xff;
     const s = setup({ outputs: [PRF, other] });
     await expect(s.h['listening.unlock']({ mode: 'create' })).rejects.toThrow(/stable/);
-    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like'] });
+    expect(await s.h['listening.status']()).toEqual({ state: 'none', session: null, features: ['cancel', 'like', 'standalone'] });
     expect(s.map.size).toBe(0);
   });
 
@@ -125,7 +125,8 @@ describe('listening wallet engine (wallet origin)', () => {
     await s.h['listening.unlock']({ mode: 'create' });
     await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Paying is switched off/);
     await s.h['listening.approveSession'](s.terms(3000));
-    await expect(s.h['listening.signLike'](like())).rejects.toThrow(/Link your main wallet first/);
+    // Unlinked is fine: a passkey-only listener likes under the listening address itself.
+    await expect(s.h['listening.signLike'](like(true, '0', '100'))).rejects.toThrow(/Balance too low/);
     const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
     await s.h['listening.link']({ main: MAIN, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data });
     const before = (await s.h['listening.status']()).session!.budgetLeft;
@@ -176,7 +177,7 @@ describe('listening wallet engine (wallet origin)', () => {
   it('returns funds only to the linked main wallet, after an in-frame confirmation, and pauses paying', async () => {
     const s = setup();
     await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
-    await expect(s.h['listening.prepareReturn']({ mode: 'all', balance: '900000', nonce: '4', fee: '3000' })).rejects.toThrow(/Link your main wallet/);
+    await expect(s.h['listening.prepareReturn']({ mode: 'all', balance: '900000', nonce: '4', fee: '3000' })).rejects.toThrow(/Choose where to send the funds/);
     const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
     await s.h['listening.link']({ main: MAIN, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data });
 
@@ -189,6 +190,48 @@ describe('listening wallet engine (wallet origin)', () => {
     expect(s.panels.at(-1)?.lines.join(' ')).toContain(MAIN);
     expect((await s.h['listening.status']()).session).toBeNull();
     await expect(s.h['listening.signPlay'](play())).rejects.toThrow(/No approved/);
+  });
+
+  describe('passkey-only (no linked main wallet)', () => {
+    const OTHER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
+    const ret = (destination?: string) => ({ mode: 'all' as const, balance: '900000', nonce: '2', fee: '3000', ...(destination === undefined ? {} : { destination }) });
+
+    it('returns to the destination the page supplies, showing the full address in the confirm', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      const r = await s.h['listening.prepareReturn'](ret(OTHER));
+      expect(r).toMatchObject({ recipient: OTHER, amount: '897000', mode: 'all' });
+      expect(cvToJSON((deserializeTransaction(r.raw) as any).payload.recipient).value).toBe(OTHER);
+      const panel = s.panels.at(-1)!;
+      expect(panel.kind).toBe('return');
+      expect(panel.lines.join(' ')).toContain(OTHER);
+      expect(panel.lines.join(' ')).toMatch(/Check every character/);
+    });
+
+    it('refuses a missing, malformed, contract or own-address destination', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      await expect(s.h['listening.prepareReturn'](ret())).rejects.toThrow(/Choose where to send/);
+      await expect(s.h['listening.prepareReturn'](ret('nonsense'))).rejects.toThrow(/standard mainnet address/);
+      await expect(s.h['listening.prepareReturn'](ret(OTHER + '.contract'))).rejects.toThrow(/standard mainnet address/);
+      await expect(s.h['listening.prepareReturn'](ret(ADDRESS))).rejects.toThrow(/this listening wallet itself/);
+    });
+
+    it('a linked main wallet wins: a different destination from the page is ignored', async () => {
+      const s = setup();
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      const issued = s.now(), link = { main: MAIN, listening: ADDRESS, issued };
+      await s.h['listening.link']({ main: MAIN, issued, mainSignature: signMessageHashRsv({ messageHash: linkHash(link), privateKey: createStacksPrivateKey(mainKey) }).data });
+      const r = await s.h['listening.prepareReturn'](ret(OTHER));
+      expect(r.recipient).toBe(MAIN);
+      expect(s.panels.at(-1)!.lines.join(' ')).not.toContain(OTHER);
+    });
+
+    it('a cancelled return signs nothing', async () => {
+      const s = setup({ cancel: ['return'] });
+      await s.h['listening.unlock']({ mode: 'create', terms: s.terms() });
+      await expect(s.h['listening.prepareReturn'](ret(OTHER))).rejects.toBeInstanceOf(CancelledError);
+    });
   });
 
   it('signs nothing when the listener cancels in the frame', async () => {

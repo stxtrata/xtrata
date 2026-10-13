@@ -10,6 +10,7 @@ RUNTIME_CONTENT_CACHE_LIMIT_BYTES = "5368709120"
 # Radio pay-per-play (docs/radio/PAY-PER-PLAY.md). The fixed addresses live here; the switch
 # RADIO_PPP_ENABLED and the canary list RADIO_PPP_ALLOWLIST are dashboard Secrets so they can be
 # changed without a code push. Do not also define those two here: a var and a secret cannot share a name.
+# The same goes for the optional RADIO_PPP_PASSKEY_ONLY secret ("1" lets listeners without a Stacks wallet use a passkey wallet alone).
 RADIO_PPP_HOST = "radio.xtrata.xyz"
 RADIO_LISTENING_WALLET_ORIGIN = "https://wallet.xtrata.xyz"
 

@@ -293,6 +293,9 @@
   .ppp-facts dt{color:var(--cyan);font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;align-self:center;white-space:nowrap}
   .ppp-facts dd{margin:0;color:var(--ink);overflow-wrap:anywhere;align-self:center}
   .ppp-addr-short{font-family:var(--mono);font-size:12px}
+  .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
+  .ppp-pick{margin:6px 0}
+  .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
   .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
   .ppp .ppp-ok{color:var(--ok)}.ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-bad{color:#ff8a8a}.ppp .ppp-mute{color:var(--mut)}
   .ppp-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
@@ -770,7 +773,7 @@
   },120);
 })();
 </script>
-<script src="/xtrata-radio.js?v=04a7f66a2451" defer></script>
+<script src="/xtrata-radio.js?v=8e7e3b8f5db7" defer></script>
 <script type="module" src="/radio/wallet.js"></script>
 <script>
 // On the pay-per-play radio host (radio.xtrata.xyz) only the radio's own pages run; everything
@@ -786,7 +789,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=fd049b808a06')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=32b8c01ce223')}).catch(function(){});
 </script>
 </body>
 </html>

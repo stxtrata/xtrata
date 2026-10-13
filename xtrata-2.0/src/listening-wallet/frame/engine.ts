@@ -118,7 +118,7 @@ function termsLines(t: SessionTerms): string[] {
       ? 'This approves ONE paid play.'
       : `It keeps paying until you switch it off or the wallet runs out, for up to ${stx(t.budget)} STX before it asks again.`,
     'Songs skipped before 30 seconds play free, and paused or muted time does not count.',
-    `Tapping the radio's heart likes or unlikes from this wallet too, for a ${stx(LIKE_FEE)} STX network fee, and counts for your linked main wallet.`
+    `Tapping the radio's heart likes or unlikes from this wallet too, for a ${stx(LIKE_FEE)} STX network fee, and counts for your linked main wallet (or for this listening address if none is linked).`
   ];
 }
 
@@ -196,7 +196,7 @@ export function createListeningEngine(deps: {
       warnings: [
         'Keep no more than 1 STX in it.',
         'Anyone who can use this passkey on an unlocked device can spend it.',
-        'If you lose the passkey, whatever is in this wallet is lost. You can return funds to your main wallet at any time.',
+        'If you lose the passkey, whatever is in this wallet is lost. You can return funds to a wallet of yours at any time.',
         ...(existing.length
           ? [`This device already has a listening wallet (${existing.map((w) => short(w.address)).join(', ')}). A new one is a separate wallet: to reach the old one later, choose its passkey when unlocking.`]
           : [])
@@ -367,7 +367,8 @@ export function createListeningEngine(deps: {
     'listening.signLike': async (params: unknown): Promise<SignedResult> => {
       const id = requireUnlocked();
       if (!ledger) throw new Error('Paying is switched off, so likes go through your main wallet.');
-      if (!record(credentialId)?.link?.main) throw new Error('Link your main wallet first, so likes count for it.');
+      // Linked or not, the like is signed by this wallet. Unlinked likes count for the listening
+      // address itself (the page lists passkey-only listeners under it).
       if (signing) throw new Error('Still signing. Try the like again in a moment.');
       signing = true;
       try {
@@ -389,9 +390,19 @@ export function createListeningEngine(deps: {
 
     'listening.prepareReturn': (params: unknown): Promise<ReturnResult> => interact(async () => {
       const id = requireUnlocked();
-      const main = record(credentialId)?.link?.main;
-      if (!main) throw new Error('Link your main wallet first. Funds can only be returned to it.');
       const p = params as ReturnParams;
+      // A linked main wallet always wins. Without one, the page supplies the destination (the
+      // funder it found on chain, or an address the listener typed) and the listener confirms
+      // the FULL address below; this frame cannot read the chain, so it cannot check where it came from.
+      const linkedMain = record(credentialId)?.link?.main;
+      const supplied = typeof p?.destination === 'string' ? p.destination.trim() : '';
+      if (!linkedMain) {
+        if (!supplied) throw new Error('Choose where to send the funds first, or link a main wallet.');
+        if (!isMainnetStandardAddress(supplied)) throw new Error('Choose a standard mainnet address (starting SP) to send to.');
+        if (supplied === id.address) throw new Error('That is this listening wallet itself. Choose a different address.');
+      }
+      const main = linkedMain ?? supplied;
+      const toLabel = linkedMain ? 'your main wallet' : 'this address';
       if (p?.mode !== 'excess' && p?.mode !== 'all') throw new Error('Choose Return excess or Return all.');
       const plan = returnPlan(p.mode, bigintParam(p.balance, 'balance'), bigintParam(p.fee, 'fee'));
       const nonce = bigintParam(p.nonce, 'nonce');
@@ -399,9 +410,10 @@ export function createListeningEngine(deps: {
       await deps.ui.act({
         kind: 'return',
         title: p.mode === 'all' ? 'Return everything' : 'Return the excess',
-        summary: `Send ${stx(plan.amount)} STX to your main wallet ${main}. Network fee ${stx(plan.fee)} STX.`,
+        summary: `Send ${stx(plan.amount)} STX to ${toLabel} ${main}. Network fee ${stx(plan.fee)} STX.`,
         lines: [
-          `Send ${stx(plan.amount)} STX to your main wallet ${main}.`,
+          `Send ${stx(plan.amount)} STX to ${toLabel} ${main}.`,
+          ...(linkedMain ? [] : ['Check every character of this address. A transfer to a wrong address cannot be undone. Do not send to an exchange deposit address unless it accepts transfers from other wallets.']),
           `Network fee ${stx(plan.fee)} STX. Left in this wallet: ${stx(plan.remaining)} STX.`,
           `Amounts use the balance the radio page reported (${stx(bigintParam(p.balance, 'balance'))} STX). If the real balance differs, the network rejects the transfer and nothing moves.`,
           'Paid listening is paused. Turn it back on any time after this confirms.'

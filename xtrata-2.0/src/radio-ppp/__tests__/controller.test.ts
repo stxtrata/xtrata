@@ -10,6 +10,7 @@ import { CancelledError, createListeningEngine, type Panel } from '../../listeni
 import { verifyLinkSignature } from '../../lib/listening-wallet/link';
 import { MIN_PLAY_INTERVAL_MS, TARGET } from '../../lib/listening-wallet/policy';
 import { validateSaved } from '../../radio-test-wallet/chain';
+import type { FunderResult } from '../../lib/listening-wallet/funder';
 
 const PRF = Uint8Array.from({ length: 32 }, (_, i) => i);
 const LISTENING = 'SPHRV6ESV321YCV6W990X4FKXB4S9D7F665FSCTV';
@@ -28,7 +29,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     enabled: true, allowed: true, here: true, radioUrl: 'https://radio.xtrata.test/radio.html', walletOrigin: 'https://wallet.xtrata.test', canary: true,
     limits: { playFee: '300', returnFee: '3000', maxSessionPlays: 3000, sessionHours: 168 }, ...over
   };
-  const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER };
+  const chain = { balance: 0n, nonce: 0n, confirmed: 0n, rejectNext: false, mined: new Set<string>(), broadcasts: [] as string[], owner: HOLDER, funder: { ok: true, funder: null, distinct: 0 } as FunderResult, funderCalls: 0 };
   const savedLinks: any[] = [];
   const store = new Map<string, string>();
   let evaluations = 0;
@@ -78,6 +79,7 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     store: { get: (k) => store.get(k) ?? null, set: (k, v) => void store.set(k, v) },
     changed: () => {},
     likesChanged: () => { likesChanged++; },
+    funder: async () => { chain.funderCalls++; return chain.funder; },
     likeState: async (_main, song) => { if (likeReadFails) throw new Error('503'); const by = likeBy.get(song) ?? []; return { liked: by.length > 0, by }; },
     likeSent: (song, liked) => { sent.push([song, liked]); },
     likeFailed: (song) => { failed.push(song); },
@@ -498,5 +500,193 @@ describe('heart lock and older wallet boxes', () => {
     const fresh = setup();
     await ready(fresh);
     expect(fresh.ppp.snapshot().walletOutdated).toBe(false);
+  });
+});
+
+describe('passkey-only listening (no Stacks wallet)', () => {
+  const solo = (opts: Parameters<typeof setup>[1] = {}) => {
+    const s = setup({ passkeyOnly: true }, opts);
+    s.setMain(undefined);
+    return s;
+  };
+  /** Created and funded from outside (a friend or an exchange sent STX to the address). */
+  const funded = async (s: ReturnType<typeof setup>, amount = TARGET) => { await s.ppp.forceRefresh(); await s.ppp.create(); s.chain.balance = amount; await s.ppp.forceRefresh(); };
+  const lastRecipient = (s: ReturnType<typeof setup>) => {
+    const tx = deserializeTransaction(s.chain.broadcasts.at(-1)!) as any;
+    return { to: cvToJSON(tx.payload.recipient).value as string, amount: String(tx.payload.amount) };
+  };
+
+  it('walks from nothing to paid plays with no wallet connected and no link', async () => {
+    const s = solo();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', solo: true });
+    await s.ppp.create();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', listening: LISTENING, solo: true, error: '' });
+    s.chain.balance = TARGET;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', payingOn: true });
+    await s.ppp.onListened({ song: 7, id: rid(2), title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.savedLinks).toHaveLength(0);
+  });
+
+  it('stays off by default: without the flag a visitor with no wallet is asked to connect', async () => {
+    const s = setup();
+    s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'connect', solo: false });
+    await s.ppp.create().catch(() => {});
+    expect(s.ppp.snapshot().listening).toBeUndefined();
+  });
+
+  it('a connected, invited main wallet keeps the linked flow even when passkey-only is on', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh(); await s.ppp.create();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'link', solo: false });
+  });
+
+  it('a main wallet that is not invited can still listen as passkey-only', async () => {
+    const s = setup({ passkeyOnly: true, allowed: false });
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', solo: true });
+  });
+
+  it('returns go to the first meaningful funder, and the wallet shows that address for confirmation', async () => {
+    const s = solo({ hold: ['return'] });
+    s.chain.funder = { ok: true, funder: MAIN, txId: '0x1', amount: '1000000', distinct: 1 };
+    await funded(s);
+    expect(s.ppp.snapshot()).toMatchObject({ returnTo: MAIN, returnToKind: 'funder', funderState: 'found', funderMultiple: false });
+    const pending = s.ppp.returnFunds('all');
+    await s.settle();
+    expect(s.held[0].panel.kind).toBe('return');
+    expect(s.held[0].panel.lines.join(' ')).toContain(MAIN); // the full address, not a short form
+    s.tap();
+    await pending;
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(lastRecipient(s)).toEqual({ to: MAIN, amount: (TARGET - 3_000n).toString() });
+    expect(s.ppp.snapshot()).toMatchObject({ payingOn: false });
+  });
+
+  it('a failed funder lookup is "could not check", never "no funder", and nothing is sent', async () => {
+    const s = solo();
+    s.chain.funder = { ok: false };
+    await funded(s);
+    expect(s.ppp.snapshot()).toMatchObject({ funderState: 'failed', returnTo: undefined });
+    await s.ppp.returnFunds('all');
+    expect(s.ppp.snapshot().error).toMatch(/Choose where to send/);
+    expect(s.chain.broadcasts).toHaveLength(0);
+    // retried after a minute, and used once it works
+    s.chain.funder = { ok: true, funder: MAIN, distinct: 1 };
+    s.tick(61_000);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ funderState: 'found', returnTo: MAIN });
+  });
+
+  it('backs off a failing funder lookup instead of retrying every minute', async () => {
+    const s = solo();
+    s.chain.funder = { ok: false };
+    await funded(s);
+    const calls = () => s.chain.funderCalls;
+    expect(calls()).toBe(1);
+    s.tick(61_000); await s.ppp.forceRefresh(); expect(calls()).toBe(2);
+    s.tick(61_000); await s.ppp.forceRefresh(); expect(calls()).toBe(2); // second failure: waits 2 minutes
+    s.tick(61_000); await s.ppp.forceRefresh(); expect(calls()).toBe(3);
+  });
+
+  it('a connected invited wallet is never passkey-only, even before its own gate has been read', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh();
+    s.setMain(HOLDER); // a different wallet connects; the gate on hand was fetched for the old one
+    expect(s.ppp.snapshot().solo).toBe(false);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().solo).toBe(false);
+  });
+
+  it('an unfunded wallet with no qualifying sender has no return target (dust never counts)', async () => {
+    const s = solo();
+    s.chain.funder = { ok: true, funder: null, distinct: 0 };
+    await funded(s);
+    expect(s.ppp.snapshot()).toMatchObject({ funderState: 'none', returnTo: undefined });
+  });
+
+  it('does not hammer the chain: a found funder is looked up once', async () => {
+    const s = solo();
+    s.chain.funder = { ok: true, funder: MAIN, distinct: 1 };
+    await funded(s);
+    await s.ppp.forceRefresh(); await s.ppp.forceRefresh();
+    expect(s.chain.funderCalls).toBe(1);
+  });
+
+  it('an address the listener chooses beats the funder; bad or self addresses are refused', async () => {
+    const s = solo();
+    s.chain.funder = { ok: true, funder: MAIN, distinct: 2 };
+    await funded(s);
+    expect(s.ppp.snapshot().funderMultiple).toBe(true);
+    s.ppp.setReturnAddress('not-an-address');
+    expect(s.ppp.snapshot().error).toMatch(/standard mainnet address/);
+    s.ppp.setReturnAddress(LISTENING);
+    expect(s.ppp.snapshot().error).toMatch(/itself/);
+    s.ppp.setReturnAddress('SM3VDXK3WZZSA84XXFKAFAF15NNZX32CTSG82JFQ4.some-contract'); // contracts are not plain addresses
+    expect(s.ppp.snapshot().error).toMatch(/standard mainnet address/);
+    s.ppp.setReturnAddress(HOLDER);
+    expect(s.ppp.snapshot()).toMatchObject({ returnTo: HOLDER, returnToKind: 'chosen' });
+    await s.ppp.returnFunds('all');
+    expect(lastRecipient(s).to).toBe(HOLDER);
+    s.ppp.clearReturnAddress();
+    expect(s.ppp.snapshot()).toMatchObject({ returnTo: MAIN, returnToKind: 'funder' });
+  });
+
+  it('a linked main wallet always wins over the funder and a chosen address', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link();
+    s.setMain(undefined); // the same wallet, later, with no main connected
+    s.chain.funder = { ok: true, funder: HOLDER, distinct: 1 };
+    s.chain.balance = TARGET;
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ solo: true, linked: MAIN, returnTo: MAIN, returnToKind: 'linked' });
+    s.ppp.setReturnAddress(HOLDER);
+    await s.ppp.returnFunds('all');
+    expect(lastRecipient(s).to).toBe(MAIN);
+  });
+
+  it('excess above 1 STX can be returned to the funder', async () => {
+    const s = solo();
+    s.chain.funder = { ok: true, funder: MAIN, distinct: 1 };
+    await funded(s, TARGET + 500_000n);
+    expect(s.ppp.snapshot().step).toBe('over');
+    await s.ppp.returnFunds('excess');
+    expect(lastRecipient(s)).toEqual({ to: MAIN, amount: '497000' });
+  });
+
+  it('likes are signed from the listening address and need no link', async () => {
+    const s = solo();
+    await funded(s);
+    await s.ppp.toggleLike({ song: 7, title: 'Night Drive' });
+    expect(s.chain.broadcasts).toHaveLength(1);
+    expect(s.sent).toEqual([[7, true]]);
+    expect(s.ppp.snapshot().entries[0]).toMatchObject({ kind: 'like', address: LISTENING, liked: true });
+  });
+
+  it('a song liked from another wallet is not toggled from here', async () => {
+    const s = solo();
+    await funded(s);
+    s.likeBy.set(4, [MAIN]);
+    await s.ppp.toggleLike({ song: 4, title: 'Smalltalk' });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    expect(s.ppp.snapshot().error).toMatch(/another wallet of yours/);
+  });
+
+  it('an older wallet box still pays, but will not return to another address or like, and says so', async () => {
+    const s = solo({ oldWallet: true });
+    s.chain.funder = { ok: true, funder: MAIN, distinct: 1 };
+    await funded(s);
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', walletCannotSolo: true });
+    await s.ppp.returnFunds('all');
+    expect(s.ppp.snapshot().error).toMatch(/needs an update/);
+    expect(s.chain.broadcasts).toHaveLength(0);
+    await s.ppp.toggleLike({ song: 1 });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    expect(s.chain.broadcasts).toHaveLength(1);
   });
 });

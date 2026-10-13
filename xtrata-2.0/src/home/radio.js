@@ -1891,7 +1891,16 @@ export const initXtrataRadio = ({ tokenIds = [], mount = null, resumePlayback = 
 
   const chainLike = root.querySelector('.xtrata-radio__chain-like');
   const walletSession = createWalletSessionStore();
-  chainState = createRadioOnchainState({wallet: () => walletSession.load(), metadata: id => trackCache.get(String(id)), changed: () => {
+  // A passkey-only listener has no Stacks wallet: the pay-per-play panel (when it is running) offers the
+  // listening address as the identity, so the heart and likes list follow it.
+  const likeIdentity = () => {
+    const session = walletSession.load();
+    // The panel only offers an identity while it runs passkey-only (no connected, invited wallet), so it wins then.
+    const listening = typeof window.XtrataRadioListeningIdentity === 'function' ? window.XtrataRadioListeningIdentity() : undefined;
+    if (typeof listening === 'string' && listening) return {...session, isConnected: true, network: 'mainnet', address: listening};
+    return session;
+  };
+  chainState = createRadioOnchainState({wallet: likeIdentity, metadata: id => trackCache.get(String(id)), changed: () => {
     likes = chainState.snapshot().likes.slice(); emit();
   }});
   // force: skip the 60s throttle (focus/visibility) but still respect a failure backoff. manual: explicit user/wallet action, always runs.

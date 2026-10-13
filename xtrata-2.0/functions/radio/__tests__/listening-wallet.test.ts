@@ -45,6 +45,18 @@ describe('pay-per-play canary gate', () => {
     expect(await (await config({ env, request: get('/x?main=' + MAIN, 'xtrata.test') })).json()).toMatchObject({ enabled: true, here: false, walletOrigin: null, radioUrl: 'https://radio.xtrata.test/radio.html' });
     expect(await (await config({ env: { ...env, RADIO_PPP_HOST: '' }, request: get('/x?main=' + MAIN) })).json()).toMatchObject({ enabled: false, here: false });
   });
+  it('passkey-only is off unless its own switch is "1", and only on the radio host', async () => {
+    const flag = async (e: object, host?: string) => (await (await config({ env: { ...env, ...e }, request: get('/x?main=' + MAIN, host) })).json()).passkeyOnly;
+    expect(await flag({})).toBe(false);
+    expect(await flag({ RADIO_PPP_PASSKEY_ONLY: '0' })).toBe(false);
+    expect(await flag({ RADIO_PPP_PASSKEY_ONLY: 'true' })).toBe(false);
+    expect(await flag({ RADIO_PPP_PASSKEY_ONLY: '1' })).toBe(true);
+    expect(await flag({ RADIO_PPP_PASSKEY_ONLY: '1' }, 'xtrata.test')).toBe(false);
+    expect(await flag({ RADIO_PPP_PASSKEY_ONLY: '1', RADIO_PPP_ENABLED: '0' })).toBe(false);
+    // it needs no main wallet and does not widen the allowlist
+    const body = await (await config({ env: { ...env, RADIO_PPP_PASSKEY_ONLY: '1' }, request: get('/x') })).json();
+    expect(body).toMatchObject({ passkeyOnly: true, allowed: false });
+  });
   it('admits only allowlisted wallets during the canary, everyone with "all"', async () => {
     expect(await (await config({ env, request: get('/x?main=' + MAIN) })).json()).toMatchObject({ enabled: true, allowed: true, here: true, canary: true, walletOrigin: 'https://wallet.xtrata.xyz', limits: { playFee: '300', sessionHours: 168 } });
     expect(await (await config({ env, request: get('/x?main=' + LISTENING) })).json()).toMatchObject({ enabled: true, allowed: false });

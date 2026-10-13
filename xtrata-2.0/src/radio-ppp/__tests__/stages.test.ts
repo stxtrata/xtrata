@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { showSteps, STAGES, stageOf } from '../stages';
+import { showSteps, SOLO_STAGES, STAGES, stageOf, stagesFor } from '../stages';
 
 const base = { payingOn: true, session: { playsLeft: 10 } as any, entries: [] as any[], gate: null };
 const at = (step: string, extra: object = {}) => stageOf({ ...base, step: step as any, ...extra });
@@ -39,5 +39,23 @@ describe('pay-per-play steps', () => {
   it('has nothing new to show while hidden or loading', () => {
     expect(at('off')).toBeNull();
     expect(at('loading')).toBeNull();
+  });
+});
+
+describe('passkey-only steps', () => {
+  const solo = (step: string, extra: object = {}) => stageOf({ ...base, step: step as any, solo: true, ...extra });
+  it('has three steps and no connect or link', () => {
+    expect(SOLO_STAGES).toEqual(['Passkey', 'Add 1 STX', 'Listen']);
+    expect(stagesFor(true)).toBe(SOLO_STAGES);
+    expect(stagesFor(false)).toBe(STAGES);
+    expect(['intro', 'locked', 'fund', 'ready'].map((s) => solo(s, { payingOn: false })!.at)).toEqual([0, 0, 1, 2]);
+    expect(solo('fund')).toMatchObject({ at: 1, caption: 'Step 2 of 3 · add 1 STX: anyone can send it to your address' });
+    expect(solo('over')).toMatchObject({ at: 1, blocked: true });
+  });
+  it('completes after the first confirmed paid play, and hides the track once someone has paid', () => {
+    const done = solo('ready', { entries: [{ kind: 'play', status: 'confirmed' }] })!;
+    expect(done.at).toBe(3);
+    expect(showSteps({ step: 'ready', entries: [{ kind: 'play' }] as any, linked: undefined, solo: true }, done)).toBe(false);
+    expect(showSteps({ step: 'fund', entries: [], linked: undefined, solo: true }, solo('fund'))).toBe(true);
   });
 });
