@@ -18,7 +18,7 @@
 | Public IPFS gateways throttle bulk reads (Pinata public gateway returned 429 during research) | Manifest builds fail or crawl | Builder retries and refuses on any failure; use a dedicated gateway for final builds | Jim |
 | Source metadata not frozen (all three recommended picks) | Metadata could be repointed before the snapshot | Manifest records the snapshot block; review the manifest publicly before finalising | Jim |
 | Twin token-URI policy (D3) undecided | Finalised URIs are permanent | Decide before building final manifests; configs use the spec's recommended resolver URL | Jim |
-| Stacks Art metadata gone (Zombie Wabbits, Citadels, Funky Donuts, Blocks) | These cannot be preserved from their original source | Record as a preservation-risk finding; needs art recovery | Jim |
+| Stacks Art metadata gone (Zombie Wabbits, Citadels, Funky Donuts, Blocks) | The contracts' own links are dead for all four. Zombie Wabbits and Citadels: art on a Stacks Art S3 bucket reported not to load (Lost). Funky Donuts (3,000) and Blocks (2,500): art survives in one Pinata IPFS folder each, found through Gamma's index, with single-account pin risk (High); every file is over 512 KB, so both need the large-on-demand route. Updated 13 Oct | Record as preservation-risk findings; archive the Blocks and Donuts folders and confirm each CID with the artist or Stacks Art before relying on it; Zombie Wabbits and Citadels need art recovery or a re-scan of Gamma's index | Jim |
 | Archived third-party sources in the repo | Licensing questions on release | Check before publishing; note in README | Jim |
 | STX price moves over open timescales | 1 STX fee worth more or less | Owner can change the fee within the cap | Jim |
 
