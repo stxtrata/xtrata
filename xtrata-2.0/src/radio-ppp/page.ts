@@ -448,12 +448,11 @@ function start(root: HTMLElement) {
         }
         break;
       case 'wrong-wallet':
-        // A different Stacks wallet is connected than the one this device's listening wallet belongs to.
+        // Only with a wallet box older than one-listening-wallet-per-address (it cannot offer this address its own).
         key.push(el('p', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`, 'ppp-warn'));
         lines.push(el('p', `You are connected as ${who(s.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`));
-        lines.push(el('p', 'Lost access to that wallet? You can link this listening wallet to the connected one instead (under Wallet, below). It asks for your passkey and shows the full address to confirm.', 'ppp-mute'));
+        lines.push(el('p', 'The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.', 'ppp-mute'));
         actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(), 'primary'));
-        more.push(button(`Link to ${short(s.main)} instead`, () => ppp.allowRelink(), 'quiet'));
         break;
       case 'not-invited':
         key.push(el('p', 'Coming soon. Listening is free.', 'ppp-mute'));
@@ -469,6 +468,8 @@ function start(root: HTMLElement) {
           ? 'You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it.'
           : 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
         // Two clear doors for a visitor with no wallet connected: a new passkey-only wallet, or their Stacks wallet.
+        // One listening wallet per wallet address: another address on this device has its own, and its plays and likes stay separate.
+        if (!s.solo && s.main) lines.push(el('p', `This is the listening wallet for ${who(s.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, 'ppp-mute'));
         if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
         actions.push(button(s.solo ? 'Turn on pay-per-play · no wallet needed' : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
         if (s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));

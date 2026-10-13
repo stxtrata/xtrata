@@ -130,6 +130,8 @@ export interface Snapshot {
   funderMultiple: boolean;
   /** Passkey-only needs a wallet box that can return to a chosen address and like unlinked. */
   walletCannotSolo: boolean;
+  /** The wallet box predates one listening wallet per address: it answers with its last wallet whichever address is connected. */
+  walletCannotMulti: boolean;
 }
 
 const UNRESOLVED: Entry['status'][] = ['prepared', 'signed', 'unknown', 'pending'];
@@ -218,15 +220,14 @@ export function createPppController(deps: PppDeps) {
   const soloOpen = () => gate?.passkeyOnly === true && (!deps.main() || (gateFor === deps.main() && !gate.allowed));
   const solo = () => soloOpen() && !status?.linked;
   /**
-   * This device's listening wallet is linked to one main wallet and a different one is connected. The
-   * listener stays locked: nothing unlocks, pays, likes or links through it until the linked wallet is
-   * connected. The one way out is `allowRelink` for the connected wallet (it still needs the passkey and
-   * a confirm in the wallet box), so a lost original wallet cannot strand funds.
+   * The listening wallet the box reports is linked to one main wallet and a different one is connected. A box that
+   * supports one listening wallet per address (`multi`) never reports another address's wallet, so this only
+   * happens with an older box: the listener then stays locked (nothing unlocks, pays, likes or links) until the
+   * linked wallet is connected, and the panel says the box is updating.
    */
-  let relinkFor: string | undefined;
   const mismatch = () => {
     const main = deps.main();
-    return !solo() && !!main && !!status?.linked && status.linked !== main && relinkFor !== main;
+    return !solo() && !!main && !!status?.linked && status.linked !== main;
   };
   const chosenKey = (listening: string) => key('return-to', listening);
   const chosenAddress = (listening = status?.address): string | undefined => {
@@ -283,7 +284,8 @@ export function createPppController(deps: PppDeps) {
     solo: solo(), returnTo: returnTarget()?.to, returnToKind: returnTarget()?.kind,
     funderState: (() => { const f = funderFor(); return !f ? 'unknown' : !f.ok ? 'failed' : f.funder ? 'found' : 'none'; })(),
     funderMultiple: (() => { const f = funderFor(); return !!f && f.ok && f.distinct > 1; })(),
-    walletCannotSolo: solo() && walletLacks('standalone')
+    walletCannotSolo: solo() && walletLacks('standalone'),
+    walletCannotMulti: walletLacks('multi')
   });
 
   const say = (m: string, e = '') => { message = m; error = e; deps.changed(); };
@@ -313,6 +315,12 @@ export function createPppController(deps: PppDeps) {
     bridge ??= await deps.bridge(gate.walletOrigin);
     return bridge;
   }
+
+  /**
+   * The wallet box answers for the connected main wallet's own listening wallet (one per address), or says it has
+   * none for it. Boxes older than `multi` ignore the address and answer with their last wallet.
+   */
+  const readStatus = (b: Bridge) => { const main = deps.main(); return b.request<StatusResult>('listening.status', main ? { main } : undefined); };
 
   async function refreshBalance(force = false) {
     if (!status?.address) return;
@@ -416,13 +424,13 @@ export function createPppController(deps: PppDeps) {
         return;
       }
       await ensureBridge();
-      status = await bridge!.request<StatusResult>('listening.status');
+      status = await readStatus(bridge!);
       if (mismatch() && status.state === 'unlocked') {
         // Another wallet was connected while this listener was unlocked (it is not that wallet's): lock it again.
         forgetQueue();
         await bridge!.request('listening.lock').catch(() => undefined);
         balance = undefined;
-        status = await bridge!.request<StatusResult>('listening.status');
+        status = await readStatus(bridge!);
       }
       if (main && gate.allowed) await lookupServerLink(main);
       await refreshBalance(force);
@@ -444,8 +452,8 @@ export function createPppController(deps: PppDeps) {
     guardMatch();
     const resume = !status?.address || payingOn(status.address);
     const label = status?.linked ? deps.nameOf?.(status.linked) : undefined;
-    await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey, ...(label ? { label } : {}) });
-    status = await b.request<StatusResult>('listening.status');
+    await b.request('listening.unlock', { mode: 'unlock', terms: resume ? onTerms() : undefined, anyPasskey, ...(deps.main() ? { main: deps.main() } : {}), ...(label ? { label } : {}) });
+    status = await readStatus(b);
     if (resume) {
       // Picked a different wallet that this device has switched off: honour that.
       if (!payingOn(status.address)) await b.request('listening.stop');
@@ -526,8 +534,8 @@ export function createPppController(deps: PppDeps) {
 
     create: () => task('Waiting for your passkey…', async () => {
       const b = await ensureBridge();
-      await b.request('listening.unlock', { mode: 'create', terms: onTerms() });
-      status = await b.request<StatusResult>('listening.status');
+      await b.request('listening.unlock', { mode: 'create', terms: onTerms(), ...(deps.main() ? { main: deps.main() } : {}) });
+      status = await readStatus(b);
       setPayingOn(true);
       say(solo() ? 'Wallet created ✓ Next: add 1 STX.' : 'Wallet created ✓ Next: link it.');
       await holdTab();
@@ -540,20 +548,6 @@ export function createPppController(deps: PppDeps) {
       if (walletLacks('cancel')) { say('Tap Cancel in the listening wallet box first, then choose a different wallet.'); return Promise.resolve(); }
       // A different wallet: withdraw the waiting panel, then ask for any listening-wallet passkey.
       return disarm(async () => { if (step() === 'locked' || step() === 'intro') await run(); });
-    },
-
-    /**
-     * The connected wallet is not the one this listener is linked to, and the listener means to move to it
-     * (the original wallet is lost, or this is the wallet they use now). Unlocking and linking then go ahead as
-     * usual: the passkey tap and the "Change where returns go?" confirm in the wallet box still decide it.
-     */
-    allowRelink: () => {
-      const main = deps.main();
-      if (!main || !mismatch()) return;
-      relinkFor = main;
-      armOff = false;
-      deps.changed();
-      void refresh(true);
     },
 
     link: () => task('Sign in your wallet…', async () => {
@@ -742,7 +736,7 @@ export function createPppController(deps: PppDeps) {
         saveEntry({ ...entry, status: definitelyRejected(e) ? 'failed' : 'unknown', note: (e as Error).message, ...(definitelyRejected(e) ? { raw: undefined } : {}) });
         error = (e as Error).message;
       }
-      status = await bridge!.request<StatusResult>('listening.status');
+      status = await readStatus(bridge!);
       return 'done';
     } catch (e) {
       message = 'This song played free: ' + (e instanceof Error ? e.message : 'payment unavailable');
@@ -851,7 +845,7 @@ export function createPppController(deps: PppDeps) {
         error = (e as Error).message;
         if (definitelyRejected(e)) try { deps.likeFailed?.(d.song); } catch { /* radio */ }
       }
-      status = await bridge!.request<StatusResult>('listening.status');
+      status = await readStatus(bridge!);
     } catch (e) {
       error = 'Like not sent: ' + (e instanceof Error ? e.message : 'the listening wallet is unavailable');
       try { deps.likeFailed?.(d.song); } catch { /* radio */ }

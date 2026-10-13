@@ -30,9 +30,15 @@ export interface StatusResult {
 
 /**
  * Features of the current wallet build: `cancel` (listening.cancel), `like` (listening.signLike at LIKE_FEE),
- * `standalone` (returns to a page-supplied destination and likes without a linked main wallet).
+ * `standalone` (returns to a page-supplied destination and likes without a linked main wallet),
+ * `multi` (one listening wallet per main-wallet address: status, unlock and create take the connected `main`).
  */
-export const LISTENING_FEATURES = ['cancel', 'like', 'standalone'] as const;
+export const LISTENING_FEATURES = ['cancel', 'like', 'standalone', 'multi'] as const;
+
+/** `listening.status`: the connected main wallet, if any, so the box answers for that address's listening wallet. */
+export interface StatusParams {
+  main?: string;
+}
 
 export interface TermsParams {
   fee: string;
@@ -43,6 +49,11 @@ export interface TermsParams {
 
 export interface UnlockParams {
   mode: 'create' | 'unlock';
+  /**
+   * The connected main wallet. Unlock opens the listening wallet linked to it (or a never-linked one it can
+   * claim); create makes a new one for it. Only chooses among this device's wallets: it grants nothing.
+   */
+  main?: string;
   /** Unlock: let the listener pick any listening-wallet passkey instead of this device's last one. */
   anyPasskey?: boolean;
   /**

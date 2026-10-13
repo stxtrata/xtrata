@@ -22,7 +22,7 @@ const OTHER_MAIN = getAddressFromPrivateKey(otherKey, TransactionVersion.Mainnet
 const HOLDER = 'SP2J6ZY48GV1EZ5V2V5RB9MP66SW86PYKKNRV9EJ7';
 const rid = (n: number) => n.toString(16).padStart(32, '0');
 
-function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean } = {}) {
+function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?: string[]; onWait?: () => void; oldWallet?: boolean; noMulti?: boolean } = {}) {
   let likesChanged = 0;
   const likeBy = new Map<number, string[]>(), sent: [number, boolean][] = [], failed: number[] = [], confirmed: [number, boolean][] = [];
   let likeReadFails = false;
@@ -38,10 +38,17 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
   const requests: [string, any][] = [];
   const names = new Map<string, string>();
   let evaluations = 0;
+  let created = 0;
+  const prfs = new Map<string, Uint8Array>();
   const walletStore = new Map<string, string>();
   const held: { panel: Panel; tap: () => void; cancel: () => void }[] = [];
   const engine = createListeningEngine({
-    passkey: { available: () => true, create: async () => ({ credentialId: 'c1' }), evaluate: async () => { evaluations++; return { credentialId: 'c1', prf: PRF.slice() }; } },
+    // The first wallet is the fixed LISTENING address; each further one (another address's) is a different passkey and wallet.
+    passkey: {
+      available: () => true,
+      create: async () => { const id = created === 0 ? 'c1' : `c${created + 1}`; prfs.set(id, created === 0 ? PRF.slice() : PRF.map((b) => (b + created * 5) % 256)); created++; return { credentialId: id }; },
+      evaluate: async (id) => { evaluations++; const k = id ?? 'c1'; return { credentialId: k, prf: (prfs.get(k) ?? PRF).slice() }; }
+    },
     ui: {
       // Panels of the held kinds wait for the listener's tap, like the real frame; others confirm at once.
       act: (panel, action) => (opts.hold?.includes(panel.kind)
@@ -63,9 +70,12 @@ function setup(over: Partial<GateConfig> = {}, opts: { tabLock?: boolean; hold?:
     bridge: async () => ({
       request: async (m: string, p?: unknown) => {
         requests.push([m, p]);
+        // `noMulti`: a wallet box from before one-listening-wallet-per-address: it ignores the connected address.
+        if (opts.noMulti && (m === 'listening.status' || m === 'listening.unlock') && p) p = { ...(p as object), main: undefined };
         if (opts.oldWallet && ['listening.cancel', 'listening.signLike'].includes(m)) return new Promise(() => {});
         const r = await (engine.handlers as any)[m](p);
         if (opts.oldWallet && m === 'listening.status') { const { features: _f, ...rest } = r; return rest; }
+        if (opts.noMulti && m === 'listening.status') return { ...r, features: (r.features ?? []).filter((f: string) => f !== 'multi') };
         return r;
       }
     }),
@@ -842,87 +852,61 @@ describe('likes while paying', () => {
   });
 });
 
-describe('a different wallet connected than the one this listening wallet belongs to', () => {
-  const OTHER = OTHER_MAIN; // a different main wallet, with its own key
+
+describe('one listening wallet per wallet address', () => {
+  const OTHER = OTHER_MAIN;
   const linkedAndPaying = async (s: ReturnType<typeof setup>) => { await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit(); };
   const calls = (s: ReturnType<typeof setup>, m: string) => s.requests.filter(([name]) => name === m);
 
-  it('stays locked with a reason: no unlock, no pay, no like, no link, no deposit, no return', async () => {
-    const s = setup({ passkeyOnly: true }, { hold: ['unlock'] });
-    await linkedAndPaying(s);
-    await s.ppp.lock();
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('locked');
-    s.setMain(OTHER);
-    await s.ppp.forceRefresh();
-    await s.settle(); // a waiting unlock panel is withdrawn
-    expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', main: OTHER, linked: MAIN, solo: false, armed: false });
-    expect(s.held).toHaveLength(0); // no unlock panel was opened in the wallet box
-    const before = s.requests.length;
-    await s.ppp.unlock();
-    await s.ppp.link();
-    await s.ppp.deposit();
-    await s.ppp.switchOn();
-    await s.ppp.returnFunds('all');
-    await s.ppp.toggleLike({ song: 7 });
-    await s.ppp.onListened({ song: 7, id: rid(9) });
-    expect(s.requests.slice(before).filter(([m]) => m !== 'listening.status')).toEqual([]); // nothing reached the wallet
-    expect(s.chain.broadcasts).toHaveLength(0);
-    expect(s.ppp.snapshot().error).toMatch(/belongs to another wallet/);
-    expect(s.ppp.heart({ song: 7 })).toBe(false); // the radio's own like path handles the tap
-  });
-
-  it('connecting the linked wallet again unlocks as normal', async () => {
+  it('another address on the same device gets its own listening wallet, and the first keeps its own', async () => {
     const s = setup({ passkeyOnly: true });
     await linkedAndPaying(s);
+    const first = s.ppp.snapshot().listening!;
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', linked: MAIN });
+    const funds = s.chain.balance;
+    s.chain.balance = 0n; // (the fake chain has one balance: the new wallet starts empty)
     s.setMain(OTHER);
     await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+    // nothing of the first address's is offered, used or unlocked for this one
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', linked: undefined, listening: undefined, main: OTHER });
+    await s.ppp.onListened({ song: 7, id: rid(5) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    // a new listening wallet for this address: created with it named, then linked to it
+    await s.ppp.create();
+    expect(calls(s, 'listening.unlock').at(-1)![1]).toMatchObject({ mode: 'create', main: OTHER });
+    expect(s.ppp.snapshot().listening).not.toBe(first);
+    expect(s.ppp.snapshot().step).toBe('link');
+    await s.ppp.link();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'fund', linked: OTHER });
+    // back to the first address: its wallet and its link, untouched
+    s.chain.balance = funds;
     s.setMain(MAIN);
     await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).not.toBe('wrong-wallet');
+    expect(s.ppp.snapshot()).toMatchObject({ linked: MAIN, listening: first });
+    expect(['locked', 'ready', 'fund']).toContain(s.ppp.snapshot().step);
   });
 
-  it('an unlocked listener is locked again, and its queue dropped, when another wallet connects', async () => {
+  it('switching address while a wallet is open locks it, drops what it was waiting to pay, and pays nothing for the other address', async () => {
     const s = setup({ passkeyOnly: true });
     await linkedAndPaying(s);
     expect(s.ppp.snapshot().step).toBe('ready');
     s.setMain(OTHER);
     await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', queued: 0 });
-    expect(calls(s, 'listening.lock').length).toBeGreaterThan(0);
-    expect((await (s.engine.handlers as any)['listening.status']()).state).toBe('known');
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', queued: 0 });
+    expect((await (s.engine.handlers as any)['listening.status']()).state).toBe('known'); // the first wallet is locked
     await s.ppp.onListened({ song: 7, id: rid(3) });
+    await s.ppp.toggleLike({ song: 7 });
     expect(s.chain.broadcasts).toHaveLength(0);
   });
 
-  it('a lost original wallet can be replaced: allowRelink opens the usual unlock and link, and still confirms in the wallet box', async () => {
+  it('asks the box about the connected address on every call, and says nothing about one when none is connected', async () => {
     const s = setup({ passkeyOnly: true });
     await linkedAndPaying(s);
-    await s.ppp.lock();
-    s.setMain(OTHER);
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
-    s.ppp.allowRelink();
-    await s.settle();
-    await s.ppp.forceRefresh();
-    // the usual one-tap unlock opens by itself (the test wallet confirms at once), then the usual link step
-    expect(s.ppp.snapshot().step).toBe('link');
-    await s.ppp.link();
-    expect(s.ppp.snapshot()).toMatchObject({ linked: OTHER });
-    // relinking never carries over to a third wallet
-    s.setMain(MAIN);
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
-  });
-
-  it('allowRelink does nothing when the wallets already match', async () => {
-    const s = setup({ passkeyOnly: true });
-    await linkedAndPaying(s);
-    s.ppp.allowRelink();
-    s.setMain(OTHER);
-    await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot().step).toBe('wrong-wallet');
+    expect(calls(s, 'listening.status').every(([, p]) => (p as any)?.main === MAIN)).toBe(true);
+    const t = setup({ passkeyOnly: true });
+    t.setMain(undefined);
+    await t.ppp.forceRefresh();
+    expect(calls(t, 'listening.status').every(([, p]) => p === undefined)).toBe(true);
   });
 
   it('passes the main wallet name to the wallet box when unlocking, and nothing for a passkey-only wallet', async () => {
@@ -931,12 +915,65 @@ describe('a different wallet connected than the one this listening wallet belong
     s.names.set(MAIN, 'jim.btc');
     await s.ppp.lock();
     await s.ppp.unlock();
-    expect(calls(s, 'listening.unlock').at(-1)![1]).toMatchObject({ label: 'jim.btc' });
+    expect(calls(s, 'listening.unlock').at(-1)![1]).toMatchObject({ label: 'jim.btc', main: MAIN });
     const t = setup({ passkeyOnly: true });
     t.setMain(undefined);
     await t.ppp.forceRefresh(); await t.ppp.create();
     await t.ppp.lock();
     await t.ppp.unlock();
     expect(calls(t, 'listening.unlock').at(-1)![1]).not.toHaveProperty('label');
+    expect(calls(t, 'listening.unlock').at(-1)![1]).not.toHaveProperty('main');
+  });
+
+  it('a passkey-only wallet stays singular: with no wallet connected there is one, and creating another is not offered', async () => {
+    const s = setup({ passkeyOnly: true });
+    s.setMain(undefined);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'intro', solo: true });
+    await s.ppp.create();
+    await s.ppp.lock();
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot().step).toBe('locked'); // intro (and a second wallet) is only for a state of none
+  });
+
+  describe('with a wallet box from before this (it ignores the connected address)', () => {
+    it('stays locked with a reason: no unlock, pay, like, link, deposit or return through the other address\'s wallet', async () => {
+      const s = setup({ passkeyOnly: true }, { noMulti: true, hold: ['unlock'] });
+      await linkedAndPaying(s);
+      await s.ppp.lock();
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'locked', walletCannotMulti: true });
+      s.setMain(OTHER);
+      await s.ppp.forceRefresh();
+      await s.settle(); // a waiting unlock panel is withdrawn
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', main: OTHER, linked: MAIN, solo: false, armed: false });
+      expect(s.held).toHaveLength(0);
+      const before = s.requests.length;
+      await s.ppp.unlock();
+      await s.ppp.link();
+      await s.ppp.deposit();
+      await s.ppp.switchOn();
+      await s.ppp.returnFunds('all');
+      await s.ppp.toggleLike({ song: 7 });
+      await s.ppp.onListened({ song: 7, id: rid(9) });
+      expect(s.requests.slice(before).filter(([m]) => m !== 'listening.status')).toEqual([]);
+      expect(s.chain.broadcasts).toHaveLength(0);
+      expect(s.ppp.snapshot().error).toMatch(/belongs to another wallet/);
+      expect(s.ppp.heart({ song: 7 })).toBe(false);
+    });
+
+    it('an unlocked wallet is locked again, and connecting its own wallet unlocks as normal', async () => {
+      const s = setup({ passkeyOnly: true }, { noMulti: true });
+      await linkedAndPaying(s);
+      s.setMain(OTHER);
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot()).toMatchObject({ step: 'wrong-wallet', queued: 0 });
+      expect(calls(s, 'listening.lock').length).toBeGreaterThan(0);
+      await s.ppp.onListened({ song: 7, id: rid(3) });
+      expect(s.chain.broadcasts).toHaveLength(0);
+      s.setMain(MAIN);
+      await s.ppp.forceRefresh();
+      expect(s.ppp.snapshot().step).not.toBe('wrong-wallet');
+    });
   });
 });
