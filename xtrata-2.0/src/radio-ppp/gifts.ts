@@ -14,6 +14,7 @@ import { CAMPAIGN_MAX_LINKS, campaignData, GIFT_FEE, GIFT_MAX, GIFT_MIN, giftLin
 import type { FunderResult } from '../lib/listening-wallet/funder';
 import { stx } from '../lib/listening-wallet/policy';
 import type { Snapshot } from './controller';
+import { copyButton, feedbackButton, shareLink } from './feedback';
 
 export interface GiftDeps {
   json(url: string, init?: RequestInit): Promise<any>;
@@ -256,8 +257,7 @@ export function createGifts(deps: GiftDeps) {
   }
 
   const linkFor = (radioUrl: string | null, code: string) => giftLink(radioUrl || location.origin + '/radio.html', code);
-  const copy = (text: string) => void navigator.clipboard?.writeText(text);
-  const share = (url: string) => (navigator as any).share ? (navigator as any).share({ title: 'On-chain music for you', text: 'I sent you some on-chain music on Xtrata Radio 🎁', url }).catch(() => undefined) : copy(url);
+  const share = (url: string) => shareLink({ title: 'On-chain music for you', text: 'I sent you some on-chain music on Xtrata Radio 🎁', url });
 
   // Built once; only the moving parts are refreshed, so the slider keeps its place while the panel re-renders.
   const range = el('input') as HTMLInputElement;
@@ -296,7 +296,7 @@ export function createGifts(deps: GiftDeps) {
           li.append(el('span', `${stxNice(BigInt(x.amount))} STX`, 't'), el('span', status, x.view?.status === 'claimed' ? 'ppp-ok' : 'ppp-mute'));
           if (x.view?.status === 'live') {
             const url = linkFor(s.gate?.radioUrl ?? null, x.code);
-            li.append(button('Copy link', () => copy(url), 'tiny'), button('Share', () => share(url), 'tiny'));
+            li.append(copyButton('gift-copy:' + x.id, 'Copy link', () => url, 'tiny', deps.changed), feedbackButton('gift-share:' + x.id, 'Share', () => share(url), 'tiny', deps.changed));
           }
           list.append(li);
         }
@@ -313,7 +313,7 @@ export function createGifts(deps: GiftDeps) {
         if (campaign) {
           const all = campaign.codes.map((c) => linkFor(s.gate?.radioUrl ?? null, c)).join('\n');
           const area = el('textarea') as HTMLTextAreaElement; area.readOnly = true; area.value = all; area.rows = Math.min(8, campaign.codes.length);
-          box.append(el('p', `${campaign.codes.length} links, ${stxNice(BigInt(campaign.amount))} STX each. Copy them now: they are not shown again.`, 'ppp-warn'), area, button('Copy all', () => copy(all), 'tiny'));
+          box.append(el('p', `${campaign.codes.length} links, ${stxNice(BigInt(campaign.amount))} STX each. Copy them now: they are not shown again.`, 'ppp-warn'), area, copyButton('campaign-copy', 'Copy all', () => all, 'tiny', deps.changed));
         }
         parts.push(box);
       }
