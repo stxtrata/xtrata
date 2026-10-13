@@ -295,7 +295,6 @@
   .ppp-addr-short{font-family:var(--mono);font-size:12px}
   .ppp-addr-full{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all}
   .ppp-pick{margin:6px 0}
-  html[data-ppp-nowallet] .radio-wallet{display:none!important}
   .ppp-pick input{font-family:var(--mono);font-size:12px;width:min(100%,26em);padding:6px 8px;box-sizing:border-box}
   .ppp p{margin:6px 0;font-size:13px;line-height:1.45;color:var(--ink)}
   .ppp .ppp-ok{color:var(--ok)}.ppp .ppp-warn{color:#ffcf8a}.ppp .ppp-bad{color:#ff8a8a}.ppp .ppp-mute{color:var(--mut)}
@@ -790,7 +789,7 @@
 </script>
 <script type="module">
 // Pay-per-play is opt-in and switchable: load its bundle only when the server says it is on.
-fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=7e8dfabb70b8')}).catch(function(){});
+fetch('/radio/listening-wallet/config',{cache:'no-store'}).then(function(r){return r.ok?r.json():{}}).then(function(c){if(c&&c.enabled)return import('/radio/ppp.js?v=cfb171fdad74')}).catch(function(){});
 </script>
 </body>
 </html>

@@ -317,15 +317,26 @@ function start(root: HTMLElement) {
     return p;
   }
 
-  // A visitor with no Stacks wallet (none connected, none installed) is not shown "Wallet not connected /
-  // Connect wallet": they have just made a wallet and it works. Extensions can inject late, so look again.
-  const hideWalletBar = (s: Snapshot) => s.solo && !s.main && !hasInstalledStacksWallet();
+  // The header's wallet bar says "Wallet not connected / Connect wallet". For a visitor using a passkey
+  // listening wallet with no Stacks wallet, that contradicts what they just made, so it is told to say
+  // what they have and offer a Stacks wallet as an optional extra (src/radio-likes/wallet.ts).
+  // Extensions can inject late, so ask again a few times.
+  let headerMark = '';
+  const syncHeader = (s: Snapshot) => {
+    const root = document.documentElement;
+    const mark = s.solo && !s.main ? (s.listening ? short(s.listening) : 'new') : '';
+    const installed = hasInstalledStacksWallet() ? '1' : '';
+    if (`${mark}|${installed}` === headerMark) return;
+    headerMark = `${mark}|${installed}`;
+    if (mark) root.dataset.pppSolo = mark; else delete root.dataset.pppSolo;
+    if (installed) root.dataset.pppWalletInstalled = installed; else delete root.dataset.pppWalletInstalled;
+    window.dispatchEvent(new Event('xtrata:ppp-header'));
+  };
   for (const ms of [1500, 4000, 9000]) setTimeout(() => render(ppp.snapshot()), ms);
 
   function render(s: Snapshot) {
     syncIdentity(s);
-    if (hideWalletBar(s)) document.documentElement.dataset.pppNowallet = '1';
-    else delete document.documentElement.dataset.pppNowallet;
+    syncHeader(s);
     renderTop(s);
     renderMode(s);
     root.hidden = s.step === 'off';
@@ -523,9 +534,6 @@ function start(root: HTMLElement) {
     // Quieter actions live in the "Wallet & history" fold.
     if (['ready', 'fund'].includes(s.step) && s.returnTo && (s.balance ?? 0n) > 0n)
       more.push(button(s.linked ? 'Return all to my wallet' : `Return all to ${short(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
-    // The header's connect button may be hidden for visitors with no wallet; this keeps the way in.
-    if (s.solo && ['fund', 'ready', 'over'].includes(s.step))
-      more.push(button('Connect a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(), 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 

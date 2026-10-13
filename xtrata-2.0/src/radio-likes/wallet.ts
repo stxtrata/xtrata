@@ -6,12 +6,17 @@ const disconnect=document.getElementById('radio-wallet-disconnect') as HTMLButto
 const message=document.getElementById('radio-wallet-message')!;
 let busy=false;
 let lastAddress:string|undefined;
+// Pay-per-play (src/radio-ppp) marks a visitor who has no Stacks wallet connected but is using a passkey
+// listening wallet: "Wallet not connected / Connect wallet" would contradict what they just made, so the
+// bar says what they have and offers a Stacks wallet as an optional extra. Wallet holders see the usual bar.
+const soloMark=()=>document.documentElement.dataset.pppSolo;
 function render(){
  const session=adapter.getSession(),connected=session.isConnected&&!!session.address;
- address.textContent=connected?session.address!:'Wallet not connected';
- address.title=connected?'Connected wallet · '+session.network:'';
+ const solo=connected?undefined:soloMark();
+ address.textContent=connected?session.address!:solo?(solo==='new'?'No wallet needed':'Listening wallet · '+solo):'Wallet not connected';
+ address.title=connected?'Connected wallet · '+session.network:solo?'A passkey listening wallet on this device. A Stacks wallet is optional.':'';
  if(lastAddress!==session.address){lastAddress=session.address;window.dispatchEvent(new Event('xtrata:wallet-changed'));}
- connect.textContent=busy?'Please wait…':connected?'Switch wallet':'Connect wallet';
+ connect.textContent=busy?'Please wait…':connected?'Switch wallet':solo?(document.documentElement.dataset.pppWalletInstalled==='1'?'Use a Stacks wallet instead':'I have a Stacks wallet'):'Connect wallet';
  connect.disabled=busy;disconnect.hidden=!connected;disconnect.disabled=busy;
 }
 async function act(action:()=>Promise<unknown>){
@@ -22,5 +27,6 @@ async function act(action:()=>Promise<unknown>){
 connect.onclick=()=>void act(()=>adapter.connect());
 disconnect.onclick=()=>void act(()=>adapter.disconnect());
 window.addEventListener('focus',render);
+window.addEventListener('xtrata:ppp-header',render);
 window.addEventListener('storage',event=>{if(event.key===null||event.key==='xtrata.v15.1.wallet.session')render();});
 render();
