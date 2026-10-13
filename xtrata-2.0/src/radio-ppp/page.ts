@@ -12,6 +12,7 @@ import { account, api, balance, broadcast, owner, transaction, validateSaved, ve
 import { createPppController, type GateConfig, type Snapshot } from './controller';
 import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
+import { hasInstalledStacksWallet } from '../lib/wallet/installed';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 
@@ -309,15 +310,22 @@ function start(root: HTMLElement) {
     if (s.returnToKind === 'chosen') box.append(' ', button('Back to the funder', () => ppp.clearReturnAddress(), 'tiny'));
     return box;
   }
-  const WALLET_TIP = 'Want your plays and likes under a wallet of your own? Get Xverse or Leather, connect it here, and link this listening wallet to it.';
+  const WALLET_TIP = 'Your plays and likes are listed under this listening address. To keep them under a wallet of your own, get Xverse or Leather (both free), connect it here, and link this listening wallet to it.';
   function walletTip(): HTMLElement {
     const p = el('p', WALLET_TIP + ' ', 'ppp-mute');
     p.append(link('Xverse', 'https://www.xverse.app/download'), ' · ', link('Leather', 'https://leather.io/install-extension'));
     return p;
   }
 
+  // A visitor with no Stacks wallet (none connected, none installed) is not shown "Wallet not connected /
+  // Connect wallet": they have just made a wallet and it works. Extensions can inject late, so look again.
+  const hideWalletBar = (s: Snapshot) => s.solo && !s.main && !hasInstalledStacksWallet();
+  for (const ms of [1500, 4000, 9000]) setTimeout(() => render(ppp.snapshot()), ms);
+
   function render(s: Snapshot) {
     syncIdentity(s);
+    if (hideWalletBar(s)) document.documentElement.dataset.pppNowallet = '1';
+    else delete document.documentElement.dataset.pppNowallet;
     renderTop(s);
     renderMode(s);
     root.hidden = s.step === 'off';
@@ -408,8 +416,14 @@ function start(root: HTMLElement) {
         break;
       }
       case 'connect':
-        key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
-        lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
+        if (s.linked) {
+          // This device's listening wallet belongs to a Stacks wallet: only that wallet unlocks it here.
+          key.push(el('p', `This device's listening wallet is linked to ${who(s.linked)}. Connect that wallet to keep paying artists.`));
+          lines.push(el('p', 'Your plays, likes and any funds returned stay with that wallet. Listening is always free.'));
+        } else {
+          key.push(el('p', 'Connect your wallet to pay artists as you listen.'));
+          lines.push(el('p', 'Every payment is recorded on-chain. Listening is always free.'));
+        }
         break;
       case 'not-invited':
         key.push(el('p', 'Coming soon. Listening is free.', 'ppp-mute'));
@@ -424,7 +438,10 @@ function start(root: HTMLElement) {
         lines.push(el('p', s.solo
           ? 'You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it.'
           : 'You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.', 'ppp-warn'));
-        actions.push(button('Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        // Two clear doors for a visitor with no wallet connected: a new passkey-only wallet, or their Stacks wallet.
+        if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
+        actions.push(button(s.solo ? 'Turn on pay-per-play · no wallet needed' : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        if (s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
         break;
       case 'locked':
@@ -492,8 +509,8 @@ function start(root: HTMLElement) {
       lines.push(walletTip());
       // Once a paid play has landed, a single quiet pointer outside the fold. Never a blocker.
       if (s.step === 'ready' && (s.entries as Shown[]).some((e) => e.kind === 'play' && e.status === 'confirmed')) {
-        const tip = el('p', 'Have a Stacks wallet? ', 'ppp-mute');
-        tip.append(link('Get Xverse or Leather', 'https://www.xverse.app/download'), ' to keep your plays and likes under your own address.');
+        const tip = el('p', 'New to Stacks? ', 'ppp-mute');
+        tip.append(link('Get Xverse or Leather', 'https://www.xverse.app/download'), ' (free) to keep your plays and likes under a wallet of your own.');
         key.push(tip);
       }
     }
@@ -506,6 +523,9 @@ function start(root: HTMLElement) {
     // Quieter actions live in the "Wallet & history" fold.
     if (['ready', 'fund'].includes(s.step) && s.returnTo && (s.balance ?? 0n) > 0n)
       more.push(button(s.linked ? 'Return all to my wallet' : `Return all to ${short(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
+    // The header's connect button may be hidden for visitors with no wallet; this keeps the way in.
+    if (s.solo && ['fund', 'ready', 'over'].includes(s.step))
+      more.push(button('Connect a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click(), 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 

@@ -636,17 +636,32 @@ describe('passkey-only listening (no Stacks wallet)', () => {
     expect(s.ppp.snapshot()).toMatchObject({ returnTo: MAIN, returnToKind: 'funder' });
   });
 
-  it('a linked main wallet always wins over the funder and a chosen address', async () => {
+  it('a listening wallet linked to a main wallet is never passkey-only: without that wallet it asks to connect', async () => {
+    const s = setup({ passkeyOnly: true });
+    await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link(); await s.ppp.deposit();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', solo: false, payingOn: true });
+    s.setMain(undefined); // the same browser later, wallet not connected
+    s.chain.funder = { ok: true, funder: HOLDER, distinct: 1 };
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'connect', solo: false, linked: MAIN, returnTo: MAIN, returnToKind: 'linked' });
+    expect(s.chain.funderCalls).toBe(0); // no funder guessing for a wallet that already has an owner
+    // it stops paying, and cannot be used, liked from, returned from or created over until the wallet is back
+    await s.ppp.onListened({ song: 7, id: rid(2) });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    await s.ppp.returnFunds('all');
+    await s.ppp.toggleLike({ song: 7 });
+    expect(s.chain.broadcasts).toHaveLength(0);
+    s.setMain(MAIN);
+    await s.ppp.forceRefresh();
+    expect(s.ppp.snapshot()).toMatchObject({ step: 'ready', solo: false });
+  });
+
+  it('a wallet linked to another main wallet is not offered passkey-only either', async () => {
     const s = setup({ passkeyOnly: true });
     await s.ppp.forceRefresh(); await s.ppp.create(); await s.ppp.link();
-    s.setMain(undefined); // the same wallet, later, with no main connected
-    s.chain.funder = { ok: true, funder: HOLDER, distinct: 1 };
-    s.chain.balance = TARGET;
+    s.setMain(HOLDER); // a different wallet connects (not invited: the fake gate allows any connected main, so link step)
     await s.ppp.forceRefresh();
-    expect(s.ppp.snapshot()).toMatchObject({ solo: true, linked: MAIN, returnTo: MAIN, returnToKind: 'linked' });
-    s.ppp.setReturnAddress(HOLDER);
-    await s.ppp.returnFunds('all');
-    expect(lastRecipient(s).to).toBe(MAIN);
+    expect(s.ppp.snapshot().solo).toBe(false);
   });
 
   it('excess above 1 STX can be returned to the funder', async () => {
