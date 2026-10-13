@@ -194,7 +194,7 @@ function Vo(t) {
             throw new Error("could not read FormData body as text");
           return Promise.resolve(this._bodyText);
         }, r.formData && (this.formData = function() {
-          return this.text().then(v);
+          return this.text().then(A);
         }), this.json = function() {
           return this.text().then(JSON.parse);
         }, this;
@@ -235,7 +235,7 @@ function Vo(t) {
       k.prototype.clone = function() {
         return new k(this, { body: this._bodyInit });
       };
-      function v(m) {
+      function A(m) {
         var L = new FormData();
         return m.trim().split("&").forEach(function(N) {
           if (N) {
@@ -1282,8 +1282,8 @@ class Et {
     const c = D(s * s), u = D(a * a), d = D(n * u), l = D(i * c), y = D(D(r * a) * u), h = D(D(o * s) * c), g = D(l - d), w = D(h - y);
     if (g === wt)
       return w === wt ? this.double() : Et.ZERO;
-    const I = D(g * g), _ = D(g * I), U = D(d * I), b = D(w * w - _ - lr * U), k = D(w * (U - b) - y * _), v = D(s * a * g);
-    return new Et(b, k, v);
+    const I = D(g * g), _ = D(g * I), U = D(d * I), b = D(w * w - _ - lr * U), k = D(w * (U - b) - y * _), A = D(s * a * g);
+    return new Et(b, k, A);
   }
   subtract(e) {
     return this.add(e.negate());
@@ -1621,10 +1621,10 @@ function He(t, e) {
   return r;
 }
 function Mw(t) {
-  const { P: e } = It, n = BigInt(6), r = BigInt(11), s = BigInt(22), i = BigInt(23), o = BigInt(44), a = BigInt(88), c = t * t * t % e, u = c * c * t % e, d = He(u, si) * u % e, l = He(d, si) * u % e, y = He(l, lr) * c % e, h = He(y, r) * y % e, g = He(h, s) * h % e, w = He(g, o) * g % e, I = He(w, a) * w % e, _ = He(I, o) * g % e, U = He(_, si) * u % e, b = He(U, i) * h % e, k = He(b, n) * c % e, v = He(k, lr);
-  if (v * v % e !== t)
+  const { P: e } = It, n = BigInt(6), r = BigInt(11), s = BigInt(22), i = BigInt(23), o = BigInt(44), a = BigInt(88), c = t * t * t % e, u = c * c * t % e, d = He(u, si) * u % e, l = He(d, si) * u % e, y = He(l, lr) * c % e, h = He(y, r) * y % e, g = He(h, s) * h % e, w = He(g, o) * g % e, I = He(w, a) * w % e, _ = He(I, o) * g % e, U = He(_, si) * u % e, b = He(U, i) * h % e, k = He(b, n) * c % e, A = He(k, lr);
+  if (A * A % e !== t)
     throw new Error("Cannot find square root");
-  return v;
+  return A;
 }
 function Vs(t, e = It.P) {
   if (t === wt || e <= wt)
@@ -2206,11 +2206,11 @@ function o1(t) {
     for (var g = 0, w = 0, I = 0, _ = h.length; I !== _ && h[I] === 0; )
       I++, g++;
     for (var U = (_ - I) * u + 1 >>> 0, b = new Uint8Array(U); I !== _; ) {
-      for (var k = h[I], v = 0, O = U - 1; (k !== 0 || v < w) && O !== -1; O--, v++)
+      for (var k = h[I], A = 0, O = U - 1; (k !== 0 || A < w) && O !== -1; O--, A++)
         k += 256 * b[O] >>> 0, b[O] = k % o >>> 0, k = k / o >>> 0;
       if (k !== 0)
         throw new Error("Non-zero carry");
-      w = v, I++;
+      w = A, I++;
     }
     for (var V = U - w; V !== U && b[V] === 0; )
       V++;
@@ -2232,11 +2232,11 @@ function o1(t) {
       var k = e[b];
       if (k === 255)
         return;
-      for (var v = 0, O = _ - 1; (k !== 0 || v < I) && O !== -1; O--, v++)
+      for (var A = 0, O = _ - 1; (k !== 0 || A < I) && O !== -1; O--, A++)
         k += o * U[O] >>> 0, U[O] = k % 256 >>> 0, k = k / 256 >>> 0;
       if (k !== 0)
         throw new Error("Non-zero carry");
-      I = v, g++;
+      I = A, g++;
     }
     for (var V = _ - I; V !== _ && U[V] === 0; )
       V++;
@@ -2292,12 +2292,12 @@ let w1 = class extends al {
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, u = this.h3 | 0, d = u, l = this.h4 | 0, y = l;
     for (let h = 0; h < 5; h++) {
       const g = 4 - h, w = g1[h], I = y1[h], _ = dl[h], U = hl[h], b = h1[h], k = p1[h];
-      for (let v = 0; v < 16; v++) {
-        const O = zi(r + ju(h, i, a, u) + Ri[_[v]] + w, b[v]) + l | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = zi(r + ju(h, i, a, u) + Ri[_[A]] + w, b[A]) + l | 0;
         r = l, l = u, u = zi(a, 10) | 0, a = i, i = O;
       }
-      for (let v = 0; v < 16; v++) {
-        const O = zi(s + ju(g, o, c, d) + Ri[U[v]] + I, k[v]) + y | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = zi(s + ju(g, o, c, d) + Ri[U[A]] + I, k[A]) + y | 0;
         s = y, y = d, d = zi(c, 10) | 0, c = o, o = O;
       }
     }
@@ -2453,12 +2453,12 @@ let Yo = class extends al {
     for (let b = 0; b < 16; b++, n += 4)
       Dn[b] = e.getUint32(n), jn[b] = e.getUint32(n += 4);
     for (let b = 16; b < 80; b++) {
-      const k = Dn[b - 15] | 0, v = jn[b - 15] | 0, O = st.rotrSH(k, v, 1) ^ st.rotrSH(k, v, 8) ^ st.shrSH(k, v, 7), V = st.rotrSL(k, v, 1) ^ st.rotrSL(k, v, 8) ^ st.shrSL(k, v, 7), P = Dn[b - 2] | 0, z = jn[b - 2] | 0, m = st.rotrSH(P, z, 19) ^ st.rotrBH(P, z, 61) ^ st.shrSH(P, z, 6), L = st.rotrSL(P, z, 19) ^ st.rotrBL(P, z, 61) ^ st.shrSL(P, z, 6), N = st.add4L(V, L, jn[b - 7], jn[b - 16]), X = st.add4H(N, O, m, Dn[b - 7], Dn[b - 16]);
+      const k = Dn[b - 15] | 0, A = jn[b - 15] | 0, O = st.rotrSH(k, A, 1) ^ st.rotrSH(k, A, 8) ^ st.shrSH(k, A, 7), V = st.rotrSL(k, A, 1) ^ st.rotrSL(k, A, 8) ^ st.shrSL(k, A, 7), P = Dn[b - 2] | 0, z = jn[b - 2] | 0, m = st.rotrSH(P, z, 19) ^ st.rotrBH(P, z, 61) ^ st.shrSH(P, z, 6), L = st.rotrSL(P, z, 19) ^ st.rotrBL(P, z, 61) ^ st.shrSL(P, z, 6), N = st.add4L(V, L, jn[b - 7], jn[b - 16]), X = st.add4H(N, O, m, Dn[b - 7], Dn[b - 16]);
       Dn[b] = X | 0, jn[b] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: u, Dl: d, Eh: l, El: y, Fh: h, Fl: g, Gh: w, Gl: I, Hh: _, Hl: U } = this;
     for (let b = 0; b < 80; b++) {
-      const k = st.rotrSH(l, y, 14) ^ st.rotrSH(l, y, 18) ^ st.rotrBH(l, y, 41), v = st.rotrSL(l, y, 14) ^ st.rotrSL(l, y, 18) ^ st.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = st.add5L(U, v, V, z1[b], jn[b]), z = st.add5H(P, _, k, O, F1[b], Dn[b]), m = P | 0, L = st.rotrSH(r, s, 28) ^ st.rotrBH(r, s, 34) ^ st.rotrBH(r, s, 39), N = st.rotrSL(r, s, 28) ^ st.rotrBL(r, s, 34) ^ st.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
+      const k = st.rotrSH(l, y, 14) ^ st.rotrSH(l, y, 18) ^ st.rotrBH(l, y, 41), A = st.rotrSL(l, y, 14) ^ st.rotrSL(l, y, 18) ^ st.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = st.add5L(U, A, V, z1[b], jn[b]), z = st.add5H(P, _, k, O, F1[b], Dn[b]), m = P | 0, L = st.rotrSH(r, s, 28) ^ st.rotrBH(r, s, 34) ^ st.rotrBH(r, s, 39), N = st.rotrSL(r, s, 28) ^ st.rotrBL(r, s, 34) ^ st.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
       _ = w | 0, U = I | 0, w = h | 0, I = g | 0, h = l | 0, g = y | 0, { h: l, l: y } = st.add(u | 0, d | 0, z | 0, m | 0), u = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
       const q = st.add3L(m, N, nt);
       r = st.add3H(q, z, L, X), s = q | 0;
@@ -2690,7 +2690,7 @@ Jo.crypto = void 0;
 Jo.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis.crypto : void 0;
 (function(t) {
   /*! noble-hashes - MIT License (c) 2022 Paul Miller (paulmillr.com) */
-  Object.defineProperty(t, "__esModule", { value: !0 }), t.wrapXOFConstructorWithOpts = t.wrapConstructorWithOpts = t.wrapConstructor = t.Hash = t.nextTick = t.swap32IfBE = t.byteSwapIfBE = t.swap8IfBE = t.isLE = void 0, t.isBytes = n, t.anumber = r, t.abytes = s, t.ahash = i, t.aexists = o, t.aoutput = a, t.u8 = c, t.u32 = u, t.clean = d, t.createView = l, t.rotr = y, t.rotl = h, t.byteSwap = g, t.byteSwap32 = w, t.bytesToHex = U, t.hexToBytes = v, t.asyncLoop = V, t.utf8ToBytes = P, t.bytesToUtf8 = z, t.toBytes = m, t.kdfInputToBytes = L, t.concatBytes = N, t.checkOpts = X, t.createHasher = q, t.createOptHasher = At, t.createXOFer = gt, t.randomBytes = jt;
+  Object.defineProperty(t, "__esModule", { value: !0 }), t.wrapXOFConstructorWithOpts = t.wrapConstructorWithOpts = t.wrapConstructor = t.Hash = t.nextTick = t.swap32IfBE = t.byteSwapIfBE = t.swap8IfBE = t.isLE = void 0, t.isBytes = n, t.anumber = r, t.abytes = s, t.ahash = i, t.aexists = o, t.aoutput = a, t.u8 = c, t.u32 = u, t.clean = d, t.createView = l, t.rotr = y, t.rotl = h, t.byteSwap = g, t.byteSwap32 = w, t.bytesToHex = U, t.hexToBytes = A, t.asyncLoop = V, t.utf8ToBytes = P, t.bytesToUtf8 = z, t.toBytes = m, t.kdfInputToBytes = L, t.concatBytes = N, t.checkOpts = X, t.createHasher = q, t.createOptHasher = At, t.createXOFer = gt, t.randomBytes = jt;
   const e = Jo;
   function n(E) {
     return E instanceof Uint8Array || ArrayBuffer.isView(E) && E.constructor.name === "Uint8Array";
@@ -2770,7 +2770,7 @@ Jo.crypto = typeof globalThis == "object" && "crypto" in globalThis ? globalThis
     if (E >= b.a && E <= b.f)
       return E - (b.a - 10);
   }
-  function v(E) {
+  function A(E) {
     if (typeof E != "string")
       throw new Error("hex string expected, got " + typeof E);
     if (I)
@@ -4496,12 +4496,12 @@ let R2 = class extends xl {
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, u = this.h3 | 0, d = u, l = this.h4 | 0, y = l;
     for (let h = 0; h < 5; h++) {
       const g = 4 - h, w = F2[h], I = z2[h], _ = El[h], U = Al[h], b = D2[h], k = j2[h];
-      for (let v = 0; v < 16; v++) {
-        const O = qi(r + wf(h, i, a, u) + Wi[_[v]] + w, b[v]) + l | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = qi(r + wf(h, i, a, u) + Wi[_[A]] + w, b[A]) + l | 0;
         r = l, l = u, u = qi(a, 10) | 0, a = i, i = O;
       }
-      for (let v = 0; v < 16; v++) {
-        const O = qi(s + wf(g, o, c, d) + Wi[U[v]] + I, k[v]) + y | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = qi(s + wf(g, o, c, d) + Wi[U[A]] + I, k[A]) + y | 0;
         s = y, y = d, d = qi(c, 10) | 0, c = o, o = O;
       }
     }
@@ -4653,12 +4653,12 @@ let sa = class extends xl {
     for (let b = 0; b < 16; b++, n += 4)
       Vn[b] = e.getUint32(n), qn[b] = e.getUint32(n += 4);
     for (let b = 16; b < 80; b++) {
-      const k = Vn[b - 15] | 0, v = qn[b - 15] | 0, O = it.rotrSH(k, v, 1) ^ it.rotrSH(k, v, 8) ^ it.shrSH(k, v, 7), V = it.rotrSL(k, v, 1) ^ it.rotrSL(k, v, 8) ^ it.shrSL(k, v, 7), P = Vn[b - 2] | 0, z = qn[b - 2] | 0, m = it.rotrSH(P, z, 19) ^ it.rotrBH(P, z, 61) ^ it.shrSH(P, z, 6), L = it.rotrSL(P, z, 19) ^ it.rotrBL(P, z, 61) ^ it.shrSL(P, z, 6), N = it.add4L(V, L, qn[b - 7], qn[b - 16]), X = it.add4H(N, O, m, Vn[b - 7], Vn[b - 16]);
+      const k = Vn[b - 15] | 0, A = qn[b - 15] | 0, O = it.rotrSH(k, A, 1) ^ it.rotrSH(k, A, 8) ^ it.shrSH(k, A, 7), V = it.rotrSL(k, A, 1) ^ it.rotrSL(k, A, 8) ^ it.shrSL(k, A, 7), P = Vn[b - 2] | 0, z = qn[b - 2] | 0, m = it.rotrSH(P, z, 19) ^ it.rotrBH(P, z, 61) ^ it.shrSH(P, z, 6), L = it.rotrSL(P, z, 19) ^ it.rotrBL(P, z, 61) ^ it.shrSL(P, z, 6), N = it.add4L(V, L, qn[b - 7], qn[b - 16]), X = it.add4H(N, O, m, Vn[b - 7], Vn[b - 16]);
       Vn[b] = X | 0, qn[b] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: u, Dl: d, Eh: l, El: y, Fh: h, Fl: g, Gh: w, Gl: I, Hh: _, Hl: U } = this;
     for (let b = 0; b < 80; b++) {
-      const k = it.rotrSH(l, y, 14) ^ it.rotrSH(l, y, 18) ^ it.rotrBH(l, y, 41), v = it.rotrSL(l, y, 14) ^ it.rotrSL(l, y, 18) ^ it.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = it.add5L(U, v, V, hm[b], qn[b]), z = it.add5H(P, _, k, O, dm[b], Vn[b]), m = P | 0, L = it.rotrSH(r, s, 28) ^ it.rotrBH(r, s, 34) ^ it.rotrBH(r, s, 39), N = it.rotrSL(r, s, 28) ^ it.rotrBL(r, s, 34) ^ it.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
+      const k = it.rotrSH(l, y, 14) ^ it.rotrSH(l, y, 18) ^ it.rotrBH(l, y, 41), A = it.rotrSL(l, y, 14) ^ it.rotrSL(l, y, 18) ^ it.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = it.add5L(U, A, V, hm[b], qn[b]), z = it.add5H(P, _, k, O, dm[b], Vn[b]), m = P | 0, L = it.rotrSH(r, s, 28) ^ it.rotrBH(r, s, 34) ^ it.rotrBH(r, s, 39), N = it.rotrSL(r, s, 28) ^ it.rotrBL(r, s, 34) ^ it.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
       _ = w | 0, U = I | 0, w = h | 0, I = g | 0, h = l | 0, g = y | 0, { h: l, l: y } = it.add(u | 0, d | 0, z | 0, m | 0), u = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
       const q = it.add3L(m, N, nt);
       r = it.add3H(q, z, L, X), s = q | 0;
@@ -4691,62 +4691,62 @@ Jr(() => new ym());
 var Mo = { exports: {} };
 Mo.exports;
 (function(t, e) {
-  var n = 200, r = "__lodash_hash_undefined__", s = 9007199254740991, i = "[object Arguments]", o = "[object Array]", a = "[object Boolean]", c = "[object Date]", u = "[object Error]", d = "[object Function]", l = "[object GeneratorFunction]", y = "[object Map]", h = "[object Number]", g = "[object Object]", w = "[object Promise]", I = "[object RegExp]", _ = "[object Set]", U = "[object String]", b = "[object Symbol]", k = "[object WeakMap]", v = "[object ArrayBuffer]", O = "[object DataView]", V = "[object Float32Array]", P = "[object Float64Array]", z = "[object Int8Array]", m = "[object Int16Array]", L = "[object Int32Array]", N = "[object Uint8Array]", X = "[object Uint8ClampedArray]", nt = "[object Uint16Array]", q = "[object Uint32Array]", At = /[\\^$.*+?()[\]{}|]/g, gt = /\w*$/, jt = /^\[object .+?Constructor\]$/, E = /^(?:0|[1-9]\d*)$/, S = {};
-  S[i] = S[o] = S[v] = S[O] = S[a] = S[c] = S[V] = S[P] = S[z] = S[m] = S[L] = S[y] = S[h] = S[g] = S[I] = S[_] = S[U] = S[b] = S[N] = S[X] = S[nt] = S[q] = !0, S[u] = S[d] = S[k] = !1;
+  var n = 200, r = "__lodash_hash_undefined__", s = 9007199254740991, i = "[object Arguments]", o = "[object Array]", a = "[object Boolean]", c = "[object Date]", u = "[object Error]", d = "[object Function]", l = "[object GeneratorFunction]", y = "[object Map]", h = "[object Number]", g = "[object Object]", w = "[object Promise]", I = "[object RegExp]", _ = "[object Set]", U = "[object String]", b = "[object Symbol]", k = "[object WeakMap]", A = "[object ArrayBuffer]", O = "[object DataView]", V = "[object Float32Array]", P = "[object Float64Array]", z = "[object Int8Array]", m = "[object Int16Array]", L = "[object Int32Array]", N = "[object Uint8Array]", X = "[object Uint8ClampedArray]", nt = "[object Uint16Array]", q = "[object Uint32Array]", At = /[\\^$.*+?()[\]{}|]/g, gt = /\w*$/, jt = /^\[object .+?Constructor\]$/, E = /^(?:0|[1-9]\d*)$/, S = {};
+  S[i] = S[o] = S[A] = S[O] = S[a] = S[c] = S[V] = S[P] = S[z] = S[m] = S[L] = S[y] = S[h] = S[g] = S[I] = S[_] = S[U] = S[b] = S[N] = S[X] = S[nt] = S[q] = !0, S[u] = S[d] = S[k] = !1;
   var C = typeof ge == "object" && ge && ge.Object === Object && ge, j = typeof self == "object" && self && self.Object === Object && self, R = C || j || Function("return this")(), W = e && !e.nodeType && e, Bt = W && !0 && t && !t.nodeType && t, Ht = Bt && Bt.exports === W;
-  function ue(p, $) {
-    return p.set($[0], $[1]), p;
+  function ue(p, v) {
+    return p.set(v[0], v[1]), p;
   }
-  function ze(p, $) {
-    return p.add($), p;
+  function ze(p, v) {
+    return p.add(v), p;
   }
-  function Zt(p, $) {
-    for (var B = -1, Q = p ? p.length : 0; ++B < Q && $(p[B], B, p) !== !1; )
+  function Zt(p, v) {
+    for (var B = -1, Q = p ? p.length : 0; ++B < Q && v(p[B], B, p) !== !1; )
       ;
     return p;
   }
-  function we(p, $) {
-    for (var B = -1, Q = $.length, oe = p.length; ++B < Q; )
-      p[oe + B] = $[B];
+  function we(p, v) {
+    for (var B = -1, Q = v.length, oe = p.length; ++B < Q; )
+      p[oe + B] = v[B];
     return p;
   }
-  function Vt(p, $, B, Q) {
+  function Vt(p, v, B, Q) {
     for (var oe = -1, me = p ? p.length : 0; ++oe < me; )
-      B = $(B, p[oe], oe, p);
+      B = v(B, p[oe], oe, p);
     return B;
   }
-  function Ft(p, $) {
+  function Ft(p, v) {
     for (var B = -1, Q = Array(p); ++B < p; )
-      Q[B] = $(B);
+      Q[B] = v(B);
     return Q;
   }
-  function ne(p, $) {
-    return p == null ? void 0 : p[$];
+  function ne(p, v) {
+    return p == null ? void 0 : p[v];
   }
   function Qt(p) {
-    var $ = !1;
+    var v = !1;
     if (p != null && typeof p.toString != "function")
       try {
-        $ = !!(p + "");
+        v = !!(p + "");
       } catch {
       }
-    return $;
+    return v;
   }
   function zt(p) {
-    var $ = -1, B = Array(p.size);
+    var v = -1, B = Array(p.size);
     return p.forEach(function(Q, oe) {
-      B[++$] = [oe, Q];
+      B[++v] = [oe, Q];
     }), B;
   }
-  function f(p, $) {
+  function f(p, v) {
     return function(B) {
-      return p($(B));
+      return p(v(B));
     };
   }
-  function A(p) {
-    var $ = -1, B = Array(p.size);
+  function $(p) {
+    var v = -1, B = Array(p.size);
     return p.forEach(function(Q) {
-      B[++$] = Q;
+      B[++v] = Q;
     }), B;
   }
   var T = Array.prototype, Z = Function.prototype, ft = Object.prototype, $t = R["__core-js_shared__"], se = function() {
@@ -4756,9 +4756,9 @@ Mo.exports;
     "^" + te.call(qt).replace(At, "\\$&").replace(/hasOwnProperty|(function).*?(?=\\\()| for .+?(?=\\\])/g, "$1.*?") + "$"
   ), _n = Ht ? R.Buffer : void 0, fe = R.Symbol, $e = R.Uint8Array, Je = f(Object.getPrototypeOf, Object), yt = Object.create, St = ft.propertyIsEnumerable, Pt = T.splice, be = Object.getOwnPropertySymbols, br = _n ? _n.isBuffer : void 0, Jt = f(Object.keys, Object), Un = ls(R, "DataView"), Ue = ls(R, "Map"), Ne = ls(R, "Promise"), Nn = ls(R, "Set"), tn = ls(R, "WeakMap"), en = ls(Object, "create"), Hn = xr(Un), is = xr(Ue), os = xr(Ne), Y = xr(Nn), et = xr(tn), x = fe ? fe.prototype : void 0, M = x ? x.valueOf : void 0;
   function K(p) {
-    var $ = -1, B = p ? p.length : 0;
-    for (this.clear(); ++$ < B; ) {
-      var Q = p[$];
+    var v = -1, B = p ? p.length : 0;
+    for (this.clear(); ++v < B; ) {
+      var Q = p[v];
       this.set(Q[0], Q[1]);
     }
   }
@@ -4769,26 +4769,26 @@ Mo.exports;
     return this.has(p) && delete this.__data__[p];
   }
   function Lt(p) {
-    var $ = this.__data__;
+    var v = this.__data__;
     if (en) {
-      var B = $[p];
+      var B = v[p];
       return B === r ? void 0 : B;
     }
-    return qt.call($, p) ? $[p] : void 0;
+    return qt.call(v, p) ? v[p] : void 0;
   }
   function ht(p) {
-    var $ = this.__data__;
-    return en ? $[p] !== void 0 : qt.call($, p);
+    var v = this.__data__;
+    return en ? v[p] !== void 0 : qt.call(v, p);
   }
-  function Mt(p, $) {
+  function Mt(p, v) {
     var B = this.__data__;
-    return B[p] = en && $ === void 0 ? r : $, this;
+    return B[p] = en && v === void 0 ? r : v, this;
   }
   K.prototype.clear = mt, K.prototype.delete = G, K.prototype.get = Lt, K.prototype.has = ht, K.prototype.set = Mt;
   function ie(p) {
-    var $ = -1, B = p ? p.length : 0;
-    for (this.clear(); ++$ < B; ) {
-      var Q = p[$];
+    var v = -1, B = p ? p.length : 0;
+    for (this.clear(); ++v < B; ) {
+      var Q = p[v];
       this.set(Q[0], Q[1]);
     }
   }
@@ -4796,28 +4796,28 @@ Mo.exports;
     this.__data__ = [];
   }
   function xn(p) {
-    var $ = this.__data__, B = _i($, p);
+    var v = this.__data__, B = _i(v, p);
     if (B < 0)
       return !1;
-    var Q = $.length - 1;
-    return B == Q ? $.pop() : Pt.call($, B, 1), !0;
+    var Q = v.length - 1;
+    return B == Q ? v.pop() : Pt.call(v, B, 1), !0;
   }
   function ve(p) {
-    var $ = this.__data__, B = _i($, p);
-    return B < 0 ? void 0 : $[B][1];
+    var v = this.__data__, B = _i(v, p);
+    return B < 0 ? void 0 : v[B][1];
   }
   function rn(p) {
     return _i(this.__data__, p) > -1;
   }
-  function kg(p, $) {
+  function kg(p, v) {
     var B = this.__data__, Q = _i(B, p);
-    return Q < 0 ? B.push([p, $]) : B[Q][1] = $, this;
+    return Q < 0 ? B.push([p, v]) : B[Q][1] = v, this;
   }
   ie.prototype.clear = nn, ie.prototype.delete = xn, ie.prototype.get = ve, ie.prototype.has = rn, ie.prototype.set = kg;
   function as(p) {
-    var $ = -1, B = p ? p.length : 0;
-    for (this.clear(); ++$ < B; ) {
-      var Q = p[$];
+    var v = -1, B = p ? p.length : 0;
+    for (this.clear(); ++v < B; ) {
+      var Q = p[v];
       this.set(Q[0], Q[1]);
     }
   }
@@ -4837,8 +4837,8 @@ Mo.exports;
   function Mg(p) {
     return Ui(this, p).has(p);
   }
-  function _g(p, $) {
-    return Ui(this, p).set(p, $), this;
+  function _g(p, v) {
+    return Ui(this, p).set(p, v), this;
   }
   as.prototype.clear = Cg, as.prototype.delete = Bg, as.prototype.get = Tg, as.prototype.has = Mg, as.prototype.set = _g;
   function cs(p) {
@@ -4856,37 +4856,37 @@ Mo.exports;
   function Pg(p) {
     return this.__data__.has(p);
   }
-  function Og(p, $) {
+  function Og(p, v) {
     var B = this.__data__;
     if (B instanceof ie) {
       var Q = B.__data__;
       if (!Ue || Q.length < n - 1)
-        return Q.push([p, $]), this;
+        return Q.push([p, v]), this;
       B = this.__data__ = new as(Q);
     }
-    return B.set(p, $), this;
+    return B.set(p, v), this;
   }
   cs.prototype.clear = Ug, cs.prototype.delete = Ng, cs.prototype.get = Hg, cs.prototype.has = Pg, cs.prototype.set = Og;
-  function Dg(p, $) {
+  function Dg(p, v) {
     var B = Aa(p) || ly(p) ? Ft(p.length, String) : [], Q = B.length, oe = !!Q;
     for (var me in p)
       qt.call(p, me) && !(oe && (me == "length" || iy(me, Q))) && B.push(me);
     return B;
   }
-  function hu(p, $, B) {
-    var Q = p[$];
-    (!(qt.call(p, $) && wu(Q, B)) || B === void 0 && !($ in p)) && (p[$] = B);
+  function hu(p, v, B) {
+    var Q = p[v];
+    (!(qt.call(p, v) && wu(Q, B)) || B === void 0 && !(v in p)) && (p[v] = B);
   }
-  function _i(p, $) {
+  function _i(p, v) {
     for (var B = p.length; B--; )
-      if (wu(p[B][0], $))
+      if (wu(p[B][0], v))
         return B;
     return -1;
   }
-  function jg(p, $) {
-    return p && pu($, $a($), p);
+  function jg(p, v) {
+    return p && pu(v, $a(v), p);
   }
-  function Sa(p, $, B, Q, oe, me, Sn) {
+  function Sa(p, v, B, Q, oe, me, Sn) {
     var xe;
     if (Q && (xe = me ? Q(p, oe, me, Sn) : Q(p)), xe !== void 0)
       return xe;
@@ -4894,21 +4894,21 @@ Mo.exports;
       return p;
     var xu = Aa(p);
     if (xu) {
-      if (xe = ny(p), !$)
+      if (xe = ny(p), !v)
         return Jg(p, xe);
     } else {
       var us = mr(p), Su = us == d || us == l;
       if (fy(p))
-        return Vg(p, $);
+        return Vg(p, v);
       if (us == g || us == i || Su && !me) {
         if (Qt(p))
           return me ? p : {};
-        if (xe = ry(Su ? {} : p), !$)
+        if (xe = ry(Su ? {} : p), !v)
           return ty(p, jg(xe, p));
       } else {
         if (!S[us])
           return me ? p : {};
-        xe = sy(p, us, Sa, $);
+        xe = sy(p, us, Sa, v);
       }
     }
     Sn || (Sn = new cs());
@@ -4918,14 +4918,14 @@ Mo.exports;
     if (Sn.set(p, xe), !xu)
       var Au = B ? ey(p) : $a(p);
     return Zt(Au || p, function(va, Hi) {
-      Au && (Hi = va, va = p[Hi]), hu(xe, Hi, Sa(va, $, B, Q, Hi, p, Sn));
+      Au && (Hi = va, va = p[Hi]), hu(xe, Hi, Sa(va, v, B, Q, Hi, p, Sn));
     }), xe;
   }
   function Fg(p) {
     return Ni(p) ? yt(p) : {};
   }
-  function zg(p, $, B) {
-    var Q = $(p);
+  function zg(p, v, B) {
+    var Q = v(p);
     return Aa(p) ? Q : we(Q, B(p));
   }
   function Rg(p) {
@@ -4934,81 +4934,81 @@ Mo.exports;
   function Gg(p) {
     if (!Ni(p) || ay(p))
       return !1;
-    var $ = mu(p) || Qt(p) ? wr : jt;
-    return $.test(xr(p));
+    var v = mu(p) || Qt(p) ? wr : jt;
+    return v.test(xr(p));
   }
   function Kg(p) {
     if (!yu(p))
       return Jt(p);
-    var $ = [];
+    var v = [];
     for (var B in Object(p))
-      qt.call(p, B) && B != "constructor" && $.push(B);
-    return $;
+      qt.call(p, B) && B != "constructor" && v.push(B);
+    return v;
   }
-  function Vg(p, $) {
-    if ($)
+  function Vg(p, v) {
+    if (v)
       return p.slice();
     var B = new p.constructor(p.length);
     return p.copy(B), B;
   }
   function Ea(p) {
-    var $ = new p.constructor(p.byteLength);
-    return new $e($).set(new $e(p)), $;
+    var v = new p.constructor(p.byteLength);
+    return new $e(v).set(new $e(p)), v;
   }
-  function qg(p, $) {
-    var B = $ ? Ea(p.buffer) : p.buffer;
+  function qg(p, v) {
+    var B = v ? Ea(p.buffer) : p.buffer;
     return new p.constructor(B, p.byteOffset, p.byteLength);
   }
-  function Wg(p, $, B) {
-    var Q = $ ? B(zt(p), !0) : zt(p);
+  function Wg(p, v, B) {
+    var Q = v ? B(zt(p), !0) : zt(p);
     return Vt(Q, ue, new p.constructor());
   }
   function Xg(p) {
-    var $ = new p.constructor(p.source, gt.exec(p));
-    return $.lastIndex = p.lastIndex, $;
+    var v = new p.constructor(p.source, gt.exec(p));
+    return v.lastIndex = p.lastIndex, v;
   }
-  function Yg(p, $, B) {
-    var Q = $ ? B(A(p), !0) : A(p);
+  function Yg(p, v, B) {
+    var Q = v ? B($(p), !0) : $(p);
     return Vt(Q, ze, new p.constructor());
   }
   function Zg(p) {
     return M ? Object(M.call(p)) : {};
   }
-  function Qg(p, $) {
-    var B = $ ? Ea(p.buffer) : p.buffer;
+  function Qg(p, v) {
+    var B = v ? Ea(p.buffer) : p.buffer;
     return new p.constructor(B, p.byteOffset, p.length);
   }
-  function Jg(p, $) {
+  function Jg(p, v) {
     var B = -1, Q = p.length;
-    for ($ || ($ = Array(Q)); ++B < Q; )
-      $[B] = p[B];
-    return $;
+    for (v || (v = Array(Q)); ++B < Q; )
+      v[B] = p[B];
+    return v;
   }
-  function pu(p, $, B, Q) {
+  function pu(p, v, B, Q) {
     B || (B = {});
-    for (var oe = -1, me = $.length; ++oe < me; ) {
-      var Sn = $[oe], xe = void 0;
+    for (var oe = -1, me = v.length; ++oe < me; ) {
+      var Sn = v[oe], xe = void 0;
       hu(B, Sn, xe === void 0 ? p[Sn] : xe);
     }
     return B;
   }
-  function ty(p, $) {
-    return pu(p, gu(p), $);
+  function ty(p, v) {
+    return pu(p, gu(p), v);
   }
   function ey(p) {
     return zg(p, $a, gu);
   }
-  function Ui(p, $) {
+  function Ui(p, v) {
     var B = p.__data__;
-    return oy($) ? B[typeof $ == "string" ? "string" : "hash"] : B.map;
+    return oy(v) ? B[typeof v == "string" ? "string" : "hash"] : B.map;
   }
-  function ls(p, $) {
-    var B = ne(p, $);
+  function ls(p, v) {
+    var B = ne(p, v);
     return Gg(B) ? B : void 0;
   }
   var gu = be ? f(be, Object) : py, mr = Rg;
   (Un && mr(new Un(new ArrayBuffer(1))) != O || Ue && mr(new Ue()) != y || Ne && mr(Ne.resolve()) != w || Nn && mr(new Nn()) != _ || tn && mr(new tn()) != k) && (mr = function(p) {
-    var $ = Qe.call(p), B = $ == g ? p.constructor : void 0, Q = B ? xr(B) : void 0;
+    var v = Qe.call(p), B = v == g ? p.constructor : void 0, Q = B ? xr(B) : void 0;
     if (Q)
       switch (Q) {
         case Hn:
@@ -5022,19 +5022,19 @@ Mo.exports;
         case et:
           return k;
       }
-    return $;
+    return v;
   });
   function ny(p) {
-    var $ = p.length, B = p.constructor($);
-    return $ && typeof p[0] == "string" && qt.call(p, "index") && (B.index = p.index, B.input = p.input), B;
+    var v = p.length, B = p.constructor(v);
+    return v && typeof p[0] == "string" && qt.call(p, "index") && (B.index = p.index, B.input = p.input), B;
   }
   function ry(p) {
     return typeof p.constructor == "function" && !yu(p) ? Fg(Je(p)) : {};
   }
-  function sy(p, $, B, Q) {
+  function sy(p, v, B, Q) {
     var oe = p.constructor;
-    switch ($) {
-      case v:
+    switch (v) {
+      case A:
         return Ea(p);
       case a:
       case c:
@@ -5064,18 +5064,18 @@ Mo.exports;
         return Zg(p);
     }
   }
-  function iy(p, $) {
-    return $ = $ ?? s, !!$ && (typeof p == "number" || E.test(p)) && p > -1 && p % 1 == 0 && p < $;
+  function iy(p, v) {
+    return v = v ?? s, !!v && (typeof p == "number" || E.test(p)) && p > -1 && p % 1 == 0 && p < v;
   }
   function oy(p) {
-    var $ = typeof p;
-    return $ == "string" || $ == "number" || $ == "symbol" || $ == "boolean" ? p !== "__proto__" : p === null;
+    var v = typeof p;
+    return v == "string" || v == "number" || v == "symbol" || v == "boolean" ? p !== "__proto__" : p === null;
   }
   function ay(p) {
     return !!se && se in p;
   }
   function yu(p) {
-    var $ = p && p.constructor, B = typeof $ == "function" && $.prototype || ft;
+    var v = p && p.constructor, B = typeof v == "function" && v.prototype || ft;
     return p === B;
   }
   function xr(p) {
@@ -5094,8 +5094,8 @@ Mo.exports;
   function cy(p) {
     return Sa(p, !0, !0);
   }
-  function wu(p, $) {
-    return p === $ || p !== p && $ !== $;
+  function wu(p, v) {
+    return p === v || p !== p && v !== v;
   }
   function ly(p) {
     return uy(p) && qt.call(p, "callee") && (!St.call(p, "callee") || Qe.call(p) == i);
@@ -5109,15 +5109,15 @@ Mo.exports;
   }
   var fy = br || gy;
   function mu(p) {
-    var $ = Ni(p) ? Qe.call(p) : "";
-    return $ == d || $ == l;
+    var v = Ni(p) ? Qe.call(p) : "";
+    return v == d || v == l;
   }
   function dy(p) {
     return typeof p == "number" && p > -1 && p % 1 == 0 && p <= s;
   }
   function Ni(p) {
-    var $ = typeof p;
-    return !!p && ($ == "object" || $ == "function");
+    var v = typeof p;
+    return !!p && (v == "object" || v == "function");
   }
   function hy(p) {
     return !!p && typeof p == "object";
@@ -5969,12 +5969,12 @@ let Sx = class extends vl {
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, u = this.h3 | 0, d = u, l = this.h4 | 0, y = l;
     for (let h = 0; h < 5; h++) {
       const g = 4 - h, w = mx[h], I = xx[h], _ = Ll[h], U = kl[h], b = wx[h], k = bx[h];
-      for (let v = 0; v < 16; v++) {
-        const O = Yi(r + Af(h, i, a, u) + Zi[_[v]] + w, b[v]) + l | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = Yi(r + Af(h, i, a, u) + Zi[_[A]] + w, b[A]) + l | 0;
         r = l, l = u, u = Yi(a, 10) | 0, a = i, i = O;
       }
-      for (let v = 0; v < 16; v++) {
-        const O = Yi(s + Af(g, o, c, d) + Zi[U[v]] + I, k[v]) + y | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = Yi(s + Af(g, o, c, d) + Zi[U[A]] + I, k[A]) + y | 0;
         s = y, y = d, d = Yi(c, 10) | 0, c = o, o = O;
       }
     }
@@ -6126,12 +6126,12 @@ let ca = class extends vl {
     for (let b = 0; b < 16; b++, n += 4)
       Yn[b] = e.getUint32(n), Zn[b] = e.getUint32(n += 4);
     for (let b = 16; b < 80; b++) {
-      const k = Yn[b - 15] | 0, v = Zn[b - 15] | 0, O = ot.rotrSH(k, v, 1) ^ ot.rotrSH(k, v, 8) ^ ot.shrSH(k, v, 7), V = ot.rotrSL(k, v, 1) ^ ot.rotrSL(k, v, 8) ^ ot.shrSL(k, v, 7), P = Yn[b - 2] | 0, z = Zn[b - 2] | 0, m = ot.rotrSH(P, z, 19) ^ ot.rotrBH(P, z, 61) ^ ot.shrSH(P, z, 6), L = ot.rotrSL(P, z, 19) ^ ot.rotrBL(P, z, 61) ^ ot.shrSL(P, z, 6), N = ot.add4L(V, L, Zn[b - 7], Zn[b - 16]), X = ot.add4H(N, O, m, Yn[b - 7], Yn[b - 16]);
+      const k = Yn[b - 15] | 0, A = Zn[b - 15] | 0, O = ot.rotrSH(k, A, 1) ^ ot.rotrSH(k, A, 8) ^ ot.shrSH(k, A, 7), V = ot.rotrSL(k, A, 1) ^ ot.rotrSL(k, A, 8) ^ ot.shrSL(k, A, 7), P = Yn[b - 2] | 0, z = Zn[b - 2] | 0, m = ot.rotrSH(P, z, 19) ^ ot.rotrBH(P, z, 61) ^ ot.shrSH(P, z, 6), L = ot.rotrSL(P, z, 19) ^ ot.rotrBL(P, z, 61) ^ ot.shrSL(P, z, 6), N = ot.add4L(V, L, Zn[b - 7], Zn[b - 16]), X = ot.add4H(N, O, m, Yn[b - 7], Yn[b - 16]);
       Yn[b] = X | 0, Zn[b] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: u, Dl: d, Eh: l, El: y, Fh: h, Fl: g, Gh: w, Gl: I, Hh: _, Hl: U } = this;
     for (let b = 0; b < 80; b++) {
-      const k = ot.rotrSH(l, y, 14) ^ ot.rotrSH(l, y, 18) ^ ot.rotrBH(l, y, 41), v = ot.rotrSL(l, y, 14) ^ ot.rotrSL(l, y, 18) ^ ot.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = ot.add5L(U, v, V, Kx[b], Zn[b]), z = ot.add5H(P, _, k, O, Gx[b], Yn[b]), m = P | 0, L = ot.rotrSH(r, s, 28) ^ ot.rotrBH(r, s, 34) ^ ot.rotrBH(r, s, 39), N = ot.rotrSL(r, s, 28) ^ ot.rotrBL(r, s, 34) ^ ot.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
+      const k = ot.rotrSH(l, y, 14) ^ ot.rotrSH(l, y, 18) ^ ot.rotrBH(l, y, 41), A = ot.rotrSL(l, y, 14) ^ ot.rotrSL(l, y, 18) ^ ot.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = ot.add5L(U, A, V, Kx[b], Zn[b]), z = ot.add5H(P, _, k, O, Gx[b], Yn[b]), m = P | 0, L = ot.rotrSH(r, s, 28) ^ ot.rotrBH(r, s, 34) ^ ot.rotrBH(r, s, 39), N = ot.rotrSL(r, s, 28) ^ ot.rotrBL(r, s, 34) ^ ot.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
       _ = w | 0, U = I | 0, w = h | 0, I = g | 0, h = l | 0, g = y | 0, { h: l, l: y } = ot.add(u | 0, d | 0, z | 0, m | 0), u = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
       const q = ot.add3L(m, N, nt);
       r = ot.add3H(q, z, L, X), s = q | 0;
@@ -6605,8 +6605,8 @@ function wS(t) {
     case vt.ContractCall:
       const o = Hs(e), a = De(e), c = De(e), u = [], d = e.readUInt32BE();
       for (let k = 0; k < d; k++) {
-        const v = fn(e);
-        u.push(v);
+        const A = fn(e);
+        u.push(A);
       }
       return iS(o, a, c, u);
     case vt.SmartContract:
@@ -6615,8 +6615,8 @@ function wS(t) {
     case vt.VersionedSmartContract: {
       const k = e.readUInt8Enum(wc, (V) => {
         throw new Error(`Cannot recognize ClarityVersion: ${V}`);
-      }), v = De(e), O = De(e, 4, rx);
-      return kf(v, O, k);
+      }), A = De(e), O = De(e, 4, rx);
+      return kf(A, O, k);
     }
     case vt.PoisonMicroblock:
       return aS();
@@ -6625,12 +6625,12 @@ function wS(t) {
       return Cf(k);
     }
     case vt.CoinbaseToAltRecipient: {
-      const k = e.readBytes(Cr), v = fn(e);
-      return Cf(k, v);
+      const k = e.readBytes(Cr), A = fn(e);
+      return Cf(k, A);
     }
     case vt.NakamotoCoinbase: {
-      const k = e.readBytes(Cr), v = fn(e), O = e.readBytes(yc);
-      return cS(k, v, O);
+      const k = e.readBytes(Cr), A = fn(e), O = e.readBytes(yc);
+      return cS(k, A, O);
     }
     case vt.TenureChange:
       const h = tt(e.readBytes(20)), g = tt(e.readBytes(20)), w = tt(e.readBytes(20)), I = tt(e.readBytes(32)), _ = e.readUInt32BE(), U = e.readUInt8Enum(xc, (k) => {
@@ -7774,12 +7774,12 @@ let R3 = class extends zl {
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, u = this.h3 | 0, d = u, l = this.h4 | 0, y = l;
     for (let h = 0; h < 5; h++) {
       const g = 4 - h, w = F3[h], I = z3[h], _ = Rl[h], U = Gl[h], b = D3[h], k = j3[h];
-      for (let v = 0; v < 16; v++) {
-        const O = eo(r + Xf(h, i, a, u) + no[_[v]] + w, b[v]) + l | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = eo(r + Xf(h, i, a, u) + no[_[A]] + w, b[A]) + l | 0;
         r = l, l = u, u = eo(a, 10) | 0, a = i, i = O;
       }
-      for (let v = 0; v < 16; v++) {
-        const O = eo(s + Xf(g, o, c, d) + no[U[v]] + I, k[v]) + y | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = eo(s + Xf(g, o, c, d) + no[U[A]] + I, k[A]) + y | 0;
         s = y, y = d, d = eo(c, 10) | 0, c = o, o = O;
       }
     }
@@ -8046,12 +8046,12 @@ let ua = class extends zl {
     for (let b = 0; b < 16; b++, n += 4)
       tr[b] = e.getUint32(n), er[b] = e.getUint32(n += 4);
     for (let b = 16; b < 80; b++) {
-      const k = tr[b - 15] | 0, v = er[b - 15] | 0, O = at.rotrSH(k, v, 1) ^ at.rotrSH(k, v, 8) ^ at.shrSH(k, v, 7), V = at.rotrSL(k, v, 1) ^ at.rotrSL(k, v, 8) ^ at.shrSL(k, v, 7), P = tr[b - 2] | 0, z = er[b - 2] | 0, m = at.rotrSH(P, z, 19) ^ at.rotrBH(P, z, 61) ^ at.shrSH(P, z, 6), L = at.rotrSL(P, z, 19) ^ at.rotrBL(P, z, 61) ^ at.shrSL(P, z, 6), N = at.add4L(V, L, er[b - 7], er[b - 16]), X = at.add4H(N, O, m, tr[b - 7], tr[b - 16]);
+      const k = tr[b - 15] | 0, A = er[b - 15] | 0, O = at.rotrSH(k, A, 1) ^ at.rotrSH(k, A, 8) ^ at.shrSH(k, A, 7), V = at.rotrSL(k, A, 1) ^ at.rotrSL(k, A, 8) ^ at.shrSL(k, A, 7), P = tr[b - 2] | 0, z = er[b - 2] | 0, m = at.rotrSH(P, z, 19) ^ at.rotrBH(P, z, 61) ^ at.shrSH(P, z, 6), L = at.rotrSL(P, z, 19) ^ at.rotrBL(P, z, 61) ^ at.shrSL(P, z, 6), N = at.add4L(V, L, er[b - 7], er[b - 16]), X = at.add4H(N, O, m, tr[b - 7], tr[b - 16]);
       tr[b] = X | 0, er[b] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: u, Dl: d, Eh: l, El: y, Fh: h, Fl: g, Gh: w, Gl: I, Hh: _, Hl: U } = this;
     for (let b = 0; b < 80; b++) {
-      const k = at.rotrSH(l, y, 14) ^ at.rotrSH(l, y, 18) ^ at.rotrBH(l, y, 41), v = at.rotrSL(l, y, 14) ^ at.rotrSL(l, y, 18) ^ at.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = at.add5L(U, v, V, y4[b], er[b]), z = at.add5H(P, _, k, O, g4[b], tr[b]), m = P | 0, L = at.rotrSH(r, s, 28) ^ at.rotrBH(r, s, 34) ^ at.rotrBH(r, s, 39), N = at.rotrSL(r, s, 28) ^ at.rotrBL(r, s, 34) ^ at.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
+      const k = at.rotrSH(l, y, 14) ^ at.rotrSH(l, y, 18) ^ at.rotrBH(l, y, 41), A = at.rotrSL(l, y, 14) ^ at.rotrSL(l, y, 18) ^ at.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = at.add5L(U, A, V, y4[b], er[b]), z = at.add5H(P, _, k, O, g4[b], tr[b]), m = P | 0, L = at.rotrSH(r, s, 28) ^ at.rotrBH(r, s, 34) ^ at.rotrBH(r, s, 39), N = at.rotrSL(r, s, 28) ^ at.rotrBL(r, s, 34) ^ at.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
       _ = w | 0, U = I | 0, w = h | 0, I = g | 0, h = l | 0, g = y | 0, { h: l, l: y } = at.add(u | 0, d | 0, z | 0, m | 0), u = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
       const q = at.add3L(m, N, nt);
       r = at.add3H(q, z, L, X), s = q | 0;
@@ -8528,7 +8528,7 @@ const rt = (t, e, ...n) => {
     const o = (a) => (za.set(s, a), a[r]);
     switch (s) {
       case "connect-modal":
-        return Promise.resolve().then(() => h$).then(o, wi);
+        return Promise.resolve().then(() => p$).then(o, wi);
     }
   }
   return import(
@@ -9117,12 +9117,12 @@ class bA extends tu {
     let r = this.h0 | 0, s = r, i = this.h1 | 0, o = i, a = this.h2 | 0, c = a, u = this.h3 | 0, d = u, l = this.h4 | 0, y = l;
     for (let h = 0; h < 5; h++) {
       const g = 4 - h, w = yA[h], I = wA[h], _ = eu[h], U = nu[h], b = pA[h], k = gA[h];
-      for (let v = 0; v < 16; v++) {
-        const O = oo(r + hd(h, i, a, u) + ao[_[v]] + w, b[v]) + l | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = oo(r + hd(h, i, a, u) + ao[_[A]] + w, b[A]) + l | 0;
         r = l, l = u, u = oo(a, 10) | 0, a = i, i = O;
       }
-      for (let v = 0; v < 16; v++) {
-        const O = oo(s + hd(g, o, c, d) + ao[U[v]] + I, k[v]) + y | 0;
+      for (let A = 0; A < 16; A++) {
+        const O = oo(s + hd(g, o, c, d) + ao[U[A]] + I, k[A]) + y | 0;
         s = y, y = d, d = oo(c, 10) | 0, c = o, o = O;
       }
     }
@@ -9389,12 +9389,12 @@ class wa extends tu {
     for (let b = 0; b < 16; b++, n += 4)
       sr[b] = e.getUint32(n), ir[b] = e.getUint32(n += 4);
     for (let b = 16; b < 80; b++) {
-      const k = sr[b - 15] | 0, v = ir[b - 15] | 0, O = ct.rotrSH(k, v, 1) ^ ct.rotrSH(k, v, 8) ^ ct.shrSH(k, v, 7), V = ct.rotrSL(k, v, 1) ^ ct.rotrSL(k, v, 8) ^ ct.shrSL(k, v, 7), P = sr[b - 2] | 0, z = ir[b - 2] | 0, m = ct.rotrSH(P, z, 19) ^ ct.rotrBH(P, z, 61) ^ ct.shrSH(P, z, 6), L = ct.rotrSL(P, z, 19) ^ ct.rotrBL(P, z, 61) ^ ct.shrSL(P, z, 6), N = ct.add4L(V, L, ir[b - 7], ir[b - 16]), X = ct.add4H(N, O, m, sr[b - 7], sr[b - 16]);
+      const k = sr[b - 15] | 0, A = ir[b - 15] | 0, O = ct.rotrSH(k, A, 1) ^ ct.rotrSH(k, A, 8) ^ ct.shrSH(k, A, 7), V = ct.rotrSL(k, A, 1) ^ ct.rotrSL(k, A, 8) ^ ct.shrSL(k, A, 7), P = sr[b - 2] | 0, z = ir[b - 2] | 0, m = ct.rotrSH(P, z, 19) ^ ct.rotrBH(P, z, 61) ^ ct.shrSH(P, z, 6), L = ct.rotrSL(P, z, 19) ^ ct.rotrBL(P, z, 61) ^ ct.shrSL(P, z, 6), N = ct.add4L(V, L, ir[b - 7], ir[b - 16]), X = ct.add4H(N, O, m, sr[b - 7], sr[b - 16]);
       sr[b] = X | 0, ir[b] = N | 0;
     }
     let { Ah: r, Al: s, Bh: i, Bl: o, Ch: a, Cl: c, Dh: u, Dl: d, Eh: l, El: y, Fh: h, Fl: g, Gh: w, Gl: I, Hh: _, Hl: U } = this;
     for (let b = 0; b < 80; b++) {
-      const k = ct.rotrSH(l, y, 14) ^ ct.rotrSH(l, y, 18) ^ ct.rotrBH(l, y, 41), v = ct.rotrSL(l, y, 14) ^ ct.rotrSL(l, y, 18) ^ ct.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = ct.add5L(U, v, V, VA[b], ir[b]), z = ct.add5H(P, _, k, O, KA[b], sr[b]), m = P | 0, L = ct.rotrSH(r, s, 28) ^ ct.rotrBH(r, s, 34) ^ ct.rotrBH(r, s, 39), N = ct.rotrSL(r, s, 28) ^ ct.rotrBL(r, s, 34) ^ ct.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
+      const k = ct.rotrSH(l, y, 14) ^ ct.rotrSH(l, y, 18) ^ ct.rotrBH(l, y, 41), A = ct.rotrSL(l, y, 14) ^ ct.rotrSL(l, y, 18) ^ ct.rotrBL(l, y, 41), O = l & h ^ ~l & w, V = y & g ^ ~y & I, P = ct.add5L(U, A, V, VA[b], ir[b]), z = ct.add5H(P, _, k, O, KA[b], sr[b]), m = P | 0, L = ct.rotrSH(r, s, 28) ^ ct.rotrBH(r, s, 34) ^ ct.rotrBH(r, s, 39), N = ct.rotrSL(r, s, 28) ^ ct.rotrBL(r, s, 34) ^ ct.rotrBL(r, s, 39), X = r & i ^ r & a ^ i & a, nt = s & o ^ s & c ^ o & c;
       _ = w | 0, U = I | 0, w = h | 0, I = g | 0, h = l | 0, g = y | 0, { h: l, l: y } = ct.add(u | 0, d | 0, z | 0, m | 0), u = a | 0, d = c | 0, a = i | 0, c = o | 0, i = r | 0, o = s | 0;
       const q = ct.add3L(m, N, nt);
       r = ct.add3H(q, z, L, X), s = q | 0;
@@ -9841,8 +9841,8 @@ function S8(t) {
     case lt.VersionedSmartContract: {
       const b = t.readUInt8Enum(zc, (O) => {
         throw new Error(`Cannot recognize ClarityVersion: ${O}`);
-      }), k = je(t), v = je(t, 4, 1e5);
-      return wd(k, v, b);
+      }), k = je(t), A = je(t, 4, 1e5);
+      return wd(k, A, b);
     }
     case lt.PoisonMicroblock:
       return b8();
@@ -9855,8 +9855,8 @@ function S8(t) {
       return bd(b, k);
     }
     case lt.NakamotoCoinbase: {
-      const b = t.readBytes(Br), k = Fe(t), v = t.readBytes(Fc);
-      return m8(b, k, v);
+      const b = t.readBytes(Br), k = Fe(t), A = t.readBytes(Fc);
+      return m8(b, k, A);
     }
     case lt.TenureChange:
       const y = dt(t.readBytes(20)), h = dt(t.readBytes(20)), g = dt(t.readBytes(20)), w = dt(t.readBytes(32)), I = t.readUInt32BE(), _ = t.readUInt8Enum(qc, (b) => {
@@ -11497,7 +11497,7 @@ const s5 = "xtrata.xyz/radio/listening-wallet", i5 = "Link a temporary listening
   return (e == null ? void 0 : e.feeRejected) === !0 || /\(400\)/.test((e == null ? void 0 : e.message) ?? "");
 }, c5 = 3e3, Fd = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (t) => t.toString(16).padStart(2, "0")).join("");
 function l5(t) {
-  let e = null, n = -1 / 0, r, s = null, i = null, o, a = -1 / 0, c = null, u = !1, d = !1, l = !1, y = null, h = !1, g = "", w = "", I, _ = null, U, b = [], k, v = -1 / 0;
+  let e = null, n = -1 / 0, r, s = null, i = null, o, a = -1 / 0, c = null, u = !1, d = !1, l = !1, y = null, h = !1, g = "", w = "", I, _ = null, U, b = [], k, A = -1 / 0;
   const O = /* @__PURE__ */ new Set();
   let V = null, P = !1, z = 0, m = !1, L = !1, N = !1, X = !1, nt = 0, q = null, At = Promise.resolve();
   const gt = () => BigInt((e == null ? void 0 : e.limits.playFee) ?? xa.toString()), jt = (x) => !!i && !(i.features ?? []).includes(x), E = (x, M) => `xtrata.ppp.v1.${x}:${M}`, S = (x = i == null ? void 0 : i.address) => {
@@ -11589,7 +11589,7 @@ function l5(t) {
       walletCannotMulti: jt("multi"),
       others: ((i == null ? void 0 : i.others) ?? []).filter((G) => G !== t.main() && G !== (i == null ? void 0 : i.linked))
     };
-  }, A = (x, M = "") => {
+  }, $ = (x, M = "") => {
     g = x, w = M, t.changed();
   };
   async function T(x, M) {
@@ -11621,7 +11621,7 @@ function l5(t) {
     i != null && i.address && (!x && t.now() - a < 3e4 || (o = await t.chain.balance(i.address), a = t.now()));
   }
   async function wr(x) {
-    if ((k !== x || t.now() - v >= 6e4) && (b = await t.links(x), k = x, v = t.now()), (i == null ? void 0 : i.state) !== "unlocked" || i.linked === x) return;
+    if ((k !== x || t.now() - A >= 6e4) && (b = await t.links(x), k = x, A = t.now()), (i == null ? void 0 : i.state) !== "unlocked" || i.linked === x) return;
     const M = `${x}:${i.address}`;
     U === M && _ || (_ = b.find((K) => K.listening === i.address) ?? null, U = M);
   }
@@ -11710,7 +11710,7 @@ function l5(t) {
     var Lt;
     se();
     const K = !(i != null && i.address) || j(i.address), mt = i != null && i.linked ? (Lt = t.nameOf) == null ? void 0 : Lt.call(t, i.linked) : void 0;
-    await x.request("listening.unlock", { mode: "unlock", terms: K ? Pt() : void 0, anyPasskey: M, ...t.main() ? { main: t.main() } : {}, ...mt ? { label: mt } : {} }), i = await qt(x), K && (j(i.address) ? await be() : await x.request("listening.stop")), A(K ? "Unlocked ✓" : "Unlocked ✓ Paying is off.");
+    await x.request("listening.unlock", { mode: "unlock", terms: K ? Pt() : void 0, anyPasskey: M, ...t.main() ? { main: t.main() } : {}, ...mt ? { label: mt } : {} }), i = await qt(x), K && (j(i.address) ? await be() : await x.request("listening.stop")), $(K ? "Unlocked ✓" : "Unlocked ✓ Paying is off.");
     const G = y;
     y = null, G && t.now() - G.at < 12e4 && setTimeout(() => void $e(!0).then(() => Y(G)), 0);
   }
@@ -11720,7 +11720,7 @@ function l5(t) {
         await Je(s, !1), nt = 0;
       } catch (x) {
         const M = x instanceof Error ? x.message : String(x);
-        /Cancelled in the listening wallet/.test(M) ? q || (X = !0, A("Not now. Nothing was signed.")) : /did not answer/.test(M) ? await (s == null ? void 0 : s.request("listening.cancel").catch(() => {
+        /Cancelled in the listening wallet/.test(M) ? q || (X = !0, $("Not now. Nothing was signed.")) : /did not answer/.test(M) ? await (s == null ? void 0 : s.request("listening.cancel").catch(() => {
         })) : (nt++, w = M);
       } finally {
         N = !1;
@@ -11751,18 +11751,18 @@ function l5(t) {
     forceRefresh: () => $e(!0),
     create: () => T("Waiting for your passkey…", async () => {
       const x = await te();
-      await x.request("listening.unlock", { mode: "create", terms: Pt(), ...t.main() ? { main: t.main() } : {} }), i = await qt(x), R(!0), A(Zt() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await be();
+      await x.request("listening.unlock", { mode: "create", terms: Pt(), ...t.main() ? { main: t.main() } : {} }), i = await qt(x), R(!0), $(Zt() ? "Wallet created ✓ Next: add 1 STX." : "Wallet created ✓ Next: link it."), await be();
     }),
     /**
      * A gift funded this wallet (the server sent it from the gift treasury): tracked exactly like a
      * deposit, so the panel says it is on its way and paying starts by itself once it confirms.
      */
     giftSent: (x, M) => {
-      !(i != null && i.address) || Bt() || (Ht({ txid: x, amount: M.toString(), at: t.now() }), a = -1 / 0, A("🎁 Gift on its way ✓ Usually arrives in a few minutes."));
+      !(i != null && i.address) || Bt() || (Ht({ txid: x, amount: M.toString(), at: t.now() }), a = -1 / 0, $("🎁 Gift on its way ✓ Usually arrives in a few minutes."));
     },
     unlock: (x = !1) => {
       const M = () => T("Waiting for your passkey…", async () => Je(await te(), x));
-      return N ? x ? jt("cancel") ? (A("Tap Cancel in the listening wallet box first, then choose a different wallet."), Promise.resolve()) : St(async () => {
+      return N ? x ? jt("cancel") ? ($("Tap Cancel in the listening wallet box first, then choose a different wallet."), Promise.resolve()) : St(async () => {
         (zt() === "locked" || zt() === "intro") && await M();
       }) : At : M();
     },
@@ -11775,9 +11775,9 @@ function l5(t) {
         await s.request("listening.link", { main: x, issued: M.issued, mainSignature: M.mainSignature });
       else {
         const K = { main: x, listening: i.address, issued: t.now() }, mt = await t.signWithMain(x, o5(K)), G = await s.request("listening.link", { main: x, issued: K.issued, mainSignature: mt });
-        await t.saveLink({ ...K, mainSignature: mt, listeningSignature: G.listeningSignature }), v = -1 / 0;
+        await t.saveLink({ ...K, mainSignature: mt, listeningSignature: G.listeningSignature }), A = -1 / 0;
       }
-      A("Linked ✓");
+      $("Linked ✓");
     }),
     deposit: () => T("Approve the deposit in your wallet…", async () => {
       se();
@@ -11787,31 +11787,31 @@ function l5(t) {
       await Qe(!0);
       const M = Dd(o ?? 0n);
       if (M <= 0n) throw new Error("This wallet already holds 1 STX. No deposit needed.");
-      I = await t.deposit(x, i.address, M), I && Ht({ txid: I, amount: M.toString(), at: t.now() }), A("Deposit sent ✓ Usually confirms in a few minutes.");
+      I = await t.deposit(x, i.address, M), I && Ht({ txid: I, amount: M.toString(), at: t.now() }), $("Deposit sent ✓ Usually confirms in a few minutes.");
     }),
     switchOn: () => T("Confirm in the listening wallet…", async () => {
       if (!ft()) throw new Error("Connect your wallet first.");
-      await be(), await s.request("listening.approveSession", Pt()), R(!0), A("Paying is on ✓");
+      await be(), await s.request("listening.approveSession", Pt()), R(!0), $("Paying is on ✓");
     }),
     /** Give up on payments the chain has never seen after 30 minutes. Their signed bytes are discarded. */
     clearStuck: () => T("Clearing…", async () => {
       for (const x of ue())
         await t.chain.transaction(x.txid) || C({ ...x, status: "failed", note: "never seen on-chain; cleared by listener", raw: void 0 });
-      A("Cleared ✓");
+      $("Cleared ✓");
     }),
     switchOff: () => T("Switching off…", async () => {
-      tn(), await (s == null ? void 0 : s.request("listening.stop")), R(!1), A("Paying is off. Music stays free.");
+      tn(), await (s == null ? void 0 : s.request("listening.stop")), R(!1), $("Paying is off. Music stays free.");
     }),
     lock: () => T("Locking…", async () => {
-      tn(), await (s == null ? void 0 : s.request("listening.lock")), o = void 0, A("Locked ✓");
+      tn(), await (s == null ? void 0 : s.request("listening.lock")), o = void 0, $("Locked ✓");
     }),
     /** Passkey-only: send returns to this address instead of the funder. Public data, kept on this device. */
     setReturnAddress: (x) => {
       const M = String(x ?? "").trim();
-      if (!(i != null && i.address)) return A("", "Unlock the listening wallet first.");
-      if (!Ko(M)) return A("", "Enter a standard mainnet address (it starts with SP).");
-      if (M === i.address) return A("", "That is this listening wallet itself. Enter a different address.");
-      t.store.set(Vt(i.address), M), A("Returns will go to that address. You confirm it in the listening wallet before anything is sent.");
+      if (!(i != null && i.address)) return $("", "Unlock the listening wallet first.");
+      if (!Ko(M)) return $("", "Enter a standard mainnet address (it starts with SP).");
+      if (M === i.address) return $("", "That is this listening wallet itself. Enter a different address.");
+      t.store.set(Vt(i.address), M), $("Returns will go to that address. You confirm it in the listening wallet before anything is sent.");
     },
     clearReturnAddress: () => {
       i != null && i.address && t.store.set(Vt(i.address), ""), t.changed();
@@ -11857,7 +11857,7 @@ function l5(t) {
       } catch (Mt) {
         throw C({ ...ht, status: "unknown", note: Mt.message }), Mt;
       }
-      x === "all" && R(!1), A(x === "all" ? M.kind === "linked" ? "Returned to your wallet ✓ Paying is off." : "Returned ✓ Paying is off." : "Excess returned ✓ Switch paying back on to continue.");
+      x === "all" && R(!1), $(x === "all" ? M.kind === "linked" ? "Returned to your wallet ✓ Paying is off." : "Returned ✓ Paying is off." : "Excess returned ✓ Switch paying back on to continue.");
     })
   }, Jt = [], Un = 10, Ue = 30 * 6e4;
   let Ne = !1;
@@ -11951,7 +11951,7 @@ function l5(t) {
       t.changed();
     }, mt = zt(), G = t.main(), Lt = Zt() ? i == null ? void 0 : i.address : G;
     if (mt === "locked") {
-      y = { ...x, at: t.now() }, A(`Unlock to like ${M}. It sends straight after.`);
+      y = { ...x, at: t.now() }, $(`Unlock to like ${M}. It sends straight after.`);
       return;
     }
     if (mt === "wrong-wallet") return K($t());
@@ -11985,13 +11985,13 @@ function l5(t) {
   async function et(x) {
     var mt, G, Lt;
     if (d) {
-      A("Still sending your last like. Try again in a moment.");
+      $("Still sending your last like. Try again in a moment.");
       return;
     }
     d = !0;
     const M = x.title ? `“${x.title}”${x.artist ? ` by ${x.artist}` : ""}` : `song #${x.song}`, K = t.wait ?? ((ht) => new Promise((Mt) => setTimeout(Mt, ht)));
     try {
-      A(`${x.liked ? "Liking" : "Unliking"} ${M}…`);
+      $(`${x.liked ? "Liking" : "Unliking"} ${M}…`);
       const ht = t.now() + 12e4;
       for (; u || W().length; ) {
         if (t.now() > ht) throw new Error("An earlier payment is still confirming. Try the like again shortly.");
@@ -12317,7 +12317,24 @@ const O5 = (t, e, n, r, s) => (Gd !== t && (P5.clear(), Gd = t), !1), D5 = (t, e
     network: t.network,
     error: V5(r)
   }), null;
-}, Vd = Object.freeze({
+};
+function Y5(t, e, n = {}) {
+  const r = n.retryAfterMs ?? 3e4, s = n.now ?? Date.now, i = /* @__PURE__ */ new Map(), o = (a, c) => {
+    c.pending = !0, c.failedAt = void 0, Promise.resolve().then(() => t(a)).then((u) => {
+      c.pending = !1, u && (c.name = u, e());
+    }).catch(() => {
+      c.pending = !1, c.failedAt = s();
+    });
+  };
+  return {
+    get(a) {
+      if (!a) return null;
+      let c = i.get(a);
+      return c ? !c.pending && c.name === null && c.failedAt !== void 0 && s() - c.failedAt >= r && o(a, c) : (c = { name: null, pending: !1 }, i.set(a, c), o(a, c)), c.name;
+    }
+  };
+}
+const Vd = Object.freeze({
   8: "melophonic",
   312: "Hundred Little Reasons",
   315: "melophonic",
@@ -12362,17 +12379,17 @@ const O5 = (t, e, n, r, s) => (Gd !== t && (P5.clear(), Gd = t), !1), D5 = (t, e
   3032: "3ai3",
   3036: "3ai3"
 });
-function Y5(t, e = "") {
+function Z5(t, e = "") {
   return Object.hasOwn(Vd, String(t)) ? Vd[String(t)] : e;
 }
 const qd = Object.freeze({ 312: "Smalltalk", 315: "Entertainment" });
-function Z5(t, e = "") {
+function Q5(t, e = "") {
   return Object.hasOwn(qd, String(t)) ? qd[String(t)] : e;
 }
-const Q5 = 100000n, J5 = 1000000n, t$ = 3000n, e$ = (t, e) => `${t}#gift=${e}`, n$ = 100, Wd = (t, e = xa) => t <= Rs ? 0 : Number((t - Rs) / Gs(e)), Xd = (t) => typeof t == "string" && /^[A-Za-z0-9_-]{22}$/.test(t), r$ = "xtrata.xyz/radio/gifts", s$ = "Create Xtrata radio gift links paid from the gift treasury", i$ = (t) => ({
-  domain: xi({ name: qe(r$), version: qe("1"), "chain-id": ur(1) }),
+const J5 = 100000n, t$ = 1000000n, e$ = 3000n, n$ = (t, e) => `${t}#gift=${e}`, r$ = 100, Wd = (t, e = xa) => t <= Rs ? 0 : Number((t - Rs) / Gs(e)), Xd = (t) => typeof t == "string" && /^[A-Za-z0-9_-]{22}$/.test(t), s$ = "xtrata.xyz/radio/gifts", i$ = "Create Xtrata radio gift links paid from the gift treasury", o$ = (t) => ({
+  domain: xi({ name: qe(s$), version: qe("1"), "chain-id": ur(1) }),
   message: xi({
-    purpose: qe(s$),
+    purpose: qe(i$),
     admin: qe(t.admin),
     count: ur(t.count),
     amount: ur(BigInt(t.amount)),
@@ -12386,7 +12403,7 @@ const Q5 = 100000n, J5 = 1000000n, t$ = 3000n, e$ = (t, e) => `${t}#gift=${e}`, 
   const r = xt("button", t, n);
   return r.type = "button", r.onclick = e, r;
 }, ws = (t) => vn(t).replace(/\.?0+$/, "");
-function o$(t) {
+function a$(t) {
   let e = null;
   const n = (() => {
     try {
@@ -12502,7 +12519,7 @@ function o$(t) {
     }
   }, b = (S, C) => t.store.set(Yd(S), JSON.stringify(C.slice(0, 50)));
   let k = 0;
-  async function v(S) {
+  async function A(S) {
     const C = U(S);
     for (const j of C)
       if (!(j.view && ["claimed", "refunded", "expired"].includes(j.view.status)))
@@ -12522,7 +12539,7 @@ function o$(t) {
       const j = U(S);
       j.unshift({ id: C.id, code: C.code, amount: g.toString(), at: t.now() }), b(S, j), w = "Approve the gift in your wallet…", t.changed();
       const R = await t.pay(S, C.depositTo, BigInt(C.deposit), C.memo), W = U(S), Bt = W.find((Ht) => Ht.id === C.id);
-      Bt && (Bt.txid = R, Bt.view = { status: "pending-deposit", amount: g.toString(), source: "friend", from: S, label: "", expires: 0 }), b(S, W), I = "Sent ✓ Your link works as soon as the payment confirms (a few minutes).", v(S);
+      Bt && (Bt.txid = R, Bt.view = { status: "pending-deposit", amount: g.toString(), source: "friend", from: S, label: "", expires: 0 }), b(S, W), I = "Sent ✓ Your link works as soon as the payment confirms (a few minutes).", A(S);
     } catch (j) {
       I = j.message || "Not sent.";
     } finally {
@@ -12533,7 +12550,7 @@ function o$(t) {
     if (!w) {
       w = "Sign in your wallet…", I = "", _ = null, t.changed();
       try {
-        const W = { admin: S, count: C, amount: j.toString(), label: R, issued: t.now() }, Bt = await t.sign(S, i$(W));
+        const W = { admin: S, count: C, amount: j.toString(), label: R, issued: t.now() }, Bt = await t.sign(S, o$(W));
         w = "Making links…", t.changed();
         const Ht = await t.json("/radio/gift/campaign", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ request: W, signature: Bt }) });
         _ = { codes: Ht.codes, amount: Ht.amount };
@@ -12544,12 +12561,12 @@ function o$(t) {
       }
     }
   }
-  const P = (S, C) => e$(S || location.origin + "/radio.html", C), z = (S) => {
+  const P = (S, C) => n$(S || location.origin + "/radio.html", C), z = (S) => {
     var C;
     return void ((C = navigator.clipboard) == null ? void 0 : C.writeText(S));
   }, m = (S) => navigator.share ? navigator.share({ title: "On-chain music for you", text: "I sent you some on-chain music on Xtrata Radio 🎁", url: S }).catch(() => {
   }) : z(S), L = xt("input");
-  L.type = "range", L.min = String(Q5), L.max = String(J5), L.step = "50000", L.value = String(g), L.setAttribute("aria-label", "Gift amount");
+  L.type = "range", L.min = String(J5), L.max = String(t$), L.step = "50000", L.value = String(g), L.setAttribute("aria-label", "Gift amount");
   const N = xt("p", "", "ppp-gift-amount"), X = ys("", () => {
     const S = t.main();
     S && O(S);
@@ -12559,10 +12576,10 @@ function o$(t) {
   L.oninput = () => {
     g = BigInt(L.value), nt();
   };
-  const q = () => `${ws(g)} STX · about ${Wd(g).toLocaleString()} paid plays · you pay ${ws(g + t$)} STX with the network fee`;
+  const q = () => `${ws(g)} STX · about ${Wd(g).toLocaleString()} paid plays · you pay ${ws(g + e$)} STX with the network fee`;
   nt();
   const At = xt("input");
-  At.type = "number", At.min = "1", At.max = String(n$), At.value = "10", At.setAttribute("aria-label", "How many links");
+  At.type = "number", At.min = "1", At.max = String(r$), At.value = "10", At.setAttribute("aria-label", "How many links");
   const gt = xt("input");
   gt.type = "number", gt.min = "0.1", gt.max = "1", gt.step = "0.05", gt.value = "0.1", gt.setAttribute("aria-label", "STX per link");
   const jt = xt("input");
@@ -12575,7 +12592,7 @@ function o$(t) {
     if (!j)
       R.push(xt("p", "Connect a Stacks wallet (top right) to send a gift."));
     else {
-      X.disabled = !!w, R.push(L, N, X), t.now() - k > 3e4 && (k = t.now(), v(j));
+      X.disabled = !!w, R.push(L, N, X), t.now() - k > 3e4 && (k = t.now(), A(j));
       const Zt = U(j);
       if (Zt.length) {
         const we = xt("ul", "", "ppp-gift-list");
@@ -12613,13 +12630,13 @@ function o$(t) {
   return { banner: l, funder: y, renderFold: E, liveGift: i };
 }
 const Zd = document.getElementById("ppp");
-Zd && a$(Zd);
-function a$(t) {
+Zd && c$(Zd);
+function c$(t) {
   var zt;
   const e = jy(), n = (f) => t.querySelector(f), r = n(".ppp-frame");
   let s = null;
-  const i = async (f, A) => {
-    const T = await fetch(f, { cache: "no-store", ...A, signal: AbortSignal.timeout(15e3) }), Z = await T.json().catch(() => ({}));
+  const i = async (f, $) => {
+    const T = await fetch(f, { cache: "no-store", ...$, signal: AbortSignal.timeout(15e3) }), Z = await T.json().catch(() => ({}));
     if (!T.ok) throw new Error((Z == null ? void 0 : Z.error) || `Request failed (${T.status}).`);
     return Z;
   }, o = l5({
@@ -12635,10 +12652,10 @@ function a$(t) {
     },
     bridge: async (f) => {
       s = document.createElement("iframe"), s.title = "Xtrata listening wallet", s.setAttribute("allow", `publickey-credentials-get ${f}; publickey-credentials-create ${f}`), s.referrerPolicy = "no-referrer";
-      const A = new Promise(($t, se) => {
+      const $ = new Promise(($t, se) => {
         s.addEventListener("load", () => $t(), { once: !0 }), setTimeout(() => se(new Error("The listening wallet did not load. Listening stays free.")), 15e3);
       });
-      s.src = f + "/", r.replaceChildren(s), await A;
+      s.src = f + "/", r.replaceChildren(s), await $;
       const T = new Ty({ walletOrigin: f, frame: s, timeoutMs: 30 * 6e4 }), Z = /* @__PURE__ */ new Set(["listening.unlock", "listening.link", "listening.approveSession", "listening.prepareReturn"]), ft = ($t, se) => Z.has($t) ? T.request($t, se) : Promise.race([
         T.request($t, se),
         new Promise((te, qt) => setTimeout(() => qt(new Error("The listening wallet is not answering. Listening stays free.")), 1e4))
@@ -12653,14 +12670,14 @@ function a$(t) {
       broadcast: e5,
       transaction: n5,
       confirmedNonce: async (f) => {
-        const A = await Wr(`/v2/accounts/${f}?proof=0`);
-        if (!Number.isSafeInteger(A == null ? void 0 : A.nonce) || A.nonce < 0) throw new Error("Malformed account data.");
-        return BigInt(A.nonce);
+        const $ = await Wr(`/v2/accounts/${f}?proof=0`);
+        if (!Number.isSafeInteger($ == null ? void 0 : $.nonce) || $.nonce < 0) throw new Error("Malformed account data.");
+        return BigInt($.nonce);
       }
     },
-    signWithMain: (f, A) => Hd({ ...A, network: "mainnet", stxAddress: f }),
-    deposit: (f, A, T) => new Promise((Z, ft) => Td({
-      recipient: A,
+    signWithMain: (f, $) => Hd({ ...$, network: "mainnet", stxAddress: f }),
+    deposit: (f, $, T) => new Promise((Z, ft) => Td({
+      recipient: $,
       amount: T.toString(),
       memo: "Xtrata listening wallet",
       stxAddress: f,
@@ -12671,14 +12688,14 @@ function a$(t) {
       onError: ft
     })),
     validate: r5,
-    tabLock: (f) => new Promise((A) => {
+    tabLock: (f) => new Promise(($) => {
       const T = navigator.locks;
       if (!(T != null && T.request)) {
-        A(!0);
+        $(!0);
         return;
       }
       T.request("xtrata-ppp:" + f, { ifAvailable: !0 }, async (Z) => {
-        A(!!Z), Z && await new Promise(() => {
+        $(!!Z), Z && await new Promise(() => {
         });
       });
     }),
@@ -12690,9 +12707,9 @@ function a$(t) {
           return null;
         }
       },
-      set: (f, A) => {
+      set: (f, $) => {
         try {
-          localStorage.setItem(f, A);
+          localStorage.setItem(f, $);
         } catch {
         }
       }
@@ -12700,30 +12717,30 @@ function a$(t) {
     changed: () => Ft(o.snapshot()),
     // A gifted wallet returns to whoever paid for the gift (the gift record), else to its first funder.
     funder: (f) => {
-      var A, T;
-      return a.funder(f, () => y5(f, Wr), !!((T = (A = o.snapshot().gate) == null ? void 0 : A.gifts) != null && T.enabled));
+      var $, T;
+      return a.funder(f, () => y5(f, Wr), !!((T = ($ = o.snapshot().gate) == null ? void 0 : $.gifts) != null && T.enabled));
     },
     likesChanged: () => {
-      var f, A;
-      (A = (f = window.XtrataRadio) == null ? void 0 : f.refreshLikes) == null || A.call(f);
+      var f, $;
+      ($ = (f = window.XtrataRadio) == null ? void 0 : f.refreshLikes) == null || $.call(f);
     },
-    likeState: async (f, A) => {
-      const T = await i("/radio/chain-likes?" + new URLSearchParams({ wallet: f, ids: String(A) })), Z = Array.isArray(T == null ? void 0 : T.rows) ? T.rows.find((ft) => (ft == null ? void 0 : ft.id) === A) : null;
+    likeState: async (f, $) => {
+      const T = await i("/radio/chain-likes?" + new URLSearchParams({ wallet: f, ids: String($) })), Z = Array.isArray(T == null ? void 0 : T.rows) ? T.rows.find((ft) => (ft == null ? void 0 : ft.id) === $) : null;
       if (!Z || typeof Z.liked != "boolean") throw new Error("Like state unavailable.");
       return { liked: Z.liked, by: Array.isArray(Z.by) ? Z.by.filter((ft) => typeof ft == "string") : Z.liked ? [f] : [] };
     },
-    likeSent: (f, A) => window.dispatchEvent(new CustomEvent("xtrata:radio-like-sent", { detail: { song: f, liked: A } })),
+    likeSent: (f, $) => window.dispatchEvent(new CustomEvent("xtrata:radio-like-sent", { detail: { song: f, liked: $ } })),
     nameOf: (f) => k(f) ?? void 0,
-    likeConfirmed: (f, A) => window.dispatchEvent(new CustomEvent("xtrata:radio-like-confirmed", { detail: { song: f, liked: A } })),
+    likeConfirmed: (f, $) => window.dispatchEvent(new CustomEvent("xtrata:radio-like-confirmed", { detail: { song: f, liked: $ } })),
     likeFailed: (f) => window.dispatchEvent(new CustomEvent("xtrata:radio-like-failed", { detail: { song: f } }))
-  }), a = o$({
+  }), a = a$({
     json: i,
     main: () => {
       const f = e.load();
       return f.isConnected && f.network === "mainnet" ? f.address : void 0;
     },
-    pay: (f, A, T, Z) => new Promise((ft, $t) => Td({
-      recipient: A,
+    pay: (f, $, T, Z) => new Promise((ft, $t) => Td({
+      recipient: $,
       amount: T.toString(),
       memo: Z,
       stxAddress: f,
@@ -12733,9 +12750,9 @@ function a$(t) {
       onCancel: () => $t(new Error("Gift cancelled. Nothing was sent.")),
       onError: $t
     })),
-    sign: (f, A) => Hd({ ...A, network: "mainnet", stxAddress: f }),
-    giftSent: (f, A) => o.giftSent(f, A),
-    who: (f) => v(f),
+    sign: (f, $) => Hd({ ...$, network: "mainnet", stxAddress: f }),
+    giftSent: (f, $) => o.giftSent(f, $),
+    who: (f) => A(f),
     changed: () => Ft(o.snapshot()),
     store: {
       get: (f) => {
@@ -12745,9 +12762,9 @@ function a$(t) {
           return null;
         }
       },
-      set: (f, A) => {
+      set: (f, $) => {
         try {
-          A === null ? localStorage.removeItem(f) : localStorage.setItem(f, A);
+          $ === null ? localStorage.removeItem(f) : localStorage.setItem(f, $);
         } catch {
         }
       }
@@ -12757,8 +12774,8 @@ function a$(t) {
   window.XtrataRadioLikeHandler = (f) => {
     if (!f || !Number.isSafeInteger(f.song) || f.song < 0) return !1;
     m();
-    const A = L(f.song, { title: f.title, artist: f.artist });
-    return o.heart({ song: f.song, title: A.title || void 0, artist: A.artist || void 0, likedBy: Array.isArray(f.likedBy) ? f.likedBy : void 0 });
+    const $ = L(f.song, { title: f.title, artist: f.artist });
+    return o.heart({ song: f.song, title: $.title || void 0, artist: $.artist || void 0, likedBy: Array.isArray(f.likedBy) ? f.likedBy : void 0 });
   };
   let c;
   window.XtrataRadioListeningIdentity = () => {
@@ -12767,61 +12784,55 @@ function a$(t) {
   };
   const u = (f) => {
     var T, Z;
-    const A = window.XtrataRadioListeningIdentity();
-    A !== c && (c = A, (Z = (T = window.XtrataRadio) == null ? void 0 : T.refreshLikes) == null || Z.call(T));
+    const $ = window.XtrataRadioListeningIdentity();
+    $ !== c && (c = $, (Z = (T = window.XtrataRadio) == null ? void 0 : T.refreshLikes) == null || Z.call(T));
   }, d = (f) => f ? f.slice(0, 6) + "…" + f.slice(-4) : "", l = (f) => (Number(f) / 1e6).toFixed(f < 1000n ? 6 : 4), y = (f) => {
-    const A = Math.round((Date.now() - f) / 6e4);
-    return A < 1 ? "now" : A < 60 ? `${A}m` : A < 1440 ? `${Math.round(A / 60)}h` : `${Math.round(A / 1440)}d`;
-  }, h = (f) => `https://explorer.hiro.so/txid/${f}?chain=mainnet`, g = (f, A = "", T = "") => {
+    const $ = Math.round((Date.now() - f) / 6e4);
+    return $ < 1 ? "now" : $ < 60 ? `${$}m` : $ < 1440 ? `${Math.round($ / 60)}h` : `${Math.round($ / 1440)}d`;
+  }, h = (f) => `https://explorer.hiro.so/txid/${f}?chain=mainnet`, g = (f, $ = "", T = "") => {
     const Z = document.createElement(f);
-    return A && (Z.textContent = A), T && (Z.className = T), Z;
-  }, w = (f, A, T = "") => {
+    return $ && (Z.textContent = $), T && (Z.className = T), Z;
+  }, w = (f, $, T = "") => {
     const Z = g("button", f, T);
-    return Z.type = "button", Z.onclick = A, Z;
-  }, I = (f, A) => {
+    return Z.type = "button", Z.onclick = $, Z;
+  }, I = (f, $) => {
     const T = g("a", f);
-    return T.href = A, T.target = "_blank", T.rel = "noopener", T;
+    return T.href = $, T.target = "_blank", T.rel = "noopener", T;
   };
   let _ = null, U = !1;
-  const b = /* @__PURE__ */ new Map(), k = (f) => f ? (b.has(f) || (b.set(f, null), X5({ address: f, network: "mainnet" }).then((A) => {
-    A && (b.set(f, A), Ft(o.snapshot()));
-  }).catch(() => {
-  })), b.get(f) ?? null) : null, v = (f) => {
-    const A = k(f);
-    return A ? `${A} · ${d(f)}` : d(f);
-  }, O = (f) => f.slice(0, 2).map(v).join(" and ") + (f.length > 2 ? ` and ${f.length - 2} more` : ""), V = /* @__PURE__ */ new Map();
+  const b = Y5((f) => X5({ address: f, network: "mainnet" }), () => Ft(o.snapshot())), k = (f) => b.get(f), A = (f) => k(f) ?? d(f), O = (f) => f.slice(0, 2).map(A).join(" and ") + (f.length > 2 ? ` and ${f.length - 2} more` : ""), V = /* @__PURE__ */ new Map();
   let P = !1;
   const z = (f) => !f || /^(?:Inscription )?#\d+$/.test(f.trim()), m = () => {
     P || (P = !0, fetch("/radio/counts?range=all&chainLikes=0", { cache: "no-store", signal: AbortSignal.timeout(2e4) }).then((f) => f.ok ? f.json() : null).then((f) => {
-      for (const A of Array.isArray(f == null ? void 0 : f.tracks) ? f.tracks : []) {
-        const T = Number(A == null ? void 0 : A.id);
-        Number.isSafeInteger(T) && V.set(T, { title: typeof A.title == "string" ? A.title : void 0, artist: typeof A.artist == "string" ? A.artist : void 0 });
+      for (const $ of Array.isArray(f == null ? void 0 : f.tracks) ? f.tracks : []) {
+        const T = Number($ == null ? void 0 : $.id);
+        Number.isSafeInteger(T) && V.set(T, { title: typeof $.title == "string" ? $.title : void 0, artist: typeof $.artist == "string" ? $.artist : void 0 });
       }
       Ft(o.snapshot());
     }).catch(() => {
       P = !1;
     }));
-  }, L = (f, A) => {
-    const T = V.get(f), Z = Z5(f, [T == null ? void 0 : T.title, A == null ? void 0 : A.title].find(($t) => !z($t)) || ""), ft = Y5(f, (T == null ? void 0 : T.artist) || (A == null ? void 0 : A.artist) || "");
+  }, L = (f, $) => {
+    const T = V.get(f), Z = Q5(f, [T == null ? void 0 : T.title, $ == null ? void 0 : $.title].find(($t) => !z($t)) || ""), ft = Z5(f, (T == null ? void 0 : T.artist) || ($ == null ? void 0 : $.artist) || "");
     return { title: Z, artist: ft };
   }, N = (f) => {
-    const { title: A, artist: T } = L(f.song, f);
-    return A ? `“${A}”${T ? ` — ${T}` : ""}` : `Song #${f.song}${T ? ` — ${T}` : ""}`;
+    const { title: $, artist: T } = L(f.song, f);
+    return $ ? `“${$}”${T ? ` — ${T}` : ""}` : `Song #${f.song}${T ? ` — ${T}` : ""}`;
   }, X = { confirmed: "ppp-ok", pending: "ppp-warn", signed: "ppp-warn", unknown: "ppp-warn", prepared: "ppp-warn", failed: "ppp-bad", cancelled: "ppp-mute" }, nt = { confirmed: "confirmed", pending: "confirming", signed: "sending", unknown: "checking", prepared: "preparing", failed: "failed", cancelled: "cancelled" };
   function q(f) {
     return ["elsewhere", "connect", "not-invited", "unsupported", "loading"].includes(f.step) ? ["", ""] : f.step === "wrong-wallet" ? ["WRONG WALLET", "warn"] : f.step === "over" ? ["OVER 1 STX", "bad"] : f.step === "locked" ? ["LOCKED", "mute"] : f.step === "intro" || f.step === "link" ? ["", ""] : f.step === "fund" ? f.depositPending ? ["ON ITS WAY", "warn"] : f.entries.length ? ["OUT OF FUNDS", "bad"] : ["ADD FUNDS", "warn"] : f.payingOn && f.session && f.session.playsLeft > 0 ? ["ON · PAYING", "ok"] : ["OFF", "mute"];
   }
-  function At(f, A, T = "", Z) {
-    const ft = g("dt", f), $t = g("dd", A, T);
+  function At(f, $, T = "", Z) {
+    const ft = g("dt", f), $t = g("dd", $, T);
     return Z && $t.append(" ", Z), [ft, $t];
   }
   const gt = document.getElementById("ppp-top"), jt = () => {
     (r.hidden || r.classList.contains("ppp-frame--rest") ? t : r).scrollIntoView({ behavior: "smooth", block: "center" }), t.classList.remove("ppp-flash"), t.offsetWidth, t.classList.add("ppp-flash");
   }, E = () => {
-    var A, T;
+    var $, T;
     const f = o.snapshot();
     if (f.step === "connect" || f.step === "wrong-wallet") {
-      (A = document.getElementById("radio-wallet-connect")) == null || A.click();
+      ($ = document.getElementById("radio-wallet-connect")) == null || $.click();
       return;
     }
     if (f.step === "elsewhere" && ((T = f.gate) != null && T.radioUrl)) {
@@ -12833,7 +12844,7 @@ function a$(t) {
   gt && (gt.onclick = E);
   function S(f) {
     if (!gt) return;
-    const A = (Z, ft, $t) => {
+    const $ = (Z, ft, $t) => {
       gt.hidden = !1, gt.className = "ppp-top" + (ft ? " is-" + ft : ""), gt.replaceChildren(g("span", "", "dot"), document.createTextNode(Z)), gt.title = $t;
     }, T = f.session ? Math.min(f.session.playsLeft, f.playsLeft) : 0;
     switch (f.step) {
@@ -12843,26 +12854,26 @@ function a$(t) {
         gt.hidden = !0;
         return;
       case "elsewhere":
-        return A("Pay-per-play radio", "quiet", "Open the pay-per-play radio");
+        return $("Pay-per-play radio", "quiet", "Open the pay-per-play radio");
       case "connect":
         gt.hidden = !0;
         return;
       case "intro":
-        return A("Set up pay-per-play", "", "Create your passkey listening wallet");
+        return $("Set up pay-per-play", "", "Create your passkey listening wallet");
       case "wrong-wallet":
-        return A(`Connect ${k(f.linked) ?? d(f.linked)}`, "warn", `This device's listening wallet belongs to ${v(f.linked)}. Connect that wallet to pay artists or like songs.`);
+        return $(`Connect ${A(f.linked)}`, "warn", `This device's listening wallet belongs to ${A(f.linked)}. Connect that wallet to pay artists or like songs.`);
       case "locked":
-        return A(f.payingOn ? "Unlock · keep paying" : "Unlock wallet", "", "Opens the listening wallet: one tap there asks for your passkey");
+        return $(f.payingOn ? "Unlock · keep paying" : "Unlock wallet", "", "Opens the listening wallet: one tap there asks for your passkey");
       case "link":
-        return A("Finish setup", "warn", "Link the listening wallet to your main wallet");
+        return $("Finish setup", "warn", "Link the listening wallet to your main wallet");
       case "fund":
-        return f.depositPending ? A("Funds on their way", "quiet", "Paying starts by itself when they land") : A(f.entries.some((Z) => Z.kind === "play") ? "Out of funds · top up" : "Add funds", "warn", "Add up to 1 STX to keep paying artists");
+        return f.depositPending ? $("Funds on their way", "quiet", "Paying starts by itself when they land") : $(f.entries.some((Z) => Z.kind === "play") ? "Out of funds · top up" : "Add funds", "warn", "Add up to 1 STX to keep paying artists");
       case "over":
-        return A("Over 1 STX", "warn", "Return the excess to keep paying");
+        return $("Over 1 STX", "warn", "Return the excess to keep paying");
       case "loading":
-        return A("Pay-per-play", "quiet", "Checking the listening wallet");
+        return $("Pay-per-play", "quiet", "Checking the listening wallet");
       case "ready":
-        return f.payingOn && T > 0 ? A(`On · ${T.toLocaleString()} plays left`, "on", "Paying artists as you listen") : A("Paying off · switch on", "off", "Pay-per-play is switched off");
+        return f.payingOn && T > 0 ? $(`On · ${T.toLocaleString()} plays left`, "on", "Paying artists as you listen") : $("Paying off · switch on", "off", "Pay-per-play is switched off");
     }
   }
   const C = document.getElementById("pppNudge"), j = document.getElementById("onair");
@@ -12891,16 +12902,16 @@ function a$(t) {
   function Bt(f) {
     var $t;
     if (f.step === "loading") return;
-    const A = f.session ? Math.min(f.session.playsLeft, f.playsLeft) : 0, T = f.step === "ready" && f.payingOn && A > 0, Z = T ? "" : R[f.step] ?? "", ft = T ? "on" : Z ? "off" : "";
-    if (ft ? document.documentElement.dataset.ppp = ft : delete document.documentElement.dataset.ppp, j && (j.hidden = !ft, j.querySelector(".onair-sub").textContent = T ? `Paying artists · ${A.toLocaleString()} plays left` : "Not paying"), C && (C.hidden = ft !== "off" || f.step === "fund" && f.depositPending, ft === "off")) {
+    const $ = f.session ? Math.min(f.session.playsLeft, f.playsLeft) : 0, T = f.step === "ready" && f.payingOn && $ > 0, Z = T ? "" : R[f.step] ?? "", ft = T ? "on" : Z ? "off" : "";
+    if (ft ? document.documentElement.dataset.ppp = ft : delete document.documentElement.dataset.ppp, j && (j.hidden = !ft, j.querySelector(".onair-sub").textContent = T ? `Paying artists · ${$.toLocaleString()} plays left` : "Not paying"), C && (C.hidden = ft !== "off" || f.step === "fund" && f.depositPending, ft === "off")) {
       const se = Math.floor(Number(1000000n / Gs(BigInt((($t = f.gate) == null ? void 0 : $t.limits.playFee) ?? "300"))));
       C.querySelector(".nudge-t").textContent = "⚠ " + Z, C.querySelector(".nudge-s").textContent = `1 STX (less than $1) pays for ${se.toLocaleString()} plays, on-chain, straight to the artists.`, C.querySelector("button").textContent = W[f.step] ?? "Start paying";
     }
   }
   let Ht = "";
   function ue(f) {
-    const A = g("div", "", "ppp-pick");
-    f.funderMultiple && f.returnToKind === "funder" && A.append(g("p", "More than one address has sent funds. Returns go to the first. Choose another below if that is not right.", "ppp-warn")), f.returnToKind === "funder" && A.append(g("p", "If the funds came from an exchange, choose your own address instead: exchanges often cannot take a refund.", "ppp-mute"));
+    const $ = g("div", "", "ppp-pick");
+    f.funderMultiple && f.returnToKind === "funder" && $.append(g("p", "More than one address has sent funds. Returns go to the first. Choose another below if that is not right.", "ppp-warn")), f.returnToKind === "funder" && $.append(g("p", "If the funds came from an exchange, choose your own address instead: exchanges often cannot take a refund.", "ppp-mute"));
     const T = g("input");
     T.type = "text", T.placeholder = "SP… address to send returns to", T.autocomplete = "off", T.spellcheck = !1, T.setAttribute("aria-label", "Address to return funds to"), T.value = Ht, T.oninput = () => {
       Ht = T.value;
@@ -12908,7 +12919,7 @@ function a$(t) {
     const Z = w(f.returnToKind === "chosen" ? "Change address" : "Use this address", () => {
       o.setReturnAddress(T.value), Ht = "";
     }, "tiny");
-    return A.append(T, " ", Z), f.returnToKind === "chosen" && A.append(" ", w("Back to the funder", () => o.clearReturnAddress(), "tiny")), A;
+    return $.append(T, " ", Z), f.returnToKind === "chosen" && $.append(" ", w("Back to the funder", () => o.clearReturnAddress(), "tiny")), $;
   }
   const ze = "Your plays and likes are listed under this listening address. To keep them under a wallet of your own, get Xverse or Leather (both free), connect it here, and link this listening wallet to it.";
   function Zt() {
@@ -12917,15 +12928,15 @@ function a$(t) {
   }
   let we = "";
   const Vt = (f) => {
-    const A = document.documentElement, T = f.solo && !f.main ? f.listening ? d(f.listening) : "new" : "", Z = b5() ? "1" : "";
-    `${T}|${Z}` !== we && (we = `${T}|${Z}`, T ? A.dataset.pppSolo = T : delete A.dataset.pppSolo, Z ? A.dataset.pppWalletInstalled = Z : delete A.dataset.pppWalletInstalled, window.dispatchEvent(new Event("xtrata:ppp-header")));
+    const $ = document.documentElement, T = f.solo && !f.main ? f.listening ? d(f.listening) : "new" : "", Z = b5() ? "1" : "";
+    `${T}|${Z}` !== we && (we = `${T}|${Z}`, T ? $.dataset.pppSolo = T : delete $.dataset.pppSolo, Z ? $.dataset.pppWalletInstalled = Z : delete $.dataset.pppWalletInstalled, window.dispatchEvent(new Event("xtrata:ppp-header")));
   };
   for (const f of [1500, 4e3, 9e3]) setTimeout(() => Ft(o.snapshot()), f);
   function Ft(f) {
     var en, Hn, is, os;
     if (u(), Vt(f), S(f), Bt(f), t.hidden = f.step === "off", t.hidden) return;
-    const [A, T] = q(f), Z = n(".ppp-state");
-    Z.textContent = A, Z.className = "ppp-state" + (T ? " ppp-state--" + T : ""), Z.hidden = !A;
+    const [$, T] = q(f), Z = n(".ppp-state");
+    Z.textContent = $, Z.className = "ppp-state" + (T ? " ppp-state--" + T : ""), Z.hidden = !$;
     const ft = !!f.busy || f.armed, $t = !["elsewhere", "connect", "wrong-wallet", "not-invited", "unsupported", "off"].includes(f.step) && (ft || !["intro", "loading"].includes(f.step));
     r.hidden = !$t, r.classList.toggle("ppp-frame--rest", !ft && !U);
     const se = n(".ppp-frame-label");
@@ -12940,7 +12951,7 @@ function a$(t) {
       return x.append(g("span", et < te.at ? "✓" : String(et + 1), "n"), Y), et === te.at && x.setAttribute("aria-current", "step"), x;
     })), wr.textContent = te.caption, wr.className = "ppp-stage " + (te.at >= nl(f.solo).length ? "ppp-ok" : te.blocked ? "ppp-bad" : "ppp-cyan"));
     const _n = n(".ppp-facts"), fe = [];
-    f.main && ((en = f.gate) != null && en.here) && !f.solo && fe.push(...At("Your wallet", v(f.main), "ppp-addr-short"));
+    f.main && ((en = f.gate) != null && en.here) && !f.solo && fe.push(...At("Your wallet", A(f.main), "ppp-addr-short"));
     const $e = () => {
       if (!f.listening) return;
       const Y = w("Copy", () => {
@@ -12951,10 +12962,10 @@ function a$(t) {
     };
     if (f.linked || $e(), f.listening && f.step !== "intro")
       if (f.linked)
-        fe.push(...At("Credited to", `${v(f.linked)} · plays, likes and returns`, f.linked === f.main || f.solo ? "ppp-ok" : "ppp-warn")), $e();
+        fe.push(...At("Credited to", `${A(f.linked)} · plays, likes and returns`, f.linked === f.main || f.solo ? "ppp-ok" : "ppp-warn")), $e();
       else if (f.solo) {
-        const Y = f.returnTo ? `${d(f.returnTo)} · ${f.returnToKind === "chosen" ? "chosen by you" : "sent the first funds"}` : f.funderState === "failed" ? "could not check who funded it right now" : "set when it is funded";
-        fe.push(...At("Returns go to", f.returnTo ? Y.replace(d(f.returnTo), f.returnTo) : Y, f.returnTo ? "ppp-addr-full" : "ppp-mute"));
+        const Y = f.returnTo ? `${A(f.returnTo)} · ${f.returnToKind === "chosen" ? "chosen by you" : "sent the first funds"}` : f.funderState === "failed" ? "could not check who funded it right now" : "set when it is funded";
+        fe.push(...At("Returns go to", f.returnTo && !k(f.returnTo) ? Y.replace(d(f.returnTo), f.returnTo) : Y, f.returnTo ? "ppp-addr-full" : "ppp-mute"));
       } else fe.push(...At("Linked to", "not linked yet", "ppp-warn"));
     if (f.linkedListening.length && ((Hn = f.gate) != null && Hn.here)) {
       const Y = f.linkedListening.map((et) => d(et) + (et === f.listening ? " (this one)" : "")).join(", ");
@@ -12965,7 +12976,7 @@ function a$(t) {
       fe.push(...At("Balance", `${vn(f.balance)} STX · about ${f.playsLeft.toLocaleString()} plays`, Y));
     }
     const Je = f.entries.find((Y) => Y.kind === "play");
-    Je && m(), Je && fe.push(...At("Last paid song", `${N(Je)} → ${d(Je.recipient)}`, X[Je.status] || "")), _n.replaceChildren(...fe), _n.hidden = !fe.length;
+    Je && m(), Je && fe.push(...At("Last paid song", `${N(Je)} → ${A(Je.recipient)}`, X[Je.status] || "")), _n.replaceChildren(...fe), _n.hidden = !fe.length;
     const yt = [], St = [], Pt = [], be = [], br = Gs(BigInt(((is = f.gate) == null ? void 0 : is.limits.playFee) ?? "300")), Jt = `Each song you listen to for 30 seconds sends ${vn(Jc)} STX to whoever holds it, plus a ${vn(br - Jc)} STX network fee. It is optional and leaves a permanent on-chain record that you paid the artist.`, Un = !!f.busy;
     switch (f.step) {
       case "elsewhere": {
@@ -12979,12 +12990,12 @@ function a$(t) {
       case "connect":
         if (f.linked) {
           const et = [f.linked, ...f.others];
-          yt.push(g("p", et.length > 1 ? `This device has listening wallets for ${O(et)}. Connect one of them to keep paying artists.` : `This device's listening wallet is linked to ${v(f.linked)}. Connect that wallet to keep paying artists.`)), St.push(g("p", "Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free."));
+          yt.push(g("p", et.length > 1 ? `This device has listening wallets for ${O(et)}. Connect one of them to keep paying artists.` : `This device's listening wallet is linked to ${A(f.linked)}. Connect that wallet to keep paying artists.`)), St.push(g("p", "Connect a different wallet instead and it gets a listening wallet of its own: each address keeps its own plays, likes and funds. Listening is always free."));
         } else
           yt.push(g("p", "Connect your wallet to pay artists as you listen.")), St.push(g("p", "Every payment is recorded on-chain. Listening is always free."));
         break;
       case "wrong-wallet":
-        yt.push(g("p", `This device's listening wallet belongs to ${v(f.linked)}. Connect that wallet to pay artists or like songs.`, "ppp-warn")), St.push(g("p", `You are connected as ${v(f.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`)), St.push(g("p", "The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.", "ppp-mute")), Pt.push(w("Switch wallet", () => {
+        yt.push(g("p", `This device's listening wallet belongs to ${A(f.linked)}. Connect that wallet to pay artists or like songs.`, "ppp-warn")), St.push(g("p", `You are connected as ${A(f.main)}. Listening is still free, and nothing is paid from the listening wallet while this wallet is connected.`)), St.push(g("p", "The listening wallet box is updating. Once it has, each wallet address gets its own listening wallet on this device.", "ppp-mute")), Pt.push(w("Switch wallet", () => {
           var et;
           return (et = document.getElementById("radio-wallet-connect")) == null ? void 0 : et.click();
         }, "primary"));
@@ -12996,9 +13007,9 @@ function a$(t) {
         yt.push(g("p", "Needs a passkey this browser cannot make. Try Chrome or Safari.", "ppp-warn"));
         break;
       case "intro":
-        yt.push(g("p", `Pay artists ${vn(br)} STX a song as you listen.`)), St.push(g("p", Jt)), St.push(g("p", "Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.", "ppp-ok")), St.push(g("p", f.solo ? "You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it." : "You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.", "ppp-warn")), !f.solo && f.main && f.others.length ? (yt.push(g("p", `This device already has a listening wallet for ${O(f.others)}. If you meant to use that one, switch to that wallet.`, "ppp-warn")), St.push(g("p", `Otherwise, set up a new listening wallet for ${v(f.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`))) : !f.solo && f.main && St.push(g("p", `This is the listening wallet for ${v(f.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, "ppp-mute")), f.solo && St.push(g("p", "Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.", "ppp-mute"));
+        yt.push(g("p", `Pay artists ${vn(br)} STX a song as you listen.`)), St.push(g("p", Jt)), St.push(g("p", "Once it has funds, every song you listen to for 30 seconds pays automatically until you switch it off or the wallet runs out. No popups while you listen.", "ppp-ok")), St.push(g("p", f.solo ? "You get a small listening wallet made from a passkey on this device: no app or Stacks wallet needed, and no key stored anywhere. Keep no more than 1 STX in it. Anything left can be sent back to whoever funded it." : "You get a small listening wallet made from a passkey on this device: nothing to install, and no key stored anywhere. Keep no more than 1 STX in it. You can return everything to your main wallet at any time.", "ppp-warn")), !f.solo && f.main && f.others.length ? (yt.push(g("p", `This device already has a listening wallet for ${O(f.others)}. If you meant to use that one, switch to that wallet.`, "ppp-warn")), St.push(g("p", `Otherwise, set up a new listening wallet for ${A(f.main)} below. Each address keeps its own plays, likes and funds, like a playlist per profile.`))) : !f.solo && f.main && St.push(g("p", `This is the listening wallet for ${A(f.main)}. Each wallet address you connect gets its own on this device, so plays and likes stay separate, like a playlist per profile.`, "ppp-mute")), f.solo && St.push(g("p", "Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.", "ppp-mute"));
         const Y = a.liveGift();
-        Pt.push(w(Y ? "Claim my gift · no wallet needed" : f.solo ? "Turn on pay-per-play · no wallet needed" : f.others.length && f.main ? `Set up for ${d(f.main)}` : "Turn on pay-per-play", () => void o.create(), "primary")), !Y && !f.solo && f.main && f.others.length && Pt.push(w("Switch wallet", () => {
+        Pt.push(w(Y ? "Claim my gift · no wallet needed" : f.solo ? "Turn on pay-per-play · no wallet needed" : f.others.length && f.main ? `Set up for ${A(f.main)}` : "Turn on pay-per-play", () => void o.create(), "primary")), !Y && !f.solo && f.main && f.others.length && Pt.push(w("Switch wallet", () => {
           var et;
           return (et = document.getElementById("radio-wallet-connect")) == null ? void 0 : et.click();
         })), !Y && f.solo && Pt.push(w("I have a Stacks wallet", () => {
@@ -13010,7 +13021,7 @@ function a$(t) {
         f.armed || (yt.push(g("p", "Locked.", "ppp-mute")), Pt.push(w(f.payingOn ? "Unlock and keep paying" : "Unlock", () => void o.unlock(), "primary"))), be.push(w("Use a different listening wallet", () => void o.unlock(!0), "quiet"));
         break;
       case "link":
-        yt.push(g("p", `Link to ${v(f.main)} · free`)), St.push(g("p", "Linking is a signature, not a transaction: no fee and no spending permission. Afterwards, funds can only be returned to this main wallet, and your likes and paid plays count for it.")), St.push(g("p", "The listening wallet will show the full address. Check it is yours before confirming.", "ppp-warn")), Pt.push(w(f.serverLinked ? "Confirm my wallet" : "Link to my wallet", () => void o.link(), "primary"));
+        yt.push(g("p", `Link to ${A(f.main)} · free`)), St.push(g("p", "Linking is a signature, not a transaction: no fee and no spending permission. Afterwards, funds can only be returned to this main wallet, and your likes and paid plays count for it.")), St.push(g("p", "The listening wallet will show the full address. Check it is yours before confirming.", "ppp-warn")), Pt.push(w(f.serverLinked ? "Confirm my wallet" : "Link to my wallet", () => void o.link(), "primary"));
         break;
       case "loading":
         yt.push(g("p", "Checking the listening wallet balance…", "ppp-mute"));
@@ -13041,7 +13052,7 @@ function a$(t) {
       const Y = g("p", "New to Stacks? ", "ppp-mute");
       Y.append(I("Get Xverse or Leather", "https://www.xverse.app/download"), " (free) to keep your plays and likes under a wallet of your own."), yt.push(Y);
     }
-    if (f.walletOutdated && St.push(g("p", "The listening wallet box is an older version, so likes go through your main wallet for now. Paid plays work as normal.", "ppp-warn")), f.stuck && (yt.push(g("p", f.stuck === 1 ? "1 payment has not appeared on-chain after 30 minutes." : `${f.stuck} payments have not appeared on-chain after 30 minutes.`, "ppp-warn")), Pt.push(w("Clear stuck payments", () => void o.clearStuck()))), ["ready", "fund"].includes(f.step) && f.returnTo && (f.balance ?? 0n) > 0n && be.push(w(f.linked ? "Return all to my wallet" : `Return all to ${d(f.returnTo)}`, () => void o.returnFunds("all"), "quiet")), ["ready", "fund", "link", "over"].includes(f.step) && be.push(w("Lock", () => void o.lock(), "quiet")), $t && !ft && be.push(w(U ? "Hide listening wallet box" : "Show listening wallet box", () => {
+    if (f.walletOutdated && St.push(g("p", "The listening wallet box is an older version, so likes go through your main wallet for now. Paid plays work as normal.", "ppp-warn")), f.stuck && (yt.push(g("p", f.stuck === 1 ? "1 payment has not appeared on-chain after 30 minutes." : `${f.stuck} payments have not appeared on-chain after 30 minutes.`, "ppp-warn")), Pt.push(w("Clear stuck payments", () => void o.clearStuck()))), ["ready", "fund"].includes(f.step) && f.returnTo && (f.balance ?? 0n) > 0n && be.push(w(f.linked ? "Return all to my wallet" : `Return all to ${A(f.returnTo)}`, () => void o.returnFunds("all"), "quiet")), ["ready", "fund", "link", "over"].includes(f.step) && be.push(w("Lock", () => void o.lock(), "quiet")), $t && !ft && be.push(w(U ? "Hide listening wallet box" : "Show listening wallet box", () => {
       U = !U, Ft(o.snapshot());
     }, "quiet")), [...Pt, ...be].forEach((Y) => Y.disabled = Un), Un && (Pt.length = 0), f.balance !== void 0 && ["fund", "ready", "over"].includes(f.step) && !(f.step === "fund" && f.depositPending && f.balance === 0n)) {
       const Y = f.balanceState === "ok" ? "ppp-ok" : f.balanceState === "low" ? "ppp-warn" : "ppp-bad", et = yt.at(0);
@@ -13059,7 +13070,7 @@ function a$(t) {
     })), n(".ppp-wallets").hidden = !(_n.childElementCount || be.length), n(".ppp-more").hidden = !St.length;
     const tn = n(".ppp-history");
     tn.hidden = !f.entries.length, f.entries.length && m(), tn.replaceChildren(g("summary", `All activity (${f.entries.length})`), ...f.entries.slice(0, 20).map((Y) => {
-      const et = g("div", "", "ppp-row"), x = Y.kind === "play" ? [g("span", N(Y), "ppp-song"), g("span", ` · ${vn(BigInt(Y.amount))} STX to ${d(Y.recipient)}`, "ppp-mute")] : Y.kind === "like" ? [g("span", `${Y.liked ? "♥ Liked" : "Unliked"} ${N(Y)}`, "ppp-song"), g("span", ` · for ${f.linked ? v(f.linked) : "this listening wallet"}`, "ppp-mute")] : [g("span", `Returned ${vn(BigInt(Y.amount))} STX`, "ppp-song"), g("span", ` to ${d(Y.recipient)}`, "ppp-mute")];
+      const et = g("div", "", "ppp-row"), x = Y.kind === "play" ? [g("span", N(Y), "ppp-song"), g("span", ` · ${vn(BigInt(Y.amount))} STX to ${A(Y.recipient)}`, "ppp-mute")] : Y.kind === "like" ? [g("span", `${Y.liked ? "♥ Liked" : "Unliked"} ${N(Y)}`, "ppp-song"), g("span", ` · for ${f.linked ? A(f.linked) : "this listening wallet"}`, "ppp-mute")] : [g("span", `Returned ${vn(BigInt(Y.amount))} STX`, "ppp-song"), g("span", ` to ${A(Y.recipient)}`, "ppp-mute")];
       return et.append(
         g("span", nt[Y.status] || Y.status, "ppp-status " + (X[Y.status] || "")),
         ...x,
@@ -13069,8 +13080,8 @@ function a$(t) {
   }
   const ne = /* @__PURE__ */ new Map(), Qt = () => {
     const f = window.XtrataRadio;
-    return f != null && f.subscribe ? (f.subscribe((A) => {
-      const T = A == null ? void 0 : A.nowPlaying;
+    return f != null && f.subscribe ? (f.subscribe(($) => {
+      const T = $ == null ? void 0 : $.nowPlaying;
       T && Number.isSafeInteger(Number(T.tokenId)) && ne.set(Number(T.tokenId), { title: T.title || void 0, artist: T.artist || void 0 });
     }), !0) : !1;
   };
@@ -13081,11 +13092,11 @@ function a$(t) {
     setTimeout(() => clearInterval(f), 6e4);
   }
   window.addEventListener("xtrata:radio-listened", (f) => {
-    const A = f.detail;
-    if (A && Number.isSafeInteger(A.song) && typeof A.id == "string" && /^[0-9a-f]{32}$/.test(A.id)) {
+    const $ = f.detail;
+    if ($ && Number.isSafeInteger($.song) && typeof $.id == "string" && /^[0-9a-f]{32}$/.test($.id)) {
       m();
-      const T = L(A.song, ne.get(A.song));
-      o.onListened({ song: A.song, id: A.id, title: T.title || void 0, artist: T.artist || void 0 });
+      const T = L($.song, ne.get($.song));
+      o.onListened({ song: $.song, id: $.id, title: T.title || void 0, artist: T.artist || void 0 });
     }
   }), window.addEventListener("xtrata:wallet-changed", () => void o.refresh()), document.addEventListener("visibilitychange", () => {
     document.hidden || o.refresh();
@@ -13093,10 +13104,10 @@ function a$(t) {
     !document.hidden && o.snapshot().step !== "off" && o.refresh();
   }, 15e3), o.refresh();
 }
-const c$ = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0ibTcgNyAxMCAxME0xNyA3IDcgMTciIHN0cm9rZT0iIzI0MjYyOSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==", l$ = () => {
+const l$ = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZD0ibTcgNyAxMCAxME0xNyA3IDcgMTciIHN0cm9rZT0iIzI0MjYyOSIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPjwvc3ZnPg==", u$ = () => {
   const t = !!window.chrome, e = window.navigator, n = e.vendor, r = typeof window.opr < "u", s = e.userAgent.includes("Edge"), i = /CriOS/.exec(e.userAgent), o = e.userAgent.includes("Mobile");
   return i ? !1 : t !== null && typeof t < "u" && n === "Google Inc." && r === !1 && s === !1 && o === !1;
-}, u$ = () => l$() ? "Chrome" : window.navigator.userAgent.includes("Firefox") ? "Firefox" : null, f$ = () => window.navigator.userAgent.includes("Mobile") ? window.navigator.userAgent.includes("iPhone") ? "IOS" : "Android" : null, d$ = '*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-scroll-snap-strictness:proximity;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;border:0 solid #e5e7eb;box-sizing:border-box}::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-scroll-snap-strictness:proximity;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;}/*! tailwindcss v3.4.14 | MIT License | https://tailwindcss.com*/:after,:before{--tw-content:""}:host,html{-webkit-text-size-adjust:100%;font-feature-settings:normal;-webkit-tap-highlight-color:transparent;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-variation-settings:normal;line-height:1.5;-moz-tab-size:4;tab-size:4}body{line-height:inherit;margin:0}hr{border-top-width:1px;color:inherit;height:0}abbr:where([title]){text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-feature-settings:normal;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-size:1em;font-variation-settings:normal}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{border-collapse:collapse;border-color:inherit;text-indent:0}button,input,optgroup,select,textarea{font-feature-settings:inherit;color:inherit;font-family:inherit;font-size:100%;font-variation-settings:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,fieldset,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{color:#9ca3af;opacity:1}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{height:auto;max-width:100%}[hidden]:where(:not([hidden=until-found])){display:none}:host{all:initial}.modal-container{color:#74777d;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol}.modal-body{-ms-overflow-style:none;scrollbar-width:none}.modal-body::-webkit-scrollbar{display:none}.sr-only{clip:rect(0,0,0,0);border-width:0;height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;white-space:nowrap;width:1px}.static{position:static}.fixed{position:fixed}.inset-0{inset:0}.z-\\[8999\\]{z-index:8999}.z-\\[9000\\]{z-index:9000}.mx-auto{margin-left:auto;margin-right:auto}.mb-4{margin-bottom:1rem}.mb-5{margin-bottom:1.25rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.box-border{box-sizing:border-box}.flex{display:flex}.aspect-square{aspect-ratio:1/1}.h-full{height:100%}.max-h-\\[calc\\(100\\%-24px\\)\\]{max-height:calc(100% - 24px)}.w-full{width:100%}.max-w-full{max-width:100%}.flex-1{flex:1 1 0%}.basis-9{flex-basis:2.25rem}.cursor-default{cursor:default}.cursor-pointer{cursor:pointer}.flex-col{flex-direction:column}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-3{gap:.75rem}.space-x-\\[5px\\]>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-left:calc(5px*(1 - var(--tw-space-x-reverse)));margin-right:calc(5px*var(--tw-space-x-reverse))}.space-y-3>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(.75rem*var(--tw-space-y-reverse));margin-top:calc(.75rem*(1 - var(--tw-space-y-reverse)))}.space-y-\\[10px\\]>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(10px*var(--tw-space-y-reverse));margin-top:calc(10px*(1 - var(--tw-space-y-reverse)))}.overflow-hidden{overflow:hidden}.overflow-y-scroll{overflow-y:scroll}.rounded-2xl{border-radius:1rem}.rounded-\\[10px\\]{border-radius:10px}.rounded-full{border-radius:9999px}.rounded-xl{border-radius:.75rem}.rounded-b-none{border-bottom-left-radius:0;border-bottom-right-radius:0}.border{border-width:1px}.border-\\[\\#333\\]{--tw-border-opacity:1;border-color:rgb(51 51 51/var(--tw-border-opacity))}.border-\\[\\#EFEFF2\\]{--tw-border-opacity:1;border-color:rgb(239 239 242/var(--tw-border-opacity))}.bg-\\[\\#00000040\\]{background-color:#00000040}.bg-\\[\\#323232\\]{--tw-bg-opacity:1;background-color:rgb(50 50 50/var(--tw-bg-opacity))}.bg-gray-200{--tw-bg-opacity:1;background-color:rgb(229 231 235/var(--tw-bg-opacity))}.bg-gray-700{--tw-bg-opacity:1;background-color:rgb(55 65 81/var(--tw-bg-opacity))}.bg-transparent{background-color:transparent}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity))}.p-1{padding:.25rem}.p-6{padding:1.5rem}.p-\\[14px\\]{padding:14px}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1\\.5{padding-bottom:.375rem;padding-top:.375rem}.py-2{padding-bottom:.5rem;padding-top:.5rem}.align-text-bottom{vertical-align:text-bottom}.text-\\[9px\\]{font-size:9px}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-medium{font-weight:500}.leading-snug{line-height:1.375}.text-\\[\\#242629\\]{--tw-text-opacity:1;color:rgb(36 38 41/var(--tw-text-opacity))}.text-\\[\\#EFEFEF\\]{--tw-text-opacity:1;color:rgb(239 239 239/var(--tw-text-opacity))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity))}.shadow{--tw-shadow:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px -1px rgba(0,0,0,.1);--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color),0 1px 2px -1px var(--tw-shadow-color)}.shadow,.shadow-\\[0_1px_2px_0_\\#0000000A\\]{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\\[0_1px_2px_0_\\#0000000A\\]{--tw-shadow:0 1px 2px 0 #0000000a;--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-\\[0_4px_5px_0_\\#00000005\\2c 0_16px_40px_0_\\#00000014\\]{--tw-shadow:0 4px 5px 0 #00000005,0 16px 40px 0 #00000014;--tw-shadow-colored:0 4px 5px 0 var(--tw-shadow-color),0 16px 40px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.outline-\\[\\#FFBD7A\\]{outline-color:#ffbd7a}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.transition-all{transition-duration:.15s;transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1)}.transition-colors{transition-duration:.15s;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1)}@keyframes enter{0%{opacity:var(--tw-enter-opacity,1);transform:translate3d(var(--tw-enter-translate-x,0),var(--tw-enter-translate-y,0),0) scale3d(var(--tw-enter-scale,1),var(--tw-enter-scale,1),var(--tw-enter-scale,1)) rotate(var(--tw-enter-rotate,0))}}@keyframes exit{to{opacity:var(--tw-exit-opacity,1);transform:translate3d(var(--tw-exit-translate-x,0),var(--tw-exit-translate-y,0),0) scale3d(var(--tw-exit-scale,1),var(--tw-exit-scale,1),var(--tw-exit-scale,1)) rotate(var(--tw-exit-rotate,0))}}.animate-in{--tw-enter-opacity:initial;--tw-enter-scale:initial;--tw-enter-rotate:initial;--tw-enter-translate-x:initial;--tw-enter-translate-y:initial;animation-duration:.15s;animation-name:enter}.fade-in{--tw-enter-opacity:0}.slide-in-from-bottom{--tw-enter-translate-y:100%}.hover\\:bg-\\[\\#0C0C0D\\]:hover{--tw-bg-opacity:1;background-color:rgb(12 12 13/var(--tw-bg-opacity))}.hover\\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity))}.hover\\:text-\\[\\#242629\\]:hover{--tw-text-opacity:1;color:rgb(36 38 41/var(--tw-text-opacity))}.hover\\:text-white:hover{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity))}.hover\\:underline:hover{text-decoration-line:underline}.hover\\:shadow-\\[0_1px_2px_0_\\#00000010\\]:hover{--tw-shadow:0 1px 2px 0 #00000010;--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.hover\\:shadow-\\[0_1px_2px_0_\\#00000010\\]:hover,.hover\\:shadow-\\[0_8px_16px_0_\\#00000020\\]:hover{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.hover\\:shadow-\\[0_8px_16px_0_\\#00000020\\]:hover{--tw-shadow:0 8px 16px 0 #00000020;--tw-shadow-colored:0 8px 16px 0 var(--tw-shadow-color)}.focus\\:underline:focus{text-decoration-line:underline}.focus\\:outline:focus{outline-style:solid}.focus\\:outline-\\[3px\\]:focus{outline-width:3px}.active\\:scale-95:active{--tw-scale-x:.95;--tw-scale-y:.95;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@media (min-width:768px){.md\\:max-h-\\[calc\\(100\\%-48px\\)\\]{max-height:calc(100% - 48px)}.md\\:w-\\[400px\\]{width:400px}.md\\:items-center{align-items:center}.md\\:justify-center{justify-content:center}.md\\:rounded-b-2xl{border-bottom-left-radius:1rem;border-bottom-right-radius:1rem}.md\\:zoom-in-50{--tw-enter-scale:.5}.md\\:slide-in-from-bottom-0{--tw-enter-translate-y:0px}}', Lg = class {
+}, f$ = () => u$() ? "Chrome" : window.navigator.userAgent.includes("Firefox") ? "Firefox" : null, d$ = () => window.navigator.userAgent.includes("Mobile") ? window.navigator.userAgent.includes("iPhone") ? "IOS" : "Android" : null, h$ = '*,:after,:before{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-scroll-snap-strictness:proximity;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;border:0 solid #e5e7eb;box-sizing:border-box}::backdrop{--tw-border-spacing-x:0;--tw-border-spacing-y:0;--tw-translate-x:0;--tw-translate-y:0;--tw-rotate:0;--tw-skew-x:0;--tw-skew-y:0;--tw-scale-x:1;--tw-scale-y:1;--tw-scroll-snap-strictness:proximity;--tw-ring-offset-width:0px;--tw-ring-offset-color:#fff;--tw-ring-color:rgba(59,130,246,.5);--tw-ring-offset-shadow:0 0 #0000;--tw-ring-shadow:0 0 #0000;--tw-shadow:0 0 #0000;--tw-shadow-colored:0 0 #0000;}/*! tailwindcss v3.4.14 | MIT License | https://tailwindcss.com*/:after,:before{--tw-content:""}:host,html{-webkit-text-size-adjust:100%;font-feature-settings:normal;-webkit-tap-highlight-color:transparent;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-variation-settings:normal;line-height:1.5;-moz-tab-size:4;tab-size:4}body{line-height:inherit;margin:0}hr{border-top-width:1px;color:inherit;height:0}abbr:where([title]){text-decoration:underline dotted}h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}b,strong{font-weight:bolder}code,kbd,pre,samp{font-feature-settings:normal;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,Liberation Mono,Courier New,monospace;font-size:1em;font-variation-settings:normal}small{font-size:80%}sub,sup{font-size:75%;line-height:0;position:relative;vertical-align:baseline}sub{bottom:-.25em}sup{top:-.5em}table{border-collapse:collapse;border-color:inherit;text-indent:0}button,input,optgroup,select,textarea{font-feature-settings:inherit;color:inherit;font-family:inherit;font-size:100%;font-variation-settings:inherit;font-weight:inherit;letter-spacing:inherit;line-height:inherit;margin:0;padding:0}button,select{text-transform:none}button,input:where([type=button]),input:where([type=reset]),input:where([type=submit]){-webkit-appearance:button;background-color:transparent;background-image:none}:-moz-focusring{outline:auto}:-moz-ui-invalid{box-shadow:none}progress{vertical-align:baseline}::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}[type=search]{-webkit-appearance:textfield;outline-offset:-2px}::-webkit-search-decoration{-webkit-appearance:none}::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}summary{display:list-item}blockquote,dd,dl,fieldset,figure,h1,h2,h3,h4,h5,h6,hr,p,pre{margin:0}fieldset,legend{padding:0}menu,ol,ul{list-style:none;margin:0;padding:0}dialog{padding:0}textarea{resize:vertical}input::placeholder,textarea::placeholder{color:#9ca3af;opacity:1}[role=button],button{cursor:pointer}:disabled{cursor:default}audio,canvas,embed,iframe,img,object,svg,video{display:block;vertical-align:middle}img,video{height:auto;max-width:100%}[hidden]:where(:not([hidden=until-found])){display:none}:host{all:initial}.modal-container{color:#74777d;font-family:Inter,-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol}.modal-body{-ms-overflow-style:none;scrollbar-width:none}.modal-body::-webkit-scrollbar{display:none}.sr-only{clip:rect(0,0,0,0);border-width:0;height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;white-space:nowrap;width:1px}.static{position:static}.fixed{position:fixed}.inset-0{inset:0}.z-\\[8999\\]{z-index:8999}.z-\\[9000\\]{z-index:9000}.mx-auto{margin-left:auto;margin-right:auto}.mb-4{margin-bottom:1rem}.mb-5{margin-bottom:1.25rem}.mt-4{margin-top:1rem}.mt-6{margin-top:1.5rem}.box-border{box-sizing:border-box}.flex{display:flex}.aspect-square{aspect-ratio:1/1}.h-full{height:100%}.max-h-\\[calc\\(100\\%-24px\\)\\]{max-height:calc(100% - 24px)}.w-full{width:100%}.max-w-full{max-width:100%}.flex-1{flex:1 1 0%}.basis-9{flex-basis:2.25rem}.cursor-default{cursor:default}.cursor-pointer{cursor:pointer}.flex-col{flex-direction:column}.items-end{align-items:flex-end}.items-center{align-items:center}.justify-between{justify-content:space-between}.gap-3{gap:.75rem}.space-x-\\[5px\\]>:not([hidden])~:not([hidden]){--tw-space-x-reverse:0;margin-left:calc(5px*(1 - var(--tw-space-x-reverse)));margin-right:calc(5px*var(--tw-space-x-reverse))}.space-y-3>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(.75rem*var(--tw-space-y-reverse));margin-top:calc(.75rem*(1 - var(--tw-space-y-reverse)))}.space-y-\\[10px\\]>:not([hidden])~:not([hidden]){--tw-space-y-reverse:0;margin-bottom:calc(10px*var(--tw-space-y-reverse));margin-top:calc(10px*(1 - var(--tw-space-y-reverse)))}.overflow-hidden{overflow:hidden}.overflow-y-scroll{overflow-y:scroll}.rounded-2xl{border-radius:1rem}.rounded-\\[10px\\]{border-radius:10px}.rounded-full{border-radius:9999px}.rounded-xl{border-radius:.75rem}.rounded-b-none{border-bottom-left-radius:0;border-bottom-right-radius:0}.border{border-width:1px}.border-\\[\\#333\\]{--tw-border-opacity:1;border-color:rgb(51 51 51/var(--tw-border-opacity))}.border-\\[\\#EFEFF2\\]{--tw-border-opacity:1;border-color:rgb(239 239 242/var(--tw-border-opacity))}.bg-\\[\\#00000040\\]{background-color:#00000040}.bg-\\[\\#323232\\]{--tw-bg-opacity:1;background-color:rgb(50 50 50/var(--tw-bg-opacity))}.bg-gray-200{--tw-bg-opacity:1;background-color:rgb(229 231 235/var(--tw-bg-opacity))}.bg-gray-700{--tw-bg-opacity:1;background-color:rgb(55 65 81/var(--tw-bg-opacity))}.bg-transparent{background-color:transparent}.bg-white{--tw-bg-opacity:1;background-color:rgb(255 255 255/var(--tw-bg-opacity))}.p-1{padding:.25rem}.p-6{padding:1.5rem}.p-\\[14px\\]{padding:14px}.px-3{padding-left:.75rem;padding-right:.75rem}.px-4{padding-left:1rem;padding-right:1rem}.py-1\\.5{padding-bottom:.375rem;padding-top:.375rem}.py-2{padding-bottom:.5rem;padding-top:.5rem}.align-text-bottom{vertical-align:text-bottom}.text-\\[9px\\]{font-size:9px}.text-sm{font-size:.875rem;line-height:1.25rem}.text-xl{font-size:1.25rem;line-height:1.75rem}.text-xs{font-size:.75rem;line-height:1rem}.font-medium{font-weight:500}.leading-snug{line-height:1.375}.text-\\[\\#242629\\]{--tw-text-opacity:1;color:rgb(36 38 41/var(--tw-text-opacity))}.text-\\[\\#EFEFEF\\]{--tw-text-opacity:1;color:rgb(239 239 239/var(--tw-text-opacity))}.text-gray-500{--tw-text-opacity:1;color:rgb(107 114 128/var(--tw-text-opacity))}.shadow{--tw-shadow:0 1px 3px 0 rgba(0,0,0,.1),0 1px 2px -1px rgba(0,0,0,.1);--tw-shadow-colored:0 1px 3px 0 var(--tw-shadow-color),0 1px 2px -1px var(--tw-shadow-color)}.shadow,.shadow-\\[0_1px_2px_0_\\#0000000A\\]{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.shadow-\\[0_1px_2px_0_\\#0000000A\\]{--tw-shadow:0 1px 2px 0 #0000000a;--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.shadow-\\[0_4px_5px_0_\\#00000005\\2c 0_16px_40px_0_\\#00000014\\]{--tw-shadow:0 4px 5px 0 #00000005,0 16px 40px 0 #00000014;--tw-shadow-colored:0 4px 5px 0 var(--tw-shadow-color),0 16px 40px 0 var(--tw-shadow-color);box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.outline-\\[\\#FFBD7A\\]{outline-color:#ffbd7a}.filter{filter:var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow)}.transition-all{transition-duration:.15s;transition-property:all;transition-timing-function:cubic-bezier(.4,0,.2,1)}.transition-colors{transition-duration:.15s;transition-property:color,background-color,border-color,text-decoration-color,fill,stroke;transition-timing-function:cubic-bezier(.4,0,.2,1)}@keyframes enter{0%{opacity:var(--tw-enter-opacity,1);transform:translate3d(var(--tw-enter-translate-x,0),var(--tw-enter-translate-y,0),0) scale3d(var(--tw-enter-scale,1),var(--tw-enter-scale,1),var(--tw-enter-scale,1)) rotate(var(--tw-enter-rotate,0))}}@keyframes exit{to{opacity:var(--tw-exit-opacity,1);transform:translate3d(var(--tw-exit-translate-x,0),var(--tw-exit-translate-y,0),0) scale3d(var(--tw-exit-scale,1),var(--tw-exit-scale,1),var(--tw-exit-scale,1)) rotate(var(--tw-exit-rotate,0))}}.animate-in{--tw-enter-opacity:initial;--tw-enter-scale:initial;--tw-enter-rotate:initial;--tw-enter-translate-x:initial;--tw-enter-translate-y:initial;animation-duration:.15s;animation-name:enter}.fade-in{--tw-enter-opacity:0}.slide-in-from-bottom{--tw-enter-translate-y:100%}.hover\\:bg-\\[\\#0C0C0D\\]:hover{--tw-bg-opacity:1;background-color:rgb(12 12 13/var(--tw-bg-opacity))}.hover\\:bg-gray-100:hover{--tw-bg-opacity:1;background-color:rgb(243 244 246/var(--tw-bg-opacity))}.hover\\:text-\\[\\#242629\\]:hover{--tw-text-opacity:1;color:rgb(36 38 41/var(--tw-text-opacity))}.hover\\:text-white:hover{--tw-text-opacity:1;color:rgb(255 255 255/var(--tw-text-opacity))}.hover\\:underline:hover{text-decoration-line:underline}.hover\\:shadow-\\[0_1px_2px_0_\\#00000010\\]:hover{--tw-shadow:0 1px 2px 0 #00000010;--tw-shadow-colored:0 1px 2px 0 var(--tw-shadow-color)}.hover\\:shadow-\\[0_1px_2px_0_\\#00000010\\]:hover,.hover\\:shadow-\\[0_8px_16px_0_\\#00000020\\]:hover{box-shadow:var(--tw-ring-offset-shadow,0 0 #0000),var(--tw-ring-shadow,0 0 #0000),var(--tw-shadow)}.hover\\:shadow-\\[0_8px_16px_0_\\#00000020\\]:hover{--tw-shadow:0 8px 16px 0 #00000020;--tw-shadow-colored:0 8px 16px 0 var(--tw-shadow-color)}.focus\\:underline:focus{text-decoration-line:underline}.focus\\:outline:focus{outline-style:solid}.focus\\:outline-\\[3px\\]:focus{outline-width:3px}.active\\:scale-95:active{--tw-scale-x:.95;--tw-scale-y:.95;transform:translate(var(--tw-translate-x),var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y))}@media (min-width:768px){.md\\:max-h-\\[calc\\(100\\%-48px\\)\\]{max-height:calc(100% - 48px)}.md\\:w-\\[400px\\]{width:400px}.md\\:items-center{align-items:center}.md\\:justify-center{justify-content:center}.md\\:rounded-b-2xl{border-bottom-left-radius:1rem;border-bottom-right-radius:1rem}.md\\:zoom-in-50{--tw-enter-scale:.5}.md\\:slide-in-from-bottom-0{--tw-enter-translate-y:0px}}', Lg = class {
   constructor(t) {
     fE(this, t), this.defaultProviders = void 0, this.installedProviders = void 0, this.persistSelection = void 0, this.callback = void 0, this.cancelCallback = void 0;
   }
@@ -13129,11 +13140,11 @@ const c$ = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbG
     return n === "IOS" ? (s = (r = t.iOSAppStoreUrl) !== null && r !== void 0 ? r : this.getBrowserUrl(t)) !== null && s !== void 0 ? s : t.webUrl : e === "Chrome" ? (o = (i = t.chromeWebStoreUrl) !== null && i !== void 0 ? i : this.getMobileUrl(t)) !== null && o !== void 0 ? o : t.webUrl : e === "Firefox" ? (c = (a = t.mozillaAddOnsUrl) !== null && a !== void 0 ? a : this.getMobileUrl(t)) !== null && c !== void 0 ? c : t.webUrl : n === "Android" ? (d = (u = t.googlePlayStoreUrl) !== null && u !== void 0 ? u : this.getBrowserUrl(t)) !== null && d !== void 0 ? d : t.webUrl : (y = (l = this.getBrowserUrl(t)) !== null && l !== void 0 ? l : t.webUrl) !== null && y !== void 0 ? y : this.getMobileUrl(t);
   }
   render() {
-    const t = u$(), e = f$(), n = this.defaultProviders.filter(
+    const t = f$(), e = d$(), n = this.defaultProviders.filter(
       (i) => this.installedProviders.findIndex((o) => o.id === i.id) === -1
       // keep providers NOT already in installed list
     ), r = this.installedProviders.length > 0, s = n.length > 0;
-    return rt("div", { class: "modal-container animate-in fade-in fixed inset-0 z-[8999] box-border flex h-full w-full items-end bg-[#00000040] md:items-center md:justify-center" }, rt("div", { class: "fixed inset-0 z-[8999]", onClick: () => this.handleCloseModal() }), rt("div", { class: "modal-body animate-in md:zoom-in-50 slide-in-from-bottom md:slide-in-from-bottom-0 z-[9000] box-border flex max-h-[calc(100%-24px)] w-full max-w-full cursor-default flex-col overflow-y-scroll rounded-2xl rounded-b-none bg-white p-6 text-sm leading-snug shadow-[0_4px_5px_0_#00000005,0_16px_40px_0_#00000014] md:max-h-[calc(100%-48px)] md:w-[400px] md:rounded-b-2xl" }, rt("div", { class: "flex flex-col space-y-[10px]" }, rt("div", { class: "flex items-center" }, rt("div", { class: "flex-1 text-xl font-medium text-[#242629]" }, "Connect a wallet"), rt("button", { class: "rounded-full bg-transparent p-1 transition-colors hover:bg-gray-100 active:scale-95", onClick: () => this.handleCloseModal() }, rt("span", { class: "sr-only" }, "Close popup"), rt("img", { src: c$ }))), r ? rt("p", null, "Select the wallet you want to connect to.") : rt("p", null, "You don't have any wallets in your browser that support this app. You need to install a wallet to proceed.")), !e && !t && rt("div", { class: "mx-auto mt-4 rounded-xl bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-500" }, "Unfortunately, your browser isn't supported"), r && rt("div", { class: "mt-6" }, rt("p", { class: "mb-4 text-sm font-medium" }, "Installed wallets"), rt("ul", { class: "space-y-3" }, this.installedProviders.map((i) => rt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, rt("div", { class: "aspect-square basis-9 overflow-hidden" }, rt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), rt("div", { class: "flex-1" }, rt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && rt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), rt("button", { class: "rounded-[10px] border border-[#333] bg-[#323232] px-4 py-2 text-sm font-medium text-[#EFEFEF] shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-all hover:bg-[#0C0C0D] hover:text-white hover:shadow-[0_8px_16px_0_#00000020] focus:outline focus:outline-[3px] active:scale-95", onClick: () => this.handleSelectProvider(i.id) }, "Connect"))))), s && rt("div", { class: "mt-6" }, r ? rt("p", { class: "mb-4 text-sm font-medium" }, "Other wallets") : rt("div", { class: "mb-5 flex justify-between" }, rt("p", { class: "text-sm font-medium" }, "Recommended wallets"), rt("a", { class: "flex cursor-pointer items-center space-x-[5px] text-xs transition-colors hover:text-[#242629] hover:underline focus:underline", href: "https://docs.hiro.so/what-is-a-wallet", rel: "noopener noreferrer", target: "_blank" }, rt("svg", { xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 16 16", fill: "none" }, rt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M8.006 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" }), rt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M5.97 5.9a2.1 2.1 0 0 1 4.08.7c0 1.4-2.1 2.1-2.1 2.1M8.006 11.5h.01" })), rt("p", null, "What is a wallet? ", rt("span", { class: "align-text-bottom text-[9px]" }, "↗")))), rt("ul", { class: "space-y-3" }, n.map((i) => rt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, rt("div", { class: "aspect-square basis-9 overflow-hidden" }, rt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), rt("div", { class: "flex-1" }, rt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && rt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), this.getInstallUrl(i, t, e) && rt("a", { class: "rounded-[10px] border border-[#EFEFF2] px-4 py-2 text-sm font-medium shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-colors hover:text-[#242629] hover:shadow-[0_1px_2px_0_#00000010] focus:outline focus:outline-[3px] active:scale-95", href: this.getInstallUrl(i, t, e), rel: "noopener noreferrer", target: "_blank" }, i.id === "AsignaProvider" ? "Open" : "Install", " →")))))));
+    return rt("div", { class: "modal-container animate-in fade-in fixed inset-0 z-[8999] box-border flex h-full w-full items-end bg-[#00000040] md:items-center md:justify-center" }, rt("div", { class: "fixed inset-0 z-[8999]", onClick: () => this.handleCloseModal() }), rt("div", { class: "modal-body animate-in md:zoom-in-50 slide-in-from-bottom md:slide-in-from-bottom-0 z-[9000] box-border flex max-h-[calc(100%-24px)] w-full max-w-full cursor-default flex-col overflow-y-scroll rounded-2xl rounded-b-none bg-white p-6 text-sm leading-snug shadow-[0_4px_5px_0_#00000005,0_16px_40px_0_#00000014] md:max-h-[calc(100%-48px)] md:w-[400px] md:rounded-b-2xl" }, rt("div", { class: "flex flex-col space-y-[10px]" }, rt("div", { class: "flex items-center" }, rt("div", { class: "flex-1 text-xl font-medium text-[#242629]" }, "Connect a wallet"), rt("button", { class: "rounded-full bg-transparent p-1 transition-colors hover:bg-gray-100 active:scale-95", onClick: () => this.handleCloseModal() }, rt("span", { class: "sr-only" }, "Close popup"), rt("img", { src: l$ }))), r ? rt("p", null, "Select the wallet you want to connect to.") : rt("p", null, "You don't have any wallets in your browser that support this app. You need to install a wallet to proceed.")), !e && !t && rt("div", { class: "mx-auto mt-4 rounded-xl bg-gray-200 px-3 py-1.5 text-sm font-medium text-gray-500" }, "Unfortunately, your browser isn't supported"), r && rt("div", { class: "mt-6" }, rt("p", { class: "mb-4 text-sm font-medium" }, "Installed wallets"), rt("ul", { class: "space-y-3" }, this.installedProviders.map((i) => rt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, rt("div", { class: "aspect-square basis-9 overflow-hidden" }, rt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), rt("div", { class: "flex-1" }, rt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && rt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), rt("button", { class: "rounded-[10px] border border-[#333] bg-[#323232] px-4 py-2 text-sm font-medium text-[#EFEFEF] shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-all hover:bg-[#0C0C0D] hover:text-white hover:shadow-[0_8px_16px_0_#00000020] focus:outline focus:outline-[3px] active:scale-95", onClick: () => this.handleSelectProvider(i.id) }, "Connect"))))), s && rt("div", { class: "mt-6" }, r ? rt("p", { class: "mb-4 text-sm font-medium" }, "Other wallets") : rt("div", { class: "mb-5 flex justify-between" }, rt("p", { class: "text-sm font-medium" }, "Recommended wallets"), rt("a", { class: "flex cursor-pointer items-center space-x-[5px] text-xs transition-colors hover:text-[#242629] hover:underline focus:underline", href: "https://docs.hiro.so/what-is-a-wallet", rel: "noopener noreferrer", target: "_blank" }, rt("svg", { xmlns: "http://www.w3.org/2000/svg", width: "14", height: "14", viewBox: "0 0 16 16", fill: "none" }, rt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M8.006 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" }), rt("path", { stroke: "#74777D", "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-width": "1.2", d: "M5.97 5.9a2.1 2.1 0 0 1 4.08.7c0 1.4-2.1 2.1-2.1 2.1M8.006 11.5h.01" })), rt("p", null, "What is a wallet? ", rt("span", { class: "align-text-bottom text-[9px]" }, "↗")))), rt("ul", { class: "space-y-3" }, n.map((i) => rt("li", { class: "flex items-center gap-3 rounded-[10px] border border-[#EFEFF2] p-[14px]" }, rt("div", { class: "aspect-square basis-9 overflow-hidden" }, rt("img", { src: i.icon, class: "h-full w-full rounded-[10px] bg-gray-700" })), rt("div", { class: "flex-1" }, rt("div", { class: "text-sm font-medium text-[#242629]" }, i.name), i.webUrl && rt("a", { href: i.webUrl, class: "text-sm", rel: "noopener noreferrer" }, new URL(i.webUrl).hostname)), this.getInstallUrl(i, t, e) && rt("a", { class: "rounded-[10px] border border-[#EFEFF2] px-4 py-2 text-sm font-medium shadow-[0_1px_2px_0_#0000000A] outline-[#FFBD7A] transition-colors hover:text-[#242629] hover:shadow-[0_1px_2px_0_#00000010] focus:outline focus:outline-[3px] active:scale-95", href: this.getInstallUrl(i, t, e), rel: "noopener noreferrer", target: "_blank" }, i.id === "AsignaProvider" ? "Open" : "Install", " →")))))));
   }
   static get assetsDirs() {
     return ["assets"];
@@ -13142,8 +13153,8 @@ const c$ = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbG
     return V4(this);
   }
 };
-Lg.style = d$;
-const h$ = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
+Lg.style = h$;
+const p$ = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   connect_modal: Lg
 }, Symbol.toStringTag, { value: "Module" }));

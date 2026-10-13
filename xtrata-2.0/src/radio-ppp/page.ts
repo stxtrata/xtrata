@@ -14,6 +14,7 @@ import { showSteps, stagesFor, stageOf, type StageView } from './stages';
 import { findFunder } from '../lib/listening-wallet/funder';
 import { hasInstalledStacksWallet } from '../lib/wallet/installed';
 import { resolvePrimaryBnsName } from '../lib/bns/primary';
+import { createNameCache } from '../lib/bns/name-cache';
 import { radioArtist, radioTitle } from '../lib/radio/artist-credits.mjs';
 import { createGifts } from './gifts';
 
@@ -163,20 +164,12 @@ function start(root: HTMLElement) {
 
   let lastStage: StageView | null = null;
   let walletShown = false; // the listener opened the resting wallet box
-  // BNS names (e.g. jim.btc) for main wallets, looked up once per address per page view.
-  const names = new Map<string, string | null>();
-  const nameOf = (address?: string) => {
-    if (!address) return null;
-    if (!names.has(address)) {
-      names.set(address, null);
-      resolvePrimaryBnsName({ address, network: 'mainnet' })
-        .then((n) => { if (n) { names.set(address, n); render(ppp.snapshot()); } })
-        .catch(() => { /* no name: the short address is shown */ });
-    }
-    return names.get(address) ?? null;
-  };
-  const who = (address?: string) => { const n = nameOf(address); return n ? `${n} · ${short(address)}` : short(address); };
-  /** Up to two wallets by name and address, then "and N more". */
+  // BNS names (e.g. jim.btc), looked up once per address per page view. A wallet with a name is shown by that
+  // name wherever its address would be; without one (or while the lookup runs) the short address stands in.
+  const names = createNameCache((address) => resolvePrimaryBnsName({ address, network: 'mainnet' }), () => render(ppp.snapshot()));
+  const nameOf = (address?: string) => names.get(address);
+  const who = (address?: string) => nameOf(address) ?? short(address);
+  /** Up to two wallets, then "and N more". */
   const whoList = (addresses: string[]) => addresses.slice(0, 2).map(who).join(' and ') + (addresses.length > 2 ? ` and ${addresses.length - 2} more` : '');
   type Shown = Snapshot['entries'][number] & { title?: string; artist?: string };
   // Song names exactly as the radio shows them: its catalogue, then the radio's own title and artist
@@ -260,7 +253,7 @@ function start(root: HTMLElement) {
       case 'elsewhere': return set('Pay-per-play radio', 'quiet', 'Open the pay-per-play radio');
       case 'connect': top.hidden = true; return; // "Connect wallet" sits right beside it
       case 'intro': return set('Set up pay-per-play', '', 'Create your passkey listening wallet');
-      case 'wrong-wallet': return set(`Connect ${nameOf(s.linked) ?? short(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
+      case 'wrong-wallet': return set(`Connect ${who(s.linked)}`, 'warn', `This device's listening wallet belongs to ${who(s.linked)}. Connect that wallet to pay artists or like songs.`);
       case 'locked': return set(s.payingOn ? 'Unlock · keep paying' : 'Unlock wallet', '', 'Opens the listening wallet: one tap there asks for your passkey');
       case 'link': return set('Finish setup', 'warn', 'Link the listening wallet to your main wallet');
       case 'fund': return s.depositPending ? set('Funds on their way', 'quiet', 'Paying starts by itself when they land')
@@ -426,9 +419,9 @@ function start(root: HTMLElement) {
       } else if (s.solo) {
         // Passkey-only: returns go back where the money came from, unless the listener chose another address.
         const where = s.returnTo
-          ? `${short(s.returnTo)} · ${s.returnToKind === 'chosen' ? 'chosen by you' : 'sent the first funds'}`
+          ? `${who(s.returnTo)} · ${s.returnToKind === 'chosen' ? 'chosen by you' : 'sent the first funds'}`
           : s.funderState === 'failed' ? 'could not check who funded it right now' : 'set when it is funded';
-        rows.push(...fact('Returns go to', s.returnTo ? where.replace(short(s.returnTo), s.returnTo) : where, s.returnTo ? 'ppp-addr-full' : 'ppp-mute'));
+        rows.push(...fact('Returns go to', s.returnTo && !nameOf(s.returnTo) ? where.replace(short(s.returnTo), s.returnTo) : where, s.returnTo ? 'ppp-addr-full' : 'ppp-mute'));
       } else rows.push(...fact('Linked to', 'not linked yet', 'ppp-warn'));
     }
     if (s.linkedListening.length && s.gate?.here) {
@@ -441,7 +434,7 @@ function start(root: HTMLElement) {
     }
     const last = (s.entries as Shown[]).find((e) => e.kind === 'play');
     if (last) loadCatalogue();
-    if (last) rows.push(...fact('Last paid song', `${songLabel(last)} → ${short(last.recipient)}`, STATUS_CLASS[last.status] || ''));
+    if (last) rows.push(...fact('Last paid song', `${songLabel(last)} → ${who(last.recipient)}`, STATUS_CLASS[last.status] || ''));
     facts.replaceChildren(...rows);
     facts.hidden = !rows.length;
 
@@ -505,7 +498,7 @@ function start(root: HTMLElement) {
         if (s.solo) lines.push(el('p', 'Already have a Stacks wallet? Connect it first (top right) so your plays and likes count for it. No wallet? Carry on: you do not need one.', 'ppp-mute'));
         // A live gift link is for a brand-new wallet: one button, nothing else to choose.
         const gift = gifts.liveGift();
-        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Turn on pay-per-play · no wallet needed' : s.others.length && s.main ? `Set up for ${short(s.main)}` : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
+        actions.push(button(gift ? 'Claim my gift · no wallet needed' : s.solo ? 'Turn on pay-per-play · no wallet needed' : s.others.length && s.main ? `Set up for ${who(s.main)}` : 'Turn on pay-per-play', () => void ppp.create(), 'primary'));
         if (!gift && !s.solo && s.main && s.others.length) actions.push(button('Switch wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         if (!gift && s.solo) actions.push(button('I have a Stacks wallet', () => (document.getElementById('radio-wallet-connect') as HTMLButtonElement | null)?.click()));
         if (!gift) actions.push(button('I already have a listening wallet', () => void ppp.unlock(true)));
@@ -590,7 +583,7 @@ function start(root: HTMLElement) {
     }
     // Quieter actions live in the "Wallet & history" fold.
     if (['ready', 'fund'].includes(s.step) && s.returnTo && (s.balance ?? 0n) > 0n)
-      more.push(button(s.linked ? 'Return all to my wallet' : `Return all to ${short(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
+      more.push(button(s.linked ? 'Return all to my wallet' : `Return all to ${who(s.returnTo)}`, () => void ppp.returnFunds('all'), 'quiet'));
     if (['ready', 'fund', 'link', 'over'].includes(s.step)) more.push(button('Lock', () => void ppp.lock(), 'quiet'));
     if (showFrame && !asking) more.push(button(walletShown ? 'Hide listening wallet box' : 'Show listening wallet box', () => { walletShown = !walletShown; render(ppp.snapshot()); }, 'quiet'));
 
@@ -636,10 +629,10 @@ function start(root: HTMLElement) {
     history.replaceChildren(el('summary', `All activity (${s.entries.length})`), ...(s.entries as Shown[]).slice(0, 20).map((e) => {
       const row = el('div', '', 'ppp-row');
       const what = e.kind === 'play'
-        ? [el('span', songLabel(e), 'ppp-song'), el('span', ` · ${stx(BigInt(e.amount))} STX to ${short(e.recipient)}`, 'ppp-mute')]
+        ? [el('span', songLabel(e), 'ppp-song'), el('span', ` · ${stx(BigInt(e.amount))} STX to ${who(e.recipient)}`, 'ppp-mute')]
         : e.kind === 'like'
           ? [el('span', `${e.liked ? '♥ Liked' : 'Unliked'} ${songLabel(e)}`, 'ppp-song'), el('span', ` · for ${s.linked ? who(s.linked) : 'this listening wallet'}`, 'ppp-mute')]
-          : [el('span', `Returned ${stx(BigInt(e.amount))} STX`, 'ppp-song'), el('span', ` to ${short(e.recipient)}`, 'ppp-mute')];
+          : [el('span', `Returned ${stx(BigInt(e.amount))} STX`, 'ppp-song'), el('span', ` to ${who(e.recipient)}`, 'ppp-mute')];
       row.append(el('span', STATUS_TEXT[e.status] || e.status, 'ppp-status ' + (STATUS_CLASS[e.status] || '')), ...what,
         el('span', ` · ${new Date(e.created).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} `, 'ppp-mute'));
       if (e.txid) row.append(link('tx ↗', explorer(e.txid)));
